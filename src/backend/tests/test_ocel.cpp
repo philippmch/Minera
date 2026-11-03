@@ -11,12 +11,15 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/ocel_csv.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/oc_causal_net.hpp"
 #include "minera/saw_nets.hpp"
 #include "../reference_tree_net.hpp"
 
 namespace {
+
+constexpr std::size_t kOcelOverLimitPadding = 128u * 1024u * 1024u;
 
 std::string policy_net_signature(const minera::PetriNet& net) {
   std::ostringstream out;
@@ -262,7 +265,129 @@ void readers_drop_unrelated_entries_contract() {
   assert(in_memory.events.empty() && in_memory.objects.empty());
 }
 
+// OCEL JSON size limits: the default limit follows the server's payload
+// limit, the message names the limit instead of calling the file invalid,
+// and the scanner reports what the parser would.
+void json_limits_contract() {
+  assert(minera::ocel_limit_text(128u * 1024u * 1024u) == "128 MiB");
+  assert(minera::ocel_limit_text(1000) == "1000 bytes");
+  const std::string small =
+      R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})";
+  assert(!minera::ocel_json_limit_violation(small));
+  minera::OcelJsonLimits tight;
+  tight.max_bytes = 64;
+  const auto violation = minera::ocel_json_limit_violation(small, tight);
+  assert(violation && violation->find("exceeds the 64 bytes OCEL limit") != std::string::npos);
+  try {
+    (void)minera::parse_ocel_json(small, tight);
+    assert(false);
+  } catch (const std::invalid_argument& error) {
+    assert(std::string(error.what()) == "OCEL JSON file exceeds the 64 bytes OCEL limit");
+  }
+  minera::OcelJsonLimits few_nodes;
+  few_nodes.max_nodes = 5;
+  assert(minera::ocel_json_limit_violation(small, few_nodes));
+  bool node_limit = false;
+  try { (void)minera::parse_ocel_json(small, few_nodes); } catch (const std::invalid_argument&) { node_limit = true; }
+  assert(node_limit);
+  minera::OcelJsonLimits shallow;
+  shallow.max_depth = 3;
+  assert(minera::ocel_json_limit_violation(small, shallow));
+
+  // A document over the former 16 MiB limit reads.
+  std::string large = R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{"pad":")";
+  large.append(17u * 1024u * 1024u, ' ');
+  large += R"("}}},"ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})";
+  minera::OcelJsonLimits long_strings;
+  long_strings.max_string_bytes = 32u * 1024u * 1024u;
+  assert(!minera::ocel_json_limit_violation(large, long_strings));
+  assert(minera::parse_ocel_json(large, long_strings).events.size() == 1);
+  std::string over(kOcelOverLimitPadding, ' ');
+  over.insert(0, small);
+  try {
+    (void)minera::parse_ocel_json(over);
+    assert(false);
+  } catch (const std::invalid_argument& error) {
+    assert(std::string(error.what()) == "OCEL JSON file exceeds the 128 MiB OCEL limit");
+  }
+}
+
+// Reference capture (pm4py 2.7.22 read_ocel / write_ocel): qualifiers come
+// from typedOmap, attributes keep their document order, and the writers keep
+// the log's event, object and attribute order and print floats as Python's
+// repr.
+void json_order_contract() {
+  const auto classic = minera::parse_ocel_json(
+      R"({"ocel:events":{"e2":{"ocel:activity":"B","ocel:timestamp":"2024-01-02T00:00:00","ocel:omap":["o2","o1"],)"
+      R"("ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"q1"},{"ocel:oid":"o2","ocel:qualifier":"q2"}],"ocel:vmap":{"z":0.1,"a":1e20}},)"
+      R"("e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}}},)"
+      R"("ocel:objects":{"o2":{"ocel:type":"item","ocel:ovmap":{"w":2,"b":true}},"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+  assert(classic.events.size() == 2 && classic.events[1].id == "e2");
+  assert(classic.events[1].attributes[0].key == "z" && classic.events[1].attributes[1].key == "a");
+  assert(classic.objects[0].id == "o2" && classic.objects[0].attributes[0].key == "w");
+  std::size_t qualified = 0;
+  for (const auto& relation : classic.relations)
+    if (relation.event_id == "e2")
+      qualified += (relation.object_id == "o1" && relation.qualifier == "q1") ||
+                   (relation.object_id == "o2" && relation.qualifier == "q2");
+  assert(qualified == 2);
+  const auto written = minera::serialize_ocel_json(classic, minera::OcelJsonFormat::kClassic);
+  assert(written.find(R"("z":0.1,"a":1e+20)") != std::string::npos);
+  assert(written.find(R"("w":2,"b":true)") != std::string::npos);
+  assert(written.find(R"("e1":)") < written.find(R"("e2":)"));
+  assert(written.find(R"("o2":)") < written.find(R"("o1":)"));
+  assert(written.find("minera:keepUnrelated") == std::string::npos);
+}
+
+// The reference CSV reader keeps orphan events and objects; the file
+// readers of the other formats drop them. An OCEL that Minera serializes
+// carries a marker, so a CSV import keeps them through every later route.
+void csv_orphans_survive_routes_contract() {
+  const auto csv = minera::parse_ocel_csv(
+      "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:order,ocel:type:item\n"
+      "e1,create,2023-01-01 10:00:00,['o1'],['i1']\n"
+      "e2,orphan,2023-01-01 11:00:00,[],[]\n"
+      "e3,pay,2023-01-01 12:00:00,['o1'],[]\n",
+      "ocel:oid,ocel:type,color\n"
+      "o1,order,red\n"
+      "i1,item,blue\n"
+      "g1,ghost,green\n");
+  assert(csv.events.size() == 3 && csv.objects.size() == 3);
+  for (const auto format : {minera::OcelJsonFormat::kClassic, minera::OcelJsonFormat::kStandard}) {
+    const auto json = minera::serialize_ocel_json(csv, format);
+    assert(json.find(R"("minera:keepUnrelated":true)") != std::string::npos);
+    const auto routed = minera::parse_ocel_json(json);
+    assert(routed.events.size() == 3 && routed.objects.size() == 3);
+    const auto graph = minera::discover_ocdfg_classic(routed);
+    assert((graph.activities == std::vector<std::string>{"create", "orphan", "pay"}));
+    auto types = graph.object_types;
+    std::sort(types.begin(), types.end());
+    assert((types == std::vector<std::string>{"ghost", "item", "order"}));
+    // Twice through a route keeps them too.
+    assert(minera::parse_ocel_json(minera::serialize_ocel_json(routed, format)).events.size() == 3);
+  }
+  // A file without the marker reads as the reference reader reads it.
+  auto unmarked = minera::serialize_ocel_json(csv, minera::OcelJsonFormat::kStandard);
+  const std::string marker = R"(,"minera:keepUnrelated":true)";
+  unmarked.erase(unmarked.find(marker), marker.size());
+  const auto dropped = minera::parse_ocel_json(unmarked);
+  assert(dropped.events.size() == 2 && dropped.objects.size() == 2);
+  bool bad_marker = false;
+  try {
+    auto wrong = minera::serialize_ocel_json(csv, minera::OcelJsonFormat::kStandard);
+    wrong.replace(wrong.find(marker), marker.size(), R"(,"minera:keepUnrelated":1)");
+    (void)minera::parse_ocel_json(wrong);
+  } catch (const std::invalid_argument&) {
+    bad_marker = true;
+  }
+  assert(bad_marker);
+}
+
 int main() {
+  json_limits_contract();
+  json_order_contract();
+  csv_orphans_survive_routes_contract();
   readers_drop_unrelated_entries_contract();
   standard_json_declared_type_fallback_contract();
   ocpn_miner_policy_contract();

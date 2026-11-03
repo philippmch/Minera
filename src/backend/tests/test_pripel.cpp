@@ -136,6 +136,7 @@ int main() {
   options.secure_random = true;
   const auto secure = minera::anonymize_pripel(source(), query(), options);
   assert(secure.diagnostics.secure_random);
+  assert(secure.diagnostics.seed == 0);
   assert(secure.log.trace_count() <= options.max_output_traces);
   options.secure_random = false;
   options.epsilon = 0.0;

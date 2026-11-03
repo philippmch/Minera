@@ -17,10 +17,14 @@
 #include <vector>
 
 #include "minera/timestamp.hpp"
-#include "numpy_legacy_random.hpp"
+#include "minera/random.hpp"
 
 namespace minera {
 namespace {
+
+// The native (non-numpy) draws: Minera's own portable algorithms over
+// std::mt19937_64, never the implementation-defined std distributions.
+namespace portable = ::minera::rng;
 
 using Marking = std::vector<std::uint64_t>;
 
@@ -601,8 +605,7 @@ PreparedOptions prepare_options(const PetriNet& net,
         "Monte Carlo enabled transition weight sum must be finite");
   }
   if (total == 0.0) {
-    return enabled[std::uniform_int_distribution<std::size_t>(
-        0, enabled.size() - 1)(rng)];
+    return enabled[portable::below(rng, enabled.size())];
   }
   std::vector<double> scaled;
   scaled.reserve(enabled.size());
@@ -614,8 +617,7 @@ PreparedOptions prepare_options(const PetriNet& net,
     }
     scaled.push_back(probability);
   }
-  const auto picked =
-      std::discrete_distribution<std::size_t>(scaled.begin(), scaled.end())(rng);
+  const auto picked = portable::weighted_index(rng, scaled);
   return enabled[picked];
 }
 
@@ -624,7 +626,7 @@ PreparedOptions prepare_options(const PetriNet& net,
 // cumulative sum normalized by its last entry.
 [[nodiscard]] std::size_t choose_transition_numpy(
     std::vector<std::size_t> enabled, const std::vector<double>& weights,
-    const std::vector<std::size_t>& rank, NumpyLegacyRandom& rng) {
+    const std::vector<std::size_t>& rank, rng::NumpyRandomState& rng) {
   if (enabled.empty()) throw std::invalid_argument("no enabled transitions");
   std::stable_sort(enabled.begin(), enabled.end(),
                    [&](std::size_t left, std::size_t right) { return rank[left] < rank[right]; });
@@ -660,7 +662,7 @@ PreparedOptions prepare_options(const PetriNet& net,
 // The reference service-time laws on numpy's legacy draws, redrawn while
 // negative.
 [[nodiscard]] double sample_duration_numpy(const MonteCarloDuration& duration,
-                                           NumpyLegacyRandom& rng) {
+                                           rng::NumpyRandomState& rng) {
   const auto draw = [&]() -> double {
     switch (duration.distribution) {
       case MonteCarloDurationDistribution::kDeterministic:
@@ -711,9 +713,9 @@ PreparedOptions prepare_options(const PetriNet& net,
     inverse_alpha = sigma / (-mu);
   }
   for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
-    const double exponential = -std::log1p(-std::generate_canonical<double, 53>(rng));
+    const double exponential = -std::log1p(-portable::unit(rng));
     const double difference = (exponential - 1.0) * inverse_alpha;
-    const double acceptance = -std::log1p(-std::generate_canonical<double, 53>(rng));
+    const double acceptance = -std::log1p(-portable::unit(rng));
     if (acceptance >= 0.5 * difference * difference) {
       // Multiply in exponent/mantissa form so a subnormal intermediate scale
       // cannot lose precision before multiplication by the exponential draw.
@@ -738,7 +740,7 @@ PreparedOptions prepare_options(const PetriNet& net,
 }
 
 [[nodiscard]] double unit_exponential(std::mt19937_64& rng) {
-  return -std::log1p(-std::generate_canonical<double, 53>(rng));
+  return -std::log1p(-portable::unit(rng));
 }
 
 [[nodiscard]] double log_positive_ratio(double numerator, double denominator) {
@@ -772,10 +774,9 @@ PreparedOptions prepare_options(const PetriNet& net,
   if (threshold > 0.0) {
     (void)sample_negative_mean_normal(-threshold, shape, rng, &log_excess);
   } else {
-    std::normal_distribution<double> standard(0.0, 1.0);
     bool accepted = false;
     for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
-      const double z = standard(rng);
+      const double z = portable::normal(rng, 0.0, 1.0);
       if (threshold == 0.0) {
         if (z < 0.0) continue;
         log_excess = std::log(shape) + std::log(z);
@@ -799,9 +800,8 @@ PreparedOptions prepare_options(const PetriNet& net,
   const double threshold = b / scale;
   // At or below mean+sd, ordinary gamma rejection retains substantial mass.
   if (shape >= 1.0 && threshold <= shape + std::sqrt(shape)) {
-    std::gamma_distribution<double> gamma(shape, 1.0);
     for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
-      const double result = std::fma(scale, gamma(rng), -b);
+      const double result = std::fma(scale, portable::gamma(rng, shape, 1.0), -b);
       if (result >= 0.0) return result;
     }
   } else if (shape < 1.0 && threshold < 1.0) {
@@ -813,8 +813,8 @@ PreparedOptions prepare_options(const PetriNet& net,
     const double body = -log_a * (q == 0.0 ? 1.0 : -std::expm1(-q) / q);
     const double body_probability = body / (body + std::exp(-1.0));
     for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
-      if (std::generate_canonical<double, 53>(rng) < body_probability) {
-        const double u = std::generate_canonical<double, 53>(rng);
+      if (portable::unit(rng) < body_probability) {
+        const double u = portable::unit(rng);
         double delta;
         if (q < 1e-12) {
           delta = -log_a * (u + 0.5 * u * (1.0 - u) * q);
@@ -868,7 +868,7 @@ PreparedOptions prepare_options(const PetriNet& net,
       // cancellation even when the location is far into the exponential tail.
       const double rate = 1.0 / duration.value_seconds;
       const double draw = std::isfinite(rate)
-          ? std::exponential_distribution<double>(rate)(rng)
+          ? portable::exponential(rng, rate)
           : duration.value_seconds * unit_exponential(rng);
       return std::max(0.0, duration.secondary_seconds) + draw;
     }
@@ -880,26 +880,24 @@ PreparedOptions prepare_options(const PetriNet& net,
       if (duration.value_seconds < 0.0)
         return sample_negative_mean_normal(duration.value_seconds,
                                             duration.secondary_seconds, rng);
-      std::normal_distribution<double> distribution(duration.value_seconds,
-                                                     duration.secondary_seconds);
       for (std::size_t attempt = 0; attempt < 10000; ++attempt) {
-        const double draw = distribution(rng);
+        const double draw = portable::normal(rng, duration.value_seconds,
+                                             duration.secondary_seconds);
         if (!(draw < 0.0)) return draw;
       }
       throw std::runtime_error("Monte Carlo normal rejection sampling budget exceeded");
     }
     case MonteCarloDurationDistribution::kUniform:
       if (duration.secondary_seconds == 0.0) return duration.value_seconds;
-      return std::uniform_real_distribution<double>(
-          std::max(0.0, duration.value_seconds),
-          duration.value_seconds + duration.secondary_seconds)(rng);
+      return portable::uniform_real(
+          rng, std::max(0.0, duration.value_seconds),
+          duration.value_seconds + duration.secondary_seconds);
     case MonteCarloDurationDistribution::kLogNormal: {
       if (duration.tertiary_seconds == 0.0) return duration.secondary_seconds;
       if (duration.secondary_seconds < 0.0)
         return sample_shifted_lognormal(duration.value_seconds, duration.secondary_seconds,
                                         duration.tertiary_seconds, rng);
-      const double draw = std::lognormal_distribution<double>(
-          0.0, duration.value_seconds)(rng);
+      const double draw = portable::lognormal(rng, 0.0, duration.value_seconds);
       return duration.secondary_seconds + duration.tertiary_seconds * draw;
     }
     case MonteCarloDurationDistribution::kGamma:
@@ -908,8 +906,8 @@ PreparedOptions prepare_options(const PetriNet& net,
         return sample_shifted_gamma(duration.value_seconds, duration.secondary_seconds,
                                     duration.tertiary_seconds, rng);
       return duration.secondary_seconds +
-             std::gamma_distribution<double>(duration.value_seconds,
-                                             duration.tertiary_seconds)(rng);
+             portable::gamma(rng, duration.value_seconds,
+                             duration.tertiary_seconds);
     default:
       throw std::invalid_argument("Monte Carlo duration distribution is invalid");
   }
@@ -1121,7 +1119,7 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
   std::vector<std::vector<double>> timestamps(net.place_count());
   std::vector<std::int64_t> occupied(net.place_count(), 0);
   std::mt19937_64 rng(options.seed);
-  std::optional<NumpyLegacyRandom> numpy_rng;
+  std::optional<rng::NumpyRandomState> numpy_rng;
   std::vector<std::size_t> choice_rank(net.transitions().size());
   if (options.numpy_legacy_seed) {
     numpy_rng.emplace(*options.numpy_legacy_seed);

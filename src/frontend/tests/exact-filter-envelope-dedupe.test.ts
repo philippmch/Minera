@@ -35,6 +35,11 @@ describe("deduplicated exact-filter envelope",()=>{
   expect(withoutLastTopLevelMember('{"exact_controls":{"n":{"exact_controls":1}}}\n','exact_controls')).toBe('{}\n');
   expect(withoutLastTopLevelMember('{\n "a": "exact_controls",\n "b": {"exact_controls": 2}\n,"exact_controls":3}','exact_controls')).toBe('{\n "a": "exact_controls",\n "b": {"exact_controls": 2}\n}');
   expect(withoutLastTopLevelMember('{"a":1}','exact_controls')).toBeUndefined();
+  // Whitespace inside an empty body is the body's own, before the appended member.
+  expect(withoutLastTopLevelMember('{ "exact_controls":{"a":1}}','exact_controls')).toBe('{ }');
+  expect(withoutLastTopLevelMember('{ \r\n\t"exact_controls":[]}\n','exact_controls')).toBe('{ \r\n\t}\n');
+  expect(withoutLastTopLevelMember('{"exact_controls":1,"b":2}','exact_controls')).toBe('{"b":2}');
+  expect(withoutLastTopLevelMember('{"a":1 ,"exact_controls":1}','exact_controls')).toBe('{"a":1 }');
  });
  it("restores the legacy body bytes, source snapshots, report and tables of the full envelope",async()=>{
   const compact=deduplicated(retainedMineStream);expect(compact.length).toBeLessThan(retainedMineStream.length);

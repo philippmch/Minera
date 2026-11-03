@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from "vitest";
-import {activeMiningSourceAllTablesCsv,isActiveMiningSourceSnapshot,requestActiveMiningSource} from "../src/active-mining-source";
+import {activeMiningSourceAllTablesCsv,activeMiningSourceNativeBlob,activeMiningSourceText,isActiveMiningSourceSnapshot,requestActiveMiningSource} from "../src/active-mining-source";
 import {nativeJson,parseNativeJson} from "../src/native-json";
 // Node modules typed locally: the frontend build carries no Node declarations.
 const nodeModule = (name: string): Promise<unknown> => import(/* @vite-ignore */ name);
@@ -34,5 +34,12 @@ describe("active-source member references",()=>{
   expect(small.tables.map(t=>t.id)).toEqual(full.tables.map(t=>t.id));
   expect(activeMiningSourceAllTablesCsv(small.tables)).toBe(activeMiningSourceAllTablesCsv(full.tables));
   expect(small.value.input_after).toBe(small.value.input_before);
+  // The complete native download writes every referenced member out in full.
+  expect(small.referenced).toBe(true);
+  expect(full.referenced).toBe(false);
+  const downloaded=activeMiningSourceText(await activeMiningSourceNativeBlob(small).arrayBuffer());
+  expect(downloaded).not.toContain('"same_as"');
+  expect(nativeJson(parseNativeJson(downloaded))).toBe(nativeJson(parseNativeJson(raw)));
+  expect(activeMiningSourceText(await activeMiningSourceNativeBlob(full).arrayBuffer())).toBe(raw);
  });
 });

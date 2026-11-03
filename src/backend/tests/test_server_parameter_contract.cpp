@@ -2,7 +2,10 @@
 // Drives a real minera_server process over loopback HTTP and checks the
 // parameter contract of the /api routes: strict values, repeated controls,
 // unknown /api/mine fields, JSON 404/405 bodies, valid UTF-8 error JSON,
-// defaults (miner, playout traces) and live-session release.
+// defaults (miner, playout traces), live-session release and the mining
+// rollback window (cancel after the response was written restores the
+// previous source until an ack, a request on the new source or the window's
+// end releases it).
 //
 // Usage: minera_server_parameter_contract_tests <minera_server> <log.csv>
 
@@ -77,6 +80,16 @@ bool contains(const httplib::Result& result, const std::string& needle) {
   return result && result->body.find(needle) != std::string::npos;
 }
 
+// The first "source_id" string value of a body, or "" when there is none.
+std::string source_id_of(const httplib::Result& result) {
+  if (!result) return "";
+  const std::string key = "\"source_id\":\"";
+  const auto at = result->body.find(key);
+  if (at == std::string::npos) return "";
+  const auto end = result->body.find('"', at + key.size());
+  return end == std::string::npos ? "" : result->body.substr(at + key.size(), end - at - key.size());
+}
+
 std::size_t count(const std::string& text, const std::string& needle) {
   std::size_t total = 0;
   for (auto at = text.find(needle); at != std::string::npos; at = text.find(needle, at + 1))
@@ -100,6 +113,9 @@ int main(int argc, char** argv) {
     return 2;
   }
 
+  // A short rollback window keeps the expiry check fast.
+  constexpr int rollback_window_ms = 1500;
+  ::setenv("MINERA_MINING_ROLLBACK_MS", std::to_string(rollback_window_ms).c_str(), 1);
   const int port = free_port();
   const std::string port_text = std::to_string(port);
   std::vector<std::string> args = {argv[1], "--port", port_text, "--frontend",
@@ -308,6 +324,69 @@ int main(int argc, char** argv) {
           "an unstarted session with queued events can be released: " + describe(result));
     result = client.Get("/api/live-stream/snapshot?session_id=c1");
     check(result && result->status == 404, "the released session is gone: " + describe(result));
+
+    // Mining rollback: a written response keeps the previous source for a
+    // cancel until it is confirmed or the window ends.
+    {
+      const auto mine_as = [&](const std::string& id) {return mine("/api/mine", {{"mining_request_id", id}});};
+      const auto cancel = [&](const std::string& id) {
+        return client.Post("/api/cancel-mine?request_id=" + id, "", "application/x-www-form-urlencoded");
+      };
+      const auto held_after = [&](const httplib::Result& canceled) {
+        if (!canceled) return std::string("no response");
+        const std::string key = "\"active_source_id\":\"";
+        const auto at = canceled->body.find(key);
+        if (at == std::string::npos) return canceled->body;
+        return canceled->body.substr(at + key.size(), canceled->body.find('"', at + key.size()) - at - key.size());
+      };
+      const std::string a = "00000000-0000-4000-8000-00000000000a", b = "00000000-0000-4000-8000-00000000000b",
+                        c = "00000000-0000-4000-8000-00000000000c", d = "00000000-0000-4000-8000-00000000000d",
+                        e = "00000000-0000-4000-8000-00000000000e";
+      result = mine_as(a);
+      const auto source_a = source_id_of(result);
+      check(result && result->status == 200 && !source_a.empty(), "rollback base mine: " + describe(result));
+      result = client.Post("/api/mine-ack?request_id=" + a, "", "application/x-www-form-urlencoded");
+      check(result && result->status == 200 && contains(result, "\"acknowledged\":true"), "mine-ack: " + describe(result));
+      result = client.Post("/api/mine-ack?request_id=" + a + "&x=1", "", "application/x-www-form-urlencoded");
+      check(result && result->status == 400, "mine-ack takes only the request id: " + describe(result));
+
+      // The client read the whole response but never confirmed it.
+      result = mine_as(b);
+      const auto source_b = source_id_of(result);
+      check(result && result->status == 200 && !source_b.empty() && source_b != source_a, "rollback mine: " + describe(result));
+      auto canceled = cancel(b);
+      check(held_after(canceled) == source_a,
+            "cancel after the response was written restores the previous source: " + describe(canceled));
+      result = client.Get("/api/active-source?source_id=" + source_a);
+      check(result && result->status == 200, "the restored source answers: " + describe(result));
+
+      // An explicit ack releases the rollback.
+      result = mine_as(c);
+      const auto source_c = source_id_of(result);
+      result = client.Post("/api/mine-ack?request_id=" + c, "", "application/x-www-form-urlencoded");
+      check(result && contains(result, "\"acknowledged\":true"), "ack of a written response: " + describe(result));
+      canceled = cancel(c);
+      check(!source_c.empty() && held_after(canceled) == source_c, "cancel after an ack keeps the new source: " + describe(canceled));
+
+      // A request bound to the new source id releases it too.
+      result = mine_as(d);
+      const auto source_d = source_id_of(result);
+      result = client.Get("/api/active-source?source_id=" + source_d);
+      check(result && result->status == 200, "the new source answers: " + describe(result));
+      canceled = cancel(d);
+      check(!source_d.empty() && held_after(canceled) == source_d,
+            "cancel after a request on the new source keeps it: " + describe(canceled));
+
+      // The window's end releases an unconfirmed rollback.
+      result = mine_as(e);
+      const auto source_e = source_id_of(result);
+      std::this_thread::sleep_for(std::chrono::milliseconds(rollback_window_ms + 1000));
+      canceled = cancel(e);
+      check(!source_e.empty() && held_after(canceled) == source_e,
+            "cancel after the rollback window keeps the new source: " + describe(canceled));
+      result = client.Post("/api/mine-ack?request_id=" + e, "", "application/x-www-form-urlencoded");
+      check(result && contains(result, "\"acknowledged\":false"), "a canceled request cannot be acknowledged: " + describe(result));
+    }
 
     // The reader snapshot still answers after the lock change.
     {

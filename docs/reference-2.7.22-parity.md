@@ -1769,6 +1769,85 @@ selectors, typed metadata round trips, independently compressed dynamic-Huffman
 input, corrupt trailers, expansion bounds, filename detection, and compressed
 file adapters.
 
+### XES reader rules matched to `read_xes` (review F3)
+
+`pm4py.read_xes` uses `ITERPARSE` by default (checked with a spy across hash
+seeds), so the iterparse family (`ITERPARSE`, `ITERPARSE_20`,
+`ITERPARSE_MEM_COMPRESSED`) follows lxml and the iterparse converters:
+
+- **Well-formed XML only.** A strict pull-parser mode rejects, with
+  "XML is not well-formed: ... (line L, column C)": a document that ends
+  inside an element (truncation on an element boundary included), a missing
+  root, text or a second element after the root, mismatched end tags, bare
+  `&` or `<` in an attribute value, duplicate XML attributes, undefined or
+  external entities, character references and raw characters outside the XML
+  Char production, malformed UTF-8 (the reader decodes UTF-8 whatever the
+  declaration says, as `read_xes` passes `encoding=utf-8`), more than 256
+  nested elements and attribute values over 10,000,000 bytes. Internal DTD
+  entities are expanded, with an amplification cap. The XES layer also
+  rejects a root other than `<log>` and an `<event>` inside an `<event>`.
+  The line and regex readers scan text and keep their lenient parsing.
+- **Attribute-value normalization.** Literal TAB, CR, LF and CR LF in an
+  attribute value become one space each; character references keep their
+  character. The writer escapes TAB, CR and LF as `&#9;`, `&#13;`, `&#10;`.
+- **Text XML cannot carry.** Both XES writers refuse invalid UTF-8 (WTF-8
+  lone surrogates included) and code points outside the XML Char production
+  (NUL, other C0 controls, U+FFFE, U+FFFF), in values, keys and metadata, with
+  "XES cannot represent this text: ...". The reference ETREE writer refuses
+  them too; its LINE_BY_LINE writer emits NUL and controls raw into a file
+  that its own `read_xes` then rejects (declared divergence: Minera refuses
+  instead, so whatever it writes reads back). Workbench routes report the
+  message in `xes_error` (or the export's `*_error` field) with a null XES.
+- **Typed values.** `int` reads like Python `int()` (surrounding whitespace,
+  single underscores between digits, Unicode decimal digits of Unicode 14),
+  `float` like `float()` (`inf`/`infinity`/`nan` in any case, overflow to
+  infinity), and `date` like `datetime.fromisoformat` (the OCEL K5 reader,
+  shared through `src/backend/python_isoformat.hpp`), keeping the clock fields
+  and attaching UTC. A value that does not convert drops that attribute, with
+  its children, and keeps the event; `CHUNK_REGEX` and `LINE_BY_LINE` raise as
+  the reference does. Declared divergence: an integer outside the 64-bit range,
+  which Python keeps exactly, is treated like an unconvertible value (dropped
+  by the iterparse family, an error for `CHUNK_REGEX` and `LINE_BY_LINE`).
+- **Valueless and keyless attributes.** A keyless attribute is skipped (the
+  reference stores it under the key `None`). A valueless `string` or `id` is a
+  null and a valueless `boolean` is false, as in the reference; a valueless
+  `int`, `float` or `date`, on which the reference fails, is skipped.
+- **Containers** are dropped at every level by `ITERPARSE` and
+  `ITERPARSE_MEM_COMPRESSED`.
+- **Metadata.** Extensions and classifiers are keyed by name: a repeated name
+  replaces the earlier declaration in its place. An extension without a name,
+  prefix or URI and a classifier without `keys` are skipped. A repeated
+  `<global>` scope keeps the last declaration. Declared divergence: a nameless
+  classifier is stored under `""` (the reference uses `None`), and a
+  `scope="log"` global stays in the document-order `globals` list.
+- **Column order.** The importer records where the selected first-class cells
+  stood among the attributes, and `to_data_frame`-style tables list event
+  columns in document order followed by the `case:` columns in trace order,
+  matching the reference dict order.
+
+Declared variant quirks that Minera does not reproduce:
+
+- `CHUNK_REGEX` in the reference drops `<id>` attributes, does not decode
+  entities or character references, flattens container children into the
+  event, and after a `<container>` swallows the following trace. Minera's
+  `CHUNK_REGEX` keeps ids, decodes references and reads every trace.
+- `LINE_BY_LINE` and `ITERPARSE_MEM_COMPRESSED` in the reference intern values
+  across the whole log by hash, so `True`, `1` and `1.0` (or `False`, `0` and
+  `-0.0`) collapse to whichever was seen first. Minera keeps each value's own
+  type.
+
+DFG text reading follows `read_dfg`: rows are stripped, counts and ids are read
+like `int()` (no negatives), zero counts are accepted (and written), labels are
+stripped and resolved by index (a repeated label names the same activity), and
+a repeated start, end or edge row replaces the earlier one. A blank row, a BOM
+and an out-of-range id are errors, as in the reference.
+
+PNML choices: Minera reads the first `<net>` and merges every page, nested
+pages included (PNML pages only partition a net), while the reference reads
+the last net and only its last top-level page. Minera rejects dangling and
+place-to-place arcs, duplicate transition ids and negative markings, which the
+reference drops, keeps or ignores.
+
 ## Native event-data interoperability evidence
 
 The traditional event-data layer now has four explicit native forms: trace
@@ -2713,8 +2792,22 @@ uses behavioral-appropriateness violations in its bounded exponential
 selection before applying the same non-negative integer release noise. The
 deterministic seed is an explicit testing/reproducibility extension. Both
 privacy surfaces also accept an explicit secure-random switch that draws one
-key from the host operating system entropy provider per release call; the
-effective key is not returned in diagnostics.
+key from the host operating system entropy provider per release call. The
+effective key is never returned: in secure mode every diagnostics and JSON
+`seed` field reports 0 (SaCoFa, Laplace and PRIPEL alike), nothing is logged,
+and no response header carries it; replaying a reported value therefore never
+reproduces a secure release (declared extension; the reference has no secure
+mode).
+
+SaCoFa on logs without empty traces runs the reference port (exact under the
+reference's seed: Python `random` and the legacy numpy generator seeded with
+the same 32-bit value). Its diagnostics are filled from that run:
+`candidate_count` is the number of candidate prefixes over all levels (each
+surviving prefix times the activities plus its end marker) and
+`selected_violation_count` the number of non-conforming prefixes the
+exponential mechanism added back, summed over the levels; both are complete
+even when the reference raises its "p too high" ValueError and Minera returns
+the empty release.
 
 Strict `tvq_*` request parsing, standalone JSON, CLI
 (`--trace-variant-query`), cached-session server endpoints, frontend query
@@ -15646,7 +15739,7 @@ execution times, their median and the total time for 426 outcomes.
 Reference behaviour found (black box):
 
 - All draws come from numpy's legacy global generator (`random` seeding has
-  no effect). Native `NumpyLegacyRandom` (src/backend/numpy_legacy_random.hpp)
+  no effect). Native `rng::NumpyRandomState` (include/minera/random.hpp)
   implements the published numpy algorithms (MT19937 init_genrand, 53-bit
   doubles, polar normal with its cached value, legacy exponential and gamma)
   and matches numpy bit for bit.
@@ -15668,10 +15761,25 @@ Reference behaviour found (black box):
   and its outputs stay untimed. Native fitting now follows this; the earlier
   stochastic-fit checks (64) still pass.
 
-Contract: exact. One outcome (mc-081, a parallel net with capacity-one
-resources) has one firing whose native resource wait is later than the
-reference's under every choice order; the test pins it as the only residual.
-The seeded mode is a native option for now (not yet in JSON, CLI or server).
+Contract: exact, with one pinned residual. In mc-081 (t0 forks p0 into
+p1 and p2, A: p1 to p3, B: p2 to p4, C joins p3 and p4 into p5; one resource
+per place; six cases arriving every 0.5 s) the first divergence is case 1's B
+firing at t = 8.152 (relative to the 1,000,000 epoch). Native finds p4 at
+capacity (case 2's B token has held it since 7.237) and takes the earliest
+release time on p4's queue, 6.398 (case 0's C); it does not wait. The
+reference records no wait and leaves 6.398 on the queue, so its case 3 B
+(9.119) takes 6.398 and does not wait, while native's case 3 takes 10.257
+and waits; cases 4 and 5 then wait until 10.257 and 10.428 in the reference.
+Every later firing follows from that. A rule change that reproduces it (for
+example counting capacity as `occupied > capacity`) breaks other bank
+outcomes (mc-043), and no consistent occupancy rule found so far explains
+both; the cause is not identified, so this is an open residual rather than a
+proven limit. The test pins it as the only one.
+The seeded mode is available natively and through the shared request parser:
+`minera_playout --monte-carlo-numpy-legacy-seed` /
+`--monte-carlo-numpy-choice-order` and the server's
+`monte_carlo_numpy_legacy_seed` / `monte_carlo_numpy_choice_order`; the
+Monte Carlo workbench JSON and the frontend do not expose it yet.
 
 ## Pandas sequence filters bank (2026-10-25)
 
@@ -15735,8 +15843,11 @@ include/minera/genetic_reference.hpp with 0 failures.
 
 Contract: sources/sinks, nets (place keys and transition multisets, markings,
 errors), partition edits and tournament fitness (within 1e-12) and order are
-exact. The operators and the GA loop are seeded-random and depend on Python's
-string-hash seed, so their outputs are bound by invariants: every individual,
+exact. The operators and the GA loop are seeded-random, and they iterate sets
+whose order follows object identity (memory addresses), not only the string
+hash: two fresh reference processes with the same `random` seed and the same
+PYTHONHASHSEED already disagree. No seed reproduces them, so their outputs are
+bound by invariants (invariant-only, declared): every individual,
 crossover and mutate output is well formed (keys are exactly T, partitions
 nonempty, drawn from T, disjoint, not repeated, and y in some O[x] iff x in
 some I[y]); mutate keeps the edge set and crossover edges are a subset of the
@@ -16233,6 +16344,7 @@ values and passing controls.
 | OC5 | `--enrich` (`enrich_ocel`, `/api/ocel/enrich`) writes O2O rows as `pm4py.ocel_o2o_enrichment` does, quirks included: the interaction graph in both orientations, descendants/cobirth/codeath once in graph orientation, and `object_inheritance_graph` carrying the descendants edges (reference code reuses the descendants graph). Computed triples are deduplicated among themselves and appended after the original O2O rows, which keep their multiplicity. Native emitted cobirth/codeath both ways and the true inheritance relation; that relation stays available as `discover_ocel_object_graph` / `--graph inheritance`. Declared difference: events without relations are skipped rather than raising. Since OC7 the JSON, XML and SQLite readers drop such events as the reference readers do, so they only reach enrichment from an OCEL CSV import (whose reference reader keeps them) or a native caller. Lifecycle E2O qualifiers are unchanged and match. | `minera_ocel_transform_tests` |
 | OC6 | Event features with `--features-name-style compatibility` reproduce two reference quirks. Endpoint columns: the reference iterates each object's first (last) event id as a string, so an event scores 1 only if its whole id is one character of some endpoint id of that type; both blocks are named `@@event_start_<type>` (start block first, types sorted). New interactions: the reference never records seen pairs, so each event counts every ordered relation pair whose first object id is lexically smaller. The native style keeps the corrected values (`@@event_end_<type>`, `@@event_new_interactions`). Declared difference: objects without relations are skipped where the reference raises KeyError. Since OC7 they only arrive from an OCEL CSV import or a native caller; the other readers drop them as the reference readers do. | `minera_ocel_features_tests` |
 | OC7 | The OCEL 1.0 JSON, OCEL 2.0 JSON, both XML and the SQLite readers keep only events and objects that take part in an event-object relation, as every reference reader does: the dropped entries take their relations, O2O links, event-to-event links and object changes with them, and a log without relations reads as empty (`drop_unrelated_ocel_entries`). The OCEL CSV reader keeps them, as the reference CSV reader does. Every OCEL route reads its document through these readers, so filters, statistics and discovery no longer see objectless events (the timestamp, event-attribute and events filters returned them; object filters kept unlinked objects). Declared: the reference OCEL 2.0 XML reader raises `AttributeError: 'NoneType' object has no attribute 'index'` on a log with no relation at all; native reads it as empty, as the reference JSON readers do. Fresh comparisons: 120 random OCELs per format (1.0 JSON, 2.0 JSON, 2.0 XML) match events, objects, relations, O2O and changes, except the 9 relation-free 2.0 XML logs where the reference raises as declared; all 15 filters match on 150 random OCELs with orphans, except one declared `filter_ocel_objects` KeyError. | `minera_ocel_tests`, `minera_ocel_xml_tests`, `minera_ocel_sqlite_tests` |
+| OC8 | OCEL file I/O follows the reference writers and readers. Writers keep the log's event, object, relation and attribute order (the reference frame order) instead of sorting by id, and print floats as Python's repr. OCEL 2.0 XML writes O2O links as the reference does (`<object>…<objects><relationship object-id qualifier/></objects>`; the former `<object-relationships>` dialect still reads), declares a column `float` only when its frame column is float64 (an int or bool column, or one with a missing cell, is `string`; an int column with a missing cell prints its integers as floats), writes `True`/`False`, the epoch time for static values and pandas timestamps (`2020-01-01T00:00:01.250000+00:00`) for events and changes; its reader reads an attribute element without text as `"None"` unless it is a float (which raises), as the reference does. OCEL 1.0 XML (`.xmlocel`) is the reference writer's document byte for byte (`<log>`, global event/object/log scopes, `omap`/`vmap`/`ovmap` lists, ints and bools as strings, float columns as `<float>`); the former dialect still reads. SQLite type tables get the pandas `to_sql` column types of the frame (INTEGER for int and bool columns, REAL for float, TEXT otherwise), the reference column order (`ocel_id, ocel_time, ocel:activity, …`; objects `ocel_id, …, ocel_changed_field, ocel_time` with change rows after the base row), pandas timestamp text and no all-null columns. CSV writes the reference text: `ocel:eid, ocel:timestamp, ocel:activity`, attributes in first-appearance order, then `ocel:type:*` columns; `False`/`True`, float repr, `2020-01-01 00:00:00+00:00`, list cells as the list's repr (`['i0']`, `["i'2"]`); its reader keeps attribute cells as text and objects in object-table order, as the reference reader does. OCEL JSON reads up to 128 MiB (the server's payload limit, 32 Mi nodes) and a larger file is refused with `OCEL JSON file exceeds the 128 MiB OCEL limit` (XML likewise); the server refuses an import whose JSON would not fit the other OCEL routes, so every import it returns can be posted back. Performance: SQLite import reads each type table once (120k events 212.8 s → 2.8 s; 30k 12.7 s → 0.5 s), classic JSON indexes typedOmap qualifiers (30k 5.9 s → 1.1 s), both XML writers index events and objects (120k from XML 97.4 s / 103.0 s → 5.2 s / 4.2 s, read included). Fresh round trips in both directions (native write → reference read, reference write → native read → JSON → reference read) for OCEL 2.0 JSON, OCEL 1.0 JSON, OCEL 2.0 XML, OCEL 1.0 XML, SQLite and CSV: 0 diffs on the rich fixture (lists, quotes, newlines, mixed and missing types, O2O, changes, orphans) and on 8,000 generated events, against 374 before. Declared: native OCEL 2.0 XML also names each value's type (`type="…"` on the value element; the reference reader ignores it) so native round trips stay typed; OCEL 1.0 XML keeps fractional seconds, where the reference truncates them; OCEL 1.0 XML and CSV refuse to drop qualifiers, O2O/E2E links, object changes or globals unless loss is allowed (`--ocel-xml-allow-lossy`, `--ocel-csv-allow-lossy`, the frontend's loss allowance), where the reference drops them silently; SQLite type-table names are collision-free tokens (`event_t_create_…`) where the reference CamelCases the type (`event_Create`), which the map tables resolve for both readers; the CSV reader accepts unquoted list items (`[o1]`), which the reference skips; a native OCEL JSON that holds events or objects without relations carries `"minera:keepUnrelated": true`, so an OCEL from a CSV import (or a filter or playout result) keeps them on every later route, while files without the marker are read as the reference reads them (OC7). | `minera_ocel_tests`, `minera_ocel_xml_tests`, `minera_ocel_sqlite_tests`, `minera_ocel_csv_tests` |
 | R1 | Token replay reads reset and inhibitor arcs as ordinary inputs of their weight, as the reference does. PNML parallel arcs stay distinct arcs: a place needs the weight of one arc to enable, firing consumes every arc, and repair walks the arcs in order, adding each arc's weight when the place is below it. Fresh comparisons of full forward per-trace results (fitness, activated and enabled transitions, reached marking, token counters) match 0/240 random nets with reset, inhibitor, weighted and parallel arcs and no silent transitions, and 225/232 with silent transitions; the 7 left are reference set-order ties (equal-length silent paths, or parallel arcs of different kinds and weights on one place), which follow memory addresses and are not claimed. The `/api/token-replay` route gives the same results on all 495 nets (the same 7 ties differ). Backwards replay uses the same arc reading (spot-checked only). | `minera_petri_extended_arcs_tests`, `minera_token_replay_diagnostics_tests` |
 | F1 | `format_dataframe` never converts a categorical column to dates: a categorical timestamp stays categorical (strings) in its source column, in `time:timestamp` and in the `start_timestamp` copy, and an all-null categorical column stays categorical. Fresh comparisons of the full formatted frame and the post-call input match 0/660 random frames mixing nullable Int64/Float64/boolean, string, object, categorical and ordered categorical, numpy int/float/bool, naive, UTC and categorical timestamps, missing values, duplicate and MultiIndex indexes, with and without a start timestamp. | `minera_dataframe_format_tests` |
 | P1 | The Polars DFG adapter (`df_statistics.get_dfg_graph`, `freq_triples`) follows the reference on nulls and aggregation keys: rows with a null case are dropped; frequency drops pairs with a null activity, while performance keeps a null source (exposed as `null_source_performance`) and drops a null target; null timestamps sort first and give their edge a null duration, which aggregations skip (an edge with only null durations is null, except `sum`, which is 0); a single observation has a null standard deviation; `stdev` and `raw_values` are rejected as the reference rejects them; triples keep a null first activity (`null_first`). Fresh comparisons of frequency, performance (every aggregation, windows 1-3, keep-once) and triples match 0/1,700 random Polars frames with null cases, activities and timestamps, categorical and integer cases, and shuffled rows. | `minera_dfg_dataframe_tests` |
@@ -16809,9 +16921,130 @@ Declarations:
   JSON, XML or SQLite reader drops them as the reference reader would, while
   a native CSV round trip keeps them (the reference's CSV round trip loses
   them at the writer). An OCEL CSV import keeps unrelated entries like the
-  reference CSV reader, but they are dropped once the OCEL travels as JSON to
-  another route.
+  reference CSV reader, and they stay through every later route: a native
+  OCEL JSON (both formats) that holds unrelated entries carries
+  `"minera:keepUnrelated": true`, and the JSON reader keeps them when it sees
+  that marker (OC8). Files without the marker are read as the reference
+  reader reads them.
 - **Eventually-follows without a start attribute** counts pairs in trace
   order; the reference first sorts each trace by completion timestamp. This
   only differs on XES traces whose events are not in time order.
 
+## Seeded random modules: draws, envelopes and declarations (2026-11-03)
+
+A review of every module whose output is random. Each contract below is
+marked **exact** (draw for draw under the reference seeding, pinned by a
+bank), **invariant-only** (the reference process and envelope, validated by
+distribution or by invariants, because the reference draws are not
+reproducible) or **declared** (a Minera extension).
+
+All seeded draws now go through one module, `include/minera/random.hpp` /
+`src/backend/random.cpp` (namespace `minera::rng`): the single MT19937
+(`init_genrand` and `init_by_array` seeding), `PythonRandom` (CPython's
+`random.Random`: `getrandbits`, bit-length rejection behind
+`randrange`/`randint`/`choice`, `random()`, `shuffle`, `sample`),
+`NumpyRandomState` (numpy's legacy `RandomState`: `random_sample`, masked
+integers, `permutation`, polar normal with its cached value, exponential,
+Laplace, gamma, triangular, `choice` with `p`) and portable native draws
+over standard engines (`below`, `uniform_int`, `unit`, `bernoulli`,
+`weighted_index`, `shuffle`, `exponential`, `normal`, `lognormal`, `gamma`).
+No seeded path uses a standard-library distribution or `std::shuffle`, whose
+algorithms the C++ standard leaves to the implementation; the former copies
+(`src/backend/python_random.hpp`, `src/backend/numpy_legacy_random.hpp`, the
+k-means++ sampler in clustering) are gone. Native-only seeded outputs that
+changed with this (Petri stochastic and extensive branching, the native
+Monte Carlo mode, the genetic miner, Declare playout, OCPN and OC causal-net
+branching caps) are invariant-only and declared; they are now the same on
+every platform. `minera_generate_sample` spells out the integer method that
+produced `data/sample_event_log.csv` and still reproduces it byte for byte.
+Unseeded draws (`std::random_device`) are unchanged.
+
+- **Process-tree playout TOPBOTTOM (default): exact.** `random.seed(seed)`
+  draws: `X` picks a child with `randbelow`; `*` repeats its redo child while
+  `random() < 0.5`; `<>` shuffles its children in place, and the shuffled
+  order persists for later traces of the same call; `+` shuffles an index list
+  per element and merges. OR raises (the reference raises TypeError). The log
+  has no case id and no timestamp. Bank: `scripts/capture-process-tree-
+  topbottom-bank.py` (300 trees, seeds 0-2, PYTHONHASHSEED 0-2 identical,
+  900 cases) drives `minera_process_tree_topbottom_parity_tests`. The former
+  loop cap is an explicit opt-in (`cap_sampled_loops`,
+  `playout_cap_sampled_loops`); `max_steps` is a safety bound that raises.
+- **Process-tree playout BASIC_PLAYOUT: invariant-only.** The reference walks
+  a set of enabled vertices (identity order), so only the process is matched:
+  a uniform pick among enabled vertices, a loop choosing redo or exit with
+  `randint(1, 2)` (a two-child loop exits through an implicit silent step),
+  OR selecting each child with `random() < 0.5` (none selected: an empty
+  trace), interleaving shuffling its children and running them in sequence.
+  Envelope: cases `"0"`, `"1"`, ... and timestamps from epoch 10,000,000,
+  one second per event, counting on across cases. The distribution over 12
+  trees (40,000 pooled reference traces each,
+  `scripts/capture-process-tree-basic-distribution.py`) is compared with a
+  chi-squared homogeneity test at 0.1% in `minera_process_tree_playout_tests`.
+- **Petri BASIC_PLAYOUT: invariant-only.** The reference chooses from a set of
+  transition objects. Matched process: a case stops at `maxTraceLength`
+  (`max_steps`, default 1000) visible events, at a deadlock, or by a "stop"
+  option that is one more equally likely choice in an accepted final marking
+  (exact, or covering it with `fm_leq_accepted`), so a case at the final
+  marking with n enabled transitions stops with probability 1/(n+1);
+  transitions without input places are always enabled. With
+  `add_only_if_fm_is_reached` rejected cases are discarded and sampling goes
+  on until `noTraces` are accepted, unless none of the first `noTraces`
+  attempts was accepted, in which case the log is empty (observed:
+  P(empty) = (1-p)^n). Envelope: accepted cases `"0"`, `"1"`, ... and
+  timestamps from epoch 10,000,000, one second per event across the returned
+  cases. Declared: supplying `start`, `case_interval` or `event_interval`
+  (server, CLI, workbench JSON) switches to the former `case_N` envelope
+  (`add_envelope`); `max_firings_per_trace` (silent livelock) and
+  `max_attempts` (the server sets 100 × traces + 1000) raise where the
+  reference would not return.
+- **Process-tree generator BASIC and PTANDLOGGENERATOR: exact**, labels
+  included (BASIC: six characters from A-Z0-9 by `randbelow(36)`;
+  PTANDLOGGENERATOR: `a`..`z`, `aa`, ... in creation order, the activity count
+  from one numpy `random_sample` through the triangular inverse CDF and
+  Python's half-even rounding, then `random.random()` operator, side, leaf,
+  silent and duplicate draws). A duplicate phase with no other label raises
+  as the reference does (IndexError). Caller-supplied BASIC activities are
+  declared. Bank: `scripts/capture-random-tree-bank.py` drives
+  `minera_random_tree_parity_tests`.
+- **DFG playout PERFORMANCE: exact** under `numpy.random.seed(seed)` (seed
+  below 2^32): case i starts at 10,000,000 + (i+1) × rate; one `choice` over
+  the start activities in their dict order (first occurrence in the log:
+  `start_activity_order`), then per step a `choice` over the successors in
+  DFG order (sorted pairs, as a DataFrame discovery gives them) with the end
+  weight appended; a non-zero mean d adds d × `standard_exponential`;
+  timestamps are rounded half-even to the microsecond. Bank:
+  `scripts/capture-dfg-performance-playout-bank.py` (300 DFGs, PYTHONHASHSEED
+  0-2 identical) drives `minera_dfg_performance_playout_parity_tests`.
+  Declared: `max_events_per_trace` (counted in `truncated_traces`) and an
+  explicit `start_time`. **CLASSIC envelope:** cases `"0"`.., epoch
+  10,000,000, one second per event across cases.
+- **split_train_test: exact** for both reference inputs
+  (`SplitTrainTestInput`, `--split-input`, server `split_input`): EventLog
+  (`random.shuffle`, then the first min(n, floor(n p) + 1) traces train) and
+  DataFrame (the default: one `random() <= p` per case in order of
+  appearance, rows keep their order). Pinned by exact outcomes in
+  `minera_log_util_tests`.
+- **SKLEARN_PROFILES clustering: exact on the profile-clustering bank**, now
+  also through the server and CLI: they run `reference_profile_clustering_
+  result` (TRACE_BASED log-to-features with the reference parameters,
+  KMeans(n_clusters=2, random_state=0), max_iter 300, tol 1e-4). The flags are
+  the reference parameters: `profile_include_activity` /
+  `profile_include_succession` are `enable_activity_def_representation` /
+  `enable_succ_def_representation` (default true), the trace/event
+  string/numeric attribute lists are `str_tr_attr` / `str_ev_attr` /
+  `num_tr_attr` / `num_ev_attr`, `profile_feature_names` is `feature_names`;
+  verified against the reference in `minera_clustering_tests`. Other cluster
+  counts and seeds (below 2^32) stand for that KMeans passed as
+  `sklearn_clusterer` (declared). The native profile engine is a declared
+  extension behind `profile_engine=native` /
+  `--profile-clustering-engine native`.
+- **Privacy (SaCoFa, PRIPEL) with secure randomness:** the OS-drawn seed is
+  never emitted; diagnostics report seed 0 and no log line or response
+  header carries it. The anonymization workbench keeps the same field set
+  (12 SaCoFa/Laplace, 11 PRIPEL diagnostics fields) with `seed` 0 in secure
+  mode; only `configured_options` echoes the seed the caller submitted, which
+  the secure path ignores. SaCoFa diagnostics now report the candidate and selected
+  violation counts.
+- **Monte Carlo PETRI_SEMAPH_FIFO with `numpy_legacy_seed`:** exact on 426 of
+  427 bank outcomes; see "Seeded Monte Carlo bank" for the residual.
+- **Genetic miner:** invariant-only, see "Genetic discovery bank".

@@ -1,6 +1,7 @@
 #include "minera/declare_playout.hpp"
 
 #include "minera/declare_streaming.hpp"
+#include "minera/random.hpp"
 
 #include <algorithm>
 #include <random>
@@ -21,7 +22,8 @@ EventLog declare_playout(const DeclareModel& model, const DeclarePlayoutOptions&
     throw std::invalid_argument("Declare playout bounds exceed the native safety limit");
   EventLog log;
   if (options.n_traces == 0) return log;
-  std::mt19937_64 rng(options.seed.value_or(std::random_device{}()));
+  // Portable draws (minera/random.hpp) over the seeded engine.
+  std::mt19937_64 engine(options.seed.value_or(std::random_device{}()));
   std::vector<std::string> activities;
   for (const auto& [_, values] : model.rules) {
     for (const auto& c : values) {
@@ -35,8 +37,8 @@ EventLog declare_playout(const DeclareModel& model, const DeclarePlayoutOptions&
   for (std::size_t trace_index = 0; trace_index < options.n_traces; ++trace_index) {
     std::size_t length = options.min_length;
     if (options.min_length <= options.max_length) {
-      std::uniform_int_distribution<std::size_t> length_dist(options.min_length, options.max_length);
-      length = length_dist(rng);
+      length = rng::uniform_int<std::mt19937_64, std::size_t>(engine, options.min_length,
+                                                               options.max_length);
     }
     Trace trace;
     trace.case_id = std::to_string(trace_index);
@@ -59,8 +61,7 @@ EventLog declare_playout(const DeclareModel& model, const DeclarePlayoutOptions&
         }
       }
       if (candidates.empty()) break;
-      std::uniform_int_distribution<std::size_t> choice(0, candidates.size() - 1);
-      const auto chosen = candidates[choice(rng)].activity;
+      const auto chosen = candidates[rng::below(engine, candidates.size())].activity;
       prefix.push_back(chosen);
       Event e; e.case_id = trace.case_id; e.activity = chosen; e.input_order = trace.events.size();
       trace.events.push_back(std::move(e));

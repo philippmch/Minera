@@ -400,6 +400,21 @@ class Replayer {
   using Marking = TokenMarking;
   using MarkingHash = TokenMarkingHash;
  private:
+  // Arc weights as token counts, one per input and output arc.
+  struct ArcWeights {
+    std::vector<TokenInteger> inputs;
+    std::vector<TokenInteger> outputs;
+  };
+  struct InputCheck {
+    std::size_t place = 0;
+    TokenInteger required = 0;
+  };
+  struct InputChecks {
+    std::size_t places = 0;  // marking size the checks were built for
+    bool never = false;      // an input arc lies outside such markings
+    bool per_call = false;   // an invalid arc weight: check arc by arc as before
+    std::vector<InputCheck> checks;
+  };
   struct ForwardConfiguration {
     detail::ReplayMarkingKeys initial_keys;
     detail::ReplayMarkingKeys final_keys;
@@ -466,6 +481,8 @@ class Replayer {
         transitions_by_activity_[*transition.activity].push_back(t);
       }
     }
+    arc_weights_.resize(net_.transitions().size());
+    input_checks_.resize(net_.transitions().size());
     build_place_closure();
     if (replay_options && replay_options->variant == TokenReplayVariant::kForward)
       forward_configuration_ = prepare_forward(*replay_options);
@@ -1046,8 +1063,7 @@ class Replayer {
       for (const std::size_t s : silent_transitions_) {
         if (!enabled(current, s)) continue;
         Marking next = current;
-        Counts scratch;
-        fire(next, s, scratch);
+        fire_marking(next, s);
         if (!seen.insert(next).second) continue;
         collect(next);
         if (remaining.empty()) break;
@@ -1126,8 +1142,7 @@ class Replayer {
         if (expanded++ >= kSilentSearchCap && !budget)
           throw std::runtime_error("enabled transition diagnostic search exceeded limit");
         Marking next = reached;
-        Counts scratch;
-        fire(next, t, scratch);
+        fire_marking(next, t);
         discover(next);
       }
       if (!options.transition_identity_hashes) {
@@ -1198,8 +1213,7 @@ class Replayer {
       if (expanded++ >= kSilentSearchCap)
         throw std::runtime_error("enabled transition diagnostic search exceeded limit");
       Marking next = latest;
-      Counts scratch;
-      fire(next, transition, scratch);
+      fire_marking(next, transition);
       discover(next);
     }
 
@@ -1445,12 +1459,11 @@ class Replayer {
   // (with its silent-routing search) once and replayed from the cache after
   // that. These caches support prefix precision and clean-run searches; the
   // forward diagnostics path also retains incomplete routing and cleaning.
+  // Only what the cache readers use is kept: per-place diagnostics would
+  // cost four token counts per place for every cached step.
   struct Step {
     Marking marking;
-    TokenInteger produced = 0;
-    TokenInteger consumed = 0;
     TokenInteger missing = 0;
-    std::vector<TokenReplayPlaceDiagnostics> places;
     std::vector<std::size_t> fired;  // transitions fired, silent routing included
   };
 
@@ -1477,10 +1490,7 @@ class Replayer {
       const std::size_t chosen = pick_enabled(step.marking, targets);
       fire(step.marking, chosen, counts);
       step.fired.push_back(chosen);
-      step.produced = counts.produced;
-      step.consumed = counts.consumed;
       step.missing = counts.missing;
-      step.places = std::move(counts.places);
     }
     return it->second;
   }
@@ -1494,13 +1504,24 @@ class Replayer {
       step.marking = marking;
       Counts counts;
       route_silently_to_marking(step.marking, counts, &step.fired);
-      step.produced = counts.produced;
-      step.consumed = counts.consumed;
       step.missing = counts.missing;
-      step.places = std::move(counts.places);
     }
     return it->second;
   }
+
+ public:
+  // Cached steps across the three step caches, and a way to drop them. The
+  // caches are pure memoization, so clearing them never changes a result.
+  [[nodiscard]] std::size_t cached_steps() const noexcept {
+    return step_cache_.size() + direct_step_cache_.size() + finish_cache_.size();
+  }
+  void clear_step_caches() const {
+    step_cache_ = {};
+    direct_step_cache_ = {};
+    finish_cache_ = {};
+  }
+
+ private:
 
   // Detects whether the exact per-place closure applies (see
   // enabled_activities) and precomputes, for every place, which activities a
@@ -1596,18 +1617,80 @@ class Replayer {
 
   [[nodiscard]] bool enabled(const Marking& marking, std::size_t t) const {
     const auto& transition = net_.transitions()[t];
-    if (transition.has_compact_ordinary_arcs()) {
+    const auto& checks = input_checks(t, marking.size());
+    if (checks.per_call) {
       for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
         const auto place = transition.inputs[index];
         if (place >= marking.size() || marking[place] < arc_tokens(transition.input_arc_weight(index))) return false;
       }
-    } else {
-      const auto required = input_requirements(transition, marking.size());
-      for (const auto place : transition.inputs) if (marking[place] < required[place]) return false;
     }
+    if (checks.never) return false;
+    for (const auto& check : checks.checks)
+      if (marking[check.place] < check.required) return false;
     for (const auto place : transition.inhibitor_inputs)
       if (place >= marking.size() || marking[place] != 0) return false;
     return true;
+  }
+
+  // The enabling thresholds of transition t for markings of `places` slots,
+  // built on first use. Compact endpoints are checked arc by arc (an arc
+  // outside the marking disables the transition); repeated-unit endpoints
+  // need input_requirements per place. Searches call enabled() for every
+  // silent transition at every expanded marking, so rebuilding a dense
+  // requirement marking per call dominated replays of large logs.
+  [[nodiscard]] const InputChecks& input_checks(std::size_t t, std::size_t places) const {
+    auto& entry = input_checks_[t];
+    if (entry && entry->places == places) return *entry;
+    const auto& transition = net_.transitions()[t];
+    InputChecks built;
+    built.places = places;
+    if (transition.has_compact_ordinary_arcs()) {
+      try {
+        for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+          const auto place = transition.inputs[index];
+          if (place >= places) { built.never = true; built.checks.clear(); break; }
+          built.checks.push_back({place, arc_tokens(transition.input_arc_weight(index))});
+        }
+      } catch (const std::invalid_argument&) {
+        // Whether the invalid weight is reached depends on the marking.
+        built = InputChecks{};
+        built.places = places;
+        built.per_call = true;
+      }
+    } else {
+      const auto required = input_requirements(transition, places);  // throws as before
+      for (const auto place : transition.inputs) built.checks.push_back({place, required[place]});
+    }
+    entry = std::move(built);
+    return *entry;
+  }
+
+  // The marking effect of fire() without its bookkeeping, for searches that
+  // throw the counts away: inputs are consumed and clamped at zero (the
+  // default backwards firing), reset inputs emptied, outputs produced.
+  void fire_marking(Marking& marking, std::size_t t) const {
+    const auto& transition = net_.transitions()[t];
+    auto& cached = arc_weights_[t];
+    if (!cached) {
+      // Built in fire()'s order, so an invalid weight throws as it does.
+      ArcWeights built;
+      built.inputs.reserve(transition.inputs.size());
+      for (std::size_t index = 0; index < transition.inputs.size(); ++index)
+        built.inputs.push_back(arc_tokens(transition.input_arc_weight(index)));
+      built.outputs.reserve(transition.outputs.size());
+      for (std::size_t index = 0; index < transition.outputs.size(); ++index)
+        built.outputs.push_back(arc_tokens(transition.output_arc_weight(index)));
+      cached = std::move(built);
+    }
+    const auto& weights = *cached;
+    for (std::size_t index = 0; index < transition.inputs.size(); ++index)
+      marking[transition.inputs[index]] -= weights.inputs[index];
+    for (const auto place : transition.inputs)
+      if (marking[place] < 0) marking[place] = 0;
+    for (const std::size_t place : transition.reset_inputs)
+      if (marking[place] > 0) marking[place] = 0;
+    for (std::size_t index = 0; index < transition.outputs.size(); ++index)
+      marking[transition.outputs[index]] += weights.outputs[index];
   }
 
   // The reference keys a transition's preset by place, so of several
@@ -1715,7 +1798,15 @@ class Replayer {
       std::size_t parent;
     };
     std::vector<Visited> arena;
-    std::unordered_set<Marking, MarkingHash> seen{start};
+    // The visited set holds arena indices, so every reached marking is
+    // stored once (a capped search can reach hundreds of thousands).
+    const auto marking_at = [&](std::size_t i) -> const Marking& {
+      return i == kStart ? start : arena[i].marking;
+    };
+    const auto hash = [&](std::size_t i) { return MarkingHash{}(marking_at(i)); };
+    const auto equal = [&](std::size_t a, std::size_t b) { return marking_at(a) == marking_at(b); };
+    std::unordered_set<std::size_t, decltype(hash), decltype(equal)> seen(16, hash, equal);
+    seen.insert(kStart);
     std::queue<std::size_t> frontier;
     frontier.push(kStart);
     std::size_t expanded = 0;
@@ -1733,16 +1824,17 @@ class Replayer {
       const std::size_t index = frontier.front();
       frontier.pop();
       // Copy: growing the arena below would invalidate a reference.
-      const Marking current = index == kStart ? start : arena[index].marking;
+      const Marking current = marking_at(index);
       for (const std::size_t s : silent_transitions_) {
         if (!enabled(current, s)) continue;
         Marking next = current;
-        Counts scratch;
-        fire(next, s, scratch);
-        if (!seen.insert(next).second) continue;
-        const bool done = goal(next);
+        fire_marking(next, s);
         arena.push_back(Visited{std::move(next), s, index});
-        if (done) return reconstruct(arena.size() - 1);
+        if (!seen.insert(arena.size() - 1).second) {
+          arena.pop_back();
+          continue;
+        }
+        if (goal(arena.back().marking)) return reconstruct(arena.size() - 1);
         frontier.push(arena.size() - 1);
       }
     }
@@ -1888,6 +1980,8 @@ class Replayer {
   mutable std::unordered_map<std::pair<Marking, std::size_t>, Step, StepKeyHash>
       step_cache_, direct_step_cache_;
   mutable std::unordered_map<Marking, Step, MarkingHash> finish_cache_;
+  mutable std::vector<std::optional<ArcWeights>> arc_weights_;
+  mutable std::vector<std::optional<InputChecks>> input_checks_;
   bool place_closure_exact_ = false;
   std::vector<std::vector<std::size_t>> place_enables_;
 };
@@ -4697,6 +4791,13 @@ std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
 replay_firing_sequences(const PetriNet& net,
                         const std::vector<std::vector<std::string>>& variants) {
   const Replayer replayer(net);
+  // Each cached step holds two markings; a log whose variants keep reaching
+  // new markings would otherwise grow the cache without bound. About 256 MiB
+  // of markings, estimated from the place count, is kept between variants.
+  const std::size_t marking_bytes =
+      2 * (net.place_count() * sizeof(TokenInteger) + sizeof(Replayer::Marking)) + 128;
+  const std::size_t cache_limit =
+      std::max<std::size_t>(4096, (std::size_t{256} << 20) / marking_bytes);
   std::vector<std::optional<std::vector<std::vector<std::size_t>>>> result;
   result.reserve(variants.size());
   for (const auto& variant : variants) {
@@ -4706,6 +4807,7 @@ replay_firing_sequences(const PetriNet& net,
       ids.push_back(replayer.activity_id(name));
     }
     result.push_back(replayer.clean_firing_sequence(ids));
+    if (replayer.cached_steps() > cache_limit) replayer.clear_step_caches();
   }
   return result;
 }

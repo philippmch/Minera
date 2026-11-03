@@ -199,7 +199,7 @@ describe("unreadable mining responses", () => {
     await expect(truncated).rejects.toThrow(/could not use its response: its .* body is not readable JSON/);
     await expect(truncated).rejects.not.toThrow(/invalid analysis/);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 413 })));
-    await expect(mineActiveDataset(file)).rejects.toThrow(/larger than the Minera backend accepts/);
+    await expect(mineActiveDataset(file)).rejects.toThrow(/larger than the 128 MiB limit of the Minera backend; compress an XES log as \.xes\.gz/);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('{"unrelated":true}', { status: 200 })));
     await expect(mineActiveDataset(file)).rejects.toThrow(/invalid analysis/);
   });

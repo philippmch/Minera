@@ -454,8 +454,8 @@
       "artifacts": [
         "include/minera/trace_variant_query_reference.hpp",
         "src/backend/trace_variant_query_reference.cpp",
-        "src/backend/python_random.hpp",
-        "src/backend/numpy_legacy_random.hpp",
+        "include/minera/random.hpp",
+        "src/backend/random.cpp",
         "src/backend/tests/test_trace_variant_query_parity.cpp",
         "scripts/capture-trace-variant-query-bank.py"
       ]
@@ -6496,7 +6496,7 @@
       "artifacts": [
         "include/minera/monte_carlo.hpp",
         "src/backend/monte_carlo.cpp",
-        "src/backend/numpy_legacy_random.hpp",
+        "include/minera/random.hpp",
         "src/backend/stochastic_map.cpp",
         "src/backend/tests/test_monte_carlo_numpy_parity.cpp",
         "src/backend/tests/fixtures/monte_carlo_numpy_bank.txt",
@@ -8479,8 +8479,8 @@
       "artifacts": [
         "include/minera/trace_variant_query_reference.hpp",
         "src/backend/trace_variant_query_reference.cpp",
-        "src/backend/python_random.hpp",
-        "src/backend/numpy_legacy_random.hpp",
+        "include/minera/random.hpp",
+        "src/backend/random.cpp",
         "src/backend/tests/test_trace_variant_query_parity.cpp",
         "scripts/capture-trace-variant-query-bank.py"
       ],
@@ -8512,8 +8512,8 @@
       "artifacts": [
         "include/minera/trace_variant_query_reference.hpp",
         "src/backend/trace_variant_query_reference.cpp",
-        "src/backend/python_random.hpp",
-        "src/backend/numpy_legacy_random.hpp",
+        "include/minera/random.hpp",
+        "src/backend/random.cpp",
         "src/backend/tests/test_trace_variant_query_parity.cpp",
         "scripts/capture-trace-variant-query-bank.py"
       ],
@@ -8545,8 +8545,8 @@
       "artifacts": [
         "include/minera/trace_variant_query_reference.hpp",
         "src/backend/trace_variant_query_reference.cpp",
-        "src/backend/python_random.hpp",
-        "src/backend/numpy_legacy_random.hpp",
+        "include/minera/random.hpp",
+        "src/backend/random.cpp",
         "src/backend/tests/test_trace_variant_query_parity.cpp",
         "scripts/capture-trace-variant-query-bank.py"
       ],
@@ -8583,8 +8583,8 @@
       "artifacts": [
         "include/minera/trace_variant_query_reference.hpp",
         "src/backend/trace_variant_query_reference.cpp",
-        "src/backend/python_random.hpp",
-        "src/backend/numpy_legacy_random.hpp",
+        "include/minera/random.hpp",
+        "src/backend/random.cpp",
         "src/backend/tests/test_trace_variant_query_parity.cpp",
         "scripts/capture-trace-variant-query-bank.py"
       ],
@@ -8621,8 +8621,8 @@
       "artifacts": [
         "include/minera/trace_variant_query_reference.hpp",
         "src/backend/trace_variant_query_reference.cpp",
-        "src/backend/python_random.hpp",
-        "src/backend/numpy_legacy_random.hpp",
+        "include/minera/random.hpp",
+        "src/backend/random.cpp",
         "src/backend/tests/test_trace_variant_query_parity.cpp",
         "scripts/capture-trace-variant-query-bank.py"
       ],
@@ -19224,7 +19224,7 @@
       "artifacts": [
         "include/minera/monte_carlo.hpp",
         "src/backend/monte_carlo.cpp",
-        "src/backend/numpy_legacy_random.hpp",
+        "include/minera/random.hpp",
         "src/backend/stochastic_map.cpp",
         "src/backend/tests/test_monte_carlo_numpy_parity.cpp",
         "src/backend/tests/fixtures/monte_carlo_numpy_bank.txt",
@@ -19264,7 +19264,7 @@
       "artifacts": [
         "include/minera/monte_carlo.hpp",
         "src/backend/monte_carlo.cpp",
-        "src/backend/numpy_legacy_random.hpp",
+        "include/minera/random.hpp",
         "src/backend/stochastic_map.cpp",
         "src/backend/tests/test_monte_carlo_numpy_parity.cpp",
         "src/backend/tests/fixtures/monte_carlo_numpy_bank.txt",

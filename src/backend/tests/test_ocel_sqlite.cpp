@@ -1,10 +1,13 @@
 #include "minera/ocel_sqlite.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
+#include <vector>
 
 #if defined(MINERA_HAS_SQLITE)
 #if defined(_WIN32)
@@ -64,35 +67,144 @@ void assert_standard_type_tables(const std::filesystem::path& path) {
       db, "SELECT ocel_type_map FROM object_map_type WHERE ocel_type=?1",
       "sales:order");
   sqlite3_stmt* event_statement = nullptr;
-  const auto event_query = "SELECT amount, note, empty FROM event_" + event_token;
+  // A column without values is not written, as the reference frame drops it.
+  sqlite3_stmt* missing = nullptr;
+  assert(sqlite3_prepare_v2(db, ("SELECT empty FROM event_" + event_token).c_str(), -1, &missing,
+                            nullptr) != SQLITE_OK);
+  sqlite3_finalize(missing);
+  const auto event_query = "SELECT amount, note FROM event_" + event_token;
   assert(sqlite3_prepare_v2(db, event_query.c_str(), -1, &event_statement,
                             nullptr) == SQLITE_OK);
   assert(sqlite3_step(event_statement) == SQLITE_ROW);
   assert(sqlite3_column_double(event_statement, 0) == 2.5);
   assert(std::string(reinterpret_cast<const char*>(sqlite3_column_text(event_statement, 1))) ==
          "quoted value");
-  assert(sqlite3_column_type(event_statement, 2) == SQLITE_NULL);
   assert(sqlite3_finalize(event_statement) == SQLITE_OK);
 
   sqlite3_stmt* object_statement = nullptr;
-  const auto object_query = "SELECT status, ocel_changed_field, \"@@cumcount\" FROM object_" + object_token +
-                             " ORDER BY \"@@cumcount\"";
+  const auto object_query = "SELECT status, ocel_changed_field FROM object_" + object_token +
+                             " ORDER BY rowid";
   assert(sqlite3_prepare_v2(db, object_query.c_str(), -1, &object_statement,
                             nullptr) == SQLITE_OK);
   assert(sqlite3_step(object_statement) == SQLITE_ROW);
   assert(std::string(reinterpret_cast<const char*>(sqlite3_column_text(object_statement, 0))) ==
          "open");
   assert(sqlite3_column_type(object_statement, 1) == SQLITE_NULL);
-  assert(sqlite3_column_int64(object_statement, 2) == 0);
   assert(sqlite3_step(object_statement) == SQLITE_ROW);
   assert(std::string(reinterpret_cast<const char*>(sqlite3_column_text(object_statement, 0))) ==
          "paid");
   assert(std::string(reinterpret_cast<const char*>(sqlite3_column_text(object_statement, 1))) ==
          "status");
-  assert(sqlite3_column_int64(object_statement, 2) == 1);
   assert(sqlite3_step(object_statement) == SQLITE_DONE);
   assert(sqlite3_finalize(object_statement) == SQLITE_OK);
   assert(sqlite3_close(db) == SQLITE_OK);
+}
+
+// The tables the reference writer creates, each as its PRAGMA columns and
+// then one line per row (rowid order) of typeof:quote per cell. Type tables
+// are labelled by their OCEL type, because the table-name tokens differ (a
+// declared difference: native tokens cannot collide).
+std::string reference_tables_dump(const std::filesystem::path& path) {
+  sqlite3* db = nullptr;
+  assert(sqlite3_open_v2(path.string().c_str(), &db, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+  const auto column_texts = [&](const std::string& sql) {
+    std::vector<std::vector<std::string>> rows;
+    sqlite3_stmt* statement = nullptr;
+    assert(sqlite3_prepare_v2(db, sql.c_str(), -1, &statement, nullptr) == SQLITE_OK);
+    while (sqlite3_step(statement) == SQLITE_ROW) {
+      std::vector<std::string> row;
+      for (int i = 0; i < sqlite3_column_count(statement); ++i) {
+        const auto* text = sqlite3_column_text(statement, i);
+        row.emplace_back(text == nullptr ? "" : reinterpret_cast<const char*>(text));
+      }
+      rows.push_back(std::move(row));
+    }
+    assert(sqlite3_finalize(statement) == SQLITE_OK);
+    return rows;
+  };
+  std::string out;
+  const auto dump_table = [&](const std::string& table, const std::string& label) {
+    const auto columns = column_texts("PRAGMA table_info(\"" + table + "\")");
+    out += label + "(";
+    std::string expression;
+    for (std::size_t i = 0; i < columns.size(); ++i) {
+      out += (i ? "," : "") + columns[i][1] + " " + columns[i][2];
+      const auto quoted = "\"" + columns[i][1] + "\"";
+      expression += (i ? "||'|'||" : "") + std::string("typeof(") + quoted + ")||':'||quote(" + quoted + ")";
+    }
+    out += ")\n";
+    for (const auto& row : column_texts("SELECT " + expression + " FROM \"" + table + "\" ORDER BY rowid"))
+      out += "  " + row[0] + "\n";
+  };
+  for (const char* table : {"event", "object", "event_object", "object_object"}) dump_table(table, table);
+  for (const auto& [map, prefix] : {std::pair<std::string, std::string>{"event_map_type", "event_"},
+                                    std::pair<std::string, std::string>{"object_map_type", "object_"}}) {
+    auto types = column_texts("SELECT ocel_type, ocel_type_map FROM " + map);
+    std::sort(types.begin(), types.end());
+    for (const auto& type : types) dump_table(prefix + type[1], prefix + "[" + type[0] + "]");
+  }
+  assert(sqlite3_close(db) == SQLITE_OK);
+  return out;
+}
+
+// Captured with PM4Py 2.7.22: read_ocel2_json on kFixture, then
+// write_ocel2_sqlite, dumped with reference_tables_dump. Columns take the
+// pandas to_sql type of the frame column (an int or bool column INTEGER, a
+// float column REAL), timestamps the text pandas writes, and an object's
+// changes follow its base row.
+constexpr const char* kFixture = R"REF({"objectTypes":[{"name":"order","attributes":[{"name":"color","type":"string"}]},{"name":"item","attributes":[{"name":"weight","type":"float"}]}],
+ "eventTypes":[{"name":"create","attributes":[]},{"name":"pick, item","attributes":[]}],
+ "objects":[
+  {"id":"o1","type":"order","attributes":[{"name":"color","time":"1970-01-01T00:00:00Z","value":"red"},{"name":"color","time":"2020-01-02T00:00:00Z","value":"blue"}],"relationships":[{"objectId":"i1","qualifier":"contains"}]},
+  {"id":"i1","type":"item","attributes":[{"name":"weight","time":"1970-01-01T00:00:00Z","value":2.5}]},
+  {"id":"i'2","type":"item","attributes":[{"name":"weight","time":"1970-01-01T00:00:00Z","value":3}]}],
+ "events":[
+  {"id":"e1","type":"create","time":"2020-01-01T00:00:00Z","attributes":[{"name":"n","value":4},{"name":"flag","value":false},{"name":"cost","value":0.1},{"name":"note","value":"a<b&\"c\"\nd"}],"relationships":[{"objectId":"o1","qualifier":"q"}]},
+  {"id":"e2","type":"pick, item","time":"2020-01-01T00:00:01.250000Z","attributes":[{"name":"n","value":5},{"name":"flag","value":true}],"relationships":[{"objectId":"i'2","qualifier":""}]},
+  {"id":"e3","type":"create","time":"2020-01-01T00:00:02.000001Z","attributes":[{"name":"n","value":-6},{"name":"flag","value":true},{"name":"cost","value":1e20}],"relationships":[{"objectId":"i1","qualifier":""}]},
+  {"id":"e4","type":"pick, item","time":"2020-01-01T00:00:03Z","attributes":[{"name":"n","value":7},{"name":"flag","value":false}],"relationships":[{"objectId":"o1","qualifier":"r"}]}]})REF";
+constexpr const char* kReferenceTables = R"REF(event(ocel_id TEXT,ocel_type TEXT)
+  text:'e1'|text:'create'
+  text:'e2'|text:'pick, item'
+  text:'e3'|text:'create'
+  text:'e4'|text:'pick, item'
+object(ocel_id TEXT,ocel_type TEXT)
+  text:'o1'|text:'order'
+  text:'i1'|text:'item'
+  text:'i''2'|text:'item'
+event_object(ocel_event_id TEXT,ocel_object_id TEXT,ocel_qualifier TEXT)
+  text:'e1'|text:'o1'|text:'q'
+  text:'e2'|text:'i''2'|text:''
+  text:'e3'|text:'i1'|text:''
+  text:'e4'|text:'o1'|text:'r'
+object_object(ocel_source_id TEXT,ocel_target_id TEXT,ocel_qualifier TEXT)
+  text:'o1'|text:'i1'|text:'contains'
+event_[create](ocel_id TEXT,ocel_time TIMESTAMP,ocel:activity TEXT,n INTEGER,flag INTEGER,cost REAL,note TEXT)
+  text:'e1'|text:'2020-01-01 00:00:00+00:00'|text:'create'|integer:4|integer:0|real:0.1|text:'a<b&"c"
+d'
+  text:'e3'|text:'2020-01-01 00:00:02.000001+00:00'|text:'create'|integer:-6|integer:1|real:1.0e+20|null:NULL
+event_[pick, item](ocel_id TEXT,ocel_time TIMESTAMP,ocel:activity TEXT,n INTEGER,flag INTEGER)
+  text:'e2'|text:'2020-01-01 00:00:01.250000+00:00'|text:'pick, item'|integer:5|integer:1
+  text:'e4'|text:'2020-01-01 00:00:03+00:00'|text:'pick, item'|integer:7|integer:0
+object_[item](ocel_id TEXT,weight REAL)
+  text:'i1'|real:2.5
+  text:'i''2'|real:3.0
+object_[order](ocel_id TEXT,color TEXT,ocel_changed_field TEXT,ocel_time TIMESTAMP)
+  text:'o1'|text:'red'|null:NULL|null:NULL
+  text:'o1'|text:'blue'|text:'color'|text:'2020-01-02 00:00:00+00:00'
+)REF";
+
+void reference_capture_tests() {
+  const auto path = std::filesystem::temp_directory_path() / "minera_ocel_sqlite_reference.sqlite";
+  std::error_code ignored;
+  std::filesystem::remove(path, ignored);
+  const auto log = minera::parse_ocel_json(kFixture);
+  minera::export_ocel_sqlite(log, path);
+  assert(reference_tables_dump(path) == kReferenceTables);
+  const auto round = minera::import_ocel_sqlite(path);
+  assert(round.events.size() == 4 && round.objects.size() == 3 && round.relations.size() == 4);
+  assert(round.o2o.size() == 1 && round.object_changes.size() == 1);
+  std::filesystem::remove(path, ignored);
 }
 #endif
 
@@ -147,6 +259,7 @@ int main() {
   bytes.read(header.data(), static_cast<std::streamsize>(header.size()));
   assert(header == std::string("SQLite format 3", 15) + '\0');
   assert_standard_type_tables(path);
+  reference_capture_tests();
 
   const auto round = minera::import_ocel_sqlite(path);
   assert(round.events.size() == 2 && round.objects.size() == 2);

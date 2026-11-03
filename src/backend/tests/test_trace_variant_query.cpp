@@ -59,6 +59,11 @@ void sacofa_and_pruning() {
   const auto result = minera::anonymize_trace_variant_query(log, options);
   assert(result.frequencies.contains({"A", "B"}));
   assert(!result.frequencies.contains({"B", "A"}));
+  // The reference-port diagnostics: four candidates per level (A, B, C and
+  // the end marker after the single surviving prefix), none added back.
+  assert(result.diagnostics.candidate_count == 8);
+  assert(result.diagnostics.selected_violation_count == 0);
+  assert(result.diagnostics.seed == 3);
 
   options.prune_threshold = 1000000;
   const auto pruned = minera::anonymize_trace_variant_query(log, options);
@@ -69,6 +74,18 @@ void sacofa_and_pruning() {
   const auto secure = minera::anonymize_trace_variant_query(log, options);
   assert(secure.diagnostics.secure_random);
   assert(secure.log.trace_count() <= options.max_output_traces);
+  // The OS-drawn key is never reported, in diagnostics or JSON.
+  assert(secure.diagnostics.seed == 0);
+  assert(secure.diagnostics.candidate_count == 8);
+  options.seed = 0xffffffffULL;
+  for (int i = 0; i < 4; ++i) {
+    const auto again = minera::anonymize_trace_variant_query(log, options);
+    assert(again.diagnostics.seed == 0);
+  }
+  options.variant = minera::TraceVariantQueryVariant::kLaplace;
+  options.seed = 5;
+  const auto secure_laplace = minera::anonymize_trace_variant_query(log, options);
+  assert(secure_laplace.diagnostics.seed == 0);
 }
 
 minera::EventLog two_complete_variants() {

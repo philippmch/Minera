@@ -6,8 +6,9 @@
 // transition names. The deterministic steps (workflow source/sink selection,
 // matrix-to-net conversion, partition edits, fitness and tournament order)
 // follow the reference exactly. The evolutionary operators are seeded-random
-// in the reference and also depend on Python's string-hash seed, so only their
-// structural invariants are part of the contract (see
+// in the reference and iterate sets ordered by object identity, so even a
+// fixed seed and a fixed PYTHONHASHSEED do not reproduce them across
+// processes; only their structural invariants are part of the contract (see
 // reference_genetic_matrix_is_well_formed).
 
 #include <cstdint>

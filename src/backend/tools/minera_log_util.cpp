@@ -93,7 +93,8 @@ int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " INPUT.csv|INPUT.xes[.gz] (--train-percentage P | --prefix-length N |"
                " --all-prefixes | --until-activity ACTIVITY | --to-activities A,B |"
-               " --feature-selection) [--seed N] [--activity-key NAME]"
+               " --feature-selection) [--seed N] [--split-input dataframe|event_log]"
+               " [--activity-key NAME]"
                " [--timestamp-key NAME] [--feature-min-different N]"
                " [--feature-max-different N] [--feature-consider-all BOOL]"
                " [--feature-mandatory A,B]\n";
@@ -128,6 +129,7 @@ int run_log_util(int argc, char** argv) {
     std::size_t operation_count = 0;
     double train_percentage = 0.8;
     std::uint64_t seed = 0;
+    auto split_input = minera::SplitTrainTestInput::kDataFrame;
     std::string activity;
     std::string activity_key = "activity";
     std::string timestamp_key = "timestamp";
@@ -163,6 +165,10 @@ int run_log_util(int argc, char** argv) {
           ++operation_count;
         } else if (option == "--seed") {
           seed = parse_seed(value);
+        } else if (option == "--split-input") {
+          if (value == "dataframe") split_input = minera::SplitTrainTestInput::kDataFrame;
+          else if (value == "event_log") split_input = minera::SplitTrainTestInput::kEventLog;
+          else throw std::invalid_argument("--split-input expects dataframe or event_log");
         } else if (option == "--activity-key") {
           activity_key = value;
         } else if (option == "--timestamp-key") {
@@ -187,7 +193,7 @@ int run_log_util(int argc, char** argv) {
     const auto log = import_log(input_path);
     if (variant == minera::LogUtilityVariant::kSplitTrainTest) {
       std::cout << minera::log_train_test_json(
-                       minera::split_log_train_test(log, train_percentage, seed))
+                       minera::split_log_train_test(log, train_percentage, seed, split_input))
                 << '\n';
     } else if (variant == minera::LogUtilityVariant::kFixedPrefixes) {
       std::cout << minera::log_prefix_json(

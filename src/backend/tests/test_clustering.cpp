@@ -1,5 +1,7 @@
 #include "minera/clustering.hpp"
 #include <algorithm>
+#include <string>
+#include <vector>
 #include <cassert>
 #include <stdexcept>
 
@@ -13,7 +15,51 @@ EventLog sample() {
   l.traces = {a,b,c}; return l;
 }
 
+// The reference SKLEARN_PROFILES pipeline hands its parameters to
+// TRACE_BASED log-to-features. Expected sublogs captured from pm4py 2.7.22
+// with scikit-learn 1.9.0 for this five-trace log.
+void reference_profile_parameters() {
+  EventLog log;
+  const char* sequences[] = {"ab", "ab", "ac", "ac", "abc"};
+  for (int i = 0; i < 5; ++i) {
+    Trace trace;
+    trace.case_id = std::to_string(i);
+    trace.attributes = {{"kind", i % 2 ? "x" : "y"}};
+    std::size_t order = 0;
+    for (const char* a = sequences[i]; *a; ++a) {
+      Event event{trace.case_id, std::string(1, *a), "", std::string("r") + *a, order++,
+                  {{"amount", std::to_string(i) + ".0", AttributeKind::kFloat}}, ""};
+      trace.events.push_back(std::move(event));
+    }
+    log.traces.push_back(std::move(trace));
+  }
+  using Clusters = std::vector<std::vector<std::size_t>>;
+  const auto run = [&](ProfileClusteringOptions options) {
+    return reference_profile_clustering_result(log, options).clusters;
+  };
+  ProfileClusteringOptions options;
+  const auto defaults = reference_profile_clustering_result(log, options);
+  assert(defaults.clusters == Clusters({{2, 3, 4}, {0, 1}}));
+  assert(defaults.clusters == reference_profile_clustering(log).clusters);
+  assert(defaults.labels == std::vector<int>({1, 1, 0, 0, 0}));
+  assert(defaults.centroids.size() == 2 && defaults.diagnostics.computed);
+  auto tr = options; tr.trace_string_attributes = {"kind"};
+  assert(run(tr) == Clusters({{0, 2, 4}, {1, 3}}));
+  auto ev = options; ev.event_numeric_attributes = {"amount"};
+  assert(run(ev) == Clusters({{0, 1, 2}, {3, 4}}));
+  auto res = options; res.event_string_attributes = {"org:resource"};
+  assert(run(res) == Clusters({{2, 3, 4}, {0, 1}}));
+  auto none = options; none.include_activity_representation = none.include_succession_representation = false;
+  assert(run(none) == Clusters({{2, 3, 4}, {0, 1}}));
+  // A numeric trace attribute missing on some trace raises, as there.
+  auto missing = options; missing.trace_numeric_attributes = {"x"};
+  bool threw = false;
+  try { (void)run(missing); } catch (const std::exception&) { threw = true; }
+  assert(threw);
+}
+
 int main() {
+  reference_profile_parameters();
   auto l = sample(); TraceAttributeClusteringOptions o; o.trace_attribute="segment";
   o.dfg_extension = true;
   const auto memberships = trace_attribute_clustering_groups(l, "segment");

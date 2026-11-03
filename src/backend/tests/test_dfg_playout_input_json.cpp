@@ -155,7 +155,8 @@ void declared_maps_drive_classic_and_performance_native_calls() {
   DfgPlayoutOptions performance;
   performance.variant = DfgPlayoutVariant::kPerformance;
   performance.traces = 3;
-  performance.seed = std::numeric_limits<std::uint64_t>::max();
+  // The largest numpy.random.seed value.
+  performance.seed = 0xffffffffULL;
   performance.case_arrival_rate = 10;
   auto execute = [&](const DfgPlayoutInput& input) {
     return dfg_playout_result(input.frequency, input.start_activities, input.end_activities,

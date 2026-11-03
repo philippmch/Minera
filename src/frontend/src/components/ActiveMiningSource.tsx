@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from "react";
 import {
   MINING_INPUT_FORMATS, MINING_INPUT_SHAPES, MINING_SOURCE_SELECTORS, activeMiningSourceAllTablesCsv, activeMiningSourceBytes,
-  activeMiningSourceReport, activeMiningSourceRequest, activeMiningSourceTableFileName, activeMiningSourceTables, classifyMiningJson, defaultMiningSourceForm,
+  activeMiningSourceNativeBlob, activeMiningSourceReportBlob, activeMiningSourceRequest, activeMiningSourceTableFileName, activeMiningSourceTables, classifyMiningJson, defaultMiningSourceForm,
   miningResultsLabel, miningSourceFormFromDescriptor, miningSourceHash, miningSourceOptions, requestActiveMiningSource, requestActiveMiningSourceFile,
   suggestMiningSourceForm, activeMiningSourceText, type ActiveMiningSourceDescriptor, type ActiveMiningSourceRun, type ActiveSourceMining, type MiningSourceForm, type MiningInputTable,
 } from "../active-mining-source";
@@ -10,12 +10,22 @@ import type {MineraExport} from "../types";
 import {TOKEN_REPLAY_IMPORT_CONTROLS, TOKEN_REPLAY_XES_BOOLEAN_CONTROLS} from "../token-replay-workbench";
 import {WORKFLOW_INPUT_XES_VARIANTS} from "../workflow-input-workbench";
 import {diagnosticCsv} from "../model-diagnostics";
-import {nativeJson} from "../native-json";
+import {nativeJson, nativeJsonBlob, nativeJsonPreview} from "../native-json";
 import {nativeResponseJson} from "../native-response";
 import {downloadQueryBlob} from "../log-query";
 import {DiagnosticTableView} from "./ModelDiagnosticsInspection";
 
 const ACTIVE_SOURCE_AUTOLOAD_BYTES = 256 * 1024;
+/** The snapshot preview shows at most this many characters of its native JSON. */
+export const ACTIVE_SOURCE_PREVIEW_CHARACTERS = 1_000_000;
+
+/** A bounded view of the snapshot's native JSON, serialized only once opened: the whole text of a large source exceeds the engine's string limit. */
+function NativeSnapshotPreview({snapshot}: {snapshot: object}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [snapshot]);
+  const preview = useMemo(() => open ? nativeJsonPreview(snapshot, 2, ACTIVE_SOURCE_PREVIEW_CHARACTERS) : null, [open, snapshot]);
+  return <details open={open} onToggle={event => setOpen(event.currentTarget.open)}><summary>Complete native source snapshot</summary>{preview && <><pre>{preview.text}</pre>{preview.truncated && <p role="status">First {preview.text.length} characters shown; use Download complete native source JSON for the whole snapshot.</p>}</>}</details>;
+}
 
 export function ActiveMiningSource({source = null, initialFile = null, data = null, outcome = null, mining, available, onOpen, onCancel}: {source?: ActiveMiningSourceDescriptor | null; initialFile?: File | null; data?: MineraExport | null; outcome?: ActiveSourceMining | null; mining: boolean; available: boolean; onOpen: (file: File, options: MineOptions) => void; onCancel: () => void}) {
   const [file, setFile] = useState<File | null>(initialFile ?? source?.file ?? null), [form, setForm] = useState<MiningSourceForm>(() => source ? miningSourceFormFromDescriptor(source) : defaultMiningSourceForm());
@@ -31,7 +41,8 @@ export function ActiveMiningSource({source = null, initialFile = null, data = nu
   const currentFile = file === source?.file, currentOutcome = currentFile ? outcome : null, miningCapture = currentOutcome ?? (currentFile ? data : null);
   const snapshot = currentFile ? inspection?.value ?? source?.snapshot ?? null : null, partial = snapshot?.detail === "summary", tables = useMemo(() => [...(snapshot ? activeMiningSourceTables(snapshot) : preview ? activeMiningSourceTables({input_before: preview}) : []), ...(currentOutcome ? activeMiningSourceTables(currentOutcome).map(table => ({...table, id: `mining${table.id}`, title: `Mining envelope ${table.title}`})) : [])], [snapshot, preview, currentOutcome]), table = tables.find(item => item.id === tableId) ?? tables[0];
   const refresh = async () => {if (!source || !available) return; request.current?.abort(); const controller = new AbortController(), ticket = revision.current; request.current = controller; setPending(true); setError(null); try {const result = await requestActiveMiningSource(source.source_id, controller.signal); if (ticket === revision.current && request.current === controller && !controller.signal.aborted) setInspection(result);} catch (cause) {if (ticket === revision.current && !controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause));} finally {if (request.current === controller) {request.current = null; setPending(false);}}};
-  const download = (text: string, name: string, type = "application/json") => downloadQueryBlob(new Blob([activeMiningSourceBytes(text)], {type}), name), isXes = /\.(?:xes|xes\.gz|gz)$/i.test(file?.name ?? "");
+  const download = (text: string, name: string, type = "application/json") => downloadQueryBlob(new Blob([activeMiningSourceBytes(text)], {type}), name);
+  const downloadNative = () => downloadQueryBlob(inspection ? activeMiningSourceNativeBlob(inspection) : nativeJsonBlob(snapshot ?? {input_before: preview}, 2, activeMiningSourceBytes), "minera-active-source-native.json"), isXes = /\.(?:xes|xes\.gz|gz)$/i.test(file?.name ?? "");
   const open = () => {if (!file) return; onOpen(file, {...(file === source?.file ? source.options : {}), ...miningSourceOptions(form)});};
   const downloadCached = async () => {if (!source || !available) return; request.current?.abort(); const controller = new AbortController(); request.current = controller; setPending(true); setError(null); try {const original = await requestActiveMiningSourceFile(source, controller.signal); if (request.current === controller && !controller.signal.aborted) downloadQueryBlob(original, original.name);} catch (cause) {if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause));} finally {if (request.current === controller) {request.current = null; setPending(false);}}};
   return <>
@@ -51,12 +62,12 @@ export function ActiveMiningSource({source = null, initialFile = null, data = nu
       {currentOutcome && currentOutcome.analysis === null && <p role="status">Classic analysis is unavailable{currentOutcome.error ? `: ${currentOutcome.error.message}` : ". Inspect the individual native family results below"}. The original source and event-table query tools remain available.</p>}
     </section>
     {table && <section className="panel" aria-label="Complete active source inspection"><div className="panel-head"><h2>{snapshot ? "Complete native source views" : "Original typed source preview"}</h2><span className="panel-meta">{currentFile ? source?.source_id : "Unmined original file"}</span></div><p>Original and checked tables retain their native cells, index, dtypes, categories and metadata. Prepared log, stream and lazy views record their own native semantics. Diagram and table pages do not limit exports.</p>{partial && <p role="status">{pending ? "Loading the complete native source views…" : available ? "This summary omits the complete source tables, logs and stream. Reload the source to inspect them; for a large original the complete views take a long time to load." : "This summary omits the complete source tables, logs and stream, and the backend no longer holds this source."}</p>}<div className="query-actions">
-      {source && currentFile && <><button className="btn-ghost" disabled={!available || pending || mining} onClick={() => void refresh()}>Reload source</button><button className="btn-ghost" onClick={() => downloadQueryBlob(source.file, source.file.name)}>Download original source bytes</button><button className="btn-ghost" disabled={!available || pending || mining} onClick={() => void downloadCached()}>Download and verify cached original bytes</button>{snapshot && <button className="btn-ghost" disabled={partial} onClick={() => download(activeMiningSourceReport(source, snapshot, outcome ?? data ?? undefined), "minera-active-source-report.json")}>Download complete source report</button>}</>}
-      <button className="btn-ghost" disabled={partial} onClick={() => download(inspection?.raw ?? nativeJson(snapshot ?? {input_before: preview}, 2), "minera-active-source-native.json")}>Download complete native source JSON</button>
+      {source && currentFile && <><button className="btn-ghost" disabled={!available || pending || mining} onClick={() => void refresh()}>Reload source</button><button className="btn-ghost" onClick={() => downloadQueryBlob(source.file, source.file.name)}>Download original source bytes</button><button className="btn-ghost" disabled={!available || pending || mining} onClick={() => void downloadCached()}>Download and verify cached original bytes</button>{snapshot && <button className="btn-ghost" disabled={partial} onClick={() => downloadQueryBlob(activeMiningSourceReportBlob(source, snapshot, outcome ?? data ?? undefined), "minera-active-source-report.json")}>Download complete source report</button>}</>}
+      <button className="btn-ghost" disabled={partial} onClick={downloadNative}>Download complete native source JSON</button>
       {miningCapture && <button className="btn-ghost" onClick={() => download(nativeResponseJson(miningCapture), "minera-active-source-mining.json")}>{miningResultsLabel(miningCapture)}</button>}
       <button className="btn-ghost" disabled={partial} onClick={() => download(diagnosticCsv(table), `minera-source-${activeMiningSourceTableFileName(table.id)}.csv`, "text/csv;charset=utf-8")}>Download complete source table CSV</button><button className="btn-ghost" disabled={partial} onClick={() => download(activeMiningSourceAllTablesCsv(tables), "minera-active-source-all-tables.csv", "text/csv;charset=utf-8")}>Download all source tables CSV</button>
       {source && currentFile && <button className="btn-ghost" onClick={() => download(activeMiningSourceRequest(source, miningCapture ?? undefined), "minera-active-source-request.json")}>Download exact source mining request</button>}
       {!currentFile && file && <button className="btn-ghost" onClick={() => downloadQueryBlob(file, file.name)}>Download original preview bytes</button>}
-    </div><label className="filters-field"><span>Native source inspection table</span><select value={table.id} onChange={event => setTableId(event.target.value)}>{tables.map(item => <option key={item.id} value={item.id}>{item.title} · {item.rows.length} rows</option>)}</select></label><DiagnosticTableView key={table.id} table={table} noun="source" />{snapshot && <details><summary>Complete native source snapshot</summary><pre>{nativeJson(snapshot, 2)}</pre></details>}</section>}
+    </div><label className="filters-field"><span>Native source inspection table</span><select value={table.id} onChange={event => setTableId(event.target.value)}>{tables.map(item => <option key={item.id} value={item.id}>{item.title} · {item.rows.length} rows</option>)}</select></label><DiagnosticTableView key={table.id} table={table} noun="source" />{snapshot && <NativeSnapshotPreview snapshot={snapshot} />}</section>}
   </>;
 }

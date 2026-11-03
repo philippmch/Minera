@@ -2,8 +2,296 @@
 
 #include <cassert>
 #include <cstdint>
+#include <regex>
+#include <stdexcept>
+#include <string>
 #include <sstream>
 #include <variant>
+
+namespace {
+
+// Captured with PM4Py 2.7.22: read_ocel2_json on kFixture, then
+// write_ocel2_xml (kReferenceXml2) and, on the copy with whole-second
+// timestamps, write_ocel (kReferenceXml1). Event attribute types follow the
+// reference frame: an int or bool column is declared "string", a float
+// column "float"; integers in a float column print as floats.
+constexpr const char* kFixture = R"REF({"objectTypes":[{"name":"order","attributes":[{"name":"color","type":"string"}]},{"name":"item","attributes":[{"name":"weight","type":"float"}]}],
+ "eventTypes":[{"name":"create","attributes":[]},{"name":"pick, item","attributes":[]}],
+ "objects":[
+  {"id":"o1","type":"order","attributes":[{"name":"color","time":"1970-01-01T00:00:00Z","value":"red"},{"name":"color","time":"2020-01-02T00:00:00Z","value":"blue"}],"relationships":[{"objectId":"i1","qualifier":"contains"}]},
+  {"id":"i1","type":"item","attributes":[{"name":"weight","time":"1970-01-01T00:00:00Z","value":2.5}]},
+  {"id":"i'2","type":"item","attributes":[{"name":"weight","time":"1970-01-01T00:00:00Z","value":3}]}],
+ "events":[
+  {"id":"e1","type":"create","time":"2020-01-01T00:00:00Z","attributes":[{"name":"n","value":4},{"name":"flag","value":false},{"name":"cost","value":0.1},{"name":"note","value":"a<b&\"c\"\nd"}],"relationships":[{"objectId":"o1","qualifier":"q"}]},
+  {"id":"e2","type":"pick, item","time":"2020-01-01T00:00:01.250000Z","attributes":[{"name":"n","value":5},{"name":"flag","value":true}],"relationships":[{"objectId":"i'2","qualifier":""}]},
+  {"id":"e3","type":"create","time":"2020-01-01T00:00:02.000001Z","attributes":[{"name":"n","value":-6},{"name":"flag","value":true},{"name":"cost","value":1e20}],"relationships":[{"objectId":"i1","qualifier":""}]},
+  {"id":"e4","type":"pick, item","time":"2020-01-01T00:00:03Z","attributes":[{"name":"n","value":7},{"name":"flag","value":false}],"relationships":[{"objectId":"o1","qualifier":"r"}]}]})REF";
+
+constexpr const char* kReferenceXml2 = R"REF(<?xml version='1.0' encoding='UTF-8'?>
+<log>
+  <object-types>
+    <object-type name="item">
+      <attributes>
+        <attribute name="weight" type="float"/>
+      </attributes>
+    </object-type>
+    <object-type name="order">
+      <attributes>
+        <attribute name="color" type="string"/>
+      </attributes>
+    </object-type>
+  </object-types>
+  <event-types>
+    <event-type name="create">
+      <attributes>
+        <attribute name="n" type="string"/>
+        <attribute name="flag" type="string"/>
+        <attribute name="cost" type="float"/>
+        <attribute name="note" type="string"/>
+      </attributes>
+    </event-type>
+    <event-type name="pick, item">
+      <attributes>
+        <attribute name="n" type="string"/>
+        <attribute name="flag" type="string"/>
+      </attributes>
+    </event-type>
+  </event-types>
+  <objects>
+    <object id="o1" type="order">
+      <attributes>
+        <attribute name="color" time="1970-01-01T00:00:00Z">red</attribute>
+        <attribute name="color" time="2020-01-02T00:00:00+00:00">blue</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="i1" qualifier="contains"/>
+      </objects>
+    </object>
+    <object id="i1" type="item">
+      <attributes>
+        <attribute name="weight" time="1970-01-01T00:00:00Z">2.5</attribute>
+      </attributes>
+    </object>
+    <object id="i'2" type="item">
+      <attributes>
+        <attribute name="weight" time="1970-01-01T00:00:00Z">3.0</attribute>
+      </attributes>
+    </object>
+  </objects>
+  <events>
+    <event id="e1" type="create" time="2020-01-01T00:00:00+00:00">
+      <attributes>
+        <attribute name="n">4</attribute>
+        <attribute name="flag">False</attribute>
+        <attribute name="cost">0.1</attribute>
+        <attribute name="note">a&lt;b&amp;"c"
+d</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="o1" qualifier="q"/>
+      </objects>
+    </event>
+    <event id="e2" type="pick, item" time="2020-01-01T00:00:01.250000+00:00">
+      <attributes>
+        <attribute name="n">5</attribute>
+        <attribute name="flag">True</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="i'2" qualifier=""/>
+      </objects>
+    </event>
+    <event id="e3" type="create" time="2020-01-01T00:00:02.000001+00:00">
+      <attributes>
+        <attribute name="n">-6</attribute>
+        <attribute name="flag">True</attribute>
+        <attribute name="cost">1e+20</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="i1" qualifier=""/>
+      </objects>
+    </event>
+    <event id="e4" type="pick, item" time="2020-01-01T00:00:03+00:00">
+      <attributes>
+        <attribute name="n">7</attribute>
+        <attribute name="flag">False</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="o1" qualifier="r"/>
+      </objects>
+    </event>
+  </events>
+</log>
+)REF";
+
+constexpr const char* kReferenceXml1 = R"REF(<?xml version='1.0' encoding='UTF-8'?>
+<log>
+  <global scope="event"/>
+  <global scope="object"/>
+  <global scope="log">
+    <list key="attribute-names">
+      <string key="attribute-name" value="color"/>
+      <string key="attribute-name" value="cost"/>
+      <string key="attribute-name" value="flag"/>
+      <string key="attribute-name" value="n"/>
+      <string key="attribute-name" value="note"/>
+      <string key="attribute-name" value="weight"/>
+    </list>
+    <list key="object-types">
+      <string key="object-type" value="order"/>
+      <string key="object-type" value="item"/>
+    </list>
+    <string key="version" value="1.0"/>
+    <string key="ordering" value="timestamp"/>
+  </global>
+  <events>
+    <event>
+      <string key="id" value="e1"/>
+      <date key="timestamp" value="2020-01-01T00:00:00Z"/>
+      <string key="activity" value="create"/>
+      <list key="omap">
+        <string key="object-id" value="o1"/>
+      </list>
+      <list key="vmap">
+        <string key="n" value="4"/>
+        <string key="flag" value="False"/>
+        <float key="cost" value="0.1"/>
+        <string key="note" value="a&lt;b&amp;&quot;c&quot;&#10;d"/>
+      </list>
+    </event>
+    <event>
+      <string key="id" value="e2"/>
+      <date key="timestamp" value="2020-01-01T00:00:01Z"/>
+      <string key="activity" value="pick, item"/>
+      <list key="omap">
+        <string key="object-id" value="i'2"/>
+      </list>
+      <list key="vmap">
+        <string key="n" value="5"/>
+        <string key="flag" value="True"/>
+      </list>
+    </event>
+    <event>
+      <string key="id" value="e3"/>
+      <date key="timestamp" value="2020-01-01T00:00:02Z"/>
+      <string key="activity" value="create"/>
+      <list key="omap">
+        <string key="object-id" value="i1"/>
+      </list>
+      <list key="vmap">
+        <string key="n" value="-6"/>
+        <string key="flag" value="True"/>
+        <float key="cost" value="1e+20"/>
+      </list>
+    </event>
+    <event>
+      <string key="id" value="e4"/>
+      <date key="timestamp" value="2020-01-01T00:00:03Z"/>
+      <string key="activity" value="pick, item"/>
+      <list key="omap">
+        <string key="object-id" value="o1"/>
+      </list>
+      <list key="vmap">
+        <string key="n" value="7"/>
+        <string key="flag" value="False"/>
+      </list>
+    </event>
+  </events>
+  <objects>
+    <object>
+      <string key="id" value="o1"/>
+      <string key="type" value="order"/>
+      <list key="ovmap">
+        <string key="color" value="red"/>
+      </list>
+    </object>
+    <object>
+      <string key="id" value="i1"/>
+      <string key="type" value="item"/>
+      <list key="ovmap">
+        <float key="weight" value="2.5"/>
+      </list>
+    </object>
+    <object>
+      <string key="id" value="i'2"/>
+      <string key="type" value="item"/>
+      <list key="ovmap">
+        <float key="weight" value="3.0"/>
+      </list>
+    </object>
+  </objects>
+</log>
+)REF";
+
+std::string replace_all(std::string text, const std::string& from, const std::string& to) {
+  for (auto at = text.find(from); at != std::string::npos; at = text.find(from, at + to.size()))
+    text.replace(at, from.size(), to);
+  return text;
+}
+
+void reference_capture_tests() {
+  const auto log = minera::parse_ocel_json(kFixture);
+
+  // OCEL 2.0 XML: the reference document, except that Minera also names
+  // each value's type (a declared divergence the reference reader ignores).
+  minera::OcelXmlExportOptions standard;
+  standard.format = minera::OcelXmlFormat::kStandard;
+  const auto xml2 = minera::serialize_ocel_xml(log, standard);
+  const std::regex value_type(R"((<attribute [^>]*) type="[a-z]+">)");
+  assert(std::regex_replace(xml2, value_type, "$1>") == kReferenceXml2);
+  assert(xml2.find("<attribute name=\"n\" time=") == std::string::npos);
+  // O2O links come back from the reference's <objects> form.
+  const auto reread2 = minera::parse_ocel_xml(kReferenceXml2);
+  assert(reread2.o2o.size() == 1 && reread2.o2o[0].source_id == "o1" &&
+         reread2.o2o[0].target_id == "i1" && reread2.o2o[0].qualifier == "contains");
+  assert(reread2.object_changes.size() == 1);
+  assert(minera::parse_ocel_xml(xml2).o2o.size() == 1);
+
+  // The reference reader reads an attribute element without text as "None"
+  // (string, integer, boolean and time declarations alike) and raises for a
+  // float; a native file names the value's type and keeps the empty string.
+  const auto empty_text = [](const std::string& type, const std::string& value) {
+    return "<log><event-types><event-type name=\"A\"><attributes><attribute name=\"a\" type=\"" + type +
+           "\"/></attributes></event-type></event-types><objects><object id=\"o1\" type=\"t\"/></objects>"
+           "<events><event id=\"e1\" type=\"A\" time=\"2020-01-01T00:00:00Z\"><attributes>" + value +
+           "</attributes><objects><relationship object-id=\"o1\" qualifier=\"\"/></objects></event></events></log>";
+  };
+  for (const char* type : {"string", "integer", "boolean", "time"})
+    assert(minera::parse_ocel_xml(empty_text(type, "<attribute name=\"a\"></attribute>"))
+               .events[0].attributes[0].value == minera::OcelValue(std::string("None")));
+  assert(minera::parse_ocel_xml(empty_text("string", "<attribute name=\"a\"> </attribute>"))
+             .events[0].attributes[0].value == minera::OcelValue(std::string(" ")));
+  bool float_raises = false;
+  try {
+    (void)minera::parse_ocel_xml(empty_text("float", "<attribute name=\"a\"/>"));
+  } catch (const std::invalid_argument&) {
+    float_raises = true;
+  }
+  assert(float_raises);
+  minera::Ocel empty_string;
+  empty_string.objects.push_back({"o1", "t", {}});
+  empty_string.events.push_back({"e1", "A", "2020-01-01T00:00:00Z", {{"a", std::string()}}});
+  empty_string.relations.push_back({"e1", "o1", ""});
+  assert(minera::parse_ocel_xml(minera::serialize_ocel_xml(empty_string, standard))
+             .events[0].attributes[0].value == minera::OcelValue(std::string()));
+
+  // OCEL 1.0 XML: byte for byte what the reference writes. Its qualifiers,
+  // O2O link and object change need the loss allowance.
+  auto whole_seconds = replace_all(kFixture, "00:00:01.250000Z", "00:00:01Z");
+  whole_seconds = replace_all(whole_seconds, "00:00:02.000001Z", "00:00:02Z");
+  const auto seconds_log = minera::parse_ocel_json(whole_seconds);
+  bool refused = false;
+  try { (void)minera::serialize_ocel_xml(seconds_log); } catch (const std::invalid_argument&) { refused = true; }
+  assert(refused);
+  minera::OcelXmlExportOptions lossy;
+  lossy.allow_lossy = true;
+  assert(minera::serialize_ocel_xml(seconds_log, lossy) == kReferenceXml1);
+  const auto reread1 = minera::parse_ocel_xml(kReferenceXml1);
+  assert(reread1.events.size() == 4 && reread1.objects.size() == 3 && reread1.relations.size() == 4);
+  assert(reread1.events[0].attributes.size() == 4 &&
+         reread1.events[0].attributes[3].value == minera::OcelValue(std::string("a<b&\"c\"\nd")));
+}
+
+}  // namespace
 
 int main() {
   minera::Ocel log;
@@ -20,14 +308,27 @@ int main() {
   log.object_changes.push_back({"o1", "Order", "2024-01-02T00:00:00Z", "status", std::string("paid")});
   log.globals["ocel:global-event.version"] = std::string("1");
 
-  const auto classic = minera::serialize_ocel_xml(log);
+  // OCEL 1.0 XML has no qualifiers, O2O/E2E links or object changes: the
+  // writer refuses to drop them unless loss is allowed, then writes what the
+  // reference writer writes.
+  bool refused = false;
+  try { (void)minera::serialize_ocel_xml(log); } catch (const std::invalid_argument&) { refused = true; }
+  assert(refused);
+  minera::OcelXmlExportOptions lossy;
+  lossy.allow_lossy = true;
+  const auto classic = minera::serialize_ocel_xml(log, lossy);
   const auto parsed = minera::parse_ocel_xml(classic);
   assert(parsed.events.size() == 2 && parsed.objects.size() == 2);
-  assert(parsed.relations.front().qualifier == "owner");
-  assert(parsed.o2o.front().qualifier == "contains");
-  assert(parsed.e2e.size() == 1 && parsed.e2e.front().qualifier == "precedes");
-  assert(parsed.object_changes.size() == 1);
-  assert(classic == minera::serialize_ocel_xml(log));
+  assert(parsed.relations.front().qualifier.empty());
+  assert(parsed.o2o.empty() && parsed.e2e.empty() && parsed.object_changes.empty());
+  assert(parsed.globals.at("ocel:global-event.version") == minera::OcelValue(std::string("1")));
+  // Booleans are written as text, as the reference writes them; the integer
+  // price sits in a column with a missing cell, a float column in the
+  // reference frame, so it is written as the float 7.0.
+  assert(parsed.objects[0].attributes[0].value == minera::OcelValue(7.0));
+  assert(parsed.events[0].attributes[0].value == minera::OcelValue(std::string("True")));
+  assert(classic == minera::serialize_ocel_xml(log, lossy));
+  reference_capture_tests();
 
   minera::OcelXmlExportOptions standard;
   standard.format = minera::OcelXmlFormat::kStandard;

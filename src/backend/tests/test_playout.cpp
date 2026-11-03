@@ -1,6 +1,8 @@
 #include "minera/json_export.hpp"
 #include "minera/playout.hpp"
+#include "minera/timestamp.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <limits>
 #include <stdexcept>
@@ -597,6 +599,139 @@ void fitting_replay_budget_is_validated() {
   assert(rejected);
 }
 
+// The reference BASIC_PLAYOUT process and envelope (invariant-only; the
+// reference draws from a set of transition objects).
+void basic_playout_reference_semantics() {
+  // Envelope: cases "0".., epoch 10,000,000, one second per event across
+  // cases; explicit timing is the declared add_envelope extension.
+  minera::PetriNet two;
+  {
+    const auto source = two.add_place();
+    const auto middle = two.add_place();
+    const auto sink = two.add_place();
+    two.set_source(source);
+    two.set_sink(sink);
+    two.set_activities({"a", "b"});
+    two.add_transition(0, {source}, {middle});
+    two.add_transition(1, {middle}, {sink});
+  }
+  minera::PlayoutOptions envelope;
+  envelope.traces = 3;
+  const auto reference = minera::playout(two, envelope);
+  assert(reference.trace_count() == 3);
+  for (std::size_t i = 0; i < 3; ++i) {
+    assert(reference.traces[i].case_id == std::to_string(i));
+    assert(reference.traces[i].events.size() == 2);
+    for (std::size_t j = 0; j < 2; ++j)
+      assert(reference.traces[i].events[j].timestamp ==
+             minera::format_timestamp(10000000.0 + static_cast<double>(2 * i + j)));
+  }
+  envelope.add_envelope = true;
+  const auto explicit_timing = minera::playout(two, envelope);
+  assert(explicit_timing.traces[1].case_id == "case_2");
+  assert(explicit_timing.traces[1].events[1].timestamp ==
+         minera::format_timestamp(envelope.start + envelope.case_interval + envelope.event_interval));
+
+  // In the final marking "stop" is one more option: with one enabled
+  // self-loop there, a case stops right after "a" with probability 1/2.
+  minera::PetriNet looping;
+  const auto lsource = looping.add_place();
+  const auto lsink = looping.add_place();
+  looping.set_source(lsource);
+  looping.set_sink(lsink);
+  looping.set_activities({"a", "c", "s"});
+  looping.add_transition(0, {lsource}, {lsink});
+  looping.add_transition(1, {lsink}, {lsink});
+  minera::PlayoutOptions stop;
+  stop.traces = 20000;
+  stop.seed = 11;
+  std::size_t only_a = 0;
+  for (const auto& trace : minera::playout(looping, stop).traces) {
+    assert(trace.events.front().activity == "a");
+    if (trace.events.size() == 1) ++only_a;
+  }
+  assert(only_a > 9700 && only_a < 10300);
+
+  // Transitions without input places are always enabled.
+  minera::PetriNet generator;
+  const auto gq0 = generator.add_place();
+  const auto gq1 = generator.add_place();
+  generator.set_source(gq0);
+  generator.set_sink(gq1);
+  generator.set_activities({"g", "h"});
+  generator.add_transition(0, {}, {gq0});
+  generator.add_transition(1, {gq0}, {gq1});
+  minera::PlayoutOptions free;
+  free.traces = 200;
+  free.max_steps = 5;
+  free.initial_marking = {0, 0};
+  bool repeated_generator = false;
+  for (const auto& trace : minera::playout(generator, free).traces) {
+    assert(trace.events.front().activity == "g");
+    assert(trace.events.size() <= 5);
+    if (trace.events.size() > 1 && trace.events[1].activity == "g") repeated_generator = true;
+  }
+  assert(repeated_generator);
+
+  // max_steps counts visible events; silent firings do not count, and a
+  // case cut at the bound is kept without add_only_if_fm_is_reached.
+  minera::PetriNet capped;
+  const auto cp0 = capped.add_place();
+  const auto cp1 = capped.add_place();
+  capped.set_source(cp0);
+  capped.set_sink(cp1);
+  capped.set_activities({"a", "b"});
+  capped.add_transition(0, {cp0}, {cp0});
+  capped.add_transition(std::nullopt, {cp0}, {cp0});
+  capped.add_transition(1, {cp0}, {cp1});
+  minera::PlayoutOptions bounded;
+  bounded.traces = 3000;
+  bounded.max_steps = 4;
+  bool cut_kept = false;
+  std::size_t longest = 0;
+  for (const auto& trace : minera::playout(capped, bounded).traces) {
+    longest = std::max(longest, trace.events.size());
+    if (trace.events.size() == 4 && trace.events.back().activity == "a") cut_kept = true;
+  }
+  assert(longest == 4 && cut_kept);
+
+  // add_only_if_fm_is_reached samples on until `traces` are accepted ...
+  bounded.add_only_if_fm_is_reached = true;
+  const auto accepted = minera::playout(capped, bounded);
+  assert(accepted.trace_count() == 3000);
+  for (std::size_t i = 0; i < accepted.traces.size(); ++i) {
+    assert(accepted.traces[i].case_id == std::to_string(i));
+    assert(accepted.traces[i].events.back().activity == "b");
+  }
+  // ... and raises past its attempt bound instead of returning fewer.
+  bounded.max_attempts = 3000;
+  bool raised = false;
+  try {
+    (void)minera::playout(capped, bounded);
+  } catch (const std::runtime_error&) {
+    raised = true;
+  }
+  assert(raised);
+
+  // A silent livelock raises at the firing bound.
+  minera::PetriNet livelock;
+  const auto vp0 = livelock.add_place();
+  const auto vp1 = livelock.add_place();
+  livelock.set_source(vp0);
+  livelock.set_sink(vp1);
+  livelock.add_transition(std::nullopt, {vp0}, {vp0});
+  minera::PlayoutOptions spin;
+  spin.traces = 1;
+  spin.max_firings_per_trace = 100;
+  raised = false;
+  try {
+    (void)minera::playout(livelock, spin);
+  } catch (const std::runtime_error&) {
+    raised = true;
+  }
+  assert(raised);
+}
+
 }  // namespace
 
 int main() {
@@ -610,6 +745,7 @@ int main() {
   visited_playout_records_markings_and_transitions();
   visited_playout_honors_filtering_and_seed();
   basic_playout_timing_is_validated();
+  basic_playout_reference_semantics();
   extensive_playout_accepts_explicit_markers();
   extensive_visited_preserves_silent_steps_and_occurrence_bound();
   sampled_variants_accept_explicit_markers();

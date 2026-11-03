@@ -9,9 +9,13 @@
 
 namespace minera {
 
-// Random process-tree construction strategies. PT-and-log is the default
-// construction controlled by the activity-count and operator probabilities;
-// BASIC remains available as the legacy recursive strategy.
+// algo.simulation.tree_generator of PM4Py 2.7.22. Both variants are exact:
+// the draws are the reference's global generators, random.seed(seed) (and
+// numpy.random.seed(seed) for PT-and-log), in the reference order, so a seed
+// reproduces the reference trees and their labels whatever the string-hash
+// seed (see random_tree.cpp for the draw order). BASIC labels its leaves
+// with six random characters from A-Z0-9; PT-and-log names its activities
+// a, b, ..., z, aa, ab, ... in creation order. PT-and-log is the default.
 enum class RandomTreeVariant {
   kBasic,
   kPtAndLogGenerator,
@@ -32,7 +36,10 @@ struct RandomTreeOptions {
   std::size_t max_rec_depth = 3;
   double prob_leaf = 0.25;
   std::uint64_t seed = 1;
-  std::vector<std::string> activities = {"A", "B", "C", "D", "E", "F"};
+  // Empty (the default): the reference's random six-character labels.
+  // Declared extension: BASIC draws each leaf label from these names with
+  // one randbelow(n) instead. PT-and-log ignores them.
+  std::vector<std::string> activities;
 
   // Parameters of the PT-and-log population generator.  The activity count
   // is sampled from a triangular distribution (min, mode, max).

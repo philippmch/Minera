@@ -16,7 +16,7 @@ struct OcelXmlImportOptions {
   // Unknown XML fields are ignored by default. Set to reject unsupported
   // constructs (for example list-valued attributes) instead.
   bool reject_unsupported = false;
-  std::size_t max_bytes = 64u * 1024u * 1024u;
+  std::size_t max_bytes = kOcelMaxDocumentBytes;
 };
 
 struct OcelXmlExportOptions {

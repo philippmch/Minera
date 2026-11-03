@@ -91,12 +91,27 @@ struct Ocel {
 
 using OCEL = Ocel;
 
+// One limit for every OCEL route and reader: it equals the server's request
+// payload limit, so any OCEL a server route accepts or produces (an import
+// envelope's log) is accepted by every other OCEL route.
+inline constexpr std::size_t kOcelMaxDocumentBytes = 128u * 1024u * 1024u;
+
 struct OcelJsonLimits {
-  std::size_t max_bytes = 16u * 1024u * 1024u;
+  std::size_t max_bytes = kOcelMaxDocumentBytes;
   std::size_t max_depth = 64;
   std::size_t max_string_bytes = 1u * 1024u * 1024u;
-  std::size_t max_nodes = 1u * 1024u * 1024u;
+  // A 120k-event classic JSON of 38 MB already has more than a million nodes.
+  std::size_t max_nodes = 32u * 1024u * 1024u;
 };
+
+// "128 MiB" for whole mebibytes, otherwise "N bytes".
+[[nodiscard]] std::string ocel_limit_text(std::size_t bytes);
+
+// The first limit a JSON document breaks, as parse_ocel_json would report it,
+// without building the document: nullopt when it fits. Checks the size,
+// nesting depth, string length and node count only, not the syntax.
+[[nodiscard]] std::optional<std::string> ocel_json_limit_violation(
+    std::string_view json, const OcelJsonLimits& limits = {});
 
 enum class OcelJsonFormat { kClassic, kStandard };
 
@@ -146,12 +161,20 @@ void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);
 // multiplicity and the type catalogs are kept.
 void drop_unrelated_ocel_entries(Ocel& log);
 
+// Reads OCEL 1.0 or 2.0 JSON as the reference readers do, including the
+// drop of unrelated events and objects, unless the document carries
+// "minera:keepUnrelated": true (see serialize_ocel_json).
 Ocel parse_ocel_json(std::string_view json,
                      const OcelJsonLimits& limits = {});
 // Exact native filter inputs may use literal empty IDs, type names and
 // attribute names. The default interchange reader retains its validation.
 Ocel parse_ocel_json_literal_names(std::string_view json,
                                   const OcelJsonLimits& limits = {});
+// Writes events, objects, attributes and relations in log order. A log with
+// events or objects outside every event-object relation gets a
+// "minera:keepUnrelated": true member, and parse_ocel_json then keeps those
+// entries rather than dropping them like the reference file readers (which
+// ignore the member): OCELs travel between routes as this JSON.
 std::string serialize_ocel_json(const Ocel& log,
                                 OcelJsonFormat format = OcelJsonFormat::kClassic);
 

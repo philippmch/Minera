@@ -449,8 +449,9 @@ TraceVariantQueryResult reference_sacofa(const EventLog& log,
   }
   std::vector<TraceVariantQueryReferenceCase> cases;
   std::string empty_message;
+  TraceVariantQueryReferenceStats stats;
   try {
-    cases = reference_sacofa_trace_variant_query(traces, reference);
+    cases = reference_sacofa_trace_variant_query(traces, reference, &stats);
   } catch (const TraceVariantQueryReferenceError& error) {
     // The reference raises a ValueError instead of releasing nothing; Minera
     // returns the empty release and keeps the reference's explanation.
@@ -464,8 +465,13 @@ TraceVariantQueryResult reference_sacofa(const EventLog& log,
   diagnostics.epsilon = options.epsilon;
   diagnostics.max_prefix_length = options.max_prefix_length;
   diagnostics.prune_threshold = options.prune_threshold;
-  diagnostics.seed = options.secure_random ? reference.seed : options.seed;
+  // The OS-drawn seed of a secure run is the key of the release: it is never
+  // reported (replaying it would reproduce the noise), and is wiped here.
+  diagnostics.seed = options.secure_random ? 0 : options.seed;
+  if (options.secure_random) reference.seed = 0;
   diagnostics.secure_random = options.secure_random;
+  diagnostics.candidate_count = stats.candidate_count;
+  diagnostics.selected_violation_count = stats.selected_violation_count;
   for (const auto& released : cases) ++result.frequencies[released.events];
   diagnostics.retained_variant_count = result.frequencies.size();
   if (result.frequencies.size() > options.max_output_variants)
@@ -517,7 +523,7 @@ TraceVariantQueryResult anonymize_trace_variant_query(
   result.diagnostics.epsilon = options.epsilon;
   result.diagnostics.max_prefix_length = options.max_prefix_length;
   result.diagnostics.prune_threshold = options.prune_threshold;
-  result.diagnostics.seed = options.seed;
+  result.diagnostics.seed = options.secure_random ? 0 : options.seed;
   result.diagnostics.secure_random = options.secure_random;
   if (options.max_prefix_length == 0 || log.traces.empty()) {
     result.diagnostics.message = options.max_prefix_length == 0

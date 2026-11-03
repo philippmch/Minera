@@ -3,7 +3,9 @@
 #include "minera/conformance.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
+#include "minera/filtering_common.hpp"
 #include "ocpn_projection.hpp"
+#include "python_isoformat.hpp"
 #include "reference_tree_net.hpp"
 
 #include <algorithm>
@@ -72,7 +74,10 @@ class Parser {
   Parser(std::string_view input, const OcelJsonLimits& limits,
          bool unsigned_graph_counts = false)
       : input_(input), limits_(limits), unsigned_graph_counts_(unsigned_graph_counts) {
-    if (input_.size() > limits_.max_bytes) fail("JSON exceeds size limit");
+    if (input_.size() > limits_.max_bytes)
+      throw std::invalid_argument("OCEL JSON file exceeds the " +
+                                  ocel_limit_text(limits_.max_bytes) +
+                                  " OCEL limit");
   }
   Json parse() {
     skip();
@@ -220,7 +225,10 @@ OcelValue scalar(const Json& j, std::string_view field) {
 }
 void attrs(const Json* j, std::vector<OcelAttribute>& out, std::string_view field) {
   if (!j) return; if (!j->is_object()) throw std::invalid_argument("OCEL attributes must be object: " + std::string(field));
-  for (const auto& [key, val] : j->object()) { if (key.rfind("ocel:", 0) == 0) continue; out.push_back({key, scalar(val, key)}); }
+  // Document order, as the reference's dict keeps it (its frame columns
+  // follow first appearance).
+  const auto& object = j->object();
+  for (const auto& key : j->keys) { if (key.rfind("ocel:", 0) == 0) continue; out.push_back({key, scalar(object.at(key), key)}); }
 }
 const Json::Object& obj(const Json& j, std::string_view field) { if (!j.is_object()) throw std::invalid_argument("OCEL field must be object: " + std::string(field)); return j.object(); }
 
@@ -502,7 +510,11 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
           const auto index=assigned[oid]++;
           if(index<occurrences[oid].size())log.relations[occurrences[oid][index]].qualifier=qualifier;
           else log.relations.push_back({id,oid,qualifier});
-        }else for(auto& rel:log.relations)if(rel.event_id==id&&rel.object_id==oid)rel.qualifier=qualifier;
+        }else{
+          // Event ids are unique, so this event's relations to oid are the
+          // ones its omap just added (one each without literal names).
+          for(const auto index:occurrences[oid])log.relations[index].qualifier=qualifier;
+        }
       }
     }
   }
@@ -562,7 +574,10 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
     if (const auto* aa = optional(x, "attributes")) {
       if (!aa->is_array())
         throw std::invalid_argument("object attributes must be array");
-      std::map<std::string, std::vector<StandardAttribute>> grouped;
+      // Grouped by name in first-appearance order (the reference's frame
+      // columns follow first appearance).
+      std::vector<std::pair<std::string, std::vector<StandardAttribute>>> grouped;
+      std::unordered_map<std::string, std::size_t> group_index;
       for (const auto& ar : aa->array()) {
         const auto& a = obj(ar, "attributes[]");
         const auto name = str(required(a, "name"), "name");
@@ -577,7 +592,9 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
           entry.has_time = true;
           entry.time = str(*time, "time");
         }
-        grouped[name].push_back(std::move(entry));
+        const auto [slot, added] = group_index.try_emplace(name, grouped.size());
+        if (added) grouped.emplace_back(name, std::vector<StandardAttribute>{});
+        grouped[slot->second].second.push_back(std::move(entry));
       }
       for (auto& [name, entries] : grouped) {
         if (entries.empty()) continue;
@@ -686,13 +703,28 @@ void write_value(std::ostringstream& out, const OcelValue& value) {
   } else if (const auto* int_value = std::get_if<std::int64_t>(&value)) {
     out << *int_value;
   } else if (const auto* double_value = std::get_if<double>(&value)) {
-    out.precision(17);
-    out << *double_value;
+    // Python's repr, as the reference's json writer prints a float (the
+    // shortest text that reads back as the same double); JSON has no NaN.
+    if (std::isfinite(*double_value)) out << filtering_float_repr(*double_value);
+    else out << "null";
   } else {
     write_string(out, std::get<std::string>(value));
   }
 }
-void write_attrs(std::ostringstream& out, const std::vector<OcelAttribute>& attrs) { std::map<std::string, const OcelValue*> sorted; for (const auto& a : attrs) sorted[a.key] = &a.value; out << '{'; bool first = true; for (const auto& [k, v] : sorted) { if (!first) out << ','; first = false; write_string(out, k); out << ':'; write_value(out, *v); } out << '}'; }
+// Keys in first-appearance order with the last value of a repeated key, as a
+// Python dict built from the attributes keeps them.
+void write_attrs(std::ostringstream& out, const std::vector<OcelAttribute>& attrs) {
+  std::vector<std::pair<std::string_view, const OcelValue*>> ordered;
+  std::unordered_map<std::string_view, std::size_t> index;
+  for (const auto& a : attrs) {
+    const auto [slot, added] = index.try_emplace(a.key, ordered.size());
+    if (added) ordered.emplace_back(a.key, &a.value);
+    else ordered[slot->second].second = &a.value;
+  }
+  out << '{'; bool first = true;
+  for (const auto& [k, v] : ordered) { if (!first) out << ','; first = false; write_string(out, k); out << ':'; write_value(out, *v); }
+  out << '}';
+}
 
 std::string classic_value_type(const OcelValue& value) {
   if (std::holds_alternative<bool>(value)) return "boolean";
@@ -820,12 +852,7 @@ void write_standard_type_table(std::ostringstream& out,
 }
 
 // `relations` are one source object's o2o relations in log order.
-void write_o2o(std::ostringstream& out, std::vector<const OcelO2oRelation*> relations) {
-  std::sort(relations.begin(), relations.end(), [](const auto* left,
-                                                   const auto* right) {
-    return std::tie(left->target_id, left->qualifier) <
-           std::tie(right->target_id, right->qualifier);
-  });
+void write_o2o(std::ostringstream& out, const std::vector<const OcelO2oRelation*>& relations) {
   out << '[';
   bool first = true;
   for (const auto* relation : relations) {
@@ -845,11 +872,6 @@ void write_e2e(std::ostringstream& out, const Ocel& log,
   std::vector<const OcelE2eRelation*> relations;
   relations.reserve(log.e2e.size());
   for (const auto& relation : log.e2e) relations.push_back(&relation);
-  std::sort(relations.begin(), relations.end(), [](const auto* left,
-                                                   const auto* right) {
-    return std::tie(left->source_id, left->target_id, left->qualifier) <
-           std::tie(right->source_id, right->target_id, right->qualifier);
-  });
   out << '[';
   for (std::size_t i = 0; i < relations.size(); ++i) {
     if (i != 0) out << ',';
@@ -898,12 +920,6 @@ void write_object_changes(std::ostringstream& out, const Ocel& log) {
   std::vector<const OcelObjectChange*> changes;
   changes.reserve(log.object_changes.size());
   for (const auto& change : log.object_changes) changes.push_back(&change);
-  std::sort(changes.begin(), changes.end(), [](const auto* left, const auto* right) {
-    return std::tie(left->object_id, left->timestamp, left->field,
-                    left->object_type) <
-           std::tie(right->object_id, right->timestamp, right->field,
-                    right->object_type);
-  });
   out << '[';
   bool first = true;
   for (const auto* change : changes) {
@@ -1054,8 +1070,17 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   sort_ocel_events_by_timestamp(result, standard ? OcelTimestampReader::kIsoFormat
                                                  : OcelTimestampReader::kIsoFormatOrFileOrder);
   // Every reference reader (OCEL 1.0 and 2.0 JSON alike) drops events and
-  // objects that take part in no event-object relation.
-  drop_unrelated_ocel_entries(result);
+  // objects that take part in no event-object relation. A document Minera
+  // wrote for an OCEL that holds such entries (an OCEL CSV import, whose
+  // reference reader keeps them, or a filter or playout result of one) says
+  // so, and keeps them: routes pass OCELs to each other as this JSON.
+  bool keep_unrelated = false;
+  if (const auto* marker = optional(r, "minera:keepUnrelated")) {
+    if (!marker->is_bool())
+      throw std::invalid_argument("minera:keepUnrelated must be boolean");
+    keep_unrelated = std::get<bool>(marker->value);
+  }
+  if (!keep_unrelated) drop_unrelated_ocel_entries(result);
   if (const auto* raw = optional(r, "minera:tableColumns")) {
     const auto& columns = obj(*raw, "minera:tableColumns");
     const auto read = [&](const char* name,
@@ -1072,67 +1097,11 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
 
 namespace {
 
-bool iso_digits(std::string_view text, std::size_t position, std::size_t count, int& value) {
-  if (position + count > text.size()) return false;
-  value = 0;
-  for (std::size_t index = position; index < position + count; ++index) {
-    if (std::isdigit(static_cast<unsigned char>(text[index])) == 0) return false;
-    value = value * 10 + (text[index] - '0');
-  }
-  return true;
-}
-
-// Clock fields HH[:MM[:SS]] (or HHMMSS) with an optional .f/,f fraction, as
-// the reference reads them (observed black-box): -1 is malformed, 0 read the
-// whole text, 1 left one stray character after the last field, which the
-// reference accepts only in front of a UTC offset.
-int iso_clock(std::string_view text, int (&fields)[3], std::int64_t& micro) {
-  fields[0] = fields[1] = fields[2] = 0;
-  micro = 0;
-  std::size_t position = 0;
-  bool separated = false;
-  bool fraction = false;
-  for (int field = 0; field < 3 && !fraction; ++field) {
-    if (!iso_digits(text, position, 2, fields[field])) return -1;
-    position += 2;
-    if (position >= text.size()) return 0;
-    const char next = text[position++];
-    if (field == 0) separated = next == ':';
-    if (position >= text.size()) return 1;
-    if (separated && next == ':') continue;
-    if (next == '.' || next == ',') fraction = true;
-    else if (!separated) --position;
-    else return -1;
-  }
-  const std::size_t remaining = text.size() - position;
-  const std::size_t count = std::min<std::size_t>(remaining, 6);
-  int digit = 0;
-  for (std::size_t index = 0; index < count; ++index) {
-    if (!iso_digits(text, position + index, 1, digit)) return -1;
-    micro = micro * 10 + digit;
-  }
-  for (std::size_t index = count; index < 6; ++index) micro *= 10;
-  position += count;
-  while (position < text.size() &&
-         std::isdigit(static_cast<unsigned char>(text[position])) != 0) ++position;
-  // Text after six fraction digits is stray too.
-  return position < text.size() ? 1 : 0;
-}
-
-std::int64_t iso_days_from_civil(int year, int month, int day) {
-  year -= month <= 2;
-  const int era = (year >= 0 ? year : year - 399) / 400;
-  const int year_of_era = year - era * 400;
-  const int day_of_year = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
-  const int day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-  return static_cast<std::int64_t>(era) * 146097 + day_of_era - 719468;
-}
-
-int iso_monday_index(std::int64_t days) {  // Monday 0 .. Sunday 6
-  return static_cast<int>(((days % 7) + 7 + 3) % 7);
-}
-
-bool iso_leap(int year) { return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0); }
+// The shape and calendar helpers are the shared fromisoformat reader's
+// (python_isoformat.hpp); this driver adds the reference's error messages.
+using detail::python_iso::digits;
+using detail::python_iso::leap;
+using detail::python_iso::monday_index;
 
 // Wall-clock microseconds since 1970 of an ISO 8601 text as the reference
 // OCEL JSON importers read it: extended or basic calendar and week dates, any
@@ -1173,28 +1142,28 @@ std::int64_t iso_wall_microseconds(std::string_view original) {
   const auto date = text.substr(0, date_end);
   int year = 0, month = 1, day = 1, week = 0, weekday = 1;
   bool week_date = false;
-  if (!iso_digits(date, 0, 4, year)) invalid();
+  if (!digits(date, 0, 4, year)) invalid();
   if (date.size() > 5 && date[4] == '-' && date[5] == 'W') {
     week_date = true;
-    if (!iso_digits(date, 6, 2, week)) invalid();
+    if (!digits(date, 6, 2, week)) invalid();
     if (date.size() == 10) {
-      if (date[8] != '-' || !iso_digits(date, 9, 1, weekday)) invalid();
+      if (date[8] != '-' || !digits(date, 9, 1, weekday)) invalid();
     } else if (date.size() != 8) invalid();
   } else if (date.size() > 4 && date[4] == '-') {
-    if (date.size() != 10 || date[7] != '-' || !iso_digits(date, 5, 2, month) ||
-        !iso_digits(date, 8, 2, day)) invalid();
+    if (date.size() != 10 || date[7] != '-' || !digits(date, 5, 2, month) ||
+        !digits(date, 8, 2, day)) invalid();
   } else if (date.size() > 4 && date[4] == 'W') {
     week_date = true;
-    if (!iso_digits(date, 5, 2, week)) invalid();
+    if (!digits(date, 5, 2, week)) invalid();
     if (date.size() == 8) {
-      if (!iso_digits(date, 7, 1, weekday)) invalid();
+      if (!digits(date, 7, 1, weekday)) invalid();
     } else if (date.size() != 7) invalid();
-  } else if (date.size() != 8 || !iso_digits(date, 4, 2, month) ||
-             !iso_digits(date, 6, 2, day)) invalid();
+  } else if (date.size() != 8 || !digits(date, 4, 2, month) ||
+             !digits(date, 6, 2, day)) invalid();
   // A week date is checked with its shape, before the clock and offset.
   if (week_date) {
-    const auto january_first = iso_monday_index(iso_days_from_civil(year, 1, 1));
-    const int weeks = january_first == 3 || (january_first == 2 && iso_leap(year)) ? 53 : 52;
+    const auto january_first = monday_index(detail::python_iso::days_from_civil(year, 1, 1));
+    const int weeks = january_first == 3 || (january_first == 2 && leap(year)) ? 53 : 52;
     if (week < 1 || week > weeks || weekday < 1 || weekday > 7) invalid();
   }
   int clock[3] = {0, 0, 0};
@@ -1202,7 +1171,7 @@ std::int64_t iso_wall_microseconds(std::string_view original) {
   if (date_end < text.size()) {
     const auto time = text.substr(date_end + 1);  // any one separator character
     const auto zone = time.find_first_of("Z+-");
-    const int read = iso_clock(time.substr(0, zone), clock, micro);
+    const int read = detail::python_iso::clock(time.substr(0, zone), clock, micro);
     if (read < 0 || (zone == std::string_view::npos && read != 0)) invalid();
     if (zone != std::string_view::npos) {
       if (time[zone] == 'Z') {
@@ -1210,7 +1179,7 @@ std::int64_t iso_wall_microseconds(std::string_view original) {
       } else {
         int offset[3] = {0, 0, 0};
         std::int64_t offset_micro = 0;
-        if (iso_clock(time.substr(zone + 1), offset, offset_micro) != 0) invalid();
+        if (detail::python_iso::clock(time.substr(zone + 1), offset, offset_micro) != 0) invalid();
         if (offset[0] * 3600 + offset[1] * 60 + offset[2] >= 86400) {
           // The message ends with the offset's timedelta repr.
           const std::int64_t sign = time[zone] == '-' ? -1 : 1;
@@ -1231,14 +1200,14 @@ std::int64_t iso_wall_microseconds(std::string_view original) {
   if (year < 1) invalid(week_date ? "month must be in 1..12" : "year " + std::to_string(year) + " is out of range");
   std::int64_t days = 0;
   if (week_date) {
-    const auto january_fourth = iso_days_from_civil(year, 1, 4);
-    days = january_fourth - iso_monday_index(january_fourth) + (week - 1) * 7 + (weekday - 1);
+    const auto january_fourth = detail::python_iso::days_from_civil(year, 1, 4);
+    days = january_fourth - monday_index(january_fourth) + (week - 1) * 7 + (weekday - 1);
   } else {
     if (month < 1 || month > 12) invalid("month must be in 1..12");
     static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    const int last = month == 2 && iso_leap(year) ? 29 : kDays[month - 1];
+    const int last = month == 2 && leap(year) ? 29 : kDays[month - 1];
     if (day < 1 || day > last) invalid("day is out of range for month");
-    days = iso_days_from_civil(year, month, day);
+    days = detail::python_iso::days_from_civil(year, month, day);
   }
   if (clock[0] > 23) invalid("hour must be in 0..23");
   if (clock[1] > 59) invalid("minute must be in 0..59");
@@ -1397,9 +1366,9 @@ std::optional<LenientTimestamp> dateutil_subset(std::string_view text) {
   if (year < 1 || month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59)
     return std::nullopt;
   static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-  if (day < 1 || day > (month == 2 && iso_leap(year) ? 29 : kDays[month - 1])) return std::nullopt;
+  if (day < 1 || day > (month == 2 && leap(year) ? 29 : kDays[month - 1])) return std::nullopt;
   const std::int64_t wall =
-      (iso_days_from_civil(year, month, day) * 86400 + hour * 3600 + minute * 60 + second) * 1000000 + micro;
+      (detail::python_iso::days_from_civil(year, month, day) * 86400 + hour * 3600 + minute * 60 + second) * 1000000 + micro;
   return LenientTimestamp{wall - offset_seconds * 1000000, aware};
 }
 
@@ -1630,6 +1599,103 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
                    });
 }
 
+std::string ocel_limit_text(std::size_t bytes) {
+  constexpr std::size_t mebibyte = 1024u * 1024u;
+  if (bytes != 0 && bytes % mebibyte == 0)
+    return std::to_string(bytes / mebibyte) + " MiB";
+  return std::to_string(bytes) + " bytes";
+}
+
+std::optional<std::string> ocel_json_limit_violation(
+    std::string_view json, const OcelJsonLimits& limits) {
+  if (json.size() > limits.max_bytes)
+    return "OCEL JSON file exceeds the " + ocel_limit_text(limits.max_bytes) +
+           " OCEL limit";
+  // Mirrors the parser's accounting: every value (not object keys) is a
+  // node, its depth is the number of enclosing containers, and strings are
+  // measured decoded.
+  std::vector<char> containers;
+  bool key_next = false;
+  std::size_t nodes = 0;
+  const auto hex = [&](std::size_t at, unsigned& code) {
+    if (at + 4 > json.size()) return false;
+    code = 0;
+    for (std::size_t k = at; k < at + 4; ++k) {
+      const char h = json[k];
+      code <<= 4;
+      if (h >= '0' && h <= '9') code += static_cast<unsigned>(h - '0');
+      else if (h >= 'a' && h <= 'f') code += static_cast<unsigned>(h - 'a' + 10);
+      else if (h >= 'A' && h <= 'F') code += static_cast<unsigned>(h - 'A' + 10);
+      else return false;
+    }
+    return true;
+  };
+  for (std::size_t i = 0; i < json.size();) {
+    const char c = json[i];
+    if (c == ' ' || c == '\n' || c == '\r' || c == '\t' || c == ':') { ++i; continue; }
+    if (c == ',') {
+      key_next = !containers.empty() && containers.back() == '{';
+      ++i;
+      continue;
+    }
+    if (c == '}' || c == ']') {
+      if (!containers.empty()) containers.pop_back();
+      key_next = false;
+      ++i;
+      continue;
+    }
+    const bool key = key_next;
+    key_next = false;
+    if (!key) {
+      if (containers.size() > limits.max_depth)
+        return std::string("OCEL JSON nesting exceeds the depth limit of ") +
+               std::to_string(limits.max_depth);
+      if (++nodes > limits.max_nodes)
+        return "OCEL JSON has more than " + std::to_string(limits.max_nodes) +
+               " values, the OCEL node limit";
+    }
+    if (c == '"') {
+      std::size_t decoded = 0;
+      ++i;
+      while (i < json.size() && json[i] != '"') {
+        if (json[i] != '\\') { ++decoded; ++i; continue; }
+        if (i + 1 < json.size() && json[i + 1] == 'u') {
+          unsigned code = 0;
+          if (!hex(i + 2, code)) { ++decoded; i += 2; continue; }
+          i += 6;
+          unsigned low = 0;
+          if (code >= 0xd800 && code <= 0xdbff && i + 1 < json.size() &&
+              json[i] == '\\' && json[i + 1] == 'u' && hex(i + 2, low)) {
+            decoded += 4;
+            i += 6;
+          } else {
+            decoded += code <= 0x7f ? 1 : code <= 0x7ff ? 2 : 3;
+          }
+        } else {
+          ++decoded;
+          i += 2;
+        }
+      }
+      ++i;
+      if (decoded > limits.max_string_bytes)
+        return "OCEL JSON has a string longer than " +
+               ocel_limit_text(limits.max_string_bytes) +
+               ", the OCEL string limit";
+      continue;
+    }
+    if (c == '{') { containers.push_back('{'); key_next = true; ++i; continue; }
+    if (c == '[') { containers.push_back('['); ++i; continue; }
+    while (i < json.size()) {
+      const char d = json[i];
+      if (d == ' ' || d == '\n' || d == '\r' || d == '\t' || d == ',' ||
+          d == ']' || d == '}' || d == ':' || d == '"' || d == '{' || d == '[')
+        break;
+      ++i;
+    }
+  }
+  return std::nullopt;
+}
+
 Ocel parse_ocel_json(std::string_view json, const OcelJsonLimits& limits) {
   return parse_ocel_json_names(json,limits,false);
 }
@@ -1639,6 +1705,22 @@ Ocel parse_ocel_json_literal_names(std::string_view json, const OcelJsonLimits& 
 
 std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
   std::ostringstream out;
+  // Marks a log that holds events or objects without an event-object
+  // relation, so parse_ocel_json keeps them instead of dropping them as the
+  // reference file readers do.
+  const auto write_keep_unrelated = [&] {
+    std::unordered_set<std::string_view> related_events, related_objects;
+    for (const auto& relation : log.relations) {
+      related_events.insert(relation.event_id);
+      related_objects.insert(relation.object_id);
+    }
+    const bool unrelated =
+        std::any_of(log.events.begin(), log.events.end(),
+                    [&](const auto& event) { return !related_events.contains(event.id); }) ||
+        std::any_of(log.objects.begin(), log.objects.end(),
+                    [&](const auto& object) { return !related_objects.contains(object.id); });
+    if (unrelated) out << ",\"minera:keepUnrelated\":true";
+  };
   const auto write_table_columns = [&] {
     const auto& columns = log.table_columns;
     if (!columns.events && !columns.objects && !columns.relations) return;
@@ -1662,16 +1744,13 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     write("relations", columns.relations);
     out << '}';
   };
+  // Events, objects, attributes and relations in log order, as the reference
+  // writers emit their frames: a reader then rebuilds the same row and column
+  // order (readers keep file order; the timestamp sort is stable).
   std::vector<const OcelEvent*> events;
   for (const auto& event : log.events) events.push_back(&event);
-  std::sort(events.begin(), events.end(), [](const auto* left, const auto* right) {
-    return left->id < right->id;
-  });
   std::vector<const OcelObject*> objects;
   for (const auto& object : log.objects) objects.push_back(&object);
-  std::sort(objects.begin(), objects.end(), [](const auto* left, const auto* right) {
-    return left->id < right->id;
-  });
 
   // Relations and O2O links indexed once by their event / source id, in log
   // order, so serialising stays linear in the log size.
@@ -1691,22 +1770,13 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     std::vector<const OcelRelation*> relations;
     if (const auto found = relations_by_event.find(event.id); found != relations_by_event.end())
       relations = found->second;
-    std::sort(relations.begin(), relations.end(), [](const auto* left,
-                                                     const auto* right) {
-      return std::tie(left->object_id, left->qualifier) <
-             std::tie(right->object_id, right->qualifier);
-    });
     return relations;
   };
   auto write_standard_attributes = [&](const std::vector<OcelAttribute>& attrs) {
-    std::vector<const OcelAttribute*> sorted;
-    for (const auto& attribute : attrs) sorted.push_back(&attribute);
-    std::sort(sorted.begin(), sorted.end(), [](const auto* left, const auto* right) {
-      return left->key < right->key;
-    });
     out << '[';
     bool first = true;
-    for (const auto* attribute : sorted) {
+    for (const auto& attribute_value : attrs) {
+      const auto* attribute = &attribute_value;
       if (!first) out << ',';
       first = false;
       out << "{\"name\":";
@@ -1721,11 +1791,6 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     std::vector<const OcelO2oRelation*> relations;
     if (const auto found = o2o_by_source.find(source); found != o2o_by_source.end())
       relations = found->second;
-    std::sort(relations.begin(), relations.end(), [](const auto* left,
-                                                     const auto* right) {
-      return std::tie(left->target_id, left->qualifier) <
-             std::tie(right->target_id, right->qualifier);
-    });
     out << '[';
     bool first = true;
     for (const auto* relation : relations) {
@@ -1789,10 +1854,6 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
       std::vector<const OcelAttribute*> static_attributes;
       for (const auto& attribute : object->attributes)
         static_attributes.push_back(&attribute);
-      std::sort(static_attributes.begin(), static_attributes.end(),
-                [](const auto* left, const auto* right) {
-                  return left->key < right->key;
-                });
       std::set<std::string> static_fields;
       for (const auto* attribute : static_attributes) {
         if (!attribute_first) out << ',';
@@ -1854,6 +1915,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
       out << '}';
     }
     write_table_columns();
+    write_keep_unrelated();
     out << '}';
     return out.str();
   }
@@ -1926,6 +1988,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
   out << ",\"ocel:global-object\":";
   write_global_category(out, log, "ocel:global-object");
   write_table_columns();
+  write_keep_unrelated();
   out << '}';
   return out.str();
 }

@@ -22,7 +22,7 @@ export const TOKEN_REPLAY_IMPORT_CONTROLS = [
   ["xes_timestamp_attribute","XES timestamp attribute","time:timestamp"], ["xes_resource_attribute","XES resource attribute","org:resource"],
   ["xes_lifecycle_attribute","XES lifecycle attribute","lifecycle:transition"], ["xes_max_traces","XES trace limit","unlimited"],
   ["xes_attributes_to_read","XES attribute projection (comma-separated)","All scalar attributes"],
-  ["xes_max_decompressed_bytes","XES decompressed byte cap","536870912"],
+  ["xes_max_decompressed_bytes","XES decompressed byte cap","268435456"],
 ] as const;
 export const TOKEN_REPLAY_CONTROLS = [
   ["token_replay_activity_attribute","Replay activity attribute","text","both"],

@@ -112,16 +112,18 @@ export class OwnedExactFilterResult extends Error{constructor(public readonly ru
 // The text of `raw` (one JSON object) without its last top-level `name`
 // member, or undefined when it has none: a linear scan of the text.
 export function withoutLastTopLevelMember(raw:string,name:string):string|undefined{
- let depth=0,position=0,expectKey=false,lastSeparator=-1,found:{start:number;depth:number}|undefined,member:[number,number]|undefined;
+ let depth=0,position=0,expectKey=false,first=false,lastSeparator=-1,found:{start:number;first:boolean}|undefined,member:[number,number]|undefined;
  const string=(start:number)=>{let i=start+1;for(;;){const quote=raw.indexOf('"',i);if(quote<0)throw new Error("Invalid native JSON text.");let slashes=0;for(let j=quote-1;j>start&&raw.charCodeAt(j)===92;--j)++slashes;i=quote+1;if(slashes%2===0)return i;}};
  while(position<raw.length){const c=raw.charCodeAt(position);
-  if(c===34){const end=string(position);if(depth===1&&expectKey){if(JSON.parse(raw.slice(position,end))===name)found={start:lastSeparator,depth};expectKey=false;}position=end;continue;}
-  if(c===123||c===91){++depth;if(depth===1){expectKey=true;lastSeparator=position+1;}}
+  // A first member starts at its key, so whitespace after the opening brace stays (a "{ }" body round-trips).
+  if(c===34){const end=string(position);if(depth===1&&expectKey){if(JSON.parse(raw.slice(position,end))===name)found={start:first?position:lastSeparator,first};expectKey=false;}position=end;continue;}
+  if(c===123||c===91){++depth;if(depth===1){expectKey=true;first=true;lastSeparator=position+1;}}
   else if(c===125||c===93){if(depth===1&&found){member=[found.start,position];found=undefined;}--depth;}
-  else if(c===44&&depth===1){if(found){member=[found.start,position];found=undefined;}expectKey=true;lastSeparator=position;}
+  // A first member followed by others also drops the comma after it.
+  else if(c===44&&depth===1){if(found){member=[found.start,found.first?position+1:position];found=undefined;}expectKey=true;first=false;lastSeparator=position;}
   ++position;}
  if(!member)return undefined;const [start,end]=member;
- // A first member keeps the opening brace; a later one drops its comma.
+ // A later member drops its comma.
  return raw.slice(0,start)+raw.slice(end);
 }
 // Restores what the backend writes once: a JSON-object legacy body is the

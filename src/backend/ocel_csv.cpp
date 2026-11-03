@@ -1,6 +1,7 @@
 #include "minera/ocel_csv.hpp"
 
 #include "minera/timestamp.hpp"
+#include "ocel_frame_types.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -165,25 +166,6 @@ void validate_row_width(const Row& row, std::size_t width, std::size_t line,
   }
 }
 
-OcelValue infer_value(std::string_view text) {
-  if (text == "true" || text == "TRUE" || text == "True") return true;
-  if (text == "false" || text == "FALSE" || text == "False") return false;
-
-  std::int64_t integer = 0;
-  const auto integer_result = std::from_chars(
-      text.data(), text.data() + text.size(), integer);
-  if (integer_result.ec == std::errc() &&
-      integer_result.ptr == text.data() + text.size()) {
-    return integer;
-  }
-
-  std::string copy(text);
-  char* end = nullptr;
-  const double real = std::strtod(copy.c_str(), &end);
-  if (end == copy.c_str() + copy.size() && std::isfinite(real)) return real;
-  return copy;
-}
-
 std::string unescape_list_string(std::string_view text, std::size_t& pos,
                                  char quote) {
   std::string value;
@@ -204,6 +186,26 @@ std::string unescape_list_string(std::string_view text, std::size_t& pos,
       case '\\': value.push_back('\\'); break;
       case '\'': value.push_back('\''); break;
       case '"': value.push_back('"'); break;
+      case 'x': {
+        // Python's repr writes other control characters as \xNN.
+        unsigned code = 0;
+        for (int digit = 0; digit < 2; ++digit) {
+          if (pos >= text.size()) throw std::invalid_argument("short \\x escape in object id");
+          const char h = text[pos++];
+          code <<= 4;
+          if (h >= '0' && h <= '9') code += static_cast<unsigned>(h - '0');
+          else if (h >= 'a' && h <= 'f') code += static_cast<unsigned>(h - 'a' + 10);
+          else if (h >= 'A' && h <= 'F') code += static_cast<unsigned>(h - 'A' + 10);
+          else throw std::invalid_argument("bad \\x escape in object id");
+        }
+        if (code < 0x80) {
+          value.push_back(static_cast<char>(code));
+        } else {
+          value.push_back(static_cast<char>(0xc0 | (code >> 6)));
+          value.push_back(static_cast<char>(0x80 | (code & 0x3f)));
+        }
+        break;
+      }
       default: value.push_back(escaped); break;
     }
   }
@@ -291,17 +293,17 @@ const OcelAttribute* find_attribute(const std::vector<OcelAttribute>& attrs,
   return found;
 }
 
-std::string value_text(const OcelValue& value) {
+// A cell as pandas to_csv prints it: Python's str, floats as their repr,
+// booleans as True/False; an integer in a float64 frame column (one with a
+// float or a missing cell) prints as a float.
+std::string value_text(const OcelValue& value, bool float_column = false) {
   if (std::holds_alternative<std::nullptr_t>(value)) return {};
-  if (const auto* boolean = std::get_if<bool>(&value)) return *boolean ? "true" : "false";
-  if (const auto* integer = std::get_if<std::int64_t>(&value)) return std::to_string(*integer);
   if (const auto* real = std::get_if<double>(&value)) {
     if (!std::isfinite(*real)) throw std::invalid_argument("OCEL CSV cannot encode non-finite values");
-    std::ostringstream out;
-    out << std::setprecision(std::numeric_limits<double>::max_digits10) << *real;
-    return out.str();
   }
-  return std::get<std::string>(value);
+  if (const auto* integer = std::get_if<std::int64_t>(&value); integer && float_column)
+    return ocel_frame::float_repr(static_cast<double>(*integer));
+  return ocel_frame::python_str(value);
 }
 
 std::string escape_csv(std::string_view value, char delimiter) {
@@ -334,26 +336,15 @@ void write_row(std::ostream& out, const Row& row, char delimiter) {
   out << '\n';
 }
 
+// An object-id cell as the reference writes it: the Python list repr.
 std::string list_text(const std::vector<std::string>& ids) {
-  std::ostringstream out;
-  out << '[';
+  std::string out = "[";
   for (std::size_t i = 0; i < ids.size(); ++i) {
-    if (i != 0) out << ',';
-    out << '"';
-    for (const char ch : ids[i]) {
-      switch (ch) {
-        case '\\': out << "\\\\"; break;
-        case '"': out << "\\\""; break;
-        case '\n': out << "\\n"; break;
-        case '\r': out << "\\r"; break;
-        case '\t': out << "\\t"; break;
-        default: out << ch; break;
-      }
-    }
-    out << '"';
+    if (i != 0) out += ", ";
+    out += ocel_frame::python_str_repr(ids[i]);
   }
-  out << ']';
-  return out.str();
+  out += ']';
+  return out;
 }
 
 struct ObjectIndex {
@@ -412,6 +403,11 @@ void check_lossy_fields(const Ocel& log, const OcelCsvExportOptions& options,
   }
 }
 
+// The event table as the reference writes it: id, timestamp and activity
+// (the column order of a frame read from OCEL JSON), the event attributes in
+// first-appearance order, then one object list per object type in
+// first-appearance order; rows in log order. A cell without objects of a
+// type stays empty.
 void write_event_table(std::ostream& out, const Ocel& log,
                        const OcelCsvExportOptions& options,
                        bool has_object_table) {
@@ -423,26 +419,43 @@ void write_event_table(std::ostream& out, const Ocel& log,
   const auto events = validate_events(log);
   check_lossy_fields(log, options, has_object_table);
 
-  std::set<std::string> event_attributes;
-  for (const auto& [id, event] : events) {
-    std::set<std::string> seen;
-    for (const auto& attr : event->attributes) {
+  std::vector<std::string> event_attributes;
+  std::unordered_set<std::string> known_attributes;
+  for (const auto& event : log.events) {
+    std::unordered_set<std::string> seen;
+    for (const auto& attr : event.attributes) {
       if (!seen.insert(attr.key).second) {
         throw std::invalid_argument("duplicate event attribute: " + attr.key);
       }
-      event_attributes.insert(attr.key);
+      if (std::holds_alternative<std::nullptr_t>(attr.value)) continue;
+      if (known_attributes.insert(attr.key).second) event_attributes.push_back(attr.key);
     }
   }
 
-  Row header{options.event_id_column, options.activity_column,
-             options.timestamp_column};
-  for (const auto& type : objects.types) {
-    const std::string name = options.object_type_prefix + type;
-    if (name.empty() || std::find(header.begin(), header.end(), name) != header.end()) {
-      throw std::invalid_argument("OCEL CSV object type column collides with a required column");
+  std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> refs;
+  std::set<std::pair<std::string, std::string>> seen_relations;
+  std::vector<std::string> types;
+  std::unordered_set<std::string> known_types;
+  for (const auto& relation : log.relations) {
+    const auto event_it = events.find(relation.event_id);
+    const auto object_it = objects.by_id.find(relation.object_id);
+    if (event_it == events.end() || object_it == objects.by_id.end()) {
+      throw std::invalid_argument("OCEL relation references an unknown id");
     }
-    header.push_back(name);
+    if (!seen_relations.emplace(relation.event_id, relation.object_id).second) {
+      if (!options.allow_lossy)
+        throw std::invalid_argument("duplicate OCEL event-object relation");
+      continue;
+    }
+    const auto& type = object_it->second->type;
+    if (known_types.insert(type).second) types.push_back(type);
+    refs[relation.event_id][type].push_back(relation.object_id);
   }
+  for (const auto& object : log.objects)
+    if (known_types.insert(object.type).second) types.push_back(object.type);
+
+  Row header{options.event_id_column, options.timestamp_column,
+             options.activity_column};
   for (const auto& key : event_attributes) {
     if (key.empty() || key == options.event_id_column || key == options.activity_column ||
         key == options.timestamp_column ||
@@ -450,6 +463,13 @@ void write_event_table(std::ostream& out, const Ocel& log,
       throw std::invalid_argument("event attribute collides with an OCEL CSV column: " + key);
     }
     header.push_back(key);
+  }
+  for (const auto& type : types) {
+    const std::string name = options.object_type_prefix + type;
+    if (name.empty() || std::find(header.begin(), header.end(), name) != header.end()) {
+      throw std::invalid_argument("OCEL CSV object type column collides with a required column");
+    }
+    header.push_back(name);
   }
   std::set<std::string> header_seen;
   for (const auto& name : header) {
@@ -459,65 +479,50 @@ void write_event_table(std::ostream& out, const Ocel& log,
   }
   write_row(out, header, options.delimiter);
 
-  std::map<std::string, std::map<std::string, std::vector<std::string>>> refs;
-  std::set<std::pair<std::string, std::string>> seen_relations;
-  for (const auto& relation : log.relations) {
-    const auto event_it = events.find(relation.event_id);
-    const auto object_it = objects.by_id.find(relation.object_id);
-    if (event_it == events.end() || object_it == objects.by_id.end()) {
-      throw std::invalid_argument("OCEL relation references an unknown id");
-    }
-    if (!seen_relations.emplace(relation.event_id, relation.object_id).second) {
-      throw std::invalid_argument("duplicate OCEL event-object relation");
-    }
-    refs[relation.event_id][object_it->second->type].push_back(relation.object_id);
-  }
-  for (auto& [event_id, by_type] : refs) {
-    (void)event_id;
-    for (auto& [type, ids] : by_type) {
-      (void)type;
-      std::sort(ids.begin(), ids.end());
-    }
-  }
-
-  for (const auto& [id, event] : events) {
-    Row row{id, event->activity, event->timestamp};
-    for (const auto& type : objects.types) {
-      const auto event_it = refs.find(id);
-      if (event_it == refs.end()) {
-        row.emplace_back("[]");
-      } else {
-        const auto type_it = event_it->second.find(type);
-        row.push_back(type_it == event_it->second.end()
-                          ? "[]"
-                          : list_text(type_it->second));
-      }
-    }
+  ocel_frame::Columns frame;
+  for (const auto& event : log.events) frame.observe_row(event.attributes);
+  for (const auto& event : log.events) {
+    Row row{event.id, ocel_frame::utc_timestamp_text(event.timestamp, ' ', "+00:00"),
+            event.activity};
     for (const auto& key : event_attributes) {
-      const auto* attr = find_attribute(event->attributes, key);
-      row.push_back(attr == nullptr ? std::string{} : value_text(attr->value));
+      const auto* attr = find_attribute(event.attributes, key);
+      row.push_back(attr == nullptr ? std::string{}
+                                    : value_text(attr->value, frame.dtype(key) == ocel_frame::Dtype::kFloat64));
+    }
+    const auto event_it = refs.find(event.id);
+    for (const auto& type : types) {
+      if (event_it == refs.end()) {
+        row.emplace_back();
+        continue;
+      }
+      const auto type_it = event_it->second.find(type);
+      row.push_back(type_it == event_it->second.end() ? std::string{}
+                                                      : list_text(type_it->second));
     }
     write_row(out, row, options.delimiter);
   }
 }
 
+// The object table: id, type and the attributes in first-appearance order,
+// rows in log order.
 void write_object_table(std::ostream& out, const Ocel& log,
                         const OcelCsvExportOptions& options) {
   if (options.delimiter == '"' || options.delimiter == '\r' ||
       options.delimiter == '\n' || options.delimiter == '\0') {
     throw std::invalid_argument("invalid CSV delimiter");
   }
-  const auto objects = validate_objects(log);
+  (void)validate_objects(log);
   check_lossy_fields(log, options, true);
-  std::set<std::string> attributes;
-  for (const auto& [id, object] : objects.by_id) {
-    (void)id;
-    std::set<std::string> seen;
-    for (const auto& attr : object->attributes) {
+  std::vector<std::string> attributes;
+  std::unordered_set<std::string> known;
+  for (const auto& object : log.objects) {
+    std::unordered_set<std::string> seen;
+    for (const auto& attr : object.attributes) {
       if (!seen.insert(attr.key).second) {
         throw std::invalid_argument("duplicate object attribute: " + attr.key);
       }
-      attributes.insert(attr.key);
+      if (std::holds_alternative<std::nullptr_t>(attr.value)) continue;
+      if (known.insert(attr.key).second) attributes.push_back(attr.key);
     }
   }
   Row header{options.object_id_column, options.object_type_column};
@@ -528,11 +533,14 @@ void write_object_table(std::ostream& out, const Ocel& log,
     header.push_back(key);
   }
   write_row(out, header, options.delimiter);
-  for (const auto& [id, object] : objects.by_id) {
-    Row row{id, object->type};
+  ocel_frame::Columns frame;
+  for (const auto& object : log.objects) frame.observe_row(object.attributes);
+  for (const auto& object : log.objects) {
+    Row row{object.id, object.type};
     for (const auto& key : attributes) {
-      const auto* attr = find_attribute(object->attributes, key);
-      row.push_back(attr == nullptr ? std::string{} : value_text(attr->value));
+      const auto* attr = find_attribute(object.attributes, key);
+      row.push_back(attr == nullptr ? std::string{}
+                                    : value_text(attr->value, frame.dtype(key) == ocel_frame::Dtype::kFloat64));
     }
     write_row(out, row, options.delimiter);
   }
@@ -559,7 +567,10 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
       throw std::invalid_argument("unknown reserved OCEL CSV column: " + name);
     }
   }
-  std::map<std::string, OcelObject> object_map;
+  // Objects in object-table order, then objects only the event table names
+  // in first-appearance order.
+  std::vector<OcelObject> object_list;
+  std::unordered_map<std::string, std::size_t> object_index;
   if (object_table != nullptr) {
     const auto object_header = read_header(*object_table, options, "object");
     const auto object_id = required_column(object_header, options.object_id_column, "object");
@@ -583,13 +594,16 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
       for (std::size_t i = 0; i < object_header.names.size(); ++i) {
         if (i == object_id || i == object_type) continue;
         const std::string value = row[i];
-        if (!value.empty()) object.attributes.push_back({object_header.names[i], infer_value(value)});
+        if (!value.empty()) object.attributes.push_back({object_header.names[i], value});
       }
-      if (!object_map.emplace(id, std::move(object)).second) {
+      if (!object_index.emplace(id, object_list.size()).second) {
         throw std::invalid_argument("duplicate object CSV id: " + id);
       }
+      object_list.push_back(std::move(object));
     }
   }
+  // Attribute cells stay text, as the reference CSV reader keeps them (it
+  // types only the timestamp); empty cells are missing values.
   Ocel log;
   std::unordered_set<std::string> event_ids;
   std::vector<const Row*> event_rows;
@@ -617,13 +631,13 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
         continue;
       }
       const std::string value = row[i];
-      if (!value.empty()) event.attributes.push_back({event_header.names[i], infer_value(value)});
+      if (!value.empty()) event.attributes.push_back({event_header.names[i], value});
     }
     log.events.push_back(std::move(event));
     event_rows.push_back(&row);
   }
-  std::map<std::string, std::string> object_types;
-  for (const auto& [id, object] : object_map) object_types.emplace(id, object.type);
+  std::unordered_map<std::string, std::string> object_types;
+  for (const auto& object : object_list) object_types.emplace(object.id, object.type);
   for (std::size_t event_index = 0; event_index < log.events.size(); ++event_index) {
     const auto& row = *event_rows[event_index];
     const auto& event = log.events[event_index];
@@ -633,8 +647,8 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
         if (!inserted && it->second != type) {
           throw std::invalid_argument("object id appears under multiple types: " + object_id);
         }
-        if (object_map.find(object_id) == object_map.end()) {
-          object_map.emplace(object_id, OcelObject{object_id, type, {}});
+        if (object_index.emplace(object_id, object_list.size()).second) {
+          object_list.push_back(OcelObject{object_id, type, {}});
         }
         log.relations.push_back({event.id, object_id, ""});
       }
@@ -649,7 +663,7 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
                      });
   }
 
-  for (const auto& [id, object] : object_map) log.objects.push_back(object);
+  log.objects = std::move(object_list);
   return log;
 }
 

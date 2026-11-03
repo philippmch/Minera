@@ -4214,6 +4214,11 @@ ProcessTreePlayoutParams parse_process_tree_playout_params(
     params.return_set_strings = parse_boolean(
         require("playout_return_set_strings"),
         "playout_return_set_strings");
+  // The sampled variants repeat loops without a bound, as the reference
+  // does; this opts in to max_loop_occurrences for them as well.
+  if (supplied("playout_cap_sampled_loops"))
+    params.cap_sampled_loops = parse_boolean(
+        require("playout_cap_sampled_loops"), "playout_cap_sampled_loops");
   if (params.min_length > params.max_length)
     throw std::invalid_argument("playout_min_length must not exceed playout_max_length");
   if (params.return_set_strings &&
@@ -6564,6 +6569,39 @@ ProfileClusteringOptions parse_profile_clustering_params(
     options.feature_names = parse_strict_csv(require("profile_feature_names"),
                                              "profile_feature_names");
   return options;
+}
+
+ProfileClusteringRequest parse_profile_clustering_request(
+    const FieldLookup& field, const FieldPresence& present) {
+  const auto supplied = [&](std::string_view name) {
+    return present ? present(name) : !field(name).empty();
+  };
+  ProfileClusteringRequest request;
+  request.options = parse_profile_clustering_params(field, present);
+  if (supplied("profile_engine")) {
+    const auto engine = std::string(field("profile_engine"));
+    if (engine == "native") request.native_engine = true;
+    else if (engine != "reference")
+      throw std::invalid_argument("profile_engine: expected reference or native");
+  }
+  if (!request.native_engine) {
+    if (request.options.seed > 0xffffffffULL)
+      throw std::invalid_argument(
+          "profile_seed: the reference random_state must be below 2^32");
+    request.kmeans.cluster_count = request.options.cluster_count;
+    request.kmeans.seed = static_cast<std::uint32_t>(request.options.seed);
+    if (supplied("profile_max_iterations"))
+      request.kmeans.max_iterations = request.options.max_iterations;
+    if (supplied("profile_tolerance")) request.kmeans.tolerance = request.options.tolerance;
+  }
+  return request;
+}
+
+ProfileClusteringResult run_profile_clustering(
+    const EventLog& log, const ProfileClusteringRequest& request) {
+  return request.native_engine
+             ? discover_profile_clustering(log, request.options)
+             : reference_profile_clustering_result(log, request.options, request.kmeans);
 }
 
 ChaoticActivitiesOptions parse_chaotic_activities_params(

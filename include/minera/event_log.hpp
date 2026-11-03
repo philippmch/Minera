@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <atomic>
 #include <cstdint>
@@ -400,6 +401,18 @@ struct Event {
   std::optional<EventAttribute> resource_attribute;
   std::optional<EventAttribute> lifecycle_attribute;
 
+  // Source document positions of the selected activity, timestamp, resource
+  // and lifecycle cells (in that order) among the event's attributes before
+  // the importer moved them into the fields above: the index each had in the
+  // complete attribute list.  kUnknownSourcePosition when the source has no
+  // order or the cell was not read from one.  Flat adapters use them to emit
+  // columns in document order, as the reference dict does; only the XES
+  // importer sets them.
+  static constexpr std::uint32_t kUnknownSourcePosition = 0xFFFFFFFFu;
+  std::array<std::uint32_t, 4> first_class_source_positions{
+      kUnknownSourcePosition, kUnknownSourcePosition, kUnknownSourcePosition,
+      kUnknownSourcePosition};
+
   // The `case:` cells of the flat row this event was read from (keys without
   // the prefix), set only by the batch CSV import. A DataFrame keeps a case
   // column per row, so its case filters and statistics test every row; the
@@ -451,6 +464,9 @@ struct Trace {
   // See Event's first-class attribute metadata. This is the selected trace
   // cell before it is projected into case_id.
   std::optional<EventAttribute> case_id_attribute;
+  // Index the selected case cell had among the trace attributes in the
+  // source document (see Event::first_class_source_positions).
+  std::uint32_t case_id_source_position = Event::kUnknownSourcePosition;
 
   [[nodiscard]] bool has_case_id() const noexcept {
     return case_id_state != FirstClassAttributeState::kMissing ||
@@ -479,6 +495,7 @@ inline void copy_trace_context(const Trace& source, Trace& target) {
   target.case_id_state = source.case_id_state;
   target.case_id_source_key = source.case_id_source_key;
   target.case_id_attribute = source.case_id_attribute;
+  target.case_id_source_position = source.case_id_source_position;
 }
 
 // Update a projected trace id and keep its selected first-class attribute in

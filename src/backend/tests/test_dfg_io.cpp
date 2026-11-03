@@ -2,7 +2,9 @@
 #include "minera/directly_follows_graph.hpp"
 
 #include <cassert>
+#include <cstdint>
 #include <filesystem>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -65,12 +67,32 @@ void projects_discovered_graph_without_zero_registry_entries() {
 
 void rejects_malformed_and_duplicate_rows() {
   assert(throws("1\nA\n1\n0x1\n"));  // missing end count
-  assert(throws("2\nA\nA\n0\n0\n"));  // duplicate label
-  assert(throws("1\nA\n2\n0x1\n0x1\n0\n"));  // duplicate start id
   assert(throws("1\nA\n0\n0\n0>1x1\n"));  // dangling edge id
-  assert(throws("1\nA\n0\n0\n0>0x0\n"));  // zero frequency
-  assert(throws("1\nA\n0\n0\n0>0x1 extra\n"));  // variant/malformed row
-  assert(throws("1\nA\n0\n0\n 0>0x1\n"));  // non-canonical row whitespace
+  assert(throws("1\nA\n0\n0\n0>0x1 extra\n"));  // malformed count
+  assert(throws("1\nA\n0\n0\n0>0x1\n\n"));  // blank row (the reference fails too)
+  assert(throws("\xef\xbb\xbf" "1\nA\n0\n0\n"));  // BOM (as in the reference)
+  assert(throws("1\nA\n0\n0\n0>0x-1\n"));  // negative count
+}
+
+// pm4py 2.7.22 read_dfg captures (review F3 fixtures).
+void reads_what_the_reference_reads() {
+  // write_dfg output with a padded label and a zero count.
+  const auto padded = minera::parse_dfg(
+      "3\na\nb\n sp \n2\n0x2\n2x1\n1\n1x3\n1>0x3\n0>1x2\n2>0x1\n0>0x0\n");
+  assert((padded.graph == std::map<std::pair<std::string, std::string>, std::uint64_t>{
+      {{"b", "a"}, 3}, {{"a", "b"}, 2}, {{"sp", "a"}, 1}, {{"a", "a"}, 0}}));
+  assert((padded.start_activities == std::map<std::string, std::uint64_t>{{"a", 2}, {"sp", 1}}));
+  assert((padded.end_activities == std::map<std::string, std::uint64_t>{{"b", 3}}));
+  // Duplicate labels name one activity; a repeated row replaces the earlier one.
+  const auto duplicate = minera::parse_dfg("2\na\na\n1\n0x1\n1\n1x1\n0>1x1\n");
+  assert(duplicate.graph.at({"a", "a"}) == 1 && duplicate.start_activities.at("a") == 1);
+  const auto repeated = minera::parse_dfg("2\na\nb\n1\n0x1\n1\n1x1\n0>1x1\n0>1x4\n");
+  assert(repeated.graph.at({"a", "b"}) == 4);
+  // Spaced numbers and CRLF rows.
+  const auto spaced = minera::parse_dfg("2\r\na\r\nb\r\n1\r\n0x1\r\n1\r\n1x1\r\n0 > 1 x 1\r\n");
+  assert(spaced.graph.at({"a", "b"}) == 1);
+  // Zero counts are written back.
+  assert(minera::parse_dfg(minera::to_dfg(padded)).graph == padded.graph);
 }
 
 void imports_and_exports_files() {
@@ -95,5 +117,6 @@ int main() {
   preserves_utf8_labels();
   projects_discovered_graph_without_zero_registry_entries();
   rejects_malformed_and_duplicate_rows();
+  reads_what_the_reference_reads();
   imports_and_exports_files();
 }

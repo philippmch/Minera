@@ -1,17 +1,19 @@
 #include "minera/process_tree_playout.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <cmath>
 #include <optional>
 #include <numeric>
-#include <random>
+#include <unordered_map>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "minera/random.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -27,6 +29,13 @@ struct EnumerationBudget {
   std::size_t remaining = 250000;
   bool exhausted = false;
 };
+
+bool contains_operator(const ProcessTreeNode& n, ProcessTreeOperator op) {
+  if (n.op == op) return true;
+  for (const auto& child : n.children)
+    if (contains_operator(child, op)) return true;
+  return false;
+}
 
 void validate_node(const ProcessTreeNode& n, const ProcessTree& t) {
   switch (n.op) {
@@ -283,160 +292,295 @@ Words enumerate(const ProcessTreeNode& n, const ProcessTree& tree,
   return {};
 }
 
-bool sample_node(const ProcessTreeNode& n, const ProcessTree& tree,
-                 std::size_t max_length, std::size_t max_loops,
-                 std::mt19937_64& rng, Word& out, bool top_bottom) {
-  auto choose = [&](std::size_t size) {
-    return std::uniform_int_distribution<std::size_t>(0, size - 1)(rng);
-  };
-  switch (n.op) {
-    case ProcessTreeOperator::kTau: return true;
-    case ProcessTreeOperator::kActivity:
-      if (max_length == 0) return false;
-      out.push_back(tree.activities()[n.activity]); return true;
-    case ProcessTreeOperator::kExclusive: {
-      if (n.children.empty()) return false;
-      const auto start = choose(n.children.size());
-      for (std::size_t k = 0; k < n.children.size(); ++k) {
-        Word candidate;
-        if (sample_node(n.children[(start + k) % n.children.size()], tree,
-                        max_length, max_loops, rng, candidate, top_bottom) &&
-            candidate.size() <= max_length) { out = std::move(candidate); return true; }
-      }
-      return false;
-    }
-    case ProcessTreeOperator::kInclusiveChoice: {
-      if (n.children.empty()) return false;
-      std::vector<std::size_t> selected;
-      selected.reserve(n.children.size());
-      for (std::size_t i = 0; i < n.children.size(); ++i) {
-        if (std::bernoulli_distribution(0.5)(rng)) selected.push_back(i);
-      }
-      if (selected.empty()) selected.push_back(choose(n.children.size()));
+// A sampled element: an activity index, or kTauElement for a silent leaf.
+// Silent leaves are kept while a trace is built because the reference
+// shuffles them together with the visible events of a parallel block.
+using Element = std::int64_t;
+constexpr Element kTauElement = -1;
+using Elements = std::vector<Element>;
 
-      std::vector<Word> parts;
-      parts.reserve(selected.size());
-      std::size_t total = 0;
-      for (const auto i : selected) {
-        Word part;
-        if (!sample_node(n.children[i], tree,
-                         max_length - std::min(max_length, total), max_loops,
-                         rng, part, top_bottom))
-          return false;
-        total += part.size();
-        parts.push_back(std::move(part));
-      }
-      while (!parts.empty()) {
-        std::vector<std::size_t> ready;
-        for (std::size_t i = 0; i < parts.size(); ++i)
-          if (!parts[i].empty()) ready.push_back(i);
-        if (ready.empty()) break;
-        const auto i = ready[choose(ready.size())];
-        out.push_back(parts[i].front());
-        parts[i].erase(parts[i].begin());
-      }
-      return out.size() <= max_length;
-    }
-    case ProcessTreeOperator::kSequence:
-      for (const auto& c : n.children) {
-        Word part;
-        if (!sample_node(c, tree, max_length - std::min(max_length, out.size()),
-                         max_loops, rng, part, top_bottom)) return false;
-        out.insert(out.end(), part.begin(), part.end());
-      }
-      return out.size() <= max_length;
-    case ProcessTreeOperator::kParallel: {
-      std::vector<Word> parts;
-      std::size_t total = 0;
-      for (const auto& c : n.children) {
-        Word p;
-        if (!sample_node(c, tree, max_length - std::min(max_length, total),
-                         max_loops, rng, p, top_bottom)) return false;
-        total += p.size(); parts.push_back(std::move(p));
-      }
-      while (!parts.empty()) {
-        std::vector<std::size_t> ready;
-        for (std::size_t i = 0; i < parts.size(); ++i) if (!parts[i].empty()) ready.push_back(i);
-        if (ready.empty()) break;
-        const auto i = ready[choose(ready.size())];
-        out.push_back(parts[i].front()); parts[i].erase(parts[i].begin());
-      }
-      return out.size() <= max_length;
-    }
-    case ProcessTreeOperator::kInterleaving: {
-      std::vector<std::size_t> order(n.children.size());
-      std::iota(order.begin(), order.end(), 0);
-      std::shuffle(order.begin(), order.end(), rng);
-      for (const auto index : order) {
-        Word part;
-        if (!sample_node(n.children[index], tree,
-                         max_length - std::min(max_length, out.size()),
-                         max_loops, rng, part, top_bottom))
-          return false;
-        out.insert(out.end(), part.begin(), part.end());
-      }
-      return out.size() <= max_length;
-    }
-    case ProcessTreeOperator::kLoop: {
-      if (top_bottom) {
-        // The top-bottom variant follows the reference's geometric loop
-        // choice: after each body there is a 50% chance of taking a redo
-        // branch, subject to the caller's safety bound.
-        std::size_t repeats = 0;
-        while (true) {
-          Word body;
-          if (!sample_node(n.children[0], tree,
-                           max_length - std::min(max_length, out.size()),
-                           max_loops, rng, body, top_bottom))
-            return false;
-          out.insert(out.end(), body.begin(), body.end());
-          if (repeats >= max_loops ||
-              std::uniform_int_distribution<int>(0, 1)(rng) == 0)
-            break;
-          const auto r = 1 + choose(n.children.size() - 1);
-          Word redo;
-          if (!sample_node(n.children[r], tree,
-                           max_length - std::min(max_length, out.size()),
-                           max_loops, rng, redo, top_bottom))
-            return false;
-          out.insert(out.end(), redo.begin(), redo.end());
-          ++repeats;
-        }
-        return out.size() <= max_length;
-      }
-      const auto repeats = max_loops == 0 ? 0 : std::uniform_int_distribution<std::size_t>(0, max_loops)(rng);
-      for (std::size_t i = 0; i <= repeats; ++i) {
-        Word body;
-        if (!sample_node(n.children[0], tree,
-                         max_length - std::min(max_length, out.size()),
-                         max_loops, rng, body, top_bottom))
-          return false;
-        out.insert(out.end(), body.begin(), body.end());
-        if (i < repeats) {
-          const auto r = 1 + choose(n.children.size() - 1);
-          Word redo;
-          if (!sample_node(n.children[r], tree,
-                           max_length - std::min(max_length, out.size()),
-                           max_loops, rng, redo, top_bottom))
-            return false;
-          out.insert(out.end(), redo.begin(), redo.end());
-        }
-      }
-      return out.size() <= max_length;
-    }
-  }
-  return false;
+// Generation stops with an error once one trace holds this many elements
+// (visible and silent); the reference itself has no bound.
+constexpr std::size_t kElementBudget = 10000000;
+
+struct SampleBounds {
+  bool cap_loops = false;
+  std::size_t max_loops = 0;
+  std::size_t elements = 0;
+};
+
+void count_element(SampleBounds& bounds) {
+  if (++bounds.elements > kElementBudget)
+    throw std::invalid_argument(
+        "process-tree playout: a sampled trace exceeds the ten-million element safety bound");
 }
 
+// TOPBOTTOM (exact under random.seed): leaves give their label (tau
+// included); a sequence concatenates its children; an exclusive choice
+// takes children[randbelow(n)]; a loop generates children[0], then while
+// random() < 0.5 children[1] followed by children[0] (further children are
+// ignored); an interleaving shuffles its child list in place (the shuffled
+// order persists into later traces) and concatenates; a parallel block
+// generates every child, lists child i once per element of its sequence,
+// shuffles that list and takes the children's elements in the listed order.
+void topbottom_node(ProcessTreeNode& n, rng::PythonRandom& random, Elements& out,
+                    SampleBounds& bounds) {
+  switch (n.op) {
+    case ProcessTreeOperator::kTau:
+      count_element(bounds);
+      out.push_back(kTauElement);
+      return;
+    case ProcessTreeOperator::kActivity:
+      count_element(bounds);
+      out.push_back(static_cast<Element>(n.activity));
+      return;
+    case ProcessTreeOperator::kSequence:
+      for (auto& child : n.children) topbottom_node(child, random, out, bounds);
+      return;
+    case ProcessTreeOperator::kExclusive:
+      topbottom_node(n.children[random.choice_index(n.children.size())], random, out, bounds);
+      return;
+    case ProcessTreeOperator::kLoop: {
+      topbottom_node(n.children[0], random, out, bounds);
+      std::size_t repeats = 0;
+      while (!(bounds.cap_loops && repeats >= bounds.max_loops) && random.random() < 0.5) {
+        topbottom_node(n.children[1], random, out, bounds);
+        topbottom_node(n.children[0], random, out, bounds);
+        ++repeats;
+      }
+      return;
+    }
+    case ProcessTreeOperator::kInterleaving:
+      random.shuffle(n.children);
+      for (auto& child : n.children) topbottom_node(child, random, out, bounds);
+      return;
+    case ProcessTreeOperator::kParallel: {
+      std::vector<Elements> parts(n.children.size());
+      std::vector<std::size_t> order;
+      for (std::size_t i = 0; i < n.children.size(); ++i) {
+        topbottom_node(n.children[i], random, parts[i], bounds);
+        order.insert(order.end(), parts[i].size(), i);
+      }
+      random.shuffle(order);
+      std::vector<std::size_t> next(parts.size(), 0);
+      for (const auto i : order) out.push_back(parts[i][next[i]++]);
+      return;
+    }
+    case ProcessTreeOperator::kInclusiveChoice:
+      throw std::invalid_argument(
+          "TOPBOTTOM process-tree playout does not support inclusive choice (the reference raises "
+          "TypeError)");
+  }
+}
+
+// BASIC_PLAYOUT as a stochastic process. The reference keeps the enabled
+// vertices in a Python set and picks one per step; set order follows the
+// string hash, so only the distribution is reproducible. Every step picks
+// one enabled vertex uniformly. Executing a leaf emits it; a sequence enables
+// its first child, an exclusive choice one uniformly drawn child, a parallel
+// block all children, an inclusive choice each child with probability 1/2
+// (none: the block closes empty), an interleaving its first child after
+// shuffling the child order, a loop its body. A closed child enables the
+// next one (sequence, interleaving), closes an exclusive choice, and closes
+// a parallel or inclusive block once all its enabled children closed. A
+// closed loop body redoes (children[1], then the body again) or exits with
+// probability 1/2 each; the exit is children[2] when present, otherwise one
+// silent step.
+class BasicPlayout {
+ public:
+  BasicPlayout(const ProcessTreeNode& root, rng::PythonRandom& random, SampleBounds& bounds)
+      : root_(root), random_(random), bounds_(bounds) {
+    index(root, nullptr, 0);
+  }
+
+  Elements run() {
+    Elements out;
+    enabled_.clear();
+    enabled_.push_back({&root_, false});
+    done_ = false;
+    while (!done_) {
+      if (enabled_.empty())
+        throw std::logic_error("process-tree basic playout lost its enabled vertices");
+      const auto at = static_cast<std::size_t>(random_.randbelow(enabled_.size()));
+      const Vertex vertex = enabled_[at];
+      enabled_.erase(enabled_.begin() + static_cast<std::ptrdiff_t>(at));
+      count_element(bounds_);
+      if (vertex.loop_exit) {
+        close(*vertex.node);
+        continue;
+      }
+      execute(*vertex.node, out);
+    }
+    return out;
+  }
+
+ private:
+  struct Vertex {
+    const ProcessTreeNode* node = nullptr;
+    bool loop_exit = false;  // the implicit silent exit of a two-child loop
+  };
+  struct Place {
+    const ProcessTreeNode* parent = nullptr;
+    std::size_t child = 0;
+  };
+  struct State {
+    std::size_t pending = 0;
+    std::size_t position = 0;
+    std::size_t repeats = 0;
+    std::vector<std::size_t> order;
+  };
+
+  void index(const ProcessTreeNode& node, const ProcessTreeNode* parent, std::size_t child) {
+    places_[&node] = {parent, child};
+    for (std::size_t i = 0; i < node.children.size(); ++i) index(node.children[i], &node, i);
+  }
+
+  void enable(const ProcessTreeNode& node) { enabled_.push_back({&node, false}); }
+
+  void execute(const ProcessTreeNode& node, Elements& out) {
+    switch (node.op) {
+      case ProcessTreeOperator::kTau:
+        close(node);
+        return;
+      case ProcessTreeOperator::kActivity:
+        out.push_back(static_cast<Element>(node.activity));
+        close(node);
+        return;
+      default:
+        break;
+    }
+    auto& state = states_[&node];
+    state = State{};
+    switch (node.op) {
+      case ProcessTreeOperator::kSequence:
+      case ProcessTreeOperator::kLoop:
+        enable(node.children[0]);
+        return;
+      case ProcessTreeOperator::kExclusive:
+        enable(node.children[random_.choice_index(node.children.size())]);
+        return;
+      case ProcessTreeOperator::kParallel:
+        state.pending = node.children.size();
+        for (const auto& child : node.children) enable(child);
+        return;
+      case ProcessTreeOperator::kInclusiveChoice: {
+        std::vector<const ProcessTreeNode*> selected;
+        for (const auto& child : node.children)
+          if (random_.random() < 0.5) selected.push_back(&child);
+        if (selected.empty()) {
+          close(node);
+          return;
+        }
+        state.pending = selected.size();
+        for (const auto* child : selected) enable(*child);
+        return;
+      }
+      case ProcessTreeOperator::kInterleaving:
+        state.order.resize(node.children.size());
+        std::iota(state.order.begin(), state.order.end(), 0);
+        random_.shuffle(state.order);
+        enable(node.children[state.order[0]]);
+        return;
+      default:
+        return;
+    }
+  }
+
+  void close(const ProcessTreeNode& node) {
+    if (&node == &root_) {
+      done_ = true;
+      return;
+    }
+    const auto place = places_.at(&node);
+    const auto& parent = *place.parent;
+    auto& state = states_[&parent];
+    switch (parent.op) {
+      case ProcessTreeOperator::kSequence:
+        if (place.child + 1 < parent.children.size())
+          enable(parent.children[place.child + 1]);
+        else
+          close(parent);
+        return;
+      case ProcessTreeOperator::kInterleaving:
+        if (++state.position < parent.children.size())
+          enable(parent.children[state.order[state.position]]);
+        else
+          close(parent);
+        return;
+      case ProcessTreeOperator::kExclusive:
+        close(parent);
+        return;
+      case ProcessTreeOperator::kParallel:
+      case ProcessTreeOperator::kInclusiveChoice:
+        if (--state.pending == 0) close(parent);
+        return;
+      case ProcessTreeOperator::kLoop:
+        if (place.child == 0) {
+          const bool capped = bounds_.cap_loops && state.repeats >= bounds_.max_loops;
+          if (!capped && random_.randint(1, 2) == 1) {
+            ++state.repeats;
+            enable(parent.children[1]);
+          } else if (parent.children.size() >= 3) {
+            enable(parent.children[2]);
+          } else {
+            enabled_.push_back({&parent, true});
+          }
+        } else if (place.child == 1) {
+          enable(parent.children[0]);
+        } else {
+          close(parent);
+        }
+        return;
+      default:
+        return;
+    }
+  }
+
+  const ProcessTreeNode& root_;
+  rng::PythonRandom& random_;
+  SampleBounds& bounds_;
+  std::unordered_map<const ProcessTreeNode*, Place> places_;
+  std::unordered_map<const ProcessTreeNode*, State> states_;
+  std::vector<Vertex> enabled_;
+  bool done_ = false;
+};
+
+Word visible_word(const Elements& elements, const ProcessTree& tree) {
+  Word word;
+  for (const auto element : elements)
+    if (element != kTauElement) word.push_back(tree.activities()[static_cast<std::size_t>(element)]);
+  return word;
+}
+
+// The reference envelopes: TOPBOTTOM and EXTENSIVE logs carry the activity
+// only; BASIC_PLAYOUT (which plays out the converted net) names its cases
+// "0", "1", ... and stamps the events one second apart from epoch
+// 10,000,000, counting on across cases. add_envelope replaces either with
+// Minera's synthetic case_N ids and configured timestamps.
 EventLog words_to_log(const Words& words, const ProcessTreePlayoutOptions& o) {
+  const bool basic = o.variant == ProcessTreePlayoutVariant::kBasicPlayout;
   EventLog log;
   log.traces.reserve(words.size());
+  double reference_clock = 10000000.0;
   for (std::size_t i = 0; i < words.size(); ++i) {
-    Trace t; t.case_id = "case_" + std::to_string(i + 1);
+    Trace t;
+    if (o.add_envelope || basic) {
+      t.case_id = o.add_envelope ? "case_" + std::to_string(i + 1) : std::to_string(i);
+      t.case_id_state = FirstClassAttributeState::kPresent;
+    }
     double now = o.start + static_cast<double>(i) * o.case_interval;
     for (std::size_t j = 0; j < words[i].size(); ++j) {
       Event e; e.case_id = t.case_id; e.activity = words[i][j];
-      e.timestamp = format_timestamp(now); e.input_order = j;
+      e.activity_state = FirstClassAttributeState::kPresent;
+      if (o.add_envelope) {
+        e.timestamp = format_timestamp(now);
+        e.timestamp_state = FirstClassAttributeState::kPresent;
+      } else if (basic) {
+        e.timestamp = format_timestamp(reference_clock);
+        e.timestamp_state = FirstClassAttributeState::kPresent;
+        reference_clock += 1.0;
+      }
+      e.input_order = j;
       t.events.push_back(std::move(e)); now += o.event_interval;
     }
     log.traces.push_back(std::move(t));
@@ -485,16 +629,39 @@ ProcessTreePlayoutResult process_tree_playout_result(
     result.truncated = truncated;
     return result;
   }
+  if (options.variant == ProcessTreePlayoutVariant::kTopBottom &&
+      contains_operator(tree.root(), ProcessTreeOperator::kInclusiveChoice))
+    throw std::invalid_argument(
+        "TOPBOTTOM process-tree playout does not support inclusive choice (the reference raises "
+        "TypeError)");
   Words words;
-  std::mt19937_64 rng(options.seed);
+  rng::PythonRandom random(options.seed);
+  SampleBounds bounds;
+  bounds.cap_loops = options.cap_sampled_loops;
+  bounds.max_loops = options.max_loop_occurrences;
   const std::size_t limit = std::min(options.max_steps, options.max_length);
   words.reserve(options.traces);
+  // TOPBOTTOM shuffles interleaving children in place, so it runs on a copy
+  // whose child order evolves across traces as the reference's tree does.
+  ProcessTreeNode working = tree.root();
+  std::optional<BasicPlayout> basic;
+  if (options.variant == ProcessTreePlayoutVariant::kBasicPlayout)
+    basic.emplace(tree.root(), random, bounds);
   for (std::size_t i = 0; i < options.traces; ++i) {
-    Word w;
-    if (sample_node(tree.root(), tree, limit, options.max_loop_occurrences,
-                    rng, w,
-                    options.variant == ProcessTreePlayoutVariant::kTopBottom))
-      words.push_back(std::move(w));
+    bounds.elements = 0;
+    Elements elements;
+    if (basic) {
+      elements = basic->run();
+    } else {
+      topbottom_node(working, random, elements, bounds);
+    }
+    auto word = visible_word(elements, tree);
+    if (word.size() > limit)
+      throw std::invalid_argument(
+          "process-tree playout: a sampled trace has " + std::to_string(word.size()) +
+          " visible events, above the max_steps / max_length safety bound of " +
+          std::to_string(limit) + " (the reference has no bound; raise it to keep every trace)");
+    words.push_back(std::move(word));
   }
   ProcessTreePlayoutResult result;
   result.log = words_to_log(words, options);

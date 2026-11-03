@@ -2,6 +2,7 @@
 #include "root_cause_trace_key.hpp"
 
 #include "gzip_codec.hpp"
+#include "xml_pull_parser.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -23,8 +24,15 @@ namespace minera {
 namespace {
 
 // Escapes the five XML metacharacters so case ids, activity names, and
-// resources containing '&', '<', quotes, etc. produce well-formed XES.
+// resources containing '&', '<', quotes, etc. produce well-formed XES.  TAB,
+// CR and LF are written as character references: a reader normalizes literal
+// ones in an attribute value to spaces.  Text that XML cannot carry at all
+// (invalid UTF-8, lone surrogates, NUL and other non-Char code points) is an
+// error rather than a document no XES reader accepts; the reference ETREE
+// writer refuses such text too.
 void write_xml_escaped(std::ostream& out, std::string_view value) {
+  if (const auto problem = detail::xml_text_problem(value); !problem.empty())
+    throw std::invalid_argument("XES cannot represent this text: " + problem);
   for (const char c : value) {
     switch (c) {
       case '&': out << "&amp;"; break;
@@ -32,6 +40,9 @@ void write_xml_escaped(std::ostream& out, std::string_view value) {
       case '>': out << "&gt;"; break;
       case '"': out << "&quot;"; break;
       case '\'': out << "&apos;"; break;
+      case '\t': out << "&#9;"; break;
+      case '\r': out << "&#13;"; break;
+      case '\n': out << "&#10;"; break;
       default: out << c;
     }
   }
@@ -251,6 +262,14 @@ std::vector<const EventAttribute*> mapped_children(const EventAttribute& attribu
   return children;
 }
 
+// True when the key holds at least two UTF-8 code points.
+bool has_two_characters(std::string_view key) {
+  std::size_t lead_bytes = 0;
+  for (const char ch : key)
+    if ((static_cast<unsigned char>(ch) & 0xc0) != 0x80 && ++lead_bytes == 2) return true;
+  return false;
+}
+
 std::pair<std::string_view, std::string_view> mapping_key_entry(std::string_view key) {
   std::size_t position = 0;
   const auto next = [&]() {
@@ -330,7 +349,10 @@ void write_typed_attribute(std::ostream& out, std::string_view indent,
         write_typed_attribute(out, child_indent + "  ", child, variant, preserve_nulls);
     } else {
       for (const auto* child : mapped_children(attribute)) {
-        if (variant == XesExportVariant::kElementTree)
+        // The reference line writer splits each mapping key into a
+        // (key, value) pair of its first two characters, and fails on a
+        // shorter key; such a child is written as itself instead.
+        if (variant == XesExportVariant::kElementTree || !has_two_characters(child->key))
           write_typed_attribute(out, child_indent + "  ", *child, variant, preserve_nulls);
         else {
           const auto [key, value] = mapping_key_entry(child->key);
@@ -751,57 +773,86 @@ bool is_selected_copy(const EventAttribute& attribute,
 
 void write_event_attributes(std::ostream& out, const Event& event, XesExportVariant variant, bool preserve_nulls) {
   std::set<const EventAttribute*> consumed;
-  if (present(event.activity_state, event.activity)) {
-    const auto key =
-        projection_key(event.activity_source_key, "concept:name");
-    const auto* nested =
-        first_class_metadata(event.activity_attribute, event.attributes, key);
-    write_projection(out, "      ", key,
-                     event.activity,
-                     AttributeKind::kString, event.activity_state, variant, preserve_nulls, nested);
-    if (nested && !event.activity_attribute) consumed.insert(nested);
+  const auto write_role = [&](int role) {
+    switch (role) {
+      case 0:
+      if (present(event.activity_state, event.activity)) {
+        const auto key =
+            projection_key(event.activity_source_key, "concept:name");
+        const auto* nested =
+            first_class_metadata(event.activity_attribute, event.attributes, key);
+        write_projection(out, "      ", key,
+                         event.activity,
+                         AttributeKind::kString, event.activity_state, variant, preserve_nulls, nested);
+        if (nested && !event.activity_attribute) consumed.insert(nested);
+      }
+        break;
+      case 1:
+      if (present(event.timestamp_state, event.timestamp)) {
+        const auto key =
+            projection_key(event.timestamp_source_key, "time:timestamp");
+        const auto* nested = first_class_metadata(event.timestamp_attribute,
+                                                  event.attributes, key);
+        write_projection(out, "      ", key,
+                         event.timestamp,
+                         event.timestamp_state == FirstClassAttributeState::kNull ||
+                                 (!event.timestamp.empty() &&
+                                   parse_timestamp(event.timestamp))
+                              ? AttributeKind::kDate
+                              : AttributeKind::kString,
+                         event.timestamp_state, variant, preserve_nulls, nested);
+        if (nested && !event.timestamp_attribute) consumed.insert(nested);
+      }
+        break;
+      case 2:
+      if (present(event.resource_state, event.resource)) {
+        const auto key =
+            projection_key(event.resource_source_key, "org:resource");
+        const auto* nested =
+            first_class_metadata(event.resource_attribute, event.attributes, key);
+        write_projection(out, "      ", key,
+                         event.resource,
+                         AttributeKind::kString, event.resource_state, variant, preserve_nulls, nested);
+        if (nested && !event.resource_attribute) consumed.insert(nested);
+      }
+        break;
+      default:
+      if (present(event.lifecycle_state, event.lifecycle)) {
+        const auto key =
+            projection_key(event.lifecycle_source_key, "lifecycle:transition");
+        const auto* nested = first_class_metadata(event.lifecycle_attribute,
+                                                  event.attributes, key);
+        write_projection(out, "      ", key,
+                         event.lifecycle,
+                         AttributeKind::kString, event.lifecycle_state, variant, preserve_nulls, nested);
+        if (nested && !event.lifecycle_attribute) consumed.insert(nested);
+      }
+        break;
+    }
+  };
+  // The selected cells go back where the importer found them (document
+  // order, like the reference dict); cells without a known place go first.
+  std::vector<std::pair<std::uint32_t, int>> known;
+  for (int role = 0; role < 4; ++role) {
+    const auto position = event.first_class_source_positions[static_cast<std::size_t>(role)];
+    if (position == Event::kUnknownSourcePosition) write_role(role);
+    else known.emplace_back(position, role);
   }
-  if (present(event.timestamp_state, event.timestamp)) {
-    const auto key =
-        projection_key(event.timestamp_source_key, "time:timestamp");
-    const auto* nested = first_class_metadata(event.timestamp_attribute,
-                                              event.attributes, key);
-    write_projection(out, "      ", key,
-                     event.timestamp,
-                     event.timestamp_state == FirstClassAttributeState::kNull ||
-                             (!event.timestamp.empty() &&
-                               parse_timestamp(event.timestamp))
-                          ? AttributeKind::kDate
-                          : AttributeKind::kString,
-                     event.timestamp_state, variant, preserve_nulls, nested);
-    if (nested && !event.timestamp_attribute) consumed.insert(nested);
-  }
-  if (present(event.resource_state, event.resource)) {
-    const auto key =
-        projection_key(event.resource_source_key, "org:resource");
-    const auto* nested =
-        first_class_metadata(event.resource_attribute, event.attributes, key);
-    write_projection(out, "      ", key,
-                     event.resource,
-                     AttributeKind::kString, event.resource_state, variant, preserve_nulls, nested);
-    if (nested && !event.resource_attribute) consumed.insert(nested);
-  }
-  if (present(event.lifecycle_state, event.lifecycle)) {
-    const auto key =
-        projection_key(event.lifecycle_source_key, "lifecycle:transition");
-    const auto* nested = first_class_metadata(event.lifecycle_attribute,
-                                              event.attributes, key);
-    write_projection(out, "      ", key,
-                     event.lifecycle,
-                     AttributeKind::kString, event.lifecycle_state, variant, preserve_nulls, nested);
-    if (nested && !event.lifecycle_attribute) consumed.insert(nested);
-  }
+  std::sort(known.begin(), known.end());
+  std::size_t next_known = 0;
+  // The k-th known cell had k other selected cells before it.
+  const auto flush_known = [&](std::size_t before_generic) {
+    while (next_known < known.size() && known[next_known].first - next_known <= before_generic)
+      write_role(known[next_known++].second);
+  };
 
   // Imported first-class attributes are removed from the generic bag after
   // selector ranking.  Any attributes left under the same key are genuine
   // conflicts and must remain visible; this also preserves manually-built
   // logs whose generic bag intentionally contains a duplicate projection.
+  std::size_t generic = 0;
   for (const auto& attribute : event.attributes) {
+    flush_known(generic++);
     const auto selected_copy =
         (event.activity_attribute &&
          is_selected_copy(attribute, &*event.activity_attribute,
@@ -822,6 +873,7 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
     if (!consumed.contains(&attribute) && !selected_copy)
       write_typed_attribute(out, "      ", attribute, variant, preserve_nulls);
   }
+  flush_known(std::numeric_limits<std::size_t>::max());
 }
 
 const EventAttribute* stored_log_name(const EventLog& log) {
@@ -930,11 +982,20 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
         projection_key(trace.case_id_source_key, "concept:name");
     const auto* nested_case = first_class_metadata(
         trace.case_id_attribute, trace.attributes, case_key);
-    if (present(trace.case_id_state, trace.case_id))
+    // The case cell goes back to its document position when it is known.
+    bool case_written = !present(trace.case_id_state, trace.case_id);
+    const auto write_case = [&] {
+      if (case_written) return;
+      case_written = true;
       write_projection(out, "    ", case_key, trace.case_id,
                        AttributeKind::kString, trace.case_id_state,
                        variant, preserve_nulls, nested_case);
+    };
+    const auto case_position = trace.case_id_source_position;
+    if (case_position == Event::kUnknownSourcePosition) write_case();
+    std::size_t trace_attribute_index = 0;
     for (const auto& attribute : trace.attributes) {
+      if (trace_attribute_index++ == case_position) write_case();
       if (&attribute != nested_case &&
           !is_selected_copy(attribute,
                             trace.case_id_attribute
@@ -943,6 +1004,7 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
                             case_key))
         write_typed_attribute(out, "    ", attribute, variant, preserve_nulls);
     }
+    write_case();
     for (const auto& event : trace.events) {
       out << "    <event>\n";
       write_event_attributes(out, event, variant, preserve_nulls);

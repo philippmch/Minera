@@ -383,6 +383,17 @@ The frontend uploads it to `POST /api/mine`, where the native core picks the
 importer by extension/content, then imports and mines it in memory — the log
 never leaves your machine.
 
+**Size limits.** The server accepts uploads of up to 128 MiB on every route,
+and the browser refuses a larger file before sending it, naming the limit. An
+XES document may be up to 256 MiB, plain or after gzip expansion, so a large
+log fits as `.xes.gz` (raise the XES bound with `xes_max_decompressed_bytes`
+or `--xes-max-decompressed-bytes` on a machine with more memory; importing
+takes about 17 times the document size). OCEL JSON and XML documents and the
+OCEL files the server generates for download are limited to 128 MiB.
+`minera_export LOG --convert-only --xes OUT.xes` converts a CSV or XES log to
+XES without running the miners; `--xes` is also honoured together with
+`--xes-return-legacy-log-object` and `--log-convert`.
+
 **Navigation.** The left sidebar shows the open log, its views and every
 standalone tool. The views are grouped as Overview (Event log, Timeline),
 Discover (Process map, Process models, Timing, Behavior), Check (Conformance),

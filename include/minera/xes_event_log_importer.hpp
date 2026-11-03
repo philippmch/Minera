@@ -64,8 +64,10 @@ struct XesImportOptions {
   // Empty means all scalar attributes. First-class selectors are always read
   // so the resulting EventLog remains structurally valid.
   std::vector<std::string> attributes_to_read;
-  // Bounds transparent gzip expansion before XML parsing.
-  std::size_t max_decompressed_bytes = 512ULL * 1024ULL * 1024ULL;
+  // Bounds the XML document (plain, or after transparent gzip expansion).
+  // Reading holds about 17 times the document size, so 256 MiB needs about
+  // 4.3 GB; raise it explicitly for larger logs on larger machines.
+  std::size_t max_decompressed_bytes = 256ULL * 1024ULL * 1024ULL;
   // Rust table return modes; other variants continue returning an EventLog.
   // Legacy takes precedence when both are true.
   // The EventLog-only convenience API always retains its legacy contract.

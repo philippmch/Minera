@@ -7,7 +7,6 @@
 #include <limits>
 #include <map>
 #include <queue>
-#include <random>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -15,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "minera/random.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -32,7 +32,13 @@ struct PartialTraceGreater {
   }
 };
 
+// The reference stamps generated events from epoch 10,000,000
+// (1970-04-26T17:46:40Z); an explicit start_time replaces that base (a
+// declared extension).
+constexpr double kReferenceEpoch = 10000000.0;
+
 double start_epoch(const DfgPlayoutOptions& options) {
+  if (options.start_time.empty()) return kReferenceEpoch;
   const auto parsed = parse_timestamp(options.start_time);
   if (!parsed || !std::isfinite(*parsed)) {
     throw std::invalid_argument("start_time must be a valid ISO-8601 timestamp");
@@ -86,7 +92,7 @@ void validate_options(const DfgPlayoutOptions& options,
     throw std::invalid_argument(
         "case_arrival_rate must be finite and non-negative");
   }
-  if (!parse_timestamp(options.start_time).has_value()) {
+  if (!options.start_time.empty() && !parse_timestamp(options.start_time).has_value()) {
     throw std::invalid_argument("start_time must be a valid ISO-8601 timestamp");
   }
   if (performance == nullptr) return;
@@ -126,7 +132,8 @@ Event make_event(const std::string& case_id, const std::string& activity,
   Event event;
   event.case_id = case_id;
   event.activity = activity;
-  event.timestamp = format_timestamp(instant);
+  // datetime.fromtimestamp(t, utc): microseconds, ties to even.
+  event.timestamp = format_timestamp_microseconds(instant);
   event.input_order = order;
   if (options.activity_key != "activity" &&
       options.activity_key != "concept:name") {
@@ -219,6 +226,7 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
   };
 
   result.complete = coverage_complete();
+  double clock = start_epoch(options);
   if (start_total <= 0.0 || options.max_variants == 0) {
     result.interrupted = start_total > 0.0 && options.max_variants == 0;
     return result;
@@ -292,8 +300,9 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
           seen_edges.insert({state.activities[i - 1], state.activities[i]});
 
         Trace trace;
-        trace.case_id =
-            "case_" + std::to_string(result.log.traces.size() + 1);
+        // The reference names its cases "0", "1", ... and stamps events one
+        // second apart from its epoch, counting on across cases.
+        trace.case_id = std::to_string(result.log.traces.size());
         add_case_id_attribute(trace, options);
         trace.attributes.push_back(
             {"probability", std::to_string(probability), AttributeKind::kFloat});
@@ -310,12 +319,10 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
           trace.attributes.push_back(
               {"variant", std::move(variant), AttributeKind::kString});
         }
-        double instant = start_epoch(options) +
-                          static_cast<double>(result.log.traces.size());
         for (const auto& activity : state.activities) {
-          trace.events.push_back(make_event(trace.case_id, activity, instant,
+          trace.events.push_back(make_event(trace.case_id, activity, clock,
                                             trace.events.size(), options));
-          instant += 1.0;
+          clock += 1.0;
         }
         result.log.traces.push_back(std::move(trace));
         cumulative_probability += probability;
@@ -344,6 +351,15 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
   return result;
 }
 
+// PERFORMANCE (exact under numpy.random.seed(seed)): case i starts at
+// epoch + (i + 1) * case_arrival_rate with one numpy choice over the start
+// activities (in start_activity_order, else map order); each step is one
+// numpy choice over the activity's successors (edge-map order) followed by
+// its end weight, and a chosen edge with a non-zero mean duration d adds
+// d * standard_exponential() to the clock. The choice normalises the weights,
+// cumulates them, divides by the last sum and takes the first index above one
+// random_sample. Cases are "0", "1", ...; events carry the activity and the
+// timestamp only.
 DfgPlayoutResult performance_playout(const DfgFrequency& frequency,
                              const DfgActivityCounts& starts,
                              const DfgActivityCounts& ends,
@@ -351,6 +367,8 @@ DfgPlayoutResult performance_playout(const DfgFrequency& frequency,
                              const DfgPerformance* performance) {
   DfgPlayoutResult result;
   result.variant = DfgPlayoutVariant::kPerformance;
+  if (options.seed > 0xffffffffULL)
+    throw std::invalid_argument("DFG performance playout seed must be below 2^32 (numpy.random.seed)");
   if (options.traces == 0) {
     result.complete = true;
     return result;
@@ -360,78 +378,64 @@ DfgPlayoutResult performance_playout(const DfgFrequency& frequency,
     result.interrupted = true;
     return result;
   }
-  std::mt19937_64 rng(options.seed);
-  // Prefix the boundary labels so they cannot alias real activity names.
-  // The labels still define the two synthetic nodes, matching the public
-  // parameter contract while keeping collision behavior deterministic.
-  const auto boundary_node = [](std::string_view kind,
-                                const std::string& label) {
-    return std::string("\x01minera-dfg-boundary:") + std::string(kind) + ":" +
-           label;
+  rng::NumpyRandomState numpy(static_cast<std::uint32_t>(options.seed));
+  struct Choice {
+    std::string next;  // empty: the end of the case
+    double weight = 0.0;
   };
-  const std::string start_node =
-      boundary_node("start", options.artificial_start_activity);
-  const std::string end_node =
-      boundary_node("end", options.artificial_end_activity);
-  std::map<std::string, std::vector<std::pair<std::string, std::uint64_t>>> out;
-  for (const auto& [edge, count] : frequency) {
-    if (count != 0) out[edge.first].push_back({edge.second, count});
+  std::map<std::string, std::vector<Choice>> out;
+  for (const auto& [edge, count] : frequency)
+    if (count != 0) out[edge.first].push_back({edge.second, static_cast<double>(count)});
+  for (const auto& [activity, count] : ends)
+    if (count != 0) out[activity].push_back({std::string{}, static_cast<double>(count)});
+  std::vector<Choice> start_choices;
+  if (!options.start_activity_order.empty()) {
+    std::set<std::string> listed;
+    for (const auto& activity : options.start_activity_order) {
+      const auto found = starts.find(activity);
+      if (found == starts.end() || !listed.insert(activity).second)
+        throw std::invalid_argument(
+            "start_activity_order must list each start activity once");
+      if (found->second != 0) start_choices.push_back({activity, static_cast<double>(found->second)});
+    }
+    for (const auto& [activity, count] : starts)
+      if (count != 0 && !listed.contains(activity))
+        throw std::invalid_argument("start_activity_order must list each start activity once");
+  } else {
+    for (const auto& [activity, count] : starts)
+      if (count != 0) start_choices.push_back({activity, static_cast<double>(count)});
   }
-  for (const auto& [activity, count] : starts) {
-    if (count != 0) out[start_node].push_back({activity, count});
-  }
-  for (const auto& [activity, count] : ends) {
-    if (count != 0) out[activity].push_back({end_node, count});
-  }
-  for (auto& [source, choices] : out) {
-    (void)source;
-    std::sort(choices.begin(), choices.end(),
-              [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
-  }
+  const auto draw = [&](const std::vector<Choice>& choices) -> const Choice& {
+    std::vector<double> weights;
+    weights.reserve(choices.size());
+    for (const auto& choice : choices) weights.push_back(choice.weight);
+    return choices[numpy.choice_index(weights)];
+  };
   const double base = start_epoch(options);
 
   for (std::size_t trace_index = 0; trace_index < options.traces; ++trace_index) {
     Trace trace;
-    trace.case_id = "case_" + std::to_string(trace_index + 1);
+    trace.case_id = std::to_string(trace_index);
     add_case_id_attribute(trace, options);
-    double instant = base + static_cast<double>(trace_index) * options.case_arrival_rate;
-    std::string current = start_node;
+    double instant = base + static_cast<double>(trace_index + 1) * options.case_arrival_rate;
     bool reached_end = false;
-    while (trace.events.size() < options.max_events_per_trace) {
-      const auto it = out.find(current);
-      std::vector<std::string> names;
-      std::vector<double> weights;
-      if (it != out.end()) {
-        for (const auto& [next, count] : it->second) {
-          names.push_back(next);
-          weights.push_back(static_cast<double>(count));
+    if (!start_choices.empty()) {
+      std::string current = draw(start_choices).next;
+      trace.events.push_back(make_event(trace.case_id, current, instant, 0, options));
+      while (true) {
+        const auto it = out.find(current);
+        if (it == out.end()) break;  // the reference has no successor either
+        const auto& choice = draw(it->second);
+        if (choice.next.empty()) {
+          reached_end = true;
+          break;
         }
-      }
-      if (names.empty()) break;
-      std::discrete_distribution<std::size_t> pick(weights.begin(), weights.end());
-      const auto selected = pick(rng);
-      const std::string next = names[selected];
-      const double mean = next == end_node
-                              ? 0.0
-                              : performance_mean(performance, {current, next});
-      if (mean > 0.0) instant += std::exponential_distribution<double>(1.0 / mean)(rng);
-      if (next == end_node || next.empty()) {
-        reached_end = true;
-        break;
-      }
-      current = next;
-      trace.events.push_back(make_event(trace.case_id, current, instant,
-                                        trace.events.size(), options));
-    }
-    // Reaching the visible-event cap can still leave only the invisible end
-    // boundary enabled. Consume that termination without charging another
-    // visible event against the caller's bound.
-    if (!reached_end && trace.events.size() == options.max_events_per_trace) {
-      const auto it = out.find(current);
-      if (it != out.end()) {
-        reached_end = std::any_of(
-            it->second.begin(), it->second.end(),
-            [&](const auto& choice) { return choice.first == end_node; });
+        if (trace.events.size() >= options.max_events_per_trace) break;
+        const double mean = performance_mean(performance, {current, choice.next});
+        if (mean != 0.0) instant += mean * numpy.standard_exponential();
+        current = choice.next;
+        trace.events.push_back(make_event(trace.case_id, current, instant,
+                                          trace.events.size(), options));
       }
     }
     result.log.traces.push_back(std::move(trace));

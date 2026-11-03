@@ -331,6 +331,7 @@ add_library(minera_core
   src/backend/resource_profiles.cpp
   src/backend/role_discovery.cpp
   src/backend/sampling.cpp
+  src/backend/random.cpp
   src/backend/secure_random.cpp
   src/backend/timestamp.cpp
   src/backend/zone_database.cpp
@@ -1532,7 +1533,17 @@ if(MINERA_BUILD_TESTS)
   target_link_libraries(minera_process_tree_playout_tests PRIVATE minera::core)
   target_compile_features(minera_process_tree_playout_tests PRIVATE cxx_std_20)
   target_compile_options(minera_process_tree_playout_tests PRIVATE ${MINERA_TEST_OPTIONS})
-  add_test(NAME minera_process_tree_playout_tests COMMAND minera_process_tree_playout_tests)
+  add_test(NAME minera_process_tree_playout_tests COMMAND minera_process_tree_playout_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/process_tree_basic_distribution.txt")
+
+  add_executable(minera_process_tree_topbottom_parity_tests
+    src/backend/tests/test_process_tree_topbottom_parity.cpp
+  )
+  target_link_libraries(minera_process_tree_topbottom_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_process_tree_topbottom_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_process_tree_topbottom_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_process_tree_topbottom_parity_tests COMMAND minera_process_tree_topbottom_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/process_tree_topbottom_bank.txt")
 
   add_executable(minera_playout_tests
     src/backend/tests/test_playout.cpp
@@ -2038,6 +2049,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_dfg_playout_tests PRIVATE cxx_std_20)
   target_compile_options(minera_dfg_playout_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dfg_playout_tests COMMAND minera_dfg_playout_tests)
+
+  add_executable(minera_dfg_performance_playout_parity_tests
+    src/backend/tests/test_dfg_performance_playout_parity.cpp
+  )
+  target_link_libraries(minera_dfg_performance_playout_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_dfg_performance_playout_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_dfg_performance_playout_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_dfg_performance_playout_parity_tests COMMAND minera_dfg_performance_playout_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/dfg_performance_playout_bank.txt")
 
   add_executable(minera_dfg_io_tests
     src/backend/tests/test_dfg_io.cpp
@@ -2919,6 +2939,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_random_tree_tests PRIVATE cxx_std_20)
   target_compile_options(minera_random_tree_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_random_tree_tests COMMAND minera_random_tree_tests)
+
+  add_executable(minera_random_tree_parity_tests
+    src/backend/tests/test_random_tree_parity.cpp
+  )
+  target_link_libraries(minera_random_tree_parity_tests PRIVATE minera::core)
+  target_compile_features(minera_random_tree_parity_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_random_tree_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_random_tree_parity_tests COMMAND minera_random_tree_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/random_tree_bank.txt")
 
   add_executable(minera_saw_nets_tests
     src/backend/tests/test_saw_nets.cpp

@@ -29,6 +29,8 @@ export interface SavedStructuralResponse {
 export interface SavedStructuralForm {operation:SavedStructuralOperation;input_format:SavedStructuralFormat;call_form:"direct"|"default_options"|"with_options";call_form_supplied:boolean;options_supplied:boolean;options_text:string;}
 export const defaultSavedStructuralForm=(operation:SavedStructuralOperation="trie_to_petri"):SavedStructuralForm=>({operation,input_format:"direct",call_form:operation==="trie_to_petri"?"direct":"with_options",call_form_supplied:true,options_supplied:operation==="query_intervals",options_text:'{"point":0,"range":null}'});
 const object=(v:unknown):v is RecordValue=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+// The PetriNet carrier: nine storage fields, plus place_names when the net names its places.
+const PETRI_NET_FIELDS=["place_count","source_storage","sink_storage","has_source","has_sink","activities","transitions","discovery_markings","transition_names"] as const;
 const keys=(v:unknown,names:readonly string[]):v is RecordValue=>object(v)&&Object.keys(v).length===names.length&&names.every(k=>Object.hasOwn(v,k));
 const hexPattern=/^(?:[0-9a-f]{2})*$/i;
 const unhex=(raw:string):Uint8Array<ArrayBuffer>=>{if(!hexPattern.test(raw))throw Error("Invalid native byte string.");return Uint8Array.from(raw.match(/../g)??[],x=>parseInt(x,16));};
@@ -72,7 +74,7 @@ export function isSavedStructuralResponse(v:unknown):v is SavedStructuralRespons
  const constructor=input.type==="TrieModel"?isSavedStructuralTrie:input.type==="IntervalVector"?isSavedStructuralIntervals:(x:unknown)=>x===null;
  if(![input.before,input.after].every(x=>x===null||constructor(x)))return false;
  if(!(v.configured_options===null||keys(v.configured_options,["before","after"])&&isSavedStructuralOptions(v.configured_options.before)&&(v.configured_options.after===null||isSavedStructuralOptions(v.configured_options.after))))return false;
- if(!(v.result===null||keys(v.result,["type","value"])&&(v.result.type==="IntervalTreeQueryResult"?isSavedStructuralQueryResult(v.result.value):v.result.type==="PetriNet"&&keys(v.result.value,["place_count","source_storage","sink_storage","has_source","has_sink","activities","transitions","discovery_markings","transition_names"])&&v.result.value.discovery_markings===null&&v.result.value.transition_names===null&&isOriginalOcPlayoutNativeType("PetriNet",v.result.value))))return false;
+ if(!(v.result===null||keys(v.result,["type","value"])&&(v.result.type==="IntervalTreeQueryResult"?isSavedStructuralQueryResult(v.result.value):v.result.type==="PetriNet"&&(keys(v.result.value,PETRI_NET_FIELDS)||keys(v.result.value,[...PETRI_NET_FIELDS,"place_names"]))&&v.result.value.discovery_markings===null&&v.result.value.transition_names===null&&isOriginalOcPlayoutNativeType("PetriNet",v.result.value))))return false;
  if(!Array.isArray(v.native_calls)||!v.native_calls.every(x=>keys(x,["name","input_type","entered","returned","error"])&&isSavedStructuralString(x.name)&&isSavedStructuralString(x.input_type)&&typeof x.entered==="boolean"&&typeof x.returned==="boolean"&&(!x.returned||x.entered)&&nullableError(x.error)))return false;
  const artifacts=v.artifacts;return keys(artifacts,SAVED_STRUCTURAL_ARTIFACTS)&&SAVED_STRUCTURAL_ARTIFACTS.every(k=>artifacts[k]===null||carrier(artifacts[k]));
 }

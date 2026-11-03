@@ -11,7 +11,10 @@
 
 namespace minera {
 
-// The two native simulation strategies supported by a directly-follows graph.
+// algo.simulation.playout.dfg of PM4Py 2.7.22. PERFORMANCE is exact under
+// numpy.random.seed(seed) (see dfg_playout.cpp); both variants use the
+// reference envelope: cases "0", "1", ... and timestamps from epoch
+// 10,000,000 (CLASSIC: one second per event, counting on across cases).
 enum class DfgPlayoutVariant { kClassic, kPerformance, CLASSIC = kClassic, PERFORMANCE = kPerformance };
 
 struct DfgPlayoutOptions {
@@ -28,9 +31,20 @@ struct DfgPlayoutOptions {
 
   std::size_t traces = 1000;
   double case_arrival_rate = 1.0;
+  // PERFORMANCE draws from numpy.random.seed(seed): below 2^32.
   std::uint64_t seed = 1;
+  // PERFORMANCE stops a case at this many events (the reference has no
+  // bound); a stopped case is counted in truncated_traces and the cases
+  // after it no longer follow the reference draws.
   std::size_t max_events_per_trace = 1000;
-  std::string start_time = "2026-01-01T00:00:00Z";
+  // Empty (default): the reference epoch 10,000,000 (1970-04-26T17:46:40Z).
+  // A timestamp replaces that base (declared extension).
+  std::string start_time;
+  // The order of the PERFORMANCE start-activity choice (the reference's
+  // start-activity dict order: first occurrence in the log, for logs and
+  // DataFrames alike). Empty: map order. Successors follow the edge map
+  // order, which is the reference DataFrame DFG order (sorted pairs).
+  std::vector<std::string> start_activity_order;
   // Attribute names used by generated traces/events. The first-class native
   // fields remain populated for compatibility; non-standard names are also
   // emitted as typed generic attributes.

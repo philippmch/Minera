@@ -5,7 +5,7 @@ import { nativeObjectTables, type DiagnosticTable } from "./model-diagnostics";
 
 export const GENERATOR_CONTROLS = [
   ["seed","Generator seed","1","both"],
-  ["activities","Activity labels as JSON (empty uses native defaults)","","basic"],
+  ["activities","Activity labels as JSON (empty uses the reference six-character labels)","","basic"],
   ["rec_depth","Initial recursion depth","0","basic"],
   ["min_rec_depth","Minimum recursion depth","1","basic"],
   ["max_rec_depth","Maximum recursion depth","3","basic"],
@@ -26,10 +26,13 @@ export const GENERATION_PLAYOUT_CONTROLS = [
   ["traces","Generated cases","20","sample"], ["max_steps","Maximum visible steps per case","100","sample"],
   ["seed","Log seed","1","both"], ["min_length","Minimum trace length","0","extensive"],
   ["max_length","Maximum trace length","20","extensive"], ["max_traces","Maximum enumerated cases","100","extensive"],
-  ["max_loop_occurrences","Maximum loop redo occurrences","2","both"],
-  ["start","Log start (epoch seconds)","1767225600","both"],
-  ["case_interval","Case interval (seconds)","60","both"],
-  ["event_interval","Event interval (seconds)","1","both"],
+  ["max_loop_occurrences","Maximum loop redo occurrences","2","extensive"],
+  // Empty keeps the reference envelope (TOPBOTTOM and EXTENSIVE: no case id
+  // or timestamp; BASIC_PLAYOUT: cases "0".. from epoch 10,000,000, one second
+  // per event). Any value opts in to case_N ids with this timing.
+  ["start","Log start (epoch seconds; empty: reference envelope)","","both"],
+  ["case_interval","Case interval (seconds; empty: reference envelope)","","both"],
+  ["event_interval","Event interval (seconds; empty: reference envelope)","","both"],
 ] as const;
 export interface GenerationForm {
   variant: "basic"|"ptandloggenerator"; generator: Record<string,string>;

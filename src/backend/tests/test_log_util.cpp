@@ -47,10 +47,14 @@ EventLog source_log() {
 
 void split_is_seeded_and_preserves_metadata() {
   const auto log = source_log();
-  const auto left = split_log_train_test(log, 0.5, 42);
-  const auto right = split_log_train_test(log, 0.5, 42);
+  const auto left = split_log_train_test(log, 0.5, 42, SplitTrainTestInput::kEventLog);
+  const auto right = split_log_train_test(log, 0.5, 42, SplitTrainTestInput::kEventLog);
   assert(left.training.traces.size() == 2);
   assert(left.testing.traces.empty());
+  // DataFrame (default): random.seed(42) draws 0.639... then 0.025...
+  const auto frame = split_log_train_test(log, 0.5, 42);
+  assert(frame.training.traces.size() == 1 && frame.training.traces[0].case_id == "c2");
+  assert(frame.testing.traces.size() == 1 && frame.testing.traces[0].case_id == "c1");
   assert(left.training.traces[0].case_id == right.training.traces[0].case_id);
   assert(left.training.attributes.size() == 1);
   assert(left.training.attributes[0].key == "source");
@@ -70,6 +74,40 @@ void split_is_seeded_and_preserves_metadata() {
     rejected = true;
   }
   assert(rejected);
+}
+
+// pm4py.split_train_test after random.seed(s), observed on the reference.
+void split_matches_reference_draws() {
+  const auto numbered = [](std::size_t n) {
+    EventLog log;
+    for (std::size_t i = 0; i < n; ++i) {
+      Trace trace;
+      trace.case_id = std::to_string(i);
+      trace.events = {event(trace.case_id, "a", "1", i)};
+      log.traces.push_back(trace);
+    }
+    return log;
+  };
+  const auto ids = [](const EventLog& log) {
+    std::vector<std::string> out;
+    for (const auto& trace : log.traces) out.push_back(trace.case_id);
+    return out;
+  };
+  auto split = split_log_train_test(numbered(10), 0.8, 1, SplitTrainTestInput::kEventLog);
+  assert((ids(split.training) == std::vector<std::string>{"6", "8", "9", "7", "5", "3", "0", "4", "1"}));
+  assert((ids(split.testing) == std::vector<std::string>{"2"}));
+  split = split_log_train_test(numbered(7), 0.5, 3, SplitTrainTestInput::kEventLog);
+  assert((ids(split.training) == std::vector<std::string>{"0", "2", "3", "6"}));
+  assert((ids(split.testing) == std::vector<std::string>{"5", "4", "1"}));
+  split = split_log_train_test(numbered(5), 0.0, 2, SplitTrainTestInput::kEventLog);
+  assert((ids(split.training) == std::vector<std::string>{"2"}));
+  split = split_log_train_test(numbered(10), 0.8, 1);
+  assert((ids(split.testing) == std::vector<std::string>{"1"}));
+  split = split_log_train_test(numbered(7), 0.5, 3);
+  assert((ids(split.training) == std::vector<std::string>{"0", "2", "5", "6"}));
+  assert((ids(split.testing) == std::vector<std::string>{"1", "3", "4"}));
+  split = split_log_train_test(numbered(5), 0.0, 2);
+  assert(split.training.traces.empty() && split.testing.traces.size() == 5);
 }
 
 void fixed_and_all_prefixes_match_contract() {
@@ -264,6 +302,7 @@ void feature_selection_keeps_useful_typed_attributes() {
 
 int main() {
   split_is_seeded_and_preserves_metadata();
+  split_matches_reference_draws();
   fixed_and_all_prefixes_match_contract();
   derived_prefix_logs_preserve_typed_case_context();
   until_activity_returns_prefix_and_duration();

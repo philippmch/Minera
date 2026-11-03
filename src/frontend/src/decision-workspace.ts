@@ -20,7 +20,8 @@ export function decisionQuery(form:DecisionForm,schema:LogQuerySchema):URLSearch
 // A table cell shows at most this many characters; CSV downloads and the
 // complete decision data keep every value whole.
 export const DECISION_CELL_PREVIEW_CHARACTERS=2000;
-export function decisionCellPreview(text:string):string {return text.length>DECISION_CELL_PREVIEW_CHARACTERS?text.slice(0,DECISION_CELL_PREVIEW_CHARACTERS)+`… (${text.length} characters; the CSV download has the complete value)`:text;}
+// The cut never splits a surrogate pair, so the preview stays well-formed text.
+export function decisionCellPreview(text:string):string {if(text.length<=DECISION_CELL_PREVIEW_CHARACTERS)return text;let end=DECISION_CELL_PREVIEW_CHARACTERS;const unit=text.charCodeAt(end-1),next=text.charCodeAt(end);if(unit>=0xd800&&unit<=0xdbff&&next>=0xdc00&&next<=0xdfff)end-=1;return text.slice(0,end)+`… (${text.length} characters; the CSV download has the complete value)`;}
 export function decisionTables(workspace:DecisionWorkspace):Record<string,OcelPreparedTable> {
  const result=workspace.result,encoded=result.family==='DECISION_TABLES'?result:result.decision_tables!;const tables:Record<string,OcelPreparedTable>={};const table=(columns:string[],rows:unknown[][]):OcelPreparedTable=>({columns,count:rows.length,rowAt:i=>rows[i]});
  // Rows holding whole native JSON values are built when first read, so a

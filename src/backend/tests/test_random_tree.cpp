@@ -114,7 +114,7 @@ void ptandlog_generation_is_seeded_and_bounded() {
   choice.sequence = choice.parallel = choice.loop = choice.or_probability = 0.0;
   choice.choice = 1.0;
   choice.silent = 1.0;
-  choice.duplicate = 1.0;
+  choice.duplicate = 0.5;
   const auto choice_tree = generate_random_process_tree(choice);
   assert(has_operator(choice_tree.root(), ProcessTreeOperator::kExclusive));
 
@@ -159,7 +159,6 @@ void plural_generation_is_seeded_and_bounded() {
   assert(first.size() == 3);
   assert(second.size() == first.size());
   for (std::size_t i = 0; i < first.size(); ++i) {
-    assert(first[i].activities() == options.activities);
     assert(equal_node(first[i].root(), second[i].root()));
     const auto leaves = visible_leaves(first[i].root());
     assert(leaves >= options.min && leaves <= options.max);
@@ -213,7 +212,9 @@ void rejects_bad_options() {
   for (auto options : {RandomTreeOptions{.min_rec_depth = 3, .max_rec_depth = 1},
                        RandomTreeOptions{.prob_leaf = -0.1},
                        RandomTreeOptions{.prob_leaf = 1.1},
-                       RandomTreeOptions{.activities = {}}}) {
+                       RandomTreeOptions{.activities = {"A", "A"}},
+                       RandomTreeOptions{.variant = RandomTreeVariant::kPtAndLogGenerator,
+                                         .seed = 0x100000000ULL}}) {
     bool threw = false;
     try {
       (void)generate_random_process_tree(options);
@@ -245,6 +246,30 @@ void rejects_bad_options() {
   }
 }
 
+// The reference labels: six characters from A-Z0-9 for BASIC, a, b, ...,
+// z, aa, ab, ... in creation order for PT-and-log; caller activities are a
+// declared BASIC extension.
+void reference_labels() {
+  RandomTreeOptions basic;
+  basic.variant = RandomTreeVariant::kBasic;
+  const auto generated = generate_random_process_tree(basic);
+  for (const auto& name : generated.activities()) {
+    assert(name.size() == 6);
+    for (const char c : name) assert((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'));
+  }
+  basic.activities = {"x", "y"};
+  const auto supplied = generate_random_process_tree(basic);
+  for (const auto& name : supplied.activities())
+    assert(name == "x" || name == "y");
+  RandomTreeOptions ptand;
+  ptand.min = ptand.mode = ptand.max = 30;
+  ptand.silent = 0.0;
+  const auto tree = generate_random_process_tree(ptand);
+  assert(tree.activities().size() == 30);
+  assert(tree.activities().front() == "a");
+  assert(std::find(tree.activities().begin(), tree.activities().end(), "ad") != tree.activities().end());
+}
+
 void json_shape_is_stable() {
   RandomTreeOptions basic;
   basic.variant = RandomTreeVariant::kBasic;
@@ -272,7 +297,7 @@ void json_shape_is_stable() {
       generate_random_process_trees(options), options.variant,
       options.activities);
   assert(empty_json.find(
-             "\"activities\":[\"A\",\"B\",\"C\",\"D\",\"E\",\"F\"],\"trees\":[]") !=
+             "\"activities\":[],\"trees\":[]") !=
          std::string::npos);
 }
 
@@ -286,4 +311,5 @@ int main() {
   plural_generation_is_seeded_and_bounded();
   rejects_bad_options();
   json_shape_is_stable();
+  reference_labels();
 }

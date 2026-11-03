@@ -10,35 +10,54 @@
 
 namespace minera {
 
+// algo.simulation.playout.petri_net BASIC_PLAYOUT of PM4Py 2.7.22
+// (parameters noTraces, maxTraceLength, add_only_if_fm_is_reached,
+// fm_leq_accepted). Invariant-only: the process and the envelope are the
+// reference's, the draws are not (the reference chooses from a set of
+// transition objects, ordered by object identity). See playout().
 struct PlayoutOptions {
-  // Number of cases to simulate.
+  // Number of cases to return (noTraces). The adapters default to the
+  // reference's 1000; the struct keeps 100 for the hashed workbench captures.
   std::size_t traces = 100;
-  // Firing cap per case, so a livelocking (unsound) net cannot spin forever.
-  // A case that hits the cap or deadlocks is emitted as far as it got.
+  // Visible events per case (maxTraceLength, reference default 1000): a case
+  // stops once it holds this many, whether or not it reached the final
+  // marking.
   std::size_t max_steps = 1000;
-  // Seed for the firing choices; the same seed replays the same log.
+  // Seed of the rng::PythonRandom firing choices; the same seed replays the
+  // same log.
   std::uint64_t seed = 1;
-  // Timestamp of the first case's first event, seconds since the Unix epoch.
-  // Defaults to 2026-01-01T00:00:00Z.
+  // The default envelope is the reference's: cases "0", "1", ... and
+  // timestamps from epoch 10,000,000, one second per event, counting on
+  // across the returned cases. add_envelope (a declared extension; the
+  // adapters set it when start, case_interval or event_interval is supplied)
+  // instead names cases "case_1", ... and starts case i at
+  // start + i * case_interval with event_interval between its events. (It is
+  // declared last, with the safety bounds, to keep positional initialisers.)
   double start = 1767225600.0;
-  // Seconds between consecutive case starts and between a case's events, so
-  // the generated log carries a plausible, strictly ordered time perspective.
   double case_interval = 60.0;
   double event_interval = 1.0;
   // Optional explicit marker vectors. An empty vector keeps the workflow
   // source/sink defaults; a supplied vector must match the place count.
   std::vector<std::uint32_t> initial_marking;
   std::vector<std::uint32_t> final_marking;
-  // When enabled, omit cases that stop at a deadlock or firing cap before
-  // reaching the selected final marking. The default preserves the original
-  // behavior and emits the partial case.
+  // Keep only cases that end in an accepted final marking, sampling on until
+  // `traces` are accepted; the log is empty when none of the first `traces`
+  // cases was accepted (as in the reference).
   bool add_only_if_fm_is_reached = false;
-  // Treat a marking containing at least the selected final marking's tokens
-  // as accepted. Exact equality remains accepted in either mode.
+  // Accept (and offer the stop option in) any marking that covers the final
+  // marking, not only the exact one.
   bool fm_leq_accepted = false;
   // Adapter-facing opt-in for the visited-elements representation returned by
   // playout_visited; the EventLog-returning playout function remains unchanged.
   bool return_visited_elements = false;
+  // Safety bounds (the reference has none and would not return): a case that
+  // fires this many transitions (silent ones included; 0 means
+  // max(1,000,000, 1000 * (max_steps + 1))) raises, and so does an
+  // add_only_if_fm_is_reached run that needs more than this many cases
+  // (0 means 10000 * traces + 10000).
+  std::size_t max_firings_per_trace = 0;
+  std::size_t max_attempts = 0;
+  bool add_envelope = false;
 };
 
 // Controls weighted stochastic playout of a Petri net.  Transition weights
@@ -81,13 +100,13 @@ struct StochasticPlayoutOptions {
   bool return_visited_elements = false;
 };
 
-// Plays out a workflow net into a synthetic event log: each case starts from
-// one token on the source place and fires uniformly random enabled
-// transitions until the final marking (a single token on the sink) is
-// reached. Visible transitions append an event; silent ones only route. On a
-// sound net every generated trace fits the model perfectly, which makes the
-// playout a self-check for discovered models and a test-log generator for
-// imported ones. Case ids are "case_1".. in generation order.
+// Plays out a Petri net into a synthetic event log, as the reference
+// BASIC_PLAYOUT does: each case starts in the initial marking and fires
+// uniformly random enabled transitions (transitions without input places are
+// always enabled); in an accepted final marking "stop" is one more equally
+// likely option, and a case also stops at max_steps visible events or at a
+// deadlock. Visible transitions append an event; silent ones only route.
+// Case ids and timestamps follow PlayoutOptions::add_envelope.
 [[nodiscard]] EventLog playout(const PetriNet& net,
                                const PlayoutOptions& options = {});
 
@@ -118,7 +137,7 @@ struct PlayoutVisitedResult {
 };
 
 // Returns the alternating marking/transition visitation sequence for each
-// accepted basic-playout case. Every case starts with its initial marking;
+// returned basic-playout case (the same cases, draw for draw, as playout). Every case starts with its initial marking;
 // each fired transition is followed by the resulting marking, including
 // silent transitions. Cases rejected by the acceptance options are omitted.
 [[nodiscard]] PlayoutVisitedResult playout_visited(

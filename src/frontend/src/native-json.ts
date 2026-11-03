@@ -67,3 +67,61 @@ export function nativeFieldRecord(field:string,holder:object,key:string,memo:Wea
   return {field,value:member};
 }
 
+const STOP_NATIVE_JSON=Symbol("stop native JSON");
+/** Writes exactly nativeJson(value, indent) to `sink` as pieces of about
+ * `pieceSize` characters, in order, without building the whole text (which
+ * can exceed the engine's string limit). A piece never ends inside a
+ * surrogate pair. `sink` returning false stops the write; the result says
+ * whether the whole text was written. */
+export function writeNativeJson(value:unknown,indent:number,sink:(piece:string)=>boolean|void,pieceSize=1<<20):boolean {
+  let buffer="";
+  const flush=(force:boolean)=>{
+    if(!buffer||(!force&&buffer.length<pieceSize))return;
+    let cut=buffer.length;const last=buffer.charCodeAt(cut-1);if(!force&&last>=0xd800&&last<=0xdbff)cut-=1;
+    if(!cut)return;
+    const piece=cut===buffer.length?buffer:buffer.slice(0,cut);buffer=cut===buffer.length?"":buffer.slice(cut);
+    if(sink(piece)===false)throw STOP_NATIVE_JSON;
+  };
+  const push=(text:string)=>{buffer+=text;flush(false);};
+  const encode=(current:unknown,level:number):void=>{
+    if(!current||typeof current!=="object"){push(JSON.stringify(current)??"null");return;}
+    const array=Array.isArray(current),record=current as Record<string,unknown>,kept=literals.get(current);
+    const keys=array?undefined:Object.keys(current).filter(key=>record[key]!==undefined);
+    const length=array?(current as unknown[]).length:keys!.length,open=array?"[":"{",close=array?"]":"}";
+    if(!length){push(open+close);return;}
+    push(indent?open+"\n":open);
+    for(let i=0;i<length;++i){
+      if(i)push(indent?",\n":",");
+      // nativeJson maps over the array, so a hole leaves an empty part.
+      if(array&&!(i in current))continue;
+      const key=array?String(i):keys![i];
+      if(indent)push(" ".repeat((level+1)*indent));
+      if(!array)push(JSON.stringify(key)+":"+(indent?" ":""));
+      const literal=kept?.get(key);
+      if(literal!==undefined)push(literal);else encode(record[key],level+1);
+    }
+    push(indent?"\n"+" ".repeat(level*indent)+close:close);
+  };
+  try{encode(value,0);flush(true);return true;}
+  catch(error){if(error===STOP_NATIVE_JSON)return false;throw error;}
+}
+/** The first `limit` characters of nativeJson(value, indent) (never ending
+ * inside a surrogate pair) and whether the text was longer. */
+export function nativeJsonPreview(value:unknown,indent:number,limit:number):{text:string;truncated:boolean}{
+  const parts:string[]=[];let size=0,truncated=false;
+  writeNativeJson(value,indent,piece=>{
+    const room=limit-size;
+    if(piece.length<=room){parts.push(piece);size+=piece.length;return true;}
+    let end=room;const unit=piece.charCodeAt(end-1);if(end>0&&unit>=0xd800&&unit<=0xdbff)end-=1;
+    parts.push(piece.slice(0,end));truncated=true;return false;
+  },Math.max(1,Math.min(limit,1<<16)));
+  return {text:parts.join(""),truncated};
+}
+/** nativeJson(value, indent) as WTF-8 bytes in a Blob (lone surrogates keep
+ * their own three bytes, like nativeStringBytes), built piece by piece so a
+ * text beyond the engine's string limit still downloads in full. */
+export function nativeJsonBlob(value:unknown,indent:number,encode:(piece:string)=>Uint8Array<ArrayBuffer>,type="application/json"):Blob{
+  const blobs:Blob[]=[];let pending:Uint8Array<ArrayBuffer>[]=[];
+  writeNativeJson(value,indent,piece=>{pending.push(encode(piece).slice());if(pending.length>=64){blobs.push(new Blob(pending));pending=[];}});
+  return new Blob([...blobs,...pending],{type});
+}

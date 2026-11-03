@@ -1,5 +1,7 @@
 #include "minera/log_util.hpp"
 
+#include "minera/random.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -60,7 +62,8 @@ double parse_elapsed(const Event& previous, const Event& target,
 
 LogTrainTestSplit split_log_train_test(const EventLog& log,
                                        double train_percentage,
-                                       std::uint64_t seed) {
+                                       std::uint64_t seed,
+                                       SplitTrainTestInput input) {
   if (!std::isfinite(train_percentage) || train_percentage < 0.0 ||
       train_percentage > 1.0) {
     throw std::invalid_argument(
@@ -68,15 +71,22 @@ LogTrainTestSplit split_log_train_test(const EventLog& log,
   }
 
   LogTrainTestSplit result{with_log_attributes(log), with_log_attributes(log)};
+  rng::PythonRandom random(seed);
+  if (input == SplitTrainTestInput::kDataFrame) {
+    for (const auto& trace : log.traces) {
+      if (trace.events.empty()) continue;  // no rows, no case
+      (random.random() <= train_percentage ? result.training : result.testing)
+          .traces.push_back(trace);
+    }
+    return result;
+  }
   std::vector<std::size_t> indexes(log.traces.size());
   std::iota(indexes.begin(), indexes.end(), 0);
-  std::mt19937_64 random(seed);
-  std::shuffle(indexes.begin(), indexes.end(), random);
+  random.shuffle(indexes);
   const auto requested = static_cast<std::size_t>(
       std::floor(static_cast<double>(indexes.size()) * train_percentage));
-  // The source utility includes one trace even for a zero percentage whenever
-  // the input is non-empty.  Cap the result so a percentage of one remains a
-  // valid partition.
+  // The reference includes one trace even for a zero percentage whenever
+  // the input is non-empty, capped so a percentage of one stays a partition.
   const auto stop = indexes.empty() ? std::size_t{0}
                                     : std::min(indexes.size(), requested + 1);
   for (std::size_t position = 0; position < indexes.size(); ++position) {

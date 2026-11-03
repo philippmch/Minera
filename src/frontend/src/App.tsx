@@ -97,7 +97,7 @@ import {SavedStructuralWorkspace} from "./components/SavedStructuralWorkspace";
 import { OriginalEditDistanceWorkspace } from "./components/OriginalEditDistanceWorkspace";
 import { OriginalObjectCentricPlayoutWorkspace } from "./components/OriginalObjectCentricPlayoutWorkspace";
 import {ActiveMiningSource} from "./components/ActiveMiningSource";
-import {activeDatasetAnalysis, activeMiningSourceText, assertMiningSourceBinding, cancelMiningRequest, classifyMiningJson, isActiveSourceMining, miningSourceDescriptor, miningSourceHash, miningSourceOptions, MiningSourceRequestGate, suggestMiningSourceForm, type ActiveMiningSourceDescriptor, type ActiveSourceMining} from "./active-mining-source";
+import {acknowledgeMiningRequest, activeDatasetAnalysis, activeMiningSourceText, assertMiningSourceBinding, cancelMiningRequest, classifyMiningJson, isActiveSourceMining, miningSourceDescriptor, miningSourceHash, miningSourceOptions, MiningSourceRequestGate, suggestMiningSourceForm, type ActiveMiningSourceDescriptor, type ActiveSourceMining} from "./active-mining-source";
 import { requestLogQuerySchema } from "./log-query";
 import { EmbeddingSearch } from "./components/EmbeddingSearch";
 import { AskModel,PromptChat } from "./components/AskModel";
@@ -233,8 +233,12 @@ export default function App() {
   const abortSourceLoad = () => {sourceGate.current.invalidate(); const previous = sourceRequest.current; sourceRequest.current = null; previous?.controller.abort(); const rollback: Promise<LiveSourceRollback> = previous?.posted ? sendCancel(previous.request_id) : Promise.resolve(undefined); ocelRequest.current?.abort(); ocelRequest.current = null; setMining(false); return {previous, rollback};};
   const handBackLiveSource = (previousSource: string | null | undefined, rollback: Promise<LiveSourceRollback>) => void liveSourceHandback.current.handback(previousSource, rollback, sourceId => {if (sourceRequest.current) return; liveSource.current = sourceId; setLiveSourceId(sourceId);});
   // A cancelled load leaves the previous analysis on screen; the backend restores its session, so it is live again.
+  // That holds even once the response was written: the backend keeps the previous session until this page
+  // acknowledges the applied response (acknowledgeMiningRequest), sends a request on the new source, or its
+  // rollback window (60 s) ends.
   const cancelSourceLoad = () => {const {previous, rollback} = abortSourceLoad(); handBackLiveSource(previous?.previousSource, rollback);};
-  // A failed load: roll the backend back in case it published the session before the response failed to arrive.
+  // A failed load: roll the backend back in case it published the session before the response failed to arrive,
+  // or the response arrived but could not be applied (it was never acknowledged).
   const failSourceLoad = (pending: {request_id: string; posted: boolean; previousSource: string | null} | null) => {if (pending) handBackLiveSource(pending.previousSource, pending.posted ? sendCancel(pending.request_id) : Promise.resolve(undefined));};
   const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; setMining(true); setError(null); return {ticket, controller, cancelsSettled: cancelBarrier.current};};
   useEffect(() => () => {sourceGate.current.invalidate(); const pending = sourceRequest.current; pending?.controller.abort(); if (pending?.posted) void cancelMiningRequest(pending.request_id); ocelRequest.current?.abort();}, []);
@@ -515,6 +519,8 @@ export default function App() {
         setFiltersActive(false);
         setSourceLoadSerial(serial => serial + 1);
         if (analysis) openData(analysis); else {setData(null); setOcelResult(null); setOcelFile(null); setOcelDataset(null); setTool("active-source"); setError(null);}
+        // Applied: the backend may now release the previous session it kept for a cancel.
+        void acknowledgeMiningRequest(ticket.request_id);
     })()
       .catch((cause: Error) => {
         if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} else failSourceLoad(sourceRequest.current); setError(`Could not load ${file.name}: ${cause.message}`); if (/\.json$/i.test(file.name)) setTool("active-source");}
@@ -575,6 +581,7 @@ export default function App() {
         setSelectedVariant(null);
         setThreshold(1);
         setError(null);
+        void acknowledgeMiningRequest(ticket.request_id);
       })
       .catch((cause: Error) => {if (sourceGate.current.accepts(ticket, controller.signal)) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} else if (sourceRequest.current?.controller === controller) failSourceLoad(sourceRequest.current); setError(`Could not filter ${original.file.name}: ${cause.message}`);}})
       .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; setMining(false);}});

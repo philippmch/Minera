@@ -12,111 +12,25 @@
 #include <unordered_set>
 #include <vector>
 
+#include "minera/random.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
 
-EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
-  const auto& transitions = net.transitions();
-  if (net.place_count() == 0 || net.source() >= net.place_count() ||
-      net.sink() >= net.place_count()) {
-    throw std::invalid_argument(
-        "playout requires valid workflow source and sink places");
-  }
-  if (!std::isfinite(options.start) ||
-      !std::isfinite(options.case_interval) ||
-      !std::isfinite(options.event_interval)) {
-    throw std::invalid_argument("playout timestamps must be finite");
-  }
-  if (options.case_interval < 0.0 || options.event_interval < 0.0) {
-    throw std::invalid_argument(
-        "playout intervals must be non-negative");
-  }
-  const auto resolve_marking = [&](const std::vector<std::uint32_t>& requested,
-                                   std::size_t boundary,
-                                   const char* label) {
-    if (!requested.empty() && requested.size() != net.place_count()) {
-      throw std::invalid_argument(std::string("playout ") + label +
-                                  " marking must match the place count");
-    }
-    std::vector<std::uint32_t> marking(net.place_count(), 0);
-    if (requested.empty()) {
-      marking[boundary] = 1;
-    } else {
-      marking = requested;
-    }
-    return marking;
-  };
-  const auto initial_marking =
-      resolve_marking(options.initial_marking, net.source(), "initial");
-  const auto final_marking =
-      resolve_marking(options.final_marking, net.sink(), "final");
-  const auto final_reached = [&](const std::vector<std::uint32_t>& marking) {
-    if (marking == final_marking) return true;
-    if (!options.fm_leq_accepted) return false;
-    return std::all_of(final_marking.begin(), final_marking.end(),
-                       [&, index = std::size_t{0}](std::uint32_t required) mutable {
-                         return required <= marking[index++];
-                       });
-  };
-  std::mt19937_64 rng(options.seed);
+namespace {
 
-  EventLog log;
-  log.traces.reserve(options.traces);
+// The reference envelope of algo.simulation.playout.petri_net BASIC_PLAYOUT:
+// accepted cases are "0", "1", ... and every event is one second after the
+// previous one, counting on across cases from epoch 10,000,000.
+constexpr double kReferencePlayoutEpoch = 10000000.0;
 
-  std::vector<std::uint32_t> marking(net.place_count(), 0);
-  std::vector<std::size_t> enabled;
+struct BasicPlayoutSetup {
+  std::vector<std::uint32_t> initial_marking;
+  std::vector<std::uint32_t> final_marking;
+};
 
-  for (std::size_t c = 0; c < options.traces; ++c) {
-    Trace trace;
-    trace.case_id = "case_" + std::to_string(c + 1);
-    double now = options.start + static_cast<double>(c) * options.case_interval;
-
-    marking = initial_marking;
-
-    for (std::size_t step = 0; step < options.max_steps; ++step) {
-      // Reaching an accepted final marking completes the case even if more
-      // transitions could still fire (for example, a loop's redo path).
-      if (final_reached(marking)) break;
-
-      enabled.clear();
-      for (std::size_t t = 0; t < transitions.size(); ++t) {
-        if (petri_transition_enabled(transitions[t], marking) &&
-            (!transitions[t].inputs.empty() ||
-             transitions[t].has_extended_arcs())) {
-          enabled.push_back(t);
-        }
-      }
-      if (enabled.empty()) {
-        break;  // deadlock (only possible on an unsound net)
-      }
-
-      const auto pick = std::uniform_int_distribution<std::size_t>(
-          0, enabled.size() - 1)(rng);
-      const auto& fired = transitions[enabled[pick]];
-      fire_petri_transition(fired, marking);
-
-      if (!fired.silent()) {
-        Event event;
-        event.case_id = trace.case_id;
-        event.activity = net.activities()[*fired.activity];
-        event.timestamp = format_timestamp(now);
-        event.input_order = trace.events.size();
-        trace.events.push_back(std::move(event));
-        now += options.event_interval;
-      }
-    }
-
-    if (options.add_only_if_fm_is_reached && !final_reached(marking)) continue;
-    log.traces.push_back(std::move(trace));
-  }
-
-  return log;
-}
-
-PlayoutVisitedResult playout_visited(const PetriNet& net,
-                                     const PlayoutOptions& options) {
-  const auto& transitions = net.transitions();
+BasicPlayoutSetup basic_playout_setup(const PetriNet& net,
+                                      const PlayoutOptions& options) {
   if (net.place_count() == 0 || net.source() >= net.place_count() ||
       net.sink() >= net.place_count()) {
     throw std::invalid_argument(
@@ -130,71 +44,159 @@ PlayoutVisitedResult playout_visited(const PetriNet& net,
   if (options.case_interval < 0.0 || options.event_interval < 0.0) {
     throw std::invalid_argument("playout intervals must be non-negative");
   }
-  const auto resolve_marking = [&](const std::vector<std::uint32_t>& requested,
-                                   std::size_t boundary,
-                                   const char* label) {
+  const auto resolve = [&](const std::vector<std::uint32_t>& requested,
+                           std::size_t boundary, const char* label) {
     if (!requested.empty() && requested.size() != net.place_count()) {
       throw std::invalid_argument(std::string("playout ") + label +
                                   " marking must match the place count");
     }
     std::vector<std::uint32_t> marking(net.place_count(), 0);
-    if (requested.empty()) {
-      marking[boundary] = 1;
-    } else {
-      marking = requested;
-    }
+    if (requested.empty()) marking[boundary] = 1;
+    else marking = requested;
     return marking;
   };
-  const auto initial_marking =
-      resolve_marking(options.initial_marking, net.source(), "initial");
-  const auto final_marking =
-      resolve_marking(options.final_marking, net.sink(), "final");
+  return {resolve(options.initial_marking, net.source(), "initial"),
+          resolve(options.final_marking, net.sink(), "final")};
+}
+
+// The sampling process the reference follows (validated by distribution, not
+// draw for draw: the reference picks from a set of transition objects, whose
+// order follows object identity):
+//  - a case stops once it holds max_steps visible events;
+//  - otherwise every enabled transition, a transition without input places
+//    included, is equally likely, and in an accepted final marking (exact,
+//    or covering it with fm_leq_accepted) "stop" is one more equally likely
+//    option, so a case at the final marking with n enabled transitions stops
+//    with probability 1/(n+1);
+//  - a case with nothing enabled stops (deadlock).
+// A case is accepted when it ends in an accepted final marking. Without
+// add_only_if_fm_is_reached every case is kept; with it, rejected cases are
+// discarded and sampling goes on until `traces` cases are accepted, unless
+// none of the first `traces` attempts was accepted, in which case the log is
+// empty (both as the reference does). Draws come from rng::PythonRandom.
+template <class Emit>
+void run_basic_playout(const PetriNet& net, const PlayoutOptions& options,
+                       Emit&& emit) {
+  const auto& transitions = net.transitions();
+  const auto setup = basic_playout_setup(net, options);
+  const auto& final_marking = setup.final_marking;
   const auto final_reached = [&](const std::vector<std::uint32_t>& marking) {
     if (marking == final_marking) return true;
     if (!options.fm_leq_accepted) return false;
-    for (std::size_t place = 0; place < marking.size(); ++place) {
+    for (std::size_t place = 0; place < marking.size(); ++place)
       if (final_marking[place] > marking[place]) return false;
-    }
     return true;
   };
+  // Safety bounds the reference does not have: it would spin forever on a
+  // silent livelock or on an add_only request whose final marking is never
+  // reached after a first success. Both raise instead of returning less.
+  const std::size_t max_firings =
+      options.max_firings_per_trace != 0
+          ? options.max_firings_per_trace
+          : std::max<std::size_t>(1000000, 1000 * (options.max_steps + 1));
+  const std::size_t max_attempts =
+      options.max_attempts != 0 ? options.max_attempts
+                                : 10000 * options.traces + 10000;
 
+  rng::PythonRandom random(options.seed);
+  std::vector<std::uint32_t> marking;
+  std::vector<std::size_t> enabled;
+  std::vector<std::size_t> fired;
+  std::size_t accepted = 0;
+  std::size_t attempts = 0;
+  while (accepted < options.traces) {
+    if (options.add_only_if_fm_is_reached && accepted == 0 &&
+        attempts >= options.traces)
+      break;
+    if (attempts >= max_attempts)
+      throw std::runtime_error(
+          "playout: " + std::to_string(attempts) + " cases generated, " +
+          std::to_string(accepted) +
+          " reached the final marking; raise max_attempts or check the "
+          "final marking");
+    ++attempts;
+    marking = setup.initial_marking;
+    fired.clear();
+    std::size_t visible = 0;
+    while (visible < options.max_steps) {
+      enabled.clear();
+      for (std::size_t t = 0; t < transitions.size(); ++t)
+        if (petri_transition_enabled(transitions[t], marking))
+          enabled.push_back(t);
+      const bool can_stop = final_reached(marking);
+      const std::size_t options_count = enabled.size() + (can_stop ? 1 : 0);
+      if (options_count == 0) break;  // deadlock
+      const auto pick = static_cast<std::size_t>(random.randbelow(options_count));
+      if (pick == enabled.size()) break;  // stop in the final marking
+      const auto& transition = transitions[enabled[pick]];
+      fire_petri_transition(transition, marking);
+      fired.push_back(enabled[pick]);
+      if (!transition.silent()) ++visible;
+      if (fired.size() >= max_firings)
+        throw std::runtime_error(
+            "playout: a case fired " + std::to_string(fired.size()) +
+            " transitions with " + std::to_string(visible) +
+            " visible events (silent livelock); raise max_firings_per_trace");
+    }
+    if (options.add_only_if_fm_is_reached && !final_reached(marking)) continue;
+    emit(setup.initial_marking, fired);
+    ++accepted;
+  }
+}
+
+}  // namespace
+
+EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
+  const auto& transitions = net.transitions();
+  EventLog log;
+  log.traces.reserve(options.traces);
+  double clock = kReferencePlayoutEpoch;
+  run_basic_playout(net, options, [&](const std::vector<std::uint32_t>&,
+                                      const std::vector<std::size_t>& fired) {
+    const auto index = log.traces.size();
+    Trace trace;
+    double now = clock;
+    if (options.add_envelope) {
+      trace.case_id = "case_" + std::to_string(index + 1);
+      now = options.start + static_cast<double>(index) * options.case_interval;
+    } else {
+      trace.case_id = std::to_string(index);
+    }
+    for (const auto t : fired) {
+      const auto& transition = transitions[t];
+      if (transition.silent()) continue;
+      Event event;
+      event.case_id = trace.case_id;
+      event.activity = net.activities()[*transition.activity];
+      event.timestamp = format_timestamp(now);
+      event.input_order = trace.events.size();
+      trace.events.push_back(std::move(event));
+      now += options.add_envelope ? options.event_interval : 1.0;
+    }
+    if (!options.add_envelope) clock = now;
+    log.traces.push_back(std::move(trace));
+  });
+  return log;
+}
+
+PlayoutVisitedResult playout_visited(const PetriNet& net,
+                                     const PlayoutOptions& options) {
+  const auto& transitions = net.transitions();
   PlayoutVisitedResult result;
   result.traces.reserve(options.traces);
-  std::mt19937_64 rng(options.seed);
-  std::vector<std::uint32_t> marking(net.place_count(), 0);
-  std::vector<std::size_t> enabled;
-
-  for (std::size_t c = 0; c < options.traces; ++c) {
+  run_basic_playout(net, options, [&](const std::vector<std::uint32_t>& initial,
+                                      const std::vector<std::size_t>& fired) {
     PlayoutVisitedTrace visited;
-    visited.reserve(options.max_steps * 2 + 1);
-    marking = initial_marking;
+    visited.reserve(fired.size() * 2 + 1);
+    auto marking = initial;
     visited.push_back({PlayoutVisitedElementKind::MARKING, marking, 0});
-
-    for (std::size_t step = 0; step < options.max_steps; ++step) {
-      if (final_reached(marking)) break;
-
-      enabled.clear();
-      for (std::size_t t = 0; t < transitions.size(); ++t) {
-        if (petri_transition_enabled(transitions[t], marking) &&
-            (!transitions[t].inputs.empty() ||
-             transitions[t].has_extended_arcs())) {
-          enabled.push_back(t);
-        }
-      }
-      if (enabled.empty()) break;
-
-      const auto pick = std::uniform_int_distribution<std::size_t>(
-          0, enabled.size() - 1)(rng);
-      const auto selected = enabled[pick];
-      fire_petri_transition(transitions[selected], marking);
-      visited.push_back(
-          {PlayoutVisitedElementKind::TRANSITION, {}, selected});
+    for (const auto t : fired) {
+      fire_petri_transition(transitions[t], marking);
+      visited.push_back({PlayoutVisitedElementKind::TRANSITION, {}, t});
       visited.push_back({PlayoutVisitedElementKind::MARKING, marking, 0});
     }
-
-    if (options.add_only_if_fm_is_reached && !final_reached(marking)) continue;
     result.traces.push_back(std::move(visited));
-  }
+  });
   return result;
 }
 
@@ -371,7 +373,7 @@ EventLog stochastic_playout_impl(const PetriNet& net,
     }
   }
 
-  std::mt19937_64 rng(options.seed);
+  std::mt19937_64 engine(options.seed);
   EventLog log;
   log.traces.reserve(options.traces);
   if (visited_result) visited_result->traces.reserve(options.traces);
@@ -435,22 +437,19 @@ EventLog stochastic_playout_impl(const PetriNet& net,
 
       std::size_t selected = 0;
       if (options.transition_weights.empty()) {
-        selected = enabled[std::uniform_int_distribution<std::size_t>(
-            0, enabled.size() - 1)(rng)];
+        selected = enabled[rng::below(engine, enabled.size())];
       } else {
         double maximum = 0.0;
         for (const auto t : enabled)
           maximum = std::max(maximum, options.transition_weights[t]);
         if (!(maximum > 0.0)) {
-          selected = enabled[std::uniform_int_distribution<std::size_t>(
-              0, enabled.size() - 1)(rng)];
+          selected = enabled[rng::below(engine, enabled.size())];
         } else {
           std::vector<double> weights;
           weights.reserve(enabled.size());
           for (const auto t : enabled)
             weights.push_back(options.transition_weights[t] / maximum);
-          const auto index =
-              std::discrete_distribution<std::size_t>(weights.begin(), weights.end())(rng);
+          const auto index = rng::weighted_index(engine, weights);
           selected = enabled[index];
         }
       }
@@ -625,7 +624,7 @@ std::string state_key(const EnumerationState& state, bool include_path) {
   return key;
 }
 
-std::size_t rounded_branching_limit(double cap, std::mt19937_64& rng) {
+std::size_t rounded_branching_limit(double cap, std::mt19937_64& engine) {
   if (cap <= 0.0) return 0;
   const auto integral = std::floor(cap);
   auto limit = integral >=
@@ -633,18 +632,18 @@ std::size_t rounded_branching_limit(double cap, std::mt19937_64& rng) {
                    ? std::numeric_limits<std::size_t>::max()
                    : static_cast<std::size_t>(integral);
   if (cap - integral > 0.0 &&
-      std::uniform_real_distribution<double>(0.0, 1.0)(rng) < cap - integral &&
+      rng::unit(engine) < cap - integral &&
       limit != std::numeric_limits<std::size_t>::max())
     ++limit;
   return limit;
 }
 
 void sample_enabled(std::vector<std::size_t>& enabled, double cap,
-                    std::mt19937_64& rng) {
+                    std::mt19937_64& engine) {
   if (cap <= 0.0 || enabled.empty()) return;
-  const auto limit = rounded_branching_limit(cap, rng);
+  const auto limit = rounded_branching_limit(cap, engine);
   if (limit >= enabled.size()) return;
-  std::shuffle(enabled.begin(), enabled.end(), rng);
+  rng::shuffle(enabled.begin(), enabled.end(), engine);
   enabled.resize(limit);
 }
 
@@ -687,7 +686,7 @@ EventLog extensive_playout_impl(const PetriNet& net,
     throw std::invalid_argument(
         "extensive playout max_marking_occ must be positive when supplied");
   }
-  std::mt19937_64 rng(options.seed);
+  std::mt19937_64 engine(options.seed);
   const bool include_elements = visited_result != nullptr;
   const bool track_marking_occurrences = options.max_marking_occ.has_value();
   const bool track_path = include_elements || track_marking_occurrences;
@@ -757,7 +756,7 @@ EventLog extensive_playout_impl(const PetriNet& net,
       if (!petri_transition_enabled(transition, state.marking)) continue;
       enabled.push_back(t);
     }
-    sample_enabled(enabled, options.branching_factor_transitions, rng);
+    sample_enabled(enabled, options.branching_factor_transitions, engine);
     for (const auto t : enabled) {
       const auto& transition = transitions[t];
 

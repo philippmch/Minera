@@ -1736,12 +1736,23 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
   return [...entries.filter(([key]) => !overridden.has(key)), ...sourceFields];
 }
 
+/** The backend's request limit (minera_server kMaxRequestPayloadBytes). */
+export const MAX_UPLOAD_BYTES = 128 * 1024 * 1024;
+
+/** The message for an upload over MAX_UPLOAD_BYTES, naming the limit. */
+export function uploadTooLargeMessage(size?: number): string {
+  const limit = `${MAX_UPLOAD_BYTES / (1024 * 1024)} MiB`;
+  const actual = size === undefined ? "" : ` (${(size / (1024 * 1024)).toFixed(1)} MiB)`;
+  return `the upload${actual} is larger than the ${limit} limit of the Minera backend; compress an XES log as .xes.gz, which Minera reads directly`;
+}
+
 /** Upload the unchanged original file and retain typed source-only outcomes. */
 export async function mineActiveDataset(
   file: File,
   options: MineOptions = {},
   signal?: AbortSignal,
 ): Promise<ActiveDatasetResult> {
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error(uploadTooLargeMessage(file.size));
   const form = new FormData();
   if (hasExactFilters(options)) form.append("log", file); else form.append("log", file, file.name);
   const fields = mineFormEntries({...options, miningRequestId: options.miningRequestId ?? crypto.randomUUID()});
@@ -1768,7 +1779,7 @@ export async function mineActiveDataset(
     throw new Error(String((parsed as { error: unknown }).error));
   }
   const unreadable = parsed === null && !exactRun ? nativeResponseFailure(response) : undefined;
-  if (response.status === 413) throw new Error("the upload is larger than the Minera backend accepts (HTTP 413)");
+  if (response.status === 413) throw new Error(uploadTooLargeMessage());
   if (!response.ok) {
     throw new Error(`the Minera backend answered with status ${response.status}${unreadable ? `, and ${unreadable}` : ""}`);
   }

@@ -28,10 +28,20 @@ enum class LogUtilityVariant {
   FEATURE_SELECTION = kFeatureSelection,
 };
 
+// How split_train_test sees the log, as pm4py.split_train_test does:
+//  - kDataFrame (default; what pm4py.read_xes and a CSV read give): one
+//    random() per case in order of appearance, the case trains when the draw
+//    is <= train_percentage; rows keep their order. Traces without events
+//    have no rows and appear in neither part.
+//  - kEventLog: random.shuffle over the traces, the first
+//    min(n, floor(n * train_percentage) + 1) train, the rest test, both in
+//    shuffled order.
+// The draws are Python's random module after random.seed(seed); the
+// reference reads the global generator, so a seeded call is exact.
+enum class SplitTrainTestInput { kDataFrame, kEventLog };
+
 struct LogUtilityOptions {
   LogUtilityVariant variant = LogUtilityVariant::kSplitTrainTest;
-  // The split uses a seeded Fisher-Yates shuffle.  The reference utility does
-  // not expose a seed; making it explicit keeps the native result reproducible.
   double train_percentage = 0.8;
   std::uint64_t seed = 0;
   std::size_t prefix_length = 0;
@@ -80,7 +90,8 @@ struct LogFeatureSelectionResult {
 
 [[nodiscard]] LogTrainTestSplit split_log_train_test(
     const EventLog& log, double train_percentage = 0.8,
-    std::uint64_t seed = 0);
+    std::uint64_t seed = 0,
+    SplitTrainTestInput input = SplitTrainTestInput::kDataFrame);
 
 [[nodiscard]] EventLog get_log_prefixes(const EventLog& log,
                                          std::size_t length);
@@ -100,8 +111,9 @@ struct LogFeatureSelectionResult {
 
 [[nodiscard]] inline LogTrainTestSplit split_train_test(
     const EventLog& log, double train_percentage = 0.8,
-    std::uint64_t seed = 0) {
-  return split_log_train_test(log, train_percentage, seed);
+    std::uint64_t seed = 0,
+    SplitTrainTestInput input = SplitTrainTestInput::kDataFrame) {
+  return split_log_train_test(log, train_percentage, seed, input);
 }
 
 [[nodiscard]] inline EventLog get_prefixes_from_log(const EventLog& log,

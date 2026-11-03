@@ -9,8 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "numpy_legacy_random.hpp"
-#include "python_random.hpp"
+#include "minera/random.hpp"
 
 namespace minera {
 namespace {
@@ -39,7 +38,7 @@ double pairwise_sum(const double* values, std::size_t n) {
   return pairwise_sum(values, half) + pairwise_sum(values + half, n - half);
 }
 
-long exp_mech(long n, double epsilon, NumpyLegacyRandom& rng) {
+long exp_mech(long n, double epsilon, rng::NumpyRandomState& rng) {
   const auto size = static_cast<std::size_t>(n);
   std::vector<double> weights(size), p(size);
   bool overflow = false;
@@ -137,7 +136,7 @@ long reference_ba_violations(const BehavioralAppropriatenessRelations& relations
 }
 
 long reference_exp_mech(long n, double epsilon, std::uint32_t seed) {
-  NumpyLegacyRandom rng(seed);
+  rng::NumpyRandomState rng(seed);
   return exp_mech(n, epsilon, rng);
 }
 
@@ -164,7 +163,8 @@ std::vector<TraceVariantQueryReferenceCase> reference_generate_variant_log(
 }
 
 std::vector<TraceVariantQueryReferenceCase> reference_sacofa_trace_variant_query(
-    const std::vector<std::vector<std::string>>& traces, const TraceVariantQueryReferenceOptions& options) {
+    const std::vector<std::vector<std::string>>& traces, const TraceVariantQueryReferenceOptions& options,
+    TraceVariantQueryReferenceStats* stats) {
   if (options.k >= 1 && std::any_of(traces.begin(), traces.end(), [](const auto& t) { return t.empty(); }))
     throw TraceVariantQueryReferenceError("IndexError", "list index out of range");
   std::vector<std::string> events;
@@ -185,8 +185,8 @@ std::vector<TraceVariantQueryReferenceCase> reference_sacofa_trace_variant_query
     bool ended = false;
     long count = 0;
   };
-  NumpyLegacyRandom numpy_rng(options.seed);
-  PythonRandom python_rng(options.seed);
+  rng::NumpyRandomState numpy_rng(options.seed);
+  rng::PythonRandom python_rng(options.seed);
   std::vector<Entry> final_entries;
   std::vector<std::vector<std::string>> current{{}};
   for (long n = 1; n <= options.k; ++n) {
@@ -201,6 +201,7 @@ std::vector<TraceVariantQueryReferenceCase> reference_sacofa_trace_variant_query
       const auto found = ended_traces.find(prefix);
       level.push_back({prefix, true, found == ended_traces.end() ? 0 : found->second});
     }
+    if (stats) stats->candidate_count += level.size();
     std::vector<std::size_t> conforming, rest;
     for (std::size_t i = 0; i < level.size(); ++i) {
       bool conforms = false;
@@ -214,8 +215,9 @@ std::vector<TraceVariantQueryReferenceCase> reference_sacofa_trace_variant_query
       (conforms ? conforming : rest).push_back(i);
     }
     const long added = exp_mech(static_cast<long>(rest.size()) + 1, options.epsilon, numpy_rng);
+    if (stats) stats->selected_violation_count += static_cast<std::uint64_t>(added);
     for (long i = 0; i < added; ++i) {
-      const auto at = python_rng.randbelow(static_cast<std::uint32_t>(rest.size()));
+      const auto at = static_cast<std::size_t>(python_rng.randbelow(rest.size()));
       conforming.push_back(rest[at]);
       rest.erase(rest.begin() + at);
     }

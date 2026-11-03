@@ -189,7 +189,7 @@ LAPLACE; under a minute to capture) passes in
 `minera_trace_variant_query_parity_tests` through the new
 include/minera/trace_variant_query_reference.hpp (model in the parity doc;
 Python `random` and legacy numpy draws emulated in
-src/backend/python_random.hpp and numpy_legacy_random.hpp). Package
+include/minera/random.hpp, the shared generator module). Package
 `algo.anonymization.trace_variant_query` and its five partial modules
 promoted. LAPLACE raises AttributeError in the pinned release for every
 input, so the reference function raises the same. The older

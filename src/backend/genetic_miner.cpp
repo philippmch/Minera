@@ -13,11 +13,15 @@
 #include <vector>
 
 #include "minera/genetic_reference.hpp"
+#include "minera/random.hpp"
 #include "minera/timestamp.hpp"
 #include "reference_activity_selector.hpp"
 
 namespace minera {
 namespace {
+
+// Seeded draws use Minera's portable algorithms over std::mt19937_64.
+namespace portable = ::minera::rng;
 
 constexpr std::size_t kHardActivities = 256;
 constexpr std::size_t kHardPopulation = 10000;
@@ -74,9 +78,8 @@ std::vector<Partition> random_partition(std::vector<std::size_t> values,
   values.erase(std::unique(values.begin(), values.end()), values.end());
   std::vector<Partition> result;
   while (!values.empty()) {
-    std::shuffle(values.begin(), values.end(), rng);
-    std::uniform_int_distribution<std::size_t> pick(1, values.size());
-    const std::size_t count = pick(rng);
+    portable::shuffle(values.begin(), values.end(), rng);
+    const std::size_t count = portable::uniform_int<std::mt19937_64, std::size_t>(rng, 1, values.size());
     Partition part(values.begin(), values.begin() + count);
     values.erase(values.begin(), values.begin() + count);
     std::sort(part.begin(), part.end());
@@ -360,8 +363,7 @@ Individual initial_individual(const std::vector<std::vector<std::uint64_t>>& cau
       for (std::size_t target = 0; target < n; ++target) {
         const double probability = static_cast<double>(causal[source][target]) /
                                    static_cast<double>(total);
-        std::bernoulli_distribution draw(probability);
-        if (draw(rng)) neighbors.push_back(target);
+        if (portable::bernoulli(rng, probability)) neighbors.push_back(target);
       }
     }
     individual.output[source] = random_partition(std::move(neighbors), rng);
@@ -413,11 +415,10 @@ Individual crossover(Individual first, const Individual& second,
                      std::mt19937_64& rng,
                      const std::vector<std::vector<std::uint64_t>>& causal) {
   if (first.input.empty()) return first;
-  std::uniform_int_distribution<std::size_t> activity(0, first.input.size() - 1);
-  const auto at = activity(rng);
+  const auto at = static_cast<std::size_t>(portable::below(rng, first.input.size()));
   if (!first.input[at].empty() && !second.input[at].empty()) {
-    const std::size_t split = std::uniform_int_distribution<std::size_t>(
-        0, std::min(first.input[at].size(), second.input[at].size()) - 1)(rng);
+    const auto split = static_cast<std::size_t>(portable::below(
+        rng, std::min(first.input[at].size(), second.input[at].size())));
     const auto old = flatten(first.input[at]);
     first.input[at] = recombine_partitions(first.input[at], second.input[at],
                                            split);
@@ -432,8 +433,8 @@ Individual crossover(Individual first, const Individual& second,
     }
   }
   if (!first.output[at].empty() && !second.output[at].empty()) {
-    const std::size_t split = std::uniform_int_distribution<std::size_t>(
-        0, std::min(first.output[at].size(), second.output[at].size()) - 1)(rng);
+    const auto split = static_cast<std::size_t>(portable::below(
+        rng, std::min(first.output[at].size(), second.output[at].size())));
     const auto old = flatten(first.output[at]);
     first.output[at] = recombine_partitions(first.output[at], second.output[at],
                                              split);
@@ -462,11 +463,10 @@ std::pair<Individual, Individual> crossover_pair(
 
 void mutate(Individual& individual, double rate, std::mt19937_64& rng,
             const std::vector<std::vector<std::uint64_t>>& causal) {
-  std::bernoulli_distribution mutate_draw(rate);
   for (auto& partitions : individual.input)
-    if (mutate_draw(rng)) partitions = random_partition(flatten(partitions), rng);
+    if (portable::bernoulli(rng, rate)) partitions = random_partition(flatten(partitions), rng);
   for (auto& partitions : individual.output)
-    if (mutate_draw(rng)) partitions = random_partition(flatten(partitions), rng);
+    if (portable::bernoulli(rng, rate)) partitions = random_partition(flatten(partitions), rng);
   repair(individual, causal);
 }
 
@@ -550,7 +550,7 @@ GeneticMinerResult mine_genetic(const EventLog& event_log,
     while (next.size() < options.population_size) {
       std::vector<std::size_t> indices(population.size());
       std::iota(indices.begin(), indices.end(), 0);
-      std::shuffle(indices.begin(), indices.end(), rng);
+      portable::shuffle(indices.begin(), indices.end(), rng);
       std::size_t parent1 = indices[0], parent2 = indices[1];
       for (std::size_t i = 0; i < std::min(options.elitism_min_sample, indices.size()); ++i)
         if (population[indices[i]].fitness > population[parent1].fitness) parent1 = indices[i];
@@ -560,7 +560,7 @@ GeneticMinerResult mine_genetic(const EventLog& event_log,
           parent2 = indices[i];
       std::pair<Individual, Individual> children{
           population[parent1].individual, population[parent2].individual};
-      if (std::bernoulli_distribution(options.crossover_rate)(rng))
+      if (portable::bernoulli(rng, options.crossover_rate))
         children = crossover_pair(population[parent1].individual,
                                   population[parent2].individual, rng, causal);
       for (Individual* child : {&children.first, &children.second}) {

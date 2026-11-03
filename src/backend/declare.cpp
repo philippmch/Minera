@@ -384,17 +384,13 @@ std::vector<std::string> project(const std::vector<std::string>& trace,
   return result;
 }
 
-std::pair<int, int> stats_for(const std::vector<Statuses>& rows,
-                              const std::vector<int>& weights,
-                              const CandidateKey& candidate) {
-  int support = 0, confidence = 0;
-  for (std::size_t i = 0; i < rows.size(); ++i) {
-    const int status = rows[i].contains(candidate) ? rows[i].at(candidate) : 0;
-    if (status != 0) support += weights[i];
-    if (status == 1) confidence += weights[i];
-  }
-  return {support, confidence};
-}
+// Weighted support (status != 0) and confidence (status == 1) of one
+// candidate over the projected traces that report it; a trace that does not
+// report a candidate counts as status 0.
+struct CandidateStats {
+  int support = 0;
+  int confidence = 0;
+};
 
 int activity_selector_priority(const EventAttribute& field,
                                std::string_view selector) {
@@ -615,15 +611,18 @@ DeclareModel discover_declare(const EventLog& log, const DeclareDiscoveryOptions
 
   std::map<std::vector<std::string>, int> projected;
   for (const auto& trace : selected) ++projected[project(trace, activities)];
-  std::vector<Statuses> rows;
-  std::vector<int> weights;
+  // Each distinct projected trace's statuses are folded into the running
+  // totals as soon as they are evaluated. Keeping every trace's status map
+  // until the end cost about 200 bytes per candidate per variant (gigabytes on
+  // a log with thousands of variants and a dozen activities).
+  std::map<CandidateKey, CandidateStats> candidates;
   for (const auto& [trace, count] : projected) {
-    rows.push_back(evaluate(trace, activities, allowed));
-    weights.push_back(count);
+    for (const auto& [candidate, status] : evaluate(trace, activities, allowed)) {
+      auto& stats = candidates[candidate];
+      if (status != 0) stats.support += count;
+      if (status == 1) stats.confidence += count;
+    }
   }
-  std::set<CandidateKey> candidates;
-  for (const auto& row : rows)
-    for (const auto& [candidate, _] : row) candidates.insert(candidate);
   const int row_count = static_cast<int>(log.traces.size());
   double min_support = options.has_min_support_ratio ? options.min_support_ratio : 0.0;
   double min_confidence = options.has_min_confidence_ratio ? options.min_confidence_ratio : 0.0;
@@ -631,8 +630,8 @@ DeclareModel discover_declare(const EventLog& log, const DeclareDiscoveryOptions
     double best = -1.0;
     CandidateKey best_key;
     int best_support = 0, best_confidence = 0;
-    for (const auto& candidate : candidates) {
-      const auto [support, confidence] = stats_for(rows, weights, candidate);
+    for (const auto& [candidate, stats] : candidates) {
+      const auto [support, confidence] = stats;
       if (support <= 0) continue;
       const double product = static_cast<double>(confidence) / row_count;
       if (product > best || (product == best && best_key < candidate)) {
@@ -644,8 +643,8 @@ DeclareModel discover_declare(const EventLog& log, const DeclareDiscoveryOptions
       min_confidence = static_cast<double>(best_confidence) / best_support * options.auto_selection_multiplier;
     }
   }
-  for (const auto& candidate : candidates) {
-    const auto [support, confidence] = stats_for(rows, weights, candidate);
+  for (const auto& [candidate, stats] : candidates) {
+    const auto [support, confidence] = stats;
     // The reference uses positive comparisons (`>=`); spelling these as negated
     // `<` would accidentally accept NaN thresholds.
     if (!(support >= row_count * min_support) || support == 0 ||

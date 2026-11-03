@@ -232,9 +232,10 @@ RECORD(PetriMarkingEntry,F(place),F(tokens))
 RECORD(PetriDetachedMarkingPlace,F(id),F(name))
 RECORD(PetriDiscoveryMarkings,F(detached_places),F(initial),F(final))
 RECORD(PetriNetLiteralStorage,F(place_count),F(source_storage),F(sink_storage),F(has_source),F(has_sink),F(activities),F(transitions),F(discovery_markings),F(transition_names),F(place_names))
-// The workbench carrier writes the nine storage fields every workbench client
-// validates; place names stay native-only (a carrier that supplies them is
-// still read).
+// The workbench carrier writes the nine storage fields, plus place_names only
+// when the net names its places: token replay breaks ties by place name, so
+// a named net must keep its names through every snapshot and artifact. An
+// unnamed net keeps the nine-field shape.
 struct PetriNetWorkbenchCarrier : PetriNetLiteralStorage {};
 RECORD(PetriNetWorkbenchCarrier,F(place_count),F(source_storage),F(sink_storage),F(has_source),F(has_sink),F(activities),F(transitions),F(discovery_markings),F(transition_names))
 RECORD(OcdfgActivityMetric,F(events),F(unique_objects),F(event_objects),F(total_objects))
@@ -402,7 +403,7 @@ template<class T> void write(std::ostream& out,const T& value) {
   else if constexpr(Tuple<T>::value){out<<'[';bool first=true;std::apply([&](const auto&... item){([&]{if(!first)out<<',';first=false;write(out,item);}(),...);},value);out<<']';}
   else if constexpr(Variant<T>::value){out<<"{\"index\":"<<value.index()<<",\"value\":";std::visit([&](const auto& item){write(out,item);},value);out<<'}';}
   else if constexpr(std::is_same_v<T,HeuristicStructuredValue>)write(out,value.value);
-  else if constexpr(std::is_same_v<T,PetriNet>){PetriNetWorkbenchCarrier stored;stored.place_count=value.place_count();stored.source_storage=value.source();stored.sink_storage=value.sink();stored.has_source=value.has_source();stored.has_sink=value.has_sink();stored.activities=value.activities();stored.transitions=value.transitions();stored.discovery_markings=value.discovery_markings();stored.transition_names=value.transition_names();write(out,stored);}
+  else if constexpr(std::is_same_v<T,PetriNet>){PetriNetWorkbenchCarrier stored;stored.place_count=value.place_count();stored.source_storage=value.source();stored.sink_storage=value.sink();stored.has_source=value.has_source();stored.has_sink=value.has_sink();stored.activities=value.activities();stored.transitions=value.transitions();stored.discovery_markings=value.discovery_markings();stored.transition_names=value.transition_names();stored.place_names=value.place_names();if(stored.place_names)write(out,static_cast<const PetriNetLiteralStorage&>(stored));else write(out,stored);}
   else record_write(out,value);
 }
 template<class T> T parse(std::string_view source) {return read<T>(Parser(source,true).parse());}

@@ -1,8 +1,10 @@
 #include "minera/ocel_xml.hpp"
 
+#include "ocel_frame_types.hpp"
 #include "xml_pull_parser.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <fstream>
@@ -123,7 +125,7 @@ OcelValue value_node(const Node& n, bool reject_lists) {
   }
   if (name == "float" || name == "double" || name == "number") {
     char* end = nullptr; const double d = std::strtod(value.c_str(), &end);
-    if (end != value.c_str() + value.size() || !std::isfinite(d)) throw std::invalid_argument("invalid OCEL XML floating value");
+    if (value.empty() || end != value.c_str() + value.size() || !std::isfinite(d)) throw std::invalid_argument("invalid OCEL XML floating value");
     return d;
   }
   if (name == "list" || name == "array") {
@@ -252,8 +254,16 @@ void parse_standard_xml_type_table(
 
 OcelValue standard_xml_value(const Node& node, const std::string* declared_type,
                              bool reject_lists) {
-  if (declared_type == nullptr || attr(node, "type") != nullptr)
-    return value_node(node, reject_lists);
+  if (attr(node, "type") != nullptr) return value_node(node, reject_lists);
+  // Reference capture (pm4py 2.7.22 read_ocel2_xml): an attribute element
+  // without text reads as the text "None" unless its type is a float (which
+  // raises there and here). Native files name each value's type and keep an
+  // empty string.
+  if (attr(node, "value") == nullptr && node.text.empty() && node.children.empty() &&
+      (declared_type == nullptr ||
+       (*declared_type != "float" && *declared_type != "double" && *declared_type != "number")))
+    return std::string("None");
+  if (declared_type == nullptr) return value_node(node, reject_lists);
   Node typed = node;
   typed.attrs.emplace_back("type", *declared_type);
   return value_node(typed, reject_lists);
@@ -365,7 +375,10 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
       if (id.empty() || type.empty() || !types.emplace(id, type).second) throw std::invalid_argument("invalid or duplicate OCEL XML object");
       OcelObject o{id, type, {}};
       if (const auto* a = child(*on, "attributes")) {
-        std::map<std::string, std::vector<StandardAttribute>> grouped;
+        // Grouped by name in first-appearance order, like the reference's
+        // frame columns.
+        std::vector<std::pair<std::string, std::vector<StandardAttribute>>> grouped;
+        std::unordered_map<std::string, std::size_t> group_index;
         for (const auto& av : a->children) if (local(av.name) == "attribute") {
           const std::string key = attr_or(av, "name", attr_or(av, "key"));
           if (key.empty()) continue;
@@ -380,7 +393,9 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
             entry.has_time = true;
             entry.time = *when;
           }
-          grouped[key].push_back(std::move(entry));
+          const auto [slot, added] = group_index.try_emplace(key, grouped.size());
+          if (added) grouped.emplace_back(key, std::vector<StandardAttribute>{});
+          grouped[slot->second].second.push_back(std::move(entry));
         }
         for (auto& [key, entries] : grouped) {
           if (entries.empty()) continue;
@@ -470,79 +485,174 @@ void validate_references(const Ocel& log) {
   }
 }
 
-std::string esc(std::string_view s) { std::string o; for (char c : s) { if (c == '&') o += "&amp;"; else if (c == '<') o += "&lt;"; else if (c == '"') o += "&quot;"; else if (c == '\'') o += "&apos;"; else o += c; } return o; }
-std::string value_text(const OcelValue& v) { if (std::holds_alternative<std::nullptr_t>(v)) return {}; if (const auto* b = std::get_if<bool>(&v)) return *b ? "true" : "false"; if (const auto* i = std::get_if<std::int64_t>(&v)) return std::to_string(*i); if (const auto* d = std::get_if<double>(&v)) { std::ostringstream o; o << std::setprecision(std::numeric_limits<double>::max_digits10) << *d; return o.str(); } return std::get<std::string>(v); }
-std::string value_tag(const OcelValue& v) { if (std::holds_alternative<std::nullptr_t>(v)) return "null"; if (std::holds_alternative<bool>(v)) return "boolean"; if (std::holds_alternative<std::int64_t>(v)) return "int"; if (std::holds_alternative<double>(v)) return "float"; return "string"; }
-std::vector<const OcelAttribute*> sorted_attrs(const std::vector<OcelAttribute>& attrs) { std::vector<const OcelAttribute*> out; for (const auto& a : attrs) out.push_back(&a); std::sort(out.begin(), out.end(), [](auto* a, auto* b) { return a->key < b->key; }); return out; }
-using StandardXmlTypeTable =
-    std::map<std::string, std::map<std::string, std::string>>;
-void merge_standard_type(std::string& current, const OcelValue& value) {
-  const auto next = value_tag(value);
-  if (current.empty() || current == next) current = next;
-  else if ((current == "int" && next == "float") ||
-           (current == "float" && next == "int")) current = "float";
-  else current = "string";
+// Attribute values as lxml escapes them: markup characters and the
+// whitespace an XML parser would otherwise normalize to spaces.
+std::string esc(std::string_view s) {
+  std::string o;
+  o.reserve(s.size());
+  for (char c : s) {
+    switch (c) {
+      case '&': o += "&amp;"; break;
+      case '<': o += "&lt;"; break;
+      case '>': o += "&gt;"; break;
+      case '"': o += "&quot;"; break;
+      case '\n': o += "&#10;"; break;
+      case '\r': o += "&#13;"; break;
+      case '\t': o += "&#9;"; break;
+      default: o += c; break;
+    }
+  }
+  return o;
 }
+// Element text as lxml escapes it.
+std::string esc_text(std::string_view s) {
+  std::string o;
+  o.reserve(s.size());
+  for (char c : s) {
+    switch (c) {
+      case '&': o += "&amp;"; break;
+      case '<': o += "&lt;"; break;
+      case '>': o += "&gt;"; break;
+      case '\r': o += "&#13;"; break;
+      default: o += c; break;
+    }
+  }
+  return o;
+}
+std::string value_text(const OcelValue& v) { if (std::holds_alternative<std::nullptr_t>(v)) return {}; if (const auto* b = std::get_if<bool>(&v)) return *b ? "true" : "false"; if (const auto* i = std::get_if<std::int64_t>(&v)) return std::to_string(*i); if (const auto* d = std::get_if<double>(&v)) return ocel_frame::float_repr(*d); return std::get<std::string>(v); }
+std::string value_tag(const OcelValue& v) { if (std::holds_alternative<std::nullptr_t>(v)) return "null"; if (std::holds_alternative<bool>(v)) return "boolean"; if (std::holds_alternative<std::int64_t>(v)) return "int"; if (std::holds_alternative<double>(v)) return "float"; return "string"; }
+
+// One owner's attribute declarations in output order.
+using StandardXmlDeclarations = std::vector<std::pair<std::string, std::string>>;
+using StandardXmlTypeTable = std::map<std::string, StandardXmlDeclarations>;
+
+// The reference writer declares what its frame column holds: "float" for a
+// float64 column (an integer column with a missing cell is one), "date" for
+// a timestamp column (here: a catalog date declaration), otherwise
+// "string". Each type lists its attributes with a value in global column
+// order (changed fields after the static ones); declared-only catalog entries
+// follow with their declared type, so empty types and attributes survive.
 void collect_standard_types(const Ocel& log, StandardXmlTypeTable& object_types,
                             StandardXmlTypeTable& event_types) {
-  object_types = log.object_type_attributes;
-  event_types = log.event_type_attributes;
-  for (const auto& object : log.objects) {
-    auto& attributes = object_types[object.type];
-    for (const auto& attribute : object.attributes) {
-      auto& declared = attributes[attribute.key];
-      if (declared.empty() && !std::holds_alternative<std::nullptr_t>(attribute.value))
-        merge_standard_type(declared, attribute.value);
-    }
-  }
+  ocel_frame::Columns object_columns, change_columns, event_columns;
+  for (const auto& object : log.objects) object_columns.observe_row(object.attributes);
   for (const auto& change : log.object_changes) {
-    auto& declared = object_types[change.object_type][change.field];
-    if (declared.empty() && !std::holds_alternative<std::nullptr_t>(change.value))
-      merge_standard_type(declared, change.value);
+    change_columns.add_rows(1);
+    change_columns.observe(change.field, change.value);
   }
-  for (const auto& event : log.events) {
-    auto& attributes = event_types[event.activity];
-    for (const auto& attribute : event.attributes) {
-      auto& declared = attributes[attribute.key];
-      if (declared.empty() && !std::holds_alternative<std::nullptr_t>(attribute.value))
-        merge_standard_type(declared, attribute.value);
+  for (const auto& event : log.events) event_columns.observe_row(event.attributes);
+  const auto declare = [](const OcelTypeCatalog& catalog, const std::string& owner,
+                          const std::string& key, ocel_frame::Dtype dtype) {
+    if (const auto schema = catalog.find(owner); schema != catalog.end())
+      if (const auto found = schema->second.find(key); found != schema->second.end()) {
+        std::string lowered = found->second;
+        for (auto& ch : lowered) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        if (lowered.find("date") != std::string::npos || lowered.find("time") != std::string::npos)
+          return found->second;
+      }
+    return std::string(dtype == ocel_frame::Dtype::kFloat64 ? "float" : "string");
+  };
+  using Present = std::map<std::string, std::unordered_set<std::string>>;
+  const auto build = [&](const OcelTypeCatalog& catalog, const Present& present,
+                         const std::vector<const ocel_frame::Columns*>& order,
+                         StandardXmlTypeTable& table) {
+    for (const auto& [owner, keys] : present) {
+      auto& declarations = table[owner];
+      std::unordered_set<std::string> written;
+      for (const auto* columns : order)
+        for (const auto& name : columns->names()) {
+          if (!keys.contains(name) || !written.insert(name).second) continue;
+          auto dtype = columns->dtype(name);
+          if (columns == &change_columns) dtype = change_columns.dtype(name);
+          else if (dtype == ocel_frame::Dtype::kEmpty) dtype = change_columns.dtype(name);
+          declarations.emplace_back(name, declare(catalog, owner, name, dtype));
+        }
     }
-  }
+    for (const auto& [owner, schema] : catalog) {
+      auto& declarations = table[owner];
+      for (const auto& [name, type] : schema) {
+        const bool listed = std::any_of(declarations.begin(), declarations.end(),
+                                        [&](const auto& entry) { return entry.first == name; });
+        if (!listed) declarations.emplace_back(name, type.empty() ? "string" : type);
+      }
+    }
+  };
+  Present object_present, event_present;
+  for (const auto& object : log.objects)
+    for (const auto& attribute : object.attributes)
+      if (!std::holds_alternative<std::nullptr_t>(attribute.value))
+        object_present[object.type].insert(attribute.key);
+  for (const auto& change : log.object_changes)
+    if (!std::holds_alternative<std::nullptr_t>(change.value))
+      object_present[change.object_type].insert(change.field);
+  for (const auto& event : log.events)
+    for (const auto& attribute : event.attributes)
+      if (!std::holds_alternative<std::nullptr_t>(attribute.value))
+        event_present[event.activity].insert(attribute.key);
+  build(log.object_type_attributes, object_present, {&object_columns, &change_columns}, object_types);
+  build(log.event_type_attributes, event_present, {&event_columns}, event_types);
+  for (const auto& object : log.objects) object_types[object.type];
+  for (const auto& event : log.events) event_types[event.activity];
 }
 void write_standard_type_table(std::ostream& out, std::string_view container,
                                std::string_view element,
                                const StandardXmlTypeTable& types) {
+  if (types.empty()) {
+    out << "  <" << container << "/>\n";
+    return;
+  }
   out << "  <" << container << ">\n";
   for (const auto& [type, attributes] : types) {
     out << "    <" << element << " name=\"" << esc(type) << "\">\n";
-    out << "      <attributes>\n";
-    for (const auto& [name, declared_type] : attributes)
-      out << "        <attribute name=\"" << esc(name) << "\" type=\""
-          << esc(declared_type.empty() ? "string" : declared_type)
-          << "\"/>\n";
-    out << "      </attributes>\n    </" << element << ">\n";
+    if (attributes.empty()) {
+      out << "      <attributes/>\n";
+    } else {
+      out << "      <attributes>\n";
+      for (const auto& [name, declared_type] : attributes)
+        out << "        <attribute name=\"" << esc(name) << "\" type=\""
+            << esc(declared_type) << "\"/>\n";
+      out << "      </attributes>\n";
+    }
+    out << "    </" << element << ">\n";
   }
   out << "  </" << container << ">\n";
 }
-void write_value(std::ostream& out, const OcelValue& v, std::string_view key, std::string_view indent, bool standard = false, std::string_view time = {}) {
-  // PM4Py 2.7.22 write_ocel2_xml leaves null values out; its reader calls
-  // float(None) on an empty float element, so OCEL 2.0 never writes one.
-  if (standard && std::holds_alternative<std::nullptr_t>(v)) return;
-  const auto tag = standard ? "attribute" : value_tag(v); out << indent << '<' << tag << " name=\"" << esc(key) << "\""; if (standard) out << " type=\"" << value_tag(v) << "\""; else out << " key=\"" << esc(key) << "\""; if (!time.empty()) out << " time=\"" << esc(time) << "\"";
-  // OCEL 2.0 carries the value as element text, which the reference reads;
-  // the legacy format keeps it in the value attribute.
-  // Booleans as Python's str(True)/str(False), the text the reference writes
-  // and reads back.
-  if (standard) {
-    const auto* flag = std::get_if<bool>(&v);
-    out << '>' << esc(flag ? (*flag ? "True" : "False") : value_text(v)) << "</attribute>\n";
+// An OCEL 2.0 attribute: the value as element text, as the reference writes
+// and reads it, with the value's own type (which the reference ignores in
+// favour of the declaration) so a native reader keeps it. Booleans read as
+// Python's str(True)/str(False). The reference leaves null values out; its
+// reader calls float(None) on an empty float element.
+void write_standard_value(std::ostream& out, const OcelValue& v, std::string_view key,
+                          std::string_view indent, std::string_view time = {}) {
+  if (std::holds_alternative<std::nullptr_t>(v)) return;
+  out << indent << "<attribute name=\"" << esc(key) << "\"";
+  if (!time.empty()) out << " time=\"" << esc(time) << "\"";
+  out << " type=\"" << value_tag(v) << "\">";
+  const auto* flag = std::get_if<bool>(&v);
+  out << esc_text(flag ? (*flag ? "True" : "False") : value_text(v)) << "</attribute>\n";
+}
+// An OCEL 1.0 XML value as the reference writer emits it: floats as <float> with
+// Python's repr (an integer in a float64 frame column is a float there),
+// every other scalar as <string> with Python's str. Nulls are left out.
+void write_classic_value(std::ostream& out, const OcelValue& v, std::string_view key,
+                         std::string_view indent, bool float_column = false) {
+  if (std::holds_alternative<std::nullptr_t>(v)) return;
+  const auto* integer = std::get_if<std::int64_t>(&v);
+  if (const auto* real = std::get_if<double>(&v); real != nullptr || (float_column && integer)) {
+    const double number = real != nullptr ? *real : static_cast<double>(*integer);
+    if (!std::isfinite(number)) return;
+    out << indent << "<float key=\"" << esc(key) << "\" value=\""
+        << ocel_frame::float_repr(number) << "\"/>\n";
+    return;
   }
-  else out << " value=\"" << esc(value_text(v)) << "\"/>\n"; }
+  out << indent << "<string key=\"" << esc(key) << "\" value=\""
+      << esc(ocel_frame::python_str(v)) << "\"/>\n";
+}
 
 }  // namespace
 
 Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
-  if (xml.size() > options.max_bytes) throw std::invalid_argument("OCEL XML exceeds size limit");
+  if (xml.size() > options.max_bytes) throw std::invalid_argument("OCEL XML file exceeds the " + ocel_limit_text(options.max_bytes) + " OCEL limit");
   const Node root = parse_tree(xml); Ocel log;
   const bool standard = child(root, "object-types") != nullptr || child(root, "event-types") != nullptr || attr(root, "ocelVersion") != nullptr;
   if (standard) parse_standard(root, log, options.reject_unsupported); else parse_classic(root, log, options.reject_unsupported);
@@ -557,47 +667,166 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
 Ocel import_ocel_xml(std::istream& input, const OcelXmlImportOptions& options) { std::ostringstream s; s << input.rdbuf(); return parse_ocel_xml(s.str(), options); }
 Ocel import_ocel_xml(const std::filesystem::path& path, const OcelXmlImportOptions& options) { std::ifstream f(path, std::ios::binary); if (!f) throw std::runtime_error("Unable to open OCEL XML: " + path.string()); return import_ocel_xml(f, options); }
 
+namespace {
+
+// Per-id indexes in log order, so the writers stay linear in the log size.
+template <typename T, typename Key>
+std::unordered_map<std::string_view, std::vector<const T*>> index_by(
+    const std::vector<T>& rows, Key key) {
+  std::unordered_map<std::string_view, std::vector<const T*>> result;
+  for (const auto& row : rows) result[key(row)].push_back(&row);
+  return result;
+}
+template <typename T>
+const std::vector<const T*>& rows_of(
+    const std::unordered_map<std::string_view, std::vector<const T*>>& index,
+    std::string_view id) {
+  static const std::vector<const T*> none;
+  const auto found = index.find(id);
+  return found == index.end() ? none : found->second;
+}
+
+// The OCEL 1.0 XML global log names the reference writer computes.
+bool computed_classic_global(std::string_view key) {
+  if (key.starts_with("ocel:global-event.") || key.starts_with("ocel:global-object."))
+    return true;  // written back in their scopes
+  static const std::set<std::string, std::less<>> computed = {
+      "ocel:global-log.version", "ocel:global-log.ordering",
+      "ocel:global-log.ocel:version", "ocel:global-log.ocel:ordering",
+      "ocel:global-log.attribute-names", "ocel:global-log.object-types",
+      "ocel:global-log.ocel:attribute-names", "ocel:global-log.ocel:object-types"};
+  return computed.contains(key);
+}
+
+}  // namespace
+
+// OCEL 1.0 XML as the reference writer emits it: the computed global scopes,
+// then events and objects in log order with keyed <string>/<float>/<date>
+// values. The format has no qualifiers, object-to-object or event-to-event
+// links, object changes or other globals; without allow_lossy an OCEL holding
+// any of them is rejected instead of losing them silently.
 void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExportOptions& options) {
   if (!options.allow_lossy) {
-    std::set<std::string> object_ids, event_ids;
-    for (const auto& o : log.objects) object_ids.insert(o.id);
-    for (const auto& e : log.events) event_ids.insert(e.id);
-    for (const auto& r : log.relations) if (!event_ids.count(r.event_id) || !object_ids.count(r.object_id)) throw std::invalid_argument("OCEL XML relation references unknown id");
-    for (const auto& r : log.o2o) if (!object_ids.count(r.source_id) || !object_ids.count(r.target_id)) throw std::invalid_argument("OCEL XML O2O relation references unknown id");
-    for (const auto& r : log.e2e) if (!event_ids.count(r.source_id) || !event_ids.count(r.target_id)) throw std::invalid_argument("OCEL XML E2E relation references unknown id");
-    for (const auto& c : log.object_changes) if (!object_ids.count(c.object_id)) throw std::invalid_argument("OCEL XML object change references unknown id");
+    validate_references(log);
+    const bool qualified = std::any_of(log.relations.begin(), log.relations.end(),
+                                       [](const auto& r) { return !r.qualifier.empty(); });
+    const bool globals = std::any_of(log.globals.begin(), log.globals.end(),
+                                     [](const auto& g) { return !computed_classic_global(g.first); });
+    if (qualified || !log.o2o.empty() || !log.e2e.empty() || !log.object_changes.empty() || globals)
+      throw std::invalid_argument(
+          "OCEL 1.0 XML cannot represent relation qualifiers, O2O/E2E links, object "
+          "changes or globals; export OCEL 2.0 XML or allow lossy export");
   }
-  if (options.include_declaration) out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-  std::vector<const OcelObject*> objects; for (const auto& o : log.objects) objects.push_back(&o); std::sort(objects.begin(), objects.end(), [](auto* a, auto* b){ return a->id < b->id; });
-  std::vector<const OcelEvent*> events; for (const auto& e : log.events) events.push_back(&e); std::sort(events.begin(), events.end(), [](auto* a, auto* b){ return a->id < b->id; });
-  const bool standard = options.format == OcelXmlFormat::kStandard;
-  out << "<log" << (standard ? " ocelVersion=\"2.0\"" : "") << ">\n";
-  if (standard) {
-    StandardXmlTypeTable object_types;
-    StandardXmlTypeTable event_types;
-    collect_standard_types(log, object_types, event_types);
-    write_standard_type_table(out, "object-types", "object-type", object_types);
-    write_standard_type_table(out, "event-types", "event-type", event_types);
-    out << "  <objects>\n"; for (auto* o : objects) { out << "    <object id=\"" << esc(o->id) << "\" type=\"" << esc(o->type) << "\">\n      <attributes>\n"; for (auto* a : sorted_attrs(o->attributes)) write_value(out, a->value, a->key, "        ", true); for (const auto& c : log.object_changes) if (c.object_id == o->id) write_value(out, c.value, c.field, "        ", true, c.timestamp); out << "      </attributes>\n"; std::vector<const OcelO2oRelation*> rs; for (const auto& r : log.o2o) if (r.source_id == o->id) rs.push_back(&r); if (!rs.empty()) { out << "      <relationships>\n"; std::sort(rs.begin(), rs.end(), [](auto* a, auto* b){ return std::tie(a->target_id,a->qualifier) < std::tie(b->target_id,b->qualifier); }); for (auto* r : rs) out << "        <relationship object-id=\"" << esc(r->target_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "      </relationships>\n"; } out << "    </object>\n"; } out << "  </objects>\n  <events>\n";
-    for (auto* e : events) { out << "    <event id=\"" << esc(e->id) << "\" type=\"" << esc(e->activity) << "\" time=\"" << esc(e->timestamp) << "\">\n      <attributes>\n"; for (auto* a : sorted_attrs(e->attributes)) write_value(out, a->value, a->key, "        ", true); out << "      </attributes>\n      <objects>\n"; std::vector<const OcelRelation*> rs; for (const auto& r : log.relations) if (r.event_id == e->id) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a, auto* b){ return std::tie(a->object_id,a->qualifier) < std::tie(b->object_id,b->qualifier); }); for (auto* r : rs) out << "        <relationship object-id=\"" << esc(r->object_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "      </objects>\n    </event>\n"; } out << "  </events>\n";
-    if (!log.e2e.empty()) { out << "  <e2e>\n"; std::vector<const OcelE2eRelation*> rs; for (const auto& r : log.e2e) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a, auto* b){ return std::tie(a->source_id,a->target_id,a->qualifier) < std::tie(b->source_id,b->target_id,b->qualifier); }); for (auto* r : rs) out << "    <relationship source-event-id=\"" << esc(r->source_id) << "\" target-event-id=\"" << esc(r->target_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "  </e2e>\n"; }
-    if (!log.globals.empty()) { out << "  <globals>\n"; for (const auto& [k,v] : log.globals) write_value(out,v,k,"    ",true); out << "  </globals>\n"; }
+  if (options.include_declaration) out << "<?xml version='1.0' encoding='UTF-8'?>\n";
+  out << "<log>\n";
+  // The event and object scopes hold the log's globals of those scopes (an
+  // OCEL read from OCEL 2.0 has none); the log scope is computed.
+  for (const std::string scope : {"event", "object"}) {
+    const auto prefix = "ocel:global-" + scope + ".";
+    std::ostringstream entries;
+    for (const auto& [key, value] : log.globals)
+      if (key.starts_with(prefix))
+        write_classic_value(entries, value, std::string_view(key).substr(prefix.size()), "    ");
+    const auto text = entries.str();
+    if (text.empty()) out << "  <global scope=\"" << scope << "\"/>\n";
+    else out << "  <global scope=\"" << scope << "\">\n" << text << "  </global>\n";
+  }
+  std::set<std::string> attribute_names;
+  for (const auto& event : log.events)
+    for (const auto& attribute : event.attributes) attribute_names.insert(attribute.key);
+  for (const auto& object : log.objects)
+    for (const auto& attribute : object.attributes) attribute_names.insert(attribute.key);
+  std::vector<std::string> object_types;
+  std::unordered_set<std::string> seen_types;
+  for (const auto& object : log.objects)
+    if (seen_types.insert(object.type).second) object_types.push_back(object.type);
+  out << "  <global scope=\"log\">\n";
+  if (attribute_names.empty()) {
+    out << "    <list key=\"attribute-names\"/>\n";
   } else {
-    out << "  <objects>\n"; for (auto* o : objects) { out << "    <object id=\"" << esc(o->id) << "\" type=\"" << esc(o->type) << "\">\n"; for (auto* a : sorted_attrs(o->attributes)) write_value(out,a->value,a->key,"      "); out << "    </object>\n"; } out << "  </objects>\n  <events>\n"; for (auto* e : events) { out << "    <event id=\"" << esc(e->id) << "\" activity=\"" << esc(e->activity) << "\" timestamp=\"" << esc(e->timestamp) << "\">\n      <vmap>\n"; for (auto* a : sorted_attrs(e->attributes)) write_value(out,a->value,a->key,"        "); out << "      </vmap>\n      <omap>\n"; std::vector<const OcelRelation*> rs; for (const auto& r : log.relations) if (r.event_id == e->id) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a, auto* b){ return std::tie(a->object_id,a->qualifier) < std::tie(b->object_id,b->qualifier); }); for (auto* r : rs) out << "        <object object-id=\"" << esc(r->object_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "      </omap>\n    </event>\n"; } out << "  </events>\n";
-    if (!log.o2o.empty()) { out << "  <o2o>\n"; std::vector<const OcelO2oRelation*> rs; for (const auto& r : log.o2o) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a,auto* b){ return std::tie(a->source_id,a->target_id,a->qualifier) < std::tie(b->source_id,b->target_id,b->qualifier); }); for (auto* r : rs) out << "    <relation source-id=\"" << esc(r->source_id) << "\" target-id=\"" << esc(r->target_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "  </o2o>\n"; }
-    if (!log.e2e.empty()) { out << "  <e2e>\n"; std::vector<const OcelE2eRelation*> rs; for (const auto& r : log.e2e) rs.push_back(&r); std::sort(rs.begin(), rs.end(), [](auto* a,auto* b){ return std::tie(a->source_id,a->target_id,a->qualifier) < std::tie(b->source_id,b->target_id,b->qualifier); }); for (auto* r : rs) out << "    <relation source-id=\"" << esc(r->source_id) << "\" target-id=\"" << esc(r->target_id) << "\" qualifier=\"" << esc(r->qualifier) << "\"/>\n"; out << "  </e2e>\n"; }
-    if (!log.object_changes.empty()) { out << "  <objectChanges>\n"; for (const auto& c : log.object_changes) { out << "    <change object-id=\"" << esc(c.object_id) << "\" object-type=\"" << esc(c.object_type) << "\" timestamp=\"" << esc(c.timestamp) << "\" field=\"" << esc(c.field) << "\">\n"; write_value(out,c.value,c.field,"      "); out << "    </change>\n"; } out << "  </objectChanges>\n"; }
-    std::map<std::string, std::vector<std::pair<std::string, const OcelValue*>>> globals;
-    for (const auto& [key, value] : log.globals) {
-      std::string scope = "log", name = key;
-      if (key.rfind("ocel:global-", 0) == 0) { const auto dot = key.find('.', 12); if (dot != std::string::npos) { scope = key.substr(12, dot - 12); name = key.substr(dot + 1); } }
-      globals[scope].push_back({name, &value});
+    out << "    <list key=\"attribute-names\">\n";
+    for (const auto& name : attribute_names)
+      out << "      <string key=\"attribute-name\" value=\"" << esc(name) << "\"/>\n";
+    out << "    </list>\n";
+  }
+  if (object_types.empty()) {
+    out << "    <list key=\"object-types\"/>\n";
+  } else {
+    out << "    <list key=\"object-types\">\n";
+    for (const auto& type : object_types)
+      out << "      <string key=\"object-type\" value=\"" << esc(type) << "\"/>\n";
+    out << "    </list>\n";
+  }
+  out << "    <string key=\"version\" value=\"1.0\"/>\n    <string key=\"ordering\" value=\"timestamp\"/>\n  </global>\n";
+  const auto relations = index_by(log.relations, [](const OcelRelation& r) -> std::string_view { return r.event_id; });
+  ocel_frame::Columns event_frame, object_frame;
+  for (const auto& event : log.events) event_frame.observe_row(event.attributes);
+  for (const auto& object : log.objects) object_frame.observe_row(object.attributes);
+  const auto write_list = [&](std::string_view key, const auto& body, bool empty) {
+    if (empty) {
+      out << "      <list key=\"" << key << "\"/>\n";
+      return;
     }
-    for (const auto& [scope, vals] : globals) { out << "  <global scope=\"" << esc(scope) << "\">\n"; for (const auto& [name, value] : vals) write_value(out, *value, name, "    "); out << "  </global>\n"; }
+    out << "      <list key=\"" << key << "\">\n";
+    body();
+    out << "      </list>\n";
+  };
+  const auto has_value = [](const std::vector<OcelAttribute>& attributes) {
+    return std::any_of(attributes.begin(), attributes.end(), [](const auto& a) {
+      if (std::holds_alternative<std::nullptr_t>(a.value)) return false;
+      const auto* real = std::get_if<double>(&a.value);
+      return real == nullptr || std::isfinite(*real);
+    });
+  };
+  if (log.events.empty()) {
+    out << "  <events/>\n";
+  } else {
+    out << "  <events>\n";
+    for (const auto& event : log.events) {
+      // Fields in the column order of a frame read from OCEL JSON.
+      out << "    <event>\n      <string key=\"id\" value=\"" << esc(event.id)
+          << "\"/>\n      <date key=\"timestamp\" value=\""
+          << esc(ocel_frame::utc_timestamp_text(event.timestamp, 'T', "Z"))
+          << "\"/>\n      <string key=\"activity\" value=\"" << esc(event.activity) << "\"/>\n";
+      const auto& rows = rows_of(relations, event.id);
+      std::unordered_set<std::string_view> listed;
+      write_list("omap", [&] {
+        for (const auto* relation : rows)
+          if (listed.insert(relation->object_id).second)
+            out << "        <string key=\"object-id\" value=\"" << esc(relation->object_id) << "\"/>\n";
+      }, rows.empty());
+      write_list("vmap", [&] {
+        for (const auto& attribute : event.attributes)
+          write_classic_value(out, attribute.value, attribute.key, "        ",
+                              event_frame.dtype(attribute.key) == ocel_frame::Dtype::kFloat64);
+      }, !has_value(event.attributes));
+      out << "    </event>\n";
+    }
+    out << "  </events>\n";
+  }
+  if (log.objects.empty()) {
+    out << "  <objects/>\n";
+  } else {
+    out << "  <objects>\n";
+    for (const auto& object : log.objects) {
+      out << "    <object>\n      <string key=\"id\" value=\"" << esc(object.id)
+          << "\"/>\n      <string key=\"type\" value=\"" << esc(object.type) << "\"/>\n";
+      write_list("ovmap", [&] {
+        for (const auto& attribute : object.attributes)
+          write_classic_value(out, attribute.value, attribute.key, "        ",
+                              object_frame.dtype(attribute.key) == ocel_frame::Dtype::kFloat64);
+      }, !has_value(object.attributes));
+      out << "    </object>\n";
+    }
+    out << "  </objects>\n";
   }
   out << "</log>\n";
 }
 
+// OCEL 2.0 XML as the reference writer emits it (object-to-object links in an
+// <objects> child of each object), with events, objects, attributes and
+// relations in log order. Event-to-event links and globals, which the
+// reference format lacks, follow in their own sections.
 void write_ocel_xml(std::ostream& out, const Ocel& log,
                     const OcelXmlExportOptions& options) {
   if (options.format != OcelXmlFormat::kStandard) {
@@ -606,112 +835,90 @@ void write_ocel_xml(std::ostream& out, const Ocel& log,
   }
   if (!options.allow_lossy) validate_references(log);
   if (options.include_declaration)
-    out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-
-  std::vector<const OcelObject*> objects;
-  for (const auto& object : log.objects) objects.push_back(&object);
-  std::sort(objects.begin(), objects.end(),
-            [](const auto* left, const auto* right) {
-              return left->id < right->id;
-            });
-  std::vector<const OcelEvent*> events;
-  for (const auto& event : log.events) events.push_back(&event);
-  std::sort(events.begin(), events.end(),
-            [](const auto* left, const auto* right) {
-              return left->id < right->id;
-            });
+    out << "<?xml version='1.0' encoding='UTF-8'?>\n";
 
   StandardXmlTypeTable object_types;
   StandardXmlTypeTable event_types;
   collect_standard_types(log, object_types, event_types);
-  out << "<log ocelVersion=\"2.0\">\n";
+  out << "<log>\n";
   write_standard_type_table(out, "object-types", "object-type", object_types);
   write_standard_type_table(out, "event-types", "event-type", event_types);
 
-  out << "  <objects>\n";
-  for (const auto* object : objects) {
-    out << "    <object id=\"" << esc(object->id) << "\" type=\""
-        << esc(object->type) << "\">\n      <attributes>\n";
-    const auto static_attributes = sorted_attrs(object->attributes);
-    for (const auto* attribute : static_attributes) {
-      write_value(out, attribute->value, attribute->key, "        ", true,
-                  "1970-01-01T00:00:00Z");
-    }
-    std::vector<const OcelObjectChange*> changes;
-    for (const auto& change : log.object_changes)
-      if (change.object_id == object->id) changes.push_back(&change);
-    std::sort(changes.begin(), changes.end(), [](const auto* left,
-                                                 const auto* right) {
-      return std::tie(left->timestamp, left->field, left->object_type) <
-             std::tie(right->timestamp, right->field, right->object_type);
-    });
+  const auto changes = index_by(log.object_changes, [](const OcelObjectChange& c) -> std::string_view { return c.object_id; });
+  const auto o2o = index_by(log.o2o, [](const OcelO2oRelation& r) -> std::string_view { return r.source_id; });
+  const auto relations = index_by(log.relations, [](const OcelRelation& r) -> std::string_view { return r.event_id; });
+  out << (log.objects.empty() ? "  <objects/>\n" : "  <objects>\n");
+  for (const auto& object : log.objects) {
+    out << "    <object id=\"" << esc(object.id) << "\" type=\""
+        << esc(object.type) << "\">\n";
+    std::ostringstream attributes;
+    for (const auto& attribute : object.attributes)
+      write_standard_value(attributes, attribute.value, attribute.key, "        ",
+                           "1970-01-01T00:00:00Z");
+    std::vector<const OcelObjectChange*> object_changes = rows_of(changes, object.id);
+    std::stable_sort(object_changes.begin(), object_changes.end(),
+                     [](const auto* left, const auto* right) {
+                       return std::tie(left->timestamp, left->field) <
+                              std::tie(right->timestamp, right->field);
+                     });
     // Like the reference, a field without a base value gets no null base
     // entry: its first change reads back as the base, as PM4Py reads its own
     // export.
-    for (const auto* change : changes)
-      write_value(out, change->value, change->field, "        ", true,
-                  change->timestamp);
-    out << "      </attributes>\n";
-    std::vector<const OcelO2oRelation*> relations;
-    for (const auto& relation : log.o2o)
-      if (relation.source_id == object->id) relations.push_back(&relation);
-    std::sort(relations.begin(), relations.end(), [](const auto* left,
-                                                    const auto* right) {
-      return std::tie(left->target_id, left->qualifier) <
-             std::tie(right->target_id, right->qualifier);
-    });
-    if (!relations.empty()) {
-      out << "      <relationships>\n";
-      for (const auto* relation : relations)
-        out << "        <relationship object-id=\""
-            << esc(relation->target_id) << "\" qualifier=\""
-            << esc(relation->qualifier) << "\"/>\n";
-      out << "      </relationships>\n";
+    for (const auto* change : object_changes)
+      write_standard_value(attributes, change->value, change->field, "        ",
+                           ocel_frame::utc_timestamp_text(change->timestamp, 'T', "+00:00"));
+    const auto text = attributes.str();
+    if (text.empty()) out << "      <attributes/>\n";
+    else out << "      <attributes>\n" << text << "      </attributes>\n";
+    const auto& links = rows_of(o2o, object.id);
+    if (!links.empty()) {
+      out << "      <objects>\n";
+      for (const auto* relation : links)
+        out << "        <relationship object-id=\"" << esc(relation->target_id)
+            << "\" qualifier=\"" << esc(relation->qualifier) << "\"/>\n";
+      out << "      </objects>\n";
     }
     out << "    </object>\n";
   }
-  out << "  </objects>\n  <events>\n";
-  for (const auto* event : events) {
-    out << "    <event id=\"" << esc(event->id) << "\" type=\""
-        << esc(event->activity) << "\" time=\"" << esc(event->timestamp)
-        << "\">\n      <attributes>\n";
-    for (const auto* attribute : sorted_attrs(event->attributes))
-      write_value(out, attribute->value, attribute->key, "        ", true);
-    out << "      </attributes>\n      <objects>\n";
-    std::vector<const OcelRelation*> relations;
-    for (const auto& relation : log.relations)
-      if (relation.event_id == event->id) relations.push_back(&relation);
-    std::sort(relations.begin(), relations.end(), [](const auto* left,
-                                                    const auto* right) {
-      return std::tie(left->object_id, left->qualifier) <
-             std::tie(right->object_id, right->qualifier);
-    });
-    for (const auto* relation : relations)
-      out << "        <relationship object-id=\"" << esc(relation->object_id)
-          << "\" qualifier=\"" << esc(relation->qualifier) << "\"/>\n";
-    out << "      </objects>\n    </event>\n";
+  if (!log.objects.empty()) out << "  </objects>\n";
+  out << (log.events.empty() ? "  <events/>\n" : "  <events>\n");
+  for (const auto& event : log.events) {
+    out << "    <event id=\"" << esc(event.id) << "\" type=\""
+        << esc(event.activity) << "\" time=\""
+        << esc(ocel_frame::utc_timestamp_text(event.timestamp, 'T', "+00:00"))
+        << "\">\n";
+    std::ostringstream attributes;
+    for (const auto& attribute : event.attributes)
+      write_standard_value(attributes, attribute.value, attribute.key, "        ");
+    const auto text = attributes.str();
+    if (text.empty()) out << "      <attributes/>\n";
+    else out << "      <attributes>\n" << text << "      </attributes>\n";
+    const auto& rows = rows_of(relations, event.id);
+    if (rows.empty()) {
+      out << "      <objects/>\n";
+    } else {
+      out << "      <objects>\n";
+      for (const auto* relation : rows)
+        out << "        <relationship object-id=\"" << esc(relation->object_id)
+            << "\" qualifier=\"" << esc(relation->qualifier) << "\"/>\n";
+      out << "      </objects>\n";
+    }
+    out << "    </event>\n";
   }
-  out << "  </events>\n";
+  if (!log.events.empty()) out << "  </events>\n";
   if (!log.e2e.empty()) {
     out << "  <e2e>\n";
-    std::vector<const OcelE2eRelation*> relations;
-    for (const auto& relation : log.e2e) relations.push_back(&relation);
-    std::sort(relations.begin(), relations.end(), [](const auto* left,
-                                                    const auto* right) {
-      return std::tie(left->source_id, left->target_id, left->qualifier) <
-             std::tie(right->source_id, right->target_id, right->qualifier);
-    });
-    for (const auto* relation : relations)
+    for (const auto& relation : log.e2e)
       out << "    <relationship source-event-id=\""
-          << esc(relation->source_id) << "\" target-event-id=\""
-          << esc(relation->target_id) << "\" qualifier=\""
-          << esc(relation->qualifier) << "\"/>\n";
+          << esc(relation.source_id) << "\" target-event-id=\""
+          << esc(relation.target_id) << "\" qualifier=\""
+          << esc(relation.qualifier) << "\"/>\n";
     out << "  </e2e>\n";
   }
   if (!log.globals.empty()) {
     out << "  <globals>\n";
     for (const auto& [key, value] : log.globals)
-      write_value(out, value, key, "    ", true);
+      write_standard_value(out, value, key, "    ");
     out << "  </globals>\n";
   }
   out << "</log>\n";

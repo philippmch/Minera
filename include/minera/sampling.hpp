@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "minera/event_log.hpp"
+#include "minera/random.hpp"
 
 namespace minera {
 
@@ -73,53 +74,10 @@ struct LogSamplingOptions {
 
 namespace sampling {
 
-// The 32-bit Mersenne Twister (MT19937) both CPython's random module and
-// numpy's legacy RandomState use.
-class Mt19937 {
- public:
-  Mt19937() { seed_scalar(5489U); }
-  // init_genrand: numpy.random.seed(s) for 0 <= s < 2^32.
-  void seed_scalar(std::uint32_t seed);
-  // init_by_array: random.seed(s) for an integer s, with the key holding
-  // |s| as 32-bit words, least significant first ({0} for zero).
-  void seed_key(const std::vector<std::uint32_t>& key);
-  [[nodiscard]] std::uint32_t next_u32();
-
- private:
-  static constexpr std::size_t kSize = 624;
-  std::array<std::uint32_t, kSize> state_{};
-  std::size_t index_ = kSize;
-};
-
-// Python's random.Random for the integer operations sampling needs.
-class PythonRandom {
- public:
-  explicit PythonRandom(std::uint64_t seed);
-  // getrandbits(k) for 0 <= k <= 64.
-  [[nodiscard]] std::uint64_t getrandbits(unsigned bits);
-  // A uniform integer in [0, n) by bit-length rejection; n > 0.
-  [[nodiscard]] std::uint64_t randbelow(std::uint64_t n);
-  // random.shuffle(x): the permutation applied to positions 0..n-1.
-  void shuffle(std::vector<std::size_t>& values);
-  // random.sample(range(n), k): the sampled positions in draw order; k <= n.
-  [[nodiscard]] std::vector<std::size_t> sample(std::size_t n, std::size_t k);
-
- private:
-  Mt19937 mt_;
-};
-
-// numpy's legacy RandomState as pandas' DataFrame.sample uses it.
-class NumpyRandomState {
- public:
-  explicit NumpyRandomState(std::uint32_t seed) { mt_.seed_scalar(seed); }
-  // A uniform integer in [0, max] by masked rejection.
-  [[nodiscard]] std::uint64_t interval(std::uint64_t max);
-  // permutation(n).
-  [[nodiscard]] std::vector<std::size_t> permutation(std::size_t n);
-
- private:
-  Mt19937 mt_;
-};
+// The shared generators (minera/random.hpp), under their historical names.
+using Mt19937 = rng::Mt19937;
+using PythonRandom = rng::PythonRandom;
+using NumpyRandomState = rng::NumpyRandomState;
 
 // The sorted distinct indices the reference's points-subset picker returns
 // for m requested points out of n >= 1 items, extremes included: 0, n - 1

@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "minera/random.hpp"
 #include "minera/timestamp.hpp"
 #include "ocpn_projection.hpp"
 
@@ -119,7 +120,7 @@ std::size_t rounded_branching_limit(double cap, std::mt19937_64& rng) {
                     : static_cast<std::size_t>(integral);
   const auto fraction = cap - integral;
   if (fraction > 0.0 &&
-      std::uniform_real_distribution<double>(0.0, 1.0)(rng) < fraction &&
+      ::minera::rng::unit(rng) < fraction &&
       result != std::numeric_limits<std::size_t>::max()) {
     ++result;
   }
@@ -132,7 +133,7 @@ void sample_branch(std::vector<Value>& values, double cap,
   if (cap <= 0.0 || values.empty()) return;
   const auto limit = rounded_branching_limit(cap, rng);
   if (limit >= values.size()) return;
-  std::shuffle(values.begin(), values.end(), rng);
+  ::minera::rng::shuffle(values.begin(), values.end(), rng);
   values.resize(limit);
 }
 

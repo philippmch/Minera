@@ -382,6 +382,22 @@ using FieldPresence = std::function<bool(std::string_view)>;
 [[nodiscard]] ProfileClusteringOptions parse_profile_clustering_params(
     const FieldLookup& field, const FieldPresence& present);
 
+// The server/CLI profile-clustering request: the reference SKLEARN_PROFILES
+// pipeline (reference_profile_clustering_result) unless profile_engine=native
+// selects the native discover_profile_clustering extension. For the
+// reference engine profile_cluster_count and profile_seed (below 2^32) are
+// the KMeans n_clusters and random_state (defaults 2 and 0), and omitted
+// profile_max_iterations / profile_tolerance take scikit-learn's 300 / 1e-4.
+struct ProfileClusteringRequest {
+  ProfileClusteringOptions options;
+  bool native_engine = false;
+  ReferenceProfileClusteringOptions kmeans;
+};
+[[nodiscard]] ProfileClusteringRequest parse_profile_clustering_request(
+    const FieldLookup& field, const FieldPresence& present);
+[[nodiscard]] ProfileClusteringResult run_profile_clustering(
+    const EventLog& log, const ProfileClusteringRequest& request);
+
 [[nodiscard]] ChaoticActivitiesOptions parse_chaotic_activities_params(
     const FieldLookup& field);
 [[nodiscard]] ChaoticActivitiesOptions parse_chaotic_activities_params(

@@ -14,78 +14,67 @@
 namespace minera {
 namespace {
 
+// The reference reads every row with str.strip() and int(), so surrounding
+// whitespace (ASCII, including the \x1c-\x1f separators) is ignored.
+bool row_space(char ch) {
+  return ch == ' ' || (ch >= '\t' && ch <= '\r') || (ch >= '\x1c' && ch <= '\x1f');
+}
+
 std::string trim(std::string_view input) {
   std::size_t first = 0;
-  while (first < input.size() &&
-         (input[first] == ' ' || input[first] == '\t' ||
-          input[first] == '\f' || input[first] == '\v')) {
-    ++first;
-  }
+  while (first < input.size() && row_space(input[first])) ++first;
   std::size_t last = input.size();
-  while (last > first &&
-         (input[last - 1] == ' ' || input[last - 1] == '\t' ||
-          input[last - 1] == '\f' || input[last - 1] == '\v')) {
-    --last;
-  }
+  while (last > first && row_space(input[last - 1])) --last;
   return std::string(input.substr(first, last - first));
 }
 
-std::string_view strict_row(std::string_view input, std::string_view what) {
-  if (input.empty() || trim(input) != input)
-    throw std::invalid_argument("DFG: malformed " + std::string(what));
-  return input;
-}
-
-std::uint64_t parse_uint(std::string_view token, std::string_view what) {
+// A non-negative decimal as int() reads it: optional whitespace and '+',
+// digits with single underscores between them.  Negative values (which the
+// reference would accept, and use as Python list indices) are rejected.
+std::uint64_t parse_uint(std::string_view raw, std::string_view what) {
+  const auto trimmed = trim(raw);
+  std::string_view token = trimmed;
   if (token.empty()) throw std::invalid_argument("DFG: missing " + std::string(what));
-  std::uint64_t value = 0;
-  const auto result = std::from_chars(token.data(), token.data() + token.size(),
-                                      value, 10);
-  if (result.ec != std::errc() || result.ptr != token.data() + token.size()) {
-    throw std::invalid_argument("DFG: invalid " + std::string(what));
+  if (token.front() == '+') token.remove_prefix(1);
+  std::string digits;
+  bool valid = !token.empty() && token.front() != '_' && token.back() != '_';
+  for (std::size_t i = 0; valid && i < token.size(); ++i) {
+    if (token[i] == '_') valid = token[i + 1] != '_';
+    else if (token[i] >= '0' && token[i] <= '9') digits.push_back(token[i]);
+    else valid = false;
   }
+  std::uint64_t value = 0;
+  if (valid) {
+    const auto result = std::from_chars(digits.data(), digits.data() + digits.size(), value, 10);
+    valid = result.ec == std::errc() && result.ptr == digits.data() + digits.size();
+  }
+  if (!valid) throw std::invalid_argument("DFG: invalid " + std::string(what));
   return value;
 }
 
-std::uint64_t parse_count(std::string_view token, std::string_view what) {
-  const auto count = parse_uint(token, what);
-  if (count == 0) {
-    throw std::invalid_argument("DFG: " + std::string(what) +
-                                " must be positive");
-  }
-  return count;
+std::pair<std::string_view, std::string_view> split_count(std::string_view value,
+                                                          std::string_view what) {
+  const auto split = value.find('x');
+  if (split == std::string::npos || value.find('x', split + 1) != std::string::npos)
+    throw std::invalid_argument("DFG: malformed " + std::string(what) + " row");
+  return {value.substr(0, split), value.substr(split + 1)};
 }
 
 std::pair<std::uint64_t, std::uint64_t> parse_id_count(std::string_view line,
                                                        std::string_view what) {
-  const auto value = strict_row(line, what);
-  const auto split = value.find('x');
-  if (split == std::string::npos || split == 0 || split + 1 == value.size() ||
-      value.find('x', split + 1) != std::string::npos) {
-    throw std::invalid_argument("DFG: malformed " + std::string(what) +
-                                " row");
-  }
-  const auto id = parse_uint(value.substr(0, split), "activity id");
-  return {id, parse_count(value.substr(split + 1), "count")};
+  const auto [id, count] = split_count(line, what);
+  return {parse_uint(id, "activity id"), parse_uint(count, "count")};
 }
 
 std::pair<std::pair<std::uint64_t, std::uint64_t>, std::uint64_t>
 parse_edge(std::string_view line) {
-  const auto value = strict_row(line, "edge row");
-  const auto split = value.find('x');
-  if (split == std::string::npos || split == 0 || split + 1 == value.size() ||
-      value.find('x', split + 1) != std::string::npos) {
-    throw std::invalid_argument("DFG: malformed edge row");
-  }
-  const auto edge = value.substr(0, split);
+  const auto [edge, count] = split_count(line, "edge");
   const auto arrow = edge.find('>');
-  if (arrow == std::string::npos || arrow == 0 || arrow + 1 == edge.size() ||
-      edge.find('>', arrow + 1) != std::string::npos) {
+  if (arrow == std::string::npos || edge.find('>', arrow + 1) != std::string::npos)
     throw std::invalid_argument("DFG: malformed edge row");
-  }
   return {{parse_uint(edge.substr(0, arrow), "source activity id"),
            parse_uint(edge.substr(arrow + 1), "target activity id")},
-          parse_count(value.substr(split + 1), "count")};
+          parse_uint(count, "count")};
 }
 
 std::vector<std::string> activity_names(const DfgCleanAnalysis& dfg) {
@@ -119,15 +108,15 @@ void write_dfg(std::ostream& out, const DfgCleanAnalysis& dfg) {
   for (std::size_t i = 0; i < names.size(); ++i) ids.emplace(names[i], i);
 
   for (const auto& [name, count] : starts) {
-    if (!ids.contains(name) || count == 0)
+    if (!ids.contains(name))
       throw std::invalid_argument("DFG: invalid start activity row");
   }
   for (const auto& [name, count] : ends) {
-    if (!ids.contains(name) || count == 0)
+    if (!ids.contains(name))
       throw std::invalid_argument("DFG: invalid end activity row");
   }
   for (const auto& [pair, count] : edges) {
-    if (!ids.contains(pair.first) || !ids.contains(pair.second) || count == 0)
+    if (!ids.contains(pair.first) || !ids.contains(pair.second))
       throw std::invalid_argument("DFG: invalid edge row");
   }
 
@@ -184,43 +173,38 @@ DfgCleanAnalysis parse_dfg(std::string_view text) {
       throw std::invalid_argument("DFG: missing " + std::string(what));
     return lines[cursor++];
   };
-  const auto activity_count = parse_uint(strict_row(next("activity count"),
-                                                   "activity count"),
-                                         "activity count");
+  // Rows are read as the reference reads them: stripped, labels by index
+  // (a repeated label names the same activity), zero counts allowed and a
+  // repeated start, end or edge row replacing the earlier one.
+  const auto activity_count = parse_uint(next("activity count"), "activity count");
   if (activity_count > lines.size())
     throw std::invalid_argument("DFG: activity count is too large");
   std::vector<std::string> names;
   names.reserve(static_cast<std::size_t>(activity_count));
-  std::map<std::string, std::size_t> ids;
   for (std::uint64_t i = 0; i < activity_count; ++i) {
-    auto name = std::string(next("activity label"));
-    if (name.empty() || name != trim(name) || name.find('\n') != std::string::npos ||
-        name.find('\r') != std::string::npos || name.find('\0') != std::string::npos)
-      throw std::invalid_argument("DFG: activity labels must be non-empty and single-line");
-    if (!ids.emplace(name, names.size()).second)
-      throw std::invalid_argument("DFG: duplicate activity label");
+    auto name = trim(next("activity label"));
+    if (name.find('\0') != std::string::npos)
+      throw std::invalid_argument("DFG: activity labels must not contain NUL");
     names.push_back(std::move(name));
   }
   DfgCleanAnalysis result;
-  const auto start_count = parse_uint(
-      strict_row(next("start activity count"), "start activity count"),
-      "start activity count");
-  if (start_count > activity_count)
+  const auto start_count = parse_uint(next("start activity count"), "start activity count");
+  if (start_count > lines.size())
     throw std::invalid_argument("DFG: start activity count is too large");
   for (std::uint64_t i = 0; i < start_count; ++i) {
     const auto [id, count] = parse_id_count(next("start activity row"), "start activity");
-    if (id >= activity_count || !result.start_activities.emplace(names[id], count).second)
-      throw std::invalid_argument("DFG: invalid or duplicate start activity id");
+    if (id >= activity_count)
+      throw std::invalid_argument("DFG: start activity id out of range");
+    result.start_activities[names[id]] = count;
   }
-  const auto end_count = parse_uint(
-      strict_row(next("end activity count"), "end activity count"),
-      "end activity count");
-  if (end_count > activity_count)
+  const auto end_count = parse_uint(next("end activity count"), "end activity count");
+  if (end_count > lines.size())
     throw std::invalid_argument("DFG: end activity count is too large");
   for (std::uint64_t i = 0; i < end_count; ++i) {
     const auto [id, count] = parse_id_count(next("end activity row"), "end activity");
-    if (id >= activity_count || !result.end_activities.emplace(names[id], count).second)
-      throw std::invalid_argument("DFG: invalid or duplicate end activity id");
+    if (id >= activity_count)
+      throw std::invalid_argument("DFG: end activity id out of range");
+    result.end_activities[names[id]] = count;
   }
   while (cursor < lines.size()) {
     if (trim(lines[cursor]).empty())
@@ -228,8 +212,7 @@ DfgCleanAnalysis parse_dfg(std::string_view text) {
     const auto [pair, count] = parse_edge(next("edge row"));
     if (pair.first >= activity_count || pair.second >= activity_count)
       throw std::invalid_argument("DFG: edge activity id out of range");
-    if (!result.graph.emplace(std::make_pair(names[pair.first], names[pair.second]), count).second)
-      throw std::invalid_argument("DFG: duplicate edge row");
+    result.graph[std::make_pair(names[pair.first], names[pair.second])] = count;
   }
   return result;
 }

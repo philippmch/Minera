@@ -2581,7 +2581,7 @@ void playout_generates_perfectly_fitting_logs() {
   const auto generated = minera::playout(net, options);
 
   assert(generated.trace_count() == 50);
-  assert(generated.traces.front().case_id == "case_1");
+  assert(generated.traces.front().case_id == "0");  // the reference envelope
   assert(minera::check_conformance(generated, net).fitness == 1.0);
   const auto graph = minera::discover_directly_follows_graph(generated);
   assert(graph.variants().size() >= 2);
@@ -5637,8 +5637,9 @@ void xes_importer_preserves_missing_fields_and_rejects_malformed_xml() {
          minera::FirstClassAttributeState::kMissing);
   // Unterminated tag.
   assert(throws([] { (void)import_xes("<log><trace"); }));
-  // An empty stream yields an empty log rather than throwing.
-  assert(import_xes("").trace_count() == 0);
+  // An empty stream is not an XES document (the reference raises "no element
+  // found"); it is rejected instead of being read as an empty log.
+  assert(throws([] { (void)import_xes(""); }));
 }
 
 std::size_t net_activity(const minera::HeuristicsNet& net, const std::string& name) {

@@ -1,7 +1,13 @@
 #include "minera/process_tree_playout.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <cstdio>
+#include <fstream>
 #include <initializer_list>
+#include <map>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -11,6 +17,8 @@
 #include "minera/json_export.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/ptml.hpp"
+#include "minera/timestamp.hpp"
+#include <set>
 
 using namespace minera;
 
@@ -40,8 +48,6 @@ void process_tree_basic_variant_contract() {
                       {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
   ProcessTreePlayoutOptions options;
   options.traces = 16;
-  options.max_length = 5;
-  options.max_loop_occurrences = 2;
   options.seed = 17;
 
   const auto basic = basic_process_tree_playout(tree, options);
@@ -55,7 +61,7 @@ void process_tree_basic_variant_contract() {
     topbottom_words.push_back(labels(trace));
   assert(basic_words != topbottom_words);
   for (const auto& word : basic_words) {
-    assert(word.size() == 1 || word.size() == 3 || word.size() == 5);
+    assert(word.size() % 2 == 1);
     for (std::size_t index = 0; index < word.size(); ++index)
       assert(word[index] == (index % 2 == 0 ? "a" : "b"));
   }
@@ -85,6 +91,7 @@ void process_tree_topbottom_variant_contract() {
   options.traces = 8;
   options.max_length = 3;
   options.max_loop_occurrences = 1;
+  options.cap_sampled_loops = true;  // the opt-in redo bound
   options.seed = 23;
 
   const auto log = topbottom_process_tree_playout(tree, options);
@@ -99,9 +106,170 @@ void process_tree_topbottom_variant_contract() {
     }
   }
 }
+
+// The reference envelopes: TOPBOTTOM has neither case ids nor timestamps,
+// BASIC_PLAYOUT names cases "0", "1", ... and stamps events one second apart
+// from epoch 10,000,000 across cases; add_envelope is Minera's opt-in.
+void process_tree_playout_envelopes() {
+  ProcessTree tree({"a", "b"}, seq({ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}));
+  ProcessTreePlayoutOptions options;
+  options.traces = 3;
+  const auto topbottom = process_tree_playout(tree, options);
+  for (const auto& trace : topbottom.traces) {
+    assert(!trace.has_case_id());
+    for (const auto& event : trace.events) assert(!event.has_timestamp());
+  }
+  options.variant = ProcessTreePlayoutVariant::BASIC_PLAYOUT;
+  const auto basic = process_tree_playout(tree, options);
+  for (std::size_t i = 0; i < basic.traces.size(); ++i) {
+    assert(basic.traces[i].case_id == std::to_string(i));
+    for (std::size_t j = 0; j < 2; ++j)
+      assert(basic.traces[i].events[j].timestamp ==
+             format_timestamp(10000000.0 + static_cast<double>(2 * i + j)));
+  }
+  assert(basic.traces[0].events[0].timestamp.rfind("1970-04-26T17:46:40", 0) == 0);
+  options.add_envelope = true;
+  const auto synthetic = process_tree_playout(tree, options);
+  assert(synthetic.traces[0].case_id == "case_1");
+  assert(synthetic.traces[0].events[0].timestamp == format_timestamp(options.start));
+}
+
+// Loops repeat without a bound unless cap_sampled_loops opts in; a trace
+// above the visible-step safety bound raises instead of being dropped.
+void process_tree_playout_loop_bounds() {
+  ProcessTree loop({"a", "b"},
+      ProcessTreeNode{ProcessTreeOperator::kLoop, 0,
+                      {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
+  ProcessTreePlayoutOptions options;
+  options.traces = 4000;
+  std::size_t longest = 0;
+  for (const auto& trace : process_tree_playout(loop, options).traces)
+    longest = std::max(longest, trace.events.size());
+  assert(longest > 2 * options.max_loop_occurrences + 1);
+  options.cap_sampled_loops = true;
+  for (const auto variant : {ProcessTreePlayoutVariant::TOPBOTTOM, ProcessTreePlayoutVariant::BASIC_PLAYOUT}) {
+    options.variant = variant;
+    for (const auto& trace : process_tree_playout(loop, options).traces)
+      assert(trace.events.size() <= 2 * options.max_loop_occurrences + 1);
+  }
+  options.cap_sampled_loops = false;
+  options.variant = ProcessTreePlayoutVariant::TOPBOTTOM;
+  options.max_steps = 3;
+  bool threw = false;
+  try { (void)process_tree_playout(loop, options); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+}
+
+// BASIC_PLAYOUT against the reference distribution
+// (scripts/capture-process-tree-basic-distribution.py): a chi-square
+// homogeneity test per tree at the 0.1% level, bins with fewer than ten
+// pooled traces merged. The draws are seeded, so the outcome is fixed.
+ProcessTree parse_tree(const std::string& text, std::size_t& at, std::vector<std::string>& names,
+                       ProcessTreeNode& out) {
+  static const std::vector<std::pair<std::string, ProcessTreeOperator>> kOps = {
+      {"->(", ProcessTreeOperator::kSequence}, {"<>(", ProcessTreeOperator::kInterleaving},
+      {"X(", ProcessTreeOperator::kExclusive}, {"+(", ProcessTreeOperator::kParallel},
+      {"*(", ProcessTreeOperator::kLoop}, {"O(", ProcessTreeOperator::kInclusiveChoice}};
+  for (const auto& [prefix, op] : kOps) {
+    if (text.compare(at, prefix.size(), prefix) != 0) continue;
+    at += prefix.size();
+    out = ProcessTreeNode{op, 0, {}};
+    do {
+      if (text[at] == ',') ++at;
+      out.children.emplace_back();
+      (void)parse_tree(text, at, names, out.children.back());
+    } while (text[at] == ',');
+    ++at;  // ')'
+    return {};
+  }
+  const auto end = text.find_first_of(",)", at);
+  const auto label = text.substr(at, end == std::string::npos ? std::string::npos : end - at);
+  at = end == std::string::npos ? text.size() : end;
+  if (label == "tau") {
+    out = ProcessTreeNode::tau();
+  } else {
+    auto found = std::find(names.begin(), names.end(), label);
+    out = ProcessTreeNode::leaf(static_cast<std::size_t>(found - names.begin()));
+    if (found == names.end()) names.push_back(label);
+  }
+  return {};
+}
+
+void process_tree_basic_distribution(const char* path) {
+  std::ifstream input(path);
+  assert(input);
+  std::vector<std::pair<std::string, std::map<std::string, double>>> trees;
+  std::string line;
+  while (std::getline(input, line)) {
+    if (line.rfind("C ", 0) == 0) trees.push_back({line.substr(2), {}});
+    if (line.rfind("F ", 0) == 0) {
+      std::istringstream fields(line.substr(2));
+      double count = 0;
+      std::string word;
+      fields >> count >> word;
+      trees.back().second[word] = count;
+    }
+  }
+  assert(trees.size() >= 10);
+  for (const auto& [text, reference] : trees) {
+    std::size_t at = 0;
+    std::vector<std::string> names;
+    ProcessTreeNode root;
+    (void)parse_tree(text, at, names, root);
+    ProcessTree tree(names, root);
+    ProcessTreePlayoutOptions options;
+    options.variant = ProcessTreePlayoutVariant::BASIC_PLAYOUT;
+    options.traces = 40000;
+    options.seed = 20261103;
+    std::map<std::string, double> native;
+    for (const auto& trace : process_tree_playout(tree, options).traces) {
+      std::string word;
+      for (const auto& event : trace.events) word += (word.empty() ? "" : ".") + event.activity;
+      native[word.empty() ? "-" : word] += 1;
+    }
+    double reference_total = 0, native_total = 0;
+    for (const auto& [word, count] : reference) reference_total += count;
+    for (const auto& [word, count] : native) native_total += count;
+    std::map<std::string, std::pair<double, double>> bins;
+    std::pair<double, double> rest{0, 0};
+    std::set<std::string> words;
+    for (const auto& [word, count] : reference) words.insert(word);
+    for (const auto& [word, count] : native) words.insert(word);
+    for (const auto& word : words) {
+      const double r = reference.contains(word) ? reference.at(word) : 0;
+      const double n = native.contains(word) ? native.at(word) : 0;
+      if (r + n < 10) { rest.first += r; rest.second += n; }
+      else bins[word] = {r, n};
+    }
+    if (rest.first + rest.second > 0) bins["<rest>"] = rest;
+    double statistic = 0;
+    const double total = reference_total + native_total;
+    for (const auto& [word, pair] : bins) {
+      const double column = pair.first + pair.second;
+      const double expected_r = column * reference_total / total;
+      const double expected_n = column * native_total / total;
+      statistic += (pair.first - expected_r) * (pair.first - expected_r) / expected_r +
+                   (pair.second - expected_n) * (pair.second - expected_n) / expected_n;
+    }
+    const double df = std::max<double>(1.0, static_cast<double>(bins.size()) - 1.0);
+    // Wilson-Hilferty upper 0.1% point of chi-square(df).
+    const double z = 3.090232306;
+    const double h = 2.0 / (9.0 * df);
+    const double critical = df * std::pow(1.0 - h + z * std::sqrt(h), 3.0);
+    if (!(statistic < critical))
+      std::fprintf(stderr, "BASIC distribution of %s: chi2 %.2f >= %.2f (df %.0f)\n", text.c_str(),
+                   statistic, critical, df);
+    assert(statistic < critical);
+  }
+}
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  process_tree_playout_envelopes();
+  process_tree_playout_loop_bounds();
+  process_tree_basic_distribution(
+      argc > 1 ? argv[1] : "src/backend/tests/fixtures/process_tree_basic_distribution.txt");
   process_tree_basic_variant_contract();
   process_tree_extensive_variant_contract();
   process_tree_topbottom_variant_contract();
@@ -214,20 +382,32 @@ int main() {
          labels(log.traces[3]) == std::vector<std::string>({"b", "a"}));
   assert(labels(log.traces[2]) != labels(log.traces[3]));
 
-  // Basic sampling selects a non-empty child subset and remains deterministic
-  // for a fixed seed.
+  // Basic sampling selects each child with probability 1/2 (possibly none,
+  // as the reference does) and remains deterministic for a fixed seed.
   ProcessTreePlayoutOptions sampled;
+  sampled.variant = ProcessTreePlayoutVariant::BASIC_PLAYOUT;
   sampled.traces = 24;
   sampled.max_length = 2;
   sampled.seed = 77;
   const auto sampled_first = process_tree_playout(inclusive, sampled);
   const auto sampled_second = process_tree_playout(inclusive, sampled);
   assert(sampled_first.traces.size() == sampled_second.traces.size());
+  bool sampled_empty = false;
   for (std::size_t i = 0; i < sampled_first.traces.size(); ++i) {
     assert(labels(sampled_first.traces[i]) == labels(sampled_second.traces[i]));
-    assert(!sampled_first.traces[i].events.empty());
+    sampled_empty = sampled_empty || sampled_first.traces[i].events.empty();
     assert(sampled_first.traces[i].events.size() <= 2);
   }
+  assert(sampled_empty);
+  // TOPBOTTOM has no inclusive choice: the reference raises TypeError.
+  bool topbottom_or = false;
+  try {
+    sampled.variant = ProcessTreePlayoutVariant::TOPBOTTOM;
+    (void)process_tree_playout(inclusive, sampled);
+  } catch (const std::invalid_argument&) {
+    topbottom_or = true;
+  }
+  assert(topbottom_or);
 
   const auto ptml = to_ptml(inclusive);
   assert(ptml.find("<or ") != std::string::npos);
@@ -281,8 +461,6 @@ int main() {
                       {ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}});
   ProcessTreePlayoutOptions omitted;
   omitted.traces = 1;
-  omitted.max_loop_occurrences = 2;
-  omitted.max_length = 8;
   bool default_matches_topbottom = true;
   bool default_differs_from_basic = false;
   for (std::uint64_t seed = 1; seed <= 64; ++seed) {
@@ -304,8 +482,7 @@ int main() {
   assert(default_matches_topbottom && default_differs_from_basic);
 
   basic.traces = 1;
-  basic.max_loop_occurrences = 2;
-  basic.max_length = 8;
+  basic.max_length = 1000;
   bool variants_differ = false;
   for (std::uint64_t seed = 1; seed <= 64 && !variants_differ; ++seed) {
     basic.seed = seed;

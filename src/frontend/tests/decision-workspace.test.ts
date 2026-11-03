@@ -44,3 +44,17 @@ describe('native encoded decisions and guarded model workspace',()=>{
   const s=parse(tables);if(s.result.family!=='DECISION_TABLES')throw new Error('wrong fixture');const run=embeddedDecisionRun(s.result,'loaded.json',60,180);expect(run.value.source_id).toBe('');expect(run.value.underlying_pnml).toBe('');expect(run.tables.training_0.count).toBe(60);expect(JSON.parse(run.report).origin).toBe('loaded_export');expect(nativeJson(JSON.parse(run.raw))).toBe(nativeJson(s.result));
  });
 });
+describe('decision cell preview',()=>{
+ it('keeps short cells whole and never splits a surrogate pair at the cut',async()=>{
+  const {decisionCellPreview,DECISION_CELL_PREVIEW_CHARACTERS:n}=await import('../src/decision-workspace');
+  expect(decisionCellPreview('x'.repeat(n))).toBe('x'.repeat(n));
+  const pair='x'.repeat(n-1)+'\u{1F600}'+'y',cut=decisionCellPreview(pair);
+  expect(cut.startsWith('x'.repeat(n-1)+'…')).toBe(true);
+  expect(cut).toContain(`(${pair.length} characters`);
+  const after='x'.repeat(n-2)+'\u{1F600}'+'yy';
+  expect(decisionCellPreview(after).startsWith('x'.repeat(n-2)+'\u{1F600}…')).toBe(true);
+  // A lone high surrogate at the cut is the text's own unit and is kept.
+  const lone='x'.repeat(n-1)+'\ud800'+'y';
+  expect(decisionCellPreview(lone).startsWith('x'.repeat(n-1)+'\ud800…')).toBe(true);
+ });
+});

@@ -8,7 +8,9 @@ export interface ClusterAnalysis {family:"CLUSTER_ANALYSIS";analysis_id:string;s
 export interface HierarchyForm {attribute:string;activity:string;variant:"DMM_LEVEN"|"AVG_LEVEN"|"DMM_VEC"|"AVG_VEC"|"DFG";alpha:string;percent:string;groups:string;nodes:string;}
 export interface ProfileForm {activity:string;clusters:string;iterations:string;traces:string;features:string;seed:string;tolerance:string;includeActivity:boolean;includeSuccession:boolean;traceStrings:string;eventStrings:string;traceNumbers:string;eventNumbers:string;featureNames:string;}
 export const DEFAULT_HIERARCHY:HierarchyForm={attribute:"case:concept:name",activity:"concept:name",variant:"DMM_LEVEN",alpha:"0.5",percent:"1",groups:"10000",nodes:"20000"};
-export const DEFAULT_PROFILE:ProfileForm={activity:"concept:name",clusters:"2",iterations:"100",traces:"100000",features:"10000",seed:"0",tolerance:"0.000001",includeActivity:true,includeSuccession:true,traceStrings:"",eventStrings:"",traceNumbers:"",eventNumbers:"",featureNames:""};
+// The reference SKLEARN_PROFILES clusterer: KMeans(n_clusters=2, random_state=0)
+// with scikit-learn's max_iter=300 and tol=1e-4.
+export const DEFAULT_PROFILE:ProfileForm={activity:"concept:name",clusters:"2",iterations:"300",traces:"100000",features:"10000",seed:"0",tolerance:"0.0001",includeActivity:true,includeSuccession:true,traceStrings:"",eventStrings:"",traceNumbers:"",eventNumbers:"",featureNames:""};
 function integer(text:string,label:string,min:number,max:number):number {const n=Number(text);if(!text.trim()||!Number.isSafeInteger(n)||n<min||n>max)throw new Error(`${label} must be an integer from ${min} through ${max}.`);return n;}
 function ratio(text:string,label:string,positive=false):number {const n=Number(text);if(!text.trim()||!Number.isFinite(n)||n<0||n>1||positive&&n===0)throw new Error(`${label} must be ${positive?"greater than 0 and at most 1":"from 0 through 1"}.`);return n;}
 function names(text:string):string[]|undefined {const values=text.split(/\r?\n/).filter(name=>name!=="");return values.length?values:undefined;}

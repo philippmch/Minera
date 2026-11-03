@@ -426,6 +426,9 @@ PlayoutOptions parse_playout_workbench_options(
   if (const auto* item = field(object, "add_only_if_fm_is_reached")) result.add_only_if_fm_is_reached = item->boolean();
   if (const auto* item = field(object, "fm_leq_accepted")) result.fm_leq_accepted = item->boolean();
   if (const auto* item = field(object, "return_visited_elements")) result.return_visited_elements = item->boolean();
+  // Explicit timing replaces the reference envelope (cases "0".., epoch
+  // 10,000,000, one second per event).
+  result.add_envelope = field(object, "start") || field(object, "case_interval") || field(object, "event_interval");
   set_supplied(object, supplied);
   return result;
 }
@@ -524,6 +527,7 @@ ProcessTreePlayoutOptions parse_process_tree_playout_workbench_options(
   if (const auto* item = field(object, "case_interval")) result.case_interval = ieee_double(*item);
   if (const auto* item = field(object, "event_interval")) result.event_interval = ieee_double(*item);
   if (const auto* item = field(object, "return_set_strings")) result.return_set_strings = item->boolean();
+  result.add_envelope = field(object, "start") || field(object, "case_interval") || field(object, "event_interval");
   set_supplied(object, supplied);
   return result;
 }

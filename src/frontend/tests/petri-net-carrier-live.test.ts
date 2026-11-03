@@ -7,12 +7,12 @@ import {isOriginalGeneticMatrixNet} from "../src/original-genetic-matrix-workben
 import {isLiteralNativeResult} from "../src/literal-controls";
 import {parseNativeJson} from "../src/native-json";
 
-// Every workbench writes PetriNet values through the backend's shared
-// nine-field carrier (serialize_oc_playout_workbench_petri_net_json), and every
-// workbench validator accepts exactly those nine fields. These envelopes are
-// live server answers (fixture requests replayed against the current server);
-// a native net's place names (tree-converted nets carry them) must never
-// become a tenth field, null or not.
+// Every workbench writes PetriNet values through the backend's shared carrier
+// (serialize_oc_playout_workbench_petri_net_json): nine storage fields, plus
+// place_names when the net names its places (tree-converted and PNML nets do;
+// token replay breaks ties by place name, so the names must survive). Every
+// workbench validator accepts both shapes. These envelopes are live server
+// answers (fixture requests replayed against the current server).
 const nodeModule = (name: string): Promise<unknown> => import(/* @vite-ignore */ name);
 const {readFileSync} = await nodeModule("node:fs") as {readFileSync(path: string, encoding: "utf8"): string};
 const {dirname, resolve} = await nodeModule("node:path") as {dirname(path: string): string; resolve(...paths: string[]): string};
@@ -35,6 +35,8 @@ const envelopes: Array<[string, (value: unknown) => boolean]> = [
   ["object-centric-playout-ocpn-result.response.json", isOriginalOcPlayoutWorkbench],
   ["petri-analysis-is-workflow-net.response.json", isOriginalPetriAnalysisWorkbench],
   ["quality-evaluate-simplicity.response.json", isOriginalQualityWorkbench],
+  // The model_file names its places; the workbench's snapshots keep them.
+  ["quality-evaluate-simplicity-named-net.response.json", isOriginalQualityWorkbench],
   ["discovery-mine-ilp.response.json", isOriginalDiscoveryWorkbench],
 ];
 
@@ -45,9 +47,19 @@ describe("live PetriNet carrier", () => {
     expect(validate(value)).toBe(true);
   });
 
-  it("every live net has exactly the nine carrier fields", () => {
+  it("the live named net keeps its place names in every snapshot", () => {
+    const found = nets(live("quality-evaluate-simplicity-named-net.response.json"));
+    expect(found.length).toBeGreaterThan(0);
+    for (const net of found) expect(net.place_names).toEqual(["source", "sink"]);
+  });
+
+  it("every live net has the nine carrier fields, plus place_names only as a list of names", () => {
     for (const [name] of envelopes)
-      for (const net of nets(live(name))) expect(Object.keys(net).sort()).toEqual([...CARRIER_FIELDS].sort());
+      for (const net of nets(live(name))) {
+        const keys = Object.keys(net).filter(key => key !== "place_names");
+        expect(keys.sort()).toEqual([...CARRIER_FIELDS].sort());
+        if (Object.hasOwn(net, "place_names")) expect(Array.isArray(net.place_names) && net.place_names.every(item => typeof item === "string")).toBe(true);
+      }
   });
 
   it("every live net passes each PetriNet validator", () => {
@@ -66,10 +78,32 @@ describe("live PetriNet carrier", () => {
     expect(isLiteralNativeResult("ilp", {type: value.result_type, value: value.native_result})).toBe(true);
   });
 
-  it("a tenth place_names field is what the validators reject", () => {
-    const [net] = nets(live("object-centric-playout-ocpn-result.response.json"));
-    const named = {...net, place_names: null};
-    expect(isOriginalOcPlayoutNativeType("PetriNet", named)).toBe(false);
-    expect(isOriginalQualityNativeType("PetriNet", named)).toBe(false);
+  it("a named net passes every PetriNet validator; a null or unknown tenth field does not", () => {
+    for (const [name] of envelopes) for (const net of nets(live(name))) {
+      const named = {...net, place_names: Array.from({length: Number(net.place_count)}, (_, index) => `p_${index}`)};
+      for (const candidate of [named, net]) {
+        expect(isOriginalOcPlayoutNativeType("PetriNet", candidate)).toBe(true);
+        expect(isOriginalQualityNativeType("PetriNet", candidate)).toBe(true);
+        expect(isOriginalPetriAnalysisNativeType("PetriNet", candidate)).toBe(true);
+        expect(isOriginalGeneticMatrixNet(candidate)).toBe(true);
+      }
+      for (const wrong of [{...net, place_names: null}, {...net, place_names: [1]}, {...net, places: []}]) {
+        expect(isOriginalOcPlayoutNativeType("PetriNet", wrong)).toBe(false);
+        expect(isOriginalQualityNativeType("PetriNet", wrong)).toBe(false);
+      }
+    }
+  });
+
+  it("envelopes whose nets name their places pass their workbench validators", () => {
+    const name = (net: Record<string, unknown>) => {net.place_names = Array.from({length: Number(net.place_count)}, (_, index) => index ? `p_${index}` : "source");};
+    for (const [file, validate] of envelopes) {
+      const value = live(file), found = nets(value);
+      for (const net of found) name(net);
+      expect(found.length).toBeGreaterThan(0);
+      expect(validate(value)).toBe(true);
+    }
+    const ilp = live("discovery-mine-ilp.response.json") as Record<string, unknown>;
+    for (const net of nets(ilp.native_result)) name(net);
+    expect(isLiteralNativeResult("ilp", {type: ilp.result_type, value: ilp.native_result})).toBe(true);
   });
 });

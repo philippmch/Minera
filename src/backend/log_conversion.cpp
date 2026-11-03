@@ -17,6 +17,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 
@@ -133,30 +134,123 @@ void append_or_merge_attribute(std::vector<EventAttribute>& fields,
   found->scalar_children_list = attribute.scalar_children_list;
 }
 
+// append_or_merge_attribute for every attribute, with a key index once the
+// list is long so a wide event stays linear.
+void append_attributes(std::vector<EventAttribute>& fields,
+                       const std::vector<EventAttribute>& attributes) {
+  constexpr std::size_t kLinearLimit = 32;
+  if (fields.size() + attributes.size() <= kLinearLimit) {
+    for (const auto& attribute : attributes) append_or_merge_attribute(fields, attribute);
+    return;
+  }
+  // Keys point into `attributes` or into cells that are not moved again:
+  // reserve first so push_back never reallocates.
+  fields.reserve(fields.size() + attributes.size());
+  std::unordered_map<std::string_view, std::size_t> index;
+  index.reserve(fields.size() + attributes.size());
+  for (std::size_t position = 0; position < fields.size(); ++position)
+    index.emplace(fields[position].key, position);
+  for (const auto& attribute : attributes) {
+    const auto found = index.find(attribute.key);
+    if (found == index.end()) {
+      index.emplace(attribute.key, fields.size());
+      fields.push_back(attribute);
+      continue;
+    }
+    auto& field = fields[found->second];
+    if (field.first_class_role == FirstClassAttributeRole::kNone ||
+        (attribute.children.empty() && !attribute.scalar_wrapper &&
+         !attribute.scalar_children_list))
+      continue;
+    field.children = attribute.children;
+    field.scalar_wrapper = attribute.scalar_wrapper;
+    field.scalar_children_list = attribute.scalar_children_list;
+  }
+}
+
+// Moves first-class projections (the leading `count` cells of fields) to the
+// places their source cells had among the attributes that follow them, so a
+// flat row lists its columns in document order like the reference dict.
+// positions[i] is the index the i-th projection's cell had in the complete
+// source attribute list; projections without a known position stay first.
+void restore_projection_order(std::vector<EventAttribute>& fields,
+                              std::size_t count,
+                              const std::vector<std::uint32_t>& positions) {
+  if (count == 0 || positions.size() != count) return;
+  std::vector<std::pair<std::uint32_t, std::size_t>> known;
+  for (std::size_t index = 0; index < count; ++index)
+    if (positions[index] != Event::kUnknownSourcePosition)
+      known.emplace_back(positions[index], index);
+  if (known.empty()) return;
+  std::sort(known.begin(), known.end());
+  std::vector<EventAttribute> ordered;
+  ordered.reserve(fields.size());
+  std::vector<bool> placed(count, false);
+  for (std::size_t index = 0; index < count; ++index) {
+    if (positions[index] == Event::kUnknownSourcePosition) {
+      ordered.push_back(std::move(fields[index]));
+      placed[index] = true;
+    }
+  }
+  // The k-th known projection (in source order) had k other selected cells
+  // before it, so it belongs before generic attribute (position - k).
+  std::size_t next_known = 0;
+  std::size_t generic = 0;
+  const auto flush_known = [&](std::size_t before_generic) {
+    while (next_known < known.size() &&
+           known[next_known].first - next_known <= before_generic) {
+      ordered.push_back(std::move(fields[known[next_known].second]));
+      placed[known[next_known].second] = true;
+      ++next_known;
+    }
+  };
+  for (std::size_t index = count; index < fields.size(); ++index, ++generic) {
+    flush_known(generic);
+    ordered.push_back(std::move(fields[index]));
+  }
+  flush_known(std::numeric_limits<std::size_t>::max());
+  fields = std::move(ordered);
+}
+
 std::vector<EventAttribute> event_fields(const Event& event) {
   std::vector<EventAttribute> fields;
   fields.reserve(event.attributes.size() + 4);
+  // Which source position belongs to each projection actually added.
+  std::vector<std::uint32_t> positions;
+  const auto track = [&](std::size_t before, std::uint32_t position) {
+    if (fields.size() > before) positions.push_back(position);
+  };
+  std::size_t before = fields.size();
   add_projection(fields, event.activity_source_key, kActivityKey,
                  event.activity, AttributeKind::kString, event.activity_state,
                  FirstClassAttributeRole::kActivity,
                  event.activity_attribute ? &*event.activity_attribute : nullptr,
                  event.activity_source_key.empty() && event.activity_attribute &&
                      event.activity_attribute->key.empty());
+  track(before, event.first_class_source_positions[0]);
+  before = fields.size();
   add_projection(fields, event.timestamp_source_key, kTimestampKey,
                  event.timestamp, AttributeKind::kDate, event.timestamp_state,
                  FirstClassAttributeRole::kTimestamp,
                  event.timestamp_attribute ? &*event.timestamp_attribute : nullptr);
+  track(before, event.first_class_source_positions[1]);
+  before = fields.size();
   add_projection(fields, event.resource_source_key, kResourceKey,
                  event.resource, AttributeKind::kString, event.resource_state,
                  FirstClassAttributeRole::kResource,
                  event.resource_attribute ? &*event.resource_attribute : nullptr);
+  track(before, event.first_class_source_positions[2]);
+  before = fields.size();
   add_projection(fields, event.lifecycle_source_key, kLifecycleKey,
                  event.lifecycle, AttributeKind::kString,
                  event.lifecycle_state,
                  FirstClassAttributeRole::kLifecycle,
                  event.lifecycle_attribute ? &*event.lifecycle_attribute : nullptr);
-  for (const auto& attribute : event.attributes)
-    append_or_merge_attribute(fields, attribute);
+  track(before, event.first_class_source_positions[3]);
+  const auto projections = fields.size();
+  if (positions.size() != projections) positions.clear();
+  append_attributes(fields, event.attributes);
+  restore_projection_order(fields, projections, positions);
   return fields;
 }
 
@@ -177,8 +271,10 @@ std::vector<EventAttribute> trace_fields(const Trace& trace) {
                  FirstClassAttributeRole::kCaseId,
                  trace.case_id_attribute ? &*trace.case_id_attribute : nullptr,
                  has_literal_empty_source_key);
-  for (const auto& attribute : trace.attributes)
-    append_or_merge_attribute(fields, attribute);
+  const auto projections = fields.size();
+  append_attributes(fields, trace.attributes);
+  if (projections == 1)
+    restore_projection_order(fields, 1, {trace.case_id_source_position});
   return fields;
 }
 
@@ -1234,9 +1330,15 @@ ConvertedEventStream event_log_to_event_stream(
           // trace attributes use the configured prefix.
           if (injected.first_class_role == FirstClassAttributeRole::kCaseId) {
             injected.key = options.case_id_key;
+            injected.first_class_state = effective_case_state;
+            injected.first_class_source_key = case_source_key;
+            // Placed in trace order (the reference column order); the final
+            // upsert below keeps it authoritative over a later alias.
+            upsert(record.fields, injected);
             case_projection = std::move(injected);
           } else {
             injected.key = options.case_attribute_prefix + injected.key;
+            if (case_projection && injected.key == options.case_id_key) continue;
             upsert(record.fields, std::move(injected));
           }
         }

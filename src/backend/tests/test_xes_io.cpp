@@ -1,4 +1,7 @@
 #include <cassert>
+#include <cmath>
+#include <initializer_list>
+#include <utility>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -480,7 +483,7 @@ void typed_nested_attributes_and_first_class_states_round_trip() {
       "<int key=\"0\" value=\"7\"/>"
       "<container key=\"details\"><boolean key=\"enabled\" value=\"true\"/>"
       "</container></list></global>"
-      "<global scope=\"custom\"><string key=\"note\" value=\"second\"/>"
+      "<global scope=\"custom2\"><string key=\"note\" value=\"second\"/>"
       "</global>"
       "<trace><event><int key=\"count\" value=\"42\"/>"
       "<float key=\"ratio\" value=\"1.25\"/>"
@@ -493,6 +496,8 @@ void typed_nested_attributes_and_first_class_states_round_trip() {
   assert(*log.attribute("concept:name") == "stored-name");
   assert(log.metadata.globals.size() == 2);
   assert(log.metadata.globals[0].scope == "custom");
+  // Public iterparse drops a <container> wherever it appears.
+  assert(log.metadata.globals[0].attributes[0].children.size() == 1);
   assert(log.metadata.globals[1].attributes[0].key == "note");
   assert(log.traces[0].case_id_state ==
          minera::FirstClassAttributeState::kMissing);
@@ -516,13 +521,6 @@ void typed_nested_attributes_and_first_class_states_round_trip() {
   assert(*round.attribute("concept:name") == "stored-name");
   auto expected_globals = log.metadata.globals;
   expected_globals[0].attributes[0].container = minera::AttributeContainerKind::kList;
-  expected_globals[0].attributes[0].children[1].container = minera::AttributeContainerKind::kList;
-  // The exported <container> comes back as a <list>, which public iterparse
-  // stores as a wrapper instead of dropping it.
-  assert(expected_globals[0].attributes[0].children[1].xes_public_shape ==
-         minera::XesPublicShape::kAbsent);
-  expected_globals[0].attributes[0].children[1].xes_public_shape =
-      minera::XesPublicShape::kWrapper;
   assert(round.metadata.globals == expected_globals);
   assert(round.traces[0].case_id_state ==
          minera::FirstClassAttributeState::kMissing);
@@ -534,12 +532,28 @@ void typed_nested_attributes_and_first_class_states_round_trip() {
 
 void invalid_typed_values_are_rejected_explicitly() {
   for (const auto& scalar : {"<int key=\"x\" value=\"nope\"/>",
-                             "<float key=\"x\" value=\"nope\"/>"}) {
+                             "<float key=\"x\" value=\"nope\"/>",
+                             "<date key=\"x\" value=\"2020-02-30T10:00:00Z\"/>"}) {
     const auto xml = std::string("<log><trace><event><string key=\"concept:name\" value=\"A\"/>") +
                      scalar + "</event></trace></log>";
+    // The iterparse readers (the default) drop just that attribute.
+    for (const auto variant : {minera::XesImportVariant::kIterparse,
+                               minera::XesImportVariant::kIterparse20,
+                               minera::XesImportVariant::kIterparseMemoryCompressed}) {
+      std::istringstream input(xml);
+      minera::XesImportOptions options;
+      options.variant = variant;
+      const auto log = minera::import_xes_event_log(input, options);
+      assert(log.traces.size() == 1 && log.traces[0].events.size() == 1);
+      assert(log.traces[0].events[0].activity == "A");
+      assert(find_attribute(log.traces[0].events[0].attributes, "x") == nullptr);
+    }
+    // The regex reader raises, as the reference does.
     assert(throws([&] {
       std::istringstream input(xml);
-      (void)minera::import_xes_event_log(input);
+      minera::XesImportOptions options;
+      options.variant = minera::XesImportVariant::kChunkRegex;
+      (void)minera::import_xes_event_log(input, options);
     }));
   }
   minera::EventLog log;
@@ -638,11 +652,22 @@ void stale_lexical_values_are_not_written_and_invalid_dates_fail() {
                                  minera::AttributeKind::kDate};
   log.traces[0].events[0].attributes.push_back(std::move(invalid));
   assert(throws([&] { (void)minera::to_xes(log); }));
-  assert(throws([] {
-    std::istringstream input(
-        "<log><trace><event><date key=\"when\" value=\"not-a-date\"/>"
-        "</event></trace></log>");
-    (void)minera::import_xes_event_log(input);
+  // The default iterparse reader drops the unreadable date and keeps the
+  // event; the regex reader raises, as the reference does.
+  const std::string bad_date =
+      "<log><trace><event><date key=\"when\" value=\"not-a-date\"/>"
+      "</event></trace></log>";
+  {
+    std::istringstream input(bad_date);
+    const auto read = minera::import_xes_event_log(input);
+    assert(read.traces[0].events.size() == 1 &&
+           read.traces[0].events[0].attributes.empty());
+  }
+  assert(throws([&] {
+    std::istringstream input(bad_date);
+    minera::XesImportOptions options;
+    options.variant = minera::XesImportVariant::kChunkRegex;
+    (void)minera::import_xes_event_log(input, options);
   }));
 }
 
@@ -656,8 +681,23 @@ void metadata_legacy_global_edits_are_exported() {
       "key=\"concept:name\" value=\"A\"/></event></trace></log>";
   std::istringstream input(xml);
   auto log = minera::import_xes_event_log(input);
-  assert(log.metadata.globals.size() == 3);
-  assert(log.metadata.trace_globals.size() == 2);
+  // The iterparse readers keep the last declaration of a repeated scope, in
+  // the place of the first.
+  assert(log.metadata.globals.size() == 2);
+  assert(log.metadata.globals[0].scope == "trace" &&
+         log.metadata.globals[0].attributes[0].key == "trace-b");
+  assert(log.metadata.trace_globals.size() == 1 &&
+         log.metadata.trace_globals[0].key == "trace-b");
+  // A log that does carry a repeated scope (built natively) keeps both
+  // declarations when its legacy projection is edited.
+  log.metadata.globals = {{"trace", {{"trace-a", "A"}}},
+                          {"custom", {{"custom-x", "X"}}},
+                          {"trace", {{"trace-b", "B"}}}};
+  log.metadata.trace_globals = {{"trace-a", "A"}, {"trace-b", "B"}};
+  log.metadata.compatibility_snapshot_valid = true;
+  log.metadata.compatibility_globals_snapshot = log.metadata.globals;
+  log.metadata.compatibility_trace_globals_snapshot = log.metadata.trace_globals;
+  log.metadata.compatibility_event_globals_snapshot = log.metadata.event_globals;
   log.metadata.trace_globals[0].value = "A-edited";
   const auto exported = minera::to_xes(log);
   const auto edited_position = exported.find("key=\"trace-a\" value=\"A-edited\"");
@@ -797,13 +837,16 @@ void null_containers_keep_recursive_children() {
       "<container key=\"payload\" null=\"true\"><string key=\"note\" "
       "value=\"kept\"/></container></event></trace></log>";
   std::istringstream input(xml);
-  const auto log = minera::import_xes_event_log(input);
+  auto log = minera::import_xes_event_log(input);
   const auto* tags =
       find_attribute(log.traces[0].events[0].attributes, "tags");
-  const auto* payload =
-      find_attribute(log.traces[0].events[0].attributes, "payload");
   assert(tags != nullptr && tags->is_null && tags->children.size() == 1);
-  assert(payload != nullptr && payload->is_null && payload->children.size() == 1);
+  // Public iterparse drops the <container>; a native one is still written.
+  assert(find_attribute(log.traces[0].events[0].attributes, "payload") == nullptr);
+  minera::EventAttribute payload{"payload", "", minera::AttributeKind::kString, true};
+  payload.container = minera::AttributeContainerKind::kContainer;
+  payload.children = {{"note", "kept"}};
+  log.traces[0].events[0].attributes.push_back(payload);
   const auto exported = minera::serialize_xes(log, {.preserve_nulls = true});
   assert(exported.find("<list key=\"tags\" null=\"true\">") !=
          std::string::npos);
@@ -1134,7 +1177,10 @@ void nested_export_variants_match_public_mapping_shapes() {
         "<values><intkey=\"\xF0\x9F\x98\x80x\"value=\"7\"/><stringkey=\"\xC3\xA9\xE6\xBC\xA2\"value=\"text\"/></values>");
   for (const std::string key : {"a", "\xF0\x9F\x98\x80", "\xC3\xA9", ""}) {
     mapping.children = {{key, "7", AttributeKind::kInt}};
-    check(mapping, "", "<values><intkey=\"" + key + "\"value=\"7\"/></values>", true);
+    // The reference line writer fails on a key shorter than two characters;
+    // Minera writes that child as itself.
+    const std::string whole = "<values><intkey=\"" + key + "\"value=\"7\"/></values>";
+    check(mapping, whole, whole);
   }
   mapping.children = {{"ab", "1", AttributeKind::kInt}, {"cd", "text"}, {"ab", "9", AttributeKind::kInt}};
   check(mapping, "<values><stringkey=\"a\"value=\"b\"/><stringkey=\"c\"value=\"d\"/></values>",
@@ -1392,6 +1438,320 @@ void unsigned_integer_boundaries_match_public_variants() {
         }
       }
     }
+  }
+}
+
+// Reference captures from pm4py 2.7.22 read_xes (ITERPARSE, its default),
+// observed in fresh processes with PYTHONHASHSEED 1-3 (review F3 fixtures).
+minera::EventLog read_iterparse(const std::string& xml) {
+  std::istringstream input(xml);
+  return minera::import_xes_event_log(input);
+}
+
+std::string one_event(const std::string& attributes) {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<log xes.version=\"1.0\"><trace>"
+         "<string key=\"concept:name\" value=\"c\"/><event>"
+         "<string key=\"concept:name\" value=\"A\"/>" + attributes +
+         "</event></trace></log>";
+}
+
+void iterparse_reference_typed_values() {
+  // int(): whitespace, underscores, leading zeros and Unicode digits.
+  const std::pair<const char*, std::int64_t> ints[] = {
+      {"1_000", 1000}, {" 3", 3}, {"3 ", 3}, {"-0", 0}, {"\xd9\xa3", 3}, {"007", 7}};
+  for (const auto& [text, expected] : ints) {
+    const auto log = read_iterparse(one_event(std::string("<int key=\"n\" value=\"") + text + "\"/>"));
+    const auto* n = find_attribute(log.traces[0].events[0].attributes, "n");
+    assert(n != nullptr && std::get<std::int64_t>(n->typed_value) == expected);
+    assert(n->value == std::to_string(expected));
+  }
+  // float(): inf/nan spellings, underscores, whitespace, overflow to inf.
+  const std::pair<const char*, double> floats[] = {
+      {"1_0.5", 10.5}, {" 2.5", 2.5}, {".5", 0.5}, {"5.", 5.0}, {"1E5", 100000.0},
+      {"inf", std::numeric_limits<double>::infinity()},
+      {"Infinity", std::numeric_limits<double>::infinity()},
+      {"-inf", -std::numeric_limits<double>::infinity()},
+      {"1e400", std::numeric_limits<double>::infinity()}};
+  for (const auto& [text, expected] : floats) {
+    const auto log = read_iterparse(one_event(std::string("<float key=\"f\" value=\"") + text + "\"/>"));
+    const auto* f = find_attribute(log.traces[0].events[0].attributes, "f");
+    assert(f != nullptr && std::get<double>(f->typed_value) == expected);
+  }
+  for (const char* text : {"nan", "+NaN", "-NaN"}) {
+    const auto log = read_iterparse(one_event(std::string("<float key=\"f\" value=\"") + text + "\"/>"));
+    const auto* f = find_attribute(log.traces[0].events[0].attributes, "f");
+    assert(f != nullptr && std::isnan(std::get<double>(f->typed_value)));
+  }
+  // Dropped attribute, event kept.
+  for (const char* scalar : {"<int key=\"x\" value=\"1.5\"/>", "<int key=\"x\" value=\"0x10\"/>",
+                             "<int key=\"x\" value=\"\"/>", "<float key=\"x\" value=\"0x1p3\"/>",
+                             "<float key=\"x\" value=\"abc\"/>", "<int key=\"x\" value=\"1__0\"/>"}) {
+    const auto log = read_iterparse(one_event(scalar));
+    assert(log.traces[0].events.size() == 1);
+    assert(find_attribute(log.traces[0].events[0].attributes, "x") == nullptr);
+  }
+  // A malformed value is dropped with its children, at every level.
+  const auto nested = read_iterparse(
+      "<log><int key=\"logbad\" value=\"x\"/><trace><string key=\"concept:name\" value=\"c\"/>"
+      "<int key=\"tbad\" value=\"q\"/><event><string key=\"concept:name\" value=\"A\"/>"
+      "<int key=\"n\" value=\"zz\"><string key=\"child\" value=\"v\"/></int>"
+      "<date key=\"time:timestamp\" value=\"bad\"/><float key=\"f\" value=\"1.5\"/></event>"
+      "<event><string key=\"concept:name\" value=\"B\"/><list key=\"L\"><values>"
+      "<int key=\"i\" value=\"bad\"/><int key=\"j\" value=\"2\"/></values></list></event>"
+      "</trace></log>");
+  assert(nested.attributes.empty());
+  assert(nested.traces[0].attributes.empty());
+  const auto& first = nested.traces[0].events[0];
+  assert(!first.has_timestamp() && first.attributes.size() == 1 && first.attributes[0].key == "f");
+  const auto* list = find_attribute(nested.traces[0].events[1].attributes, "L");
+  assert(list != nullptr && list->children.size() == 1 && list->children[0].key == "j");
+  // Booleans: only a case-insensitive "true" is true.
+  for (const auto& [text, expected] : std::initializer_list<std::pair<const char*, bool>>{
+           {"tRuE", true}, {"1", false}, {"yes", false}, {" true", false}, {"", false}}) {
+    const auto log = read_iterparse(one_event(std::string("<boolean key=\"b\" value=\"") + text + "\"/>"));
+    assert(std::get<bool>(find_attribute(log.traces[0].events[0].attributes, "b")->typed_value) == expected);
+  }
+}
+
+void iterparse_reference_dates() {
+  // fromisoformat forms; the clock fields are kept and UTC attached.
+  const std::pair<const char*, const char*> accepted[] = {
+      {"2020-01-01", "2020-01-01T00:00:00.000Z"},
+      {"2020-01-01T10:00", "2020-01-01T10:00:00.000Z"},
+      {"2020-01-01 10:00:00", "2020-01-01T10:00:00.000Z"},
+      {"2020-01-01T10:00:00+0200", "2020-01-01T10:00:00.000Z"},
+      {"2020-01-01T10:00:00,5Z", "2020-01-01T10:00:00.500Z"},
+      {"2020-01-01T10:00:00.123+14:00", "2020-01-01T10:00:00.123Z"},
+      {"20200101T100000Z", "2020-01-01T10:00:00.000Z"},
+      {"2020-W01-1", "2019-12-30T00:00:00.000Z"},
+      {"2020-01-01T10:00:00.Z", "2020-01-01T10:00:00.000Z"},
+      {"2020-01-01T10:00:00+05:30:15", "2020-01-01T10:00:00.000Z"},
+      {"2020-01-01T10Z", "2020-01-01T10:00:00.000Z"},
+      {"1970-01-01T00:00:00.0000001Z", "1970-01-01T00:00:00.000000Z"},
+      {"2020-01-01T10:00:00.123456789123Z", "2020-01-01T10:00:00.123456Z"},
+      {"0001-01-01T00:00:00Z", "0001-01-01T00:00:00.000Z"},
+      {"9999-12-31T23:59:59.999999Z", "9999-12-31T23:59:59.999999Z"}};
+  for (const auto& [text, expected] : accepted) {
+    const auto log = read_iterparse(
+        one_event(std::string("<date key=\"time:timestamp\" value=\"") + text + "\"/>"));
+    const auto& event = log.traces[0].events[0];
+    assert(event.has_timestamp());
+    assert(event.timestamp == expected);
+  }
+  for (const char* text : {"2020-01-01T10:00:00.5z", "2020-01-01T24:00:00Z", "2020-02-30T10:00:00Z",
+                           "garbage", "2020-01-01T10:00:60Z", " 2020-01-01T10:00:00Z",
+                           "2020-1-1T10:00:00Z", "2020-01-01T10:00:00+25:00",
+                           "10000-01-01T00:00:00Z", "2020-01-01T10:00:00 UTC", ""}) {
+    const auto log = read_iterparse(
+        one_event(std::string("<date key=\"time:timestamp\" value=\"") + text + "\"/>"));
+    assert(log.traces[0].events.size() == 1 && !log.traces[0].events[0].has_timestamp());
+  }
+}
+
+void iterparse_reference_rejects_malformed_xml() {
+  const std::string ok_event =
+      "<event><string key=\"concept:name\" value=\"A\"/></event>";
+  const std::string head = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+  const std::vector<std::string> rejected = {
+      "",
+      "hello world",
+      head + "<log><trace><string key=\"concept:name\" value=\"c1\"/>" + ok_event + "</trace>\n<trace>",
+      head + "<log><trace><string key=\"concept:name\" value=\"c1\"/>" + ok_event + "</trace>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"A\"/></evnt></trace></log>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"A\"/>" + ok_event + "</event></trace></log>",
+      head + "<trace>" + ok_event + "</trace>",
+      head + "<foo><trace>" + ok_event + "</trace></foo>",
+      head + "<LOG><TRACE>" + ok_event + "</TRACE></LOG>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"A & B\"/></event></trace></log>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"A < B\"/></event></trace></log>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"A\" value=\"B\"/></event></trace></log>",
+      head + "<log><trace>" + ok_event + "</trace></log>garbage",
+      head + "<log><trace>" + ok_event + "</trace></log><log/>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"A&#1;B\"/></event></trace></log>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"A\x01" "B\"/></event></trace></log>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"A&#xD800;B\"/></event></trace></log>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"A&#x110000;B\"/></event></trace></log>",
+      // ISO-8859-1 bytes: the reader is UTF-8 whatever the declaration says.
+      "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<log><trace><event>"
+      "<string key=\"concept:name\" value=\"caf\xe9\"/></event></trace></log>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"\xff\xfe\"/></event></trace></log>",
+      "<?xml version=\"1.0\"?>\n<!DOCTYPE log [<!ENTITY xxe SYSTEM \"file:///etc/hostname\">]>\n"
+      "<log><trace><event><string key=\"concept:name\" value=\"&xxe;\"/></event></trace></log>",
+      head + "<log><trace><event><string key=\"concept:name\" value=\"&undefined;\"/></event></trace></log>",
+  };
+  for (const auto& xml : rejected) {
+    for (const auto variant : {minera::XesImportVariant::kIterparse,
+                               minera::XesImportVariant::kIterparse20,
+                               minera::XesImportVariant::kIterparseMemoryCompressed}) {
+      minera::XesImportOptions options;
+      options.variant = variant;
+      assert(throws([&] {
+        std::istringstream input(xml);
+        (void)minera::import_xes_event_log(input, options);
+      }));
+    }
+  }
+  // Entity amplification is refused without expanding the whole document.
+  std::string lol = "<?xml version=\"1.0\"?>\n<!DOCTYPE lolz [\n<!ENTITY lol \"lol\">\n";
+  for (int level = 1; level <= 9; ++level) {
+    lol += "<!ENTITY lol" + std::to_string(level) + " \"";
+    for (int copy = 0; copy < 10; ++copy)
+      lol += level == 1 ? std::string("&lol;") : "&lol" + std::to_string(level - 1) + ";";
+    lol += "\">\n";
+  }
+  lol += "]>\n<log><trace><event><string key=\"concept:name\" value=\"&lol9;\"/></event></trace></log>";
+  assert(throws([&] { (void)read_iterparse(lol); }));
+  // lxml's limit: 256 nested elements are read, 257 are not.
+  const auto nested = [](std::size_t lists) {
+    std::string xml = "<log><trace><string key=\"concept:name\" value=\"c1\"/><event>"
+                      "<string key=\"concept:name\" value=\"A\"/>";
+    for (std::size_t i = 0; i < lists; ++i) xml += "<list key=\"l\">";
+    for (std::size_t i = 0; i < lists; ++i) xml += "</list>";
+    return xml + "</event></trace></log>";
+  };
+  assert(read_iterparse(nested(253)).traces[0].events[0].activity == "A");
+  assert(throws([&] { (void)read_iterparse(nested(254)); }));
+}
+
+void iterparse_reference_accepts_and_normalizes() {
+  // An internal DTD entity is expanded.
+  const auto entity = read_iterparse(
+      "<?xml version=\"1.0\"?>\n<!DOCTYPE log [<!ENTITY act \"Expanded\">]>\n"
+      "<log><trace><string key=\"concept:name\" value=\"c1\"/><event>"
+      "<string key=\"concept:name\" value=\"&act;\"/></event></trace></log>");
+  assert(entity.traces[0].events[0].activity == "Expanded");
+  // Literal TAB/CR/LF become spaces; character references keep the character.
+  const auto ws = read_iterparse(
+      "<log><trace><string key=\"concept:name\" value=\"c&#10;1\"/><event>"
+      "<string key=\"concept:name\" value=\"a\tb\nc\r\nd  e\"/>"
+      "<string key=\"refs\" value=\"A&#9;B&#13;C&#10;D\"/></event></trace></log>");
+  assert(ws.traces[0].case_id == "c\n1");
+  assert(ws.traces[0].events[0].activity == "a b c d  e");
+  assert(*ws.traces[0].events[0].attribute("refs") == "A\tB\rC\nD");
+  // The writer escapes them, so the values survive a round trip.
+  const auto written = minera::serialize_xes(ws, {});
+  assert(written.find("c&#10;1") != std::string::npos);
+  assert(written.find("A&#9;B&#13;C&#10;D") != std::string::npos);
+  const auto back = read_iterparse(written);
+  assert(back.traces[0].case_id == "c\n1");
+  assert(*back.traces[0].events[0].attribute("refs") == "A\tB\rC\nD");
+  // Keyless and valueless attributes: skipped, None for a string, False for
+  // a boolean (the reference fails on a valueless number or date).
+  const auto keyless = read_iterparse(one_event(
+      "<string value=\"nokey\"/><string key=\"s\"/><id key=\"x\"/><boolean key=\"b\"/>"
+      "<int key=\"i\"/><float key=\"f\"/><date key=\"d\"/>"));
+  const auto& event = keyless.traces[0].events[0];
+  assert(event.attributes.size() == 3);
+  assert(find_attribute(event.attributes, "s")->is_null);
+  assert(find_attribute(event.attributes, "x")->is_null);
+  assert(!std::get<bool>(find_attribute(event.attributes, "b")->typed_value));
+  // Containers are dropped at every level.
+  const auto containers = read_iterparse(
+      "<log><container key=\"lc\"/><trace><string key=\"concept:name\" value=\"c\"/>"
+      "<container key=\"tc\"><string key=\"x\" value=\"1\"/></container><event>"
+      "<string key=\"concept:name\" value=\"A\"/><container key=\"ec\"/></event></trace></log>");
+  assert(containers.attributes.empty() && containers.traces[0].attributes.empty() &&
+         containers.traces[0].events[0].attributes.empty());
+  // Extensions and classifiers are keyed by name (last wins, first place);
+  // incomplete ones are skipped.  A repeated global scope keeps the last.
+  const auto metadata = read_iterparse(
+      "<log><extension name=\"A\" prefix=\"a\" uri=\"u1\"/><extension name=\"B\" prefix=\"b\"/>"
+      "<extension prefix=\"c\" uri=\"u3\"/><extension name=\"A\" prefix=\"a2\" uri=\"u4\"/>"
+      "<global scope=\"event\"><string key=\"x\" value=\"1\"/></global>"
+      "<global scope=\"event\"><string key=\"y\" value=\"2\"/></global>"
+      "<global scope=\"log\"><string key=\"w\" value=\"4\"/></global>"
+      "<classifier name=\"Q\" keys=\"concept:name\"/><classifier name=\"Q\" keys=\"org:resource\"/>"
+      "<classifier name=\"K\"/><trace/></log>");
+  assert(metadata.metadata.extensions.size() == 1);
+  assert(metadata.metadata.extensions[0].prefix == "a2");
+  assert(metadata.metadata.classifiers.size() == 1);
+  assert(metadata.metadata.classifiers[0].keys == std::vector<std::string>{"org:resource"});
+  assert(metadata.metadata.event_globals.size() == 1 &&
+         metadata.metadata.event_globals[0].key == "y");
+  assert(metadata.metadata.globals.size() == 2 && metadata.metadata.globals[1].scope == "log");
+}
+
+void iterparse_reference_column_order() {
+  // pm4py to_data_frame on this log (stable across hash seeds).
+  const auto log = read_iterparse(
+      "<log xes.version=\"1.0\"><trace><int key=\"prio\" value=\"1\"/>"
+      "<string key=\"concept:name\" value=\"c1\"/>"
+      "<container key=\"tc\"><string key=\"x\" value=\"1\"/></container><event>"
+      "<string key=\"org:resource\" value=\"R1\"/>"
+      "<date key=\"time:timestamp\" value=\"2020-01-01T10:00:00+02:00\"/>"
+      "<string key=\"cost\" value=\"3\"/><string key=\"concept:name\" value=\"A\"/>"
+      "<string key=\"lifecycle:transition\" value=\"complete\"/></event><event>"
+      "<string key=\"zeta\" value=\"z\"/><string key=\"concept:name\" value=\"B\"/>"
+      "<date key=\"time:timestamp\" value=\"2020-01-01T11:00:00+02:00\"/></event></trace>"
+      "<trace><string key=\"concept:name\" value=\"c2\"/><string key=\"newcase\" value=\"n\"/>"
+      "<event><string key=\"alpha\" value=\"a\"/><string key=\"concept:name\" value=\"C\"/>"
+      "<date key=\"time:timestamp\" value=\"2020-01-01T12:00:00+02:00\"/></event></trace></log>");
+  const auto table = minera::event_log_to_table(log);
+  const std::vector<std::string> expected = {
+      "org:resource", "time:timestamp", "cost", "concept:name", "lifecycle:transition",
+      "case:prio", "case:concept:name", "zeta", "alpha", "case:newcase"};
+  assert(table.columns == expected);
+}
+
+void wide_elements_import_in_linear_time() {
+  // 200k distinct attributes on one event took 88 s with a linear lookup.
+  std::string xml = "<log><trace><string key=\"concept:name\" value=\"c\"/><event>"
+                    "<string key=\"concept:name\" value=\"A\"/>";
+  constexpr int kAttributes = 200000;
+  for (int i = 0; i < kAttributes; ++i)
+    xml += "<string key=\"k" + std::to_string(i) + "\" value=\"v\"/>";
+  xml += "<string key=\"k7\" value=\"last\"/></event></trace></log>";
+  const auto log = read_iterparse(xml);
+  const auto& event = log.traces[0].events[0];
+  assert(event.attributes.size() == static_cast<std::size_t>(kAttributes));
+  assert(*event.attribute("k7") == "last");
+  assert(minera::event_log_to_table(log).columns.size() ==
+         static_cast<std::size_t>(kAttributes) + 2);
+}
+
+// Reference capture (pm4py 2.7.22, fresh processes): the ETREE writer raises
+// "All strings must be XML compatible: Unicode or ASCII, no NULL bytes or
+// control characters" for NUL, U+0001 and U+FFFE, and both writers raise
+// UnicodeEncodeError for a lone surrogate. Its LINE_BY_LINE writer emits NUL,
+// U+0001 and U+FFFE raw, and read_xes then fails on the file it wrote
+// ("invalid character in attribute value"). Minera's writers refuse all of
+// them (declared for LINE_BY_LINE), so every document they produce reads back.
+void writer_refuses_text_xml_cannot_carry() {
+  const std::vector<std::pair<std::string, std::string>> refused = {
+      {std::string("a\0b", 3), "character U+0000 is not allowed in XML"},
+      {"a\x01" "b", "character U+0001 is not allowed in XML"},
+      {"a\xef\xbf\xbe" "b", "character U+FFFE is not allowed in XML"},
+      {"a\xed\xa0\x80" "b", "invalid UTF-8 byte sequence"},  // WTF-8 lone surrogate
+      {"a\xff" "b", "invalid UTF-8 byte sequence"},
+      {"a\xc3", "invalid UTF-8 byte sequence"},
+  };
+  for (const auto variant : {minera::XesExportVariant::LINE_BY_LINE,
+                             minera::XesExportVariant::ETREE}) {
+    minera::XesExportOptions options;
+    options.variant = variant;
+    for (const auto& [text, reason] : refused) {
+      for (int place = 0; place < 3; ++place) {
+        auto log = sample_log();
+        auto& event = log.traces[0].events[0];
+        if (place == 0) event.attributes.push_back(minera::EventAttribute{"payload", text});
+        else if (place == 1) event.attributes.push_back(minera::EventAttribute{text, "value"});
+        else log.attributes.push_back(minera::EventAttribute{"opaque", text});
+        bool threw = false;
+        try {
+          (void)minera::serialize_xes(log, options);
+        } catch (const std::invalid_argument& error) {
+          threw = std::string(error.what()) == "XES cannot represent this text: " + reason;
+        }
+        assert(threw);
+      }
+    }
+    // Text XML can carry is written and read back unchanged.
+    auto log = sample_log();
+    const std::string text = "\xc3\xbf \xe2\x98\xba \xf0\x90\x80\x80 \xef\xbf\xbd \t";
+    log.traces[0].events[0].attributes.push_back(minera::EventAttribute{"payload", text});
+    std::istringstream input(minera::serialize_xes(log, options));
+    const auto restored = minera::import_xes_event_log(input);
+    assert(*restored.traces[0].events[0].attribute("payload") == text);
   }
 }
 
@@ -2073,5 +2433,12 @@ int main() {
   null_containers_keep_recursive_children();
   null_scalar_list_children_preserve_order_and_duplicates();
   typed_first_class_selectors_survive_flat_adapters();
+  iterparse_reference_typed_values();
+  iterparse_reference_dates();
+  iterparse_reference_rejects_malformed_xml();
+  writer_refuses_text_xml_cannot_carry();
+  iterparse_reference_accepts_and_normalizes();
+  iterparse_reference_column_order();
+  wide_elements_import_in_linear_time();
   return 0;
 }

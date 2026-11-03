@@ -1,0 +1,10802 @@
+# algo.simulation.playout.process_tree TOPBOTTOM, pm4py 2.7.22, bank seed 20261103;
+# 300 trees x 3 seeds x 10 traces, identical under PYTHONHASHSEED [0, 1, 2].
+C tb-000-0 491515759 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-000-1 812945263 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-000-2 769604098 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-001-0 3066102518 10
+T +(X(d),a,tau,<>(->(*(a,d)),b,->(c,X(a,b),a,+(c,d))))
+R c a a a d c d b a
+R c a a d c b d a a d a d a
+R a a d c a a d c b
+R b a a c a d a d c
+R d c a a a d c a d a d a b
+R a a c d a a d c b
+R a d a c a b a c d d b
+R c a a a c d d a b
+R a c a a c a d b d
+R c a a a d c b a d a d d a
+C tb-001-1 2488205701 10
+T +(X(d),a,tau,<>(->(*(a,d)),b,->(c,X(a,b),a,+(c,d))))
+R a c b a d d a c b
+R c a a a c d d a d a d a d a b
+R c a a c d d a d a d a d a a b
+R b a a d a c a a d c d
+R a b c d b a d c a
+R a d a d a d a d c a a c d b a
+R c a b a d d c b a d a d a
+R b d a d a c a a a d c
+R a d a a d a d d a b c a a c d
+R a c b a c d d b a
+C tb-001-2 1055209879 10
+T +(X(d),a,tau,<>(->(*(a,d)),b,->(c,X(a,b),a,+(c,d))))
+R a d b c b a a c d
+R c b a a c d a d b
+R b a c b d a a c d
+R a b c a a d a c d
+R a b c b a d a c d
+R c a a a c d a d a b d
+R c a a c d b a a d a d d a d a d a d a
+R a c a d a a d c b
+R c b a a d d c b a d a d a d a
+R c a a d c d a a b
+C tb-002-0 3230728097 10
+T <>(a,b,b)
+R b b a
+R b a b
+R b a b
+R a b b
+R a b b
+R a b b
+R b b a
+R b a b
+R a b b
+R b a b
+C tb-002-1 4147159102 10
+T <>(a,b,b)
+R b a b
+R b b a
+R a b b
+R b a b
+R b a b
+R b b a
+R a b b
+R a b b
+R b a b
+R a b b
+C tb-002-2 511490884 10
+T <>(a,b,b)
+R a b b
+R a b b
+R b b a
+R a b b
+R b a b
+R b a b
+R a b b
+R a b b
+R b a b
+R b a b
+C tb-003-0 735765681 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-003-1 2885962099 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-003-2 1459209800 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-004-0 2628913924 10
+T ->(d,c,d,a)
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+C tb-004-1 2347528009 10
+T ->(d,c,d,a)
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+C tb-004-2 2798206132 10
+T ->(d,c,d,a)
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+R d c d a
+C tb-005-0 293383177 10
+T ->(tau,b,c,tau)
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+C tb-005-1 3596820761 10
+T ->(tau,b,c,tau)
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+C tb-005-2 1219377533 10
+T ->(tau,b,c,tau)
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+C tb-006-0 3318180676 10
+T ->(e)
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-006-1 3532645091 10
+T ->(e)
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-006-2 2596808313 10
+T ->(e)
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-007-0 357934164 10
+T +(d,->(f),*(d,f))
+R d f d f d d f f d f d f d f d f d
+R f d d
+R f d d
+R d f d
+R f d d
+R f d d
+R f d d
+R d d f
+R d f f d d f d
+R d f d d f f d
+C tb-007-1 3930335476 10
+T +(d,->(f),*(d,f))
+R f d d
+R d f f d d
+R d d f
+R d f d
+R d f d
+R f d d f d
+R d d f d f d f f d
+R d f d
+R f d d
+R d f d
+C tb-007-2 699106062 10
+T +(d,->(f),*(d,f))
+R d d f f d
+R d f d d f d f d f f d f d f d
+R d d f
+R d f f d f d d
+R f d d
+R f d d f d
+R d f f d d f d f d
+R f d d
+R d d f f d
+R d f f d d
+C tb-008-0 3426629407 10
+T *(<>(+(X(e),<>(f),g)),<>(<>(->(b,d)),<>(X(f,f),d,f,->(c,tau,a,tau)),->(<>(a,d,f),X(a,c,f,a),+(tau))))
+R f g e a d f c d f c a f b d g f e d f a a b d f c a d f g f e
+R g e f
+R f g e
+R e g f
+R g e f a d f f c a d f f b d e f g b d c a d f f a d f c e f g
+R f e g
+R f g e d f a a f d c a f b d e f g a f d a c a f f d b d f e g b d f a d c f d c a f g f e f d f c a b d d a f a f e g
+R f g e
+R e f g
+R g e f
+C tb-008-1 3001333789 10
+T *(<>(+(X(e),<>(f),g)),<>(<>(->(b,d)),<>(X(f,f),d,f,->(c,tau,a,tau)),->(<>(a,d,f),X(a,c,f,a),+(tau))))
+R e f g c a f f d b d a d f a g e f f f c a d b d a f d a e g f
+R g f e d f a f b d f d f c a g f e
+R g f e d c a f f a f d a b d f g e
+R e g f
+R e f g f d f c a d f a a b d e f g f a d f b d d f f c a e f g b d d c a f f a d f f e g f
+R e f g f d a c f c a d f b d e g f b d d f a f c a d f f f g e b d f c a d f d a f f e f g d f a c c a f d f b d g f e
+R e f g d f f c a b d f d a f f e g
+R g f e
+R f g e
+R f g e
+C tb-008-2 2426821761 10
+T *(<>(+(X(e),<>(f),g)),<>(<>(->(b,d)),<>(X(f,f),d,f,->(c,tau,a,tau)),->(<>(a,d,f),X(a,c,f,a),+(tau))))
+R g e f a d f f b d f d c a f g e f
+R g f e
+R g e f d f a c b d f c a d f e f g f d a f c a f d f b d g e f
+R f e g
+R e f g
+R f e g b d c a f f d d a f a g e f
+R g f e b d d a f c c a f d f f e g b d f a d c d f f c a e f g
+R g e f b d a f d a f d f c a g f e
+R g f e
+R g e f f f c a d b d a d f a e f g f d c a f a d f f b d g e f d f a f b d f c a d f e f g b d d f a f f d c a f e g f
+C tb-009-0 966481060 10
+T ->(e,*(X(e,b,e,f),tau),<>(X(c,tau,c,c),d))
+R e e e e e c d
+R e b b e e d c
+R e e e d c
+R e f c d
+R e b f d
+R e f c d
+R e e e f d c
+R e f e d c
+R e e d c
+R e b d c
+C tb-009-1 1729056590 10
+T ->(e,*(X(e,b,e,f),tau),<>(X(c,tau,c,c),d))
+R e f b e e d c
+R e f e c d
+R e e d
+R e e d c
+R e f b e f d c
+R e e d c
+R e e d
+R e b d
+R e e f c d
+R e f e f f e b b c d
+C tb-009-2 2887729676 10
+T ->(e,*(X(e,b,e,f),tau),<>(X(c,tau,c,c),d))
+R e f b e c d
+R e b e d
+R e e b f c d
+R e f e d
+R e e f f c d
+R e e d
+R e f d c
+R e b e d c
+R e e d
+R e e f b c d
+C tb-010-0 577448875 10
+T *(b,a)
+R b
+R b a b
+R b a b
+R b a b a b a b
+R b a b
+R b
+R b a b
+R b a b a b a b
+R b
+R b a b
+C tb-010-1 422941453 10
+T *(b,a)
+R b
+R b
+R b
+R b
+R b a b
+R b a b
+R b
+R b
+R b a b
+R b
+C tb-010-2 3180838820 10
+T *(b,a)
+R b
+R b a b a b a b a b a b
+R b a b
+R b
+R b a b
+R b
+R b a b
+R b
+R b a b a b
+R b
+C tb-011-0 7462471 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-011-1 2515387478 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-011-2 4262192126 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-012-0 2961249860 10
+T ->(d,<>(*(*(c,b,a),X(b,c,c))),*(b,+(->(c,b,c,tau))),<>(b))
+R d c b b
+R d c b c c c c c c c b c c c b c b c c c b c b c c c b c b b
+R d c c c c c c c b c b c b b
+R d c b c b c c c b c b c b c b c b b
+R d c b c b c c c b c b c b c b b
+R d c b c b c b b
+R d c b c b c b b
+R d c b c b c b c b c b b
+R d c b c b c b c b c b c b c b c b c b c b b
+R d c b c b c b c b c b b
+C tb-012-1 1225080654 10
+T ->(d,<>(*(*(c,b,a),X(b,c,c))),*(b,+(->(c,b,c,tau))),<>(b))
+R d c b c b c b b
+R d c c c b c c c c c b c b c b b
+R d c b c b c b c b c b b
+R d c b b
+R d c b b
+R d c b c b c b c b c b c b b
+R d c c c b c c c b c b b
+R d c b c b c b c b c b c b c b b
+R d c b c b b
+R d c c c b c b c b b
+C tb-012-2 4224702374 10
+T ->(d,<>(*(*(c,b,a),X(b,c,c))),*(b,+(->(c,b,c,tau))),<>(b))
+R d c b c b c b c b c c c b c b c b c b c b c b c b c b c b b
+R d c b c b b
+R d c b c b c b c b b
+R d c b c b c c c b c c c c c b c c c b b
+R d c b c b c b c b c b b
+R d c b c b c c c c c b c b b
+R d c b c c c b c b c b c b c c c b b
+R d c c c b c b c b c b c b b
+R d c b c b c b c b b
+R d c b c b c b c b c b c c c c c b c b c b c b b
+C tb-013-0 3786638764 10
+T <>(+(->(c,->(c,tau,c),+(a,b,tau)),+(*(a,c),<>(a)),a,a))
+R a a a c c c b a a
+R a c c a c a b a a
+R c c c a a b a a a
+R a c c c a a a b a
+R a c a c c b a a a
+R a c a c a c a b a
+R a c c a c c a a a c b a a
+R c a c c a a a a b
+R c a c a c a b a a
+R c a c a c a a b a
+C tb-013-1 2561468275 10
+T <>(+(->(c,->(c,tau,c),+(a,b,tau)),+(*(a,c),<>(a)),a,a))
+R c a a c a c b c a a a
+R a c a a c c c a c a c a b c a a a
+R a a c c a c c a a b a
+R c a a c a a c c c a b c a a c a a
+R c c c a a a a c a b a
+R c a c c c a c a c a c a c b a c a a a a a c a
+R c c a a c c a a c a a b a
+R a a c a c c a a b
+R c c a c c a a a a b a
+R c a c a c a a a c a c a b c a c a
+C tb-013-2 2140337946 10
+T <>(+(->(c,->(c,tau,c),+(a,b,tau)),+(*(a,c),<>(a)),a,a))
+R c c a a a c a c a a c a b c a
+R a c a c a a c b a
+R a a c c c a a b a
+R c a c c a c c a c a c a c a a b c a a c a a a c a
+R a c c a c a c a c a c a a b a
+R c a a c c a a b a
+R c c a a c b a c a a a
+R c c a a c a b a a
+R c c a c b a a a a
+R a c c c a a c b a a a
+C tb-014-0 3246783240 10
+T *(+(<>(b)),<>(c,d,X(c,f,a,f),<>(tau,b,a,b)))
+R b
+R b
+R b
+R b
+R b c c b b a d b d c a b a b b d c a b b c b
+R b
+R b b a b c c d b
+R b
+R b a b b a c d b
+R b
+C tb-014-1 599938827 10
+T *(+(<>(b)),<>(c,d,X(c,f,a,f),<>(tau,b,a,b)))
+R b b b a c d f b c b a b d c b d c b b a a b
+R b a c d a b b b a b b d a c b
+R b
+R b b b a d c a b b a b c f d b
+R b
+R b d c a b b f b
+R b f d c a b b b
+R b
+R b
+R b c f b a b d b f d b a b c b d c c b a b b d c c a b b b b b a f c d b
+C tb-014-2 3047565107 10
+T *(+(<>(b)),<>(c,d,X(c,f,a,f),<>(tau,b,a,b)))
+R b c f b a b d b
+R b f b b a d c b b a b d c f b d c b a b a b d c b b a f b c c d b b a b
+R b d a c b a b b a b b d c c b
+R b c d b a b c b
+R b c a b b c d b
+R b c c b a b d b a b b d c c b
+R b c b b a d c b d b a b f c b b b a f c d b a d c b b a b
+R b d c f a b b b c b a b f d b a a b b d c b
+R b
+R b c d f b a b b
+C tb-015-0 2612253707 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-015-1 1030369442 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-015-2 833279269 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-016-0 1671321615 10
+T +(e)
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-016-1 2694396936 10
+T +(e)
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-016-2 3365215174 10
+T +(e)
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-017-0 1975048769 10
+T <>(<>(+(f,c,g)),->(->(g,h,f,d),<>(f,b,a),tau),+(+(tau),tau,<>(g),+(a,tau)),->(g,a,*(d,d),+(f,h,a)))
+R a g g c f g a d h f a g h f d a f b
+R g a d h a f g a g f c g h f d b f a
+R f c g g a d a f h g h f d f a b a g
+R g a d a h f g h f d a b f c g f a g
+R g a d d d d d a f h a g g f c g h f d a b f
+R g a d d d a h f c g f g a g h f d b a f
+R g a d d d d d d d a f h a g f g c g h f d b a f
+R g h f d f a b g a f g c g a d d d f h a
+R g a d a f h c f g g a g h f d f b a
+R g c f a g g h f d f a b g a d d d f h a
+C tb-017-1 2208164045 10
+T <>(<>(+(f,c,g)),->(->(g,h,f,d),<>(f,b,a),tau),+(+(tau),tau,<>(g),+(a,tau)),->(g,a,*(d,d),+(f,h,a)))
+R f g c a g g a d f a h g h f d a f b
+R g a c g f g h f d b f a g a d d d d d d d d d d d f h a
+R g a d h a f g h f d b f a g f c g a
+R g a d d d f a h g a f c g g h f d a f b
+R c g f g a g h f d b a f g a d d d d d f h a
+R g a d d d d d d d d d d d h a f g h f d f a b c g f g a
+R g a g a d d d d d h a f f c g g h f d f a b
+R g c f a g g a d f a h g h f d b f a
+R g a g a d d d d d d d d d h a f g h f d f a b c f g
+R g a g f c g a d f a h g h f d f b a
+C tb-017-2 3283363744 10
+T <>(<>(+(f,c,g)),->(->(g,h,f,d),<>(f,b,a),tau),+(+(tau),tau,<>(g),+(a,tau)),->(g,a,*(d,d),+(f,h,a)))
+R g h f d f b a g a d d d d d d d f h a g a f g c
+R g a d h a f g h f d b f a c f g a g
+R g a f c g g h f d f b a g a d f a h
+R g a d d d d d d d h a f g h f d b a f g a g c f
+R c f g g h f d a b f g a d a f h a g
+R g a g a d a h f g h f d f a b c f g
+R f g c g h f d a f b g a d d d f a h g a
+R g a g h f d b a f g a d h f a c g f
+R c f g g a d f h a g h f d b a f g a
+R g h f d b a f a g c f g g a d h a f
+C tb-018-0 1164636188 10
+T <>(X(<>(b,b,b,a),+(b),a,b),<>(+(a),X(b)),<>(a,b,->(a,b,b,b)),+(+(a)))
+R a b b b a a b a b b b b a
+R a a b b b b a a b a
+R a a b a b b b a b a
+R b a b a a b b b b a
+R a b a a b b b b a a
+R b a a b b b b a b a
+R b a a b b b a b a b
+R a a b a a b b b b a b b b
+R b a a b a b b b a a
+R b a a b b b b b b a a b a
+C tb-018-1 3123384046 10
+T <>(X(<>(b,b,b,a),+(b),a,b),<>(+(a),X(b)),<>(a,b,->(a,b,b,b)),+(+(a)))
+R a b a b b b a b a b
+R a a b b b b a b b b a b a
+R a a b a b b b a b a
+R b a b a a b b b a b
+R a b a a a b b b b b
+R a b a b b b a b a a b b b
+R a b a b a b a b b b
+R b a b a b b b b a a
+R b a b a a b b b b a
+R b a a b b b a b a b
+C tb-018-2 912042969 10
+T <>(X(<>(b,b,b,a),+(b),a,b),<>(+(a),X(b)),<>(a,b,->(a,b,b,b)),+(+(a)))
+R a a a b b b b a b a
+R b a a b b b b a a a
+R a a b b b a b a b b a b b
+R a b a a a b b b b b
+R a b a b a b b b b a
+R b a a b a a b b b b
+R a b a b a b b b a a
+R b a a b b b a b b a
+R a b a b b b a a a b
+R b a a b b b a b b a b b a
+C tb-019-0 3383080943 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-019-1 1843599573 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-019-2 4199215812 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-020-0 2474650166 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-020-1 3520118764 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-020-2 2798913967 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-021-0 3828739215 10
+T <>(+(X(<>(tau),X(a,tau,b,tau),+(tau))))
+R
+R
+R
+R
+R a
+R
+R
+R
+R
+R
+C tb-021-1 2898498830 10
+T <>(+(X(<>(tau),X(a,tau,b,tau),+(tau))))
+R a
+R
+R
+R
+R
+R b
+R
+R
+R
+R
+C tb-021-2 317774621 10
+T <>(+(X(<>(tau),X(a,tau,b,tau),+(tau))))
+R b
+R
+R
+R
+R
+R
+R
+R b
+R
+R
+C tb-022-0 1072146350 10
+T *(->(+(+(d,e,a),->(f,tau)),->(e,<>(f,f),*(b,tau,b),c),c),c,tau)
+R e d a f e f f b b b b c c
+R a d e f e f f b b b b c c c f a d e e f f b c c c a d f e e f f b b b c c c d f e a e f f b c c c a f d e e f f b b b b b b c c
+R e f a d e f f b c c
+R a d f e e f f b c c
+R d f a e e f f b c c c e f d a e f f b c c
+R e a f d e f f b b b c c
+R e f d a e f f b c c c e d a f e f f b c c
+R f e d a e f f b c c c f a e d e f f b b c c
+R d f e a e f f b b b c c
+R d a f e e f f b b b c c
+C tb-022-1 950890144 10
+T *(->(+(+(d,e,a),->(f,tau)),->(e,<>(f,f),*(b,tau,b),c),c),c,tau)
+R f d a e e f f b b b b c c c d f a e e f f b c c
+R e a f d e f f b b b b c c c f a e d e f f b b b c c
+R f e a d e f f b c c
+R e d a f e f f b b b c c
+R f e d a e f f b b b c c
+R d f e a e f f b c c
+R f e a d e f f b b c c
+R d f a e e f f b b b b c c
+R a d e f e f f b b c c c a d f e e f f b b b c c c f e d a e f f b b b c c c f e d a e f f b b c c c f e a d e f f b c c
+R d f a e e f f b b c c c f d e a e f f b b b b c c c d e f a e f f b b b c c
+C tb-022-2 1150325839 10
+T *(->(+(+(d,e,a),->(f,tau)),->(e,<>(f,f),*(b,tau,b),c),c),c,tau)
+R f e d a e f f b b c c
+R d f a e e f f b c c c a e d f e f f b c c c e a d f e f f b c c
+R d f a e e f f b b b b c c c e a f d e f f b b b b b c c c a e f d e f f b c c
+R e f d a e f f b b b b b b c c
+R a f d e e f f b b c c c a f d e e f f b c c
+R f d a e e f f b c c c f e a d e f f b c c
+R e f a d e f f b b b b c c
+R f d e a e f f b c c c d a f e e f f b b b b b c c
+R f e d a e f f b b b c c c f a d e e f f b c c c d f e a e f f b c c c f a e d e f f b b c c c a e f d e f f b c c c f d a e e f f b b c c c f e a d e f f b c c
+R e f d a e f f b b c c c f a e d e f f b b b b b b c c
+C tb-023-0 4278509365 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-023-1 2330666723 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-023-2 3049584852 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-024-0 3218300276 10
+T <>(<>(b,c),->(a,d,b),+(tau,d),->(a,c))
+R b c a d b a c d
+R d a d b b c a c
+R a c a d b b c d
+R a c c b a d b d
+R d a d b c b a c
+R c b a d b d a c
+R b c a c a d b d
+R d b c a c a d b
+R d a d b c b a c
+R c b a d b d a c
+C tb-024-1 3521274303 10
+T <>(<>(b,c),->(a,d,b),+(tau,d),->(a,c))
+R a d b c b d a c
+R a c b c d a d b
+R b c d a d b a c
+R a d b c b d a c
+R a d b d a c c b
+R d b c a c a d b
+R a d b b c a c d
+R a d b d b c a c
+R c b a d b d a c
+R a d b c b d a c
+C tb-024-2 1568189626 10
+T <>(<>(b,c),->(a,d,b),+(tau,d),->(a,c))
+R a d b d c b a c
+R d a c c b a d b
+R d a c c b a d b
+R a c a d b d b c
+R a c d a d b c b
+R b c d a d b a c
+R a c a d b d b c
+R a d b b c d a c
+R a d b a c c b d
+R a c d b c a d b
+C tb-025-0 1719364283 10
+T X(tau,b,a)
+R
+R
+R
+R
+R
+R b
+R a
+R
+R a
+R b
+C tb-025-1 2890904603 10
+T X(tau,b,a)
+R b
+R a
+R b
+R
+R b
+R a
+R b
+R a
+R b
+R b
+C tb-025-2 1455689232 10
+T X(tau,b,a)
+R a
+R b
+R
+R a
+R b
+R
+R
+R a
+R b
+R
+C tb-026-0 2280473101 10
+T *(X(b,b,a),<>(b,b,b),<>(a,b,b,tau))
+R b b b b a
+R b b b b b
+R b b b b b b b b b
+R b b b b a
+R a b b b b b b b b b b b a
+R b b b b b b b b a
+R b b b b a
+R a
+R a b b b a
+R a
+C tb-026-1 3278587635 10
+T *(X(b,b,a),<>(b,b,b),<>(a,b,b,tau))
+R a b b b a
+R b b b b b
+R a
+R b b b b b
+R b b b b b
+R b
+R a
+R a
+R b
+R b
+C tb-026-2 3735560487 10
+T *(X(b,b,a),<>(b,b,b),<>(a,b,b,tau))
+R b
+R a b b b b b b b b
+R b
+R a
+R b
+R b b b b a
+R a
+R a
+R a b b b b b b b b b b b a b b b a b b b a
+R b b b b b b b b b
+C tb-027-0 3890035547 10
+T <>(a,->(a,b,a,c),->(c))
+R c a a b a c
+R a a b a c c
+R a c a b a c
+R c a b a c a
+R c a a b a c
+R c a a b a c
+R c a a b a c
+R c a b a c a
+R c a b a c a
+R a b a c a c
+C tb-027-1 4270946759 10
+T <>(a,->(a,b,a,c),->(c))
+R a c a b a c
+R c a a b a c
+R a a b a c c
+R c a b a c a
+R a b a c c a
+R c a a b a c
+R c a a b a c
+R c a a b a c
+R a b a c a c
+R c a a b a c
+C tb-027-2 675891091 10
+T <>(a,->(a,b,a,c),->(c))
+R c a a b a c
+R c a a b a c
+R c a b a c a
+R a a b a c c
+R a a b a c c
+R a b a c c a
+R a c a b a c
+R a a b a c c
+R a b a c a c
+R a b a c a c
+C tb-028-0 2311908036 10
+T *(*(a,c),b)
+R a
+R a b a c a b a c a b a c a b a c a b a
+R a c a b a c a b a
+R a c a c a c a b a c a c a
+R a
+R a c a c a c a
+R a b a c a b a c a c a c a c a c a c a b a c a c a
+R a c a b a c a c a c a b a
+R a
+R a c a
+C tb-028-1 3444014465 10
+T *(*(a,c),b)
+R a b a c a c a c a b a
+R a b a c a c a
+R a
+R a
+R a c a b a
+R a c a c a b a c a c a
+R a c a c a c a c a c a b a b a
+R a b a c a
+R a c a c a b a c a c a
+R a b a
+C tb-028-2 216046236 10
+T *(*(a,c),b)
+R a b a b a c a b a c a
+R a c a b a b a c a c a c a
+R a
+R a c a b a
+R a c a b a
+R a c a c a c a
+R a
+R a
+R a c a c a b a b a b a c a c a b a c a c a c a c a c a c a c a c a c a
+R a c a
+C tb-029-0 4664349 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-029-1 2441639875 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-029-2 2827546956 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-030-0 3931300724 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-030-1 4278277719 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-030-2 1419690215 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-031-0 3277896179 10
+T <>(<>(X(<>(d),<>(f,h,a)),c,*(tau,g)),b,X(<>(X(tau,g,d),*(g,c),h,<>(c,a,f,d))))
+R b c f a d g h g f h a c
+R c a h f b g g c a f d h
+R d c h g c g a c f d b
+R b h g c f a d g h a f c
+R g h c d f a g c g b c h a f
+R h a f c g h f c a d g b
+R b g h g a c f d d c
+R b g c d d g h a c d f
+R c d b h g c a f d d
+R b f c a d h g d c
+C tb-031-1 1336654658 10
+T <>(<>(X(<>(d),<>(f,h,a)),c,*(tau,g)),b,X(<>(X(tau,g,d),*(g,c),h,<>(c,a,f,d))))
+R c f a h h c d f a g d b
+R b d f c a g c g c g c g d h d g g g c
+R c d d g h d c a f b
+R g f a d c h g c g g g d c b
+R h g f c a d b c d
+R b h g c g c g c g d d f c a c d
+R c d h g a d c f g b
+R c f h a g h a c d f b
+R b d c g h c d a f
+R c d g b a d c f h g
+C tb-031-2 1110138906 10
+T <>(<>(X(<>(d),<>(f,h,a)),c,*(tau,g)),b,X(<>(X(tau,g,d),*(g,c),h,<>(c,a,f,d))))
+R b f d c a h g c g f a h c
+R g h d c f a g h a f g c b
+R f a h g g c b h a f d c d g c g c g
+R d d c f a g c g h f a h c b
+R b c g g g f a h d g f a d c h
+R b d c g h d f a c
+R b g c g h f c d a g g a h f c
+R b h g c g d f a c d c
+R d c b g c f a d d h
+R b c d g g g g g g g g g g g h g c g c g c g d d c f a
+C tb-032-0 2409946703 10
+T *(->(c),X(d,d))
+R c d c d c d c d c d c
+R c d c d c
+R c
+R c
+R c
+R c d c d c
+R c d c d c
+R c d c d c d c d c
+R c d c
+R c d c
+C tb-032-1 1619913906 10
+T *(->(c),X(d,d))
+R c
+R c d c
+R c
+R c d c d c d c d c d c d c
+R c d c
+R c
+R c
+R c
+R c
+R c d c
+C tb-032-2 553657032 10
+T *(->(c),X(d,d))
+R c d c
+R c d c
+R c d c d c
+R c d c d c d c d c d c d c d c d c
+R c d c
+R c d c
+R c d c
+R c d c
+R c d c d c d c d c d c
+R c
+C tb-033-0 4062248955 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-033-1 2335473335 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-033-2 1389281211 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-034-0 3435953521 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-034-1 3456035818 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-034-2 2968898418 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-035-0 1671044174 10
+T *(<>(f,f),*(f,a))
+R f f f f f f f f f a f f f
+R f f
+R f f f a f f f
+R f f
+R f f
+R f f
+R f f f f f f a f f f
+R f f
+R f f
+R f f f f f
+C tb-035-1 3142630220 10
+T *(<>(f,f),*(f,a))
+R f f f f f
+R f f
+R f f f f f f a f f f f a f f f
+R f f
+R f f
+R f f
+R f f
+R f f f a f a f f f
+R f f f a f a f f f
+R f f
+C tb-035-2 1220877834 10
+T *(<>(f,f),*(f,a))
+R f f f f f f f f
+R f f
+R f f
+R f f
+R f f f a f f f
+R f f f a f f f
+R f f
+R f f
+R f f
+R f f
+C tb-036-0 2452645105 10
+T X(c,<>(X(b,<>(tau,b,tau)),X(b,*(c,b))),*(<>(+(a,c)),->(<>(a,a,b))),->(*(->(a),<>(c,b,c,b))))
+R c
+R c
+R b b
+R c
+R c b c b c b c b
+R b c
+R b b
+R c a a b a a c a a b a c a a b c a
+R b b
+R a
+C tb-036-1 3239155757 10
+T X(c,<>(X(b,<>(tau,b,tau)),X(b,*(c,b))),*(<>(+(a,c)),->(<>(a,a,b))),->(*(->(a),<>(c,b,c,b))))
+R b b
+R a c b b c a
+R a c
+R a c
+R a c a b a a c a b a c a b a a a c
+R c
+R c a a a b a c
+R c
+R c
+R c
+C tb-036-2 638448394 10
+T X(c,<>(X(b,<>(tau,b,tau)),X(b,*(c,b))),*(<>(+(a,c)),->(<>(a,a,b))),->(*(->(a),<>(c,b,c,b))))
+R b b
+R b b
+R c b c b
+R c
+R c
+R c
+R c
+R a
+R a
+R b c
+C tb-037-0 3419557607 10
+T X(<>(c,->(b,a,tau)),c,X(X(c,tau,b,a)))
+R c
+R b a c
+R c
+R b a c
+R
+R a
+R c
+R c
+R b
+R c
+C tb-037-1 225698934 10
+T X(<>(c,->(b,a,tau)),c,X(X(c,tau,b,a)))
+R c
+R
+R c
+R
+R c
+R
+R c
+R
+R a
+R a
+C tb-037-2 326247050 10
+T X(<>(c,->(b,a,tau)),c,X(X(c,tau,b,a)))
+R c
+R
+R c
+R c
+R c
+R
+R c
+R b
+R c
+R c b a
+C tb-038-0 3705473018 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-038-1 1486940137 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-038-2 256657226 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-039-0 1526023539 10
+T X(tau,<>(->(c,a),+(->(a,f,b,d)),X(*(a,a,d),+(d,a,a,a),f,+(f)),*(*(c,a,a),X(f,b,c))),e)
+R
+R f c a f b d c a
+R e
+R e
+R e
+R
+R e
+R e
+R f a f b d c a c
+R e
+C tb-039-1 3492068542 10
+T X(tau,<>(->(c,a),+(->(a,f,b,d)),X(*(a,a,d),+(d,a,a,a),f,+(f)),*(*(c,a,a),X(f,b,c))),e)
+R
+R e
+R e
+R e
+R
+R c a c a f b d a d a a
+R e
+R e
+R e
+R e
+C tb-039-2 3400276773 10
+T X(tau,<>(->(c,a),+(->(a,f,b,d)),X(*(a,a,d),+(d,a,a,a),f,+(f)),*(*(c,a,a),X(f,b,c))),e)
+R a f b d c a c a c a c c c b c b c a c a c c a a a d a
+R
+R
+R e
+R a f b d c b c c a f
+R c a d a a a f b d c a
+R c a c a c a c a c f a f b d
+R
+R
+R c a f b d c a f
+C tb-040-0 4031415912 10
+T <>(+(d,a,b),<>(c,a,b,a),*(d,d,tau),*(c,tau,b))
+R c d b d a c a a b
+R c c b a a d d a b
+R a d b d d d d d d d c a a b c
+R b c a a c c d d d d d a b d
+R c a c b a a d b d d d d d d d d d d d d d
+R d d d d d d d d a b c c a c a b
+R c a a b d b a c c c d d d d d
+R c c d b a d c a b a
+R c d c a a b d b a
+R b d a b a a c c d
+C tb-040-1 3514510746 10
+T <>(+(d,a,b),<>(c,a,b,a),*(d,d,tau),*(c,tau,b))
+R d a c a b b a d c
+R c d d d d d d d d d a b a c a b d
+R c a b c a d d d b d a
+R b c a a d c c d b a
+R b a d c c d a b c a
+R d d d c b a a c b d a
+R a b d d d d d d d d d d d d c a a b c c
+R a c a b c d d d d d d d b a d
+R c a d b c a a b d d d
+R c a a c b d d d d d a d b
+C tb-040-2 4031623495 10
+T <>(+(d,a,b),<>(c,a,b,a),*(d,d,tau),*(c,tau,b))
+R b a d d c a a b c
+R b d a d c c c a b a c
+R a d b c a c b a d
+R c a b a c c d a b d
+R a a b c d c c a b d
+R c d a b d a a b c
+R d d d d b a c a c b a
+R a c a b c a b d d d d d d d d
+R c d b a d c a a b
+R a b a c b a d c c c c c c d
+C tb-041-0 3850276298 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-041-1 619145877 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-041-2 3240979854 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-042-0 2465894019 10
+T *(+(g,tau,tau,c),tau)
+R g c
+R c g
+R g c g c
+R c g
+R g c
+R g c c g
+R g c
+R c g c g
+R c g c g c g
+R g c c g c g
+C tb-042-1 971985640 10
+T *(+(g,tau,tau,c),tau)
+R c g c g c g
+R g c g c g c c g g c
+R g c
+R c g
+R g c g c c g g c g c
+R c g
+R c g
+R c g g c
+R c g
+R g c g c c g g c c g c g
+C tb-042-2 2175244514 10
+T *(+(g,tau,tau,c),tau)
+R g c
+R g c
+R g c
+R g c c g g c
+R g c g c c g
+R g c
+R g c g c
+R c g c g
+R c g
+R g c c g
+C tb-043-0 3599833832 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-043-1 494540068 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-043-2 83937387 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-044-0 3628447723 10
+T ->(tau,->(c,d))
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+C tb-044-1 3262959069 10
+T ->(tau,->(c,d))
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+C tb-044-2 3070205505 10
+T ->(tau,->(c,d))
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+R c d
+C tb-045-0 2146307538 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-045-1 1470804197 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-045-2 3993807535 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-046-0 3906934531 10
+T +(X(*(a,a),a,*(*(a,b,a),b),X(<>(a,tau,a),<>(a,b),+(b,b))),+(X(X(a,b,b),<>(a,a,tau,a),->(a,a,b,a),X(a,tau,a,a))),a,<>(tau))
+R a a a a a a a
+R a b a a
+R a b a b
+R a a b a a a
+R a a a b b b a
+R a a a a a
+R a a b a a a b a b a a
+R a b a b
+R a b a a b a
+R a a a a a b a a a a
+C tb-046-1 2794307976 10
+T +(X(*(a,a),a,*(*(a,b,a),b),X(<>(a,tau,a),<>(a,b),+(b,b))),+(X(X(a,b,b),<>(a,a,tau,a),->(a,a,b,a),X(a,tau,a,a))),a,<>(tau))
+R a a a b a a b a b b a a
+R a a a a a a a b a
+R b a a a a
+R a a a b a b a b a b a b a a a
+R a a b
+R a b a b a
+R a a a a
+R a a a
+R a a a
+R a a b a b a b
+C tb-046-2 2139142285 10
+T +(X(*(a,a),a,*(*(a,b,a),b),X(<>(a,tau,a),<>(a,b),+(b,b))),+(X(X(a,b,b),<>(a,a,tau,a),->(a,a,b,a),X(a,tau,a,a))),a,<>(tau))
+R a a a a a a a
+R a b a a
+R a a a a a
+R a a a a a a a
+R a a
+R a b a b a b a
+R a a a b b a
+R a a a a a a a a a a a a a
+R a a a a a
+R a a a a a
+C tb-047-0 2038941868 10
+T <>(X(->(+(b,a,b,a),a),->(b),a),+(b))
+R a b
+R a b a b a b
+R b a b b a a
+R b b
+R a b b a a b
+R b b
+R a b
+R a a b b a b
+R b b a a a b
+R a b
+C tb-047-1 227148234 10
+T <>(X(->(+(b,a,b,a),a),->(b),a),+(b))
+R b b
+R b b
+R b a
+R b a
+R b b
+R b b
+R b b
+R b b a a a b
+R b b b a a a
+R a b
+C tb-047-2 4916025 10
+T <>(X(->(+(b,a,b,a),a),->(b),a),+(b))
+R b a b a b a
+R b a
+R b b
+R b b a b a a
+R b a
+R b a
+R b b b a a a
+R b b
+R b b
+R b a
+C tb-048-0 563858172 10
+T <>(c)
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-048-1 1899122946 10
+T <>(c)
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-048-2 1246023807 10
+T <>(c)
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-049-0 862014697 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-049-1 2964381838 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-049-2 4053995666 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-050-0 2453336635 10
+T *(->(+(d),->(c,tau,c,a),c),a)
+R d c c a c a d c c a c a d c c a c a d c c a c
+R d c c a c a d c c a c a d c c a c a d c c a c a d c c a c a d c c a c a d c c a c
+R d c c a c a d c c a c a d c c a c
+R d c c a c a d c c a c
+R d c c a c a d c c a c
+R d c c a c a d c c a c
+R d c c a c a d c c a c a d c c a c a d c c a c a d c c a c a d c c a c
+R d c c a c
+R d c c a c
+R d c c a c a d c c a c a d c c a c
+C tb-050-1 3346091923 10
+T *(->(+(d),->(c,tau,c,a),c),a)
+R d c c a c
+R d c c a c a d c c a c a d c c a c a d c c a c
+R d c c a c
+R d c c a c
+R d c c a c
+R d c c a c a d c c a c a d c c a c a d c c a c
+R d c c a c a d c c a c a d c c a c
+R d c c a c
+R d c c a c
+R d c c a c
+C tb-050-2 2693589836 10
+T *(->(+(d),->(c,tau,c,a),c),a)
+R d c c a c a d c c a c a d c c a c
+R d c c a c a d c c a c
+R d c c a c a d c c a c a d c c a c a d c c a c
+R d c c a c a d c c a c a d c c a c
+R d c c a c a d c c a c
+R d c c a c
+R d c c a c a d c c a c a d c c a c a d c c a c
+R d c c a c
+R d c c a c a d c c a c
+R d c c a c
+C tb-051-0 620510453 10
+T <>(<>(->(X(d,tau,d),b),->(tau),->(X(e,c),X(tau,d,tau,a),X(b),->(e)),+(*(e,a),<>(a,e))))
+R b e b e e e a
+R d b e a e c a b e
+R e d b e d b e a e
+R e a e c a b e d b
+R d b e b e e e a
+R e b e e a e d b
+R c b e e e a e a a e d b
+R b e e a a e e b e
+R e a e a e e a a e b c a b e
+R e a e a e e b e d b
+C tb-051-1 845344867 10
+T <>(<>(->(X(d,tau,d),b),->(tau),->(X(e,c),X(tau,d,tau,a),X(b),->(e)),+(*(e,a),<>(a,e))))
+R c b e e a e d b
+R d b e e a e a e a e a e a c a b e
+R c a b e e a e e a a e d b
+R b c b e a e e
+R e b e d b a e e
+R b e a b e e e a
+R e d b e e e a d b
+R d b e d b e e e a
+R d b e e a e a e d b e
+R e a e a e a e d b e b e
+C tb-051-2 4133823198 10
+T <>(<>(->(X(d,tau,d),b),->(tau),->(X(e,c),X(tau,d,tau,a),X(b),->(e)),+(*(e,a),<>(a,e))))
+R a e e b c a b e
+R c a b e d b e a e a e e a a e
+R c b e d b e a e a e a e
+R e e a e a b e d b
+R a e e d b e a b e
+R d b e a e c b e
+R e a e e a e b e b
+R e a e a e a e a e a a e e a e c a b e d b
+R d b e a e a e e b e
+R c b e e a e d b
+C tb-052-0 1168666603 10
+T <>(*(->(tau,c),X(tau),X(d,g)))
+R c
+R c
+R c
+R c c
+R c
+R c
+R c
+R c c c
+R c c
+R c
+C tb-052-1 693322894 10
+T <>(*(->(tau,c),X(tau),X(d,g)))
+R c c c
+R c
+R c
+R c
+R c
+R c c c
+R c
+R c c
+R c c
+R c c
+C tb-052-2 473313120 10
+T <>(*(->(tau,c),X(tau),X(d,g)))
+R c
+R c
+R c
+R c
+R c
+R c c c c
+R c c c c c
+R c
+R c c
+R c c c
+C tb-053-0 2515075173 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-053-1 3044714466 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-053-2 4030857420 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-054-0 4081154859 10
+T X(b,a,a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-054-1 2976806365 10
+T X(b,a,a)
+R a
+R a
+R a
+R a
+R b
+R a
+R a
+R a
+R b
+R a
+C tb-054-2 2229559746 10
+T X(b,a,a)
+R b
+R a
+R a
+R a
+R a
+R b
+R a
+R a
+R a
+R b
+C tb-055-0 523083555 10
+T +(<>(->(e,a,tau),<>(f,f,b,d),*(d,tau,tau),->(a,f,a)),+(f,<>(e),->(f,e,tau,b)))
+R f d f a f a e a e d f e f b b
+R f a f a e f f b e d f e a d b d
+R e e a f a f a d e f f b f b d
+R d b f f a f f e a f b e e a d
+R a f f f a d d d e e a b e f b f d
+R e a e d f a e f a f f b d b f
+R a f a e f e a e d f f d f b b
+R f f a e e f a b d f f e a d b d
+R d f d b f e f f e a b f a e a
+R f f d f f b e a b f a e a e d
+C tb-055-1 1589583116 10
+T +(<>(->(e,a,tau),<>(f,f,b,d),*(d,tau,tau),->(a,f,a)),+(f,<>(e),->(f,e,tau,b)))
+R f a e f a e a f b d f b e d f
+R f e e a d f a f a e d b b f f
+R b d f f e f e a e d b d a f f a
+R f a f a d e e f d b f f b d e a
+R d b f f f e a e a f e b f a d d
+R f d f d f b e e b a e a f f a
+R a f a f f d f b d d e e f d e a b
+R d f d f d e a b e f f d e a f a b
+R d f d f d f e b f a f e a e a b
+R e e f f a e d a f a d b b f f
+C tb-055-2 3083468182 10
+T +(<>(->(e,a,tau),<>(f,f,b,d),*(d,tau,tau),->(a,f,a)),+(f,<>(e),->(f,e,tau,b)))
+R f f d f f b a e f a e a e d b
+R d f f b f f e e a a f e a b d d
+R e f b d f e a f d f e b d a f a
+R a f f f a f b f e d d d d d e e a b
+R f a f a e a f f f d e b b d e
+R e a f d d f d e a f a f b b d e f
+R f a e f a f e e a f b d f b d
+R d f f d e f b e a e f b a f a
+R d b f f f a f a d e e d d e a b f
+R f e d d b f f e a b f a e a f
+C tb-056-0 2596245425 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-056-1 1276809544 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-056-2 3253654444 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-057-0 1702790977 10
+T ->(X(*(c,tau,f),->(g,b),X(a,e)))
+R g b
+R g b
+R a
+R a
+R c c c c
+R c
+R e
+R c
+R e
+R c
+C tb-057-1 1678228735 10
+T ->(X(*(c,tau,f),->(g,b),X(a,e)))
+R e
+R c c c
+R a
+R e
+R e
+R g b
+R a
+R g b
+R g b
+R c c
+C tb-057-2 1380645136 10
+T ->(X(*(c,tau,f),->(g,b),X(a,e)))
+R g b
+R g b
+R a
+R a
+R g b
+R g b
+R c
+R g b
+R c c
+R c
+C tb-058-0 2674490907 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-058-1 1587026602 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-058-2 376577205 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-059-0 2189519487 10
+T +(->(X(b,c,b,c),b,b,b))
+R c b b b
+R b b b b
+R b b b b
+R c b b b
+R c b b b
+R b b b b
+R b b b b
+R c b b b
+R b b b b
+R c b b b
+C tb-059-1 2965704283 10
+T +(->(X(b,c,b,c),b,b,b))
+R b b b b
+R c b b b
+R b b b b
+R b b b b
+R b b b b
+R b b b b
+R c b b b
+R c b b b
+R c b b b
+R b b b b
+C tb-059-2 1055580450 10
+T +(->(X(b,c,b,c),b,b,b))
+R c b b b
+R b b b b
+R b b b b
+R c b b b
+R b b b b
+R b b b b
+R b b b b
+R c b b b
+R b b b b
+R b b b b
+C tb-060-0 2269299224 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-060-1 3668752416 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-060-2 645280365 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-061-0 2271201466 10
+T ->(b,d,<>(<>(b,tau),*(a,b),<>(tau,b,d)))
+R b d b d b a
+R b d a b a d b b
+R b d a d b b
+R b d d b b a b a b a b a
+R b d b b d a b a
+R b d a b d b
+R b d b a b a b d
+R b d a b d b
+R b d d b b a
+R b d a b a b a b d b
+C tb-061-1 1673963237 10
+T ->(b,d,<>(<>(b,tau),*(a,b),<>(tau,b,d)))
+R b d a b a b a b d b
+R b d b a d b
+R b d d b a b
+R b d a d b b
+R b d a b a b d b
+R b d b b d a
+R b d b a b d
+R b d d b a b
+R b d b d a b
+R b d b d b a b a
+C tb-061-2 1579642501 10
+T ->(b,d,<>(<>(b,tau),*(a,b),<>(tau,b,d)))
+R b d b b d a
+R b d b d a b a b a b a b a b a b
+R b d b d b a b a b a
+R b d a b d b
+R b d a d b b
+R b d a b a b b d
+R b d d b a b a b a b a b
+R b d b d b a b a b a b a
+R b d a b b d
+R b d b b d a b a b a
+C tb-062-0 3105165114 10
+T +(+(h,d,a,tau))
+R h a d
+R h a d
+R d h a
+R d a h
+R h d a
+R a d h
+R h d a
+R d h a
+R d a h
+R d a h
+C tb-062-1 309161885 10
+T +(+(h,d,a,tau))
+R h a d
+R a h d
+R h d a
+R h a d
+R d h a
+R d a h
+R a h d
+R h a d
+R h d a
+R d h a
+C tb-062-2 1277579206 10
+T +(+(h,d,a,tau))
+R h a d
+R d a h
+R h d a
+R a d h
+R a d h
+R a h d
+R a d h
+R h a d
+R a d h
+R h a d
+C tb-063-0 3846885308 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-063-1 2909336310 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-063-2 3166367451 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-064-0 696726100 10
+T *(b,b)
+R b b b b b b b b b
+R b
+R b
+R b
+R b
+R b b b b b b b
+R b b b b b b b b b
+R b
+R b b b b b
+R b b b
+C tb-064-1 3669318775 10
+T *(b,b)
+R b
+R b b b
+R b
+R b
+R b b b b b b b
+R b b b
+R b
+R b
+R b
+R b b b
+C tb-064-2 2417482977 10
+T *(b,b)
+R b
+R b b b
+R b
+R b b b
+R b b b
+R b b b
+R b
+R b b b b b
+R b b b b b b b
+R b b b b b
+C tb-065-0 139497308 10
+T *(g,->(->(*(b,tau,g),+(g),*(g,f,b),tau),->(*(f,b,f),b),+(<>(c,g,e,f),f,e)),e)
+R g
+R g
+R g
+R g b b b g g f b f b f b f b f b f b e f c f g e g
+R g
+R g b b b b b g g f g f b f b g c e e f f g
+R g b g g f b f b f b c g e f f e g b b b g g f g f g f g f b e c f g f e g
+R g
+R g b b b b g g f g f g f b f b f b f b f b e e f c g f g b b b g g f g f b c f e g f e g
+R g b b g g f g f b g c e e f f g b g g f g f b c g f f e e g b b g g f g f b g c e f f e g
+C tb-065-1 854193179 10
+T *(g,->(->(*(b,tau,g),+(g),*(g,f,b),tau),->(*(f,b,f),b),+(<>(c,g,e,f),f,e)),e)
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g b g g f g f b g e f c e f g
+R g
+R g b g g f g f b g e f e c f g b g g f g f g f b f b g c e e f f g
+C tb-065-2 2942312307 10
+T *(g,->(->(*(b,tau,g),+(g),*(g,f,b),tau),->(*(f,b,f),b),+(<>(c,g,e,f),f,e)),e)
+R g b b g g f b c e g f e f g b g g f b f b f b e c g f f e g b g g f b f b f b e c f g e f g
+R g b b g g f g f b f g e f c e g b b g g f b f c e e f g g b b b b g g f b f b f c e f e g g b b b b g g f g f b f b f e f e c g g
+R g b b b b g g f b f b f b f b e e f c f g g
+R g
+R g b b b b b g g f g f b f b f b f b e g f e f c g
+R g
+R g b g g f g f b g e f c f e g
+R g
+R g
+R g b g g f g f b f b g e f e c f g
+C tb-066-0 4169721598 10
+T +(a,X(X(<>(c),<>(a),+(c,d,tau)),d,*(*(d,c),<>(d,d,b)),X(a,->(b))),X(->(c,d,<>(a,c,d,a)),*(*(a,d),*(tau,a))))
+R a a b
+R a d a d d a a d a d a d a d a d a a a d a d a d a d a d a a
+R a a d a d c a d a d a d d a
+R a d a d a d a c d a
+R c b d a a a c d
+R a d a
+R c d a a d c d a
+R a d a
+R c d d a c a d a c
+R c d b a a a c d
+C tb-066-1 2019583985 10
+T +(a,X(X(<>(c),<>(a),+(c,d,tau)),d,*(*(d,c),<>(d,d,b)),X(a,->(b))),X(->(c,d,<>(a,c,d,a)),*(*(a,d),*(tau,a))))
+R c a d a a d c a
+R a a a
+R d c c d d c d d a d b d b d d a a c d d c d
+R a d a d d a a a a
+R a c d a a d d c
+R a a a a
+R a a d d a a
+R a d a d d a a d a a d a
+R c d d a c a d a
+R a d a a a a a a a d a d a d d a
+C tb-066-2 1664209829 10
+T +(a,X(X(<>(c),<>(a),+(c,d,tau)),d,*(*(d,c),<>(d,d,b)),X(a,->(b))),X(->(c,d,<>(a,c,d,a)),*(*(a,d),*(tau,a))))
+R c d a c a a a d
+R c d a d a d a c
+R d a c d b d d d d d d b d c d b a a d d d
+R d c d c a c d d c d a a
+R d a a a
+R c d d a d c a a
+R d c d c a d a a c d
+R d c d a c a a d
+R a d a d a d d a a a a a a
+R c a d d a a c a
+C tb-067-0 2072828082 10
+T X(e)
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-067-1 4165182174 10
+T X(e)
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-067-2 3397631173 10
+T X(e)
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-068-0 2893172296 10
+T *(->(+(f,c,tau,f)),tau,+(h,+(a,h)))
+R f c f f c f f f c
+R f f c f c f
+R f f c
+R f c f c f f f c f f f c c f f
+R c f f c f f c f f f c f f f c
+R f c f f f c f f c
+R f f c
+R f c f f f c c f f
+R f f c c f f
+R f f c
+C tb-068-1 1878259360 10
+T *(->(+(f,c,tau,f)),tau,+(h,+(a,h)))
+R c f f
+R c f f
+R f f c
+R f f c f c f
+R c f f
+R c f f
+R f f c
+R f f c f f c
+R c f f
+R f f c f f c f f c f c f
+C tb-068-2 2369580741 10
+T *(->(+(f,c,tau,f)),tau,+(h,+(a,h)))
+R c f f c f f f c f
+R f c f
+R c f f c f f f c f c f f
+R c f f f c f c f f
+R c f f f f c f f c c f f c f f f f c
+R f f c
+R f f c c f f f c f
+R c f f
+R c f f f f c
+R f f c
+C tb-069-0 3840941558 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-069-1 2847247725 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-069-2 1979010776 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-070-0 2246307318 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-070-1 1935086881 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-070-2 628830469 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-071-0 1904800492 10
+T X(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-071-1 474348156 10
+T X(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-071-2 1884058166 10
+T X(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-072-0 145477899 10
+T X(e,b)
+R b
+R e
+R b
+R e
+R b
+R e
+R b
+R e
+R b
+R b
+C tb-072-1 1319306077 10
+T X(e,b)
+R e
+R e
+R b
+R e
+R b
+R e
+R b
+R b
+R e
+R e
+C tb-072-2 1425901621 10
+T X(e,b)
+R e
+R b
+R e
+R b
+R b
+R e
+R e
+R e
+R b
+R e
+C tb-073-0 1137430715 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-073-1 2599231263 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-073-2 2131726637 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-074-0 1488022048 10
+T <>(b,a,X(a,->(->(a,c),*(b,c,a),->(b),b),tau,c),tau)
+R b a a c b c b c b b b
+R a b
+R b a a
+R b a a
+R b c a
+R a b a
+R b a a
+R a b a
+R a b a
+R a a c b b b b
+C tb-074-1 3684195163 10
+T <>(b,a,X(a,->(->(a,c),*(b,c,a),->(b),b),tau,c),tau)
+R b a a
+R a b a c b b b
+R a b c
+R b a c b b b a
+R a c b c b b b a b
+R b a a c b c b b b
+R a b c
+R b a
+R b a
+R a c b b b b a
+C tb-074-2 1854014970 10
+T <>(b,a,X(a,->(->(a,c),*(b,c,a),->(b),b),tau,c),tau)
+R a b
+R a b
+R a b
+R b c a
+R b a
+R a b
+R a c b c b c b c b b b b a
+R a b c
+R b c a
+R a b a
+C tb-075-0 2428164570 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-075-1 3141452435 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-075-2 3353445077 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-076-0 920462996 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-076-1 1013700641 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-076-2 2914976532 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-077-0 1130404275 10
+T +(b,b)
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+C tb-077-1 2267265911 10
+T +(b,b)
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+C tb-077-2 2430652614 10
+T +(b,b)
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+C tb-078-0 3245691913 10
+T h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+C tb-078-1 1300868348 10
+T h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+C tb-078-2 2061413399 10
+T h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+C tb-079-0 4091459644 10
+T ->(<>(X(+(f,g,d,a),*(tau,c),->(e,a,e))),g)
+R f a d g g
+R e a e g
+R g
+R e a e g
+R e a e g
+R g
+R e a e g
+R e a e g
+R e a e g
+R a g d f g
+C tb-079-1 1514397571 10
+T ->(<>(X(+(f,g,d,a),*(tau,c),->(e,a,e))),g)
+R g f a d g
+R g a d f g
+R c c c g
+R e a e g
+R c c g
+R d a f g g
+R e a e g
+R e a e g
+R e a e g
+R g f a d g
+C tb-079-2 1279846114 10
+T ->(<>(X(+(f,g,d,a),*(tau,c),->(e,a,e))),g)
+R a f g d g
+R c g
+R a g d f g
+R e a e g
+R f d a g g
+R g
+R e a e g
+R g
+R c c c c c c c c g
+R c c g
+C tb-080-0 322307987 10
+T <>(a,a)
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+C tb-080-1 2173952044 10
+T <>(a,a)
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+C tb-080-2 1822168067 10
+T <>(a,a)
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+R a a
+C tb-081-0 3181499355 10
+T +(<>(X(a),X(a,b),+(b),*(a,a)))
+R b a b a
+R a b b a
+R a a a b
+R a a b a
+R a b a a
+R b a a a a a
+R b a b a
+R b a a a a b
+R a a a a a a b b
+R a a a b b a
+C tb-081-1 3602478861 10
+T +(<>(X(a),X(a,b),+(b),*(a,a)))
+R a a a a a b
+R b b a a a a
+R b b a a a a
+R a a a a b b
+R a b a a
+R a a a a b b
+R a b a b
+R b a a a a a a a
+R b a b a
+R a b b a
+C tb-081-2 201649015 10
+T +(<>(X(a),X(a,b),+(b),*(a,a)))
+R a a b b
+R a a a b
+R a a b a
+R a a a a a b a a
+R a a a a b b
+R b a a a a a a a a b
+R b b a a a a a a a a a a
+R a a a a a a b a
+R b b a a a a a a a a a a a a
+R b a a a a a a b
+C tb-082-0 4232219611 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-082-1 272397168 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-082-2 1209215829 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-083-0 2150894294 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-083-1 2862285946 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-083-2 2622233210 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-084-0 2007916054 10
+T X(h)
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+C tb-084-1 792755817 10
+T X(h)
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+C tb-084-2 3683189924 10
+T X(h)
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+C tb-085-0 4079941307 10
+T X(+(c,tau,c),<>(b,b),X(c,a),+(a,b,a,a))
+R a
+R b a a a
+R a a b a
+R c c
+R b b
+R c c
+R c c
+R c c
+R b a a a
+R a a b a
+C tb-085-1 2588834799 10
+T X(+(c,tau,c),<>(b,b),X(c,a),+(a,b,a,a))
+R a
+R a a b a
+R b b
+R b b
+R b a a a
+R a a b a
+R b b
+R b b
+R c c
+R b b
+C tb-085-2 2958247524 10
+T X(+(c,tau,c),<>(b,b),X(c,a),+(a,b,a,a))
+R a a a b
+R b b
+R c c
+R c
+R b b
+R b b
+R c c
+R a a b a
+R c
+R a a b a
+C tb-086-0 4171513483 10
+T X(c,->(X(b,c,a,a),*(b,d,c)))
+R c
+R c
+R c
+R c
+R c
+R c
+R b b
+R c b d b d b
+R a b
+R c b
+C tb-086-1 205093668 10
+T X(c,->(X(b,c,a,a),*(b,d,c)))
+R c
+R b b
+R c b
+R c b
+R b b d b
+R b b
+R c
+R c b d b
+R c
+R c b d b
+C tb-086-2 2744670507 10
+T X(c,->(X(b,c,a,a),*(b,d,c)))
+R c
+R c
+R c
+R c
+R b b d b d b
+R b b d b
+R c b
+R c
+R a b d b
+R c
+C tb-087-0 646742600 10
+T +(X(*(<>(b,d,tau,c),<>(c),<>(d)),X(+(a),*(d,a)),*(*(b,d),<>(c),c),+(->(c,c),+(d,tau,a,c))),+(X(<>(tau,tau,tau)),c,X(<>(d,d,b,a),X(c)),d),*(->(d,X(c,a),X(d,a,c,d)),b))
+R d b c c d a c b d c d d a d
+R d d c b a d d c a d d c c c
+R d a a d d d c c c c d b d c
+R b c b d b d b d d b d c d a a b d d c b
+R b d a c c d c d a b c b c d d c c d b b d d a a
+R c d c b d c c c c b d b c c c d d d b a d
+R d c a b a c d d d d c a d b d a a b d d a b d c
+R d d b d a c b d c b c
+R c d c c c b d c c b d d c c b c d b c d c b d c b d d a d b d a c
+R d a c d d a b c d c c c c d c
+C tb-087-1 3664490423 10
+T +(X(*(<>(b,d,tau,c),<>(c),<>(d)),X(+(a),*(d,a)),*(*(b,d),<>(c),c),+(->(c,c),+(d,tau,a,c))),+(X(<>(tau,tau,tau)),c,X(<>(d,d,b,a),X(c)),d),*(->(d,X(c,a),X(d,a,c,d)),b))
+R b c d d a d c d c c a d c d
+R d d a c b c d d d c b d
+R d c a c c c c d d c d
+R d c b c d b c c d d c b d c c c d b b d c c d b c b c d d a c b d d c c
+R c b d d d d d a a b c d
+R d d d d c d c a d c a b
+R d a d c c c d d b d b c a a b a d d a a d d
+R b d d c b d b c b d b d a d b a c b c c d b
+R d d a d a b d d b a c a a d
+R d d a d d d d a b d b a d a a c d b a c d a d d
+C tb-087-2 546313788 10
+T +(X(*(<>(b,d,tau,c),<>(c),<>(d)),X(+(a),*(d,a)),*(*(b,d),<>(c),c),+(->(c,c),+(d,tau,a,c))),+(X(<>(tau,tau,tau)),c,X(<>(d,d,b,a),X(c)),d),*(->(d,X(c,a),X(d,a,c,d)),b))
+R d d c c a c c c b c d c a b d c c d a
+R c d c c d b d d a d d b d c a b d a c
+R b d b d c b d b d a c a d b d d c c d d c b d a d b d a c b
+R d c c d b d d a c c b d d a c a b c d c d c a
+R d a c b d a a d d b d a c c c
+R d b a a b d d d d b a c b c b d d b d a b d
+R d c c d c b d c d c d c c a d
+R a d b a d d c d d b d b
+R c d c d a c a
+R b d d c b d c d b d b c c c b
+C tb-088-0 1359201253 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-088-1 268639036 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-088-2 1548638079 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-089-0 3213934175 10
+T +(X(->(g),->(g,d,b)),g,->(<>(tau,f,d,g)),e)
+R g g g d e f
+R g d f e g g
+R g d f g g e
+R g g e d b f g d
+R g d b g d e g f
+R g d g e f g
+R g d g f e g
+R d g f e d b g g
+R g d f b g g e d
+R g d e f g b g d
+C tb-089-1 1515523026 10
+T +(X(->(g),->(g,d,b)),g,->(<>(tau,f,d,g)),e)
+R f g d e g g
+R d g f e g g
+R e g f g d g b d
+R f e g g d g
+R d f g g e g
+R g d e g f g d b
+R e g d f g d b g
+R g g g f e d
+R g g g f d e
+R d g g f e g
+C tb-089-2 1600304917 10
+T +(X(->(g),->(g,d,b)),g,->(<>(tau,f,d,g)),e)
+R e g g d g f
+R g d d f g e b g
+R g f g e d g d b
+R d g g g f e
+R e g f g g d
+R g e g d f g
+R f g d e g d b g
+R g f d g d e g b
+R g d g e g b f d
+R g d d e g g b f
+C tb-090-0 3869066142 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-090-1 3778124820 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-090-2 1963339326 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-091-0 927004598 10
+T +(->(<>(e,a,d),*(tau,e,d)),->(a,->(a,a),->(e,a)))
+R a a a a d e e a
+R a e d a a a e a
+R d a e a a a e a e
+R a a e d e e a a e e a
+R a a a e a e d a
+R a d a e a e a e e e a
+R a e d a a e e a e e a
+R a d a a e a e a
+R a a a d a e e a
+R a a e a a e d a
+C tb-091-1 3952308584 10
+T +(->(<>(e,a,d),*(tau,e,d)),->(a,->(a,a),->(e,a)))
+R a a d a e a e a
+R a d a a a e e a
+R e d a e a e a e a e a
+R e d a a e e a a e e a e e
+R e a a d a a e e e e a
+R a a d a e a e a e
+R a a a d e a e a
+R d e a a a e a e e a
+R d e a a a a e a
+R a a a a e d e a e
+C tb-091-2 3313472549 10
+T +(->(<>(e,a,d),*(tau,e,d)),->(a,->(a,a),->(e,a)))
+R a e a a a e a d
+R a d a a a e e a
+R a e d a a a e e a e
+R a a a e d a e e a
+R e a a a e d a a
+R a d a a a e a e
+R a a a a e d e a
+R a a e d a e e a e a
+R a d e a a e a e e a
+R a d e a a a e e a
+C tb-092-0 591476009 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-092-1 3258858316 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-092-2 1517435409 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-093-0 3430398099 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-093-1 3769942641 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-093-2 3712447633 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-094-0 655005127 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-094-1 2552434838 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-094-2 675717818 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-095-0 436181432 10
+T +(b,tau,<>(d),*(c,a))
+R b c d
+R b c a d c a c
+R c a d c a c b
+R b d c
+R c b d
+R c d a c b
+R d b c
+R b d c
+R d b c
+R c a c d a c b
+C tb-095-1 4057434748 10
+T +(b,tau,<>(d),*(c,a))
+R c b d a c
+R b d c
+R c a c a c a b c d
+R d c b a c
+R d b c
+R c a c a c a d b c
+R c d b
+R c d a b c a c
+R c b a d c
+R d c b
+C tb-095-2 1089204757 10
+T +(b,tau,<>(d),*(c,a))
+R d c a c b a c
+R d c b
+R c d b
+R c d a b c
+R b c d
+R c d b
+R c a c a c a d c a c a c b
+R c d b
+R b c d a c a c
+R b d c
+C tb-096-0 3096189832 10
+T ->(d,+(h))
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+C tb-096-1 416201516 10
+T ->(d,+(h))
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+C tb-096-2 720281181 10
+T ->(d,+(h))
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+R d h
+C tb-097-0 1931151233 10
+T *(d,f)
+R d f d f d
+R d
+R d
+R d
+R d
+R d f d f d
+R d
+R d
+R d
+R d
+C tb-097-1 1944357510 10
+T *(d,f)
+R d
+R d
+R d f d
+R d f d
+R d f d f d
+R d
+R d
+R d f d f d
+R d f d
+R d
+C tb-097-2 4130248538 10
+T *(d,f)
+R d
+R d
+R d f d
+R d
+R d
+R d
+R d f d
+R d f d f d f d
+R d
+R d f d f d f d f d f d f d f d f d f d f d f d
+C tb-098-0 1473061180 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-098-1 2713656353 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-098-2 867203429 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-099-0 2134972622 10
+T ->(c,->(e))
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+C tb-099-1 1053197913 10
+T ->(c,->(e))
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+C tb-099-2 2012258653 10
+T ->(c,->(e))
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+R c e
+C tb-100-0 2600293865 10
+T X(c,+(b,f,f),+(f),<>(tau,e))
+R f f b
+R b f f
+R f b f
+R c
+R c
+R e
+R c
+R f
+R f f b
+R f
+C tb-100-1 2492260619 10
+T X(c,+(b,f,f),+(f),<>(tau,e))
+R c
+R f b f
+R c
+R c
+R e
+R c
+R c
+R f
+R f f b
+R c
+C tb-100-2 4119604652 10
+T X(c,+(b,f,f),+(f),<>(tau,e))
+R c
+R f
+R e
+R e
+R f f b
+R c
+R f
+R b f f
+R c
+R b f f
+C tb-101-0 138715237 10
+T *(b,b)
+R b b b
+R b b b b b
+R b b b b b
+R b b b
+R b b b
+R b
+R b
+R b
+R b b b b b
+R b b b b b b b
+C tb-101-1 3711372016 10
+T *(b,b)
+R b
+R b b b b b b b
+R b b b b b b b
+R b b b b b
+R b b b
+R b
+R b
+R b b b
+R b
+R b
+C tb-101-2 709219842 10
+T *(b,b)
+R b
+R b b b b b b b
+R b b b b b b b b b b b b b b b b b b b b b
+R b b b b b
+R b b b b b
+R b
+R b b b b b b b
+R b b b b b
+R b b b
+R b
+C tb-102-0 2133476738 10
+T <>(b,*(e,<>(->(tau),+(f),+(g,d,f)),tau),a,*(tau,->(f)))
+R f f b e f f d g e a
+R f f f f f e f d f g e f g f d e a b
+R a b e
+R b f f e f d g f e f f g d e g d f f e a
+R b e a
+R e d g f f e f g f d e f f b a
+R e a b
+R f e a b
+R b f f e a
+R b e d g f f e a f f f f f f
+C tb-102-1 1810587883 10
+T <>(b,*(e,<>(->(tau),+(f),+(g,d,f)),tau),a,*(tau,->(f)))
+R a e f g d f e b f
+R e f g d f e g f d f e f d g f e f f d g e f b a
+R e f f g d e g d f f e f f g d e f f a b
+R a b e d f g f e
+R a b e
+R e b f a
+R f f a e b
+R b e a
+R e a f f f b
+R e g d f f e a b
+C tb-102-2 985725791 10
+T <>(b,*(e,<>(->(tau),+(f),+(g,d,f)),tau),a,*(tau,->(f)))
+R a e b
+R e f d g f e f g f d e b a
+R e f a b
+R a b e d f g f e d f g f e
+R e f a b
+R b a e
+R f f e a b
+R a b f e
+R f e f f g d e f f g d e f g f d e f d g f e f d g f e f d g f e a b
+R a b f e
+C tb-103-0 1275120056 10
+T ->(+(c),X(b,c,a),*(a,a,a),->(c,b))
+R c a a c b
+R c b a c b
+R c c a c b
+R c a a a a c b
+R c a a a a a a c b
+R c c a c b
+R c a a a a c b
+R c a a c b
+R c c a a a c b
+R c b a c b
+C tb-103-1 1576517261 10
+T ->(+(c),X(b,c,a),*(a,a,a),->(c,b))
+R c c a c b
+R c b a a a c b
+R c c a a a a a c b
+R c b a c b
+R c a a c b
+R c a a a a a a a a a a c b
+R c a a a a c b
+R c c a a a c b
+R c a a c b
+R c c a a a c b
+C tb-103-2 1823110620 10
+T ->(+(c),X(b,c,a),*(a,a,a),->(c,b))
+R c c a a a c b
+R c a a c b
+R c c a a a c b
+R c a a c b
+R c c a c b
+R c c a c b
+R c b a a a a a a a c b
+R c c a c b
+R c a a a a a a c b
+R c a a a a c b
+C tb-104-0 1909776382 10
+T +(<>(tau,c))
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-104-1 4055903709 10
+T +(<>(tau,c))
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-104-2 114352370 10
+T +(<>(tau,c))
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-105-0 2994098469 10
+T +(+(a,b,e,c),X(c,tau),e)
+R e b e a c
+R e e b c a
+R e a c b e
+R a c e e b
+R e b e c a
+R e a b c e
+R e b e a c
+R b c e a e c
+R c b e a c e
+R e b c e a
+C tb-105-1 1130774551 10
+T +(+(a,b,e,c),X(c,tau),e)
+R c a b e e
+R c e a b e
+R a e c e b
+R e a c b e
+R b e c e a
+R e a e b c
+R e a b c e
+R b a e c e
+R b a e c e
+R e c a e b
+C tb-105-2 3487721246 10
+T +(+(a,b,e,c),X(c,tau),e)
+R c e b a e c
+R e e a c b
+R e c c e b a
+R c a c e b e
+R e e a c c b
+R c e e b a c
+R c a e e b
+R c e b e a
+R a b e e c
+R a e b e c
+C tb-106-0 3976638760 10
+T <>(+(a),a,*(b,b,a),+(a,a))
+R a b b b b b a a a
+R a a b b b b b b b b b a a
+R a b a a a
+R b b b a a a a
+R b b b b b b b b b b b a a a a
+R a b a a a
+R b b b b b b b b b a a a a
+R a a a b b b b b b b b b b b a
+R a a a a b
+R b b b a a a a
+C tb-106-1 2633745023 10
+T <>(+(a),a,*(b,b,a),+(a,a))
+R a a a a b
+R a a a a b
+R a a a a b b b b b
+R a a a a b b b b b
+R a a a a b b b
+R a a a b b b b b a
+R b b b a a a a
+R a a b b b b b b b b b a a
+R a a a b a
+R b a a a a
+C tb-106-2 1160936766 10
+T <>(+(a),a,*(b,b,a),+(a,a))
+R a a a a b
+R a a a b a
+R a a a b b b a
+R a a b a a
+R b b b a a a a
+R a a a b a
+R b b b b b a a a a
+R a a a a b
+R a a b a a
+R b b b b b a a a a
+C tb-107-0 4175314497 10
+T ->(*(tau,<>(X(tau,a,tau),b)),<>(->(b,a)),+(tau,->(->(a,a,b,b),*(a,b,tau)),b,b),->(X(b,a,X(tau,a,b)),tau,<>(X(b),->(b,b),->(b,a)),<>(<>(tau),*(b,a),->(b,tau,b))))
+R b b b a b a a b b a b a b a b b a a b b b b a b b b a b
+R b b a a a b b b b a a b a b b b b b b
+R b a a a b b b b a a b b a b b b b b a b a b
+R b b a b a b b a b a b a b b a a b b a b b b b b
+R b a a b b a b b a a b b a b b b b b a b a b a b
+R b a b a a b b b a b a b b b a b b b b b
+R b b b b a a a b b a b a b a b b a b a b a b a b b b b a b a b a b a b a b b b
+R b b b a a a b b b b a a b a b b b b b b
+R b b a b a a b b b a b b b a b b b b b
+R b a b a a b b a b a b b a a b b a b b b a b a b a b b b
+C tb-107-1 3753110749 10
+T ->(*(tau,<>(X(tau,a,tau),b)),<>(->(b,a)),+(tau,->(->(a,a,b,b),*(a,b,tau)),b,b),->(X(b,a,X(tau,a,b)),tau,<>(X(b),->(b,b),->(b,a)),<>(<>(tau),*(b,a),->(b,tau,b))))
+R b a b a b a b b a a b b b b a b b b a b
+R b a b a b a b a b b a b a b a a b b b a b b b b
+R b b a a a b b b a b a b b a a b a b b b b b b
+R b b b b a b a b a b b a b b b b a b b b b a b a b a b
+R b a b b b a a a b b a b b a b b a b b b b b b a b a b
+R b a a a b b a b a b b b a b a b b b a b b b a b b b
+R b b a b a a b b a b b b b b a b b b b
+R b a b a a b b b a a b b a b b b a b a b b b
+R b b b b a a a b b b b a b a a b b b b a b a b a b b b
+R b a a a b b b a b a b b b b a b b b
+C tb-107-2 1717903599 10
+T ->(*(tau,<>(X(tau,a,tau),b)),<>(->(b,a)),+(tau,->(->(a,a,b,b),*(a,b,tau)),b,b),->(X(b,a,X(tau,a,b)),tau,<>(X(b),->(b,b),->(b,a)),<>(<>(tau),*(b,a),->(b,tau,b))))
+R b a b a a b b a b a b b a b a b b b b b b
+R b b a b b a a a b b a b b a b b b b a b b b a b a b a b a b a b b b
+R b b a b a a b b a b b b b b b a b b b a b a b
+R b a a b a b b b a b a b b b b a b b b b
+R b a b b b b a a a b b b b a b b a b b b b b b a b a b a b a b
+R b a a a b b b a b a b a b a b b b b b b a b a b
+R b a a a b b b a b b a b a b a b b a b b b b b
+R b b a b a a a b b a b b a b b b b b b a b b b
+R b a b a a a b b b a b b b b a b b b b
+R b b a b a a a b b b a b a b a b b b b a b b b
+C tb-108-0 2253983470 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-108-1 3781864035 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-108-2 653704103 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-109-0 3367852178 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-109-1 256831227 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-109-2 1990785082 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-110-0 2626267281 10
+T ->(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-110-1 1420261261 10
+T ->(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-110-2 1175023436 10
+T ->(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-111-0 2268226257 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-111-1 2177059693 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-111-2 1247537561 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-112-0 470176179 10
+T <>(<>(b,->(f),a,e),X(+(d,d,d),tau,->(d,c,tau,tau)),b,b)
+R b f a e b b
+R d c b f a e b b
+R e f a b b b
+R b f e a b b
+R a e f b d c b b
+R b a f e b d c b
+R d c b b a b f e
+R b b b f e a
+R d d d a b e f b b
+R b b e f a d c b
+C tb-112-1 2951325146 10
+T <>(<>(b,->(f),a,e),X(+(d,d,d),tau,->(d,c,tau,tau)),b,b)
+R d c b b f e a b
+R b a b e f b
+R b b a f b e
+R b b e f b a
+R a f e b d d d b b
+R d d d b a f e b b
+R d c e a b f b b
+R b e b a f d c b
+R b a f b e d c b
+R b e a b f d c b
+C tb-112-2 2535798094 10
+T <>(<>(b,->(f),a,e),X(+(d,d,d),tau,->(d,c,tau,tau)),b,b)
+R b b e a f b
+R b b a f b e
+R d c f b e a b b
+R b d c f a e b b
+R d c b b f e a b
+R b f a e b b d d d
+R b d d d b b a e f
+R b e a b f b
+R b e a f b b
+R b e f b a b
+C tb-113-0 3121238306 10
+T *(a,a,b)
+R a a a a a a a a a
+R a a a
+R a
+R a a a
+R a
+R a a a
+R a a a a a
+R a a a
+R a
+R a
+C tb-113-1 3407673710 10
+T *(a,a,b)
+R a a a a a
+R a a a
+R a
+R a
+R a a a
+R a
+R a
+R a a a a a a a a a a a
+R a
+R a
+C tb-113-2 2338639251 10
+T *(a,a,b)
+R a a a
+R a a a a a
+R a a a
+R a
+R a a a
+R a
+R a a a a a a a a a a a
+R a a a
+R a
+R a
+C tb-114-0 326262173 10
+T +(->(d,<>(<>(tau,d,e),*(tau,c),X(a,b,e,a)),X(a,*(a,tau,e),f)))
+R d c c c d e b a a
+R d a c c c d e a
+R d a c c e d f
+R d e d e a
+R d d e e a
+R d a d e a
+R d c e e d f
+R d d e a f
+R d e d e f
+R d c c c d e a f
+C tb-114-1 565245045 10
+T +(->(d,<>(<>(tau,d,e),*(tau,c),X(a,b,e,a)),X(a,*(a,tau,e),f)))
+R d e d a a
+R d e d e a
+R d d e c c a a a
+R d b d e c c c c c a
+R d d e c b a
+R d e d e a
+R d e d e a a a a a a a a
+R d c c c c d e b a
+R d a e d a
+R d c d e e a a a a a a
+C tb-114-2 3759643578 10
+T +(->(d,<>(<>(tau,d,e),*(tau,c),X(a,b,e,a)),X(a,*(a,tau,e),f)))
+R d e d a a
+R d b e d a
+R d d e c a f
+R d e c c d e a
+R d e d e c a
+R d c c a e d a
+R d d e b c c a a
+R d c d e e a
+R d a d e a
+R d e d c b f
+C tb-115-0 1645471992 10
+T ->(a,tau)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-115-1 468246439 10
+T ->(a,tau)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-115-2 3878022086 10
+T ->(a,tau)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-116-0 1582234841 10
+T X(*(b,+(e,c)),+(*(tau,e,tau),a,+(b)),a)
+R a b
+R a
+R b e c b e c b c e b e c b
+R e b a
+R b a
+R e a b
+R b a
+R a e b e e
+R a b
+R b c e b
+C tb-116-1 1391289349 10
+T X(*(b,+(e,c)),+(*(tau,e,tau),a,+(b)),a)
+R b a
+R b e c b e c b
+R a
+R b e c b c e b c e b c e b
+R b a e e e e e
+R b c e b c e b
+R a
+R b c e b
+R b c e b
+R a b
+C tb-116-2 194437441 10
+T X(*(b,+(e,c)),+(*(tau,e,tau),a,+(b)),a)
+R e b a
+R a e b
+R a
+R a e b
+R e b a e
+R e a b e e e e
+R a
+R b
+R b
+R a b
+C tb-117-0 1970373274 10
+T ->(c,b)
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+C tb-117-1 664071049 10
+T ->(c,b)
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+C tb-117-2 3376700433 10
+T ->(c,b)
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+C tb-118-0 1736820419 10
+T *(<>(c,a,d,b),a)
+R b c a d
+R b a c d
+R b a d c
+R b a c d a c a b d a b d a c a d b a c a d b c a
+R a d c b a a d c b a b a d c a a d b c
+R a d c b a c d a b a a c d b
+R b d a c a c d a b a a d b c
+R b a c d
+R d a b c
+R b a c d a c d b a
+C tb-118-1 2479976403 10
+T *(<>(c,a,d,b),a)
+R a d b c a c d b a
+R c a b d a d c b a a d b c a
+R a c b d a c b a d a d b a c a c a d b
+R b c a d a a b c d
+R b a c d
+R d c a b
+R b c a d a c b d a
+R a b d c
+R b a d c
+R a b d c a b a c d a c b d a
+C tb-118-2 409633736 10
+T *(<>(c,a,d,b),a)
+R c a d b a a c b d a c b a d a b c d a
+R c d a b a b c d a a a b d c
+R b d a c
+R c b a d
+R b a c d a b a d c a a d c b
+R b c a d a b c d a a c d b a
+R b a d c a c b a d a b d a c
+R b d a c
+R b a c d a d b c a
+R d b a c a d c a b
+C tb-119-0 4271722580 10
+T +(e,c,c)
+R c e c
+R c e c
+R c c e
+R c e c
+R c e c
+R c e c
+R c e c
+R c e c
+R e c c
+R e c c
+C tb-119-1 3178389659 10
+T +(e,c,c)
+R c c e
+R c e c
+R c e c
+R c c e
+R c c e
+R c c e
+R c c e
+R c c e
+R e c c
+R c e c
+C tb-119-2 2191857572 10
+T +(e,c,c)
+R c c e
+R c c e
+R c e c
+R c e c
+R c c e
+R c e c
+R c c e
+R e c c
+R e c c
+R c e c
+C tb-120-0 12543332 10
+T <>(f)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-120-1 2550524915 10
+T <>(f)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-120-2 1888878994 10
+T <>(f)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-121-0 1493535200 10
+T <>(X(b,b,c),->(b,b,a,a),*(a,tau,c))
+R b a b b a a
+R b a b b a a
+R c a b b a a
+R b b a a a a a b
+R b b a a a a c
+R b a b b a a
+R a a b b a a b
+R b b a a c a
+R a a a b b b a a
+R c a a a b b a a
+C tb-121-1 1652009477 10
+T <>(X(b,b,c),->(b,b,a,a),*(a,tau,c))
+R b b a a c a a
+R a b b a a b
+R a a b b a a b
+R a b b a a b
+R b b a a a c
+R b b a a a b
+R b b a a a b
+R b b a a b a a a
+R c b b a a a a
+R b b b a a a
+C tb-121-2 3615935819 10
+T <>(X(b,b,c),->(b,b,a,a),*(a,tau,c))
+R b b a a c a
+R b b a a a b
+R a a b b b a a
+R b b a a b a a
+R b a a a b b a a
+R b b a a b a a
+R b b b a a a a a
+R a b b b a a
+R b b a a a c
+R a b b a a b
+C tb-122-0 1610720316 10
+T *(*(b,tau),*(b,b))
+R b
+R b b b b
+R b b b b b b
+R b b b b b b b b b b b b
+R b b b b b b b b b b b b b b
+R b b b
+R b b b b b b b b b b b b b b b b b b b b b b b b b
+R b b b b
+R b b b
+R b b b b
+C tb-122-1 1378432977 10
+T *(*(b,tau),*(b,b))
+R b
+R b b
+R b
+R b b b b b b
+R b b b b
+R b b
+R b b
+R b b b b b b b b b b b b
+R b
+R b b b b
+C tb-122-2 2317045211 10
+T *(*(b,tau),*(b,b))
+R b b b b b b b b b b b b b b b b b b b b b b b b b b
+R b b b b b b b b b b
+R b
+R b b b
+R b
+R b b b b b b b b
+R b b b b b b b b b b b b b b
+R b b b b b b b b b b b b
+R b b b
+R b b b b b b b b b b b b b b b b b b b b b b b b b b
+C tb-123-0 4217863206 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-123-1 1839888791 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-123-2 1795254216 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-124-0 1748332036 10
+T <>(+(->(<>(b)),*(*(b,a,b),tau,e)),+(*(a,d,->(e,c,e,a)),->(->(a),b,tau),<>(tau),a),+(X(X(d,e,a,c),+(e,e,c)),->(*(a,tau),c,->(e,a)),+(<>(a,b))),b)
+R a a b a b a a e a b c e a b b
+R a a d a b a a c a c b e a a b b b
+R b d a a a a c e b a b a b b b a a a b
+R a a b a e c e a b a b a b b b b a b a a b d a a b
+R a c a c a e a e e b b b b a b b a b a b a a
+R b a a b d a d a a a a c e a e b b b
+R b a e a c a e a b b b a a b d a a
+R b b b a a a c e b a a b a a
+R a b a a e a c e a e c b b b a b b a b a a
+R a a a a b a a a c e a b b a a d a a b d a d a b
+C tb-124-1 2050946000 10
+T <>(+(->(<>(b)),*(*(b,a,b),tau,e)),+(*(a,d,->(e,c,e,a)),->(->(a),b,tau),<>(tau),a),+(X(X(d,e,a,c),+(e,e,c)),->(*(a,tau),c,->(e,a)),+(<>(a,b))),b)
+R a a d b a a b b a b b a b b a c e a a a b
+R b c a c b e a a b b a b a a b a
+R b a b a a a e a c e c e a b b a b b a b b a b b a b b
+R e a c c a e a b e b b a b a b b b a b b a b a a b
+R a a b d a d a a b a b b b a b a b a b b b b b b c b e a a c e a e
+R b a b a b a b b a b a b a b b e a e a c c b e a b a b a a
+R e a e a a b a c a c e a a b a b a a b a b a b b b
+R b a b b b a c e a d a b a a a d b a d a
+R b a a a b d a e a a c b e e a c b b b b a b
+R b b b a a a b b a a a c a a a a a c e a
+C tb-124-2 3877000602 10
+T <>(+(->(<>(b)),*(*(b,a,b),tau,e)),+(*(a,d,->(e,c,e,a)),->(->(a),b,tau),<>(tau),a),+(X(X(d,e,a,c),+(e,e,c)),->(*(a,tau),c,->(e,a)),+(<>(a,b))),b)
+R b a b b a a c a e a e b a b a d a a b
+R a a d b a a d a b b a a a c e e a b a c e a b
+R a d a a a b b a b a b a b a b b b a a a d b a c e a b
+R b a a d a d a a b d a d a b b a e c b a a c e e a
+R b b a b b a b a c a a b e a a a b a b
+R b a a d a b d a d a d a a e a e c c e a b a b a b b
+R a a b a d a b a d a a c e a b b a b a b b b b a b a b a b a b b a b b
+R a b a a b e a a c a c e b e a b a b b
+R b b b a a c b e e e c a a a b a a
+R b a b b a b a b b b b a b a b a b b b a a b a a b a c e e a a c e
+C tb-125-0 642561329 10
+T ->(a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-125-1 645669012 10
+T ->(a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-125-2 1670267027 10
+T ->(a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-126-0 4065876803 10
+T X(a,b)
+R b
+R b
+R a
+R b
+R a
+R b
+R b
+R a
+R a
+R b
+C tb-126-1 3914122884 10
+T X(a,b)
+R b
+R a
+R b
+R a
+R a
+R b
+R b
+R a
+R b
+R a
+C tb-126-2 344568231 10
+T X(a,b)
+R b
+R b
+R a
+R a
+R b
+R a
+R b
+R b
+R a
+R a
+C tb-127-0 441149902 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-127-1 2433994384 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-127-2 3545229067 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-128-0 2142885525 10
+T ->(d,tau,d,d)
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+C tb-128-1 3393562215 10
+T ->(d,tau,d,d)
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+C tb-128-2 4055974298 10
+T ->(d,tau,d,d)
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+R d d d
+C tb-129-0 2659388470 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-129-1 2143559726 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-129-2 1976113260 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-130-0 773449819 10
+T ->(c,tau,tau,a)
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+C tb-130-1 2765092020 10
+T ->(c,tau,tau,a)
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+C tb-130-2 2343963603 10
+T ->(c,tau,tau,a)
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+R c a
+C tb-131-0 3253411930 10
+T +(a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-131-1 2938605512 10
+T +(a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-131-2 3356198721 10
+T +(a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-132-0 98276206 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-132-1 344098497 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-132-2 948855434 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-133-0 254269173 10
+T *(*(a,*(a,tau,a),b),X(X(tau),X(c,c,a,c),*(c,b,a),+(c,c,b,a)),c)
+R a
+R a
+R a
+R a a a a a a
+R a a c b c a a a a a a a c b c a
+R a a c a
+R a a a a c a a a
+R a c c b a a
+R a a c c b a a a a a a a a a a
+R a a a a a a a a a
+C tb-133-1 1505108662 10
+T *(*(a,*(a,tau,a),b),X(X(tau),X(c,c,a,c),*(c,b,a),+(c,c,b,a)),c)
+R a a a a a c a a a a
+R a a a a a
+R a a a
+R a a a a a a a a a a
+R a
+R a
+R a a a a a a a a a a a
+R a a a a a a a a a a a a a a a a a b c c a c a a a
+R a
+R a
+C tb-133-2 2028056330 10
+T *(*(a,*(a,tau,a),b),X(X(tau),X(c,c,a,c),*(c,b,a),+(c,c,b,a)),c)
+R a a a a a a a a a a a a
+R a
+R a a a c a b c a a a a
+R a
+R a
+R a a a a a c b c b c a a c c b a
+R a b c a c a a a a a a a a a a a a a a a
+R a a a
+R a
+R a a a
+C tb-134-0 1283939113 10
+T ->(+(d,e,b),X(d))
+R d b e d
+R e b d d
+R d e b d
+R d b e d
+R d b e d
+R b d e d
+R d b e d
+R e b d d
+R e b d d
+R e d b d
+C tb-134-1 2975335339 10
+T ->(+(d,e,b),X(d))
+R b d e d
+R b e d d
+R b e d d
+R e d b d
+R d e b d
+R e d b d
+R d b e d
+R d e b d
+R e d b d
+R e b d d
+C tb-134-2 347492328 10
+T ->(+(d,e,b),X(d))
+R d b e d
+R d e b d
+R b d e d
+R b e d d
+R d b e d
+R b d e d
+R e b d d
+R b d e d
+R b d e d
+R b d e d
+C tb-135-0 2602486425 10
+T ->(h,X(+(g,h)),<>(<>(*(a,tau),X(g),+(e,f,f,tau),*(b,h,a)),<>(X(h,a,f))))
+R h h g a g e f f b a
+R h h g f a g e f f b h b
+R h h g f g b h b h b a a a a f e f
+R h g h a b f f e g f
+R h g h f a a g e f f b
+R h h g g b f e f a a f
+R h h g b h b f f e a a g h
+R h g h f f e a a g b h b h b h b f
+R h g h a a f f e b g a
+R h h g a b g e f f f
+C tb-135-1 739663476 10
+T ->(h,X(+(g,h)),<>(<>(*(a,tau),X(g),+(e,f,f,tau),*(b,h,a)),<>(X(h,a,f))))
+R h h g a g b h b h b h b f f e h
+R h g h g a b f e f a
+R h h g h g a a a b h b f e f
+R h h g f e f a b g a
+R h h g a a a a a e f f b g
+R h h g a a f f e g b a
+R h g h a e f f b a a a g
+R h g h b h b g f e f a a a
+R h h g a b h b f f e g a
+R h h g b h b h b a e f f g f
+C tb-135-2 1939367955 10
+T ->(h,X(+(g,h)),<>(<>(*(a,tau),X(g),+(e,f,f,tau),*(b,h,a)),<>(X(h,a,f))))
+R h g h b h b f e f g a a
+R h h g h a e f f g b
+R h g h h a g f e f b h b h b h b h b
+R h h g g e f f b a a
+R h h g a g b h b e f f a
+R h g h a a a a a a a g f f e b h b a
+R h g h f b g a e f f
+R h h g b a g f e f f
+R h h g f f e g a a b h
+R h g h b h b h b a a g e f f h
+C tb-136-0 257402210 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-136-1 2256746998 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-136-2 4293409473 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-137-0 571703809 10
+T g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+C tb-137-1 3474372254 10
+T g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+C tb-137-2 824856682 10
+T g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+C tb-138-0 1044717652 10
+T +(d,b)
+R b d
+R b d
+R d b
+R d b
+R b d
+R b d
+R b d
+R d b
+R b d
+R d b
+C tb-138-1 3657329814 10
+T +(d,b)
+R b d
+R d b
+R d b
+R d b
+R d b
+R d b
+R b d
+R b d
+R d b
+R b d
+C tb-138-2 1256723904 10
+T +(d,b)
+R d b
+R d b
+R b d
+R b d
+R d b
+R d b
+R d b
+R b d
+R d b
+R d b
+C tb-139-0 596866249 10
+T <>(e,c,d,b)
+R b c e d
+R e b c d
+R c b d e
+R c b d e
+R c d e b
+R d c b e
+R b e c d
+R d c b e
+R d c b e
+R b d c e
+C tb-139-1 2778488261 10
+T <>(e,c,d,b)
+R e b d c
+R e d c b
+R d e b c
+R e b c d
+R d b c e
+R d c e b
+R d e c b
+R b d c e
+R d b e c
+R b c e d
+C tb-139-2 898234448 10
+T <>(e,c,d,b)
+R b e c d
+R c d e b
+R b d e c
+R b e d c
+R c b e d
+R e b c d
+R b d e c
+R b e d c
+R c d b e
+R d c b e
+C tb-140-0 1371003619 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-140-1 2265833926 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-140-2 624374884 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-141-0 3916767064 10
+T h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+C tb-141-1 1742161483 10
+T h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+C tb-141-2 4211237006 10
+T h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+R h
+C tb-142-0 2656610586 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-142-1 713390705 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-142-2 1273638918 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-143-0 3323266340 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-143-1 2933213000 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-143-2 3670654807 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-144-0 2017904444 10
+T X(c,tau,b,b)
+R c
+R b
+R b
+R c
+R b
+R c
+R c
+R b
+R b
+R b
+C tb-144-1 2111589806 10
+T X(c,tau,b,b)
+R
+R
+R b
+R b
+R c
+R b
+R b
+R b
+R
+R b
+C tb-144-2 693860533 10
+T X(c,tau,b,b)
+R b
+R c
+R b
+R
+R b
+R c
+R
+R
+R b
+R b
+C tb-145-0 3213685639 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-145-1 318041487 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-145-2 2490850876 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-146-0 3906509390 10
+T *(tau,->(<>(a),f))
+R a f
+R a f a f
+R a f a f a f
+R
+R
+R a f
+R a f a f
+R
+R
+R a f
+C tb-146-1 3880893638 10
+T *(tau,->(<>(a),f))
+R a f a f a f a f a f
+R
+R a f
+R a f
+R
+R a f a f a f a f a f a f
+R a f a f a f a f a f
+R a f a f a f a f
+R
+R a f a f a f a f a f
+C tb-146-2 2705684747 10
+T *(tau,->(<>(a),f))
+R
+R a f a f
+R
+R a f a f
+R a f a f a f a f a f
+R a f
+R
+R a f a f a f
+R a f
+R a f
+C tb-147-0 2901257708 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-147-1 2515108081 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-147-2 3841539954 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-148-0 4066696899 10
+T ->(c,<>(+(tau),*(tau,b,e),tau),b,tau)
+R c b b
+R c b b b
+R c b
+R c b b b
+R c b
+R c b b
+R c b
+R c b
+R c b b
+R c b b
+C tb-148-1 1329451221 10
+T ->(c,<>(+(tau),*(tau,b,e),tau),b,tau)
+R c b
+R c b
+R c b b b b b
+R c b b
+R c b b
+R c b b b b
+R c b b
+R c b b b b
+R c b b
+R c b
+C tb-148-2 4260189052 10
+T ->(c,<>(+(tau),*(tau,b,e),tau),b,tau)
+R c b b
+R c b b
+R c b b b b
+R c b b
+R c b b b
+R c b b b b
+R c b b b b
+R c b
+R c b b b b
+R c b b b b b
+C tb-149-0 576778184 10
+T ->(->(->(d,tau,c)),->(->(tau,c)),*(a,X(d,b),->(a,c,a,a)))
+R d c c a
+R d c c a
+R d c c a
+R d c c a d a
+R d c c a d a
+R d c c a
+R d c c a
+R d c c a b a
+R d c c a b a d a
+R d c c a
+C tb-149-1 1526014876 10
+T ->(->(->(d,tau,c)),->(->(tau,c)),*(a,X(d,b),->(a,c,a,a)))
+R d c c a
+R d c c a
+R d c c a
+R d c c a
+R d c c a b a d a b a
+R d c c a
+R d c c a b a d a
+R d c c a b a b a
+R d c c a d a d a
+R d c c a
+C tb-149-2 3376476532 10
+T ->(->(->(d,tau,c)),->(->(tau,c)),*(a,X(d,b),->(a,c,a,a)))
+R d c c a
+R d c c a
+R d c c a
+R d c c a
+R d c c a b a b a
+R d c c a
+R d c c a b a d a
+R d c c a
+R d c c a
+R d c c a d a d a
+C tb-150-0 1256940714 10
+T ->(a,b,tau,tau)
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+C tb-150-1 4059183042 10
+T ->(a,b,tau,tau)
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+C tb-150-2 1747449933 10
+T ->(a,b,tau,tau)
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+R a b
+C tb-151-0 2493238522 10
+T +(+(X(X(c,g))),+(+(X(f),g),<>(X(e,c,tau,e)),*(g,+(b,f,d,c))),->(X(f,->(d,e),e,<>(f)),*(*(a,c,c),X(e,f,a,e)),e),X(<>(e,c,tau,f),b))
+R b f c a c a c a f f a c a f a c e g a g c a e
+R e d f e b g a g c a c a g c a e a c a e
+R f a g c e f a c d a b f a c f g e b g
+R g b c e f e a b f a g d f g c g a e
+R e b f f a g e g c
+R d e a a g e f b a g c a e g
+R g c f a g d f b c a f c e b g
+R g f b e a c g a g c a f e a d e a f c a c a c b a c c a g e
+R f f c a c a e a c f a e g c a c a e c a g e e
+R g g f e d b c e c e a e g f f g
+C tb-151-1 2023126486 10
+T +(+(X(X(c,g))),+(+(X(f),g),<>(X(e,c,tau,e)),*(g,+(b,f,d,c))),->(X(f,->(d,e),e,<>(f)),*(*(a,c,c),X(e,f,a,e)),e),X(<>(e,c,tau,f),b))
+R f g a g e b b c a f d c f c g a c a e e
+R e g f b g f a c c f d e g g e
+R g d d e a f e f a b c g c a g a c b g a e
+R f a b g e a e f a g c d f c b a c g e
+R f g a c a c g a c b a e a a a c a c a e c c f
+R f g a g d c f a c e a f g b e e g f
+R g f f e g c f c a e
+R g f b c e a c a c d a g c a g c b a c c f a c a c a d e a f a g c c g a d f e c a e a b c a f c a c a g d a a c c b f b a g e
+R e f a c a e a g f c a c a a a c a c e a g e e a d b c c a c f g e c a c a e
+R g d f f c f a c g f e b c g e g
+C tb-151-2 271597039 10
+T +(+(X(X(c,g))),+(+(X(f),g),<>(X(e,c,tau,e)),*(g,+(b,f,d,c))),->(X(f,->(d,e),e,<>(f)),*(*(a,c,c),X(e,f,a,e)),e),X(<>(e,c,tau,f),b))
+R g g d c b d f e a c g g c d a f f e b b g
+R f g a e a c f a c a e a e f g a e c d a a b f a e g e g
+R g e f g a e c b a f c f f a g d e g e c
+R f g b a g c a c a e f c a e a e a c a e a e
+R e a c a g g c e f f e g c a e
+R f c a b c a f c g g a e
+R g f c d f b a g c f g a c b e e a c f d b c a e a e g
+R g b d e a b c a d c a e a e c f a e a c a c g a c a e a a f g e a c c a e a a a e
+R f c a c a c g a g a a a a a f a f e c f a c a e
+R f a g g g b c f e
+C tb-152-0 2298384201 10
+T ->(c,X(d,b,c))
+R c c
+R c c
+R c c
+R c d
+R c c
+R c d
+R c d
+R c d
+R c c
+R c c
+C tb-152-1 3959831430 10
+T ->(c,X(d,b,c))
+R c d
+R c b
+R c c
+R c d
+R c c
+R c d
+R c b
+R c c
+R c c
+R c d
+C tb-152-2 4134952386 10
+T ->(c,X(d,b,c))
+R c d
+R c d
+R c d
+R c b
+R c d
+R c b
+R c b
+R c c
+R c c
+R c d
+C tb-153-0 3178841191 10
+T *(g,f,*(d,d,f))
+R g f g f g
+R g f g
+R g f g f g
+R g f g f g
+R g f g f g
+R g f g
+R g
+R g
+R g
+R g f g
+C tb-153-1 1526024442 10
+T *(g,f,*(d,d,f))
+R g f g f g f g
+R g
+R g
+R g f g
+R g
+R g f g
+R g
+R g f g f g f g
+R g f g f g f g
+R g
+C tb-153-2 757661228 10
+T *(g,f,*(d,d,f))
+R g
+R g f g f g
+R g f g f g f g
+R g f g
+R g f g
+R g
+R g f g
+R g f g f g
+R g
+R g f g f g
+C tb-154-0 2213509272 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-154-1 1335954087 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-154-2 1103235549 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-155-0 333949443 10
+T X(d,+(c,b,tau))
+R c b
+R d
+R b c
+R b c
+R c b
+R d
+R d
+R d
+R d
+R b c
+C tb-155-1 323679138 10
+T X(d,+(c,b,tau))
+R b c
+R b c
+R b c
+R b c
+R d
+R c b
+R c b
+R c b
+R d
+R d
+C tb-155-2 1978314419 10
+T X(d,+(c,b,tau))
+R d
+R d
+R d
+R b c
+R d
+R b c
+R d
+R c b
+R b c
+R d
+C tb-156-0 3411012148 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-156-1 3102615659 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-156-2 4087460343 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-157-0 726535589 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-157-1 269222163 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-157-2 1046730445 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-158-0 675476406 10
+T ->(<>(*(X(b),<>(a,b)),X(+(a,c))),->(tau),X(+(X(c),tau,X(c,f),->(b,a,tau)),->(X(c))))
+R c a b c b a c
+R b b a b b a b b a b a b b a c b c a c
+R b c a b a c c
+R c a b f b a c
+R c a b b a c c
+R b a b b a b b a b b a c c b f a
+R c a b b a c f
+R c a b c
+R c a b c
+R a c b a b b b a b a b b a b b c c b a
+C tb-158-1 2396168274 10
+T ->(<>(*(X(b),<>(a,b)),X(+(a,c))),->(tau),X(+(X(c),tau,X(c,f),->(b,a,tau)),->(X(c))))
+R b a b b a b b a c b a c c
+R c a b c
+R b b a b c a b c a c
+R c a b c b a c
+R b b a b b a b a b b b a b a c c c b a
+R b b a b a b b b a b b a b a c c
+R a c b c
+R b b a b b a b b a b b a b b a b c a c
+R a c b b a c f
+R b a c b c c a
+C tb-158-2 1461970395 10
+T ->(<>(*(X(b),<>(a,b)),X(+(a,c))),->(tau),X(+(X(c),tau,X(c,f),->(b,a,tau)),->(X(c))))
+R b b a b a b b c a b c a c
+R b b a b c a c b f a
+R c a b c
+R c a b a b b c
+R c a b c
+R b a b b a b b a c c c b a
+R b a c f b a c
+R b c a c
+R c a b b a b b a b b a c f
+R a c b b a b b a b b a b c
+C tb-159-0 2913492033 10
+T <>(g)
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+C tb-159-1 2255514095 10
+T <>(g)
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+C tb-159-2 1641912411 10
+T <>(g)
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+C tb-160-0 363703938 10
+T +(c)
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-160-1 376906906 10
+T +(c)
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-160-2 4046271036 10
+T +(c)
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-161-0 3407897579 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-161-1 4062645714 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-161-2 2651926690 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-162-0 3042896163 10
+T <>(<>(->(b,f,d)),->(X(c,g,b),<>(b),+(d)),g)
+R b b d b f d g
+R b f d g c b d
+R g b f d c b d
+R b f d b b d g
+R b f d g c b d
+R g b f d g b d
+R g c b d b f d
+R b f d g b b d
+R g b b d b f d
+R b f d g b b d
+C tb-162-1 4135658398 10
+T <>(<>(->(b,f,d)),->(X(c,g,b),<>(b),+(d)),g)
+R g g b d b f d
+R g b f d c b d
+R g b f d g b d
+R b b d g b f d
+R g c b d b f d
+R b f d c b d g
+R g b f d c b d
+R c b d b f d g
+R b f d g b b d
+R g b f d b b d
+C tb-162-2 3634697421 10
+T <>(<>(->(b,f,d)),->(X(c,g,b),<>(b),+(d)),g)
+R b f d g b d g
+R g c b d b f d
+R g b f d b b d
+R b b d b f d g
+R g c b d b f d
+R g b d b f d g
+R b b d g b f d
+R g b d b f d g
+R g b f d g b d
+R g b d g b f d
+C tb-163-0 2946927667 10
+T +(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-163-1 2659122788 10
+T +(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-163-2 3994770621 10
+T +(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-164-0 3928139348 10
+T +(<>(+(a,a),->(b,b,b,a)))
+R a a b b b a
+R b b b a a a
+R b b b a a a
+R b b b a a a
+R b b b a a a
+R a a b b b a
+R a a b b b a
+R a a b b b a
+R b b b a a a
+R a a b b b a
+C tb-164-1 1328822355 10
+T +(<>(+(a,a),->(b,b,b,a)))
+R a a b b b a
+R a a b b b a
+R a a b b b a
+R b b b a a a
+R b b b a a a
+R a a b b b a
+R a a b b b a
+R a a b b b a
+R a a b b b a
+R a a b b b a
+C tb-164-2 4191668619 10
+T +(<>(+(a,a),->(b,b,b,a)))
+R b b b a a a
+R b b b a a a
+R b b b a a a
+R a a b b b a
+R b b b a a a
+R b b b a a a
+R b b b a a a
+R b b b a a a
+R a a b b b a
+R a a b b b a
+C tb-165-0 2360229207 10
+T +(f)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-165-1 863775566 10
+T +(f)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-165-2 3646126718 10
+T +(f)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-166-0 3524021258 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-166-1 2496286654 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-166-2 4241963129 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-167-0 3157745555 10
+T <>(*(*(b,b),b))
+R b b b b b b b b b b b b b
+R b
+R b b b b b b b
+R b b b
+R b b b b b b b b b b b b b
+R b b b
+R b b b
+R b b b
+R b b b b b b b b b
+R b b b b b
+C tb-167-1 713230667 10
+T <>(*(*(b,b),b))
+R b b b b b
+R b
+R b b b
+R b b b b b b b b b b b b b
+R b
+R b b b b b b b b b b b b b b b b b b b b b b b b b
+R b b b b b
+R b b b b b
+R b b b b b b b b b b b
+R b
+C tb-167-2 3377206260 10
+T <>(*(*(b,b),b))
+R b b b b b b b
+R b b b b b
+R b b b b b b b b b b b
+R b b b b b b b b b b b b b b b b b b b b b b b b b b b b b
+R b b b
+R b
+R b b b b b b b b b b b
+R b b b
+R b b b b b b b
+R b b b
+C tb-168-0 891233784 10
+T *(<>(a,b),<>(c,a),<>(<>(a),b,<>(b,a)))
+R b a c a b a
+R a b a c b a
+R a b
+R a b
+R a b a c a b a c a b a c b a
+R a b c a b a
+R a b
+R b a c a b a
+R b a c a a b c a b a
+R a b c a b a c a b a a c b a
+C tb-168-1 391505223 10
+T *(<>(a,b),<>(c,a),<>(<>(a),b,<>(b,a)))
+R b a a c b a c a a b
+R b a
+R b a
+R b a
+R b a c a a b
+R a b
+R a b c a b a a c a b a c b a a c b a
+R b a
+R a b
+R a b c a a b
+C tb-168-2 2638453618 10
+T *(<>(a,b),<>(c,a),<>(<>(a),b,<>(b,a)))
+R a b
+R b a c a a b
+R b a
+R b a
+R a b
+R b a
+R b a c a a b
+R a b
+R a b
+R b a a c b a
+C tb-169-0 1105834214 10
+T +(->(<>(a,c),+(a,c,c),*(b,b,a),->(c,a,b)),a)
+R a c a c c b b b a c a b
+R a c c c a b b b b b b a b b b b b c a b
+R a c c a c b b b b a b c a b
+R c a c a c b a b b b b b b c a b
+R a c a a c c b b b b b c a b
+R a c a a c c b b b b b b b b b b b c a b
+R a c c c a b b b b b b b b b a b b c a b
+R c a c a c b a c a b
+R a c a c c b b b c a a b
+R c a a c c b b b b b a c a b
+C tb-169-1 1227662285 10
+T +(->(<>(a,c),+(a,c,c),*(b,b,a),->(c,a,b)),a)
+R a c c a c b c a b a
+R a c c a c b b b a b b c a b
+R c a a c c b b b b b a b b c a b
+R a c a c a c b c a b
+R a a c a c c b b b c a b
+R a c c a c b b b b b a b b c a b
+R c a c a c b b a b c a b
+R a c c a a c b c a b
+R c a a c a c b b b b b c a b
+R a c c a c b c a a b
+C tb-169-2 347193834 10
+T +(->(<>(a,c),+(a,c,c),*(b,b,a),->(c,a,b)),a)
+R c a a c a c b b b b b b b b b c a b
+R a a c c c a b b b b b c a b
+R a c a a c c b b b b b c a b
+R c a c a a c b c a b
+R c a c a c a b c a b
+R a a c c a c b b b c a b
+R c a c a c b c a a b
+R a a c a c c b c a b
+R a c a c a c b c a b
+R c a c c a b c a a b
+C tb-170-0 3253976882 10
+T +(->(b,tau),tau,->(<>(b),a),->(X(tau,b,tau),b,X(tau,a)))
+R b b b a a
+R b b b a
+R b b b a
+R b a b b a
+R b b b a b a
+R b b b a
+R b b b a b a
+R b b b a a
+R b b b b a
+R b b b a
+C tb-170-1 1080528604 10
+T +(->(b,tau),tau,->(<>(b),a),->(X(tau,b,tau),b,X(tau,a)))
+R b b b b a
+R b b b a a
+R b b b a a
+R b b b a a
+R b b a b a
+R b b a b
+R b a b b b
+R b b b b a a
+R b b b a b
+R b b b b a a
+C tb-170-2 2287954941 10
+T +(->(b,tau),tau,->(<>(b),a),->(X(tau,b,tau),b,X(tau,a)))
+R b b b a
+R b b b a b
+R b b b a b a
+R b b b a a
+R b b a b
+R b b b a a
+R b b a b
+R b b b a a
+R b b b b a
+R b b b a a
+C tb-171-0 698247294 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-171-1 879518573 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-171-2 3794034778 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-172-0 3126526206 10
+T *(c,->(a),<>(a))
+R c a c
+R c a c
+R c
+R c a c a c
+R c a c
+R c
+R c a c a c a c
+R c a c
+R c a c
+R c a c a c a c a c a c a c a c
+C tb-172-1 4062305886 10
+T *(c,->(a),<>(a))
+R c a c a c a c
+R c a c a c
+R c
+R c
+R c a c
+R c a c
+R c
+R c
+R c
+R c
+C tb-172-2 2484951279 10
+T *(c,->(a),<>(a))
+R c a c a c a c a c
+R c a c
+R c
+R c a c
+R c
+R c
+R c
+R c a c
+R c
+R c a c
+C tb-173-0 1063931683 10
+T ->(X(->(a,b,a,b),X(a,b,a,a),a,+(a,a)),+(a,*(a,a,b)),*(X(a,b,a),->(a,a,a),<>(a)))
+R a a a a a a a a a a
+R a a a a a a a a a a b a a a b a a a a
+R a b a b a a a
+R a a a a a a
+R a a a a a a a a
+R a a a b a a a b a a a a
+R a b a b a a a a a a a
+R a a a a a a a a a a a a b a a a a
+R a a a a b
+R a a a a a a a a
+C tb-173-1 4198859277 10
+T ->(X(->(a,b,a,b),X(a,b,a,a),a,+(a,a)),+(a,*(a,a,b)),*(X(a,b,a),->(a,a,a),<>(a)))
+R a a a a a a a
+R a a a a b a a a a a a a b
+R a a a a a a a a a
+R a a a a
+R a a a a a b
+R a a a a a b a a a b a a a a a a a a a a a a a a a a
+R a b a b a a a a a a a a a a a a a
+R a a a a
+R a b a b a a a
+R a a a a b
+C tb-173-2 438289160 10
+T ->(X(->(a,b,a,b),X(a,b,a,a),a,+(a,a)),+(a,*(a,a,b)),*(X(a,b,a),->(a,a,a),<>(a)))
+R a a a a
+R a a a a
+R a a a a b a a a a a a a a
+R a b a b a a a a a a a
+R a a a a
+R a a a a a a a a
+R a a a b a a a a
+R b a a b
+R b a a a a a a a a a
+R a a a a a a a a a a a b a a a a a a a a a a a b a a a a a a a a
+C tb-174-0 4263727201 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-174-1 70258405 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-174-2 2900398102 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-175-0 1809032007 10
+T +(b,+(<>(tau),c))
+R b c
+R c b
+R c b
+R b c
+R c b
+R c b
+R c b
+R c b
+R c b
+R c b
+C tb-175-1 2485264723 10
+T +(b,+(<>(tau),c))
+R c b
+R b c
+R b c
+R b c
+R c b
+R b c
+R c b
+R c b
+R b c
+R b c
+C tb-175-2 2467846507 10
+T +(b,+(<>(tau),c))
+R b c
+R c b
+R b c
+R c b
+R c b
+R c b
+R b c
+R b c
+R c b
+R c b
+C tb-176-0 1692342305 10
+T ->(<>(c,d,b,b))
+R c d b b
+R d b b c
+R b b c d
+R b d b c
+R b b d c
+R b c d b
+R b d b c
+R d b c b
+R c d b b
+R b d b c
+C tb-176-1 3581035118 10
+T ->(<>(c,d,b,b))
+R c b b d
+R b d b c
+R b d c b
+R c d b b
+R b c b d
+R b c b d
+R c b b d
+R c b d b
+R b b d c
+R c b d b
+C tb-176-2 650223099 10
+T ->(<>(c,d,b,b))
+R b b d c
+R c b d b
+R b d b c
+R c d b b
+R c b d b
+R d b c b
+R d b c b
+R b c b d
+R d b b c
+R c d b b
+C tb-177-0 2511996655 10
+T *(e,->(d,f,d,tau),*(tau,b,a))
+R e
+R e d f d e
+R e
+R e d f d e d f d e
+R e
+R e
+R e d f d e d f d e
+R e d f d e
+R e d f d e d f d e d f d e
+R e d f d e
+C tb-177-1 226262406 10
+T *(e,->(d,f,d,tau),*(tau,b,a))
+R e d f d e d f d e
+R e d f d e
+R e d f d e
+R e d f d e d f d e
+R e d f d e d f d e d f d e d f d e
+R e
+R e d f d e d f d e d f d e d f d e d f d e
+R e
+R e
+R e d f d e
+C tb-177-2 3486761033 10
+T *(e,->(d,f,d,tau),*(tau,b,a))
+R e d f d e d f d e
+R e
+R e d f d e
+R e
+R e
+R e
+R e d f d e d f d e
+R e d f d e
+R e d f d e
+R e
+C tb-178-0 3983166805 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-178-1 1960201304 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-178-2 1053706997 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-179-0 3582697987 10
+T *(b,d,b)
+R b
+R b
+R b
+R b
+R b
+R b
+R b d b
+R b
+R b
+R b
+C tb-179-1 3863828046 10
+T *(b,d,b)
+R b d b d b d b d b d b d b
+R b d b
+R b
+R b d b d b d b d b
+R b d b d b d b d b
+R b d b
+R b
+R b
+R b d b
+R b d b d b
+C tb-179-2 2327804412 10
+T *(b,d,b)
+R b
+R b
+R b
+R b d b
+R b d b
+R b d b
+R b d b d b
+R b d b d b
+R b d b
+R b d b
+C tb-180-0 2218393137 10
+T ->(f,*(g,g),X(a,tau,a,c),b)
+R f g a b
+R f g g g b
+R f g g g b
+R f g a b
+R f g c b
+R f g g g b
+R f g g g a b
+R f g a b
+R f g a b
+R f g a b
+C tb-180-1 778008826 10
+T ->(f,*(g,g),X(a,tau,a,c),b)
+R f g a b
+R f g g g b
+R f g a b
+R f g g g g g c b
+R f g c b
+R f g a b
+R f g g g g g c b
+R f g g g g g c b
+R f g g g g g b
+R f g a b
+C tb-180-2 843010661 10
+T ->(f,*(g,g),X(a,tau,a,c),b)
+R f g b
+R f g c b
+R f g b
+R f g a b
+R f g c b
+R f g a b
+R f g a b
+R f g g g a b
+R f g a b
+R f g g g g g a b
+C tb-181-0 1921254554 10
+T +(c,+(X(<>(d),<>(tau,d,d),d),<>(->(a,d,c)),<>(X(tau,b,b),X(b,c,b),*(c,b)),<>(->(b,c,a),+(b,c,d,d),->(d,b,d,b),b)))
+R d d b d b d b c a d c c c d b b b c c a
+R b b c b d a b d a c b d c c b d c b d d b c c b
+R b d c c b d a b b d c d a c b d c b d b c c
+R c d b d d b b b b b a c d a c d c b d c
+R c a d d b d c b d b c c d d b c b c a b b d
+R b c a a b d b d c c b b d b d c b c d b c d
+R a d b c b d d b b c d b c a d b c d c
+R b c a c d b b d b b c a c d c b c c b d c d d d
+R b b c b c a b c d b d a b b d d c d b c d c c b
+R b d b c a d b c b c c a d d c d b d c b d
+C tb-181-1 1864690992 10
+T +(c,+(X(<>(d),<>(tau,d,d),d),<>(->(a,d,c)),<>(X(tau,b,b),X(b,c,b),*(c,b)),<>(->(b,c,a),+(b,c,d,d),->(d,b,d,b),b)))
+R d c b d b b a c d c a c b c d b d d b c c
+R c c b a b c c a c d c d b d b c b c d d b d b b c
+R d b b d b b c b c d a b d c d b c a c b c d
+R a d d d b d b b c c c a b d b d d b c c c
+R d b d c c d a d b d c c b b d c b c a
+R a d d b b d b d d b c b d c b d c c a b c b c
+R c c b b d b c a d c b d a c c c d d b d b d b b c
+R c a d b b b d d d c d b c b c d b c b b b c b c c b a c
+R b d a d d c d b c d d b b c d b b c c a c
+R d b d a b d c b b d c c a d b d c c c
+C tb-181-2 4074167561 10
+T +(c,+(X(<>(d),<>(tau,d,d),d),<>(->(a,d,c)),<>(X(tau,b,b),X(b,c,b),*(c,b)),<>(->(b,c,a),+(b,c,d,d),->(d,b,d,b),b)))
+R b c c a b c c b b d d a d b d c d d c b
+R b b b c a d d d c b b d b b c a b d c c c d
+R b d a c d d c d b b b c c a d b c b d c b b
+R b b c b d b c b c c b c d b a b c b c d a c d d b d d b c b c c
+R b b d b a d b c c d b b d c c b b c b c c a c d d b b c d
+R b c a d b d d c c b c b b b d d a d d c b
+R d d c b d a c b b c d d b d b b b c d b c a c
+R b b c b d a b c d c d b d c a c d b d b
+R d a b d b b c d c d a d b d c c c b c
+R b b c c d b c c b d d b d c b c a b b c d c d c b a c b c b
+C tb-182-0 2498341597 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-182-1 1015505210 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-182-2 1114550668 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-183-0 3727092515 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-183-1 2584955584 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-183-2 3530174330 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-184-0 1838831411 10
+T <>(a,d,b)
+R a b d
+R a d b
+R a d b
+R d a b
+R d a b
+R b a d
+R b d a
+R a d b
+R d b a
+R a b d
+C tb-184-1 1816010489 10
+T <>(a,d,b)
+R d b a
+R d b a
+R b a d
+R a b d
+R a d b
+R a d b
+R d a b
+R d a b
+R d a b
+R d a b
+C tb-184-2 293005188 10
+T <>(a,d,b)
+R a d b
+R b a d
+R a d b
+R b d a
+R a b d
+R b d a
+R d b a
+R b d a
+R d a b
+R b d a
+C tb-185-0 3780660597 10
+T +(*(b,d,tau),b,->(a,g,h,g))
+R b a g h b d g b
+R a g h g b b
+R a g h b b g
+R a g b h g b
+R b b a d b d g h b d g b d b d b
+R b d a b d g h b b g
+R a b b g d h g b
+R b b a g h g
+R b a g h b d b g
+R a b g d b b h g
+C tb-185-1 3287374607 10
+T +(*(b,d,tau),b,->(a,g,h,g))
+R b a g h b g
+R b b a g h g
+R a g h b b g
+R b a d b g h b g
+R b d a b b d b g h d b g
+R b d a g h b d b b g
+R a b g h g b
+R a g b b h g
+R a g b d b h b g
+R a g h b g b
+C tb-185-2 2143008640 10
+T +(*(b,d,tau),b,->(a,g,h,g))
+R b b a g h g
+R b d a b g h b g d b d b
+R b a d g b d h b d g b b
+R b a d b d g h g b b d b
+R b d b d b d b a d b d b d b g h g b d b
+R a b g b h g
+R a b g h g b
+R a g h b g b
+R b a b g h g
+R a b d b b d b d g b h d b d g b d b d b
+C tb-186-0 953684445 10
+T X(+(<>(*(b,e)),e),<>(+(*(d,c)),b,c,->(->(a,c,tau,e),b)),d,X(+(X(c),->(b,b),X(tau,b),+(b,c))))
+R c b b b c b
+R d
+R d c d c d c d c d b c a c e b
+R d b a c e b c
+R a c e b b c d
+R d
+R b e b e
+R c b b b c
+R e b
+R d
+C tb-186-1 1629162268 10
+T X(+(<>(*(b,e)),e),<>(+(*(d,c)),b,c,->(->(a,c,tau,e),b)),d,X(+(X(c),->(b,b),X(tau,b),+(b,c))))
+R d
+R d c d a c e b b c
+R e b
+R e b
+R d b c a c e b
+R d
+R b a c e b c d
+R b e e b e b e b
+R b c b b b c
+R d
+C tb-186-2 1259345392 10
+T X(+(<>(*(b,e)),e),<>(+(*(d,c)),b,c,->(->(a,c,tau,e),b)),d,X(+(X(c),->(b,b),X(tau,b),+(b,c))))
+R c b b c b
+R d c d c d c d a c e b b c
+R b e b e e b e b e b e b e b
+R e b e b e b
+R d
+R d
+R d b a c e b c
+R e b
+R d c d a c e b c b
+R b b c b c
+C tb-187-0 2748805155 10
+T +(<>(b,tau,d))
+R b d
+R b d
+R d b
+R b d
+R d b
+R b d
+R d b
+R b d
+R b d
+R b d
+C tb-187-1 1211963465 10
+T +(<>(b,tau,d))
+R d b
+R d b
+R d b
+R d b
+R b d
+R b d
+R d b
+R d b
+R d b
+R b d
+C tb-187-2 1031314490 10
+T +(<>(b,tau,d))
+R d b
+R d b
+R b d
+R d b
+R d b
+R b d
+R b d
+R b d
+R d b
+R d b
+C tb-188-0 3743903811 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-188-1 3060209133 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-188-2 1625841558 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-189-0 245539029 10
+T X(+(->(X(tau),<>(c,c),*(a,b,tau)),->(X(a,b)),*(b,X(a,c,b))))
+R b c c a b a a a b a b b a
+R b b a c c a b b a
+R a c c b a b a b a b a b a
+R c b b c b c a b a a b
+R c b a c a b a
+R c b a c c b a c b
+R c c a b b b a
+R c b c a b b a
+R b c c b a b a
+R c c b b a b a b b b a
+C tb-189-1 3119126145 10
+T X(+(->(X(tau),<>(c,c),*(a,b,tau)),->(X(a,b)),*(b,X(a,c,b))))
+R a b c c a
+R b b c c a b b
+R c b c b c b a a b b a
+R b b c c a b a
+R b c c a b
+R b c c a b
+R c c a a b b a
+R b b c c b c a
+R b c c b a b b
+R b a b c b b b b b b a b c c c b a a b
+C tb-189-2 450757182 10
+T X(+(->(X(tau),<>(c,c),*(a,b,tau)),->(X(a,b)),*(b,X(a,c,b))))
+R b c c b a b a
+R c b a c a b b b a c b a b a b
+R b a c c b a b b a
+R b b c c a b a
+R c a b c c b a b a
+R c c b b b b a
+R b b c a c a b b a b a b a
+R b c b c b c b a b a b
+R c c b c a b a
+R c b c a b a b
+C tb-190-0 944061671 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-190-1 1597144148 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-190-2 2535809610 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-191-0 4164954661 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-191-1 1333315270 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-191-2 206651353 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-192-0 3168519772 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-192-1 3931438537 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-192-2 4154490616 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-193-0 804965390 10
+T X(->(*(<>(b),*(b,a),X(b)),<>(*(tau,e),+(f,c,e,a),X(c,b,e),d),d),X(d,->(<>(f,tau,tau),b),b),->(f,<>(<>(c),<>(b,g),<>(d,e),<>(a,g,b))),->(->(X(b,c),<>(tau,f,e,g))))
+R b b a b b d b f e a c e e e d
+R c e f g
+R f b
+R f c b g e d g b a
+R d
+R b f e g
+R f c d e b a g g b
+R b e f g
+R d
+R b a e c f c d d
+C tb-193-1 1768987116 10
+T X(->(*(<>(b),*(b,a),X(b)),<>(*(tau,e),+(f,c,e,a),X(c,b,e),d),d),X(d,->(<>(f,tau,tau),b),b),->(f,<>(<>(c),<>(b,g),<>(d,e),<>(a,g,b))),->(->(X(b,c),<>(tau,f,e,g))))
+R b f g e
+R f b
+R f a g b c b g d e
+R f c d e g b g a b
+R b f g e
+R b
+R f b g a b g e d c
+R b f g e
+R f d e c b g a b g
+R b f e g
+C tb-193-2 1839213974 10
+T X(->(*(<>(b),*(b,a),X(b)),<>(*(tau,e),+(f,c,e,a),X(c,b,e),d),d),X(d,->(<>(f,tau,tau),b),b),->(f,<>(<>(c),<>(b,g),<>(d,e),<>(a,g,b))),->(->(X(b,c),<>(tau,f,e,g))))
+R d
+R f g b e d c g a b
+R b e g f
+R f g b a g b c e d
+R f d e b g b g a c
+R b
+R b d c e a f b e e e d
+R c g f e
+R b e f g
+R f d e c a g b b g
+C tb-194-0 2282884608 10
+T <>(X(b,*(->(c,a,b),+(b,a,c,a)),+(X(c),<>(b),->(c,c)),*(<>(b),->(a,c,c),b)),a,X(*(+(c,a,a),b),->(b,b),->(tau)))
+R c c c b a
+R a b b b
+R c a b a b a c c a b a
+R a c a b c c c a
+R a c a b a a c b a c a b a a c a c a b
+R a b b c b c c
+R b a c c b a
+R a c a a b a c c b a c c b
+R a c a b
+R b b b a
+C tb-194-1 744904831 10
+T <>(X(b,*(->(c,a,b),+(b,a,c,a)),+(X(c),<>(b),->(c,c)),*(<>(b),->(a,c,c),b)),a,X(*(+(c,a,a),b),->(b,b),->(tau)))
+R a a c b a c a b a
+R c b c c a
+R b a
+R a b b c c b c
+R c c c b a
+R b c c c a
+R c a b c a b a c a b a c a b c a b a b a c c a b a a c a b c a a b c a a
+R a b b b
+R b c c c a
+R c a b b b a
+C tb-194-2 2840065847 10
+T <>(X(b,*(->(c,a,b),+(b,a,c,a)),+(X(c),<>(b),->(c,c)),*(<>(b),->(a,c,c),b)),a,X(*(+(c,a,a),b),->(b,b),->(tau)))
+R c a b a b a c c a b b a c a c a b a a c a
+R a c c c b
+R b b c a b c b a a c a b c b a a c a b a b c a c a b a
+R a c b c c c a a
+R c b c c a a c b c a a b a c a b a c a b c a a a
+R a c c b c
+R b b a b
+R a b
+R a b b b
+R a c a b c a a b a
+C tb-195-0 2071328265 10
+T *(->(X(->(b,b),->(e,c)),a),b)
+R e c a b b b a
+R e c a
+R e c a
+R e c a
+R e c a b e c a
+R b b a
+R b b a b e c a
+R b b a b b b a b b b a
+R e c a
+R b b a b e c a
+C tb-195-1 1782974815 10
+T *(->(X(->(b,b),->(e,c)),a),b)
+R b b a
+R e c a
+R b b a
+R e c a
+R b b a
+R e c a b e c a
+R b b a b b b a
+R b b a b e c a
+R b b a
+R b b a
+C tb-195-2 65023545 10
+T *(->(X(->(b,b),->(e,c)),a),b)
+R b b a b b b a
+R e c a b b b a b e c a
+R b b a b e c a b b b a b b b a
+R e c a
+R b b a
+R b b a
+R b b a b e c a b b b a b e c a
+R e c a b b b a
+R e c a
+R e c a b e c a b b b a b b b a b e c a b e c a
+C tb-196-0 3658002853 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-196-1 38808520 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-196-2 427044839 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-197-0 294452830 10
+T X(X(<>(*(e,tau),<>(c,f,c,d)),->(*(b,g),<>(c,e,a,d)),g,tau))
+R f c c d e e
+R
+R b a d e c
+R
+R g
+R c d c f e
+R b d e c a
+R f d c c e e
+R b a e c d
+R f c c d e e
+C tb-197-1 1397105271 10
+T X(X(<>(*(e,tau),<>(c,f,c,d)),->(*(b,g),<>(c,e,a,d)),g,tau))
+R f c d c e e
+R
+R e d c c f
+R c c d f e e e
+R
+R
+R
+R g
+R b c a d e
+R b e c d a
+C tb-197-2 1386512599 10
+T X(X(<>(*(e,tau),<>(c,f,c,d)),->(*(b,g),<>(c,e,a,d)),g,tau))
+R e e e e e d f c c
+R b g b g b g b g b e c d a
+R
+R d c f c e
+R
+R
+R g
+R g
+R c c f d e
+R e c d f c
+C tb-198-0 1814779217 10
+T *(a,tau,tau)
+R a
+R a
+R a a
+R a
+R a
+R a a
+R a a a a
+R a
+R a
+R a
+C tb-198-1 1440992310 10
+T *(a,tau,tau)
+R a
+R a
+R a
+R a a
+R a a
+R a a a a a a a
+R a
+R a
+R a a
+R a a
+C tb-198-2 895883971 10
+T *(a,tau,tau)
+R a
+R a a a
+R a
+R a a
+R a a
+R a
+R a a
+R a a
+R a a
+R a
+C tb-199-0 759000121 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-199-1 145568936 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-199-2 175436766 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-200-0 4185742559 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-200-1 145116456 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-200-2 4209661658 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-201-0 89992906 10
+T *(->(*(b,b)),a,X(X(b,a)))
+R b
+R b b b a b b b b b
+R b
+R b a b b b a b b b b b b b b b
+R b
+R b a b b b a b
+R b a b b b a b
+R b b b a b b b b b b b
+R b a b a b a b a b a b b b
+R b b b a b b b
+C tb-201-1 3269827630 10
+T *(->(*(b,b)),a,X(X(b,a)))
+R b
+R b
+R b b b b b b b b b b b a b
+R b b b
+R b a b b b a b b b
+R b b b b b b b a b b b b b a b a b b b a b b b a b b b b b
+R b b b a b b b a b b b b b b b
+R b a b b b
+R b b b b b b b
+R b a b a b b b
+C tb-201-2 2974239080 10
+T *(->(*(b,b)),a,X(X(b,a)))
+R b b b a b b b b b
+R b a b
+R b
+R b b b b b b b b b a b
+R b
+R b
+R b a b b b
+R b a b b b b b b b a b b b
+R b b b
+R b a b
+C tb-202-0 1485938088 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-202-1 4157180992 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-202-2 2866470119 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-203-0 121930150 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-203-1 4588894 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-203-2 598264727 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-204-0 2811145755 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-204-1 4024899158 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-204-2 3603057719 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-205-0 101152578 10
+T X(+(a,b),c)
+R c
+R c
+R c
+R b a
+R c
+R c
+R a b
+R b a
+R a b
+R b a
+C tb-205-1 4239034111 10
+T X(+(a,b),c)
+R b a
+R c
+R c
+R c
+R c
+R b a
+R b a
+R c
+R b a
+R a b
+C tb-205-2 2792100685 10
+T X(+(a,b),c)
+R b a
+R c
+R a b
+R b a
+R c
+R b a
+R a b
+R a b
+R c
+R c
+C tb-206-0 774369855 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-206-1 3167809096 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-206-2 2988599639 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-207-0 798804370 10
+T ->(e,<>(*(<>(e,c,b,d),+(e,a)),tau))
+R e d e c b
+R e d c e b e a d c e b
+R e c e b d e a e b c d
+R e c d b e a e d c b e a e b c d e a e e b c d e a e c d b e a b d e c e a b c e d
+R e e b c d a e e c d b a e b e d c
+R e c e b d a e d b e c a e c e d b e a e b c d
+R e c d b e
+R e b c d e
+R e b e c d
+R e b d e c a e e c d b
+C tb-207-1 3100067576 10
+T ->(e,<>(*(<>(e,c,b,d),+(e,a)),tau))
+R e e c d b a e b c d e
+R e d b c e e a e d b c e a b c d e e a d c e b
+R e b e c d
+R e e b d c a e d c b e
+R e b d c e a e e b c d
+R e d e b c
+R e e d c b a e b d c e a e c d b e e a e c b d a e e c b d
+R e c d e b
+R e d b e c
+R e d b c e
+C tb-207-2 354245204 10
+T ->(e,<>(*(<>(e,c,b,d),+(e,a)),tau))
+R e b d c e a e c e b d
+R e e b c d
+R e e b c d
+R e d e b c e a b e d c
+R e b d c e
+R e e c d b a e c b e d
+R e e b d c e a d c b e a e b d c e a e d b c e a e b c d e e a e b d c a e b c e d
+R e c b d e
+R e c d b e
+R e e b c d
+C tb-208-0 2972386275 10
+T ->(X(d,c,d,+(b,d)))
+R d
+R d
+R d
+R d b
+R d
+R d b
+R b d
+R d
+R d
+R c
+C tb-208-1 988930052 10
+T ->(X(d,c,d,+(b,d)))
+R d
+R d
+R d
+R d b
+R b d
+R d b
+R d
+R d b
+R b d
+R d
+C tb-208-2 1959063127 10
+T ->(X(d,c,d,+(b,d)))
+R d b
+R b d
+R c
+R d
+R b d
+R c
+R d
+R b d
+R b d
+R d
+C tb-209-0 574825643 10
+T +(h,g,b,b)
+R b h b g
+R b h b g
+R b g h b
+R h g b b
+R b b h g
+R b b g h
+R b b h g
+R b h g b
+R b b g h
+R b h b g
+C tb-209-1 4013651895 10
+T +(h,g,b,b)
+R h g b b
+R b b g h
+R h g b b
+R b b g h
+R g b h b
+R b b g h
+R b h g b
+R g b h b
+R b h g b
+R h b b g
+C tb-209-2 2104950394 10
+T +(h,g,b,b)
+R b b g h
+R b h g b
+R g h b b
+R h b b g
+R b b g h
+R b h b g
+R g b b h
+R b g h b
+R b b h g
+R g b h b
+C tb-210-0 2401975575 10
+T *(*(+(X(b),b),b),+(+(*(b,a,a),<>(a),a)))
+R b b b b b b b b b b b b b b
+R b b b b b b b b
+R b b b b b b b b
+R b b b b b b b b b b b
+R b b
+R b b
+R b b b a a b b b b b b b b b b b a a b b b b a a b b b a b a b a a b b b b b b b b b b b b b b b a a b b b b b
+R b b
+R b b
+R b b b b b
+C tb-210-1 1231052491 10
+T *(*(+(X(b),b),b),+(+(*(b,a,a),<>(a),a)))
+R b b b a b a b a a b a b a b a a b b b a b a b a a b b b b b b b a a a b a b a b a b b b b b b
+R b b b b b b b b b a b a a b b b b b
+R b b b b b b b b b b b b b b
+R b b
+R b b b b b b b b b b b b b b b b b
+R b b b b b b b b
+R b b
+R b b b b b b b b b b b a a b b b b b b b b b b b b b b b b a b a a b a a b b b b a a b a b b a a b b b b b b
+R b b b b b b b b b a a a b a b b b b b b
+R b b
+C tb-210-2 348231199 10
+T *(*(+(X(b),b),b),+(+(*(b,a,a),<>(a),a)))
+R b b a b a a b a b b b b b b a a b b b a b a b b
+R b b b b b
+R b b b b b b b b b b b b b b
+R b b
+R b b
+R b b
+R b b b b b b b b b b b b b b b b b b b b b b b b b b b b b a a b b b b a a a b a b a b b b b b b b b b b b b
+R b b b b b b b b b b b b b b
+R b b a a b a b b b b b b b a a a b b b b b b b b b
+R b b
+C tb-211-0 1847140928 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-211-1 453006213 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-211-2 1479654124 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-212-0 3989985776 10
+T *(a,+(c),+(g,d))
+R a c a c a c a
+R a c a
+R a
+R a c a
+R a c a
+R a c a c a c a c a
+R a
+R a c a
+R a c a
+R a c a
+C tb-212-1 1994225211 10
+T *(a,+(c),+(g,d))
+R a
+R a
+R a
+R a
+R a
+R a
+R a c a c a c a c a
+R a c a c a c a
+R a c a c a c a c a
+R a c a c a
+C tb-212-2 1594984418 10
+T *(a,+(c),+(g,d))
+R a c a c a c a
+R a
+R a c a
+R a c a
+R a
+R a
+R a
+R a c a c a c a c a
+R a c a
+R a c a
+C tb-213-0 1689484767 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-213-1 3551224626 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-213-2 2089895765 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-214-0 1535944473 10
+T ->(+(*(+(e,a,f,c),<>(f,f,c),a),c,X(*(tau,tau))))
+R c c f a e
+R c e a f c f f a c f e c f c f e a f c f c f a c f e f c f a e f c
+R f e c c a
+R f c e c a
+R c e a c f f c f c a f e
+R c c f a e c f f c e a f
+R a c c f e c f f f a c e
+R a f c e c f f c e a f c c f f a f e c
+R f c a e c f c f c a f e f c f c e f a
+R e f a c f c f c f e a f c f a e f c f f c f e c a c f f f c a e f f c a f c e c f c f c f a e
+C tb-214-1 460869118 10
+T ->(+(*(+(e,a,f,c),<>(f,f,c),a),c,X(*(tau,tau))))
+R f e a c c f c f f e a c
+R c e a f c
+R c f a e c f c f e c a f
+R c f c a e
+R a e f c c f f f a e c c f f a c c f e f f c f e a c f c f e c a f f c f f a e c
+R a e f c c f f e f a c f f c f a e c f c c f a c f e c f f c e f a
+R e c a f c
+R c f e a c f f f e c a f f c a f e c f c f a f e c c f f e a f c f f c e f c a f c f e f a c f c f e c c f a f f c f a c e f c f a c e f f c f f a e c c f f c a e f
+R c e a f c f f c a e f c
+R c f e a c f f c a c f e
+C tb-214-2 3561338778 10
+T ->(+(*(+(e,a,f,c),<>(f,f,c),a),c,X(*(tau,tau))))
+R f c e a c c f f f a c e
+R c a c f e
+R c f e a c f f c a e c f f f c f a e c f f c a f e c
+R f c c e a
+R f c a c e
+R e c a f c c f f a e c f
+R c f c e a c f f f e c a
+R f c e a f c f e c f a c f f a f c e f f c a c f e c f f a f c e f c f f c c a e
+R a c c f e
+R f a c e c
+C tb-215-0 2997376017 10
+T +(->(tau,b,e,tau),c,+(c),->(tau,tau))
+R b c e c
+R c b e c
+R c b c e
+R b e c c
+R c b e c
+R c b c e
+R b c e c
+R c b e c
+R c b e c
+R c c b e
+C tb-215-1 3107759629 10
+T +(->(tau,b,e,tau),c,+(c),->(tau,tau))
+R b c e c
+R b e c c
+R c b e c
+R c b e c
+R c b e c
+R c b e c
+R c c b e
+R b e c c
+R b c e c
+R b c e c
+C tb-215-2 2769385289 10
+T +(->(tau,b,e,tau),c,+(c),->(tau,tau))
+R c c b e
+R c c b e
+R c b e c
+R c c b e
+R c b c e
+R c b e c
+R c b e c
+R c b e c
+R c b e c
+R c b e c
+C tb-216-0 3836706573 10
+T +(d)
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-216-1 2392290931 10
+T +(d)
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-216-2 3611349406 10
+T +(d)
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-217-0 1090905860 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-217-1 1927467278 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-217-2 3127219097 10
+T d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+R d
+C tb-218-0 2122915664 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-218-1 281764716 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-218-2 739611906 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-219-0 2765372645 10
+T <>(tau,b,a,a)
+R b a a
+R a b a
+R a a b
+R b a a
+R a a b
+R b a a
+R a a b
+R a b a
+R a a b
+R a b a
+C tb-219-1 1936115257 10
+T <>(tau,b,a,a)
+R a a b
+R a b a
+R b a a
+R a b a
+R b a a
+R b a a
+R a b a
+R a a b
+R a a b
+R a b a
+C tb-219-2 972428773 10
+T <>(tau,b,a,a)
+R b a a
+R a b a
+R b a a
+R a a b
+R b a a
+R b a a
+R b a a
+R a b a
+R b a a
+R b a a
+C tb-220-0 1182552641 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-220-1 4245123809 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-220-2 1738070676 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-221-0 3073875296 10
+T <>(c,b)
+R c b
+R b c
+R b c
+R b c
+R c b
+R c b
+R b c
+R b c
+R b c
+R c b
+C tb-221-1 819186204 10
+T <>(c,b)
+R c b
+R b c
+R c b
+R b c
+R b c
+R b c
+R b c
+R b c
+R b c
+R c b
+C tb-221-2 2722810901 10
+T <>(c,b)
+R c b
+R c b
+R c b
+R c b
+R b c
+R b c
+R b c
+R c b
+R c b
+R c b
+C tb-222-0 1722803066 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-222-1 1879587094 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-222-2 3082522603 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-223-0 3415484420 10
+T ->(->(b,d,c,b),->(tau,c,a,c))
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+C tb-223-1 141282467 10
+T ->(->(b,d,c,b),->(tau,c,a,c))
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+C tb-223-2 2473303777 10
+T ->(->(b,d,c,b),->(tau,c,a,c))
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+R b d c b c a c
+C tb-224-0 927274457 10
+T ->(+(tau),+(tau,g,h),e)
+R g h e
+R g h e
+R h g e
+R h g e
+R g h e
+R g h e
+R h g e
+R h g e
+R h g e
+R h g e
+C tb-224-1 1886041952 10
+T ->(+(tau),+(tau,g,h),e)
+R h g e
+R h g e
+R g h e
+R h g e
+R g h e
+R h g e
+R g h e
+R h g e
+R g h e
+R g h e
+C tb-224-2 1087826516 10
+T ->(+(tau),+(tau,g,h),e)
+R g h e
+R h g e
+R h g e
+R h g e
+R h g e
+R g h e
+R g h e
+R g h e
+R h g e
+R h g e
+C tb-225-0 737214127 10
+T *(<>(a,b,a),X(b,b,a,b),<>(b))
+R a a b b a a b b b a a b a a b
+R b a a b a b a b a a b b b a a
+R b a a
+R a b a b b a a b a b a b b a a
+R a a b
+R a b a
+R b a a
+R b a a
+R a b a
+R a b a b a a b
+C tb-225-1 4265967280 10
+T *(<>(a,b,a),X(b,b,a,b),<>(b))
+R a a b b b a a b a a b b a b a b b a a
+R a a b b a a b a a a b b b a a a a a b a a b a a a b a b a b a
+R a a b a b a a
+R b a a b b a a
+R a b a b a a b b b a a
+R a a b
+R a a b
+R b a a
+R a b a
+R b a a b a b a
+C tb-225-2 1842944300 10
+T *(<>(a,b,a),X(b,b,a,b),<>(b))
+R a b a
+R b a a b a b a
+R a b a
+R a b a b b a a b b a a
+R a b a b a a b a a a b b a b a b a b a
+R b a a
+R a a b
+R a b a b a a b
+R a b a
+R a a b
+C tb-226-0 3339952190 10
+T X(d,<>(f),*(tau,b,h),+(g))
+R g
+R d
+R f
+R g
+R g
+R d
+R d
+R
+R f
+R f
+C tb-226-1 951352418 10
+T X(d,<>(f),*(tau,b,h),+(g))
+R g
+R g
+R b
+R f
+R f
+R g
+R g
+R g
+R d
+R b b
+C tb-226-2 1758188013 10
+T X(d,<>(f),*(tau,b,h),+(g))
+R
+R
+R
+R f
+R d
+R b b b b b
+R f
+R d
+R g
+R f
+C tb-227-0 3686638912 10
+T ->(*(d,<>(tau,g,h),+(f,tau)),<>(*(b,d)))
+R d h g d h g d b d b d b
+R d b
+R d b
+R d b d b d b d b
+R d g h d g h d b
+R d h g d b
+R d b
+R d g h d h g d b
+R d g h d b
+R d b
+C tb-227-1 502698640 10
+T ->(*(d,<>(tau,g,h),+(f,tau)),<>(*(b,d)))
+R d h g d h g d h g d g h d h g d b
+R d g h d h g d g h d b
+R d b d b d b d b d b d b d b
+R d b d b d b
+R d h g d g h d h g d h g d b d b
+R d h g d b
+R d h g d b d b
+R d b
+R d b
+R d b d b d b
+C tb-227-2 2798394986 10
+T ->(*(d,<>(tau,g,h),+(f,tau)),<>(*(b,d)))
+R d b d b
+R d h g d g h d g h d h g d g h d g h d b d b d b d b d b d b d b d b d b
+R d b d b
+R d b d b d b d b d b
+R d g h d h g d b d b
+R d h g d h g d h g d g h d b d b
+R d b
+R d h g d b
+R d b d b d b
+R d b d b d b d b d b
+C tb-228-0 3095224982 10
+T *(f,tau)
+R f
+R f f f
+R f
+R f f f f f
+R f f
+R f f
+R f
+R f f f f f
+R f
+R f
+C tb-228-1 2019697 10
+T *(f,tau)
+R f
+R f f
+R f f f
+R f
+R f f f f f
+R f
+R f
+R f
+R f
+R f f
+C tb-228-2 405279368 10
+T *(f,tau)
+R f
+R f
+R f f f
+R f f f f f f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-229-0 3704473278 10
+T *(X(*(e,+(g)),<>(X(d,d),+(d,e,h),<>(f),h),*(*(h,b),+(f,f,e,b),d)),<>(e,X(X(c,a),->(f,e),X(c,f,a,tau),*(b,tau,e))))
+R d f h e d h
+R h b h b h b h f e b f h b h f e b f h f f e b h
+R h b e f f h e b f f h b h e b b h
+R h
+R e
+R h e f e f h d d e h
+R e e a h b h f b f e h
+R d e h h f d
+R e c e e e a h h d e d f
+R e g e e a h f e e e e b b e g e g e g e e c e
+C tb-229-1 3549236185 10
+T *(X(*(e,+(g)),<>(X(d,d),+(d,e,h),<>(f),h),*(*(h,b),+(f,f,e,b),d)),<>(e,X(X(c,a),->(f,e),X(c,f,a,tau),*(b,tau,e))))
+R h
+R e g e g e g e
+R e
+R e g e e b b b b f h d e d h
+R e
+R h e f d h e d h
+R h a e h b h a e h f e b f h b f f e h b h b h b h b h e f b f h b h b h f b f e h b h
+R h b h f b f e h b b e e
+R e g e g e g e g e e b h
+R e e c h b h a e h e b h f f b e h b h b h
+C tb-229-2 1665368665 10
+T *(X(*(e,+(g)),<>(X(d,d),+(d,e,h),<>(f),h),*(*(h,b),+(f,f,e,b),d)),<>(e,X(X(c,a),->(f,e),X(c,f,a,tau),*(b,tau,e))))
+R h f d e h d e f e h b h b h b h f e f b h b h c e h d e d f h
+R h c e h
+R e g e
+R h b h f b f e h b h b h b h b h b h
+R d h e d f h f e e e
+R h b h e b f f h b h f b e f h b h f f b e h f e b f h b h b h b h b h e b f f h f f e b h
+R d d h e h f e b h d e d h f
+R h e f e e g e g e e b b e g e g e
+R f d h d h e
+R f h e d h d e f e h f e f b h f f b e h e b b b b e g e
+C tb-230-0 2751301742 10
+T <>(c,g,*(g,c,h))
+R g c g
+R g c g
+R g c g
+R c g g
+R g c g
+R c g g c g c g
+R g g c
+R g g c g c g c g c
+R g c g c g c g c g c g c g c g c g
+R g g c g c g c
+C tb-230-1 1642743544 10
+T <>(c,g,*(g,c,h))
+R g g c
+R g g c g c g c g c g c g c
+R c g g
+R g c g
+R g c g c g c g
+R g c g c g c g
+R g c g c g c g c g
+R g c g
+R g c g
+R g g c
+C tb-230-2 1851014444 10
+T <>(c,g,*(g,c,h))
+R g c g
+R g g c
+R g g c
+R g g c g c g c
+R c g g
+R c g g c g c g
+R g g c
+R g g c
+R g c g c g
+R g g c
+C tb-231-0 767482744 10
+T <>(X(tau,c),+(b,c,b),*(d,d))
+R c d b c b
+R d b c b
+R c b b d
+R b b c d c
+R c b b d
+R d c b c b
+R c d b c b
+R d b b c
+R d d d c b c b
+R c d d d d d b c b
+C tb-231-1 3231260500 10
+T <>(X(tau,c),+(b,c,b),*(d,d))
+R b c b d d d
+R b c b d
+R c d d d c b b
+R d d d c b b c
+R c c b b d d d d d d d d d d d
+R d c b b c
+R c b b c d
+R d d d b c b c
+R d d d d d d d b c b
+R c b b d
+C tb-231-2 3672583418 10
+T <>(X(tau,c),+(b,c,b),*(d,d))
+R d d d c b c b
+R c b b c d
+R b c b d
+R d d d c b b c
+R d b b c
+R b c b d
+R c c b b d
+R c d b b c
+R b c b c d d d d d d d d d
+R c d b c b
+C tb-232-0 3324346122 10
+T +(a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-232-1 2893571339 10
+T +(a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-232-2 3504184457 10
+T +(a)
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-233-0 3825739303 10
+T +(b,a)
+R a b
+R a b
+R a b
+R b a
+R a b
+R b a
+R a b
+R b a
+R b a
+R a b
+C tb-233-1 1749396994 10
+T +(b,a)
+R b a
+R b a
+R a b
+R b a
+R b a
+R b a
+R b a
+R b a
+R b a
+R b a
+C tb-233-2 2191314290 10
+T +(b,a)
+R b a
+R b a
+R a b
+R a b
+R a b
+R b a
+R a b
+R a b
+R a b
+R b a
+C tb-234-0 3837826871 10
+T X(X(b,<>(<>(c)),X(X(b,c),b,->(b,tau,c,b)),b),c,+(X(+(tau)),tau,c,b),b)
+R b
+R c b
+R c
+R c b
+R b
+R c
+R b
+R c
+R b
+R c b
+C tb-234-1 1604886036 10
+T X(X(b,<>(<>(c)),X(X(b,c),b,->(b,tau,c,b)),b),c,+(X(+(tau)),tau,c,b),b)
+R c b
+R b
+R c
+R b
+R b
+R b
+R b c
+R b
+R c b
+R c
+C tb-234-2 2213136634 10
+T X(X(b,<>(<>(c)),X(X(b,c),b,->(b,tau,c,b)),b),c,+(X(+(tau)),tau,c,b),b)
+R c
+R c
+R b
+R c
+R c
+R c
+R c b
+R c b
+R b c
+R b c
+C tb-235-0 730792666 10
+T ->(->(d,c,tau,tau))
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+C tb-235-1 3639878632 10
+T ->(->(d,c,tau,tau))
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+C tb-235-2 431269081 10
+T ->(->(d,c,tau,tau))
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+R d c
+C tb-236-0 3469412202 10
+T <>(a,c,a,c)
+R c c a a
+R c a a c
+R c c a a
+R c c a a
+R c a a c
+R c a a c
+R c a c a
+R a c c a
+R a c c a
+R c a c a
+C tb-236-1 4068100503 10
+T <>(a,c,a,c)
+R a c c a
+R a a c c
+R a c c a
+R c a a c
+R c c a a
+R c a c a
+R c c a a
+R a c c a
+R a c a c
+R a a c c
+C tb-236-2 4163200065 10
+T <>(a,c,a,c)
+R a c a c
+R a c c a
+R a a c c
+R a c c a
+R c a a c
+R c c a a
+R a c c a
+R a c c a
+R a a c c
+R a c a c
+C tb-237-0 1547883730 10
+T <>(b,b,tau)
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+C tb-237-1 1496694911 10
+T <>(b,b,tau)
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+C tb-237-2 3298095787 10
+T <>(b,b,tau)
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+R b b
+C tb-238-0 1916944052 10
+T X(->(b),+(X(b,a,b,b),->(b)))
+R b
+R b b
+R b
+R b
+R b
+R b
+R b b
+R b
+R b
+R b
+C tb-238-1 891551132 10
+T X(->(b),+(X(b,a,b,b),->(b)))
+R b b
+R b b
+R b b
+R b a
+R b
+R b
+R b b
+R b b
+R b
+R b b
+C tb-238-2 3730637221 10
+T X(->(b),+(X(b,a,b,b),->(b)))
+R b
+R b b
+R b
+R b
+R b
+R b b
+R b b
+R b b
+R b b
+R b a
+C tb-239-0 2829340624 10
+T *(<>(->(->(b,a,b,a),->(b,b),tau,b),<>(->(b,a,a,a),*(a,b,b),+(a,b),a),->(b)),X(b,*(a,<>(b,tau,a,a))))
+R b a b a a a a a b b a b a b b b
+R b b a a b a a a a b a b a b a b a b b b
+R b b a b a a a a b a a b a b a b b b
+R a a b a a a b a b b a b a b b b a b a b a b b b b a b a b a a b b a a a a a b b a a a b a a a b a b a b b b
+R b a b a b b b b a b a b a b a a a a b a
+R b a b a b b b a b a a b a b a a a b
+R b a b a b b b b b a a a a b a b a b a a b a
+R a b a b a a b a b a a a b b a b a b b b b b a b a b b b a b a a b a a a b a a a b a a a b a a a b a b a b a b b b b a b a b a b b b b a b a b a a b a a a b a
+R b a b a b b b b b a a a b a a a
+R a b a a a a b a a b b b a b a b b b b b a b a b b b a a a b b a a a b
+C tb-239-1 2326228276 10
+T *(<>(->(->(b,a,b,a),->(b,b),tau,b),<>(->(b,a,a,a),*(a,b,b),+(a,b),a),->(b)),X(b,*(a,<>(b,tau,a,a))))
+R b b a a a a b a b a a b a b a b b b a a a b a b a a a b a b a b b b b
+R a a b a a a a b b b a b a b b b
+R b a b a b b b b a a b a b a a a a a b a a b a b a b b b a b a a a a b a b a a a b a b a b a b b b a a b a a a b a b b b a a a a a b a b b a b a b b b
+R b a b a b b b b b a a a a a b a b a b a b a a a a b a a b a a a b a a a b a a b a b a a a a b a b a b a b b b
+R b b a a a a b a b a b a b a b a b a a b a b a b b b b b a b a b b b a a a b b a a a b
+R b b a a a a b a a b a b a b a b b b
+R b a b a b b b b b a a a a b a a b a b b b a b a b b b a b a b a b a a a a a b b a b a b b b a a b a a a b a
+R b b a b a b b b a a a b b a a a
+R a b a a b a b a a a b b a b a b b b b a a b b a a a a b a b a b b b b
+R a a b a b a a a b b a b a b b b b b b a b a b b b a a b a a a a b
+C tb-239-2 3287813297 10
+T *(<>(->(->(b,a,b,a),->(b,b),tau,b),<>(->(b,a,a,a),*(a,b,b),+(a,b),a),->(b)),X(b,*(a,<>(b,tau,a,a))))
+R a b a b a a a b a a b b a b a b b b a a b a a a b a a a b a b a b a b a b a a a a b b a b a b b b
+R b a a a a a a b b a b a b b b b b b a b a b b b b a a a a a b a b a a b b
+R a b a b a a a a b b a b a b b b
+R a b a a b a a a b b a b a b b b b b b a b a b b b a b a b a b a b a a b a a a
+R b a b a b b b b a a b a a a a b
+R b a b a b b b a a b b a a a a b b b b a a a a a b a b a b a b a b b b
+R b a b a b b b b a a a a a b a b a b
+R b a b a a b a a a b a b a b b b b b a b a b b b b b a a a a b a b a b a a
+R b a a a a a b a b a b a b a b b b b
+R a b a a b a b a a a b a b a b b b b b b b a b a b b b a b a a a a b a b a b b a a a a a b a b a b a b a b a b b b b
+C tb-240-0 2465058027 10
+T X(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-240-1 549774056 10
+T X(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-240-2 2677799628 10
+T X(tau)
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-241-0 3214460695 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-241-1 3953999166 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-241-2 4174765167 10
+T tau
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R
+C tb-242-0 3551392016 10
+T <>(*(tau,b),+(d),d)
+R d d
+R b d d
+R d d b
+R d d b
+R d b b d
+R d d
+R d d b
+R d d
+R d d
+R d d
+C tb-242-1 2325352734 10
+T <>(*(tau,b),+(d),d)
+R d d
+R d d
+R d d
+R d d b
+R d d
+R d d
+R d b d
+R d d b
+R d d
+R d d
+C tb-242-2 3365422183 10
+T <>(*(tau,b),+(d),d)
+R b b b b d d
+R d d
+R b d d
+R d d
+R d d
+R d d
+R d d
+R d b b b d
+R d d
+R d d
+C tb-243-0 3900167495 10
+T *(*(+(c,b,c,c),*(c,b,a),a),<>(c))
+R c c c b
+R b c c c
+R c c b c c c b c c c b c b c b c b c b c b c c c b c c c b c c c b c c c
+R c c c b c c c b c c c c c b c b c b c b c b c b c b c b c b c b c c c c c c c b
+R b c c c c c b c c c c c b c c c c c b
+R c b c c c b c b c c c
+R b c c c c c b c c c c b c c c b c c c
+R c b c c
+R c c b c c c c b c c c b c c c c b c c
+R c c b c c b c c c c b c c c c c b c c c b c b c b c b c b c b c b c c c c b c b c b c b c b c b c c c c c c c b c b c c c c b c c c c b c c c c b c b c c c c c b c c c c c c b c b c c c c b c c c c b c b c b c b c b c c b c c c c c c b c b c c c b c
+C tb-243-1 1377409498 10
+T *(*(+(c,b,c,c),*(c,b,a),a),<>(c))
+R c b c c c b c b c b c b c b c b c b c b c b c c c b c c c b c c c b c c c c b c b c c b c c
+R c b c c
+R b c c c c c c b c c c c b c c b c b c c c c b c b c c c c b c c c b c c c c b c c b c c c b c
+R c b c c c b c b c c c c b c c c b c c b c c c c b c c c
+R c b c c c c c b c c c c c b c b c c c
+R b c c c
+R c c b c c b c b c b c c c b c c c c c b c b c c b c c
+R c c c b c b c b c b c c c b c c b c b c b c b c c b c c
+R b c c c
+R c b c c c c c b c c c c c b
+C tb-243-2 2148996983 10
+T *(*(+(c,b,c,c),*(c,b,a),a),<>(c))
+R b c c c c c c c b
+R c c c b c c c c b c c b c c c c c c b c b c c c
+R c c c b
+R b c c c c c b c c c c b c c
+R b c c c
+R c c b c c c c c b c c c b c c b c b c b c b c b c c c
+R c b c c c b c c c c b c c c c b c c c c b
+R c b c c c c b c c
+R c c c b c b c c c c b c c c c b c c c c b c c c c b c c c b c c b c c c c b c c c c b c c c b c c b c c c
+R c c b c
+C tb-244-0 2603917851 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-244-1 2432842040 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-244-2 3470113620 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-245-0 2000133717 10
+T *(d,*(X(h,f,d,f),h,*(b,d,a)),g)
+R d f h h h f h d h h d
+R d
+R d f d d h f h f d f d
+R d
+R d f h f d
+R d
+R d
+R d
+R d h h h d
+R d
+C tb-245-1 3990978758 10
+T *(d,*(X(h,f,d,f),h,*(b,d,a)),g)
+R d
+R d f h f h d h f d
+R d d h h h f d d h f h f h f h h d
+R d f h f d f h d h f h f d
+R d d d f h h h f d
+R d f d
+R d h d
+R d
+R d
+R d f h f d
+C tb-245-2 3611940006 10
+T *(d,*(X(h,f,d,f),h,*(b,d,a)),g)
+R d h d
+R d
+R d
+R d
+R d d h d d
+R d h h h d
+R d
+R d
+R d h d f h d h f d
+R d d d
+C tb-246-0 3963437872 10
+T *(f,d,e)
+R f d f d f
+R f
+R f
+R f
+R f
+R f d f
+R f d f d f d f
+R f d f d f
+R f
+R f d f d f d f d f
+C tb-246-1 1506600735 10
+T *(f,d,e)
+R f d f
+R f
+R f
+R f
+R f d f
+R f
+R f
+R f d f d f
+R f d f
+R f
+C tb-246-2 3355304134 10
+T *(f,d,e)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f d f d f
+R f
+C tb-247-0 4120982177 10
+T X(<>(->(X(c),->(c),+(c))),b)
+R b
+R b
+R b
+R b
+R c c c
+R c c c
+R b
+R c c c
+R c c c
+R c c c
+C tb-247-1 2191093221 10
+T X(<>(->(X(c),->(c),+(c))),b)
+R b
+R c c c
+R c c c
+R c c c
+R b
+R b
+R c c c
+R b
+R c c c
+R c c c
+C tb-247-2 1201602354 10
+T X(<>(->(X(c),->(c),+(c))),b)
+R b
+R c c c
+R c c c
+R b
+R b
+R b
+R c c c
+R c c c
+R c c c
+R b
+C tb-248-0 1653858852 10
+T g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+C tb-248-1 2864741300 10
+T g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+C tb-248-2 4255385120 10
+T g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+R g
+C tb-249-0 281749101 10
+T ->(b,tau,<>(c,d,b),*(b,c,c))
+R b d c b b
+R b b c d b
+R b c d b b c b c b
+R b b d c b c b c b c b c b
+R b c b d b c b
+R b c b d b
+R b c d b b c b
+R b b c d b
+R b d b c b c b
+R b d c b b
+C tb-249-1 658967636 10
+T ->(b,tau,<>(c,d,b),*(b,c,c))
+R b b d c b
+R b b c d b
+R b b d c b
+R b d b c b c b c b c b
+R b c d b b c b c b c b c b
+R b c d b b
+R b c d b b
+R b b d c b
+R b d c b b c b c b c b
+R b c d b b
+C tb-249-2 1181740019 10
+T ->(b,tau,<>(c,d,b),*(b,c,c))
+R b b d c b c b
+R b d c b b
+R b c b d b c b c b
+R b d b c b c b c b
+R b c d b b
+R b b d c b c b
+R b b d c b c b c b c b
+R b c d b b
+R b b d c b c b
+R b c d b b
+C tb-250-0 2262099227 10
+T ->(X(X(tau),X(a),*(b,b,tau),->(a,a,b)),*(a,<>(tau,b,b)))
+R a
+R b b b a b b a
+R a b b a b b a
+R b a b b a
+R a a b a b b a b b a
+R b a
+R a
+R a a b a
+R a b b a b b a
+R a a b b a
+C tb-250-1 536721155 10
+T ->(X(X(tau),X(a),*(b,b,tau),->(a,a,b)),*(a,<>(tau,b,b)))
+R a b b a b b a b b a
+R a
+R b a
+R a a b b a b b a
+R a a b b a
+R b b b b b b b b b a b b a b b a b b a b b a
+R a a b b a b b a
+R a a b a b b a b b a b b a b b a b b a b b a b b a
+R a a
+R a b b a b b a b b a
+C tb-250-2 1750977631 10
+T ->(X(X(tau),X(a),*(b,b,tau),->(a,a,b)),*(a,<>(tau,b,b)))
+R b b b b b b b a b b a b b a b b a b b a b b a b b a
+R a a b a
+R a a
+R a a b a
+R b a
+R a b b a b b a
+R a
+R b a b b a
+R b a b b a b b a
+R a b b a
+C tb-251-0 4084247996 10
+T +(+(->(e),e),b,g)
+R e e b g
+R g e e b
+R e e g b
+R e g b e
+R g b e e
+R e b g e
+R g e e b
+R e g b e
+R e g b e
+R e b e g
+C tb-251-1 2856744602 10
+T +(+(->(e),e),b,g)
+R g e e b
+R e e g b
+R e g b e
+R g e e b
+R b e g e
+R g e b e
+R b e e g
+R g e e b
+R e b g e
+R b g e e
+C tb-251-2 1805408375 10
+T +(+(->(e),e),b,g)
+R e g b e
+R e b g e
+R b g e e
+R e b g e
+R b e g e
+R e b g e
+R e b g e
+R e b g e
+R e b e g
+R b g e e
+C tb-252-0 1935513163 10
+T X(X(a,b,e,b),*(a,c,a))
+R a
+R b
+R b
+R a
+R a
+R e
+R a c a
+R a
+R b
+R a
+C tb-252-1 4034680413 10
+T X(X(a,b,e,b),*(a,c,a))
+R a
+R b
+R b
+R a
+R a
+R a
+R a c a c a
+R a c a
+R a c a c a
+R a
+C tb-252-2 111097411 10
+T X(X(a,b,e,b),*(a,c,a))
+R a
+R a
+R a
+R a c a c a c a
+R b
+R e
+R b
+R e
+R e
+R e
+C tb-253-0 635416 10
+T *(a,a)
+R a a a a a a a
+R a a a
+R a
+R a
+R a a a
+R a a a
+R a a a a a
+R a
+R a a a
+R a a a a a
+C tb-253-1 154177495 10
+T *(a,a)
+R a
+R a
+R a
+R a a a a a
+R a a a a a
+R a a a a a a a
+R a a a
+R a a a a a
+R a
+R a
+C tb-253-2 4115767903 10
+T *(a,a)
+R a a a
+R a a a a a
+R a a a
+R a
+R a a a a a
+R a
+R a
+R a a a
+R a a a a a a a
+R a a a
+C tb-254-0 1247644394 10
+T +(c,c,b,c)
+R c c b c
+R c c b c
+R b c c c
+R b c c c
+R c c b c
+R c b c c
+R c b c c
+R c b c c
+R b c c c
+R c c c b
+C tb-254-1 3001354418 10
+T +(c,c,b,c)
+R b c c c
+R b c c c
+R c c b c
+R c c c b
+R c c b c
+R b c c c
+R c c c b
+R c c c b
+R c b c c
+R c c c b
+C tb-254-2 1991746070 10
+T +(c,c,b,c)
+R c b c c
+R c c b c
+R c c c b
+R c c c b
+R c c b c
+R c b c c
+R b c c c
+R c c b c
+R b c c c
+R b c c c
+C tb-255-0 485664530 10
+T +(->(*(<>(b,tau,a,a),X(b,b,a,a),a),->(c),*(*(a,b,b),c)),b,X(tau))
+R a a b b c a b a b a b a b a b a c a b a b a b a b a b a c a
+R b a a b c a b a
+R a a b a a b a c a b c a
+R b a b a c a b a c a b a
+R a b a b b a b a c a c a
+R b a a c a b a b a b c a
+R a b a a a b a a a a b c a b a b b a b a c a b a b a b a b a c a b a
+R b a a c a b
+R a b a c b a
+R b a b a b a a b c a b a
+C tb-255-1 3773461649 10
+T +(->(*(<>(b,tau,a,a),X(b,b,a,a),a),->(c),*(*(a,b,b),c)),b,X(tau))
+R b b a a c a
+R a a b b c a
+R b a a b c a
+R a b a c a b a b a b b a c a c a b a b a b a b a
+R b a a a b a a a a a b c a b a c a b a b a b
+R a a b b c a
+R b b a a b a b a a a a b c a c a c a c a c a b a c a b a b a b a
+R b a a c a b
+R a a b b a b a a a b b a c a
+R a b a c b a
+C tb-255-2 174318858 10
+T +(->(*(<>(b,tau,a,a),X(b,b,a,a),a),->(c),*(*(a,b,b),c)),b,X(tau))
+R b a a b a a b b b b a a c a
+R b a a c a b a c b a b a b a
+R a b b a c a b a c a
+R a b a c b a
+R b a a b c a
+R b a a c a b b a
+R a b a c a b a c a b a b a b a b a b a b a c a c a b a b a c b a b a
+R a a b c a b b a b a c a b a c a
+R b a a b a a a b c a
+R a a b b c a
+C tb-256-0 1140525631 10
+T ->(b)
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-256-1 1405135068 10
+T ->(b)
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-256-2 1981846248 10
+T ->(b)
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-257-0 2709377241 10
+T *(X(b,*(b,b),a),<>(a,X(b,a,b),X(tau,a)),b)
+R a b a b a b b
+R b b b
+R a b a a b b a a b
+R b b b a a a b a a b b b
+R a
+R b a a b
+R a a b a a
+R b b a a b
+R a
+R a
+C tb-257-1 2334819874 10
+T *(X(b,*(b,b),a),<>(a,X(b,a,b),X(tau,a)),b)
+R b a a b b b b b a b b
+R b b b
+R a
+R a b a b
+R a
+R b b b b a a
+R a b a a a a b b b b
+R b b b b b b b
+R a a b a b
+R b b a b
+C tb-257-2 357303829 10
+T *(X(b,*(b,b),a),<>(a,X(b,a,b),X(tau,a)),b)
+R b a a b b b b a a b a a a b
+R b
+R b a b a
+R b b b b b
+R b b a a b b b b b b b b b a a a
+R b
+R b
+R b b b
+R b b b b b
+R b b a a b b b b b b b a a b b b a a
+C tb-258-0 3528540144 10
+T ->(<>(tau,g,a))
+R g a
+R a g
+R g a
+R a g
+R g a
+R g a
+R a g
+R g a
+R g a
+R g a
+C tb-258-1 466527023 10
+T ->(<>(tau,g,a))
+R a g
+R a g
+R a g
+R g a
+R a g
+R g a
+R g a
+R a g
+R a g
+R g a
+C tb-258-2 2162877316 10
+T ->(<>(tau,g,a))
+R a g
+R g a
+R a g
+R a g
+R g a
+R g a
+R a g
+R g a
+R a g
+R a g
+C tb-259-0 4279035370 10
+T <>(+(+(->(d,b),+(c)),X(->(c),<>(d),c),*(X(c),a,<>(a)),<>(<>(a),X(c),->(c,tau,c))),b,tau,X(X(c,tau),->(<>(b,a)),b,a))
+R c c c a d a c c a c a c c b a c c a c a c c b
+R a b d d c b c c c c a
+R a c c c d b d c c b a b
+R b d c c c c a c b c a c c a b
+R c d a c d c c a c c b b a b
+R a c c a c a c c c d a c c b b
+R c b c d c a c a c c c b a c c
+R b c c c c c d c a b
+R c c c c a c d d b a b
+R c b c c d d c c a a c b c
+C tb-259-1 3901878386 10
+T <>(+(+(->(d,b),+(c)),X(->(c),<>(d),c),*(X(c),a,<>(a)),<>(<>(a),X(c),->(c,tau,c))),b,tau,X(X(c,tau),->(<>(b,a)),b,a))
+R c a c c a a c d d c a b c c c b
+R c d c c c b c d a c b
+R b a c c c c d d b c a
+R a b c c c c c c a d b
+R b c c d c c c c a b a
+R b c c c d c c a c b a c b
+R c d c a c c c b c b b a
+R b c a d c d c a c c c b
+R a d c c c d c a b c c a b
+R c c c c c a d b d b b
+C tb-259-2 2416642434 10
+T <>(+(+(->(d,b),+(c)),X(->(c),<>(d),c),*(X(c),a,<>(a)),<>(<>(a),X(c),->(c,tau,c))),b,tau,X(X(c,tau),->(<>(b,a)),b,a))
+R b c a c a c d c c c a c b c a
+R b c a d c c a c d c b a c c b a
+R a b c a c d a c b c c c c
+R a d c d c c b a c c c b b
+R b b c c c d c a c b c
+R b a c c c c a a d b c c c a c
+R b b c c a d d b c c a c c c a
+R b a b d c a c c c c b a c c
+R b c c d b c c a c c b
+R b b c c a c a c a c a d c c c a c c c a a b c
+C tb-260-0 2100993201 10
+T +(<>(<>(tau,c),+(f,->(b,e),b,<>(f)),X(f,<>(tau,a,d,c),->(b,d,b,d),*(d,tau,a))),<>(*(c,+(f)),X(f,<>(e,c,c,a),->(c,a,c)),b),->(->(->(b,e,d,e),*(tau,f,b),f,c),tau))
+R f b e b b d f e b c e c d c a f d c d c d
+R b b e d e c c a f c f c b f f c b e
+R f c b b e d f e a c e b c b f c f e c f f c
+R c c f b b e a d c b e c f b f f c e d f f c c a f c c
+R b e f d c e c b b f c f c e a e c f b
+R c c b e d e f f b c f a e f c f f b f c b f
+R b c f e d b b f e c e f f c f c c c a c f b
+R b e f d e b f e e b c f c f a d f c c c b
+R d c b e d e b f b f f c f e c b
+R c b e b d e c b d b d c b b e f f c a f c
+C tb-260-1 180713525 10
+T +(<>(<>(tau,c),+(f,->(b,e),b,<>(f)),X(f,<>(tau,a,d,c),->(b,d,b,d),*(d,tau,a))),<>(*(c,+(f)),X(f,<>(e,c,c,a),->(c,a,c)),b),->(->(->(b,e,d,e),*(tau,f,b),f,c),tau))
+R b e d c e b b f f f f e c b b d f c f b d
+R c b e b e f a b f d c e c c e b f f c
+R c b e c f d c f c f e f c b d b c d b f b c b e f a c
+R b c e f d f e f c b f c b b e f
+R c b e b c d a c c f c e b f f f b f c c f e c f
+R b e d d e a c f b f f c a b c f b f e c c f f c c
+R b c f e b d e e b f f b f d f c c
+R b b e e f d b f e b c f a c f c f d c f c
+R b f b e b c d f e e f a c f f d c c c b
+R b c b f c e a d b e e b f c d f c c d
+C tb-260-2 839750988 10
+T +(<>(<>(tau,c),+(f,->(b,e),b,<>(f)),X(f,<>(tau,a,d,c),->(b,d,b,d),*(d,tau,a))),<>(*(c,+(f)),X(f,<>(e,c,c,a),->(c,a,c)),b),->(->(->(b,e,d,e),*(tau,f,b),f,c),tau))
+R b d c c e d e f f c f f b c e f c f c b c e a b
+R c b b e d f b c b e f a c e b d f b c c f c d
+R a f c c e b c b e f e f b c d c e f c d f d f c c b
+R b c b c e d f e f b e f b c c c f a d a c c
+R c b b f e f d b e d d c d e d f d d f c b
+R b d b e c b a c d d c c b e b b f c f f e
+R d b e d f c b e e c b f f c e a c c b
+R c b f b b f e d e e f c a f c f c c f c b
+R b f b c c e a b d f e e b d c f c c
+R b e b c c b e a d e b c e f f c f f c c f f c
+C tb-261-0 1113290937 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-261-1 694242372 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-261-2 1906246335 10
+T f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-262-0 1444590689 10
+T +(->(c,a,d))
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+C tb-262-1 183182514 10
+T +(->(c,a,d))
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+C tb-262-2 892506128 10
+T +(->(c,a,d))
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+R c a d
+C tb-263-0 2101023502 10
+T ->(e,d,tau)
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+C tb-263-1 2443787750 10
+T ->(e,d,tau)
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+C tb-263-2 955878537 10
+T ->(e,d,tau)
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+R e d
+C tb-264-0 2984269327 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-264-1 130379595 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-264-2 2996110206 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-265-0 3020585064 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-265-1 2224807853 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-265-2 1973429010 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-266-0 3637007371 10
+T +(<>(*(e,a,f),*(*(a,d),+(h,g)),*(->(h,g,tau,tau),a,c),b))
+R b e h g a d a d a d a g h a
+R a d a d a d a d a d a d a b h g e
+R b a h g a d a g h a d a d a h g a h g e a e a e
+R a d a g h a e h g b
+R e h g a h g a h g a h g a h g b a d a h g a g h a h g a h g a d a g h a g h a h g a h g a
+R e a e a d a d a d a d a h g a d a d a d a h g b
+R b h g a h g e a d a d a g h a d a d a d a d a h g a d a
+R h g a d a d a d a h g a d a e a e b
+R b e a h g a h g
+R h g a h g a h g a h g a h g a h g e a e a e a e a e a d a d a h g a b
+C tb-266-1 204106416 10
+T +(<>(*(e,a,f),*(*(a,d),+(h,g)),*(->(h,g,tau,tau),a,c),b))
+R h g b e a g h a g h a h g a h g a
+R e a b h g a h g
+R h g a h g a d a d a b e a e
+R e a e a e b h g a d a
+R a d a d a h g a d a g h a h g a e a e b h g
+R a h g a h g a e h g a h g b
+R b h g a h g a e a e
+R e a g h a g h a d a h g a d a d a h g a b h g
+R e a e a d a h g a h g a h g a h g b
+R a d a h g a h g a h g e a e a e a e b
+C tb-266-2 2965553928 10
+T +(<>(*(e,a,f),*(*(a,d),+(h,g)),*(->(h,g,tau,tau),a,c),b))
+R h g a h g a h g a h g a h g a h g a d a g h a d a d a b e a e
+R b a h g a d a h g a e h g
+R b e h g a h g a h g a d a
+R a d a d a d a d a e a e b h g a h g a h g
+R e h g b a d a d a
+R a d a d a d a b h g a h g e a e
+R b a d a e a e h g a h g a h g
+R e a e h g a h g a h g b a
+R e a e b h g a h g a
+R h g b a d a e a e a e
+C tb-267-0 886677605 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-267-1 4177024531 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-267-2 2046021229 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-268-0 2189330511 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-268-1 2926549461 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-268-2 1484269367 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-269-0 873274873 10
+T +(<>(e),*(g,e),->(c,h,g))
+R c g h g e
+R g c h e g
+R g c h e g e g
+R g c e g e h g e g
+R g e g e c h e g g
+R g e g e g c h g e
+R e c g e g h g
+R e g c h g
+R c e g h e g g
+R g c h g e g e
+C tb-269-1 1057281332 10
+T +(<>(e),*(g,e),->(c,h,g))
+R e g c h g
+R g c h g e
+R g e c h e g g e g
+R g e g c h g e g e
+R c g h e g
+R e g c e g h g
+R g e e g e c g e h g g
+R c g e e h g e g g
+R g c e g e h g
+R c h g e g
+C tb-269-2 2945767987 10
+T +(<>(e),*(g,e),->(c,h,g))
+R c h g e g
+R g c e g h e e g e g g e g
+R c h g e g g e
+R c h e g e g g
+R g c h e g
+R e c g e h g g
+R c h g e g e g e g
+R c h g e g g e e g
+R c h e g g
+R c g e g h e e g g
+C tb-270-0 1197903452 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-270-1 3714350522 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-270-2 1836268824 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-271-0 1195906739 10
+T X(+(X(+(b),X(b,tau),+(b,a))),*(<>(a,<>(b,b),*(a,tau,b)),a,*(<>(b,b),a)),->(*(+(b,a),X(a,a,a),b),a,+(+(a,b,a,b),*(a,tau,a),b),<>(b)),->(a))
+R b
+R a
+R b b a a a a b b a a a a a a a
+R a
+R a b b a a a
+R a
+R b
+R b a a a b b a a b a b
+R b
+R b a a a b a b b a b
+C tb-271-1 3309747164 10
+T X(+(X(+(b),X(b,tau),+(b,a))),*(<>(a,<>(b,b),*(a,tau,b)),a,*(<>(b,b),a)),->(*(+(b,a),X(a,a,a),b),a,+(+(a,b,a,b),*(a,tau,a),b),<>(b)),->(a))
+R a a a b b a b b a a a a b b a a
+R b a a b a a b a a b b a a b a a b
+R a
+R b b a a a a a a b b a a a a a b b
+R a b b a a b b a a
+R a b b a
+R a b a a b a b a a b a a a b a b a a b a a b a a b a a a a a b b a a b
+R a
+R a b a a b b b a a b
+R b
+C tb-271-2 1858414261 10
+T X(+(X(+(b),X(b,tau),+(b,a))),*(<>(a,<>(b,b),*(a,tau,b)),a,*(<>(b,b),a)),->(*(+(b,a),X(a,a,a),b),a,+(+(a,b,a,b),*(a,tau,a),b),<>(b)),->(a))
+R a
+R b a a a b a a b a a b a b a b b a a b
+R a
+R a b
+R a b
+R a
+R b
+R b
+R a b b a
+R a a a a a a b b a a a b b
+C tb-272-0 3418275874 10
+T *(tau,X(e,tau,b))
+R
+R b e
+R
+R
+R e
+R
+R
+R b
+R b
+R
+C tb-272-1 3516600202 10
+T *(tau,X(e,tau,b))
+R
+R
+R
+R e
+R
+R b b
+R
+R
+R
+R b
+C tb-272-2 1291607757 10
+T *(tau,X(e,tau,b))
+R
+R b b
+R
+R
+R b e
+R b b
+R
+R b
+R b
+R
+C tb-273-0 1786218711 10
+T X(<>(X(e,tau,b,a)),<>(X(e),a),<>(->(a),<>(e,tau,a,f),X(c,f,d),<>(e,d)))
+R a
+R f a e f a d e
+R e d c e a f a
+R d e e a f a f
+R e
+R e f a d d e a
+R b
+R d e e f a c a
+R
+R e
+C tb-273-1 2225370998 10
+T X(<>(X(e,tau,b,a)),<>(X(e),a),<>(->(a),<>(e,tau,a,f),X(c,f,d),<>(e,d)))
+R a e
+R
+R e
+R e f a d d e a
+R a e
+R e a
+R a e
+R b
+R a d e f a e d
+R d e d a f e a
+C tb-273-2 190542099 10
+T X(<>(X(e,tau,b,a)),<>(X(e),a),<>(->(a),<>(e,tau,a,f),X(c,f,d),<>(e,d)))
+R f e a f d e a
+R e a
+R a e
+R a d e f e a f
+R d e d a e a f
+R e a
+R e a
+R e
+R a
+R a
+C tb-274-0 1813958574 10
+T *(X(<>(X(a),*(a,b,b))),X(X(b)),<>(a,+(<>(a)),->(a,->(b,b,tau,a))))
+R a b a a
+R a a
+R a a
+R a b a b a b a b a b a b a a
+R a a
+R a a
+R a b a a b a a b a b a a
+R a b a a b a b a b a a
+R a a b a a b a b a a
+R a a
+C tb-274-1 1805500754 10
+T *(X(<>(X(a),*(a,b,b))),X(X(b)),<>(a,+(<>(a)),->(a,->(b,b,tau,a))))
+R a b a a
+R a b a b a a b a a b a b a a b a a b a a
+R a a
+R a a b a a
+R a a b a a b a b a b a a b a a b a b a a b a
+R a a b a a b a a
+R a a b a b a b a a b a a b a
+R a a
+R a a b a b a b a a b a b a a b a a
+R a a b a a
+C tb-274-2 4044562958 10
+T *(X(<>(X(a),*(a,b,b))),X(X(b)),<>(a,+(<>(a)),->(a,->(b,b,tau,a))))
+R a a
+R a b a b a b a b a a
+R a a
+R a a b a b a b a b a a b a b a b a b a b a b a a
+R a a
+R a b a b a b a a
+R a a b a b a a
+R a a b a b a b a a
+R a a b a b a a b a a b a a b a b a a
+R a a
+C tb-275-0 417780288 10
+T ->(tau,<>(c,X(tau,+(a))),c)
+R a c c
+R c c
+R c c
+R c c
+R c a c
+R a c c
+R a c c
+R a c c
+R c a c
+R c c
+C tb-275-1 429309585 10
+T ->(tau,<>(c,X(tau,+(a))),c)
+R a c c
+R c c
+R a c c
+R a c c
+R c c
+R c c
+R c a c
+R a c c
+R a c c
+R c c
+C tb-275-2 269446936 10
+T ->(tau,<>(c,X(tau,+(a))),c)
+R c c
+R c c
+R a c c
+R c c
+R c c
+R c c
+R c c
+R c c
+R c a c
+R a c c
+C tb-276-0 318307793 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-276-1 1814539981 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-276-2 1270767628 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-277-0 3459977980 10
+T <>(+(e,c,b,e),X(b,e,e,c),X(f,b))
+R b c e e e f
+R b c e e b b
+R c e e b b c
+R b b e e c e
+R b e c e e b
+R b e c e b b
+R e e b c e b
+R e c b e e f
+R c b e e e b
+R b e b e c e
+C tb-277-1 1198397805 10
+T <>(+(e,c,b,e),X(b,e,e,c),X(f,b))
+R b e c e e f
+R b c e e b b
+R b b e c e e
+R c b c b e e
+R c b c b e e
+R c b e e c f
+R c e b e b e
+R f e c e b e
+R e f b e c e
+R c b e e b c
+C tb-277-2 2507851311 10
+T <>(+(e,c,b,e),X(b,e,e,c),X(f,b))
+R e c e b e b
+R e e b c b c
+R b e e b c e
+R e c b e b e
+R f b e c b e
+R f b e c e b
+R e e c b b b
+R c e e b b f
+R e e c b f c
+R f e b c e e
+C tb-278-0 3693596641 10
+T X(*(tau,d,tau),+(tau,tau,a,d),X(b,a))
+R d
+R d a
+R d d
+R a d
+R d a
+R b
+R a
+R d a
+R a d
+R a d
+C tb-278-1 1115577375 10
+T X(*(tau,d,tau),+(tau,tau,a,d),X(b,a))
+R d d
+R d d
+R
+R
+R d a
+R d a
+R a
+R b
+R a
+R a
+C tb-278-2 3270718398 10
+T X(*(tau,d,tau),+(tau,tau,a,d),X(b,a))
+R a
+R a d
+R a
+R
+R d a
+R d a
+R
+R d
+R b
+R d
+C tb-279-0 1654972770 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-279-1 2281614851 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-279-2 370472952 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-280-0 2259242781 10
+T *(->(tau,<>(+(tau,a,tau,tau),X(b,b),X(tau,a,b),X(b,a)),a,X(+(b,a,a),X(b))),<>(*(X(a),tau)),<>(*(+(tau,a,a),*(b,b),*(b,a)),X(a,X(b,b),a),*(*(b,a),X(b,a,b,tau),X(tau,a,b)),b))
+R a a b a a a b
+R a a b a a b a
+R b a b b a b
+R b a a a a a a b a a b a a a a b
+R b a b b a a a b a b a b a b a a a a a b a b a a a b
+R a b b a b a a b b a a a a b a a a a a b a a a b
+R b b a a b
+R b a b a b a a b b a a b a a
+R a b a b a b a a b b a a a b a a a a a b a b a a a b b b a b a a
+R a b a a a a b a a b b a a a b a a a b a a a a b a a a b a b a a b a a b a a b a b a a b b a a a a b a a a a a a a a b b a a b
+C tb-280-1 3489954032 10
+T *(->(tau,<>(+(tau,a,tau,tau),X(b,b),X(tau,a,b),X(b,a)),a,X(+(b,a,a),X(b))),<>(*(X(a),tau)),<>(*(+(tau,a,a),*(b,b),*(b,a)),X(a,X(b,b),a),*(*(b,a),X(b,a,b,tau),X(tau,a,b)),b))
+R b a a b a b
+R b a b a a b a a a a a b b a a b a a
+R b b a a a b a
+R b a a a a b
+R b a b a a b a a
+R b a a b a b
+R a b b a a a b
+R b a b a b
+R a a b a a a b a a a a b b a b a a a a b a a a b a a a a a b b b a b
+R b a b b a a b a a a b b b a a b a b b a a b a b a b a a a a b
+C tb-280-2 500095372 10
+T *(->(tau,<>(+(tau,a,tau,tau),X(b,b),X(tau,a,b),X(b,a)),a,X(+(b,a,a),X(b))),<>(*(X(a),tau)),<>(*(+(tau,a,a),*(b,b),*(b,a)),X(a,X(b,b),a),*(*(b,a),X(b,a,b,tau),X(tau,a,b)),b))
+R b a a a b a a
+R a a b a b a a
+R a b b b a b
+R a b a a a a b a a a a b b a a a a b a a b b a a b a a a b b a b
+R a a b a b a b a b b a b a b b b a a b a b a b a a b a a b b b a b a a a a a b a b a a
+R a a a b a a b a
+R b a b a a a a b
+R a b a b a b
+R a a b b a b a a a b b a a a b
+R a a b a b a b b a a a a a b
+C tb-281-0 1692114321 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-281-1 3773425869 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-281-2 1550099444 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-282-0 344737170 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-282-1 3443811628 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-282-2 1461004308 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-283-0 3551485455 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-283-1 603389626 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-283-2 1641456841 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-284-0 765453543 10
+T <>(+(+(g,e),<>(c,h,h,g),+(h,tau,h,g),*(c,b)))
+R g g g c h h b h h c c b c e
+R g h c h h c h g e g
+R g h h c g h g h e c
+R g h g h h c b c e g h c
+R g h h h c g e g h c
+R g h e h h g c c g h
+R h c g e h h c g h g
+R h h c g b h c e c g b c h g
+R g h h e h g c g c h
+R h g h c g c h h b c b c e g
+C tb-284-1 3937359773 10
+T <>(+(+(g,e),<>(c,h,h,g),+(h,tau,h,g),*(c,b)))
+R h e g h c g c g h h
+R h g h h c h c b g c e g
+R h c h g g e c h g h
+R c h g b c g b e c h b g c h h c
+R h g h g e c c h h g
+R c g b c g g c h h b c h h e
+R g h c h g h e c g h
+R g c h e c h h h g g
+R h h h g c e c h g g
+R c g g h h h e c h g
+C tb-284-2 1802066641 10
+T <>(+(+(g,e),<>(c,h,h,g),+(h,tau,h,g),*(c,b)))
+R h h c h c g g h g e
+R c h b h g c c b e g h h g c
+R g c h g h h e h g c
+R h h c h c g g e g h
+R c h h c g h g g h e
+R c c b h g g h c e b h c h g
+R h e g g h c h g h c
+R c h e h g g c b c h g h
+R h c h h g b g c c g e h
+R h g h h h g e c c g
+C tb-285-0 3679761250 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-285-1 2727478156 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-285-2 1107503093 10
+T b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+R b
+C tb-286-0 418421641 10
+T ->(a,->(<>(a,b),<>(b,b),->(b,b,tau,b)),->(+(a,a,b,a)),*(*(a,a),tau))
+R a a b b b b b b a a a b a a a a a a
+R a b a b b b b b a a b a a a a a a a a
+R a a b b b b b b b a a a a a a a a a a a a
+R a b a b b b b b b a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a
+R a a b b b b b b a a b a a a a a a
+R a a b b b b b b a a b a a a a a a a a a a a a a
+R a b a b b b b b a a a b a a a
+R a a b b b b b b a a b a a a a
+R a b a b b b b b a a a b a a a
+R a b a b b b b b a b a a a a a
+C tb-286-1 3494991056 10
+T ->(a,->(<>(a,b),<>(b,b),->(b,b,tau,b)),->(+(a,a,b,a)),*(*(a,a),tau))
+R a a b b b b b b a b a a a a a a a a a a
+R a a b b b b b b a a a b a a a a a a a a a
+R a a b b b b b b b a a a a
+R a b a b b b b b a a a b a a a a a a a a a a a
+R a a b b b b b b a a a b a a a
+R a b a b b b b b a a a b a a a a
+R a b a b b b b b a a a b a a a a a
+R a a b b b b b b a a b a a a a a
+R a b a b b b b b b a a a a a a a a a a a a
+R a b a b b b b b a a b a a a a a a
+C tb-286-2 884598793 10
+T ->(a,->(<>(a,b),<>(b,b),->(b,b,tau,b)),->(+(a,a,b,a)),*(*(a,a),tau))
+R a b a b b b b b a b a a a a a a a a a a a a a a
+R a a b b b b b b a a a b a a
+R a b a b b b b b b a a a a
+R a b a b b b b b b a a a a a a a a a a
+R a b a b b b b b b a a a a a
+R a b a b b b b b a b a a a
+R a a b b b b b b a a a b a a a a a a a a
+R a b a b b b b b a b a a a a a a a a
+R a a b b b b b b a a a b a
+R a b a b b b b b a b a a a
+C tb-287-0 461705641 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-287-1 2469376552 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-287-2 2024213631 10
+T c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+R c
+C tb-288-0 972171373 10
+T X(*(*(b,tau,a),->(b,a,a),+(a,tau,b)),+(X(b,a,b),+(a),+(b,a,a,a)),+(->(b),*(a,b,b),a,->(tau,tau,b,a)),*(b,b))
+R b
+R b a b a b a a
+R b b a a a
+R b b
+R b b b
+R b
+R a b a a a b
+R a a b a b
+R a a b b a a
+R a b a b a a
+C tb-288-1 2072135165 10
+T X(*(*(b,tau,a),->(b,a,a),+(a,tau,b)),+(X(b,a,b),+(a),+(b,a,a,a)),+(->(b),*(a,b,b),a,->(tau,tau,b,a)),*(b,b))
+R b a a a a a
+R b b b b a a b b a a b b a a b b b b b b
+R a b b a a a
+R b b
+R b b b
+R b a b a a
+R a b a a a a
+R a a b a a a
+R a b b b a a a
+R b b b b a a b b a a b b b b a a b b b a a b b
+C tb-288-2 3283558279 10
+T X(*(*(b,tau,a),->(b,a,a),+(a,tau,b)),+(X(b,a,b),+(a),+(b,a,a,a)),+(->(b),*(a,b,b),a,->(tau,tau,b,a)),*(b,b))
+R b
+R b b b b a a b b
+R b b b
+R a a a b a b
+R b
+R b b
+R b a a b a
+R b
+R b
+R a a b b a
+C tb-289-0 1105600974 10
+T X(*(b,b),+(tau))
+R
+R
+R
+R
+R
+R
+R
+R
+R
+R b b b
+C tb-289-1 1266420119 10
+T X(*(b,b),+(tau))
+R
+R
+R
+R
+R b b b b b b b
+R
+R b
+R b b b b b
+R b b b
+R b
+C tb-289-2 2296056611 10
+T X(*(b,b),+(tau))
+R b
+R b
+R b b b b b b b b b b b
+R b
+R
+R
+R
+R
+R
+R b
+C tb-290-0 901205493 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-290-1 3700946292 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-290-2 484849158 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-291-0 690460732 10
+T +(X(a,->(a,b,c),X(a,c,c,c),*(tau,c)),+(<>(b,b)))
+R b a b
+R b a b
+R b c b
+R a b c b b
+R b c b
+R b a b b c
+R b b a
+R b b
+R b b c
+R a b c b b
+C tb-291-1 1384749144 10
+T +(X(a,->(a,b,c),X(a,c,c,c),*(tau,c)),+(<>(b,b)))
+R b b
+R b b
+R a b b
+R a b b b c
+R a b b
+R b b
+R b a b
+R c b b
+R b b c
+R b b
+C tb-291-2 2347597467 10
+T +(X(a,->(a,b,c),X(a,c,c,c),*(tau,c)),+(<>(b,b)))
+R b b a
+R a b c b b
+R b c b
+R c b b
+R b b
+R b b
+R b a b
+R c b c b
+R b b a
+R b a b
+C tb-292-0 2019321619 10
+T ->(X(*(->(b,tau,a,d),<>(f,e),X(tau,e))),e,+(*(+(e,f),->(c,e,a),*(e,e)),d,*(+(b,b),X(d,b,d)),*(a,X(c,e,e,a),X(a,a))))
+R b a d f e b a d e e f c a e b a e f c e a e e a f b d c e d a b f e c b e b c b a f e b a
+R b a d e e f b c a d e a a a e b e f a
+R b a d f e b a d e a f e c b e a e f c e e d a f e c a e b e a f a e
+R b a d e f e c e a f b e b c e a e a d f c e a f e c e a e f e c e a f a e
+R b a d e a c a e b d b f c d e b a f e b
+R b a d e b b a e f d d a b a b
+R b a d f e b a d f e b a d f e b a d e e f c e a f a e c e a e f c e a e f c e a f b e c e a e f b c e a e f c e e b a f a e c e a f d e b c e a b f e c e a e f c e a f e
+R b a d f e b a d f e b a d e b e f c a e b a d b f e b c e a e f b
+R b a d e b b d e b b f b a b b d
+R b a d e f b a d e b f e c a e e a d a f b e c e a a e f c e a a e f
+C tb-292-1 2384743668 10
+T ->(X(*(->(b,tau,a,d),<>(f,e),X(tau,e))),e,+(*(+(e,f),->(c,e,a),*(e,e)),d,*(+(b,b),X(d,b,d)),*(a,X(c,e,e,a),X(a,a))))
+R b a d e f b a d e e d f b b a
+R b a d e b b e f d a
+R b a d e d a e b b d b b f
+R b a d f e b a d e f b b e c d a e b a e f e a c b e e a e a d f
+R b a d e b b a b b f e b d d b b
+R b a d e f b a b e a d e
+R b a d f e b a d e f b a d f e b a d f e b a d f e b a d f e b a d e f b e c a b d e a d b f e b
+R b a d e f b a d f e b a d f e b a d e d b f a c e b a
+R b a d f e b a d e f b a d e f d e c a e a f b e c b a
+R b a d e a b b e a e d b a e f e b a d b b d a a b b d a b b d b d a b
+C tb-292-2 2962483157 10
+T ->(X(*(->(b,tau,a,d),<>(f,e),X(tau,e))),e,+(*(+(e,f),->(c,e,a),*(e,e)),d,*(+(b,b),X(d,b,d)),*(a,X(c,e,e,a),X(a,a))))
+R b a d e f b a d e f b a d e e a f c e a f e c e a f e c e a b f e d c e a f e c e a e b f c e a f e c e a e f c e a f e c e a f e e c e a e f c e a e a f c e a e f
+R b a d e e d f c e a e f c e b b a f e c b b e a a b e f
+R b a d e f e b c e b a a d e f
+R b a d e d e f a a b a b
+R b a d f e b a d e b a e b f d
+R b a d e f b a d e a f b e b c e a d b e f d b
+R b a d e f e b a a c e a f e c b d e a a e f
+R b a d e f b a d e d f b a b e
+R b a d e e f c d e a f b e a c e a b e f
+R b a d e f b a d f e b a d e b f a b c d b b b a e
+C tb-293-0 128678047 10
+T *(->(tau,tau,tau),<>(g),a)
+R g
+R
+R
+R g
+R
+R
+R
+R g g
+R g g g g g g
+R g g
+C tb-293-1 926311436 10
+T *(->(tau,tau,tau),<>(g),a)
+R g g g g g
+R
+R g
+R g g g
+R
+R g
+R
+R
+R g g
+R g g g g
+C tb-293-2 2650122248 10
+T *(->(tau,tau,tau),<>(g),a)
+R g g
+R
+R g g
+R g g g
+R g
+R g g
+R
+R g
+R
+R
+C tb-294-0 3735833597 10
+T ->(f)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-294-1 3312801387 10
+T ->(f)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-294-2 3194503532 10
+T ->(f)
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+R f
+C tb-295-0 1806937756 10
+T *(X(a,a),X(a,b,c),+(b,a))
+R a
+R a
+R a a a
+R a b a
+R a c a b a
+R a
+R a
+R a
+R a c a a a c a c a a a b a
+R a a a a a
+C tb-295-1 1611718964 10
+T *(X(a,a),X(a,b,c),+(b,a))
+R a b a
+R a
+R a
+R a
+R a a a a a
+R a a a b a
+R a
+R a a a
+R a
+R a c a a a
+C tb-295-2 2664897065 10
+T *(X(a,a),X(a,b,c),+(b,a))
+R a
+R a a a
+R a
+R a
+R a c a
+R a
+R a
+R a a a
+R a
+R a
+C tb-296-0 326548183 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-296-1 1335948255 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-296-2 4061131659 10
+T a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+R a
+C tb-297-0 2071456869 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-297-1 67283892 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-297-2 4016953324 10
+T e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+R e
+C tb-298-0 3150105941 10
+T <>(*(b,b))
+R b
+R b b b b b b b
+R b
+R b
+R b
+R b b b b b
+R b
+R b
+R b b b
+R b b b
+C tb-298-1 1040179465 10
+T <>(*(b,b))
+R b b b b b b b b b b b b b b b
+R b b b
+R b b b b b b b
+R b b b b b
+R b b b b b b b b b b b b b b b b b
+R b b b b b b b
+R b
+R b
+R b b b
+R b b b b b
+C tb-298-2 590803892 10
+T <>(*(b,b))
+R b
+R b
+R b b b b b b b
+R b
+R b
+R b
+R b
+R b b b b b b b b b b b
+R b
+R b b b
+C tb-299-0 3563560821 10
+T *(c,b,d)
+R c b c
+R c b c
+R c
+R c
+R c
+R c b c b c b c
+R c b c
+R c
+R c b c
+R c b c b c b c b c
+C tb-299-1 23304800 10
+T *(c,b,d)
+R c b c b c b c b c
+R c b c
+R c
+R c b c b c
+R c b c b c
+R c
+R c b c
+R c
+R c b c
+R c b c b c b c b c b c b c
+C tb-299-2 1279734623 10
+T *(c,b,d)
+R c b c b c
+R c
+R c b c
+R c
+R c
+R c b c b c b c b c
+R c
+R c b c
+R c b c
+R c b c b c b c

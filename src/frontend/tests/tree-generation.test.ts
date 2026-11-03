@@ -58,6 +58,10 @@ describe("native tree generation workflow",()=>{
     expect(query.has("playout_seed")).toBe(false);
     form.withLog=true;form.playoutVariant="EXTENSIVE";form.returnStrings=true;
     const extended=new URLSearchParams(treeGenerationQuery(form));expect(extended.has("playout_traces")).toBe(false);expect(extended.get("playout_return_set_strings")).toBe("true");
+    // The reference envelope unless timing is typed in.
+    for(const key of ["playout_start","playout_case_interval","playout_event_interval"])expect(extended.has(key)).toBe(false);
+    form.playoutVariant="TOPBOTTOM";expect(new URLSearchParams(treeGenerationQuery(form)).has("playout_max_loop_occurrences")).toBe(false);
+    form.playout.start="5";expect(new URLSearchParams(treeGenerationQuery(form)).get("playout_start")).toBe("5");
   });
   it.each(['["A",null]','[]','A,B','[""]'])("rejects malformed activity label input %s",activities=>{
     const form=defaultGenerationForm();form.variant="basic";form.generator.activities=activities;expect(()=>treeGenerationQuery(form)).toThrow(/Activity labels/);

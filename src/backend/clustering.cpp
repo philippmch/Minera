@@ -16,6 +16,7 @@
 #include <unordered_map>
 #include <utility>
 #include "full_double.hpp"
+#include "minera/random.hpp"
 
 namespace minera {
 namespace {
@@ -972,13 +973,6 @@ std::string profile_clustering_json(const ProfileClusteringResult& result) {
 
 namespace {
 
-// numpy's legacy random_sample: 53 bits from two 32-bit Mersenne Twister draws.
-double legacy_random_sample(std::mt19937& engine) {
-  const double a = static_cast<double>(engine() >> 5);
-  const double b = static_cast<double>(engine() >> 6);
-  return (a * 67108864.0 + b) / 9007199254740992.0;
-}
-
 double dot(const std::vector<double>& a, const std::vector<double>& b) {
   double sum = 0.0;
   for (std::size_t k = 0; k < a.size(); ++k) sum += a[k] * b[k];
@@ -1027,12 +1021,12 @@ ReferenceKMeansResult reference_kmeans_labels(
   };
 
   // k-means++ seeding.
-  std::mt19937 engine(options.seed);
+  rng::NumpyRandomState engine(options.seed);
   std::vector<double> cdf(n);
   double running = 0.0;
   for (std::size_t i = 0; i < n; ++i) cdf[i] = running += 1.0 / static_cast<double>(n);
   for (auto& value : cdf) value /= cdf.back();
-  const double first = legacy_random_sample(engine);
+  const double first = engine.random_sample();
   if (near(first * static_cast<double>(n), std::round(first * static_cast<double>(n))))
     result.tie_dependent = true;
   const auto first_centre = static_cast<std::size_t>(
@@ -1043,7 +1037,7 @@ ReferenceKMeansResult reference_kmeans_labels(
   const auto trials = 2 + static_cast<std::size_t>(std::log(static_cast<double>(k)));
   for (std::size_t c = 1; c < k; ++c) {
     std::vector<double> draws(trials);
-    for (auto& draw : draws) draw = legacy_random_sample(engine) * potential;
+    for (auto& draw : draws) draw = engine.random_sample() * potential;
     std::vector<double> cumulative(n);
     running = 0.0;
     for (std::size_t i = 0; i < n; ++i) cumulative[i] = running += closest[i];
@@ -1143,12 +1137,17 @@ ReferenceKMeansResult reference_kmeans_labels(
       shift += norm * norm;
     }
     centres = std::move(sums);
+    result.iterations = iteration + 1;
     if (labels == previous) {
       strict = true;
+      result.converged = true;
       break;
     }
     if (near(shift, tolerance)) result.tie_dependent = true;
-    if (shift <= tolerance) break;
+    if (shift <= tolerance) {
+      result.converged = true;
+      break;
+    }
     previous = labels;
   }
   if (!strict) labels = assign(centres);
@@ -1177,6 +1176,104 @@ ReferenceProfileClusteringResult reference_profile_clustering(
   result.clusters.erase(std::remove_if(result.clusters.begin(), result.clusters.end(),
                                        [](const auto& members) { return members.empty(); }),
                         result.clusters.end());
+  return result;
+}
+
+namespace {
+
+LogToFeaturesOptions reference_profile_features(const ProfileClusteringOptions& options) {
+  // The reference hands its parameters to the TRACE_BASED log-to-features
+  // extraction unchanged, after defaulting both representation switches to
+  // true; each Minera flag is the corresponding reference parameter.
+  LogToFeaturesOptions features;
+  features.variant = LogToFeaturesVariant::TRACE_BASED;
+  features.activity_key = options.activity_attribute;
+  features.enable_activity_def_representation = options.include_activity_representation;
+  features.enable_succ_def_representation = options.include_succession_representation;
+  features.case_string_attributes = options.trace_string_attributes;           // str_tr_attr
+  features.case_string_attributes_supplied = !options.trace_string_attributes.empty();
+  features.event_string_attributes = options.event_string_attributes;          // str_ev_attr
+  features.event_string_attributes_supplied = !options.event_string_attributes.empty();
+  features.case_numeric_attributes = options.trace_numeric_attributes;         // num_tr_attr
+  features.case_numeric_attributes_supplied = !options.trace_numeric_attributes.empty();
+  features.event_numeric_attributes = options.event_numeric_attributes;        // num_ev_attr
+  features.event_numeric_attributes_supplied = !options.event_numeric_attributes.empty();
+  features.feature_names = options.feature_names;                              // feature_names
+  features.feature_names_supplied = !options.feature_names.empty();
+  return features;
+}
+
+}  // namespace
+
+ProfileClusteringResult reference_profile_clustering_result(
+    const EventLog& log, const ProfileClusteringOptions& options,
+    const ReferenceProfileClusteringOptions& kmeans) {
+  if (options.variant != ProfileClusteringVariant::kSklearnProfiles)
+    throw std::invalid_argument("profile clustering: unsupported variant");
+  if (kmeans.cluster_count == 0 || kmeans.max_iterations == 0)
+    throw std::invalid_argument("profile clustering: bounds must be positive");
+  if (!std::isfinite(kmeans.tolerance) || kmeans.tolerance < 0.0)
+    throw std::invalid_argument("profile clustering: tolerance must be finite and non-negative");
+  if (log.traces.size() > options.max_traces)
+    throw std::invalid_argument("profile clustering: trace bound exceeded");
+  if (log.traces.size() < kmeans.cluster_count)
+    throw std::invalid_argument("profile clustering: fewer traces than clusters");
+  const auto features = log_to_features(log, reference_profile_features(options));
+  if (features.feature_names.size() > options.max_features)
+    throw std::invalid_argument("profile clustering: feature bound exceeded");
+  std::vector<std::vector<double>> rows;
+  rows.reserve(features.trace_rows.size());
+  for (const auto& trace : features.trace_rows) {
+    std::vector<double> row;
+    row.reserve(trace.size());
+    for (const auto& cell : trace) {
+      const double value = std::holds_alternative<double>(cell) ? std::get<double>(cell) : 0.0;
+      // scikit-learn rejects such input with ValueError.
+      if (!std::isfinite(value))
+        throw std::invalid_argument("profile clustering: features contain NaN or infinity");
+      row.push_back(value);
+    }
+    rows.push_back(std::move(row));
+  }
+  const auto fitted = reference_kmeans_labels(rows, kmeans);
+
+  ProfileClusteringResult result;
+  result.variant = options.variant;
+  result.feature_names = features.feature_names;
+  // Sublogs in ascending k-means label order, empty labels omitted; a
+  // trace's label is the index of its sublog.
+  std::vector<std::vector<std::size_t>> by_label(kmeans.cluster_count);
+  for (std::size_t i = 0; i < fitted.labels.size(); ++i) by_label[fitted.labels[i]].push_back(i);
+  result.labels.assign(fitted.labels.size(), 0);
+  for (auto& members : by_label) {
+    if (members.empty()) continue;
+    const auto label = static_cast<int>(result.clusters.size());
+    for (const auto i : members) result.labels[i] = label;
+    result.clusters.push_back(std::move(members));
+  }
+  const std::size_t d = result.feature_names.size();
+  for (const auto& members : result.clusters) {
+    std::vector<double> centre(d, 0.0);
+    for (const auto i : members)
+      for (std::size_t j = 0; j < d && j < rows[i].size(); ++j) centre[j] += rows[i][j];
+    for (auto& value : centre) value /= static_cast<double>(members.size());
+    for (const auto i : members)
+      for (std::size_t j = 0; j < d && j < rows[i].size(); ++j)
+        result.inertia += (rows[i][j] - centre[j]) * (rows[i][j] - centre[j]);
+    result.centroids.push_back(std::move(centre));
+  }
+  result.diagnostics.computed = true;
+  result.diagnostics.converged = fitted.converged;
+  result.diagnostics.trace_count = log.traces.size();
+  result.diagnostics.feature_count = d;
+  result.diagnostics.cluster_count = result.clusters.size();
+  result.diagnostics.iterations = fitted.iterations;
+  result.diagnostics.message =
+      std::string("reference SKLEARN_PROFILES: KMeans(n_clusters=") +
+      std::to_string(kmeans.cluster_count) + ", random_state=" + std::to_string(kmeans.seed) +
+      ") on TRACE_BASED features" +
+      (fitted.tie_dependent ? "; a decision sat on a distance tie, which the reference "
+                              "breaks by its BLAS rounding" : "");
   return result;
 }
 

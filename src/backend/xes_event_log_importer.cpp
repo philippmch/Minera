@@ -1,6 +1,7 @@
 #include "minera/xes_event_log_importer.hpp"
 
 #include "gzip_codec.hpp"
+#include "python_isoformat.hpp"
 #include "xml_pull_parser.hpp"
 #include "rust_xes_unicode.hpp"
 
@@ -61,11 +62,250 @@ bool true_attribute(const std::vector<std::pair<std::string, std::string>>& attr
   return normalized == "true" || normalized == "1" || normalized == "yes";
 }
 
+std::string native_integer_text(const NativeAttributeValue& value) {
+  if (const auto* signed_value = std::get_if<std::int64_t>(&value))
+    return std::to_string(*signed_value);
+  if (const auto* unsigned_value = std::get_if<std::uint64_t>(&value))
+    return std::to_string(*unsigned_value);
+  throw std::invalid_argument("XES int attribute has no integer native value");
+}
+
+// Python's int() and float() strip str.isspace() characters (Unicode 14 for
+// the pinned reference) and read any Unicode decimal digit (category Nd).
+bool python_space(std::uint32_t code_point) {
+  return (code_point >= 0x9 && code_point <= 0xD) ||
+         (code_point >= 0x1C && code_point <= 0x20) || code_point == 0x85 ||
+         code_point == 0xA0 || code_point == 0x1680 ||
+         (code_point >= 0x2000 && code_point <= 0x200A) || code_point == 0x2028 ||
+         code_point == 0x2029 || code_point == 0x202F || code_point == 0x205F ||
+         code_point == 0x3000;
+}
+
+int python_decimal_digit(std::uint32_t code_point) {
+  // The zero of every Nd block of ten (Unicode 14.0).
+  static constexpr std::uint32_t kZeros[] = {
+      0x30,    0x660,   0x6F0,   0x7C0,   0x966,   0x9E6,   0xA66,   0xAE6,
+      0xB66,   0xBE6,   0xC66,   0xCE6,   0xD66,   0xDE6,   0xE50,   0xED0,
+      0xF20,   0x1040,  0x1090,  0x17E0,  0x1810,  0x1946,  0x19D0,  0x1A80,
+      0x1A90,  0x1B50,  0x1BB0,  0x1C40,  0x1C50,  0xA620,  0xA8D0,  0xA900,
+      0xA9D0,  0xA9F0,  0xAA50,  0xABF0,  0xFF10,  0x104A0, 0x10D30, 0x11066,
+      0x110F0, 0x11136, 0x111D0, 0x112F0, 0x11450, 0x114D0, 0x11650, 0x116C0,
+      0x11730, 0x118E0, 0x11950, 0x11C50, 0x11D50, 0x11DA0, 0x16A60, 0x16AC0,
+      0x16B50, 0x1D7CE, 0x1D7D8, 0x1D7E2, 0x1D7EC, 0x1D7F6, 0x1E140, 0x1E2F0,
+      0x1E950, 0x1FBF0};
+  const auto* after = std::upper_bound(std::begin(kZeros), std::end(kZeros), code_point);
+  if (after == std::begin(kZeros)) return -1;
+  const auto offset = code_point - *(after - 1);
+  return offset < 10 ? static_cast<int>(offset) : -1;
+}
+
+// The ASCII spelling int()/float() actually parse: surrounding whitespace is
+// removed and decimal digits are mapped to 0-9.  nullopt when another
+// non-ASCII character (or malformed UTF-8) remains.
+std::optional<std::string> python_numeric_ascii(std::string_view text) {
+  std::string out;
+  out.reserve(text.size());
+  std::size_t index = 0;
+  std::size_t last_non_space = 0;
+  while (index < text.size()) {
+    const auto lead = static_cast<unsigned char>(text[index]);
+    std::uint32_t code_point = lead;
+    std::size_t length = 1;
+    if (lead >= 0x80) {
+      length = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 0;
+      if (length == 0 || index + length > text.size()) return std::nullopt;
+      code_point = lead & (0x7F >> length);
+      for (std::size_t k = 1; k < length; ++k) {
+        const auto next = static_cast<unsigned char>(text[index + k]);
+        if ((next & 0xC0) != 0x80) return std::nullopt;
+        code_point = (code_point << 6) | (next & 0x3F);
+      }
+    }
+    index += length;
+    if (python_space(code_point)) {
+      if (!out.empty()) out.push_back(' ');
+      continue;
+    }
+    if (code_point < 0x80) out.push_back(static_cast<char>(code_point));
+    else if (const int digit = python_decimal_digit(code_point); digit >= 0)
+      out.push_back(static_cast<char>('0' + digit));
+    else return std::nullopt;
+    last_non_space = out.size();
+  }
+  out.resize(last_non_space);
+  return out;
+}
+
+// Removes the underscores of a digit run, which Python allows only singly
+// and between two digits.  false when the run is empty or misuses one.
+bool python_digit_run(std::string_view run, std::string& out) {
+  if (run.empty() || run.front() == '_' || run.back() == '_') return false;
+  for (std::size_t index = 0; index < run.size(); ++index) {
+    const char ch = run[index];
+    if (ch == '_') {
+      if (run[index + 1] == '_') return false;
+      continue;
+    }
+    if (ch < '0' || ch > '9') return false;
+    out.push_back(ch);
+  }
+  return true;
+}
+
+// Python int(text) for base 10, limited to what a 64-bit cell holds.
+NativeAttributeValue python_int_value(std::string_view text) {
+  const auto ascii = python_numeric_ascii(text);
+  if (!ascii || ascii->empty())
+    throw std::invalid_argument("XES int attribute has an invalid value: " + std::string(text));
+  std::string_view body = *ascii;
+  bool negative = false;
+  if (body.front() == '+' || body.front() == '-') {
+    negative = body.front() == '-';
+    body.remove_prefix(1);
+  }
+  std::string digits;
+  if (!python_digit_run(body, digits))
+    throw std::invalid_argument("XES int attribute has an invalid value: " + std::string(text));
+  std::uint64_t magnitude = 0;
+  const auto parsed = std::from_chars(digits.data(), digits.data() + digits.size(), magnitude, 10);
+  if (parsed.ec != std::errc{} ||
+      (negative && magnitude > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) + 1))
+    throw std::invalid_argument("XES int attribute is outside the 64-bit range: " + std::string(text));
+  if (negative)
+    return magnitude == 0 ? std::int64_t{0}
+                          : static_cast<std::int64_t>(-static_cast<std::int64_t>(magnitude - 1) - 1);
+  if (magnitude <= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+    return static_cast<std::int64_t>(magnitude);
+  return magnitude;
+}
+
+// Python float(text): optional sign, then inf/infinity/nan in any case or a
+// decimal with optional fraction and exponent; out-of-range values round to
+// infinity or zero as Python does.
+double python_float_value(std::string_view text, std::string* canonical) {
+  const auto invalid = [&]() -> double {
+    throw std::invalid_argument("XES float attribute has an invalid value: " + std::string(text));
+  };
+  const auto ascii = python_numeric_ascii(text);
+  if (!ascii || ascii->empty()) return invalid();
+  std::string_view body = *ascii;
+  bool negative = false;
+  if (body.front() == '+' || body.front() == '-') {
+    negative = body.front() == '-';
+    body.remove_prefix(1);
+  }
+  std::string lower(body);
+  for (auto& ch : lower) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  if (lower == "inf" || lower == "infinity") {
+    if (canonical) *canonical = negative ? "-INF" : "INF";
+    return negative ? -std::numeric_limits<double>::infinity()
+                    : std::numeric_limits<double>::infinity();
+  }
+  if (lower == "nan") {
+    if (canonical) *canonical = "NaN";
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  std::string number;
+  if (negative) number.push_back('-');
+  const auto exponent_at = body.find_first_of("eE");
+  const auto mantissa = body.substr(0, exponent_at);
+  const auto dot = mantissa.find('.');
+  const auto integral = mantissa.substr(0, dot);
+  const auto fraction = dot == std::string_view::npos ? std::string_view{} : mantissa.substr(dot + 1);
+  if (integral.empty() && fraction.empty()) return invalid();
+  if (!integral.empty() && !python_digit_run(integral, number)) return invalid();
+  if (dot != std::string_view::npos) {
+    number.push_back('.');
+    if (!fraction.empty() && !python_digit_run(fraction, number)) return invalid();
+  }
+  std::int64_t exponent = 0;
+  if (exponent_at != std::string_view::npos) {
+    auto power = body.substr(exponent_at + 1);
+    number.push_back(body[exponent_at]);
+    if (!power.empty() && (power.front() == '+' || power.front() == '-')) {
+      if (power.front() == '-') number.push_back('-');
+      power.remove_prefix(1);
+    }
+    const auto start = number.size();
+    if (!python_digit_run(power, number)) return invalid();
+    // Only the order of magnitude matters for out-of-range values.
+    for (std::size_t index = start; index < number.size() && exponent < 100000; ++index)
+      exponent = exponent * 10 + (number[index] - '0');
+    if (number[start - 1] == '-') exponent = -exponent;
+  }
+  double parsed = 0.0;
+  const auto result = std::from_chars(number.data(), number.data() + number.size(), parsed,
+                                      std::chars_format::general);
+  if (result.ptr != number.data() + number.size()) return invalid();
+  if (result.ec == std::errc::result_out_of_range) {
+    // Decimal exponent of the leading significant digit decides overflow
+    // (infinity) versus underflow (zero).
+    std::int64_t lead = 0;
+    bool found = false;
+    for (const char ch : integral) {
+      if (ch == '_') continue;
+      if (!found && ch != '0') found = true;
+      if (found) ++lead;
+    }
+    if (!found) {
+      lead = 0;
+      for (const char ch : fraction) {
+        if (ch == '_') continue;
+        --lead;
+        if (ch != '0') { found = true; break; }
+      }
+    }
+    const bool overflow = found && lead + exponent > 0;
+    parsed = overflow ? std::numeric_limits<double>::infinity() : 0.0;
+    if (negative) parsed = -parsed;
+    if (canonical) *canonical = overflow ? (negative ? "-INF" : "INF") : (negative ? "-0.0" : "0.0");
+    return parsed;
+  }
+  if (result.ec != std::errc{}) return invalid();
+  // A spelling only Python reads (whitespace, underscores, non-ASCII digits)
+  // is kept as the plain decimal it denotes.
+  if (canonical && (*ascii != text || body.find('_') != std::string_view::npos))
+    *canonical = number;
+  return parsed;
+}
+
+// The text Minera keeps for a date: the wall clock with UTC attached, in
+// milliseconds unless the source wrote more fraction digits (up to six).
+std::string python_wall_date_text(const detail::PythonIsoDateTime& value) {
+  constexpr std::int64_t kMicro = 1000000;
+  auto seconds = value.wall_microseconds / kMicro;
+  auto fraction = value.wall_microseconds % kMicro;
+  if (fraction < 0) {
+    fraction += kMicro;
+    --seconds;
+  }
+  auto text = format_timestamp(static_cast<double>(seconds));
+  const auto dot = text.find('.');
+  if (dot == std::string::npos) return text;
+  char digits[7];
+  for (int index = 5; index >= 0; --index) {
+    digits[index] = static_cast<char>('0' + fraction % 10);
+    fraction /= 10;
+  }
+  digits[6] = '\0';
+  const std::size_t keep = value.fraction_digits > 3 ? std::min<std::size_t>(6, value.fraction_digits) : 3;
+  return text.substr(0, dot + 1) + std::string(digits, keep) + 'Z';
+}
+
 NativeAttributeValue parse_native_value(AttributeKind kind,
                                        std::string_view value,
-                                       XesImportVariant variant) {
+                                       XesImportVariant variant,
+                                       std::string* canonical = nullptr) {
   switch (kind) {
     case AttributeKind::kInt: {
+      if (variant != XesImportVariant::kRustXes) {
+        auto parsed = python_int_value(value);
+        if (canonical) {
+          auto text = native_integer_text(parsed);
+          if (text != value) *canonical = std::move(text);
+        }
+        return parsed;
+      }
       if (value.empty())
         throw std::invalid_argument("XES int attribute has an empty value");
       const char* first = value.data();
@@ -93,6 +333,8 @@ NativeAttributeValue parse_native_value(AttributeKind kind,
                                   std::string(value));
     }
     case AttributeKind::kFloat: {
+      if (variant != XesImportVariant::kRustXes)
+        return python_float_value(value, canonical);
       if (value == "INF" || value == "+INF")
         return std::numeric_limits<double>::infinity();
       if (value == "-INF")
@@ -124,6 +366,15 @@ NativeAttributeValue parse_native_value(AttributeKind kind,
           (value[3] == 'e' || value[3] == 'E');
     }
     case AttributeKind::kDate: {
+      if (variant != XesImportVariant::kRustXes) {
+        // The reference reads dates with fromisoformat, keeps the clock
+        // fields and attaches UTC.
+        const auto iso = detail::parse_python_isoformat(value);
+        if (!iso)
+          throw std::invalid_argument("XES date attribute has an invalid value: " +
+                                      std::string(value));
+        return NativeDate{python_wall_date_text(*iso)};
+      }
       auto parsed = parse_timestamp(value);
       if (!parsed) {
         throw std::invalid_argument("XES date attribute has an invalid value: " +
@@ -166,17 +417,10 @@ NativeAttributeValue parse_native_value(AttributeKind kind,
   return std::monostate{};
 }
 
-std::string native_integer_text(const NativeAttributeValue& value) {
-  if (const auto* signed_value = std::get_if<std::int64_t>(&value))
-    return std::to_string(*signed_value);
-  if (const auto* unsigned_value = std::get_if<std::uint64_t>(&value))
-    return std::to_string(*unsigned_value);
-  throw std::invalid_argument("XES int attribute has no integer native value");
-}
 
 void skip_element(detail::XmlPullParser& parser,
                   const detail::XmlPullParser::Token& start) {
-  constexpr std::size_t kMaxSkippedDepth = 128;
+  constexpr std::size_t kMaxSkippedDepth = 256;
   if (start.self_closing) return;
   std::size_t depth = 1;
   while (depth != 0) {
@@ -452,7 +696,8 @@ std::optional<EventAttribute> parse_attribute_node(
     const detail::XmlPullParser::Token& start,
     XesImportVariant variant,
     std::size_t depth = 0) {
-  constexpr std::size_t kMaxAttributeDepth = 128;
+  // lxml (the reference) stops at 256 nested elements in the whole document.
+  constexpr std::size_t kMaxAttributeDepth = 256;
   if (depth > kMaxAttributeDepth)
     throw std::invalid_argument("XES attribute nesting exceeds the maximum depth");
   const auto element = local_name(start.name);
@@ -526,6 +771,15 @@ std::optional<EventAttribute> parse_attribute_node(
     } else result.typed_value = parse_native_value(*kind, *raw, variant);
     return result;
   }
+  // The lxml-based readers drop a <container> wherever it appears.
+  const bool iterparse_family = variant == XesImportVariant::kIterparse ||
+                                variant == XesImportVariant::kIterparseMemoryCompressed ||
+                                variant == XesImportVariant::kIterparse20;
+  if (container && (variant == XesImportVariant::kIterparse ||
+                    variant == XesImportVariant::kIterparseMemoryCompressed)) {
+    skip_element(parser, start);
+    return std::nullopt;
+  }
   const bool is_null = true_attribute(start.attributes, "null") ||
                        true_attribute(start.attributes, "is_null");
   EventAttribute result;
@@ -535,22 +789,42 @@ std::optional<EventAttribute> parse_attribute_node(
                                       : AttributeContainerKind::kScalar;
   result.kind = kind.value_or(AttributeKind::kString);
   result.is_null = is_null;
+  bool parse_value = !is_null && kind.has_value();
   if (const auto* value = detail::attribute(start.attributes, "value")) {
     result.value = *value;
-  } else if (!is_null && kind) {
-    throw std::invalid_argument("XES scalar attribute is missing its value");
+  } else if (parse_value) {
+    // A valueless scalar: the reference keeps a string or id as None and a
+    // boolean as False; a valueless number or date (on which the reference
+    // fails) is skipped like a keyless attribute.
+    if (*kind == AttributeKind::kString || *kind == AttributeKind::kId) {
+      result.is_null = true;
+      parse_value = false;
+    } else if (*kind != AttributeKind::kBoolean) {
+      skip_element(parser, start);
+      return std::nullopt;
+    }
   }
-  if (!is_null && kind) {
-    result.typed_value = parse_native_value(*kind, result.value, variant);
+  if (parse_value) {
+    std::string canonical;
+    try {
+      result.typed_value = parse_native_value(*kind, result.value, variant, &canonical);
+    } catch (const std::invalid_argument&) {
+      // The iterparse readers drop a value they cannot convert, with its
+      // nested children, and keep the rest of the event.
+      if (!iterparse_family) throw;
+      skip_element(parser, start);
+      return std::nullopt;
+    }
     if (const auto* date = std::get_if<NativeDate>(&result.typed_value))
       result.value = date->value;
+    else if (!canonical.empty())
+      result.value = std::move(canonical);
   }
   // The public iterparse importers never store a <container>, store a <list>
   // without child elements as None, and wrap any other <list> like a scalar
   // with children (see XesPublicShape).
   const bool public_shapes = variant == XesImportVariant::kIterparse ||
                              variant == XesImportVariant::kIterparseMemoryCompressed;
-  if (public_shapes && container) result.xes_public_shape = XesPublicShape::kAbsent;
   if (public_shapes && list) result.xes_public_shape = XesPublicShape::kNone;
   const auto public_children_empty = [&] {
     return std::all_of(result.children.begin(), result.children.end(), [](const auto& child) {
@@ -656,6 +930,39 @@ void replace_attribute(std::vector<EventAttribute>& attributes,
   if (existing == attributes.end()) attributes.push_back(std::move(attribute));
   else if (overwrite) *existing = std::move(attribute);
 }
+
+// Key lookup for the attributes of the element being read.  A small element
+// is scanned linearly; once it holds many attributes a hash index takes over,
+// so reading an element stays linear in its number of attributes.
+class AttributeSlots {
+ public:
+  void clear() {
+    index_.clear();
+    indexed_ = 0;
+  }
+
+  void replace(std::vector<EventAttribute>& attributes, EventAttribute attribute,
+               bool overwrite) {
+    constexpr std::size_t kLinearLimit = 16;
+    if (attributes.size() < kLinearLimit && index_.empty()) {
+      replace_attribute(attributes, std::move(attribute), overwrite);
+      return;
+    }
+    for (; indexed_ < attributes.size(); ++indexed_)
+      index_.emplace(attributes[indexed_].key, indexed_);
+    const auto [found, inserted] = index_.emplace(attribute.key, attributes.size());
+    if (inserted) {
+      attributes.push_back(std::move(attribute));
+      indexed_ = attributes.size();
+    } else if (overwrite) {
+      attributes[found->second] = std::move(attribute);
+    }
+  }
+
+ private:
+  std::unordered_map<std::string, std::size_t> index_;
+  std::size_t indexed_ = 0;
+};
 
 template <typename Emit>
 void emit_imported_attribute(EventAttribute attribute, XesImportVariant variant,
@@ -967,8 +1274,20 @@ static EventLog import_xes_impl(
 
   if (options.variant == XesImportVariant::kLineByLine)
     xml = line_by_line_xml(xml, options.max_traces);
-  detail::XmlPullParser parser(xml);
+  // The lxml-based reference readers reject a document that is not
+  // well-formed XML; the line and regex readers scan text and do not.
+  const bool strict_xml = options.variant == XesImportVariant::kIterparse ||
+                          options.variant == XesImportVariant::kIterparse20 ||
+                          options.variant == XesImportVariant::kIterparseMemoryCompressed;
+  detail::XmlPullParser parser(xml, false, false,
+                               strict_xml ? detail::XmlStrictness::kStrict
+                                          : detail::XmlStrictness::kLenient);
   EventLog log;
+  bool saw_root = false;
+  AttributeSlots event_slots;
+  AttributeSlots trace_slots;
+  AttributeSlots log_slots;
+  const bool record_positions = options.variant != XesImportVariant::kRustXes;
   std::vector<std::string> stack;
 
   Trace current_trace;
@@ -986,14 +1305,19 @@ static EventLog import_xes_impl(
   std::size_t input_order = 0;
   bool saw_timestamp = false;
 
+  // Removes the selected cell from the generic attributes and returns the
+  // index it had, or kUnknownSourcePosition when nothing was removed.
   const auto erase_selected = [](std::vector<EventAttribute>& attributes,
-                                 std::string_view key) {
-    if (key.empty()) return;
+                                 std::string_view key) -> std::uint32_t {
+    if (key.empty()) return Event::kUnknownSourcePosition;
     const auto found = std::find_if(
         attributes.begin(), attributes.end(),
         [&](const auto& attribute) { return attribute.key == key; });
-    if (found != attributes.end() && found->children.empty() && !found->scalar_wrapper)
-      attributes.erase(found);
+    if (found == attributes.end() || !found->children.empty() || found->scalar_wrapper)
+      return Event::kUnknownSourcePosition;
+    const auto index = static_cast<std::uint32_t>(found - attributes.begin());
+    attributes.erase(found);
+    return index;
   };
 
   const auto apply_event_attribute = [&](EventAttribute attribute) {
@@ -1046,16 +1370,37 @@ static EventLog import_xes_impl(
     if (attributes_to_read.empty() || attributes_to_read.contains(attribute.key) ||
         activity_rank != 0 || timestamp_rank != 0 || resource_rank != 0 ||
         lifecycle_rank != 0) {
-      replace_attribute(current_event.attributes, std::move(attribute),
-                        options.variant != XesImportVariant::kRustXes);
+      event_slots.replace(current_event.attributes, std::move(attribute),
+                          options.variant != XesImportVariant::kRustXes);
     }
   };
 
   const auto finish_event = [&]() {
-    erase_selected(current_event.attributes, current_event.activity_source_key);
-    erase_selected(current_event.attributes, current_event.timestamp_source_key);
-    erase_selected(current_event.attributes, current_event.resource_source_key);
-    erase_selected(current_event.attributes, current_event.lifecycle_source_key);
+    // Erase in descending source order so each recorded index refers to the
+    // complete attribute list.
+    const std::string* keys[4] = {&current_event.activity_source_key,
+                                  &current_event.timestamp_source_key,
+                                  &current_event.resource_source_key,
+                                  &current_event.lifecycle_source_key};
+    std::array<std::pair<std::size_t, int>, 4> order{};
+    std::size_t selected = 0;
+    for (int role = 0; role < 4; ++role) {
+      const auto& key = *keys[role];
+      if (key.empty()) continue;
+      const auto found = std::find_if(
+          current_event.attributes.begin(), current_event.attributes.end(),
+          [&](const auto& attribute) { return attribute.key == key; });
+      if (found != current_event.attributes.end())
+        order[selected++] = {static_cast<std::size_t>(found - current_event.attributes.begin()), role};
+    }
+    std::sort(order.begin(), order.begin() + static_cast<std::ptrdiff_t>(selected),
+              [](const auto& left, const auto& right) { return left.first > right.first; });
+    for (std::size_t index = 0; index < selected; ++index) {
+      const auto role = order[index].second;
+      const auto position = erase_selected(current_event.attributes, *keys[role]);
+      if (record_positions) current_event.first_class_source_positions[role] = position;
+    }
+    event_slots.clear();
     current_event.input_order = input_order++;
     current_trace.events.push_back(std::move(current_event));
     current_event = Event{};
@@ -1067,7 +1412,10 @@ static EventLog import_xes_impl(
   };
 
   const auto finish_trace = [&]() {
-    erase_selected(current_trace.attributes, current_trace.case_id_source_key);
+    const auto case_position =
+        erase_selected(current_trace.attributes, current_trace.case_id_source_key);
+    if (record_positions) current_trace.case_id_source_position = case_position;
+    trace_slots.clear();
     for (auto& event : current_trace.events) {
       event.case_id = current_trace.case_id;
       event.case_id_state = current_trace.case_id_state;
@@ -1090,6 +1438,12 @@ static EventLog import_xes_impl(
            stack.empty() ? std::string{} : std::string(local_name(stack.back()));
       const std::string element = std::string(local_name(token.name));
       bool consumed_by_parser = false;
+      if (!saw_root) {
+        saw_root = true;
+        if (strict_xml && element != "log")
+          throw std::runtime_error("XES document root is <" + token.name +
+                                   ">, not <log>");
+      }
 
       if (element == "trace" && parent == "log") {
         if (log.traces.size() >= options.max_traces) break;
@@ -1108,26 +1462,61 @@ static EventLog import_xes_impl(
         // represented as empty strings so a permissive read does not discard
         // a declaration from an otherwise usable log.
         LogExtension extension;
-        if (const auto* value = detail::attribute(token.attributes, "name"))
-          extension.name = *value;
-        if (const auto* value = detail::attribute(token.attributes, "prefix"))
-          extension.prefix = *value;
-        if (const auto* value = detail::attribute(token.attributes, "uri"))
-          extension.uri = *value;
-        log.metadata.extensions.push_back(std::move(extension));
+        const auto* name = detail::attribute(token.attributes, "name");
+        const auto* prefix = detail::attribute(token.attributes, "prefix");
+        const auto* uri = detail::attribute(token.attributes, "uri");
+        if (name) extension.name = *name;
+        if (prefix) extension.prefix = *prefix;
+        if (uri) extension.uri = *uri;
+        if (!strict_xml) {
+          log.metadata.extensions.push_back(std::move(extension));
+        } else if (name && prefix && uri) {
+          // The iterparse readers key extensions by name (a repeated name
+          // replaces the earlier declaration in its place) and skip one that
+          // lacks a name, prefix or URI.
+          auto& extensions = log.metadata.extensions;
+          const auto found = std::find_if(extensions.begin(), extensions.end(),
+              [&](const auto& stored) { return stored.name == extension.name; });
+          if (found == extensions.end()) extensions.push_back(std::move(extension));
+          else *found = std::move(extension);
+        }
       } else if (!in_trace && parent == "log" && element == "classifier") {
         LogClassifier classifier;
         if (const auto* value = detail::attribute(token.attributes, "name"))
           classifier.name = *value;
-        if (const auto* value = detail::attribute(token.attributes, "keys"))
-          classifier.keys = tokenize_classifier_keys(*value);
-        log.metadata.classifiers.push_back(std::move(classifier));
+        const auto* keys = detail::attribute(token.attributes, "keys");
+        if (keys) classifier.keys = tokenize_classifier_keys(*keys);
+        if (!strict_xml) {
+          log.metadata.classifiers.push_back(std::move(classifier));
+        } else if (keys) {
+          // Keyed by name like extensions; a classifier without keys is
+          // skipped.
+          auto& classifiers = log.metadata.classifiers;
+          const auto found = std::find_if(classifiers.begin(), classifiers.end(),
+              [&](const auto& stored) { return stored.name == classifier.name; });
+          if (found == classifiers.end()) classifiers.push_back(std::move(classifier));
+          else *found = std::move(classifier);
+        }
       } else if (!in_trace && parent == "log" && element == "global") {
         LogGlobal global;
         if (const auto* scope = detail::attribute(token.attributes, "scope"))
           global.scope = *scope;
-        log.metadata.globals.push_back(std::move(global));
-        active_global = &log.metadata.globals.back();
+        auto& globals = log.metadata.globals;
+        const auto repeated = strict_xml && !global.scope.empty()
+            ? std::find_if(globals.begin(), globals.end(),
+                           [&](const auto& stored) { return stored.scope == global.scope; })
+            : globals.end();
+        if (repeated != globals.end()) {
+          // The iterparse readers keep the last declaration of a scope (in
+          // the place of the first).
+          repeated->attributes.clear();
+          if (global.scope == "trace") log.metadata.trace_globals.clear();
+          if (global.scope == "event") log.metadata.event_globals.clear();
+          active_global = &*repeated;
+        } else {
+          globals.push_back(std::move(global));
+          active_global = &globals.back();
+        }
       } else if (active_global && parent == "global") {
         consumed_by_parser = true;
         if (const auto attribute = parse_attribute_node(parser, token, options.variant)) {
@@ -1141,6 +1530,8 @@ static EventLog import_xes_impl(
           }
         }
       } else if (in_event && parent == "event") {
+        if (strict_xml && element == "event")
+          throw std::runtime_error("XES input nests an <event> inside an <event>");
         consumed_by_parser = true;
         if (const auto attribute = parse_attribute_node(parser, token, options.variant))
           emit_imported_attribute(*attribute, options.variant, apply_event_attribute);
@@ -1161,8 +1552,8 @@ static EventLog import_xes_impl(
               current_trace.case_id_attribute = emitted;
             }
             if (attributes_to_read.empty() || attributes_to_read.contains(emitted.key) || rank != 0)
-              replace_attribute(current_trace.attributes, std::move(emitted),
-                                options.variant != XesImportVariant::kRustXes);
+              trace_slots.replace(current_trace.attributes, std::move(emitted),
+                                  options.variant != XesImportVariant::kRustXes);
           });
         }
       } else if (!in_trace && parent == "log") {
@@ -1170,7 +1561,7 @@ static EventLog import_xes_impl(
         if (const auto attribute = parse_attribute_node(parser, token, options.variant))
           emit_imported_attribute(*attribute, options.variant, [&](EventAttribute emitted) {
             if (attributes_to_read.empty() || attributes_to_read.contains(emitted.key))
-              replace_attribute(log.attributes, std::move(emitted),
+              log_slots.replace(log.attributes, std::move(emitted),
                                 options.variant != XesImportVariant::kRustXes);
           });
       }

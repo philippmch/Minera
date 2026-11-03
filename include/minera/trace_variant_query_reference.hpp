@@ -87,10 +87,19 @@ struct TraceVariantQueryReferenceOptions {
   std::uint32_t seed = 0;
 };
 
+// Counters of one SaCoFa run: the candidate prefixes over all levels and the
+// non-conforming prefixes the exponential mechanism added back.
+struct TraceVariantQueryReferenceStats {
+  std::uint64_t candidate_count = 0;
+  std::uint64_t selected_violation_count = 0;
+};
+
 // algorithm.apply with SACOFA: the dataframe's cases (empty traces dropped;
-// none when every trace is empty).
+// none when every trace is empty). |stats|, when given, is filled as the
+// levels run, so it is complete even when the run raises ValueError.
 [[nodiscard]] std::vector<TraceVariantQueryReferenceCase> reference_sacofa_trace_variant_query(
-    const std::vector<std::vector<std::string>>& traces, const TraceVariantQueryReferenceOptions& options);
+    const std::vector<std::vector<std::string>>& traces, const TraceVariantQueryReferenceOptions& options,
+    TraceVariantQueryReferenceStats* stats = nullptr);
 
 // algorithm.apply with LAPLACE: always raises.
 [[noreturn]] void reference_laplace_trace_variant_query(const std::vector<std::vector<std::string>>& traces,

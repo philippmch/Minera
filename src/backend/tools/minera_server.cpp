@@ -31,6 +31,8 @@
 #include <cctype>
 #include <cerrno>
 #include <cmath>
+#include <condition_variable>
+#include <cstring>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -247,6 +249,13 @@ namespace {
 
 using minera::error_json;
 using minera::looks_like_xes;
+
+// Upload and download limits (README "Limits").  Minera holds about 17 times
+// an XES document's size in memory, so a 128 MiB request (or a .xes.gz that
+// inflates to the 256 MiB XES default) stays within a 8-16 GB machine.  Every
+// OCEL route parses up to the same 128 MiB.
+constexpr std::size_t kMaxRequestPayloadBytes = 128u * 1024u * 1024u;
+constexpr std::size_t kMaxResponseBytes = 128u * 1024u * 1024u;
 
 bool has_table_column(const minera::EventTable& table, std::string_view column) {
   return std::find(table.columns.begin(), table.columns.end(), column) !=
@@ -1948,6 +1957,27 @@ void handle_ocel_filter(const httplib::Request& request,
   }
 }
 
+// The OCEL JSON an import returns (classic as "log", standard as
+// "open_log"). The browser posts it back to every other OCEL route, so an import is refused unless that JSON passes the OCEL
+// parse limits and, with room for the multipart framing, the upload limit.
+std::string importable_ocel_json(
+    const minera::Ocel& log,
+    minera::OcelJsonFormat format = minera::OcelJsonFormat::kClassic) {
+  auto json = minera::serialize_ocel_json(log, format);
+  constexpr std::size_t kFramingBytes = 1u << 20;
+  minera::OcelJsonLimits limits;
+  limits.max_bytes = std::min(limits.max_bytes, kMaxRequestPayloadBytes - kFramingBytes);
+  if (json.size() > limits.max_bytes)
+    throw std::invalid_argument(
+        "the imported OCEL is " + std::to_string((json.size() + (1u << 20) - 1) >> 20) +
+        " MiB as OCEL JSON, larger than the " + minera::ocel_limit_text(limits.max_bytes) +
+        " the other OCEL routes accept (the " + minera::ocel_limit_text(kMaxRequestPayloadBytes) +
+        " upload limit less multipart framing)");
+  if (const auto violation = minera::ocel_json_limit_violation(json, limits))
+    throw std::invalid_argument("the imported OCEL does not fit the other OCEL routes: " + *violation);
+  return json;
+}
+
 void handle_ocel_sqlite(const httplib::Request& request,
                         httplib::Response& response) {
   std::filesystem::path temporary;
@@ -1999,7 +2029,7 @@ void handle_ocel_sqlite(const httplib::Request& request,
       std::ifstream input(temporary, std::ios::binary | std::ios::ate);
       if (!input) throw std::runtime_error("cannot read temporary SQLite output");
       const auto size = input.tellg();
-      constexpr std::streamoff kMaxSqliteResponseBytes = 64 * 1024 * 1024;
+      constexpr auto kMaxSqliteResponseBytes = static_cast<std::streamoff>(kMaxResponseBytes);
       if (size < 16 || size > kMaxSqliteResponseBytes)
         throw std::invalid_argument("SQLite export exceeds the server response limit");
       std::string sqlite(static_cast<std::size_t>(size), '\0');
@@ -2020,8 +2050,8 @@ void handle_ocel_sqlite(const httplib::Request& request,
     temporary.clear();
     response.set_content(
         std::string("{\"family\":\"OCEL_SQLITE\",\"variant\":\"IMPORT\",\"log\":") +
-            minera::serialize_ocel_json(log) +
-            (include_open_source ? ",\"open_log\":" + minera::serialize_ocel_json(
+            importable_ocel_json(log) +
+            (include_open_source ? ",\"open_log\":" + importable_ocel_json(
                 log, minera::OcelJsonFormat::kStandard) : "") + "}",
         "application/json");
   } catch (const std::exception& error) {
@@ -2133,7 +2163,7 @@ void handle_ocel_exchange(const httplib::Request& request,
             std::ifstream input(csv_temporary / name, std::ios::binary | std::ios::ate);
             if (!input) throw std::runtime_error("cannot read OCEL CSV output");
             const auto size = input.tellg();
-            if (size < 0 || size > 32 * 1024 * 1024)
+            if (size < 0 || static_cast<std::size_t>(size) > kMaxResponseBytes)
               throw std::invalid_argument("OCEL CSV output exceeds the response limit");
             std::string text(static_cast<std::size_t>(size), '\0');
             input.seekg(0);
@@ -2159,7 +2189,7 @@ void handle_ocel_exchange(const httplib::Request& request,
         content_type = "text/csv";
         filename = "ocel_objects.csv";
       }
-      constexpr std::size_t kMaxExchangeResponseBytes = 32u * 1024u * 1024u;
+      constexpr std::size_t kMaxExchangeResponseBytes = kMaxResponseBytes;
       if (payload.size() > kMaxExchangeResponseBytes)
         throw std::invalid_argument("OCEL exchange export exceeds the response limit");
       response.set_header("Content-Disposition",
@@ -2199,8 +2229,8 @@ void handle_ocel_exchange(const httplib::Request& request,
     else variant = "IMPORT_CSV";
     response.set_content(
         std::string("{\"family\":\"OCEL_IO\",\"variant\":\"") +
-            variant + "\",\"log\":" + minera::serialize_ocel_json(log) +
-            (include_open_source ? ",\"open_log\":" + minera::serialize_ocel_json(
+            variant + "\",\"log\":" + importable_ocel_json(log) +
+            (include_open_source ? ",\"open_log\":" + importable_ocel_json(
                 log, minera::OcelJsonFormat::kStandard) : "") + "}",
         "application/json");
   } catch (const std::exception& error) {
@@ -5200,7 +5230,7 @@ void handle_profile_clustering(const httplib::Request& request,
         "profile_include_activity", "profile_include_succession",
         "profile_trace_string_attributes", "profile_event_string_attributes",
         "profile_trace_numeric_attributes", "profile_event_numeric_attributes",
-        "profile_feature_names", "source_id", "include_cases"};
+        "profile_feature_names", "profile_engine", "source_id", "include_cases"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key))
@@ -5215,14 +5245,16 @@ void handle_profile_clustering(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     const bool include_cases = clustering_cases_requested(request, *session);
-    const auto options = minera::parse_profile_clustering_params(lookup, present);
+    // The reference SKLEARN_PROFILES pipeline unless profile_engine=native.
+    const auto profile_request = minera::parse_profile_clustering_request(lookup, present);
+    const auto& options = profile_request.options;
     if (options.cluster_count > kServerProfileMaxClusters ||
         options.max_iterations > kServerProfileMaxIterations ||
         options.max_traces > kServerProfileMaxTraces ||
         options.max_features > kServerProfileMaxFeatures) {
       throw std::invalid_argument("profile clustering safety bound exceeded");
     }
-    const auto result = minera::discover_profile_clustering(require_prepared_log(*session), options);
+    const auto result = minera::run_profile_clustering(require_prepared_log(*session), profile_request);
     auto body = minera::profile_clustering_json(result);
     if (include_cases) {
       auto analysis = std::make_shared<ClusteringAnalysis>();
@@ -6851,7 +6883,7 @@ void handle_log_util(const httplib::Request& request,
       return;
     }
     static const std::set<std::string> allowed = {
-        "variant", "train_percentage", "seed", "prefix_length",
+        "variant", "train_percentage", "seed", "split_input", "prefix_length",
         "activity", "activity_key", "timestamp_key", "activities",
         "feature_min_different_values", "feature_max_different_values",
         "feature_consider_all_attributes", "feature_mandatory_attributes", "source_id", "include_source"};
@@ -6929,8 +6961,15 @@ void handle_log_util(const httplib::Request& request,
         options.train_percentage = parsed;
       }
       if (request.has_param("seed")) options.seed = parse_size("seed", std::numeric_limits<std::size_t>::max());
+      auto split_input = minera::SplitTrainTestInput::kDataFrame;
+      if (request.has_param("split_input")) {
+        const auto kind = value("split_input");
+        if (kind == "event_log") split_input = minera::SplitTrainTestInput::kEventLog;
+        else if (kind != "dataframe")
+          throw std::invalid_argument("split_input expects dataframe or event_log");
+      }
       const auto result = minera::split_log_train_test(
-          require_prepared_log(*session), options.train_percentage, options.seed);
+          require_prepared_log(*session), options.train_percentage, options.seed, split_input);
       publish(minera::log_train_test_json(result), {{"training", "Training log", &result.training},
                                                   {"testing", "Testing log", &result.testing}});
     } else if (variant_text == "fixed_prefixes") {
@@ -7558,7 +7597,7 @@ void handle_tree_generation(const httplib::Request& request,
         "random_tree_duplicate", "random_tree_no_models", "random_tree_seed", "random_tree_activities",
         "tree_variant", "generate_log", "playout_variant", "playout_traces", "playout_max_steps",
         "playout_seed", "playout_min_length", "playout_max_length", "playout_max_loop_occurrences",
-        "playout_max_traces", "playout_return_set_strings", "playout_start",
+        "playout_max_traces", "playout_return_set_strings", "playout_cap_sampled_loops", "playout_start",
         "playout_case_interval", "playout_event_interval"};
     for (const auto& [key, value] : request.params) {
       (void)value;
@@ -7574,6 +7613,11 @@ void handle_tree_generation(const httplib::Request& request,
         request.has_param("tree_variant") ? request.get_param_value("tree_variant") : "standard");
     const auto with_log = ocel_query_bool(request, "generate_log", false);
     auto playout_options = minera::parse_process_tree_playout_params(lookup, present);
+    // The reference playout log has no case ids or timestamps (BASIC has its
+    // own fixed ones); giving any of these opts in to Minera's envelope.
+    playout_options.add_envelope = request.has_param("playout_start") ||
+                                   request.has_param("playout_case_interval") ||
+                                   request.has_param("playout_event_interval");
     playout_options.start = ocel_query_number(request, "playout_start", playout_options.start);
     playout_options.case_interval = ocel_query_number(request, "playout_case_interval", playout_options.case_interval);
     playout_options.event_interval = ocel_query_number(request, "playout_event_interval", playout_options.event_interval);
@@ -9369,7 +9413,9 @@ void handle_playout(const httplib::Request& request,
       // The native extensive default is intentionally generous for local
       // callers. The server uses a bounded default when the client did not
       // provide a cap, so an ordinary default request remains usable.
-      if (!request.has_param("max_length")) options.max_length = 64;
+      if (!request.has_param("max_length") &&
+          options.variant == minera::ProcessTreePlayoutVariant::kExtensive)
+        options.max_length = 64;
       if (options.variant == minera::ProcessTreePlayoutVariant::kExtensive &&
           options.max_traces > 10000) {
         if (request.has_param("max_trace_cap") ||
@@ -9454,8 +9500,12 @@ void handle_playout(const httplib::Request& request,
       minera::DfgStatisticalOptions dfg_options;
       const auto frequency = minera::discover_frequency_dfg(require_prepared_log(*session), dfg_options);
       minera::DfgActivityCounts starts, ends;
+      // The reference's start-activity dict lists activities in first-
+      // occurrence order; its PERFORMANCE start choice follows that order.
       for (const auto& trace : require_prepared_log(*session).traces) {
         if (!trace.events.empty()) {
+          if (!starts.contains(trace.events.front().activity))
+            options.start_activity_order.push_back(trace.events.front().activity);
           ++starts[trace.events.front().activity];
           ++ends[trace.events.back().activity];
         }
@@ -9574,6 +9624,14 @@ void handle_playout(const httplib::Request& request,
     return;
   }
   try {
+    // The reference envelope (cases "0".., epoch 10,000,000, one second per
+    // event) unless the caller asks for its own timing.
+    options.add_envelope = request.has_param("start") ||
+                           request.has_param("case_interval") ||
+                           request.has_param("event_interval");
+    // A server-side bound on add_only_if_fm_is_reached resampling; the
+    // reference has none.
+    options.max_attempts = 100 * options.traces + 1000;
     options.start = ocel_query_number(request, "start", options.start);
     options.case_interval =
         ocel_query_number(request, "case_interval", options.case_interval);
@@ -9684,7 +9742,6 @@ void handle_xes(const httplib::Request& request, httplib::Response& response) {
 
   try {
     minera::XesExportOptions options;
-    options.name = session->dataset;
     if (request.has_param("xes_export_variant")) {
       options.variant = minera::parse_xes_export_variant(
           request.get_param_value("xes_export_variant"));
@@ -10783,6 +10840,8 @@ httplib::Server::Handler api_route_handler(std::string path,
         return;
       }
     }
+    // A request on the newly mined source confirms its mining response.
+    confirm_mining_source(request);
     // A request bound to an imported model runs only when that model is the
     // server's imported model both before and after the handler: ids are
     // never reused, so the handler's own session snapshot held it too.
@@ -10797,10 +10856,13 @@ httplib::Server::Handler api_route_handler(std::string path,
         reject_stale_imported_model(response);
       return;
     }
-    const auto started = std::chrono::steady_clock::now();
     handler(request, response);
-    // A long handler leaves its working set on the allocator's free lists.
-    if (std::chrono::steady_clock::now() - started > std::chrono::milliseconds(100))
+    // A handler that read or wrote a large body leaves its working set on the
+    // allocator's free lists; small requests skip the (process-wide) trim.
+    constexpr std::size_t large_body = std::size_t{8} << 20;
+    std::size_t uploaded = request.body.size();
+    for (const auto& [name, file] : request.files) {(void)name; uploaded += file.content.size();}
+    if (uploaded >= large_body || response.body.size() >= large_body)
       minera_release_free_memory();
   };
 }
@@ -10844,7 +10906,8 @@ httplib::Server::HandlerResponse api_error_body(const httplib::Request& request,
   } else if (response.status == 404 && route == g_api_route_methods.end()) {
     message = "unknown API route: " + request.path;
   } else if (response.status == 413) {
-    message = "request payload exceeds the server limit";
+    message = "the upload is larger than the " + std::to_string(kMaxRequestPayloadBytes >> 20) +
+              " MiB server limit; compress an XES log as .xes.gz";
   } else {
     message = std::string(httplib::status_message(response.status));
     if (message.empty()) message = "HTTP " + std::to_string(response.status);
@@ -10874,8 +10937,12 @@ int main(int argc, char** argv) {
 #if defined(__GLIBC__)
   // Bound the per-thread arenas and map large buffers (logs, response bodies)
   // directly, so memory freed after a request returns to the system.
+#if defined(M_ARENA_MAX)
   mallopt(M_ARENA_MAX, 2);
+#endif
+#if defined(M_MMAP_THRESHOLD)
   mallopt(M_MMAP_THRESHOLD, 1 << 20);
+#endif
 #endif
   int port = 8484;
   std::filesystem::path frontend_dir = "src/frontend/dist";
@@ -10952,7 +11019,7 @@ int main(int argc, char** argv) {
 
   httplib::Server server;
   // Bound multipart bodies before the HTTP library buffers or parses them.
-  server.set_payload_max_length(32u * 1024u * 1024u);
+  server.set_payload_max_length(kMaxRequestPayloadBytes);
   server.set_post_routing_handler([](const httplib::Request& request, httplib::Response& response) {
     if (request.path.starts_with("/api/") &&
         response.get_header_value("Content-Type").starts_with("application/json"))
@@ -11144,6 +11211,7 @@ int main(int argc, char** argv) {
     deliver_published_mining(response);
   });
   api_post(server, "/api/cancel-mine", handle_cancel_mine);
+  api_post(server, "/api/mine-ack", handle_mine_ack);
   api_get(server, "/api/active-source", handle_active_source);
   api_get(server, "/api/active-source-file", handle_active_source_file);
   api_post(server, "/api/ocel/discover", handle_ocel_discovery);

@@ -512,14 +512,20 @@ struct ActiveMiningTicket {
   std::shared_ptr<const MinedSession> previous;
   std::shared_ptr<const ClusteringAnalysis> previous_clustering;
   std::shared_ptr<const MinedSession> published;
-  // Set once the published response reached the client in full: the rollback
-  // session is then released, so a later cancel keeps the delivered session.
-  bool delivered = false;
+  // Set once the rollback session was released: the client confirmed it
+  // consumed the published response (an ack, or a later request bound to the
+  // new source id) or the rollback window after the response was written
+  // expired. Until then a cancel restores the previous session, even when the
+  // response bytes already reached the socket.
+  bool released = false;
 };
 // The ticket this request thread published, handed to the route wrapper.
 thread_local std::shared_ptr<ActiveMiningTicket> t_published_mining_ticket;
 std::uint64_t g_active_mining_generation = 0;
 std::map<std::string, std::shared_ptr<ActiveMiningTicket>> g_active_mining_requests;
+// The one ticket that may still hold a rollback session (each new mining
+// request drops every older rollback).
+std::shared_ptr<ActiveMiningTicket> g_rollback_mining_ticket;
 
 std::shared_ptr<ActiveMiningTicket> begin_active_mining(const httplib::Request& request) {
   auto ticket = std::make_shared<ActiveMiningTicket>();
@@ -543,6 +549,10 @@ std::shared_ptr<ActiveMiningTicket> begin_active_mining(const httplib::Request& 
     (void)id;
     previous->previous.reset(); previous->previous_clustering.reset(); previous->published.reset();
   }
+  if (g_rollback_mining_ticket) {
+    g_rollback_mining_ticket->previous.reset(); g_rollback_mining_ticket->previous_clustering.reset();
+    g_rollback_mining_ticket->published.reset(); g_rollback_mining_ticket.reset();
+  }
   if (!ticket->id.empty()) {
     g_active_mining_requests[ticket->id] = ticket;
     while (g_active_mining_requests.size() > 2048) {
@@ -562,6 +572,7 @@ void publish_active_mining(const std::shared_ptr<ActiveMiningTicket>& ticket,
   session->mining_request_id = ticket->id;
   session->active_source_native_dispatch = ticket->native_source_dispatch;
   g_session = session; g_clustering_analysis.reset(); ticket->published = session;
+  g_rollback_mining_ticket = ticket;
   t_published_mining_ticket = ticket;
 }
 
@@ -570,23 +581,106 @@ void release_mining_rollback(const std::shared_ptr<ActiveMiningTicket>& ticket) 
   std::shared_ptr<const ClusteringAnalysis> previous_clustering;
   {
     std::lock_guard<std::mutex> lock(g_session_mutex);
-    if (ticket->canceled || ticket->delivered) return;
-    ticket->delivered = true;
+    if (ticket->canceled || ticket->released) return;
+    ticket->released = true;
     previous = std::move(ticket->previous); previous_clustering = std::move(ticket->previous_clustering);
+    if (g_rollback_mining_ticket == ticket) g_rollback_mining_ticket.reset();
   }
   // Destroy the replaced session outside the lock.
+  if (!previous && !previous_clustering) return;
   previous.reset(); previous_clustering.reset();
   minera_release_free_memory();
 }
 
+// How long a written mining response keeps its rollback session while the
+// client has not confirmed it: long enough for a client that fails to read or
+// validate the response to cancel, short enough to bound the memory held.
+// MINERA_MINING_ROLLBACK_MS overrides it (milliseconds; the contract tests use it).
+std::chrono::milliseconds mining_rollback_window() {
+  static const auto window = [] {
+    std::chrono::milliseconds value(60000);
+    if (const char* text = std::getenv("MINERA_MINING_ROLLBACK_MS")) {
+      std::uint64_t parsed = 0;
+      const auto* end = text + std::strlen(text);
+      const auto [at, error] = std::from_chars(text, end, parsed);
+      if (error == std::errc() && at == end && *text && parsed <= 86400000) value = std::chrono::milliseconds(parsed);
+    }
+    return value;
+  }();
+  return window;
+}
+
+// Releases rollback sessions whose window expired. Its state is never
+// destroyed, so the detached thread outlives static destruction safely.
+struct MiningRollbackReaper {
+  std::mutex mutex;
+  std::condition_variable wake;
+  std::vector<std::pair<std::chrono::steady_clock::time_point, std::weak_ptr<ActiveMiningTicket>>> due;
+};
+
+MiningRollbackReaper& mining_rollback_reaper() {
+  static MiningRollbackReaper* reaper = [] {
+    auto* created = new MiningRollbackReaper;
+    std::thread([created] {
+      std::unique_lock<std::mutex> lock(created->mutex);
+      for (;;) {
+        if (created->due.empty()) {created->wake.wait(lock); continue;}
+        const auto next = std::min_element(created->due.begin(), created->due.end(),
+            [](const auto& a, const auto& b) {return a.first < b.first;})->first;
+        if (std::chrono::steady_clock::now() < next) {created->wake.wait_until(lock, next); continue;}
+        std::vector<std::shared_ptr<ActiveMiningTicket>> expired;
+        const auto now = std::chrono::steady_clock::now();
+        std::erase_if(created->due, [&](const auto& entry) {
+          if (entry.first > now) return false;
+          if (auto ticket = entry.second.lock()) expired.push_back(std::move(ticket));
+          return true;
+        });
+        lock.unlock();
+        for (const auto& ticket : expired) release_mining_rollback(ticket);
+        expired.clear();
+        lock.lock();
+      }
+    }).detach();
+    return created;
+  }();
+  return *reaper;
+}
+
+void schedule_mining_rollback_release(const std::shared_ptr<ActiveMiningTicket>& ticket) {
+  // A request without an identity can never be canceled.
+  if (ticket->id.empty() || mining_rollback_window().count() == 0) {release_mining_rollback(ticket); return;}
+  auto& reaper = mining_rollback_reaper();
+  {
+    std::lock_guard<std::mutex> lock(reaper.mutex);
+    reaper.due.emplace_back(std::chrono::steady_clock::now() + mining_rollback_window(), ticket);
+  }
+  reaper.wake.notify_one();
+}
+
+// A request bound to the published source id proves its client consumed the
+// mining response, so the rollback session is released.
+void confirm_mining_source(const httplib::Request& request) {
+  if (!request.has_param("source_id")) return;
+  std::shared_ptr<ActiveMiningTicket> ticket;
+  {
+    std::lock_guard<std::mutex> lock(g_session_mutex);
+    if (!g_rollback_mining_ticket || !g_rollback_mining_ticket->published ||
+        request.get_param_value("source_id") != std::to_string(g_rollback_mining_ticket->published->query_source_id)) return;
+    ticket = g_rollback_mining_ticket;
+  }
+  release_mining_rollback(ticket);
+}
+
 // A mining response is streamed from a shared body so its completion is
-// observable: only a response written in full to a still-connected client
-// releases the rollback session (a client that aborted keeps cancel-mine
-// able to restore the previous source). The body bytes are unchanged.
+// observable: once it was written (in full or not) the rollback window
+// starts, and an acknowledgement, a request on the new source or the window's
+// end releases the previous session. Within the window cancel-mine restores
+// it. The body bytes are unchanged.
 void deliver_published_mining(httplib::Response& response) {
   auto ticket = std::move(t_published_mining_ticket);
   t_published_mining_ticket.reset();
-  if (!ticket || response.body.empty()) return;
+  if (!ticket) return;
+  if (response.body.empty()) {schedule_mining_rollback_release(ticket); return;}
   const auto type = response.get_header_value("Content-Type");
   auto body = std::make_shared<std::string>(std::move(response.body));
   if (type.starts_with("application/json") && body->find('\xed') != std::string::npos)
@@ -599,10 +693,27 @@ void deliver_published_mining(httplib::Response& response) {
       [body](std::size_t offset, std::size_t length, httplib::DataSink& sink) {
         return sink.write(body->data() + offset, std::min(length, body->size() - offset));
       },
-      [ticket, body](bool success) mutable {
+      [ticket, body](bool) mutable {
         body.reset();
-        if (success) release_mining_rollback(ticket);
+        schedule_mining_rollback_release(ticket);
       });
+}
+
+// The client applied the mining response: its rollback session is released.
+void handle_mine_ack(const httplib::Request& request, httplib::Response& response) {
+  try {
+    const auto id = request.get_param_value("request_id");
+    if (id.size() != 36 || request.params.size() != 1 || !request.body.empty())
+      throw std::invalid_argument("mine-ack requires a request UUID and an empty body");
+    std::shared_ptr<ActiveMiningTicket> ticket;
+    {
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      const auto found = g_active_mining_requests.find(id);
+      if (found != g_active_mining_requests.end() && !found->second->canceled) ticket = found->second;
+    }
+    if (ticket) release_mining_rollback(ticket);
+    response.set_content("{\"family\":\"ACTIVE_SOURCE_ACK\",\"request_id\":" + active_source_quote(id) + ",\"acknowledged\":" + (ticket ? "true" : "false") + "}", "application/json");
+  } catch (const std::exception& error) {response.status = 400; response.set_content(error_json(error.what()), "application/json");}
 }
 
 void handle_cancel_mine(const httplib::Request& request, httplib::Response& response) {
@@ -620,11 +731,12 @@ void handle_cancel_mine(const httplib::Request& request, httplib::Response& resp
     auto& ticket = g_active_mining_requests[id];
     if (!ticket) {ticket = std::make_shared<ActiveMiningTicket>(); ticket->id = id;}
     ticket->canceled = true;
-    if (ticket->published && !ticket->delivered && g_session == ticket->published && ticket->generation == g_active_mining_generation) {
+    if (ticket->published && !ticket->released && g_session == ticket->published && ticket->generation == g_active_mining_generation) {
       replaced = std::move(g_session);
       g_session = ticket->previous; g_clustering_analysis = ticket->previous_clustering;
       // The canceled ticket can never restore again, so it holds nothing.
       ticket->published.reset(); ticket->previous.reset(); ticket->previous_clustering.reset();
+      if (g_rollback_mining_ticket == ticket) g_rollback_mining_ticket.reset();
     }
     // The source the backend holds once the cancel is applied, so the UI hands
     // back only the source that is really live, whatever the request order.

@@ -1,6 +1,7 @@
 // Generates the bundled order-to-cash sample event log (deterministic).
 
 #include <array>
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -9,6 +10,26 @@
 #include <vector>
 
 namespace {
+
+// A uniform integer in [lo, hi] (span below 2^32) from 32-bit MT19937
+// outputs by Lemire's multiply-and-reject method. Spelled out rather than
+// left to std::uniform_int_distribution, whose algorithm the standard does
+// not fix; it reproduces the bundled data/sample_event_log.csv, which was
+// generated with this method.
+template <class Int>
+Int uniform(std::mt19937& engine, Int lo, Int hi) {
+  const auto range = static_cast<std::uint32_t>(hi - lo) + 1U;
+  std::uint64_t product = static_cast<std::uint64_t>(engine()) * range;
+  auto low = static_cast<std::uint32_t>(product);
+  if (low < range) {
+    const std::uint32_t threshold = (0U - range) % range;
+    while (low < threshold) {
+      product = static_cast<std::uint64_t>(engine()) * range;
+      low = static_cast<std::uint32_t>(product);
+    }
+  }
+  return lo + static_cast<Int>(product >> 32U);
+}
 
 struct Variant {
   int weight;
@@ -94,20 +115,20 @@ int main(int argc, char** argv) {
   }
 
   std::mt19937 rng(17);
-  std::uniform_int_distribution<std::size_t> pick(0, population.size() - 1);
-  std::uniform_int_distribution<long> start_offset(0, 120L * 24 * 60);
-  std::uniform_int_distribution<long> step_gap(30, 36L * 60);
+  const auto pick = [&] { return uniform<std::size_t>(rng, 0, population.size() - 1); };
+  const auto start_offset = [&] { return uniform<long>(rng, 0, 120L * 24 * 60); };
+  const auto step_gap = [&] { return uniform<long>(rng, 30, 36L * 60); };
 
   out << "case_id,activity,timestamp,resource\n";
   for (int id = 1; id <= kCaseCount; ++id) {
-    const auto& steps = population[pick(rng)]->steps;
-    long minutes = 4L * 24 * 60 + start_offset(rng);
+    const auto& steps = population[pick()]->steps;
+    long minutes = 4L * 24 * 60 + start_offset();
     char case_id[16];
     std::snprintf(case_id, sizeof(case_id), "ORD-%04d", id);
     for (const auto& step : steps) {
       out << case_id << ',' << step << ',' << to_timestamp(minutes) << ','
           << resource_for(step) << '\n';
-      minutes += step_gap(rng);
+      minutes += step_gap();
     }
   }
 

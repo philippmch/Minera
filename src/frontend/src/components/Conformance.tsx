@@ -657,7 +657,7 @@ function PetriPlayoutPanel({ dataset, miners, sourceId }: { dataset: string; min
         <label>Mode<select value={mode} onChange={e => { setMode(e.target.value as "basic" | "extensive"); setVisited(null); setError(null); }}><option value="basic">Basic sampling</option><option value="extensive">Extensive enumeration</option></select></label>
         <label>Traces<input type="number" min={1} value={options.traces ?? ""} onChange={e => number("traces", e.target.value)} /></label>
         {mode === "basic" ? <>
-          <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
+          <label>Max visible events per case<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
           <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
         </> : <>
           <label>Max length<input type="number" min={0} value={options.max_length ?? ""} onChange={e => number("max_length", e.target.value)} /></label>

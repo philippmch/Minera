@@ -245,7 +245,8 @@ PripelResult anonymize_pripel(const EventLog& source,
 
   PripelResult result;
   result.diagnostics.epsilon = options.epsilon;
-  result.diagnostics.seed = options.seed;
+  // A secure run draws from the OS; no seed reproduces it, so none is reported.
+  result.diagnostics.seed = options.secure_random ? 0 : options.seed;
   result.diagnostics.secure_random = options.secure_random;
   result.diagnostics.query_trace_count = released_query.traces.size();
 

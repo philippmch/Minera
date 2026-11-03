@@ -78,9 +78,10 @@ trace_attribute_clustering_groups(const EventLog& log,
 [[nodiscard]] std::string trace_attribute_clustering_json(
     const TraceAttributeClusteringResult& result);
 
-// Deterministic native equivalent of profile-based trace clustering. The
-// default representation contains activity and adjacent-activity one-hot
-// features; explicit attribute lists add trace/event profile dimensions.
+// Native profile-based trace clustering (a Minera extension: its own one-hot
+// activity/adjacent-activity profiles and seeded k-means). The server and
+// CLI run reference_profile_clustering_result below unless the caller asks
+// for this engine explicitly (profile_engine=native).
 enum class ProfileClusteringVariant {
   kSklearnProfiles,
   SKLEARN_PROFILES = kSklearnProfiles,
@@ -145,6 +146,10 @@ struct ReferenceProfileClusteringOptions {
 
 struct ReferenceKMeansResult {
   std::vector<std::size_t> labels;
+  // Lloyd iterations run, and whether they stopped on repeated labels or the
+  // tolerance rather than at max_iterations.
+  std::size_t iterations = 0;
+  bool converged = false;
   // Some decision (a nearest centre, a seeding draw or candidate, the stop
   // test) fell within rounding distance of a tie. The reference then decides
   // by its BLAS kernel's rounding, which varies across machines.
@@ -162,6 +167,26 @@ struct ReferenceProfileClusteringResult {
 // where the reference raises ValueError.
 [[nodiscard]] ReferenceProfileClusteringResult reference_profile_clustering(
     const EventLog& log, const ReferenceProfileClusteringOptions& options = {});
+
+// The SKLEARN_PROFILES pipeline of the reference (what the server and CLI run
+// by default) in the native result shape. The options' representation and
+// attribute flags are the reference parameters it hands to TRACE_BASED
+// log-to-features (include_activity_representation:
+// enable_activity_def_representation, include_succession_representation:
+// enable_succ_def_representation, trace/event string/numeric attributes:
+// str_tr_attr / str_ev_attr / num_tr_attr / num_ev_attr, feature_names,
+// activity_attribute: the activity key); max_traces and max_features are
+// Minera safety bounds. `kmeans` is the clusterer: the reference default is
+// KMeans(n_clusters=2, random_state=0) with scikit-learn's max_iter=300 and
+// tol=1e-4; other values stand for that KMeans passed as sklearn_clusterer.
+// clusters are the reference sublogs (ascending label, empty omitted),
+// labels index them, centroids are the cluster means and inertia the summed
+// squared distances to them. Throws std::invalid_argument where the
+// reference raises (fewer traces than clusters, non-finite features, missing
+// numeric attributes).
+[[nodiscard]] ProfileClusteringResult reference_profile_clustering_result(
+    const EventLog& log, const ProfileClusteringOptions& options,
+    const ReferenceProfileClusteringOptions& kmeans = {});
 
 // The k-means labels behind reference_profile_clustering for explicit rows.
 [[nodiscard]] ReferenceKMeansResult reference_kmeans_labels(

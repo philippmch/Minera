@@ -613,6 +613,7 @@ int usage(const char* program) {
                "  --xes-import-variant <id> iterparse, line_by_line,\n"
                "                            iterparse_mem_compressed, iterparse_20,\n"
                "                            chunk_regex, or rustxes\n"
+               "  --convert-only            Read the input, write --xes, and skip mining\n"
                "  --xes-return-legacy-log-object <bool> Emit XES import result JSON\n"
                "  --xes-return-pl-lazyframe <bool> Select lazy raw RUSTXES table\n"
                "  --xes-conversion-case-id-key <key> RUSTXES legacy grouping column\n"
@@ -716,7 +717,8 @@ int usage(const char* program) {
                "  --clustering             Emit trace-attribute clustering JSON\n"
                "  --clustering-* <v>       Attribute, variant, alpha, percent, and bounds\n"
                "  --profile-clustering      Emit profile-based clustering JSON\n"
-               "  --profile-clustering-* <v>  Variant, K-means bounds, seed, representations, and attributes\n"
+               "  --profile-clustering-* <v>  Variant, K-means bounds, seed, representations, and attributes;\n"
+               "                            engine reference (default, the pm4py pipeline) or native\n"
                "  --trace-variant-query    Emit trace-variant query JSON\n"
                "  --tvq-variant <id>       laplace or sacofa (default: sacofa)\n"
                "  --tvq-epsilon <f>        Positive privacy parameter\n"
@@ -1643,11 +1645,16 @@ int usage(const char* program) {
 }
 
 minera::DfgPlayoutResult generate_dfg_playout(
-    const minera::EventLog& log, const minera::DfgPlayoutOptions& options) {
+    const minera::EventLog& log, minera::DfgPlayoutOptions options) {
   const auto frequency = minera::discover_frequency_dfg(log);
   minera::DfgActivityCounts starts, ends;
+  // The reference's start-activity dict lists activities in first-occurrence
+  // order; its PERFORMANCE start choice follows that order.
+  const bool order_starts = options.start_activity_order.empty();
   for (const auto& trace : log.traces) {
     if (!trace.events.empty()) {
+      if (order_starts && !starts.contains(trace.events.front().activity))
+        options.start_activity_order.push_back(trace.events.front().activity);
       ++starts[trace.events.front().activity];
       ++ends[trace.events.back().activity];
     }
@@ -2088,6 +2095,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
   minera::CsvImportOptions options;
   minera::XesImportOptions xes_options;
   bool xes_import_result_requested = false;
+  // --convert-only: read the input, write --xes and stop before mining.
+  bool convert_only = false;
   minera::XesExportOptions xes_export_options;
   minera::LogFilterOptions filter;
   std::optional<std::size_t> sample_cases_option;
@@ -3294,6 +3303,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       dfg_output = cli_path(value);
       continue;
     }
+    if (arg == "--convert-only") {
+      convert_only = true;
+      continue;
+    }
     if (arg == "--log-convert") {
       const auto* value = next();
       if (!value || *value == '\0') return usage(argv[0]);
@@ -3433,7 +3446,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
           "profile_include_activity", "profile_include_succession",
           "profile_trace_string_attributes", "profile_event_string_attributes",
           "profile_trace_numeric_attributes", "profile_event_numeric_attributes",
-          "profile_feature_names"};
+          "profile_feature_names", "profile_engine"};
       if (!names.contains(key)) return usage(argv[0]);
       profile_clustering_fields.insert_or_assign(std::move(key), value);
       profile_clustering_requested = true;
@@ -5877,6 +5890,9 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         basic_playout_options.final_marking = parse_uint32_marking(
             lookup("final_marking").c_str(),
             "--petri-playout-final-marking");
+      basic_playout_options.add_envelope = present("start") ||
+                                           present("case_interval") ||
+                                           present("event_interval");
       if (present("start"))
         basic_playout_options.start = parse_finite_double(
             lookup("start").c_str(), "--petri-playout-start");
@@ -6316,8 +6332,16 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     if (xes_import_result_requested) {
       if (!input_is_xes)
         throw std::invalid_argument("XES import result requires an XES input");
-      const auto body = minera::xes_import_result_json(
-          minera::import_xes_result(input, xes_options));
+      const auto result = minera::import_xes_result(input, xes_options);
+      if (!xes_output.empty()) {
+        // --xes also applies here: write the imported log as read.
+        if (result.kind == minera::EventDataKind::kEventLog)
+          (void)minera::export_xes_event_log(xes_output, result.log, xes_export_options);
+        else
+          (void)minera::export_xes_event_log(
+              xes_output, minera::import_xes_event_log(input, xes_options), xes_export_options);
+      }
+      const auto body = minera::xes_import_result_json(result);
       if (output.empty()) std::cout << body << '\n';
       else {
         std::ofstream file(output);
@@ -6336,6 +6360,15 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     } else {
       log = minera::import_csv_event_log(input, options);
     }
+    if (convert_only) {
+      // A headless conversion (CSV or XES to XES) without running the miners.
+      if (xes_output.empty())
+        throw std::invalid_argument("--convert-only requires --xes <output>");
+      (void)minera::export_xes_event_log(xes_output, log, xes_export_options);
+      return 0;
+    }
+    if (log_conversion_requested && !xes_output.empty())
+      (void)minera::export_xes_event_log(xes_output, log, xes_export_options);
     if (log_conversion_requested) {
       const auto lookup = [&](std::string_view name) {
         const auto it = log_conversion_fields.find(std::string(name));
@@ -7124,9 +7157,11 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto present = [&](std::string_view name) {
         return profile_clustering_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_profile_clustering_params(lookup, present);
+      // The reference SKLEARN_PROFILES pipeline unless
+      // --profile-clustering-engine native.
+      const auto request = minera::parse_profile_clustering_request(lookup, present);
       const auto body = minera::profile_clustering_json(
-          minera::discover_profile_clustering(log, params));
+          minera::run_profile_clustering(log, request));
       if (output.empty()) std::cout << body << '\n';
       else { std::ofstream file(output); if (!file) { std::cerr << "error: cannot open output file " << output << '\n'; return 1; } file << body << '\n'; }
       return 0;
@@ -8408,7 +8443,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     // Optionally emit the (filtered) event log as standard XES, making the
     // CLI double as a CSV-to-XES converter.
     if (!xes_output.empty()) {
-      xes_export_options.name = dataset;
+      // The log keeps its own concept:name (or none), as the reference writes it.
       (void)minera::export_xes_event_log(xes_output, log,
                                          xes_export_options);
     }

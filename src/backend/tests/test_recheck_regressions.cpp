@@ -376,7 +376,7 @@ void ocel_wall_clock_order(){
  OcelXmlExportOptions standard_xml; standard_xml.format=OcelXmlFormat::kStandard;
  const auto written=serialize_ocel_xml(valued,standard_xml);
  check(written.find(R"(<attribute name="cost" type="int">5</attribute>)")!=std::string::npos&&
-       written.find(R"(<attribute name="p" type="string" time="2020-01-01T09:00:00+00:00">y</attribute>)")!=std::string::npos&&
+       written.find(R"(<attribute name="p" time="2020-01-01T09:00:00+00:00" type="string">y</attribute>)")!=std::string::npos&&
        written.find(R"(>a&lt;b&amp;c</attribute>)")!=std::string::npos&&written.find(" value=\"")==std::string::npos,"OCEL 2.0 XML writes values as element text");
  const auto xml_back=parse_ocel_xml(written);
  bool cost=false,status=false;

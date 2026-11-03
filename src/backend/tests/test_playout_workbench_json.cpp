@@ -71,6 +71,8 @@ void exact_native_defaults_and_all_69_fields() {
   assert(basic.start == 1767225600 && basic.case_interval == 60 && basic.event_interval == 1);
   assert(basic.initial_marking.empty() && basic.final_marking.empty());
   assert(!basic.add_only_if_fm_is_reached && !basic.fm_leq_accepted && !basic.return_visited_elements);
+  // The reference envelope unless timing is supplied.
+  assert(!basic.add_envelope && parse_playout_workbench_options(R"({"start":5})").add_envelope);
   const auto stochastic = parse_stochastic_playout_workbench_options("{}");
   assert(stochastic.traces == 1000 && stochastic.max_steps == 1000 && stochastic.seed == 1);
   assert(stochastic.stop_at_final && !stochastic.fit_from_log && stochastic.fitting_max_states == 200000);
@@ -90,7 +92,7 @@ void exact_native_defaults_and_all_69_fields() {
   assert(dfg.max_execution_time_ms == 0 && !dfg.return_variants && !dfg.return_only_if_complete);
   assert(dfg.min_variant_occurrences == 1 && dfg.traces == 1000 && dfg.case_arrival_rate == 1);
   assert(dfg.seed == 1 && dfg.max_events_per_trace == 1000 && dfg.max_steps == 0);
-  assert(dfg.start_time == "2026-01-01T00:00:00Z" && dfg.activity_key == "concept:name");
+  assert(dfg.start_time.empty() && dfg.activity_key == "concept:name");
   assert(dfg.timestamp_key == "time:timestamp" && dfg.case_id_key == "case:concept:name");
   assert(dfg.artificial_start_activity == "\xe2\x96\xb6" && dfg.artificial_end_activity == "\xe2\x96\xa0");
   const auto tree = parse_process_tree_playout_workbench_options("{}");
@@ -99,6 +101,7 @@ void exact_native_defaults_and_all_69_fields() {
   assert(tree.max_length == 1000 && tree.min_length == 1 && tree.max_traces == 100000);
   assert(tree.max_loop_occurrences == 3 && tree.start == basic.start);
   assert(tree.case_interval == 60 && tree.event_interval == 1 && !tree.return_set_strings);
+  assert(!tree.add_envelope && parse_process_tree_playout_workbench_options(R"({"event_interval":2})").add_envelope);
 
   const auto max_size = std::numeric_limits<std::size_t>::max();
   const auto max_seed = std::numeric_limits<std::uint64_t>::max();
@@ -258,7 +261,7 @@ void declared_dfg_and_original_tree_strategies_reach_native_calls() {
   const auto c = dfg_playout_result(edges, starts, ends, classic);
   assert(c.log.traces.size() == 1 && c.log.traces[0].events.size() == 2);
   assert(c.counts.size() == 1 && c.counts.begin()->first == std::vector<std::string>({"A", "B"}));
-  const auto performance = parse_dfg_playout_workbench_options(R"({"variant":"performance","traces":2,"seed":18446744073709551615,"max_steps":1,"case_arrival_rate":3,"activity_key":"visible","timestamp_key":"when","case_id_key":"case"})");
+  const auto performance = parse_dfg_playout_workbench_options(R"({"variant":"performance","traces":2,"seed":4294967295,"max_steps":1,"case_arrival_rate":3,"activity_key":"visible","timestamp_key":"when","case_id_key":"case"})");
   rejects([&] { (void)dfg_playout_result(edges, starts, ends, performance); });
   DfgPerformance timings;
   timings[{"A", "B"}].value = 2.0;

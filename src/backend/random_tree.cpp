@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <cmath>
-#include <random>
+#include <map>
 #include <set>
+#include <string>
+#include <vector>
+
+#include "minera/random.hpp"
 #include <stdexcept>
 
 namespace minera {
@@ -19,8 +23,6 @@ void validate_options(const RandomTreeOptions& options) {
       options.prob_leaf > 1.0)
     throw std::invalid_argument(
         "random tree: prob_leaf must be finite and in [0,1]");
-  if (options.activities.empty())
-    throw std::invalid_argument("random tree: activities must not be empty");
   std::set<std::string> unique(options.activities.begin(),
                                options.activities.end());
   if (unique.size() != options.activities.size() ||
@@ -29,6 +31,9 @@ void validate_options(const RandomTreeOptions& options) {
         "random tree: activities must be non-empty and unique");
 
   if (options.variant != RandomTreeVariant::kPtAndLogGenerator) return;
+  // numpy.random.seed accepts 32-bit seeds only.
+  if (options.seed > 0xffffffffULL)
+    throw std::invalid_argument("random tree: PT-and-log seed must be below 2^32");
 
   if (options.min == 0 || options.min > options.max ||
       options.mode < options.min || options.mode > options.max)
@@ -62,180 +67,289 @@ void validate_options(const RandomTreeOptions& options) {
         "random tree: at least one PT-and-log operator probability must be positive");
 }
 
-std::size_t random_index(std::mt19937_64& generator, std::size_t size) {
-  std::uniform_int_distribution<std::size_t> distribution(0, size - 1);
-  return distribution(generator);
+// Leaf labels of the BASIC generator: six characters, each
+// "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[randbelow(36)]. With caller
+// activities (a declared extension) one randbelow(n) picks the label.
+class BasicGenerator {
+ public:
+  BasicGenerator(const RandomTreeOptions& options, rng::PythonRandom& random)
+      : options_(options), random_(random) {
+    for (const auto& name : options.activities) intern(name);
+  }
+
+  ProcessTree run() {
+    auto root = node(options_.rec_depth);
+    return ProcessTree(names_, std::move(root));
+  }
+
+ private:
+  std::size_t intern(const std::string& name) {
+    const auto found = index_.find(name);
+    if (found != index_.end()) return found->second;
+    index_.emplace(name, names_.size());
+    names_.push_back(name);
+    return names_.size() - 1;
+  }
+
+  ProcessTreeNode label() {
+    if (!options_.activities.empty())
+      return ProcessTreeNode::leaf(random_.choice_index(options_.activities.size()));
+    static constexpr char kAlphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    std::string name;
+    for (int i = 0; i < 6; ++i) name.push_back(kAlphabet[random_.randbelow(36)]);
+    return ProcessTreeNode::leaf(intern(name));
+  }
+
+  // gen(d): a leaf beyond max_rec_depth, or (from min_rec_depth on) with
+  // probability prob_leaf; depth 0 is ->(label, gen(1), label); otherwise
+  // one random() picks a sequence of randrange(2, 6) children, a loop
+  // *(gen, gen, tau), an exclusive choice of randrange(2, 5) or a parallel
+  // block of randrange(2, 4), the children generated at depth + 1.
+  ProcessTreeNode node(std::size_t depth) {
+    if (depth > options_.max_rec_depth) return label();
+    if (depth >= options_.min_rec_depth && random_.random() < options_.prob_leaf) return label();
+    if (depth == 0) {
+      ProcessTreeNode root{ProcessTreeOperator::kSequence, 0, {}};
+      root.children.push_back(label());
+      root.children.push_back(node(1));
+      root.children.push_back(label());
+      return root;
+    }
+    const double pick = random_.random();
+    const auto block = [&](ProcessTreeOperator op, std::int64_t low, std::int64_t high) {
+      ProcessTreeNode out{op, 0, {}};
+      const auto count = static_cast<std::size_t>(random_.randrange(low, high));
+      for (std::size_t i = 0; i < count; ++i) out.children.push_back(node(depth + 1));
+      return out;
+    };
+    if (pick < 0.25) return block(ProcessTreeOperator::kSequence, 2, 6);
+    if (pick < 0.5) {
+      ProcessTreeNode loop{ProcessTreeOperator::kLoop, 0, {}};
+      loop.children.push_back(node(depth + 1));
+      loop.children.push_back(node(depth + 1));
+      loop.children.push_back(ProcessTreeNode::tau());
+      return loop;
+    }
+    if (pick < 0.75) return block(ProcessTreeOperator::kExclusive, 2, 5);
+    return block(ProcessTreeOperator::kParallel, 2, 4);
+  }
+
+  const RandomTreeOptions& options_;
+  rng::PythonRandom& random_;
+  std::vector<std::string> names_;
+  std::map<std::string, std::size_t> index_;
+};
+
+// Python's round() of a float: half to even.
+double python_round(double value) {
+  const double floor = std::floor(value);
+  const double fraction = value - floor;
+  if (fraction > 0.5 || (fraction == 0.5 && std::fmod(floor, 2.0) != 0.0)) return floor + 1.0;
+  return floor;
 }
 
-bool random_event(std::mt19937_64& generator, double probability) {
-  return std::bernoulli_distribution(probability)(generator);
+// The k-th label of the PT-and-log generator: a, ..., z, aa, ab, ...
+std::string ptand_label(std::size_t k) {
+  std::string out;
+  for (std::size_t n = k + 1; n > 0; n = (n - 1) / 26)
+    out.insert(out.begin(), static_cast<char>('a' + (n - 1) % 26));
+  return out;
 }
 
-ProcessTreeNode generate_node(std::mt19937_64& generator,
-                              const RandomTreeOptions& options,
-                              std::size_t depth) {
-  if (depth == 0) {
-    ProcessTreeNode root{ProcessTreeOperator::kSequence, 0, {}};
-    root.children.push_back(
-        ProcessTreeNode::leaf(random_index(generator, options.activities.size())));
-    root.children.push_back(generate_node(generator, options, depth + 1));
-    root.children.push_back(
-        ProcessTreeNode::leaf(random_index(generator, options.activities.size())));
-    return root;
+// PTANDLOGGENERATOR (exact under random.seed and numpy.random.seed with the
+// same value). Per model: the activity count is round(min + (max - min) * x)
+// with x the triangular inverse CDF (c = (mode - min) / (max - min)) of one
+// numpy random_sample (no draw when min == max). From a single silent root,
+// each step draws random() * total weight against the cumulative weights of
+// sequence, choice, parallel, loop and or, then randbelow(2) for the child
+// order, then a leaf (randbelow over the leaves in breadth-first order; the
+// first step draws over two copies of the root). The leaf becomes the
+// operator with its own label (a new one when silent) and a new leaf that is
+// silent when random() < silent or the count is reached; the operator moves
+// to the end of its parent's children. Labels are a, b, ... in creation
+// order. Finally, with more than two leaves, one random() per leaf (in
+// breadth-first order) below `duplicate` marks it; each marked leaf in turn
+// copies its label onto rest[randbelow(len(rest))], rest the leaves equal
+// (by label) to no marked leaf, redrawing while the target equals one of the
+// marked leaf's other sibling leaves.
+class PtandGenerator {
+ public:
+  PtandGenerator(const RandomTreeOptions& options, rng::PythonRandom& random,
+                 rng::NumpyRandomState& numpy)
+      : options_(options), random_(random), numpy_(numpy) {}
+
+  ProcessTree run() {
+    nodes_.clear();
+    labels_.clear();
+    std::size_t total = options_.min;
+    if (options_.min != options_.max) {
+      const double span = static_cast<double>(options_.max - options_.min);
+      const double c = static_cast<double>(options_.mode - options_.min) / span;
+      const double u = numpy_.random_sample();
+      const double x = u < c ? std::sqrt(c * u) : 1.0 - std::sqrt((1.0 - c) * (1.0 - u));
+      total = static_cast<std::size_t>(python_round(x * span + static_cast<double>(options_.min)));
+    }
+    const std::vector<double> weights = {options_.sequence, options_.choice, options_.parallel,
+                                         options_.loop, options_.or_probability};
+    std::vector<double> cumulative;
+    double running = 0.0;
+    for (const double w : weights) cumulative.push_back(running += w);
+    static constexpr ProcessTreeOperator kOps[] = {
+        ProcessTreeOperator::kSequence, ProcessTreeOperator::kExclusive, ProcessTreeOperator::kParallel,
+        ProcessTreeOperator::kLoop, ProcessTreeOperator::kInclusiveChoice};
+
+    nodes_.push_back(Node{});  // the silent root
+    std::size_t created = 0;
+    bool first = true;
+    while (created < total) {
+      const double r = random_.random() * cumulative.back();
+      std::size_t op = 0;
+      while (op < 4 && cumulative[op] <= r) ++op;
+      const auto order = random_.randbelow(2);
+      std::size_t leaf = 0;
+      if (first) {
+        (void)random_.randbelow(2);
+        first = false;
+      } else {
+        const auto leaves = breadth_first_leaves();
+        leaf = leaves[static_cast<std::size_t>(random_.randbelow(leaves.size()))];
+      }
+      const auto own = nodes_[leaf].label >= 0 ? nodes_[leaf].label : new_label(created);
+      const bool silent = random_.random() < options_.silent || created >= total;
+      const auto other = silent ? -1 : new_label(created);
+      const auto first_child = add_leaf(order == 0 ? own : other, leaf);
+      const auto second_child = add_leaf(order == 0 ? other : own, leaf);
+      auto& node = nodes_[leaf];
+      node.label = -1;
+      node.op = kOps[op];
+      node.children = {first_child, second_child};
+      if (node.parent >= 0) {
+        auto& siblings = nodes_[static_cast<std::size_t>(node.parent)].children;
+        siblings.erase(std::find(siblings.begin(), siblings.end(), leaf));
+        siblings.push_back(leaf);
+      }
+    }
+    const auto leaves = breadth_first_leaves();
+    if (leaves.size() > 2) {
+      // Leaves compare by label (two silent leaves are equal), as process
+      // trees compare structurally in the reference.
+      std::vector<std::size_t> marked;
+      for (const auto leaf : leaves)
+        if (random_.random() < options_.duplicate) marked.push_back(leaf);
+      std::vector<std::size_t> rest;
+      for (const auto leaf : leaves) {
+        bool equal_to_marked = false;
+        for (const auto m : marked) equal_to_marked |= nodes_[m].label == nodes_[leaf].label;
+        if (!equal_to_marked) rest.push_back(leaf);
+      }
+      for (const auto leaf : marked) {
+        if (rest.empty())
+          throw std::invalid_argument(
+              "random tree: no leaf left to take a duplicate label (the reference raises IndexError)");
+        // A target must not equal a sibling of the marked leaf (siblings
+        // equal to the marked leaf itself excepted); the reference redraws
+        // until it finds one, and loops forever when there is none.
+        const auto& siblings = nodes_[static_cast<std::size_t>(nodes_[leaf].parent)].children;
+        const auto rejected = [&](std::size_t target) {
+          for (const auto sibling : siblings) {
+            const auto& node = nodes_[sibling];
+            if (!node.children.empty() || node.label == nodes_[leaf].label) continue;
+            if (node.label == nodes_[target].label) return true;
+          }
+          return false;
+        };
+        if (std::all_of(rest.begin(), rest.end(), rejected))
+          throw std::invalid_argument(
+              "random tree: no admissible leaf for a duplicate label (the reference loops forever)");
+        std::size_t target = 0;
+        do {
+          target = rest[static_cast<std::size_t>(random_.randbelow(rest.size()))];
+        } while (rejected(target));
+        nodes_[target].label = nodes_[leaf].label;
+      }
+    }
+    // Activities in creation order, keeping only labels still on a leaf.
+    std::vector<int> used(labels_.size(), 0);
+    for (const auto& node : nodes_)
+      if (node.children.empty() && node.label >= 0) used[static_cast<std::size_t>(node.label)] = 1;
+    std::vector<std::string> names;
+    std::vector<std::size_t> remap(labels_.size(), 0);
+    for (std::size_t i = 0; i < labels_.size(); ++i)
+      if (used[i]) {
+        remap[i] = names.size();
+        names.push_back(labels_[i]);
+      }
+    return ProcessTree(names, convert(0, remap));
   }
 
-  bool leaf = depth > options.max_rec_depth;
-  if (!leaf && depth >= options.min_rec_depth && depth <= options.max_rec_depth) {
-    std::bernoulli_distribution choose_leaf(options.prob_leaf);
-    leaf = choose_leaf(generator);
-  }
-  if (leaf) {
-    return ProcessTreeNode::leaf(
-        random_index(generator, options.activities.size()));
-  }
-
-  const int operator_index =
-      std::uniform_int_distribution<int>(0, 3)(generator);
-  const auto append_children = [&](ProcessTreeOperator op,
-                                   std::size_t count) {
-    ProcessTreeNode result{op, 0, {}};
-    result.children.reserve(count);
-    for (std::size_t i = 0; i < count; ++i)
-      result.children.push_back(generate_node(generator, options, depth + 1));
-    return result;
+ private:
+  struct Node {
+    ProcessTreeOperator op = ProcessTreeOperator::kTau;
+    int label = -1;  // leaf label index, -1 for tau
+    int parent = -1;
+    std::vector<std::size_t> children;
   };
-  switch (operator_index) {
-    case 0:
-      return append_children(
-          ProcessTreeOperator::kSequence,
-          std::uniform_int_distribution<std::size_t>(2, 5)(generator));
-    case 1: {
-      ProcessTreeNode result{ProcessTreeOperator::kLoop, 0, {}};
-      result.children.push_back(generate_node(generator, options, depth + 1));
-      result.children.push_back(generate_node(generator, options, depth + 1));
-      result.children.push_back(ProcessTreeNode::tau());
-      return result;
+
+  int new_label(std::size_t& created) {
+    labels_.push_back(ptand_label(created++));
+    return static_cast<int>(labels_.size() - 1);
+  }
+
+  std::size_t add_leaf(int label, std::size_t parent) {
+    Node node;
+    node.label = label;
+    node.parent = static_cast<int>(parent);
+    nodes_.push_back(node);
+    return nodes_.size() - 1;
+  }
+
+  std::vector<std::size_t> breadth_first_leaves() const {
+    std::vector<std::size_t> queue{0}, leaves;
+    for (std::size_t at = 0; at < queue.size(); ++at) {
+      const auto& node = nodes_[queue[at]];
+      if (node.children.empty()) leaves.push_back(queue[at]);
+      else queue.insert(queue.end(), node.children.begin(), node.children.end());
     }
-    case 2:
-      return append_children(
-          ProcessTreeOperator::kExclusive,
-          std::uniform_int_distribution<std::size_t>(2, 4)(generator));
-    default:
-      return append_children(
-          ProcessTreeOperator::kParallel,
-          std::uniform_int_distribution<std::size_t>(2, 3)(generator));
-  }
-}
-
-std::size_t draw_activity_count(std::mt19937_64& generator,
-                                const RandomTreeOptions& options) {
-  if (options.min == options.max) return options.min;
-  const double span = static_cast<double>(options.max - options.min);
-  const double left_span = static_cast<double>(options.mode - options.min);
-  const double right_span = static_cast<double>(options.max - options.mode);
-  const double split = left_span / span;
-  const double sample = std::uniform_real_distribution<double>(0.0, 1.0)(
-      generator);
-  const double continuous =
-      sample < split
-          ? static_cast<double>(options.min) +
-                std::sqrt(sample * span * left_span)
-          : static_cast<double>(options.max) -
-                std::sqrt((1.0 - sample) * span * right_span);
-  const auto rounded = static_cast<long long>(std::llround(continuous));
-  return static_cast<std::size_t>(std::clamp(
-      rounded, static_cast<long long>(options.min),
-      static_cast<long long>(options.max)));
-}
-
-ProcessTreeNode generate_ptandlog_tree(std::mt19937_64& generator,
-                                       const RandomTreeOptions& options) {
-  std::vector<ProcessTreeNode> population;
-  const auto activity_count = draw_activity_count(generator, options);
-  population.reserve(activity_count);
-
-  std::vector<std::size_t> assigned;
-  assigned.reserve(activity_count);
-  for (std::size_t i = 0; i < activity_count; ++i) {
-    std::size_t activity = i % options.activities.size();
-    if (!assigned.empty() && random_event(generator, options.duplicate))
-      activity = assigned[random_index(generator, assigned.size())];
-    assigned.push_back(activity);
-    population.push_back(ProcessTreeNode::leaf(activity));
+    return leaves;
   }
 
-  std::vector<double> operator_weights = {
-      options.sequence, options.choice, options.parallel, options.loop,
-      options.or_probability};
-  while (population.size() > 1) {
-    const auto first = random_index(generator, population.size());
-    std::size_t second = random_index(generator, population.size() - 1);
-    if (second >= first) ++second;
-    const auto op_index = std::discrete_distribution<std::size_t>(
-        operator_weights.begin(), operator_weights.end())(generator);
-
-    ProcessTreeNode combined;
-    switch (op_index) {
-      case 0:
-        combined.op = ProcessTreeOperator::kSequence;
-        combined.children = {std::move(population[first]),
-                             std::move(population[second])};
-        break;
-      case 1:
-        combined.op = ProcessTreeOperator::kExclusive;
-        combined.children = {std::move(population[first]),
-                             std::move(population[second])};
-        if (random_event(generator, options.silent))
-          combined.children.push_back(ProcessTreeNode::tau());
-        break;
-      case 2:
-        combined.op = ProcessTreeOperator::kParallel;
-        combined.children = {std::move(population[first]),
-                             std::move(population[second])};
-        break;
-      case 3:
-        combined.op = ProcessTreeOperator::kLoop;
-        combined.children.push_back(std::move(population[first]));
-        combined.children.push_back(std::move(population[second]));
-        if (random_event(generator, options.silent))
-          combined.children.push_back(ProcessTreeNode::tau());
-        break;
-      default:
-        combined.op = ProcessTreeOperator::kInclusiveChoice;
-        combined.children = {std::move(population[first]),
-                             std::move(population[second])};
-        break;
-    }
-
-    const auto high = std::max(first, second);
-    const auto low = std::min(first, second);
-    population.erase(population.begin() + high);
-    population.erase(population.begin() + low);
-    population.push_back(std::move(combined));
+  ProcessTreeNode convert(std::size_t index, const std::vector<std::size_t>& remap) const {
+    const auto& node = nodes_[index];
+    if (node.children.empty())
+      return node.label < 0 ? ProcessTreeNode::tau()
+                            : ProcessTreeNode::leaf(remap[static_cast<std::size_t>(node.label)]);
+    ProcessTreeNode out{node.op, 0, {}};
+    for (const auto child : node.children) out.children.push_back(convert(child, remap));
+    return out;
   }
-  return std::move(population.front());
-}
+
+  const RandomTreeOptions& options_;
+  rng::PythonRandom& random_;
+  rng::NumpyRandomState& numpy_;
+  std::vector<Node> nodes_;
+  std::vector<std::string> labels_;
+};
 
 }  // namespace
 
 std::vector<ProcessTree> generate_random_process_trees(
     const RandomTreeOptions& options) {
   validate_options(options);
-  std::mt19937_64 generator(options.seed);
+  // The reference draws from the global generators: random.seed(seed) and,
+  // for PT-and-log, numpy.random.seed(seed).
+  rng::PythonRandom random(options.seed);
   const std::size_t count =
       options.variant == RandomTreeVariant::kPtAndLogGenerator
           ? options.no_models
           : 1;
   std::vector<ProcessTree> result;
   result.reserve(count);
-  for (std::size_t i = 0; i < count; ++i) {
-    if (options.variant == RandomTreeVariant::kPtAndLogGenerator) {
-      result.emplace_back(options.activities,
-                          generate_ptandlog_tree(generator, options));
-    } else {
-      result.emplace_back(options.activities,
-                          generate_node(generator, options, options.rec_depth));
-    }
+  if (options.variant == RandomTreeVariant::kPtAndLogGenerator) {
+    rng::NumpyRandomState numpy(static_cast<std::uint32_t>(options.seed));
+    PtandGenerator generator(options, random, numpy);
+    for (std::size_t i = 0; i < count; ++i) result.push_back(generator.run());
+  } else {
+    result.push_back(BasicGenerator(options, random).run());
   }
   return result;
 }

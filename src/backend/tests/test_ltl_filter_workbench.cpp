@@ -2,6 +2,7 @@
 #include "minera/ltl_filter_workbench.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "../log_ltl_original_call_parser.hpp"
+#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <sstream>
@@ -278,7 +279,14 @@ inline void workflows(const std::function<DiscoveryWorkbenchResponse(const Parts
    const auto expected=engine=="log"?serialize_embedding_workbench_raw_log_json(expected_log):serialize_embedding_workbench_table_json(subset(table,selected));
    const auto answer=run(request(engine,source,operation));common_success(answer,source,expected,engine);
    if(engine=="log"){
-    const auto xes=native_text(answer.json,"filtered_xes");require(xes.has_value(),"filtered relationship XES missing");std::istringstream stream(*xes);const auto imported=import_xes_event_log(stream);require(imported.traces.size()==1,"relationship XES projection changed traces");require(imported.traces[0].events.size()==selected.size(),"relationship XES projection changed events");
+    // The sample log carries opaque bytes ("\xff\0") that XML cannot hold, so the XES artifact is
+    // replaced by the writer's diagnostic (pm4py's ETREE writer refuses such text as well).
+    require(!native_text(answer.json,"filtered_xes"),"unrepresentable relationship XES emitted");require(native_text(answer.json,"xes_error")==std::optional<std::string>("XES cannot represent this text: invalid UTF-8 byte sequence"),"relationship XES diagnostic changed");
+    // A copy whose opaque values are text round-trips through the writer and the default reader.
+    auto textual=log;textual.attributes[0]=EventAttribute{"opaque","ÿ"};for(auto& trace:textual.traces)for(auto& event:trace.events)event.attributes[2]=EventAttribute{"payload","ÿ"};
+    const auto textual_answer=run(request(engine,serialize_embedding_workbench_raw_log_json(textual),operation));require(textual_answer.status==200&&!native_text(textual_answer.json,"xes_error"),"textual relationship XES failed");
+    const auto xes=native_text(textual_answer.json,"filtered_xes");require(xes.has_value(),"filtered relationship XES missing");std::istringstream stream(*xes);const auto imported=import_xes_event_log(stream);require(imported.traces.size()==1,"relationship XES projection changed traces");require(imported.traces[0].events.size()==selected.size(),"relationship XES projection changed events");
+    const auto& round_trip=imported.traces[0].events[0].attributes;require(std::any_of(round_trip.begin(),round_trip.end(),[](const EventAttribute& a){return a.key=="payload"&&a.value=="ÿ";}),"relationship XES lost the text payload");
    }else require(serialize_embedding_workbench_table_json(parse_embedding_workbench_table_json(*text(answer.json,"result_json")))==expected,"relationship table artifact cannot reopen");
   }
   const std::string literal(" literal\n\0Ω ",13);
