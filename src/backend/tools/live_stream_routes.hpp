@@ -36,8 +36,19 @@ struct StreamBudgetCharge {
   void absorb(StreamBudgetCharge& other) noexcept {bytes+=other.bytes;events+=other.events;other.bytes=other.events=0;}
   void release() noexcept {g_stream_budget_bytes-=bytes;g_stream_budget_events-=events;bytes=events=0;}
 };
+// The server-wide stream budget in use, for the session lists:
+// "stream_budget":{"bytes":N,"events":N,"max_bytes":N,"max_events":N}.
+std::string stream_budget_json() {
+  return "\"stream_budget\":{\"bytes\":"+std::to_string(g_stream_budget_bytes.load())+",\"events\":"+std::to_string(g_stream_budget_events.load())+
+         ",\"max_bytes\":"+std::to_string(kStreamGlobalMaxStoredBytes)+",\"max_events\":"+std::to_string(kStreamGlobalMaxEvents)+"}";
+}
+// When a request last named a session (steady clock ticks). Sessions nobody
+// touches for the idle expiry are freed by the stream idle reaper.
+using StreamTouch = std::atomic<std::chrono::steady_clock::rep>;
+inline std::chrono::steady_clock::rep stream_now() { return std::chrono::steady_clock::now().time_since_epoch().count(); }
 struct LiveSessionRecord {
   std::mutex mutex;
+  StreamTouch touched{stream_now()};
   std::string id, method;
   httplib::Params configuration;
   minera::CsvImportOptions csv;
@@ -60,16 +71,37 @@ constexpr std::size_t kLiveMaxEvents = 1000000;
 std::mutex g_live_mutex;
 std::map<std::string,std::shared_ptr<LiveSessionRecord>> g_live_sessions;
 
-// An upper estimate of the events a stream source holds, without parsing it:
-// CSV lines, or XES <event elements (a gzip XES source is inflated within the
-// import limit only to count).
+// An estimate, from above, of the events a stream source holds, without
+// parsing it. CSV: the non-blank lines after the header (a quoted field that
+// spans lines counts once per line). XES: the <event start tags, counting
+// only those before the (max_traces + 1)-th <trace when xes_max_traces limits
+// the import. A gzip XES source is inflated within the import limit only to
+// count.
 std::size_t reader_estimated_events(const std::string& source,const std::string& kind,const minera::XesImportOptions& xes) {
-  if(kind=="csv_events")return static_cast<std::size_t>(std::count(source.begin(),source.end(),'\n'))+1;
+  if(kind=="csv_events"){
+    std::size_t lines=0;bool content=false;
+    for(const char c:source){
+      if(c=='\n'){if(content)++lines;content=false;}
+      else if(c!='\r'&&c!=' '&&c!='\t')content=true;
+    }
+    if(content)++lines;
+    return lines>0?lines-1:0;  // the header row is not an event
+  }
   const std::string inflated=minera::detail::is_gzip_data(source)?minera::detail::gzip_decompress(source,xes.max_decompressed_bytes):std::string();
   const std::string_view text=inflated.empty()?std::string_view(source):std::string_view(inflated);
-  std::size_t count=0;
-  for(auto at=text.find("<event");at!=std::string_view::npos;at=text.find("<event",at+6))++count;
-  return count;
+  // A start tag named exactly `name`: "<name" followed by whitespace, '>' or '/'.
+  const auto tag_at=[&](std::size_t at,std::string_view name){
+    if(text.compare(at,name.size(),name)!=0)return false;
+    const auto next=at+name.size();
+    if(next>=text.size())return false;
+    const char c=text[next];return c=='>'||c=='/'||c==' '||c=='\t'||c=='\n'||c=='\r';
+  };
+  std::size_t events=0,traces=0;
+  for(auto at=text.find('<');at!=std::string_view::npos;at=text.find('<',at+1)){
+    if(tag_at(at,"<event"))++events;
+    else if(tag_at(at,"<trace")&&++traces>xes.max_traces)break;
+  }
+  return events;
 }
 std::string live_required(const httplib::Request& request,const std::string& key) {
   if(!request.has_param(key)||request.get_param_value(key).empty())throw std::invalid_argument(key+" is required");
@@ -86,7 +118,7 @@ void live_params(const httplib::Request& request,const std::set<std::string>& al
 }
 std::shared_ptr<LiveSessionRecord> live_find(const httplib::Request& request) {
   const auto id=live_required(request,"session_id");std::lock_guard lock(g_live_mutex);const auto it=g_live_sessions.find(id);
-  if(it==g_live_sessions.end())throw std::out_of_range("live session is unavailable; it may have been released or the server restarted");return it->second;
+  if(it==g_live_sessions.end())throw std::out_of_range("live session is unavailable; it may have been released, expired after being idle, or the server restarted");it->second->touched=stream_now();return it->second;
 }
 void live_open(const LiveSessionRecord& session) {
   if(session.released||!session.monitor)throw std::out_of_range("live session was released");
@@ -175,9 +207,9 @@ void handle_live_create(const httplib::Request& request,httplib::Response& respo
     // returns its charge when it is destroyed.
     record->budget.reserve(record->stored_bytes,0);
     {std::lock_guard lock(g_live_mutex);const auto found=g_live_sessions.find(id);
-      if(found!=g_live_sessions.end())record=found->second;
+      if(found!=g_live_sessions.end()){record=found->second;record->touched=stream_now();}
       else if(g_live_sessions.size()>=kLiveMaxSessions)throw LiveCapacityError(429,"too many live sessions ("+std::to_string(kLiveMaxSessions)+"); release one before creating another");
-      else g_live_sessions.emplace(id,record);}
+      else{record->touched=stream_now();g_live_sessions.emplace(id,record);}}
     std::lock_guard lock(record->mutex);live_open(*record);
     if(record->configuration!=request.params||((method=="tbr"||method=="declare")&&record->sources.front().bytes!=form_field(request,"model")))throw minera::StreamingSessionConflict("live session ID already has a different configuration");
     response.set_content(live_payload(*record),"application/json");
@@ -230,7 +262,7 @@ void handle_live_action(const httplib::Request& request,httplib::Response& respo
 }
 void handle_live_list(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{live_params(request,{});std::vector<std::shared_ptr<LiveSessionRecord>> sessions;{std::lock_guard lock(g_live_mutex);for(const auto& [id,s]:g_live_sessions){(void)id;sessions.push_back(s);}}
-    std::ostringstream out;out<<"{\"sessions\":[";bool first=true;for(const auto& s:sessions){std::lock_guard lock(s->mutex);if(s->released)continue;if(!first)out<<',';first=false;out<<live_payload(*s,0);}out<<"]}";response.set_content(out.str(),"application/json");});
+    std::ostringstream out;out<<"{\"sessions\":[";bool first=true;for(const auto& s:sessions){std::lock_guard lock(s->mutex);if(s->released)continue;if(!first)out<<',';first=false;out<<live_payload(*s,0);}out<<"],"<<stream_budget_json()<<"}";response.set_content(out.str(),"application/json");});
 }
 void handle_live_source(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{live_params(request,{"session_id","source_id"});auto s=live_find(request);std::lock_guard lock(s->mutex);live_open(*s);const auto id=live_required(request,"source_id");for(const auto& source:s->sources)if(source.id==id){response.set_content(source.bytes,"application/octet-stream");return;}throw std::out_of_range("live source upload is unavailable");});

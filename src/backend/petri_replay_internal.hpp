@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <limits>
 #include <map>
+#include <optional>
 #include <queue>
 #include <set>
 #include <stdexcept>
@@ -355,81 +356,154 @@ std::vector<std::size_t> exhaustive_hidden_transition_trial(
 
 // Structural place paths deliberately ignore enabling while searching. Replay
 // can retain an enabled prefix even when a later multi-input join is blocked.
+//
+// The breadth-first tree grown from a source place depends only on the net,
+// the silent outgoing order and the length bound, never on the marking, so
+// SilentPlacePathIndex grows each source's tree once and every later query
+// only reads paths off it. silent_place_paths answers one query with a
+// throwaway index; both produce the same paths, order and errors.
+class SilentPlacePathIndex {
+ public:
+  SilentPlacePathIndex(const PetriNet& net, std::size_t place_count,
+                       std::size_t max_path_length = 51,
+                       const std::vector<std::vector<std::size_t>>* outgoing_order = nullptr)
+      : net_(&net), max_path_length_(max_path_length), outgoing_(place_count),
+        trees_(place_count) {
+    if (outgoing_order) order_ = *outgoing_order;
+    has_order_ = outgoing_order != nullptr;
+    for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+      const auto& transition = net.transitions()[t];
+      if (!transition.silent()) continue;
+      std::set<std::size_t> inputs(transition.inputs.begin(), transition.inputs.end());
+      inputs.insert(transition.reset_inputs.begin(), transition.reset_inputs.end());
+      inputs.insert(transition.inhibitor_inputs.begin(), transition.inhibitor_inputs.end());
+      for (const auto place : inputs) outgoing_[place].push_back(t);
+    }
+    if (outgoing_order) {
+      outgoing_.assign(place_count, {});
+      for (std::size_t place = 0; place < outgoing_order->size(); ++place)
+        for (const auto transition : (*outgoing_order)[place])
+          if (net.transitions()[transition].silent()) outgoing_[place].push_back(transition);
+    }
+  }
+
+  // Whether this index answers queries with these parameters.
+  [[nodiscard]] bool matches(const PetriNet& net, std::size_t place_count,
+                             std::size_t max_path_length,
+                             const std::vector<std::vector<std::size_t>>* outgoing_order) const {
+    if (net_ != &net || trees_.size() != place_count || max_path_length_ != max_path_length ||
+        has_order_ != (outgoing_order != nullptr))
+      return false;
+    return !outgoing_order || *outgoing_order == order_;
+  }
+
+  [[nodiscard]] std::vector<HiddenPlacePath> paths(
+      const ReplayMarkingKeys& source_keys, const ReplayMarkingKeys& target_keys,
+      const std::vector<std::string>& place_names) const {
+    std::vector<HiddenPlacePath> result;
+    std::size_t stored_steps = 0;
+    // The marked targets, in ascending order, listed once for all sources.
+    std::vector<std::size_t> targets;
+    for (std::size_t target = 0; target < target_keys.size(); ++target)
+      if (target_keys[target]) targets.push_back(target);
+    for (std::size_t source = 0; source < source_keys.size(); ++source) {
+      if (!source_keys[source]) continue;
+      const Tree& tree = tree_from(source);
+      if (tree.overflow)
+        throw std::runtime_error("Petri usage replay exceeded the silent place-path state limit");
+      for (const auto target : targets) {
+        if (tree.parent[target] == kNone ||
+            (target == source && tree.cycle_parent == kNone)) continue;
+        HiddenPlacePath path{source, target, {}};
+        auto place = target;
+        if (target == source) {
+          path.transitions.push_back(tree.cycle_transition);
+          place = tree.cycle_parent;
+        }
+        for (; place != source; place = tree.parent[place]) path.transitions.push_back(tree.via[place]);
+        std::reverse(path.transitions.begin(), path.transitions.end());
+        if (path.transitions.size() > 1'000'000 - stored_steps)
+          throw std::runtime_error("Petri usage replay exceeded the silent place-path size limit");
+        stored_steps += path.transitions.size();
+        result.push_back(std::move(path));
+      }
+    }
+    std::sort(result.begin(), result.end(), [&](const auto& left, const auto& right) {
+      return std::tuple{left.transitions.size(), std::string_view(place_names[left.source]), std::string_view(place_names[left.target]), left.source, left.target}
+           < std::tuple{right.transitions.size(), std::string_view(place_names[right.source]), std::string_view(place_names[right.target]), right.source, right.target};
+    });
+    return result;
+  }
+
+ private:
+  static constexpr std::size_t kNone = std::numeric_limits<std::size_t>::max();
+  struct Tree {
+    std::vector<std::size_t> parent, via;
+    std::size_t cycle_parent = kNone, cycle_transition = kNone;
+    // The search passed kReplayStructuralSearchCap; a query from this source
+    // fails, as the uncached search did.
+    bool overflow = false;
+  };
+
+  const Tree& tree_from(std::size_t source) const {
+    auto& slot = trees_[source];
+    if (slot) return *slot;
+    const std::size_t places = trees_.size();
+    Tree tree;
+    tree.parent.assign(places, kNone);
+    tree.via.assign(places, kNone);
+    std::vector<std::size_t> distance(places, 0);
+    tree.parent[source] = source;
+    std::queue<std::size_t> pending;
+    pending.push(source);
+    std::size_t visited = 1;
+    while (!pending.empty() && !tree.overflow) {
+      const auto place = pending.front(); pending.pop();
+      if (distance[place] >= max_path_length_) continue;
+      for (const auto t : outgoing_[place]) {
+        for (const auto output : net_->transitions()[t].outputs) {
+          // Retain the first nonempty source cycle without changing the empty
+          // BFS seed. Re-enqueuing the source would corrupt its other paths.
+          if (output == source && tree.cycle_parent == kNone) {
+            tree.cycle_parent = place;
+            tree.cycle_transition = t;
+          }
+          if (tree.parent[output] != kNone) continue;
+          if (++visited > kReplayStructuralSearchCap) {
+            tree.overflow = true;
+            break;
+          }
+          tree.parent[output] = place;
+          tree.via[output] = t;
+          distance[output] = distance[place] + 1;
+          pending.push(output);
+        }
+        if (tree.overflow) break;
+      }
+    }
+    if (tree.overflow) {
+      tree.parent.clear();
+      tree.via.clear();
+    }
+    slot = std::move(tree);
+    return *slot;
+  }
+
+  const PetriNet* net_;
+  std::size_t max_path_length_;
+  bool has_order_ = false;
+  std::vector<std::vector<std::size_t>> order_;
+  std::vector<std::vector<std::size_t>> outgoing_;
+  mutable std::vector<std::optional<Tree>> trees_;
+};
+
 inline std::vector<HiddenPlacePath> silent_place_paths(
     const ReplayMarkingKeys& source_keys, const ReplayMarkingKeys& target_keys, const PetriNet& net,
     const std::vector<std::string>& place_names,
     std::size_t max_path_length = 51,
     const std::vector<std::vector<std::size_t>>* outgoing_order = nullptr) {
-  std::vector<std::vector<std::size_t>> outgoing(source_keys.size());
-  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
-    const auto& transition = net.transitions()[t];
-    if (!transition.silent()) continue;
-    std::set<std::size_t> inputs(transition.inputs.begin(), transition.inputs.end());
-    inputs.insert(transition.reset_inputs.begin(), transition.reset_inputs.end());
-    inputs.insert(transition.inhibitor_inputs.begin(), transition.inhibitor_inputs.end());
-    for (const auto place : inputs) outgoing[place].push_back(t);
-  }
-  if (outgoing_order) {
-    outgoing.assign(source_keys.size(), {});
-    for (std::size_t place = 0; place < outgoing_order->size(); ++place)
-      for (const auto transition : (*outgoing_order)[place])
-        if (net.transitions()[transition].silent()) outgoing[place].push_back(transition);
-  }
-  const auto none = std::numeric_limits<std::size_t>::max();
-  std::vector<HiddenPlacePath> result;
-  std::size_t stored_steps = 0;
-  for (std::size_t source = 0; source < source_keys.size(); ++source) {
-    if (!source_keys[source]) continue;
-    std::vector<std::size_t> parent(source_keys.size(), none), via(source_keys.size(), none);
-    std::vector<std::size_t> distance(source_keys.size(), 0);
-    std::size_t cycle_parent = none, cycle_transition = none;
-    parent[source] = source;
-    std::queue<std::size_t> pending;
-    pending.push(source);
-    std::size_t visited = 1;
-    while (!pending.empty()) {
-      const auto place = pending.front(); pending.pop();
-      if (distance[place] >= max_path_length) continue;
-      for (const auto t : outgoing[place]) {
-        for (const auto output : net.transitions()[t].outputs) {
-          // Retain the first nonempty source cycle without changing the empty
-          // BFS seed. Re-enqueuing the source would corrupt its other paths.
-          if (output == source && cycle_parent == none) {
-            cycle_parent = place;
-            cycle_transition = t;
-          }
-          if (parent[output] != none) continue;
-          if (++visited > kReplayStructuralSearchCap)
-            throw std::runtime_error("Petri usage replay exceeded the silent place-path state limit");
-          parent[output] = place;
-          via[output] = t;
-          distance[output] = distance[place] + 1;
-          pending.push(output);
-        }
-      }
-    }
-    for (std::size_t target = 0; target < target_keys.size(); ++target) {
-      if (!target_keys[target] || parent[target] == none ||
-          (target == source && cycle_parent == none)) continue;
-      HiddenPlacePath path{source, target, {}};
-      auto place = target;
-      if (target == source) {
-        path.transitions.push_back(cycle_transition);
-        place = cycle_parent;
-      }
-      for (; place != source; place = parent[place]) path.transitions.push_back(via[place]);
-      std::reverse(path.transitions.begin(), path.transitions.end());
-      if (path.transitions.size() > 1'000'000 - stored_steps)
-        throw std::runtime_error("Petri usage replay exceeded the silent place-path size limit");
-      stored_steps += path.transitions.size();
-      result.push_back(std::move(path));
-    }
-  }
-  std::sort(result.begin(), result.end(), [&](const auto& left, const auto& right) {
-    return std::tuple{left.transitions.size(), std::string_view(place_names[left.source]), std::string_view(place_names[left.target]), left.source, left.target}
-         < std::tuple{right.transitions.size(), std::string_view(place_names[right.source]), std::string_view(place_names[right.target]), right.source, right.target};
-  });
-  return result;
+  return SilentPlacePathIndex(net, source_keys.size(), max_path_length, outgoing_order)
+      .paths(source_keys, target_keys, place_names);
 }
 
 // Public hidden routing first fires enabled path prefixes, then recomputes

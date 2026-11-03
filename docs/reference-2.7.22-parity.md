@@ -136,7 +136,7 @@ are reconciled.
 | Label splitting | contextual | **Complete** — the CONTEXTUAL variation matches a 1,600-call public bank (default, short/long/empty contexts, edge minimums, target subsets, custom target column and suffix), and keeps JSON/CLI/local-server/frontend adapters |
 | Merging | case relations | **Complete** — the PANDAS variation matches a 440-call public bank (values, dtypes, index labels and raising calls) under default and custom keys, and keeps native/JSON/CLI/server/frontend entry points |
 | Organizational mining | local diagnostics, network analysis frequency/performance, resource profiles, roles, SNA metrics | **Complete** — deterministic local diagnostics (group-attribute and explicit role/clustering modes), frequency/performance network analysis, role discovery, all eleven resource-profile metrics, and four SNA metrics (handover, working-together, subcontracting, joint-activities) have native/JSON/CLI/server/frontend adapters; focused contracts prove LOG/PANDAS adapters, custom selectors, diagnostics, common role records, and all eight SNA selectors |
-| Reduction | process-tree transition-reduction based; ordinary Petri-net silent-transition reduction | **Complete for TREE_TR_BASED** — the reference walk and fold are bound by a 6,000-call bank (see "Process-tree reduction bank"); `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, and custom activity keys are exposed through JSON/CLI/server/frontend adapters. Ordinary PNML reduction exposes the complete structural fixed-point rule family through native, standalone CLI, multipart local-server, and typed frontend APIs, including deterministic single-entry/single-exit/series transition and place fusion, positively marked invariant-place elimination, duplicate silent-transition fusion, inert self-loop elimination, extended-arc preservation, redundant reset cleanup, and opt-in parallel-place fusion and abstraction; result diagnostics include remapped markings, place aliases, and reduced PNML. Marking-aware PNML import/export preserves arbitrary nonnegative initial/final vectors through reduction, while legacy conformance import remains strict to single-token workflow nets. |
+| Reduction | process-tree transition-reduction based; ordinary Petri-net silent-transition reduction | **Complete for TREE_TR_BASED** — the reference walk and fold are bound by an 11,028-call bank (6,000 reductions, 3,027 folds and 2,001 reductions with interleaving; see "Process-tree reduction bank"); `TREE_TR_BASED` trace reduction, optional-subtree replacement, reference-compatible folding, and custom activity keys are exposed through JSON/CLI/server/frontend adapters. Ordinary PNML reduction exposes the complete structural fixed-point rule family through native, standalone CLI, multipart local-server, and typed frontend APIs, including deterministic single-entry/single-exit/series transition and place fusion, positively marked invariant-place elimination, duplicate silent-transition fusion, inert self-loop elimination, extended-arc preservation, redundant reset cleanup, and opt-in parallel-place fusion and abstraction; result diagnostics include remapped markings, place aliases, and reduced PNML. Marking-aware PNML import/export preserves arbitrary nonnegative initial/final vectors through reduction, while legacy conformance import remains strict to single-token workflow nets. |
 | Simulation | Petri basic/stochastic/extensive; process-tree basic/extensive/top-bottom; DFG classic/performance; Declare; object-centric Petri/causal nets; Monte Carlo; random tree and tree+log generation | **Partial overall; tree generation plus Petri, process-tree, DFG, Declare, OCPN (EXTENSIVE, see "OCPN extensive playout bank") and OC causal net (EXTENSIVE, see "OC causal net extensive playout bank") playout complete** — Petri basic/stochastic/extensive, Declare classic, both DFG variants, all three native process-tree playout variants, both seeded random-tree strategies (BASIC and bounded PT-and-log generation, including deterministic multi-model batches), and a bounded virtual-time Monte Carlo Petri variant with source-log-fitted activation weights and service means are wired through strict request parsing, CLI, local server, JSON, and frontend controls; completed catalog packages are backed by manifest-enforced native/request/JSON/CLI/server/frontend/test artifacts; Declare now uses nonnegative bounded native options, a shared strict server/request parser, and a dedicated frontend serializer instead of incorrectly emitting process-tree field names; DFG performance playout counts completed versus truncated/deadlocked traces and treats an invisible end-boundary transition after the visible-event cap as successful termination; bounded OCPN playout plus native causal-net obligation search support independent/shared/synchronized projections, marker groups, cardinality, key constraints, independent activity/binding/transition branching caps, reachability, binding sequences, and per-trace object suffixing through native, CLI, multipart local-server, and frontend adapters; broader simulation/model-family coverage remains |
 | Transformation | event/trace/temporal features; next-activity/next-time/remaining-time targets; interval tree; trie; embeddings; OCEL descriptions/features/splitting | **Partial** — event/trace/temporal feature tables are native and exposed through `minera_export --log-to-features` and the local `/api/transform-features` endpoint; event rows infer typed attributes with bounded categorical cardinality, use canonical `event:key@value` names, and are rectangular across traces; trace extraction now defaults to trace-based rows, infers complete typed case attributes, scopes missing categorical values to traces with no observed value, and exposes selectable activity/succession representations, categorical cardinality bounds, case identifiers, duration/timing/path/workload/concurrency extras, and epsilon controls through native, JSON, CLI, server, and typed frontend adapters; trace timing extras enumerate only observed direct/indirect paths (including self-loops), honor the configured start timestamp, and retain the last valid positive occurrence; work-in-progress and resource-workload extras count overlapping cases, while concurrency extras count other events using the configured start timestamp; temporal rows now provide arrival/finish-rate, service/waiting/sojourn, rework, case/resource, and legacy compact projections with explicit feature schemas plus calendar frequencies (`W`, `MS`, `QE`, and related aliases) and fixed-width compatibility; all three target variants, open-path interval extraction, the traditional trie, contextual label splitting, deterministic case/event embeddings with cosine top-k ranking, both OCEL description variants with timestamp controls, all three bounded OCEL event/object/events-object feature tables with shared activity, timestamp, relation, endpoint, independently selectable lifecycle metrics and relation-stream lifecycle paths, deterministic object-specific relation-prefix length/timediff/one-hot activity columns, interaction, and custom attribute option groups, object-type filtering, optional per-object-type interaction counts, and opt-in interaction/descendants/inheritance/cobirth/codeath graph scalar columns for OBJECTS, and both connected-components and ancestors/descendants OCEL splits are native or headless CLI/server/frontend API-wired; numeric transformer model runtimes and broader OCEL feature parameters remain |
 
@@ -1021,7 +1021,16 @@ native interval-event, case-envelope, and concurrent-activity counters run
 after all ordinary, segment, path, and LTL filters; JSON embeds the three
 arrays under `overlap`. CLI flags and server/frontend form fields are covered
 by `src/backend/tests/test_request_params.cpp` and the focused overlap/native
-JSON tests.
+JSON tests. Events that start after they complete follow the reference
+(2026-11-03): interval-event overlap rejects them (the reference interval
+tree raises "Start must be less than end"); case overlap takes the
+min-start/max-end envelope as it is and rejects only an inverted envelope
+(the reference also raises then); concurrent activities sort each trace by
+start and stop scanning later events at the first one that does not overlap
+even with touching endpoints, as the reference does, so an inverted event
+can hide a later overlap. Fuzzed 0/3,000 seeded logs (about one event in
+ten inverted) for all three statistics, strict and not;
+`minera_overlap_tests` pins the reference captures.
 
 Passed-time evidence: `discover_passed_time` exposes `PRE`, `POST`, and
 `PREPOST` with neighbor rows in the order each directly-follows pair first
@@ -5202,7 +5211,11 @@ event and trace modes without a GUI.
 for incremental directly-follows discovery. Reopening the same file rebuilds
 activity, boundary, edge, and open-case state; `reset()` truncates it back to a
 validated header. The headless `minera_streaming_dfg` command accepts
-`--state STATE.csv` for this mode. Focused Release coverage includes
+`--state STATE.csv` for this mode. Its `--case-id-column` and
+`--activity-column` default to `case_id` and `activity` (Minera's CSV import
+defaults), where the reference streaming DFG reads `case:concept:name` and
+`concept:name`; pass those names for a pm4py-style CSV. The command's usage
+text says so. Focused Release coverage includes
 interleaved cases, quoted identifiers, multiline activities, restart replay,
 reset, and invalid-state rejection. The file is a local restart checkpoint;
 the standalone `minera_streaming_store` command now exercises deterministic
@@ -5631,7 +5644,10 @@ the recursive OCEL envelope. Focused tests cover typed scalar attributes,
 duplicate relation counts, orphan removal, inclusive boundaries, lifecycle
 endpoints, recursive expansion, singleton components, component predicates,
 empty maps, malformed bounds, nested delimiter round-trips, escaped
-backslashes, and integer overflow rejection. The shared native query codec is
+backslashes, and integer overflow rejection. Reversed timestamp bounds (from
+after to) give an empty OCEL, as `pm4py.filter_ocel_events_timestamp` does
+(until 2026-11-03 native rejected them with "OCEL timestamp bounds are
+reversed"). The shared native query codec is
 also used by the object-binding playout parser, so object types and ids may
 contain the grammar delimiters without being split at the wrong layer.
 
@@ -15364,7 +15380,7 @@ Validation: docs/feature-first-literal-vectors-validation.json.
 
 ## Feature86 - OCPN discovery policies
 
-Feature86 exposes OCPN strict-sequence-cut and specialized-fallthrough policy in existing OCEL discovery and model discovery before OCPN or causal-net playout. Both controls default to false, preserve explicit false, and accept only true, false, 1 or 0 at the HTTP and CLI boundaries. The CLI forwards discovery options into OCPN playout as well as direct discovery and causal-net discovery. Validation passed 16 selected cases / 16 dedicated physical HTTP calls and 9179 frontend tests in 152 files. 4 audited extensions remain. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
+Feature86 exposes OCPN strict-sequence-cut and specialized-fallthrough policy in existing OCEL discovery and model discovery before OCPN or causal-net playout. Both controls default to true (the native `OcpnDiscoveryOptions` defaults, as `pm4py.discover_oc_petri_net` mines without the strict sequence cut or fall-throughs) at the HTTP, CLI and frontend boundaries, preserve explicit false, and accept only true, false, 1 or 0. (The server parsed an omitted flag as false until 2026-11-03, so its OCPN nets differed from the reference on 73 of 150 seeded OCELs; `minera_server_parameter_contract_tests` now pins the omitted, true and false results on a single-object log whose reference net is `->(d, é, *(tau, a))`.) The CLI forwards discovery options into OCPN playout as well as direct discovery and causal-net discovery. Validation passed 16 selected cases / 16 dedicated physical HTTP calls and 9179 frontend tests in 152 files. 4 audited extensions remain. Strict scope stays 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified.
 
 Validation: docs/feature-first-ocpn-controls-validation.json.
 
@@ -15726,9 +15742,12 @@ Contract decisions:
   reference and native place to be such an optimal rounding
   (`reference_ilp_rounding_is_optimal`); native picks its own optimal
   vertex (dense simplex, Bland's rule, rows added lazily).
-- The older `mine_ilp` (native boundaries, noise filter, integer regions) and
-  its adapters stay as documented extensions; `reference_ilp_net` is not yet
-  wired into JSON/CLI/server. The package is complete.
+- `mine_ilp`, and with it the JSON, CLI and server adapters, now builds its
+  net with `reference_ilp_net` (`src/backend/ilp_miner.cpp`); the older
+  native options (boundaries, noise filter, integer regions) stay as
+  documented extensions. LP ties make adapter nets differ from the reference
+  in shape (for example one shared self-loop place instead of two) while
+  every reference place stays an optimal rounding. The package is complete.
 
 
 ## OCEL LLM-abstraction bank (2026-10-25)
@@ -15995,7 +16014,12 @@ Reference behaviour found (black box):
 ## Process-tree reduction bank (2026-10-25)
 
 `scripts/capture-tree-reduction-bank.py` (seed 20261025, eight hash seeds)
-records 6,000 public calls into `docs/tree-reduction-bank.txt.gz`:
+records 6,000 public calls into `docs/tree-reduction-bank.txt.gz`, followed
+(seed 20261103, 2026-11-03) by 3,027 `process_tree.utils.generic.fold` calls
+(27 fixed trees and 3,000 seeded ones over every operator including
+interleaving, some operators without children) and 2,001 TREE_TR_BASED
+reductions of trees with interleaving nodes, including the public
+`<>(a, X(b, tau))` on trace `a`, which gives `<>(a, tau)`. The original part:
 `reducer.apply` with the TREE_TR_BASED variant, `tree_tr_based.apply` with a
 custom ACTIVITY_KEY, and `reducer.apply` without a variant (which raises
 "please specify the variant of the reduction to be used."), on seeded trees
@@ -16006,7 +16030,9 @@ different hash seeds; every observed outcome is kept.
 outcome (tree or error) comes from `reference_reduce_process_tree` under
 some order of the distinct leaves, and `reduce_process_tree` (the public
 reduction and its adapters) is that function in breadth-first leaf order,
-which matches the reference in all but 50 non-varying cases.
+which matches the reference in all but 50 non-varying cases. The extra
+cases pass with 0 failures as well (TypeError compares by class); before the
+2026-11-03 fold rewrite the extended bank failed 2,088 calls.
 
 Reference behaviour found (black box):
 - The walk deduplicates structurally equal subtrees. It starts from the
@@ -16019,13 +16045,68 @@ Reference behaviour found (black box):
 - Footprints are computed for the visited nodes: tau is skippable; xor is
   skippable when a child is; a loop when its first child is (a visited loop
   with fewer than two children raises IndexError "list index out of range");
-  sequence, parallel and or when all children are.
+  sequence, parallel and or when all children are. There is no interleaving
+  footprint: a visited node other than the root and the last one whose
+  subtree holds an interleaving node raises `TypeError: 'NoneType' object is
+  not subscriptable`. Native raises `ProcessTreeReductionError` of type
+  TypeError there, with a message that names the interleaving node, rather
+  than returning a tree the reference never gives (a computed tree would
+  depend on the hash seed whenever the walk order decides whether the node is
+  read). An interleaving root or last node folds normally.
 - Every visited node that is skippable and shares no activity with the trace
-  is replaced by tau in its parent; then the result is folded:
-  sequence, parallel and xor absorb same-operator children (or does not), xor
-  and or keep only their last tau, sequence and parallel drop taus unless
-  nothing else is left, one-child nodes become their child, and a loop of
-  only taus becomes tau. The input tree is not changed.
+  is replaced by tau in its parent; then the result is folded. The input
+  tree is not changed.
+- The fold uses the reference node equality: two childless nodes are equal
+  when their labels are, so tau equals any childless operator (`X()`), and
+  list removal takes the first equal child. Before a node's children fold,
+  a sequence, parallel, xor or or node with tau children keeps one tau when
+  nothing else is left; otherwise sequence and parallel remove one equal
+  child per tau, and xor and or one per tau but the first. The children then
+  fold and a one-child node becomes its child. Sequence, parallel and xor
+  absorb same-operator children (or and interleaving do not); the subtree's
+  sequence and parallel nodes then drop their taus and its xor and or nodes
+  keep one (the last when only taus are left), and a one-child node again
+  becomes its child. Only a loop of exactly two taus becomes tau
+  (`*(tau,tau,tau)` stays); interleaving nodes are otherwise left alone
+  (`<>(tau,a)` and `<>(a,<>(b,c))` stay); childless operators stay
+  (`+()`), and the equality makes `X(a,X())` fold to `a`, `->(X(),tau)` to
+  tau and `->(tau,X())` to `X()`. `fold_process_tree_reference` follows
+  these rules; on seeded fuzz with childless operators about one tree in
+  5,000 still differs (a childless operator next to taus inside a nested
+  xor or or that its parent absorbs, which the reference also removes), and
+  none without childless operators (0 of 20,000).
+
+## Fuzz review, second pass (2026-11-03)
+
+Black-box comparisons against the reference on seeded inputs (harnesses
+outside the repository):
+
+- Petri-net reachability footprints (`footprints.petri.variants.reach_graph`)
+  on 200 seeded nets (tree conversions and random nets): all equal or both
+  rejecting (the reference construction is cut after 10 s or 1.5 GB).
+- Process-tree footprints: 4,000 seeded trees with binary loops (sequence,
+  xor, parallel, loop, or, interleaving) give no value difference; the
+  reference KeyError and the three-child loops are declared.
+- OCEL conformance (`conformance.ocel` ETOT, OTG and OCDFG graph comparison
+  through `minera_ocel --conformance ... --real ocel --normative`): 200 seeded
+  OCEL pairs, 0 differences in any field.
+- OCPN to OC causal net (`objects.ocpn` factory and the TO_OC_CAUSAL_NET
+  converter, against `oc_causal_net_from_ocpn(discover_ocpn(...))`): 360
+  seeded OCELs, all isomorphic (activities, marker groups, cardinalities,
+  shared marker keys; labelled transitions matched by label, since the
+  reference names them by random UUID); one OCEL fails in the reference reader.
+- Petri-net and process-tree BPMN export: see the BPMN entries in the
+  declarations (one task per transition fixed; the reference's dropped
+  one-child-sequence flow declared).
+- `reduce_petri_net` (default and with parallel-place fusion and
+  abstraction) preserves the language of 194 of 194 seeded nets the
+  reference extensive playout can enumerate (traces of up to four visible
+  events). Native has no counterpart of the reference's
+  `objects.petri_net.utils.reduction` rules, so the reduced nets are not
+  compared structurally.
+- Not compared: the reference 2.7.22 has no region-based miner besides ILP
+  (compared earlier), and native exposes the reachability graph only through
+  Woflan (bank-bound) and the footprints above.
 
 ## Organizational-mining util bank (2026-10-25)
 
@@ -16803,6 +16884,64 @@ Declared (not equivalent, kept on purpose):
   acquisition) holds at most 32 sessions (429 beyond), with 256 MiB of
   uploads and 1,000,000 events per live session (413 beyond). Tests:
   `minera_streaming_session_tests`.
+- **Stream session limits (declared native limits).** The reference streams
+  without bounds; the server declares these:
+  - Per live session: 256 MiB of uploads and 1,000,000 events. A batch is
+    refused (413) before parsing when its estimate would pass the limit, and
+    again after parsing on the exact count.
+  - Per reader session: 1,000,000 events, estimated before parsing. A CSV
+    source counts its non-blank rows after the header; an XES source counts
+    its `<event` start tags within `xes_max_traces` traces. A source
+    estimated above the limit gets 413, so a source with exactly 1,000,000
+    rows is accepted.
+  - Server-wide: 1 GiB of source bytes and 2,000,000 events across all live
+    and reader sessions (429 beyond). A reader is charged once, for its
+    source bytes and its estimated events. The session lists report the
+    budget in use as `stream_budget` (`bytes`, `events`, `max_bytes`,
+    `max_events`).
+  - Idle expiry: a live or reader session that no request names (create,
+    snapshot, read, append, action, source, export, release; the session
+    lists do not count) for 30 minutes is released as an explicit release
+    would be, and its budget returned. A session still working through
+    queued events (`ACTIVE` with `pending` events) is never expired, and each
+    request or append restarts its idle time. A request for an expired
+    session gets 404 ("expired after being idle"). `MINERA_STREAM_IDLE_MS`
+    overrides the expiry in milliseconds; 0 disables it.
+  - The frontend keeps its live or reader session when the user moves to
+    another view, so a running stream survives and the remembered id
+    reconnects to it. It releases the session when the user replaces it
+    ("Release and start a separate …", or a new session or reader source).
+  Tests: `minera_server_parameter_contract_tests` (1,000,001 rows refused
+  with an exact estimate, LF and CRLF with blank lines; idle expiry on a
+  server with a 1.5 s expiry).
+- **Mining admission and memory (declared native limits).** The reference
+  mines whatever it is given; the server declares these:
+  - Size cap: `/api/mine` counts CSV rows or XES `<event` tags before
+    parsing and estimates 10 KiB per event plus 2 KiB per event for each
+    column beyond case, activity, timestamp and resource. Above the budget
+    (half the physical or cgroup memory; `--mine-memory-budget`) or
+    `--max-mine-events` it answers 413 `MINE_LIMIT` with the estimate, the
+    limit and a hint. Sampling does not lift it: the whole upload is
+    retained as the source.
+  - One `/api/mine` at a time; others get 503 `MINE_BUSY` with
+    `Retry-After` (1 s when the running mine is already canceled, else 5 s).
+  - A canceled or replaced mine stops between stages with the existing
+    canceled 400 instead of running to completion; results of a mine that
+    is not canceled are byte-identical.
+  - Memory: the session shares the active source's checked log instead of
+    copying it, and shares a prepared Alpha or Inductive log that came out
+    unchanged; the source's stream and lazy table views are built on first
+    use; the upload is parsed in place and the response tail is written in
+    place. On a 200,000-event, four-column CSV the mine's peak RSS fell from
+    3.44 GB to 1.59 GB and its retained (trimmed) RSS from 2.61 GB to
+    0.88 GB, with a byte-identical 122,914,698-byte response.
+  - With zlib, JSON and text responses are gzipped on `Accept-Encoding:
+    gzip` (never a 206 range); the mining body shrinks about tenfold.
+  Tests: `minera_server_parameter_contract_tests` (gzip round trip with
+  exact bytes for a repaired body and for `/api/mine`, Range with gzip, 415
+  for a gzip request body; 413 for the budget and the event cap; 503 while
+  a mine runs; cancel between stages on a server with
+  `MINERA_MINE_STAGE_PAUSE_MS`), `mine-admission.test.ts`.
 
 ## BPMN, transition systems, performance spectrum and sampling (2026-11-03)
 
@@ -16837,8 +16976,11 @@ Fixes:
   6 constructs outside the reference converter). Tests: `minera_bpmn_reference_parity_tests` (21 captured nets).
 - **Petri-net BPMN export.** Uses the reference mapping: an exclusive gateway
   per place, start event into the source gateway and the sink gateway into the
-  end event, one task per visible label (shared by equally labelled
-  transitions) with a converging parallel gateway for several input places
+  end event, one task per visible transition (equally labelled transitions
+  keep separate tasks, as in the reference; until 2026-11-03 native shared
+  one task per label, which differed on 101 of 199 seeded nets and gave the
+  shared task several outgoing flows, which BPMN starts all at once) with a
+  converging parallel gateway for several input places
   and a diverging one for several output places (an exclusive gateway on a
   side with no place), a silent transition as one parallel gateway when it
   has several input or output places (Converging when several inputs) and an
@@ -16848,6 +16990,20 @@ Fixes:
   the reference's export including gateway directions; the inductive-tree
   export is isomorphic on 26 of 26 logs it could be checked on (two larger
   logs ran out of memory in the full CLI bundle, unrelated to BPMN).
+  Fresh file-level comparison (2026-11-03) against
+  `write_bpmn(convert_to_bpmn(net), auto_layout=False)`: 199 of 199 seeded
+  nets (tree-derived and random, many with duplicate labels) give the same
+  multiset of nodes (kind, task name, gateway direction) and labelled flows;
+  `minera_bpmn_reference_parity_tests` adds four captured duplicate-label
+  nets. Declared: for one net that is not a workflow net the reference
+  raises "Unsupported conversion of the provided object to BPMN"; native
+  exports any accepting net.
+- **Process-tree BPMN export.** The block-by-block export matches the
+  reference export file on 600 seeded trees (sequence, xor, parallel, loop,
+  or) except where the reference converter drops a flow: it loses the exit
+  flow of a sequence with one child (`X(->(a), c)` leaves task `a` without
+  an outgoing flow, `->(->(a, b))` leaves the end event unreached), 61 of
+  600. Native keeps the flow, so its document stays connected (declared).
 - **Exported BPMN documents.** Gateways carry `gatewayDirection`, every node
   lists `<incoming>`/`<outgoing>`, events are named `start`/`end`, and a
   `BPMNDiagram` with a deterministic layered layout (longest-path columns,
@@ -16912,6 +17068,15 @@ Declarations:
   complex gateways, transactions crash its reader).
 - **BPMN connector names.** Reference connector transitions get random
   UUIDs; native names them `00000000-0000-4000-8000-<counter>`.
+- **Footprints of loops with more than two children.** The reference
+  process-tree footprints read only a loop's first two children; a later
+  redo child contributes its activities and nothing else (`*(->(c,a),c,d)`
+  has no `(a,d)` or `(d,c)` sequence, and `d` is never a start or end
+  activity), although the reference's own Petri-net conversion makes it an
+  alternative redo. Native footprints follow the n-ary loop semantics used by
+  every native conversion (body, then any redo child), so they describe the
+  model's language (90 of 2,000 seeded trees with three-child loops differ,
+  none without them).
 - **Reachability graphs on unbounded nets.** Native stops with an error once
   the state space grows past its bound; the reference's construction does not
   terminate.
@@ -16976,6 +17141,25 @@ Declarations:
     filters with no match.
   - `read_ocel2_xml` raises `AttributeError` on a log with no event-object
     relation; native reads it as empty, like the reference JSON readers (OC7).
+  - Social-network analysis and roles discovery raise when some events lack
+    `org:resource`: the EventLog variants with `KeyError`, and the pandas
+    handover, subcontracting and working-together variants with `TypeError`
+    from sorting a string against NaN (pandas joint activities and pandas
+    roles do compute, and native matches them). Native skips the events
+    without a resource and returns the network or roles of the rest (trace
+    a/R1, b/none, c/R2 gives the handover R1 to R2).
+  - Pandas roles discovery on a log with no traces raises
+    `KeyError: 'org:resource'`; native returns no roles.
+  - `filter_ocel_object_types_allowed_activities` on an OCEL with no
+    event-object relation raises `UFuncTypeError`; native returns an empty
+    OCEL.
+  - Process-tree footprints (`footprints.tree.variants.bottomup`) raise
+    `KeyError(<tree>)` for many trees that repeat an activity or a subtree
+    in some arrangements (`+(X(a), a)`, `*(+(c,b,a), *(b,b))`) and for every
+    tree with an interleaving node (`<>(a)`): 509 of 2,000 seeded trees with
+    binary loops, 747 of 2,000 with or and interleaving nodes. Native
+    computes the footprints; where the reference computes, the two agree
+    (0 value diffs in those 4,000).
 - **Writers stay lossless.** The reference writers (JSON, XML, SQLite, CSV)
   drop unrelated events and objects, also from the OCEL in memory, before
   writing. Native writers keep what the OCEL holds, because native adapters

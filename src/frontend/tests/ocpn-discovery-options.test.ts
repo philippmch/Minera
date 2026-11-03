@@ -64,6 +64,7 @@ describe("OCPN inductive discovery controls", () => {
     expect(html).toContain('aria-label="OCEL discovery: Disable strict sequence cut"');
     expect(html).toContain('aria-label="OCEL discovery: Disable fallthroughs"');
     expect(html).toContain('value="native" selected=""');
+    expect(html).toContain("Native default (enabled)");
     const other = renderToStaticMarkup(createElement(OcelExplorer, {result: {...discovery, variant: "etot"}, busy: false, onDiscover: () => {}}));
     expect(other).not.toContain("Disable fallthroughs");
   });

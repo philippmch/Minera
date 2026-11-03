@@ -397,18 +397,17 @@ BpmnGraph net_bpmn_graph(const PetriNet& net) {
     place_node[p] = graph.add("exclusiveGateway", "exclusiveGateway", std::nullopt, "Unspecified");
   if (start) graph.flow(*start, place_node[net.source()]);
   if (end) graph.flow(place_node[net.sink()], *end);
-  std::unordered_map<std::string, std::size_t> tasks;
   for (const auto& transition : net.transitions()) {
     const auto& inputs = transition.inputs;
     const auto& outputs = transition.outputs;
     std::size_t entry = 0;
     std::size_t exit = 0;
     if (!transition.silent()) {
+      // One task per transition, as the reference converter builds them:
+      // transitions sharing a label stay separate tasks (one shared task
+      // with several flows would start every outgoing flow).
       const auto& label = net.activities()[*transition.activity];
-      auto found = tasks.find(label);
-      if (found == tasks.end())
-        found = tasks.emplace(label, graph.add("task", "Activity", label)).first;
-      entry = exit = found->second;
+      entry = exit = graph.add("task", "Activity", label);
       if (inputs.size() > 1) {
         const auto join = graph.add("parallelGateway", "parallelGateway", std::nullopt, "Converging");
         graph.flow(join, entry);

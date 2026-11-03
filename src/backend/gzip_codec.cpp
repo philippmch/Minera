@@ -243,7 +243,7 @@ void inflate_codes(BitReader& reader, const HuffmanTree& literals,
     const auto symbol = literals.decode(reader);
     if (symbol < 256) {
       if (output.size() >= max_output_bytes)
-        throw std::runtime_error("gzip output exceeds the configured limit");
+        throw GzipOutputLimitError("gzip output exceeds the configured limit");
       output.push_back(static_cast<char>(symbol));
       continue;
     }
@@ -262,7 +262,7 @@ void inflate_codes(BitReader& reader, const HuffmanTree& literals,
     if (distance == 0 || distance > output.size())
       throw std::runtime_error("deflate back-reference distance is invalid");
     if (length > max_output_bytes - output.size())
-      throw std::runtime_error("gzip output exceeds the configured limit");
+      throw GzipOutputLimitError("gzip output exceeds the configured limit");
     for (unsigned i = 0; i < length; ++i)
       output.push_back(output[output.size() - distance]);
   }
@@ -287,7 +287,7 @@ std::size_t inflate_member(std::string_view bytes, std::size_t offset,
           length > bytes.size() - position - 4)
         throw std::runtime_error("deflate stored block is truncated");
       if (length > max_output_bytes - output.size())
-        throw std::runtime_error("gzip output exceeds the configured limit");
+        throw GzipOutputLimitError("gzip output exceeds the configured limit");
       output.append(bytes.substr(position + 4, length));
       reader = BitReader(bytes, position + 4 + length);
     } else if (type == 1) {
@@ -326,6 +326,16 @@ std::string gzip_compress(std::string_view bytes) {
   // windowBits 15 + 16 asks zlib for a gzip wrapper (header and CRC-32 trailer).
   if (deflateInit2(&stream, 9, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK)
     throw std::runtime_error("gzip compressor could not be initialised");
+  // zlib stamps its build platform in the header's OS byte (3 on Unix, 10 on
+  // Windows, 19 on macOS); write 255 ("unknown") as Python's gzip and the
+  // stored-block writer below do, so exports match on every platform. The
+  // modification time stays 0, which keeps exports deterministic.
+  gz_header header{};
+  header.os = 255;
+  if (deflateSetHeader(&stream, &header) != Z_OK) {
+    deflateEnd(&stream);
+    throw std::runtime_error("gzip compressor could not be initialised");
+  }
   std::string output;
   std::array<unsigned char, 1U << 16U> buffer{};
   std::size_t offset = 0;

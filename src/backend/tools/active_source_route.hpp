@@ -406,7 +406,7 @@ std::vector<std::vector<std::size_t>> active_source_trace_table_rows(const Mined
     }
     result.push_back(std::move(rows));
   }
-  if (event_count != session.log.event_count() || event_count != ordinals.size())
+  if (event_count != session_log(session).event_count() || event_count != ordinals.size())
     throw std::invalid_argument("prepared event provenance does not match checked source rows");
   return result;
 }
@@ -490,7 +490,9 @@ std::string active_source_table_json_from_log_indices(const MinedSession& sessio
 struct ActiveMiningTicket {
   std::uint64_t generation = 0;
   std::string id;
-  bool canceled = false;
+  // Atomic so the running mine can poll it between stages without taking
+  // g_session_mutex; it is still written under that mutex.
+  std::atomic<bool> canceled = false;
   bool native_source_dispatch = false;
   std::shared_ptr<const MinedSession> previous;
   std::shared_ptr<const ClusteringAnalysis> previous_clustering;
@@ -502,9 +504,11 @@ struct ActiveMiningTicket {
   // response bytes already reached the socket.
   bool released = false;
 };
+// The mine holding the /api/mine slot (see mine_limits.hpp), for its 503.
+std::weak_ptr<ActiveMiningTicket> g_running_mine_ticket;  // under g_session_mutex
 // The ticket this request thread published, handed to the route wrapper.
 thread_local std::shared_ptr<ActiveMiningTicket> t_published_mining_ticket;
-std::uint64_t g_active_mining_generation = 0;
+std::atomic<std::uint64_t> g_active_mining_generation = 0;
 std::map<std::string, std::shared_ptr<ActiveMiningTicket>> g_active_mining_requests;
 // The one ticket that may still hold a rollback session (each new mining
 // request drops every older rollback).
@@ -525,8 +529,9 @@ std::shared_ptr<ActiveMiningTicket> begin_active_mining(const httplib::Request& 
   const auto existing = ticket->id.empty() ? g_active_mining_requests.end() : g_active_mining_requests.find(ticket->id);
   if (existing != g_active_mining_requests.end() && existing->second->generation != 0)
     throw std::invalid_argument("mining request identity was already used");
-  if (existing != g_active_mining_requests.end()) ticket->canceled = existing->second->canceled;
+  if (existing != g_active_mining_requests.end()) ticket->canceled = existing->second->canceled.load();
   ticket->generation = ++g_active_mining_generation;
+  g_running_mine_ticket = ticket;
   ticket->previous = g_session; ticket->previous_clustering = g_clustering_analysis;
   for (auto& [id, previous] : g_active_mining_requests) {
     (void)id;
@@ -545,6 +550,24 @@ std::shared_ptr<ActiveMiningTicket> begin_active_mining(const httplib::Request& 
     }
   }
   return ticket;
+}
+
+// Between mining stages: a canceled request, or one a newer source request
+// replaced, stops with the answer publish_active_mining would give it at the
+// end, so the remaining stages never run. A request that is neither runs on
+// unchanged.
+void abort_if_mining_canceled(const std::shared_ptr<ActiveMiningTicket>& ticket) {
+  static const auto pause = [] {
+    // MINERA_MINE_STAGE_PAUSE_MS (tests only) waits at every stage boundary,
+    // so a cancel can be sent while a small log is still being mined.
+    const char* text = std::getenv("MINERA_MINE_STAGE_PAUSE_MS");
+    char* end = nullptr;
+    const long value = text ? std::strtol(text, &end, 10) : 0;
+    return text && end != text && *end == '\0' && value > 0 && value <= 60000 ? value : 0L;
+  }();
+  if (pause > 0) std::this_thread::sleep_for(std::chrono::milliseconds(pause));
+  if (ticket->canceled.load() || ticket->generation != g_active_mining_generation.load())
+    throw std::invalid_argument("mining request was canceled or replaced by a newer source request");
 }
 
 void publish_active_mining(const std::shared_ptr<ActiveMiningTicket>& ticket,
@@ -697,7 +720,42 @@ void confirm_mining_source(const httplib::Request& request) {
 // starts, and an acknowledgement, a request on the new source or the window's
 // end releases the previous session. Within the window cancel-mine restores
 // it. The body bytes are unchanged.
-void deliver_published_mining(httplib::Response& response) {
+#if defined(CPPHTTPLIB_ZLIB_SUPPORT)
+// One gzip member of the whole body. The mining body can pass 100 MB, so it
+// is deflated at zlib's fastest level: JSON still shrinks about tenfold, in a
+// fraction of the time the default level takes.
+std::optional<std::string> gzip_mining_body(const std::string& body) {
+  z_stream stream{};
+  if (deflateInit2(&stream, Z_BEST_SPEED, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK)
+    return std::nullopt;
+  std::string out;
+  // JSON deflates about tenfold; start at an eighth and grow as needed.
+  out.resize(body.size() / 8 + (1u << 16));
+  std::size_t offset = 0;
+  int status = Z_OK;
+  while (status == Z_OK) {
+    if (stream.avail_in == 0 && offset < body.size()) {
+      const auto slice = std::min<std::size_t>(body.size() - offset, 1u << 30);
+      stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(body.data() + offset));
+      stream.avail_in = static_cast<uInt>(slice);
+      offset += slice;
+    }
+    if (out.size() - stream.total_out < (1u << 16)) out.resize(out.size() + (out.size() >> 2) + (1u << 16));
+    stream.next_out = reinterpret_cast<Bytef*>(out.data() + stream.total_out);
+    stream.avail_out = static_cast<uInt>(std::min<std::size_t>(out.size() - stream.total_out, 1u << 30));
+    status = deflate(&stream, offset == body.size() && stream.avail_in == 0 ? Z_FINISH : Z_NO_FLUSH);
+    if (status == Z_BUF_ERROR) status = Z_OK;  // no progress possible yet: more room or input
+  }
+  const auto written = stream.total_out;
+  deflateEnd(&stream);
+  if (status != Z_STREAM_END) return std::nullopt;
+  out.resize(written);
+  out.shrink_to_fit();
+  return out;
+}
+#endif
+
+void deliver_published_mining(const httplib::Request& request, httplib::Response& response) {
   auto ticket = std::move(t_published_mining_ticket);
   t_published_mining_ticket.reset();
   if (!ticket) return;
@@ -710,6 +768,22 @@ void deliver_published_mining(httplib::Response& response) {
   if (type.starts_with("application/json") && !minera::detail::is_clean_utf8(*body))
     *body = active_source_safe_json(*body);
   response.body.clear();
+#if defined(CPPHTTPLIB_ZLIB_SUPPORT)
+  // httplib compresses only bodies it holds, not this fixed-length provider,
+  // so a client that accepts gzip gets the repaired body gzipped here. A
+  // Range request keeps the identity body, so its byte offsets stay those
+  // of the JSON.
+  if (request.ranges.empty() && !request.has_header("Range") &&
+      httplib::detail::encoding_type(request, response) == httplib::detail::EncodingType::Gzip &&
+      httplib::detail::can_compress_content_type(type)) {
+    if (auto compressed = gzip_mining_body(*body)) {
+      *body = std::move(*compressed);
+      response.set_header("Content-Encoding", "gzip");
+    }
+  }
+#else
+  (void)request;
+#endif
   // set_content_provider adds the Content-Type header again.
   response.headers.erase("Content-Type");
   const auto size = body->size();

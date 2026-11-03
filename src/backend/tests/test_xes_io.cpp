@@ -188,6 +188,32 @@ void rejects_corruption_and_expansion_beyond_limit() {
     std::istringstream input(valid);
     (void)minera::import_xes_event_log(input, bounded);
   }));
+  // The limit errors name the bound and how to raise it, plain or gzip.
+  const auto limit_message = [&](const std::string& bytes) {
+    try {
+      std::istringstream input(bytes);
+      (void)minera::import_xes_event_log(input, bounded);
+    } catch (const std::exception& error) {
+      return std::string(error.what());
+    }
+    return std::string();
+  };
+  const auto plain = limit_message(minera::serialize_xes(sample_log(), minera::XesExportOptions{}));
+  assert(plain.starts_with("XES input exceeds the XES size limit of 16 bytes"));
+  assert(plain.find("--max-xes-decompressed-bytes") != std::string::npos);
+  const auto compressed = valid;  // a gzip export
+  // The gzip header names no operating system (0xff), on every platform.
+  assert(compressed.size() > 10 && static_cast<unsigned char>(compressed[9]) == 0xff);
+  const auto gzip = limit_message(compressed);
+  assert(gzip.starts_with("gzip XES input expands past the XES size limit of 16 bytes"));
+  assert(throws([&] { (void)minera::detail::gzip_decompress(compressed, 16); }));
+  bool limit_type = false;
+  try {
+    (void)minera::detail::gzip_decompress(compressed, 16);
+  } catch (const minera::detail::GzipOutputLimitError&) {
+    limit_type = true;
+  }
+  assert(limit_type);
 }
 
 void file_export_uses_gzip_suffix_and_imports_it() {

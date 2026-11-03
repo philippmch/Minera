@@ -1525,6 +1525,30 @@ void parse_mine_params_rejects_invalid_inductive_options() {
   }
 }
 
+// A request may raise the XES bound past the 256 MiB default up to the
+// server ceiling (2 GiB unless minera_server --max-xes-decompressed-bytes);
+// above it the error names the ceiling and the flag.
+void xes_max_decompressed_bytes_respects_the_server_ceiling() {
+  assert(minera::xes_decompressed_ceiling() == minera::kDefaultXesDecompressedCeiling);
+  assert(minera::kDefaultXesDecompressedCeiling == std::size_t{2147483648});
+  auto params = minera::parse_mine_params(fields({{"xes_max_decompressed_bytes", "1073741824"}}));
+  assert(params.xes.max_decompressed_bytes == 1073741824);
+  params = minera::parse_mine_params(fields({{"xes_max_decompressed_bytes", "2147483648"}}));
+  assert(params.xes.max_decompressed_bytes == 2147483648);
+  std::string message;
+  try {
+    (void)minera::parse_mine_params(fields({{"xes_max_decompressed_bytes", "2147483649"}}));
+  } catch (const std::invalid_argument& error) {
+    message = error.what();
+  }
+  assert(message.find("ceiling of 2147483648 bytes") != std::string::npos);
+  assert(message.find("--max-xes-decompressed-bytes 2147483649") != std::string::npos);
+  minera::set_xes_decompressed_ceiling(std::size_t{4} << 30);
+  params = minera::parse_mine_params(fields({{"xes_max_decompressed_bytes", "2147483649"}}));
+  assert(params.xes.max_decompressed_bytes == 2147483649);
+  minera::set_xes_decompressed_ceiling(minera::kDefaultXesDecompressedCeiling);
+}
+
 void parse_mine_params_rejects_invalid_xes_options() {
   for (const auto& item : {
            std::pair{"xes_variant", "unknown"},
@@ -6303,6 +6327,7 @@ void knowledge_injection_params_contract() {
 }
 
 int main() {
+  xes_max_decompressed_bytes_respects_the_server_ceiling();
   parse_mine_params_reads_sampling_controls();
   ends_with_ci_is_case_insensitive();
   looks_like_xes_uses_extension_then_content_sniff();

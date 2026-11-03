@@ -386,10 +386,53 @@ never leaves your machine.
 **Size limits.** The server accepts uploads of up to 128 MiB on every route,
 and the browser refuses a larger file before sending it, naming the limit. An
 XES document may be up to 256 MiB, plain or after gzip expansion, so a large
-log fits as `.xes.gz` (raise the XES bound with `xes_max_decompressed_bytes`
-or `--xes-max-decompressed-bytes` on a machine with more memory; importing
-takes about 17 times the document size). OCEL JSON and XML documents and the
+log fits as `.xes.gz`. On a machine with more memory, raise the XES bound
+with the request field `xes_max_decompressed_bytes` or with
+`minera_export --xes-max-decompressed-bytes`; importing takes about 17 times
+the document size. A server request may raise the bound up to the server's
+ceiling, 2 GiB unless `minera_server` is started with
+`--max-xes-decompressed-bytes N`. A larger request gets a 400 that names the
+ceiling and the flag, and a document past the bound gets an error that names
+the limit. OCEL JSON and XML documents and the
 OCEL files the server generates for download are limited to 128 MiB.
+
+**Mining size cap and one mine at a time.** Before parsing, `/api/mine`
+estimates the memory a mine needs: it counts the CSV's non-blank rows after
+the header (quote-aware) or the XES `<event` start tags (inflating a gzip XES
+as it counts; without zlib a gzip XES is not pre-scanned), and takes 10 KiB
+per event plus 2 KiB per event for every column beyond case, activity,
+timestamp and resource (for XES, the attribute keys of the first trace and
+its first event). The budget is half of the physical memory, or of the
+container's cgroup limit when lower; `minera_server --mine-memory-budget
+BYTES` (suffix K, M, G or T) sets it and `--max-mine-events N` adds an event
+cap. A log over either gets 413 with `{"family":"MINE_LIMIT", "error",
+"limit" ("mine_memory_budget" or "max_mine_events"), "estimated_events",
+"estimated_bytes", "extra_columns", "memory_budget_bytes", "max_mine_events",
+"hint"}`, and the app shows its message. Sampling and filter controls do not
+change the estimate: the whole upload is imported and retained as the source,
+and they trim only the mined view. JSON event tables
+(`mining_input_format=table`) are not pre-scanned. Only one `/api/mine` runs
+at a time; another gets 503 with `Retry-After` and `{"family":"MINE_BUSY",
+"error":"Another log is being mined — wait or cancel it.", "canceling",
+"retry_after_seconds"}`. `canceling` is true when the running mine was
+canceled or replaced and only has to reach its next stage; the app then
+retries after `Retry-After` (for up to two minutes) instead of failing.
+A canceled or replaced mine checks its flag between stages (after the import
+and after each discovery and conformance step) and stops with the usual
+"mining request was canceled or replaced by a newer source request" 400; a
+mine that is neither runs exactly as before. Alignment and evaluation routes
+do not stop when the client disconnects (the vendored HTTP server cannot
+observe a disconnect while a handler runs, and the alignment engines take no
+cancellation callback).
+
+**Compressed responses.** When the server is built with zlib it gzips JSON,
+XML and text responses for a client that sends `Accept-Encoding: gzip`, and
+names `Vary: Accept-Encoding`. The body is compressed after the UTF-8 repair
+and `Content-Length` is the compressed size; the large `/api/mine` body is
+deflated at zlib's fastest level. A Range request (206) is always served
+from the identity bytes, without `Content-Encoding`. gzip request bodies are
+still refused with 415, and the server's own outgoing HTTP client neither
+asks for nor inflates gzip, as in a build without zlib.
 `minera_export LOG --convert-only --xes OUT.xes` converts a CSV or XES log to
 XES without running the miners; `--xes` is also honoured together with
 `--xes-return-legacy-log-object` and `--log-convert`.
@@ -706,8 +749,15 @@ header lists the patches. They do the following:
 - Header lines, the number of headers and the number of trailers are bounded.
 - A `POST`, `PUT` or `PATCH` that has neither a Content-Length nor chunked
   encoding gets `411`.
-- Each request gets an overall deadline for reading its head and its body.
-- Outgoing clients get a response-size cap.
+- Each request gets an overall deadline for reading its head (10 s) and its
+  body (120 s), and a body must arrive at an average of at least 64 KiB/s
+  after its first 5 s. A request cut off by either gets `408 Request Timeout`
+  with a JSON message naming the deadlines and the minimum rate, and the
+  connection is closed.
+- Outgoing clients get a response-size cap. A response over the cap fails
+  with its own error ("Response body exceeds the client's payload limit"), so
+  the query, language-model, embedding and repository-history runtimes report
+  "result exceeds N" instead of a generic read failure.
 
 Re-apply the patches if the header is upgraded.
 
@@ -1711,7 +1761,11 @@ the order in which batches were appended.
 
 The session persists while this server process runs. Navigating away leaves it
 running; use the saved ID, **Connect or refresh session**, or **List server stream
-sessions** to reconnect. A server restart removes sessions. Mutation requests
+sessions** to reconnect. A server restart removes sessions, and the server frees
+a live or reader session that no request has named for 30 minutes (one still
+working through queued events is kept; `MINERA_STREAM_IDLE_MS` overrides the
+expiry, 0 disables it). Moving to another view keeps the session; **Release and
+start a separate session** (or reader) releases it. Mutation requests
 carry the current revision and unique batch receipt; stale or repeated requests
 are rejected. After an interrupted request, refresh to inspect whether it
 committed before appending again. **Release server session** returns final data

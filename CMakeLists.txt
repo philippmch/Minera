@@ -598,6 +598,15 @@ add_executable(minera_server
 target_link_libraries(minera_server PRIVATE minera::core Threads::Threads)
 target_include_directories(minera_server PRIVATE third_party)
 target_compile_features(minera_server PRIVATE cxx_std_20)
+# With zlib the server gzips text and JSON responses for clients that send
+# Accept-Encoding: gzip (never a 206 range). Its httplib still refuses gzip
+# request bodies and its outgoing client neither asks for nor inflates gzip,
+# as without zlib (MINERA_HTTPLIB_COMPRESS_RESPONSES_ONLY, third_party/httplib.h).
+if(ZLIB_FOUND)
+  target_compile_definitions(minera_server PRIVATE
+    CPPHTTPLIB_ZLIB_SUPPORT MINERA_HTTPLIB_COMPRESS_RESPONSES_ONLY)
+  target_link_libraries(minera_server PRIVATE ZLIB::ZLIB)
+endif()
 if(MSVC)
   target_compile_options(minera_server PRIVATE /bigobj)
 endif()
@@ -1803,6 +1812,11 @@ if(MINERA_BUILD_TESTS)
       src/backend/tests/test_server_parameter_contract.cpp)
     target_include_directories(minera_server_parameter_contract_tests PRIVATE third_party)
     target_link_libraries(minera_server_parameter_contract_tests PRIVATE Threads::Threads)
+    if(ZLIB_FOUND)
+      # The server gzips responses; the test inflates them to compare bytes.
+      target_link_libraries(minera_server_parameter_contract_tests PRIVATE ZLIB::ZLIB)
+      target_compile_definitions(minera_server_parameter_contract_tests PRIVATE MINERA_TEST_HAS_ZLIB=1)
+    endif()
     target_compile_features(minera_server_parameter_contract_tests PRIVATE cxx_std_20)
     add_dependencies(minera_server_parameter_contract_tests minera_server)
     add_test(NAME minera_server_parameter_contract_tests
@@ -2301,6 +2315,18 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_token_precision_scaling_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_token_precision_scaling_tests COMMAND minera_token_precision_scaling_tests)
   set_tests_properties(minera_token_precision_scaling_tests PROPERTIES TIMEOUT 300)
+  add_executable(minera_mining_fast_path_equivalence_tests src/backend/tests/test_mining_fast_path_equivalence.cpp)
+  target_link_libraries(minera_mining_fast_path_equivalence_tests PRIVATE minera::core)
+  target_compile_features(minera_mining_fast_path_equivalence_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_mining_fast_path_equivalence_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_mining_fast_path_equivalence_tests COMMAND minera_mining_fast_path_equivalence_tests)
+  set_tests_properties(minera_mining_fast_path_equivalence_tests PROPERTIES TIMEOUT 600)
+  add_executable(minera_mining_fast_path_scaling_tests src/backend/tests/test_mining_fast_path_scaling.cpp)
+  target_link_libraries(minera_mining_fast_path_scaling_tests PRIVATE minera::core)
+  target_compile_features(minera_mining_fast_path_scaling_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_mining_fast_path_scaling_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_mining_fast_path_scaling_tests COMMAND minera_mining_fast_path_scaling_tests)
+  set_tests_properties(minera_mining_fast_path_scaling_tests PROPERTIES TIMEOUT 900)
 
   add_executable(minera_zone_database_tests src/backend/tests/test_zone_database.cpp)
   target_link_libraries(minera_zone_database_tests PRIVATE minera::core)

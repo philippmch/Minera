@@ -31,8 +31,9 @@ void write_bpmn(std::ostream& out,
 // Serializes any accepting Petri net as BPMN 2.0 XML with the reference
 // (pm4py 2.7.22) Petri-net-to-BPMN structure: every place becomes an
 // exclusive gateway; the source place is reached from the start event and the
-// sink place leads to the end event; transitions sharing a visible label share
-// one task, preceded by a converging parallel gateway when the transition has
+// sink place leads to the end event; every visible transition becomes its own
+// task (transitions sharing a label are not merged), preceded by a converging
+// parallel gateway when the transition has
 // several input places and followed by a diverging one when it has several
 // output places (and by an exclusive gateway when it has no input or no output
 // place); a silent transition becomes one parallel gateway when it has several

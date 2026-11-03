@@ -68,10 +68,78 @@ void eventually_follows_interval_reference() {
   assert(thrown);
 }
 
+// Reference capture (pm4py 2.7.22 statistics.overlap.interval_events,
+// overlap.cases and concurrent_activities, start_timestamp_key) on events that
+// start after they complete (minutes). Interval-event overlap raises
+// ("Start must be less than end"); case overlap takes the min-start/max-end
+// envelope and raises only when that envelope is inverted; concurrent
+// activities sort each trace by start and stop scanning later events at the
+// first one that does not overlap.
+void inverted_interval_reference() {
+  const auto at = [](int minute) {
+    char text[32];
+    std::snprintf(text, sizeof text, "2024-01-01T%02d:%02d:00", minute / 60, minute % 60);
+    return std::string(text);
+  };
+  const auto ev = [&](const char* activity, int start, int end) {
+    Event e;
+    e.activity = activity;
+    e.timestamp = at(end);
+    e.attributes.push_back({"start_timestamp", at(start)});
+    return e;
+  };
+  OverlapOptions options;
+  options.start_timestamp_attribute = "start_timestamp";
+  const auto raises = [](auto&& call) {
+    try {
+      (void)call();
+    } catch (const std::invalid_argument&) {
+      return true;
+    }
+    return false;
+  };
+
+  // [A 60-0, B 30-120], [A 90-100]: interval events raise, cases give
+  // [2, 2], and no activities are concurrent.
+  EventLog inverted;
+  inverted.traces.push_back(Trace{"c0", {ev("A", 60, 0), ev("B", 30, 120)}});
+  inverted.traces.push_back(Trace{"c1", {ev("A", 90, 100)}});
+  assert(raises([&] { return discover_interval_event_overlap_counts(inverted, options); }));
+  assert((discover_case_overlap_counts(inverted, options) == CaseOverlapCounts{2, 2}));
+  assert(discover_concurrent_activity_overlap(inverted, options).empty());
+  options.strict = true;
+  assert(discover_concurrent_activity_overlap(inverted, options).empty());
+  options.strict = false;
+
+  // [X 0-10, Y 5-3, Z 6-8]: the inverted Y ends the scan from X, so the
+  // overlapping X and Z are not counted; the case envelope is proper.
+  EventLog scan{{Trace{"c0", {ev("X", 0, 10), ev("Y", 5, 3), ev("Z", 6, 8)}}}};
+  assert(discover_concurrent_activity_overlap(scan, options).empty());
+  assert((discover_case_overlap_counts(scan, options) == CaseOverlapCounts{1}));
+
+  // [X 0-10, Y 5-5, Z 6-8]: a zero-length event that only touches does not
+  // end the strict scan.
+  EventLog zero{{Trace{"c0", {ev("X", 0, 10), ev("Y", 5, 5), ev("Z", 6, 8)}}}};
+  const auto zero_pairs = discover_concurrent_activity_overlap(zero, options);
+  assert(zero_pairs.size() == 2 && zero_pairs.at({"X", "Y"}) == 1 && zero_pairs.at({"X", "Z"}) == 1);
+  options.strict = true;
+  const auto zero_strict = discover_concurrent_activity_overlap(zero, options);
+  assert(zero_strict.size() == 1 && zero_strict.at({"X", "Z"}) == 1);
+  options.strict = false;
+
+  // [A 0-10], [B 20-5]: an inverted case envelope raises.
+  EventLog envelope;
+  envelope.traces.push_back(Trace{"c0", {ev("A", 0, 10)}});
+  envelope.traces.push_back(Trace{"c1", {ev("B", 20, 5)}});
+  assert(raises([&] { return discover_case_overlap_counts(envelope, options); }));
+  assert(discover_concurrent_activity_overlap(envelope, options).empty());
+}
+
 }  // namespace
 
 int main() {
   eventually_follows_interval_reference();
+  inverted_interval_reference();
   Trace a{"a", {event("2024-01-01T00:00:00Z", "2024-01-01T00:00:10Z")}};
   Trace b{"b", {event("2024-01-01T00:00:10Z", "2024-01-01T00:00:20Z")}};
   EventLog log{{a, b}};

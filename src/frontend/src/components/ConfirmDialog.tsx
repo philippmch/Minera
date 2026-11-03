@@ -3,7 +3,9 @@ import { useEffect, useId, useRef, type KeyboardEvent } from "react";
 /**
  * An in-app confirmation for a step that discards work. It is modal: focus
  * starts on the safe choice, Tab stays inside, Escape cancels, and focus goes
- * back to where it was when the dialog closes.
+ * back to where it was when the dialog closes. The dialog box itself takes
+ * focus (tabIndex -1) when its text is clicked, so focus never falls to the
+ * page behind it and Tab, Shift+Tab and Escape keep working.
  */
 export function ConfirmDialog({ title, message, confirmLabel, cancelLabel = "Cancel", onConfirm, onCancel }: {
   title: string;
@@ -33,7 +35,7 @@ export function ConfirmDialog({ title, message, confirmLabel, cancelLabel = "Can
   };
   return (
     <div className="palette-veil confirm-veil" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
-      <div ref={dialog} className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={messageId} onKeyDown={onKeyDown}>
+      <div ref={dialog} className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={messageId} tabIndex={-1} onKeyDown={onKeyDown}>
         <h2 id={titleId}>{title}</h2>
         <p id={messageId}>{message}</p>
         <div className="confirm-actions">

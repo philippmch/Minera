@@ -577,3 +577,353 @@ R"PNML(<pnml>
 </pnml>)PNML",
 {"endEvent||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "parallelGateway||Converging", "parallelGateway||Diverging", "startEvent||Unspecified", "task|a|Unspecified", "task|b|Unspecified", "task|c|Unspecified", "task|d|Unspecified"},
 {"exclusiveGateway||Unspecified>parallelGateway||Converging", "exclusiveGateway||Unspecified>task|c|Unspecified", "exclusiveGateway||Unspecified>task|d|Unspecified", "parallelGateway||Converging>endEvent||Unspecified", "parallelGateway||Diverging>exclusiveGateway||Unspecified", "parallelGateway||Diverging>task|a|Unspecified", "startEvent||Unspecified>task|b|Unspecified", "task|a|Unspecified>parallelGateway||Converging", "task|b|Unspecified>parallelGateway||Diverging", "task|c|Unspecified>exclusiveGateway||Unspecified", "task|d|Unspecified>exclusiveGateway||Unspecified"}},
+// Duplicate-label nets (2026-11-03 review): pm4py.write_bpmn(convert_to_bpmn(...), auto_layout=False) keeps one task per transition.
+{"dup_label_n11.pnml",
+R"PNML(<?xml version='1.0' encoding='UTF-8'?>
+<pnml>
+  <net id="n" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name>
+      <text>n</text>
+    </name>
+    <page id="n0">
+      <place id="source">
+        <name>
+          <text>source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="p2">
+        <name>
+          <text>p2</text>
+        </name>
+      </place>
+      <place id="p1">
+        <name>
+          <text>p1</text>
+        </name>
+      </place>
+      <place id="sink">
+        <name>
+          <text>sink</text>
+        </name>
+      </place>
+      <place id="p0">
+        <name>
+          <text>p0</text>
+        </name>
+      </place>
+      <transition id="t0">
+        <name>
+          <text>b</text>
+        </name>
+      </transition>
+      <transition id="t1">
+        <name>
+          <text>t1</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="4be46cf4-3359-43fc-8819-6deaa3ff08cb"/>
+      </transition>
+      <transition id="t3">
+        <name>
+          <text>t3</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="225ffb3c-cb37-4409-9b24-da2a22b7e867"/>
+      </transition>
+      <transition id="t2">
+        <name>
+          <text>b</text>
+        </name>
+      </transition>
+      <arc id="140336698704656" source="source" target="t1"/>
+      <arc id="140336698704976" source="p1" target="t1"/>
+      <arc id="140336698704848" source="source" target="t2"/>
+      <arc id="140336698704784" source="t2" target="p2"/>
+      <arc id="140336698705104" source="t1" target="p2"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>)PNML",
+{"endEvent||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "parallelGateway||Converging", "startEvent||Unspecified", "task|b|Unspecified", "task|b|Unspecified"},
+{"exclusiveGateway||Unspecified>endEvent||Unspecified", "exclusiveGateway||Unspecified>parallelGateway||Converging", "exclusiveGateway||Unspecified>parallelGateway||Converging", "exclusiveGateway||Unspecified>task|b|Unspecified", "exclusiveGateway||Unspecified>task|b|Unspecified", "parallelGateway||Converging>exclusiveGateway||Unspecified", "startEvent||Unspecified>exclusiveGateway||Unspecified", "task|b|Unspecified>exclusiveGateway||Unspecified", "task|b|Unspecified>exclusiveGateway||Unspecified"}},
+{"dup_label_n31.pnml",
+R"PNML(<?xml version='1.0' encoding='UTF-8'?>
+<pnml>
+  <net id="imdf_net_1793724533.620046" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name>
+      <text>imdf_net_1793724533.620046</text>
+    </name>
+    <page id="n0">
+      <place id="source">
+        <name>
+          <text>source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="p_4">
+        <name>
+          <text>p_4</text>
+        </name>
+      </place>
+      <place id="p_3">
+        <name>
+          <text>p_3</text>
+        </name>
+      </place>
+      <place id="sink">
+        <name>
+          <text>sink</text>
+        </name>
+      </place>
+      <place id="p_6">
+        <name>
+          <text>p_6</text>
+        </name>
+      </place>
+      <transition id="tau_1">
+        <name>
+          <text>tau_1</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="810cd5ae-39d5-4804-81f3-b74e697b8285"/>
+      </transition>
+      <transition id="tau_2">
+        <name>
+          <text>tau_2</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="28bd2032-96f4-44b3-81d5-28bb86f25ceb"/>
+      </transition>
+      <transition id="996f95c2-f595-443b-ad34-3a29ce55d3f3">
+        <name>
+          <text>a</text>
+        </name>
+      </transition>
+      <transition id="f9188fe6-86ce-484c-863a-7aa4cc1d9b51">
+        <name>
+          <text>a</text>
+        </name>
+      </transition>
+      <transition id="3aa237cb-b416-4296-a8f6-f02a68f58c57">
+        <name>
+          <text>a</text>
+        </name>
+      </transition>
+      <transition id="bb3a92ea-ceb9-4918-97b1-17e11efe4213">
+        <name>
+          <text>a</text>
+        </name>
+      </transition>
+      <arc id="140336698700048" source="3aa237cb-b416-4296-a8f6-f02a68f58c57" target="p_4"/>
+      <arc id="140336698688784" source="source" target="tau_1"/>
+      <arc id="140336698688528" source="tau_1" target="p_3"/>
+      <arc id="140336698692112" source="p_3" target="f9188fe6-86ce-484c-863a-7aa4cc1d9b51"/>
+      <arc id="140336698701008" source="tau_2" target="sink"/>
+      <arc id="140336698687696" source="p_4" target="tau_2"/>
+      <arc id="140336698699728" source="f9188fe6-86ce-484c-863a-7aa4cc1d9b51" target="p_4"/>
+      <arc id="140336698646928" source="p_3" target="996f95c2-f595-443b-ad34-3a29ce55d3f3"/>
+      <arc id="140336698700944" source="996f95c2-f595-443b-ad34-3a29ce55d3f3" target="p_6"/>
+      <arc id="140336698699920" source="p_6" target="3aa237cb-b416-4296-a8f6-f02a68f58c57"/>
+      <arc id="140336698700176" source="bb3a92ea-ceb9-4918-97b1-17e11efe4213" target="p_4"/>
+      <arc id="140336698700240" source="p_3" target="bb3a92ea-ceb9-4918-97b1-17e11efe4213"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>)PNML",
+{"endEvent||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "startEvent||Unspecified", "task|a|Unspecified", "task|a|Unspecified", "task|a|Unspecified", "task|a|Unspecified"},
+{"exclusiveGateway||Unspecified>endEvent||Unspecified", "exclusiveGateway||Unspecified>task|a|Unspecified", "exclusiveGateway||Unspecified>task|a|Unspecified", "exclusiveGateway||Unspecified>task|a|Unspecified", "startEvent||Unspecified>exclusiveGateway||Unspecified", "task|a|Unspecified>exclusiveGateway||Unspecified", "task|a|Unspecified>exclusiveGateway||Unspecified", "task|a|Unspecified>exclusiveGateway||Unspecified", "task|a|Unspecified>task|a|Unspecified"}},
+{"dup_label_n32.pnml",
+R"PNML(<?xml version='1.0' encoding='UTF-8'?>
+<pnml>
+  <net id="n" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name>
+      <text>n</text>
+    </name>
+    <page id="n0">
+      <place id="source">
+        <name>
+          <text>source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="sink">
+        <name>
+          <text>sink</text>
+        </name>
+      </place>
+      <place id="p0">
+        <name>
+          <text>p0</text>
+        </name>
+      </place>
+      <transition id="t0">
+        <name>
+          <text>a</text>
+        </name>
+      </transition>
+      <transition id="t2">
+        <name>
+          <text>t2</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="4a895080-0844-4d16-8bc6-50e467a02b1a"/>
+      </transition>
+      <transition id="t1">
+        <name>
+          <text>a</text>
+        </name>
+      </transition>
+      <arc id="140336698638800" source="source" target="t0"/>
+      <arc id="140336698640912" source="t0" target="p0"/>
+      <arc id="140336698641936" source="source" target="t2"/>
+      <arc id="140336698641744" source="t0" target="sink"/>
+      <arc id="140336698639056" source="p0" target="t1"/>
+      <arc id="140336698641040" source="p0" target="t2"/>
+      <arc id="140336698640272" source="t2" target="p0"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>)PNML",
+{"endEvent||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "parallelGateway||Converging", "parallelGateway||Diverging", "startEvent||Unspecified", "task|a|Unspecified", "task|a|Unspecified"},
+{"exclusiveGateway||Unspecified>parallelGateway||Converging", "exclusiveGateway||Unspecified>parallelGateway||Converging", "exclusiveGateway||Unspecified>task|a|Unspecified", "exclusiveGateway||Unspecified>task|a|Unspecified", "parallelGateway||Converging>exclusiveGateway||Unspecified", "parallelGateway||Diverging>endEvent||Unspecified", "parallelGateway||Diverging>exclusiveGateway||Unspecified", "startEvent||Unspecified>exclusiveGateway||Unspecified", "task|a|Unspecified>exclusiveGateway||Unspecified", "task|a|Unspecified>parallelGateway||Diverging"}},
+{"dup_label_n38.pnml",
+R"PNML(<?xml version='1.0' encoding='UTF-8'?>
+<pnml>
+  <net id="imdf_net_1793724533.6220288" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
+    <name>
+      <text>imdf_net_1793724533.6220288</text>
+    </name>
+    <page id="n0">
+      <place id="source">
+        <name>
+          <text>source</text>
+        </name>
+        <initialMarking>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="sink">
+        <name>
+          <text>sink</text>
+        </name>
+      </place>
+      <place id="p_5">
+        <name>
+          <text>p_5</text>
+        </name>
+      </place>
+      <place id="p_6">
+        <name>
+          <text>p_6</text>
+        </name>
+      </place>
+      <place id="p_8">
+        <name>
+          <text>p_8</text>
+        </name>
+      </place>
+      <place id="p_9">
+        <name>
+          <text>p_9</text>
+        </name>
+      </place>
+      <transition id="skip_7">
+        <name>
+          <text>skip_7</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="186596f5-d86d-462e-b3f8-ad03279d4de3"/>
+      </transition>
+      <transition id="skip_8">
+        <name>
+          <text>skip_8</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="0e3bae8e-c8e0-4775-b30a-9fdf8a314f6d"/>
+      </transition>
+      <transition id="skip_9">
+        <name>
+          <text>skip_9</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="1479d480-7773-41f4-bafd-5f31ecb029e2"/>
+      </transition>
+      <transition id="tau_1">
+        <name>
+          <text>tau_1</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="53117527-0bc0-489b-bf31-fb851adde62c"/>
+      </transition>
+      <transition id="44ab5530-3a87-41de-ad4c-33708c5330fb">
+        <name>
+          <text>c</text>
+        </name>
+      </transition>
+      <transition id="cc8adb08-7538-43f8-9969-c017ff8d2016">
+        <name>
+          <text>é</text>
+        </name>
+      </transition>
+      <transition id="f3bc9d85-d2cd-44d9-92d2-c94fababfa4b">
+        <name>
+          <text>d</text>
+        </name>
+      </transition>
+      <transition id="init_loop_5">
+        <name>
+          <text>init_loop_5</text>
+        </name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="333e617d-c383-4082-8dba-3ddba6a8aa7d"/>
+      </transition>
+      <transition id="cfe48e7b-3055-423f-97ef-dacfe96dc80b">
+        <name>
+          <text>é</text>
+        </name>
+      </transition>
+      <arc id="140336698715984" source="skip_8" target="p_5"/>
+      <arc id="140336698769360" source="p_8" target="cfe48e7b-3055-423f-97ef-dacfe96dc80b"/>
+      <arc id="140336698768016" source="cfe48e7b-3055-423f-97ef-dacfe96dc80b" target="p_9"/>
+      <arc id="140336698766992" source="p_9" target="skip_8"/>
+      <arc id="140336698704528" source="skip_9" target="sink"/>
+      <arc id="140336698793360" source="p_5" target="cc8adb08-7538-43f8-9969-c017ff8d2016"/>
+      <arc id="140336698793488" source="cc8adb08-7538-43f8-9969-c017ff8d2016" target="p_6"/>
+      <arc id="140336698758416" source="p_6" target="skip_9"/>
+      <arc id="140336698705168" source="tau_1" target="p_5"/>
+      <arc id="140336698767568" source="p_9" target="skip_7"/>
+      <arc id="140336698794704" source="p_6" target="init_loop_5"/>
+      <arc id="140336698793808" source="p_5" target="f3bc9d85-d2cd-44d9-92d2-c94fababfa4b"/>
+      <arc id="140336698794832" source="init_loop_5" target="p_8"/>
+      <arc id="140336698793936" source="f3bc9d85-d2cd-44d9-92d2-c94fababfa4b" target="p_6"/>
+      <arc id="140336698790608" source="source" target="tau_1"/>
+      <arc id="140336698792912" source="p_5" target="44ab5530-3a87-41de-ad4c-33708c5330fb"/>
+      <arc id="140336698714576" source="skip_7" target="p_8"/>
+      <arc id="140336698793040" source="44ab5530-3a87-41de-ad4c-33708c5330fb" target="p_6"/>
+    </page>
+    <finalmarkings>
+      <marking>
+        <place idref="sink">
+          <text>1</text>
+        </place>
+      </marking>
+    </finalmarkings>
+  </net>
+</pnml>)PNML",
+{"endEvent||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "startEvent||Unspecified", "task|c|Unspecified", "task|d|Unspecified", "task|é|Unspecified", "task|é|Unspecified"},
+{"exclusiveGateway||Unspecified>endEvent||Unspecified", "exclusiveGateway||Unspecified>exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified>exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified>exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified>task|c|Unspecified", "exclusiveGateway||Unspecified>task|d|Unspecified", "exclusiveGateway||Unspecified>task|é|Unspecified", "exclusiveGateway||Unspecified>task|é|Unspecified", "startEvent||Unspecified>exclusiveGateway||Unspecified", "task|c|Unspecified>exclusiveGateway||Unspecified", "task|d|Unspecified>exclusiveGateway||Unspecified", "task|é|Unspecified>exclusiveGateway||Unspecified", "task|é|Unspecified>exclusiveGateway||Unspecified"}},

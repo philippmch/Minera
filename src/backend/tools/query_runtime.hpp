@@ -12,6 +12,7 @@ inline httplib::Result request(std::string_view url,std::string_view route,const
   client.set_payload_max_length(16u*1024u*1024u);
   if(body&&body->size()>32u*1024u*1024u)throw std::length_error("query runtime input exceeds 32 MiB");
   auto result=body?client.Post(std::string(route),*body,"application/json"):client.Get(std::string(route));
+  if(!result&&result.error()==httplib::Error::ExceedPayloadMaxLength)throw std::length_error("query runtime result exceeds 16 MiB");
   if(!result)throw std::runtime_error("could not reach the query runtime");
   if(result->body.size()>16u*1024u*1024u)throw std::length_error("query runtime result exceeds 16 MiB");
   return result;

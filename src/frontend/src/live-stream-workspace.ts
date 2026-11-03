@@ -96,6 +96,12 @@ export function actLiveSession(run: LiveRun, action: LiveAction, caseId: string,
   const params=new URLSearchParams({session_id:run.result.session_id,expected_revision:String(nativeCell(run.result,"revision"))});if(action!=="release")params.set("action",action);if(caseId&&action!=="release")params.set("case_id",caseId);
   return liveRequest(action==="release"?"release":"action",params,"POST",undefined,signal);
 }
+/** Releases a live session without waiting (leaving the workspace or replacing the session); a failure, such as a revision another tab moved on, leaves it for the session list. */
+export function releaseLiveSessionQuietly(run: LiveRun): void {
+  if (run.result.released) return;
+  const params = new URLSearchParams({session_id: run.result.session_id, expected_revision: String(nativeCell(run.result, "revision"))});
+  void backendFetch(`/api/live-stream/release?${params}`, {method: "POST", keepalive: true}).catch(() => undefined);
+}
 export async function listLiveSessions(signal?: AbortSignal): Promise<LiveSnapshot[]> {
   const response=await backendFetch("/api/live-stream/list",{...(signal?{signal}:{})});const raw=await response.text();signal?.throwIfAborted();const value=parseNativeJson(raw);
   if(!response.ok||!record(value)||!Array.isArray(value.sessions)||!value.sessions.every(validLiveSnapshot)||new Set(value.sessions.map(s=>s.session_id)).size!==value.sessions.length)throw new Error("Could not list valid server stream sessions.");return value.sessions;

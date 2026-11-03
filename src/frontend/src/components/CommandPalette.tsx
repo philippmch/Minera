@@ -69,6 +69,9 @@ export function CommandPalette({ commands, onClose }: { commands: readonly Palet
         role="dialog"
         aria-modal="true"
         aria-label="Search views and tools"
+        // A click on the dialog's own text or padding keeps focus in the
+        // search field, so the keys below still reach the dialog.
+        onMouseDown={(event) => { if (event.target !== input.current) event.preventDefault(); }}
         onKeyDown={(event) => {
           // The search field keeps focus (a combobox), so Escape and Tab are handled for the whole dialog.
           if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(); }

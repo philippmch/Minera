@@ -1,6 +1,7 @@
 #pragma once
 
 #include <any>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -112,6 +113,14 @@ namespace minera {
 // surrounding each part are dropped (so "a , b" yields "a","b"); empty parts
 // (e.g. from "a,,b" or a trailing comma) are skipped entirely.
 [[nodiscard]] std::vector<std::string> split_csv(std::string_view value);
+
+// The highest xes_max_decompressed_bytes a request may ask for. Requests
+// default to XesImportOptions{}.max_decompressed_bytes (256 MiB) and may raise
+// it up to this ceiling, which minera_server sets from
+// --max-xes-decompressed-bytes (default kDefaultXesDecompressedCeiling).
+inline constexpr std::size_t kDefaultXesDecompressedCeiling = std::size_t{2} << 30;
+void set_xes_decompressed_ceiling(std::size_t bytes) noexcept;
+[[nodiscard]] std::size_t xes_decompressed_ceiling() noexcept;
 
 // Serializes a message as a one-key JSON error object. Quotes, backslashes
 // and control characters are escaped, WTF-8 surrogate code units become

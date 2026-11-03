@@ -695,10 +695,8 @@ Ocel filter_ocel_events_timestamp(const Ocel& log, std::string_view from,
       parse_bound(from, -std::numeric_limits<double>::infinity());
   const double upper =
       parse_bound(to, std::numeric_limits<double>::infinity());
-  if (lower > upper) {
-    throw std::invalid_argument("OCEL timestamp bounds are reversed");
-  }
-
+  // Reversed bounds select no event, so the result is an empty OCEL, as in
+  // the reference.
   Ocel filtered = log;
   filter_records(filtered.events, [&](const OcelEvent& event) {
     const auto instant = parse_timestamp(event.timestamp);

@@ -15,6 +15,8 @@
 // the server share one copy.
 
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
@@ -24,7 +26,9 @@
 #include <string_view>
 #include <system_error>
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <process.h>
+#else
 #include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -35,8 +39,9 @@ namespace minera::secure_temp {
 // The only file names placed in a registered directory. The signal handler
 // removes exactly these, because it cannot list a directory safely.
 inline constexpr const char* kKnownFiles[] = {
-    "original.data", "ocel.sqlite", "ocel.sqlite-journal", "ocel.sqlite-wal",
-    "ocel.sqlite-shm", "events.csv", "objects.csv"};
+    "original.data", "original.data-journal", "original.data-wal", "original.data-shm",
+    "ocel.sqlite", "ocel.sqlite-journal", "ocel.sqlite-wal", "ocel.sqlite-shm",
+    "events.csv", "objects.csv"};
 
 namespace detail {
 inline constexpr std::size_t kSlots = 64;
@@ -92,11 +97,26 @@ class PrivateDirectory {
     path_ = pattern;
     register_slot();
 #else
+    // random_device may be deterministic on some runtimes, so the name also
+    // mixes the clock, the process id and a process-wide counter: two
+    // processes, or two directories in one process, never draw the same name
+    // even then. create_directory fails on an existing name, so a clash only
+    // costs another attempt.
+    static std::atomic<std::uint64_t> counter{0};
     std::random_device entropy;
-    for (int attempt = 0; attempt < 16 && path_.empty(); ++attempt) {
-      const auto candidate = base / (std::string(prefix) + std::to_string(entropy()) +
-                                     std::to_string(entropy()));
-      if (std::filesystem::create_directory(candidate)) path_ = candidate;
+    const auto pid = static_cast<std::uint64_t>(::_getpid());
+    for (int attempt = 0; attempt < 64 && path_.empty(); ++attempt) {
+      const auto now = static_cast<std::uint64_t>(
+          std::chrono::steady_clock::now().time_since_epoch().count());
+      const std::uint64_t random =
+          (static_cast<std::uint64_t>(entropy()) << 32) ^ static_cast<std::uint64_t>(entropy());
+      const std::uint64_t mixed =
+          random ^ (now * 0x9E3779B97F4A7C15ull) ^
+          (counter.fetch_add(1, std::memory_order_relaxed) * 0xBF58476D1CE4E5B9ull);
+      const auto candidate = base / (std::string(prefix) + std::to_string(pid) + "-" +
+                                     std::to_string(mixed));
+      std::error_code error;
+      if (std::filesystem::create_directory(candidate, error)) path_ = candidate;
     }
     if (path_.empty()) throw std::runtime_error("cannot create a private temporary directory");
 #endif

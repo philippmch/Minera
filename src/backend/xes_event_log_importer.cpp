@@ -1259,10 +1259,24 @@ static EventLog import_xes_impl(
 
   std::string xml((std::istreambuf_iterator<char>(input)),
                   std::istreambuf_iterator<char>());
+  // The bound is xes_max_decompressed_bytes (minera_export
+  // --xes-max-decompressed-bytes); a minera_server request may raise it up to
+  // the server's --max-xes-decompressed-bytes ceiling.
+  const auto limit_hint = [&](const char* what) {
+    return std::string(what) + " the XES size limit of " +
+           std::to_string(options.max_decompressed_bytes) +
+           " bytes; raise xes_max_decompressed_bytes (minera_server accepts up to its "
+           "--max-xes-decompressed-bytes ceiling; minera_export takes "
+           "--xes-max-decompressed-bytes)";
+  };
   if (detail::is_gzip_data(xml)) {
-    xml = detail::gzip_decompress(xml, options.max_decompressed_bytes);
+    try {
+      xml = detail::gzip_decompress(xml, options.max_decompressed_bytes);
+    } catch (const detail::GzipOutputLimitError&) {
+      throw std::runtime_error(limit_hint("gzip XES input expands past"));
+    }
   } else if (xml.size() > options.max_decompressed_bytes) {
-    throw std::runtime_error("XES input exceeds the configured size limit");
+    throw std::runtime_error(limit_hint("XES input exceeds"));
   }
 
   // Strip a leading UTF-8 byte-order mark so the first '<' is found cleanly.

@@ -155,9 +155,13 @@ inline httplib::Result request(std::string_view url, std::string_view route,
     throw std::invalid_argument("LLM request must be nonempty and within the runtime input bound");
   auto response = body ? client.Post(std::string(route), *body, "application/json")
                        : client.Get(std::string(route));
+  if (!response && response.error() == httplib::Error::ExceedPayloadMaxLength)
+    throw std::runtime_error("LLM runtime response exceeds the application bound of " +
+                             std::to_string(max_response_bytes) + " bytes");
   if (!response) throw std::runtime_error("Could not reach the configured LLM runtime");
   if (response->body.size() > max_response_bytes)
-    throw std::runtime_error("LLM runtime response exceeds the application bound");
+    throw std::runtime_error("LLM runtime response exceeds the application bound of " +
+                             std::to_string(max_response_bytes) + " bytes");
   return response;
 }
 

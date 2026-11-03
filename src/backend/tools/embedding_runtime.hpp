@@ -225,6 +225,8 @@ inline minera::EmbeddingProviderCallback make_http_provider(
                       ",\"model\":" + detail::escape_json(model) +
                       ",\"dimensions\":" + std::to_string(dimensions) + "}";
     const auto result = client.Post("/embed", body, "application/json");
+    if (!result && result.error() == httplib::Error::ExceedPayloadMaxLength)
+      throw std::runtime_error("embedding runtime: response exceeds 16 MiB");
     if (!result)
       throw std::runtime_error("embedding runtime: HTTP request failed (" +
                                httplib::to_string(result.error()) + ")");

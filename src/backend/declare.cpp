@@ -3,6 +3,7 @@
 #include "minera/log_conversion.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <iomanip>
@@ -11,6 +12,7 @@
 #include <optional>
 #include <set>
 #include <sstream>
+#include <string_view>
 #include <stdexcept>
 #include <tuple>
 #include <unordered_map>
@@ -47,27 +49,6 @@ const std::vector<std::string>& families() {
       kDeclareNonCoexistence, kDeclareNonSuccession,
       kDeclareNonChainSuccession};
   return value;
-}
-
-struct CandidateKey {
-  std::string family;
-  std::string first;
-  std::string second;
-  bool binary = false;
-
-  friend bool operator<(const CandidateKey& lhs, const CandidateKey& rhs) {
-    return std::tie(lhs.family, lhs.first, lhs.second, lhs.binary) <
-           std::tie(rhs.family, rhs.first, rhs.second, rhs.binary);
-  }
-  friend bool operator==(const CandidateKey& lhs, const CandidateKey& rhs) {
-    return lhs.family == rhs.family && lhs.first == rhs.first &&
-           lhs.second == rhs.second && lhs.binary == rhs.binary;
-  }
-};
-
-CandidateKey key(const std::string& family, const std::string& a,
-                 const std::string& b = {}, bool binary = false) {
-  return CandidateKey{family, a, b, binary};
 }
 
 bool has(const std::set<std::string>& allowed, const char* family) {
@@ -135,132 +116,186 @@ bool chain_precedence(const std::vector<std::string>& trace,
   return true;
 }
 
-using Statuses = std::map<CandidateKey, int>;
+// Dense Declare candidate evaluation over interned activities.
+//
+// Every candidate (family, a[, b]) of a computed family has a status per
+// projected trace: 1 satisfied, -1 violated, 0 not activated. Support counts
+// the weighted traces with status != 0 and confidence those with status 1.
+// A binary candidate whose activities are both absent from a trace has status
+// 0 in every family (each base template is activated only by an occurrence,
+// and the compound templates are minima/negations of statuses that are then
+// all 0), so only the pairs touching a present activity are evaluated: the
+// cost per variant is O(k * A) for k present activities instead of a
+// string-keyed map of every candidate.
+enum BinaryFamily : std::size_t {
+  kRe, kResp, kPrec, kAltResp, kChainResp, kAltPrec, kChainPrec, kSucc,
+  kAltSucc, kChainSucc, kCoex, kNonCoex, kNonSucc, kNonChainSucc, kBinaryFamilies
+};
+enum UnaryFamily : std::size_t { kExists, kExactlyOne, kInit, kAbsent, kUnaryFamilies };
 
-Statuses evaluate(const std::vector<std::string>& trace,
-                  const std::set<std::string>& activities,
-                  const std::set<std::string>& allowed) {
-  Statuses result;
-  std::unordered_map<std::string, std::vector<int>> idx;
-  for (int i = 0; i < static_cast<int>(trace.size()); ++i) idx[trace[i]].push_back(i);
+const char* const kBinaryFamilyNames[kBinaryFamilies] = {
+    kDeclareRespondedExistence, kDeclareResponse, kDeclarePrecedence,
+    kDeclareAltResponse, kDeclareChainResponse, kDeclareAltPrecedence,
+    kDeclareChainPrecedence, kDeclareSuccession, kDeclareAltSuccession,
+    kDeclareChainSuccession, kDeclareCoexistence, kDeclareNonCoexistence,
+    kDeclareNonSuccession, kDeclareNonChainSuccession};
+const char* const kUnaryFamilyNames[kUnaryFamilies] = {
+    kDeclareExistence, kDeclareExactlyOne, kDeclareInit, kDeclareAbsence};
 
-  auto put = [&](const char* f, const std::string& a, int value,
-                 const std::string& b = {}, bool binary = false) {
-    result[key(f, a, b, binary)] = value;
+bool alt_response_positions(const std::vector<int>& ia, const std::vector<int>& ib,
+                            int length) {
+  if (ia.empty()) return true;
+  if (ib.empty()) return false;
+  std::size_t p = 0;
+  for (std::size_t i = 0; i < ia.size(); ++i) {
+    const int next = i + 1 < ia.size() ? ia[i + 1] : length;
+    while (p < ib.size() && ib[p] <= ia[i]) ++p;
+    if (p == ib.size() || ib[p] >= next) return false;
+  }
+  return true;
+}
+
+bool alt_precedence_positions(const std::vector<int>& ia, const std::vector<int>& ib) {
+  if (ib.empty()) return true;
+  if (ia.empty()) return false;
+  std::size_t p = 0;
+  int previous = -1;
+  for (const int bi : ib) {
+    while (p < ia.size() && ia[p] <= previous) ++p;
+    if (p == ia.size() || ia[p] >= bi) return false;
+    previous = bi;
+  }
+  return true;
+}
+
+struct DenseDeclareStats {
+  std::size_t activity_count = 0;
+  // Which families the reference evaluation computes for these templates.
+  std::array<bool, kBinaryFamilies> binary{};
+  std::array<bool, kUnaryFamilies> unary{};
+  // [family][a][b] and [family][a].
+  std::vector<int> binary_support, binary_confidence;
+  std::vector<int> unary_support, unary_confidence;
+
+  std::size_t at(std::size_t family, std::size_t a, std::size_t b) const {
+    return (family * activity_count + a) * activity_count + b;
+  }
+};
+
+DenseDeclareStats evaluate_dense(
+    const std::map<std::vector<std::size_t>, int>& variants,
+    std::size_t activity_count, const std::set<std::string>& allowed) {
+  DenseDeclareStats stats;
+  stats.activity_count = activity_count;
+  const auto allows = [&](std::initializer_list<const char*> names) {
+    for (const auto* name : names)
+      if (!has(allowed, name)) return false;
+    return true;
   };
-  auto pairs = [&](const char* f, auto&& fn) {
-    if (!has(allowed, f)) return;
-    for (const auto& a : activities) {
-      for (const auto& b : activities) {
-        if (a == b) continue;
-        auto value = fn(a, b);
-        if (value.has_value()) put(f, a, *value, b, true);
-      }
+  stats.unary[kExists] = allows({kDeclareExistence});
+  stats.unary[kExactlyOne] = allows({kDeclareExactlyOne});
+  stats.unary[kInit] = allows({kDeclareInit});
+  stats.unary[kAbsent] = allows({kDeclareAbsence, kDeclareExistence});
+  for (const auto f : {kRe, kResp, kPrec, kAltResp, kChainResp, kAltPrec, kChainPrec})
+    stats.binary[f] = allows({kBinaryFamilyNames[f]});
+  stats.binary[kSucc] = allows({kDeclareSuccession, kDeclareResponse, kDeclarePrecedence});
+  stats.binary[kAltSucc] =
+      allows({kDeclareAltSuccession, kDeclareAltResponse, kDeclareAltPrecedence});
+  stats.binary[kChainSucc] =
+      allows({kDeclareChainSuccession, kDeclareChainResponse, kDeclareChainPrecedence});
+  stats.binary[kCoex] = allows({kDeclareCoexistence, kDeclareRespondedExistence});
+  stats.binary[kNonCoex] = allows(
+      {kDeclareNonCoexistence, kDeclareCoexistence, kDeclareRespondedExistence});
+  stats.binary[kNonSucc] = allows({kDeclareNonSuccession, kDeclareSuccession,
+                                   kDeclareResponse, kDeclarePrecedence});
+  stats.binary[kNonChainSucc] =
+      allows({kDeclareNonChainSuccession, kDeclareChainSuccession,
+              kDeclareChainResponse, kDeclareChainPrecedence});
+
+  const std::size_t n = activity_count;
+  stats.binary_support.assign(kBinaryFamilies * n * n, 0);
+  stats.binary_confidence.assign(stats.binary_support.size(), 0);
+  stats.unary_support.assign(kUnaryFamilies * n, 0);
+  stats.unary_confidence.assign(stats.unary_support.size(), 0);
+
+  std::vector<std::vector<int>> positions(n);
+  std::vector<char> in(n, 0);
+  std::vector<char> visited(n * n, 0);
+  std::vector<std::size_t> touched;
+  std::vector<std::size_t> present;
+  for (const auto& [trace, count] : variants) {
+    present.clear();
+    for (std::size_t i = 0; i < trace.size(); ++i) {
+      auto& list = positions[trace[i]];
+      if (list.empty()) present.push_back(trace[i]);
+      list.push_back(static_cast<int>(i));
     }
-    // Step 2 zero-fills all ordered keys of an allowed family.
-    for (const auto& a : activities)
-      for (const auto& b : activities)
-        if (a != b) {
-          const auto k = key(f, a, b, true);
-          if (!result.contains(k)) result[k] = 0;
-        }
-  };
-
-  if (has(allowed, kDeclareExistence))
-    for (const auto& a : activities) put(kDeclareExistence, a, in(idx, a) ? 1 : -1);
-  if (has(allowed, kDeclareExactlyOne))
-    for (const auto& a : activities)
-      put(kDeclareExactlyOne, a,
-          idx.contains(a) && idx.at(a).size() == 1 ? 1 : -1);
-  if (has(allowed, kDeclareInit))
-    for (const auto& a : activities)
-      put(kDeclareInit, a, !trace.empty() && trace.front() == a ? 1 : -1);
-
-  pairs(kDeclareRespondedExistence, [&](const std::string& a, const std::string& b)
-                                  -> std::optional<int> {
-    if (!in(idx, a)) return std::nullopt;
-    return in(idx, b) ? 1 : -1;
-  });
-  pairs(kDeclareResponse, [&](const std::string& a, const std::string& b)
-                         -> std::optional<int> {
-    if (!in(idx, a)) return std::nullopt;
-    return !in(idx, b) || idx.at(a).back() >= idx.at(b).back() ? -1 : 1;
-  });
-  pairs(kDeclarePrecedence, [&](const std::string& a, const std::string& b)
-                           -> std::optional<int> {
-    if (!in(idx, b)) return std::nullopt;
-    return !in(idx, a) || idx.at(a).front() >= idx.at(b).front() ? -1 : 1;
-  });
-  pairs(kDeclareAltResponse, [&](const std::string& a, const std::string& b)
-                              -> std::optional<int> {
-    if (!in(idx, a)) return std::nullopt;
-    return alt_response(trace, idx, a, b) ? 1 : -1;
-  });
-  pairs(kDeclareChainResponse, [&](const std::string& a, const std::string& b)
-                                -> std::optional<int> {
-    if (!in(idx, a)) return std::nullopt;
-    return chain_response(trace, idx, a, b) ? 1 : -1;
-  });
-  pairs(kDeclareAltPrecedence, [&](const std::string& a, const std::string& b)
-                                -> std::optional<int> {
-    if (!in(idx, b)) return std::nullopt;
-    return alt_precedence(idx, a, b) ? 1 : -1;
-  });
-  pairs(kDeclareChainPrecedence, [&](const std::string& a, const std::string& b)
-                                  -> std::optional<int> {
-    if (!in(idx, b)) return std::nullopt;
-    return chain_precedence(trace, idx, a, b) ? 1 : -1;
-  });
-
-  auto compound = [&](const char* f, const char* x, const char* y,
-                      auto fn) {
-    if (!has(allowed, f) || !has(allowed, x) || !has(allowed, y)) return;
-    for (const auto& a : activities)
-      for (const auto& b : activities)
-        if (a != b) put(f, a, fn(a, b), b, true);
-  };
-  compound(kDeclareSuccession, kDeclareResponse, kDeclarePrecedence,
-           [&](const std::string& a, const std::string& b) {
-             const int r = result[key(kDeclareResponse, a, b, true)];
-             const int p = result[key(kDeclarePrecedence, a, b, true)];
-             return std::min(r, p);
-           });
-  compound(kDeclareAltSuccession, kDeclareAltResponse, kDeclareAltPrecedence,
-           [&](const std::string& a, const std::string& b) {
-             return std::min(result[key(kDeclareAltResponse, a, b, true)],
-                             result[key(kDeclareAltPrecedence, a, b, true)]);
-           });
-  compound(kDeclareChainSuccession, kDeclareChainResponse, kDeclareChainPrecedence,
-           [&](const std::string& a, const std::string& b) {
-             return std::min(result[key(kDeclareChainResponse, a, b, true)],
-                             result[key(kDeclareChainPrecedence, a, b, true)]);
-           });
-  compound(kDeclareCoexistence, kDeclareRespondedExistence, kDeclareRespondedExistence,
-           [&](const std::string& a, const std::string& b) {
-             return std::min(result[key(kDeclareRespondedExistence, a, b, true)],
-                             result[key(kDeclareRespondedExistence, b, a, true)]);
-           });
-  if (has(allowed, kDeclareAbsence) && has(allowed, kDeclareExistence))
-    for (const auto& a : activities) put(kDeclareAbsence, a,
-                                         -result[key(kDeclareExistence, a)]);
-  compound(kDeclareNonCoexistence, kDeclareCoexistence, kDeclareRespondedExistence,
-           [&](const std::string& a, const std::string& b) {
-             return -result[key(kDeclareCoexistence, a, b, true)];
-           });
-  if (has(allowed, kDeclareNonSuccession) && has(allowed, kDeclareSuccession) &&
-      has(allowed, kDeclareResponse) && has(allowed, kDeclarePrecedence))
-    for (const auto& a : activities)
-      for (const auto& b : activities)
-        if (a != b) put(kDeclareNonSuccession, a,
-                        -result[key(kDeclareSuccession, a, b, true)], b, true);
-  if (has(allowed, kDeclareNonChainSuccession) &&
-      has(allowed, kDeclareChainSuccession) && has(allowed, kDeclareChainResponse) &&
-      has(allowed, kDeclareChainPrecedence))
-    for (const auto& a : activities)
-      for (const auto& b : activities)
-        if (a != b) put(kDeclareNonChainSuccession, a,
-                        -result[key(kDeclareChainSuccession, a, b, true)], b, true);
-  return result;
+    for (const auto a : present) in[a] = 1;
+    const int length = static_cast<int>(trace.size());
+    const auto add_unary = [&](std::size_t family, std::size_t a, int status) {
+      if (!stats.unary[family]) return;
+      if (status != 0) stats.unary_support[family * n + a] += count;
+      if (status == 1) stats.unary_confidence[family * n + a] += count;
+    };
+    for (std::size_t a = 0; a < n; ++a) {
+      const int exists = in[a] ? 1 : -1;
+      add_unary(kExists, a, exists);
+      add_unary(kExactlyOne, a, in[a] && positions[a].size() == 1 ? 1 : -1);
+      add_unary(kInit, a, !trace.empty() && trace.front() == a ? 1 : -1);
+      add_unary(kAbsent, a, -exists);
+    }
+    const auto evaluate_pair = [&](std::size_t a, std::size_t b) {
+      if (a == b || visited[a * n + b]) return;
+      visited[a * n + b] = 1;
+      touched.push_back(a * n + b);
+      const bool ia = in[a] != 0, ib = in[b] != 0;
+      const auto& pa = positions[a];
+      const auto& pb = positions[b];
+      std::array<int, kBinaryFamilies> s{};
+      s[kRe] = ia ? (ib ? 1 : -1) : 0;
+      s[kResp] = ia ? ((!ib || pa.back() >= pb.back()) ? -1 : 1) : 0;
+      s[kPrec] = ib ? ((!ia || pa.front() >= pb.front()) ? -1 : 1) : 0;
+      s[kAltResp] = ia ? (alt_response_positions(pa, pb, length) ? 1 : -1) : 0;
+      if (ia) {
+        bool ok = true;
+        for (const int i : pa)
+          if (i + 1 >= length || trace[static_cast<std::size_t>(i) + 1] != b) { ok = false; break; }
+        s[kChainResp] = ok ? 1 : -1;
+      }
+      s[kAltPrec] = ib ? (alt_precedence_positions(pa, pb) ? 1 : -1) : 0;
+      if (ib) {
+        bool ok = true;
+        for (const int i : pb)
+          if (i == 0 || trace[static_cast<std::size_t>(i) - 1] != a) { ok = false; break; }
+        s[kChainPrec] = ok ? 1 : -1;
+      }
+      s[kSucc] = std::min(s[kResp], s[kPrec]);
+      s[kAltSucc] = std::min(s[kAltResp], s[kAltPrec]);
+      s[kChainSucc] = std::min(s[kChainResp], s[kChainPrec]);
+      s[kCoex] = std::min(s[kRe], ib ? (ia ? 1 : -1) : 0);
+      s[kNonCoex] = -s[kCoex];
+      s[kNonSucc] = -s[kSucc];
+      s[kNonChainSucc] = -s[kChainSucc];
+      for (std::size_t f = 0; f < kBinaryFamilies; ++f) {
+        if (!stats.binary[f] || s[f] == 0) continue;
+        const auto index = stats.at(f, a, b);
+        stats.binary_support[index] += count;
+        if (s[f] == 1) stats.binary_confidence[index] += count;
+      }
+    };
+    for (const auto a : present)
+      for (std::size_t b = 0; b < n; ++b) {
+        evaluate_pair(a, b);
+        evaluate_pair(b, a);
+      }
+    for (const auto index : touched) visited[index] = 0;
+    touched.clear();
+    for (const auto a : present) {
+      in[a] = 0;
+      positions[a].clear();
+    }
+  }
+  return stats;
 }
 
 const std::string* first_class_value(
@@ -375,22 +410,6 @@ std::set<std::string> default_activities(
 std::set<std::string> to_set(const std::vector<std::string>& values) {
   return std::set<std::string>(values.begin(), values.end());
 }
-
-std::vector<std::string> project(const std::vector<std::string>& trace,
-                                 const std::set<std::string>& activities) {
-  std::vector<std::string> result;
-  for (const auto& activity : trace)
-    if (activities.contains(activity)) result.push_back(activity);
-  return result;
-}
-
-// Weighted support (status != 0) and confidence (status == 1) of one
-// candidate over the projected traces that report it; a trace that does not
-// report a candidate counts as status 0.
-struct CandidateStats {
-  int support = 0;
-  int confidence = 0;
-};
 
 int activity_selector_priority(const EventAttribute& field,
                                std::string_view selector) {
@@ -609,55 +628,92 @@ DeclareModel discover_declare(const EventLog& log, const DeclareDiscoveryOptions
   DeclareModel model;
   if (activities.empty() || log.traces.empty()) return model;
 
-  std::map<std::vector<std::string>, int> projected;
-  for (const auto& trace : selected) ++projected[project(trace, activities)];
-  // Each distinct projected trace's statuses are folded into the running
-  // totals as soon as they are evaluated. Keeping every trace's status map
-  // until the end cost about 200 bytes per candidate per variant (gigabytes on
-  // a log with thousands of variants and a dozen activities).
-  std::map<CandidateKey, CandidateStats> candidates;
-  for (const auto& [trace, count] : projected) {
-    for (const auto& [candidate, status] : evaluate(trace, activities, allowed)) {
-      auto& stats = candidates[candidate];
-      if (status != 0) stats.support += count;
-      if (status == 1) stats.confidence += count;
+  // Intern the considered activities in their (sorted) set order, so index
+  // order is the candidates' string order.
+  const std::vector<std::string> names(activities.begin(), activities.end());
+  std::unordered_map<std::string_view, std::size_t> ids;
+  for (std::size_t i = 0; i < names.size(); ++i) ids.emplace(names[i], i);
+  std::map<std::vector<std::size_t>, int> projected;
+  for (const auto& trace : selected) {
+    std::vector<std::size_t> variant;
+    variant.reserve(trace.size());
+    for (const auto& activity : trace) {
+      const auto found = ids.find(activity);
+      if (found != ids.end()) variant.push_back(found->second);
     }
+    ++projected[std::move(variant)];
   }
+  const auto stats = evaluate_dense(projected, names.size(), allowed);
+
+  // Visit every candidate of a computed family in (family, first, second)
+  // order, the order of the reference's candidate map.
+  struct FamilyRef {
+    const char* name;
+    bool binary;
+    std::size_t index;
+  };
+  std::vector<FamilyRef> order;
+  for (std::size_t f = 0; f < kBinaryFamilies; ++f)
+    if (stats.binary[f]) order.push_back({kBinaryFamilyNames[f], true, f});
+  for (std::size_t f = 0; f < kUnaryFamilies; ++f)
+    if (stats.unary[f]) order.push_back({kUnaryFamilyNames[f], false, f});
+  std::sort(order.begin(), order.end(), [](const FamilyRef& x, const FamilyRef& y) {
+    return std::string_view(x.name) < std::string_view(y.name);
+  });
+  const std::size_t n = names.size();
+  const auto each_candidate = [&](auto&& visit) {
+    for (const auto& family : order) {
+      if (family.binary) {
+        for (std::size_t a = 0; a < n; ++a)
+          for (std::size_t b = 0; b < n; ++b) {
+            if (a == b) continue;
+            const auto index = stats.at(family.index, a, b);
+            visit(family, a, b, stats.binary_support[index], stats.binary_confidence[index]);
+          }
+      } else {
+        for (std::size_t a = 0; a < n; ++a) {
+          const auto index = family.index * n + a;
+          visit(family, a, n, stats.unary_support[index], stats.unary_confidence[index]);
+        }
+      }
+    }
+  };
+
   const int row_count = static_cast<int>(log.traces.size());
   double min_support = options.has_min_support_ratio ? options.min_support_ratio : 0.0;
   double min_confidence = options.has_min_confidence_ratio ? options.min_confidence_ratio : 0.0;
   if (!options.has_min_support_ratio && !options.has_min_confidence_ratio) {
     double best = -1.0;
-    CandidateKey best_key;
     int best_support = 0, best_confidence = 0;
-    for (const auto& [candidate, stats] : candidates) {
-      const auto [support, confidence] = stats;
-      if (support <= 0) continue;
+    // Ascending candidate order, so an equal product keeps the later
+    // candidate (the reference's `best_key < candidate` tie rule).
+    each_candidate([&](const FamilyRef&, std::size_t, std::size_t, int support, int confidence) {
+      if (support <= 0) return;
       const double product = static_cast<double>(confidence) / row_count;
-      if (product > best || (product == best && best_key < candidate)) {
-        best = product; best_key = candidate; best_support = support; best_confidence = confidence;
+      if (product > best || product == best) {
+        best = product; best_support = support; best_confidence = confidence;
       }
-    }
+    });
     if (best >= 0.0) {
       min_support = static_cast<double>(best_support) / row_count * options.auto_selection_multiplier;
       min_confidence = static_cast<double>(best_confidence) / best_support * options.auto_selection_multiplier;
     }
   }
-  for (const auto& [candidate, stats] : candidates) {
-    const auto [support, confidence] = stats;
+  each_candidate([&](const FamilyRef& family, std::size_t a, std::size_t b, int support,
+                     int confidence) {
     // The reference uses positive comparisons (`>=`); spelling these as negated
     // `<` would accidentally accept NaN thresholds.
     if (!(support >= row_count * min_support) || support == 0 ||
         !(confidence >= support * min_confidence))
-      continue;
+      return;
     DeclareConstraint constraint;
-    constraint.first = candidate.first;
-    constraint.second = candidate.second;
-    constraint.binary = candidate.binary;
+    constraint.first = names[a];
+    if (family.binary) constraint.second = names[b];
+    constraint.binary = family.binary;
     constraint.support = support;
     constraint.confidence = confidence;
-    model.add(candidate.family, std::move(constraint));
-  }
+    model.add(family.name, std::move(constraint));
+  });
   return model;
 }
 
@@ -751,12 +807,21 @@ std::vector<DeclareConformance> check_declare_conformance(
   validate_activity_key(options.activity_key);
   std::vector<DeclareConformance> result;
   result.reserve(log.traces.size());
+  // A trace's result depends only on its activity sequence, so each distinct
+  // sequence (variant) is checked once.
+  std::map<std::vector<std::string>, std::size_t> checked;
   for (const auto& trace : log.traces) {
     std::vector<std::string> activities;
     activities.reserve(trace.events.size());
     for (const auto& event : trace.events)
       activities.push_back(selected_activity(event, options.activity_key));
+    const auto found = checked.find(activities);
+    if (found != checked.end()) {
+      result.push_back(result[found->second]);
+      continue;
+    }
     result.push_back(check_declare_conformance(activities, model));
+    checked.emplace(std::move(activities), result.size() - 1);
   }
   return result;
 }

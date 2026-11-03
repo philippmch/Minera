@@ -1746,6 +1746,44 @@ export function uploadTooLargeMessage(size?: number): string {
   return `the upload${actual} is larger than the ${limit} limit of the Minera backend; compress an XES log as .xes.gz, which Minera reads directly`;
 }
 
+/** The backend mines one log at a time (503 MINE_BUSY for any other). */
+export const MINE_BUSY_MESSAGE = "Another log is being mined — wait or cancel it.";
+/** How long a mine waits for a canceled mine that still holds the backend's single slot. */
+export const MINE_BUSY_WAIT_MS = 120_000;
+
+/** A mine the backend refused before parsing it: 413 MINE_LIMIT, with its estimate. */
+export class MineLimitError extends Error {
+  constructor(message: string, readonly estimatedEvents?: number, readonly estimatedBytes?: number,
+              readonly limit?: string) {
+    super(message);
+    this.name = "MineLimitError";
+  }
+}
+
+type MineAdmission = {family?: unknown; error?: unknown; canceling?: unknown; retry_after_seconds?: unknown;
+  estimated_events?: unknown; estimated_bytes?: unknown; limit?: unknown};
+
+async function mineAdmission(response: Response): Promise<MineAdmission | undefined> {
+  if (response.status !== 503 && response.status !== 413) return undefined;
+  try {
+    const value: unknown = await response.clone().json();
+    if (value === null || typeof value !== "object") return undefined;
+    const family = (value as MineAdmission).family;
+    return family === "MINE_BUSY" || family === "MINE_LIMIT" ? value as MineAdmission : undefined;
+  } catch {return undefined;}
+}
+
+function waitFor(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {reject(signal.reason); return;}
+    const timer = setTimeout(() => {signal?.removeEventListener("abort", stop); resolve();}, ms);
+    const stop = () => {clearTimeout(timer); reject(signal?.reason);};
+    signal?.addEventListener("abort", stop, {once: true});
+  });
+}
+
+const finiteNumber = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
 /** Upload the unchanged original file and retain typed source-only outcomes. */
 export async function mineActiveDataset(
   file: File,
@@ -1760,13 +1798,31 @@ export async function mineActiveDataset(
   appendExactFilterFiles(form, options);
 
   let response: Response;
-  try {
-    response = await importedModelFetch("/api/mine", { method: "POST", body: form, signal });
-  } catch (cause) {
-    if (signal?.aborted) throw cause;
-    throw new Error(
-      "could not reach the Minera backend — is minera_server running?",
-    );
+  // A mine the app just canceled (or replaced) keeps the backend's single
+  // mining slot until its next stage; the backend says so ("canceling"), and
+  // this request retries after Retry-After instead of failing.
+  const started = Date.now();
+  for (;;) {
+    try {
+      response = await importedModelFetch("/api/mine", { method: "POST", body: form, signal });
+    } catch (cause) {
+      if (signal?.aborted) throw cause;
+      throw new Error(
+        "could not reach the Minera backend — is minera_server running?",
+      );
+    }
+    const admission = await mineAdmission(response);
+    if (!admission) break;
+    if (admission.family === "MINE_LIMIT") {
+      throw new MineLimitError(typeof admission.error === "string" ? admission.error : "the log is too large for this Minera backend",
+        finiteNumber(admission.estimated_events), finiteNumber(admission.estimated_bytes),
+        typeof admission.limit === "string" ? admission.limit : undefined);
+    }
+    const retryHeader = Number(response.headers.get("Retry-After"));
+    const retrySeconds = Number.isFinite(retryHeader) && retryHeader > 0 ? retryHeader : finiteNumber(admission.retry_after_seconds) ?? 1;
+    if (admission.canceling !== true || Date.now() - started + retrySeconds * 1000 > MINE_BUSY_WAIT_MS)
+      throw new Error(MINE_BUSY_MESSAGE);
+    await waitFor(retrySeconds * 1000, signal);
   }
 
   const exactRun = hasExactFilters(options) ? await readExactFilterResponse(response, "/api/mine", form, fields, signal) : null;

@@ -217,8 +217,17 @@ describe("actual own-server workflow input discovery fixtures", () => {
     expect(decodedAll[0]).toEqual(["table_id", "table_title", "row_index", "column_index", "column", "value"]); expect(decodedAll.slice(1)).toEqual(expected);
     saveArtifact(entry.id, "all-tables.csv", allCsv, proof); proofs.push(proof);
   });
+  // About 20,000 cells with seven exact checks each. Each check is the
+  // Object.is comparison toBe makes, collected into one assertion: a vitest
+  // expect() per check made this test take seconds and time out under load.
   it("retains every before/after table cell, presence state, dtype and complete selected record", () => {
-    let cellsChecked = 0, pagesChecked = 0;
+    let cellsChecked = 0, pagesChecked = 0, mismatchCount = 0;
+    const mismatches: string[] = [];
+    const same = (actual: unknown, expected: unknown, where: string) => {
+      if (Object.is(actual, expected)) return;
+      const show = (value: unknown) => {try {return value === undefined ? "undefined" : nativeJson(value);} catch {return String(value);}};
+      if (++mismatchCount <= 20) mismatches.push(`${where}: ${show(actual)} is not ${show(expected)}`);
+    };
     for (const entry of entries) {
       const parsed = parseNativeJson(responseText(entry)); if (!isWorkflowInputDiscovery(parsed)) continue;
       const tables = workflowInputTables(parsed, entry.fields);
@@ -226,17 +235,19 @@ describe("actual own-server workflow input discovery fixtures", () => {
         const table = parsed[name]; if (!table) continue;
         const flat = tables.find(item => item.id === name + "_cells")!;
         expect(flat.rows).toHaveLength(table.rows.length * table.columns.length);
+        expect(flat.records).toHaveLength(flat.rows.length);
         table.rows.forEach((row, row_index) => row.forEach((cell, column_index) => {
-          const i = row_index * table.columns.length + column_index, record = flat.records![i] as {cell: unknown};
-          expect(flat.rows[i][0]).toBe(row_index); expect(flat.rows[i][1]).toBe(column_index); expect(flat.rows[i][2]).toBe(table.columns[column_index]);
-          expect(flat.rows[i][3]).toBe(table.dtypes?.[column_index]); expect(flat.rows[i][4]).toBe(cell === null ? "missing" : cell.null ? "present null" : "present");
-          expect(record.cell).toBe(cell); expect(nativeJson(record.cell)).toBe(nativeJson(cell)); ++cellsChecked;
+          const i = row_index * table.columns.length + column_index, record = flat.records![i] as {cell: unknown}, where = `${entry.id} ${name} row ${row_index} column ${column_index}`;
+          same(flat.rows[i][0], row_index, where + " row index"); same(flat.rows[i][1], column_index, where + " column index"); same(flat.rows[i][2], table.columns[column_index], where + " column");
+          same(flat.rows[i][3], table.dtypes?.[column_index], where + " dtype"); same(flat.rows[i][4], cell === null ? "missing" : cell.null ? "present null" : "present", where + " presence");
+          same(record.cell, cell, where + " record cell"); same(nativeJson(record.cell), nativeJson(cell), where + " record cell JSON"); ++cellsChecked;
         }));
         if (flat.rows.length > 25) {expect(diagnosticPage(flat.rows, 1)).toHaveLength(Math.min(25, flat.rows.length - 25)); ++pagesChecked;}
       }
     }
+    expect(mismatches).toEqual([]); expect(mismatchCount).toBe(0);
     expect(cellsChecked).toBeGreaterThan(0); expect(pagesChecked).toBeGreaterThan(0);
-  });
+  }, 30_000);
   it("retains failed mutable tables and completed detached/native-only results as distinct real outcomes", () => {
     const failed = actual(entries.find(entry => entry.id === "mutable-datetime-failure")!), detached = actual(entries.find(entry => entry.id === "alpha-plus-detached")!);
     expect(failed.computed).toBe(false); expect(failed.error).not.toBeNull(); expect(failed.input_before).not.toBeNull(); expect(failed.input_after).not.toBeNull(); expect(failed.result).toBeNull();

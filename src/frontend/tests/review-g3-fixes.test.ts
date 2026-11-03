@@ -4,7 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { initialToolFromHash, parseRoute, routeFor, routeHash, sameHash } from "../src/routing";
 import { TOOLS, VIEWS } from "../src/tools";
 import { readStored, removeStored, writeStored } from "../src/storage";
-import { BACKEND_UNREACHABLE, backendFetch } from "../src/backend-fetch";
+import { BACKEND_UNREACHABLE, backendFetch, backendFetchArgumentError, isNetworkFailure } from "../src/backend-fetch";
+import { releaseReaderQuietly, type ReaderRun } from "../src/reader-stream-workspace";
+import { releaseLiveSessionQuietly, type LiveRun } from "../src/live-stream-workspace";
 import { DOWNLOAD_URL_LIFETIME_MS, downloadBlob } from "../src/download";
 import { countLabel, ocelResultHasNoObjects } from "../src/app-logic";
 import { CommandPalette, filterCommands, paletteCommands } from "../src/components/CommandPalette";
@@ -93,6 +95,52 @@ describe("backend fetch", () => {
     await expect(backendFetch("/api/y")).resolves.toBe(response);
     expect(fetchMock.mock.calls[0]).toEqual(["/api/y"]);
   });
+  it("keeps argument TypeErrors apart from network failures", async () => {
+    // A header value fetch() refuses: named before the request, never "unreachable".
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const token = backendFetch("/api/x", { headers: { Authorization: "Bearer tok\u20acen" } });
+    await expect(token).rejects.toBeInstanceOf(TypeError);
+    await expect(backendFetch("/api/x", { headers: { Authorization: "Bearer tok\u20acen" } })).rejects.toThrow(/Authorization value contains “€”/);
+    await expect(backendFetch("/api/x", { headers: [["X-Key", "a\nb"]] })).rejects.toThrow(/line break or NUL/);
+    await expect(backendFetch("/api/x", { method: "GET", body: "x" })).rejects.toThrow("A GET request cannot carry a body.");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(backendFetchArgumentError({ headers: { "X-Name": "caf\u00e9" }, method: "POST", body: "x" })).toBeNull();
+    // Argument errors fetch() itself raises keep their message.
+    const argument = new TypeError("Failed to execute 'fetch' on 'Window': Invalid name");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(argument));
+    await expect(backendFetch("/api/x")).rejects.toBe(argument);
+    const url = new TypeError("Failed to parse URL from http://[::1");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(url));
+    await expect(backendFetch("/api/x")).rejects.toBe(url);
+    // Real network failures in each engine's wording still map.
+    for (const message of ["Failed to fetch", "NetworkError when attempting to fetch resource.", "Load failed", "fetch failed"]) {
+      expect(isNetworkFailure(new TypeError(message))).toBe(true);
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError(message)));
+      await expect(backendFetch("/api/x")).rejects.toThrow(BACKEND_UNREACHABLE);
+    }
+    expect(isNetworkFailure(new Error("Failed to fetch"))).toBe(false);
+    expect(isNetworkFailure(new TypeError("x is not a function"))).toBe(false);
+  });
+});
+
+describe("stream session release", () => {
+  it("releases an open reader or live session once, in the background", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}"));
+    vi.stubGlobal("fetch", fetchMock);
+    releaseReaderQuietly({ result: { session_id: "r1", revision: 4, released: false } } as unknown as ReaderRun);
+    releaseLiveSessionQuietly({ result: { session_id: "l1", revision: 7, released: false } } as unknown as LiveRun);
+    releaseReaderQuietly({ result: { session_id: "r2", revision: 1, released: true } } as unknown as ReaderRun);
+    releaseLiveSessionQuietly({ result: { session_id: "l2", revision: 1, released: true } } as unknown as LiveRun);
+    expect(fetchMock.mock.calls).toEqual([
+      ["/api/stream-reader/release?session_id=r1&expected_revision=4", { method: "POST", keepalive: true }],
+      ["/api/live-stream/release?session_id=l1&expected_revision=7", { method: "POST", keepalive: true }],
+    ]);
+    // A failed release is left for the session list, never thrown into an unmount.
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    expect(() => releaseReaderQuietly({ result: { session_id: "r3", revision: 1, released: false } } as unknown as ReaderRun)).not.toThrow();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 });
 
 describe("downloads", () => {
@@ -167,6 +215,8 @@ describe("confirmation before discarding data", () => {
     expect(html).toContain('aria-modal="true"');
     expect(html).toMatch(/aria-labelledby="([^"]+)"[^>]*aria-describedby="([^"]+)"/);
     expect(html.indexOf("Keep working")).toBeLessThan(html.indexOf("Close and go to start"));
+    // The box takes focus itself when its text is clicked, so keys stay trapped.
+    expect(html).toMatch(/role="alertdialog"[^>]*tabindex="-1"/);
   });
   it("offers Cancel on the start page while a log is loading", () => {
     const props = { onOpenFile: () => {}, onLoadSample: () => {}, onLoadOcelSample: () => {}, onLoadResourceSample: () => {}, error: null, mining: true, onCancel: () => {} };
@@ -184,7 +234,28 @@ describe("error boundary", () => {
     const html = renderToStaticMarkup(boundary.render() as never);
     expect(html).toContain('role="alert"');
     expect(html).toContain("The operation is insecure.");
+    expect(html).toContain("Back to the start page");
+    expect(html).toContain("Reload Minera");
+    expect(html).toContain("was lost");
+  });
+  it("keeps the open data when only a view fails, and clears on a route change", () => {
+    const boundary = new ErrorBoundary({ children: "the view", scope: "view", resetKey: "#/view/dfg" });
+    boundary.state = { error: new Error("bad cell") };
+    const html = renderToStaticMarkup(boundary.render() as never);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Something went wrong in this view");
+    expect(html).toContain("The open data is kept");
     expect(html).toContain("Try again");
+    expect(html).not.toContain("Reload Minera");
+    const cleared: unknown[] = [];
+    boundary.setState = ((state: unknown) => void cleared.push(state)) as never;
+    boundary.componentDidUpdate({ resetKey: "#/view/dfg" });
+    expect(cleared).toEqual([]);
+    (boundary as { props: unknown }).props = { children: "the view", scope: "view", resetKey: "#/tool/token-replay" };
+    boundary.componentDidUpdate({ resetKey: "#/view/dfg" });
+    expect(cleared).toEqual([{ error: null }]);
+    boundary.state = { error: null };
+    expect(boundary.render()).toBe("the view");
   });
 });
 

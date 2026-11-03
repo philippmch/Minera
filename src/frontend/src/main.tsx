@@ -10,7 +10,7 @@ installScrollableFocus();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ErrorBoundary onReset={() => { window.location.hash = ""; }}>
+    <ErrorBoundary scope="app" onReset={() => { window.location.hash = ""; }}>
       <App />
     </ErrorBoundary>
   </StrictMode>,

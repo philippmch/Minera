@@ -54,7 +54,10 @@ using ProcessTreeReductionLeaf = std::optional<std::string>;
 // skippable and shares no activity with the trace is replaced by tau in its
 // parent, and the result is the folded last visited node, which is not the
 // root when the walk stops early. A visited loop with fewer than two children
-// raises IndexError. The reference orders the distinct leaves by Python's
+// raises IndexError. A visited node other than the root and the last one whose
+// subtree holds an interleaving node raises ProcessTreeReductionError of type
+// TypeError, as the reference footprints have no interleaving case (its
+// message there is "'NoneType' object is not subscriptable"). The reference orders the distinct leaves by Python's
 // hash-seeded set iteration; `leaf_order` (a permutation of the distinct
 // leaves) selects one such order, and the default is breadth-first first
 // appearance.
@@ -65,11 +68,21 @@ using ProcessTreeReductionLeaf = std::optional<std::string>;
 // The distinct leaves of a tree in breadth-first first appearance.
 [[nodiscard]] std::vector<ProcessTreeReductionLeaf> process_tree_reduction_leaves(const ProcessTree& tree);
 
-// The reference fold (process_tree.utils.generic.fold): sequence, parallel
-// and xor nodes absorb children of their own operator (or nodes do not); xor
-// and or keep only their last tau child, sequence and parallel drop taus
-// (keeping one when nothing else is left); one-child nodes become their child;
-// a loop of only taus becomes tau.
+// The reference fold (process_tree.utils.generic.fold). Node equality is the
+// reference's: childless nodes compare by label alone, so tau equals every
+// childless operator, and removals take the first equal child. Before its
+// children fold, a sequence, parallel, xor or or node with tau children keeps
+// one tau when nothing else is left; otherwise sequence and parallel remove
+// one equal child per tau and xor and or one per tau but the first. The
+// children then fold, and a one-child node becomes its child. Sequence,
+// parallel and xor nodes absorb children of their own operator (or and
+// interleaving nodes do not), the subtree's sequence and parallel nodes drop
+// their taus and its xor and or nodes keep one (the last when only taus are
+// left), and a one-child node again becomes its child. A loop of exactly two
+// taus becomes tau; other loops, interleaving nodes (apart from the one-child
+// collapse) and childless operators stay as they are. Trees in which a
+// childless operator sits next to taus in a nested xor can still differ from
+// the reference (about one seeded case in 5,000 with childless operators).
 [[nodiscard]] ProcessTreeNode fold_process_tree_reference(ProcessTreeNode node);
 
 // Convenience aliases matching the naming used by the other Minera modules.

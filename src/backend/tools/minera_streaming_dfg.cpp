@@ -16,7 +16,10 @@ int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " INPUT.csv [OUTPUT.json]"
                " [--case-id-column NAME] [--activity-column NAME]"
-               " [--state STATE.csv]\n";
+               " [--state STATE.csv]\n"
+               "  --case-id-column defaults to case_id and --activity-column to activity;\n"
+               "  the reference streaming DFG reads case:concept:name and concept:name, so\n"
+               "  pass those names for a pm4py-style CSV.\n";
   return 2;
 }
 

@@ -70,6 +70,8 @@ inline RepositoryHistoryTransport repository_history_http_transport() {
     if (!token.empty())
       headers.emplace("Authorization", "Bearer " + std::string(token));
     const auto response = client.Get(path, headers);
+    if (!response && response.error() == httplib::Error::ExceedPayloadMaxLength)
+      throw std::length_error("Repository history: response exceeds 64 MiB");
     if (!response)
       throw std::invalid_argument("Repository history: endpoint request failed");
     return RepositoryHistoryResponse{response->status, response->body};

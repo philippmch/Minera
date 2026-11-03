@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <charconv>
 #include <chrono>
 #include <cctype>
@@ -464,12 +465,67 @@ struct MinedSession {
   std::string heuristic_case_id_attribute = "case:concept:name";
   std::string powl_timestamp_key = "time:timestamp";
   std::string powl_case_id_key = "case:concept:name";
+  // When set, the prepared logs are the active source's own checked log
+  // (shared, not copied): they point into active_source, which this session
+  // and every copy of it keep alive. The owned members above are then empty.
+  const minera::EventLog* log_view = nullptr;
+  const minera::EventLog* inductive_log_view = nullptr;
+  const minera::EventLog* alpha_log_view = nullptr;
 };
+
+const minera::EventLog& session_log(const MinedSession& session) {
+  return session.log_view ? *session.log_view : session.log;
+}
+const minera::EventLog& session_inductive_log(const MinedSession& session) {
+  return session.inductive_log_view ? *session.inductive_log_view : session.inductive_log;
+}
+const minera::EventLog& session_alpha_log(const MinedSession& session) {
+  return session.alpha_log_view ? *session.alpha_log_view : session.alpha_log;
+}
+
+// True when a miner's prepared log (normalize_alpha_event_log,
+// prepare_inductive_event_log) came back equal to its input in every field
+// those preparations can set, so the session can share the input instead of
+// keeping a second copy. Event order, grouping and all attributes are
+// compared too; any difference keeps the prepared copy.
+bool prepared_log_is_identity(const minera::EventLog& prepared, const minera::EventLog& source) {
+  if (prepared.traces.size() != source.traces.size() ||
+      !(prepared.attributes == source.attributes) || !(prepared.metadata == source.metadata))
+    return false;
+  for (std::size_t t = 0; t < source.traces.size(); ++t) {
+    const auto& a = prepared.traces[t];
+    const auto& b = source.traces[t];
+    if (a.case_id != b.case_id || a.case_id_state != b.case_id_state ||
+        a.case_id_source_key != b.case_id_source_key || !(a.case_id_attribute == b.case_id_attribute) ||
+        a.case_id_source_position != b.case_id_source_position ||
+        !(a.attributes == b.attributes) || !(a.properties == b.properties) ||
+        a.events.size() != b.events.size())
+      return false;
+    for (std::size_t e = 0; e < b.events.size(); ++e) {
+      const auto& x = a.events[e];
+      const auto& y = b.events[e];
+      if (x.input_order != y.input_order || x.case_id != y.case_id || x.activity != y.activity ||
+          x.timestamp != y.timestamp || x.resource != y.resource || x.lifecycle != y.lifecycle ||
+          x.case_id_state != y.case_id_state || x.activity_state != y.activity_state ||
+          x.timestamp_state != y.timestamp_state || x.resource_state != y.resource_state ||
+          x.lifecycle_state != y.lifecycle_state ||
+          x.case_id_source_key != y.case_id_source_key || x.activity_source_key != y.activity_source_key ||
+          x.timestamp_source_key != y.timestamp_source_key || x.resource_source_key != y.resource_source_key ||
+          x.lifecycle_source_key != y.lifecycle_source_key ||
+          !(x.activity_attribute == y.activity_attribute) || !(x.timestamp_attribute == y.timestamp_attribute) ||
+          !(x.resource_attribute == y.resource_attribute) || !(x.lifecycle_attribute == y.lifecycle_attribute) ||
+          x.first_class_source_positions != y.first_class_source_positions ||
+          !(x.attributes == y.attributes) || !(x.case_row_attributes == y.case_row_attributes))
+        return false;
+    }
+  }
+  return true;
+}
 
 const minera::EventLog& require_prepared_log(const MinedSession& session) {
   if (!session.log_ready) throw std::invalid_argument(
       "the active source has no prepared EventLog; inspect its preparation error");
-  return session.log;
+  return session_log(session);
 }
 
 const minera::ProcessTree& require_process_tree(const MinedSession& session) {
@@ -497,12 +553,12 @@ const minera::EventLog& cached_model_log(const MinedSession& session,
   if (miner == "inductive" || miner == "process_tree") {
     if (!session.inductive_log_ready)
       throw std::invalid_argument("the cached Inductive prepared log is unavailable");
-    return session.inductive_log;
+    return session_inductive_log(session);
   }
   if (miner == "alpha") {
     if (!session.alpha_log_ready)
       throw std::invalid_argument("the cached Alpha prepared log is unavailable");
-    return session.alpha_log;
+    return session_alpha_log(session);
   }
   return require_prepared_log(session);
 }
@@ -1025,6 +1081,7 @@ minera::CorrelationVariantsAnalysis analyze_correlation_variants(
 }
 
 #include "active_source_route.hpp"
+#include "mine_limits.hpp"
 #include "active_source_options.hpp"
 #include "active_source_mining.hpp"
 
@@ -1045,7 +1102,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
   FormFieldAuditScope field_audit;
   try {
     const auto ticket = begin_active_mining(request);
-    std::string csv;
+    // The upload is read in place: a copy would hold the file twice.
+    const std::string* csv = &request.body;
     std::string dataset = "event log";
     minera::MineParams params;
 
@@ -1057,8 +1115,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         return;
       }
       audit_form_field("log");
-      const auto& file = request.get_file_value("log");
-      csv = file.content;
+      // get_file_value returns a copy; the entry itself outlives this block.
+      const auto& file = request.files.find("log")->second;
+      csv = &file.content;
       if (!file.filename.empty()) dataset = file.filename;
 
       params = minera::parse_mine_params(
@@ -1070,7 +1129,6 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
             return request.has_file(std::string(name));
           });
     } else {
-      csv = request.body;
       params = minera::parse_mine_params(
           [&](std::string_view name) {
             const auto key = std::string(name);
@@ -1084,8 +1142,13 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 
     const auto exact_heuristic_options=params.heuristic;
     std::string paired_csv_import_error;
+    check_mine_size_limit(request, *csv, dataset, params);
     auto active_source = std::make_shared<const minera::ActiveEventSource>(
-        prepare_active_event_source(request, csv, dataset, params, &paired_csv_import_error, true));
+        prepare_active_event_source(request, *csv, dataset, params, &paired_csv_import_error, true));
+    // A canceled or superseded request stops between stages with the same
+    // answer publish_active_mining gives; the stages themselves are unchanged.
+    const auto checkpoint = [&] {abort_if_mining_canceled(ticket);};
+    checkpoint();
     if(minera::exact_heuristic_options_requested([&](std::string_view key){return active_source_supplied(request,key);}))params.heuristic=exact_heuristic_options;
     minera::record_exact_effective_options(params);
     const auto literal_source_selectors = active_source_supplied(request, "mining_selectors_json")
@@ -1104,7 +1167,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       return;
     }
     const bool xes_input = active_source->file().format == "xes";
-    auto log = active_source->checked_log();
+    // The checked log lives in active_source, which the session keeps; it is
+    // read in place rather than copied.
+    const auto& log = active_source->checked_log();
     std::optional<minera::CsvEventData> csv_data;
     if (!xes_input && !params.correlation_variants.empty())
       csv_data = minera::CsvEventData{active_source->original_log(), active_source->original_table()};
@@ -1146,6 +1211,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       minera::register_correlation_activities(
           graph, *correlation_variants_analysis);
     }
+    checkpoint();
     const auto temporal_profile =
         minera::discover_temporal_profile(log, params.temporal_profile);
     const auto minimum_self_distances =
@@ -1165,23 +1231,36 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     for (const auto& transition : transition_system.transitions()) {
       if (transition.label) graph.ensure_activity(*transition.label);
     }
-    auto inductive_log =
+    checkpoint();
+    // A preparation that changed nothing is dropped and the checked log
+    // shared, so the session keeps one copy instead of three.
+    auto inductive_prepared =
         minera::prepare_inductive_event_log(log, params.inductive);
+    const bool inductive_is_log = prepared_log_is_identity(inductive_prepared, log);
+    if (inductive_is_log) inductive_prepared = minera::EventLog{};
+    const minera::EventLog& inductive_log = inductive_is_log ? log : inductive_prepared;
     const auto tree = minera::discover_process_tree(log, params.inductive);
+    checkpoint();
     for (const auto& activity : tree.activities()) {
       graph.ensure_activity(activity);
     }
     const auto inductive_graph =
         minera::discover_directly_follows_graph(inductive_log);
     const auto net = minera::discover_petri_net(log, params.alpha);
-    auto alpha_log =
+    checkpoint();
+    auto alpha_prepared =
         minera::normalize_alpha_event_log(log, params.alpha);
+    const bool alpha_is_log = prepared_log_is_identity(alpha_prepared, log);
+    if (alpha_is_log) alpha_prepared = minera::EventLog{};
+    const minera::EventLog& alpha_log = alpha_is_log ? log : alpha_prepared;
     register_activity_selector_values(graph, log,
                                       params.alpha.activity_attribute);
     for (const auto& activity : net.activities())
       graph.ensure_activity(activity);
     const auto heuristics = minera::discover_heuristics_net(log, params.heuristic);
+    checkpoint();
     const auto powl = minera::discover_powl(log, params.powl);
+    checkpoint();
     register_powl_labels(graph, powl);
     const auto powl_log = project_powl_activity(
         log, params.powl.activity_key, params.powl.timestamp_key,
@@ -1197,6 +1276,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         analyze_footprints(log, graph, alpha_log, tree, powl,
                            inductive_net, net,
                            heuristic_net, powl_net, params.footprints);
+    checkpoint();
     const auto performance = minera::compute_performance_metrics(log, graph);
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
@@ -1212,10 +1292,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     if (params.batches) {
       batch_discovery = discover_selected_batches(log, params.batch_options);
     }
+    checkpoint();
     const auto log_skeleton =
         minera::discover_log_skeleton(log, params.log_skeleton);
     const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
         log, log_skeleton, params.log_skeleton);
+    checkpoint();
     const auto declare =
         minera::discover_declare(log, params.declare_options);
     const auto declare_conformance =
@@ -1235,6 +1317,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       }
     }
 
+    checkpoint();
     std::optional<minera::IntervalEventOverlapCounts> overlap_interval_events;
     std::optional<minera::CaseOverlapCounts> overlap_cases;
     std::optional<minera::ConcurrentActivityOverlapResult>
@@ -1282,6 +1365,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       replay_options = minera::tools::default_replay_input_options(
           *conformance_log, std::move(replay_options),
           params.token_replay_activity_attribute_supplied);
+      checkpoint();
       return minera::ModelConformance{std::move(id),
                                       minera::final_marking_reachable(petri),
                                       minera::check_conformance(
@@ -1306,6 +1390,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 
     // Frequency/performance annotations for every miner's Petri-net view:
     // one more token replay per net, cheap enough to compute up front.
+    checkpoint();
     const auto petri_decoration = minera::decorate_model(alpha_log, net);
     const auto inductive_decoration =
         minera::decorate_model(inductive_log, inductive_net);
@@ -1315,7 +1400,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto powl_decoration = minera::decorate_model(
         powl_log, powl_net, params.powl.activity_key, params.powl.timestamp_key);
 
-    const std::string body = minera::analysis_json(
+    checkpoint();
+    std::string body = minera::analysis_json(
         dataset, log, graph, &tree, &net, &heuristics, &conformance,
         &performance, &resources, &variant_durations, &eventually,
         /*decisions=*/nullptr, &petri_decoration,
@@ -1348,10 +1434,14 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     auto session = std::make_shared<MinedSession>();
     session->active_source = active_source;
     session->paired_csv_import_error = paired_csv_import_error;
-    // The response body is complete, so the logs move into the session.
-    session->log = std::move(log);
-    session->inductive_log = std::move(inductive_log);
-    session->alpha_log = std::move(alpha_log);
+    // The response body is complete. The checked log stays in active_source
+    // and the session points at it; a prepared log that differs from it
+    // moves into the session.
+    session->log_view = &log;
+    if (inductive_is_log) session->inductive_log_view = &log;
+    else session->inductive_log = std::move(inductive_prepared);
+    if (alpha_is_log) session->alpha_log_view = &log;
+    else session->alpha_log = std::move(alpha_prepared);
     session->graph = graph;
     session->nets.emplace("inductive", inductive_net);
     session->nets.emplace("alpha", net);
@@ -1362,7 +1452,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->declare = declare;
     session->dataset = dataset;
     session->token_replay = minera::tools::default_replay_input_options(
-        session->log, params.token_replay, params.token_replay_activity_attribute_supplied);
+        session_log(*session), params.token_replay, params.token_replay_activity_attribute_supplied);
     session->inductive_options = params.inductive;
     session->alpha_activity_attribute = params.alpha.activity_attribute;
     session->alpha_case_id_attribute = params.alpha.case_id_attribute;
@@ -1382,14 +1472,25 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                    minera::sampling_options_json(*params.filter.sampling)
              : std::string{}) +
         '}';
-    std::string bound_body;
-    bound_body.reserve(body.size() + bound_tail.size());
-    bound_body.append(body, 0, body_end);
-    bound_body += bound_tail;
-    bound_body.append(body, body_end + 1);
+    // The tail replaces the closing brace in place when the buffer has room
+    // (the stream's spare capacity usually does), with no second body copy;
+    // otherwise one exact-size copy, never a doubled buffer.
+    if (body.capacity() >= body.size() - 1 + bound_tail.size()) {
+      body.replace(body_end, 1, bound_tail);
+    } else {
+      std::string bound_body;
+      bound_body.reserve(body.size() - 1 + bound_tail.size());
+      bound_body.append(body, 0, body_end);
+      bound_body += bound_tail;
+      bound_body.append(body, body_end + 1);
+      body = std::move(bound_body);
+    }
     publish_active_mining(ticket, session);
 
-    response.set_content(std::move(bound_body), "application/json");
+    response.set_content(std::move(body), "application/json");
+  } catch (const MineLimitError& error) {
+    response.status = 413;
+    response.set_content(error.body, "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -2284,10 +2385,13 @@ void handle_ocel_discovery(const httplib::Request& request,
       payload = minera::otg_json(minera::discover_otg_classic(log));
     } else if (variant == "ocpn") {
       minera::OcpnDiscoveryOptions discovery;
+      // Omitted flags keep the native defaults (true), as the reference
+      // OCPN discovery mines without fall-throughs or the strict sequence cut.
       discovery.disable_strict_sequence_cut = ocel_query_bool(
-          request, "ocpn_disable_strict_sequence_cut", false);
+          request, "ocpn_disable_strict_sequence_cut",
+          discovery.disable_strict_sequence_cut);
       discovery.disable_fallthroughs = ocel_query_bool(
-          request, "ocpn_disable_fallthroughs", false);
+          request, "ocpn_disable_fallthroughs", discovery.disable_fallthroughs);
       if (request.has_param("ocpn_annotation")) {
         const auto value = request.get_param_value("ocpn_annotation");
         if (value == "annotated" || value == "classic") {
@@ -2752,9 +2856,10 @@ void handle_ocel_playout(const httplib::Request& request,
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     minera::OcpnDiscoveryOptions discovery;
     discovery.disable_strict_sequence_cut = ocel_query_bool(
-        request, "ocpn_disable_strict_sequence_cut", false);
+        request, "ocpn_disable_strict_sequence_cut",
+        discovery.disable_strict_sequence_cut);
     discovery.disable_fallthroughs = ocel_query_bool(
-        request, "ocpn_disable_fallthroughs", false);
+        request, "ocpn_disable_fallthroughs", discovery.disable_fallthroughs);
     if (request.has_param("ocpn_variant")) {
       const auto value = request.get_param_value("ocpn_variant");
       if (value == "log" || value == "im") {
@@ -10871,10 +10976,29 @@ void reject_stale_imported_model(httplib::Response& response) {
       "application/json");
 }
 
+// Every /api JSON body leaves as valid UTF-8 (json_utf8.hpp): results that
+// carry a log's own bytes (a Latin-1 CSV, WTF-8 surrogates) are repaired. The
+// repair must run before httplib frames the response: apply_ranges sets
+// Content-Length (and slices a Range request) before the post-routing
+// handler runs, so a repair there would grow the body past its declared
+// length. Handlers, the pre-routing and the error handler call this; the
+// check is a single pass and clean bodies are left untouched.
+void repair_api_json_body(httplib::Response& response) {
+  if (response.body.empty() ||
+      !response.get_header_value("Content-Type").starts_with("application/json"))
+    return;
+  if (!minera::detail::is_clean_utf8(response.body))
+    response.body = active_source_safe_json(response.body);
+}
+
 httplib::Server::Handler api_route_handler(std::string path,
                                            httplib::Server::Handler handler) {
   return [path = std::move(path), handler = std::move(handler)](
              const httplib::Request& request, httplib::Response& response) {
+    struct RepairOnExit {
+      httplib::Response& response;
+      ~RepairOnExit() { try { repair_api_json_body(response); } catch (...) {} }
+    } repair{response};
     if (!api_route_owns_repeated_controls(path, request)) {
       if (const auto repeated = repeated_request_control(request)) {
         response.status = 400;
@@ -10932,7 +11056,12 @@ void api_post(httplib::Server& server, const std::string& path,
 void api_post(httplib::Server& server, const std::string& path,
               httplib::Server::HandlerWithContentReader handler) {
   g_api_route_methods[path].insert("POST");
-  server.Post(path, std::move(handler));
+  server.Post(path, [handler = std::move(handler)](const httplib::Request& request,
+                                                   httplib::Response& response,
+                                                   const httplib::ContentReader& reader) {
+    handler(request, response, reader);
+    repair_api_json_body(response);
+  });
 }
 
 // Gives /api error statuses without a body (unknown routes, wrong methods,
@@ -10953,6 +11082,13 @@ httplib::Server::HandlerResponse api_error_body(const httplib::Request& request,
               "; use " + allow;
   } else if (response.status == 404 && route == g_api_route_methods.end()) {
     message = "unknown API route: " + request.path;
+  } else if (response.status == 408) {
+    message = "the request arrived too slowly: the server reads the request head within " +
+              std::to_string(CPPHTTPLIB_HEADER_READ_TIMEOUT_SECOND) + " s and the body within " +
+              std::to_string(CPPHTTPLIB_BODY_READ_TIMEOUT_SECOND) + " s, at a minimum average of " +
+              std::to_string(CPPHTTPLIB_BODY_MIN_RATE_BYTES_PER_SECOND / 1024) +
+              " KiB/s after the first " + std::to_string(CPPHTTPLIB_BODY_MIN_RATE_GRACE_SECOND) +
+              " s";
   } else if (response.status == 413) {
     message = "the upload is larger than the " + std::to_string(kMaxRequestPayloadBytes >> 20) +
               (request.path.starts_with("/api/ocel") ? " MiB server limit"
@@ -10974,6 +11110,16 @@ int usage(const char* program) {
                "  --embedding-runtime-url <url> HTTP transformer runtime (POST /embed)\n"
                "  --llm-runtime-url <url> Optional language-model runtime (POST /complete)\n"
                "  --query-runtime-url <url> Optional DuckDB query runtime (POST /query)\n"
+               "  --max-xes-decompressed-bytes <n> Highest XES size (plain or after gzip\n"
+               "                     expansion) a request may ask for with\n"
+               "                     xes_max_decompressed_bytes (default: 2147483648;\n"
+               "                     requests default to 268435456)\n"
+               "  --mine-memory-budget <bytes> Memory a single /api/mine may plan\n"
+               "                     for (suffix K, M, G or T allowed; default: half of\n"
+               "                     the physical or cgroup memory); a larger log gets\n"
+               "                     413 MINE_LIMIT before it is parsed\n"
+               "  --max-mine-events <n> Most events a single /api/mine accepts\n"
+               "                     (default: no limit besides the memory budget)\n"
                "  --allow-origin <origin> Extra browser origin allowed to call /api"
                " (repeatable; the server's own port and the Vite ports 5173/4173"
                " on 127.0.0.1 and localhost are always allowed)\n";
@@ -11029,6 +11175,40 @@ int main(int argc, char** argv) {
       g_llm_runtime_url = value;
     } else if (arg == "--query-runtime-url") {
       const auto* value = next();if(!value)return usage(argv[0]);g_query_runtime_url=value;
+    } else if (arg == "--max-xes-decompressed-bytes") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      const std::string_view text = value;
+      std::size_t ceiling = 0;
+      const auto parsed = std::from_chars(text.data(), text.data() + text.size(), ceiling);
+      const auto floor = minera::XesImportOptions{}.max_decompressed_bytes;
+      if (text.empty() || parsed.ec != std::errc{} ||
+          parsed.ptr != text.data() + text.size() || ceiling < floor) {
+        std::cerr << "error: --max-xes-decompressed-bytes expects a byte count of at least "
+                  << floor << " (the per-request default), got '" << text << "'\n";
+        return usage(argv[0]);
+      }
+      minera::set_xes_decompressed_ceiling(ceiling);
+    } else if (arg == "--mine-memory-budget" || arg == "--max-mine-events") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      std::string_view text = value;
+      std::uint64_t scale = 1;
+      if (arg == "--mine-memory-budget" && !text.empty()) {
+        const char unit = static_cast<char>(std::toupper(static_cast<unsigned char>(text.back())));
+        const int shift = unit == 'K' ? 10 : unit == 'M' ? 20 : unit == 'G' ? 30 : unit == 'T' ? 40 : 0;
+        if (shift != 0) {scale = std::uint64_t{1} << shift; text.remove_suffix(1);}
+      }
+      std::uint64_t amount = 0;
+      const auto parsed = std::from_chars(text.data(), text.data() + text.size(), amount);
+      if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() ||
+          amount == 0 || amount > UINT64_MAX / scale) {
+        std::cerr << "error: " << arg << " expects a positive "
+                  << (arg == "--max-mine-events" ? "event count" : "byte count (suffix K, M, G or T allowed)")
+                  << ", got '" << value << "'\n";
+        return usage(argv[0]);
+      }
+      (arg == "--max-mine-events" ? g_max_mine_events : g_mine_memory_budget) = amount * scale;
     } else if (arg == "--allow-origin") {
       const auto* value = next();
       if (!value || !*value || std::string_view(value) == "*") return usage(argv[0]);
@@ -11069,17 +11249,36 @@ int main(int argc, char** argv) {
   httplib::Server server;
   // Bound multipart bodies before the HTTP library buffers or parses them.
   server.set_payload_max_length(kMaxRequestPayloadBytes);
+  // JSON bodies are repaired before httplib frames them (repair_api_json_body
+  // in the route wrappers, the pre-routing and the error handler). This last
+  // step is a safety net that keeps the framing honest: a body still holding
+  // ill-formed bytes is repaired and its Content-Length recomputed. A Range
+  // response (Content-Range) is a slice of the already repaired body and may
+  // end inside a character, so it is left exactly as sliced.
   server.set_post_routing_handler([](const httplib::Request& request, httplib::Response& response) {
-    if (request.path.starts_with("/api/") &&
-        response.get_header_value("Content-Type").starts_with("application/json"))
-      // Every JSON body leaves as valid UTF-8 (json_utf8.hpp): results that
-      // carry a log's own bytes (a Latin-1 CSV, WTF-8 surrogates) are repaired
-      // here; the check is a single pass and clean bodies are left as they are.
-      if (!minera::detail::is_clean_utf8(response.body))
-        response.body = active_source_safe_json(response.body);
+#if defined(CPPHTTPLIB_ZLIB_SUPPORT)
+    // Text and JSON bodies are gzipped for a client that asks, so the
+    // representation varies with Accept-Encoding.
+    if (!response.has_header("Vary") &&
+        httplib::detail::can_compress_content_type(response.get_header_value("Content-Type")))
+      response.set_header("Vary", "Accept-Encoding");
+#endif
+    // A gzipped body was repaired before it was compressed (repair_api_json_body).
+    if (!request.path.starts_with("/api/") || response.has_header("Content-Range") ||
+        response.has_header("Content-Encoding") || response.body.empty() ||
+        !response.get_header_value("Content-Type").starts_with("application/json") ||
+        minera::detail::is_clean_utf8(response.body))
+      return;
+    response.body = active_source_safe_json(response.body);
+    if (response.has_header("Content-Length")) {
+      response.headers.erase("Content-Length");  // set_header adds, not replaces
+      response.set_header("Content-Length", std::to_string(response.body.size()));
+    }
   });
   server.set_error_handler([](const httplib::Request& request, httplib::Response& response) {
-    return api_error_body(request, response);
+    const auto handled = api_error_body(request, response);
+    repair_api_json_body(response);
+    return handled;
   });
 
   // The app is local-first. Browsers attach Origin to cross-origin and
@@ -11104,6 +11303,7 @@ int main(int argc, char** argv) {
       if (!allowed_hosts.contains(host)) {
         response.status = 421;
         response.set_content(error_json("Host " + host + " is not served by this Minera server"), "application/json");
+        repair_api_json_body(response);
         return httplib::Server::HandlerResponse::Handled;
       }
     }
@@ -11117,6 +11317,7 @@ int main(int argc, char** argv) {
     if (!request.path.starts_with("/api/")) return httplib::Server::HandlerResponse::Unhandled;
     response.status = 403;
     response.set_content(error_json("Origin " + origin + " is not allowed to call the Minera API; start the server with --allow-origin to permit it"), "application/json");
+    repair_api_json_body(response);
     return httplib::Server::HandlerResponse::Handled;
   });
   const auto preflight = [](const httplib::Request&, httplib::Response& response) {
@@ -11257,9 +11458,12 @@ int main(int argc, char** argv) {
   server.Options("/api/knowledge-injection", preflight);
 
   api_post(server, "/api/mine", [](const httplib::Request& request,httplib::Response& response){
+    // One mine at a time; the slot is freed once the response is prepared.
+    MineSlot slot;
+    if (!slot.held()) {answer_mine_busy(response); return;}
     t_published_mining_ticket.reset();
     exact_filter_discovery_route::integrated(request,response,"mine",handle_mine);
-    deliver_published_mining(response);
+    deliver_published_mining(request, response);
   });
   api_post(server, "/api/cancel-mine", handle_cancel_mine);
   api_post(server, "/api/mine-ack", handle_mine_ack);
@@ -11519,6 +11723,8 @@ int main(int argc, char** argv) {
   // SIGTERM/SIGINT remove in-flight temporary uploads, then end the process
   // as the default action would.
   minera::secure_temp::install_signal_cleanup();
+  // Frees live and reader sessions nobody has used for the idle expiry.
+  const StreamIdleReaper stream_idle_reaper;
   if (!server.listen("127.0.0.1", port)) {
     std::cerr << "error: cannot listen on port " << port << '\n';
     return 1;

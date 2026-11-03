@@ -410,14 +410,33 @@ Relations compute_relations(const UVCL& log) {
     for (std::size_t i = 1; i < seq.size(); ++i) {
       add_checked(r.dfg[{seq[i - 1], seq[i]}], count);
     }
-    std::set<std::pair<std::string, std::string>> seen_in_trace;
+    // O(L*k) eventually-follows counting over local ids (k distinct labels
+    // in this sequence), folded into the string maps once per distinct pair.
+    std::unordered_map<std::string_view, std::size_t> local;
+    std::vector<std::string_view> names;
+    std::vector<std::size_t> ids(seq.size());
     for (std::size_t i = 0; i < seq.size(); ++i) {
-      for (std::size_t j = i + 1; j < seq.size(); ++j) {
-        add_checked(r.efg[{seq[i], seq[j]}], count);
-        if (seen_in_trace.insert({seq[i], seq[j]}).second)
-          add_checked(r.trace_efg[{seq[i], seq[j]}], count);
-      }
+      const auto [it, inserted] = local.try_emplace(seq[i], names.size());
+      if (inserted) names.push_back(seq[i]);
+      ids[i] = it->second;
     }
+    const std::size_t k = names.size();
+    std::vector<std::uint64_t> before(k, 0), pairs(k * k, 0);
+    std::vector<std::size_t> seen_ids;
+    for (std::size_t j = 0; j < seq.size(); ++j) {
+      for (const std::size_t x : seen_ids) pairs[x * k + ids[j]] += before[x];
+      if (before[ids[j]]++ == 0) seen_ids.push_back(ids[j]);
+    }
+    for (std::size_t x = 0; x < k; ++x)
+      for (std::size_t y = 0; y < k; ++y) {
+        const std::uint64_t n = pairs[x * k + y];
+        if (n == 0) continue;
+        if (count != 0 && n > std::numeric_limits<std::uint64_t>::max() / count)
+          throw std::overflow_error("POWL counter overflow");
+        const std::pair<std::string, std::string> key{std::string(names[x]), std::string(names[y])};
+        add_checked(r.efg[key], n * count);
+        add_checked(r.trace_efg[key], count);
+      }
   }
   for (const auto& [p, count] : r.efg) {
     (void)count;
@@ -565,148 +584,201 @@ PowlNode recurse(const UVCL& log, State& s) {
   return discover_rec(log, s);
 }
 
-std::optional<PowlNode> make_xor(const UVCL& log, State& s) {
-  const auto r = compute_relations(log);
-  if (r.acts.size() < 2) return std::nullopt;
-  std::vector<std::vector<std::string>> comps;
-  std::set<std::string> seen;
-  for (const auto& root : r.acts) {
-    if (seen.count(root)) continue;
-    std::vector<std::string> comp{root}; seen.insert(root);
+// Dense views of a Relations object, indexed by position in r.acts (which is
+// sorted, so id order equals activity-name order).
+struct DenseIds {
+  std::unordered_map<std::string_view, std::size_t> id;
+  explicit DenseIds(const Relations& r) {
+    id.reserve(r.acts.size());
+    for (std::size_t i = 0; i < r.acts.size(); ++i) id.emplace(r.acts[i], i);
+  }
+  std::size_t operator()(const std::string& activity) const {
+    return id.at(activity);
+  }
+};
+
+std::vector<char> dense_dfg(const Relations& r, const DenseIds& ids) {
+  const auto n = r.acts.size();
+  std::vector<char> m(n * n, 0);
+  for (const auto& [edge, count] : r.dfg) {
+    (void)count;
+    m[ids(edge.first) * n + ids(edge.second)] = 1;
+  }
+  return m;
+}
+
+struct UnionFind {
+  std::vector<std::size_t> parent;
+  explicit UnionFind(std::size_t n) : parent(n) {
+    std::iota(parent.begin(), parent.end(), std::size_t{0});
+  }
+  std::size_t find(std::size_t x) {
+    while (parent[x] != x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+  void unite(std::size_t a, std::size_t b) {
+    a = find(a);
+    b = find(b);
+    if (a == b) return;
+    if (b < a) std::swap(a, b);
+    parent[b] = a;
+  }
+};
+
+// Members of each union-find component, in ascending id order; components are
+// listed by their smallest member.
+std::vector<std::vector<std::size_t>> components(UnionFind& uf, std::size_t n) {
+  std::vector<std::vector<std::size_t>> out;
+  std::vector<std::size_t> slot(n, n);
+  for (std::size_t i = 0; i < n; ++i) {
+    const auto root = uf.find(i);
+    if (slot[root] == n) {
+      slot[root] = out.size();
+      out.emplace_back();
+    }
+    out[slot[root]].push_back(i);
+  }
+  return out;
+}
+
+std::optional<PowlNode> make_xor(const UVCL& log, State& s,
+                                 const Relations* precomputed = nullptr) {
+  std::optional<Relations> owned;
+  if (!precomputed) owned = compute_relations(log);
+  const Relations& r = precomputed ? *precomputed : *owned;
+  const auto n = r.acts.size();
+  if (n < 2) return std::nullopt;
+  const DenseIds ids(r);
+  const auto dfg = dense_dfg(r, ids);
+  // Weakly connected components of the DFG, discovered in the same order as
+  // the reference breadth-first scan over the sorted activities.
+  std::vector<std::vector<std::size_t>> comps;
+  std::vector<char> seen(n, 0);
+  for (std::size_t root = 0; root < n; ++root) {
+    if (seen[root]) continue;
+    std::vector<std::size_t> comp{root};
+    seen[root] = 1;
     for (std::size_t p = 0; p < comp.size(); ++p) {
-      for (const auto& a : r.acts) {
-        if (!seen.count(a) && (has(r.dfg, comp[p], a) || has(r.dfg, a, comp[p]))) {
-          seen.insert(a); comp.push_back(a);
+      const auto current = comp[p];
+      for (std::size_t a = 0; a < n; ++a) {
+        if (!seen[a] && (dfg[current * n + a] || dfg[a * n + current])) {
+          seen[a] = 1;
+          comp.push_back(a);
         }
       }
     }
     comps.push_back(std::move(comp));
   }
   if (comps.size() < 2) return std::nullopt;
+  // Probing only needs to know that the cut exists.  Projection cannot fail
+  // here: every projected count total is bounded by the checked trace count.
+  if (s.probe_only) return PowlNode::silent();
+  std::vector<std::size_t> comp_of(n, 0);
+  for (std::size_t index = 0; index < comps.size(); ++index)
+    for (const auto a : comps[index]) comp_of[a] = index;
   // Exclusive-choice projection assigns each trace to the component with the
   // largest activity overlap.  A trace belongs to one branch only; projecting
   // it independently onto every component would manufacture optional silent
   // branches and change the discovered language.
   std::vector<UVCL> projected(comps.size());
+  std::vector<std::size_t> overlap(comps.size());
+  std::vector<std::size_t> owner;
   for (const auto& [sequence, count] : log) {
+    std::fill(overlap.begin(), overlap.end(), 0);
+    owner.resize(sequence.size());
+    for (std::size_t i = 0; i < sequence.size(); ++i) {
+      owner[i] = comp_of[ids(sequence[i])];
+      ++overlap[owner[i]];
+    }
     std::size_t selected = 0;
     std::size_t selected_count = 0;
     for (std::size_t index = 0; index < comps.size(); ++index) {
-      std::size_t overlap = 0;
-      for (const auto& activity : sequence)
-        if (std::find(comps[index].begin(), comps[index].end(), activity) !=
-            comps[index].end())
-          ++overlap;
       // The source implementation resolves equal overlaps in favor of the
       // later component after sorting by (overlap, index) descending.
-      if (overlap >= selected_count) {
+      if (overlap[index] >= selected_count) {
         selected = index;
-        selected_count = overlap;
+        selected_count = overlap[index];
       }
     }
     Sequence branch;
-    for (const auto& activity : sequence)
-      if (std::find(comps[selected].begin(), comps[selected].end(), activity) !=
-          comps[selected].end())
-        branch.push_back(activity);
+    for (std::size_t i = 0; i < sequence.size(); ++i)
+      if (owner[i] == selected) branch.push_back(sequence[i]);
     add_variant(projected[selected], std::move(branch), count);
   }
   std::vector<PowlNode> children;
-  if (s.probe_only) return PowlNode::silent();
   children.reserve(projected.size());
   for (auto& child_log : projected)
     children.push_back(recurse(child_log, s));
   return PowlNode::xor_node(std::move(children));
 }
 
-std::optional<PowlNode> make_sequence(const UVCL& log, State& s) {
-  const auto r = compute_relations(log);
+std::optional<PowlNode> make_sequence(const UVCL& log, State& s,
+                                      const Relations* precomputed = nullptr) {
+  std::optional<Relations> owned;
+  if (!precomputed) owned = compute_relations(log);
+  const Relations& r = precomputed ? *precomputed : *owned;
   const auto n = r.acts.size();
   if (n < 2) return std::nullopt;
+  const DenseIds ids(r);
 
   // Build the transitive predecessor/successor relation of the directly
   // follows graph. Sequence groups are merged while a pair of groups has
   // either evidence in both directions or no evidence in either direction.
   // This preserves optional/skippable stages instead of forcing them into a
   // topological level solely because their direct graph is acyclic.
-  std::map<std::string, std::set<std::string>> successors;
-  std::map<std::string, std::set<std::string>> predecessors;
-  for (const auto& activity : r.acts) {
-    successors[activity];
-    predecessors[activity];
-  }
+  //
+  // reach[a] holds every activity reachable from a in one or more DFG steps,
+  // excluding a itself (bitset Warshall closure).
+  const std::size_t words = (n + 63) / 64;
+  std::vector<std::uint64_t> reach(n * words, 0);
+  const auto bit = [&](const std::vector<std::uint64_t>& rows, std::size_t row,
+                       std::size_t column) {
+    return ((rows[row * words + column / 64] >> (column % 64)) & 1u) != 0;
+  };
+  std::vector<std::pair<std::size_t, std::size_t>> edges;
+  edges.reserve(r.dfg.size());
   for (const auto& [edge, count] : r.dfg) {
     (void)count;
-    successors[edge.first].insert(edge.second);
-    predecessors[edge.second].insert(edge.first);
+    const auto a = ids(edge.first);
+    const auto b = ids(edge.second);
+    edges.emplace_back(a, b);
+    reach[a * words + b / 64] |= std::uint64_t{1} << (b % 64);
   }
-  for (const auto& source : r.acts) {
-    std::vector<std::string> pending(successors[source].begin(),
-                                     successors[source].end());
-    std::set<std::string> visited;
-    while (!pending.empty()) {
-      const auto current = pending.back();
-      pending.pop_back();
-      if (!visited.insert(current).second) continue;
-      for (const auto& next : successors[current]) pending.push_back(next);
-    }
-    visited.erase(source);
-    successors[source] = std::move(visited);
-  }
-  for (const auto& target : r.acts) {
-    std::vector<std::string> pending(predecessors[target].begin(),
-                                     predecessors[target].end());
-    std::set<std::string> visited;
-    while (!pending.empty()) {
-      const auto current = pending.back();
-      pending.pop_back();
-      if (!visited.insert(current).second) continue;
-      for (const auto& previous : predecessors[current])
-        pending.push_back(previous);
-    }
-    visited.erase(target);
-    predecessors[target] = std::move(visited);
-  }
-  const auto reaches = [&](const std::string& source,
-                           const std::string& target) {
-    return successors.at(source).count(target) != 0;
-  };
-
-  std::vector<std::set<std::string>> groups;
-  for (const auto& activity : r.acts) groups.push_back({activity});
-  while (true) {
-    bool merged = false;
-    for (std::size_t left = 0; left < groups.size() && !merged; ++left) {
-      for (std::size_t right = left + 1; right < groups.size(); ++right) {
-        bool merge = false;
-        for (const auto& a : groups[left]) {
-          for (const auto& b : groups[right]) {
-            const bool forward = reaches(a, b);
-            const bool reverse = reaches(b, a);
-            if ((forward && reverse) || (!forward && !reverse)) {
-              merge = true;
-              break;
-            }
-          }
-          if (merge) break;
-        }
-        if (!merge) continue;
-        groups[left].insert(groups[right].begin(), groups[right].end());
-        groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(right));
-        merged = true;
-        break;
+  for (std::size_t k = 0; k < n; ++k)
+    for (std::size_t i = 0; i < n; ++i)
+      if (bit(reach, i, k))
+        for (std::size_t w = 0; w < words; ++w)
+          reach[i * words + w] |= reach[k * words + w];
+  for (std::size_t i = 0; i < n; ++i)
+    reach[i * words + i / 64] &= ~(std::uint64_t{1} << (i % 64));
+  std::vector<std::size_t> successor_count(n, 0), predecessor_count(n, 0);
+  for (std::size_t i = 0; i < n; ++i)
+    for (std::size_t j = 0; j < n; ++j)
+      if (bit(reach, i, j)) {
+        ++successor_count[i];
+        ++predecessor_count[j];
       }
-    }
-    if (!merged) break;
-  }
+
+  // Merging groups until no pair of groups has a merge witness yields the
+  // connected components of the pairwise merge relation.
+  UnionFind uf(n);
+  for (std::size_t a = 0; a < n; ++a)
+    for (std::size_t b = a + 1; b < n; ++b)
+      if (bit(reach, a, b) == bit(reach, b, a)) uf.unite(a, b);
+  auto groups = components(uf, n);
   if (groups.size() < 2) return std::nullopt;
+  // Groups are disjoint, so (score, first activity) is a total order and the
+  // sorted sequence does not depend on the order the groups were formed in.
   std::sort(groups.begin(), groups.end(), [&](const auto& left, const auto& right) {
-    const auto left_first = *left.begin();
-    const auto right_first = *right.begin();
-    const auto left_score = predecessors[left_first].size() +
-                            (n - successors[left_first].size());
-    const auto right_score = predecessors[right_first].size() +
-                             (n - successors[right_first].size());
+    const auto left_first = left.front();
+    const auto right_first = right.front();
+    const auto left_score = predecessor_count[left_first] +
+                            (n - successor_count[left_first]);
+    const auto right_score = predecessor_count[right_first] +
+                             (n - successor_count[right_first]);
     if (left_score != right_score) return left_score < right_score;
     return left_first < right_first;
   });
@@ -714,89 +786,93 @@ std::optional<PowlNode> make_sequence(const UVCL& log, State& s) {
   // Strict sequence repair merges groups that can be skipped. The direct DFG
   // is used for the repair while the transitive relation above determines the
   // initial sequence ordering.
-  std::vector<std::ptrdiff_t> min_from(groups.size());
-  std::vector<std::ptrdiff_t> max_to(groups.size());
-  const auto group_has_start = [&](const std::set<std::string>& group) {
-    for (const auto& activity : group)
-      if (r.starts.count(activity) != 0) return true;
-    return false;
-  };
-  const auto group_has_end = [&](const std::set<std::string>& group) {
-    for (const auto& activity : group)
-      if (r.ends.count(activity) != 0) return true;
-    return false;
-  };
-  for (std::size_t index = 0; index < groups.size(); ++index) {
-    min_from[index] = group_has_start(groups[index])
-                          ? -1
-                          : static_cast<std::ptrdiff_t>(groups.size());
-    max_to[index] = group_has_end(groups[index])
-                        ? static_cast<std::ptrdiff_t>(groups.size())
-                        : -1;
-  }
-  std::map<std::string, std::size_t> group_of;
-  for (std::size_t index = 0; index < groups.size(); ++index)
-    for (const auto& activity : groups[index]) group_of[activity] = index;
-  for (const auto& [edge, count] : r.dfg) {
+  std::vector<char> is_start(n, 0), is_end(n, 0);
+  for (const auto& [activity, count] : r.starts) {
     (void)count;
-    min_from[group_of.at(edge.second)] = std::min(
-        min_from[group_of.at(edge.second)],
-        static_cast<std::ptrdiff_t>(group_of.at(edge.first)));
-    max_to[group_of.at(edge.first)] = std::max(
-        max_to[group_of.at(edge.first)],
-        static_cast<std::ptrdiff_t>(group_of.at(edge.second)));
+    is_start[ids(activity)] = 1;
   }
+  for (const auto& [activity, count] : r.ends) {
+    (void)count;
+    is_end[ids(activity)] = 1;
+  }
+  const auto group_count = groups.size();
+  std::vector<std::size_t> owner(n, 0);
+  for (std::size_t index = 0; index < group_count; ++index)
+    for (const auto a : groups[index]) owner[a] = index;
+  std::vector<std::ptrdiff_t> min_from(group_count);
+  std::vector<std::ptrdiff_t> max_to(group_count);
+  for (std::size_t index = 0; index < group_count; ++index) {
+    bool has_start = false;
+    bool has_end = false;
+    for (const auto a : groups[index]) {
+      has_start = has_start || is_start[a];
+      has_end = has_end || is_end[a];
+    }
+    min_from[index] = has_start ? -1 : static_cast<std::ptrdiff_t>(group_count);
+    max_to[index] = has_end ? static_cast<std::ptrdiff_t>(group_count) : -1;
+  }
+  for (const auto& [a, b] : edges) {
+    min_from[owner[b]] = std::min(min_from[owner[b]],
+                                  static_cast<std::ptrdiff_t>(owner[a]));
+    max_to[owner[a]] = std::max(max_to[owner[a]],
+                                static_cast<std::ptrdiff_t>(owner[b]));
+  }
+  // Evaluated against the groups as they stand during the repair pass.
   const auto skippable = [&](std::size_t pivot) {
-    for (std::size_t before = 0; before < pivot; ++before)
-      for (std::size_t after = pivot + 1; after < groups.size(); ++after)
-        for (const auto& a : groups[before])
-          for (const auto& b : groups[after])
-            if (has(r.dfg, a, b)) return true;
-    for (std::size_t after = pivot + 1; after < groups.size(); ++after)
-      if (group_has_start(groups[after])) return true;
-    for (std::size_t before = 0; before < pivot; ++before)
-      if (group_has_end(groups[before])) return true;
+    for (const auto& [a, b] : edges)
+      if (owner[a] < pivot && owner[b] > pivot) return true;
+    for (std::size_t a = 0; a < n; ++a) {
+      if (is_start[a] && owner[a] > pivot) return true;
+      if (is_end[a] && owner[a] < pivot) return true;
+    }
     return false;
   };
-  for (std::size_t pivot = 0; pivot < groups.size(); ++pivot) {
+  const auto absorb = [&](std::size_t into, std::size_t from) {
+    for (const auto a : groups[from]) owner[a] = into;
+    groups[into].insert(groups[into].end(), groups[from].begin(),
+                        groups[from].end());
+    groups[from].clear();
+  };
+  for (std::size_t pivot = 0; pivot < group_count; ++pivot) {
     if (!skippable(pivot)) continue;
     for (std::ptrdiff_t previous = static_cast<std::ptrdiff_t>(pivot) - 1;
          previous >= 0 && max_to[static_cast<std::size_t>(previous)] <=
-                                static_cast<std::ptrdiff_t>(pivot);
-         --previous) {
-      groups[pivot].insert(groups[static_cast<std::size_t>(previous)].begin(),
-                           groups[static_cast<std::size_t>(previous)].end());
-      groups[static_cast<std::size_t>(previous)].clear();
-    }
+                              static_cast<std::ptrdiff_t>(pivot);
+         --previous)
+      absorb(pivot, static_cast<std::size_t>(previous));
     for (std::size_t next = pivot + 1;
-         next < groups.size() && min_from[next] >=
-                                     static_cast<std::ptrdiff_t>(pivot);
-         ++next) {
-      groups[pivot].insert(groups[next].begin(), groups[next].end());
-      groups[next].clear();
-    }
+         next < group_count &&
+         min_from[next] >= static_cast<std::ptrdiff_t>(pivot);
+         ++next)
+      absorb(pivot, next);
   }
-  groups.erase(std::remove_if(groups.begin(), groups.end(),
-                              [](const auto& group) { return group.empty(); }),
-               groups.end());
-  if (groups.size() < 2) return std::nullopt;
+  std::vector<std::size_t> final_index(group_count, 0);
+  std::size_t kept = 0;
+  for (std::size_t index = 0; index < group_count; ++index)
+    if (!groups[index].empty()) final_index[index] = kept++;
+  if (kept < 2) return std::nullopt;
+  if (s.probe_only) return PowlNode::silent();
+  for (auto& o : owner) o = final_index[o];
 
   // Split each trace at the same least-cost boundaries as the strict sequence
   // projection: entering the current group reduces cost, while an event from
   // a not-yet-seen group increases it. Empty projected traces are retained.
-  std::vector<UVCL> projected_logs(groups.size());
+  std::vector<UVCL> projected_logs(kept);
+  std::vector<std::size_t> event_group;
   for (const auto& [sequence, count] : log) {
+    event_group.resize(sequence.size());
+    for (std::size_t i = 0; i < sequence.size(); ++i)
+      event_group[i] = owner[ids(sequence[i])];
     std::size_t split_point = 0;
-    std::set<std::string> ignored;
-    for (std::size_t index = 0; index < groups.size(); ++index) {
+    for (std::size_t index = 0; index < kept; ++index) {
       std::ptrdiff_t cost = 0;
       std::ptrdiff_t least_cost = 0;
       std::size_t new_split_point = split_point;
       for (std::size_t position = split_point; position < sequence.size();
            ++position) {
-        if (groups[index].count(sequence[position]) != 0) {
+        if (event_group[position] == index) {
           --cost;
-        } else if (ignored.count(sequence[position]) == 0) {
+        } else if (event_group[position] > index) {
           ++cost;
         }
         if (cost < least_cost) {
@@ -807,56 +883,40 @@ std::optional<PowlNode> make_sequence(const UVCL& log, State& s) {
       Sequence child;
       for (std::size_t position = split_point; position < new_split_point;
            ++position)
-        if (groups[index].count(sequence[position]) != 0)
-          child.push_back(sequence[position]);
+        if (event_group[position] == index) child.push_back(sequence[position]);
       add_variant(projected_logs[index], std::move(child), count);
       split_point = new_split_point;
-      ignored.insert(groups[index].begin(), groups[index].end());
     }
   }
   std::vector<PowlNode> children;
-  if (s.probe_only) return PowlNode::silent();
   children.reserve(projected_logs.size());
   for (auto& child_log : projected_logs)
     children.push_back(recurse(child_log, s));
   return PowlNode::sequence(std::move(children));
 }
 
-std::optional<PowlNode> make_concurrency(const UVCL& log, State& s) {
-  const auto r = compute_relations(log);
+std::optional<PowlNode> make_concurrency(const UVCL& log, State& s,
+                                         const Relations* precomputed = nullptr) {
+  std::optional<Relations> owned;
+  if (!precomputed) owned = compute_relations(log);
+  const Relations& r = precomputed ? *precomputed : *owned;
   const auto n = r.acts.size();
   if (n < 2) return std::nullopt;
+  const DenseIds ids(r);
+  const auto dfg = dense_dfg(r, ids);
 
-  // Start with one group per activity. Groups are merged whenever any pair
-  // lacks the two-way DFG evidence required for concurrency. Repeating the
-  // pass computes the connected components of that incompatibility relation,
-  // while preserving the reference cut's pairwise merge semantics.
+  // Groups are merged whenever any pair lacks the two-way DFG evidence
+  // required for concurrency. The merge fixpoint is the set of connected
+  // components of that incompatibility relation.
+  UnionFind uf(n);
+  for (std::size_t a = 0; a < n; ++a)
+    for (std::size_t b = a + 1; b < n; ++b)
+      if (!(dfg[a * n + b] && dfg[b * n + a])) uf.unite(a, b);
   std::vector<std::set<std::string>> groups;
-  groups.reserve(n);
-  for (const auto& activity : r.acts) groups.push_back({activity});
-  bool merged = true;
-  while (merged) {
-    merged = false;
-    for (std::size_t left = 0; left < groups.size() && !merged; ++left) {
-      for (std::size_t right = left + 1; right < groups.size(); ++right) {
-        bool incompatible = false;
-        for (const auto& a : groups[left]) {
-          for (const auto& b : groups[right]) {
-            const bool parallel = has(r.dfg, a, b) && has(r.dfg, b, a);
-            if (!parallel) {
-              incompatible = true;
-              break;
-            }
-          }
-          if (incompatible) break;
-        }
-        if (!incompatible) continue;
-        groups[left].insert(groups[right].begin(), groups[right].end());
-        groups.erase(groups.begin() + static_cast<std::ptrdiff_t>(right));
-        merged = true;
-        break;
-      }
-    }
+  for (const auto& component : components(uf, n)) {
+    std::set<std::string> group;
+    for (const auto a : component) group.insert(group.end(), r.acts[a]);
+    groups.push_back(std::move(group));
   }
   std::sort(groups.begin(), groups.end(), [](const auto& left, const auto& right) {
     if (left.size() != right.size()) return left.size() < right.size();
@@ -895,9 +955,12 @@ std::optional<PowlNode> make_concurrency(const UVCL& log, State& s) {
   return PowlNode::concurrency(std::move(children));
 }
 
-std::optional<PowlNode> make_loop(const UVCL& log, State& s) {
+std::optional<PowlNode> make_loop(const UVCL& log, State& s,
+                                  const Relations* precomputed = nullptr) {
   if (log.empty()) return std::nullopt;
-  const auto relations = compute_relations(log);
+  std::optional<Relations> owned;
+  if (!precomputed) owned = compute_relations(log);
+  const Relations& relations = precomputed ? *precomputed : *owned;
   if (relations.dfg.empty()) return std::nullopt;
 
   std::set<std::string> starts;
@@ -1532,26 +1595,79 @@ std::optional<PowlNode> activity_once_fall_through(const UVCL& log,
   return std::nullopt;
 }
 
-bool remainder_has_normal_cut(const UVCL& log, const State& state) {
+// Relations of a projection of a log onto a subset of its activities.
+// Eventually-follows counts between two kept activities are unchanged by the
+// projection (their relative order is preserved and merged variants sum the
+// same multiplicities), so they are taken from the parent; directly-follows,
+// starts, ends and the trace count are recomputed from the projected log in
+// the same order as compute_relations.
+Relations relations_after_projection(const Relations& parent,
+                                     const UVCL& projected) {
+  Relations r;
+  r.acts = activities(projected);
+  for (const auto& a : r.acts) { r.predecessors[a]; r.successors[a]; }
+  for (const auto& [seq, count] : projected) {
+    add_checked(r.trace_count, count);
+    if (seq.empty()) continue;
+    add_checked(r.starts[seq.front()], count);
+    add_checked(r.ends[seq.back()], count);
+    for (std::size_t i = 1; i < seq.size(); ++i)
+      add_checked(r.dfg[{seq[i - 1], seq[i]}], count);
+  }
+  const auto kept = [&](const std::string& activity) {
+    return std::binary_search(r.acts.begin(), r.acts.end(), activity);
+  };
+  for (const auto& [pair, count] : parent.efg)
+    if (kept(pair.first) && kept(pair.second))
+      r.efg.emplace_hint(r.efg.end(), pair, count);
+  for (const auto& [pair, count] : parent.trace_efg)
+    if (kept(pair.first) && kept(pair.second))
+      r.trace_efg.emplace_hint(r.trace_efg.end(), pair, count);
+  for (const auto& [p, count] : r.efg) {
+    (void)count;
+    r.successors[p.first].insert(p.second);
+    r.predecessors[p.second].insert(p.first);
+  }
+  return r;
+}
+
+bool remainder_has_normal_cut(const UVCL& log, const State& state,
+                              const Relations* parent = nullptr) {
   if (activities(log).size() < 2) return false;
   State probe = state;
   probe.probe_only = true;
-  if (make_xor(log, probe)) return true;
-  if (make_sequence(log, probe)) return true;
-  if (make_concurrency(log, probe)) return true;
-  if (make_loop(log, probe)) return true;
+  const auto relations =
+      parent ? relations_after_projection(*parent, log) : compute_relations(log);
+  if (make_xor(log, probe, &relations)) return true;
+  if (make_sequence(log, probe, &relations)) return true;
+  if (make_concurrency(log, probe, &relations)) return true;
+  if (make_loop(log, probe, &relations)) return true;
   return false;
 }
 
 std::optional<PowlNode> activity_concurrent_fall_through(const UVCL& log,
                                                          State& s) {
   const auto acts = activities(log);
+  // The parent relations are computed once and narrowed for each candidate.
+  // Should the parent's own counters overflow, each remainder falls back to
+  // computing its relations directly, as it would without the shortcut.
+  std::optional<Relations> parent;
+  bool parent_tried = false;
   for (const auto& candidate : acts) {
     std::set<std::string> rest(acts.begin(), acts.end());
     rest.erase(candidate);
     if (rest.empty()) continue;
     const auto remainder = project(log, rest);
-    if (!remainder_has_normal_cut(remainder, s)) continue;
+    if (!parent_tried && rest.size() >= 2) {
+      parent_tried = true;
+      try {
+        parent = compute_relations(log);
+      } catch (const std::overflow_error&) {
+        parent.reset();
+      }
+    }
+    if (!remainder_has_normal_cut(remainder, s, parent ? &*parent : nullptr))
+      continue;
     std::vector<PowlNode> children;
     children.push_back(recurse(project(log, {candidate}), s));
     children.push_back(recurse(remainder, s));
@@ -1771,17 +1887,22 @@ std::optional<PowlNode> CutFactory::find(const VariantLog& log, State& state) {
   switch (state.opts.variant) {
     case PowlDiscoveryVariant::kTree:
     case PowlDiscoveryVariant::kBruteForce:
-    case PowlDiscoveryVariant::kMaximal:
-      cut = ExclusiveChoiceCut::detect(log, state);
-      if (!cut) cut = SequenceCut::detect(log, state);
-      if (!cut) cut = ConcurrencyCut::detect(log, state);
-      if (!cut) cut = LoopCut::detect(log, state);
+    case PowlDiscoveryVariant::kMaximal: {
+      // The four cuts read the same relations of the same log.
+      const auto relations = compute_relations(log);
+      cut = make_xor(log, state, &relations);
+      if (!cut) cut = make_sequence(log, state, &relations);
+      if (!cut) cut = make_concurrency(log, state, &relations);
+      if (!cut && !log.empty()) cut = make_loop(log, state, &relations);
       break;
+    }
     case PowlDiscoveryVariant::kDynamicClustering:
-    case PowlDiscoveryVariant::kDynamicClusteringPlain:
-      cut = ExclusiveChoiceCut::detect(log, state);
-      if (!cut) cut = LoopCut::detect(log, state);
+    case PowlDiscoveryVariant::kDynamicClusteringPlain: {
+      const auto relations = compute_relations(log);
+      cut = make_xor(log, state, &relations);
+      if (!cut && !log.empty()) cut = make_loop(log, state, &relations);
       break;
+    }
   }
   if (cut) return cut;
 

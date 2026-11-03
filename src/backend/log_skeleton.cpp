@@ -164,14 +164,21 @@ std::set<LogSkeletonPair> relation_set(const Activities& trace,
       for (const auto& [b, cb] : counts)
         if (a != b && ca == cb) result.insert({a, b});
   } else if (family == "always_after" || family == "always_before") {
-    for (std::size_t i = 0; i < trace.size(); ++i)
-      for (std::size_t j = 0; j < trace.size(); ++j) {
-        if (i == j) continue;
-        const bool after = j > i;
-        if ((family == "always_after" && after) ||
-            (family == "always_before" && !after))
-          result.insert({trace[i], trace[j]});
-      }
+    // (trace[i], trace[j]) over positions i != j, j after i (always_after)
+    // or before it (always_before). A label pair (a, b) occurs in that order
+    // exactly when the first a precedes the last b (after), or the last a
+    // follows the first b (before), so the set needs only each label's first
+    // and last position: O(L + k^2) instead of O(L^2).
+    std::map<std::string, std::pair<std::size_t, std::size_t>> span;
+    for (std::size_t i = 0; i < trace.size(); ++i) {
+      const auto [it, inserted] = span.try_emplace(trace[i], i, i);
+      if (!inserted) it->second.second = i;
+    }
+    const bool after = family == "always_after";
+    for (const auto& [a, a_span] : span)
+      for (const auto& [b, b_span] : span)
+        if (after ? a_span.first < b_span.second : a_span.second > b_span.first)
+          result.insert(result.end(), {a, b});
   } else if (family == "never_together") {
     for (const auto& a : counts)
       for (const auto& b : counts)
@@ -396,9 +403,11 @@ LogSkeletonModel discover_from_variants(
 
   {
     std::map<LogSkeletonPair, std::size_t> support;
-    for (const auto& [trace, weight] : variants)
+    for (const auto& [trace, weight] : variants) {
+      const auto counts = frequencies(trace);
       for (const auto& pair : relation_set(trace, "equivalence"))
-        support[pair] += weight * frequencies(trace).at(pair.source);
+        support[pair] += weight * counts.at(pair.source);
+    }
     std::set<LogSkeletonPair> kept;
     for (const auto& [pair, count] : support)
       if (count >= threshold(all_activs[pair.source], options.noise_threshold))
@@ -664,8 +673,19 @@ std::vector<LogSkeletonConformance> check_log_skeleton_conformance(
   validate_activity_key(options.activity_key);
   std::vector<LogSkeletonConformance> result;
   result.reserve(log.traces.size());
-  for (const auto& trace : log.traces)
-    result.push_back(check_log_skeleton_conformance(trace, model, options));
+  // A trace's result depends only on its activity sequence, so each distinct
+  // sequence (variant) is checked once.
+  std::map<Activities, std::size_t> checked;
+  for (const auto& trace : log.traces) {
+    auto activities = activities_of(trace, options.activity_key);
+    const auto found = checked.find(activities);
+    if (found != checked.end()) {
+      result.push_back(result[found->second]);
+      continue;
+    }
+    result.push_back(check_log_skeleton_conformance(activities, model, options));
+    checked.emplace(std::move(activities), result.size() - 1);
+  }
   return result;
 }
 

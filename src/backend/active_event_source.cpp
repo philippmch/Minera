@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <limits>
 #include <locale>
+#include <mutex>
 #include <numeric>
 #include <set>
 #include <sstream>
@@ -35,7 +36,12 @@ struct OriginalSource {
   std::string log_error;
   std::string table_error;
   ActiveEventSource::RepresentativeRows representatives;
-  std::vector<std::optional<EventRecord>> native_rows;
+  // The canonical flat record of each source row, needed only to project a
+  // filtered log back onto source rows (with_filters). It is a full copy of
+  // the rows, so it is built on first use rather than kept for every source;
+  // construction still builds it once to report the same errors.
+  mutable std::once_flag native_rows_once;
+  mutable std::vector<std::optional<EventRecord>> native_rows;
 };
 
 void collect_keys(const EventAttribute& attribute, std::set<std::string>& keys) {
@@ -214,18 +220,29 @@ EventStream canonical_stream(const EventLog& log,
   return stream;
 }
 
-void retain_native_rows(OriginalSource& source) {
-  if (!source.log || !source.table) return;
-  source.native_rows.resize(source.table->rows.size());
+std::vector<std::optional<EventRecord>> build_native_rows(const OriginalSource& source) {
+  std::vector<std::optional<EventRecord>> native_rows;
+  if (!source.log || !source.table) return native_rows;
+  native_rows.resize(source.table->rows.size());
   const auto flat = canonical_stream(*source.log, source.options);
   std::size_t encounter = 0;
   for (const auto& rows : source.representatives) {
     for (const auto row : rows) {
-      if (row && *row < source.native_rows.size())
-        source.native_rows[*row] = flat.events.at(encounter);
+      if (row && *row < native_rows.size())
+        native_rows[*row] = flat.events.at(encounter);
       ++encounter;
     }
   }
+  return native_rows;
+}
+
+// Builds the rows once to raise any error at construction, as before, and
+// drops them; native_rows() rebuilds them (deterministically) when needed.
+void retain_native_rows(OriginalSource& source) { (void)build_native_rows(source); }
+
+const std::vector<std::optional<EventRecord>>& native_rows(const OriginalSource& source) {
+  std::call_once(source.native_rows_once, [&] {source.native_rows = build_native_rows(source);});
+  return source.native_rows;
 }
 
 bool equal_attribute(const EventAttribute& left, const EventAttribute& right) {
@@ -284,6 +301,7 @@ EventTable project_table(const OriginalSource& source, const EventLog& log,
                                     ? "active source: original table is unavailable"
                                     : source.table_error);
   const auto flat = canonical_stream(log, source.options);
+  const auto& source_rows = native_rows(source);
   std::vector<ProjectedOccurrence> occurrences;
   occurrences.reserve(flat.events.size());
   bool transformed = false;
@@ -292,10 +310,10 @@ EventTable project_table(const OriginalSource& source, const EventLog& log,
   for (const auto& trace_rows : representatives) {
     for (const auto row : trace_rows) {
       if (!row || *row >= source.table->rows.size() ||
-          *row >= source.native_rows.size() || !source.native_rows[*row])
+          *row >= source_rows.size() || !source_rows[*row])
         throw std::invalid_argument(
             "active source: filtered event has no source-row representative; checked flat projection is unavailable");
-      auto mutations = record_changes(*source.native_rows[*row], flat.events.at(encounter));
+      auto mutations = record_changes(*source_rows[*row], flat.events.at(encounter));
       transformed = transformed || !mutations.empty() || !seen.insert(*row).second;
       occurrences.push_back({*row, std::move(mutations)});
       ++encounter;
@@ -816,10 +834,18 @@ std::string serialize_active_source_temporal_conformance_json(const TemporalConf
 struct ActiveEventSource::State {
   std::shared_ptr<const OriginalSource> original;
   EventDataKind selected = EventDataKind::kEventTable;
-  std::optional<EventTable> table;
-  std::optional<EventLog> log;
-  std::optional<EventStream> stream;
+  // An unfiltered source views the original's table and log (aliasing
+  // pointers that keep the original alive) instead of copying them; a
+  // filtered source owns its own.
+  std::shared_ptr<const EventTable> table;
+  std::shared_ptr<const EventLog> log;
+  // The lazy table scans the shared table in place. The stream is a full
+  // copy of the events, so it is built when a route first asks for it;
+  // prepare_flat builds it once up front only to report the same errors.
   std::optional<LazyEventTable> lazy;
+  bool stream_available = false;
+  mutable std::once_flag stream_once;
+  mutable std::optional<EventStream> stream;
   std::string log_error;
   std::string flat_error;
   std::string table_origin;
@@ -827,16 +853,48 @@ struct ActiveEventSource::State {
   RepresentativeRows representatives;
   std::vector<ActiveSourceCellChange> changes;
 
+  State() = default;
+  State(const State&) = delete;
+  State& operator=(const State&) = delete;
+
+  void view_original() {
+    if (original->table) table = std::shared_ptr<const EventTable>(original, &*original->table);
+    if (original->log) log = std::shared_ptr<const EventLog>(original, &*original->log);
+  }
+  static LazyEventTable lazy_view(const std::shared_ptr<const EventTable>& source) {
+    // As LazyEventTable::from_table, without copying the rows.
+    source->validate();
+    return LazyEventTable(
+        source->columns,
+        [source](const LazyEventTable::RowConsumer& consumer) {
+          for (const auto& row : source->rows) consumer(row);
+        },
+        source->attributes, source->metadata, source->rows.size(), source->dtypes,
+        source->index, source->categorical_dtypes);
+  }
   void prepare_flat() {
     stream.reset();
+    stream_available = false;
     lazy.reset();
     if (!table) return;
     try {
-      stream = selected_stream(*table, original->selectors, original->options);
-      lazy = LazyEventTable::from_table(*table);
+      (void)selected_stream(*table, original->selectors, original->options);
+      stream_available = true;
+      lazy = lazy_view(table);
     } catch (const std::exception& error) {
       flat_error = error.what();
     }
+  }
+  const EventStream* stream_if_available() const noexcept {
+    if (!stream_available || !table) return nullptr;
+    try {
+      std::call_once(stream_once, [this] {
+        stream.emplace(selected_stream(*table, original->selectors, original->options));
+      });
+    } catch (...) {
+      return nullptr;
+    }
+    return stream ? &*stream : nullptr;
   }
 };
 
@@ -878,8 +936,7 @@ ActiveEventSource ActiveEventSource::from_table(EventTable table, ActiveSourceFi
   auto state = std::make_shared<State>();
   state->original = original;
   state->selected = selected;
-  state->table = original->table;
-  state->log = original->log;
+  state->view_original();
   state->log_error = original->log_error;
   state->table_origin = original->table_origin;
   state->representatives = original->representatives;
@@ -912,8 +969,7 @@ ActiveEventSource ActiveEventSource::from_csv(CsvEventData data, ActiveSourceFil
   auto state = std::make_shared<State>();
   state->original = original;
   state->selected = selected;
-  state->table = original->table;
-  state->log = original->log;
+  state->view_original();
   state->table_origin = original->table_origin;
   state->representatives = original->representatives;
   state->ordinals.resize(original->table->rows.size());
@@ -950,8 +1006,7 @@ ActiveEventSource ActiveEventSource::from_log(EventLog log, ActiveSourceFile fil
   auto state = std::make_shared<State>();
   state->original = original;
   state->selected = selected;
-  state->table = original->table;
-  state->log = original->log;
+  state->view_original();
   state->flat_error = original->table_error;
   state->table_origin = original->table_origin;
   state->representatives = original->representatives;
@@ -973,7 +1028,7 @@ const EventTable* ActiveEventSource::original_table_if_available() const noexcep
 const EventLog* ActiveEventSource::original_log_if_available() const noexcept { return state_->original->log ? &*state_->original->log : nullptr; }
 const EventTable* ActiveEventSource::checked_table_if_available() const noexcept { return state_->table ? &*state_->table : nullptr; }
 const EventLog* ActiveEventSource::checked_log_if_available() const noexcept { return state_->log ? &*state_->log : nullptr; }
-const EventStream* ActiveEventSource::checked_stream_if_available() const noexcept { return state_->stream ? &*state_->stream : nullptr; }
+const EventStream* ActiveEventSource::checked_stream_if_available() const noexcept { return state_->stream_if_available(); }
 const LazyEventTable* ActiveEventSource::checked_lazy_if_available() const noexcept { return state_->lazy ? &*state_->lazy : nullptr; }
 const std::string& ActiveEventSource::checked_log_preparation_error() const noexcept { return state_->log_error; }
 const std::string& ActiveEventSource::checked_flat_projection_error() const noexcept { return state_->flat_error; }
@@ -998,8 +1053,9 @@ const EventLog& ActiveEventSource::checked_log() const {
   return *state_->log;
 }
 const EventStream& ActiveEventSource::checked_stream() const {
-  if (!state_->stream) throw std::invalid_argument(state_->flat_error);
-  return *state_->stream;
+  const auto* stream = state_->stream_if_available();
+  if (!stream) throw std::invalid_argument(state_->flat_error);
+  return *stream;
 }
 const LazyEventTable& ActiveEventSource::checked_lazy() const {
   if (!state_->lazy) throw std::invalid_argument(state_->flat_error);
@@ -1050,15 +1106,16 @@ ActiveEventSource ActiveEventSource::with_filters(
     }
     output->representatives.push_back(std::move(representatives));
   }
-  output->log = std::move(filtered);
+  output->log = std::make_shared<const EventLog>(std::move(filtered));
   try {
-    output->table = project_table(*output->original, *output->log,
-                                  output->representatives, output->ordinals,
-                                  output->changes);
+    output->table = std::make_shared<const EventTable>(
+        project_table(*output->original, *output->log, output->representatives,
+                      output->ordinals, output->changes));
     output->prepare_flat();
   } catch (const std::exception& error) {
     output->table.reset();
     output->stream.reset();
+    output->stream_available = false;
     output->lazy.reset();
     output->ordinals.clear();
     output->changes.clear();

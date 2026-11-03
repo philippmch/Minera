@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { readStored, writeStored } from "../storage";
+import { readStored, removeStored, writeStored } from "../storage";
 import { downloadQueryBlob } from "../log-query";
 import { ocelPreparedCsv } from "../ocel-preparation";
 import { nativeJson } from "../native-json";
@@ -15,7 +15,7 @@ import { DeclareStreamChart } from "./DeclareStreamChart";
 import { LiveStreamingInspection } from "./LiveStreamingInspection";
 import { ReaderStreamWorkspace } from "./ReaderStreamWorkspace";
 import { type CsvOptions } from "../api";
-import { LIVE_XES_VARIANTS, defaultLiveImport, createLiveSession, getLiveSession, appendLiveSession, actLiveSession, listLiveSessions, formFromLive, importsFromLive, type LiveRun, type LiveSnapshot, type LiveAction, type LiveImportForm } from "../live-stream-workspace";
+import { LIVE_XES_VARIANTS, defaultLiveImport, createLiveSession, getLiveSession, appendLiveSession, actLiveSession, listLiveSessions, formFromLive, importsFromLive, releaseLiveSessionQuietly, type LiveRun, type LiveSnapshot, type LiveAction, type LiveImportForm } from "../live-stream-workspace";
 
 export function StreamingWorkspace({ file = null, sourceFormat, busy = false, data, onOpen }: { file?: File | null; sourceFormat?:"auto"|"table"; busy?: boolean; data?:MineraExport;onOpen?:(file:File,activityAttribute:string,importOptions?:CsvOptions)=>void }) {
   const [form, setForm] = useState(defaultStreaming);
@@ -36,6 +36,12 @@ export function StreamingWorkspace({ file = null, sourceFormat, busy = false, da
   const [selectedNode, setSelectedNode] = useState<string>();
   const request = useRef<AbortController | null>(null);
   const cancel = () => { request.current?.abort(); request.current = null; setPending(false); };
+  // Leaving the workspace keeps the live session running (the remembered id
+  // reconnects to it; the server frees an idle one after its idle expiry).
+  // Replacing it, with "Release and start a separate session" or a new
+  // session, releases the open one.
+  const heldLive = useRef<LiveRun | null>(null);
+  heldLive.current = liveRun && !liveRun.result.released ? liveRun : null;
   useEffect(() => () => request.current?.abort(), []);
   const change = <K extends keyof StreamingForm>(key: K, value: StreamingForm[K]) => {
     setForm(previous => ({ ...previous, [key]: value })); setRun(null); setError(null);
@@ -53,7 +59,7 @@ export function StreamingWorkspace({ file = null, sourceFormat, busy = false, da
   };
   // The id is remembered only once the backend created the session (liveOperation does it), so a failed create
   // never leaves a dead session id to reconnect to.
-  const create=()=>{const id=crypto.randomUUID();void liveOperation(signal=>createLiveSession(form,imports,id,model,signal));};
+  const create=()=>{if(heldLive.current){releaseLiveSessionQuietly(heldLive.current);heldLive.current=null;}const id=crypto.randomUUID();void liveOperation(signal=>createLiveSession(form,imports,id,model,signal));};
   const connect=(id:string)=>{if(id)void liveOperation(signal=>getLiveSession(id,signal));};
   const list=async()=>{cancel();const controller=new AbortController();request.current=controller;setPending(true);setError(null);try{const next=await listLiveSessions(controller.signal);if(request.current===controller&&!controller.signal.aborted)setSessions(next);}catch(cause){if(request.current===controller&&!controller.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}finally{if(request.current===controller){request.current=null;setPending(false);}}};
   const append=()=>{if(liveRun&&log){const batchId=crypto.randomUUID();void liveOperation(signal=>appendLiveSession(liveRun,log,batchFormat,batchId,waitForBatch,signal));}};
@@ -147,7 +153,7 @@ export function StreamingWorkspace({ file = null, sourceFormat, busy = false, da
       {pending && <p role="status">{mode==="fresh"?"Replaying…":"Updating live session…"} <button className="btn-ghost" onClick={cancel}>{mode==="fresh"?"Cancel streaming workflow":"Cancel live request"}</button></p>}
       {error && <div className="error-banner" role="alert">{error}</div>}
     </section>
-    {mode==="live"&&liveRun&&<LiveStreamingInspection run={liveRun} pending={pending||busy} onAction={liveAction} onDisconnect={()=>{cancel();setLiveRun(null);setError(null);}} onError={setError}/>}
+    {mode==="live"&&liveRun&&<LiveStreamingInspection run={liveRun} pending={pending||busy} onAction={liveAction} onDisconnect={()=>{cancel();if(heldLive.current){releaseLiveSessionQuietly(heldLive.current);removeStored("minera.liveStreamSession");setConnectionId("");}setLiveRun(null);setError(null);}} onError={setError}/>}
     {mode==="fresh"&&run && selected && <section className="panel streaming-inspection">
       <div className="panel-head"><h2>Streaming data</h2><span className="panel-meta">{run.method} · {selection} · {selected.count} rows</span></div>
       <p>Parsed events: {run.result.input.parsed_events} · Processed events: {run.result.family === "STREAMING_DFG" ? run.result.events : run.result.total_events_processed} · Order: {run.result.input.event_order}</p>

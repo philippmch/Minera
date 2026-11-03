@@ -172,13 +172,11 @@ int main() {
     rejected = true;
   }
   assert(rejected);
-  rejected = false;
-  try {
-    (void)minera::filter_ocel_events_timestamp(
-        log, "2024-01-03T00:00:00Z", "2024-01-01T00:00:00Z");
-  } catch (const std::invalid_argument&) {
-    rejected = true;
-  }
-  assert(rejected);
+  // Reversed bounds give an empty OCEL (no events, objects or relations), as
+  // pm4py 2.7.22 filter_ocel_events_timestamp does.
+  const auto reversed = minera::filter_ocel_events_timestamp(
+      log, "2024-01-03T00:00:00Z", "2024-01-01T00:00:00Z");
+  assert(reversed.events.empty() && reversed.objects.empty() && reversed.relations.empty());
+  assert(reversed.e2e.empty() && reversed.o2o.empty());
   return 0;
 }

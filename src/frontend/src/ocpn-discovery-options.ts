@@ -1,4 +1,4 @@
-/** The native discovery defaults apply when a member is omitted. */
+/** The native discovery defaults (both true, as the reference) apply when a member is omitted. */
 export interface OcpnDiscoveryFlags {
   ocpn_disable_strict_sequence_cut?: boolean;
   ocpn_disable_fallthroughs?: boolean;

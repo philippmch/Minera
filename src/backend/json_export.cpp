@@ -4880,7 +4880,9 @@ std::string analysis_json(std::string_view dataset,
                       case_overlap_counts, concurrent_activity_overlap,
                       decision_tables, minimum_self_distance_variant,
                       typed_edit_distance);
-  return out.str();
+  // Moving the buffer out avoids a second copy of a body that can reach
+  // hundreds of megabytes.
+  return std::move(out).str();
 }
 
 std::string replay_fitness_json(const ReplayFitnessResult& result,

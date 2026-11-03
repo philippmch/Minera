@@ -1,6 +1,8 @@
 import { OCPN_DISCOVERY_FLAGS, type OcpnDiscoveryFlags } from "../ocpn-discovery-options";
 
-/** Keep omission, enabled and explicitly disabled discovery options distinct. */
+/** Keep omission, enabled and explicitly disabled discovery options distinct.
+ * Omission uses the native default: both policies enabled, as the reference
+ * OCPN discovery mines without the strict sequence cut or fall-throughs. */
 export function OcpnDiscoveryControls({options = {}, onChange, disabled = false, scope}: {
   options?: OcpnDiscoveryFlags;
   onChange: (options: OcpnDiscoveryFlags) => void;
@@ -17,7 +19,7 @@ export function OcpnDiscoveryControls({options = {}, onChange, disabled = false,
         else next[key] = event.target.value === "true";
         onChange(next);
       }}>
-      <option value="native">Native default</option>
+      <option value="native">Native default (enabled)</option>
       <option value="true">Enabled</option>
       <option value="false">Disabled</option>
     </select>

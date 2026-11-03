@@ -4,7 +4,10 @@
 // native reduction under some order of the distinct leaves (the reference
 // iterates them in hash-seeded set order). The count of cases whose default
 // (breadth-first) leaf order gives none of the observed outcomes is reported.
-// Errors compare by class and message.
+// Errors compare by class and message (TypeError by class alone). The fold
+// cases compare fold_process_tree_reference with
+// process_tree.utils.generic.fold, including childless operators and
+// interleaving nodes.
 #include "minera/process_tree_reduction.hpp"
 
 #include "../gzip_codec.hpp"
@@ -65,6 +68,9 @@ class TreeParser {
     auto root = node();
     return ProcessTree(activities_, std::move(root));
   }
+  // A node that ProcessTree may reject (a childless operator), for fold.
+  ProcessTreeNode parse_node() { return node(); }
+  const std::vector<std::string>& activities() const { return activities_; }
 
  private:
   ProcessTreeNode node() {
@@ -86,6 +92,9 @@ class TreeParser {
     if (text_.compare(at_, 3, "->(") == 0) {
       result.op = ProcessTreeOperator::kSequence;
       at_ += 3;
+    } else if (text_.compare(at_, 3, "<>(") == 0) {
+      result.op = ProcessTreeOperator::kInterleaving;
+      at_ += 3;
     } else {
       const char op = text_[at_];
       result.op = op == 'X'   ? ProcessTreeOperator::kExclusive
@@ -93,6 +102,10 @@ class TreeParser {
                   : op == '*' ? ProcessTreeOperator::kLoop
                               : ProcessTreeOperator::kInclusiveChoice;
       at_ += 2;
+    }
+    if (text_[at_] == ')') {
+      ++at_;
+      return result;
     }
     while (true) {
       result.children.push_back(node());
@@ -105,20 +118,35 @@ class TreeParser {
   std::vector<std::string> activities_;
 };
 
-std::string dump(const ProcessTree& tree, const ProcessTreeNode& node) {
+std::string dump(const std::vector<std::string>& activities, const ProcessTreeNode& node) {
   switch (node.op) {
     case ProcessTreeOperator::kTau: return "T";
-    case ProcessTreeOperator::kActivity: return "L:" + tree.activities().at(node.activity);
+    case ProcessTreeOperator::kActivity: return "L:" + activities.at(node.activity);
     default: break;
   }
-  std::string out = node.op == ProcessTreeOperator::kSequence    ? "->("
-                    : node.op == ProcessTreeOperator::kExclusive ? "X("
-                    : node.op == ProcessTreeOperator::kParallel  ? "+("
-                    : node.op == ProcessTreeOperator::kLoop      ? "*("
-                                                                 : "O(";
+  std::string out = node.op == ProcessTreeOperator::kSequence       ? "->("
+                    : node.op == ProcessTreeOperator::kExclusive    ? "X("
+                    : node.op == ProcessTreeOperator::kParallel     ? "+("
+                    : node.op == ProcessTreeOperator::kLoop         ? "*("
+                    : node.op == ProcessTreeOperator::kInterleaving ? "<>("
+                                                                    : "O(";
   for (std::size_t i = 0; i < node.children.size(); ++i)
-    out += (i ? "," : "") + dump(tree, node.children[i]);
+    out += (i ? "," : "") + dump(activities, node.children[i]);
   return out + ")";
+}
+
+std::string dump(const ProcessTree& tree, const ProcessTreeNode& node) { return dump(tree.activities(), node); }
+
+std::size_t fold_cases = 0;
+
+// process_tree.utils.generic.fold on one tree.
+std::string check_fold(const BankCase& item) {
+  ++fold_cases;
+  TreeParser parser(item.tree);
+  const auto node = parser.parse_node();
+  const auto actual = "O " + dump(parser.activities(), fold_process_tree_reference(node));
+  if (std::find(item.outcomes.begin(), item.outcomes.end(), actual) != item.outcomes.end()) return {};
+  return item.tree + "\n  expected " + item.outcomes.front() + "\n  actual   " + actual;
 }
 
 std::size_t counts[3] = {};
@@ -150,12 +178,18 @@ std::string check_tree_tr_based(const BankCase& item) {
     try {
       return "O " + dump(tree, reference_reduce_process_tree(tree, trace, options, order).root());
     } catch (const ProcessTreeReductionError& error) {
-      return "E " + error.type + " " + error.what();
+      // The native TypeError (an interleaving node, which the reference
+      // footprints lack) explains itself; the reference message is
+      // "'NoneType' object is not subscriptable". Compare that class alone.
+      return error.type == "TypeError" ? "E TypeError" : "E " + error.type + " " + error.what();
     }
   };
   const auto actual = run(nullptr);
   if (item.outcomes.size() > 1) ++counts[1];
-  std::vector<std::string> missing = item.outcomes;
+  std::vector<std::string> outcomes = item.outcomes;
+  for (auto& outcome : outcomes)
+    if (outcome.rfind("E TypeError ", 0) == 0) outcome = "E TypeError";
+  std::vector<std::string> missing = outcomes;
   auto order = process_tree_reduction_leaves(tree);
   std::sort(order.begin(), order.end());
   std::size_t tried = 0;
@@ -164,7 +198,7 @@ std::string check_tree_tr_based(const BankCase& item) {
     missing.erase(std::remove(missing.begin(), missing.end(), outcome), missing.end());
   } while (!missing.empty() && ++tried < 50000 && std::next_permutation(order.begin(), order.end()));
   bool default_seen = false;
-  for (const auto& outcome : item.outcomes) default_seen = default_seen || outcome == actual;
+  for (const auto& outcome : outcomes) default_seen = default_seen || outcome == actual;
   if (!default_seen) ++counts[2];
   if (missing.empty()) return {};
   std::string expected;
@@ -208,14 +242,17 @@ int main(int argc, char** argv) try {
   }
   std::size_t failures = 0;
   for (const auto& item : read_bank(argv[1])) {
-    const auto failure = item.mode == "custom_key" ? check_tree_tr_based(item) : check_reducer(item);
+    const auto failure = item.mode == "fold"         ? check_fold(item)
+                         : item.mode == "custom_key" ? check_tree_tr_based(item)
+                                                     : check_reducer(item);
     if (failure.empty()) continue;
     if (++failures <= 25) std::cerr << item.name << " (" << item.mode << "): " << failure << '\n';
   }
   std::cout << counts[0] << " calls compared (" << counts[1] << " with hash-seed dependent outcomes, "
             << counts[2] << " where the default leaf order differs), "
             << failures << " failures\n";
-  return failures || counts[0] < 6000 ? 1 : 0;
+  std::cout << fold_cases << " folds compared\n";
+  return failures || counts[0] < 8000 || fold_cases < 3000 ? 1 : 0;
 } catch (const std::exception& error) {
   std::cerr << "error: " << error.what() << "\n";
   return 1;

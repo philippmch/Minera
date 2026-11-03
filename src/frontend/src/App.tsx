@@ -38,6 +38,7 @@ import { Advanced, PageHeader } from "./components/ui";
 import { toolById, toolGroup, viewById, VIEWS, VIEW_GROUPS, type ToolId } from "./tools";
 import { initialToolFromHash, parseRoute, routeFor, routeHash, sameHash } from "./routing";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
 import { ProcessModel } from "./components/ProcessModel";
@@ -750,7 +751,8 @@ export default function App() {
   useEffect(() => {
     const onRoute = () => {
       const route = parseRoute(window.location.hash), current = routeState.current;
-      setPaletteOpen(false); setSidebarOpen(false); setExportOpen(false);
+      // Any route change answers a pending "close the open data?" question; only the start page asks it again.
+      setPaletteOpen(false); setSidebarOpen(false); setExportOpen(false); setConfirmHome(false);
       if (route.kind === "tool") { setTool(route.id); return; }
       if (route.kind === "view" && current.hasLog) { setTool(null); setOwnedExactInspection(false); if (current.views.includes(route.id)) setTab(route.id); return; }
       if (route.kind === "workspace" && current.hasOpenData) { setTool(null); return; }
@@ -800,7 +802,16 @@ export default function App() {
       confirmLabel="Close and go to start"
       cancelLabel="Keep working"
       onConfirm={() => { setConfirmHome(false); goHome(); }}
-      onCancel={() => { setConfirmHome(false); if (sameHash(window.location.hash, "")) window.history.pushState(null, "", routeTarget || window.location.pathname + window.location.search); }}
+      onCancel={() => {
+        setConfirmHome(false);
+        if (!sameHash(window.location.hash, "")) return;
+        // Back (or a link) reached the start page while data is open. Step forward again to the entry the
+        // user came from, which keeps the rest of the Forward history; when there is none (a typed "#"),
+        // the start-page entry is rewritten to the page still shown.
+        const shown = routeTarget || window.location.pathname + window.location.search;
+        window.history.forward();
+        window.setTimeout(() => { if (sameHash(window.location.hash, "")) window.history.replaceState(window.history.state, "", shown); }, 250);
+      }}
     />
   );
   const dropveil = (
@@ -837,8 +848,11 @@ export default function App() {
           <span className="brand-name">Minera</span>
           <button className="mobile-menu" onClick={() => setPaletteOpen(true)} aria-label="Search views and tools">⌕</button>
         </div>
-        {header}
-        {content}
+        {/* A render error in the view or tool stays inside it: App keeps the open data, and another route clears it. */}
+        <ErrorBoundary scope="view" resetKey={routeTarget}>
+          {header}
+          {content}
+        </ErrorBoundary>
       </div>
       {palette}
       {homeConfirmation}

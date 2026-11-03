@@ -64,8 +64,13 @@ double require_time(const Event& event, const std::string& key,
   return *parsed;
 }
 
+// Interval-event overlap rejects an event that starts after it completes, as
+// the reference interval tree does; case overlap (which rejects only an
+// inverted case envelope) and concurrent activities take such an inverted
+// event interval as it is (allow_inverted), as the reference does.
 std::vector<Interval> intervals_of(const EventLog& log,
-                                   const OverlapOptions& options) {
+                                   const OverlapOptions& options,
+                                   bool allow_inverted) {
   const auto start_key = selected_key(options.start_timestamp_attribute,
                                       options.start_timestamp_key,
                                       options.start_timestamp_source);
@@ -76,7 +81,7 @@ std::vector<Interval> intervals_of(const EventLog& log,
     for (const auto& event : trace.events) {
       const double start = require_time(event, start_key, "start");
       const double end = require_time(event, end_key, "completion");
-      if (start > end) {
+      if (start > end && !allow_inverted) {
         throw std::invalid_argument("overlap: start timestamp is after completion timestamp");
       }
       intervals.push_back({start, end});
@@ -105,7 +110,7 @@ void validate_options(const OverlapOptions& options) {
 IntervalEventOverlapCounts discover_interval_event_overlap_counts(
     const EventLog& log, const OverlapOptions& options) {
   validate_options(options);
-  const auto intervals = intervals_of(log, options);
+  const auto intervals = intervals_of(log, options, false);
   IntervalEventOverlapCounts result(intervals.size(), 0);
   for (std::size_t i = 0; i < intervals.size(); ++i) {
     for (std::size_t j = 0; j < intervals.size(); ++j) {
@@ -120,7 +125,7 @@ IntervalEventOverlapCounts discover_interval_event_overlap_counts(
 CaseOverlapCounts discover_case_overlap_counts(const EventLog& log,
                                                const OverlapOptions& options) {
   validate_options(options);
-  const auto event_intervals = intervals_of(log, options);
+  const auto event_intervals = intervals_of(log, options, true);
   std::vector<Interval> envelopes;
   envelopes.reserve(log.traces.size());
   std::size_t offset = 0;
@@ -135,6 +140,10 @@ CaseOverlapCounts discover_case_overlap_counts(const EventLog& log,
       envelope.start = std::min(envelope.start, interval.start);
       envelope.end = std::max(envelope.end, interval.end);
     }
+    // The case envelope goes into the interval tree, which rejects one that
+    // starts after it completes, as for interval-event overlap.
+    if (envelope.start > envelope.end)
+      throw std::invalid_argument("overlap: case start timestamp is after its completion timestamp");
     envelopes.push_back(envelope);
     offset += trace.events.size();
   }
@@ -154,7 +163,7 @@ CaseOverlapCounts discover_case_overlap_counts(const EventLog& log,
 ConcurrentActivityOverlapResult discover_concurrent_activity_overlap(
     const EventLog& log, const ConcurrentActivityOverlapOptions& options) {
   validate_options(options);
-  const auto event_intervals = intervals_of(log, options);
+  const auto event_intervals = intervals_of(log, options, true);
   ConcurrentActivityOverlapResult result;
   std::size_t offset = 0;
   for (const auto& trace : log.traces) {
@@ -180,8 +189,13 @@ ConcurrentActivityOverlapResult discover_concurrent_activity_overlap(
         const double hi = std::min(sorted[i].interval.end,
                                    sorted[j].interval.end);
         // Concurrent-activity overlap intentionally uses raw endpoint
-        // comparisons; its strict option has no epsilon tolerance.
-        if (options.strict ? !(lo < hi) : !(lo <= hi)) continue;
+        // comparisons; its strict option has no epsilon tolerance. As in the
+        // reference, the scan of later events stops at the first one that
+        // does not overlap even with touching endpoints: with proper
+        // intervals sorted by start no later one could, and an inverted
+        // interval is not treated specially.
+        if (!(lo <= hi)) break;
+        if (options.strict && !(lo < hi)) continue;
         const auto& first = sorted[i].activity;
         const auto& second = sorted[j].activity;
         const ConcurrentActivityOverlapKey key =

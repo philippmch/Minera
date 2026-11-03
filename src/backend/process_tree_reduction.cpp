@@ -287,6 +287,9 @@ ProcessTreeReductionLeaf leaf_of(const WalkNode& node, const std::vector<std::st
 struct Footprint {
   bool skippable = false;
   std::set<std::string> activities;
+  // The subtree holds an interleaving node, which the reference footprints
+  // cannot describe.
+  bool interleaving = false;
 };
 
 Footprint footprint(const std::vector<WalkNode>& nodes, std::size_t index,
@@ -303,10 +306,12 @@ Footprint footprint(const std::vector<WalkNode>& nodes, std::size_t index,
   }
   if (node.op == ProcessTreeOperator::kLoop && node.children.size() < 2)
     throw ProcessTreeReductionError("IndexError", "list index out of range");
+  result.interleaving = node.op == ProcessTreeOperator::kInterleaving;
   std::vector<Footprint> children;
   for (const auto child : node.children) {
     children.push_back(footprint(nodes, child, activities));
     result.activities.insert(children.back().activities.begin(), children.back().activities.end());
+    result.interleaving = result.interleaving || children.back().interleaving;
   }
   if (node.op == ProcessTreeOperator::kExclusive) {
     result.skippable = std::any_of(children.begin(), children.end(), [](const Footprint& f) { return f.skippable; });
@@ -339,50 +344,109 @@ std::vector<ProcessTreeReductionLeaf> process_tree_reduction_leaves(const Proces
   return leaves;
 }
 
-ProcessTreeNode fold_process_tree_reference(ProcessTreeNode node) {
-  for (auto& child : node.children) child = fold_process_tree_reference(std::move(child));
-  const auto tau = [](const ProcessTreeNode& child) { return child.op == ProcessTreeOperator::kTau; };
-  switch (node.op) {
-    case ProcessTreeOperator::kTau:
-    case ProcessTreeOperator::kActivity:
-      return node;
-    case ProcessTreeOperator::kLoop:
-      if (node.children.size() == 1) return std::move(node.children.front());
-      if (!node.children.empty() && std::all_of(node.children.begin(), node.children.end(), tau))
-        return ProcessTreeNode::tau();
-      return node;
-    default:
-      break;
+namespace {
+
+// The reference node equality: two childless nodes are equal when their
+// labels are (so tau, an empty operator and another tau all compare equal);
+// otherwise the operator and the ordered children must match.
+bool reference_equal(const ProcessTreeNode& a, const ProcessTreeNode& b) {
+  if (a.children.empty() && b.children.empty()) {
+    const bool a_label = a.op == ProcessTreeOperator::kActivity;
+    const bool b_label = b.op == ProcessTreeOperator::kActivity;
+    return a_label == b_label && (!a_label || a.activity == b.activity);
   }
-  if (node.op != ProcessTreeOperator::kInclusiveChoice) {
-    std::vector<ProcessTreeNode> flat;
-    for (auto& child : node.children) {
-      if (child.op == node.op) {
-        for (auto& grandchild : child.children) flat.push_back(std::move(grandchild));
-      } else {
-        flat.push_back(std::move(child));
+  if (a.op != b.op || a.children.size() != b.children.size()) return false;
+  for (std::size_t i = 0; i < a.children.size(); ++i)
+    if (!reference_equal(a.children[i], b.children[i])) return false;
+  return true;
+}
+
+std::size_t reference_index(const std::vector<ProcessTreeNode>& children, const ProcessTreeNode& value) {
+  for (std::size_t i = 0; i < children.size(); ++i)
+    if (reference_equal(children[i], value)) return i;
+  throw std::logic_error("process tree fold: value not in children");
+}
+
+// list.remove: drops the first child equal to `value` under reference_equal.
+void reference_remove(std::vector<ProcessTreeNode>& children, const ProcessTreeNode& value) {
+  const ProcessTreeNode copy = value;
+  children.erase(children.begin() + static_cast<std::ptrdiff_t>(reference_index(children, copy)));
+}
+
+bool is_real_tau(const ProcessTreeNode& node) { return node.op == ProcessTreeOperator::kTau; }
+
+bool reduces_taus(ProcessTreeOperator op) {
+  return op == ProcessTreeOperator::kSequence || op == ProcessTreeOperator::kParallel ||
+         op == ProcessTreeOperator::kExclusive || op == ProcessTreeOperator::kInclusiveChoice;
+}
+
+std::size_t tau_count(const std::vector<ProcessTreeNode>& children) {
+  return static_cast<std::size_t>(std::count_if(children.begin(), children.end(), is_real_tau));
+}
+
+// The tau reduction applied to a node before its children fold: when every
+// child is tau one is kept; otherwise sequence and parallel remove one equal
+// child per tau and xor and or one per tau but the first. Removal is by
+// equality, so an empty operator or another tau ahead of a tau can go first.
+void reduce_taus_before_fold(ProcessTreeNode& node) {
+  if (!reduces_taus(node.op)) return;
+  auto& children = node.children;
+  const auto taus = tau_count(children);
+  if (taus == 0) return;
+  if (taus == children.size()) {
+    children.resize(1);
+    return;
+  }
+  const bool drop_all = node.op == ProcessTreeOperator::kSequence || node.op == ProcessTreeOperator::kParallel;
+  for (std::size_t i = drop_all ? 0 : 1; i < taus; ++i) reference_remove(children, ProcessTreeNode::tau());
+}
+
+// The tau reduction applied after a node's children fold and flatten: when
+// every child is tau the last is kept; sequence and parallel drop their tau
+// children, and xor and or remove equal children until one tau is left.
+void reduce_taus_after_fold(ProcessTreeNode& node) {
+  for (auto& child : node.children) reduce_taus_after_fold(child);
+  if (!reduces_taus(node.op)) return;
+  auto& children = node.children;
+  if (tau_count(children) == 0) return;
+  if (tau_count(children) == children.size()) {
+    children.erase(children.begin(), children.end() - 1);
+    return;
+  }
+  if (node.op == ProcessTreeOperator::kSequence || node.op == ProcessTreeOperator::kParallel) {
+    children.erase(std::remove_if(children.begin(), children.end(), is_real_tau), children.end());
+  } else {
+    while (tau_count(children) > 1) reference_remove(children, ProcessTreeNode::tau());
+  }
+}
+
+}  // namespace
+
+ProcessTreeNode fold_process_tree_reference(ProcessTreeNode node) {
+  reduce_taus_before_fold(node);
+  if (!node.children.empty()) {
+    for (auto& child : node.children) child = fold_process_tree_reference(std::move(child));
+    if (node.children.size() == 1) return std::move(node.children.front());
+    if (node.op == ProcessTreeOperator::kSequence || node.op == ProcessTreeOperator::kExclusive ||
+        node.op == ProcessTreeOperator::kParallel) {
+      auto& children = node.children;
+      while (true) {
+        const auto same = std::find_if(children.begin(), children.end(),
+                                       [&](const ProcessTreeNode& child) { return child.op == node.op; });
+        if (same == children.end()) break;
+        const ProcessTreeNode absorbed = *same;
+        const auto at = reference_index(children, absorbed);
+        children.insert(children.begin() + static_cast<std::ptrdiff_t>(at), absorbed.children.begin(),
+                        absorbed.children.end());
+        reference_remove(children, absorbed);
       }
     }
-    node.children = std::move(flat);
+    reduce_taus_after_fold(node);
+    if (node.children.size() == 1) return std::move(node.children.front());
   }
-  if (node.op == ProcessTreeOperator::kExclusive || node.op == ProcessTreeOperator::kInclusiveChoice) {
-    std::optional<std::size_t> last;
-    for (std::size_t i = 0; i < node.children.size(); ++i)
-      if (tau(node.children[i])) last = i;
-    std::vector<ProcessTreeNode> kept;
-    for (std::size_t i = 0; i < node.children.size(); ++i)
-      if (!tau(node.children[i]) || i == last) kept.push_back(std::move(node.children[i]));
-    node.children = std::move(kept);
-  } else {
-    const bool any_tau = std::any_of(node.children.begin(), node.children.end(), tau);
-    std::vector<ProcessTreeNode> kept;
-    for (auto& child : node.children)
-      if (!tau(child)) kept.push_back(std::move(child));
-    if (kept.empty() && any_tau) kept.push_back(ProcessTreeNode::tau());
-    node.children = std::move(kept);
-  }
-  if (node.children.size() == 1) return std::move(node.children.front());
-  if (node.children.empty()) return ProcessTreeNode::tau();
+  if (node.op == ProcessTreeOperator::kLoop && node.children.size() == 2 &&
+      std::all_of(node.children.begin(), node.children.end(), is_real_tau))
+    return ProcessTreeNode::tau();
   return node;
 }
 
@@ -423,6 +487,14 @@ ProcessTree reference_reduce_process_tree(const ProcessTree& tree, const Trace& 
 
   std::vector<Footprint> footprints;
   for (const auto index : walk) footprints.push_back(footprint(nodes, index, activities));
+  // The reference uses the footprint of every visited node but the last (the
+  // result) and the root, and fails with TypeError when that footprint covers
+  // an interleaving node. Replacing either of those cannot change the result.
+  const auto replaceable = [&](std::size_t at) { return at + 1 < walk.size() && nodes[walk[at]].parent; };
+  for (std::size_t at = 0; at < walk.size(); ++at)
+    if (replaceable(at) && footprints[at].interleaving)
+      throw ProcessTreeReductionError(
+          "TypeError", "process tree reduction does not support interleaving nodes (the reference footprints have none)");
   const auto observed = trace_activities(tree, trace, options);
   for (std::size_t at = 0; at < walk.size(); ++at) {
     const auto index = walk[at];
@@ -430,7 +502,7 @@ ProcessTree reference_reduce_process_tree(const ProcessTree& tree, const Trace& 
     const bool disjoint_trace = std::none_of(fp.activities.begin(), fp.activities.end(),
                                              [&](const std::string& a) { return observed.contains(a); });
     const auto parent = nodes[index].parent;
-    if (!fp.skippable || !disjoint_trace || !parent) continue;
+    if (!replaceable(at) || !fp.skippable || !disjoint_trace) continue;
     const auto& siblings = nodes[*parent].children;
     const auto position = static_cast<std::size_t>(std::find(siblings.begin(), siblings.end(), index) - siblings.begin());
     const auto tau = nodes.size();

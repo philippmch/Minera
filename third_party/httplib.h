@@ -19,13 +19,21 @@
  *  - header and chunked-trailer lines are bounded in count, and every
  *    protocol line (request line, header, chunk size, trailer) in length,
  *    before it is buffered;
- *  - Client::set_payload_max_length bounds a response body while it streams;
+ *  - Client::set_payload_max_length bounds a response body while it streams
+ *    (Error::ExceedPayloadMaxLength when it is passed);
  *  - optional whole-phase read deadlines for the request head and body
  *    (CPPHTTPLIB_HEADER_READ_TIMEOUT_SECOND, CPPHTTPLIB_BODY_READ_TIMEOUT_SECOND)
  *    and a minimum average body rate (CPPHTTPLIB_BODY_MIN_RATE_BYTES_PER_SECOND)
- *    so a slowly dripping client cannot hold a worker thread for long;
+ *    so a slowly dripping client cannot hold a worker thread for long; a
+ *    request cut off by them gets 408 Request Timeout;
  *  - a request whose body read failed closes its connection, since the rest
- *    of that body cannot be framed off the stream.
+ *    of that body cannot be framed off the stream;
+ *  - a 206 Partial Content body is never compressed: the range was cut from
+ *    the identity body, so its bytes and Content-Range must stay identity;
+ *  - with MINERA_HTTPLIB_COMPRESS_RESPONSES_ONLY (set next to
+ *    CPPHTTPLIB_ZLIB_SUPPORT), zlib serves only gzip responses to clients that
+ *    ask for them: gzip/deflate request bodies keep their 415 and the client
+ *    neither advertises nor inflates gzip, exactly as without zlib.
  * Upstream fixed the chunked case in 0.20.1 (CVE-2025-46728).
  */
 
@@ -1200,6 +1208,7 @@ enum class Error {
   Compression,
   ConnectionTimeout,
   ProxyConnection,
+  ExceedPayloadMaxLength, // MINERA PATCH: set_payload_max_length was exceeded
 
   // For internal use only
   SSLPeerCouldBeClosed_,
@@ -2244,6 +2253,8 @@ inline std::string to_string(const Error error) {
   case Error::Compression: return "Compression failed";
   case Error::ConnectionTimeout: return "Connection timed out";
   case Error::ProxyConnection: return "Proxy connection failed";
+  case Error::ExceedPayloadMaxLength: // MINERA PATCH
+    return "Response body exceeds the client's payload limit";
   case Error::Unknown: return "Unknown";
   default: break;
   }
@@ -4403,7 +4414,9 @@ bool prepare_content_receiver(T &x, int &status,
     std::unique_ptr<decompressor> decompressor;
 
     if (encoding == "gzip" || encoding == "deflate") {
-#ifdef CPPHTTPLIB_ZLIB_SUPPORT
+      // MINERA PATCH: inflating request bodies (and client responses) stays
+      // off when zlib is only there to compress responses.
+#if defined(CPPHTTPLIB_ZLIB_SUPPORT) && !defined(MINERA_HTTPLIB_COMPRESS_RESPONSES_ONLY)
       decompressor = detail::make_unique<gzip_decompressor>();
 #else
       status = StatusCode::UnsupportedMediaType_415;
@@ -4441,6 +4454,70 @@ bool prepare_content_receiver(T &x, int &status,
   };
   return callback(std::move(out));
 }
+
+// MINERA PATCH: the server arms a thread-local deadline only while it reads a
+// request head or body; handler code (including httplib::Client calls made
+// from a handler on this thread) never runs under it. A phase may also demand
+// a minimum average transfer rate once its grace period has passed, so a
+// client dripping bytes releases its worker long before the deadline.
+struct RequestReadDeadline {
+  struct State {
+    bool armed = false;
+    std::chrono::steady_clock::time_point start{}, at{};
+    uint64_t received = 0;
+    uint64_t min_bytes_per_second = 0;
+    bool tripped = false;
+  };
+  static State &state() {
+    static thread_local State value;
+    return value;
+  }
+  static void count(ssize_t n) {
+    if (n > 0 && state().armed) { state().received += static_cast<uint64_t>(n); }
+  }
+  static bool expired() {
+    auto &s = state();
+    if (!s.armed) { return false; }
+    if (s.tripped) { return true; }
+    const auto now = std::chrono::steady_clock::now();
+    if (now > s.at) { return s.tripped = true; }
+    if (s.min_bytes_per_second == 0) { return false; }
+    const auto elapsed =
+        std::chrono::duration_cast<std::chrono::seconds>(now - s.start).count();
+    s.tripped = elapsed > CPPHTTPLIB_BODY_MIN_RATE_GRACE_SECOND &&
+                s.received < s.min_bytes_per_second * static_cast<uint64_t>(elapsed);
+    return s.tripped;
+  }
+  // True once an armed deadline (or rate floor) has cut a read short; the
+  // request then gets 408 Request Timeout instead of 400.
+  static bool tripped() {
+    const auto &s = state();
+    return s.armed && s.tripped;
+  }
+};
+
+class ScopedReadDeadline {
+public:
+  explicit ScopedReadDeadline(time_t seconds, uint64_t min_bytes_per_second = 0)
+      : previous_(RequestReadDeadline::state()) {
+    if (seconds > 0) {
+      auto &s = RequestReadDeadline::state();
+      s.armed = true;
+      s.start = std::chrono::steady_clock::now();
+      s.at = s.start + std::chrono::seconds(seconds);
+      s.received = 0;
+      s.min_bytes_per_second = min_bytes_per_second;
+      s.tripped = false;
+    }
+  }
+  ~ScopedReadDeadline() { RequestReadDeadline::state() = previous_; }
+  void disarm() { RequestReadDeadline::state().armed = false; }
+  ScopedReadDeadline(const ScopedReadDeadline &) = delete;
+  ScopedReadDeadline &operator=(const ScopedReadDeadline &) = delete;
+
+private:
+  RequestReadDeadline::State previous_;
+};
 
 template <typename T>
 bool read_content(Stream &strm, T &x, size_t payload_max_length, int &status,
@@ -4480,8 +4557,11 @@ bool read_content(Stream &strm, T &x, size_t payload_max_length, int &status,
         }
 
         if (!ret) {
+          // MINERA PATCH: a body cut off by the read deadline or the minimum
+          // rate is a timeout (408), not a malformed request.
           status = exceed_payload_max_length ? StatusCode::PayloadTooLarge_413
-                                             : StatusCode::BadRequest_400;
+                   : RequestReadDeadline::tripped() ? StatusCode::RequestTimeout_408
+                                                    : StatusCode::BadRequest_400;
         }
         return ret;
       });
@@ -5975,59 +6055,6 @@ inline bool SocketStream::is_writable() const {
          is_socket_alive(sock_);
 }
 
-// MINERA PATCH: the server arms a thread-local deadline only while it reads a
-// request head or body; handler code (including httplib::Client calls made
-// from a handler on this thread) never runs under it. A phase may also demand
-// a minimum average transfer rate once its grace period has passed, so a
-// client dripping bytes releases its worker long before the deadline.
-struct RequestReadDeadline {
-  struct State {
-    bool armed = false;
-    std::chrono::steady_clock::time_point start{}, at{};
-    uint64_t received = 0;
-    uint64_t min_bytes_per_second = 0;
-  };
-  static State &state() {
-    static thread_local State value;
-    return value;
-  }
-  static void count(ssize_t n) {
-    if (n > 0 && state().armed) { state().received += static_cast<uint64_t>(n); }
-  }
-  static bool expired() {
-    const auto &s = state();
-    if (!s.armed) { return false; }
-    const auto now = std::chrono::steady_clock::now();
-    if (now > s.at) { return true; }
-    if (s.min_bytes_per_second == 0) { return false; }
-    const auto elapsed =
-        std::chrono::duration_cast<std::chrono::seconds>(now - s.start).count();
-    return elapsed > CPPHTTPLIB_BODY_MIN_RATE_GRACE_SECOND &&
-           s.received < s.min_bytes_per_second * static_cast<uint64_t>(elapsed);
-  }
-};
-
-class ScopedReadDeadline {
-public:
-  explicit ScopedReadDeadline(time_t seconds, uint64_t min_bytes_per_second = 0)
-      : previous_(RequestReadDeadline::state()) {
-    if (seconds > 0) {
-      auto &s = RequestReadDeadline::state();
-      s.armed = true;
-      s.start = std::chrono::steady_clock::now();
-      s.at = s.start + std::chrono::seconds(seconds);
-      s.received = 0;
-      s.min_bytes_per_second = min_bytes_per_second;
-    }
-  }
-  ~ScopedReadDeadline() { RequestReadDeadline::state() = previous_; }
-  void disarm() { RequestReadDeadline::state().armed = false; }
-  ScopedReadDeadline(const ScopedReadDeadline &) = delete;
-  ScopedReadDeadline &operator=(const ScopedReadDeadline &) = delete;
-
-private:
-  RequestReadDeadline::State previous_;
-};
 
 // MINERA PATCH: enforce the read deadline and meter the bytes read.
 inline ssize_t SocketStream::read(char *ptr, size_t size) {
@@ -7161,7 +7188,10 @@ inline void Server::apply_ranges(const Request &req, Response &res,
       res.body.swap(data);
     }
 
-    if (type != detail::EncodingType::None) {
+    // MINERA PATCH: a range is cut from the identity body; compressing the
+    // slice would make Content-Range name bytes of a different encoding.
+    if (type != detail::EncodingType::None &&
+        res.status != StatusCode::PartialContent_206) {
       std::unique_ptr<detail::compressor> compressor;
       std::string content_encoding;
 
@@ -7271,7 +7301,10 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
   // Request line and headers
   if (!parse_request_line(line_reader.ptr(), req) ||
       !detail::read_headers(strm, req.headers)) {
-    res.status = StatusCode::BadRequest_400;
+    // MINERA PATCH: a head cut off by its read deadline is a timeout.
+    res.status = detail::RequestReadDeadline::tripped()
+                     ? StatusCode::RequestTimeout_408
+                     : StatusCode::BadRequest_400;
     // MINERA PATCH: a head that failed to parse (or ran past its deadline or
     // bounds) leaves the stream unframed; close instead of keeping it alive.
     connection_closed = true;
@@ -7410,6 +7443,7 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
     // so the connection cannot carry another request.
     if (detail::expect_content(req) &&
         (res.status == StatusCode::BadRequest_400 ||
+         res.status == StatusCode::RequestTimeout_408 ||
          res.status == StatusCode::LengthRequired_411 ||
          res.status == StatusCode::PayloadTooLarge_413 ||
          res.status == StatusCode::UnsupportedMediaType_415)) {
@@ -7933,7 +7967,8 @@ inline bool ClientImpl::write_request(Stream &strm, Request &req,
 #ifdef CPPHTTPLIB_BROTLI_SUPPORT
       accept_encoding = "br";
 #endif
-#ifdef CPPHTTPLIB_ZLIB_SUPPORT
+      // MINERA PATCH: see prepare_content_receiver.
+#if defined(CPPHTTPLIB_ZLIB_SUPPORT) && !defined(MINERA_HTTPLIB_COMPRESS_RESPONSES_ONLY)
       if (!accept_encoding.empty()) { accept_encoding += ", "; }
       accept_encoding += "gzip, deflate";
 #endif
@@ -8211,7 +8246,8 @@ inline bool ClientImpl::process_request(Stream &strm, Request &req,
         auto len = res.get_header_value_u64("Content-Length");
         // MINERA PATCH: never reserve past the client's payload bound.
         if (len > res.body.max_size() || len > payload_max_length_) {
-          error = Error::Read;
+          error = len > payload_max_length_ ? Error::ExceedPayloadMaxLength
+                                            : Error::Read;
           return false;
         }
         res.body.reserve(static_cast<size_t>(len));
@@ -8219,12 +8255,17 @@ inline bool ClientImpl::process_request(Stream &strm, Request &req,
     }
 
     if (res.status != StatusCode::NotModified_304) {
-      int dummy_status;
-      // MINERA PATCH: the client's payload bound applies while streaming.
+      int dummy_status = 0;
+      // MINERA PATCH: the client's payload bound applies while streaming, and
+      // passing it is reported as its own error.
       if (!detail::read_content(strm, res, payload_max_length_,
                                 dummy_status, std::move(progress),
                                 std::move(out), decompress_)) {
-        if (error != Error::Canceled) { error = Error::Read; }
+        if (error != Error::Canceled) {
+          error = dummy_status == StatusCode::PayloadTooLarge_413
+                      ? Error::ExceedPayloadMaxLength
+                      : Error::Read;
+        }
         return false;
       }
     }

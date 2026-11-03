@@ -4,6 +4,7 @@
 #include "json_utf8.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <cctype>
 #include <cmath>
@@ -432,6 +433,10 @@ std::size_t parse_nonnegative_size(std::string_view value, std::string_view name
     throw std::invalid_argument(std::string(name) + ": expected a non-negative integer, got '" + std::string(value) + "'");
   return parsed;
 }
+
+// (Still inside this file's anonymous namespace: the public accessors are
+// defined at the end, in namespace minera.)
+std::atomic<std::size_t> g_xes_decompressed_ceiling{kDefaultXesDecompressedCeiling};
 
 std::size_t parse_positive_size(std::string_view value, std::string_view name) {
   if (value.empty())
@@ -2229,12 +2234,19 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.xes.attributes_to_read = split_csv(field("xes_attributes_to_read"));
   }
   if (supplied("xes_max_decompressed_bytes")) {
-    // A request may lower the decompression bound but never raise it past
-    // the default: one small .xes.gz could otherwise inflate without limit.
-    params.xes.max_decompressed_bytes = std::min(
-        parse_positive_size(field("xes_max_decompressed_bytes"),
-                            "xes_max_decompressed_bytes"),
-        XesImportOptions{}.max_decompressed_bytes);
+    // A request may lower the decompression bound, or raise it up to the
+    // server's ceiling (--max-xes-decompressed-bytes): one small .xes.gz
+    // could otherwise inflate without limit.
+    const auto requested = parse_positive_size(field("xes_max_decompressed_bytes"),
+                                               "xes_max_decompressed_bytes");
+    const auto ceiling = xes_decompressed_ceiling();
+    if (requested > ceiling)
+      throw std::invalid_argument(
+          "xes_max_decompressed_bytes " + std::to_string(requested) +
+          " is above the server's ceiling of " + std::to_string(ceiling) +
+          " bytes; start minera_server with --max-xes-decompressed-bytes " +
+          std::to_string(requested) + " (or more) to allow it");
+    params.xes.max_decompressed_bytes = requested;
   }
 
   // Optional log-preprocessing filters, applied before discovery.
@@ -7228,6 +7240,14 @@ LogConversionOptions parse_log_conversion_params(const FieldLookup& field,
         parse_attribute_list("log_conversion_event_attributes_as_nodes");
   }
   return options;
+}
+
+void set_xes_decompressed_ceiling(std::size_t bytes) noexcept {
+  g_xes_decompressed_ceiling.store(bytes);
+}
+
+std::size_t xes_decompressed_ceiling() noexcept {
+  return g_xes_decompressed_ceiling.load();
 }
 
 }  // namespace minera

@@ -10,23 +10,33 @@
 // Usage: minera_server_parameter_contract_tests <minera_server> <log.csv>
 
 #include <netinet/in.h>
+#include <poll.h>
+#include <sys/time.h>
 #include <signal.h>
 #include <spawn.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <cctype>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "httplib.h"
+#if defined(MINERA_TEST_HAS_ZLIB)
+#include <zlib.h>
+#endif
 
 extern char** environ;
 
@@ -117,6 +127,234 @@ std::size_t count(const std::string& text, const std::string& needle) {
   return total;
 }
 
+
+// A minimal JSON text checker (RFC 8259 syntax; strings are checked for
+// escapes and raw control bytes, UTF-8 separately by valid_utf8).
+class JsonChecker {
+ public:
+  explicit JsonChecker(const std::string& text) : text_(text) {}
+  bool valid() {
+    space();
+    if (!value(0)) return false;
+    space();
+    return at_ == text_.size();
+  }
+
+ private:
+  const std::string& text_;
+  std::size_t at_ = 0;
+  bool more() const { return at_ < text_.size(); }
+  char peek() const { return more() ? text_[at_] : '\0'; }
+  void space() {
+    while (more() && (peek() == ' ' || peek() == '\t' || peek() == '\n' || peek() == '\r')) ++at_;
+  }
+  bool literal(const char* word) {
+    const std::size_t length = std::strlen(word);
+    if (text_.compare(at_, length, word) != 0) return false;
+    at_ += length;
+    return true;
+  }
+  bool digits() {
+    const auto begin = at_;
+    while (more() && peek() >= '0' && peek() <= '9') ++at_;
+    return at_ > begin;
+  }
+  bool number() {
+    if (peek() == '-') ++at_;
+    if (peek() == '0') ++at_;
+    else if (!digits()) return false;
+    if (peek() == '.') { ++at_; if (!digits()) return false; }
+    if (peek() == 'e' || peek() == 'E') {
+      ++at_;
+      if (peek() == '+' || peek() == '-') ++at_;
+      if (!digits()) return false;
+    }
+    return true;
+  }
+  bool string() {
+    if (peek() != '"') return false;
+    ++at_;
+    while (more()) {
+      const auto c = static_cast<unsigned char>(text_[at_++]);
+      if (c == '"') return true;
+      if (c < 0x20) return false;
+      if (c != '\\') continue;
+      if (!more()) return false;
+      const char escape = text_[at_++];
+      if (escape == 'u') {
+        for (int k = 0; k < 4; ++k, ++at_)
+          if (!more() || !std::isxdigit(static_cast<unsigned char>(peek()))) return false;
+      } else if (std::strchr("\"\\/bfnrt", escape) == nullptr || escape == '\0') {
+        return false;
+      }
+    }
+    return false;
+  }
+  bool value(int depth) {
+    if (depth > 512) return false;
+    space();
+    const char c = peek();
+    if (c == '{' || c == '[') {
+      const char close = c == '{' ? '}' : ']';
+      ++at_;
+      space();
+      if (peek() == close) { ++at_; return true; }
+      for (;;) {
+        space();
+        if (c == '{') {
+          if (!string()) return false;
+          space();
+          if (peek() != ':') return false;
+          ++at_;
+        }
+        if (!value(depth + 1)) return false;
+        space();
+        if (peek() == ',') { ++at_; continue; }
+        if (peek() == close) { ++at_; return true; }
+        return false;
+      }
+    }
+    if (c == '"') return string();
+    if (c == 't') return literal("true");
+    if (c == 'f') return literal("false");
+    if (c == 'n') return literal("null");
+    return number();
+  }
+};
+
+bool valid_json(const std::string& text) { return valid_utf8(text) && JsonChecker(text).valid(); }
+
+// One HTTP/1.1 exchange on a fresh loopback connection, read to EOF, so the
+// body is what the server wrote, not what Content-Length promised.
+struct RawResponse {
+  int status = 0;
+  std::string head, body;
+  bool complete = false;
+  std::string header(const std::string& name) const {
+    std::string lower_head = head;
+    for (auto& c : lower_head) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    std::string key = "\r\n" + name + ":";
+    for (auto& c : key) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    const auto at = lower_head.find(key);
+    if (at == std::string::npos) return {};
+    auto begin = at + key.size();
+    while (begin < head.size() && head[begin] == ' ') ++begin;
+    return head.substr(begin, head.find("\r\n", begin) - begin);
+  }
+};
+
+int connect_loopback(int port) {
+  const int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  address.sin_port = htons(static_cast<uint16_t>(port));
+  if (::connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof address) != 0) {
+    ::close(fd);
+    return -1;
+  }
+  timeval timeout{60, 0};
+  ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
+  return fd;
+}
+
+bool send_all(int fd, const std::string& data) {
+  for (std::size_t sent = 0; sent < data.size();) {
+    const auto n = ::send(fd, data.data() + sent, data.size() - sent, MSG_NOSIGNAL);
+    if (n <= 0) return false;
+    sent += static_cast<std::size_t>(n);
+  }
+  return true;
+}
+
+RawResponse read_raw_response(int fd) {
+  std::string raw;
+  char buffer[65536];
+  for (ssize_t n; (n = ::recv(fd, buffer, sizeof buffer, 0)) > 0;) raw.append(buffer, static_cast<std::size_t>(n));
+  ::close(fd);
+  RawResponse response;
+  const auto end = raw.find("\r\n\r\n");
+  if (end == std::string::npos || raw.compare(0, 9, "HTTP/1.1 ") != 0) return response;
+  response.head = raw.substr(0, end);
+  response.body = raw.substr(end + 4);
+  response.status = std::atoi(raw.c_str() + 9);
+  response.complete = true;
+  return response;
+}
+
+std::string host_header(int port) { return "Host: 127.0.0.1:" + std::to_string(port) + "\r\n"; }
+
+RawResponse raw_exchange(int port, const std::string& method, const std::string& target,
+                         const std::string& extra_headers = "", const std::string& body = "",
+                         const std::string& content_type = "application/x-www-form-urlencoded") {
+  const int fd = connect_loopback(port);
+  if (fd < 0) return {};
+  std::string request = method + " " + target + " HTTP/1.1\r\n" + host_header(port) + "Connection: close\r\n" +
+                        extra_headers;
+  if (method == "POST")
+    request += "Content-Type: " + content_type + "\r\nContent-Length: " +
+               std::to_string(body.size()) + "\r\n";
+  request += "\r\n" + body;
+  if (!send_all(fd, request)) { ::close(fd); return {}; }
+  return read_raw_response(fd);
+}
+
+#if defined(MINERA_TEST_HAS_ZLIB)
+// Inflates one complete gzip member; nullopt for anything else (a truncated
+// or trailing-garbage body included).
+std::optional<std::string> gunzip(const std::string& bytes) {
+  z_stream stream{};
+  if (inflateInit2(&stream, 15 + 16) != Z_OK) return std::nullopt;
+  stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(bytes.data()));
+  stream.avail_in = static_cast<uInt>(bytes.size());
+  std::string out;
+  char buffer[65536];
+  int status = Z_OK;
+  while (status == Z_OK) {
+    stream.next_out = reinterpret_cast<Bytef*>(buffer);
+    stream.avail_out = sizeof buffer;
+    status = inflate(&stream, Z_NO_FLUSH);
+    out.append(buffer, sizeof buffer - stream.avail_out);
+  }
+  const bool whole = status == Z_STREAM_END && stream.avail_in == 0;
+  inflateEnd(&stream);
+  if (!whole) return std::nullopt;
+  return out;
+}
+
+std::string gzip_bytes(const std::string& bytes) {
+  z_stream stream{};
+  if (deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) return {};
+  std::string out(deflateBound(&stream, bytes.size()), '\0');
+  stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(bytes.data()));
+  stream.avail_in = static_cast<uInt>(bytes.size());
+  stream.next_out = reinterpret_cast<Bytef*>(out.data());
+  stream.avail_out = static_cast<uInt>(out.size());
+  const bool done = deflate(&stream, Z_FINISH) == Z_STREAM_END;
+  out.resize(stream.total_out);
+  deflateEnd(&stream);
+  return done ? out : std::string{};
+}
+#endif
+
+// A mining body with its source ids blanked, so two mines of one log compare.
+std::string without_source_ids(std::string body) {
+  const std::string key = "\"source_id\":\"";
+  for (std::size_t at = 0; (at = body.find(key, at)) != std::string::npos;) {
+    at += key.size();
+    const auto end = body.find('"', at);
+    if (end == std::string::npos) break;
+    body.erase(at, end - at);
+  }
+  return body;
+}
+
+std::string describe(const RawResponse& response) {
+  if (!response.complete) return "no response";
+  return std::to_string(response.status) + " Content-Length " + response.header("Content-Length") +
+         " body " + std::to_string(response.body.size()) + " " + response.body.substr(0, 200);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -167,6 +405,57 @@ int main(int argc, char** argv) {
       for (auto& [name, value] : fields) items.push_back({name, value, "", ""});
       return client.Post(path, items);
     };
+
+    // OCPN discovery policy defaults (fuzz review H3). One item object with
+    // d, é, a, a: pm4py.discover_oc_petri_net mines it without fall-throughs
+    // and gives ->(d, é, *(tau, a)), so a is optional. Omitted flags must
+    // keep the native defaults (both true) rather than the IM defaults,
+    // which give ->(d, é, *(a, tau)).
+    {
+      const std::string ocel =
+          "{\"ocel:global-event\":{\"ocel:activity\":\"__INVALID__\"},"
+          "\"ocel:global-object\":{\"ocel:type\":\"__INVALID__\"},"
+          "\"ocel:global-log\":{\"ocel:attribute-names\":[],\"ocel:object-types\":[\"item\"],"
+          "\"ocel:version\":\"1.0\",\"ocel:ordering\":\"timestamp\"},\"ocel:events\":{"
+          "\"e0\":{\"ocel:activity\":\"d\",\"ocel:timestamp\":\"2020-01-01T00:00:00\",\"ocel:omap\":[\"o2\"],\"ocel:vmap\":{}},"
+          "\"e1\":{\"ocel:activity\":\"\xc3\xa9\",\"ocel:timestamp\":\"2020-01-02T00:00:00\",\"ocel:omap\":[\"o2\"],\"ocel:vmap\":{}},"
+          "\"e2\":{\"ocel:activity\":\"a\",\"ocel:timestamp\":\"2020-01-03T00:00:00\",\"ocel:omap\":[\"o2\"],\"ocel:vmap\":{}},"
+          "\"e3\":{\"ocel:activity\":\"a\",\"ocel:timestamp\":\"2020-01-03T01:00:00\",\"ocel:omap\":[\"o2\"],\"ocel:vmap\":{}}},"
+          "\"ocel:objects\":{\"o2\":{\"ocel:type\":\"item\",\"ocel:ovmap\":{}}}}";
+      const auto discover = [&](const std::string& query) {
+        return client.Post("/api/ocel/discover?variant=ocpn" + query, ocel, "application/json");
+      };
+      const auto omitted = discover("");
+      const auto enabled = discover("&ocpn_disable_strict_sequence_cut=true&ocpn_disable_fallthroughs=true");
+      const auto disabled = discover("&ocpn_disable_strict_sequence_cut=false&ocpn_disable_fallthroughs=false");
+      check(omitted && omitted->status == 200 && enabled && enabled->status == 200 &&
+                omitted->body == enabled->body,
+            "OCPN discovery defaults both policy flags to true: " + describe(omitted));
+      // Activities are sorted (a, d, é): é feeds place 3, a silent step moves
+      // to place 4, a loops back to 3 and a silent step reaches the sink.
+      check(contains(omitted, "{\"activity\":2,\"inputs\":[2],\"outputs\":[3]},"
+                              "{\"activity\":null,\"inputs\":[3],\"outputs\":[4]},"
+                              "{\"activity\":0,\"inputs\":[4],\"outputs\":[3]},"
+                              "{\"activity\":null,\"inputs\":[4],\"outputs\":[1]}"),
+            "OCPN default net is ->(d, \xc3\xa9, *(tau, a)): " + describe(omitted));
+      check(disabled && disabled->status == 200 && disabled->body != omitted->body,
+            "explicit false OCPN policy flags still select the IM defaults: " + describe(disabled));
+      const auto playout = client.Post(
+          "/api/ocel/playout?model=ocpn&variant=extensive&max_traces=4&include_model=true", ocel,
+          "application/json");
+      const auto playout_enabled = client.Post(
+          "/api/ocel/playout?model=ocpn&variant=extensive&max_traces=4&include_model=true"
+          "&ocpn_disable_strict_sequence_cut=true&ocpn_disable_fallthroughs=true",
+          ocel, "application/json");
+      const auto playout_disabled = client.Post(
+          "/api/ocel/playout?model=ocpn&variant=extensive&max_traces=4&include_model=true"
+          "&ocpn_disable_strict_sequence_cut=false&ocpn_disable_fallthroughs=false",
+          ocel, "application/json");
+      check(playout && playout_enabled && playout_disabled && playout->status == 200 &&
+                playout_enabled->status == 200 && playout_disabled->status == 200 &&
+                playout->body == playout_enabled->body && playout->body != playout_disabled->body,
+            "OCPN playout discovery defaults both policy flags to true: " + describe(playout));
+    }
 
     // Item 8: unknown route and wrong method carry JSON bodies.
     auto result = client.Get("/api/nonexistent");
@@ -480,6 +769,416 @@ int main(int argc, char** argv) {
                 valid_body(result),
             label + " simulation workspace keeps its result and reports xes_error: " +
                 describe(result));
+    }
+
+    // Content-Length after the JSON UTF-8 repair (review H1): a Latin-1 log
+    // makes the handlers write ill-formed UTF-8, which is repaired to U+FFFD
+    // (one byte becomes three) before httplib frames the response, so each
+    // body is exactly Content-Length bytes and parses as JSON. Read over raw
+    // sockets to EOF, so a body longer than its Content-Length is seen.
+    {
+      const std::string latin1_log =
+          "case_id,activity,timestamp\n"
+          "c1,Pr\xfc" "fung,2024-01-01T00:00:00Z\nc1,B\xe4r,2024-01-01T00:01:00Z\n"
+          "c2,Pr\xfc" "fung,2024-01-01T00:00:00Z\nc2,B\xe4r,2024-01-01T00:01:00Z\n";
+      httplib::MultipartFormDataItems items = {{"log", latin1_log, "log.csv", "text/csv"}};
+      result = client.Post("/api/mine", items);
+      check(result && result->status == 200, "Latin-1 sweep mine: " + describe(result));
+      const auto source = source_id_of(result);
+      struct Route { const char* method; std::string target; };
+      const std::vector<Route> routes = {
+          {"GET", "/api/dfg"}, {"GET", "/api/trie"}, {"GET", "/api/dfg-dataframe"},
+          {"GET", "/api/active-source?source_id=" + source}, {"GET", "/api/stochastic-map"},
+          {"GET", "/api/process-tree-petri"}, {"GET", "/api/trie-to-petri"},
+          {"GET", "/api/interval-tree"}, {"GET", "/api/playout?miner=dfg&dfg_playout_traces=3"},
+          {"POST", "/api/dfg"}, {"POST", "/api/discover-dfg"}, {"POST", "/api/case-statistics"},
+          {"POST", "/api/attribute-statistics"}, {"POST", "/api/boundary-activities"},
+          {"POST", "/api/align"}, {"POST", "/api/footprints-workbench"}, {"POST", "/api/features"},
+          {"POST", "/api/cycle-time"}, {"POST", "/api/log-util?variant=split_train_test&include_source=true&source_id=" + source},
+          {"POST", "/api/label-splitting?include_source=true&source_id=" + source},
+          // Error bodies that echo the ill-formed target or value.
+          {"GET", "/api/nonexistent-Pr\xfc" "fung"},
+          {"GET", "/api/dfg?noise_threshold=\xfc"},
+          {"POST", "/api/version"},
+      };
+      int repaired = 0;
+      for (const auto& route : routes) {
+        const auto response = raw_exchange(port, route.method, route.target);
+        const auto what = std::string(route.method) + " " + route.target + ": " + describe(response);
+        check(response.complete, "raw response for " + what);
+        if (!response.complete) continue;
+        check(response.header("Content-Length") == std::to_string(response.body.size()),
+              "body length equals Content-Length for " + what);
+        if (response.header("Content-Type").starts_with("application/json")) {
+          check(valid_json(response.body), "body parses as JSON for " + what);
+          if (response.body.find("\\ufffd") != std::string::npos) ++repaired;
+        }
+      }
+      check(repaired >= 8, "the sweep reached repaired bodies (" + std::to_string(repaired) + ")");
+
+      // A Range request slices the repaired body: 206 with exact framing.
+      const auto full = raw_exchange(port, "GET", "/api/trie");
+      check(full.complete && full.status == 200 && full.body.find("\\ufffd") != std::string::npos,
+            "trie for the range check: " + describe(full));
+      const auto slice = raw_exchange(port, "GET", "/api/trie", "Range: bytes=0-15\r\n");
+      check(slice.status == 206 && slice.body == full.body.substr(0, 16) &&
+                slice.header("Content-Length") == "16" &&
+                slice.header("Content-Range") == "bytes 0-15/" + std::to_string(full.body.size()),
+            "range slice of a repaired body: " + describe(slice));
+      const auto tail = raw_exchange(port, "GET", "/api/trie", "Range: bytes=-10\r\n");
+      check(tail.status == 206 && full.body.size() >= 10 &&
+                tail.body == full.body.substr(full.body.size() - 10) &&
+                tail.header("Content-Length") == "10",
+            "suffix range of a repaired body: " + describe(tail));
+
+      // gzip on Accept-Encoding: the repaired body, compressed after the
+      // repair, inflates to exactly the identity bytes; a Range request
+      // stays identity (206 of the JSON's own bytes); no Accept-Encoding,
+      // no gzip. Without zlib the server answers identity throughout.
+      const auto gz = raw_exchange(port, "GET", "/api/trie", "Accept-Encoding: gzip\r\n");
+      check(gz.complete && gz.status == 200 &&
+                gz.header("Content-Length") == std::to_string(gz.body.size()),
+            "gzip trie framing: " + describe(gz));
+#if defined(MINERA_TEST_HAS_ZLIB)
+      const auto inflated = gunzip(gz.body);
+      check(gz.header("Content-Encoding") == "gzip" && gz.header("Vary") == "Accept-Encoding" &&
+                inflated && *inflated == full.body && gz.body.size() < full.body.size(),
+            "gzip trie inflates to the identity bytes: " + describe(gz));
+      check(full.header("Vary") == "Accept-Encoding" && full.header("Content-Encoding").empty(),
+            "the identity answer names Vary and no encoding: " + full.head);
+#else
+      check(gz.header("Content-Encoding").empty() && gz.body == full.body,
+            "without zlib a gzip request gets the identity body: " + describe(gz));
+#endif
+      const auto gz_slice =
+          raw_exchange(port, "GET", "/api/trie", "Accept-Encoding: gzip\r\nRange: bytes=0-15\r\n");
+      check(gz_slice.status == 206 && gz_slice.header("Content-Encoding").empty() &&
+                gz_slice.body == full.body.substr(0, 16) && gz_slice.header("Content-Length") == "16" &&
+                gz_slice.header("Content-Range") == "bytes 0-15/" + std::to_string(full.body.size()),
+            "a range with Accept-Encoding: gzip is an identity slice: " + describe(gz_slice));
+      const auto gz_head = raw_exchange(port, "GET", "/api/version", "Accept-Encoding: identity\r\n");
+      check(gz_head.status == 200 && gz_head.header("Content-Encoding").empty(),
+            "Accept-Encoding without gzip gets identity: " + describe(gz_head));
+      // A gzip request body is still refused, as without zlib.
+      const auto gz_upload = raw_exchange(port, "POST", "/api/version", "Content-Encoding: gzip\r\n", "x");
+      check(gz_upload.status == 415, "a gzip request body is refused with 415: " + describe(gz_upload));
+
+      // The streamed /api/mine body: the same bytes as an identity mine of
+      // the same log, except its fresh source id.
+      const auto mine_target = [&](const char* id) {
+        return std::string("/api/mine?mining_request_id=00000000-0000-4000-8000-0000000000") + id;
+      };
+      const auto plain_mine = raw_exchange(port, "POST", mine_target("f1"), "", log, "text/csv");
+      result = client.Post("/api/mine-ack?request_id=00000000-0000-4000-8000-0000000000f1", "", "application/x-www-form-urlencoded");
+      const auto gz_mine = raw_exchange(port, "POST", mine_target("f2"), "Accept-Encoding: gzip\r\n", log, "text/csv");
+      result = client.Post("/api/mine-ack?request_id=00000000-0000-4000-8000-0000000000f2", "", "application/x-www-form-urlencoded");
+      check(plain_mine.status == 200 && plain_mine.header("Content-Encoding").empty() &&
+                plain_mine.header("Content-Length") == std::to_string(plain_mine.body.size()),
+            "identity mine: " + describe(plain_mine));
+      check(gz_mine.status == 200 && gz_mine.header("Content-Length") == std::to_string(gz_mine.body.size()),
+            "gzip mine framing: " + describe(gz_mine));
+#if defined(MINERA_TEST_HAS_ZLIB)
+      const auto mined = gunzip(gz_mine.body);
+      check(gz_mine.header("Content-Encoding") == "gzip" && mined &&
+                without_source_ids(*mined) == without_source_ids(plain_mine.body) &&
+                *mined != plain_mine.body,
+            "gzip mine inflates to the identity mine bytes: " + describe(gz_mine));
+#else
+      check(gz_mine.header("Content-Encoding").empty() &&
+                without_source_ids(gz_mine.body) == without_source_ids(plain_mine.body),
+            "without zlib the mine is identity: " + describe(gz_mine));
+#endif
+    }
+
+    // XES size limit (review M1): a request may raise the bound past the old
+    // 256 MiB clamp up to the server ceiling (--max-xes-decompressed-bytes,
+    // 2 GiB by default); above it the error names the flag.
+    {
+      const std::string xes =
+          "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<log xes.version=\"1.0\">"
+          "<trace><string key=\"concept:name\" value=\"c1\"/>"
+          "<event><string key=\"concept:name\" value=\"A\"/><date key=\"time:timestamp\" value=\"2024-01-01T00:00:00.000+00:00\"/></event>"
+          "<event><string key=\"concept:name\" value=\"B\"/><date key=\"time:timestamp\" value=\"2024-01-01T00:01:00.000+00:00\"/></event>"
+          "</trace></log>\n";
+      const auto mine_xes = [&](const std::string& bytes) {
+        httplib::MultipartFormDataItems items = {{"log", xes, "log.xes", "application/xml"},
+                                                 {"xes_max_decompressed_bytes", bytes, "", ""}};
+        return client.Post("/api/mine", items);
+      };
+      result = mine_xes("1073741824");
+      check(result && result->status == 200, "a 1 GiB XES bound is accepted: " + describe(result));
+      result = mine_xes("2147483649");
+      check(result && result->status == 400 && contains(result, "--max-xes-decompressed-bytes") &&
+                contains(result, "2147483648"),
+            "a bound above the ceiling names the flag: " + describe(result));
+      result = mine_xes("100");
+      check(result && result->status == 400 && contains(result, "XES size limit of 100 bytes") &&
+                contains(result, "xes_max_decompressed_bytes"),
+            "a too-small bound names the limit: " + describe(result));
+    }
+
+    // Reader event estimate (review M2): the estimate is exactly the CSV rows
+    // after the header (a trailing newline, blank lines and CRLF add none),
+    // so the per-session limit of 1,000,000 events admits 1,000,000 rows.
+    // Sources above the limit are refused before parsing, with the estimate
+    // in the message; a source within it would be parsed (several GB for a
+    // million rows), so the boundary is checked from above.
+    {
+      const auto rows = [](std::size_t count, const char* newline) {
+        std::string csv = std::string("case_id,activity,timestamp") + newline;
+        csv.reserve(count * 27 + 32);
+        for (std::size_t i = 0; i < count; ++i)
+          csv += "c" + std::to_string(i % 1000) + ",A,2024-01-01T00:00:00Z" + newline;
+        return csv;
+      };
+      for (const auto& [label, source] : std::vector<std::pair<std::string, std::string>>{
+               {"LF", rows(1000001, "\n")},
+               {"CRLF with blank lines", rows(1000001, "\r\n") + "\r\n \r\n\r\n"}}) {
+        httplib::MultipartFormDataItems items = {{"log", source, "log.csv", "text/csv"}};
+        result = client.Post("/api/stream-reader/create?session_id=big&kind=csv_events", items);
+        check(result && result->status == 413 &&
+                  contains(result, "holds up to 1000001 events, above the per-session limit of 1000000"),
+              "a 1,000,001-row reader (" + label + ") is refused with an exact estimate: " + describe(result));
+      }
+    }
+
+    // A body sent below the minimum rate gets 408 naming that rate (review L4).
+    {
+      const int fd = connect_loopback(port);
+      check(fd >= 0, "connect for the slow body");
+      if (fd >= 0) {
+        send_all(fd, "POST /api/mine HTTP/1.1\r\n" + host_header(port) + "Connection: close\r\n"
+                     "Content-Type: multipart/form-data; boundary=x\r\nContent-Length: 1000000\r\n\r\n--x\r\n");
+        // One byte every 200 ms is far below 64 KiB/s; the server cuts it
+        // after the 5 s grace and answers.
+        pollfd poll_fd{fd, POLLIN, 0};
+        for (int drip = 0; drip < 100 && ::poll(&poll_fd, 1, 200) == 0; ++drip) send_all(fd, "x");
+        const auto slow = read_raw_response(fd);
+        check(slow.status == 408 && slow.body.find("KiB/s") != std::string::npos &&
+                  valid_json(slow.body),
+              "a slow body gets 408 naming the minimum rate: " + describe(slow));
+      }
+    }
+  }
+
+  // Idle expiry of live and reader sessions, on a second server with a short
+  // MINERA_STREAM_IDLE_MS: a session nobody names for the expiry is freed and
+  // its share of the stream budget returned; one that keeps getting requests
+  // (snapshots, appends) stays.
+  {
+    ::setenv("MINERA_STREAM_IDLE_MS", "1500", 1);
+    const int idle_port = free_port();
+    const std::string idle_port_text = std::to_string(idle_port);
+    std::vector<std::string> idle_args = {argv[1], "--port", idle_port_text, "--frontend",
+                                          "/nonexistent-minera-frontend"};
+    std::vector<char*> idle_raw;
+    for (auto& arg : idle_args) idle_raw.push_back(arg.data());
+    idle_raw.push_back(nullptr);
+    pid_t idle_server = 0;
+    const bool spawned = ::posix_spawn(&idle_server, argv[1], nullptr, nullptr, idle_raw.data(), environ) == 0;
+    ::unsetenv("MINERA_STREAM_IDLE_MS");
+    check(spawned, "start the idle-expiry server");
+    if (spawned) {
+      httplib::Client idle("127.0.0.1", idle_port);
+      idle.set_read_timeout(60, 0);
+      bool idle_ready = false;
+      for (int attempt = 0; attempt < 200 && !idle_ready; ++attempt) {
+        if (auto r = idle.Get("/api/version"); r && r->status == 200) idle_ready = true;
+        else std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      }
+      check(idle_ready, "idle-expiry server answers /api/version");
+      const auto form = "application/x-www-form-urlencoded";
+      auto r = idle.Post("/api/live-stream/create?method=dfg&session_id=idle_live", "", form);
+      check(r && r->status == 200, "idle live create: " + describe(r));
+      r = idle.Post("/api/live-stream/create?method=dfg&session_id=kept_live", "", form);
+      check(r && r->status == 200, "kept live create: " + describe(r));
+      {
+        httplib::MultipartFormDataItems items = {{"log", log, "log.csv", "text/csv"}};
+        r = idle.Post("/api/live-stream/append?session_id=idle_live&expected_revision=0&batch_id=b1&format=csv", items);
+        check(r && r->status == 200, "idle live append: " + describe(r));
+        r = idle.Post("/api/stream-reader/create?session_id=idle_reader&kind=csv_events", items);
+        check(r && r->status == 200, "idle reader create: " + describe(r));
+      }
+      r = idle.Get("/api/live-stream/list");
+      check(r && r->status == 200 && contains(r, "\"stream_budget\":{\"bytes\":") &&
+                !contains(r, "\"stream_budget\":{\"bytes\":0,\"events\":0,"),
+            "the sessions hold stream budget: " + describe(r));
+      // Keep one session in use for twice the expiry: snapshots, then an append.
+      int kept_revision = 0;
+      for (int step = 0; step < 8; ++step) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+        if (step == 5) {
+          httplib::MultipartFormDataItems items = {{"log", log, "log.csv", "text/csv"}};
+          r = idle.Post("/api/live-stream/append?session_id=kept_live&expected_revision=" +
+                            std::to_string(kept_revision) + "&batch_id=k1&format=csv", items);
+          check(r && r->status == 200, "an append keeps the session: " + describe(r));
+          ++kept_revision;
+        } else {
+          r = idle.Get("/api/live-stream/snapshot?session_id=kept_live&wait_until_drained=false");
+          check(r && r->status == 200, "a snapshot keeps the session (step " + std::to_string(step) + "): " + describe(r));
+        }
+      }
+      r = idle.Get("/api/live-stream/snapshot?session_id=idle_live");
+      check(r && r->status == 404 && contains(r, "expired after being idle"),
+            "an idle live session expires: " + describe(r));
+      r = idle.Get("/api/stream-reader/snapshot?session_id=idle_reader");
+      check(r && r->status == 404 && contains(r, "expired after being idle"),
+            "an idle reader session expires: " + describe(r));
+      r = idle.Get("/api/live-stream/snapshot?session_id=kept_live&wait_until_drained=false");
+      check(r && r->status == 200, "the session in use stays: " + describe(r));
+      r = idle.Get("/api/live-stream/list");
+      check(r && r->status == 200 && contains(r, "\"session_id\":\"kept_live\"") &&
+                !contains(r, "idle_live"),
+            "the live list holds only the session in use: " + describe(r));
+      r = idle.Get("/api/stream-reader/list");
+      check(r && r->status == 200 && contains(r, "{\"sessions\":[],"),
+            "the reader list is empty: " + describe(r));
+      // Only the kept session's append (log bytes and events) is still charged.
+      const auto kept_events = r ? r->body.find("\"stream_budget\":{\"bytes\":" + std::to_string(log.size()) + ",") : std::string::npos;
+      check(kept_events != std::string::npos,
+            "the expired sessions returned their budget: " + describe(r));
+      ::kill(idle_server, SIGTERM);
+      int idle_status = 0;
+      ::waitpid(idle_server, &idle_status, 0);
+    }
+  }
+
+  // Mining admission, on a third server: MINERA_MINE_STAGE_PAUSE_MS slows
+  // every stage boundary (250 ms) so the checks can act while a 4-event mine
+// runs;
+  // --mine-memory-budget 2000000 admits about 122 events of a three-column
+  // CSV (16 KiB each) and --max-mine-events 60 fewer.
+  {
+    ::setenv("MINERA_MINE_STAGE_PAUSE_MS", "250", 1);
+    const int limit_port = free_port();
+    const std::string limit_port_text = std::to_string(limit_port);
+    std::vector<std::string> limit_args = {argv[1], "--port", limit_port_text, "--frontend",
+                                           "/nonexistent-minera-frontend", "--mine-memory-budget",
+                                           "2000000", "--max-mine-events", "60"};
+    std::vector<char*> limit_raw;
+    for (auto& arg : limit_args) limit_raw.push_back(arg.data());
+    limit_raw.push_back(nullptr);
+    pid_t limit_server = 0;
+    const bool spawned = ::posix_spawn(&limit_server, argv[1], nullptr, nullptr, limit_raw.data(), environ) == 0;
+    ::unsetenv("MINERA_MINE_STAGE_PAUSE_MS");
+    check(spawned, "start the mining-admission server");
+    if (spawned) {
+      httplib::Client limits("127.0.0.1", limit_port);
+      limits.set_read_timeout(60, 0);
+      bool limit_ready = false;
+      for (int attempt = 0; attempt < 200 && !limit_ready; ++attempt) {
+        if (auto r = limits.Get("/api/version"); r && r->status == 200) limit_ready = true;
+        else std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      }
+      check(limit_ready, "mining-admission server answers /api/version");
+      const auto form = "application/x-www-form-urlencoded";
+      const auto mine_on = [&](httplib::Client& client_, const std::string& bytes,
+                               std::vector<std::pair<std::string, std::string>> fields) {
+        httplib::MultipartFormDataItems items = {{"log", bytes, "log.csv", "text/csv"}};
+        for (auto& [name, value] : fields) items.push_back({name, value, "", ""});
+        return client_.Post("/api/mine", items);
+      };
+      const auto generated = [](int cases, int per_case) {
+        std::string csv = "case_id,activity,timestamp\n";
+        for (int c = 0; c < cases; ++c)
+          for (int e = 0; e < per_case; ++e)
+            csv += "c" + std::to_string(c) + ",A" + std::to_string(e) + ",2024-01-01T00:0" +
+                   std::to_string(e) + ":00Z\n";
+        return csv;
+      };
+
+      // 413 MINE_LIMIT, before anything is parsed (no stage pause applies).
+      auto r = mine_on(limits, generated(100, 3), {});
+      check(r && r->status == 413 && contains(r, "\"family\":\"MINE_LIMIT\"") &&
+                contains(r, "\"limit\":\"mine_memory_budget\"") &&
+                contains(r, "\"estimated_events\":300,") &&
+                contains(r, "\"estimated_bytes\":3072000,") &&
+                contains(r, "\"memory_budget_bytes\":2000000,") &&
+                contains(r, "\"max_mine_events\":60,") &&
+                contains(r, "--mine-memory-budget") && valid_json(r->body),
+            "an over-budget log gets 413 MINE_LIMIT with the estimate: " + describe(r));
+      r = mine_on(limits, generated(20, 4), {});
+      check(r && r->status == 413 && contains(r, "\"limit\":\"max_mine_events\"") &&
+                contains(r, "\"estimated_events\":80,") && contains(r, "--max-mine-events"),
+            "a log over --max-mine-events gets 413 MINE_LIMIT: " + describe(r));
+      // An XES log is estimated from its <event> tags (and, with zlib, a gzip
+      // one as it inflates); three attribute keys mean no extra columns.
+      {
+        std::string xes = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<log xes.version=\"1.0\">";
+        for (int c = 0; c < 50; ++c) {
+          xes += "<trace><string key=\"concept:name\" value=\"c" + std::to_string(c) + "\"/>";
+          for (int e = 0; e < 4; ++e)
+            xes += "<event><string key=\"concept:name\" value=\"A" + std::to_string(e) +
+                   "\"/><date key=\"time:timestamp\" value=\"2024-01-01T00:0" + std::to_string(e) +
+                   ":00.000+00:00\"/></event>";
+          xes += "</trace>";
+        }
+        xes += "</log>\n";
+        std::vector<std::pair<std::string, std::string>> uploads = {{"log.xes", xes}};
+#if defined(MINERA_TEST_HAS_ZLIB)
+        uploads.push_back({"log.xes.gz", gzip_bytes(xes)});
+#endif
+        for (const auto& [name, bytes] : uploads) {
+          httplib::MultipartFormDataItems items = {{"log", bytes, name, "application/octet-stream"}};
+          const auto x = limits.Post("/api/mine", items);
+          check(x && x->status == 413 && contains(x, "\"limit\":\"mine_memory_budget\"") &&
+                    contains(x, "\"estimated_events\":200,") && contains(x, "\"extra_columns\":0,") &&
+                    contains(x, "\"estimated_bytes\":2048000,"),
+                name + " over the budget gets 413 MINE_LIMIT: " + describe(x));
+        }
+      }
+      // The whole upload is imported, so sampling does not lift the cap.
+      r = mine_on(limits, generated(100, 3), {{"sample_cases", "10"}, {"sample_seed", "1"}});
+      check(r && r->status == 413 && contains(r, "\"estimated_events\":300,"),
+            "a sampled mine is estimated on the whole upload: " + describe(r));
+      // A log within both limits is admitted.
+      r = mine_on(limits, generated(15, 4), {});
+      check(r && r->status == 200 && contains(r, "\"event_count\": 60"),
+            "a log at --max-mine-events is admitted: " + describe(r));
+
+      // One mine at a time; a cancel stops the running one at its next stage.
+      const std::string slow_id = "00000000-0000-4000-8000-0000000000c1";
+      httplib::Result slow;
+      const auto slow_start = std::chrono::steady_clock::now();
+      auto slow_end = slow_start;
+      std::atomic<bool> slow_done = false;
+      std::thread runner([&] {
+        httplib::Client own("127.0.0.1", limit_port);
+        own.set_read_timeout(60, 0);
+        slow = mine_on(own, log, {{"mining_request_id", slow_id}});
+        slow_end = std::chrono::steady_clock::now();
+        slow_done = true;
+      });
+      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+      r = mine_on(limits, log, {});
+      check(r && r->status == 503 && r->get_header_value("Retry-After") == "5" &&
+                contains(r, "\"family\":\"MINE_BUSY\"") &&
+                contains(r, "Another log is being mined \\u2014 wait or cancel it.") &&
+                contains(r, "\"canceling\":false"),
+            "a second mine while one runs gets 503 with Retry-After: " + describe(r));
+      r = limits.Post("/api/cancel-mine?request_id=" + slow_id, "", form);
+      check(r && r->status == 200 && contains(r, "\"canceled\":true"), "cancel the running mine: " + describe(r));
+      const auto canceled_at = std::chrono::steady_clock::now();
+      r = mine_on(limits, log, {});
+      if (!slow_done || (r && r->status == 503))
+        check(r && r->status == 503 && r->get_header_value("Retry-After") == "1" &&
+                  contains(r, "\"canceling\":true"),
+              "while the canceled mine winds down, 503 says so: " + describe(r));
+      runner.join();
+      const auto after_cancel = std::chrono::duration_cast<std::chrono::milliseconds>(slow_end - canceled_at).count();
+      const auto whole = std::chrono::duration_cast<std::chrono::milliseconds>(slow_end - slow_start).count();
+      check(slow && slow->status == 400 && contains(slow, "mining request was canceled or replaced"),
+            "the canceled mine answers the canceled response: " + describe(slow));
+      // About 20 stage boundaries at 250 ms make an uncanceled run take 5 s.
+      check(after_cancel < 1500 && whole < 4000,
+            "the canceled mine stops at its next stage (" + std::to_string(after_cancel) + " ms after the cancel, " +
+                std::to_string(whole) + " ms in all)");
+      r = mine_on(limits, log, {});
+      check(r && r->status == 200 && contains(r, "\"source_id\":"),
+            "once the slot is free a mine runs to completion: " + describe(r));
+      ::kill(limit_server, SIGTERM);
+      int limit_status = 0;
+      ::waitpid(limit_server, &limit_status, 0);
     }
   }
 

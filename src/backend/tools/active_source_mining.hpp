@@ -24,6 +24,8 @@ void handle_active_source_mining(const httplib::Request& request,
   std::map<std::string, std::string> records;
   std::map<std::string, std::string> options_overrides;
   const auto run = [&](const std::string& family, std::string_view input_kind, const auto& call) {
+    // A canceled or superseded request stops before its next family.
+    abort_if_mining_canceled(ticket);
     std::string result = "null", error = "null";
     bool native_returned = false;
     try {result = call(native_returned);}
@@ -39,9 +41,10 @@ void handle_active_source_mining(const httplib::Request& request,
   };
   const auto selected = active_source_shape(session->active_source->selected_kind());
   run("source_log_preparation", "source_conversion", [&](bool& native_returned) {
-    session->log = session->active_source->checked_log(); session->log_ready = true;
+    // Shared with active_source (which the session keeps), not copied.
+    session->log_view = &session->active_source->checked_log(); session->log_ready = true;
     native_returned = true;
-    return minera::serialize_active_source_log_json(session->log);
+    return minera::serialize_active_source_log_json(session_log(*session));
   });
   run("directly_follows_graph", "log", [&](bool& native_returned) {
     session->graph = minera::discover_directly_follows_graph(require_prepared_log(*session));
@@ -159,14 +162,14 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   std::optional<minera::PerformanceSpectrum> spectrum;
   if (!params.spectrum_activities.empty()) run("performance_spectrum", "selected_native_variant", [&](bool& native_returned) {
-    spectrum = discover_selected_performance_spectrum(session->log, params.spectrum_activities,
+    spectrum = discover_selected_performance_spectrum(session_log(*session), params.spectrum_activities,
         params.spectrum, session->active_source.get());
     native_returned = true;
     return minera::serialize_active_source_spectrum_json(*spectrum);
   });
   std::optional<minera::BatchDiscovery> batches;
   if (params.batches) run("batches", "selected_native_variant", [&](bool& native_returned) {
-    batches = discover_selected_batches(session->log, params.batch_options, session->active_source.get());
+    batches = discover_selected_batches(session_log(*session), params.batch_options, session->active_source.get());
     native_returned = true;
     return minera::serialize_active_source_batches_json(*batches);
   });
@@ -224,7 +227,7 @@ void handle_active_source_mining(const httplib::Request& request,
     if (!session->alpha_log_ready || !session->tree_ready || !session->powl ||
         !net("inductive") || !net("alpha") || !net("heuristic") || !net("powl"))
       throw std::invalid_argument("requested footprint bundle requires successfully discovered source models");
-    footprints = analyze_footprints(require_prepared_log(*session), require_graph(*session), session->alpha_log,
+    footprints = analyze_footprints(require_prepared_log(*session), require_graph(*session), session_alpha_log(*session),
         session->tree, *session->powl, *net("inductive"), *net("alpha"), *net("heuristic"), *net("powl"), params.footprints,
         session->active_source.get());
     native_returned = true;
@@ -257,7 +260,7 @@ void handle_active_source_mining(const httplib::Request& request,
         native_returned = true;
         return "{\"representation\":\"analysis_presentation\"}";
       });
-      analysis = minera::analysis_json(dataset, session->log, graph,
+      analysis = minera::analysis_json(dataset, session_log(*session), graph,
           session->tree_ready ? &session->tree : nullptr, net("alpha"), heuristics ? &*heuristics : nullptr,
           &conformance, performance ? &*performance : nullptr, resources ? &*resources : nullptr,
           durations ? &*durations : nullptr, eventually ? &*eventually : nullptr,

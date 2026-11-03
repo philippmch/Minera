@@ -1336,9 +1336,17 @@ class Replayer {
       const detail::ReplayMarkingKeys& target_keys,
       const std::vector<std::string>& place_names,
       const TokenReplayOptions& options) const {
-    if (!has_supplied_hidden_paths(options))
-      return detail::silent_place_paths(source_keys, target_keys, net_, place_names, 51,
-          options.place_outgoing_transition_order ? &*options.place_outgoing_transition_order : nullptr);
+    if (!has_supplied_hidden_paths(options)) {
+      // The structural search trees are the net's, not the marking's: grow
+      // them once per replayer instead of once per routing query.
+      const auto* order = options.place_outgoing_transition_order
+                              ? &*options.place_outgoing_transition_order
+                              : nullptr;
+      if (!place_path_index_ ||
+          !place_path_index_->matches(net_, source_keys.size(), 51, order))
+        place_path_index_.emplace(net_, source_keys.size(), 51, order);
+      return place_path_index_->paths(source_keys, target_keys, place_names);
+    }
     std::vector<detail::HiddenPlacePath> result;
     const auto* matrix = std::get_if<TokenReplayHiddenPathMatrix>(
         &*options.places_shortest_path_by_hidden);
@@ -1958,6 +1966,12 @@ class Replayer {
       Marking& marking, Counts& counts,
       std::vector<std::size_t>* fired = nullptr) const {
     if (marking_has_final_places(marking, final_)) return;
+    // A final place that no silent firing can ever mark rules the route out
+    // (the relaxed fixpoint over-approximates the silently markable places),
+    // so skip the search, which could only end at its cap without a path.
+    const auto reachable = relaxed_silent_places(marking);
+    for (std::size_t place = 0; place < final_.size() && place < reachable.size(); ++place)
+      if (final_[place] > 0 && !reachable[place]) return;
     const auto path = silent_path(
         marking, [&](const Marking& candidate) {
           return marking_has_final_places(candidate, final_);
@@ -1980,6 +1994,7 @@ class Replayer {
   mutable std::unordered_map<std::pair<Marking, std::size_t>, Step, StepKeyHash>
       step_cache_, direct_step_cache_;
   mutable std::unordered_map<Marking, Step, MarkingHash> finish_cache_;
+  mutable std::optional<detail::SilentPlacePathIndex> place_path_index_;
   mutable std::vector<std::optional<ArcWeights>> arc_weights_;
   mutable std::vector<std::optional<InputChecks>> input_checks_;
   bool place_closure_exact_ = false;
@@ -3554,6 +3569,51 @@ class Aligner {
     return next;
   }
 
+  // Markings met by the model-run searches, each stored once.  Search
+  // entries refer to markings by id; ties in the frontier are still broken by
+  // comparing the markings themselves, so expansion order is unchanged.
+  class MarkingTable {
+   public:
+    MarkingTable() : ids_(16, IdHash{this}, IdEqual{this}) {}
+    MarkingTable(const MarkingTable&) = delete;
+    MarkingTable& operator=(const MarkingTable&) = delete;
+
+    // Returns the id of the marking and whether it was added by this call.
+    std::pair<std::uint32_t, bool> intern(Marking marking) {
+      if (markings_.size() >= std::numeric_limits<std::uint32_t>::max())
+        throw std::length_error("model-run search marking table overflow");
+      const auto id = static_cast<std::uint32_t>(markings_.size());
+      hashes_.push_back(MarkingHash{}(marking));
+      markings_.push_back(std::move(marking));
+      const auto [found, inserted] = ids_.insert(id);
+      if (!inserted) {
+        markings_.pop_back();
+        hashes_.pop_back();
+      }
+      return {*found, inserted};
+    }
+    [[nodiscard]] const Marking& operator[](std::uint32_t id) const {
+      return markings_[id];
+    }
+
+   private:
+    struct IdHash {
+      const MarkingTable* table;
+      std::size_t operator()(std::uint32_t id) const noexcept {
+        return table->hashes_[id];
+      }
+    };
+    struct IdEqual {
+      const MarkingTable* table;
+      bool operator()(std::uint32_t left, std::uint32_t right) const noexcept {
+        return table->markings_[left] == table->markings_[right];
+      }
+    };
+    std::vector<Marking> markings_;
+    std::vector<std::size_t> hashes_;
+    std::unordered_set<std::uint32_t, IdHash, IdEqual> ids_;
+  };
+
   // Cheapest count of visible transitions on any run from the initial to the
   // final marking, found by the same uniform-cost search with no trace, or
   // std::nullopt when the final marking is unreachable within the search bound.
@@ -3561,12 +3621,18 @@ class Aligner {
       const AlignmentOptions& options,
       std::chrono::steady_clock::time_point deadline,
       bool& exhausted) const {
-    Marking start = initial_;
-    std::priority_queue<std::pair<std::uint64_t, Marking>,
-                        std::vector<std::pair<std::uint64_t, Marking>>,
-                        std::greater<>>
-        frontier;
-    std::unordered_map<Marking, std::uint64_t, MarkingHash> best{{start, 0}};
+    constexpr std::uint64_t kUnseen = std::numeric_limits<std::uint64_t>::max();
+    MarkingTable table;
+    std::vector<std::uint64_t> best;  // by marking id; kUnseen when absent
+    using Entry = std::pair<std::uint64_t, std::uint32_t>;  // cost, marking id
+    // Orders like std::greater over (cost, Marking).
+    const auto later = [&](const Entry& left, const Entry& right) {
+      if (left.first != right.first) return left.first > right.first;
+      return table[left.second] > table[right.second];
+    };
+    std::priority_queue<Entry, std::vector<Entry>, decltype(later)> frontier(later);
+    const auto start = table.intern(initial_).first;
+    best.push_back(0);
     frontier.push({0, start});
     const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
                                                         : options.max_states;
@@ -3577,20 +3643,20 @@ class Aligner {
         return std::nullopt;
       }
       ++expanded;
-      auto [cost, marking] = frontier.top();  // top() is const&: this copies
+      const auto [cost, id] = frontier.top();
       frontier.pop();
-      const auto it = best.find(marking);
-      if (it != best.end() && cost > it->second) continue;
+      if (best[id] != kUnseen && cost > best[id]) continue;
+      const Marking& marking = table[id];
       if (marking == final_) return cost;
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
-        if (!enabled(marking, t)) continue;
-        Marking next = fire(marking, t);
+        if (!enabled(table[id], t)) continue;
         const std::uint64_t next_cost =
             cost + (net_.transitions()[t].silent() ? 0 : 1);
-        const auto found = best.find(next);
-        if (found != best.end() && found->second <= next_cost) continue;
+        const auto [next, added] = table.intern(fire(table[id], t));
+        if (added) best.push_back(kUnseen);
+        if (best[next] != kUnseen && best[next] <= next_cost) continue;
         best[next] = next_cost;
-        frontier.push({next_cost, std::move(next)});
+        frontier.push({next_cost, next});
       }
     }
     exhausted = !frontier.empty();
@@ -3618,12 +3684,31 @@ class Aligner {
       if (!lp.feasible) return std::nullopt;
       return static_cast<std::uint64_t>(std::max(0.0, std::ceil(lp.objective - 1e-6)));
     };
-    using Entry = std::tuple<std::uint64_t, std::uint64_t, Marking>;  // f, g, marking
-    std::priority_queue<Entry, std::vector<Entry>, std::greater<>> frontier;
-    std::unordered_map<Marking, std::uint64_t, MarkingHash> best{{initial_, 0}};
-    const auto start_bound = bound(initial_);
+    constexpr std::uint64_t kUnseen = std::numeric_limits<std::uint64_t>::max();
+    // The bound depends on the marking alone (solve_lp is deterministic), so
+    // it is solved once per marking, including markings it rules out.
+    struct Known {
+      std::uint64_t best = kUnseen;
+      bool bounded = false;
+      std::optional<std::uint64_t> bound;
+    };
+    MarkingTable table;
+    std::vector<Known> known;  // by marking id
+    using Entry = std::tuple<std::uint64_t, std::uint64_t, std::uint32_t>;  // f, g, marking id
+    // Orders like std::greater over (f, g, Marking).
+    const auto later = [&](const Entry& left, const Entry& right) {
+      if (std::get<0>(left) != std::get<0>(right))
+        return std::get<0>(left) > std::get<0>(right);
+      if (std::get<1>(left) != std::get<1>(right))
+        return std::get<1>(left) > std::get<1>(right);
+      return table[std::get<2>(left)] > table[std::get<2>(right)];
+    };
+    std::priority_queue<Entry, std::vector<Entry>, decltype(later)> frontier(later);
+    const auto start = table.intern(initial_).first;
+    known.push_back({0, true, bound(initial_)});
+    const auto start_bound = known[start].bound;
     if (!start_bound) return std::nullopt;
-    frontier.push({*start_bound, 0, initial_});
+    frontier.push({*start_bound, 0, start});
     const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
                                                         : options.max_states;
     std::size_t expanded = 0;
@@ -3633,21 +3718,25 @@ class Aligner {
         return std::nullopt;
       }
       ++expanded;
-      auto [f, cost, marking] = frontier.top();
+      const auto [f, cost, id] = frontier.top();
+      (void)f;
       frontier.pop();
-      const auto it = best.find(marking);
-      if (it != best.end() && cost > it->second) continue;
-      if (marking == final_) return cost;
+      if (known[id].best != kUnseen && cost > known[id].best) continue;
+      if (table[id] == final_) return cost;
       for (std::size_t t = 0; t < tcount; ++t) {
-        if (!enabled(marking, t)) continue;
-        Marking next = fire(marking, t);
+        if (!enabled(table[id], t)) continue;
         const std::uint64_t next_cost = cost + (net_.transitions()[t].silent() ? 0 : 1);
-        const auto found = best.find(next);
-        if (found != best.end() && found->second <= next_cost) continue;
-        const auto h = bound(next);
+        const auto [next, added] = table.intern(fire(table[id], t));
+        if (added) known.emplace_back();
+        if (known[next].best != kUnseen && known[next].best <= next_cost) continue;
+        if (!known[next].bounded) {
+          known[next].bound = bound(table[next]);
+          known[next].bounded = true;
+        }
+        const auto h = known[next].bound;
         if (!h) continue;
-        best[next] = next_cost;
-        frontier.push({next_cost + *h, next_cost, std::move(next)});
+        known[next].best = next_cost;
+        frontier.push({next_cost + *h, next_cost, next});
       }
     }
     exhausted = !frontier.empty();
@@ -3797,8 +3886,10 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
   }
 
   // Emit the relation: for every visible edge m -a-> m', a is directly
-  // followed by everything observable at m'.
-  Relation relation;
+  // followed by everything observable at m'. The pairs are first OR-ed into
+  // one bit row per activity (a set of pairs ignores repeats), then named
+  // once, rather than inserting a string pair for every edge and label.
+  std::vector<std::uint64_t> follows(acts * words, 0);
   for (std::uint32_t id = 0; id < count; ++id) {
     if (!was_expanded[id]) continue;
     const Marking& current = *by_id[id];
@@ -3807,13 +3898,16 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
       const auto found = index.find(fire(current, transition));
       if (found == index.end()) continue;
       const std::uint32_t next = found->second;
-      for (std::size_t b = 0; b < acts; ++b) {
-        if (labels[next * words + b / 64] & (std::uint64_t{1} << (b % 64))) {
-          relation.emplace(names[*transition.activity], names[b]);
-        }
-      }
+      const std::size_t row = *transition.activity * words;
+      for (std::size_t w = 0; w < words; ++w)
+        follows[row + w] |= labels[next * words + w];
     }
   }
+  Relation relation;
+  for (std::size_t a = 0; a < acts; ++a)
+    for (std::size_t b = 0; b < acts; ++b)
+      if (follows[a * words + b / 64] & (std::uint64_t{1} << (b % 64)))
+        relation.emplace(names[a], names[b]);
   return relation;
 }
 
