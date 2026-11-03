@@ -1,4 +1,5 @@
 import { ilpMinerQuery, geneticMinerQuery } from "./api";
+import { backendFetch } from "./backend-fetch";
 import { isILPMinerResult, isGeneticMinerResult, type ILPMinerResult, type GeneticMinerResult, type ILPMinerOptions, type GeneticMinerOptions } from "./types";
 import { computePetriLayout } from "./petri-layout";
 
@@ -28,7 +29,7 @@ export function isDiscoveryModel(value:unknown):value is Omit<DiscoveryModel,"re
 export async function requestDiscoveryModel(family:DiscoveryFamily,sourceId:string,options:ILPMinerOptions|GeneticMinerOptions,signal?:AbortSignal):Promise<DiscoveryModel> {
   if(!sourceId)throw new Error("Refresh the discovery source first.");
   const query=new URLSearchParams(family==="ilp"?ilpMinerQuery(options as ILPMinerOptions):geneticMinerQuery(options as GeneticMinerOptions));query.set("source_id",sourceId);query.set("include_pnml","true");
-  const response=await fetch(`/api/${family}-mine?${query}`,{method:"POST",...(signal?{signal}:{})});const raw=await response.text();let value:unknown;
+  const response=await backendFetch(`/api/${family}-mine?${query}`,{method:"POST",...(signal?{signal}:{})});const raw=await response.text();let value:unknown;
   try{value=JSON.parse(raw);}catch{throw new Error("The backend returned an invalid discovery response.");}
   if(value&&typeof value==="object"&&"error"in value)throw new Error(String((value as {error:unknown}).error));
   if(!response.ok)throw new Error(`Discovery returned ${response.status}.`);

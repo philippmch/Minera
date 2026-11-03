@@ -62,6 +62,9 @@ inline RepositoryHistoryTransport repository_history_http_transport() {
     client.set_connection_timeout(10);
     client.set_read_timeout(30);
     client.set_write_timeout(10);
+    // The same 64 MiB response bound as the WinHTTP transport, applied while
+    // the body streams in.
+    client.set_payload_max_length(64ULL * 1024 * 1024);
     httplib::Headers headers{{"Accept", "application/json"},
                              {"User-Agent", "Minera"}};
     if (!token.empty())

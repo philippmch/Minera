@@ -1,4 +1,5 @@
 import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart";
+import { backendFetch } from "./backend-fetch";
 import {nativeCell, nativeJson, parseNativeJson} from "./native-json";
 import {nativeResponseJson, nativeResponseRequest, readNativeResponse} from "./native-response";
 import {diagnosticCsv, nativeObjectTables, type DiagnosticTable} from "./model-diagnostics";
@@ -109,7 +110,7 @@ export async function runOriginalModelContext(model: File, form: OriginalModelCo
  // actual Content-Disposition filename spelling and filename presence instead.
  for (const [key, entry] of body) {const filename = typeof entry === "string" ? null : await originalEditDistanceWireFilename(entry.name), raw = fields.find(([name]) => name === key)?.[1]; expected.set(key, {bytes: bytes[key] ?? nativeStringBytes(raw ?? ""), file: filename !== null, filename: filename ?? ""});}
  signal?.throwIfAborted();
- const response = await fetch("/api/llm-context", {method: "POST", body, signal}), value = await readNativeResponse(response, {path: "/api/llm-context", fields}); signal?.throwIfAborted();
+ const response = await backendFetch("/api/llm-context", {method: "POST", body, signal}), value = await readNativeResponse(response, {path: "/api/llm-context", fields}); signal?.throwIfAborted();
  if (!isOriginalModelContextEnvelope(value)) throw new Error(`Invalid original-model context envelope (HTTP ${response.status}).`);
  if (!sameBytes(stringBytes(value.variant), nativeStringBytes(form.variant)) || value.input_context.model_format !== form.modelFormat || !sameBytes(stringBytes(value.input_context.filename), nativeStringBytes(expected.get("model_file")!.filename)) || !sameBytes(stringBytes(value.original_model), bytes.model_file) || BigInt(String(nativeCell(value.input_context, "original_model_bytes"))) !== BigInt(model.size)) throw new Error("Original context response does not match the submitted model File and format.");
  const parts = [...value.original_inputs, ...value.query_inputs];

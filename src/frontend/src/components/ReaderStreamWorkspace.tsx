@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { readStored, writeStored } from "../storage";
 import { actReader, createReader, defaultReaderForm, getReader, listReaders, readReader, readerExport, readerExportImportOptions, readerFormFrom, readerOriginal, READER_KINDS, LIVE_XES_VARIANTS, type ReaderAction, type ReaderForm, type ReaderRun, type ReaderSnapshot } from "../reader-stream-workspace";
 import { type CsvOptions } from "../api";
 import { downloadQueryBlob } from "../log-query";
@@ -8,11 +9,11 @@ import { cellText } from "../transformation-workspace";
 
 export function ReaderStreamWorkspace({file=null,busy=false,onOpen}:{file?:File|null;busy?:boolean;onOpen?:(file:File,activityAttribute:string,importOptions?:CsvOptions)=>void}) {
   const [form,setForm]=useState(defaultReaderForm),[upload,setUpload]=useState<File|null>(null),[run,setRun]=useState<ReaderRun|null>(null),[sessions,setSessions]=useState<ReaderSnapshot[]>([]);
-  const [connection,setConnection]=useState(()=>typeof localStorage==="undefined"?"":localStorage.getItem("minera.readerSession")??"");
+  const [connection,setConnection]=useState(()=>readStored("minera.readerSession")??"");
   const [maximum,setMaximum]=useState("25"),[selection,setSelection]=useState("read_items"),[page,setPage]=useState(0),[column,setColumn]=useState(0),[scope,setScope]=useState<"read"|"delivered">("delivered"),[variant,setVariant]=useState("line_by_line"),[gzip,setGzip]=useState(false);
   const [pending,setPending]=useState(false),[error,setError]=useState<string|null>(null);const request=useRef<AbortController|null>(null);
   const cancel=()=>{request.current?.abort();request.current=null;setPending(false);};useEffect(()=>()=>request.current?.abort(),[]);
-  const remember=(id:string)=>{setConnection(id);if(typeof localStorage!=="undefined")localStorage.setItem("minera.readerSession",id);};
+  const remember=(id:string)=>{setConnection(id);writeStored("minera.readerSession",id);};
   const operation=async<T,>(task:(signal:AbortSignal)=>Promise<T>,accept:(value:T)=>void)=>{cancel();const c=new AbortController();request.current=c;setPending(true);setError(null);try{const value=await task(c.signal);if(request.current===c&&!c.signal.aborted)accept(value);}catch(cause){if(request.current===c&&!c.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}finally{if(request.current===c){request.current=null;setPending(false);}}};
   const accept=(next:ReaderRun)=>{setRun(next);remember(next.result.session_id);setForm(readerFormFrom(next.result));setPage(0);setColumn(0);};
   const create=()=>{if(upload){const id=crypto.randomUUID();remember(id);void operation(signal=>createReader(form,id,upload,signal),accept);}};

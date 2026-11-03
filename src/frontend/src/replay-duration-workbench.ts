@@ -1,4 +1,5 @@
 import {activeMiningSourceTables, miningSourceHash} from "./active-mining-source";
+import { backendFetch } from "./backend-fetch";
 import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart";
 import {nativeCell, nativeJson, parseNativeJson} from "./native-json";
 import {nativeResponseJson, nativeResponseRequest, readNativeResponse} from "./native-response";
@@ -73,7 +74,7 @@ export async function runReplayDurationWorkbench(log: File, model: File | null, 
   if (saved !== null && (analysis.mode !== "saved_diagnostics" || Object.hasOwn(analysis, "saved_diagnostics"))) throw new Error("Saved diagnostic file input requires saved_diagnostics mode and no inline saved_diagnostics member. Remove the file or edit it inline explicitly.");
   const [logHash, modelHash, savedHash] = await Promise.all([miningSourceHash(log), model ? miningSourceHash(model) : null, saved ? miningSourceHash(saved) : null]);
   signal?.throwIfAborted(); const body = new FormData(); body.append("log", log); if (model) body.append("model", model); if (saved) body.append("saved_diagnostics_file", saved); fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
-  const path = "/api/analyze-replay-duration-workbench", response = await fetch(path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
+  const path = "/api/analyze-replay-duration-workbench", response = await backendFetch(path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
   if (!response.ok) throw new Error(object(value) && typeof value.error === "string" ? value.error : `Duration analysis failed (${response.status}).`);
   if (!isReplayDurationWorkflow(value)) throw new Error("The server did not return a complete native duration analysis workflow.");
   const actual = originalEmbeddingFilterStringBytes(value.analysis_raw as Parameters<typeof originalEmbeddingFilterStringBytes>[0]), expected = nativeStringBytes(form.analysisRaw);

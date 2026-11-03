@@ -21,6 +21,7 @@
 #else
 #include <sqlite3.h>
 #endif
+#include "sqlite_untrusted.hpp"
 #endif
 
 namespace minera {
@@ -238,6 +239,7 @@ struct Database {
       handle = nullptr;
       throw ConnectorReferenceError("OperationalError", message);
     }
+    if ((flags & SQLITE_OPEN_READONLY) != 0) detail::harden_untrusted_sqlite(handle);
   }
   ~Database() { sqlite3_close(handle); }
   Database(const Database&) = delete;

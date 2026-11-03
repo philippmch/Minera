@@ -1,5 +1,6 @@
 #include "minera/log_timestamp_filter.hpp"
 #include "minera/timestamp.hpp"
+#include "event_attribute_erase.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
 
@@ -259,7 +260,7 @@ EventLog filter_log_timestamp_events(EventLog& source,const EventAttribute& dt1,
       Trace trace;for(const auto& field:event.attributes)if(field.key.starts_with("case:")){auto value=field;value.key.erase(0,5);trace.attributes.push_back(std::move(value));}
       set_case_projection(trace);result.traces.push_back(std::move(trace));case_keys.push_back(key);
     }
-    event.attributes.erase(std::remove_if(event.attributes.begin(),event.attributes.end(),[](const auto& value){return value.key.starts_with("case:");}),event.attributes.end());
+    detail::erase_event_attributes(event,[](const auto& value){return value.key.starts_with("case:");});
     result.traces[index].events.push_back(std::move(event));
   }
   return result;

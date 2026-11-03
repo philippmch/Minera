@@ -8,6 +8,10 @@
 #include <utility>
 #include <vector>
 
+#if defined(MINERA_HAS_ZLIB)
+#include <zlib.h>
+#endif
+
 namespace minera::detail {
 namespace {
 
@@ -314,6 +318,43 @@ bool is_gzip_data(std::string_view bytes) noexcept {
          static_cast<unsigned char>(bytes[1]) == 0x8bU;
 }
 
+#if defined(MINERA_HAS_ZLIB)
+// Deflate at level 9 with zlib's default memory level, the settings Python's
+// gzip module uses (and so pm4py's compressed XES export).
+std::string gzip_compress(std::string_view bytes) {
+  z_stream stream{};
+  // windowBits 15 + 16 asks zlib for a gzip wrapper (header and CRC-32 trailer).
+  if (deflateInit2(&stream, 9, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK)
+    throw std::runtime_error("gzip compressor could not be initialised");
+  std::string output;
+  std::array<unsigned char, 1U << 16U> buffer{};
+  std::size_t offset = 0;
+  int status = Z_OK;
+  do {
+    const auto chunk = std::min<std::size_t>(bytes.size() - offset,
+                                             std::numeric_limits<uInt>::max());
+    stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(bytes.data() + offset));
+    stream.avail_in = static_cast<uInt>(chunk);
+    offset += chunk;
+    const int flush = offset == bytes.size() ? Z_FINISH : Z_NO_FLUSH;
+    do {
+      stream.next_out = buffer.data();
+      stream.avail_out = static_cast<uInt>(buffer.size());
+      status = deflate(&stream, flush);
+      if (status == Z_STREAM_ERROR) {
+        deflateEnd(&stream);
+        throw std::runtime_error("gzip compression failed");
+      }
+      output.append(reinterpret_cast<const char*>(buffer.data()),
+                    buffer.size() - stream.avail_out);
+    } while (stream.avail_out == 0);
+  } while (offset < bytes.size());
+  deflateEnd(&stream);
+  if (status != Z_STREAM_END) throw std::runtime_error("gzip compression did not finish");
+  return output;
+}
+#else
+// Without zlib: a valid gzip member of stored (uncompressed) deflate blocks.
 std::string gzip_compress(std::string_view bytes) {
   std::string output;
   output.reserve(bytes.size() + bytes.size() / 65535 * 5 + 23);
@@ -334,6 +375,7 @@ std::string gzip_compress(std::string_view bytes) {
   append_u32(output, static_cast<std::uint32_t>(bytes.size()));
   return output;
 }
+#endif
 
 std::string gzip_decompress(std::string_view bytes,
                             std::size_t max_output_bytes) {

@@ -1,4 +1,5 @@
 import {nativeCell} from "./native-json";
+import { backendFetch } from "./backend-fetch";
 import {appendNativeMultipartField,nativeStringBytes} from "./native-multipart";
 import {nativeResponseJson,readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
@@ -65,7 +66,7 @@ export async function requestPandasVariantsOriginal(sourceFile:File,form:PandasV
   if(variantsFile!==null&&!(variantsFile instanceof File))throw new Error("The supplied variants table must be an actual File.");
   const fields=pandasVariantsOriginalFields(form),body=new FormData();body.append("source_file",sourceFile);if(variantsFile)body.append("variants_file",variantsFile);
   for(const[key,value]of fields)appendNativeMultipartField(body,key,value);
-  const response=await fetch("/api/reference-table-variants",{method:"POST",body,signal});signal?.throwIfAborted();
+  const response=await backendFetch("/api/reference-table-variants",{method:"POST",body,signal});signal?.throwIfAborted();
   if(response.status!==200&&response.status!==400)throw new Error(`Original pandas variants returned HTTP ${response.status}.`);
   const responseBytes=new Uint8Array(await response.arrayBuffer());
   try{new TextDecoder("utf-8",{fatal:true}).decode(responseBytes);}catch{throw new Error("The original pandas variants response is not safe JSON UTF-8.");}

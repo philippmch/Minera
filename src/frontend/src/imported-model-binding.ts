@@ -1,3 +1,4 @@
+import { backendFetch } from "./backend-fetch";
 // Binds requests on the imported model to the model the server installed.
 //
 // Every /api/check-model answer carries a fresh `imported_model_id`. Requests
@@ -75,7 +76,7 @@ export function importedModelRequestInit(input: string, init?: RequestInit): Req
 export async function importedModelFetch(input: string, init?: RequestInit): Promise<Response> {
   const bound = importedModelRequestInit(input, init);
   const sentId = bound !== init ? importedModelId : undefined;
-  const response = await (bound === undefined ? fetch(input) : fetch(input, bound));
+  const response = await (bound === undefined ? backendFetch(input) : backendFetch(input, bound));
   if (sentId === undefined || response.status !== 409 || typeof response.clone !== "function") return response;
   const body: unknown = await response.clone().json().catch(() => null);
   if (body === null || typeof body !== "object" || (body as {error?: unknown}).error !== STALE_IMPORTED_MODEL_MESSAGE) return response;

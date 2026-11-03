@@ -11,11 +11,64 @@
 #define CPPHTTPLIB_VERSION "0.18.3"
 
 /*
+ * MINERA PATCH (local, not upstream): request-size hardening for the vendored
+ * 0.18.3. Search for "MINERA PATCH" to find every change.
+ *  - payload_max_length also bounds chunked and length-less bodies (413);
+ *  - a request POST/PUT/PATCH with neither Content-Length nor chunked
+ *    Transfer-Encoding is refused with 411 instead of being read to EOF;
+ *  - header and chunked-trailer lines are bounded in count, and every
+ *    protocol line (request line, header, chunk size, trailer) in length,
+ *    before it is buffered;
+ *  - Client::set_payload_max_length bounds a response body while it streams;
+ *  - optional whole-phase read deadlines for the request head and body
+ *    (CPPHTTPLIB_HEADER_READ_TIMEOUT_SECOND, CPPHTTPLIB_BODY_READ_TIMEOUT_SECOND)
+ *    and a minimum average body rate (CPPHTTPLIB_BODY_MIN_RATE_BYTES_PER_SECOND)
+ *    so a slowly dripping client cannot hold a worker thread for long;
+ *  - a request whose body read failed closes its connection, since the rest
+ *    of that body cannot be framed off the stream.
+ * Upstream fixed the chunked case in 0.20.1 (CVE-2025-46728).
+ */
+
+/*
  * Configuration
  */
 
 #ifndef CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND
 #define CPPHTTPLIB_KEEPALIVE_TIMEOUT_SECOND 5
+#endif
+
+// MINERA PATCH: bounds on header/trailer counts and on any protocol line.
+#ifndef CPPHTTPLIB_HEADER_MAX_COUNT
+#define CPPHTTPLIB_HEADER_MAX_COUNT 100
+#endif
+
+#ifndef CPPHTTPLIB_TRAILER_MAX_COUNT
+#define CPPHTTPLIB_TRAILER_MAX_COUNT 64
+#endif
+
+#ifndef CPPHTTPLIB_LINE_MAX_LENGTH
+#define CPPHTTPLIB_LINE_MAX_LENGTH 32768
+#endif
+
+// MINERA PATCH: whole-phase server read deadlines in seconds (0 disables).
+// The request line plus headers, and then the request body, must each arrive
+// within its deadline, on top of the per-read CPPHTTPLIB_READ_TIMEOUT_SECOND.
+#ifndef CPPHTTPLIB_HEADER_READ_TIMEOUT_SECOND
+#define CPPHTTPLIB_HEADER_READ_TIMEOUT_SECOND 0
+#endif
+
+#ifndef CPPHTTPLIB_BODY_READ_TIMEOUT_SECOND
+#define CPPHTTPLIB_BODY_READ_TIMEOUT_SECOND 0
+#endif
+
+// MINERA PATCH: minimum average body transfer rate (bytes/second, 0 disables),
+// enforced once the body has been read for longer than the grace period.
+#ifndef CPPHTTPLIB_BODY_MIN_RATE_BYTES_PER_SECOND
+#define CPPHTTPLIB_BODY_MIN_RATE_BYTES_PER_SECOND 0
+#endif
+
+#ifndef CPPHTTPLIB_BODY_MIN_RATE_GRACE_SECOND
+#define CPPHTTPLIB_BODY_MIN_RATE_GRACE_SECOND 5
 #endif
 
 #ifndef CPPHTTPLIB_KEEPALIVE_TIMEOUT_CHECK_INTERVAL_USECOND
@@ -1418,6 +1471,9 @@ public:
   template <class Rep, class Period>
   void set_read_timeout(const std::chrono::duration<Rep, Period> &duration);
 
+  // MINERA PATCH: bound the response body a client buffers or streams.
+  void set_payload_max_length(size_t length);
+
   void set_write_timeout(time_t sec, time_t usec = 0);
   template <class Rep, class Period>
   void set_write_timeout(const std::chrono::duration<Rep, Period> &duration);
@@ -1527,6 +1583,7 @@ protected:
   time_t connection_timeout_sec_ = CPPHTTPLIB_CONNECTION_TIMEOUT_SECOND;
   time_t connection_timeout_usec_ = CPPHTTPLIB_CONNECTION_TIMEOUT_USECOND;
   time_t read_timeout_sec_ = CPPHTTPLIB_CLIENT_READ_TIMEOUT_SECOND;
+  size_t payload_max_length_ = (std::numeric_limits<size_t>::max)(); // MINERA PATCH
   time_t read_timeout_usec_ = CPPHTTPLIB_CLIENT_READ_TIMEOUT_USECOND;
   time_t write_timeout_sec_ = CPPHTTPLIB_CLIENT_WRITE_TIMEOUT_SECOND;
   time_t write_timeout_usec_ = CPPHTTPLIB_CLIENT_WRITE_TIMEOUT_USECOND;
@@ -1850,6 +1907,9 @@ public:
   void set_read_timeout(time_t sec, time_t usec = 0);
   template <class Rep, class Period>
   void set_read_timeout(const std::chrono::duration<Rep, Period> &duration);
+
+  // MINERA PATCH: bound the response body a client buffers or streams.
+  void set_payload_max_length(size_t length);
 
   void set_write_timeout(time_t sec, time_t usec = 0);
   template <class Rep, class Period>
@@ -2906,6 +2966,8 @@ inline bool stream_line_reader::getline() {
     }
 
     append(byte);
+    // MINERA PATCH: never buffer a protocol line without bound.
+    if (size() > CPPHTTPLIB_LINE_MAX_LENGTH) { return false; }
 
 #ifdef CPPHTTPLIB_ALLOW_LF_AS_LINE_TERMINATOR
     if (byte == '\n') { break; }
@@ -3237,6 +3299,7 @@ public:
   bool is_readable() const override;
   bool is_writable() const override;
   ssize_t read(char *ptr, size_t size) override;
+  ssize_t read_unmetered(char *ptr, size_t size); // MINERA PATCH
   ssize_t write(const char *ptr, size_t size) override;
   void get_remote_ip_and_port(std::string &ip, int &port) const override;
   void get_local_ip_and_port(std::string &ip, int &port) const override;
@@ -4171,9 +4234,12 @@ inline bool read_headers(Stream &strm, Headers &headers) {
   const auto bufsiz = 2048;
   char buf[bufsiz];
   stream_line_reader line_reader(strm, buf, bufsiz);
+  size_t header_count = 0; // MINERA PATCH
 
   for (;;) {
     if (!line_reader.getline()) { return false; }
+    // MINERA PATCH: a bounded number of header lines.
+    if (++header_count > CPPHTTPLIB_HEADER_MAX_COUNT + 1) { return false; }
 
     // Check if the line ends with CRLF.
     auto line_terminator_len = 2;
@@ -4302,8 +4368,11 @@ inline bool read_content_chunked(Stream &strm, T &x,
   // chuncked transfer coding data without the final CRLF.
   if (!line_reader.getline()) { return true; }
 
+  size_t trailer_count = 0; // MINERA PATCH
   while (strcmp(line_reader.ptr(), "\r\n") != 0) {
     if (line_reader.size() > CPPHTTPLIB_HEADER_MAX_LENGTH) { return false; }
+    // MINERA PATCH: a bounded number of trailer fields.
+    if (++trailer_count > CPPHTTPLIB_TRAILER_MAX_COUNT) { return false; }
 
     // Exclude line terminator
     constexpr auto line_terminator_len = 2;
@@ -4382,11 +4451,23 @@ bool read_content(Stream &strm, T &x, size_t payload_max_length, int &status,
       [&](const ContentReceiverWithProgress &out) {
         auto ret = true;
         auto exceed_payload_max_length = false;
+        // MINERA PATCH: payload_max_length bounds every framing, not only a
+        // declared Content-Length; count the wire bytes as they arrive.
+        uint64_t received = 0;
+        ContentReceiverWithProgress bounded =
+            [&](const char *buf, size_t n, uint64_t off, uint64_t len) {
+              received += n;
+              if (received > payload_max_length) {
+                exceed_payload_max_length = true;
+                return false;
+              }
+              return out(buf, n, off, len);
+            };
 
         if (is_chunked_transfer_encoding(x.headers)) {
-          ret = read_content_chunked(strm, x, out);
+          ret = read_content_chunked(strm, x, bounded);
         } else if (!has_header(x.headers, "Content-Length")) {
-          ret = read_content_without_length(strm, out);
+          ret = read_content_without_length(strm, bounded);
         } else {
           auto len = get_header_value_u64(x.headers, "Content-Length", 0, 0);
           if (len > payload_max_length) {
@@ -5894,7 +5975,69 @@ inline bool SocketStream::is_writable() const {
          is_socket_alive(sock_);
 }
 
+// MINERA PATCH: the server arms a thread-local deadline only while it reads a
+// request head or body; handler code (including httplib::Client calls made
+// from a handler on this thread) never runs under it. A phase may also demand
+// a minimum average transfer rate once its grace period has passed, so a
+// client dripping bytes releases its worker long before the deadline.
+struct RequestReadDeadline {
+  struct State {
+    bool armed = false;
+    std::chrono::steady_clock::time_point start{}, at{};
+    uint64_t received = 0;
+    uint64_t min_bytes_per_second = 0;
+  };
+  static State &state() {
+    static thread_local State value;
+    return value;
+  }
+  static void count(ssize_t n) {
+    if (n > 0 && state().armed) { state().received += static_cast<uint64_t>(n); }
+  }
+  static bool expired() {
+    const auto &s = state();
+    if (!s.armed) { return false; }
+    const auto now = std::chrono::steady_clock::now();
+    if (now > s.at) { return true; }
+    if (s.min_bytes_per_second == 0) { return false; }
+    const auto elapsed =
+        std::chrono::duration_cast<std::chrono::seconds>(now - s.start).count();
+    return elapsed > CPPHTTPLIB_BODY_MIN_RATE_GRACE_SECOND &&
+           s.received < s.min_bytes_per_second * static_cast<uint64_t>(elapsed);
+  }
+};
+
+class ScopedReadDeadline {
+public:
+  explicit ScopedReadDeadline(time_t seconds, uint64_t min_bytes_per_second = 0)
+      : previous_(RequestReadDeadline::state()) {
+    if (seconds > 0) {
+      auto &s = RequestReadDeadline::state();
+      s.armed = true;
+      s.start = std::chrono::steady_clock::now();
+      s.at = s.start + std::chrono::seconds(seconds);
+      s.received = 0;
+      s.min_bytes_per_second = min_bytes_per_second;
+    }
+  }
+  ~ScopedReadDeadline() { RequestReadDeadline::state() = previous_; }
+  void disarm() { RequestReadDeadline::state().armed = false; }
+  ScopedReadDeadline(const ScopedReadDeadline &) = delete;
+  ScopedReadDeadline &operator=(const ScopedReadDeadline &) = delete;
+
+private:
+  RequestReadDeadline::State previous_;
+};
+
+// MINERA PATCH: enforce the read deadline and meter the bytes read.
 inline ssize_t SocketStream::read(char *ptr, size_t size) {
+  if (RequestReadDeadline::expired()) { return -1; }
+  const auto n = read_unmetered(ptr, size);
+  RequestReadDeadline::count(n);
+  return n;
+}
+
+inline ssize_t SocketStream::read_unmetered(char *ptr, size_t size) {
 #ifdef _WIN32
   size =
       (std::min)(size, static_cast<size_t>((std::numeric_limits<int>::max)()));
@@ -6636,6 +6779,15 @@ Server::read_content_core(Stream &strm, Request &req, Response &res,
     return true;
   }
 
+  // MINERA PATCH: a request body must be framed; reading a length-less
+  // request body to EOF would let one connection buffer without bound.
+  if ((req.method == "POST" || req.method == "PUT" || req.method == "PATCH") &&
+      !req.has_header("Content-Length") &&
+      !detail::is_chunked_transfer_encoding(req.headers)) {
+    res.status = StatusCode::LengthRequired_411;
+    return false;
+  }
+
   if (!detail::read_content(strm, req, payload_max_length_, res.status, nullptr,
                             out, true)) {
     return false;
@@ -6855,10 +7007,16 @@ inline bool Server::routing(Request &req, Response &res, Stream &strm) {
     {
       ContentReader reader(
           [&](ContentReceiver receiver) {
+            // MINERA PATCH: body read deadline.
+            detail::ScopedReadDeadline deadline(CPPHTTPLIB_BODY_READ_TIMEOUT_SECOND,
+                                        CPPHTTPLIB_BODY_MIN_RATE_BYTES_PER_SECOND);
             return read_content_with_content_receiver(
                 strm, req, res, std::move(receiver), nullptr, nullptr);
           },
           [&](MultipartContentHeader header, ContentReceiver receiver) {
+            // MINERA PATCH: body read deadline.
+            detail::ScopedReadDeadline deadline(CPPHTTPLIB_BODY_READ_TIMEOUT_SECOND,
+                                        CPPHTTPLIB_BODY_MIN_RATE_BYTES_PER_SECOND);
             return read_content_with_content_receiver(strm, req, res, nullptr,
                                                       std::move(header),
                                                       std::move(receiver));
@@ -6892,7 +7050,11 @@ inline bool Server::routing(Request &req, Response &res, Stream &strm) {
     }
 
     // Read content into `req.body`
+    // MINERA PATCH: body read deadline.
+    detail::ScopedReadDeadline deadline(CPPHTTPLIB_BODY_READ_TIMEOUT_SECOND,
+                                        CPPHTTPLIB_BODY_MIN_RATE_BYTES_PER_SECOND);
     if (!read_content(strm, req, res)) { return false; }
+    deadline.disarm();
   }
 
   // Regular handler
@@ -7056,10 +7218,26 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
                         const std::function<void(Request &)> &setup_request) {
   std::array<char, 2048> buf{};
 
+  // MINERA PATCH: the request line and headers share one read deadline.
+  detail::ScopedReadDeadline head_deadline(CPPHTTPLIB_HEADER_READ_TIMEOUT_SECOND);
+
   detail::stream_line_reader line_reader(strm, buf.data(), buf.size());
 
   // Connection has been closed on client
-  if (!line_reader.getline()) { return false; }
+  if (!line_reader.getline()) {
+    // MINERA PATCH: a request line cut off at CPPHTTPLIB_LINE_MAX_LENGTH still
+    // gets the 414 an over-long URI below the bound gets, then the close.
+    if (line_reader.size() > CPPHTTPLIB_LINE_MAX_LENGTH) {
+      Request req;
+      Response res;
+      res.version = "HTTP/1.1";
+      res.headers = default_headers_;
+      res.status = StatusCode::UriTooLong_414;
+      connection_closed = true;
+      return write_response(strm, true, req, res);
+    }
+    return false;
+  }
 
   Request req;
 
@@ -7086,15 +7264,21 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
     Headers dummy;
     detail::read_headers(strm, dummy);
     res.status = StatusCode::UriTooLong_414;
-    return write_response(strm, close_connection, req, res);
+    connection_closed = true; // MINERA PATCH: the head was not fully framed.
+    return write_response(strm, true, req, res);
   }
 
   // Request line and headers
   if (!parse_request_line(line_reader.ptr(), req) ||
       !detail::read_headers(strm, req.headers)) {
     res.status = StatusCode::BadRequest_400;
-    return write_response(strm, close_connection, req, res);
+    // MINERA PATCH: a head that failed to parse (or ran past its deadline or
+    // bounds) leaves the stream unframed; close instead of keeping it alive.
+    connection_closed = true;
+    return write_response(strm, true, req, res);
   }
+
+  head_deadline.disarm(); // MINERA PATCH: the head is complete.
 
   if (req.get_header_value("Connection") == "close") {
     connection_closed = true;
@@ -7222,6 +7406,16 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
   } else {
     if (res.status == -1) { res.status = StatusCode::NotFound_404; }
 
+    // MINERA PATCH: after a failed body read the stream position is unknown,
+    // so the connection cannot carry another request.
+    if (detail::expect_content(req) &&
+        (res.status == StatusCode::BadRequest_400 ||
+         res.status == StatusCode::LengthRequired_411 ||
+         res.status == StatusCode::PayloadTooLarge_413 ||
+         res.status == StatusCode::UnsupportedMediaType_415)) {
+      connection_closed = true;
+      return write_response(strm, true, req, res);
+    }
     return write_response(strm, close_connection, req, res);
   }
 }
@@ -7279,6 +7473,7 @@ inline void ClientImpl::copy_settings(const ClientImpl &rhs) {
   client_key_path_ = rhs.client_key_path_;
   connection_timeout_sec_ = rhs.connection_timeout_sec_;
   read_timeout_sec_ = rhs.read_timeout_sec_;
+  payload_max_length_ = rhs.payload_max_length_; // MINERA PATCH
   read_timeout_usec_ = rhs.read_timeout_usec_;
   write_timeout_sec_ = rhs.write_timeout_sec_;
   write_timeout_usec_ = rhs.write_timeout_usec_;
@@ -8014,7 +8209,8 @@ inline bool ClientImpl::process_request(Stream &strm, Request &req,
     if (res.has_header("Content-Length")) {
       if (!req.content_receiver) {
         auto len = res.get_header_value_u64("Content-Length");
-        if (len > res.body.max_size()) {
+        // MINERA PATCH: never reserve past the client's payload bound.
+        if (len > res.body.max_size() || len > payload_max_length_) {
           error = Error::Read;
           return false;
         }
@@ -8024,7 +8220,8 @@ inline bool ClientImpl::process_request(Stream &strm, Request &req,
 
     if (res.status != StatusCode::NotModified_304) {
       int dummy_status;
-      if (!detail::read_content(strm, res, (std::numeric_limits<size_t>::max)(),
+      // MINERA PATCH: the client's payload bound applies while streaming.
+      if (!detail::read_content(strm, res, payload_max_length_,
                                 dummy_status, std::move(progress),
                                 std::move(out), decompress_)) {
         if (error != Error::Canceled) { error = Error::Read; }
@@ -8732,6 +8929,11 @@ inline void ClientImpl::set_connection_timeout(time_t sec, time_t usec) {
 inline void ClientImpl::set_read_timeout(time_t sec, time_t usec) {
   read_timeout_sec_ = sec;
   read_timeout_usec_ = usec;
+}
+
+// MINERA PATCH
+inline void ClientImpl::set_payload_max_length(size_t length) {
+  payload_max_length_ = length;
 }
 
 inline void ClientImpl::set_write_timeout(time_t sec, time_t usec) {
@@ -10154,6 +10356,11 @@ inline void Client::set_connection_timeout(time_t sec, time_t usec) {
 
 inline void Client::set_read_timeout(time_t sec, time_t usec) {
   cli_->set_read_timeout(sec, usec);
+}
+
+// MINERA PATCH
+inline void Client::set_payload_max_length(size_t length) {
+  cli_->set_payload_max_length(length);
 }
 
 inline void Client::set_write_timeout(time_t sec, time_t usec) {

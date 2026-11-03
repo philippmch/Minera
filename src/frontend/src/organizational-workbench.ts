@@ -1,4 +1,5 @@
 import type { LocalDiagnosticsResult, MineraExport, NetworkAnalysisResult, ResourceProfilesResult, RoleDiscoveryResult } from "./types";
+import { backendFetch } from "./backend-fetch";
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
 import { nativeResponseJson, nativeResponseRequest, readNativeResponse } from "./native-response";
 import { diagnosticCsv, nativeObjectTables, type DiagnosticTable } from "./model-diagnostics";
@@ -248,7 +249,7 @@ export async function runOrganizationalWorkbench(family: OrganizationalFamily, s
   const snapshot = {...source}, fields = organizationalWorkbenchFields(family, form, snapshot);
   signal?.throwIfAborted();
   const path = ORGANIZATIONAL_PATHS[family] + "?" + new URLSearchParams(fields);
-  const response = await fetch(path, {method: "POST", signal});
+  const response = await backendFetch(path, {method: "POST", signal});
   const value = await readNativeResponse(response, {path, fields});
   signal?.throwIfAborted();
   if (!response.ok) throw new Error(object(value) && typeof value.error === "string" ? value.error : `${ORGANIZATIONAL_TITLES[family]} failed (${response.status}).`);

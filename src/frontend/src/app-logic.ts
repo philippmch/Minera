@@ -404,3 +404,15 @@ export function identityKey(value: object | null | undefined): string {
   if (key === undefined) { key = ++nextIdentityKey; identityKeys.set(value, key); }
   return `object-${key}`;
 }
+
+/** "1 case", "2 cases", "1,234 events": a formatted count with the noun in the right number. */
+export function countLabel(count: number, singular: string, plural = `${singular}s`): string {
+  return `${new Intl.NumberFormat("en-US").format(count)} ${count === 1 ? singular : plural}`;
+}
+
+/** Whether an object-centric discovery result was computed from a log with no objects (nothing to show). */
+export function ocelResultHasNoObjects(result: Record<string, unknown> | null | undefined): boolean {
+  if (!result) return false;
+  const types = result.object_types;
+  return Array.isArray(types) && types.length === 0;
+}

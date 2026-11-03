@@ -1,4 +1,5 @@
 import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart";
+import { backendFetch } from "./backend-fetch";
 import {nativeCell, nativeJson, parseNativeJson} from "./native-json";
 import {nativeResponseJson, nativeResponseRequest, readNativeResponse} from "./native-response";
 import {diagnosticCsv, nativeObjectTables, type DiagnosticTable} from "./model-diagnostics";
@@ -119,7 +120,7 @@ export async function runTreeReductionWorkbench(model: File, trace: File, form: 
   fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
   if (uploads.options) body.append("tree_reduction_options_file", uploads.options);
   if (uploads.activityKey) body.append("tree_reduction_activity_key_file", uploads.activityKey);
-  const response = await fetch("/api/model-conversion-workbench", {method: "POST", body, signal}), value = await readNativeResponse(response, {path: "/api/model-conversion-workbench", fields});
+  const response = await backendFetch("/api/model-conversion-workbench", {method: "POST", body, signal}), value = await readNativeResponse(response, {path: "/api/model-conversion-workbench", fields});
   if (!isTreeReductionWorkbench(value)) throw new Error(`Invalid tree reduction envelope (HTTP ${response.status}).`);
   if (value.input_context.format !== form.modelFormat || value.trace_context.format !== form.traceFormat || !equalBytes(stringBytes(value.model.original_model), modelBytes) || !equalBytes(stringBytes(value.trace.original_trace), traceBytes) || integer(value.input_context, "original_model_bytes") !== BigInt(modelBytes.length) || integer(value.trace_context, "original_trace_bytes") !== BigInt(traceBytes.length)) throw new Error("Tree reduction response does not match both original input Files and formats.");
   if (!equalBytes(stringBytes(value.input_context.dataset), nativeStringBytes(model.name)) || !equalBytes(stringBytes(value.trace_context.dataset), nativeStringBytes(trace.name)) || value.trace.native_trace !== null && integer(value.trace_context, "event_count") !== BigInt((value.trace.native_trace.events as unknown[]).length)) throw new Error("Tree reduction input names or complete Trace event count do not match.");

@@ -1,4 +1,5 @@
 import {nativeCell} from "./native-json";
+import { backendFetch } from "./backend-fetch";
 import {appendNativeMultipartField,nativeStringBytes} from "./native-multipart";
 import {nativeResponseJson, readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
@@ -80,7 +81,7 @@ export async function requestLogAttributes(sourceFile:File,form:LogAttributesFor
   const fields=logAttributesFields(form),body=new FormData();body.append("source_file",sourceFile);
   const suppliedVariants=form.operation === "threshold" ? variantsFile : null;if(suppliedVariants)body.append("variants_file",suppliedVariants);
   for(const[k,v]of fields)appendNativeMultipartField(body,k,v);
-  const response=await fetch("/api/reference-log-attributes",{method:"POST",body,signal});signal?.throwIfAborted();
+  const response=await backendFetch("/api/reference-log-attributes",{method:"POST",body,signal});signal?.throwIfAborted();
   if(response.status !== 200 && response.status !== 400)throw new Error(`Log attributes filtering returned HTTP ${response.status}.`);
   const responseBytes=new Uint8Array(await response.arrayBuffer());try{new TextDecoder("utf-8",{fatal:true}).decode(responseBytes);}catch{throw new Error("The log attributes response is not safe JSON UTF-8.");}
   const value=await readNativeResponse(new Response(responseBytes),{path:"/api/reference-log-attributes",fields,reference:{name:sourceFile.name,size:sourceFile.size,last_modified:sourceFile.lastModified}});signal?.throwIfAborted();

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { readStored, writeStored } from "../storage";
 import { downloadQueryBlob } from "../log-query";
 import { ocelPreparedCsv } from "../ocel-preparation";
 import { nativeJson } from "../native-json";
@@ -22,7 +23,7 @@ export function StreamingWorkspace({ file = null, sourceFormat, busy = false, da
   const [imports,setImports]=useState(defaultLiveImport);
   const [liveRun,setLiveRun]=useState<LiveRun|null>(null);
   const [sessions,setSessions]=useState<LiveSnapshot[]>([]);
-  const [connectionId,setConnectionId]=useState(()=>typeof localStorage==="undefined"?"":localStorage.getItem("minera.liveStreamSession")??"");
+  const [connectionId,setConnectionId]=useState(()=>readStored("minera.liveStreamSession")??"");
   const [batchFormat,setBatchFormat]=useState<"csv"|"xes">("csv");
   const [waitForBatch,setWaitForBatch]=useState(true);
   const [log, setLog] = useState<File | null>(null);
@@ -43,7 +44,7 @@ export function StreamingWorkspace({ file = null, sourceFormat, busy = false, da
     cancel(); setRun(null); setError(null);
     if (role === "log") {setLog(value);setBatchFormat(/\.xes(?:\.gz)?$/i.test(value?.name??"")?"xes":"csv");} else setModel(value);
   };
-  const remember=(id:string)=>{setConnectionId(id);if(typeof localStorage!=="undefined")localStorage.setItem("minera.liveStreamSession",id);};
+  const remember=(id:string)=>{setConnectionId(id);writeStored("minera.liveStreamSession",id);};
   const liveOperation=async(operation:(signal:AbortSignal)=>Promise<LiveRun>)=>{
     cancel();const controller=new AbortController();request.current=controller;setPending(true);setError(null);
     try{const next=await operation(controller.signal);if(request.current===controller&&!controller.signal.aborted){setLiveRun(next);remember(next.result.session_id);setForm(formFromLive(next.result));setImports(importsFromLive(next.result));}}

@@ -30,6 +30,8 @@ export function watchVisualizationTargets(onChange:(targets:VisualizationTarget[
   const navigation=new MutationObserver(attach);navigation.observe(document.body,{childList:true,subtree:true});attach();window.addEventListener("resize",refresh);
   return()=>{navigation.disconnect();observer.disconnect();window.removeEventListener("resize",refresh);};
 }
+/** Controls hidden from captured images (they keep their space so the layout does not shift). */
+export const VISUALIZATION_CHROME=".map-hint, [data-export-ignore], .map-controls button:not(.active):not([aria-pressed=\"true\"]), .map-controls input, .map-controls select";
 /** The LLM preview has a size budget; local downloads keep the displayed CSS-pixel size. */
 export async function renderVisualizationCanvas(target:VisualizationTarget,signal?:AbortSignal,forLlm=true):Promise<HTMLCanvasElement> {
   const check=()=>{if(signal?.aborted)throw new DOMException("Capture cancelled","AbortError");if(!target.element.isConnected)throw new Error("The visualization changed; select the current view again.");};
@@ -45,9 +47,12 @@ export async function renderVisualizationCanvas(target:VisualizationTarget,signa
       [element,...element.querySelectorAll("*")].forEach((node,index)=>{
         const captured=styles[index];if(!captured||!("style" in node))return;
         const styled=node as HTMLElement|SVGElement;
-        styled.style.animation="none";styled.style.transition="none";styled.style.opacity=captured.opacity;styled.style.transform=captured.transform;
+        // html2canvas paints box-shadow as a translucent fill over part of the box, so shadows are dropped from captures.
+        styled.style.animation="none";styled.style.transition="none";styled.style.boxShadow="none";styled.style.opacity=captured.opacity;styled.style.transform=captured.transform;
         if(captured.svg)for(const [name,value] of captured.svg)styled.style.setProperty(name,value.replace(/url\(["']?[^#)"']*#([^)"']+)["']?\)/g,"url(#$1)"));
       });
+      // Interactive chrome (zoom hints, sliders, mode buttons) is not part of the picture.
+      element.querySelectorAll<HTMLElement>(VISUALIZATION_CHROME).forEach(node=>{node.style.visibility="hidden";});
     }});
   check();
   if(!forLlm&&(canvas.width!==size.width||canvas.height!==size.height))throw new Error("The browser could not render the complete view at its requested size. Reduce the displayed view and try again.");

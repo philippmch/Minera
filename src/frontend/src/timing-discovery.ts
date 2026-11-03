@@ -1,4 +1,5 @@
 import { isMineraExport,type MineraExport } from "./types";
+import { backendFetch } from "./backend-fetch";
 import { nativeJson } from "./native-json";
 import { nativeResponseJson,readNativeResponse } from "./native-response";
 import { nativeObjectTables,type DiagnosticTable } from "./model-diagnostics";
@@ -35,7 +36,7 @@ export function validTimingDiscovery(v:unknown):v is TimingDiscovery {
 }
 export interface TimingRun {value:TimingDiscovery;raw:string;report:string;tables:DiagnosticTable[];}
 export async function runTimingDiscovery(family:TimingFamily,form:TimingForm,source:LogQuerySchema,signal?:AbortSignal):Promise<TimingRun> {
-  const q=timingQuery(family,form,source.source_id),path='/api/discover-timing?'+q;const response=await fetch(path,{method:'POST',signal});const value=await readNativeResponse(response,{path});
+  const q=timingQuery(family,form,source.source_id),path='/api/discover-timing?'+q;const response=await backendFetch(path,{method:'POST',signal});const value=await readNativeResponse(response,{path});
   if(!response.ok||record(value)&&'error'in value)throw new Error(record(value)&&typeof value.error==='string'?value.error:'Native timing discovery failed.');
   if(!validTimingDiscovery(value))throw new Error('Native timing discovery returned an invalid result.');
   if(value.method!==family||value.variant!==form.variant||value.source_id!==source.source_id||value.source.case_count!==source.case_count||value.source.event_count!==source.event_count)throw new Error('Timing result does not match the requested source or variant.');

@@ -1,4 +1,5 @@
 import { isRandomTreeResult, isLogConversionResult, type RandomTreeResult, type ProcessTreeNode, type LogConversionResult } from "./types";
+import { backendFetch } from "./backend-fetch";
 import { readNativeResponse, nativeResponseRequest, hasNativeResponse } from "./native-response";
 import { nativeCell, nativeJson } from "./native-json";
 import { nativeObjectTables, type DiagnosticTable } from "./model-diagnostics";
@@ -90,7 +91,7 @@ export function isTreeGenerationResult(value:unknown):value is TreeGenerationRes
 }
 export async function generateTrees(form:GenerationForm,signal?:AbortSignal):Promise<TreeGenerationResult> {
   const path="/api/generate-trees?"+treeGenerationQuery(form);
-  const response=await fetch(path,{method:"POST",signal});const value=await readNativeResponse(response,{path});
+  const response=await backendFetch(path,{method:"POST",signal});const value=await readNativeResponse(response,{path});
   if(!response.ok)throw Error(record(value)&&typeof value.error==="string"?value.error:`Minera answered with status ${response.status}`);
   if(!isTreeGenerationResult(value))throw Error("Minera returned an invalid tree-generation result.");return value;
 }

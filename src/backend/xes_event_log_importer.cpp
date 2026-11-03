@@ -1304,6 +1304,8 @@ static EventLog import_xes_impl(
 
   std::size_t input_order = 0;
   bool saw_timestamp = false;
+  // Strict readers: an <event> outside any trace was seen (see below).
+  bool orphan_event_open = false;
 
   // Removes the selected cell from the generic attributes and returns the
   // index it had, or kUnknownSourcePosition when nothing was removed.
@@ -1444,13 +1446,26 @@ static EventLog import_xes_impl(
           throw std::runtime_error("XES document root is <" + token.name +
                                    ">, not <log>");
       }
+      if (strict_xml) {
+        // The iterparse readers track one open trace and one open event: a
+        // <trace> while a trace is open raises, and so does an <event> while
+        // an event is open. An <event> outside a trace is never closed (its
+        // end only closes events of a trace), so any later <event> raises.
+        if (element == "trace" && in_trace)
+          throw std::runtime_error("file contains <trace> in another <trace> tag");
+        if (element == "event") {
+          if (in_event || orphan_event_open)
+            throw std::runtime_error("file contains <event> in another <event> tag");
+          if (!in_trace) orphan_event_open = true;
+        }
+      }
 
       if (element == "trace" && parent == "log") {
         if (log.traces.size() >= options.max_traces) break;
         if (options.variant == XesImportVariant::kRustXes && token.self_closing && log.traces.empty())
           throw std::invalid_argument("RUSTXES: Failed to parse XES: MissingLastTrace");
         if (in_trace) {
-          throw std::runtime_error("XES input nests a <trace> inside a <trace>");
+          throw std::runtime_error("file contains <trace> in another <trace> tag");
         }
         in_trace = true;
       } else if (element == "event" && in_trace && parent == "trace") {
@@ -1530,8 +1545,6 @@ static EventLog import_xes_impl(
           }
         }
       } else if (in_event && parent == "event") {
-        if (strict_xml && element == "event")
-          throw std::runtime_error("XES input nests an <event> inside an <event>");
         consumed_by_parser = true;
         if (const auto attribute = parse_attribute_node(parser, token, options.variant))
           emit_imported_attribute(*attribute, options.variant, apply_event_attribute);

@@ -1,4 +1,5 @@
 import {OriginalLogQueryWorkspace} from "./components/OriginalLogQueryWorkspace";
+import { backendFetch } from "./backend-fetch";
 import {OriginalLabelSplittingWorkspace} from "./components/OriginalLabelSplittingWorkspace";
 import {OriginalFeaturesWorkspace} from "./components/OriginalFeaturesWorkspace";
 import {OwnedExactFilterResult,exactFilterRun,type ExactFilterRun} from "./exact-filter-controls";
@@ -27,7 +28,6 @@ import {
   type EventAttributeStat,
   type MineraExport,
   type OcelDiscoveryResult,
-  numberFormat,
 } from "./types";
 import { computeLayout } from "./layout";
 import { computeTreeLayout } from "./tree-layout";
@@ -36,6 +36,8 @@ import { Sidebar, type SidebarDataset } from "./components/Sidebar";
 import { CommandPalette, paletteCommands } from "./components/CommandPalette";
 import { Advanced, PageHeader } from "./components/ui";
 import { toolById, toolGroup, viewById, VIEWS, VIEW_GROUPS, type ToolId } from "./tools";
+import { initialToolFromHash, parseRoute, routeFor, routeHash, sameHash } from "./routing";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
 import { ProcessModel } from "./components/ProcessModel";
@@ -152,6 +154,8 @@ import {
   isJsonExport,
   logLifecycles,
   maxEdgeCount,
+  countLabel,
+  ocelResultHasNoObjects,
   type Tab,
 } from "./app-logic";
 
@@ -161,7 +165,9 @@ export default function App() {
   const [previousExactSuccess,setPreviousExactSuccess] = useState<ExactFilterRun|null>(null);
   const [data, setData] = useState<MineraExport | null>(null);
   const [ocelResult, setOcelResult] = useState<OcelDiscoveryResult | null>(null);
-  const [tool, setTool] = useState<ToolId | null>(null);
+  // A #/tool/<id> link opens that tool directly; tools need no open log.
+  const [tool, setTool] = useState<ToolId | null>(() => initialToolFromHash(typeof window === "undefined" ? "" : window.location.hash));
+  const [confirmHome, setConfirmHome] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -539,7 +545,7 @@ export default function App() {
   const loadResourceSample = () => {
     loadSampleFile("sample-resource-log.csv", "text/csv");
   };
-  const loadSampleFile = (name: string, type: string) => {const {ticket, controller} = beginSourceLoad(); fetch(`${import.meta.env.BASE_URL}${name}`, {signal: controller.signal}).then(response => {if (!response.ok) throw new Error("sample not found"); return response.arrayBuffer();}).then(bytes => {if (sourceGate.current.accepts(ticket, controller.signal)) loadFile(new File([bytes], name, {type}));}).catch(cause => {if (sourceGate.current.accepts(ticket, controller.signal)) setError(`Could not load ${name}: ${cause instanceof Error ? cause.message : String(cause)}`);}).finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; setMining(false);}});};
+  const loadSampleFile = (name: string, type: string) => {const {ticket, controller} = beginSourceLoad(); backendFetch(`${import.meta.env.BASE_URL}${name}`, {signal: controller.signal}).then(response => {if (!response.ok) throw new Error("sample not found"); return response.arrayBuffer();}).then(bytes => {if (sourceGate.current.accepts(ticket, controller.signal)) loadFile(new File([bytes], name, {type}));}).catch(cause => {if (sourceGate.current.accepts(ticket, controller.signal)) setError(`Could not load ${name}: ${cause instanceof Error ? cause.message : String(cause)}`);}).finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; setMining(false);}});};
 
   // Re-mines the original upload with the given filters and miner settings,
   // keeping the active tab. Always mines from source.file so nothing compounds.
@@ -705,6 +711,9 @@ export default function App() {
     setFiltersActive(false);
     conceptDriftCache.current = {};
   };
+  // Open data is lost by going to the start page, so that asks first (in the app, not with window.confirm).
+  const hasOpenData = Boolean(data || ocelResult || source);
+  const requestHome = () => { setSidebarOpen(false); setPaletteOpen(false); if (hasOpenData) setConfirmHome(true); else goHome(); };
 
   // ⌘K / Ctrl+K opens the palette from anywhere.
   useEffect(() => {
@@ -725,8 +734,43 @@ export default function App() {
       })
     : [];
   const shownTab = displayedTab(tab, views.map((item) => item.id));
+
+  // Hash routing: every change of tool or view is a history entry, so Back and Forward stay inside the app.
+  const routeTarget = routeHash(routeFor({ tool, view: data ? shownTab : null, hasLog: Boolean(data), hasOtherData: Boolean(ocelResult || source) }));
+  const routeSynced = useRef(false);
+  useEffect(() => {
+    if (sameHash(window.location.hash, routeTarget)) { routeSynced.current = true; return; }
+    const url = routeTarget || window.location.pathname + window.location.search;
+    // The first sync replaces the entry (a reload of a view link with no data lands on the start page).
+    if (routeSynced.current) window.history.pushState(null, "", url); else window.history.replaceState(window.history.state, "", url);
+    routeSynced.current = true;
+  }, [routeTarget]);
+  const routeState = useRef({ hasOpenData, hasLog: Boolean(data), views: views.map((item) => item.id) });
+  routeState.current = { hasOpenData, hasLog: Boolean(data), views: views.map((item) => item.id) };
+  useEffect(() => {
+    const onRoute = () => {
+      const route = parseRoute(window.location.hash), current = routeState.current;
+      setPaletteOpen(false); setSidebarOpen(false); setExportOpen(false);
+      if (route.kind === "tool") { setTool(route.id); return; }
+      if (route.kind === "view" && current.hasLog) { setTool(null); setOwnedExactInspection(false); if (current.views.includes(route.id)) setTab(route.id); return; }
+      if (route.kind === "workspace" && current.hasOpenData) { setTool(null); return; }
+      // The start page (or a view link without data): leaving open data asks first.
+      if (current.hasOpenData) { setConfirmHome(true); return; }
+      setTool(null);
+      if (!sameHash(window.location.hash, "")) window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    };
+    window.addEventListener("hashchange", onRoute);
+    return () => window.removeEventListener("hashchange", onRoute);
+  }, []);
+  // Closing the tab or reloading drops the open data, so the browser asks first while there is some.
+  useEffect(() => {
+    if (!hasOpenData) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasOpenData]);
   const datasetCard: SidebarDataset | null = data
-    ? { kind: "Event log", name: data.dataset, detail: `${numberFormat.format(data.trace_count)} cases · ${numberFormat.format(data.event_count)} events` }
+    ? { kind: "Event log", name: data.dataset, detail: `${countLabel(data.trace_count, "case")} · ${countLabel(data.event_count, "event")}` }
     : ocelResult
       ? { kind: "Object-centric log", name: ocelDataset ?? "object-centric log" }
       : source
@@ -738,14 +782,27 @@ export default function App() {
     onSelectView: selectView,
     onOpenTool: openTool,
     extra: [
-      { id: "action:home", title: "Go to start", section: "Navigate", detail: "Close the open data and return to the start page.", run: goHome },
       ...(data || ocelResult ? [] : [
         { id: "action:sample", title: "Open the sample log", section: "Samples", detail: "Order-to-cash sample with 320 cases.", run: loadSample },
         { id: "action:ocel-sample", title: "Open the object-centric sample", section: "Samples", detail: "Orders and items.", run: loadOcelSample },
       ]),
     ],
+    // Last, so an empty query never preselects it; with data open it asks before closing anything.
+    trailing: [
+      { id: "action:home", title: "Go to start", section: "Navigate", detail: hasOpenData ? "Close the open data and return to the start page (asks first)." : "Return to the start page.", run: requestHome },
+    ],
   });
   const palette = paletteOpen && <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />;
+  const homeConfirmation = confirmHome && (
+    <ConfirmDialog
+      title="Close the open data?"
+      message={`Going to the start page closes ${data?.dataset ?? ocelDataset ?? source?.file.name ?? "the open data"} and discards its results in this tab. The original file is not changed.`}
+      confirmLabel="Close and go to start"
+      cancelLabel="Keep working"
+      onConfirm={() => { setConfirmHome(false); goHome(); }}
+      onCancel={() => { setConfirmHome(false); if (sameHash(window.location.hash, "")) window.history.pushState(null, "", routeTarget || window.location.pathname + window.location.search); }}
+    />
+  );
   const dropveil = (
     <div className={dragging ? "dropveil active" : "dropveil"}>
       <div className="dropveil-card">Drop an event source, Minera export or OCEL file</div>
@@ -766,7 +823,7 @@ export default function App() {
         workspace={workspace}
         activeTool={tool}
         onOpenTool={openTool}
-        onHome={goHome}
+        onHome={requestHome}
         onOpenFile={loadFile}
         onOpenPalette={() => setPaletteOpen(true)}
         mining={mining}
@@ -784,6 +841,7 @@ export default function App() {
         {content}
       </div>
       {palette}
+      {homeConfirmation}
       {dropveil}
     </div>
   );
@@ -861,7 +919,8 @@ export default function App() {
     return shell(
       <>
         <PageHeader eyebrow="Object-centric log" title={ocelDataset ?? "Object-centric log"} summary="Discover object-centric models, explore objects and ask a model about the log." actions={exportToggle} />
-        {error && <div className="error-banner">{error}</div>}
+        {error && <div className="error-banner" role="alert">{error}</div>}
+        {ocelResultHasNoObjects(ocelResult.result) && <div className="empty-state" role="status"><strong>This object-centric log has no objects.</strong> Object-centric models are built from the objects each event refers to, so there is nothing to discover. Check that the file lists its objects and that each event's relationships name them.</div>}
         {exportOpen && <VisualizationExplain key={cacheGeneration.current+":"+ocelResult.variant} dataset={ocelDataset??"object-centric log"} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});if(ocelQuestions.current)ocelQuestions.current.open=true;ocelQuestions.current?.scrollIntoView?.({behavior:"smooth",block:"start"});}} />}
       </>,
       <main className="layout-log">
@@ -889,6 +948,7 @@ export default function App() {
           onOpenPalette={() => setPaletteOpen(true)}
           error={error}
           mining={mining}
+          onCancel={cancelSourceLoad}
         />
         {palette}
         {dropveil}
@@ -908,7 +968,8 @@ export default function App() {
         summary={view.summary}
         actions={exportable ? exportToggle : undefined}
       />
-      {error && <div className="error-banner">{error}</div>}
+      {error && <div className="error-banner" role="alert">{error}</div>}
+      {data.event_count === 0 && <div className="empty-state" role="status"><strong>No events were read from {data.dataset}.</strong> Check that the file is not empty and that its header row names the case, activity and timestamp columns (for example <code>case_id</code>, <code>activity</code>, <code>timestamp</code>), then open it again.</div>}
       {exportable && exportOpen && <VisualizationExplain key={cacheGeneration.current+":"+shownTab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");setExportOpen(false);}} />}
       {(shownTab === "log" || shownTab === "dotted" || shownTab === "dfg") && <Kpis data={data} />}
       {exactInspection&&<details className="exact-result"><summary>Latest complete exact native result and request</summary><ExactFilterInspection run={exactInspection}/></details>}

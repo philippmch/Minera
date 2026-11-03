@@ -1,4 +1,5 @@
 import { streamingDfgQuery, streamingFootprintsQuery, streamingTemporalQuery, streamingTbrQuery } from "./api";
+import { backendFetch } from "./backend-fetch";
 import {
   isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult,
   isStreamingTbrResult, type StreamingDfgResult, type StreamingFootprintsResult,
@@ -224,7 +225,7 @@ export async function requestStreamingWorkflow(
   const body = new FormData(); body.append("log", log, log.name);
   if (form.method === "tbr"||form.method==="declare") body.append("model", model!, model!.name);
   const params=new URLSearchParams(query);if(form.method==="declare")params.set("format",/\.xes(?:\.gz)?$/i.test(log.name)?"xes":"csv");
-  const response = await fetch("/api/streaming-" + form.method + "?" + params, { method: "POST", body, signal });
+  const response = await backendFetch("/api/streaming-" + form.method + "?" + params, { method: "POST", body, signal });
   const raw = await response.text(); signal?.throwIfAborted();
   let result: unknown;
   try { result = parseNativeJson(raw); } catch { throw new Error("The backend returned invalid streaming JSON."); }

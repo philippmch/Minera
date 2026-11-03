@@ -93,18 +93,19 @@ function SimulationInspection({ run, onOpenLog, onOpenUnderlying }: { run: Simul
   const trees = kind === "places" ? run.value.result.output_places_interval_trees : run.value.result.output_transitions_interval_trees;
   const intervals = trees[treeIndex]?.intervals ?? []; const shown = intervals.slice(intervalPage*100,(intervalPage+1)*100);
   const low = shown.length ? Math.min(...shown.map(interval=>interval.start)) : 0; const high = shown.length ? Math.max(...shown.map(interval=>interval.end)) : 1; const scale = (value: number) => 80+(value-low)/Math.max(1,high-low)*820;
-  const xes = () => new File([run.value.xes],`minera-${run.value.miner}-simulation.xes`,{type:"application/xml"});
+  const xes = () => {if (run.value.xes === null) throw new Error(`XES export is unavailable: ${run.value.xes_error}`); return new File([run.value.xes],`minera-${run.value.miner}-simulation.xes`,{type:"application/xml"});};
   const pnml = () => new File([run.value.underlying_pnml],`minera-${run.value.miner}-simulation-model.pnml`,{type:"application/xml"});
   const download = (raw:string,name:string,type="application/json")=>downloadQueryBlob(new Blob([raw],{type}),name);
   const visibleColumns=current.columns.slice(columnPage*8,(columnPage+1)*8);
   return <section className="simulation-inspection" aria-label="Complete simulation inspection">
     <h3>Complete simulation results</h3><p>{run.value.result.log.trace_count} generated cases · {run.value.result.log.event_count} events · {run.value.miner} · source {run.value.source_id}</p>
+    {run.value.xes===null&&<p role="status">XES export is unavailable: {run.value.xes_error}. The simulation result, tables and JSON remain available.</p>}
     <p>Visible case durations measure first to last visible event. Scheduler elapsed times also include silent work. Place intervals describe native resource accounting and can extend beyond event times.</p>
     <div className="query-actions">
       <button className="btn-ghost" onClick={()=>download(run.raw,"minera-simulation-workspace.json")}>Download complete simulation JSON</button>
       <button className="btn-ghost" onClick={()=>download(run.report,"minera-simulation-report.json")}>Download simulation report</button>
-      <button className="btn-ghost" onClick={()=>downloadQueryBlob(xes(),xes().name)}>Download matching simulation XES</button>
-      {onOpenLog&&<button className="btn-ghost" onClick={()=>onOpenLog(xes())}>Mine this simulated log</button>}
+      <button className="btn-ghost" disabled={run.value.xes===null} onClick={()=>downloadQueryBlob(xes(),xes().name)}>Download matching simulation XES</button>
+      {onOpenLog&&<button className="btn-ghost" disabled={run.value.xes===null} onClick={()=>onOpenLog(xes())}>Mine this simulated log</button>}
       <button className="btn-ghost" onClick={()=>downloadQueryBlob(pnml(),pnml().name)}>Download simulation workflow PNML</button>
       {onOpenUnderlying&&<button className="btn-ghost" onClick={()=>onOpenUnderlying(pnml(),run.value.source_id)}>Check simulation workflow</button>}
     </div>

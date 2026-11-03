@@ -426,6 +426,14 @@ else()
   endif()
 endif()
 
+# zlib, when available, compresses gzip exports (level 9, as Python's gzip does);
+# without it they are written as stored deflate blocks.
+find_package(ZLIB QUIET)
+if(ZLIB_FOUND)
+  target_link_libraries(minera_core PRIVATE ZLIB::ZLIB)
+  target_compile_definitions(minera_core PUBLIC MINERA_HAS_ZLIB=1)
+endif()
+
 if(MSVC)
   target_compile_options(minera_core PRIVATE /W4 /permissive-)
 else()
@@ -2057,7 +2065,8 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_dfg_performance_playout_parity_tests PRIVATE cxx_std_20)
   target_compile_options(minera_dfg_performance_playout_parity_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_dfg_performance_playout_parity_tests COMMAND minera_dfg_performance_playout_parity_tests
-           "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/dfg_performance_playout_bank.txt")
+           "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/dfg_performance_playout_bank.txt"
+           "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/dfg_classic_playout_bank.txt")
 
   add_executable(minera_dfg_io_tests
     src/backend/tests/test_dfg_io.cpp

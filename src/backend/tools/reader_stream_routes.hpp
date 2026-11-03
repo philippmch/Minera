@@ -7,6 +7,7 @@ struct ReaderSessionRecord {
   LiveUpload source;
   // Shared so a snapshot can wait for the queue without the record lock.
   std::shared_ptr<minera::ReaderStreamSession> reader;
+  StreamBudgetCharge budget;
   bool released=false;
 };
 std::mutex g_reader_mutex;
@@ -50,7 +51,15 @@ void handle_reader_create(const httplib::Request& request,httplib::Response& res
     if(minimum>maximum)throw std::invalid_argument("minimum trace events exceeds maximum");
     options.events.acceptance=[case_id,activity](const minera::Event& event){return (!case_id||event.case_id==*case_id)&&(!activity||event.activity==*activity);};
     options.traces.acceptance=[case_id,activity,minimum,maximum](const minera::Trace& trace){return (!case_id||trace.case_id==*case_id)&&trace.events.size()>=minimum&&trace.events.size()<=maximum&&(!activity||std::any_of(trace.events.begin(),trace.events.end(),[&](const auto& event){return event.activity==*activity;}));};
-    auto record=std::make_shared<ReaderSessionRecord>();record->id=id;record->configuration=request.params;
+    // A reader parses its whole source when it is created and copies every
+    // item again as it is read and delivered, so a 128 MiB upload of short CSV
+    // rows can need several GiB. Before parsing, the source is bounded by an
+    // upper estimate of its events (CSV lines, XES <event elements), checked
+    // against the per-session event limit and charged twice, with the source
+    // bytes, against the server's stream budget.
+    const auto estimated_events=reader_estimated_events(options.source,kind,options.xes);
+    if(estimated_events>kLiveMaxEvents)throw LiveCapacityError(413,"reader source holds up to "+std::to_string(estimated_events)+" events, above the per-session limit of "+std::to_string(kLiveMaxEvents));
+    auto record=std::make_shared<ReaderSessionRecord>();record->budget.reserve(options.source.size(),2*estimated_events);record->id=id;record->configuration=request.params;
     record->source={"source",request.has_param("source_name")?request.get_param_value("source_name"):"reader-upload",kind=="csv_events"?"csv":"xes",request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",options.source};
     record->reader=std::make_shared<minera::ReaderStreamSession>(std::move(options));
     {std::lock_guard lock(g_reader_mutex);const auto found=g_reader_sessions.find(id);
@@ -98,5 +107,7 @@ void handle_reader_release(const httplib::Request& request,httplib::Response& re
   live_response(response,[&]{live_params(request,{"session_id","expected_revision"});auto s=reader_find(request);std::lock_guard lock(s->mutex);reader_open(*s);const auto revision=live_revision(request);
     if(s->reader->revision()!=revision)throw minera::StreamingSessionConflict("reader session revision changed; refresh before releasing");
     s->reader->action(minera::ReaderStreamAction::kFinish,revision);auto payload=reader_payload(*s);payload.pop_back();payload+=",\"released\":true}";
-    s->released=true;s->reader.reset();{std::lock_guard registry(g_reader_mutex);g_reader_sessions.erase(s->id);}response.set_content(payload,"application/json");});
+    s->released=true;s->reader.reset();std::string().swap(s->source.bytes);s->budget.release();
+    {std::lock_guard registry(g_reader_mutex);g_reader_sessions.erase(s->id);}response.set_content(payload,"application/json");});
+  if(response.status<300)minera_release_free_memory();
 }

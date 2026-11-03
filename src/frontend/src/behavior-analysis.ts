@@ -1,4 +1,5 @@
 import { isMineraExport,isTemporalConformanceResult,type MineraExport,type TemporalConformanceResult } from "./types";
+import { backendFetch } from "./backend-fetch";
 import { nativeCell,nativeJson,parseNativeJson } from "./native-json";
 import { nativeResponseJson,readNativeResponse } from "./native-response";
 import { nativeObjectTables,parseDiagnosticWeight,type DiagnosticTable } from "./model-diagnostics";
@@ -57,7 +58,7 @@ export function behaviorTables(value:BehaviorAnalysis,parameters:URLSearchParams
 }
 export interface BehaviorRun {value:BehaviorAnalysis;raw:string;report:string;tables:DiagnosticTable[];form:BehaviorForm;}
 export async function runBehaviorAnalysis(family:BehaviorFamily,form:BehaviorForm,source:LogQuerySchema,signal?:AbortSignal):Promise<BehaviorRun> {
-  const q=behaviorQuery(family,form,source.source_id),path='/api/analyze-behavior?'+q;const response=await fetch(path,{method:'POST',signal});const value=await readNativeResponse(response,{path});
+  const q=behaviorQuery(family,form,source.source_id),path='/api/analyze-behavior?'+q;const response=await backendFetch(path,{method:'POST',signal});const value=await readNativeResponse(response,{path});
   if(!response.ok||record(value)&&'error'in value)throw new Error(record(value)&&typeof value.error==='string'?value.error:'Native behavior analysis failed.');
   if(!validBehaviorAnalysis(value))throw new Error('Native behavior analysis returned an invalid result.');
   const adapter=family==='correlation'?form.adapter:family==='minimum_self_distance'?({log:'log',pandas:'dataframe',polars:'lazyframe'}as Record<string,string>)[form.variant]:form.variant;

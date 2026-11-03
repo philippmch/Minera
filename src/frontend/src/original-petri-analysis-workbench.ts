@@ -1,4 +1,5 @@
 import {miningSourceHash} from "./active-mining-source";
+import { backendFetch } from "./backend-fetch";
 import {nativeObjectTables, type DiagnosticTable} from "./model-diagnostics";
 import {nativeCell, nativeJson, parseNativeJson} from "./native-json";
 import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart";
@@ -376,7 +377,7 @@ export async function runOriginalPetriAnalysisWorkbench(uploads: Partial<Record<
  const body = new FormData(), originals: OriginalEditDistanceRequestOriginal[] = [];
  for (const control of controls) {const bytes = control.file ? new Uint8Array(await control.file.arrayBuffer()) : nativeStringBytes(control.text), file = control.file ?? new File([bytes], control.name); if (control.file) body.append(control.name, control.file, control.file.name); else appendNativeMultipartField(body, control.name, control.text); const transported = body.get(control.name); originals.push({field: control.name, filename: typeof transported === "string" || transported === null ? null : await originalEditDistanceWireFilename(transported.name), local_filename: control.file?.name ?? null, local_last_modified: control.file?.lastModified ?? null, bytes: bytes.length, sha256: await miningSourceHash(file), encoding: "hex", data: hex(bytes)}); signal?.throwIfAborted();}
  for (const role of roles) {const file = uploads[role]!; body.append(`${role}_file`, file, file.name); originals.push({field: `${role}_file`, filename: await originalEditDistanceWireFilename(file.name), local_filename: file.name, local_last_modified: file.lastModified, bytes: file.size, sha256: await miningSourceHash(file), encoding: "hex", data: hex(new Uint8Array(await file.arrayBuffer()))}); signal?.throwIfAborted();}
- const request: OriginalPetriAnalysisRun["request"] = {path: "/api/petri-analysis-workbench", operation: form.operation, originals}, response = await fetch(request.path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path: request.path, fields: controls.filter(control => !control.file).map(control => [control.name, control.text])}); signal?.throwIfAborted();
+ const request: OriginalPetriAnalysisRun["request"] = {path: "/api/petri-analysis-workbench", operation: form.operation, originals}, response = await backendFetch(request.path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path: request.path, fields: controls.filter(control => !control.file).map(control => [control.name, control.text])}); signal?.throwIfAborted();
  if (!isOriginalPetriAnalysisWorkbench(value)) {if (object(value) && typeof value.error === "string") throw new Error(value.error); throw new Error(`The server did not return an owned exact Petri-analysis response (HTTP ${response.status}).`);}
  // A raw-reader/parser refusal cannot claim any unparsed body parts. The
  // attempted request is retained separately from the default error operation.

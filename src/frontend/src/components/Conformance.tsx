@@ -1,4 +1,5 @@
 import {OriginalBoseWorkspace} from "./OriginalBoseWorkspace";
+import { downloadBlob } from "../download";
 import {OriginalEditDistanceWorkspace} from "./OriginalEditDistanceWorkspace";
 import {LiteralControlsPanel} from "./LiteralControlsPanel";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -498,7 +499,7 @@ function ConceptDriftPanel({ onRequest }: { onRequest?: (options?: ConceptDriftO
       <label><input type="checkbox" checked={includeTimestamps} onChange={event => setIncludeTimestamps(event.target.checked)} /> Include drift timestamps</label>
     </div>
     <button className="button" disabled={!onRequest || busy || invalidSettings || !activityAttribute.trim() || !timestampAttribute.trim() || !caseIdAttribute.trim()} onClick={() => void run()}>{busy ? "Detecting…" : "Detect concept drift"}</button>
-    {error && <div className="error-banner">{error}</div>}
+    {error && <div className="error-banner" role="alert">{error}</div>}
     {result && <small>{result.change_points.length} change point(s), {result.returned_sublogs.length} segment(s) across {result.sublogs.length} sub-logs.</small>}
   </section>;
 }
@@ -576,9 +577,7 @@ function ProcessTreePlayoutPanel({ dataset, available, sourceId }: { dataset: st
       if (sourceId === undefined) throw new Error(PLAYOUT_NEEDS_SOURCE);
       const xes = await fetchPlayout("process_tree", options, sourceId);
       const blob = new Blob([xes], { type: "application/xml" });
-      const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
-      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-process_tree-playout.xes`; anchor.click();
-      URL.revokeObjectURL(anchor.href);
+      downloadBlob(blob, `${dataset.replace(/\.[^.]+$/, "")}-process_tree-playout.xes`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   };
@@ -634,15 +633,11 @@ function PetriPlayoutPanel({ dataset, miners, sourceId }: { dataset: string; min
           : await fetchExtensivePlayoutVisited(selectedMiner, common, sourceId);
         setVisited(result);
         const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
-        const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
-        anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-${mode}-playout.json`; anchor.click();
-        URL.revokeObjectURL(anchor.href);
+        downloadBlob(blob, `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-${mode}-playout.json`);
       } else {
         const xes = await fetchPlayout(selectedMiner, common, sourceId);
         const blob = new Blob([xes], { type: "application/xml" });
-        const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
-        anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-${mode}-playout.xes`; anchor.click();
-        URL.revokeObjectURL(anchor.href);
+        downloadBlob(blob, `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-${mode}-playout.xes`);
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
@@ -687,9 +682,7 @@ function StochasticPetriPlayoutPanel({ dataset, miners, sourceId }: { dataset: s
       const selectedMiner = miners.some((candidate) => candidate.id === miner) ? miner : (miners[0]?.id ?? "inductive");
       const xes = await fetchPlayout(selectedMiner, options, sourceId);
       const blob = new Blob([xes], { type: "application/xml" });
-      const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
-      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-stochastic-playout.xes`; anchor.click();
-      URL.revokeObjectURL(anchor.href);
+      downloadBlob(blob, `${dataset.replace(/\.[^.]+$/, "")}-${selectedMiner}-stochastic-playout.xes`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   };
@@ -728,9 +721,7 @@ function DfgPlayoutPanel({ dataset, available, sourceId }: { dataset: string; av
       const structured = typeof result !== "string";
       const body = structured ? JSON.stringify(result, null, 2) : result;
       const blob = new Blob([body], { type: structured ? "application/json" : "application/xml" });
-      const anchor = document.createElement("a"); anchor.href = URL.createObjectURL(blob);
-      anchor.download = `${dataset.replace(/\.[^.]+$/, "")}-dfg-playout.${structured ? "json" : "xes"}`; anchor.click();
-      URL.revokeObjectURL(anchor.href);
+      downloadBlob(blob, `${dataset.replace(/\.[^.]+$/, "")}-dfg-playout.${structured ? "json" : "xes"}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   };

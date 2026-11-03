@@ -1,4 +1,5 @@
 import { type LinkAnalysisResult,isCaseRelationsResult,isLinkAnalysisResult,isTimestampInterleavingsResult } from './types';
+import { backendFetch } from "./backend-fetch";
 import { parseNativeJson,nativeJson,nativeCell } from './native-json';
 import { nativeRecordTables } from './ocel-execution';
 import { type OcelPreparedTable } from './ocel-preparation';
@@ -46,7 +47,7 @@ export async function requestRelated(form:RelatedForm,files:RelatedSources,signa
   if(!files.left||!files.right||!files.relations)throw new Error('Choose the independent base, incoming and relation files.');for(const [key,file] of [['left',files.left],['right',files.right],['relations',files.relations]] as const)sources[key]=await bind(file,file.name,signal);
   const upload=new FormData();const fields=form.method==='merge'?['base_log','incoming_log','case_relations']:['left','right','relations'];[files.left,files.right,files.relations].forEach((file,i)=>upload.append(fields[i],file,file.name));body=upload;route=form.method==='merge'?'merge-case-relations':'timestamp-interleavings';
  }
- if(signal?.aborted)throw new DOMException('Relation workflow cancelled','AbortError');const response=await fetch('/api/'+route+(query?'?'+query:''),{method:'POST',...(body!==undefined?{body}:{}),...(headers?{headers}:{}),...(signal?{signal}:{})});const raw=await response.text();signal?.throwIfAborted();let value:unknown;try{value=parseNativeJson(raw);}catch{throw new Error('The backend returned invalid relation-workflow JSON.');}
+ if(signal?.aborted)throw new DOMException('Relation workflow cancelled','AbortError');const response=await backendFetch('/api/'+route+(query?'?'+query:''),{method:'POST',...(body!==undefined?{body}:{}),...(headers?{headers}:{}),...(signal?{signal}:{})});const raw=await response.text();signal?.throwIfAborted();let value:unknown;try{value=parseNativeJson(raw);}catch{throw new Error('The backend returned invalid relation-workflow JSON.');}
  const partial=form.method==='format'&&record(value)&&value.family==='FORMAT_DATAFRAME'&&typeof value.error==='string'&&isNativeRelationTable(value.input_after);
  if(!response.ok&&!partial)throw new Error(record(value)&&isOriginalEmbeddingFilterNativeString(value.error)?relatedNativeText(value.error):`Relation workflow returned ${response.status}.`);
  const tables:Record<string,OcelPreparedTable>={};

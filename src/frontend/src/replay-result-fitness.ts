@@ -1,4 +1,5 @@
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
+import { backendFetch } from "./backend-fetch";
 import { nativeResponseJson, readNativeResponse } from "./native-response";
 import { nativeObjectTables, type DiagnosticTable } from "./model-diagnostics";
 
@@ -77,7 +78,7 @@ export async function runReplayResultFitness(form: ReplayResultFitnessForm, sign
   const query = new URLSearchParams({ input_kind: request.input_kind });
   if (request.fitness_variant) query.set("fitness_variant", request.fitness_variant);
   const path = `/api/evaluate-replay-results?${query}`;
-  const response = await fetch(path, {
+  const response = await backendFetch(path, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: request.input_json, signal,
   });
   const value = await readNativeResponse(response, { path });

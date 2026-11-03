@@ -47,6 +47,12 @@ describe("native transformation workflows",()=>{
   it("retains padded empty traces without inventing source events or changing source indices",()=>{
     const matrix=transformationMatrix(run(eventResult));expect(matrix.count).toBe(6);expect(matrix.rowAt(4)).toEqual({metadata:[2,"same",0,"event"],values:[1,3]});expect(matrix.rowAt(2)).toEqual({metadata:[1,"empty",0,"padding"],values:[0,0]});const view=transformationMatrix(run(temporalResult));expect(view.rowAt(0).metadata[2]).toBe("1790899200000000000");expect(view.rowAt(0).values).toEqual([""]);
   });
+  it("keeps a label split whose text XES cannot carry and reports the writer's refusal",()=>{
+    const refused={...labels,transformed_xes:null,transformed_xes_error:"XES cannot represent this text: \"A\\u0001x\""};
+    expect(isTransformationRun(refused)).toBe(true);
+    expect(isTransformationRun({...labels,transformed_xes:null})).toBe(false);
+    expect(()=>transformedXes({...refused,data_json:"",report_json:""} as TransformationRun)).toThrow(/XES export is unavailable: XES cannot represent/);
+  });
   it("validates ordered label rows and output field completeness, and exports the same XES",async()=>{
     expect(isTransformationRun(labels)).toBe(true);expect(isTransformationRun({...labels,label_rows:[labels.label_rows[2],...labels.label_rows.slice(0,2)]})).toBe(false);expect(isTransformationRun({...labels,complete_activity_field:false})).toBe(false);
     const partial={...labels,complete_activity_field:false,label_rows:labels.label_rows.map((row,i)=>i?row:{...row,output:""})};expect(isTransformationRun(partial)).toBe(true);

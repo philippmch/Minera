@@ -1,4 +1,5 @@
 import {nativeCell} from "./native-json";
+import { backendFetch } from "./backend-fetch";
 import {appendNativeMultipartField,nativeStringBytes} from "./native-multipart";
 import {nativeResponseJson,readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
@@ -73,7 +74,7 @@ export async function requestPolarsTimestampOriginal(sourceFile:File,form:Polars
   signal?.throwIfAborted();if(!(sourceFile instanceof File))throw new Error("Choose an actual native EventTable source File.");
   const fields=polarsTimestampOriginalFields(form),body=new FormData();body.append("source_file",sourceFile);
   for(const[key,value]of fields)appendNativeMultipartField(body,key,value);
-  const response=await fetch("/api/reference-table-timestamp",{method:"POST",body,signal});signal?.throwIfAborted();
+  const response=await backendFetch("/api/reference-table-timestamp",{method:"POST",body,signal});signal?.throwIfAborted();
   if(response.status!==200&&response.status!==400)throw new Error(`Original Polars timestamp returned HTTP ${response.status}.`);
   const responseBytes=new Uint8Array(await response.arrayBuffer());
   try{new TextDecoder("utf-8",{fatal:true}).decode(responseBytes);}catch{throw new Error("The original Polars timestamp response is not safe JSON UTF-8.");}

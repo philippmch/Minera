@@ -96,8 +96,26 @@ std::string resource_for(const std::string& activity) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  const auto usage = [&](std::ostream& stream) {
+    stream << "Usage: " << argv[0] << " <output.csv>\n"
+           << "Writes the deterministic order-to-cash sample event log to <output.csv>.\n";
+  };
+  if (argc == 2) {
+    const std::string argument = argv[1];
+    if (argument == "-h" || argument == "--help") {
+      usage(std::cout);
+      return 0;
+    }
+    // An option-looking argument is never taken as the output file name, so a
+    // mistyped flag cannot create a file called "--verbose" in the cwd.
+    if (!argument.empty() && argument.front() == '-') {
+      std::cerr << "error: unknown option " << argument << '\n';
+      usage(std::cerr);
+      return 2;
+    }
+  }
   if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " <output.csv>\n";
+    usage(std::cerr);
     return 2;
   }
 

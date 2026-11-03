@@ -241,6 +241,7 @@ class XmlPullParser {
 
       const char marker = xml_[pos_];
       if (marker == '?') {
+        if (strict_) check_strict_pi_target(open);
         skip_until("?>");
         if (coalesce_character_data_) {
           Token token;
@@ -540,6 +541,22 @@ class XmlPullParser {
     } while (value != 0);
     while (text.size() < 4) text.insert(text.begin(), '0');
     return text;
+  }
+
+  // A processing instruction named "xml" is the XML declaration, allowed only
+  // as the first bytes of the document (after a byte-order mark the caller
+  // strips); other case variants of "xml" are reserved names.
+  void check_strict_pi_target(std::size_t open) const {
+    std::size_t end = open + 2;
+    while (end < xml_.size() && xml_[end] != '?' &&
+           !std::isspace(static_cast<unsigned char>(xml_[end])))
+      ++end;
+    const auto target = xml_.substr(open + 2, end - open - 2);
+    if (target.size() != 3) return;
+    const auto lower = [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); };
+    if (lower(target[0]) != 'x' || lower(target[1]) != 'm' || lower(target[2]) != 'l') return;
+    if (target != "xml") fail_at(open, "Invalid PI name");
+    if (open != 0) fail_at(open, "XML declaration allowed only at the start of the document");
   }
 
   // Character data between tags: only whitespace outside the root element,

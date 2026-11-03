@@ -716,6 +716,26 @@ void polars_null_and_aggregation_contract() {
   (void)discover_polars_dfg(LazyEventTable::from_table(table), options);
 }
 
+// Regression: event_from_row once read the selected activity and timestamp
+// cells through a pointer into a destroyed temporary row (heap-use-after-free
+// under ASan). Heap-allocated (non-SSO) cell strings make the read observable.
+void selected_cells_outlive_row_lookup() {
+  const std::string a(64, 'a'), b(64, 'b');
+  const auto table = make_table(
+      {"case:concept:name", "concept:name", "time:timestamp"},
+      {row({value("case:concept:name", "case-with-a-long-identifier-0001"),
+            value("concept:name", a), value("time:timestamp", "2026-01-01T00:00:00Z")}),
+       row({value("case:concept:name", "case-with-a-long-identifier-0001"),
+            value("concept:name", b), value("time:timestamp", "2026-01-02T00:00:00Z")})});
+  DfgTableOptions options;
+  const auto result = discover_pandas_dfg(table, options);
+  assert(result.frequency.size() == 1);
+  assert(count(result.frequency, a, b) == 1);
+  options.measure = DfgTableMeasure::kPerformance;
+  const auto performance = discover_pandas_dfg(table, options);
+  assert(performance.performance.size() == 1);
+}
+
 int main() {
   graph_measure_selectors_and_ordering();
   dataframe_triples_contract();
@@ -728,5 +748,6 @@ int main() {
   first_class_selector_contract();
   event_log_projection_selector_contract();
   polars_null_and_aggregation_contract();
+  selected_cells_outlive_row_lookup();
   return 0;
 }

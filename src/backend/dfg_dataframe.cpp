@@ -362,34 +362,37 @@ Event event_from_row(const EventTable::Row& row, const EventTable& table,
                           : first_class_role_for_column(table.columns[i]);
     set_event_projection(result, copy, table.columns[i], role);
   }
+  // One named row for every selector lookup: selected_cell returns a pointer
+  // into the row, so it must outlive each dereference below.
+  const TableRow wrapped{row};
   const auto case_value = cell_text(
-      TableRow{row}, table, case_selector, FirstClassAttributeRole::kCaseId);
+      wrapped, table, case_selector, FirstClassAttributeRole::kCaseId);
   if (case_value) {
     result.case_id = *case_value;
     result.case_id_state = FirstClassAttributeState::kPresent;
     result.case_id_source_key = case_selector.name;
   }
   const auto activity_value = cell_text(
-      TableRow{row}, table, activity_selector,
+      wrapped, table, activity_selector,
       FirstClassAttributeRole::kActivity);
   if (activity_value) {
     result.activity = *activity_value;
     result.activity_state = FirstClassAttributeState::kPresent;
     result.activity_source_key = activity_selector.name;
     if (const auto* selected = selected_cell(
-            TableRow{row}, table, activity_selector,
+            wrapped, table, activity_selector,
             FirstClassAttributeRole::kActivity))
       result.activity_attribute = *selected;
   }
   const auto timestamp_value = cell_text(
-      TableRow{row}, table, timestamp_selector,
+      wrapped, table, timestamp_selector,
       FirstClassAttributeRole::kTimestamp);
   if (timestamp_value) {
     result.timestamp = *timestamp_value;
     result.timestamp_state = FirstClassAttributeState::kPresent;
     result.timestamp_source_key = timestamp_selector.name;
     if (const auto* selected = selected_cell(
-            TableRow{row}, table, timestamp_selector,
+            wrapped, table, timestamp_selector,
             FirstClassAttributeRole::kTimestamp))
       result.timestamp_attribute = *selected;
   }

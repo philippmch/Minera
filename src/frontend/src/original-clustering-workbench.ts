@@ -1,4 +1,5 @@
 import {miningSourceHash} from "./active-mining-source";
+import { backendFetch } from "./backend-fetch";
 import {nativeCell,nativeJson,parseNativeJson} from "./native-json";
 import {appendNativeMultipartField,nativeStringBytes} from "./native-multipart";
 import {nativeResponseJson,readNativeResponse} from "./native-response";
@@ -100,7 +101,7 @@ export async function runOriginalClusteringWorkbench(uploads:Partial<Record<"log
  const capture=async(field:string,bytes:Uint8Array<ArrayBuffer>,localFile:File|null)=>{const part=body.get(field),wire=part!==null&&typeof part!=="string"?part:null;originals.push({field,filename:wire?await originalEditDistanceWireFilename(wire.name):null,local_filename:localFile?.name??null,local_last_modified:localFile?.lastModified??null,content_type:wire?wire.type||"application/octet-stream":null,bytes:bytes.length,sha256:await miningSourceHash(new File([bytes],field)),encoding:"hex",data:hex(bytes)});signal?.throwIfAborted();};
  for(const control of controls){const bytes=control.file?new Uint8Array(await control.file.arrayBuffer()):nativeStringBytes(control.text);if(control.file)body.append(control.name,control.file,control.file.name);else appendNativeMultipartField(body,control.name,control.text);await capture(control.name,bytes,control.file);}
  const file=files[role]!;body.append(role+"_file",file,file.name);await capture(role+"_file",new Uint8Array(await file.arrayBuffer()),file);
- const request:OriginalClusteringRun["request"]={path:"/api/clustering-workbench",operation:form.operation,call_form:form.call_form,originals},response=await fetch(request.path,{method:"POST",body,signal}),value=await readNativeResponse(response,{path:request.path,fields:controls.filter(x=>!x.file).map(x=>[x.name,x.text])});signal?.throwIfAborted();
+ const request:OriginalClusteringRun["request"]={path:"/api/clustering-workbench",operation:form.operation,call_form:form.call_form,originals},response=await backendFetch(request.path,{method:"POST",body,signal}),value=await readNativeResponse(response,{path:request.path,fields:controls.filter(x=>!x.file).map(x=>[x.name,x.text])});signal?.throwIfAborted();
  if(!isOriginalClusteringWorkbench(value))throw new Error("The server did not return a complete owned clustering response (HTTP "+response.status+").");
  const transportFailure=!value.native_entered&&value.error!==null&&["transport_error","configuration_error"].includes(originalEmbeddingFilterStringText(value.error.phase))&&value.originals.length===0&&value.supplied_controls.length===0;
  if(!transportFailure){

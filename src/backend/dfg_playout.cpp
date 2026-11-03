@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "minera/filtering_common.hpp"
 #include "minera/random.hpp"
 #include "minera/timestamp.hpp"
 
@@ -148,9 +149,12 @@ Event make_event(const std::string& case_id, const std::string& activity,
   return event;
 }
 
+// The default key is the trace's concept:name (case:concept:name in frame
+// terms), so only another name adds an attribute (a declared extension).
 void add_case_id_attribute(Trace& trace, const DfgPlayoutOptions& options) {
   if (options.case_id_key == "case_id" ||
-      options.case_id_key == "concept:name") {
+      options.case_id_key == "concept:name" ||
+      options.case_id_key == "case:concept:name") {
     return;
   }
   trace.attributes.push_back(
@@ -161,11 +165,11 @@ std::uint64_t variant_occurrence_count(double probability,
                                        std::size_t max_variants) {
   if (!std::isfinite(probability) || probability <= 0.0 || max_variants == 0)
     return 0;
-  const long double scaled =
-      std::ceil(static_cast<long double>(probability) *
-                static_cast<long double>(max_variants));
-  if (scaled >= static_cast<long double>(
-                    std::numeric_limits<std::uint64_t>::max()))
+  // ceil(probability * max_variants) in binary64, as the reference computes
+  // it: 0.2 * 5 is 1.0 there (a wider product would round up to 2).
+  const double scaled =
+      std::ceil(probability * static_cast<double>(max_variants));
+  if (scaled >= 18446744073709551616.0)
     return std::numeric_limits<std::uint64_t>::max();
   return static_cast<std::uint64_t>(scaled);
 }
@@ -231,13 +235,75 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
     result.interrupted = start_total > 0.0 && options.max_variants == 0;
     return result;
   }
+  // A trace is found when its own state leaves the queue and its last
+  // activity can end; the caps, the probability budget and the coverage
+  // interruption apply in that search order. The traces found are then
+  // listed as the reference lists them: by descending probability, equal
+  // probabilities by their activity sequence. Case ids and the one-second
+  // clock follow that list.
+  struct FoundTrace {
+    std::vector<std::string> activities;
+    double probability = 0.0;
+  };
+  std::vector<FoundTrace> found;
+  std::map<std::string, double> out_totals;
+  for (const auto& [activity, outgoing] : transitions) {
+    double total = 0.0;
+    for (const auto& item : outgoing) total += item.second;
+    out_totals[activity] = total;
+  }
+  // false: the search stops (a trace below the minimum occurrences, the
+  // probability budget spent, or the DFG covered when that interrupts).
+  bool stopped = false;
+  const auto consider = [&](const std::vector<std::string>& activities, double path_cost) {
+    const auto out_it = transitions.find(activities.back());
+    if (out_it == transitions.end()) return true;
+    const auto end_it = out_it->second.find(std::string{});
+    if (end_it == out_it->second.end() || end_it->second <= 0.0) return true;
+    const double cost = path_cost - std::log(end_it->second / out_totals[activities.back()]);
+    const double probability = std::exp(-cost);
+    if (!std::isfinite(probability) || probability <= 0.0) return true;
+    // The cap applies to a trace found beyond it, so a search that ends
+    // with exactly max_variants traces is not cut short.
+    if (found.size() >= options.max_variants) {
+      result.interrupted = true;
+      return false;
+    }
+    const std::uint64_t variant_occurrences =
+        variant_occurrence_count(probability, options.max_variants);
+    max_occ = std::max<std::size_t>(
+        max_occ, static_cast<std::size_t>(std::min<std::uint64_t>(
+                     variant_occurrences, std::numeric_limits<std::size_t>::max())));
+    if (variant_occurrences < options.min_variant_occurrences &&
+        options.min_variant_occurrences <= max_occ)
+      return false;
+    if (cumulative_probability > options.min_weighted_probability) {
+      result.interrupted = true;
+      return false;
+    }
+    // A trace skipped for adding nothing new still spends its probability.
+    cumulative_probability += probability;
+    bool adds_new = !seen_starts.contains(activities.front()) ||
+                    !seen_ends.contains(activities.back());
+    for (std::size_t i = 1; i < activities.size(); ++i)
+      if (!seen_edges.contains({activities[i - 1], activities[i]})) adds_new = true;
+    if (options.add_trace_if_takes_new_edges && !adds_new) return true;
+    seen_starts.insert(activities.front());
+    seen_ends.insert(activities.back());
+    for (std::size_t i = 1; i < activities.size(); ++i)
+      seen_edges.insert({activities[i - 1], activities[i]});
+    result.counts[activities] = variant_occurrences;
+    found.push_back({activities, probability});
+    result.complete = coverage_complete();
+    return !(options.interrupt_when_dfg_complete && result.complete);
+  };
+
   for (const auto& [activity, count] : starts) {
     if (count == 0) continue;
-    queue.push(PartialTrace{-std::log(static_cast<double>(count) / start_total),
-                            {activity}});
+    queue.push(PartialTrace{-std::log(static_cast<double>(count) / start_total), {activity}});
   }
 
-  while (!queue.empty()) {
+  while (!queue.empty() && !stopped) {
     if (++expansions > expansion_budget) {
       result.interrupted = true;
       break;
@@ -246,113 +312,74 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
       result.interrupted = true;
       break;
     }
-    if (result.log.traces.size() >= options.max_variants) {
-      result.interrupted = true;
-      break;
-    }
     auto state = queue.top();
     queue.pop();
     if (state.activities.empty()) continue;
-    const std::string& last = state.activities.back();
-    const auto out_it = transitions.find(last);
+    const auto out_it = transitions.find(state.activities.back());
     if (out_it == transitions.end()) continue;
 
     std::unordered_map<std::string, std::size_t> occurrences;
     for (const auto& activity : state.activities) ++occurrences[activity];
+    const double total = out_totals[state.activities.back()];
+    // The end weight sorts first (the empty name) in the successor map.
     for (const auto& [next, weight] : out_it->second) {
       if (weight <= 0.0) continue;
       if (next.empty()) {
-        const double probability = std::exp(-state.cost) *
-                                   (weight / [&] {
-                                     double total = 0.0;
-                                     for (const auto& item : out_it->second)
-                                       total += item.second;
-                                     return total;
-                                   }());
-        if (!std::isfinite(probability) || probability <= 0.0) continue;
-        const std::uint64_t variant_occurrences =
-            variant_occurrence_count(probability, options.max_variants);
-        max_occ = std::max<std::size_t>(
-            max_occ, static_cast<std::size_t>(std::min<std::uint64_t>(
-                         variant_occurrences,
-                         std::numeric_limits<std::size_t>::max())));
-        if (variant_occurrences < options.min_variant_occurrences &&
-            options.min_variant_occurrences <= max_occ)
-          break;
-        if (cumulative_probability > options.min_weighted_probability) {
-          result.interrupted = true;
+        if (!consider(state.activities, state.cost)) {
+          stopped = true;
           break;
         }
-
-        bool adds_new = !seen_starts.contains(state.activities.front()) ||
-                        !seen_ends.contains(last);
-        for (std::size_t i = 1; i < state.activities.size(); ++i) {
-          if (!seen_edges.contains(
-                  {state.activities[i - 1], state.activities[i]})) {
-            adds_new = true;
-          }
-        }
-        if (options.add_trace_if_takes_new_edges && !adds_new) continue;
-
-        seen_starts.insert(state.activities.front());
-        seen_ends.insert(last);
-        for (std::size_t i = 1; i < state.activities.size(); ++i)
-          seen_edges.insert({state.activities[i - 1], state.activities[i]});
-
-        Trace trace;
-        // The reference names its cases "0", "1", ... and stamps events one
-        // second apart from its epoch, counting on across cases.
-        trace.case_id = std::to_string(result.log.traces.size());
-        add_case_id_attribute(trace, options);
-        trace.attributes.push_back(
-            {"probability", std::to_string(probability), AttributeKind::kFloat});
-        trace.attributes.push_back(
-            {"variant_occurrences", std::to_string(variant_occurrences),
-             AttributeKind::kInt});
-        result.counts[state.activities] = variant_occurrences;
-        if (options.return_variants) {
-          std::string variant;
-          for (const auto& activity : state.activities) {
-            if (!variant.empty()) variant.push_back(',');
-            variant += activity;
-          }
-          trace.attributes.push_back(
-              {"variant", std::move(variant), AttributeKind::kString});
-        }
-        for (const auto& activity : state.activities) {
-          trace.events.push_back(make_event(trace.case_id, activity, clock,
-                                            trace.events.size(), options));
-          clock += 1.0;
-        }
-        result.log.traces.push_back(std::move(trace));
-        cumulative_probability += probability;
-        result.complete = coverage_complete();
-
-        if (options.interrupt_when_dfg_complete) {
-          if (result.complete) break;
-        }
-      } else {
-        if (occurrences[next] >= options.max_occurrences_per_activity) continue;
-        auto next_trace = state.activities;
-        next_trace.push_back(next);
-        double total = 0.0;
-        for (const auto& item : out_it->second) total += item.second;
-        queue.push(PartialTrace{state.cost - std::log(weight / total),
-                                std::move(next_trace)});
+        continue;
       }
+      if (occurrences[next] >= options.max_occurrences_per_activity) continue;
+      PartialTrace child{state.cost - std::log(weight / total), state.activities};
+      child.activities.push_back(next);
+      queue.push(std::move(child));
     }
-    if (options.interrupt_when_dfg_complete && result.complete) break;
   }
-  if (options.return_only_if_complete &&
-      (result.interrupted || !result.complete)) {
+  std::sort(found.begin(), found.end(), [](const auto& lhs, const auto& rhs) {
+    if (lhs.probability != rhs.probability) return lhs.probability > rhs.probability;
+    return lhs.activities < rhs.activities;
+  });
+  for (const auto& item : found) {
+    Trace trace;
+    // The reference names its cases "0", "1", ... and stamps events one
+    // second apart from its epoch, counting on across cases.  Its traces
+    // carry concept:name and the probability as a full-precision float;
+    // the estimated occurrences stay in result.counts.
+    trace.case_id = std::to_string(result.log.traces.size());
+    add_case_id_attribute(trace, options);
+    trace.attributes.push_back(
+        {"probability", filtering_float_repr(item.probability), AttributeKind::kFloat});
+    if (options.return_variants) {
+      std::string variant;
+      for (const auto& activity : item.activities) {
+        if (!variant.empty()) variant.push_back(',');
+        variant += activity;
+      }
+      trace.attributes.push_back({"variant", std::move(variant), AttributeKind::kString});
+    }
+    for (const auto& activity : item.activities) {
+      trace.events.push_back(make_event(trace.case_id, activity, clock,
+                                        trace.events.size(), options));
+      clock += 1.0;
+    }
+    result.log.traces.push_back(std::move(trace));
+  }
+  // "Complete" is the search's: the reference returns nothing when the
+  // search was cut short (the variant cap or the probability budget stopped
+  // it, or a safety bound), whether or not the traces cover the DFG.
+  if (options.return_only_if_complete && result.interrupted) {
     result.log = {};
     result.counts.clear();
   }
   return result;
 }
 
-// PERFORMANCE (exact under numpy.random.seed(seed)): case i starts at
-// epoch + (i + 1) * case_arrival_rate with one numpy choice over the start
+// PERFORMANCE (exact under numpy.random.seed(seed)): the case clock starts at
+// the epoch and gains case_arrival_rate once per case, before the case (a
+// running sum, as the reference adds it, not epoch + (i + 1) * rate, which
+// rounds differently for rates such as 0.3), with one numpy choice over the start
 // activities (in start_activity_order, else map order); each step is one
 // numpy choice over the activity's successors (edge-map order) followed by
 // its end weight, and a chosen edge with a non-zero mean duration d adds
@@ -411,13 +438,14 @@ DfgPlayoutResult performance_playout(const DfgFrequency& frequency,
     for (const auto& choice : choices) weights.push_back(choice.weight);
     return choices[numpy.choice_index(weights)];
   };
-  const double base = start_epoch(options);
+  double case_start = start_epoch(options);
 
   for (std::size_t trace_index = 0; trace_index < options.traces; ++trace_index) {
     Trace trace;
     trace.case_id = std::to_string(trace_index);
     add_case_id_attribute(trace, options);
-    double instant = base + static_cast<double>(trace_index + 1) * options.case_arrival_rate;
+    case_start += options.case_arrival_rate;
+    double instant = case_start;
     bool reached_end = false;
     if (!start_choices.empty()) {
       std::string current = draw(start_choices).next;

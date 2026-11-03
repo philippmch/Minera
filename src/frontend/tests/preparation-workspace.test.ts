@@ -25,6 +25,13 @@ describe("log preparation workflows",()=>{
     const query=new URLSearchParams(logConversionQuery(options));expect(query.get("log_conversion_case_attributes_as_nodes")).toBe("segment,A\\,α");expect(query.get("log_conversion_event_attributes_as_nodes")).toBe("cost,path\\\\name");
     expect(()=>conversionOptions({...form,maximumNodes:"200001"})).toThrow(/Maximum graph nodes/);expect(()=>conversionOptions({...form,eventNodes:{mode:"list",text:'[""]'}})).toThrow(/non-empty names/);
   });
+  it("keeps a prepared output whose text XES cannot carry and reports the writer's refusal",()=>{
+    const refused={...output(),xes:null,xes_error:"XES cannot represent this text: \"A\\u0001x\""};
+    expect(isPreparationRun(envelope(fixed,[refused]))).toBe(true);
+    expect(isPreparationRun(envelope(fixed,[{...output(),xes:null}]))).toBe(false);
+    expect(isPreparationRun(envelope(fixed,[{...output(),xes_error:"refused"}]))).toBe(false);
+    expect(()=>preparedXes(refused)).toThrow(/XES export is unavailable: XES cannot represent/);
+  });
   it("serializes all six case utilities with exact activity lists and native defaults",()=>{
     expect(UTILITY_METHODS).toHaveLength(6);
     const forms=[DEFAULT_UTILITY,{...DEFAULT_UTILITY,variant:"fixed_prefixes" as const,length:"0"},{...DEFAULT_UTILITY,variant:"all_prefixes" as const},{...DEFAULT_UTILITY,variant:"until_activity" as const,activity:" A,α "},{...DEFAULT_UTILITY,variant:"to_activities" as const,activities:'["A,α","B 東京"]'},{...DEFAULT_UTILITY,variant:"feature_selection" as const,minimum:"0",mandatory:{mode:"list" as const,text:'["native_id","A,α"]'}}];

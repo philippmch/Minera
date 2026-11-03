@@ -29,6 +29,13 @@ describe("anonymization delivery",()=>{
     expect(isAnonymizationRelease({...envelope,released_xes:""})).toBe(false);
     expect(isAnonymizationRelease({...envelope,result:{...result,diagnostics:{...result.diagnostics,released_trace_count:2}}})).toBe(false);
   });
+  it("keeps a release whose text XES cannot carry and reports the writer's refusal",()=>{
+    const refused={...envelope,released_xes:null,released_xes_error:"XES cannot represent this text: \"Pr\\ufffdfung\""};
+    expect(isAnonymizationRelease(refused)).toBe(true);
+    expect(isAnonymizationRelease({...envelope,released_xes:null})).toBe(false);
+    expect(isAnonymizationRelease({...envelope,released_xes_error:"refused"})).toBe(false);
+    expect(()=>releasedFile({...refused,data_json:"",report_json:""} as never)).toThrow(/XES export is unavailable: XES cannot represent/);
+  });
   it("binds a single run to its source and exports the exact returned XES and JSON",async()=>{
     const fetch=respond(envelope);vi.stubGlobal("fetch",fetch);const signal=new AbortController().signal;
     const release=await requestVariantRelease("7",variantOptions(variantForm),signal);

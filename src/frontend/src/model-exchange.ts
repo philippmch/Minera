@@ -1,4 +1,5 @@
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
+import { backendFetch } from "./backend-fetch";
 import { type OcelPreparedTable } from "./ocel-preparation";
 import { type ModelGraph } from "./model-graph";
 
@@ -215,7 +216,7 @@ export async function requestModelExchange(file: File, form: ModelExchangeForm, 
   const source = { name: file.name, size: file.size, sha256: [...new Uint8Array(digest)].map(v => v.toString(16).padStart(2, "0")).join("") };
   signal?.throwIfAborted();
   const body = new FormData(); body.append("model", file, file.name);
-  const response = await fetch("/api/model-exchange?" + query, { method: "POST", body, signal });
+  const response = await backendFetch("/api/model-exchange?" + query, { method: "POST", body, signal });
   const raw = await response.text(); signal?.throwIfAborted();
   let result: unknown;
   try { result = parseNativeJson(raw); } catch { throw new Error("The backend returned invalid model exchange JSON."); }

@@ -156,6 +156,21 @@ void imports_fixed_huffman_and_concatenated_gzip() {
   assert(joined_log.traces[0].events[0].activity == "B");
 }
 
+// Compressed exports must round-trip, and with zlib they are deflated at level 9
+// (as Python's gzip writes them) rather than stored.
+void compresses_gzip_exports() {
+  std::string repetitive;
+  for (int i = 0; i < 2000; ++i)
+    repetitive += "<event><string key=\"concept:name\" value=\"Approve\"/></event>\n";
+  const auto compressed = minera::detail::gzip_compress(repetitive);
+  assert(minera::detail::is_gzip_data(compressed));
+  assert(minera::detail::gzip_decompress(compressed, repetitive.size()) == repetitive);
+  assert(minera::detail::gzip_decompress(minera::detail::gzip_compress(""), 0).empty());
+#if defined(MINERA_HAS_ZLIB)
+  assert(compressed.size() * 20 < repetitive.size());
+#endif
+}
+
 void rejects_corruption_and_expansion_beyond_limit() {
   minera::XesExportOptions options;
   options.compress = true;
@@ -1613,6 +1628,61 @@ void iterparse_reference_rejects_malformed_xml() {
   assert(throws([&] { (void)read_iterparse(nested(254)); }));
 }
 
+// pm4py 2.7.22 iterparse readers on misplaced <trace>/<event> starts and XML
+// declarations (lxml), with the reference's messages.
+void iterparse_reference_rejects_misplaced_elements_and_declarations() {
+  const std::string event = "<event><string key=\"concept:name\" value=\"A\"/></event>";
+  const std::string trace = "<trace><string key=\"concept:name\" value=\"c1\"/>" + event + "</trace>";
+  const std::string head = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+  const std::string trace_in_trace = "file contains <trace> in another <trace> tag";
+  const std::string event_in_event = "file contains <event> in another <event> tag";
+  const std::string late_declaration = "XML declaration allowed only at the start of the document";
+  const std::vector<std::pair<std::string, std::string>> rejected = {
+      {head + "<log><trace><string key=\"concept:name\" value=\"c1\"/><trace>" + event +
+           "</trace></trace></log>", trace_in_trace},
+      {head + "<log><trace><event><trace>" + event + "</trace></event></trace></log>", trace_in_trace},
+      // An <event> directly under <log> stays open, so any later <event> fails.
+      {head + "<log>" + event + trace + "</log>", event_in_event},
+      {head + "<log>" + event + event + "</log>", event_in_event},
+      {" " + head + "<log>" + trace + "</log>", late_declaration},
+      {"\n" + head + "<log>" + trace + "</log>", late_declaration},
+      {"<!-- c -->" + head + "<log>" + trace + "</log>", late_declaration},
+      {"<?XML version=\"1.0\"?>\n<log>" + trace + "</log>", "Invalid PI name"},
+  };
+  const auto variants = {minera::XesImportVariant::kIterparse,
+                         minera::XesImportVariant::kIterparse20,
+                         minera::XesImportVariant::kIterparseMemoryCompressed};
+  for (const auto& [xml, message] : rejected) {
+    for (const auto variant : variants) {
+      minera::XesImportOptions options;
+      options.variant = variant;
+      bool matched = false;
+      try {
+        std::istringstream input(xml);
+        (void)minera::import_xes_event_log(input, options);
+      } catch (const std::exception& error) {
+        matched = std::string(error.what()).find(message) != std::string::npos;
+      }
+      assert(matched);
+    }
+  }
+  // A trailing orphan <event> and other processing instructions are read.
+  const std::vector<std::string> accepted = {
+      head + "<log>" + trace + event + "</log>",
+      head + "<?xml-stylesheet href=\"a.xsl\"?>\n<log>" + trace + "</log>",
+      "<?xmlfoo bar?>\n<log>" + trace + "</log>",
+  };
+  for (const auto& xml : accepted) {
+    for (const auto variant : variants) {
+      minera::XesImportOptions options;
+      options.variant = variant;
+      std::istringstream input(xml);
+      const auto log = minera::import_xes_event_log(input, options);
+      assert(log.traces.size() == 1 && log.traces[0].events.size() == 1);
+    }
+  }
+}
+
 void iterparse_reference_accepts_and_normalizes() {
   // An internal DTD entity is expanded.
   const auto entity = read_iterparse(
@@ -2415,6 +2485,7 @@ int main() {
   variants_and_gzip_round_trip();
   imports_external_dynamic_huffman_gzip();
   imports_fixed_huffman_and_concatenated_gzip();
+  compresses_gzip_exports();
   rejects_corruption_and_expansion_beyond_limit();
   file_export_uses_gzip_suffix_and_imports_it();
   metadata_import_export_import_round_trip();
@@ -2436,6 +2507,7 @@ int main() {
   iterparse_reference_typed_values();
   iterparse_reference_dates();
   iterparse_reference_rejects_malformed_xml();
+  iterparse_reference_rejects_misplaced_elements_and_declarations();
   writer_refuses_text_xml_cannot_carry();
   iterparse_reference_accepts_and_normalizes();
   iterparse_reference_column_order();

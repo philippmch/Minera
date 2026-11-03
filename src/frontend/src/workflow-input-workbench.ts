@@ -1,4 +1,5 @@
 import {hasExactFilters,hasFullHeuristic,exactFilterFields,appendExactFilterFiles,readExactFilterResponse,OwnedExactFilterResult,type ExactFilterControls,type ExactFilterRun} from "./exact-filter-controls";
+import { backendFetch } from "./backend-fetch";
 import {originalEditDistanceWireFilename} from "./original-edit-distance-workbench";
 import {appendNativeMultipartField, nativeStringBytes as workflowInputNativeBytes} from "./native-multipart";
 export {workflowInputNativeBytes};
@@ -280,7 +281,7 @@ export async function runWorkflowInput(file: File, form: WorkflowInputForm, sign
   signal?.throwIfAborted();
   const body = new FormData(); body.append("input", file); fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
   appendExactFilterFiles(body,form.exact??{});
-  const path = "/api/discover-workflow-input", response = await fetch(path, {method: "POST", body, signal});
+  const path = "/api/discover-workflow-input", response = await backendFetch(path, {method: "POST", body, signal});
   const exact = form.exact && hasExactFilters(form.exact) ? await readExactFilterResponse(response,path,body,fields,signal) : undefined;
   const value = exact?.value ?? await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
   if (exact && (!response.ok || exact.value.family === "EXACT_FILTER_DISCOVERY" || hasFullHeuristic(form.exact??{}))) throw new OwnedExactFilterResult(exact);

@@ -1,4 +1,5 @@
 import {parseDiscoveryStringVector, discoveryStringVectorJson, type DiscoveryVectorMode} from "./discovery-string-vectors";
+import { backendFetch } from "./backend-fetch";
 import { isMineraExport,type MineraExport } from "./types";
 import { nativeCell,nativeJson } from "./native-json";
 import { nativeResponseJson,readNativeResponse } from "./native-response";
@@ -54,7 +55,7 @@ export function dfgDiscoveryTables(value:DfgDiscovery,q:URLSearchParams):Diagnos
 }
 export interface DfgDiscoveryRun {value:DfgDiscovery;raw:string;report:string;tables:DiagnosticTable[];}
 export async function runDfgDiscovery(form:DfgDiscoveryForm,source:LogQuerySchema,signal?:AbortSignal):Promise<DfgDiscoveryRun> {
-  const q=dfgDiscoveryQuery(form,source.source_id),path='/api/discover-dfg?'+q;const response=await fetch(path,{method:'POST',signal});const value=await readNativeResponse(response,{path});if(!response.ok||record(value)&&'error'in value)throw new Error(record(value)&&typeof value.error==='string'?value.error:'Native DFG discovery failed.');if(!validDfgDiscovery(value))throw new Error('Native DFG discovery returned an invalid result.');
+  const q=dfgDiscoveryQuery(form,source.source_id),path='/api/discover-dfg?'+q;const response=await backendFetch(path,{method:'POST',signal});const value=await readNativeResponse(response,{path});if(!response.ok||record(value)&&'error'in value)throw new Error(record(value)&&typeof value.error==='string'?value.error:'Native DFG discovery failed.');if(!validDfgDiscovery(value))throw new Error('Native DFG discovery returned an invalid result.');
   if(value.source_id!==source.source_id||value.source.case_count!==source.case_count||value.source.event_count!==source.event_count||!equal(value.statistical_variants,selected(DFG_STATISTICAL,form.statistical))||!equal(value.causal_variants,selected(DFG_CAUSAL,form.causal)))throw new Error('DFG result does not match the requested source or variants.');
   return {value,raw:nativeResponseJson(value),report:nativeJson({family:'DFG_DISCOVERY_REPORT',request:{method:'POST',path:'/api/discover-dfg',parameters:Object.fromEntries(q)},response:value},2),tables:dfgDiscoveryTables(value,q)};
 }

@@ -23,6 +23,7 @@
 #else
 #include <sqlite3.h>
 #endif
+#include "sqlite_untrusted.hpp"
 #endif
 
 namespace minera {
@@ -69,6 +70,8 @@ class Database {
       db_ = nullptr;
       throw std::runtime_error("SQLite open failed: " + message);
     }
+    // An imported database is untrusted; an export writes Minera's own schema.
+    if ((flags & SQLITE_OPEN_READONLY) != 0) detail::harden_untrusted_sqlite(db_);
     sqlite3_busy_timeout(db_, 5000);
   }
 

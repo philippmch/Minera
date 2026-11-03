@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { downloadBlob } from "../download";
 import { requestEmbeddings } from "../api";
 import { DEFAULT_EMBEDDING_SEARCH, LOCAL_EMBEDDING_MODEL, embeddingSearchOptions, embeddingSearchError, type EmbeddingSearchSettings } from "../embedding-search";
 import { type EmbeddingApiResult, type MineraExport, numberFormat } from "../types";
@@ -46,10 +47,7 @@ export function EmbeddingSearch({ data, available, mining }: { data: MineraExpor
   const cancel = () => { request.current?.abort(); request.current = null; setPending(false); };
   const download = () => {
     if (!result) return;
-    const url = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], { type: "application/json" }));
-    const anchor = document.createElement("a"); anchor.href = url;
-    anchor.download = result.family === "TO_EMBEDDINGS" ? "minera-embeddings.json" : "minera-embedding-matches.json";
-    anchor.click(); URL.revokeObjectURL(url);
+    downloadBlob(new Blob([JSON.stringify(result, null, 2)], { type: "application/json" }), result.family === "TO_EMBEDDINGS" ? "minera-embeddings.json" : "minera-embedding-matches.json");
   };
   const isSearch = result?.family === "TO_EMBEDDINGS_SIMILARITY";
   const pageCount = Math.ceil((result?.items.length ?? 0) / PAGE_SIZE);

@@ -1,4 +1,5 @@
 import {cloneExactFilterFiles,exactFilterMatchesWireFilename} from "./exact-filter-controls";
+import { backendFetch } from "./backend-fetch";
 import {isMineraExport, type MineraExport} from "./types";
 import {isOcelJsonDocument} from "./app-logic";
 import {nativeCell, nativeJson, nativeJsonBlob, parseNativeJson} from "./native-json";
@@ -94,7 +95,7 @@ export function cancelMiningRequest(requestId: string, timeoutMs = CANCEL_MINING
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const expired = new Promise<MiningCancelOutcome>(resolve => {timer = setTimeout(() => {controller.abort(); resolve({confirmed: false});}, timeoutMs);});
-  const answered = fetch(`/api/cancel-mine?request_id=${encodeURIComponent(requestId)}`, {method: "POST", signal: controller.signal}).then(async (response): Promise<MiningCancelOutcome> => {
+  const answered = backendFetch(`/api/cancel-mine?request_id=${encodeURIComponent(requestId)}`, {method: "POST", signal: controller.signal}).then(async (response): Promise<MiningCancelOutcome> => {
     if (!response.ok) return {confirmed: false};
     const value: unknown = await response.json().catch(() => undefined);
     if (!object(value) || value.family !== "ACTIVE_SOURCE_CANCEL" || value.canceled !== true) return {confirmed: false};
@@ -112,7 +113,7 @@ export function cancelMiningRequest(requestId: string, timeoutMs = CANCEL_MINING
  * to the end of the window.
  */
 export function acknowledgeMiningRequest(requestId: string): Promise<boolean> {
-  return fetch(`/api/mine-ack?request_id=${encodeURIComponent(requestId)}`, {method: "POST"}).then(async response => {
+  return backendFetch(`/api/mine-ack?request_id=${encodeURIComponent(requestId)}`, {method: "POST"}).then(async response => {
     if (!response.ok) return false;
     const value: unknown = await response.json().catch(() => undefined);
     return object(value) && value.family === "ACTIVE_SOURCE_ACK" && value.acknowledged === true;
@@ -145,7 +146,7 @@ export function activeMiningSourceRequest(source: ActiveMiningSourceDescriptor, 
 export function activeMiningSourceBytes(text: string): Uint8Array<ArrayBuffer> {return workflowInputNativeBytes(text);}
 /** `raw` is the response text as received; `referenced` says it named members by reference, which `value` and `envelope` hold expanded. */
 export interface ActiveMiningSourceRun {value: ActiveMiningSourceSnapshot; envelope: object; raw: string; referenced: boolean; tables: DiagnosticTable[];}
-export async function requestActiveMiningSource(sourceId: string, signal?: AbortSignal): Promise<ActiveMiningSourceRun> {const path = `/api/active-source?source_id=${encodeURIComponent(sourceId)}`, response = await fetch(path, {signal}), value = await readNativeResponse(response, {path}); signal?.throwIfAborted(); const referenced = object(value) && object(value.active_source) && hasActiveSourceReferences(value.active_source); if (object(value) && object(value.active_source)) resolveActiveSourceReferences(value.active_source); if (!response.ok) throw new Error(object(value) && typeof value.error === "string" ? value.error : `Could not inspect the active source (${response.status}).`); if (!object(value) || value.family !== "ACTIVE_EVENT_SOURCE" || value.source_id !== sourceId || !isActiveMiningSourceSnapshot(value.active_source) || value.active_source.source_id !== sourceId) throw new Error("The source inspector response does not match the active native source."); return {value: value.active_source, envelope: value, raw: nativeResponseJson(value), referenced, tables: activeMiningSourceTables(value.active_source)};}
+export async function requestActiveMiningSource(sourceId: string, signal?: AbortSignal): Promise<ActiveMiningSourceRun> {const path = `/api/active-source?source_id=${encodeURIComponent(sourceId)}`, response = await backendFetch(path, {signal}), value = await readNativeResponse(response, {path}); signal?.throwIfAborted(); const referenced = object(value) && object(value.active_source) && hasActiveSourceReferences(value.active_source); if (object(value) && object(value.active_source)) resolveActiveSourceReferences(value.active_source); if (!response.ok) throw new Error(object(value) && typeof value.error === "string" ? value.error : `Could not inspect the active source (${response.status}).`); if (!object(value) || value.family !== "ACTIVE_EVENT_SOURCE" || value.source_id !== sourceId || !isActiveMiningSourceSnapshot(value.active_source) || value.active_source.source_id !== sourceId) throw new Error("The source inspector response does not match the active native source."); return {value: value.active_source, envelope: value, raw: nativeResponseJson(value), referenced, tables: activeMiningSourceTables(value.active_source)};}
 /**
  * The complete native source JSON of an inspection: the response bytes as
  * received, or, when they named members by reference, the envelope with every
@@ -155,5 +156,5 @@ export async function requestActiveMiningSource(sourceId: string, signal?: Abort
 export function activeMiningSourceNativeBlob(run: ActiveMiningSourceRun): Blob {return run.referenced ? nativeJsonBlob(run.envelope, 0, activeMiningSourceBytes) : new Blob([activeMiningSourceBytes(run.raw)], {type: "application/json"});}
 /** activeMiningSourceReport's bytes, built without one string holding the whole report. */
 export function activeMiningSourceReportBlob(source: ActiveMiningSourceDescriptor, snapshot: object, mining?: ActiveDatasetResult): Blob {return nativeJsonBlob(activeMiningSourceReportValue(source, snapshot, mining), 2, activeMiningSourceBytes);}
-export async function requestActiveMiningSourceFile(source: ActiveMiningSourceDescriptor, signal?: AbortSignal): Promise<File> {const path = `/api/active-source-file?source_id=${encodeURIComponent(source.source_id)}`, response = await fetch(path, {signal}); if (!response.ok) throw new Error(`Could not download the original native source (${response.status}).`); const bytes = await response.arrayBuffer(); signal?.throwIfAborted(); const file = new File([bytes], source.file.name, {type: source.file.type, lastModified: source.file.lastModified}), sha256 = await miningSourceHash(file); signal?.throwIfAborted(); if (file.size !== source.file.size || sha256 !== source.sha256) throw new Error("The cached original source bytes do not match the active upload."); return file;}
+export async function requestActiveMiningSourceFile(source: ActiveMiningSourceDescriptor, signal?: AbortSignal): Promise<File> {const path = `/api/active-source-file?source_id=${encodeURIComponent(source.source_id)}`, response = await backendFetch(path, {signal}); if (!response.ok) throw new Error(`Could not download the original native source (${response.status}).`); const bytes = await response.arrayBuffer(); signal?.throwIfAborted(); const file = new File([bytes], source.file.name, {type: source.file.type, lastModified: source.file.lastModified}), sha256 = await miningSourceHash(file); signal?.throwIfAborted(); if (file.size !== source.file.size || sha256 !== source.sha256) throw new Error("The cached original source bytes do not match the active upload."); return file;}
 export function activeMiningSourceTableFileName(id: string): string {let text = ""; for (let index = 0; index < id.length; ++index) text += /^[a-z0-9_.-]$/.test(id[index]) ? id[index] : "%" + id.charCodeAt(index).toString(16).padStart(4, "0"); return text;}

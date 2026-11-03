@@ -1,6 +1,6 @@
 #include "minera/dfg_io.hpp"
 
-#include <charconv>
+#include <limits>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "minera/directly_follows_graph.hpp"
+#include "pnml_decimal.hpp"
 
 namespace minera {
 namespace {
@@ -28,28 +29,138 @@ std::string trim(std::string_view input) {
   return std::string(input.substr(first, last - first));
 }
 
-// A non-negative decimal as int() reads it: optional whitespace and '+',
-// digits with single underscores between them.  Negative values (which the
-// reference would accept, and use as Python list indices) are rejected.
-std::uint64_t parse_uint(std::string_view raw, std::string_view what) {
-  const auto trimmed = trim(raw);
-  std::string_view token = trimmed;
-  if (token.empty()) throw std::invalid_argument("DFG: missing " + std::string(what));
-  if (token.front() == '+') token.remove_prefix(1);
-  std::string digits;
-  bool valid = !token.empty() && token.front() != '_' && token.back() != '_';
-  for (std::size_t i = 0; valid && i < token.size(); ++i) {
-    if (token[i] == '_') valid = token[i + 1] != '_';
-    else if (token[i] >= '0' && token[i] <= '9') digits.push_back(token[i]);
-    else valid = false;
+// One code point of possibly malformed UTF-8; a malformed byte stands alone
+// and matches neither whitespace nor a digit.
+struct CodePoint {
+  std::uint32_t value;
+  std::size_t offset;
+  std::size_t size;
+};
+
+std::vector<CodePoint> code_points(std::string_view text) {
+  std::vector<CodePoint> result;
+  for (std::size_t position = 0; position < text.size();) {
+    const auto first = static_cast<unsigned char>(text[position]);
+    std::size_t count = 0;
+    std::uint32_t code = first;
+    if (first >= 0xc2 && first <= 0xdf) { code = first & 0x1f; count = 1; }
+    else if (first >= 0xe0 && first <= 0xef) { code = first & 0x0f; count = 2; }
+    else if (first >= 0xf0 && first <= 0xf4) { code = first & 0x07; count = 3; }
+    bool valid = first < 0x80 || count != 0;
+    for (std::size_t i = 1; valid && i <= count; ++i) {
+      if (position + i >= text.size() ||
+          (static_cast<unsigned char>(text[position + i]) & 0xc0) != 0x80) {
+        valid = false;
+      } else {
+        code = (code << 6) | (static_cast<unsigned char>(text[position + i]) & 0x3f);
+      }
+    }
+    if (valid && ((count == 2 && code < 0x800) || (count == 3 && code < 0x10000) ||
+                  (code >= 0xd800 && code <= 0xdfff) || code > 0x10ffff)) {
+      valid = false;
+    }
+    if (!valid) { code = 0xffffffffu; count = 0; }
+    result.push_back({code, position, count + 1});
+    position += count + 1;
   }
-  std::uint64_t value = 0;
-  if (valid) {
-    const auto result = std::from_chars(digits.data(), digits.data() + digits.size(), value, 10);
-    valid = result.ec == std::errc() && result.ptr == digits.data() + digits.size();
+  return result;
+}
+
+// str.strip(): the str.isspace() set, which adds \x1c-\x1f to the
+// whitespace that int() ignores.
+bool python_strip_space(std::uint32_t code) {
+  return detail::pnml_integer_space(code) || (code >= 0x1c && code <= 0x1f);
+}
+
+std::string python_strip(std::string_view input) {
+  const auto points = code_points(input);
+  std::size_t first = 0, last = points.size();
+  while (first < last && python_strip_space(points[first].value)) ++first;
+  while (last > first && python_strip_space(points[last - 1].value)) --last;
+  if (first == last) return {};
+  const auto begin = points[first].offset;
+  const auto end = points[last - 1].offset + points[last - 1].size;
+  return std::string(input.substr(begin, end - begin));
+}
+
+// An integer as int() reads it: surrounding int() whitespace, an optional
+// sign, and Unicode decimal digits with single underscores between them.
+// "-0" is zero.  A magnitude beyond 64 bits is kept as "overflow".
+struct PythonInt {
+  bool negative = false;
+  std::uint64_t magnitude = 0;
+  bool overflow = false;
+};
+
+PythonInt parse_python_int(std::string_view raw, std::string_view what) {
+  const auto points = code_points(raw);
+  std::size_t first = 0, last = points.size();
+  while (first < last && detail::pnml_integer_space(points[first].value)) ++first;
+  while (last > first && detail::pnml_integer_space(points[last - 1].value)) --last;
+  if (first == last) throw std::invalid_argument("DFG: missing " + std::string(what));
+  const auto invalid = [&] { return std::invalid_argument("DFG: invalid " + std::string(what)); };
+  PythonInt result;
+  if (points[first].value == '+' || points[first].value == '-') {
+    result.negative = points[first].value == '-';
+    ++first;
   }
-  if (!valid) throw std::invalid_argument("DFG: invalid " + std::string(what));
-  return value;
+  bool previous_digit = false, digit_seen = false;
+  for (std::size_t i = first; i < last; ++i) {
+    if (points[i].value == '_') {
+      if (!previous_digit || i + 1 == last ||
+          detail::pnml_decimal_digit(points[i + 1].value) < 0) {
+        throw invalid();
+      }
+      previous_digit = false;
+      continue;
+    }
+    const int digit = detail::pnml_decimal_digit(points[i].value);
+    if (digit < 0) throw invalid();
+    const auto digit_value = static_cast<std::uint64_t>(digit);
+    if (result.magnitude > (std::numeric_limits<std::uint64_t>::max() - digit_value) / 10)
+      result.overflow = true;
+    else
+      result.magnitude = result.magnitude * 10 + digit_value;
+    previous_digit = digit_seen = true;
+  }
+  if (!digit_seen) throw invalid();
+  if (result.magnitude == 0 && !result.overflow) result.negative = false;
+  return result;
+}
+
+// A section size: range() of a negative size is empty, so it reads no rows.
+std::uint64_t parse_section_size(std::string_view raw, std::string_view what,
+                                 std::size_t row_count) {
+  const auto value = parse_python_int(raw, what);
+  if (value.negative) return 0;
+  if (value.overflow || value.magnitude > row_count)
+    throw std::invalid_argument("DFG: " + std::string(what) + " is too large");
+  return value.magnitude;
+}
+
+// Counts are kept unsigned, so a negative count (which the reference keeps)
+// and one beyond 64 bits are refused; see the parity notes.
+std::uint64_t parse_count(std::string_view raw) {
+  const auto value = parse_python_int(raw, "count");
+  if (value.negative) throw std::invalid_argument("DFG: negative counts are not supported");
+  if (value.overflow) throw std::invalid_argument("DFG: count is too large");
+  return value.magnitude;
+}
+
+// An activity id indexes the label list as Python does: -1 is the last label.
+std::size_t parse_activity_id(std::string_view raw, std::string_view what,
+                              std::size_t activity_count, std::string_view range_what) {
+  const auto value = parse_python_int(raw, what);
+  const auto out_of_range = [&] {
+    return std::invalid_argument("DFG: " + std::string(range_what) + " id out of range");
+  };
+  if (value.overflow) throw out_of_range();
+  if (!value.negative) {
+    if (value.magnitude >= activity_count) throw out_of_range();
+    return static_cast<std::size_t>(value.magnitude);
+  }
+  if (value.magnitude > activity_count) throw out_of_range();
+  return activity_count - static_cast<std::size_t>(value.magnitude);
 }
 
 std::pair<std::string_view, std::string_view> split_count(std::string_view value,
@@ -58,23 +169,6 @@ std::pair<std::string_view, std::string_view> split_count(std::string_view value
   if (split == std::string::npos || value.find('x', split + 1) != std::string::npos)
     throw std::invalid_argument("DFG: malformed " + std::string(what) + " row");
   return {value.substr(0, split), value.substr(split + 1)};
-}
-
-std::pair<std::uint64_t, std::uint64_t> parse_id_count(std::string_view line,
-                                                       std::string_view what) {
-  const auto [id, count] = split_count(line, what);
-  return {parse_uint(id, "activity id"), parse_uint(count, "count")};
-}
-
-std::pair<std::pair<std::uint64_t, std::uint64_t>, std::uint64_t>
-parse_edge(std::string_view line) {
-  const auto [edge, count] = split_count(line, "edge");
-  const auto arrow = edge.find('>');
-  if (arrow == std::string::npos || edge.find('>', arrow + 1) != std::string::npos)
-    throw std::invalid_argument("DFG: malformed edge row");
-  return {{parse_uint(edge.substr(0, arrow), "source activity id"),
-           parse_uint(edge.substr(arrow + 1), "target activity id")},
-          parse_uint(count, "count")};
 }
 
 std::vector<std::string> activity_names(const DfgCleanAnalysis& dfg) {
@@ -173,46 +267,50 @@ DfgCleanAnalysis parse_dfg(std::string_view text) {
       throw std::invalid_argument("DFG: missing " + std::string(what));
     return lines[cursor++];
   };
-  // Rows are read as the reference reads them: stripped, labels by index
-  // (a repeated label names the same activity), zero counts allowed and a
-  // repeated start, end or edge row replacing the earlier one.
-  const auto activity_count = parse_uint(next("activity count"), "activity count");
-  if (activity_count > lines.size())
-    throw std::invalid_argument("DFG: activity count is too large");
+  // Rows are read as the reference reads them: labels and rows stripped,
+  // numbers read like int(), labels by index (a repeated label names the
+  // same activity, a negative index counts from the end), zero counts
+  // allowed and a repeated start, end or edge row replacing the earlier one.
+  const auto activity_count = static_cast<std::size_t>(
+      parse_section_size(next("activity count"), "activity count", lines.size()));
   std::vector<std::string> names;
-  names.reserve(static_cast<std::size_t>(activity_count));
-  for (std::uint64_t i = 0; i < activity_count; ++i) {
-    auto name = trim(next("activity label"));
+  names.reserve(activity_count);
+  for (std::size_t i = 0; i < activity_count; ++i) {
+    auto name = python_strip(next("activity label"));
     if (name.find('\0') != std::string::npos)
       throw std::invalid_argument("DFG: activity labels must not contain NUL");
     names.push_back(std::move(name));
   }
   DfgCleanAnalysis result;
-  const auto start_count = parse_uint(next("start activity count"), "start activity count");
-  if (start_count > lines.size())
-    throw std::invalid_argument("DFG: start activity count is too large");
-  for (std::uint64_t i = 0; i < start_count; ++i) {
-    const auto [id, count] = parse_id_count(next("start activity row"), "start activity");
-    if (id >= activity_count)
-      throw std::invalid_argument("DFG: start activity id out of range");
-    result.start_activities[names[id]] = count;
-  }
-  const auto end_count = parse_uint(next("end activity count"), "end activity count");
-  if (end_count > lines.size())
-    throw std::invalid_argument("DFG: end activity count is too large");
-  for (std::uint64_t i = 0; i < end_count; ++i) {
-    const auto [id, count] = parse_id_count(next("end activity row"), "end activity");
-    if (id >= activity_count)
-      throw std::invalid_argument("DFG: end activity id out of range");
-    result.end_activities[names[id]] = count;
-  }
+  const auto read_activity_rows = [&](std::string_view section, std::string_view row_what,
+                                      std::string_view what,
+                                      std::map<std::string, std::uint64_t>& target) {
+    const auto rows = parse_section_size(next(section), section, lines.size());
+    for (std::uint64_t i = 0; i < rows; ++i) {
+      const auto row = python_strip(next(row_what));
+      const auto [id, count] = split_count(row, what);
+      const auto value = parse_count(count);
+      target[names[parse_activity_id(id, "activity id", activity_count, what)]] = value;
+    }
+  };
+  read_activity_rows("start activity count", "start activity row", "start activity",
+                     result.start_activities);
+  read_activity_rows("end activity count", "end activity row", "end activity",
+                     result.end_activities);
   while (cursor < lines.size()) {
-    if (trim(lines[cursor]).empty())
-      throw std::invalid_argument("DFG: unexpected blank row");
-    const auto [pair, count] = parse_edge(next("edge row"));
-    if (pair.first >= activity_count || pair.second >= activity_count)
-      throw std::invalid_argument("DFG: edge activity id out of range");
-    result.graph[std::make_pair(names[pair.first], names[pair.second])] = count;
+    const auto row = python_strip(lines[cursor]);
+    if (row.empty()) throw std::invalid_argument("DFG: unexpected blank row");
+    ++cursor;
+    const auto [edge, count] = split_count(row, "edge");
+    const auto value = parse_count(count);
+    const auto arrow = edge.find('>');
+    if (arrow == std::string::npos || edge.find('>', arrow + 1) != std::string::npos)
+      throw std::invalid_argument("DFG: malformed edge row");
+    const auto source = parse_activity_id(edge.substr(0, arrow), "source activity id",
+                                          activity_count, "edge activity");
+    const auto target = parse_activity_id(edge.substr(arrow + 1), "target activity id",
+                                          activity_count, "edge activity");
+    result.graph[std::make_pair(names[source], names[target])] = value;
   }
   return result;
 }

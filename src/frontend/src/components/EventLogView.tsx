@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { downloadBlob } from "../download";
 import { caseRowEntries } from "../app-logic";
 import { type MineraExport, type Trace, numberFormat } from "../types";
 import {
@@ -120,13 +121,8 @@ export function XesButton({ dataset, available = true }: { dataset: string; avai
     setError(null);
     fetchXes(buildXesExportOptions(variant, compress, inferMetadata, preserveNulls))
       .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
         const base = dataset.replace(/\.[^.]+$/, "") || "log";
-        anchor.href = url;
-        anchor.download = `${base}.xes${compress ? ".gz" : ""}`;
-        anchor.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, `${base}.xes${compress ? ".gz" : ""}`);
       })
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setBusy(false));
@@ -141,10 +137,10 @@ export function XesButton({ dataset, available = true }: { dataset: string; avai
       <label><input type="checkbox" checked={compress} onChange={(event) => setCompress(event.target.checked)} /> gzip</label>
       <label><input aria-label="Infer XES metadata" type="checkbox" checked={inferMetadata} onChange={(event) => setInferMetadata(event.target.checked)} /> infer metadata</label>
       <label><input aria-label="Preserve null markers" type="checkbox" checked={preserveNulls} onChange={(event) => setPreserveNulls(event.target.checked)} /> preserve null markers</label>
-      <button className="btn-ghost" onClick={download} disabled={busy || !available} title={available ? undefined : UNAVAILABLE_EXPORT}>
+      <button className="btn-ghost" onClick={download} disabled={busy || !available} title={available ? undefined : UNAVAILABLE_EXPORT} aria-describedby={available ? undefined : EXPORT_NOTE_ID}>
         {busy ? "Exporting…" : "Download log as XES"}
       </button>
-      {error && <span className="pnml-error">{error}</span>}
+      {error && <span className="pnml-error" role="alert">{error}</span>}
     </span>
   );
 }
@@ -171,13 +167,8 @@ function DfgButton({ dataset, available = true }: { dataset: string; available?:
     fetchDfg(options)
       .then((text) => {
         const blob = new Blob([text], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
         const base = dataset.replace(/\.[^.]+$/, "") || "log";
-        anchor.href = url;
-        anchor.download = `${base}.dfg`;
-        anchor.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, `${base}.dfg`);
       })
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setBusy(false));
@@ -277,16 +268,17 @@ function DfgButton({ dataset, available = true }: { dataset: string; available?:
           </label>
         </div>
       </details>
-      <button className="btn-ghost" onClick={download} disabled={busy || !available} title={available ? undefined : UNAVAILABLE_EXPORT}>
+      <button className="btn-ghost" onClick={download} disabled={busy || !available} title={available ? undefined : UNAVAILABLE_EXPORT} aria-describedby={available ? undefined : EXPORT_NOTE_ID}>
         {busy ? "Exporting…" : "Download DFG"}
       </button>
-      {error && <span className="pnml-error">{error}</span>}
+      {error && <span className="pnml-error" role="alert">{error}</span>}
     </span>
   );
 }
 
 // /api/xes and /api/dfg export the backend's cached log, which belongs to this analysis only while its source is live.
 const UNAVAILABLE_EXPORT = "Open the original CSV or XES log to export it: this analysis is not the backend's active log.";
+const EXPORT_NOTE_ID = "log-export-unavailable";
 
 export function EventLogView({ data, available = true }: { data: MineraExport; available?: boolean }) {
   const traces = data.traces ?? [];
@@ -335,10 +327,12 @@ export function EventLogView({ data, available = true }: { data: MineraExport; a
         </span>
         <XesButton dataset={data.dataset} available={available} />
         <DfgButton dataset={data.dataset} available={available} />
+        {!available && <p className="export-note" id={EXPORT_NOTE_ID}>Exports are unavailable: {UNAVAILABLE_EXPORT}</p>}
         <input
           className="case-search"
           type="search"
           placeholder="Filter case id…"
+          aria-label="Filter case id"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);

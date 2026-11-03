@@ -106,12 +106,14 @@ export function ProcessMap({
               <button
                 className={mode === "frequency" ? "mode-btn active" : "mode-btn"}
                 onClick={() => setMode("frequency")}
+                aria-pressed={mode === "frequency"}
               >
                 Frequency
               </button>
               <button
                 className={mode === "performance" ? "mode-btn active" : "mode-btn"}
                 onClick={() => setMode("performance")}
+                aria-pressed={mode === "performance"}
               >
                 Performance
               </button>

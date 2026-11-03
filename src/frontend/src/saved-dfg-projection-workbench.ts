@@ -1,4 +1,5 @@
 import {miningSourceHash} from "./active-mining-source";
+import { backendFetch } from "./backend-fetch";
 import {defaultGraphAlignmentForm, graphAlignmentFields, graphAlignmentReport, type GraphAlignmentForm, type GraphAlignmentRun} from "./graph-alignment-workbench";
 import {nativeObjectTables, type DiagnosticTable} from "./model-diagnostics";
 import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart";
@@ -58,7 +59,7 @@ export async function runSavedDfgProjectionWorkbench(input: File, model: File, f
   if ((saved !== null) === (form.savedJson !== undefined)) throw new Error("Supply one saved result File or an inline saved result, never both. Edit the File inline explicitly to replace it.");
   const fields = savedDfgProjectionFields(form, input.name), [inputHash, modelHash, savedHash] = await Promise.all([miningSourceHash(input), miningSourceHash(model), saved ? miningSourceHash(saved) : null]); signal?.throwIfAborted();
   const body = new FormData(); body.append("input_file", input); body.append("model_file", model); if (saved) body.append("saved_result_file", saved); fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
-  const path = "/api/align-graph-workbench", response = await fetch(path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
+  const path = "/api/align-graph-workbench", response = await backendFetch(path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
   if (!isSavedDfgProjectionValue(value)) throw new Error(object(value) && typeof value.error === "string" ? value.error : "The server did not return a complete saved DFG projection envelope.");
   if (value.input_context.dataset !== input.name || value.model_context.dataset !== model.name || String(nativeCell(value.input_context, "original_input_bytes")) !== String(input.size) || String(nativeCell(value.model_context, "original_input_bytes")) !== String(model.size) || value.input_context.format !== form.inputFormat || value.model_context.format !== form.source.modelFormat) throw new Error("The projection response does not match the original input and model Files.");
   for (const [file, carrier] of [[input, value.original_input], [model, value.original_model]] as const) if (!equalBytes(new Uint8Array(await file.arrayBuffer()), originalEmbeddingFilterStringBytes(carrier))) throw new Error("The projection response changed original input or model bytes.");

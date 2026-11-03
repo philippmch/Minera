@@ -1,4 +1,5 @@
 import {nativeCell} from "./native-json";
+import { backendFetch } from "./backend-fetch";
 import {appendNativeMultipartField,nativeStringBytes} from "./native-multipart";
 import {nativeResponseJson,readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
@@ -104,7 +105,7 @@ export async function requestLtlFilter(sourceFile:File|null,form:LtlFilterForm,s
   signal?.throwIfAborted();if(!isLtlHelper(form.operation)&&!(sourceFile instanceof File))throw new Error("Choose an actual source File.");
   const fields=ltlFilterFields(form),body=new FormData();const supplied=isLtlHelper(form.operation)?null:sourceFile;if(supplied)body.append("source_file",supplied);
   for(const[key,value]of fields)appendNativeMultipartField(body,key,value);
-  const response=await fetch("/api/reference-ltl-filter",{method:"POST",body,signal});signal?.throwIfAborted();if(response.status!==200&&response.status!==400)throw new Error(`Relationship filtering returned HTTP ${response.status}.`);
+  const response=await backendFetch("/api/reference-ltl-filter",{method:"POST",body,signal});signal?.throwIfAborted();if(response.status!==200&&response.status!==400)throw new Error(`Relationship filtering returned HTTP ${response.status}.`);
   const responseBytes=new Uint8Array(await response.arrayBuffer());try{new TextDecoder("utf-8",{fatal:true}).decode(responseBytes);}catch{throw new Error("The relationship response is not safe JSON UTF-8.");}
   const value=await readNativeResponse(new Response(responseBytes),{path:"/api/reference-ltl-filter",fields,reference:supplied?{name:supplied.name,size:supplied.size,last_modified:supplied.lastModified}:undefined});signal?.throwIfAborted();
   if(!isLtlFilterEnvelope(value)||value.http_status!==response.status)throw new Error("The relationship response has an invalid native envelope.");

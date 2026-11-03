@@ -16,6 +16,7 @@
 #else
 #include <sqlite3.h>
 #endif
+#include "sqlite_untrusted.hpp"
 #endif
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -41,7 +42,7 @@ std::string table_json(const DatabaseHistoryTable& table,const std::string& fami
 }
 #ifdef MINERA_HAS_SQLITE
 DatabaseHistoryTable sqlite_read(const DatabaseHistoryOptions& o,const std::string& query){
- sqlite3* raw=nullptr;const auto u8=o.path.u8string();const auto code=sqlite3_open_v2(reinterpret_cast<const char*>(u8.c_str()),&raw,SQLITE_OPEN_READONLY,nullptr);std::unique_ptr<sqlite3,decltype(&sqlite3_close)> db(raw,&sqlite3_close);if(code!=SQLITE_OK)throw std::invalid_argument("Database history: could not open the explicit SQLite file read-only");sqlite3_busy_timeout(raw,static_cast<int>(o.timeout_seconds*1000));
+ sqlite3* raw=nullptr;const auto u8=o.path.u8string();const auto code=sqlite3_open_v2(reinterpret_cast<const char*>(u8.c_str()),&raw,SQLITE_OPEN_READONLY,nullptr);std::unique_ptr<sqlite3,decltype(&sqlite3_close)> db(raw,&sqlite3_close);if(code!=SQLITE_OK)throw std::invalid_argument("Database history: could not open the explicit SQLite file read-only");detail::harden_untrusted_sqlite(raw);sqlite3_busy_timeout(raw,static_cast<int>(o.timeout_seconds*1000));
  const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(o.timeout_seconds);sqlite3_progress_handler(raw,1000,[](void* context){return std::chrono::steady_clock::now()>*static_cast<const std::chrono::steady_clock::time_point*>(context)?1:0;},const_cast<std::chrono::steady_clock::time_point*>(&deadline));
  sqlite3_stmt* statement=nullptr;if(sqlite3_prepare_v2(raw,query.c_str(),static_cast<int>(query.size()),&statement,nullptr)!=SQLITE_OK)throw std::invalid_argument("Database history: SQLite schema/query is incompatible with the selected connector");std::unique_ptr<sqlite3_stmt,decltype(&sqlite3_finalize)> owner(statement,&sqlite3_finalize);if(!sqlite3_stmt_readonly(statement))throw std::invalid_argument("Database history: query is not read-only");DatabaseHistoryTable table;
  for(int i=0;i<sqlite3_column_count(statement);++i){table.columns.emplace_back(sqlite3_column_name(statement,i));const auto* type=sqlite3_column_decltype(statement,i);table.column_types.emplace_back(type?type:"expression");}

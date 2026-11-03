@@ -95,6 +95,42 @@ void reads_what_the_reference_reads() {
   assert(minera::parse_dfg(minera::to_dfg(padded)).graph == padded.graph);
 }
 
+// Numbers follow int() and ids follow Python indexing (pm4py 2.7.22 read_dfg).
+void reads_numbers_like_python_int() {
+  using Counts = std::map<std::string, std::uint64_t>;
+  // Negative ids count from the end; -0 is zero.
+  const auto negative = minera::parse_dfg("2\nA\nB\n1\n-2x3\n1\n-1x1\n-2>-1x2\n");
+  assert(negative.graph.at({"A", "B"}) == 2);
+  assert((negative.start_activities == Counts{{"A", 3}}));
+  assert((negative.end_activities == Counts{{"B", 1}}));
+  const auto zero = minera::parse_dfg("2\nA\nB\n1\n0x-0\n1\n1x-0\n-0>1x-0\n");
+  assert(zero.graph.at({"A", "B"}) == 0 && zero.start_activities.at("A") == 0 &&
+         zero.end_activities.at("B") == 0);
+  // Unicode decimal digits (Arabic-Indic, fullwidth) and underscores.
+  const auto unicode = minera::parse_dfg(
+      "\xd9\xa2\nA\nB\n\xd9\xa1\n\xd9\xa0x\xef\xbc\x93\n1\n1x1_0\n0>1x\xd9\xa2\n");
+  assert(unicode.start_activities.at("A") == 3 && unicode.end_activities.at("B") == 10 &&
+         unicode.graph.at({"A", "B"}) == 2);
+  // str.strip() of labels and rows and int() whitespace inside rows (NBSP).
+  const auto nbsp = minera::parse_dfg(
+      "2\n\xc2\xa0" "A\nB\n1\n\xc2\xa0" "0x\xc2\xa0" "3\n1\n1x1\n0 > 1 x 2\n");
+  assert(nbsp.start_activities.at("A") == 3 && nbsp.graph.at({"A", "B"}) == 2);
+  // A negative section size reads no rows, as range() does.
+  const auto empty_starts = minera::parse_dfg("2\nA\nB\n-1\n1\n1x1\n0>1x2\n");
+  assert(empty_starts.start_activities.empty() && empty_starts.end_activities.at("B") == 1);
+  // Out-of-range negative ids fail as Python indexing does.
+  assert(throws("2\nA\nB\n1\n-3x3\n1\n1x1\n0>1x2\n"));
+  assert(throws("-1\n1\n0x1\n"));
+  // int() refuses a sign separated from its digits, doubled underscores and
+  // \x1c (which str.strip() removes but int() does not).
+  assert(throws("1\nA\n1\n0x- 1\n0\n"));
+  assert(throws("1\nA\n1\n0x1__0\n0\n"));
+  assert(throws("1\nA\n1\n0x\x1c" "1\n0\n"));
+  // Declared: counts are unsigned 64-bit, so negative and huge counts are refused.
+  assert(throws("2\nA\nB\n1\n0x-3\n1\n1x1\n0>1x2\n"));
+  assert(throws("2\nA\nB\n1\n0x99999999999999999999999\n1\n1x1\n0>1x2\n"));
+}
+
 void imports_and_exports_files() {
   DfgCleanAnalysis source;
   source.graph[{"α", "β"}] = 1;
@@ -118,5 +154,6 @@ int main() {
   projects_discovered_graph_without_zero_registry_entries();
   rejects_malformed_and_duplicate_rows();
   reads_what_the_reference_reads();
+  reads_numbers_like_python_int();
   imports_and_exports_files();
 }

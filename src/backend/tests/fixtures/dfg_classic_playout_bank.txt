@@ -1,0 +1,6069 @@
+# algo.simulation.playout.dfg CLASSIC, pm4py 2.7.22, bank seed 20261104; identical under PYTHONHASHSEED [0, 1, 2].
+C dfgc-000 5 0.5 1 0 0 1 0
+E a b 1
+E b a 1
+S a 1
+N b 1
+R 0.5 a b
+C dfgc-001 10 0.5 2 0 0 2 0
+E a c 3
+E b a 6
+E b b 5
+E c b 4
+E c d 4
+S d 3
+S c 4
+N a 5
+N b 1
+X KeyError
+C dfgc-002 10 0.9 1 1 0 1 0
+E a a 4
+S a 1
+N a 3
+R 0.42857142857142855 a
+C dfgc-003 40 0.5 1 0 1 1 1
+E a a 1
+E a b 1
+E a c 1
+E b c 1
+S a 1
+N b 1
+N c 1
+R 0.3333333333333333 a c
+R 0.16666666666666669 a b
+R 0.16666666666666669 a b c
+C dfgc-004 1 0.5 2 0 0 2 0
+E a b 1
+E a e 1
+E b a 1
+E b c 1
+E c a 1
+E c d 1
+E d a 1
+E d d 1
+E e a 1
+E e b 1
+E e c 1
+E e d 1
+S b 1
+S e 1
+S a 1
+S d 1
+N a 1
+N b 1
+N c 1
+N d 1
+R 0.08333333333333333 a
+C dfgc-005 2 1 1 0 1 1 1
+E a a 4
+E a b 5
+E a c 5
+E a d 6
+E a e 1
+E b c 1
+E b d 3
+E c a 1
+E c b 1
+E c d 6
+E c e 3
+E d d 2
+E d e 4
+E e e 4
+S a 3
+S c 2
+N b 4
+N c 1
+N e 3
+Z
+C dfgc-006 2 1 2 0 1 2 0
+E a b 1
+E b b 1
+S a 1
+N b 1
+R 0.5 a b
+R 0.25 a b b
+C dfgc-007 3000 0.2 1 0 0 1 0
+E a e 1
+E b a 4
+E b b 3
+E c a 3
+E c b 2
+E d a 2
+E d b 6
+E e d 3
+S e 1
+S a 3
+N a 1
+N b 2
+N c 4
+R 0.375 a
+C dfgc-008 2 0.2 2 0 0 2 0
+E a a 1
+E a b 4
+E a c 6
+E b b 5
+E b d 2
+E b e 5
+E c b 3
+E c d 2
+E c e 3
+E d a 5
+E d b 3
+E d c 2
+E d e 2
+E e a 3
+E e b 3
+S b 1
+S d 3
+S e 1
+S a 3
+N a 4
+N b 3
+R 0.09999999999999998 a
+R 0.04166666666666668 d a
+C dfgc-009 40 0.9 3 0 0 5 0
+S b 2
+N b 6
+R 1.0 b
+C dfgc-010 10 1 2 0 0 1 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-011 10 0.9 3 0 0 1 0
+E a b 1
+S b 1
+N b 1
+R 1.0 b
+C dfgc-012 10 0.5 2 1 0 2 0
+S a 3
+N a 6
+R 1.0 a
+C dfgc-013 1 0.5 2 1 0 1 0
+E a a 5
+S a 4
+N a 5
+R 0.5 a
+C dfgc-014 5 0.2 3 0 0 1 1
+E a a 1
+E a b 1
+E b c 1
+E c a 1
+E c b 1
+S b 1
+S a 1
+S c 1
+N c 1
+Z
+C dfgc-015 1 0.9 3 0 0 5 0
+E a b 1
+E b a 1
+E b b 1
+S b 1
+N a 1
+N b 1
+R 0.3333333333333333 b
+C dfgc-016 40 1 2 0 0 2 0
+E b a 6
+E b b 1
+S a 1
+N a 2
+N b 1
+R 1.0 a
+C dfgc-017 5 0.2 3 0 0 1 0
+E a c 1
+E a d 1
+E a e 1
+E b a 1
+E b b 1
+E b c 1
+E c a 1
+E c c 1
+E c d 1
+E c e 1
+E d a 1
+E d c 1
+E d d 1
+E d e 1
+E e a 1
+E e b 1
+E e d 1
+S c 1
+S b 1
+S d 1
+N a 1
+N c 1
+N e 1
+R 0.06666666666666667 c
+R 0.02777777777777778 b a
+R 0.022222222222222227 b c
+R 0.02083333333333334 d a
+R 0.01666666666666667 d c
+C dfgc-018 1 0.2 1 0 0 5 0
+E a a 5
+S a 3
+N a 1
+R 0.16666666666666669 a
+C dfgc-019 5 1 2 0 0 5 0
+E a b 2
+S a 3
+S b 4
+N a 5
+N b 4
+R 0.5714285714285714 b
+R 0.3061224489795918 a
+R 0.12244897959183675 a b
+C dfgc-020 3 0.2 1 0 0 1 0
+E a a 3
+E b a 2
+E b c 6
+E c b 6
+S a 2
+S c 1
+N a 5
+N b 2
+R 0.41666666666666663 a
+C dfgc-021 3000 0.2 1 1 0 1 0
+E a a 6
+S a 2
+N a 1
+R 0.14285714285714285 a
+C dfgc-022 1 1 2 0 1 5 0
+E a a 2
+E a c 6
+E a d 2
+E b b 2
+E b c 3
+E b d 3
+E c c 2
+E d b 3
+E d c 2
+S c 2
+S a 2
+S b 2
+S d 1
+N b 4
+N c 3
+R 0.0952380952380952 b
+C dfgc-023 40 1 2 0 1 2 0
+E a a 6
+S a 2
+N a 2
+R 0.25 a
+R 0.1875 a a
+C dfgc-024 2 1 2 0 0 1 0
+E a b 1
+E b a 1
+E b c 1
+E c b 1
+E c c 1
+S c 1
+S a 1
+S b 1
+N a 1
+R 0.16666666666666669 a
+R 0.08333333333333333 b a
+C dfgc-025 10 1 1 0 0 1 0
+E a a 1
+E a d 1
+E a e 1
+E b a 1
+E b d 1
+E b e 1
+E c b 1
+E c c 1
+E c e 1
+E d a 1
+E d d 1
+E e b 1
+E e c 1
+E e e 1
+S e 1
+S d 1
+N a 1
+N c 1
+N d 1
+N e 1
+R 0.16666666666666669 d
+R 0.12500000000000003 e
+R 0.04166666666666668 d a
+R 0.031250000000000014 e c
+R 0.013888888888888888 e b d
+R 0.010416666666666668 d a e
+R 0.010416666666666668 e b a
+R 0.0034722222222222216 e b a d
+R 0.0034722222222222216 e b d a
+R 0.0026041666666666665 d a e c
+C dfgc-026 1 1 2 0 0 1 0
+S a 1
+N a 6
+R 1.0 a
+C dfgc-027 3000 1 2 0 0 1 0
+E a b 6
+E a d 4
+E b c 6
+E c a 6
+E c b 3
+E c c 4
+E d a 3
+E d b 3
+E d c 5
+E d d 2
+S b 4
+S a 1
+S c 2
+N b 2
+N c 2
+R 0.14285714285714285 b
+R 0.057142857142857134 b c
+R 0.0380952380952381 c
+R 0.025714285714285717 b c a b
+R 0.021428571428571425 a b
+R 0.021428571428571425 b c b
+R 0.01714285714285714 c a b
+R 0.015238095238095245 b c c
+R 0.01428571428571428 c b
+R 0.010285714285714296 b c a b c
+R 0.010158730158730152 c c
+R 0.008571428571428577 a b c
+R 0.008571428571428577 b c b c
+R 0.006857142857142856 b c c a b
+R 0.006857142857142856 c a b c
+R 0.005714285714285712 b c c b
+R 0.005714285714285712 c b c
+R 0.00457142857142857 c c a b
+R 0.003956043956043955 b c a d b
+R 0.0038571428571428576 a b c a b
+R 0.003809523809523807 c c b
+R 0.0035164835164835173 b c a d c
+R 0.003296703296703295 a d b
+R 0.003214285714285714 a b c b
+R 0.0030857142857142862 c a b c a b
+R 0.0029304029304029304 a d c
+R 0.002637362637362636 c a d b
+R 0.0025714285714285713 c a b c b
+R 0.0025714285714285713 c b c a b
+R 0.0023736263736263735 b c a d a b
+R 0.0023443223443223426 c a d c
+R 0.0022857142857142868 a b c c
+R 0.002142857142857142 c b c b
+R 0.0019780219780219776 a d a b
+R 0.0015824175824175834 b c a d c a b
+R 0.001582417582417582 b c a d b c
+R 0.001582417582417582 c a d a b
+R 0.0015428571428571444 a b c a b c
+R 0.0013186813186813191 a d c a b
+R 0.0013186813186813191 b c a d c b
+R 0.001318681318681318 a d b c
+R 0.0012857142857142867 a b c b c
+R 0.001098901098901099 a d c b
+R 0.0010549450549450553 c a d b c
+R 0.0010549450549450544 b c c a d b
+R 0.0010549450549450544 c a d c a b
+R 0.0010285714285714284 a b c c a b
+R 0.0009494505494505494 b c a d a b c
+R 0.0008791208791208785 c a d c b
+R 0.0008571428571428568 a b c c b
+R 0.0007912087912087909 a d a b c
+R 0.0007814407814407812 a d c c
+R 0.0007032967032967028 c c a d b
+R 0.0006329670329670333 c a d a b c
+R 0.0006329670329670328 b c c a d a b
+R 0.0006086221470836851 b c a d d b
+R 0.0005934065934065933 a b c a d b
+R 0.0005934065934065933 a d b c a b
+R 0.0005409974640743867 b c a d d c
+R 0.0005274725274725276 a b c a d c
+R 0.0005274725274725276 a d c a b c
+R 0.0005071851225697375 a d d b
+R 0.0004945054945054943 a d b c b
+R 0.00047472527472527465 c a b c a d b
+R 0.00047472527472527465 c a d b c a b
+R 0.00045083122006198877 a d d c
+R 0.00043956043956043956 a d c b c
+R 0.00042197802197802177 c c a d a b
+R 0.00040574809805579037 c a d d b
+R 0.0003956043956043954 c a d b c b
+R 0.0003956043956043954 c b c a d b
+R 0.0003651732882502112 b c a d a d b
+R 0.0003651732882502112 b c a d d a b
+R 0.0003606649760495913 c a d d c
+R 0.0003516483516483517 a d c c a b
+R 0.00035164835164835137 a d b c c
+R 0.00032459847844463206 b c a d a d c
+R 0.00030431107354184257 a d a d b
+R 0.00030431107354184257 a d d a b
+R 0.00029670329670329685 a d a b c b
+R 0.00029304029304029326 a d c c b
+R 0.00027049873203719327 a d a d c
+R 0.00024344885883347429 b c a d c a d b
+R 0.00024344885883347429 b c a d d b c
+R 0.00024344885883347429 b c a d d c a b
+R 0.00024344885883347429 c a d a d b
+R 0.00024344885883347429 c a d d a b
+R 0.0002373626373626373 a b c a d b c
+R 0.0002373626373626373 a d b c a b c
+R 0.0002373626373626373 c a d a b c b
+R 0.0002373626373626373 c b c a d a b
+R 0.00021639898562975484 c a d a d c
+R 0.00021098901098901086 a d a b c c
+R 0.00020287404902789518 a d c a d b
+R 0.00020287404902789518 a d d b c
+R 0.00020287404902789518 a d d c a b
+R 0.00020287404902789518 b c a d d c b
+R 0.00019780219780219806 a d c a b c b
+R 0.00019780219780219806 a d c b c a b
+R 0.0001978021978021977 a b c a d c b
+R 0.0001978021978021977 a d b c b c
+R 0.00018033248802479566 a d c a d c
+R 0.00016906170752324594 a d d c b
+R 0.000164835164835165 a d c b c b
+R 0.0001622992392223163 c a d d b c
+R 0.0001622992392223163 c a d d c a b
+R 0.000162299239222316 b c c a d d b
+R 0.000162299239222316 c a d c a d b
+R 0.0001582417582417583 a b c c a d b
+R 0.0001582417582417583 a d b c c a b
+R 0.0001460693153000846 b c a d a d b c
+R 0.0001460693153000846 b c a d d a b c
+R 0.00013524936601859688 c a d d c b
+R 0.00013186813186813188 a d b c c b
+R 0.00012172442941673713 a d a d b c
+R 0.00012172442941673713 a d d a b c
+R 0.00012172442941673713 b c a d a d c b
+R 0.00012022165868319696 a d d c c
+R 0.00011868131868131864 a d a b c b c
+R 0.0001081994928148774 c c a d d b
+R 0.00010143702451394758 a d a d c b
+R 9.73795435333898e-05 c a d d a b c
+R 9.737954353338962e-05 b c c a d a d b
+R 9.737954353338962e-05 b c c a d d a b
+R 9.737954353338962e-05 c a d a d b c
+R 9.129332206255278e-05 a b c a d d b
+R 9.129332206255278e-05 a d b c a d b
+R 9.129332206255278e-05 a d d b c a b
+R 8.114961961115814e-05 a d c a d b c
+R 8.1149619611158e-05 a b c a d d c
+R 8.1149619611158e-05 a d b c a d c
+R 8.1149619611158e-05 a d d c a b c
+R 8.1149619611158e-05 c a d a d c b
+R 7.912087912087915e-05 a d a b c c b
+R 7.607776838546063e-05 a d d b c b
+R 7.303465765004229e-05 c a b c a d d b
+R 7.303465765004229e-05 c a d b c a d b
+R 7.303465765004229e-05 c a d d b c a b
+R 7.21329952099182e-05 a d a d c c
+R 6.762468300929843e-05 a d c a d c b
+R 6.762468300929832e-05 a d d c b c
+R 6.491969568892646e-05 c c a d a d b
+R 6.491969568892646e-05 c c a d d a b
+R 6.086221470836856e-05 c a d d b c b
+R 6.086221470836856e-05 c b c a d d b
+R 5.40997464074387e-05 a d c c a d b
+R 5.40997464074387e-05 a d d b c c
+R 5.40997464074386e-05 a d d c c a b
+R 4.5646661031276384e-05 a d a d b c b
+R 4.5646661031276384e-05 a d d a b c b
+R 4.508312200619891e-05 a d d c c b
+R 4.057480980557899e-05 a d a d c b c
+R 3.651732882502114e-05 c a d a d b c b
+R 3.651732882502114e-05 c a d d a b c b
+R 3.651732882502114e-05 c b c a d a d b
+R 3.651732882502114e-05 c b c a d d a b
+R 3.6517328825021075e-05 a b c a d d b c
+R 3.6517328825021075e-05 a d b c a d b c
+R 3.6517328825021075e-05 a d d b c a b c
+R 3.2459847844463225e-05 a d a d b c c
+R 3.2459847844463225e-05 a d d a b c c
+R 3.0431107354184276e-05 a b c a d d c b
+R 3.0431107354184276e-05 a d b c a d c b
+R 3.0431107354184276e-05 a d c a d b c b
+R 3.0431107354184276e-05 a d c b c a d b
+R 3.0431107354184276e-05 a d d c a b c b
+R 3.0431107354184276e-05 a d d c b c a b
+R 3.0431107354184225e-05 a d d b c b c
+R 2.7049873203719348e-05 a d a d c c b
+R 2.535925612848689e-05 a d d c b c b
+R 2.43448858833474e-05 a b c c a d d b
+R 2.43448858833474e-05 a d b c c a d b
+R 2.43448858833474e-05 a d d b c c a b
+R 2.0287404902789497e-05 a d d b c c b
+R 1.8258664412510538e-05 a d a d b c b c
+R 1.8258664412510538e-05 a d d a b c b c
+R 1.5215553677092138e-05 a d a d c b c b
+R 1.2172442941673721e-05 a d a d b c c b
+R 1.2172442941673721e-05 a d d a b c c b
+C dfgc-028 2 1 2 0 0 1 0
+S a 2
+N a 1
+R 1.0 a
+C dfgc-029 3 1 1 0 1 1 0
+E b b 6
+S a 4
+N a 5
+N b 3
+R 1.0 a
+C dfgc-030 3000 0.9 1 1 0 5 0
+E a c 1
+E a d 1
+E b a 1
+E b c 1
+E b d 1
+E b e 1
+E c c 1
+E c d 1
+E d a 1
+E d b 1
+E d d 1
+E e a 1
+E e c 1
+S e 1
+S b 1
+S d 1
+S c 1
+S a 1
+N b 1
+N c 1
+N d 1
+N e 1
+R 0.06666666666666667 c
+R 0.06666666666666667 e
+R 0.05000000000000001 d
+R 0.04000000000000001 b
+R 0.03333333333333335 a c
+R 0.025000000000000012 a d
+R 0.022222222222222227 e c
+R 0.01666666666666667 c d
+R 0.013333333333333338 b c
+R 0.013333333333333338 b e
+R 0.011111111111111112 e a c
+R 0.010000000000000004 b d
+R 0.010000000000000004 d b
+R 0.008333333333333335 a c d
+R 0.008333333333333335 d a c
+R 0.008333333333333335 e a d
+R 0.006666666666666668 b a c
+R 0.005555555555555555 e c d
+R 0.005000000000000002 a d b
+R 0.005000000000000002 b a d
+R 0.0044444444444444444 b e c
+R 0.003333333333333334 b c d
+R 0.003333333333333334 c d b
+R 0.003333333333333334 d b c
+R 0.003333333333333334 d b e
+R 0.0027777777777777775 e a c d
+R 0.0022222222222222222 b e a c
+R 0.0016666666666666668 a c d b
+R 0.0016666666666666668 b a c d
+R 0.0016666666666666668 b e a d
+R 0.0016666666666666668 e a d b
+C dfgc-031 10 0.9 2 0 0 1 0
+E a c 1
+E a d 1
+E b d 1
+E c a 1
+E c c 1
+E d b 1
+S a 1
+N a 1
+N b 1
+N c 1
+R 0.3333333333333333 a
+R 0.16666666666666669 a d b
+R 0.11111111111111109 a c
+R 0.08333333333333333 a d b d b
+R 0.037037037037037035 a c a
+R 0.037037037037037035 a c c
+R 0.018518518518518517 a c a d b
+R 0.012345679012345675 a c a c
+R 0.012345679012345675 a c c a
+R 0.009259259259259257 a c a d b d b
+C dfgc-032 3000 0.5 2 0 1 1 1
+E a a 1
+E a c 1
+E b a 1
+E b b 1
+E b c 1
+E c a 1
+S a 1
+N a 1
+N c 1
+Z
+C dfgc-033 3000 1 3 0 0 5 0
+E b a 6
+S a 1
+S b 2
+N a 3
+N b 4
+R 0.39999999999999997 b a
+R 0.3333333333333333 a
+R 0.26666666666666666 b
+C dfgc-034 1 0.2 2 0 0 2 0
+E a b 6
+E a c 4
+E a e 5
+E b c 6
+E b d 3
+E c b 5
+E c d 5
+E d a 4
+E d b 1
+E e c 1
+E e e 4
+S e 2
+S b 1
+S d 4
+N b 4
+N e 4
+R 0.12698412698412698 e
+C dfgc-035 2 1 3 0 0 1 1
+E a a 1
+E a c 1
+E b a 1
+E c a 1
+E c d 1
+E d c 1
+E d d 1
+S d 1
+S c 1
+N b 1
+N c 1
+Z
+C dfgc-036 40 1 3 0 0 1 0
+E a c 5
+E b b 5
+E c a 5
+E d a 2
+E d b 5
+S a 1
+S c 2
+N a 2
+N b 4
+N d 4
+R 0.19047619047619047 c a
+R 0.13605442176870747 c a c a
+R 0.09718172983479102 c a c a c a
+R 0.0952380952380952 a
+R 0.06802721088435372 a c a
+R 0.04859086491739551 a c a c a
+C dfgc-037 2 1 3 0 0 1 1
+E a b 1
+E b a 1
+E b c 1
+E c c 1
+E c d 1
+E d d 1
+S a 1
+N a 1
+N c 1
+Z
+C dfgc-038 3000 0.5 2 1 1 1 0
+E b a 4
+E b b 5
+S a 3
+N b 1
+X KeyError
+C dfgc-039 10 0.5 2 0 0 2 0
+E a a 1
+E a b 1
+E b a 1
+E b c 1
+E b d 1
+E c b 1
+E c c 1
+E d a 1
+E d b 1
+S a 1
+S c 1
+N a 1
+N b 1
+N c 1
+N d 1
+R 0.16666666666666669 a
+R 0.16666666666666669 c
+C dfgc-040 1 1 1 0 0 1 0
+E a a 6
+E a b 3
+E b a 4
+S b 3
+S a 2
+N b 3
+R 0.2571428571428571 b
+C dfgc-041 1 0.2 2 0 1 1 0
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-042 5 0.2 3 1 0 1 0
+E a a 3
+E a b 1
+E b a 3
+E b c 6
+E b d 2
+E c a 3
+E c b 3
+E c d 3
+E d b 4
+E d d 1
+S d 2
+S b 4
+N a 4
+N c 6
+N d 6
+R 0.18181818181818182 d
+R 0.14545454545454545 b c
+C dfgc-043 2 1 2 0 1 1 0
+E a a 1
+S b 1
+S a 1
+N b 1
+R 0.5 b
+C dfgc-044 2 0.5 1 0 0 2 1
+E a a 6
+S a 3
+N a 3
+R 0.3333333333333333 a
+C dfgc-045 1 0.5 3 1 0 1 1
+S a 4
+N a 3
+R 1.0 a
+C dfgc-046 1 0.9 2 0 0 2 1
+S a 1
+S b 1
+N b 1
+X KeyError
+C dfgc-047 40 0.2 1 0 0 1 0
+E b b 1
+E b c 1
+E c a 1
+E c c 1
+S b 1
+S a 1
+S c 1
+N a 1
+R 0.3333333333333333 a
+C dfgc-048 10 0.5 2 0 0 2 0
+E a a 1
+E a b 1
+E a c 1
+E b d 1
+E b e 1
+E c b 1
+E c c 1
+E c e 1
+E d b 1
+E d d 1
+E d e 1
+E e a 1
+E e b 1
+E e d 1
+E e e 1
+S c 1
+S e 1
+N a 1
+N c 1
+N d 1
+N e 1
+R 0.12500000000000003 c
+R 0.10000000000000002 e
+C dfgc-049 2 1 3 0 0 1 0
+E a a 1
+S a 2
+N a 2
+R 0.6666666666666666 a
+R 0.2222222222222222 a a
+C dfgc-050 2 0.9 3 0 0 1 1
+S a 4
+N a 1
+R 1.0 a
+C dfgc-051 2 0.9 2 0 0 1 0
+E a a 1
+S a 4
+N a 2
+R 0.6666666666666666 a
+R 0.2222222222222222 a a
+C dfgc-052 3 0.2 1 1 0 2 0
+E a b 4
+E b a 2
+E b b 2
+S b 1
+N a 1
+N b 6
+R 0.6 b
+C dfgc-053 5 0.5 2 0 0 1 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-054 3 1 3 1 0 1 0
+E a b 2
+E a d 3
+E a e 6
+E b a 1
+E b b 1
+E b d 4
+E b e 5
+E c c 6
+E d a 2
+E e a 5
+E e b 4
+E e d 6
+S e 3
+S c 4
+N a 6
+N b 3
+N c 4
+R 0.22857142857142856 c
+R 0.1371428571428571 c c
+R 0.08228571428571428 c c c
+C dfgc-055 3 1 2 0 1 1 0
+E a a 2
+E b a 3
+S b 3
+N a 1
+N b 1
+R 0.25 b
+R 0.24999999999999994 b a
+R 0.16666666666666663 b a a
+C dfgc-056 40 0.5 3 1 0 1 0
+E a a 4
+E a b 6
+E a e 2
+E b b 5
+E c c 6
+E d e 6
+E e a 6
+E e e 1
+S c 2
+S e 2
+S b 1
+S a 2
+N a 4
+N e 6
+R 0.13186813186813184 e
+R 0.07142857142857141 a
+R 0.03296703296703296 e a
+R 0.01785714285714285 a a
+R 0.01648351648351649 a e
+R 0.010143702451394763 e e
+R 0.008241758241758238 e a a
+R 0.007607776838546066 e a e
+R 0.0044642857142857114 a a a
+R 0.004120879120879123 a e a
+R 0.004120879120879118 a a e
+R 0.0025359256128486903 e e a
+R 0.002060439560439559 e a a a
+R 0.0019019442096365163 e a a e
+R 0.0019019442096365163 e a e a
+R 0.001267962806424345 a e e
+R 0.0010302197802197805 a e a a
+R 0.0010302197802197794 a a a e
+R 0.0010302197802197794 a a e a
+R 0.0009509721048182597 a e a e
+R 0.0007802848039534429 e e e
+R 0.0006339814032121725 e e a a
+R 0.0005852136029650823 e a e e
+R 0.0005852136029650823 e e a e
+R 0.00047548605240912896 e a a a e
+R 0.00047548605240912896 e a a e a
+R 0.00047548605240912896 e a e a a
+R 0.00043891020222381136 e a e a e
+R 0.0003169907016060862 a a e e
+R 0.0003169907016060862 a e e a
+R 0.0002377430262045649 a e a a e
+R 0.0002377430262045649 a e a e a
+R 0.00023774302620456446 a a e a e
+R 0.00019507120098836086 e e e a
+R 0.0001584953508030431 e e a a a
+R 0.00014630340074127054 e a e e a
+R 0.00014630340074127054 e e a e a
+R 0.00010972755055595283 e a e a e a
+R 7.924767540152153e-05 a a e e a
+R 7.924767540152153e-05 a e e a a
+C dfgc-057 5 0.5 2 0 0 1 0
+S b 3
+N a 2
+N b 5
+R 1.0 b
+C dfgc-058 3 0.5 1 0 1 1 0
+E a a 3
+E a c 6
+E b b 2
+E b c 3
+E c a 2
+E c c 2
+E d b 2
+E d c 4
+S b 1
+S c 1
+S a 2
+S d 4
+N a 3
+N b 4
+N c 1
+N d 2
+R 0.12500000000000003 d
+R 0.0625 a
+R 0.05000000000000001 d c
+C dfgc-059 5 0.5 1 0 0 5 0
+E a b 3
+E a c 5
+E a e 3
+E b a 3
+E b d 1
+E c c 5
+E c d 6
+E d b 5
+E d c 3
+E d e 1
+S b 3
+S e 3
+S c 1
+N a 3
+N b 5
+N c 3
+N d 4
+N e 4
+R 0.42857142857142855 e
+R 0.2380952380952381 b
+C dfgc-060 5 1 3 0 0 1 0
+E a a 4
+E b b 2
+S a 1
+N b 4
+C dfgc-061 3000 0.5 3 0 0 2 0
+E a c 5
+E b a 5
+E c b 4
+E c c 3
+S b 3
+S c 3
+N a 3
+R 0.1875 b a
+R 0.10714285714285714 c b a
+R 0.0669642857142857 b a c b a
+R 0.045918367346938785 c c b a
+R 0.038265306122448974 c b a c b a
+R 0.028698979591836735 b a c c b a
+R 0.023915816326530608 b a c b a c b a
+R 0.019679300291545195 c c c b a
+C dfgc-062 5 1 2 0 0 1 0
+E a b 4
+E a e 3
+E c b 4
+E c d 3
+E d c 3
+E e d 1
+S b 3
+S e 4
+N b 4
+N e 6
+R 0.48979591836734687 e
+R 0.42857142857142855 b
+R 0.0466472303206997 e d c b
+R 0.019991670137442734 e d c d c b
+C dfgc-063 3 1 3 0 1 1 0
+E b b 3
+S a 1
+N b 1
+X KeyError
+C dfgc-064 10 0.2 3 1 0 2 0
+S a 4
+S b 1
+N a 4
+N b 6
+R 0.8 a
+C dfgc-065 1 1 1 0 0 5 0
+E b b 5
+E b c 2
+E b d 1
+E c b 5
+E c c 4
+E c d 4
+E d a 4
+E d b 4
+S b 2
+S a 3
+S d 2
+N a 6
+N b 2
+N c 6
+R 0.42857142857142855 a
+C dfgc-066 5 0.2 2 1 0 1 0
+E a a 4
+E a c 6
+E a d 1
+E b c 4
+E b d 2
+E c a 1
+E c c 5
+E d c 2
+E d d 2
+S d 4
+S b 3
+N a 2
+N b 1
+N d 2
+R 0.1904761904761904 d
+R 0.061224489795918366 b
+C dfgc-067 5 0.5 2 0 0 1 0
+E b b 1
+S a 3
+N a 6
+N b 1
+R 1.0 a
+C dfgc-068 10 1 2 0 0 1 0
+S a 2
+N a 1
+R 1.0 a
+C dfgc-069 1 0.9 3 0 0 1 1
+E a c 4
+E b a 6
+E b b 5
+E b c 1
+E b d 1
+E c a 5
+E c b 4
+E d c 4
+E d d 6
+S c 2
+S d 1
+N a 3
+N d 6
+Z
+C dfgc-070 40 1 2 0 0 1 0
+E a a 2
+E a b 4
+E a c 3
+E b a 6
+E b b 1
+E b c 2
+E c a 2
+E d c 5
+S d 3
+N b 1
+N d 3
+R 0.375 d
+R 0.02777777777777778 d c a b
+R 0.009259259259259257 d c a c a b
+R 0.007407407407407413 d c a b a b
+R 0.006172839506172843 d c a a b
+R 0.0027777777777777775 d c a b b
+R 0.0024691358024691366 d c a b c a b
+R 0.0009259259259259263 d c a c a b b
+R 0.0006172839506172846 d c a a b b
+C dfgc-071 3000 1 2 0 1 1 1
+E a c 3
+E b a 2
+E b b 5
+E b d 5
+E c a 3
+E c b 5
+E c c 6
+E c d 3
+E d b 3
+E d d 1
+S a 2
+S b 2
+S c 3
+N a 2
+N b 2
+N c 6
+R 0.11428571428571427 a
+R 0.1118012422360248 c
+R 0.04472049689440992 a c
+R 0.040816326530612235 b
+R 0.029165541452876035 c c
+R 0.02236024844720496 c a
+R 0.016326530612244892 b a
+R 0.014577259475218655 b b
+R 0.013309671694764864 c b
+R 0.010932944606413992 b d b
+R 0.005989352262644186 c d b
+R 0.0027332361516034975 b d d b
+C dfgc-072 10 0.9 1 0 1 1 0
+E a a 5
+S a 1
+N a 3
+R 0.375 a
+C dfgc-073 40 0.2 1 0 1 1 0
+E a a 1
+E b c 1
+E c a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-074 3 0.2 1 0 0 2 0
+E a a 4
+E a d 6
+E b b 3
+E b c 4
+E c b 2
+E d c 2
+S b 2
+S a 1
+N a 4
+N b 5
+N d 4
+R 0.2777777777777778 b
+C dfgc-075 40 0.5 3 0 0 1 0
+E a a 1
+E b a 1
+E b c 1
+E c a 1
+E c b 1
+E d b 1
+E d c 1
+E d d 1
+S a 1
+N a 1
+N b 1
+N c 1
+N d 1
+R 0.5 a
+R 0.25 a a
+C dfgc-076 5 0.5 2 1 0 1 0
+E a b 2
+E a c 4
+E a d 6
+E b b 4
+E b c 3
+E c c 4
+E c e 4
+E e a 5
+S a 3
+S c 3
+N a 2
+N b 6
+N e 1
+X KeyError
+C dfgc-077 10 1 2 1 0 1 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-078 40 1 2 0 0 1 0
+E a b 4
+E a c 5
+E b a 3
+E c b 5
+S a 2
+N c 4
+R 0.24691358024691357 a c
+R 0.10973936899862825 a b a c
+R 0.07620789513793631 a c b a c
+C dfgc-079 5 1 2 1 0 1 0
+E a a 4
+S a 2
+N a 1
+R 0.2 a
+R 0.16000000000000003 a a
+C dfgc-080 40 0.5 1 1 1 1 0
+E a b 6
+E b b 2
+E c a 3
+E c b 6
+E c d 5
+E d a 3
+E d d 5
+S c 4
+N a 1
+N c 3
+N d 1
+R 0.17647058823529413 c
+R 0.0326797385620915 c d
+R 0.025210084033613446 c a
+R 0.014005602240896352 c d a
+C dfgc-081 10 0.5 2 1 1 1 0
+E a a 1
+E a b 1
+E a d 1
+E b a 1
+E b c 1
+E c d 1
+E e a 1
+E e b 1
+E e e 1
+S d 1
+N b 1
+N c 1
+X KeyError
+C dfgc-082 40 0.9 2 0 0 1 0
+E b a 6
+S a 3
+N a 2
+R 1.0 a
+C dfgc-083 1 1 2 0 0 1 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-084 3000 0.9 3 1 0 1 0
+E a a 1
+E b a 5
+E b b 1
+S b 2
+S a 1
+N a 2
+N b 4
+R 0.26666666666666666 b
+R 0.2222222222222222 a
+R 0.2222222222222222 b a
+R 0.07407407407407404 a a
+R 0.07407407407407404 b a a
+R 0.026666666666666665 b b
+C dfgc-085 3000 1 3 0 1 2 1
+E a b 1
+S a 1
+N a 1
+N b 1
+R 0.5 a
+R 0.5 a b
+C dfgc-086 40 0.5 2 0 0 1 0
+E a b 1
+E a d 1
+E b b 1
+E b c 1
+E d b 1
+E d d 1
+E d e 1
+E e e 1
+S b 1
+S e 1
+S c 1
+S a 1
+N a 1
+N b 1
+N c 1
+N d 1
+N e 1
+R 0.25 c
+R 0.12500000000000003 e
+R 0.08333333333333333 a
+R 0.08333333333333333 b
+C dfgc-087 1 0.5 2 0 0 5 0
+E a a 5
+E a b 1
+E a c 3
+E b a 6
+E b c 2
+E b d 3
+E c c 1
+E c d 1
+E d a 1
+E d c 1
+E d d 6
+S b 1
+S d 3
+S a 1
+N a 6
+N b 5
+N d 2
+R 0.12000000000000001 d
+C dfgc-088 10 0.2 1 0 0 1 0
+E a a 6
+S a 3
+N a 2
+R 0.25 a
+C dfgc-089 3000 0.2 2 0 0 1 0
+E a a 2
+E a b 4
+E a e 5
+E b d 1
+E b e 5
+E c a 4
+E c c 3
+E c d 3
+E c e 5
+E d b 2
+E e e 1
+S d 2
+N b 1
+N c 6
+N e 6
+R 0.6122448979591837 d b e
+R 0.14285714285714285 d b
+C dfgc-090 3 1 2 0 1 1 0
+E a d 1
+E b a 1
+E b d 1
+E c c 1
+E c d 1
+S d 1
+N a 1
+N d 1
+R 1.0 d
+C dfgc-091 5 1 2 0 0 1 0
+E b c 1
+E c b 1
+E c c 1
+E d a 1
+S c 1
+S a 1
+N d 1
+X KeyError
+C dfgc-092 40 1 2 0 0 1 0
+S b 1
+S a 1
+N a 1
+N b 1
+R 0.5 a
+R 0.5 b
+C dfgc-093 2 1 3 0 0 1 0
+E a c 1
+E c a 1
+E c b 5
+S c 3
+S a 4
+N c 3
+X KeyError
+C dfgc-094 5 0.5 1 0 0 1 1
+E a b 1
+E b a 1
+S a 1
+N b 1
+R 0.5 a b
+C dfgc-095 10 0.9 2 0 0 1 0
+E a a 3
+E a c 5
+E c a 1
+S c 1
+S a 2
+S b 3
+N a 1
+N b 4
+N c 4
+R 0.5 b
+R 0.14814814814814817 a c
+R 0.13333333333333333 c
+R 0.049382716049382706 a a c
+R 0.037037037037037035 a
+R 0.01646090534979423 a c a c
+R 0.012345679012345675 a a
+R 0.0041152263374485566 a c a
+R 0.003703703703703706 c a
+C dfgc-096 5 1 3 0 0 1 0
+E a b 1
+S a 4
+N b 4
+R 1.0 a b
+C dfgc-097 3000 1 2 0 1 2 0
+E a a 1
+E a c 1
+E a d 1
+E c d 1
+E d c 1
+S d 1
+S c 1
+S a 1
+N a 1
+N b 1
+N d 1
+R 0.16666666666666669 c d
+R 0.16666666666666669 d
+R 0.08333333333333333 a
+R 0.08333333333333333 c d c d
+R 0.041666666666666664 a c d
+R 0.041666666666666664 a d
+R 0.02083333333333334 a a
+C dfgc-098 5 1 3 0 1 1 0
+E a a 2
+E b a 1
+E c a 4
+E c b 5
+E c c 2
+E d a 2
+E d b 6
+E d c 1
+E e a 1
+E e b 5
+E e c 3
+E e d 6
+E e e 5
+S d 2
+S e 3
+N a 5
+N c 3
+N e 2
+R 0.19047619047619047 d b a
+R 0.09740259740259741 e b a
+R 0.07792207792207789 e d b a
+R 0.05454545454545455 e
+R 0.012396694214876033 e e
+C dfgc-099 2 0.5 3 0 0 1 0
+E a a 2
+E a b 3
+E b c 1
+E b d 4
+E c b 5
+E c c 3
+E d c 6
+S d 1
+S b 1
+S c 3
+S a 2
+N b 2
+N c 1
+N d 3
+R 0.06802721088435375 c b
+R 0.047619047619047596 c
+C dfgc-100 5 0.9 2 1 0 1 1
+E a a 1
+E a b 3
+E a c 3
+E b a 2
+E b c 1
+E c b 3
+S c 1
+S b 2
+N a 5
+N b 4
+N d 3
+Z
+C dfgc-101 3 1 1 0 0 1 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-102 3 0.5 2 0 0 2 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-103 10 0.9 2 0 0 5 0
+E a a 2
+E a c 6
+E b c 5
+E c b 4
+S b 3
+S a 4
+N a 5
+N b 5
+N c 6
+R 0.21978021978021978 a
+R 0.2142857142857143 b
+R 0.15824175824175823 a c
+R 0.12857142857142861 b c
+R 0.05274725274725274 a c b
+R 0.04285714285714286 b c b
+R 0.03381234150464921 a a
+R 0.03164835164835165 a c b c
+R 0.025714285714285717 b c b c
+C dfgc-104 3 0.5 2 0 0 5 0
+E a b 1
+S a 1
+N b 1
+R 1.0 a b
+C dfgc-105 3000 0.5 2 0 1 1 1
+S a 1
+N a 2
+R 1.0 a
+C dfgc-106 1 0.2 1 0 0 2 0
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-107 3000 1 3 0 0 1 0
+E a b 1
+E a c 1
+E a d 1
+E b c 1
+E b d 1
+E d c 1
+E d e 1
+E e a 1
+E e b 1
+E e d 1
+S c 1
+S e 1
+S b 1
+S a 1
+N a 1
+N d 1
+X KeyError
+C dfgc-108 3000 1 2 1 1 1 1
+E a b 6
+E a c 2
+E a d 2
+E b a 1
+E c a 4
+E c b 2
+E c c 6
+E c d 6
+E d a 6
+E d c 2
+E d e 5
+E e b 5
+E e e 6
+S a 3
+S e 2
+S d 4
+N d 4
+R 0.10457516339869281 d
+R 0.01568627450980393 a d
+R 0.009411764705882352 a b a d
+R 0.007381776239907726 d a d
+R 0.005228758169934642 a c d
+R 0.004753416518122402 e b a d
+R 0.004100986799948738 d c d
+R 0.002796127363601413 d e b a d
+R 0.0025927726462485813 e e b a d
+R 0.0017429193899782135 a c c d
+R 0.0006971677559912854 a c a d
+R 0.0003485838779956426 a c b a d
+C dfgc-109 1 1 2 1 0 1 0
+E a a 1
+E b b 1
+S a 1
+N a 1
+N b 1
+R 0.5 a
+C dfgc-110 2 0.2 2 0 0 5 1
+E a a 6
+E a c 2
+E a d 1
+E b c 3
+S b 2
+S a 4
+S c 1
+N a 5
+N b 4
+N c 1
+N d 2
+Z
+C dfgc-111 3 1 1 0 0 2 0
+E a a 1
+E a b 1
+E c a 1
+S b 1
+S a 1
+N a 1
+N c 1
+X KeyError
+C dfgc-112 3 0.2 2 0 0 2 0
+E b a 6
+S a 3
+N a 1
+N b 3
+R 1.0 a
+C dfgc-113 40 0.2 2 0 0 2 0
+E b a 1
+S b 1
+N a 1
+N b 1
+R 0.5 b
+C dfgc-114 3 0.9 1 0 0 5 1
+S a 1
+N a 2
+N b 3
+R 1.0 a
+C dfgc-115 3000 0.2 2 0 0 1 0
+E a a 5
+E a b 5
+E b a 5
+E c c 1
+S c 2
+N c 6
+R 0.8571428571428571 c
+C dfgc-116 3000 0.2 3 0 0 1 0
+E a b 3
+S a 1
+N a 2
+N b 2
+R 0.4 a
+C dfgc-117 5 0.2 2 0 0 2 0
+E a b 1
+E a d 1
+E b c 1
+E b d 1
+E d b 1
+E d c 1
+S d 1
+S c 1
+N a 1
+N b 1
+N d 1
+X KeyError
+C dfgc-118 2 0.2 1 0 1 2 0
+S a 1
+N a 5
+R 1.0 a
+C dfgc-119 5 0.2 2 0 0 1 0
+E a b 5
+E b a 4
+E b b 3
+E c a 2
+E c c 2
+S c 1
+N a 4
+N c 2
+R 0.3333333333333333 c
+C dfgc-120 5 0.9 1 1 0 1 1
+E a b 1
+E b a 1
+E b b 1
+E c a 1
+E c b 1
+E c c 1
+S b 1
+N a 1
+N b 1
+R 0.3333333333333333 b
+R 0.16666666666666669 b a
+C dfgc-121 1 1 1 0 0 1 0
+E a a 1
+E a b 1
+E a e 1
+E b a 1
+E b b 1
+E c a 1
+E c e 1
+E d c 1
+E d d 1
+E d e 1
+E e d 1
+S e 1
+N b 1
+N c 1
+R 0.11111111111111109 e d c
+C dfgc-122 1 0.5 2 0 0 1 0
+E a b 5
+E a c 4
+E b b 6
+E c b 2
+S a 4
+S c 1
+N a 4
+R 0.24615384615384614 a
+C dfgc-123 3000 1 3 0 0 2 0
+E a b 1
+S b 2
+S c 4
+N a 6
+N b 3
+N c 5
+R 0.6666666666666666 c
+R 0.3333333333333333 b
+C dfgc-124 40 1 2 0 1 1 1
+E a a 6
+E a c 5
+E b a 5
+E b b 6
+E b c 3
+E c c 5
+E d a 5
+E d d 6
+S a 3
+N a 1
+N b 5
+N c 6
+N d 1
+R 0.22727272727272727 a c
+R 0.10330578512396693 a c c
+R 0.08333333333333333 a
+R 0.041666666666666664 a a
+C dfgc-125 40 0.5 1 1 1 2 1
+E a b 1
+E b a 2
+E b b 5
+E b c 6
+E c a 5
+E c b 6
+S a 4
+S c 2
+N a 4
+N b 3
+N c 3
+Z
+C dfgc-126 3 1 2 0 0 5 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-127 5 1 2 0 1 1 1
+E b c 3
+E b d 1
+E c a 6
+E c d 5
+E d d 1
+S c 2
+N b 1
+X KeyError
+C dfgc-128 10 0.5 3 0 0 2 1
+E a a 1
+S a 1
+N a 1
+Z
+C dfgc-129 3 0.2 1 0 0 1 0
+E b b 4
+E b c 4
+S b 2
+N a 1
+N c 1
+R 0.5 b c
+C dfgc-130 40 0.2 2 1 0 2 1
+E b b 1
+S b 2
+S a 2
+N a 1
+R 0.5 a
+C dfgc-131 2 0.9 1 0 1 1 0
+E a e 3
+E b a 4
+E b e 4
+E c a 5
+E c c 2
+E d c 6
+E d e 2
+E e a 4
+E e b 6
+E e d 2
+S e 2
+S a 1
+S c 2
+N a 2
+N b 3
+N d 2
+R 0.11428571428571432 c a
+R 0.08000000000000002 a
+C dfgc-132 40 0.5 2 1 1 2 1
+S a 2
+N a 3
+N b 4
+R 1.0 a
+C dfgc-133 3000 0.2 1 0 0 5 0
+E a b 1
+E a d 1
+E b d 1
+E b e 1
+E c a 1
+E c c 1
+E d c 1
+E d d 1
+E d e 1
+E e b 1
+E e d 1
+S c 1
+S b 1
+N b 1
+N d 1
+N e 1
+R 0.16666666666666669 b
+R 0.04166666666666668 b d
+C dfgc-134 5 1 2 1 0 1 0
+E a a 1
+E a c 5
+E b a 1
+E b b 4
+E b c 5
+E b d 5
+E c a 5
+E c c 6
+E c d 6
+E d a 3
+E d b 4
+E d d 3
+S d 4
+S a 3
+S c 2
+N d 5
+R 0.14814814814814814 d
+R 0.032679738562091484 a c d
+R 0.02962962962962963 d d
+R 0.02614379084967319 c d
+R 0.013168724279835385 d b d
+C dfgc-135 5 0.2 1 1 0 2 0
+E a b 1
+E b a 1
+E b d 1
+E c a 1
+E c b 1
+E d b 1
+E d c 1
+S d 1
+S b 1
+N a 1
+R 0.12500000000000003 b a
+R 0.0625 d b a
+R 0.0625 d c a
+C dfgc-136 5 0.9 3 0 0 5 0
+E a a 1
+E c b 1
+S c 3
+S b 4
+N a 2
+N c 1
+X KeyError
+C dfgc-137 1 0.5 3 0 0 1 0
+E a a 2
+E b a 4
+E c c 4
+S a 4
+S c 3
+N a 6
+N b 4
+N c 2
+R 0.42857142857142855 a
+C dfgc-138 40 0.5 1 0 1 5 1
+E a c 2
+E a d 2
+E a e 5
+E b c 1
+E c c 1
+E c d 1
+E c e 2
+E e a 3
+E e d 4
+S a 3
+S b 2
+S e 2
+N d 4
+N e 1
+R 0.14285714285714285 e d
+R 0.03571428571428572 e
+R 0.02976190476190477 a e
+R 0.01785714285714285 b c e
+C dfgc-139 3 1 3 0 0 1 0
+S a 3
+N a 3
+R 1.0 a
+C dfgc-140 3000 1 2 0 0 1 0
+E b a 1
+E b b 1
+S a 1
+S b 1
+N a 1
+N b 1
+R 0.5 a
+R 0.16666666666666669 b
+R 0.16666666666666669 b a
+R 0.055555555555555566 b b
+R 0.055555555555555566 b b a
+C dfgc-141 3000 1 1 0 1 1 0
+E a a 1
+E a c 2
+E b d 5
+E b e 3
+E c d 3
+E c e 5
+E d a 1
+E d c 3
+E e d 6
+S a 2
+N a 1
+N b 5
+N d 1
+N e 3
+R 0.25 a
+R 0.10416666666666666 a c e
+R 0.04166666666666668 a c e d
+R 0.03749999999999999 a c d
+C dfgc-142 40 1 1 0 0 5 0
+E a a 1
+E b a 1
+S b 1
+S a 1
+N a 1
+N b 1
+R 0.25 a
+R 0.25 b
+R 0.12500000000000003 b a
+C dfgc-143 1 0.9 2 0 1 5 0
+E a c 3
+E b a 1
+E b b 3
+E c b 2
+S b 3
+N a 5
+N b 4
+N c 6
+R 0.5 b
+C dfgc-144 3000 0.2 3 0 0 1 0
+E a c 1
+E b a 2
+E b b 1
+E b c 5
+E c a 2
+E c b 2
+E c c 2
+S a 2
+N c 5
+R 0.45454545454545453 a c
+C dfgc-145 10 1 3 0 1 5 0
+E a a 6
+E a b 3
+E a d 2
+E b b 3
+E c a 6
+E d a 3
+E d b 1
+E d c 6
+S b 1
+S d 1
+S a 4
+N b 6
+N c 4
+R 0.12121212121212117 a b
+R 0.11111111111111109 b
+R 0.06611570247933882 a a b
+R 0.04040404040404038 a b b
+R 0.03999999999999999 d c
+R 0.029090909090909087 a d c
+R 0.011111111111111112 d b
+R 0.010909090909090908 d c a b
+R 0.009090909090909087 d a b
+C dfgc-146 10 0.5 1 0 0 1 1
+S a 1
+N a 1
+R 1.0 a
+C dfgc-147 3 1 1 1 0 1 0
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-148 3 0.9 3 1 1 1 0
+E a a 5
+E b b 1
+E b c 4
+E c a 3
+S b 4
+N b 1
+R 0.16666666666666669 b
+R 0.02777777777777778 b b
+C dfgc-149 5 1 1 1 0 1 0
+E a b 1
+E a c 1
+E b b 1
+E b c 1
+S a 1
+N a 1
+N b 1
+N c 1
+R 0.3333333333333333 a
+R 0.3333333333333333 a c
+R 0.11111111111111109 a b
+R 0.11111111111111109 a b c
+C dfgc-150 3000 0.2 2 0 0 1 1
+E a b 3
+E a c 1
+E b a 4
+E c a 4
+E c b 4
+S c 4
+S a 1
+S b 1
+N a 4
+N b 2
+N c 5
+Z
+C dfgc-151 3 1 2 0 0 1 0
+S a 2
+N a 3
+R 1.0 a
+C dfgc-152 3 1 2 1 0 1 0
+E a a 6
+S a 3
+N a 4
+R 0.4 a
+R 0.24000000000000005 a a
+C dfgc-153 1 0.2 2 0 0 1 0
+E a b 1
+E b e 1
+E c c 1
+E c d 1
+E d c 1
+E e b 1
+E e e 1
+S c 1
+S e 1
+S b 1
+N d 1
+N e 1
+R 0.11111111111111109 b e
+C dfgc-154 3 0.2 2 0 0 1 0
+E a a 1
+E a d 3
+E b a 6
+E b b 1
+E c a 4
+E c c 2
+E d a 5
+S b 2
+S d 4
+N a 4
+N b 1
+N c 6
+R 0.3333333333333333 d a
+C dfgc-155 3000 0.5 3 0 0 1 0
+E a b 5
+E a c 5
+S b 2
+S a 2
+N a 1
+N b 5
+N c 6
+R 0.5 b
+R 0.04545454545454544 a
+C dfgc-156 40 0.5 3 0 0 1 0
+E b a 3
+S b 2
+N a 3
+N b 5
+R 0.625 b
+C dfgc-157 3000 1 3 0 0 1 1
+E a a 3
+E a c 3
+E a d 6
+E b a 1
+E b d 5
+E b e 5
+E c b 1
+E c c 2
+E d b 4
+E d d 3
+E e a 1
+E e b 4
+E e c 2
+S c 2
+S d 3
+S a 1
+N c 5
+N d 1
+N e 1
+Z
+C dfgc-158 5 0.9 2 0 0 2 0
+E a d 1
+E a e 1
+E b b 1
+E b c 1
+E c b 1
+E c c 1
+E c d 1
+E d d 1
+E d e 1
+E e a 1
+E e c 1
+E e d 1
+S c 1
+N b 1
+N c 1
+N d 1
+R 0.25 c
+C dfgc-159 3 1 2 0 0 1 0
+E b c 1
+E c a 4
+E c c 3
+S c 2
+N a 1
+N b 4
+R 0.5714285714285714 c a
+R 0.2448979591836734 c c a
+C dfgc-160 5 0.2 2 0 0 1 1
+E a a 4
+E c c 4
+E c d 5
+E d a 3
+E d d 4
+S c 2
+S d 3
+N a 5
+N c 5
+Z
+C dfgc-161 10 1 1 0 0 2 0
+E a a 4
+E a b 6
+E a c 6
+E b b 1
+E b c 4
+E c a 3
+S b 2
+N b 3
+N c 3
+R 0.375 b
+R 0.25 b c
+C dfgc-162 40 0.9 2 0 0 1 0
+E a b 1
+S a 4
+S b 3
+N a 5
+N b 1
+R 0.47619047619047616 a
+R 0.42857142857142855 b
+C dfgc-163 3 0.5 2 0 0 1 0
+S a 4
+N a 4
+R 1.0 a
+C dfgc-164 5 0.9 2 0 0 1 0
+E a b 1
+E a c 5
+E a d 6
+E b d 5
+E c a 4
+E c b 1
+E c c 1
+E c d 5
+E d a 4
+S a 3
+N a 1
+N c 5
+N d 1
+R 0.12019230769230768 a c
+R 0.09230769230769233 a d
+R 0.07692307692307693 a
+R 0.0340828402366864 a d a d
+R 0.028402366863905324 a d a
+C dfgc-165 40 0.5 1 0 0 1 0
+S b 2
+N b 2
+R 1.0 b
+C dfgc-166 3 0.9 3 1 0 5 0
+E a c 1
+E b a 1
+E b b 1
+E b e 1
+E c c 1
+E c d 1
+E d a 1
+E d b 1
+E d d 1
+E d e 1
+E e a 1
+E e b 1
+S e 1
+S d 1
+N a 1
+N b 1
+N c 1
+N d 1
+N e 1
+R 0.16666666666666669 e
+R 0.10000000000000002 d
+R 0.08333333333333333 e a
+C dfgc-167 1 0.2 2 0 0 2 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-168 3 0.2 3 0 1 2 1
+E b a 5
+E c b 6
+S b 3
+N a 5
+R 1.0 b a
+C dfgc-169 1 0.2 2 0 0 1 0
+E a b 1
+E a c 3
+E a d 6
+E c b 3
+E d b 4
+E e a 1
+E e b 3
+S b 1
+S d 1
+S e 3
+N a 5
+N b 1
+N c 2
+N d 2
+N e 5
+R 0.33333333333333337 e
+C dfgc-170 3000 1 3 0 0 5 0
+E a a 5
+E c b 6
+S c 1
+N a 2
+N c 2
+X KeyError
+C dfgc-171 3000 0.2 2 0 0 1 0
+E b a 1
+E b b 1
+E c c 1
+S a 1
+S b 1
+S c 1
+N a 1
+N b 1
+R 0.3333333333333333 a
+C dfgc-172 40 1 2 0 0 5 0
+S a 3
+N a 4
+R 1.0 a
+C dfgc-173 2 0.9 2 0 0 2 0
+E a a 2
+E a b 5
+E a c 1
+E a d 5
+E c c 6
+E d c 6
+E d d 4
+S a 4
+N a 2
+X KeyError
+C dfgc-174 2 0.2 3 0 0 1 0
+S a 2
+N a 4
+R 1.0 a
+C dfgc-175 1 0.5 2 0 1 1 0
+E a a 3
+E b b 1
+E b c 4
+E c b 5
+E c c 1
+S b 2
+S c 3
+N b 1
+R 0.08333333333333333 c b
+C dfgc-176 1 1 2 1 0 1 0
+E a b 3
+S a 4
+N b 3
+R 1.0 a b
+C dfgc-177 10 0.9 2 0 0 1 0
+S a 3
+N a 2
+R 1.0 a
+C dfgc-178 40 1 3 0 0 1 0
+E b a 5
+S a 1
+N b 1
+X KeyError
+C dfgc-179 5 1 1 0 0 2 0
+E a a 1
+E a b 5
+S a 2
+N a 3
+X KeyError
+C dfgc-180 40 0.5 3 0 0 1 1
+E b a 1
+E b b 1
+S b 1
+N b 1
+X KeyError
+C dfgc-181 3 1 1 0 0 2 0
+E a c 4
+E c a 4
+E c b 2
+E c c 4
+E d d 2
+S c 4
+S b 4
+S a 2
+N b 4
+R 0.4 b
+C dfgc-182 1 1 2 0 0 5 0
+E b b 1
+E c b 1
+E c c 1
+S c 1
+S b 1
+S a 1
+N b 1
+X KeyError
+C dfgc-183 5 1 2 1 0 1 0
+S a 3
+N b 5
+X KeyError
+C dfgc-184 3 1 2 0 1 5 0
+E a a 1
+E b a 2
+S a 3
+N a 3
+R 0.75 a
+R 0.1875 a a
+C dfgc-185 40 0.9 1 0 0 2 0
+E a c 2
+E a d 1
+E b a 6
+E b b 6
+E b d 6
+E c b 6
+E c c 1
+E d a 2
+E d d 5
+S b 4
+S d 2
+N b 3
+N c 3
+N d 6
+R 0.15384615384615385 d
+R 0.0952380952380952 b
+R 0.08791208791208792 b d
+R 0.03809523809523808 b a c
+R 0.029304029304029297 b a d
+C dfgc-186 2 1 2 0 0 1 1
+S a 4
+N a 3
+R 1.0 a
+C dfgc-187 1 1 2 1 0 1 0
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-188 1 1 2 0 0 1 0
+E b b 3
+S a 2
+N a 4
+N b 1
+R 1.0 a
+C dfgc-189 2 1 1 0 0 1 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-190 40 0.5 3 1 0 1 0
+E a a 1
+E a b 1
+E a c 1
+E a d 1
+E b c 1
+E b d 1
+E c d 1
+E d c 1
+S a 1
+S d 1
+S c 1
+N b 1
+N c 1
+N d 1
+R 0.16666666666666669 c
+R 0.16666666666666669 d
+R 0.08333333333333333 c d
+R 0.08333333333333333 d c
+R 0.02777777777777778 a b
+C dfgc-191 10 0.2 2 1 0 1 0
+E a a 1
+E a b 3
+E b a 2
+E b c 3
+E b d 3
+E c a 3
+E c c 6
+E d b 2
+E d d 2
+S d 4
+N a 3
+N d 4
+R 0.5 d
+C dfgc-192 2 0.5 3 0 0 5 0
+E a a 3
+S a 2
+N a 6
+R 0.6666666666666666 a
+C dfgc-193 5 0.9 3 0 0 5 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-194 2 1 1 0 0 1 0
+E a a 3
+S a 1
+N a 1
+R 0.25 a
+C dfgc-195 1 0.9 1 1 0 2 0
+E a a 1
+E b a 1
+S a 1
+N b 1
+C dfgc-196 40 1 2 0 0 1 0
+S a 4
+N a 3
+R 1.0 a
+C dfgc-197 1 0.2 3 1 0 2 0
+E a a 6
+E b a 2
+E b b 3
+E b c 4
+E c a 3
+E c c 5
+S b 1
+S a 4
+N c 1
+R 0.00987654320987654 b c
+C dfgc-198 3000 1 1 0 0 1 0
+E a a 6
+S a 3
+N a 6
+R 0.5 a
+C dfgc-199 5 0.9 2 0 0 1 0
+E a a 6
+E b a 5
+E b b 4
+S a 3
+N b 4
+C dfgc-200 5 0.2 2 0 0 1 0
+E a a 6
+E a c 2
+E a e 1
+E b a 6
+E b d 2
+E c b 1
+E c c 2
+E d a 6
+E d c 3
+E d d 1
+E e b 5
+E e d 2
+S e 1
+S a 1
+S c 1
+N a 5
+R 0.11904761904761905 a
+R 0.06377551020408162 e b a
+R 0.05102040816326529 a a
+C dfgc-201 3000 0.9 2 0 0 2 1
+E b b 1
+S a 1
+N b 1
+X KeyError
+C dfgc-202 5 1 2 0 0 5 1
+E a a 3
+E a c 4
+E b b 1
+E b c 4
+E c a 2
+E c b 3
+S a 2
+S b 1
+N a 5
+N b 6
+N c 2
+Z
+C dfgc-203 1 0.5 2 0 1 1 0
+E a b 1
+E a c 1
+E b a 1
+E b b 1
+E b d 1
+E c d 1
+E c e 1
+E d a 1
+E e b 1
+E e c 1
+S d 1
+S a 1
+S e 1
+N a 1
+N b 1
+N c 1
+R 0.11111111111111109 a
+C dfgc-204 40 0.9 2 0 0 1 0
+E b d 4
+E b e 2
+E c c 5
+E c d 1
+E d a 1
+E d b 3
+E d c 2
+E d e 4
+E e a 5
+E e c 3
+E e d 6
+E e e 5
+S a 4
+S c 2
+S b 3
+N a 2
+N e 1
+R 0.4444444444444444 a
+R 0.02777777777777778 b e a
+R 0.022222222222222227 b d a
+R 0.022222222222222227 b d e a
+R 0.006944444444444444 b e e a
+R 0.005555555555555555 b d e e a
+R 0.005555555555555555 b e
+R 0.0055555555555555506 b d b e a
+R 0.0044444444444444444 b d e
+R 0.00444444444444444 b d b d a
+R 0.00444444444444444 b d b d e a
+R 0.003703703703703706 c d a
+R 0.0037037037037037025 c d e a
+R 0.003333333333333334 b e d a
+R 0.003333333333333331 b e d e a
+R 0.003086419753086421 c c d a
+R 0.0030864197530864183 c c d e a
+R 0.002666666666666665 b d e d a
+R 0.002666666666666665 b d e d e a
+R 0.0013888888888888885 b e e
+R 0.001111111111111112 b d e e
+R 0.00111111111111111 b d b e
+R 0.0008888888888888888 b d b d e
+R 0.0007407407407407405 c d e
+R 0.0006666666666666661 b e d e
+R 0.0006172839506172835 c c d e
+R 0.0005333333333333334 b d e d e
+R 0.00027777777777777745 b d b e e
+R 0.00022222222222222215 b d b d e e
+R 0.00018518518518518507 c d b e
+R 0.00018518518518518507 c d e e
+R 0.0001666666666666665 b e d b e
+R 0.00015432098765432085 c c d b e
+R 0.00015432098765432085 c c d e e
+R 0.0001481481481481482 b d c d e
+R 0.0001481481481481482 c d b d e
+R 0.0001333333333333333 b d b e d e
+R 0.0001333333333333333 b d e d b e
+R 0.0001333333333333333 b e d b d e
+R 0.0001234567901234568 b d c c d e
+C dfgc-205 10 0.2 2 0 0 1 0
+E a a 5
+E a c 3
+E b a 5
+E b c 5
+E c a 6
+S c 3
+S a 1
+S b 4
+N a 6
+N b 2
+R 0.16071428571428573 c a
+R 0.08333333333333333 b
+C dfgc-206 40 0.2 2 0 1 5 0
+E d b 1
+E d d 1
+S d 1
+N d 1
+X KeyError
+C dfgc-207 5 0.5 1 0 0 2 1
+E a c 1
+E b a 1
+E b e 1
+E c b 1
+E c c 1
+E d a 1
+E d d 1
+E e a 1
+E e d 1
+E e e 1
+S b 1
+N a 1
+N b 1
+N c 1
+N e 1
+R 0.3333333333333333 b
+C dfgc-208 1 1 3 0 1 5 0
+E a a 3
+E a b 1
+E b b 4
+S b 3
+S a 2
+N a 6
+R 0.24000000000000005 a
+C dfgc-209 40 0.9 3 1 0 1 0
+E a a 1
+E a b 4
+E a c 2
+E a d 6
+E c d 3
+E d b 4
+E d d 4
+S b 1
+S d 3
+S c 2
+N b 1
+R 0.25 d b
+R 0.16666666666666669 b
+R 0.16666666666666669 c d b
+R 0.12500000000000003 d d b
+R 0.08333333333333333 c d d b
+R 0.0625 d d d b
+R 0.041666666666666664 c d d d b
+C dfgc-210 5 0.2 2 0 1 1 0
+E a b 6
+E b a 2
+E b b 2
+E c a 3
+S b 1
+S a 2
+S c 1
+N b 3
+N c 6
+R 0.2142857142857143 a b
+C dfgc-211 3 1 2 0 0 5 0
+E a b 1
+E a c 1
+E a d 1
+E b b 1
+E b c 1
+E c a 1
+E c b 1
+E d c 1
+E d d 1
+S c 1
+S a 1
+S b 1
+N c 1
+N d 1
+R 0.11111111111111109 c
+R 0.055555555555555566 b c
+R 0.037037037037037035 a c
+C dfgc-212 1 0.5 2 0 0 1 0
+E a a 1
+E a b 2
+E a c 2
+E b a 3
+E b b 2
+E b c 3
+E c b 4
+E c c 2
+S a 1
+N c 5
+R 0.18181818181818182 a c
+C dfgc-213 1 0.5 1 0 0 1 0
+E a a 2
+E a b 2
+E a c 1
+E b a 5
+E c b 3
+S a 3
+N a 6
+R 0.5454545454545454 a
+C dfgc-214 1 0.9 2 0 0 1 0
+E a c 6
+E b b 6
+E c a 5
+E c c 4
+S c 1
+S b 2
+N a 4
+N b 5
+R 0.30303030303030304 b
+C dfgc-215 2 1 3 1 1 1 0
+E b b 1
+E b d 1
+E c c 1
+E d a 1
+E d d 1
+E d e 1
+E e c 1
+E e e 1
+S d 1
+N c 1
+N d 1
+N e 1
+X KeyError
+C dfgc-216 10 1 3 0 0 1 0
+E b a 1
+E b b 1
+E c b 1
+E c c 1
+S b 1
+N a 1
+N b 1
+N c 1
+R 0.3333333333333333 b
+R 0.3333333333333333 b a
+R 0.11111111111111109 b b
+R 0.11111111111111109 b b a
+R 0.037037037037037035 b b b
+R 0.037037037037037035 b b b a
+C dfgc-217 2 0.2 2 0 0 1 0
+E a a 1
+E a b 1
+E a c 1
+E a d 1
+E a e 1
+E b a 1
+E b c 1
+E b e 1
+E c b 1
+E c c 1
+E d b 1
+E e a 1
+E e c 1
+E e d 1
+S c 1
+S b 1
+S e 1
+S d 1
+N a 1
+N b 1
+N c 1
+N d 1
+N e 1
+R 0.08333333333333333 c
+R 0.0625 b
+C dfgc-218 10 0.9 1 0 0 1 0
+E a b 4
+E a c 2
+E b a 5
+E b c 5
+E c c 3
+S c 3
+S b 4
+N a 4
+N b 3
+R 0.13186813186813184 b
+R 0.08791208791208792 b a
+C dfgc-219 10 0.9 1 0 0 2 1
+E a a 1
+E a b 3
+E b a 2
+E b b 5
+E c b 5
+E d b 2
+E d c 6
+S d 1
+N b 4
+R 0.27272727272727276 d c b
+C dfgc-220 5 0.9 3 0 0 2 1
+E a a 1
+E a b 1
+E b b 1
+S a 1
+N a 1
+N b 1
+R 0.3333333333333333 a
+C dfgc-221 10 0.5 2 0 0 1 0
+E a b 1
+E b a 1
+E c b 1
+S c 1
+S b 1
+N a 1
+N c 1
+R 0.25 b a
+R 0.25 c
+R 0.12500000000000003 b a b a
+C dfgc-222 40 0.5 2 0 0 1 0
+E a a 3
+S a 2
+N a 4
+N b 5
+R 0.5714285714285714 a
+C dfgc-223 3 1 3 0 0 5 0
+E a c 1
+E b a 1
+E b b 1
+E b c 1
+E c b 1
+E c c 1
+S a 1
+N a 1
+R 0.5 a
+R 0.041666666666666664 a c b a
+R 0.02083333333333334 a c c b a
+C dfgc-224 40 1 3 0 1 2 1
+E a a 5
+E a b 4
+E a c 6
+E b a 5
+E b b 3
+E b c 3
+E b d 5
+E c a 3
+E c d 3
+E d b 3
+S c 2
+S b 3
+N b 4
+N c 1
+R 0.12000000000000001 b
+R 0.057142857142857134 c
+R 0.03428571428571429 c d b
+R 0.029999999999999995 b d b
+C dfgc-225 2 0.5 1 0 0 5 0
+E a b 3
+E b a 1
+E c c 6
+S c 3
+N a 5
+N b 6
+C dfgc-226 40 1 1 0 0 5 0
+E a a 5
+E a b 6
+E b a 4
+E b b 3
+S a 4
+S b 1
+N b 4
+R 0.1586776859504132 a b
+C dfgc-227 3 1 2 1 0 1 0
+E a a 1
+E a c 1
+E b b 1
+E c b 1
+E c c 1
+E d a 1
+E d b 1
+E d c 1
+S c 1
+S b 1
+S a 1
+N a 1
+N c 1
+N d 1
+R 0.11111111111111109 a
+R 0.11111111111111109 c
+R 0.037037037037037035 a a
+C dfgc-228 5 0.2 2 0 0 1 0
+E a b 5
+E a c 6
+E a d 3
+E a e 4
+E b b 5
+E b e 4
+E c b 5
+E c e 1
+E d a 5
+E d b 2
+E d d 4
+E e c 4
+E e d 3
+S d 2
+S a 1
+S b 2
+S c 2
+N a 5
+N b 3
+N c 2
+N d 5
+R 0.08928571428571426 d
+R 0.07142857142857141 b
+R 0.07142857142857141 c
+C dfgc-229 3 1 3 0 0 1 0
+E b a 3
+E b b 3
+E b c 2
+E b d 2
+E d b 4
+E d c 5
+E d d 5
+S d 2
+S c 1
+N c 2
+X KeyError
+C dfgc-230 1 0.2 1 0 0 5 0
+E a a 2
+E a b 1
+E a c 1
+E b a 6
+E b c 1
+E c c 2
+S a 1
+N a 1
+N b 4
+N c 5
+R 0.2 a
+C dfgc-231 10 0.9 3 0 0 1 1
+E a a 1
+E b b 1
+E d b 1
+S b 1
+N b 1
+N c 1
+N d 1
+R 0.5 b
+R 0.25 b b
+R 0.12500000000000003 b b b
+C dfgc-232 3000 1 1 0 0 2 0
+E a c 1
+E a d 1
+E c a 1
+E c c 1
+E c d 1
+E d c 1
+E d d 1
+S a 1
+N a 1
+N b 1
+N c 1
+N d 1
+R 0.3333333333333333 a
+R 0.11111111111111109 a d
+R 0.08333333333333333 a c
+R 0.02777777777777778 a c d
+R 0.02777777777777778 a d c
+C dfgc-233 3 1 2 0 0 1 0
+E a b 5
+E b a 1
+E b c 5
+E b d 5
+E c a 4
+S b 2
+N a 6
+N b 3
+X KeyError
+C dfgc-234 5 0.5 2 0 0 1 0
+E a a 6
+E a c 5
+E b c 4
+E c b 6
+S c 4
+N b 5
+N c 6
+R 0.5 c
+R 0.2777777777777778 c b
+C dfgc-235 3 0.2 1 0 0 1 1
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-236 3000 1 2 0 0 2 0
+E b b 2
+S a 1
+N b 1
+X KeyError
+C dfgc-237 3 0.9 2 0 0 1 0
+S a 2
+N a 3
+R 1.0 a
+C dfgc-238 1 0.2 3 0 0 2 1
+E a a 1
+E b b 1
+E b c 1
+S c 1
+S a 1
+N a 1
+N b 1
+N c 1
+Z
+C dfgc-239 3000 0.5 2 0 0 1 0
+E a d 1
+E b a 1
+E b c 6
+E b d 4
+E c a 3
+E d a 6
+E d b 2
+E d d 2
+S c 1
+S a 3
+S d 1
+N a 5
+N b 3
+N c 3
+N d 2
+R 0.5 a
+R 0.10000000000000002 c
+C dfgc-240 5 0.5 3 0 1 2 0
+E a b 1
+E a c 1
+E a d 1
+E b a 1
+E b b 1
+E b c 1
+E b d 1
+E c c 1
+E e a 1
+E e b 1
+E e c 1
+E e d 1
+S a 1
+S b 1
+S e 1
+N a 1
+N b 1
+N d 1
+N e 1
+R 0.08333333333333333 a
+R 0.08333333333333333 a d
+R 0.06666666666666667 b
+R 0.06666666666666667 e
+R 0.01666666666666667 a b
+C dfgc-241 3 1 1 0 0 1 0
+E a a 1
+E b a 1
+E b c 1
+E c a 1
+E c b 1
+S a 1
+N b 1
+N c 1
+C dfgc-242 3000 0.2 2 1 0 1 1
+E b b 5
+S b 3
+N a 4
+N b 1
+R 0.16666666666666669 b
+R 0.1388888888888889 b b
+C dfgc-243 3 1 2 0 0 1 0
+E a b 1
+E a c 5
+E a d 1
+E b d 2
+E c a 5
+E c b 5
+E c c 6
+E d a 5
+S a 4
+S d 1
+N a 6
+N b 2
+R 0.36923076923076925 a
+R 0.09230769230769233 d a
+R 0.04437869822485209 a c a
+C dfgc-244 10 1 2 1 0 5 0
+E b c 2
+E c b 3
+E c c 3
+S c 3
+S b 1
+S a 1
+N a 2
+R 0.2 a
+C dfgc-245 3000 1 3 0 0 1 0
+E b b 1
+E b c 1
+E c a 1
+E c c 1
+S a 1
+N c 1
+X KeyError
+C dfgc-246 2 0.9 1 0 0 1 0
+E a a 2
+E b c 2
+E b d 5
+E c e 1
+E d a 6
+E d b 4
+E d e 5
+E e b 6
+E e c 4
+E e d 6
+E e e 6
+S d 1
+S e 2
+N a 1
+R 0.04444444444444445 d a
+R 0.024242424242424232 e d a
+C dfgc-247 1 1 2 0 0 1 0
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-248 40 0.5 1 0 1 1 0
+E a a 1
+E a b 1
+E a c 1
+E a d 1
+E b b 1
+E b c 1
+E b d 1
+E c b 1
+E c c 1
+E c d 1
+E d d 1
+E d e 1
+E e a 1
+E e b 1
+E e d 1
+S b 1
+S a 1
+S c 1
+N b 1
+N d 1
+R 0.08333333333333333 b
+R 0.037037037037037035 c d
+R 0.02777777777777778 a d
+R 0.02777777777777778 b d
+R 0.02777777777777778 c b
+R 0.02083333333333334 a b
+R 0.009259259259259257 b c d
+R 0.006944444444444444 a c b
+R 0.0030864197530864183 c d e b
+R 0.0007716049382716044 c d e a b
+C dfgc-249 1 0.9 2 0 0 1 0
+E a a 6
+E a b 1
+E a c 2
+E a e 1
+E c c 3
+E c d 4
+E c e 4
+E d b 3
+E d c 5
+E d d 2
+E e a 5
+E e b 5
+E e c 6
+E e e 2
+S e 4
+S b 1
+S c 3
+N c 1
+N e 3
+R 0.07142857142857141 e
+C dfgc-250 3000 0.2 3 1 0 2 0
+E a a 1
+E a c 1
+E a d 1
+E a e 1
+E c d 1
+E c e 1
+E d b 1
+E d c 1
+E e e 1
+S a 1
+S c 1
+S b 1
+N a 1
+X KeyError
+C dfgc-251 3000 1 2 0 1 1 0
+S b 3
+N b 3
+R 1.0 b
+C dfgc-252 2 0.9 2 0 1 5 0
+E a b 4
+E b a 4
+E b c 6
+E c a 3
+E c b 2
+S a 3
+S b 2
+N a 3
+N c 2
+R 0.2571428571428571 a
+R 0.06857142857142857 b c
+C dfgc-253 3 0.9 2 0 0 1 0
+E a a 1
+E a b 1
+S b 1
+N a 1
+X KeyError
+C dfgc-254 3 0.5 2 1 0 1 0
+E a a 2
+E b b 3
+S a 4
+N a 6
+N b 1
+R 0.75 a
+C dfgc-255 3000 0.9 2 0 0 2 0
+E a a 3
+S a 4
+N a 1
+R 0.25 a
+R 0.1875 a a
+C dfgc-256 3000 1 2 1 1 5 0
+E a a 2
+E a d 6
+E b a 3
+E b c 2
+E c a 3
+E d a 4
+E d d 6
+S c 1
+S a 3
+S d 4
+N a 5
+N b 3
+N c 2
+R 0.14423076923076925 a
+R 0.07692307692307693 d a
+R 0.05000000000000001 c
+R 0.04615384615384616 d d a
+R 0.028846153846153848 c a
+R 0.026627218934911243 a d a
+R 0.02218934911242604 a a
+C dfgc-257 2 0.9 2 0 0 1 0
+S a 2
+N a 6
+R 1.0 a
+C dfgc-258 40 0.5 3 0 0 5 0
+E a a 5
+E b b 5
+S a 1
+N b 4
+C dfgc-259 5 0.2 2 0 0 2 0
+E a a 3
+E a b 6
+E b b 6
+E c b 3
+E c d 1
+E d c 1
+S b 4
+S a 1
+N a 5
+N b 5
+N c 4
+R 0.36363636363636365 b
+C dfgc-260 1 0.5 2 0 0 5 0
+E a c 1
+E a d 6
+E b c 6
+E b d 1
+E c c 1
+E d b 1
+E d c 1
+E d d 5
+S a 3
+S d 4
+S c 4
+N a 4
+N b 5
+N c 3
+N d 5
+R 0.27272727272727276 c
+C dfgc-261 3 0.2 3 0 1 2 0
+E a a 4
+S a 4
+N a 4
+R 0.5 a
+C dfgc-262 2 1 2 1 0 5 0
+E a a 1
+E a b 3
+E b b 6
+E b c 5
+E c a 3
+E c c 5
+S a 4
+N a 4
+N c 3
+R 0.5 a
+R 0.046487603305785136 a b c
+C dfgc-263 5 1 3 0 0 2 0
+E a a 3
+E a b 2
+E b a 5
+E b b 5
+S a 2
+N b 3
+R 0.09230769230769233 a b
+R 0.055384615384615386 a a b
+R 0.03550295857988167 a b b
+R 0.03323076923076924 a a a b
+R 0.021301775147929008 a a b b
+C dfgc-264 5 1 1 0 0 5 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-265 2 0.5 2 0 0 1 1
+E b a 1
+E b b 1
+S b 1
+S a 1
+N a 1
+N b 1
+Z
+C dfgc-266 1 0.2 2 0 1 1 0
+S a 2
+N a 6
+R 1.0 a
+C dfgc-267 3 0.2 2 0 0 1 0
+E a a 4
+E b b 1
+E b c 4
+E c c 1
+S c 2
+N a 1
+N b 3
+N c 6
+R 0.8571428571428571 c
+C dfgc-268 3000 0.9 3 0 0 2 0
+E a a 1
+E a b 1
+E b b 1
+S a 1
+N a 1
+N b 1
+R 0.3333333333333333 a
+R 0.16666666666666669 a b
+R 0.11111111111111109 a a
+R 0.08333333333333333 a b b
+R 0.05555555555555554 a a b
+R 0.041666666666666664 a b b b
+R 0.037037037037037035 a a a
+R 0.02777777777777777 a a b b
+R 0.018518518518518517 a a a b
+R 0.013888888888888888 a a b b b
+R 0.009259259259259257 a a a b b
+R 0.0046296296296296285 a a a b b b
+C dfgc-269 3 0.9 2 1 0 5 0
+E a a 1
+E c b 1
+S c 1
+N a 1
+N b 1
+N c 1
+R 0.5 c
+R 0.5 c b
+C dfgc-270 3000 1 3 1 0 1 0
+E a b 3
+E a c 3
+E c c 6
+S a 4
+N a 4
+N b 3
+N c 6
+R 0.4 a
+R 0.3 a b
+R 0.15 a c
+R 0.075 a c c
+C dfgc-271 5 0.9 2 0 0 5 0
+E a a 1
+E a d 1
+E b a 1
+E b d 1
+E c d 1
+E d b 1
+E d d 1
+S c 1
+N a 1
+N b 1
+N c 1
+R 0.5 c
+R 0.08333333333333333 c d b
+R 0.04166666666666668 c d d b
+R 0.02777777777777778 c d b a
+R 0.013888888888888888 c d d b a
+C dfgc-272 3 0.2 2 0 1 5 0
+S a 2
+N a 2
+R 1.0 a
+C dfgc-273 5 1 3 0 0 5 0
+E a c 3
+E b a 5
+E b b 4
+E b d 4
+E c c 5
+E c d 6
+E d a 5
+E d b 3
+E e a 1
+E e b 6
+E e c 5
+E e d 1
+E e e 2
+S e 3
+S c 4
+N a 2
+N b 4
+N c 6
+N d 4
+R 0.20168067226890754 c
+R 0.06722689075630252 c d
+R 0.05931784478497284 c c
+R 0.0504201680672269 e c
+R 0.04033613445378152 e b
+C dfgc-274 40 0.9 3 0 0 1 0
+E a a 2
+E b a 5
+E b b 3
+S a 2
+S c 2
+N c 3
+R 0.5 c
+C dfgc-275 3000 0.2 2 0 0 5 0
+E a b 5
+E b a 4
+E b b 2
+E c b 6
+E c c 2
+S a 3
+S b 2
+N b 1
+N c 2
+R 0.08571428571428572 a b
+R 0.057142857142857134 b
+R 0.04897959183673468 a b a b
+R 0.03265306122448979 b a b
+C dfgc-276 3000 0.2 2 0 0 2 1
+E a c 2
+E a d 2
+E a e 6
+E b b 5
+E b c 2
+E b d 1
+E c c 4
+E c e 4
+E d b 4
+E d c 3
+E d d 3
+E d e 6
+E e a 2
+E e b 4
+E e c 1
+E e d 5
+E e e 5
+S e 4
+S b 1
+S a 1
+N b 2
+N c 2
+N d 4
+Z
+C dfgc-277 3000 1 2 1 0 5 1
+E a c 1
+E b a 5
+E b b 6
+S a 3
+N b 1
+N c 6
+R 1.0 a c
+C dfgc-278 3000 0.2 3 0 0 2 0
+E a d 1
+E c c 1
+E c d 1
+E c e 1
+E d b 1
+E d d 1
+S a 1
+N a 1
+X KeyError
+C dfgc-279 3 0.9 2 0 0 1 0
+E a b 1
+E b b 1
+S a 1
+N a 1
+N b 1
+R 0.5 a
+R 0.25 a b
+R 0.12500000000000003 a b b
+C dfgc-280 40 0.2 2 1 0 1 0
+E a a 1
+E a b 1
+E a d 1
+E b b 1
+E b c 1
+E b d 1
+E c a 1
+E c b 1
+E c c 1
+E c d 1
+E d a 1
+E d d 1
+S a 1
+S c 1
+N a 1
+N b 1
+N c 1
+R 0.12500000000000003 a
+R 0.10000000000000002 c
+C dfgc-281 3 0.5 3 1 1 1 0
+E a b 5
+E a c 6
+E c a 6
+S c 4
+S a 3
+N a 2
+X KeyError
+C dfgc-282 2 0.2 1 1 0 1 0
+E b b 1
+S a 1
+N a 1
+N b 6
+R 1.0 a
+C dfgc-283 40 0.9 2 0 0 5 0
+E a c 3
+E b b 4
+E b c 2
+E b d 2
+E c c 4
+E c d 4
+E d a 1
+E d c 3
+S c 3
+S b 1
+N a 1
+N b 5
+N c 1
+N d 2
+R 0.11111111111111115 c d
+R 0.08333333333333333 c
+R 0.037037037037037035 c c
+C dfgc-284 3000 0.5 1 0 0 1 1
+E a b 4
+E b b 6
+E b c 6
+E b d 2
+E c a 3
+E c c 1
+E d a 4
+E d b 4
+E d d 2
+E e b 5
+E e e 1
+S a 1
+S b 1
+S c 1
+N b 5
+N c 6
+N e 3
+Z
+C dfgc-285 1 0.2 3 0 1 2 0
+E a a 5
+E a c 3
+E a d 2
+E b b 2
+E c c 4
+E c e 5
+E d d 3
+E d e 6
+E e d 6
+S d 2
+N b 6
+N c 2
+N d 5
+R 0.3571428571428572 d
+C dfgc-286 2 0.9 3 0 0 1 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-287 40 1 2 1 0 2 0
+E b b 1
+S a 1
+N a 1
+N b 1
+R 1.0 a
+C dfgc-288 5 0.5 1 0 1 1 0
+E a a 5
+S a 2
+N a 6
+R 0.5454545454545454 a
+C dfgc-289 1 1 1 1 0 2 0
+E a a 4
+E a c 5
+E b b 4
+E b c 5
+E b d 4
+E b e 4
+E c a 6
+E d a 4
+E d c 1
+E d d 6
+E d e 5
+E e d 5
+S d 3
+N c 3
+N e 6
+R 0.17045454545454547 d e
+C dfgc-290 3 1 1 0 0 1 0
+E b a 3
+E b b 6
+E b d 2
+E c a 3
+E c b 3
+E c c 3
+E c d 5
+E d d 3
+S b 2
+S d 2
+S c 3
+N a 5
+N b 6
+N c 5
+R 0.112781954887218 c
+R 0.10084033613445381 b
+R 0.06766917293233081 c a
+C dfgc-291 5 0.5 2 0 1 1 1
+S a 4
+N a 4
+R 1.0 a
+C dfgc-292 1 0.5 2 0 0 5 0
+S a 2
+S b 4
+N a 6
+X KeyError
+C dfgc-293 10 1 2 0 1 5 0
+E a a 1
+E a b 1
+E a c 1
+E a e 1
+E b c 1
+E b d 1
+E c b 1
+E c d 1
+E d a 1
+E d b 1
+E d c 1
+E e a 1
+E e d 1
+S a 1
+S d 1
+S b 1
+N b 1
+N c 1
+N d 1
+R 0.11111111111111109 b
+R 0.08333333333333333 d
+R 0.037037037037037035 b c
+R 0.02777777777777778 a b
+R 0.02777777777777778 a c
+R 0.02777777777777778 b d
+R 0.02777777777777778 d b
+R 0.02777777777777778 d c
+R 0.012345679012345675 b c b
+R 0.010416666666666668 a e d
+C dfgc-294 2 0.9 3 0 0 5 0
+S a 4
+N a 1
+R 1.0 a
+C dfgc-295 40 0.9 1 0 1 2 0
+E b b 1
+S a 1
+N b 1
+X KeyError
+C dfgc-296 1 0.9 1 0 0 1 0
+E a a 1
+E a b 1
+E a d 1
+E a e 1
+E b d 1
+E c d 1
+E d c 1
+E d e 1
+E e c 1
+E e d 1
+E e e 1
+S a 1
+N a 1
+N b 1
+N d 1
+N e 1
+R 0.2 a
+C dfgc-297 3000 0.5 3 1 0 5 0
+E a a 3
+E b a 2
+E b b 5
+E b c 5
+E c a 5
+E c c 1
+S c 2
+S b 3
+S a 1
+N b 4
+N c 1
+R 0.12500000000000003 b
+R 0.047619047619047596 c
+R 0.039062500000000014 b b
+R 0.022321428571428572 b c
+R 0.012207031250000002 b b b
+R 0.00697544642857143 b b c
+R 0.00680272108843537 c c
+R 0.0031887755102040826 b c c
+R 0.0021798270089285715 b b b c
+C dfgc-298 2 1 2 0 1 1 0
+E a b 6
+E a e 5
+E b b 6
+E b e 6
+E c a 6
+E c b 5
+E c d 1
+E c e 6
+E d d 4
+E e b 6
+E e c 4
+E e e 2
+S b 4
+S a 3
+S e 3
+N a 2
+N b 2
+N e 1
+R 0.057142857142857134 b
+R 0.04615384615384614 a
+C dfgc-299 5 1 1 0 0 2 0
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-300 40 0.2 2 0 1 5 0
+E a b 1
+E a c 1
+E a d 1
+E b b 1
+E b e 1
+E c d 1
+E d c 1
+E d d 1
+E e d 1
+E e e 1
+S e 1
+S b 1
+S c 1
+N c 1
+N e 1
+R 0.16666666666666669 c
+R 0.11111111111111109 e
+C dfgc-301 3000 0.2 1 0 1 2 1
+E a d 1
+E a e 1
+E b a 1
+E b e 1
+E d b 1
+E d c 1
+E d d 1
+E d e 1
+E e a 1
+E e b 1
+E e e 1
+S e 1
+N a 1
+N c 1
+N e 1
+Z
+C dfgc-302 10 0.9 2 1 1 2 1
+E a b 5
+E b b 4
+E b e 4
+E c d 6
+E c e 3
+E d a 4
+E d b 1
+E d c 4
+E e a 1
+E e b 6
+E e c 2
+E e e 5
+S d 1
+S c 3
+S a 2
+N a 4
+N c 1
+R 0.14814814814814814 a
+R 0.05000000000000001 c
+C dfgc-303 40 0.9 3 0 0 1 0
+E a d 2
+E a e 6
+E b a 2
+E b c 1
+E b e 4
+E c b 1
+E d b 2
+E d c 1
+E d e 1
+E e c 1
+S a 3
+N a 6
+N b 6
+N c 5
+N d 5
+N e 5
+R 0.42857142857142855 a
+R 0.3571428571428571 a e
+R 0.07936507936507935 a d
+R 0.05952380952380952 a e c
+C dfgc-304 3 1 3 1 1 2 0
+S a 3
+N a 6
+R 1.0 a
+C dfgc-305 3000 1 2 0 1 1 1
+E a a 6
+S a 4
+N a 2
+R 0.25 a
+R 0.1875 a a
+C dfgc-306 3 0.9 3 0 0 2 0
+E a a 1
+E a b 1
+E b a 1
+E b b 1
+E b c 1
+E c d 1
+E d c 1
+E d d 1
+S d 1
+N a 1
+N b 1
+N c 1
+N d 1
+R 0.3333333333333333 d
+R 0.16666666666666669 d c
+R 0.11111111111111109 d d
+C dfgc-307 1 0.5 1 0 0 1 0
+S a 1
+N b 1
+X KeyError
+C dfgc-308 5 0.9 3 0 1 1 0
+S a 2
+N a 4
+R 1.0 a
+C dfgc-309 3000 0.9 2 1 0 5 0
+E a a 1
+E b b 4
+S a 3
+N b 6
+C dfgc-310 40 1 2 0 0 1 0
+E a a 1
+E a b 1
+E b c 1
+E c a 1
+E c b 1
+S b 1
+S c 1
+N a 1
+N b 1
+R 0.25 b
+R 0.12500000000000003 c b
+R 0.08333333333333333 c a
+R 0.0625 b c b
+R 0.04166666666666668 b c a
+R 0.041666666666666664 c a b
+R 0.03125 c b c b
+R 0.02777777777777778 c a a
+R 0.02083333333333334 b c a b
+R 0.02083333333333334 c b c a
+R 0.013888888888888888 b c a a
+R 0.013888888888888888 c a a b
+R 0.010416666666666668 b c b c a
+R 0.010416666666666668 c a b c b
+R 0.010416666666666668 c b c a b
+R 0.006944444444444444 b c a a b
+R 0.006944444444444444 c a b c a
+R 0.006944444444444444 c b c a a
+R 0.0034722222222222216 b c a b c a
+R 0.0034722222222222216 b c b c a a
+R 0.0034722222222222216 c a a b c b
+R 0.0034722222222222216 c a b c a b
+R 0.0034722222222222216 c b c a a b
+C dfgc-311 3 0.5 2 0 0 1 0
+E a c 1
+E a e 6
+E c b 1
+E c e 4
+E d a 4
+E e d 3
+E e e 5
+S d 4
+S e 2
+S c 4
+S b 2
+N b 3
+N d 2
+R 0.16666666666666669 b
+R 0.11111111111111109 d
+R 0.03333333333333332 c e d
+C dfgc-312 40 1 3 0 0 2 1
+E a a 5
+E a c 4
+E a d 5
+E a e 5
+E b c 6
+E c b 2
+E c d 2
+E c e 4
+E d a 2
+E d d 4
+E d e 3
+E e b 6
+E e d 3
+S c 3
+S e 4
+S d 3
+N a 5
+N c 1
+N d 6
+N e 2
+R 0.12000000000000001 d
+R 0.07272727272727272 e
+R 0.03333333333333332 c
+C dfgc-313 1 1 2 1 0 5 0
+E a a 6
+E a c 1
+E a e 5
+E b a 1
+E c b 2
+E c d 5
+E c e 5
+E d a 5
+E d d 4
+E d e 1
+E e a 4
+E e b 6
+E e c 1
+E e e 4
+S a 2
+N b 4
+N c 6
+R 0.13333333333333333 a e b
+C dfgc-314 40 0.5 3 0 1 2 0
+S a 3
+N a 1
+R 1.0 a
+C dfgc-315 10 1 2 1 0 1 0
+E a a 2
+E a c 2
+E b a 3
+E b b 5
+E b c 6
+E b d 4
+E b e 1
+E c b 4
+E d d 3
+E d e 1
+S c 2
+N a 3
+N c 6
+N e 6
+R 0.6 c
+R 0.07578947368421052 c b c
+R 0.027067669172932324 c b a
+R 0.02105263157894737 c b d e
+R 0.02105263157894736 c b e
+R 0.01994459833795014 c b b c
+R 0.01578947368421053 c b d d e
+R 0.010827067669172939 c b a c
+R 0.007733619763694956 c b a a
+R 0.007123070834982193 c b b a
+C dfgc-316 3 1 1 0 0 1 1
+E a b 1
+E b a 1
+S a 1
+N a 1
+N b 1
+R 0.5 a
+R 0.25 a b
+C dfgc-317 5 0.9 2 0 1 1 0
+E a a 1
+E a b 1
+E a c 1
+E a d 1
+E a e 1
+E b a 1
+E b d 1
+E c a 1
+E c d 1
+E d e 1
+E e a 1
+E e b 1
+E e c 1
+E e d 1
+S b 1
+N a 1
+N c 1
+N d 1
+R 0.25 b d
+R 0.08333333333333333 b a
+R 0.041666666666666664 b a d
+R 0.02777777777777778 b a c
+R 0.013888888888888888 b a a
+C dfgc-318 3 1 1 0 0 2 0
+S a 3
+N a 4
+R 1.0 a
+C dfgc-319 2 0.5 3 0 0 1 0
+E b b 4
+S b 4
+N b 6
+R 0.6 b
+C dfgc-320 3000 1 2 0 0 5 0
+E a a 1
+E b a 4
+E b c 4
+E b d 1
+E d b 1
+E d c 2
+E d d 2
+E d e 3
+E e a 1
+E e b 6
+E e c 5
+E e d 4
+E e e 4
+S a 1
+S d 2
+N a 5
+N c 5
+N d 1
+N e 2
+R 0.27777777777777773 a
+R 0.14814814814814814 d c
+R 0.07407407407407404 d
+R 0.0505050505050505 d e c
+R 0.046296296296296315 a a
+R 0.032921810699588466 d b c
+R 0.032921810699588466 d d c
+R 0.027434842249657056 d b a
+R 0.026936026936026928 d e b c
+R 0.022446689113355775 d e b a
+R 0.020202020202020197 d e
+R 0.01646090534979423 d d
+R 0.004489337822671155 d d e
+R 0.004489337822671155 d e d
+R 0.0036730945821854886 d e e
+C dfgc-321 1 0.5 2 0 1 1 0
+E a a 3
+E a c 2
+E b c 3
+E c b 6
+E c c 5
+S b 1
+S c 4
+N b 3
+N c 2
+R 0.1230769230769231 c
+C dfgc-322 3000 1 2 1 0 5 0
+E a b 1
+E a c 1
+E b a 1
+E b b 1
+E b c 1
+E d a 1
+E d b 1
+S a 1
+N b 1
+N c 1
+N d 1
+R 0.5 a c
+R 0.12500000000000003 a b
+R 0.12500000000000003 a b c
+R 0.0625 a b a c
+R 0.031250000000000014 a b b
+R 0.031250000000000014 a b b c
+R 0.015625000000000007 a b a b
+R 0.015625000000000007 a b a b c
+R 0.015625000000000007 a b b a c
+C dfgc-323 10 1 3 0 0 1 0
+E a d 4
+E b d 1
+E b e 1
+E c a 4
+E c b 1
+E d a 3
+E d b 6
+E d c 1
+E e c 1
+S a 1
+N a 3
+N b 3
+N c 6
+N d 1
+R 0.42857142857142855 a
+R 0.187012987012987 a d b
+R 0.06679035250463819 a d a
+R 0.051948051948051945 a d
+R 0.03400236127508855 a d b e c
+R 0.029144881092933037 a d a d b
+R 0.028335301062573783 a d c
+R 0.020401416765053124 a d b d b
+R 0.008095800303592506 a d a d
+R 0.005667060212514758 a d b d
+C dfgc-324 3 0.2 2 0 0 1 0
+E a a 1
+E a b 1
+E a c 1
+E a e 1
+E b c 1
+E c a 1
+E c e 1
+E d d 1
+E d e 1
+E e c 1
+E e e 1
+S b 1
+S e 1
+N b 1
+N c 1
+R 0.25 b
+C dfgc-325 5 0.9 1 1 0 1 1
+E a a 6
+E b a 1
+S a 4
+N a 2
+R 0.25 a
+C dfgc-326 1 0.9 2 0 0 1 0
+S a 3
+N a 3
+R 1.0 a
+C dfgc-327 1 0.9 2 0 1 1 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-328 1 0.2 2 0 0 1 0
+E b a 2
+E b b 6
+E b d 3
+E c b 6
+E c c 2
+E c d 6
+E d c 3
+E d d 5
+E d e 1
+E e a 6
+E e b 1
+S c 1
+N a 1
+N b 1
+N e 3
+R 0.035714285714285705 c b
+C dfgc-329 1 1 2 1 0 5 0
+E a a 6
+S a 4
+N a 4
+R 0.4 a
+C dfgc-330 40 0.9 2 0 0 1 0
+E b b 1
+S a 1
+N a 1
+N b 1
+R 1.0 a
+C dfgc-331 10 1 2 0 0 1 0
+E a b 4
+E a c 2
+E a d 4
+E b a 4
+E b b 3
+E b d 3
+E c a 4
+E c b 2
+E c c 1
+E d a 3
+E d b 5
+S a 2
+S c 2
+S d 3
+N a 6
+N b 6
+N c 3
+R 0.10714285714285714 a
+R 0.10044642857142858 d b
+R 0.08571428571428572 c
+R 0.06026785714285716 d a
+R 0.04285714285714286 c a
+R 0.02678571428571428 a b
+R 0.02511160714285714 d b a
+R 0.021428571428571425 c b
+R 0.01883370535714286 d b b
+R 0.016741071428571425 a d b
+C dfgc-332 10 0.5 2 0 0 5 0
+E a c 5
+E b b 4
+E c a 5
+S b 2
+S c 1
+N b 4
+N c 5
+R 0.3333333333333333 b
+R 0.16666666666666669 b b
+R 0.16666666666666669 c
+C dfgc-333 3 1 3 1 0 2 0
+E a b 6
+S a 2
+N b 1
+R 1.0 a b
+C dfgc-334 5 1 2 0 0 1 0
+E a a 1
+E a b 1
+E a d 1
+E b a 1
+E b c 1
+E c b 1
+E c d 1
+E d b 1
+E d c 1
+S c 1
+S b 1
+N a 1
+N c 1
+R 0.16666666666666669 c
+R 0.08333333333333333 b c
+R 0.0625 b a
+R 0.02777777777777778 c b c
+R 0.02083333333333334 c b a
+C dfgc-335 2 0.2 2 0 0 1 0
+E b d 5
+E b e 3
+E c a 5
+E c b 6
+E c d 5
+E c e 4
+E d b 3
+E d c 5
+E d d 6
+E d e 3
+E e b 3
+E e d 1
+S a 2
+N e 3
+X KeyError
+C dfgc-336 3 1 3 0 1 2 0
+E a c 2
+E a e 1
+E b d 1
+E b e 3
+E c d 2
+E d a 3
+E d c 3
+E d d 5
+E d e 4
+E e d 4
+E e e 5
+S e 4
+S c 2
+S b 2
+N a 5
+N e 1
+R 0.05000000000000001 e
+R 0.025000000000000012 e e
+R 0.018750000000000003 b e
+C dfgc-337 3000 1 2 0 0 5 0
+E a a 1
+E a c 4
+E b b 5
+E b c 6
+E c a 2
+E c b 2
+S c 2
+S b 3
+N c 6
+R 0.24000000000000005 c
+R 0.19636363636363635 b c
+R 0.08925619834710742 b b c
+R 0.038400000000000004 c a c
+R 0.03141818181818184 b c a c
+R 0.026181818181818188 c b c
+R 0.021421487603305783 b c b c
+R 0.014280991735537199 b b c a c
+R 0.011900826446280995 c b b c
+R 0.007680000000000006 c a a c
+R 0.006283636363636366 b c a a c
+R 0.002856198347107439 b b c a a c
+C dfgc-338 2 1 2 0 0 1 0
+E a a 6
+E b a 2
+S b 3
+N b 5
+R 0.7142857142857143 b
+C dfgc-339 1 0.9 2 0 0 2 0
+E a b 5
+E a e 6
+E b c 4
+E b d 5
+E c b 6
+E c e 1
+E e b 1
+E e c 4
+S a 2
+S e 1
+S b 4
+N c 3
+N e 4
+X KeyError
+C dfgc-340 40 0.9 3 0 0 1 0
+E a a 2
+E a b 6
+E a c 3
+E a d 6
+E b b 6
+E b c 1
+E c b 2
+E d c 6
+S b 2
+S c 1
+S a 2
+N d 1
+R 0.020168067226890758 a d
+R 0.002372713791398913 a a d
+R 0.00027914279898810714 a a a d
+C dfgc-341 3000 0.5 3 0 1 2 0
+E a a 1
+E b d 1
+E b e 4
+E c a 4
+E c c 1
+E d b 5
+E d e 4
+E e b 6
+S b 1
+S e 1
+S a 1
+N b 4
+N d 5
+N e 2
+R 0.14814814814814814 b
+R 0.11111111111111109 e b
+R 0.08333333333333333 e
+R 0.037037037037037035 b e
+C dfgc-342 2 1 3 0 0 2 0
+E a a 1
+E a d 1
+E a e 1
+E b c 1
+E b d 1
+E c a 1
+E c d 1
+E c e 1
+E d b 1
+E d c 1
+E d d 1
+E e a 1
+E e b 1
+E e c 1
+E e d 1
+S a 1
+N b 1
+N d 1
+R 0.08333333333333333 a d
+R 0.02777777777777778 a a d
+C dfgc-343 2 1 2 1 0 1 0
+E a a 6
+E a b 4
+E b a 3
+S a 3
+N a 5
+N b 2
+R 0.3333333333333333 a
+R 0.13333333333333333 a a
+C dfgc-344 1 1 3 0 0 2 0
+E b b 4
+S a 1
+N b 4
+X KeyError
+C dfgc-345 1 0.9 1 0 1 1 0
+E b b 1
+E c c 1
+S c 1
+N c 1
+R 0.5 c
+C dfgc-346 2 0.5 1 1 0 2 0
+E a a 6
+E a c 2
+E a d 5
+E b a 3
+E b d 1
+E c c 2
+E d a 5
+E d b 4
+E d e 2
+E e b 2
+E e c 4
+E e e 1
+S c 1
+S b 1
+N a 5
+N c 1
+N d 6
+R 0.16666666666666669 c
+R 0.1041666666666667 b a
+C dfgc-347 3000 1 1 0 0 1 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-348 5 0.9 2 0 1 2 0
+E b a 3
+E c b 2
+E c c 1
+S b 3
+N a 6
+N c 1
+R 1.0 b a
+C dfgc-349 3000 0.5 3 1 0 1 0
+S a 1
+N a 2
+R 1.0 a
+C dfgc-350 3000 0.9 3 0 0 1 1
+E a a 4
+E a b 2
+E a c 4
+E a e 1
+E b b 4
+E b c 2
+E b d 4
+E c b 6
+E d a 2
+E e b 3
+E e c 5
+S a 1
+S e 1
+S d 4
+S b 3
+N b 3
+R 0.07692307692307693 b
+R 0.03729603729603731 d a c b
+R 0.02366863905325444 b b
+R 0.01864801864801865 d a b
+R 0.016025641025641024 e c b
+R 0.013562195380377205 d a a c b
+R 0.01183431952662722 b c b
+R 0.011475703783396091 d a c b b
+R 0.009615384615384618 e b
+R 0.009324009324009326 a c b
+R 0.00860677783754707 b d a c b
+R 0.007282658170232134 b b b
+R 0.006781097690188601 d a a b
+R 0.005827505827505828 d a e c b
+R 0.005737851891698046 d a b b
+R 0.005737851891698046 d a c b c b
+R 0.0049317074110462565 d a a a c b
+R 0.004930966469428006 e c b b
+R 0.004662004662004662 a b
+R 0.004303388918773535 b d a b
+R 0.004172983193962215 d a a c b b
+R 0.004172983193962215 d a c b d a c b
+R 0.0036413290851160665 b b c b
+R 0.0036413290851160665 b c b b
+R 0.003530985779506489 d a c b b b
+R 0.0034965034965034974 d a e b
+R 0.0033905488450942972 a a c b
+R 0.0031297373954716594 b d a a c b
+R 0.0029585798816568047 e b b
+R 0.0028689259458490224 a c b b
+R 0.0028689259458490224 d a b c b
+R 0.002648239334629867 b b d a c b
+R 0.002648239334629867 b d a c b b
+R 0.0024658537055231257 d a a a b
+R 0.002465483234714003 e c b c b
+R 0.0021190930281839355 d a a e c b
+R 0.0020864915969811076 d a a b b
+R 0.0020864915969811076 d a a c b c b
+R 0.0020864915969811076 d a b d a c b
+R 0.0020864915969811076 d a c b d a b
+R 0.0018206645425580333 b c b c b
+R 0.0017930787161556387 d a e c b b
+R 0.0017930787161556387 e c b d a c b
+R 0.001765492889753246 d a c b b c b
+R 0.0017654928897532444 d a b b b
+R 0.0017654928897532444 d a c b c b b
+R 0.0016952744225471486 a a b
+R 0.0015648686977358295 b d a a b
+R 0.0015174484341680785 d a a a c b b
+R 0.0015174484341680785 d a a c b d a c b
+R 0.0015174484341680785 d a c b d a a c b
+R 0.001517220452131694 e c b b b
+R 0.0014792899408284021 e b c b
+R 0.0014568764568764555 a e c b
+R 0.0014344629729245112 a b b
+R 0.0014344629729245112 a c b c b
+R 0.001344809037116728 b d a e c b
+R 0.0013241196673149335 b b d a b
+R 0.0013241196673149335 b c b d a c b
+R 0.0013241196673149335 b d a b b
+R 0.0013241196673149335 b d a c b c b
+R 0.0012839948289114507 d a a c b b b
+R 0.0012839948289114507 d a c b b d a c b
+R 0.0012839948289114507 d a c b d a c b b
+R 0.0012714558169103615 d a a e b
+R 0.0012329268527615628 a a a c b
+R 0.001138086325626058 b d a a a c b
+R 0.0010758472296933835 d a e b b
+R 0.0010758472296933835 e b d a c b
+R 0.0010432457984905538 a c b d a c b
+R 0.0010432457984905538 d a a b c b
+R 0.0010432457984905538 d a b d a b
+R 0.0010432457984905527 a a c b b
+R 0.000962996121683588 b b d a a c b
+R 0.000962996121683588 b d a c b d a c b
+R 0.0009629961216835872 b d a a c b b
+R 0.0009103322712790165 e b b b
+R 0.0008965393580778194 d a e c b c b
+R 0.0008965393580778194 e c b d a b
+R 0.0008827464448766229 d a b b c b
+R 0.0008827464448766229 d a c b c b c b
+R 0.0008827464448766221 a c b b b
+R 0.0008827464448766221 d a b c b b
+R 0.0008741258741258734 a e b
+R 0.000806885422270037 b d a e b
+R 0.0007705792829759766 d a a a e c b
+R 0.0007587242170840391 d a a a c b c b
+R 0.0007587242170840391 d a a b d a c b
+R 0.0007587242170840391 d a a c b d a b
+R 0.0007587242170840391 d a b d a a c b
+R 0.0007587242170840391 d a c b d a a b
+R 0.0007587242170840385 d a a a b b
+R 0.0007586102260658469 e c b b c b
+R 0.0007586102260658469 e c b c b b
+R 0.0007172314864622555 a b c b
+R 0.0006620598336574666 b c b d a b
+R 0.0006620598336574666 b d a b c b
+R 0.0006520286240565959 d a c b d a e c b
+R 0.0006520286240565959 d a e c b d a c b
+R 0.0006520286240565959 e c b d a a c b
+R 0.0006520286240565954 d a a e c b b
+R 0.0006419974144557258 d a a c b b c b
+R 0.0006419974144557258 d a c b d a c b c b
+R 0.0006419974144557252 d a a b b b
+R 0.0006419974144557252 d a a c b c b b
+R 0.0006419974144557252 d a b b d a c b
+R 0.0006419974144557252 d a b d a c b b
+R 0.0006419974144557252 d a c b b d a b
+R 0.0006419974144557252 d a c b c b d a c b
+R 0.0006419974144557252 d a c b d a b b
+R 0.0006164634263807813 a a a b
+R 0.000569043162813029 b d a a a b
+R 0.0005517165280478887 d a e c b b b
+R 0.0005517165280478887 e c b b d a c b
+R 0.0005517165280478887 e c b d a c b b
+R 0.0005379236148466922 d a e b c b
+R 0.0005379236148466917 e b d a b
+R 0.0005297732570459838 a a e c b
+R 0.0005216228992452768 a a c b c b
+R 0.0005216228992452768 a b d a c b
+R 0.0005216228992452768 a c b d a b
+R 0.0005216228992452763 a a b b
+R 0.0004890214680424466 b d a a e c b
+R 0.00048149806084179397 b b d a a b
+R 0.00048149806084179397 b c b d a a c b
+R 0.00048149806084179397 b d a a c b c b
+R 0.00048149806084179397 b d a b d a c b
+R 0.00048149806084179397 b d a c b d a b
+R 0.0004814980608417936 b d a a b b
+R 0.0004669072105132548 d a a a c b b b
+R 0.0004669072105132548 d a a c b b d a c b
+R 0.0004669072105132548 d a a c b d a c b b
+R 0.0004669072105132548 d a c b b d a a c b
+R 0.0004669072105132548 d a c b d a a c b b
+R 0.0004669072105132548 d a c b d a c b d a c b
+R 0.00046234756978558606 d a a a e b
+R 0.0004551661356395082 e b b c b
+R 0.0004551661356395082 e b c b b
+R 0.00044826967903890925 a e c b b
+R 0.00044137322243831137 a c b b c b
+R 0.00044137322243831137 d a b c b c b
+R 0.000441373222438311 a b b b
+R 0.000441373222438311 a c b c b b
+R 0.0004137873960359166 b b d a e c b
+R 0.00041378739603591623 b d a e c b b
+R 0.00039121717443395764 d a c b d a e b
+R 0.00039121717443395764 d a e b d a c b
+R 0.00039121717443395764 e b d a a c b
+R 0.0003912171744339573 d a a e b b
+R 0.00037936210854201956 a c b d a a c b
+R 0.00037936210854201956 d a a a b c b
+R 0.00037936210854201956 d a a b d a b
+R 0.00037936210854201956 d a b d a a b
+R 0.0003793621085420192 a a a c b b
+R 0.0003793621085420192 a a c b d a c b
+R 0.00037930511303292344 e c b c b c b
+R 0.0003501804078849411 b b d a a a c b
+R 0.0003501804078849411 b d a c b d a a c b
+R 0.00035018040788494084 b d a a a c b b
+R 0.00035018040788494084 b d a a c b d a c b
+R 0.0003310299168287333 d a e b b b
+R 0.0003310299168287333 e b b d a c b
+R 0.0003310299168287333 e b d a c b b
+R 0.00032601431202829823 d a b d a e c b
+R 0.00032601431202829823 d a e c b d a b
+R 0.00032601431202829823 e c b d a a b
+R 0.0003260143120282977 d a a e c b c b
+R 0.0003209987072278629 a c b b d a c b
+R 0.0003209987072278629 a c b d a c b b
+R 0.0003209987072278629 d a a b b c b
+R 0.0003209987072278629 d a a b c b b
+R 0.0003209987072278629 d a a c b c b c b
+R 0.0003209987072278629 d a b b d a b
+R 0.0003209987072278629 d a b c b d a c b
+R 0.0003209987072278629 d a b d a b b
+R 0.0003209987072278629 d a b d a c b c b
+R 0.0003209987072278629 d a c b c b d a b
+R 0.0003209987072278629 d a c b d a b c b
+R 0.0003209987072278623 a a c b b b
+R 0.00031786395422759065 a a e b
+R 0.0002934128808254683 b d a a e b
+R 0.0002801685493993185 e c b d a e c b
+R 0.00027585826402394434 d a e c b b c b
+R 0.00027585826402394434 d a e c b c b b
+R 0.00027585826402394434 e c b b d a b
+R 0.00027585826402394434 e c b c b d a c b
+R 0.00027585826402394434 e c b d a b b
+R 0.00027585826402394434 e c b d a c b c b
+R 0.0002689618074233456 a e b b
+R 0.0002608114496226384 a a b c b
+R 0.0002608114496226384 a b d a b
+R 0.00024827243762155023 b b d a e b
+R 0.0002482724376215498 b d a e b b
+R 0.00024074903042089698 b c b d a a b
+R 0.00024074903042089698 b d a a b c b
+R 0.00024074903042089698 b d a b d a b
+R 0.0002371013178387624 d a a c b d a e c b
+R 0.0002371013178387624 d a c b d a a e c b
+R 0.0002371013178387624 d a e c b d a a c b
+R 0.0002371013178387624 e c b d a a a c b
+R 0.00023710131783876196 d a a a e c b b
+R 0.00023710131783876196 d a a e c b d a c b
+R 0.0002334536052566276 d a a a c b b c b
+R 0.0002334536052566276 d a a a c b c b b
+R 0.0002334536052566276 d a a b b d a c b
+R 0.0002334536052566276 d a a b d a c b b
+R 0.0002334536052566276 d a a c b b d a b
+R 0.0002334536052566276 d a a c b c b d a c b
+R 0.0002334536052566276 d a a c b d a b b
+R 0.0002334536052566276 d a a c b d a c b c b
+R 0.0002334536052566276 d a b b d a a c b
+R 0.0002334536052566276 d a b d a a c b b
+R 0.0002334536052566276 d a b d a c b d a c b
+R 0.0002334536052566276 d a c b b d a a b
+R 0.0002334536052566276 d a c b c b d a a c b
+R 0.0002334536052566276 d a c b d a a b b
+R 0.0002334536052566276 d a c b d a a c b c b
+R 0.0002334536052566276 d a c b d a b d a c b
+R 0.0002334536052566276 d a c b d a c b d a b
+R 0.00023345360525662716 d a a a b b b
+R 0.00022758306781975408 e b c b c b
+R 0.0002241348395194546 a e c b c b
+R 0.00022068661121915569 a b b c b
+R 0.00022068661121915569 a b c b b
+R 0.00022068661121915569 a c b c b c b
+R 0.00020689369801795847 b c b d a e c b
+R 0.0002068936980179581 b d a e c b c b
+R 0.0002006241920174141 d a a e c b b b
+R 0.0002006241920174141 d a c b b d a e c b
+R 0.0002006241920174141 d a c b d a e c b b
+R 0.0002006241920174141 d a e c b b d a c b
+R 0.0002006241920174141 d a e c b d a c b b
+R 0.0002006241920174141 e c b b d a a c b
+R 0.0002006241920174141 e c b d a a c b b
+R 0.0002006241920174141 e c b d a c b d a c b
+R 0.00019560858721697898 d a b d a e b
+R 0.00019560858721697898 d a e b d a b
+R 0.00019560858721697898 e b d a a b
+R 0.00019560858721697863 d a a e b c b
+R 0.0001926448207439943 a a a e c b
+R 0.00018968105427100975 a a a b b
+R 0.00018968105427100975 a a a c b c b
+R 0.00018968105427100975 a a b d a c b
+R 0.00018968105427100975 a a c b d a b
+R 0.00018968105427100975 a b d a a c b
+R 0.00018968105427100975 a c b d a a b
+R 0.00017782598837907167 b d a a a e c b
+R 0.00017509020394247056 b b d a a a b
+R 0.00017509020394247056 b c b d a a a c b
+R 0.00017509020394247056 b d a a a b b
+R 0.00017509020394247056 b d a a a c b c b
+R 0.00017509020394247056 b d a a b d a c b
+R 0.00017509020394247056 b d a a c b d a b
+R 0.00017509020394247056 b d a b d a a c b
+R 0.00017509020394247056 b d a c b d a a b
+R 0.00016810112963959112 e b d a e c b
+R 0.00016810112963959112 e c b d a e b
+R 0.00016551495841436693 d a e b c b b
+R 0.00016551495841436663 d a e b b c b
+R 0.00016551495841436663 e b b d a b
+R 0.00016551495841436663 e b c b d a c b
+R 0.00016551495841436663 e b d a b b
+R 0.00016551495841436663 e b d a c b c b
+R 0.00016300715601414912 a c b d a e c b
+R 0.00016300715601414882 a a e c b b
+R 0.00016300715601414882 a e c b d a c b
+R 0.0001604993536139314 a a c b c b b
+R 0.0001604993536139314 a b b d a c b
+R 0.0001604993536139314 a b d a c b b
+R 0.0001604993536139314 a c b b d a b
+R 0.0001604993536139314 a c b c b d a c b
+R 0.0001604993536139314 a c b d a b b
+R 0.0001604993536139314 a c b d a c b c b
+R 0.0001604993536139314 d a a b c b c b
+R 0.0001604993536139314 d a b c b d a b
+R 0.0001604993536139314 d a b d a b c b
+R 0.00016049935361393114 a a b b b
+R 0.00016049935361393114 a a c b b c b
+R 0.0001504681440130607 b b d a a e c b
+R 0.0001504681440130607 b d a c b d a e c b
+R 0.00015046814401306047 b d a a e c b b
+R 0.00015046814401306047 b d a e c b d a c b
+R 0.00014226079070325746 d a a c b d a e b
+R 0.00014226079070325746 d a c b d a a e b
+R 0.00014226079070325746 d a e b d a a c b
+R 0.00014226079070325746 e b d a a a c b
+R 0.00014226079070325722 d a a a e b b
+R 0.00014226079070325722 d a a e b d a c b
+R 0.00013792913201197217 a e c b b b
+R 0.00013792913201197217 d a e c b c b c b
+R 0.00013792913201197217 e c b c b d a b
+R 0.00013792913201197217 e c b d a b c b
+R 0.00013448090371167277 a e b c b
+R 0.00012413621881077511 b c b d a e b
+R 0.00012413621881077487 b d a e b c b
+R 0.00012037451521044848 d a a e b b b
+R 0.00012037451521044848 d a c b b d a e b
+R 0.00012037451521044848 d a c b d a e b b
+R 0.00012037451521044848 d a e b b d a c b
+R 0.00012037451521044848 d a e b d a c b b
+R 0.00012037451521044848 e b b d a a c b
+R 0.00012037451521044848 e b d a a c b b
+R 0.00012037451521044848 e b d a c b d a c b
+R 0.00011855065891938118 d a a b d a e c b
+R 0.00011855065891938118 d a b d a a e c b
+R 0.00011855065891938118 d a e c b d a a b
+R 0.00011855065891938118 e c b d a a a b
+R 0.00011855065891938098 d a a a e c b c b
+R 0.00011855065891938098 d a a e c b d a b
+R 0.00011672680262831378 a c b b d a a c b
+R 0.00011672680262831378 a c b d a a c b b
+R 0.00011672680262831378 a c b d a c b d a c b
+R 0.00011672680262831378 d a a a b c b b
+R 0.00011672680262831378 d a a a c b c b c b
+R 0.00011672680262831378 d a a b b d a b
+R 0.00011672680262831378 d a a b c b d a c b
+R 0.00011672680262831378 d a a b d a b b
+R 0.00011672680262831378 d a a b d a c b c b
+R 0.00011672680262831378 d a a c b c b d a b
+R 0.00011672680262831378 d a a c b d a b c b
+R 0.00011672680262831378 d a b b d a a b
+R 0.00011672680262831378 d a b c b d a a c b
+R 0.00011672680262831378 d a b d a a b b
+R 0.00011672680262831378 d a b d a a c b c b
+R 0.00011672680262831378 d a b d a b d a c b
+R 0.00011672680262831378 d a b d a c b d a b
+R 0.00011672680262831378 d a c b c b d a a b
+R 0.00011672680262831378 d a c b d a a b c b
+R 0.00011672680262831378 d a c b d a b d a b
+R 0.00011672680262831356 a a a c b b b
+R 0.00011672680262831356 a a c b b d a c b
+R 0.00011672680262831356 a a c b d a c b b
+R 0.00011672680262831356 d a a a b b c b
+R 0.0001155868924463966 a a a e b
+R 0.00011034330560957783 a b c b c b
+R 0.00010669559302744301 b d a a a e b
+R 0.00010187947250884309 d a e c b d a e c b
+R 0.00010187947250884309 e c b d a a e c b
+R 0.00010086067778375469 e b d a e b
+R 0.00010031209600870703 d a a e c b b c b
+R 0.00010031209600870703 d a a e c b c b b
+R 0.00010031209600870703 d a b b d a e c b
+R 0.00010031209600870703 d a b d a e c b b
+R 0.00010031209600870703 d a c b c b d a e c b
+R 0.00010031209600870703 d a c b d a e c b c b
+R 0.00010031209600870703 d a e c b b d a b
+R 0.00010031209600870703 d a e c b c b d a c b
+R 0.00010031209600870703 d a e c b d a b b
+R 0.00010031209600870703 d a e c b d a c b c b
+R 0.00010031209600870703 e c b b d a a b
+R 0.00010031209600870703 e c b c b d a a c b
+R 0.00010031209600870703 e c b d a a b b
+R 0.00010031209600870703 e c b d a a c b c b
+R 0.00010031209600870703 e c b d a b d a c b
+R 0.00010031209600870703 e c b d a c b d a b
+R 9.780429360848948e-05 a c b d a e b
+R 9.780429360848932e-05 a a e b b
+R 9.780429360848932e-05 a e b d a c b
+R 9.484052713550486e-05 a a a b c b
+R 9.484052713550486e-05 a a b d a b
+R 9.484052713550486e-05 a b d a a b
+R 9.028088640783645e-05 b b d a a e b
+R 9.028088640783645e-05 b d a c b d a e b
+R 9.028088640783629e-05 b d a a e b b
+R 9.028088640783629e-05 b d a e b d a c b
+R 8.754510197123526e-05 b c b d a a a b
+R 8.754510197123526e-05 b d a a a b c b
+R 8.754510197123526e-05 b d a a b d a b
+R 8.754510197123526e-05 b d a b d a a b
+R 8.620570750748266e-05 e c b b d a e c b
+R 8.620570750748266e-05 e c b d a e c b b
+R 8.275747920718345e-05 d a e b c b c b
+R 8.275747920718331e-05 a e b b b
+R 8.275747920718331e-05 e b c b d a b
+R 8.275747920718331e-05 e b d a b c b
+R 8.150357800707454e-05 a b d a e c b
+R 8.150357800707441e-05 a a e c b c b
+R 8.150357800707441e-05 a e c b d a b
+R 8.02496768069657e-05 a a b c b b
+R 8.02496768069657e-05 a a c b c b c b
+R 8.02496768069657e-05 a b b d a b
+R 8.02496768069657e-05 a b c b d a c b
+R 8.02496768069657e-05 a b d a b b
+R 8.02496768069657e-05 a b d a c b c b
+R 8.02496768069657e-05 a c b c b d a b
+R 8.02496768069657e-05 a c b d a b c b
+R 8.024967680696556e-05 a a b b c b
+R 7.523407200653035e-05 b c b d a a e c b
+R 7.523407200653035e-05 b d a b d a e c b
+R 7.523407200653022e-05 b d a a e c b c b
+R 7.523407200653022e-05 b d a e c b d a b
+R 7.295425164269604e-05 d a a a e c b b b
+R 7.295425164269604e-05 d a a c b b d a e c b
+R 7.295425164269604e-05 d a a c b d a e c b b
+R 7.295425164269604e-05 d a a e c b d a c b b
+R 7.295425164269604e-05 d a c b b d a a e c b
+R 7.295425164269604e-05 d a c b d a a e c b b
+R 7.295425164269604e-05 d a c b d a c b d a e c b
+R 7.295425164269604e-05 d a c b d a e c b d a c b
+R 7.295425164269604e-05 d a e c b b d a a c b
+R 7.295425164269604e-05 d a e c b d a a c b b
+R 7.295425164269604e-05 d a e c b d a c b d a c b
+R 7.295425164269604e-05 e c b b d a a a c b
+R 7.295425164269604e-05 e c b d a a a c b b
+R 7.295425164269604e-05 e c b d a a c b d a c b
+R 7.295425164269604e-05 e c b d a c b d a a c b
+R 7.29542516426959e-05 d a a e c b b d a c b
+R 7.113039535162872e-05 d a a b d a e b
+R 7.113039535162872e-05 d a b d a a e b
+R 7.113039535162872e-05 d a e b d a a b
+R 7.113039535162872e-05 e b d a a a b
+R 7.11303953516286e-05 d a a a e b c b
+R 7.11303953516286e-05 d a a e b d a b
+R 6.896456600598607e-05 a e c b b c b
+R 6.896456600598607e-05 a e c b c b b
+R 6.112768350530586e-05 d a e b d a e c b
+R 6.112768350530586e-05 d a e c b d a e b
+R 6.112768350530586e-05 e b d a a e c b
+R 6.112768350530586e-05 e c b d a a e b
+R 6.018725760522423e-05 d a a e b b c b
+R 6.018725760522423e-05 d a a e b c b b
+R 6.018725760522423e-05 d a b b d a e b
+R 6.018725760522423e-05 d a b d a e b b
+R 6.018725760522423e-05 d a c b c b d a e b
+R 6.018725760522423e-05 d a c b d a e b c b
+R 6.018725760522423e-05 d a e b b d a b
+R 6.018725760522423e-05 d a e b c b d a c b
+R 6.018725760522423e-05 d a e b d a b b
+R 6.018725760522423e-05 d a e b d a c b c b
+R 6.018725760522423e-05 e b b d a a b
+R 6.018725760522423e-05 e b c b d a a c b
+R 6.018725760522423e-05 e b d a a b b
+R 6.018725760522423e-05 e b d a a c b c b
+R 6.018725760522423e-05 e b d a b d a c b
+R 6.018725760522423e-05 e b d a c b d a b
+R 5.9275329459690585e-05 a c b d a a e c b
+R 5.9275329459690484e-05 a a a e c b b
+R 5.9275329459690484e-05 a a c b d a e c b
+R 5.9275329459690484e-05 a a e c b d a c b
+R 5.9275329459690484e-05 a e c b d a a c b
+R 5.8363401314156884e-05 a a a c b c b b
+R 5.8363401314156884e-05 a b d a a c b b
+R 5.8363401314156884e-05 a c b d a a b b
+R 5.8363401314156884e-05 a c b d a a c b c b
+R 5.8363401314156884e-05 d a a a b c b c b
+R 5.8363401314156884e-05 d a a b d a b c b
+R 5.8363401314156884e-05 d a b d a a b c b
+R 5.836340131415678e-05 a a a b b b
+R 5.836340131415678e-05 a a a c b b c b
+R 5.836340131415678e-05 a a b b d a c b
+R 5.836340131415678e-05 a a b d a c b b
+R 5.836340131415678e-05 a a c b b d a b
+R 5.836340131415678e-05 a a c b c b d a c b
+R 5.836340131415678e-05 a a c b d a b b
+R 5.836340131415678e-05 a a c b d a c b c b
+R 5.836340131415678e-05 a b b d a a c b
+R 5.836340131415678e-05 a b d a c b d a c b
+R 5.836340131415678e-05 a c b b d a a b
+R 5.836340131415678e-05 a c b c b d a a c b
+R 5.836340131415678e-05 a c b d a b d a c b
+R 5.836340131415678e-05 a c b d a c b d a b
+R 5.836340131415678e-05 d a a b c b d a b
+R 5.836340131415678e-05 d a b c b d a a b
+R 5.836340131415678e-05 d a b d a b d a b
+R 5.4715688732022084e-05 b b d a a a e c b
+R 5.4715688732022084e-05 b d a c b d a a e c b
+R 5.471568873202199e-05 b d a a a e c b b
+R 5.471568873202199e-05 b d a a c b d a e c b
+R 5.471568873202199e-05 b d a a e c b d a c b
+R 5.471568873202199e-05 b d a e c b d a a c b
+R 5.1723424504489604e-05 e b b d a e c b
+R 5.1723424504489604e-05 e b d a e c b b
+R 5.1723424504489604e-05 e c b b d a e b
+R 5.1723424504489604e-05 e c b d a e b b
+R 5.0156048004353516e-05 a a e c b b b
+R 5.0156048004353516e-05 a c b b d a e c b
+R 5.0156048004353516e-05 a c b d a e c b b
+R 5.0156048004353516e-05 a e c b b d a c b
+R 5.0156048004353516e-05 a e c b d a c b b
+R 5.0156048004353516e-05 d a a e c b c b c b
+R 5.0156048004353516e-05 d a b c b d a e c b
+R 5.0156048004353516e-05 d a b d a e c b c b
+R 5.0156048004353516e-05 d a e c b c b d a b
+R 5.0156048004353516e-05 d a e c b d a b c b
+R 5.0156048004353516e-05 e c b c b d a a b
+R 5.0156048004353516e-05 e c b d a a b c b
+R 5.0156048004353516e-05 e c b d a b d a b
+R 4.890214680424465e-05 a a e b c b
+R 4.890214680424465e-05 a b d a e b
+R 4.890214680424465e-05 a e b d a b
+R 4.514044320391822e-05 b c b d a a e b
+R 4.514044320391822e-05 b d a b d a e b
+R 4.5140443203918144e-05 b d a a e b c b
+R 4.5140443203918144e-05 b d a e b d a b
+R 4.377255098561763e-05 d a a a e b b b
+R 4.377255098561763e-05 d a a c b b d a e b
+R 4.377255098561763e-05 d a a c b d a e b b
+R 4.377255098561763e-05 d a a e b b d a c b
+R 4.377255098561763e-05 d a a e b d a c b b
+R 4.377255098561763e-05 d a c b b d a a e b
+R 4.377255098561763e-05 d a c b d a a e b b
+R 4.377255098561763e-05 d a c b d a c b d a e b
+R 4.377255098561763e-05 d a c b d a e b d a c b
+R 4.377255098561763e-05 d a e b b d a a c b
+R 4.377255098561763e-05 d a e b d a a c b b
+R 4.377255098561763e-05 d a e b d a c b d a c b
+R 4.377255098561763e-05 e b b d a a a c b
+R 4.377255098561763e-05 e b d a a a c b b
+R 4.377255098561763e-05 e b d a a c b d a c b
+R 4.377255098561763e-05 e b d a c b d a a c b
+R 4.310285375374133e-05 e c b c b d a e c b
+R 4.310285375374133e-05 e c b d a e c b c b
+R 4.137873960359165e-05 a e b b c b
+R 4.137873960359165e-05 a e b c b b
+R 4.0124838403482846e-05 a a b c b c b
+R 4.0124838403482846e-05 a b c b d a b
+R 4.0124838403482846e-05 a b d a b c b
+R 3.7047080912306646e-05 d a e c b d a a e c b
+R 3.7047080912306646e-05 e c b d a a a e c b
+R 3.704708091230658e-05 d a a e c b d a e c b
+R 3.667661010318353e-05 d a e b d a e b
+R 3.667661010318353e-05 e b d a a e b
+R 3.647712582134801e-05 d a a a e c b b c b
+R 3.647712582134801e-05 d a a a e c b c b b
+R 3.647712582134801e-05 d a a b b d a e c b
+R 3.647712582134801e-05 d a a b d a e c b b
+R 3.647712582134801e-05 d a a c b c b d a e c b
+R 3.647712582134801e-05 d a a c b d a e c b c b
+R 3.647712582134801e-05 d a a e c b b d a b
+R 3.647712582134801e-05 d a a e c b c b d a c b
+R 3.647712582134801e-05 d a a e c b d a b b
+R 3.647712582134801e-05 d a a e c b d a c b c b
+R 3.647712582134801e-05 d a b b d a a e c b
+R 3.647712582134801e-05 d a b d a a e c b b
+R 3.647712582134801e-05 d a b d a c b d a e c b
+R 3.647712582134801e-05 d a b d a e c b d a c b
+R 3.647712582134801e-05 d a c b c b d a a e c b
+R 3.647712582134801e-05 d a c b d a a e c b c b
+R 3.647712582134801e-05 d a c b d a b d a e c b
+R 3.647712582134801e-05 d a c b d a e c b d a b
+R 3.647712582134801e-05 d a e c b b d a a b
+R 3.647712582134801e-05 d a e c b c b d a a c b
+R 3.647712582134801e-05 d a e c b d a a b b
+R 3.647712582134801e-05 d a e c b d a a c b c b
+R 3.647712582134801e-05 d a e c b d a b d a c b
+R 3.647712582134801e-05 d a e c b d a c b d a b
+R 3.647712582134801e-05 e c b b d a a a b
+R 3.647712582134801e-05 e c b c b d a a a c b
+R 3.647712582134801e-05 e c b d a a a b b
+R 3.647712582134801e-05 e c b d a a a c b c b
+R 3.647712582134801e-05 e c b d a a b d a c b
+R 3.647712582134801e-05 e c b d a a c b d a b
+R 3.647712582134801e-05 e c b d a b d a a c b
+R 3.647712582134801e-05 e c b d a c b d a a b
+R 3.55651976758143e-05 a a a e b b
+R 3.55651976758143e-05 a a c b d a e b
+R 3.55651976758143e-05 a a e b d a c b
+R 3.55651976758143e-05 a c b d a a e b
+R 3.55651976758143e-05 a e b d a a c b
+R 3.4482283002993035e-05 a e c b c b c b
+R 3.2829413239213255e-05 b b d a a a e b
+R 3.2829413239213255e-05 b d a c b d a a e b
+R 3.28294132392132e-05 b d a a a e b b
+R 3.28294132392132e-05 b d a a c b d a e b
+R 3.28294132392132e-05 b d a a e b d a c b
+R 3.28294132392132e-05 b d a e b d a a c b
+R 3.134753000272097e-05 d a e c b b d a e c b
+R 3.134753000272097e-05 d a e c b d a e c b b
+R 3.134753000272097e-05 e c b b d a a e c b
+R 3.134753000272097e-05 e c b d a a e c b b
+R 3.134753000272097e-05 e c b d a c b d a e c b
+R 3.134753000272097e-05 e c b d a e c b d a c b
+R 3.103405470269377e-05 e b d a e b b
+R 3.103405470269372e-05 e b b d a e b
+R 3.0093628802612167e-05 d a e b c b d a b
+R 3.0093628802612113e-05 a a e b b b
+R 3.0093628802612113e-05 a c b b d a e b
+R 3.0093628802612113e-05 a c b d a e b b
+R 3.0093628802612113e-05 a e b d a c b b
+R 3.0093628802612113e-05 d a a e b c b c b
+R 3.0093628802612113e-05 d a b c b d a e b
+R 3.0093628802612113e-05 d a b d a e b c b
+R 3.0093628802612113e-05 d a e b d a b c b
+R 3.0093628802612113e-05 e b c b d a a b
+R 3.0093628802612113e-05 e b d a a b c b
+R 3.0093628802612113e-05 e b d a b d a b
+R 3.009362880261206e-05 a e b b d a c b
+R 2.9637664729845293e-05 a b d a a e c b
+R 2.963766472984524e-05 a a a e c b c b
+R 2.963766472984524e-05 a a b d a e c b
+R 2.963766472984524e-05 a a e c b d a b
+R 2.963766472984524e-05 a e c b d a a b
+R 2.918170065707844e-05 a a a b c b b
+R 2.918170065707844e-05 a a a c b c b c b
+R 2.918170065707844e-05 a a b c b d a c b
+R 2.918170065707844e-05 a a c b c b d a b
+R 2.918170065707844e-05 a b b d a a b
+R 2.918170065707844e-05 a b c b d a a c b
+R 2.918170065707844e-05 a b d a a b b
+R 2.918170065707844e-05 a b d a a c b c b
+R 2.918170065707844e-05 a b d a b d a c b
+R 2.918170065707844e-05 a b d a c b d a b
+R 2.918170065707844e-05 a c b c b d a a b
+R 2.918170065707844e-05 a c b d a a b c b
+R 2.918170065707844e-05 a c b d a b d a b
+R 2.9181700657078388e-05 a a a b b c b
+R 2.9181700657078388e-05 a a b b d a b
+R 2.9181700657078388e-05 a a b d a b b
+R 2.9181700657078388e-05 a a b d a c b c b
+R 2.9181700657078388e-05 a a c b d a b c b
+R 2.735784436601104e-05 b c b d a a a e c b
+R 2.735784436601104e-05 b d a a b d a e c b
+R 2.735784436601104e-05 b d a b d a a e c b
+R 2.735784436601099e-05 b d a a a e c b c b
+R 2.735784436601099e-05 b d a a e c b d a b
+R 2.735784436601099e-05 b d a e c b d a a b
+R 2.5861712252244802e-05 e b c b d a e c b
+R 2.5861712252244802e-05 e b d a e c b c b
+R 2.5861712252244802e-05 e c b d a e b c b
+R 2.5861712252244754e-05 e c b c b d a e b
+R 2.5469868127210766e-05 a e c b d a e c b
+R 2.50780240021768e-05 a b b d a e c b
+R 2.50780240021768e-05 a c b c b d a e c b
+R 2.5078024002176754e-05 a a e c b b c b
+R 2.5078024002176754e-05 a a e c b c b b
+R 2.5078024002176754e-05 a b d a e c b b
+R 2.5078024002176754e-05 a c b d a e c b c b
+R 2.5078024002176754e-05 a e c b c b d a c b
+R 2.5078024002176754e-05 a e c b d a b b
+R 2.5078024002176754e-05 a e c b d a c b c b
+R 2.507802400217671e-05 a e c b b d a b
+R 2.351064750204071e-05 b d a e c b d a e c b
+R 2.2228248547383952e-05 d a a e b d a e c b
+R 2.2228248547383952e-05 d a a e c b d a e b
+R 2.2228248547383952e-05 d a e b d a a e c b
+R 2.2228248547383952e-05 d a e c b d a a e b
+R 2.2228248547383952e-05 e b d a a a e c b
+R 2.2228248547383952e-05 e c b d a a a e b
+R 2.1886275492808853e-05 d a a b d a e b b
+R 2.1886275492808853e-05 d a b d a a e b b
+R 2.1886275492808853e-05 d a e b d a a b b
+R 2.1886275492808853e-05 e b d a a a b b
+R 2.1886275492808813e-05 d a a a e b b c b
+R 2.1886275492808813e-05 d a a a e b c b b
+R 2.1886275492808813e-05 d a a c b d a e b c b
+R 2.1886275492808813e-05 d a a e b c b d a c b
+R 2.1886275492808813e-05 d a a e b d a b b
+R 2.1886275492808813e-05 d a a e b d a c b c b
+R 2.1886275492808813e-05 d a b d a e b d a c b
+R 2.1886275492808813e-05 d a c b d a a e b c b
+R 2.1886275492808813e-05 d a c b d a e b d a b
+R 2.1886275492808813e-05 d a e b b d a a b
+R 2.1886275492808813e-05 d a e b c b d a a c b
+R 2.1886275492808813e-05 d a e b d a a c b c b
+R 2.1886275492808813e-05 d a e b d a b d a c b
+R 2.1886275492808813e-05 d a e b d a c b d a b
+R 2.1886275492808813e-05 e b b d a a a b
+R 2.1886275492808813e-05 e b c b d a a a c b
+R 2.1886275492808813e-05 e b d a a a c b c b
+R 2.1886275492808813e-05 e b d a a b d a c b
+R 2.1886275492808813e-05 e b d a a c b d a b
+R 2.1886275492808813e-05 e b d a b d a a c b
+R 2.1886275492808813e-05 e b d a c b d a a b
+R 2.1886275492808775e-05 d a a b b d a e b
+R 2.1886275492808775e-05 d a a c b c b d a e b
+R 2.1886275492808775e-05 d a a e b b d a b
+R 2.1886275492808775e-05 d a b b d a a e b
+R 2.1886275492808775e-05 d a b d a c b d a e b
+R 2.1886275492808775e-05 d a c b c b d a a e b
+R 2.1886275492808775e-05 d a c b d a b d a e b
+R 2.0689369801795822e-05 a e b c b c b
+R 1.8808518001632585e-05 d a e b b d a e c b
+R 1.8808518001632585e-05 d a e b d a e c b b
+R 1.8808518001632585e-05 d a e c b d a e b b
+R 1.8808518001632585e-05 e b b d a a e c b
+R 1.8808518001632585e-05 e b d a a e c b b
+R 1.8808518001632585e-05 e b d a c b d a e c b
+R 1.8808518001632585e-05 e b d a e c b d a c b
+R 1.8808518001632585e-05 e c b d a a e b b
+R 1.8808518001632585e-05 e c b d a e b d a c b
+R 1.880851800163255e-05 d a e c b b d a e b
+R 1.880851800163255e-05 e c b b d a a e b
+R 1.880851800163255e-05 e c b d a c b d a e b
+R 1.8238562910674037e-05 a c b b d a a e c b
+R 1.8238562910674037e-05 a c b d a a e c b b
+R 1.8238562910674037e-05 a c b d a c b d a e c b
+R 1.8238562910674037e-05 d a a b c b d a e c b
+R 1.8238562910674037e-05 d a b c b d a a e c b
+R 1.8238562910674037e-05 d a b d a b d a e c b
+R 1.8238562910674007e-05 a a a e c b b b
+R 1.8238562910674007e-05 a a c b b d a e c b
+R 1.8238562910674007e-05 a a c b d a e c b b
+R 1.8238562910674007e-05 a a e c b b d a c b
+R 1.8238562910674007e-05 a a e c b d a c b b
+R 1.8238562910674007e-05 a c b d a e c b d a c b
+R 1.8238562910674007e-05 a e c b b d a a c b
+R 1.8238562910674007e-05 a e c b d a a c b b
+R 1.8238562910674007e-05 a e c b d a c b d a c b
+R 1.8238562910674007e-05 d a a a e c b c b c b
+R 1.8238562910674007e-05 d a a b d a e c b c b
+R 1.8238562910674007e-05 d a a e c b d a b c b
+R 1.8238562910674007e-05 d a b d a a e c b c b
+R 1.8238562910674007e-05 d a b d a e c b d a b
+R 1.8238562910674007e-05 d a e c b c b d a a b
+R 1.8238562910674007e-05 d a e c b d a a b c b
+R 1.8238562910674007e-05 d a e c b d a b d a b
+R 1.8238562910674007e-05 e c b c b d a a a b
+R 1.8238562910674007e-05 e c b d a a a b c b
+R 1.8238562910674007e-05 e c b d a a b d a b
+R 1.8238562910674007e-05 e c b d a b d a a b
+R 1.8238562910673973e-05 d a a e c b c b d a b
+R 1.778259883790718e-05 a b d a a e b
+R 1.7782598837907146e-05 a a a e b c b
+R 1.7782598837907146e-05 a a e b d a b
+R 1.7782598837907146e-05 a e b d a a b
+R 1.7782598837907115e-05 a a b d a e b
+R 1.6414706619606597e-05 b c b d a a a e b
+R 1.6414706619606597e-05 b d a a a e b c b
+R 1.6414706619606597e-05 b d a a b d a e b
+R 1.6414706619606597e-05 b d a a e b d a b
+R 1.6414706619606597e-05 b d a b d a a e b
+R 1.6414706619606597e-05 b d a e b d a a b
+R 1.5673765001360484e-05 d a e c b c b d a e c b
+R 1.5673765001360484e-05 d a e c b d a e c b c b
+R 1.5673765001360484e-05 e c b c b d a a e c b
+R 1.5673765001360484e-05 e c b d a a e c b c b
+R 1.5673765001360484e-05 e c b d a b d a e c b
+R 1.5673765001360457e-05 e c b d a e c b d a b
+R 1.5517027351346882e-05 e b c b d a e b
+R 1.5517027351346882e-05 e b d a e b c b
+R 1.5281920876326462e-05 a e b d a e c b
+R 1.5281920876326435e-05 a e c b d a e b
+R 1.5046814401306055e-05 a a e b b c b
+R 1.5046814401306055e-05 a a e b c b b
+R 1.5046814401306055e-05 a b b d a e b
+R 1.5046814401306055e-05 a b d a e b b
+R 1.5046814401306055e-05 a c b c b d a e b
+R 1.5046814401306055e-05 a c b d a e b c b
+R 1.5046814401306055e-05 a e b b d a b
+R 1.5046814401306055e-05 a e b c b d a c b
+R 1.5046814401306055e-05 a e b d a b b
+R 1.5046814401306055e-05 a e b d a c b c b
+R 1.4590850328539218e-05 a a a b c b c b
+R 1.4590850328539218e-05 a b d a a b c b
+R 1.4590850328539192e-05 a a b c b d a b
+R 1.4590850328539192e-05 a a b d a b c b
+R 1.4590850328539192e-05 a b c b d a a b
+R 1.4590850328539192e-05 a b d a b d a b
+R 1.4106388501224428e-05 b d a e b d a e c b
+R 1.4106388501224428e-05 b d a e c b d a e b
+R 1.3336949128430349e-05 d a a e b d a e b
+R 1.3336949128430349e-05 d a e b d a a e b
+R 1.3336949128430349e-05 e b d a a a e b
+R 1.2539012001088376e-05 a a e c b c b c b
+R 1.2539012001088376e-05 a b c b d a e c b
+R 1.2539012001088376e-05 a b d a e c b c b
+R 1.2539012001088376e-05 a e c b c b d a b
+R 1.2539012001088376e-05 a e c b d a b c b
+R 1.1399101819171283e-05 d a e c b d a a e c b b
+R 1.1399101819171283e-05 e c b d a a a e c b b
+R 1.1399101819171262e-05 d a a e c b d a e c b b
+R 1.1399101819171262e-05 d a c b d a e c b d a e c b
+R 1.1399101819171262e-05 d a e c b b d a a e c b
+R 1.1399101819171262e-05 d a e c b d a c b d a e c b
+R 1.1399101819171262e-05 d a e c b d a e c b d a c b
+R 1.1399101819171262e-05 e c b b d a a a e c b
+R 1.1399101819171262e-05 e c b d a a c b d a e c b
+R 1.1399101819171262e-05 e c b d a a e c b d a c b
+R 1.1399101819171262e-05 e c b d a c b d a a e c b
+R 1.1399101819171262e-05 e c b d a e c b d a a c b
+R 1.1399101819171242e-05 d a a e c b b d a e c b
+R 1.1285110800979553e-05 d a e b b d a e b
+R 1.1285110800979553e-05 d a e b d a e b b
+R 1.1285110800979553e-05 e b b d a a e b
+R 1.1285110800979553e-05 e b d a a e b b
+R 1.1285110800979553e-05 e b d a c b d a e b
+R 1.1285110800979553e-05 e b d a e b d a c b
+R 1.0943137746404425e-05 d a a b d a e b c b
+R 1.0943137746404425e-05 d a b d a a e b c b
+R 1.0943137746404425e-05 d a e b d a a b c b
+R 1.0943137746404425e-05 e b d a a a b c b
+R 1.0943137746404406e-05 a a a e b b b
+R 1.0943137746404406e-05 a a c b b d a e b
+R 1.0943137746404406e-05 a a c b d a e b b
+R 1.0943137746404406e-05 a a e b b d a c b
+R 1.0943137746404406e-05 a a e b d a c b b
+R 1.0943137746404406e-05 a c b b d a a e b
+R 1.0943137746404406e-05 a c b d a a e b b
+R 1.0943137746404406e-05 a c b d a c b d a e b
+R 1.0943137746404406e-05 a c b d a e b d a c b
+R 1.0943137746404406e-05 a e b d a a c b b
+R 1.0943137746404406e-05 a e b d a c b d a c b
+R 1.0943137746404406e-05 d a a a e b c b c b
+R 1.0943137746404406e-05 d a a b c b d a e b
+R 1.0943137746404406e-05 d a a e b c b d a b
+R 1.0943137746404406e-05 d a a e b d a b c b
+R 1.0943137746404406e-05 d a b c b d a a e b
+R 1.0943137746404406e-05 d a b d a b d a e b
+R 1.0943137746404406e-05 d a b d a e b d a b
+R 1.0943137746404406e-05 d a e b c b d a a b
+R 1.0943137746404406e-05 d a e b d a b d a b
+R 1.0943137746404406e-05 e b c b d a a a b
+R 1.0943137746404406e-05 e b d a a b d a b
+R 1.0943137746404406e-05 e b d a b d a a b
+R 1.0943137746404386e-05 a e b b d a a c b
+R 9.404259000816291e-06 d a e b c b d a e c b
+R 9.404259000816291e-06 d a e b d a e c b c b
+R 9.404259000816291e-06 d a e c b c b d a e b
+R 9.404259000816291e-06 d a e c b d a e b c b
+R 9.404259000816291e-06 e b c b d a a e c b
+R 9.404259000816291e-06 e b d a a e c b c b
+R 9.404259000816291e-06 e b d a b d a e c b
+R 9.404259000816291e-06 e b d a e c b d a b
+R 9.404259000816291e-06 e c b c b d a a e b
+R 9.404259000816291e-06 e c b d a a e b c b
+R 9.404259000816291e-06 e c b d a b d a e b
+R 9.404259000816291e-06 e c b d a e b d a b
+R 9.261770228076643e-06 a a e c b d a e c b
+R 9.261770228076643e-06 a e c b d a a e c b
+R 9.16915252579588e-06 a e b d a e b
+R 9.119281455337019e-06 a b d a a e c b b
+R 9.119281455337019e-06 a c b d a a e c b c b
+R 9.119281455337002e-06 a a a e c b b c b
+R 9.119281455337002e-06 a a a e c b c b b
+R 9.119281455337002e-06 a a b b d a e c b
+R 9.119281455337002e-06 a a b d a e c b b
+R 9.119281455337002e-06 a a c b c b d a e c b
+R 9.119281455337002e-06 a a c b d a e c b c b
+R 9.119281455337002e-06 a a e c b b d a b
+R 9.119281455337002e-06 a a e c b c b d a c b
+R 9.119281455337002e-06 a a e c b d a b b
+R 9.119281455337002e-06 a a e c b d a c b c b
+R 9.119281455337002e-06 a b b d a a e c b
+R 9.119281455337002e-06 a b d a c b d a e c b
+R 9.119281455337002e-06 a b d a e c b d a c b
+R 9.119281455337002e-06 a c b c b d a a e c b
+R 9.119281455337002e-06 a c b d a b d a e c b
+R 9.119281455337002e-06 a c b d a e c b d a b
+R 9.119281455337002e-06 a e c b b d a a b
+R 9.119281455337002e-06 a e c b c b d a a c b
+R 9.119281455337002e-06 a e c b d a a b b
+R 9.119281455337002e-06 a e c b d a a c b c b
+R 9.119281455337002e-06 a e c b d a b d a c b
+R 9.119281455337002e-06 a e c b d a c b d a b
+R 8.54932636437844e-06 b d a a e c b d a e c b
+R 8.54932636437844e-06 b d a e c b d a a e c b
+R 8.463833100734644e-06 b d a e b d a e b
+R 7.83688250068024e-06 a e c b b d a e c b
+R 7.83688250068024e-06 a e c b d a e c b b
+R 7.523407200653027e-06 a a e b c b c b
+R 7.523407200653027e-06 a b d a e b c b
+R 7.523407200653027e-06 a e b c b d a b
+R 7.523407200653027e-06 a e b d a b c b
+R 7.523407200653014e-06 a b c b d a e b
+R 6.839461091502759e-06 d a a e b b d a e c b
+R 6.839461091502759e-06 d a a e b d a e c b b
+R 6.839461091502759e-06 d a a e c b d a e b b
+R 6.839461091502759e-06 d a c b d a e b d a e c b
+R 6.839461091502759e-06 d a c b d a e c b d a e b
+R 6.839461091502759e-06 d a e b b d a a e c b
+R 6.839461091502759e-06 d a e b d a a e c b b
+R 6.839461091502759e-06 d a e b d a c b d a e c b
+R 6.839461091502759e-06 d a e b d a e c b d a c b
+R 6.839461091502759e-06 d a e c b b d a a e b
+R 6.839461091502759e-06 d a e c b d a a e b b
+R 6.839461091502759e-06 d a e c b d a c b d a e b
+R 6.839461091502759e-06 d a e c b d a e b d a c b
+R 6.839461091502759e-06 e b b d a a a e c b
+R 6.839461091502759e-06 e b d a a a e c b b
+R 6.839461091502759e-06 e b d a a c b d a e c b
+R 6.839461091502759e-06 e b d a a e c b d a c b
+R 6.839461091502759e-06 e b d a c b d a a e c b
+R 6.839461091502759e-06 e b d a e c b d a a c b
+R 6.839461091502759e-06 e c b b d a a a e b
+R 6.839461091502759e-06 e c b d a a a e b b
+R 6.839461091502759e-06 e c b d a a c b d a e b
+R 6.839461091502759e-06 e c b d a a e b d a c b
+R 6.839461091502759e-06 e c b d a c b d a a e b
+R 6.839461091502759e-06 e c b d a e b d a a c b
+R 6.839461091502734e-06 d a a e c b b d a e b
+R 5.69955090958564e-06 d a e c b d a a e c b c b
+R 5.69955090958564e-06 e c b d a a a e c b c b
+R 5.69955090958563e-06 d a a e c b c b d a e c b
+R 5.69955090958563e-06 d a a e c b d a e c b c b
+R 5.69955090958563e-06 d a b d a e c b d a e c b
+R 5.69955090958563e-06 d a e c b c b d a a e c b
+R 5.69955090958563e-06 d a e c b d a b d a e c b
+R 5.69955090958563e-06 d a e c b d a e c b d a b
+R 5.69955090958563e-06 e c b c b d a a a e c b
+R 5.69955090958563e-06 e c b d a a b d a e c b
+R 5.69955090958563e-06 e c b d a a e c b d a b
+R 5.69955090958563e-06 e c b d a b d a a e c b
+R 5.69955090958563e-06 e c b d a e c b d a a b
+R 5.6425554004897765e-06 d a e b d a e b c b
+R 5.6425554004897765e-06 e b d a a e b c b
+R 5.6425554004897765e-06 e b d a e b d a b
+R 5.642555400489766e-06 d a e b c b d a e b
+R 5.642555400489766e-06 e b c b d a a e b
+R 5.642555400489766e-06 e b d a b d a e b
+R 5.557062136845987e-06 a a e b d a e c b
+R 5.557062136845987e-06 a a e c b d a e b
+R 5.557062136845987e-06 a e b d a a e c b
+R 5.557062136845987e-06 a e c b d a a e b
+R 5.471568873202212e-06 a b d a a e b b
+R 5.471568873202202e-06 a a a e b b c b
+R 5.471568873202202e-06 a a a e b c b b
+R 5.471568873202202e-06 a a c b d a e b c b
+R 5.471568873202202e-06 a a e b b d a b
+R 5.471568873202202e-06 a a e b c b d a c b
+R 5.471568873202202e-06 a a e b d a b b
+R 5.471568873202202e-06 a a e b d a c b c b
+R 5.471568873202202e-06 a b d a e b d a c b
+R 5.471568873202202e-06 a c b d a a e b c b
+R 5.471568873202202e-06 a c b d a e b d a b
+R 5.471568873202202e-06 a e b c b d a a c b
+R 5.471568873202202e-06 a e b d a a b b
+R 5.471568873202202e-06 a e b d a a c b c b
+R 5.471568873202202e-06 a e b d a b d a c b
+R 5.471568873202202e-06 a e b d a c b d a b
+R 5.471568873202192e-06 a a b b d a e b
+R 5.471568873202192e-06 a a b d a e b b
+R 5.471568873202192e-06 a a c b c b d a e b
+R 5.471568873202192e-06 a b b d a a e b
+R 5.471568873202192e-06 a b d a c b d a e b
+R 5.471568873202192e-06 a c b c b d a a e b
+R 5.471568873202192e-06 a c b d a b d a e b
+R 5.471568873202192e-06 a e b b d a a b
+R 5.129595818627065e-06 b d a a e b d a e c b
+R 5.129595818627065e-06 b d a e b d a a e c b
+R 5.129595818627056e-06 b d a a e c b d a e b
+R 5.129595818627056e-06 b d a e c b d a a e b
+R 4.898051562925154e-06 e c b d a e c b d a e c b
+R 4.7021295004081455e-06 a e b d a e c b b
+R 4.702129500408137e-06 a e b b d a e c b
+R 4.702129500408137e-06 a e c b b d a e b
+R 4.702129500408137e-06 a e c b d a e b b
+R 4.5596407276685084e-06 a a b c b d a e c b
+R 4.5596407276685084e-06 a b c b d a a e c b
+R 4.5596407276685084e-06 a b d a a e c b c b
+R 4.5596407276685084e-06 a b d a b d a e c b
+R 4.559640727668501e-06 a a a e c b c b c b
+R 4.559640727668501e-06 a a b d a e c b c b
+R 4.559640727668501e-06 a a e c b c b d a b
+R 4.559640727668501e-06 a a e c b d a b c b
+R 4.559640727668501e-06 a b d a e c b d a b
+R 4.559640727668501e-06 a e c b c b d a a b
+R 4.559640727668501e-06 a e c b d a a b c b
+R 4.559640727668501e-06 a e c b d a b d a b
+R 4.103676654901656e-06 d a e b d a e b d a c b
+R 4.103676654901656e-06 e b d a a e b d a c b
+R 4.103676654901656e-06 e b d a e b d a a c b
+R 4.103676654901648e-06 d a a e b b d a e b
+R 4.103676654901648e-06 d a a e b d a e b b
+R 4.103676654901648e-06 d a c b d a e b d a e b
+R 4.103676654901648e-06 d a e b b d a a e b
+R 4.103676654901648e-06 d a e b d a a e b b
+R 4.103676654901648e-06 d a e b d a c b d a e b
+R 4.103676654901648e-06 e b b d a a a e b
+R 4.103676654901648e-06 e b d a a a e b b
+R 4.103676654901648e-06 e b d a a c b d a e b
+R 4.103676654901648e-06 e b d a c b d a a e b
+R 3.91844125034012e-06 a e c b c b d a e c b
+R 3.91844125034012e-06 a e c b d a e c b c b
+R 3.419730545751379e-06 d a a e b c b d a e c b
+R 3.419730545751379e-06 d a a e b d a e c b c b
+R 3.419730545751379e-06 d a a e c b d a e b c b
+R 3.419730545751379e-06 d a b d a e b d a e c b
+R 3.419730545751379e-06 d a e b c b d a a e c b
+R 3.419730545751379e-06 d a e b d a a e c b c b
+R 3.419730545751379e-06 d a e b d a b d a e c b
+R 3.419730545751379e-06 d a e b d a e c b d a b
+R 3.419730545751379e-06 d a e c b d a a e b c b
+R 3.419730545751379e-06 d a e c b d a e b d a b
+R 3.419730545751379e-06 e b c b d a a a e c b
+R 3.419730545751379e-06 e b d a a a e c b c b
+R 3.419730545751379e-06 e b d a a b d a e c b
+R 3.419730545751379e-06 e b d a a e c b d a b
+R 3.419730545751379e-06 e b d a b d a a e c b
+R 3.419730545751379e-06 e b d a e c b d a a b
+R 3.419730545751379e-06 e c b d a a a e b c b
+R 3.419730545751379e-06 e c b d a a e b d a b
+R 3.419730545751379e-06 e c b d a e b d a a b
+R 3.419730545751373e-06 d a a e c b c b d a e b
+R 3.419730545751373e-06 d a b d a e c b d a e b
+R 3.419730545751373e-06 d a e c b c b d a a e b
+R 3.419730545751373e-06 d a e c b d a b d a e b
+R 3.419730545751373e-06 e c b c b d a a a e b
+R 3.419730545751373e-06 e c b d a a b d a e b
+R 3.419730545751373e-06 e c b d a b d a a e b
+R 3.334237282107587e-06 a a e b d a e b
+R 3.334237282107587e-06 a e b d a a e b
+R 3.0777574911762397e-06 b d a a e b d a e b
+R 3.0777574911762397e-06 b d a e b d a a e b
+R 2.938830937755093e-06 e b d a e c b d a e c b
+R 2.938830937755093e-06 e c b d a e b d a e c b
+R 2.938830937755088e-06 e c b d a e c b d a e b
+R 2.849775454792815e-06 a a e c b b d a e c b
+R 2.849775454792815e-06 a a e c b d a e c b b
+R 2.849775454792815e-06 a c b d a e c b d a e c b
+R 2.849775454792815e-06 a e c b b d a a e c b
+R 2.849775454792815e-06 a e c b d a a e c b b
+R 2.849775454792815e-06 a e c b d a c b d a e c b
+R 2.849775454792815e-06 a e c b d a e c b d a c b
+R 2.821277700244888e-06 a e b d a e b b
+R 2.8212777002448776e-06 a e b b d a e b
+R 2.735784436601106e-06 a b d a a e b c b
+R 2.7357844366011007e-06 a a a e b c b c b
+R 2.7357844366011007e-06 a a b c b d a e b
+R 2.7357844366011007e-06 a a e b c b d a b
+R 2.7357844366011007e-06 a a e b d a b c b
+R 2.7357844366011007e-06 a b c b d a a e b
+R 2.7357844366011007e-06 a b d a b d a e b
+R 2.7357844366011007e-06 a b d a e b d a b
+R 2.7357844366011007e-06 a e b c b d a a b
+R 2.7357844366011007e-06 a e b d a a b c b
+R 2.7357844366011007e-06 a e b d a b d a b
+R 2.735784436601096e-06 a a b d a e b c b
+R 2.3510647502040727e-06 a e b c b d a e c b
+R 2.3510647502040727e-06 a e b d a e c b c b
+R 2.3510647502040727e-06 a e c b c b d a e b
+R 2.3510647502040685e-06 a e c b d a e b c b
+R 2.051838327450828e-06 d a a e b c b d a e b
+R 2.051838327450828e-06 d a b d a e b d a e b
+R 2.051838327450828e-06 d a e b c b d a a e b
+R 2.051838327450828e-06 d a e b d a b d a e b
+R 2.051838327450828e-06 d a e b d a e b d a b
+R 2.051838327450828e-06 e b c b d a a a e b
+R 2.051838327450828e-06 e b d a a b d a e b
+R 2.051838327450828e-06 e b d a a e b d a b
+R 2.051838327450828e-06 e b d a b d a a e b
+R 2.051838327450828e-06 e b d a e b d a a b
+R 2.051838327450824e-06 d a a e b d a e b c b
+R 2.051838327450824e-06 d a e b d a a e b c b
+R 2.051838327450824e-06 e b d a a a e b c b
+R 1.7811096592455108e-06 d a e c b d a e c b d a e c b
+R 1.7811096592455108e-06 e c b d a a e c b d a e c b
+R 1.7811096592455108e-06 e c b d a e c b d a a e c b
+R 1.7632985626530563e-06 e b d a e b d a e c b
+R 1.7632985626530563e-06 e b d a e c b d a e b
+R 1.7632985626530563e-06 e c b d a e b d a e b
+R 1.7098652728756893e-06 a a e b b d a e c b
+R 1.7098652728756893e-06 a a e b d a e c b b
+R 1.7098652728756893e-06 a a e c b b d a e b
+R 1.7098652728756893e-06 a a e c b d a e b b
+R 1.7098652728756893e-06 a c b d a e b d a e c b
+R 1.7098652728756893e-06 a c b d a e c b d a e b
+R 1.7098652728756893e-06 a e b d a a e c b b
+R 1.7098652728756893e-06 a e b d a c b d a e c b
+R 1.7098652728756893e-06 a e b d a e c b d a c b
+R 1.7098652728756893e-06 a e c b b d a a e b
+R 1.7098652728756893e-06 a e c b d a a e b b
+R 1.7098652728756893e-06 a e c b d a c b d a e b
+R 1.7098652728756863e-06 a e b b d a a e c b
+R 1.7098652728756863e-06 a e c b d a e b d a c b
+R 1.4248877273964074e-06 a a e c b c b d a e c b
+R 1.4248877273964074e-06 a a e c b d a e c b c b
+R 1.4248877273964074e-06 a b d a e c b d a e c b
+R 1.4248877273964074e-06 a e c b c b d a a e c b
+R 1.4248877273964074e-06 a e c b d a a e c b c b
+R 1.4248877273964074e-06 a e c b d a b d a e c b
+R 1.4248877273964074e-06 a e c b d a e c b d a b
+R 1.4106388501224437e-06 a e b d a e b c b
+R 1.4106388501224414e-06 a e b c b d a e b
+R 1.0686657955473067e-06 d a e b d a e c b d a e c b
+R 1.0686657955473067e-06 d a e c b d a e b d a e c b
+R 1.0686657955473067e-06 d a e c b d a e c b d a e b
+R 1.0686657955473067e-06 e b d a a e c b d a e c b
+R 1.0686657955473067e-06 e b d a e c b d a a e c b
+R 1.0686657955473067e-06 e c b d a a e b d a e c b
+R 1.0686657955473067e-06 e c b d a a e c b d a e b
+R 1.0686657955473067e-06 e c b d a e b d a a e c b
+R 1.0686657955473067e-06 e c b d a e c b d a a e b
+R 1.057979137591832e-06 e b d a e b d a e b
+R 1.0259191637254138e-06 a e b d a e b d a c b
+R 1.0259191637254119e-06 a a e b b d a e b
+R 1.0259191637254119e-06 a a e b d a e b b
+R 1.0259191637254119e-06 a c b d a e b d a e b
+R 1.0259191637254119e-06 a e b b d a a e b
+R 1.0259191637254119e-06 a e b d a a e b b
+R 1.0259191637254119e-06 a e b d a c b d a e b
+R 8.549326364378446e-07 a a e b c b d a e c b
+R 8.549326364378446e-07 a a e b d a e c b c b
+R 8.549326364378446e-07 a a e c b d a e b c b
+R 8.549326364378446e-07 a b d a e b d a e c b
+R 8.549326364378446e-07 a e b c b d a a e c b
+R 8.549326364378446e-07 a e b d a a e c b c b
+R 8.549326364378446e-07 a e b d a b d a e c b
+R 8.549326364378446e-07 a e b d a e c b d a b
+R 8.549326364378446e-07 a e c b d a a e b c b
+R 8.549326364378431e-07 a a e c b c b d a e b
+R 8.549326364378431e-07 a b d a e c b d a e b
+R 8.549326364378431e-07 a e c b c b d a a e b
+R 8.549326364378431e-07 a e c b d a b d a e b
+R 8.549326364378431e-07 a e c b d a e b d a b
+R 6.411994773283841e-07 d a e b d a e b d a e c b
+R 6.411994773283841e-07 e b d a a e b d a e c b
+R 6.411994773283841e-07 e b d a e b d a a e c b
+R 6.411994773283829e-07 d a e b d a e c b d a e b
+R 6.411994773283829e-07 d a e c b d a e b d a e b
+R 6.411994773283829e-07 e b d a a e c b d a e b
+R 6.411994773283829e-07 e b d a e c b d a a e b
+R 6.411994773283829e-07 e c b d a a e b d a e b
+R 6.411994773283829e-07 e c b d a e b d a a e b
+R 5.129595818627069e-07 a a e b c b d a e b
+R 5.129595818627069e-07 a b d a e b d a e b
+R 5.129595818627069e-07 a e b c b d a a e b
+R 5.129595818627069e-07 a e b d a b d a e b
+R 5.129595818627069e-07 a e b d a e b d a b
+R 5.129595818627059e-07 a a e b d a e b c b
+R 5.129595818627059e-07 a e b d a a e b c b
+R 4.452774148113776e-07 a e c b d a e c b d a e c b
+R 3.8471968639703054e-07 d a e b d a e b d a e b
+R 3.8471968639703054e-07 e b d a a e b d a e b
+R 3.8471968639703054e-07 e b d a e b d a a e b
+R 2.671664488868266e-07 a e b d a e c b d a e c b
+R 2.671664488868266e-07 a e c b d a e c b d a e b
+R 2.6716644888682614e-07 a e c b d a e b d a e c b
+R 1.60299869332096e-07 a e b d a e b d a e c b
+R 1.602998693320957e-07 a e b d a e c b d a e b
+R 1.602998693320957e-07 a e c b d a e b d a e b
+R 9.61799215992578e-08 a e b d a e b d a e b
+C dfgc-351 2 0.9 2 0 1 1 1
+E a a 3
+E a b 3
+E a c 5
+E b c 5
+E c c 3
+S a 3
+N a 1
+N b 1
+N c 5
+Z
+C dfgc-352 1 1 2 1 0 2 0
+E a a 1
+E a b 1
+E a c 1
+E b d 1
+E b e 1
+E d c 1
+E e a 1
+E e b 1
+E e d 1
+E e e 1
+S e 1
+S d 1
+S a 1
+S b 1
+N a 1
+N b 1
+N d 1
+N e 1
+R 0.0625 a
+C dfgc-353 3 0.2 2 0 0 1 1
+E a b 1
+E a d 1
+E a e 4
+E b a 2
+E b d 5
+E b e 4
+E c a 1
+E c b 1
+E c c 2
+E c e 4
+E d c 6
+E d d 2
+E d e 6
+E e c 6
+E e d 1
+S a 4
+S c 4
+N c 4
+N d 6
+Z
+C dfgc-354 40 1 2 0 0 1 0
+E a b 3
+E a c 6
+E a d 5
+E b c 1
+E c b 5
+E d a 4
+E d b 5
+E d d 4
+S d 4
+S b 3
+S c 2
+N b 6
+N c 2
+R 0.2857142857142857 b
+R 0.14652014652014655 d b
+R 0.13605442176870747 c b
+R 0.06349206349206349 c
+R 0.04508312200619891 d d b
+R 0.03588248486207669 d a c b
+R 0.0291545189504373 b c b
+R 0.02511773940345368 d a b
+R 0.01674515960230245 d a c
+R 0.016101115002213902 d a d b
+R 0.014951035359198627 d b c b
+R 0.013883104262113014 c b c b
+R 0.01360544217687074 b c
+R 0.01104076457294668 d d a c b
+R 0.007728535201062675 d d a b
+R 0.006977149834292691 d b c
+R 0.006478781988986071 c b c
+R 0.005152356800708449 d d a c
+R 0.004600318572061115 d d b c b
+R 0.003943130204623814 d a d a c b
+R 0.003661478047150685 d a c b c b
+R 0.0027601911432366694 d a d a b
+R 0.002563034633005477 d a b c b
+R 0.0021468153336285196 d d b c
+R 0.001840127428824446 d a d a c
+R 0.0017086897553369859 d a c b c
+R 0.0016429709185932567 d a d b c b
+R 0.0013883104262112998 b c b c
+R 0.001196082828735889 d a b c
+R 0.0011266086298925182 d d a c b c b
+R 0.0007886260409247627 d d a b c b
+R 0.0007667197620101862 d a d b c
+R 0.0007119540647237438 d b c b c
+R 0.0005257506939498417 d d a c b c
+R 0.00040236022496161356 d a d a c b c b
+R 0.00036802548576488916 d d a b c
+R 0.00021906278914576708 d d b c b c
+R 0.00018776810498208628 d a d a c b c
+R 0.0001314376734874605 d a d a b c
+R 0.0001220492682383561 d a b c b c
+C dfgc-355 10 0.5 2 0 0 5 0
+E a a 4
+E a b 1
+E b a 2
+E b b 6
+E c c 6
+S b 4
+N a 1
+N b 3
+R 0.2727272727272727 b
+R 0.1487603305785124 b b
+R 0.030303030303030304 b a
+R 0.020202020202020197 b a a
+R 0.016528925619834708 b b a
+R 0.011019283746556469 b b a a
+R 0.008264462809917354 b a b
+C dfgc-356 3000 0.9 1 0 0 1 0
+S a 3
+N a 2
+R 1.0 a
+C dfgc-357 3 1 2 0 0 1 0
+E b c 2
+E b e 6
+E c c 4
+E d a 4
+E d c 5
+E e a 3
+E e b 6
+S b 1
+N a 4
+N b 2
+N c 5
+N e 6
+R 0.24000000000000005 b e
+R 0.2 b
+R 0.048 b e b
+C dfgc-358 3 0.5 2 1 0 5 1
+E a a 1
+E a c 1
+E b a 1
+E b b 1
+E b c 1
+E c a 1
+S c 1
+S a 1
+S b 1
+N a 1
+N c 1
+Z
+C dfgc-359 5 0.5 2 1 0 1 0
+E a b 5
+S a 3
+N a 1
+X KeyError
+C dfgc-360 2 1 2 1 0 1 0
+E a a 5
+E a b 4
+E b a 5
+S b 4
+N a 1
+R 0.10000000000000002 b a
+R 0.05000000000000001 b a a
+C dfgc-361 1 0.5 2 0 0 1 0
+E a a 4
+S a 3
+N a 4
+R 0.5 a
+C dfgc-362 5 1 3 0 0 1 0
+E a a 4
+E b a 4
+S a 3
+N a 4
+R 0.5 a
+R 0.25 a a
+R 0.12500000000000003 a a a
+C dfgc-363 1 1 2 0 1 1 0
+E a a 2
+E b c 5
+E c a 4
+E c b 5
+S c 4
+N a 5
+R 0.31746031746031744 c a
+C dfgc-364 3 1 2 0 0 2 0
+S a 1
+N a 1
+R 1.0 a
+C dfgc-365 3 1 2 0 0 1 0
+E a b 4
+E b a 4
+E b b 2
+E b c 1
+E b d 2
+E c b 6
+E c c 2
+E c d 6
+E d b 3
+E e b 2
+E e c 6
+S d 3
+S b 2
+N b 2
+N e 4
+R 0.10909090909090911 d b
+R 0.07272727272727272 b
+R 0.039669421487603315 d b a b
+C dfgc-366 3 0.2 2 0 0 2 0
+E a b 1
+E b a 1
+S b 1
+N a 1
+N b 1
+R 0.5 b
+C dfgc-367 3000 0.2 1 0 0 1 0
+E a b 5
+S b 1
+N a 5
+N b 6
+R 1.0 b
+C dfgc-368 1 1 2 1 0 2 0
+E a a 3
+E a c 4
+E b b 3
+E b e 4
+E c b 2
+E c e 4
+E d b 1
+E d c 3
+E d e 5
+E e a 6
+E e b 3
+E e e 5
+S b 4
+N a 6
+N b 5
+N c 2
+R 0.4166666666666667 b
+C dfgc-369 5 0.9 1 0 1 5 0
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-370 3 0.9 2 0 0 1 0
+E a a 1
+E a b 1
+E b a 1
+S a 2
+N a 1
+N b 4
+R 0.3333333333333333 a
+R 0.26666666666666666 a b
+R 0.11111111111111109 a a
+C dfgc-371 2 0.2 2 1 0 1 0
+E a b 1
+E b a 1
+E c b 1
+S b 1
+N c 1
+C dfgc-372 10 1 2 0 0 1 0
+E a b 6
+E a d 6
+E b a 6
+E b b 6
+E c a 3
+E c b 1
+E c c 3
+E d a 4
+E d c 4
+E d d 6
+S c 4
+S d 1
+N a 4
+N d 5
+R 0.08571428571428572 c a
+R 0.05263157894736843 d
+R 0.03673469387755103 c c a
+R 0.03383458646616542 c a d
+R 0.016620498614958446 d d
+R 0.01607142857142857 c a b a
+R 0.014500537056928033 c c a d
+R 0.01428571428571428 c b a
+R 0.010684606252473292 c a d d
+R 0.010526315789473686 d a
+C dfgc-373 2 0.2 3 0 0 5 0
+E a c 1
+E b a 1
+E b b 1
+E c d 1
+E d d 1
+S a 1
+S d 1
+N a 1
+N b 1
+N c 1
+N d 1
+R 0.25 a
+C dfgc-374 3000 1 3 0 0 5 0
+E a b 2
+E a c 4
+E a d 5
+E b a 5
+E b c 5
+E c a 6
+E d b 6
+E d c 1
+E d d 6
+S a 3
+N c 5
+N d 3
+R 0.1652892561983471 a c
+R 0.08522727272727272 a d
+R 0.04132231404958677 a b c
+R 0.0387396694214876 a d b c
+R 0.032784645857523394 a c a c
+R 0.03196022727272727 a d d
+R 0.01690458302028549 a c a d
+R 0.015026296018031553 a b a c
+R 0.014527376033057851 a d d b c
+R 0.014087152516904584 a d b a c
+R 0.012913223140495863 a d c
+R 0.011985085227272728 a d d d
+R 0.00819616146438085 a c a b c
+R 0.008196161464380843 a b c a c
+R 0.007747933884297519 a b a d
+R 0.007683901372857047 a c a d b c
+R 0.00768390137285704 a d b c a c
+R 0.007263688016528925 a d b a d
+R 0.006502739674219515 a c a c a c
+R 0.006339218632607065 a c a d d
+R 0.0054477660123966945 a d d d b c
+R 0.005282682193839219 a d d b a c
+R 0.004842458677685949 a d d c
+R 0.0042261457550713715 a b c a d
+R 0.003962011645379411 a d b c a d
+R 0.003756574004507888 a b a b c
+R 0.003521788129226145 a b a d b c
+R 0.003521788129226145 a d b a b c
+R 0.003352975144519437 a c a c a d
+R 0.003301676371149511 a d b a d b c
+R 0.00290547520661157 a b a d d
+R 0.0027238830061983473 a d b a d d
+R 0.0027238830061983473 a d d b a d
+R 0.0023772069872276492 a c a d d d
+R 0.0015848046581517644 a b c a d d
+R 0.0015367802745714094 a b a c a d
+R 0.0015367802745714094 a c a b a d
+R 0.0014857543670172807 a d d b c a d
+R 0.0014857543670172794 a d b c a d d
+R 0.0014407315074106964 a c a d b a d
+R 0.0014407315074106964 a d b a c a d
+C dfgc-375 3000 1 2 0 0 1 0
+E a a 1
+E a b 1
+S b 1
+N a 1
+N b 1
+R 1.0 b
+C dfgc-376 5 0.5 2 0 0 5 0
+S b 2
+S a 1
+N a 4
+X KeyError
+C dfgc-377 3000 1 3 0 0 1 0
+E a b 2
+S a 2
+S b 4
+N a 1
+X KeyError
+C dfgc-378 2 1 2 0 0 1 0
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+R 0.25 a a
+C dfgc-379 2 0.5 3 0 0 1 0
+E a c 5
+E b b 3
+E b c 1
+E c a 1
+E c b 5
+E c c 3
+S a 3
+S b 4
+N c 4
+R 0.13186813186813184 a c
+R 0.04395604395604394 b c
+C dfgc-380 1 1 1 0 1 5 0
+E a a 1
+E a b 5
+E a c 5
+E b b 4
+E c b 1
+S c 4
+S b 4
+S a 1
+N c 2
+R 0.2962962962962963 c
+C dfgc-381 3000 1 2 0 1 2 0
+E a d 1
+E b b 1
+E b d 1
+E c b 1
+E d c 1
+S a 1
+N a 1
+N b 1
+N c 1
+R 0.5 a
+R 0.25 a d c
+R 0.08333333333333333 a d c b
+R 0.041666666666666664 a d c b d c
+R 0.02777777777777778 a d c b b
+C dfgc-382 3 1 1 0 1 2 1
+E a a 1
+S a 1
+N a 1
+R 0.5 a
+C dfgc-383 1 0.5 2 0 0 1 1
+E b a 1
+S a 1
+N a 1
+N b 1
+R 1.0 a
+C dfgc-384 10 1 2 0 1 2 0
+E a b 1
+E b b 1
+E b d 1
+E c a 1
+E c c 1
+E c d 1
+E d b 1
+E d c 1
+E d d 1
+S b 1
+S c 1
+S a 1
+S d 1
+N d 1
+R 0.0625 d
+R 0.031250000000000014 a b d
+R 0.031250000000000014 b d
+R 0.02083333333333334 c d
+R 0.015625000000000007 a b b d
+R 0.015625000000000007 d d
+R 0.010416666666666668 c a b d
+R 0.007812500000000002 d b d
+R 0.006944444444444444 c c d
+R 0.005208333333333334 d c d
+C dfgc-385 3 1 2 1 0 1 0
+E a a 6
+E a b 1
+E b a 4
+E b b 5
+S b 1
+N a 5
+R 0.1851851851851852 b a
+R 0.102880658436214 b b a
+R 0.09259259259259259 b a a
+C dfgc-386 3 1 2 0 0 5 0
+S a 1
+N a 1
+N b 1
+R 1.0 a
+C dfgc-387 2 0.5 2 0 1 1 1
+E a c 1
+E b a 1
+E b b 1
+E b c 1
+E c b 1
+S b 1
+N a 1
+N b 1
+N c 1
+Z
+C dfgc-388 2 0.2 2 1 0 1 0
+E a a 4
+E b a 5
+E b b 1
+S a 3
+N a 3
+R 0.42857142857142855 a
+C dfgc-389 3 1 3 0 0 1 0
+E a a 3
+E a b 4
+E b b 1
+S a 3
+N a 6
+N b 5
+R 0.46153846153846156 a
+R 0.2564102564102564 a b
+R 0.106508875739645 a a
+C dfgc-390 2 0.5 2 1 0 1 1
+E a a 1
+E a b 1
+E b a 1
+E b b 1
+S b 1
+N a 1
+Z
+C dfgc-391 5 0.5 2 0 0 5 0
+E c a 1
+S a 1
+S c 1
+N a 1
+N b 1
+N c 1
+R 0.5 a
+R 0.25 c
+C dfgc-392 40 1 3 0 0 1 1
+E a b 1
+E b a 1
+E b c 1
+E c b 1
+S a 1
+N b 1
+R 0.3333333333333333 a b
+R 0.11111111111111109 a b a b
+R 0.11111111111111109 a b c b
+R 0.037037037037037035 a b a b a b
+R 0.037037037037037035 a b a b c b
+R 0.037037037037037035 a b c b a b
+R 0.037037037037037035 a b c b c b
+C dfgc-393 10 1 2 0 1 1 1
+S a 1
+N b 5
+X KeyError
+C dfgc-394 10 0.2 2 1 0 1 0
+E a a 4
+S a 2
+N a 1
+R 0.2 a
+R 0.16000000000000003 a a
+C dfgc-395 2 0.2 2 0 1 1 0
+E a b 3
+E a d 4
+E b b 2
+E b c 2
+E c b 2
+E c d 1
+E d a 6
+E d c 5
+E e a 2
+S d 4
+N b 6
+N c 4
+N d 6
+R 0.35294117647058826 d
+C dfgc-396 40 1 1 1 0 1 1
+E a b 3
+E a d 6
+E b b 4
+E b c 4
+E c d 5
+S c 1
+S d 4
+N a 6
+N b 5
+N c 3
+X KeyError
+C dfgc-397 10 1 3 0 0 2 0
+E a a 1
+S a 4
+N a 6
+R 0.8571428571428571 a
+R 0.12244897959183669 a a
+C dfgc-398 10 0.5 2 0 0 1 1
+E a a 3
+S a 3
+N a 4
+Z
+C dfgc-399 2 1 2 0 0 1 1
+E a a 3
+E a b 3
+E a c 1
+E b d 5
+E b e 3
+E c b 5
+E c d 1
+E d a 2
+E d e 1
+E e a 6
+E e c 1
+E e d 5
+E e e 4
+S d 1
+S b 3
+S c 4
+N a 3
+N b 5
+N d 4
+N e 6
+Z

@@ -86,6 +86,11 @@ void error_json_escapes_quotes_and_backslashes() {
          "{\"error\": \"\\ufffd\\ufffd\\ufffd\"}");
   assert(minera::error_json("\xf4\x90\x80\x80") ==
          "{\"error\": \"\\ufffd\\ufffd\\ufffd\\ufffd\"}");
+  // A truncated sequence is one U+FFFD (its maximal subpart), as Python's
+  // errors="replace" and the browser's TextDecoder decode it.
+  assert(minera::error_json("\xe2\x82x") == "{\"error\": \"\\ufffdx\"}");
+  assert(minera::error_json("\xf0\x9f\x98") == "{\"error\": \"\\ufffd\"}");
+  assert(minera::error_json("Pr\xfc" "fung") == "{\"error\": \"Pr\\ufffdfung\"}");
   // Well-formed UTF-8 passes through; lone WTF-8 surrogates are escaped.
   assert(minera::error_json("caf\xc3\xa9 \xe2\x82\xac \xf0\x9f\x98\x80") ==
          "{\"error\": \"caf\xc3\xa9 \xe2\x82\xac \xf0\x9f\x98\x80\"}");

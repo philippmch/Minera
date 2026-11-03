@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { EVERYDAY_TOOLS, REFERENCE_TOOLS, groupTools, searchTools, type ToolGroup, type ToolId, type ToolSpec } from "../tools";
-import { BrandMark, LOG_FILE_ACCEPT, ThemeToggle } from "./ui";
+import { BrandMark, LOG_FILE_ACCEPT, PaletteShortcut, ThemeToggle } from "./ui";
 
 interface LandingProps {
   onOpenFile: (file: File) => void;
@@ -11,6 +11,8 @@ interface LandingProps {
   onOpenPalette?: () => void;
   error: string | null;
   mining: boolean;
+  /** Stops the load in progress; shown as a Cancel button while mining. */
+  onCancel?: () => void;
 }
 
 const SAMPLES = [
@@ -19,7 +21,7 @@ const SAMPLES = [
   { key: "resource", title: "Resource handovers", detail: "Small log with resources", text: "Mine a sample with resource relationships" },
 ] as const;
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, onOpenTool, onOpenPalette, error, mining }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, onOpenTool, onOpenPalette, error, mining, onCancel }: LandingProps) {
   const [query, setQuery] = useState("");
   const groups = useMemo(() => groupTools(searchTools(query, EVERYDAY_TOOLS)), [query]);
   const reference = useMemo(() => groupTools(searchTools(query, REFERENCE_TOOLS)), [query]);
@@ -37,7 +39,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
           {onOpenPalette && (
             <button className="sidebar-search landing-search" onClick={onOpenPalette}>
               <span>Search tools</span>
-              <kbd>⌘K</kbd>
+              <PaletteShortcut />
             </button>
           )}
           <ThemeToggle />
@@ -73,7 +75,9 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
           </span>
         </label>
 
-        {error && <div className="error-banner landing-error" role="alert">{error}</div>}
+        {mining && onCancel
+          ? <div className="landing-error landing-status" role="status">Mining the event log… <button className="btn-ghost landing-cancel" onClick={onCancel}>Cancel</button></div>
+          : error && <div className="error-banner landing-error" role="alert">{error}</div>}
 
         <div className="landing-samples reveal" aria-label="Sample data">
           <span className="section-label">Or start from a sample</span>

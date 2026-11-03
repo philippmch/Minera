@@ -1,4 +1,5 @@
 import { type OcelExchangeResult,type OcelSqliteResult,isOcelExchangeResult,isOcelSqliteResult } from './types';
+import { backendFetch } from "./backend-fetch";
 import { parseNativeJson,nativeJson } from './native-json';
 import { preparedOcelTables,type OcelPreparedTable } from './ocel-preparation';
 export const OCEL_IMPORT_FORMATS=[['json','Classic JSON'],['json_standard','Standard OCEL 2.0 JSON'],['xml','Classic XML'],['xml_standard','Standard OCEL 2.0 XML'],['csv','Event CSV with optional object table'],['sqlite','OCEL 2.0 SQLite']] as const;
@@ -29,7 +30,7 @@ export async function requestOcelIo(form:OcelIoForm,file:File,objects?:File,sign
  if(form.mode==='import'&&form.format==='csv'&&objects)sources.objects=await bind(objects,objects.name);
  if(signal?.aborted)throw new DOMException('File exchange cancelled','AbortError');
  const upload=new FormData();upload.append('log',file,file.name);if(sources.objects)upload.append('objects',objects!,objects!.name);
- const response=await fetch('/api/ocel/'+(form.format==='sqlite'?'sqlite':'io')+'?'+query,{method:'POST',body:upload,...(signal?{signal}:{})});
+ const response=await backendFetch('/api/ocel/'+(form.format==='sqlite'?'sqlite':'io')+'?'+query,{method:'POST',body:upload,...(signal?{signal}:{})});
  if(!response.ok){const raw=await response.text();let value:unknown;try{value=JSON.parse(raw);}catch{}throw new Error(record(value)&&value.error?String(value.error):`OCEL file exchange returned ${response.status}.`);}
  const artifacts:OcelIoArtifact[]=[];let raw:string|undefined;let result:OcelIoRun['result'];let tables:OcelIoRun['tables'];
  if(form.mode==='import'){

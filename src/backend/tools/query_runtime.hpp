@@ -8,6 +8,8 @@ namespace minera::query_runtime {
 inline httplib::Result request(std::string_view url,std::string_view route,const std::string* body=nullptr){
   llm_runtime::validate_url(url);httplib::Client client{std::string(url)};
   client.set_connection_timeout(std::chrono::seconds(5));client.set_write_timeout(std::chrono::seconds(10));client.set_read_timeout(std::chrono::seconds(60));
+  // Stop reading as soon as the body passes the result bound, whatever its framing.
+  client.set_payload_max_length(16u*1024u*1024u);
   if(body&&body->size()>32u*1024u*1024u)throw std::length_error("query runtime input exceeds 32 MiB");
   auto result=body?client.Post(std::string(route),*body,"application/json"):client.Get(std::string(route));
   if(!result)throw std::runtime_error("could not reach the query runtime");

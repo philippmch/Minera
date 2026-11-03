@@ -57,7 +57,18 @@
 #include <malloc.h>
 #endif
 
+// A slowly dripping client may hold a worker thread only this long (see the
+// MINERA PATCH notes in third_party/httplib.h): the request line and headers
+// within 10 s, the body within 120 s and, after its first 5 s, at an average
+// of at least 64 KiB/s (loopback uploads run far faster), on top of the 5 s
+// per-read timeout.
+#define CPPHTTPLIB_HEADER_READ_TIMEOUT_SECOND 10
+#define CPPHTTPLIB_BODY_READ_TIMEOUT_SECOND 120
+#define CPPHTTPLIB_BODY_MIN_RATE_BYTES_PER_SECOND 65536
 #include "httplib.h"
+#include "../secure_temp.hpp"
+#include "../gzip_codec.hpp"
+#include "../json_utf8.hpp"
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
 #include "query_runtime.hpp"
@@ -1980,6 +1991,9 @@ std::string importable_ocel_json(
 
 void handle_ocel_sqlite(const httplib::Request& request,
                         httplib::Response& response) {
+  // A private directory (mkdtemp) holds the database and its journal; it is
+  // removed when this handler returns, and on SIGTERM/SIGINT.
+  std::optional<minera::secure_temp::PrivateDirectory> temporary_directory;
   std::filesystem::path temporary;
   try {
     for (const auto& [key, value] : request.params) {
@@ -2011,12 +2025,8 @@ void handle_ocel_sqlite(const httplib::Request& request,
       body = file.content;
       if (body.empty()) throw std::invalid_argument("empty SQLite upload");
     }
-    const auto stamp = std::chrono::high_resolution_clock::now()
-                           .time_since_epoch().count();
-    const auto thread = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    temporary = std::filesystem::temp_directory_path() /
-                ("minera_ocel_" + std::to_string(stamp) + "_" +
-                 std::to_string(thread) + ".sqlite");
+    temporary_directory.emplace("minera_ocel_");
+    temporary = temporary_directory->file("ocel.sqlite");
     if (mode == "import") {
       std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
       if (!output) throw std::runtime_error("cannot create temporary SQLite upload");
@@ -2066,13 +2076,10 @@ void handle_ocel_sqlite(const httplib::Request& request,
 
 void handle_ocel_exchange(const httplib::Request& request,
                           httplib::Response& response) {
+  std::optional<minera::secure_temp::PrivateDirectory> csv_directory;
   std::filesystem::path csv_temporary;
   const auto cleanup_csv = [&]() {
-    if (csv_temporary.empty()) return;
-    std::error_code ignored;
-    std::filesystem::remove(csv_temporary / "events.csv", ignored);
-    std::filesystem::remove(csv_temporary / "objects.csv", ignored);
-    std::filesystem::remove(csv_temporary, ignored);
+    csv_directory.reset();
     csv_temporary.clear();
   };
   try {
@@ -2150,13 +2157,8 @@ void handle_ocel_exchange(const httplib::Request& request,
         filename = "ocel.xml";
       } else if (format == "csv") {
         if (include_objects) {
-          const auto stamp = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-          const auto thread = std::hash<std::thread::id>{}(std::this_thread::get_id());
-          const auto candidate = std::filesystem::temp_directory_path() /
-              ("minera_ocel_csv_" + std::to_string(stamp) + "_" + std::to_string(thread));
-          if (!std::filesystem::create_directory(candidate))
-            throw std::runtime_error("cannot create temporary OCEL CSV directory");
-          csv_temporary = candidate;
+          csv_directory.emplace("minera_ocel_csv_");
+          csv_temporary = csv_directory->path();
           minera::export_ocel_csv(log, csv_temporary / "events.csv",
                                  csv_temporary / "objects.csv", csv_options.export_options);
           const auto read_csv = [&](const char* name) {
@@ -4488,6 +4490,23 @@ struct PreparationLogView {
   const minera::EventLog* log;
 };
 
+// An XES export embedded in a larger response, as `"<field>":<xes>,
+// "<field>_error":null`. When the writer refuses the log (text XML cannot
+// carry, a native NA attribute) the XES is null and the error field holds the
+// message, so the route keeps its main result (as the workbench routes do with
+// xes_error).
+template <class Write>
+std::string embedded_xes_fields(const std::string& field, Write&& write) {
+  const auto quote = minera::embedding_runtime::detail::escape_json;
+  std::string xes;
+  try {
+    xes = write();
+  } catch (const std::exception& error) {
+    return "\"" + field + "\":null,\"" + field + "_error\":" + quote(error.what());
+  }
+  return "\"" + field + "\":" + quote(xes) + ",\"" + field + "_error\":null";
+}
+
 std::string preparation_json(const MinedSession& session, std::string result,
                              const std::vector<PreparationLogView>& outputs = {}) {
   const auto quote = minera::embedding_runtime::detail::escape_json;
@@ -4509,8 +4528,8 @@ std::string preparation_json(const MinedSession& session, std::string result,
         ",\"case_count\":" + std::to_string(output.log->trace_count()) +
         ",\"event_count\":" + std::to_string(output.log->event_count()) +
         ",\"activity_attribute\":" + quote(activity_attribute) +
-        ",\"complete_activity_field\":" + std::string(complete ? "true" : "false") +
-        ",\"xes\":" + quote(minera::serialize_xes(*output.log, options)) + '}';
+        ",\"complete_activity_field\":" + std::string(complete ? "true" : "false") + ',' +
+        embedded_xes_fields("xes", [&] { return minera::serialize_xes(*output.log, options); }) + '}';
   }
   body += "]}";
   std::lock_guard<std::mutex> lock(g_session_mutex);
@@ -5768,8 +5787,8 @@ std::string anonymization_release_json(std::string result_json,
   options.preserve_nulls = true;
   return "{\"family\":\"ANONYMIZATION_RELEASE\",\"source_id\":" +
          quote(std::to_string(session.query_source_id)) + ",\"result\":" +
-         result_json + ",\"released_xes\":" +
-         quote(minera::serialize_xes(log, options)) + '}';
+         result_json + ',' +
+         embedded_xes_fields("released_xes", [&] { return minera::serialize_xes(log, options); }) + '}';
 }
 
 // Cached-session trace-variant query adapter; the source session stays intact.
@@ -6381,13 +6400,20 @@ void handle_check_model(const httplib::Request& request,
     const auto imported_model_id = ++g_imported_model_sequence;
     next_session->imported_model_id = imported_model_id;
 
+    // Rollback state that pinned the replaced session; destroyed after unlock.
+    std::vector<std::shared_ptr<const void>> rollback_garbage;
     {
       std::lock_guard<std::mutex> lock(g_session_mutex);
       // Only publish if no re-mine replaced the session in the meantime. An
       // unpublished import is refused either way: its id never reaches the
       // server's session, so reporting success would mislead the caller.
-      if (g_session == session) g_session = std::move(next_session);
-      else {
+      if (g_session == session) {
+        g_session = std::move(next_session);
+        // A mining ticket still holding the replaced session as "published"
+        // can no longer roll anything back meaningfully; drop its copies so
+        // the old session is freed rather than retained beside the new one.
+        forget_mining_rollback_locked(session, rollback_garbage);
+      } else {
         response.status = 409;
         response.set_content(error_json(request.has_param("source_id")
             ? "the active session changed during model checking; retry the handoff"
@@ -6395,6 +6421,11 @@ void handle_check_model(const httplib::Request& request,
                              "application/json");
         return;
       }
+    }
+    if (!rollback_garbage.empty()) {
+      rollback_garbage.clear();
+      session.reset();
+      minera_release_free_memory();
     }
     // Runs on the imported model echo this id (X-Minera-Imported-Model) so a
     // model replaced while they are pending is detected by the server.
@@ -6729,10 +6760,11 @@ std::string transformation_json(const MinedSession& session,
     body += "{\"index\":" + std::to_string(i) + ",\"case_id\":" + quote(trace.case_id) +
         ",\"event_count\":" + std::to_string(trace.events.size()) + '}';
   }
-  body += "],\"result\":" + result_json + ",\"transformed_xes\":";
+  body += "],\"result\":" + result_json + ',';
   if (split && options) {
     minera::XesExportOptions export_options; export_options.preserve_nulls = true;
-    body += quote(minera::serialize_xes(split->log, export_options));
+    body += embedded_xes_fields("transformed_xes",
+        [&] { return minera::serialize_xes(split->log, export_options); });
     const bool projected = options->target_key == "activity" || options->target_key == "concept:name";
     std::string activity_attribute = projected ? "concept:name" : options->target_key;
     if (projected) for (const auto& trace : split->log.traces) if (!trace.events.empty()) {
@@ -6761,7 +6793,7 @@ std::string transformation_json(const MinedSession& session,
       }
     }
     body += "],\"complete_activity_field\":" + std::string(complete ? "true" : "false");
-  } else body += "null";
+  } else body += "\"transformed_xes\":null";
   body += '}';
   std::lock_guard<std::mutex> lock(g_session_mutex);
   if (!g_session || g_session->query_source_id != session.query_source_id)
@@ -8792,7 +8824,7 @@ std::string simulation_workspace_json(const minera::MonteCarloResult& result,
       ",\"event_count\":" + (session.active_source && session.active_source->checked_table_if_available() ? std::to_string(session.active_source->checked_table().rows.size()) : session.log_ready ? std::to_string(require_prepared_log(session).event_count()) : std::string("null")) +
       "},\"result\":" + minera::monte_carlo_json(result) +
       ",\"simulated_log\":" + minera::log_conversion_json(simulated) +
-      ",\"xes\":" + quote(minera::to_xes(result.log, miner + " Monte Carlo playout")) +
+      ',' + embedded_xes_fields("xes", [&] { return minera::to_xes(result.log, miner + " Monte Carlo playout"); }) +
       ",\"model\":" + model + ",\"underlying_pnml\":" +
       quote(minera::to_pnml(document, "simulation underlying model")) + '}';
 }
@@ -9690,6 +9722,10 @@ void handle_playout(const httplib::Request& request,
     return;
   }
 
+  // The playout safety bounds (max_attempts, max_firings_per_trace) and the
+  // XES writer's refusal of text XML cannot carry are reported as 400 JSON,
+  // like the other playout branches.
+  try {
   if (options.return_visited_elements) {
     response.set_content(
         minera::serialize_playout_visited_json(
@@ -9723,6 +9759,9 @@ void handle_playout(const httplib::Request& request,
   const auto log = minera::playout(*selected, options);
   response.set_content(minera::to_xes(log, miner + " playout"),
                        "application/xml");
+  } catch (const std::exception& error) {
+    reject(error.what());
+  }
 }
 
 // Exports the most recently mined event log â€” after any server-side filtering
@@ -10816,6 +10855,12 @@ void reject_stale_imported_model(httplib::Response& response) {
   for (const char* name : {"Access-Control-Allow-Origin", "Vary"})
     if (response.has_header(name))
       fresh.set_header(name, response.get_header_value(name));
+  // Response's defaulted move-assignment drops a content-provider releaser
+  // without running it (a published mining ticket would then never be
+  // released), so move the handler's response aside: its destructor runs the
+  // releaser, reporting the body as unsent.
+  httplib::Response discarded = std::move(response);
+  response.content_provider_resource_releaser_ = nullptr;
   response = std::move(fresh);
   response.status = 409;
   response.set_content(
@@ -10845,7 +10890,10 @@ httplib::Server::Handler api_route_handler(std::string path,
     // A request bound to an imported model runs only when that model is the
     // server's imported model both before and after the handler: ids are
     // never reused, so the handler's own session snapshot held it too.
-    if (path != "/api/check-model" && request.has_header("X-Minera-Imported-Model")) {
+    // Mining replaces the session (and so the imported model) by design, so a
+    // stale header must not turn a published mine into a 409.
+    if (path != "/api/check-model" && path != "/api/mine" &&
+        request.has_header("X-Minera-Imported-Model")) {
       const auto expected = request.get_header_value("X-Minera-Imported-Model");
       if (expected != std::to_string(current_imported_model_id())) {
         reject_stale_imported_model(response);
@@ -10907,7 +10955,8 @@ httplib::Server::HandlerResponse api_error_body(const httplib::Request& request,
     message = "unknown API route: " + request.path;
   } else if (response.status == 413) {
     message = "the upload is larger than the " + std::to_string(kMaxRequestPayloadBytes >> 20) +
-              " MiB server limit; compress an XES log as .xes.gz";
+              (request.path.starts_with("/api/ocel") ? " MiB server limit"
+                                                      : " MiB server limit; compress an XES log as .xes.gz");
   } else {
     message = std::string(httplib::status_message(response.status));
     if (message.empty()) message = "HTTP " + std::to_string(response.status);
@@ -11023,8 +11072,10 @@ int main(int argc, char** argv) {
   server.set_post_routing_handler([](const httplib::Request& request, httplib::Response& response) {
     if (request.path.starts_with("/api/") &&
         response.get_header_value("Content-Type").starts_with("application/json"))
-      // The conversion is the identity on bodies without a 0xED lead byte.
-      if (response.body.find('\xed') != std::string::npos)
+      // Every JSON body leaves as valid UTF-8 (json_utf8.hpp): results that
+      // carry a log's own bytes (a Latin-1 CSV, WTF-8 surrogates) are repaired
+      // here; the check is a single pass and clean bodies are left as they are.
+      if (!minera::detail::is_clean_utf8(response.body))
         response.body = active_source_safe_json(response.body);
   });
   server.set_error_handler([](const httplib::Request& request, httplib::Response& response) {
@@ -11465,6 +11516,9 @@ int main(int argc, char** argv) {
               << "); serving the API only\n";
   }
 
+  // SIGTERM/SIGINT remove in-flight temporary uploads, then end the process
+  // as the default action would.
+  minera::secure_temp::install_signal_cleanup();
   if (!server.listen("127.0.0.1", port)) {
     std::cerr << "error: cannot listen on port " << port << '\n';
     return 1;

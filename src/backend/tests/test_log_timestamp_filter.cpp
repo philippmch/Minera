@@ -1,4 +1,8 @@
 #include "minera/log_timestamp_filter.hpp"
+#include "minera/log_attributes_filter.hpp"
+#include "minera/xes_event_log_importer.hpp"
+#include "minera/xes_export.hpp"
+#include <sstream>
 #include "minera/embedding_workbench_json.hpp"
 #include "minera/declare_workbench_json.hpp"
 #include <cassert>
@@ -5442,4 +5446,45 @@ void native_timestamp_filter_storage_controls(){
  assert(filtered.traces[0].properties.empty());assert(filtered.metadata.properties==source.metadata.properties);
 }
 } // namespace
-int main(){try{retained_public_timestamp_filter_cases();native_timestamp_filter_storage_controls();}catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}
+
+// An event's own case: cells are dropped when the filtered events are grouped
+// back into traces (pm4py 2.7.22 apply_events); the selected cells keep their
+// places among the attributes that remain, as the reference dict does.
+void filtered_events_keep_document_order_after_dropping_case_cells() {
+  const std::string xes =
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?><log><trace><string key=\"concept:name\" value=\"c1\"/>"
+      "<event><string key=\"case:x\" value=\"e\"/><string key=\"a\" value=\"1\"/><string key=\"concept:name\" value=\"A\"/>"
+      "<string key=\"b\" value=\"2\"/><date key=\"time:timestamp\" value=\"2024-01-01T00:00:00.000+00:00\"/><string key=\"c\" value=\"3\"/></event>"
+      "<event><string key=\"case:x\" value=\"e\"/><string key=\"a\" value=\"1\"/><string key=\"concept:name\" value=\"B\"/>"
+      "<string key=\"b\" value=\"2\"/><date key=\"time:timestamp\" value=\"2024-01-02T00:00:00.000+00:00\"/><string key=\"c\" value=\"3\"/></event>"
+      "</trace></log>";
+  const auto first_event_keys = [](const EventLog& log) {
+    const auto text = serialize_xes(log);
+    const auto begin = text.find("<event>");
+    const auto end = text.find("</event>", begin);
+    std::vector<std::string> keys;
+    for (auto at = text.find("key=\"", begin); at != std::string::npos && at < end; at = text.find("key=\"", at + 5)) {
+      const auto close = text.find('"', at + 5);
+      keys.push_back(text.substr(at + 5, close - at - 5));
+    }
+    return keys;
+  };
+  const std::vector<std::string> expected = {"a", "concept:name", "b", "time:timestamp", "c"};
+  {
+    std::istringstream input(xes);
+    auto log = import_xes_event_log(input, XesImportOptions{});
+    const auto filtered = filter_log_timestamp_events(
+        log, EventAttribute{"", "2023-01-01 00:00:00"}, EventAttribute{"", "2025-01-01 00:00:00"});
+    if (first_event_keys(filtered) != expected) throw std::runtime_error("timestamp events filter misplaced the selected cells");
+  }
+  {
+    std::istringstream input(xes);
+    auto log = import_xes_event_log(input, XesImportOptions{});
+    EventAttribute values{"", ""};
+    values.container = AttributeContainerKind::kList;
+    values.children = {EventAttribute{"0", "A"}};
+    const auto filtered = filter_log_attributes_events(log, values);
+    if (first_event_keys(filtered) != expected) throw std::runtime_error("attributes events filter misplaced the selected cells");
+  }
+}
+int main(){try{filtered_events_keep_document_order_after_dropping_case_cells();retained_public_timestamp_filter_cases();native_timestamp_filter_storage_controls();}catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}

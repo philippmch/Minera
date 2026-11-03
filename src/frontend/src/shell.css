@@ -17,7 +17,7 @@
     --paper-raised: #1f1c18;
     --ink: #ece6da;
     --ink-70: rgba(236, 230, 218, 0.72);
-    --ink-45: rgba(236, 230, 218, 0.5);
+    --ink-45: rgba(236, 230, 218, 0.6);
     --line: rgba(236, 230, 218, 0.16);
     --line-soft: rgba(236, 230, 218, 0.08);
     --ink-tint: rgba(236, 230, 218, 0.06);
@@ -40,7 +40,7 @@
   --paper-raised: #1f1c18;
   --ink: #ece6da;
   --ink-70: rgba(236, 230, 218, 0.72);
-  --ink-45: rgba(236, 230, 218, 0.5);
+  --ink-45: rgba(236, 230, 218, 0.6);
   --line: rgba(236, 230, 218, 0.16);
   --line-soft: rgba(236, 230, 218, 0.08);
   --ink-tint: rgba(236, 230, 218, 0.06);
@@ -536,10 +536,12 @@ input[type="file"]::file-selector-button:hover { background: var(--ink); color: 
     width: min(300px, 86vw);
     background: var(--paper);
     transform: translateX(-102%);
-    transition: transform 0.2s ease;
+    /* Hidden (and so out of the tab order) once the slide-out finishes. */
+    visibility: hidden;
+    transition: transform 0.2s ease, visibility 0s linear 0.2s;
     box-shadow: 0 0 48px rgba(32, 29, 24, 0.2);
   }
-  .sidebar.open { transform: none; }
+  .sidebar.open { transform: none; visibility: visible; transition: transform 0.2s ease; }
   .sidebar-close { display: block; }
   .sidebar-veil { display: block; position: fixed; inset: 0; z-index: 50; background: rgba(32, 29, 24, 0.25); }
   .mobile-bar {
@@ -568,3 +570,17 @@ input[type="file"]::file-selector-button:hover { background: var(--ink); color: 
 @media (prefers-reduced-motion: reduce) {
   .sidebar, .landing-sample, .tool-card { transition: none; }
 }
+
+/* Shown by the top-level error boundary instead of a blank page. */
+.app-crash { max-width: 640px; margin: 12vh auto; padding: 0 var(--page-gutter); }
+.app-crash h1 { font-size: 24px; margin: 0 0 8px; }
+.app-crash pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border: 1px solid var(--line); background: var(--paper-raised); font: 12px var(--font-mono); }
+.app-crash-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* In-app confirmation before discarding open data. */
+.confirm-veil { z-index: 110; }
+.confirm-dialog { width: min(440px, 100%); padding: 20px 22px; background: var(--paper-raised); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-raised); }
+.confirm-dialog h2 { margin: 0 0 8px; font-size: 18px; }
+.confirm-dialog p { margin: 0 0 18px; color: var(--ink-70); }
+.confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.landing-cancel { justify-self: start; }

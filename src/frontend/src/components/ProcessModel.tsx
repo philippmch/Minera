@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from "react";
+import { downloadBlob } from "../download";
 import { type TreeLayout } from "../tree-layout";
 import { type PetriLayout } from "../petri-layout";
 import { type MineraExport } from "../types";
@@ -446,13 +447,8 @@ function PnmlButton({
     fetchPnml(minerId)
       .then((xml) => {
         const blob = new Blob([xml], { type: "application/xml" });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
         const base = dataset.replace(/\.[^.]+$/, "") || "model";
-        anchor.href = url;
-        anchor.download = `${base}-${minerId}.pnml`;
-        anchor.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, `${base}-${minerId}.pnml`);
       })
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setBusy(false));
@@ -463,7 +459,7 @@ function PnmlButton({
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : `Download ${groupName} as PNML`}
       </button>
-      {error && <span className="pnml-error">{error}</span>}
+      {error && <span className="pnml-error" role="alert">{error}</span>}
     </span>
   );
 }
@@ -490,13 +486,8 @@ function BpmnButton({
     fetchBpmn(minerId)
       .then((xml) => {
         const blob = new Blob([xml], { type: "application/xml" });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
         const base = dataset.replace(/\.[^.]+$/, "") || "model";
-        anchor.href = url;
-        anchor.download = `${base}-${minerId}.bpmn`;
-        anchor.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, `${base}-${minerId}.bpmn`);
       })
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setBusy(false));
@@ -507,7 +498,7 @@ function BpmnButton({
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : `Download ${groupName} as BPMN`}
       </button>
-      {error && <span className="pnml-error">{error}</span>}
+      {error && <span className="pnml-error" role="alert">{error}</span>}
     </span>
   );
 }
@@ -532,13 +523,8 @@ function PtmlButton({
     fetchPtml(minerId)
       .then((xml) => {
         const blob = new Blob([xml], { type: "application/xml" });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
         const base = dataset.replace(/\.[^.]+$/, "") || "model";
-        anchor.href = url;
-        anchor.download = `${base}-${minerId}.ptml`;
-        anchor.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, `${base}-${minerId}.ptml`);
       })
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setBusy(false));
@@ -549,7 +535,7 @@ function PtmlButton({
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : `Download ${groupName} as PTML`}
       </button>
-      {error && <span className="pnml-error">{error}</span>}
+      {error && <span className="pnml-error" role="alert">{error}</span>}
     </span>
   );
 }
@@ -586,13 +572,8 @@ function PlayoutButton({
     fetchPlayout(minerId, simulatedLogOptions(minerId), sourceId)
       .then((xml) => {
         const blob = new Blob([xml], { type: "application/xml" });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
         const base = dataset.replace(/\.[^.]+$/, "") || "model";
-        anchor.href = url;
-        anchor.download = `${base}-${minerId}-playout.xes`;
-        anchor.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, `${base}-${minerId}-playout.xes`);
       })
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setBusy(false));
@@ -603,7 +584,7 @@ function PlayoutButton({
       <button className="btn-ghost" onClick={download} disabled={busy}>
         {busy ? "Simulating…" : "Simulate log (XES)"}
       </button>
-      {error && <span className="pnml-error">{error}</span>}
+      {error && <span className="pnml-error" role="alert">{error}</span>}
     </span>
   );
 }

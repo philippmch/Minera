@@ -52,6 +52,10 @@ class Parser {
  private:
   const std::string& text_;
   std::size_t pos_ = 0;
+  // node() recurses once per nesting level; bound it so a deeply nested
+  // model is a parse error rather than a stack overflow of the caller.
+  static constexpr std::size_t kMaxDepth = 1000;
+  std::size_t depth_ = 0;
 
   [[noreturn]] void fail(const char* message) const {
     throw std::invalid_argument(std::string("invalid POWL at offset ") +
@@ -183,6 +187,9 @@ class Parser {
     return text_.substr(begin, end - begin);
   }
   PowlNode node() {
+    if (depth_ >= kMaxDepth) fail("nesting exceeds 1000 levels");
+    ++depth_;
+    struct Leave { std::size_t& depth; ~Leave() { --depth; } } leave{depth_};
     skip();
     if (tau_token()) return PowlNode::silent();
     if (operator_token("X", '(')) return composite('X');

@@ -1,4 +1,5 @@
 import { generatedSql,requestLogQuery,type LogQuerySchema,type LogQueryResult,type QueryEngine } from "./log-query";
+import { backendFetch } from "./backend-fetch";
 import {requestExactLogQuery,type ExactQueryControls,type ExactLogQueryRun,exactQueryStringText} from "./exact-log-query";
 import { llmLogContext } from "./llm";
 import { type MineraExport } from "./types";
@@ -35,7 +36,7 @@ export function isClusterSummary(value:unknown):value is ClusterSummary{
 }
 function clusterUrl(schema:LogQuerySchema,definition:ClusterDefinition,format:string){return "/api/log-cluster?"+new URLSearchParams({source_id:schema.source_id,name:definition.name,format});}
 async function clusterResponse(schema:LogQuerySchema,definition:ClusterDefinition,format:string,signal?:AbortSignal){
- const response=await fetch(clusterUrl(schema,definition,format),{method:"POST",headers:{"Content-Type":"text/plain; charset=utf-8"},body:definition.regex,...(signal?{signal}:{})});
+ const response=await backendFetch(clusterUrl(schema,definition,format),{method:"POST",headers:{"Content-Type":"text/plain; charset=utf-8"},body:definition.regex,...(signal?{signal}:{})});
  if(!response.ok){const value=await response.json().catch(()=>null);throw new Error(value?.error||`Cluster backend returned ${response.status}.`);}return response;
 }
 export async function requestCluster(schema:LogQuerySchema,definition:ClusterDefinition,signal?:AbortSignal):Promise<ClusterSummary>{

@@ -50,7 +50,7 @@ def cases():
         ea = {a: rng.randint(1, 9) for a in acts}
         perf = {k: (0.0 if rng.random() < 0.15 else round(rng.uniform(0.001, 50000), 6)) for k in dfg}
         yield (f'dfgp-{index:03d}', rng.randint(0, 2 ** 32 - 1), rng.choice([1, 3, 10]),
-               rng.choice([1, 2.5, 3600, 0.001]), dfg, sa, ea, perf)
+               rng.choice([1, 2.5, 3600, 0.001, 0.3, 1e-07, 86400.5]), dfg, sa, ea, perf)
 
 
 def child():

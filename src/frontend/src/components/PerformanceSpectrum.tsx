@@ -86,6 +86,7 @@ export function PerformanceSpectrumView({ data,nativeOnly=false }: PerformanceSp
         {[...pattern, -1].map((selected, index) => (
           <select
             key={index}
+            aria-label={index < pattern.length ? `Spectrum step ${index + 1}` : "Add a spectrum step"}
             value={selected === -1 ? "" : String(selected)}
             onChange={(e) => setStep(index, e.target.value)}
           >

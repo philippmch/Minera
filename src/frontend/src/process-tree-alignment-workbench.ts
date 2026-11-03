@@ -1,4 +1,5 @@
 import {appendNativeMultipartField} from "./native-multipart";
+import { backendFetch } from "./backend-fetch";
 import {diagnosticCsv, nativeObjectTables, type DiagnosticTable} from "./model-diagnostics";
 import {nativeCell, nativeJson} from "./native-json";
 import type {ModelGraph} from "./model-graph";
@@ -232,7 +233,7 @@ async function fileHash(file: File): Promise<string> {return Array.from(new Uint
 export async function runProcessTreeAlignmentWorkbench(input: File, model: File, form: ProcessTreeAlignmentForm, signal?: AbortSignal): Promise<ProcessTreeAlignmentRun> {
   const fields = processTreeAlignmentFields(form, input.name), [input_sha256, model_sha256] = await Promise.all([fileHash(input), fileHash(model)]); signal?.throwIfAborted();
   const body = new FormData(); body.append("input_file", input); body.append("model_file", model); fields.forEach(([key, value]) => appendNativeMultipartField(body, key, value));
-  const path = "/api/align-process-tree-workbench", response = await fetch(path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
+  const path = "/api/align-process-tree-workbench", response = await backendFetch(path, {method: "POST", body, signal}), value = await readNativeResponse(response, {path, fields}); signal?.throwIfAborted();
   if (!isProcessTreeAlignmentWorkbench(value)) {if (!response.ok) throw new Error(object(value) && typeof value.error === "string" ? value.error : `Process-tree alignment failed (${response.status}).`); throw new Error("The server did not return a valid native process-tree alignment envelope.");}
   if (value.variant !== form.variant || value.input_shape !== form.inputShape || value.input_context.format !== form.inputFormat || value.model_context.format !== form.modelFormat || value.input_context.dataset !== input.name || value.model_context.dataset !== model.name || BigInt(String(nativeCell(value.input_context, "original_input_bytes"))) !== BigInt(input.size) || BigInt(String(nativeCell(value.model_context, "original_input_bytes"))) !== BigInt(model.size) || value.conversion_context.variant !== form.conversion) throw new Error("The process-tree alignment response does not match the submitted inputs and options.");
   const controls = processTreeAlignmentControlFields(form.fields, form.explicitEmptySelectors);

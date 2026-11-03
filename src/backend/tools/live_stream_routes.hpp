@@ -4,6 +4,38 @@
 struct LiveUpload {
   std::string id, name, format, provided_sha256, bytes;
 };
+struct LiveCapacityError : std::runtime_error { int status; LiveCapacityError(int code,const std::string& message):std::runtime_error(message),status(code){} };
+// Server-wide ceilings across every live and reader session, on top of each
+// session's own budget: without them 32 sessions at their per-session limits
+// could hold tens of GiB. A full budget refuses (429) until a session is
+// released. One live event costs about 2 KB once queued and delivered.
+constexpr std::size_t kStreamGlobalMaxStoredBytes = std::size_t{1} << 30;
+constexpr std::size_t kStreamGlobalMaxEvents = 2000000;
+std::atomic<std::size_t> g_stream_budget_bytes{0}, g_stream_budget_events{0};
+void stream_budget_take(std::atomic<std::size_t>& counter,std::size_t limit,std::size_t amount,const char* what) {
+  auto current=counter.load();
+  do {
+    if(amount>limit||current>limit-amount)
+      throw LiveCapacityError(429,std::string("the server's stream ")+what+" budget ("+std::to_string(limit)+") across live and reader sessions is exhausted; release a session and retry");
+  } while(!counter.compare_exchange_weak(current,current+amount));
+}
+// What one session holds of the global budget; returned when it is released
+// or destroyed, whichever comes first.
+struct StreamBudgetCharge {
+  std::size_t bytes=0, events=0;
+  StreamBudgetCharge()=default;
+  StreamBudgetCharge(const StreamBudgetCharge&)=delete;
+  StreamBudgetCharge& operator=(const StreamBudgetCharge&)=delete;
+  ~StreamBudgetCharge() {release();}
+  void reserve(std::size_t more_bytes,std::size_t more_events) {
+    stream_budget_take(g_stream_budget_bytes,kStreamGlobalMaxStoredBytes,more_bytes,"byte");
+    try {stream_budget_take(g_stream_budget_events,kStreamGlobalMaxEvents,more_events,"event");}
+    catch(...) {g_stream_budget_bytes-=more_bytes;throw;}
+    bytes+=more_bytes;events+=more_events;
+  }
+  void absorb(StreamBudgetCharge& other) noexcept {bytes+=other.bytes;events+=other.events;other.bytes=other.events=0;}
+  void release() noexcept {g_stream_budget_bytes-=bytes;g_stream_budget_events-=events;bytes=events=0;}
+};
 struct LiveSessionRecord {
   std::mutex mutex;
   std::string id, method;
@@ -15,12 +47,12 @@ struct LiveSessionRecord {
   std::shared_ptr<minera::StreamingSession> monitor;
   std::size_t stored_bytes = 0, stored_events = 0;
   std::vector<LiveUpload> sources;
+  StreamBudgetCharge budget;
   bool released = false;
 };
 // Sessions live in server memory until released, so the registries are
 // bounded: a full registry refuses new sessions (429) until one is released,
 // and a session refuses uploads beyond its stored-byte budget (413).
-struct LiveCapacityError : std::runtime_error { int status; LiveCapacityError(int code,const std::string& message):std::runtime_error(message),status(code){} };
 constexpr std::size_t kLiveMaxSessions = 32;
 constexpr std::size_t kLiveMaxStoredBytes = 256u * 1024u * 1024u;
 // Each queued event and its delivery record cost a few KB in memory.
@@ -28,6 +60,17 @@ constexpr std::size_t kLiveMaxEvents = 1000000;
 std::mutex g_live_mutex;
 std::map<std::string,std::shared_ptr<LiveSessionRecord>> g_live_sessions;
 
+// An upper estimate of the events a stream source holds, without parsing it:
+// CSV lines, or XES <event elements (a gzip XES source is inflated within the
+// import limit only to count).
+std::size_t reader_estimated_events(const std::string& source,const std::string& kind,const minera::XesImportOptions& xes) {
+  if(kind=="csv_events")return static_cast<std::size_t>(std::count(source.begin(),source.end(),'\n'))+1;
+  const std::string inflated=minera::detail::is_gzip_data(source)?minera::detail::gzip_decompress(source,xes.max_decompressed_bytes):std::string();
+  const std::string_view text=inflated.empty()?std::string_view(source):std::string_view(inflated);
+  std::size_t count=0;
+  for(auto at=text.find("<event");at!=std::string_view::npos;at=text.find("<event",at+6))++count;
+  return count;
+}
 std::string live_required(const httplib::Request& request,const std::string& key) {
   if(!request.has_param(key)||request.get_param_value(key).empty())throw std::invalid_argument(key+" is required");
   return request.get_param_value(key);
@@ -128,6 +171,9 @@ void handle_live_create(const httplib::Request& request,httplib::Response& respo
     }
     record->monitor=std::make_shared<minera::StreamingSession>(std::move(options));
     for(const auto& source:record->sources)record->stored_bytes+=source.bytes.size();
+    // Charged before registering; a record that loses to an existing ID
+    // returns its charge when it is destroyed.
+    record->budget.reserve(record->stored_bytes,0);
     {std::lock_guard lock(g_live_mutex);const auto found=g_live_sessions.find(id);
       if(found!=g_live_sessions.end())record=found->second;
       else if(g_live_sessions.size()>=kLiveMaxSessions)throw LiveCapacityError(429,"too many live sessions ("+std::to_string(kLiveMaxSessions)+"); release one before creating another");
@@ -151,7 +197,12 @@ void handle_live_append(const httplib::Request& request,httplib::Response& respo
     const bool wait=ocel_query_bool(request,"wait_until_drained",true);
     const auto batch=live_required(request,"batch_id"),format=live_required(request,"format");live_id(batch);if(batch=="model")throw std::invalid_argument("model is reserved as a source ID");
     const auto bytes=ocel_request_body(request,"log");if(bytes.empty())throw std::invalid_argument("live event upload is empty");
-    if(s->stored_bytes+bytes.size()>kLiveMaxStoredBytes)throw LiveCapacityError(413,"live session upload budget ("+std::to_string(kLiveMaxStoredBytes)+" bytes) is exhausted; release it and start another");std::istringstream input(bytes);minera::EventLog log;
+    if(s->stored_bytes+bytes.size()>kLiveMaxStoredBytes)throw LiveCapacityError(413,"live session upload budget ("+std::to_string(kLiveMaxStoredBytes)+" bytes) is exhausted; release it and start another");
+    // Parsing materializes every event, so bound the batch by an upper
+    // estimate of its events before parsing it (see reader_estimated_events).
+    if(format=="csv"||format=="xes"){const auto estimated=reader_estimated_events(bytes,format=="csv"?"csv_events":"xes_events",s->xes);
+      if(s->stored_events+estimated>kLiveMaxEvents)throw LiveCapacityError(413,"live session event budget ("+std::to_string(kLiveMaxEvents)+" events) cannot take a batch of up to "+std::to_string(estimated)+" events; release it and start another");}
+    StreamBudgetCharge charge;charge.reserve(bytes.size(),0);std::istringstream input(bytes);minera::EventLog log;
     if(format=="csv")log=minera::import_csv_event_log(input,s->csv);else if(format=="xes")log=minera::import_xes_event_log(input,s->xes);else throw std::invalid_argument("live batches require CSV or XES format");
     httplib::Request order;order.params.emplace("streaming_event_order",s->configuration.contains("streaming_event_order")?s->configuration.find("streaming_event_order")->second:"input");std::vector<minera::Event> events;for(const auto* event:streaming_events(log,order))events.push_back(*event);
     // The monitors select the session's activity and timestamp fields by its
@@ -159,7 +210,8 @@ void handle_live_append(const httplib::Request& request,httplib::Response& respo
     // them unless the event carries a literal field of that name.
     if(format=="xes")for(auto& event:events){const auto literal=[&](const std::string& key){return std::any_of(event.attributes.begin(),event.attributes.end(),[&](const auto& a){return a.key==key;});};if(!literal(s->csv.activity_column))event.activity_source_key=s->csv.activity_column;if(!literal(s->csv.timestamp_column))event.timestamp_source_key=s->csv.timestamp_column;}
     if(s->stored_events+events.size()>kLiveMaxEvents)throw LiveCapacityError(413,"live session event budget ("+std::to_string(kLiveMaxEvents)+" events) is exhausted; release it and start another");
-    const auto appended=events.size();s->monitor->append(std::move(events),batch,revision);s->stored_events+=appended;s->sources.push_back({batch,request.has_param("source_name")?request.get_param_value("source_name"):batch,format,request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",bytes});s->stored_bytes+=bytes.size();
+    charge.reserve(0,events.size());
+    const auto appended=events.size();s->monitor->append(std::move(events),batch,revision);s->budget.absorb(charge);s->stored_events+=appended;s->sources.push_back({batch,request.has_param("source_name")?request.get_param_value("source_name"):batch,format,request.has_param("source_sha256")?request.get_param_value("source_sha256"):"",bytes});s->stored_bytes+=bytes.size();
     if(!wait){response.set_content(live_payload(*s,limit),"application/json");return;}
     monitor=s->monitor;}
     monitor->wait_until_drained();
@@ -191,5 +243,10 @@ void handle_live_release(const httplib::Request& request,httplib::Response& resp
     // discards that queue (the stream's stop clears an inactive queue).
     const auto before=s->monitor->snapshot_json(false,0);
     if(before.find("\"state\":\"ACTIVE\"")!=std::string::npos)s->monitor->action(minera::StreamingSessionAction::kFinish,revision);
-    auto payload=live_payload(*s);payload.pop_back();payload+=",\"released\":true}";s->released=true;s->monitor.reset();{std::lock_guard registry_lock(g_live_mutex);g_live_sessions.erase(s->id);}response.set_content(payload,"application/json");});
+    auto payload=live_payload(*s);payload.pop_back();payload+=",\"released\":true}";s->released=true;s->monitor.reset();
+    // The uploads are dropped now too, not when the last request lets go.
+    std::vector<LiveUpload>().swap(s->sources);s->budget.release();
+    {std::lock_guard registry_lock(g_live_mutex);g_live_sessions.erase(s->id);}response.set_content(payload,"application/json");});
+  // A released session's queue, deliveries and uploads go back to the system.
+  if(response.status<300)minera_release_free_memory();
 }

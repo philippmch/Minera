@@ -1,4 +1,5 @@
 import {nativeCell,nativeJson} from "./native-json";
+import { backendFetch } from "./backend-fetch";
 import {appendNativeMultipartField,nativeStringBytes} from "./native-multipart";
 import {nativeResponseJson,readNativeResponse} from "./native-response";
 import {nativeObjectTables,type DiagnosticTable} from "./model-diagnostics";
@@ -95,7 +96,7 @@ export async function runSavedStructural(uploads:{input_file?:File;options_json?
  await append("operation",form.operation);await append("input_format",form.input_format);if(form.call_form_supplied)await append("call_form",form.call_form);
  if(form.operation==="query_intervals"&&form.options_supplied)await append("options_json",form.options_text,uploads.options_json);
  await append("input_file","",uploads.input_file);
- const path="/api/structural-inputs" as const,response=await fetch(path,{method:"POST",body,signal}),value=await readNativeResponse(response,{path});signal?.throwIfAborted();
+ const path="/api/structural-inputs" as const,response=await backendFetch(path,{method:"POST",body,signal}),value=await readNativeResponse(response,{path});signal?.throwIfAborted();
  if(!isSavedStructuralResponse(value))throw Error("The server did not return a complete saved-structure response (HTTP "+response.status+").");
  if(value.originals.length!==originals.length)throw Error("Saved-structure response changed original part ownership.");
  for(let i=0;i<originals.length;++i){const sent=originals[i],got=value.originals[i],bytes=savedStructuralCarrierBytes(got.original);if(!sameString(got.field,sent.field)||got.file!==sent.file||(sent.filename===null?got.filename!==null:got.filename===null||!sameString(got.filename,sent.filename))||bytes.length!==sent.bytes.length||!bytes.every((x,j)=>x===sent.bytes[j]))throw Error("Saved-structure response changed original bytes, order or filename presence.");}

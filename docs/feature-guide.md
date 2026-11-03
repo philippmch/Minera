@@ -697,7 +697,19 @@ The JSON export also carries the performance (`performance`) and resource
 
 The HTTP layer uses the vendored
 [cpp-httplib](https://github.com/yhirose/cpp-httplib)
-(`third_party/httplib.h`).
+(`third_party/httplib.h`, version 0.18.3, with local hardening patches).
+Every patched line is tagged `MINERA PATCH`, and a banner at the top of the
+header lists the patches. They do the following:
+
+- Chunked bodies, and bodies with no Content-Length, are capped at the
+  payload limit; larger ones get `413`.
+- Header lines, the number of headers and the number of trailers are bounded.
+- A `POST`, `PUT` or `PATCH` that has neither a Content-Length nor chunked
+  encoding gets `411`.
+- Each request gets an overall deadline for reading its head and its body.
+- Outgoing clients get a response-size cap.
+
+Re-apply the patches if the header is upgraded.
 
 ### Language-model providers
 

@@ -21,6 +21,10 @@ describe("single-run native Monte Carlo workspace",()=>{
   value=parse();value.model.transitions[0].inputs=[999];expect(validSimulationWorkspace(value)).toBe(false);
   value=parse();value.result.output_places_interval_trees.pop();expect(validSimulationWorkspace(value)).toBe(false);
  });
+ it("keeps a simulation whose text XES cannot carry and reports the writer's refusal",()=>{
+  let value=parse();value.xes=null;value.xes_error="XES cannot represent this text: \"A\\u0001x\"";expect(validSimulationWorkspace(value)).toBe(true);
+  value=parse();value.xes=null;expect(validSimulationWorkspace(value)).toBe(false);
+ });
  it("requests one source-bound native envelope instead of two simulations",async()=>{
   const fetch=vi.fn(async()=>new Response(normal));vi.stubGlobal("fetch",fetch);
   const inputs=defaultSimulationInputs();inputs.options.simulations=60;

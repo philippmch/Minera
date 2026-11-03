@@ -76,6 +76,26 @@ bool utf8_without_controls(const std::string& text) {
   return true;
 }
 
+// Well-formed UTF-8 (JSON whitespace allowed), checked by Python's strict
+// decoder rules: no overlong forms, surrogates or code points above U+10FFFF.
+bool valid_utf8(const std::string& text) {
+  for (std::size_t i = 0; i < text.size();) {
+    const auto lead = static_cast<unsigned char>(text[i]);
+    if (lead < 0x80) { ++i; continue; }
+    std::size_t length = lead >= 0xc2 && lead <= 0xdf ? 2 : lead >= 0xe0 && lead <= 0xef ? 3
+                       : lead >= 0xf0 && lead <= 0xf4 ? 4 : 0;
+    if (length == 0 || i + length > text.size()) return false;
+    for (std::size_t k = 1; k < length; ++k)
+      if ((static_cast<unsigned char>(text[i + k]) & 0xC0) != 0x80) return false;
+    const auto second = static_cast<unsigned char>(text[i + 1]);
+    if ((lead == 0xe0 && second < 0xa0) || (lead == 0xed && second > 0x9f) ||
+        (lead == 0xf0 && second < 0x90) || (lead == 0xf4 && second > 0x8f))
+      return false;
+    i += length;
+  }
+  return true;
+}
+
 bool contains(const httplib::Result& result, const std::string& needle) {
   return result && result->body.find(needle) != std::string::npos;
 }
@@ -396,6 +416,70 @@ int main(int argc, char** argv) {
       result = client.Get("/api/stream-reader/snapshot?session_id=r1");
       check(result && result->status == 200 && contains(result, "STREAM_READER_SESSION"),
             "reader snapshot: " + describe(result));
+    }
+
+    // Logs whose text XES cannot carry (a C0 control, Latin-1 bytes): Petri
+    // playout answers 400 JSON, and routes that embed XES keep their result
+    // and report the refusal in the matching *_error field.
+    for (const std::string activity : {std::string("A\x01x"), std::string("Pr\xfc" "fung")}) {
+      const std::string bad_log =
+          "case_id,activity,timestamp\n"
+          "c1," + activity + ",2024-01-01T00:00:00Z\nc1,B,2024-01-01T00:01:00Z\n"
+          "c2," + activity + ",2024-01-01T00:00:00Z\nc2,B,2024-01-01T00:01:00Z\n";
+      const auto label = activity[1] == '\x01' ? std::string("control char") : std::string("Latin-1");
+      httplib::MultipartFormDataItems items = {{"log", bad_log, "log.csv", "text/csv"}};
+      result = client.Post("/api/mine", items);
+      check(result && result->status == 200 && valid_utf8(result->body),
+            label + " mine answers valid UTF-8 JSON: " + describe(result));
+      const auto source = source_id_of(result);
+      check(!source.empty(), label + " mine returns a source id: " + describe(result));
+      const auto refused = "XES cannot represent";
+      // Every JSON body is valid UTF-8: the Latin-1 byte reaches the result
+      // JSON as U+FFFD (one per maximal ill-formed subpart).
+      const bool latin1 = label == "Latin-1";
+      const auto valid_body = [&](const httplib::Result& r) {
+        return valid_utf8(r->body) &&
+               (!latin1 || r->body.find("Pr\\ufffdfung") != std::string::npos);
+      };
+
+      result = client.Get("/api/playout?miner=inductive&traces=3");
+      check(result && result->status == 400 && contains(result, "\"error\"") &&
+                contains(result, refused) && utf8_without_controls(result->body),
+            label + " Petri playout gives 400 JSON: " + describe(result));
+
+      result = client.Post("/api/log-util?variant=split_train_test&include_source=true&source_id=" +
+                               source, "", "application/x-www-form-urlencoded");
+      check(result && result->status == 200 && contains(result, "\"xes\":null") &&
+                contains(result, std::string("\"xes_error\":\"") + refused) &&
+                valid_body(result),
+            label + " preparation keeps its result and reports xes_error: " + describe(result));
+
+      result = client.Post("/api/label-splitting?include_source=true&source_id=" + source, "",
+                           "application/x-www-form-urlencoded");
+      check(result && result->status == 200 && contains(result, "LOG_TRANSFORMATION") &&
+                contains(result, "\"transformed_xes\":null") &&
+                contains(result, std::string("\"transformed_xes_error\":\"") + refused) &&
+                valid_body(result),
+            label + " transformation keeps its result and reports transformed_xes_error: " +
+                describe(result));
+
+      result = client.Post("/api/anonymize-trace-variants?include_xes=true&tvq_epsilon=100&tvq_k=1&tvq_seed=1&source_id=" +
+                               source, "", "application/x-www-form-urlencoded");
+      check(result && result->status == 200 && contains(result, "ANONYMIZATION_RELEASE") &&
+                contains(result, "\"released_xes\":null") &&
+                contains(result, std::string("\"released_xes_error\":\"") + refused) &&
+                valid_body(result),
+            label + " anonymization keeps its release and reports released_xes_error: " +
+                describe(result));
+
+      result = client.Post("/api/monte-carlo?miner=inductive&include_workspace=true&source_id=" +
+                               source, "", "application/x-www-form-urlencoded");
+      check(result && result->status == 200 && contains(result, "SIMULATION_WORKSPACE") &&
+                contains(result, "\"xes\":null") &&
+                contains(result, std::string("\"xes_error\":\"") + refused) &&
+                valid_body(result),
+            label + " simulation workspace keeps its result and reports xes_error: " +
+                describe(result));
     }
   }
 

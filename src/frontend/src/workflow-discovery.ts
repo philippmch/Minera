@@ -1,4 +1,5 @@
 import { mineFormEntries, type MinerOptions, type CsvOptions } from "./api";
+import { backendFetch } from "./backend-fetch";
 import { isMineraExport, type MineraExport, type PetriNetModel } from "./types";
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
 import type { LogQuerySchema } from "./log-query";
@@ -87,7 +88,7 @@ export interface WorkflowRun {value:WorkflowDiscovery;raw:string;report:string;t
  * default (reported as concept:name) is not an attribute of CSV-sourced logs, so naming it fails the check. */
 export function workflowReplayKey(run:WorkflowRun):string|undefined {return run.replayActivityKey===undefined?undefined:run.value.activity_key;}
 export async function runWorkflowDiscovery(family:WorkflowFamily,form:WorkflowForm,schema:LogQuerySchema,signal?:AbortSignal):Promise<WorkflowRun> {
- const q=workflowQuery(family,form,schema.source_id),response=await fetch('/api/discover-workflow?'+q,{method:'POST',...(signal?{signal}:{})}),raw=await response.text();let value:unknown;
+ const q=workflowQuery(family,form,schema.source_id),response=await backendFetch('/api/discover-workflow?'+q,{method:'POST',...(signal?{signal}:{})}),raw=await response.text();let value:unknown;
  try{value=parseNativeJson(raw);}catch{throw new Error('The backend returned invalid discovery JSON.');}
  if(record(value)&&'error'in value)throw new Error(String(value.error));if(!response.ok)throw new Error('Workflow discovery returned '+response.status+'.');if(!validWorkflowDiscovery(value))throw new Error('The backend returned an invalid native workflow discovery result.');
  if(value.method!==family||value.variant!==form.variant||value.source_id!==schema.source_id||value.source.case_count!==schema.case_count||value.source.event_count!==schema.event_count)throw new Error('Discovery result does not match the selected source and variant.');

@@ -2,9 +2,12 @@
 // (scripts/capture-dfg-performance-playout-bank.py; 300 random DFGs in
 // DataFrame-discovery order, identical under PYTHONHASHSEED 0, 1 and 2).
 // Every case id, activity and microsecond timestamp must match.
+// CLASSIC against scripts/capture-dfg-classic-playout-bank.py: random DFGs
+// and parameters, each trace's activities and probability repr in log order.
 #include "minera/dfg_playout.hpp"
 #include "minera/timestamp.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <exception>
@@ -91,6 +94,108 @@ std::int64_t epoch_micros(const std::string& text) {
   return static_cast<std::int64_t>(*seconds) * 1000000 + std::stoll(text.substr(20, 6));
 }
 
+struct ClassicCase {
+  std::string name;
+  DfgPlayoutOptions options;
+  DfgFrequency frequency;
+  DfgActivityCounts starts, ends;
+  std::vector<std::pair<std::string, std::vector<std::string>>> expected;
+  bool error = false;
+};
+
+std::vector<ClassicCase> load_classic(const char* path) {
+  std::ifstream input(path);
+  if (!input) throw std::runtime_error(std::string("cannot read ") + path);
+  std::vector<ClassicCase> cases;
+  std::string line;
+  while (std::getline(input, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    std::istringstream fields(line);
+    std::string tag;
+    fields >> tag;
+    if (tag == "C") {
+      ClassicCase item;
+      std::string probability;
+      int interrupt = 0, add_new = 0, only_complete = 0;
+      fields >> item.name >> item.options.max_variants >> probability >>
+          item.options.max_occurrences_per_activity >> interrupt >> add_new >>
+          item.options.min_variant_occurrences >> only_complete;
+      item.options.min_weighted_probability = std::stod(probability);
+      item.options.interrupt_when_dfg_complete = interrupt != 0;
+      item.options.add_trace_if_takes_new_edges = add_new != 0;
+      item.options.return_only_if_complete = only_complete != 0;
+      cases.push_back(std::move(item));
+      continue;
+    }
+    auto& item = cases.back();
+    std::string a, b;
+    std::uint64_t count = 0;
+    if (tag == "E") {
+      fields >> a >> b >> count;
+      item.frequency[{a, b}] = count;
+    } else if (tag == "S") {
+      fields >> a >> count;
+      item.starts[a] = count;
+    } else if (tag == "N") {
+      fields >> a >> count;
+      item.ends[a] = count;
+    } else if (tag == "R") {
+      auto& trace = item.expected.emplace_back();
+      fields >> trace.first;
+      while (fields >> a) trace.second.push_back(a);
+    } else if (tag == "X") {
+      item.error = true;
+    }  // "Z": the reference returned None; Minera returns an empty log.
+  }
+  return cases;
+}
+
+int compare_classic(const char* path) {
+  int failures = 0;
+  std::size_t compared = 0, traces = 0, raised = 0;
+  for (const auto& item : load_classic(path)) {
+    // Declared: the reference raises KeyError when the search reaches an
+    // activity with neither successors nor an end weight; Minera skips it.
+    if (item.error) { ++raised; continue; }
+    ++compared;
+    std::string detail;
+    try {
+      const auto result = dfg_playout_result(item.frequency, item.starts, item.ends, item.options);
+      if (result.log.traces.size() != item.expected.size())
+        detail = "trace count " + std::to_string(result.log.traces.size()) + " instead of " +
+                 std::to_string(item.expected.size());
+      for (std::size_t i = 0; i < std::min(result.log.traces.size(), item.expected.size()); ++i) {
+        const auto& trace = result.log.traces[i];
+        std::vector<std::string> activities;
+        for (const auto& event : trace.events) activities.push_back(event.activity);
+        const auto* probability = trace.attribute("probability");
+        if (trace.case_id != std::to_string(i) || activities != item.expected[i].second ||
+            !probability || *probability != item.expected[i].first) {
+          detail += " | trace " + std::to_string(i) + " expected " + item.expected[i].first;
+          for (const auto& a : item.expected[i].second) detail += " " + a;
+          detail += " got " + (probability ? *probability : std::string("-"));
+          for (const auto& a : activities) detail += " " + a;
+          break;
+        }
+        ++traces;
+      }
+    } catch (const std::exception& error) {
+      detail = std::string("raised ") + error.what();
+    }
+    if (!detail.empty()) {
+      ++failures;
+      if (failures <= 20) std::fprintf(stderr, "%s: %s\n", item.name.c_str(), detail.substr(0, 800).c_str());
+    }
+  }
+  std::printf("%zu CLASSIC DFG playouts compared (%zu traces, %zu reference errors skipped), %d failing\n",
+              compared, traces, raised, failures);
+  if (compared < 350) {
+    ++failures;
+    std::fprintf(stderr, "CLASSIC bank coverage below the pinned floor\n");
+  }
+  return failures;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -136,5 +241,6 @@ int main(int argc, char** argv) {
     ++failures;
     std::fprintf(stderr, "bank coverage below the pinned floor\n");
   }
+  failures += compare_classic(argc > 2 ? argv[2] : "src/backend/tests/fixtures/dfg_classic_playout_bank.txt");
   return failures == 0 ? 0 : 1;
 }

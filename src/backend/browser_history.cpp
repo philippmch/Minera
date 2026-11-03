@@ -16,6 +16,7 @@
 #else
 #include <sqlite3.h>
 #endif
+#include "sqlite_untrusted.hpp"
 #endif
 
 namespace minera {
@@ -37,6 +38,7 @@ class Database {
       throw std::runtime_error("browser history: cannot open database: " +
                                message);
     }
+    detail::harden_untrusted_sqlite(db_);
     sqlite3_busy_timeout(db_, 1000);
   }
   ~Database() { if (db_) sqlite3_close(db_); }

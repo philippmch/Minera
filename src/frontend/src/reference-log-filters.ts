@@ -1,4 +1,5 @@
 import {nativeCell} from "./native-json";
+import { backendFetch } from "./backend-fetch";
 import {appendNativeMultipartField, nativeStringBytes} from "./native-multipart";
 import {nativeResponseJson, readNativeResponse} from "./native-response";
 import {isOriginalEmbeddingFilterNativeString, originalEmbeddingFilterStringBytes, originalEmbeddingFilterStringText, type OriginalEmbeddingFilterNativeString} from "./original-embedding-filter-workbench";
@@ -144,7 +145,7 @@ export async function requestReferenceLogFilter(sourceFile: File, form: Referenc
   const fields = referenceLogFilterFields(form), body = new FormData();
   body.append("source_file", sourceFile);
   for (const [key, value] of fields) appendNativeMultipartField(body, key, value);
-  const response = await fetch("/api/reference-log-filter", {method: "POST", body, signal});
+  const response = await backendFetch("/api/reference-log-filter", {method: "POST", body, signal});
   signal?.throwIfAborted();
   if (response.status !== 200 && response.status !== 400) throw new Error(`The log filter returned HTTP ${response.status}.`);
   const responseBytes = new Uint8Array(await response.arrayBuffer());

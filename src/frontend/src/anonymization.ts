@@ -1,11 +1,15 @@
 import { traceVariantQuery, pripelQuery } from "./api";
+import { backendFetch } from "./backend-fetch";
 import { isTraceVariantQueryResult, isPripelResult, type TraceVariantQueryOptions, type PripelOptions, type TraceVariantQueryResult, type PripelResult } from "./types";
 
 export interface AnonymizationRelease {
   family: "ANONYMIZATION_RELEASE";
   source_id: string;
   result: TraceVariantQueryResult | PripelResult;
-  released_xes: string;
+  // Null, with the writer's refusal in released_xes_error, when the release
+  // holds text XES cannot carry; the release itself is kept.
+  released_xes: string | null;
+  released_xes_error?: string | null;
   // Keep the original JSON bytes: native uint64 seeds need not fit JS numbers.
   report_json: string;
 }
@@ -33,11 +37,11 @@ export function attributeOptions(form: PripelForm): PripelOptions {
 export function isAnonymizationRelease(value: unknown): value is Omit<AnonymizationRelease, "report_json"> {
   if (!value || typeof value !== "object") return false;
   const r = value as Partial<AnonymizationRelease>;
-  return r.family === "ANONYMIZATION_RELEASE" && typeof r.source_id === "string" && !!r.source_id && typeof r.released_xes === "string" && r.released_xes.includes("<log") && (isTraceVariantQueryResult(r.result) || isPripelResult(r.result)) && r.result.diagnostics.released_trace_count === r.result.log.traces.length;
+  return r.family === "ANONYMIZATION_RELEASE" && typeof r.source_id === "string" && !!r.source_id && (typeof r.released_xes === "string" && r.released_xes.includes("<log") && (r.released_xes_error === undefined || r.released_xes_error === null) || r.released_xes === null && typeof r.released_xes_error === "string") && (isTraceVariantQueryResult(r.result) || isPripelResult(r.result)) && r.result.diagnostics.released_trace_count === r.result.log.traces.length;
 }
 async function releaseRequest(path: string, sourceId: string, signal?: AbortSignal, body?: BodyInit): Promise<AnonymizationRelease> {
   if (!sourceId) throw new Error("Refresh the anonymization source before running.");
-  const response = await fetch(path, { method: "POST", ...(body === undefined ? {} : { body }), ...(signal ? { signal } : {}) });
+  const response = await backendFetch(path, { method: "POST", ...(body === undefined ? {} : { body }), ...(signal ? { signal } : {}) });
   const text = await response.text();
   let value: unknown;
   try { value = JSON.parse(text); } catch { throw new Error("The backend returned an invalid anonymization response."); }
@@ -64,6 +68,7 @@ export function requestAttributeRelease(sourceId: string, query: File, options: 
 }
 export function releasedFile(release: AnonymizationRelease): File {
   const name = release.result.family === "PRIPEL" ? "pripel" : release.result.variant;
+  if (release.released_xes === null) throw new Error(`XES export is unavailable: ${release.released_xes_error ?? "the backend returned no XES"}`);
   return new File([release.released_xes], `minera-${name}-released.xes`, { type: "application/xml" });
 }
 export function releaseEventCount(release: AnonymizationRelease): number {

@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { Tab } from "../app-logic";
 import { EVERYDAY_TOOLS, REFERENCE_TOOLS, VIEW_GROUPS, groupTools, searchTools, type ToolId, type ViewSpec } from "../tools";
-import { BrandMark, FileButton, ThemeToggle } from "./ui";
+import { BrandMark, FileButton, PaletteShortcut, ThemeToggle } from "./ui";
 
 export interface SidebarDataset {
   kind: string;
@@ -31,8 +31,29 @@ export function Sidebar({ dataset, views, activeView, onSelectView, workspace, a
   const groups = useMemo(() => groupTools(searchTools(query, EVERYDAY_TOOLS)), [query]);
   const reference = useMemo(() => groupTools(searchTools(query, REFERENCE_TOOLS)), [query]);
   const searching = query.trim().length > 0;
+  const aside = useRef<HTMLElement | null>(null);
+  // The drawer (narrow screens): focus moves into it when it opens and back to the menu button when it closes.
+  useEffect(() => {
+    if (!open) return;
+    aside.current?.querySelector<HTMLElement>(".sidebar-close")?.focus();
+    return () => {
+      const focus = document.activeElement;
+      if (!focus || focus === document.body || aside.current?.contains(focus)) document.querySelector<HTMLElement>(".mobile-menu")?.focus();
+    };
+  }, [open]);
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (!open) return;
+    if (event.key === "Escape") { event.preventDefault(); onClose?.(); return; }
+    if (event.key !== "Tab") return;
+    // Keep Tab inside the open drawer, which covers the page.
+    const items = Array.from(aside.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex='-1'])") ?? []).filter((item) => item.offsetParent !== null || item === document.activeElement);
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  };
   return (
-    <aside className={open ? "sidebar open" : "sidebar"} aria-label="Navigation">
+    <aside ref={aside} className={open ? "sidebar open" : "sidebar"} aria-label="Navigation" onKeyDown={onKeyDown}>
       <div className="sidebar-head">
         <button className="brand" onClick={onHome} title="Back to start">
           <BrandMark className="brand-mark" />
@@ -52,7 +73,7 @@ export function Sidebar({ dataset, views, activeView, onSelectView, workspace, a
 
       <button className="sidebar-search" onClick={onOpenPalette}>
         <span>Search views and tools</span>
-        <kbd>⌘K</kbd>
+        <PaletteShortcut />
       </button>
 
       <div className="sidebar-scroll">

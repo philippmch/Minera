@@ -1,4 +1,5 @@
 import {parseDiscoveryStringVector, discoveryStringVectorJson, type DiscoveryVectorMode} from "./discovery-string-vectors";
+import { backendFetch } from "./backend-fetch";
 import { DECLARE_TEMPLATES, isMineraExport, type MineraExport } from "./types";
 import type { LogQuerySchema } from "./log-query";
 import { nativeJson } from "./native-json";
@@ -83,7 +84,7 @@ export function constraintTables(value:ConstraintDiscovery, parameters:URLSearch
 }
 export async function runConstraintDiscovery(family:ConstraintFamily, form:ConstraintForm, source:LogQuerySchema, signal?:AbortSignal):Promise<ConstraintRun> {
   const parameters=constraintQuery(family,form,source.source_id), path="/api/discover-constraints?"+parameters;
-  const response=await fetch(path,{method:"POST",signal});
+  const response=await backendFetch(path,{method:"POST",signal});
   const value=await readNativeResponse(response,{path});
   if (!response.ok || record(value)&&"error" in value) throw new Error(record(value)&&typeof value.error === "string" ? value.error : "Native constraint discovery failed.");
   if (!validConstraintDiscovery(value)) throw new Error("Native constraint discovery returned an invalid result.");

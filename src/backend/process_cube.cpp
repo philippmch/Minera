@@ -298,6 +298,21 @@ class JsonParser {
   [[noreturn]] void fail(const char* message) const {
     throw std::invalid_argument(std::string("invalid process cube JSON: ") + message);
   }
+  // parse_value recurses per nesting level; a deep document would exhaust the
+  // request thread's stack. The table shape needs three levels; 64 matches the
+  // other request JSON parsers.
+  static constexpr std::size_t kMaxDepth = 64;
+  std::size_t depth_ = 0;
+  struct DepthGuard {
+    JsonParser& parser;
+    explicit DepthGuard(JsonParser& value) : parser(value) {
+      if (++parser.depth_ > kMaxDepth) {
+        --parser.depth_;
+        parser.fail("nesting exceeds 64 levels");
+      }
+    }
+    ~DepthGuard() { --parser.depth_; }
+  };
   void skip() {
     while (pos_ < input_.size() &&
            (input_[pos_] == ' ' || input_[pos_] == '\n' ||
@@ -361,6 +376,7 @@ class JsonParser {
     fail("unterminated string");
   }
   JsonValue parse_value() {
+    const DepthGuard depth(*this);
     skip();
     if (pos_ >= input_.size()) fail("unexpected end");
     const char ch = input_[pos_];

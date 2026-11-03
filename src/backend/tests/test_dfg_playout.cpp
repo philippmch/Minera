@@ -151,8 +151,16 @@ void classic_complete_only_and_variant_metadata_are_effective() {
   minera::DfgPlayoutOptions incomplete;
   incomplete.max_variants = 10;
   incomplete.return_only_if_complete = true;
+  // "Complete" is the search's (pm4py 2.7.22): an exhausted search keeps its
+  // traces although X->Y is never covered; a search cut short by the cap
+  // returns nothing.
+  const auto kept = minera::dfg_playout(dfg, starts, ends, incomplete);
+  assert(kept.traces.size() == 1);
+  DfgFrequency branching{{{"A", "B"}, 1}, {{"A", "C"}, 1}};
+  DfgActivityCounts branch_ends{{"B", 1}, {"C", 1}};
+  incomplete.max_variants = 1;
   const auto suppressed =
-      minera::dfg_playout(dfg, starts, ends, incomplete);
+      minera::dfg_playout(branching, starts, branch_ends, incomplete);
   assert(suppressed.traces.empty());
 
   DfgFrequency simple{{{"A", "B"}, 1}};
@@ -212,9 +220,9 @@ void classic_result_honors_minimum_variant_occurrences() {
 }
 
 void classic_result_complete_only_suppresses_partial_counts() {
-  DfgFrequency dfg{{{"A", "B"}, 1}, {{"X", "Y"}, 1}};
+  DfgFrequency dfg{{{"A", "B"}, 1}, {{"A", "C"}, 1}, {{"X", "Y"}, 1}};
   DfgActivityCounts starts{{"A", 1}};
-  DfgActivityCounts ends{{"B", 1}};
+  DfgActivityCounts ends{{"B", 1}, {"C", 1}};
   minera::DfgPlayoutOptions options;
   options.max_variants = 1;
   options.return_variants = true;
@@ -223,6 +231,7 @@ void classic_result_complete_only_suppresses_partial_counts() {
   const auto result =
       minera::dfg_playout_result(dfg, starts, ends, options);
   assert(!result.complete);
+  assert(result.interrupted);
   assert(result.log.traces.empty());
   assert(result.counts.empty());
 }
@@ -289,6 +298,29 @@ void classic_completion_flag_controls_early_stop() {
   assert(stopped.complete);
   assert(stopped.counts.size() >= 3);
   assert(stopped.counts.size() < all.counts.size());
+}
+
+// pm4py 2.7.22 CLASSIC: traces listed by descending probability, carrying
+// concept:name and the probability as Python's float repr, nothing else by
+// default (more cases in the CLASSIC bank of the playout parity test).
+void classic_traces_carry_reference_attributes() {
+  DfgFrequency dfg{{{"A", "B"}, 3}, {{"B", "C"}, 2}, {{"B", "A"}, 1}};
+  DfgActivityCounts starts{{"A", 3}};
+  DfgActivityCounts ends{{"C", 2}, {"B", 1}};
+  const auto log = minera::dfg_playout(dfg, starts, ends, minera::DfgPlayoutOptions{});
+  const std::vector<std::pair<std::string, std::string>> expected = {
+      {"A,B,C", "0.5"}, {"A,B", "0.25"}, {"A,B,A,B,C", "0.12500000000000003"},
+      {"A,B,A,B", "0.0625"}};
+  assert(log.traces.size() == expected.size());
+  for (std::size_t i = 0; i < expected.size(); ++i) {
+    const auto& trace = log.traces[i];
+    std::string activities;
+    for (const auto& event : trace.events) activities += (activities.empty() ? "" : ",") + event.activity;
+    assert(trace.case_id == std::to_string(i));
+    assert(activities == expected[i].first);
+    assert(trace.attributes.size() == 1 && trace.attributes[0].key == "probability");
+    assert(trace.attributes[0].value == expected[i].second);
+  }
 }
 
 void custom_attribute_keys_are_emitted_for_both_variants() {
@@ -386,6 +418,7 @@ int main() {
   performance_uses_frequency_weighted_choices();
   invalid_performance_inputs_are_rejected();
   classic_timeout_and_probability_settings_bound_work();
+  classic_traces_carry_reference_attributes();
   classic_complete_only_and_variant_metadata_are_effective();
   classic_result_exposes_deterministic_variant_counts();
   classic_result_honors_minimum_variant_occurrences();

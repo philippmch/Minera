@@ -1,4 +1,5 @@
 #include "minera/source_acquisition.hpp"
+#include "secure_temp.hpp"
 #include "minera/browser_history.hpp"
 #include "minera/communication_history.hpp"
 #include "minera/enterprise_history.hpp"
@@ -34,16 +35,13 @@ std::string read_file(const std::filesystem::path& path) {
 }
 class UploadedFile {
  public:
-  explicit UploadedFile(const std::string& bytes) {
-    static std::atomic<std::size_t> counter=0;
-    const auto stamp=std::chrono::steady_clock::now().time_since_epoch().count();
-    directory_=std::filesystem::temp_directory_path()/("minera-source-"+std::to_string(stamp)+"-"+std::to_string(counter++)+"-"+std::to_string(std::random_device{}()));
-    if(!std::filesystem::create_directory(directory_))throw std::runtime_error("source acquisition: temporary directory collision");
-    path_=directory_/"original.data";std::ofstream output(path_,std::ios::binary);output.write(bytes.data(),static_cast<std::streamsize>(bytes.size()));if(!output){std::error_code error;std::filesystem::remove(path_,error);std::filesystem::remove(directory_,error);throw std::runtime_error("source acquisition: could not materialize uploaded file");}
+  // A private (0700, unpredictable) directory, removed on destruction and on
+  // SIGTERM/SIGINT; see secure_temp.hpp.
+  explicit UploadedFile(const std::string& bytes):directory_("minera-source-") {
+    path_=directory_.file("original.data");std::ofstream output(path_,std::ios::binary);output.write(bytes.data(),static_cast<std::streamsize>(bytes.size()));if(!output)throw std::runtime_error("source acquisition: could not materialize uploaded file");
   }
-  ~UploadedFile(){std::error_code error;std::filesystem::remove(path_,error);std::filesystem::remove(directory_,error);}
   const std::filesystem::path& path() const {return path_;}
- private:std::filesystem::path directory_,path_;
+ private:secure_temp::PrivateDirectory directory_;std::filesystem::path path_;
 };
 }
 SourceAcquisitionResult acquire_source(const SourceAcquisitionInput& input) {

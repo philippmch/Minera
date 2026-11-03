@@ -196,6 +196,12 @@ class PtmlBuilder {
 
  private:
   ProcessTreeNode build(const std::string& id) {
+    // build() recurses once per tree level and visiting_ holds the current
+    // path; bound it so a deep model is an error, not a stack overflow.
+    constexpr std::size_t kMaxDepth = 1000;
+    if (visiting_.size() >= kMaxDepth) {
+      throw std::runtime_error("PTML process tree nesting exceeds 1000 levels");
+    }
     if (!visiting_.insert(id).second) {
       throw std::runtime_error("PTML edges form a cycle at node '" + id + "'");
     }

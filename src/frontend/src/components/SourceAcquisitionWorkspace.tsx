@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
+import { readStored, writeStored } from "../storage";
 import {DATABASE_CONNECTORS,defaultAcquisitionForm,SOURCE_CONNECTORS,type AcquisitionForm} from '../source-acquisition-workspace';
 import {downloadQueryBlob} from '../log-query';
 import {nativeCell} from '../native-json';
@@ -7,9 +8,9 @@ import {AcquisitionXesEditor,ExactSourceAcquisitionInspection} from './ExactSour
 const SCHEMAS:Record<string,string>={camunda_workflow:'process_id,case_id,activity,timestamp,resource',sap_o2c:'case_id,activity,timestamp,resource',sap_accounting:'case_id,activity,timestamp,resource,document_type',outlook_mail_extractor:'conversation_id,direction,item_class,created_at,sender,recipients,topic,subject',outlook_calendar:'conversation_id,subject,created_at,last_changed_at,start_at,end_at,cancelled,reminder_at'};
 export function SourceAcquisitionWorkspace({busy=false,onOpen}:{busy?:boolean;onOpen?:(file:File)=>void}) {
  const [form,setForm]=useState(defaultAcquisitionForm),[file,setFile]=useState<File|null>(null),[token,setToken]=useState(''),[databaseConnection,setDatabaseConnection]=useState(''),[run,setRun]=useState<ExactSourceRun<ExactAcquiredSource>|null>(null),[sources,setSources]=useState<ExactAcquiredSource[]>([]),[failed,setFailed]=useState<ExactSourceRun|null>(null),[extra,setExtra]=useState<ExactSourceRun|null>(null);
- const [connection,setConnection]=useState(()=>typeof localStorage==='undefined'?'':localStorage.getItem('minera.acquiredSource')??''),[pending,setPending]=useState(false),[error,setError]=useState<string|null>(null);
+ const [connection,setConnection]=useState(()=>readStored('minera.acquiredSource')??''),[pending,setPending]=useState(false),[error,setError]=useState<string|null>(null);
  const request=useRef<AbortController|null>(null),gate=useRef(new AcquisitionRequestGate()),identity=useRef<object>({});const cancel=()=>{gate.current.invalidate();identity.current={};request.current?.abort();request.current=null;setPending(false);};useEffect(()=>()=>{gate.current.invalidate();request.current?.abort();},[]);
- const remember=(id:string)=>{setConnection(id);if(typeof localStorage!=='undefined')localStorage.setItem('minera.acquiredSource',id);};
+ const remember=(id:string)=>{setConnection(id);writeStored('minera.acquiredSource',id);};
  const operation=async<T extends ExactAcquisitionEnvelope,>(task:(signal:AbortSignal)=>Promise<ExactSourceRun<T>>,accept:(value:ExactSourceRun<T>)=>void)=>{cancel();const c=new AbortController(),ticket=gate.current.issue(identity.current);request.current=c;setPending(true);setError(null);try{const value=await task(c.signal);if(request.current===c&&gate.current.accepts(ticket,identity.current,c.signal)){if(value.value.error)setFailed(value);else accept(value);}}catch(cause){if(request.current===c&&gate.current.accepts(ticket,identity.current,c.signal))setError(cause instanceof Error?cause.message:String(cause));}finally{if(request.current===c){request.current=null;setPending(false);}}};
  const accept=(value:ExactSourceRun<ExactAcquiredSource>)=>{setRun(retainExactSourceFiles(value,run));setFailed(null);setExtra(null);setForm(exactAcquiredForm(value.value));setToken('');setDatabaseConnection('');if(value.value.source_id!==null){const id=acquisitionUnicode(value.value.source_id);if(id!==null)remember(id);}};
  const acquire=()=>{const id=crypto.randomUUID();remember(id);void operation(signal=>acquireExactSource(form,id,file,token,signal,databaseConnection),accept);};

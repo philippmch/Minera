@@ -9,27 +9,10 @@ void minera_release_free_memory() {
 #endif
 }
 
+// Valid UTF-8 JSON under the shared policy (json_utf8.hpp): WTF-8
+// surrogates as \uXXXX escapes, other ill-formed bytes as U+FFFD.
 std::string active_source_safe_json(std::string_view input) {
-  constexpr char hex[] = "0123456789abcdef";
-  std::string output;
-  output.reserve(input.size());
-  for (std::size_t i = 0; i < input.size(); ++i) {
-    const auto a = static_cast<unsigned char>(input[i]);
-    if (a == 0xed && i + 2 < input.size()) {
-      const auto b = static_cast<unsigned char>(input[i + 1]);
-      const auto c = static_cast<unsigned char>(input[i + 2]);
-      if (b >= 0xa0 && b <= 0xbf && c >= 0x80 && c <= 0xbf) {
-        const auto unit = ((a & 15) << 12) | ((b & 63) << 6) | (c & 63);
-        output += "\\u";
-        for (int shift = 12; shift >= 0; shift -= 4)
-          output += hex[(unit >> shift) & 15];
-        i += 2;
-        continue;
-      }
-    }
-    output += input[i];
-  }
-  return output;
+  return minera::detail::repair_json_utf8(input);
 }
 
 std::string active_source_quote(std::string_view value) {
@@ -577,19 +560,43 @@ void publish_active_mining(const std::shared_ptr<ActiveMiningTicket>& ticket,
 }
 
 void release_mining_rollback(const std::shared_ptr<ActiveMiningTicket>& ticket) {
-  std::shared_ptr<const MinedSession> previous;
+  std::shared_ptr<const MinedSession> previous, published;
   std::shared_ptr<const ClusteringAnalysis> previous_clustering;
   {
     std::lock_guard<std::mutex> lock(g_session_mutex);
     if (ticket->canceled || ticket->released) return;
     ticket->released = true;
     previous = std::move(ticket->previous); previous_clustering = std::move(ticket->previous_clustering);
+    // A released ticket can never restore, so it must not keep the published
+    // session alive either: once a later request (check-model) replaced
+    // g_session, this reference would be the only owner of a full session.
+    published = std::move(ticket->published);
     if (g_rollback_mining_ticket == ticket) g_rollback_mining_ticket.reset();
   }
-  // Destroy the replaced session outside the lock.
-  if (!previous && !previous_clustering) return;
+  // Destroy the replaced sessions outside the lock.
+  const bool sole_owner = published && published.use_count() == 1;
+  published.reset();
+  if (!previous && !previous_clustering && !sole_owner) return;
   previous.reset(); previous_clustering.reset();
   minera_release_free_memory();
+}
+
+// Called with g_session_mutex held when a request other than mining replaces
+// g_session (check-model installs an imported model on a copy of `replaced`).
+// A ticket that published `replaced` can no longer restore its previous
+// session (cancel-mine requires g_session == published), so it gives up the
+// published, previous and clustering references; they are moved into
+// `garbage` so the caller destroys them after unlocking.
+void forget_mining_rollback_locked(const std::shared_ptr<const MinedSession>& replaced,
+    std::vector<std::shared_ptr<const void>>& garbage) {
+  const auto forget = [&](const std::shared_ptr<ActiveMiningTicket>& ticket) {
+    if (!ticket || !replaced || ticket->published != replaced) return;
+    garbage.push_back(std::move(ticket->published)); ticket->published.reset();
+    garbage.push_back(std::move(ticket->previous)); ticket->previous.reset();
+    garbage.push_back(std::move(ticket->previous_clustering)); ticket->previous_clustering.reset();
+  };
+  for (const auto& [id, ticket] : g_active_mining_requests) {(void)id; forget(ticket);}
+  if (g_rollback_mining_ticket && !g_rollback_mining_ticket->published) g_rollback_mining_ticket.reset();
 }
 
 // How long a written mining response keeps its rollback session while the
@@ -629,6 +636,10 @@ MiningRollbackReaper& mining_rollback_reaper() {
             [](const auto& a, const auto& b) {return a.first < b.first;})->first;
         if (std::chrono::steady_clock::now() < next) {created->wake.wait_until(lock, next); continue;}
         std::vector<std::shared_ptr<ActiveMiningTicket>> expired;
+        // Reserve up front so collecting cannot throw; on allocation failure
+        // retry shortly instead of terminating this detached thread.
+        try {expired.reserve(created->due.size());}
+        catch (...) {created->wake.wait_for(lock, std::chrono::milliseconds(100)); continue;}
         const auto now = std::chrono::steady_clock::now();
         std::erase_if(created->due, [&](const auto& entry) {
           if (entry.first > now) return false;
@@ -636,7 +647,9 @@ MiningRollbackReaper& mining_rollback_reaper() {
           return true;
         });
         lock.unlock();
-        for (const auto& ticket : expired) release_mining_rollback(ticket);
+        for (const auto& ticket : expired) {
+          try {release_mining_rollback(ticket);} catch (...) {}
+        }
         expired.clear();
         lock.lock();
       }
@@ -646,15 +659,23 @@ MiningRollbackReaper& mining_rollback_reaper() {
   return *reaper;
 }
 
-void schedule_mining_rollback_release(const std::shared_ptr<ActiveMiningTicket>& ticket) {
-  // A request without an identity can never be canceled.
-  if (ticket->id.empty() || mining_rollback_window().count() == 0) {release_mining_rollback(ticket); return;}
-  auto& reaper = mining_rollback_reaper();
-  {
-    std::lock_guard<std::mutex> lock(reaper.mutex);
-    reaper.due.emplace_back(std::chrono::steady_clock::now() + mining_rollback_window(), ticket);
+// Never throws: it runs from a content-provider releaser, i.e. inside
+// ~Response, where an escaping exception would terminate the server. If the
+// rollback cannot be scheduled (allocation or thread-creation failure), it is
+// released at once, giving up the cancel window rather than leaking it.
+void schedule_mining_rollback_release(const std::shared_ptr<ActiveMiningTicket>& ticket) noexcept {
+  try {
+    // A request without an identity can never be canceled.
+    if (ticket->id.empty() || mining_rollback_window().count() == 0) {release_mining_rollback(ticket); return;}
+    auto& reaper = mining_rollback_reaper();
+    {
+      std::lock_guard<std::mutex> lock(reaper.mutex);
+      reaper.due.emplace_back(std::chrono::steady_clock::now() + mining_rollback_window(), ticket);
+    }
+    reaper.wake.notify_one();
+  } catch (...) {
+    try {release_mining_rollback(ticket);} catch (...) {}
   }
-  reaper.wake.notify_one();
 }
 
 // A request bound to the published source id proves its client consumed the
@@ -681,9 +702,12 @@ void deliver_published_mining(httplib::Response& response) {
   t_published_mining_ticket.reset();
   if (!ticket) return;
   if (response.body.empty()) {schedule_mining_rollback_release(ticket); return;}
+  // If wrapping the body fails (allocation), the ticket must still start its
+  // rollback window, or the previous session stays pinned until the next mine.
+  try {
   const auto type = response.get_header_value("Content-Type");
   auto body = std::make_shared<std::string>(std::move(response.body));
-  if (type.starts_with("application/json") && body->find('\xed') != std::string::npos)
+  if (type.starts_with("application/json") && !minera::detail::is_clean_utf8(*body))
     *body = active_source_safe_json(*body);
   response.body.clear();
   // set_content_provider adds the Content-Type header again.
@@ -693,10 +717,14 @@ void deliver_published_mining(httplib::Response& response) {
       [body](std::size_t offset, std::size_t length, httplib::DataSink& sink) {
         return sink.write(body->data() + offset, std::min(length, body->size() - offset));
       },
-      [ticket, body](bool) mutable {
+      [ticket, body](bool) mutable noexcept {
         body.reset();
-        schedule_mining_rollback_release(ticket);
+        schedule_mining_rollback_release(ticket);  // noexcept
       });
+  } catch (...) {
+    if (!response.content_provider_resource_releaser_) schedule_mining_rollback_release(ticket);
+    throw;
+  }
 }
 
 // The client applied the mining response: its rollback session is released.

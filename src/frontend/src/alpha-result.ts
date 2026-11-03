@@ -1,3 +1,4 @@
+import { backendFetch } from "./backend-fetch";
 export type AlphaPlaceName = { boundary: string } | { before: (string | null)[]; after: (string | null)[] };
 export interface AlphaPlusResult {
   family: "ALPHA_PLUS";
@@ -59,7 +60,7 @@ export async function discoverAlphaPlusResult(options: AlphaPlusResultOptions = 
   const query = alphaPlusResultQuery(options);
   const body = file ? new FormData() : undefined;
   if (body && file) body.set("log", file);
-  const response = await fetch(`/api/discover-alpha-plus${query ? `?${query}` : ""}`, { method: "POST", body });
+  const response = await backendFetch(`/api/discover-alpha-plus${query ? `?${query}` : ""}`, { method: "POST", body });
   const result: unknown = await response.json();
   if (record(result) && typeof result.error === "string") throw new Error(result.error);
   if (!response.ok) throw new Error(`Alpha+ discovery failed with status ${response.status}`);

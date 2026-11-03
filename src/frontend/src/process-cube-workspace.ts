@@ -1,4 +1,5 @@
 import { processCubeQuery, type ProcessCubeOptions } from "./api";
+import { backendFetch } from "./backend-fetch";
 import { isProcessCubeTable, isProcessCubeResult, type ProcessCubeTable, type ProcessCubeResult } from "./types";
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
 import { type OcelPreparedTable } from "./ocel-preparation";
@@ -85,7 +86,7 @@ export async function requestCubeFile(file: File, form: CubeForm, signal?: Abort
   const options = cubeOptions(form), query = processCubeQuery(options), bytes = await file.arrayBuffer();
   const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), value => value.toString(16).padStart(2, "0")).join("");
   signal?.throwIfAborted();
-  const response = await fetch("/api/process-cube?" + query, { method: "POST", headers: { "Content-Type": "application/json" }, body: bytes, ...(signal ? { signal } : {}) });
+  const response = await backendFetch("/api/process-cube?" + query, { method: "POST", headers: { "Content-Type": "application/json" }, body: bytes, ...(signal ? { signal } : {}) });
   const raw = await response.text(); signal?.throwIfAborted();
   let value: unknown;
   try { value = parseNativeJson(raw); } catch { throw new Error("The backend returned invalid process-cube JSON."); }

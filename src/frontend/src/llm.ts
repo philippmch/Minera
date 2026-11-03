@@ -1,4 +1,5 @@
 import {hasExactKnowledge,requestExactKnowledge,type ExactKnowledgeRequest,type ExactKnowledgeEnvelope,type KnowledgeRequest} from "./exact-knowledge";
+import { backendFetch } from "./backend-fetch";
 import type {LlmCallOverrides} from "./provider-call-config";
 import { knowledgeInjectionQuery } from "./api";
 import { isKnowledgeInjectionResult, type KnowledgeInjectionOptions, type KnowledgeInjectionResult, type KnowledgeInjectionVariant, type MineraExport } from "./types";
@@ -60,7 +61,7 @@ async function checkedJson<T>(response:Response,guard:(value:unknown)=>value is 
   return value;
 }
 export async function requestLlmStatus(signal?:AbortSignal):Promise<LlmRuntimeStatus> {
-  return checkedJson(await fetch("/api/llm/status",signal?{signal}:{}),isLlmRuntimeStatus,"language-model runtime status");
+  return checkedJson(await backendFetch("/api/llm/status",signal?{signal}:{}),isLlmRuntimeStatus,"language-model runtime status");
 }
 export function requestKnowledgePreview(options:ExactKnowledgeRequest,signal?:AbortSignal):Promise<ExactKnowledgeEnvelope>;
 export function requestKnowledgePreview(options:KnowledgeInjectionOptions,signal?:AbortSignal):Promise<KnowledgeInjectionResult>;
@@ -68,11 +69,11 @@ export async function requestKnowledgePreview(options:KnowledgeRequest,signal?:A
   if(hasExactKnowledge(options))return requestExactKnowledge(options,signal);
   const form=new FormData();
   for(const [key,value] of new URLSearchParams(knowledgeInjectionQuery(options)))form.append(key,value);
-  const result=await checkedJson(await fetch("/api/knowledge-injection",{method:"POST",body:form,...(signal?{signal}:{})}),isKnowledgeInjectionResult,"knowledge prompt");
+  const result=await checkedJson(await backendFetch("/api/knowledge-injection",{method:"POST",body:form,...(signal?{signal}:{})}),isKnowledgeInjectionResult,"knowledge prompt");
   return {...result,prompt:result.prompt.replace(/\r\n?/g,"\n")};
 }
 export async function requestLlmCompletion(input:LlmCompletionRequest,signal?:AbortSignal):Promise<LlmCompletion> {
   const body=JSON.stringify(input);
   if(new TextEncoder().encode(body).length>2*1024*1024)throw new Error("The request exceeds the runtime input bound.");
-  return checkedJson(await fetch("/api/llm/complete",{method:"POST",headers:{"Content-Type":"application/json"},body,...(signal?{signal}:{})}),isLlmCompletion,"language-model completion");
+  return checkedJson(await backendFetch("/api/llm/complete",{method:"POST",headers:{"Content-Type":"application/json"},body,...(signal?{signal}:{})}),isLlmCompletion,"language-model completion");
 }

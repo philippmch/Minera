@@ -1,6 +1,7 @@
 #include "minera/exact_filter_discovery_json.hpp"
 #include "minera/request_params.hpp"
 #include "minera/literal_controls_json.hpp"
+#include "json_utf8.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -984,10 +985,6 @@ std::string error_json(std::string_view message) {
     out += "\\u";
     for (int shift = 12; shift >= 0; shift -= 4) out += hex[(unit >> shift) & 15];
   };
-  const auto continuation = [&](std::size_t at) {
-    return at < message.size() &&
-           (static_cast<unsigned char>(message[at]) & 0xc0) == 0x80;
-  };
   for (std::size_t i = 0; i < message.size();) {
     const auto c = static_cast<unsigned char>(message[i]);
     if (c < 0x80) {
@@ -1006,29 +1003,16 @@ std::string error_json(std::string_view message) {
       ++i;
       continue;
     }
-    const std::size_t length = c >= 0xc2 && c <= 0xdf ? 2 :
-                               c >= 0xe0 && c <= 0xef ? 3 :
-                               c >= 0xf0 && c <= 0xf4 ? 4 : 0;
-    bool valid = length != 0 && i + length <= message.size();
-    for (std::size_t k = 1; valid && k < length; ++k) valid = continuation(i + k);
-    if (valid) {
-      const auto second = static_cast<unsigned char>(message[i + 1]);
-      if ((c == 0xe0 && second < 0xa0) || (c == 0xf0 && second < 0x90) ||
-          (c == 0xf4 && second > 0x8f)) {
-        valid = false;
-      } else if (c == 0xed && second >= 0xa0) {
-        const auto third = static_cast<unsigned char>(message[i + 2]);
-        escape_unit(((c & 15u) << 12) | ((second & 63u) << 6) | (third & 63u));
-        i += 3;
-        continue;
-      }
-    }
-    if (!valid) {
-      out += "\\ufffd";
-      ++i;
+    // The shared JSON policy (json_utf8.hpp): one U+FFFD per maximal
+    // ill-formed subpart, as Python's errors="replace" decodes.
+    if (const auto unit = detail::wtf8_surrogate_at(message, i)) {
+      escape_unit(unit);
+      i += 3;
       continue;
     }
-    out.append(message.substr(i, length));
+    const auto [length, valid] = detail::utf8_unit(message, i);
+    if (valid) out.append(message.substr(i, length));
+    else out += "\\ufffd";
     i += length;
   }
   out += "\"}";
@@ -2245,8 +2229,12 @@ MineParams parse_mine_params(const FieldLookup& field,
     params.xes.attributes_to_read = split_csv(field("xes_attributes_to_read"));
   }
   if (supplied("xes_max_decompressed_bytes")) {
-    params.xes.max_decompressed_bytes = parse_positive_size(
-        field("xes_max_decompressed_bytes"), "xes_max_decompressed_bytes");
+    // A request may lower the decompression bound but never raise it past
+    // the default: one small .xes.gz could otherwise inflate without limit.
+    params.xes.max_decompressed_bytes = std::min(
+        parse_positive_size(field("xes_max_decompressed_bytes"),
+                            "xes_max_decompressed_bytes"),
+        XesImportOptions{}.max_decompressed_bytes);
   }
 
   // Optional log-preprocessing filters, applied before discovery.

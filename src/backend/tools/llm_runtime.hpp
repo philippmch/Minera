@@ -149,6 +149,8 @@ inline httplib::Result request(std::string_view url, std::string_view route,
   client.set_connection_timeout(std::chrono::seconds(5));
   client.set_write_timeout(std::chrono::seconds(5));
   client.set_read_timeout(std::chrono::seconds(90));
+  // Stop reading as soon as the body passes the bound, whatever its framing.
+  client.set_payload_max_length(max_response_bytes);
   if (body && (body->empty() || body->size() > max_input_bytes))
     throw std::invalid_argument("LLM request must be nonempty and within the runtime input bound");
   auto response = body ? client.Post(std::string(route), *body, "application/json")

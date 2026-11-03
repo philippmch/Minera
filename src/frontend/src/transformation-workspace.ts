@@ -1,4 +1,5 @@
 import { logToFeaturesQuery,logToTargetQuery,labelSplittingQuery,type LogToFeaturesOptions,type LogToTargetOptions,type LabelSplittingOptions } from "./api";
+import { backendFetch } from "./backend-fetch";
 import { isLogToFeaturesResult,isLogToTargetResult,isLabelSplittingResult,type LogToFeaturesResult,type LogToTargetResult,type LabelSplittingResult } from "./types";
 
 export type TransformationMethod="features"|"targets"|"labels";
@@ -66,7 +67,7 @@ export function labelOptions(form:LabelForm):LabelSplittingOptions {
 }
 export interface TransformationCase {index:number;case_id:string;event_count:number;}
 export interface LabelRow {case_index:number;event_index:number;input:string;previous:string;output:string;}
-export interface TransformationRun {family:"LOG_TRANSFORMATION";source_id:string;cases:TransformationCase[];result:LogToFeaturesResult|LogToTargetResult|LabelSplittingResult;transformed_xes:string|null;activity_attribute?:string;complete_activity_field?:boolean;label_rows?:LabelRow[];data_json:string;report_json:string;}
+export interface TransformationRun {family:"LOG_TRANSFORMATION";source_id:string;cases:TransformationCase[];result:LogToFeaturesResult|LogToTargetResult|LabelSplittingResult;transformed_xes:string|null;transformed_xes_error?:string|null;activity_attribute?:string;complete_activity_field?:boolean;label_rows?:LabelRow[];data_json:string;report_json:string;}
 export function isTransformationRun(value:unknown):value is Omit<TransformationRun,"data_json"|"report_json"> {
   if(!value||typeof value!=="object")return false;const run=value as Partial<TransformationRun>;
   if(run.family!=="LOG_TRANSFORMATION"||typeof run.source_id!=="string"||!run.source_id||!Array.isArray(run.cases)||!run.cases.every((trace,index)=>!!trace&&trace.index===index&&typeof trace.case_id==="string"&&Number.isSafeInteger(trace.event_count)&&trace.event_count>=0))return false;
@@ -80,14 +81,14 @@ export function isTransformationRun(value:unknown):value is Omit<TransformationR
   if(isLogToTargetResult(run.result)) {
     const r=run.result;return run.transformed_xes===null&&r.trace_count===cases.length&&r.rows.length===cases.length&&r.classes.length===r.target_width&&r.rows.every((rows,i)=>(r.padded?rows.length>=cases[i].event_count&&rows.length===(r.rows[0]?.length??0):rows.length===cases[i].event_count)&&rows.every(row=>row.length===r.target_width));
   }
-  if(!isLabelSplittingResult(run.result)||typeof run.transformed_xes!=="string"||typeof run.activity_attribute!=="string"||!run.activity_attribute||typeof run.complete_activity_field!=="boolean"||!Array.isArray(run.label_rows)||run.result.log.traces.length!==cases.length||!run.result.log.traces.every((trace,i)=>trace.case_id===cases[i].case_id&&trace.events.length===cases[i].event_count))return false;
+  if(!isLabelSplittingResult(run.result)||!(typeof run.transformed_xes==="string"&&(run.transformed_xes_error===undefined||run.transformed_xes_error===null)||run.transformed_xes===null&&typeof run.transformed_xes_error==="string")||typeof run.activity_attribute!=="string"||!run.activity_attribute||typeof run.complete_activity_field!=="boolean"||!Array.isArray(run.label_rows)||run.result.log.traces.length!==cases.length||!run.result.log.traces.every((trace,i)=>trace.case_id===cases[i].case_id&&trace.events.length===cases[i].event_count))return false;
   let position=0;for(const trace of cases)for(let event=0;event<trace.event_count;event++){const row=run.label_rows[position++];if(!row||row.case_index!==trace.index||row.event_index!==event||![row.input,row.previous,row.output].every(value=>typeof value==="string"))return false;}return position===run.label_rows.length&&run.complete_activity_field===run.label_rows.every(row=>!!row.output);
 }
 export async function requestTransformation(method:TransformationMethod,sourceId:string,options:LogToFeaturesOptions|LogToTargetOptions|LabelSplittingOptions,signal?:AbortSignal):Promise<TransformationRun> {
   if(!sourceId)throw new Error("Refresh the transformation source first.");
   const query=method==="features"?logToFeaturesQuery(options as LogToFeaturesOptions):method==="targets"?logToTargetQuery(options as LogToTargetOptions):labelSplittingQuery(options as LabelSplittingOptions);
   const route=method==="features"?"log-to-features":method==="targets"?"transform-target":"label-splitting";const params=new URLSearchParams(query);params.set("source_id",sourceId);params.set("include_source","true");
-  const response=await fetch(`/api/${route}?${params}`,{method:"POST",...(signal?{signal}:{})});const raw=await response.text();let value:unknown;try{value=JSON.parse(raw);}catch{throw new Error("The backend returned an invalid transformation response.");}
+  const response=await backendFetch(`/api/${route}?${params}`,{method:"POST",...(signal?{signal}:{})});const raw=await response.text();let value:unknown;try{value=JSON.parse(raw);}catch{throw new Error("The backend returned an invalid transformation response.");}
   if(value&&typeof value==="object"&&"error"in value)throw new Error(String((value as {error:unknown}).error));if(!response.ok)throw new Error(`Transformation returned ${response.status}.`);if(!isTransformationRun(value))throw new Error("The backend returned an invalid transformation result.");if(value.source_id!==sourceId)throw new Error("The source log changed; refresh the transformation source.");
   if(value.result.family!==({features:"LOG_TO_FEATURES",targets:"LOG_TO_TARGET",labels:"LABEL_SPLITTING"} as const)[method])throw new Error("The backend returned a different transformation method.");
   const variant=method==="features"?(options as LogToFeaturesOptions).features_variant:method==="targets"?(options as LogToTargetOptions).target_variant:(options as LabelSplittingOptions).label_splitting_variant;
@@ -109,4 +110,4 @@ export function transformationCsv(run:TransformationRun):Blob {
   const matrix=transformationMatrix(run);const quote=(value:unknown)=>'"'+cellText(value).replaceAll('"','""')+'"';const lines=[[...matrix.metadataNames,...matrix.columns].map(quote).join(",")];
   for(let index=0;index<matrix.count;index++){const row=matrix.rowAt(index);lines.push([...row.metadata,...row.values].map(quote).join(","));}return new Blob([lines.join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"});
 }
-export function transformedXes(run:TransformationRun):Blob {if(run.transformed_xes===null)throw new Error("This transformation does not produce an XES log.");return new Blob([run.transformed_xes],{type:"application/xml"});}
+export function transformedXes(run:TransformationRun):Blob {if(run.transformed_xes===null)throw new Error(typeof run.transformed_xes_error==="string"?`XES export is unavailable: ${run.transformed_xes_error}`:"This transformation does not produce an XES log.");return new Blob([run.transformed_xes],{type:"application/xml"});}

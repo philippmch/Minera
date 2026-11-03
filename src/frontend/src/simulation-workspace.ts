@@ -10,7 +10,9 @@ export interface SimulationWorkspace {
   family: "SIMULATION_WORKSPACE"; source_id: string; dataset: string; miner: string;
   source: { case_count: number; event_count: number }; result: MonteCarloResult;
   simulated_log: { family: "LOG_CONVERSION"; variant: "TO_EVENT_LOG"; log: LogConversionLog };
-  xes: string; underlying_pnml: string;
+  // Null, with the writer's refusal in xes_error, when the simulated log holds
+  // text XES cannot carry; the simulation result is kept.
+  xes: string | null; xes_error?: string | null; underlying_pnml: string;
   model: PetriNetModel & { activities: string[]; transitions: Array<PetriNetModel["transitions"][number] & { index: number }> };
 }
 export interface SimulationInputs {
@@ -45,7 +47,7 @@ const record = (value: unknown): value is Record<string, unknown> => !!value && 
 export function validSimulationWorkspace(value: unknown): value is SimulationWorkspace {
   if (!record(value) || value.family !== "SIMULATION_WORKSPACE" || typeof value.source_id !== "string" || !value.source_id || typeof value.dataset !== "string" || typeof value.miner !== "string" || !record(value.source) ||
       !Number.isSafeInteger(value.source.case_count) || (value.source.case_count as number) < 0 || !Number.isSafeInteger(value.source.event_count) || (value.source.event_count as number) < 0 || !isMonteCarloResult(value.result) || !isLogConversionResult(value.simulated_log) || value.simulated_log.variant !== "TO_EVENT_LOG" ||
-      typeof value.xes !== "string" || !value.xes.includes("<log") || typeof value.underlying_pnml !== "string" || !value.underlying_pnml.includes("<pnml") || !record(value.model)) return false;
+      !(typeof value.xes === "string" && value.xes.includes("<log") && (value.xes_error === undefined || value.xes_error === null) || value.xes === null && typeof value.xes_error === "string") || typeof value.underlying_pnml !== "string" || !value.underlying_pnml.includes("<pnml") || !record(value.model)) return false;
   const model = value.model;
   if (!Number.isSafeInteger(model.place_count) || (model.place_count as number) <= 0 || !Array.isArray(model.activities) || !model.activities.every(name => typeof name === "string") || !Array.isArray(model.transitions)) return false;
   const place = (n: unknown) => Number.isSafeInteger(n) && (n as number) >= 0 && (n as number) < (model.place_count as number);

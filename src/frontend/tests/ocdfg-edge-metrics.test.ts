@@ -140,9 +140,15 @@ describe("OCDFG edge metrics delivery",()=>{
     vi.spyOn(URL,"createObjectURL").mockImplementation(value=>{blob=value as Blob;return "blob:metrics";});
     const revoke=vi.spyOn(URL,"revokeObjectURL").mockImplementation(()=>{});
     const anchor={href:"",download:"",click:vi.fn()};vi.stubGlobal("document",{createElement:()=>anchor});
-    downloadOcdfgEdgeMetrics(source);
-    expect(anchor.download).toBe("minera-ocdfg-edge-metrics.json");expect(anchor.click).toHaveBeenCalledOnce();
-    expect(revoke).toHaveBeenCalledWith("blob:metrics");expect(blob?.type).toBe("application/json");
+    vi.useFakeTimers();
+    try {
+      downloadOcdfgEdgeMetrics(source);
+      expect(anchor.download).toBe("minera-ocdfg-edge-metrics.json");expect(anchor.click).toHaveBeenCalledOnce();
+      // The object URL outlives the click so the browser can still read it.
+      expect(revoke).not.toHaveBeenCalled();
+      vi.runAllTimers();
+      expect(revoke).toHaveBeenCalledWith("blob:metrics");expect(blob?.type).toBe("application/json");
+    } finally { vi.useRealTimers(); }
     const restored=JSON.parse(await blob!.text()) as OcdfgEdgeMetricsReport;
     expect(restored).toEqual(source);expect(restored.object_types[0].edges).toHaveLength(31);
     expect(restored.object_types[0].edges[30].associations).toHaveLength(61);

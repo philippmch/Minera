@@ -1,4 +1,5 @@
 import { FOOTPRINTS_DISCOVERY_VARIANTS, FOOTPRINTS_CONFORMANCE_VARIANTS, isMineraExport, type AggregateFootprint, type FootprintsModelVariant, type MineraExport } from "./types";
+import { backendFetch } from "./backend-fetch";
 import type { LogQuerySchema } from "./log-query";
 import { nativeCell, nativeJson } from "./native-json";
 import { nativeResponseJson, readNativeResponse } from "./native-response";
@@ -65,7 +66,7 @@ export function graphDiscoveryTables(value:GraphDiscovery,parameters:URLSearchPa
 }
 export async function runGraphDiscovery(family:GraphDiscoveryFamily,form:FootprintsForm|TransitionForm,source:LogQuerySchema,signal?:AbortSignal):Promise<GraphDiscoveryRun> {
   const parameters=graphDiscoveryQuery(family,form,source.source_id),path='/api/discover-graph?'+parameters;
-  const response=await fetch(path,{method:'POST',signal});const value=await readNativeResponse(response,{path});
+  const response=await backendFetch(path,{method:'POST',signal});const value=await readNativeResponse(response,{path});
   if(!response.ok||record(value)&&'error'in value)throw new Error(record(value)&&typeof value.error==='string'?value.error:'Native graph discovery failed.');
   if(!validGraphDiscovery(value))throw new Error('Native graph discovery returned an invalid result.');
   if(value.method!==family||value.source_id!==source.source_id||value.source.case_count!==source.case_count||value.source.event_count!==source.event_count)throw new Error('Discovery result does not match the active source.');

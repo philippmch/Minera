@@ -219,6 +219,8 @@ inline minera::EmbeddingProviderCallback make_http_provider(
     client.set_connection_timeout(timeout);
     client.set_read_timeout(timeout);
     client.set_write_timeout(timeout);
+    // An embedding response is a short vector; never buffer an unbounded body.
+    client.set_payload_max_length(std::size_t{16} << 20);
     const auto body = std::string("{\"text\":") + detail::escape_json(text) +
                       ",\"model\":" + detail::escape_json(model) +
                       ",\"dimensions\":" + std::to_string(dimensions) + "}";

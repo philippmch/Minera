@@ -1,4 +1,5 @@
 import { nativeCell, nativeJson, parseNativeJson } from "./native-json";
+import { backendFetch } from "./backend-fetch";
 import { validStreamingResult, streamingQuery, streamingTables, defaultStreaming, type StreamingForm, type StreamingMethod, type StreamingResult } from "./streaming-workspace";
 import { type OcelPreparedTable } from "./ocel-preparation";
 import { validDeclareStreamEvent, type DeclareStreamEvent } from "./declare-stream-workspace";
@@ -75,7 +76,7 @@ export function liveCreateQuery(form: StreamingForm, imports: LiveImportForm, se
 }
 async function digest(file: Blob): Promise<string> {return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",await file.arrayBuffer())),v=>v.toString(16).padStart(2,"0")).join("");}
 async function liveRequest(route: string, params: URLSearchParams, method: "GET" | "POST", body?: FormData, signal?: AbortSignal): Promise<LiveRun> {
-  signal?.throwIfAborted();const response=await fetch("/api/live-stream/"+route+"?"+params,{method,...(body?{body}:{}),...(signal?{signal}:{})});const raw=await response.text();signal?.throwIfAborted();let value:unknown;
+  signal?.throwIfAborted();const response=await backendFetch("/api/live-stream/"+route+"?"+params,{method,...(body?{body}:{}),...(signal?{signal}:{})});const raw=await response.text();signal?.throwIfAborted();let value:unknown;
   try{value=parseNativeJson(raw);}catch{throw new Error("The backend returned invalid live-stream JSON.");}
   if(record(value)&&"error"in value)throw new Error(String(value.error));if(!response.ok)throw new Error("Live streaming returned "+response.status+".");
   if(!validLiveSnapshot(value)||value.session_id!==params.get("session_id"))throw new Error("The backend returned an invalid or different live session.");
@@ -96,11 +97,11 @@ export function actLiveSession(run: LiveRun, action: LiveAction, caseId: string,
   return liveRequest(action==="release"?"release":"action",params,"POST",undefined,signal);
 }
 export async function listLiveSessions(signal?: AbortSignal): Promise<LiveSnapshot[]> {
-  const response=await fetch("/api/live-stream/list",{...(signal?{signal}:{})});const raw=await response.text();signal?.throwIfAborted();const value=parseNativeJson(raw);
+  const response=await backendFetch("/api/live-stream/list",{...(signal?{signal}:{})});const raw=await response.text();signal?.throwIfAborted();const value=parseNativeJson(raw);
   if(!response.ok||!record(value)||!Array.isArray(value.sessions)||!value.sessions.every(validLiveSnapshot)||new Set(value.sessions.map(s=>s.session_id)).size!==value.sessions.length)throw new Error("Could not list valid server stream sessions.");return value.sessions;
 }
 export async function liveOriginal(run: LiveRun, source: LiveSource, signal?: AbortSignal): Promise<Blob> {
-  const response=await fetch("/api/live-stream/source?"+new URLSearchParams({session_id:run.result.session_id,source_id:source.source_id}),{...(signal?{signal}:{})});const blob=await response.blob();signal?.throwIfAborted();
+  const response=await backendFetch("/api/live-stream/source?"+new URLSearchParams({session_id:run.result.session_id,source_id:source.source_id}),{...(signal?{signal}:{})});const blob=await response.blob();signal?.throwIfAborted();
   if(!response.ok||blob.size!==source.size||source.provided_sha256&&await digest(blob)!==source.provided_sha256)throw new Error("The original live upload is unavailable or its byte binding differs.");return blob;
 }
 export function formFromLive(snapshot: LiveSnapshot): StreamingForm {

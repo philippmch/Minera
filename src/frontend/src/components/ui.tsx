@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { readStored, removeStored, writeStored } from "../storage";
 
 /** File types the main "Open log" entry points accept. */
 export const LOG_FILE_ACCEPT = ".csv,.tsv,.xes,.xes.gz,.gz,.json,text/csv,application/xml,application/gzip";
@@ -62,12 +63,8 @@ const THEME_KEY = "minera-theme";
 const THEME_ORDER: ThemeChoice[] = ["system", "light", "dark"];
 
 function storedTheme(): ThemeChoice {
-  try {
-    const value = typeof localStorage === "undefined" ? null : localStorage.getItem(THEME_KEY);
-    return value === "light" || value === "dark" ? value : "system";
-  } catch {
-    return "system";
-  }
+  const value = readStored(THEME_KEY);
+  return value === "light" || value === "dark" ? value : "system";
 }
 
 /** Cycles system → light → dark and remembers the choice in this browser. */
@@ -76,12 +73,34 @@ export function ThemeToggle() {
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "system") delete root.dataset.theme; else root.dataset.theme = theme;
-    try { if (theme === "system") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, theme); } catch { /* storage unavailable */ }
+    if (theme === "system") removeStored(THEME_KEY); else writeStored(THEME_KEY, theme);
   }, [theme]);
   const next = THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length];
+  const label = THEME_LABELS[theme];
+  // The accessible name starts with the visible text so voice control ("click Auto") works.
   return (
-    <button className="theme-toggle" onClick={() => setTheme(next)} title={`Theme: ${theme}. Switch to ${next}.`} aria-label={`Theme: ${theme}. Switch to ${next}.`}>
-      {theme === "system" ? "Auto" : theme === "light" ? "Light" : "Dark"}
+    <button className="theme-toggle" onClick={() => setTheme(next)} title={`${label} theme. Switch to ${THEME_LABELS[next]}.`} aria-label={`${label} theme. Switch to ${THEME_LABELS[next]}.`}>
+      {label}
     </button>
   );
+}
+
+const THEME_LABELS: Record<ThemeChoice, string> = { system: "Auto", light: "Light", dark: "Dark" };
+
+/** Whether the viewer is on an Apple platform, where shortcuts use ⌘ rather than Ctrl. */
+export function isApplePlatform(nav: { platform?: string; userAgent?: string; userAgentData?: { platform?: string } } | undefined = typeof navigator === "undefined" ? undefined : navigator as never): boolean {
+  if (!nav) return false;
+  const platform = nav.userAgentData?.platform || nav.platform || nav.userAgent || "";
+  return /mac|iphone|ipad|ipod/i.test(platform);
+}
+
+/** The palette shortcut as the viewer's platform writes it. */
+export function paletteShortcutLabel(apple = isApplePlatform()): string {
+  return apple ? "⌘K" : "Ctrl K";
+}
+
+/** The palette shortcut hint shown on the search buttons. */
+export function PaletteShortcut() {
+  const label = paletteShortcutLabel();
+  return <kbd aria-label={label === "⌘K" ? "Command K" : "Control K"}>{label}</kbd>;
 }

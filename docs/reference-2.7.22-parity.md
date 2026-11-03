@@ -951,8 +951,34 @@ controls. Ordinary requests retain XES output. Classic requests with
 `return_variants=true` use a deterministic JSON envelope containing one
 activity-sequence and occurrence-count entry per discovered variant, together
 with completeness and interruption status; `return_only_if_complete` clears
-the entries when coverage is not complete. The native log continues to carry
-probability and estimated-occurrence trace attributes for XES consumers.
+the entries when the search was cut short (interrupted), as the reference
+returns None then. As in the reference, CLASSIC
+traces carry `concept:name` and `probability`, written with Python's float
+repr (`0.12500000000000003`, not six digits); the estimated occurrences are
+only in the variant envelope. Both variants add a trace attribute for the case
+id only when `case_id_key` names something other than `concept:name` or
+`case:concept:name` (a declared extension for CLASSIC, which has no such key;
+the reference PERFORMANCE writes the id under that key instead of
+`concept:name`, while Minera keeps both). CLASSIC lists its traces as
+the reference does: found in best-first order (a trace when its own search
+state leaves the queue, equal costs by activity sequence), with the variant
+cap applied to a trace found beyond it, a trace below `min_variant_occ` or a
+spent probability budget stopping the whole search (a trace skipped by
+`add_trace_if_takes_new_els_to_dfg` still spends its probability),
+`ceil(probability * max_variants)` in binary64, and the probability as
+`exp(-cost)` of the summed log costs; the traces are then sorted by
+descending probability, equal probabilities by activity sequence, before
+case ids and timestamps are assigned. `return_only_if_complete` empties the
+log only when the search was cut short (the reference returns None), not
+when the traces miss part of the DFG. Bound by the CLASSIC bank
+(`scripts/capture-dfg-classic-playout-bank.py`, 358 compared cases and 2,286
+traces in `minera_dfg_performance_playout_parity_tests`; a held-out run of
+555 cases with up to six activities matched except one, below). Declared:
+Minera keeps its expansion bound (max(10,000, 128 x max_variants) queue
+pops) and wall-clock bound, so a search the reference exhausts can stop
+early and count as cut short; where the search reaches an activity with
+neither successors nor an end weight the reference raises `KeyError` and
+Minera skips the activity (42 bank cases).
 
 Petri stochastic simulation evidence: the native `stochastic_playout` API uses
 transition-index weights, validates finite non-negative values and weighted
@@ -1784,8 +1810,21 @@ seeds), so the iterparse family (`ITERPARSE`, `ITERPARSE_20`,
   Char production, malformed UTF-8 (the reader decodes UTF-8 whatever the
   declaration says, as `read_xes` passes `encoding=utf-8`), more than 256
   nested elements and attribute values over 10,000,000 bytes. Internal DTD
-  entities are expanded, with an amplification cap. The XES layer also
-  rejects a root other than `<log>` and an `<event>` inside an `<event>`.
+  entities are expanded, with an amplification cap. An XML declaration that
+  does not open the document (after whitespace, a comment or another
+  processing instruction) fails with "XML declaration allowed only at the
+  start of the document", and a case variant such as `<?XML` with "Invalid PI
+  name"; `<?xml-stylesheet` and other targets are skipped. The XES layer also
+  rejects a root other than `<log>` and, with the reference's messages, a
+  `<trace>` inside an open `<trace>` (also one inside an `<event>`: "file
+  contains <trace> in another <trace> tag") and an `<event>` inside an open
+  `<event>` ("file contains <event> in another <event> tag"); an `<event>`
+  directly under `<log>` is never closed in the reference, so any later
+  `<event>` fails the same way, while a trailing one is read and ignored.
+  Declared residual: the reference also counts `<trace>` and `<event>` tags
+  nested inside attribute elements (an `<event>` inside a trace's `<string>`
+  becomes an event of that trace, a `<trace>` inside a log attribute a
+  trace); Minera's attribute reader treats them as attribute children.
   The line and regex readers scan text and keep their lenient parsing.
 - **Attribute-value normalization.** Literal TAB, CR, LF and CR LF in an
   attribute value become one space each; character references keep their
@@ -1798,6 +1837,19 @@ seeds), so the iterparse family (`ITERPARSE`, `ITERPARSE_20`,
   that its own `read_xes` then rejects (declared divergence: Minera refuses
   instead, so whatever it writes reads back). Workbench routes report the
   message in `xes_error` (or the export's `*_error` field) with a null XES.
+- **JSON responses are valid UTF-8.** A log can hold bytes that are not UTF-8
+  (a Latin-1 CSV, which the reference's `read_csv` refuses with a decode
+  error, so it shows no text for them). Every `/api` JSON body, results and
+  errors alike, follows one policy (`src/backend/json_utf8.hpp`): a WTF-8
+  surrogate code unit keeps its identity as a `\udXXX` escape, as Python's
+  `json.dumps` writes a lone surrogate, and every other ill-formed sequence
+  becomes one U+FFFD per maximal subpart, as `bytes.decode("utf-8",
+  "replace")` and the browser's `TextDecoder` read it (`Pr\xfcfung` is
+  `Pr\ufffdfung`, a truncated `\xe2\x82` is one U+FFFD). U+FFFD was chosen
+  over a surrogateescape `\udcXX` because it is what the frontend would decode
+  anyway and what the error bodies already used. The server applies it as
+  the last step of every JSON response; XES, CSV and other exports keep their
+  own rules (the XES writers refuse such text, see above).
 - **Typed values.** `int` reads like Python `int()` (surrounding whitespace,
   single underscores between digits, Unicode decimal digits of Unicode 14),
   `float` like `float()` (`inf`/`infinity`/`nan` in any case, overflow to
@@ -1823,7 +1875,10 @@ seeds), so the iterparse family (`ITERPARSE`, `ITERPARSE_20`,
 - **Column order.** The importer records where the selected first-class cells
   stood among the attributes, and `to_data_frame`-style tables list event
   columns in document order followed by the `case:` columns in trace order,
-  matching the reference dict order.
+  matching the reference dict order. The event filters that regroup events
+  into traces (timestamp and attribute `apply_events`) drop an event's own
+  `case:` cells as the reference does and move the recorded positions with
+  them, so the selected cells keep their place among the attributes left.
 
 Declared variant quirks that Minera does not reproduce:
 
@@ -1836,11 +1891,18 @@ Declared variant quirks that Minera does not reproduce:
   `-0.0`) collapse to whichever was seen first. Minera keeps each value's own
   type.
 
-DFG text reading follows `read_dfg`: rows are stripped, counts and ids are read
-like `int()` (no negatives), zero counts are accepted (and written), labels are
-stripped and resolved by index (a repeated label names the same activity), and
-a repeated start, end or edge row replaces the earlier one. A blank row, a BOM
-and an out-of-range id are errors, as in the reference.
+DFG text reading follows `read_dfg`: labels and rows are stripped as
+`str.strip()` strips them (Unicode whitespace included), section sizes, counts
+and ids are read like `int()` (surrounding Unicode whitespace, a sign, Unicode
+decimal digits, single underscores between digits, `-0` as zero), ids index the
+label list as Python does (`-1` is the last label, so `-n` to `n-1` are valid),
+a negative section size reads no rows, zero counts are accepted (and written),
+a repeated label names the same activity, and a repeated start, end or edge row
+replaces the earlier one. A blank row, a BOM and an out-of-range id are errors,
+as in the reference. Declared difference: Minera stores counts as unsigned
+64-bit integers, so a negative count (which the reference keeps, e.g. `{'A': -3}`)
+is refused with `DFG: negative counts are not supported`, and a count beyond
+2^64-1 (which Python's unbounded int keeps) with `DFG: count is too large`.
 
 PNML choices: Minera reads the first `<net>` and merges every page, nested
 pages included (PNML pages only partition a net), while the reference reads
@@ -17007,7 +17069,10 @@ Unseeded draws (`std::random_device`) are unchanged.
   declared. Bank: `scripts/capture-random-tree-bank.py` drives
   `minera_random_tree_parity_tests`.
 - **DFG playout PERFORMANCE: exact** under `numpy.random.seed(seed)` (seed
-  below 2^32): case i starts at 10,000,000 + (i+1) × rate; one `choice` over
+  below 2^32): the case clock starts at 10,000,000 and adds the rate once
+  before each case, as a running floating-point sum (not 10,000,000 +
+  (i+1) × rate, which rounds differently for rates such as 0.3 or 1e-7; the
+  bank includes 0.3, 1e-7 and 86400.5); one `choice` over
   the start activities in their dict order (first occurrence in the log:
   `start_activity_order`), then per step a `choice` over the successors in
   DFG order (sorted pairs, as a DataFrame discovery gives them) with the end
