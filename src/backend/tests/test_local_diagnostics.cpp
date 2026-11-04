@@ -29,6 +29,34 @@ int main() {
   const auto denominator_result = discover_local_diagnostics(denominator_log);
   assert(denominator_result.group_relative_focus.at("g1").at("A") == 0.5);
 
+  // Reference apply_from_group_attribute: groups are resource sets, and every
+  // event of a member counts for each of its groups (even an untagged one);
+  // coverage alone uses the events tagged with the group. Values observed
+  // from PM4Py 2.7.22.
+  {
+    EventLog multi;
+    Trace m; m.case_id = "c";
+    m.events.push_back(Event{"c", "A", "", "r1", 0, {{"org:group", "g1", AttributeKind::kString}}, {}});
+    m.events.push_back(Event{"c", "B", "", "r1", 1, {{"org:group", "g2", AttributeKind::kString}}, {}});
+    m.events.push_back(Event{"c", "A", "", "r1", 2, {}, {}});
+    m.events.push_back(Event{"c", "A", "", "r2", 3, {{"org:group", "g2", AttributeKind::kString}}, {}});
+    multi.traces.push_back(std::move(m));
+    const auto r = discover_local_diagnostics(multi);
+    assert(r.group_relative_focus.at("g1").at("A") == 2.0 / 3.0);
+    assert(r.group_relative_focus.at("g1").at("B") == 1.0);
+    assert(r.group_relative_focus.at("g2").at("A") == 1.0);
+    assert(r.group_relative_stake.at("g1").at("A") == 2.0 / 3.0);
+    assert(r.group_relative_stake.at("g2").at("A") == 0.75);
+    assert(r.group_relative_stake.at("g2").at("B") == 0.25);
+    assert(r.group_coverage.at("g1").at("r1") == 1.0);
+    assert(r.group_coverage.at("g2").at("r1") == 0.5 && r.group_coverage.at("g2").at("r2") == 0.5);
+    assert(r.group_member_contribution.at("g1").at("r1").at("A") == 2);
+    assert(r.group_member_contribution.at("g2").at("r1").at("A") == 2);
+    assert(r.group_member_contribution.at("g2").at("r1").at("B") == 1);
+    assert(r.group_member_contribution.at("g2").at("r2").at("A") == 1);
+    assert(r.diagnostics.skipped_events == 0);
+  }
+
   LocalDiagnosticsOptions explicit_mode;
   explicit_mode.explicit_groups = {{"g1", {"r1", "r2"}}};
   const auto explicit_result = discover_local_diagnostics(log, explicit_mode);

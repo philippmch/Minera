@@ -24,8 +24,8 @@ describe("ILP and genetic discovery delivery",()=>{
     expect(()=>ilpOptions({...DEFAULT_ILP_FORM,start:""})).toThrow(/boundary labels/);expect(()=>ilpOptions({...DEFAULT_ILP_FORM,nodes:"1000001"})).toThrow(/Maximum ILP nodes/);
   });
   it("exposes zero generations, all evolutionary parameters and strict tournament bounds",()=>{
-    expect(geneticOptions({...DEFAULT_GENETIC_FORM,activity:"stage",timestamp:"when",caseId:"case_key",seed:"17",population:"4",generations:"0",tournament:"1"})).toMatchObject({activity_key:"stage",timestamp_key:"when",case_id_key:"case_key",seed:17,population_size:4,generations:0,elitism_min_sample:1,elitism_rate:0.1,crossover_rate:0.8,mutation_rate:0.1,max_states:10000});
-    expect(()=>geneticOptions({...DEFAULT_GENETIC_FORM,tournament:"32"})).toThrow(/smaller/);expect(()=>geneticOptions({...DEFAULT_GENETIC_FORM,mutation:"Infinity"})).toThrow(/Mutation/);expect(()=>geneticOptions({...DEFAULT_GENETIC_FORM,seed:"9007199254740992"})).toThrow(/Seed/);
+    expect(geneticOptions({...DEFAULT_GENETIC_FORM,activity:"stage",timestamp:"when",caseId:"case_key",seed:"17",population:"4",generations:"0",tournament:"1"})).toMatchObject({activity_key:"stage",timestamp_key:"when",case_id_key:"case_key",seed:17,population_size:4,generations:0,elitism_min_sample:1,elitism_rate:0.01,crossover_rate:1,mutation_rate:0.01,max_states:50500});
+    expect(()=>geneticOptions({...DEFAULT_GENETIC_FORM,tournament:"500"})).toThrow(/smaller/);expect(()=>geneticOptions({...DEFAULT_GENETIC_FORM,mutation:"Infinity"})).toThrow(/Mutation/);expect(()=>geneticOptions({...DEFAULT_GENETIC_FORM,seed:"9007199254740992"})).toThrow(/Seed/);
   });
   it("uses net-local activity IDs and preserves executable arcs and silent transitions",()=>{
     const layout=discoveryLayout({...model,report_json:""} as DiscoveryModel);expect(layout.transitions.map(t=>t.label)).toEqual(["Review β","Approve 東京"]);expect(layout.arcs).toHaveLength(4);

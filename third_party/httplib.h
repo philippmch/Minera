@@ -33,7 +33,12 @@
  *  - with MINERA_HTTPLIB_COMPRESS_RESPONSES_ONLY (set next to
  *    CPPHTTPLIB_ZLIB_SUPPORT), zlib serves only gzip responses to clients that
  *    ask for them: gzip/deflate request bodies keep their 415 and the client
- *    neither advertises nor inflates gzip, exactly as without zlib.
+ *    neither advertises nor inflates gzip, exactly as without zlib;
+ *  - Request::is_connection_closed lets a long-running handler poll whether
+ *    its client has gone away (the upstream 0.20 name for the same check);
+ *  - Accept-Encoding is parsed with its q-values (accepts_content_coding),
+ *    so "gzip;q=0" or "identity" alone gets an uncompressed response.;
+ *  - a Range header is honoured on GET only; other methods ignore it.
  * Upstream fixed the chunked case in 0.20.1 (CVE-2025-46728).
  */
 
@@ -691,6 +696,10 @@ struct Request {
   Ranges ranges;
   Match matches;
   std::unordered_map<std::string, std::string> path_params;
+  // MINERA PATCH: set by the server while a handler runs; true once the
+  // client has closed its end of the connection (a peek reads end of file or
+  // the socket is gone). Empty outside a server handler.
+  std::function<bool()> is_connection_closed;
 
   // for client
   ResponseHandler response_handler;
@@ -3950,6 +3959,67 @@ inline bool can_compress_content_type(const std::string &content_type) {
   }
 }
 
+// MINERA PATCH: parse Accept-Encoding (RFC 9110 12.5.3) instead of searching
+// it for a substring. `coding` is acceptable when the client names it (or
+// "x-gzip" for "gzip"), or "*" when it does not, with a q-value above 0 and
+// not below identity's, so "gzip;q=0", "identity" and "*;q=0" get the
+// identity body. An entry whose q-value does not parse is ignored.
+inline bool accepts_content_coding(const std::string &accept_encoding,
+                                   const std::string &coding) {
+  const auto lower = [](std::string text) {
+    for (auto &c : text) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return text;
+  };
+  const auto trim = [](const std::string &text) {
+    const auto first = text.find_first_not_of(" \t");
+    if (first == std::string::npos) { return std::string(); }
+    return text.substr(first, text.find_last_not_of(" \t") - first + 1);
+  };
+  double named = -1, wildcard = -1, identity = -1;
+  std::size_t begin = 0;
+  while (begin <= accept_encoding.size()) {
+    auto end = accept_encoding.find(',', begin);
+    if (end == std::string::npos) { end = accept_encoding.size(); }
+    const auto entry = accept_encoding.substr(begin, end - begin);
+    begin = end + 1;
+    const auto semicolon = entry.find(';');
+    const auto name = lower(trim(entry.substr(0, semicolon)));
+    if (name.empty()) { continue; }
+    double q = 1;
+    bool valid = true;
+    for (auto at = semicolon; at != std::string::npos;) {
+      const auto next = entry.find(';', at + 1);
+      const auto param = lower(trim(entry.substr(
+          at + 1, next == std::string::npos ? std::string::npos : next - at - 1)));
+      at = next;
+      if (param.rfind("q=", 0) != 0) { continue; }
+      // qvalue = ( "0" [ "." 0*3DIGIT ] ) / ( "1" [ "." 0*3("0") ] )
+      const auto value = trim(param.substr(2));
+      valid = !value.empty() && (value[0] == '0' || value[0] == '1') &&
+              (value.size() == 1 || (value[1] == '.' && value.size() <= 5));
+      q = valid ? value[0] - '0' : 0;
+      for (std::size_t k = 2; valid && k < value.size(); ++k) {
+        valid = std::isdigit(static_cast<unsigned char>(value[k])) &&
+                (value[0] == '0' || value[k] == '0');
+        if (valid) { q += (value[k] - '0') / (k == 2 ? 10.0 : k == 3 ? 100.0 : 1000.0); }
+      }
+    }
+    if (!valid) { continue; }
+    if (name == coding || (coding == "gzip" && name == "x-gzip")) {
+      named = (std::max)(named, q);
+    } else if (name == "*") {
+      wildcard = (std::max)(wildcard, q);
+    } else if (name == "identity") {
+      identity = (std::max)(identity, q);
+    }
+  }
+  const auto chosen = named >= 0 ? named : wildcard;
+  if (chosen <= 0) { return false; }
+  return identity < 0 || chosen >= identity;
+}
+
 inline EncodingType encoding_type(const Request &req, const Response &res) {
   auto ret =
       detail::can_compress_content_type(res.get_header_value("Content-Type"));
@@ -3959,14 +4029,12 @@ inline EncodingType encoding_type(const Request &req, const Response &res) {
   (void)(s);
 
 #ifdef CPPHTTPLIB_BROTLI_SUPPORT
-  // TODO: 'Accept-Encoding' has br, not br;q=0
-  ret = s.find("br") != std::string::npos;
+  ret = accepts_content_coding(s, "br"); // MINERA PATCH
   if (ret) { return EncodingType::Brotli; }
 #endif
 
 #ifdef CPPHTTPLIB_ZLIB_SUPPORT
-  // TODO: 'Accept-Encoding' has gzip, not gzip;q=0
-  ret = s.find("gzip") != std::string::npos;
+  ret = accepts_content_coding(s, "gzip"); // MINERA PATCH
   if (ret) { return EncodingType::Gzip; }
 #endif
 
@@ -7270,6 +7338,10 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
   }
 
   Request req;
+  // MINERA PATCH: let handlers notice a client that disconnected.
+  req.is_connection_closed = [&strm]() {
+    return !detail::is_socket_alive(strm.socket());
+  };
 
   Response res;
   res.version = "HTTP/1.1";
@@ -7332,7 +7404,9 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
   req.set_header("LOCAL_ADDR", req.local_addr);
   req.set_header("LOCAL_PORT", std::to_string(req.local_port));
 
-  if (req.has_header("Range")) {
+  // MINERA PATCH: Range is defined for GET only (RFC 9110 14.2); any other
+  // method ignores it and gets the whole representation.
+  if (req.method == "GET" && req.has_header("Range")) {
     const auto &range_header_value = req.get_header_value("Range");
     if (!detail::parse_range_header(range_header_value, req.ranges)) {
       res.status = StatusCode::RangeNotSatisfiable_416;

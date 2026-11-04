@@ -4628,7 +4628,7 @@ std::string preparation_json(const MinedSession& session, std::string result,
       if (first) { activity_attribute = key; first = false; }
       complete = complete && !event.activity.empty() && key == activity_attribute;
     }
-    minera::XesExportOptions options; options.preserve_nulls = true;
+    minera::XesExportOptions options;  // nulls omitted, as pm4py writes None/NaN
     body += "{\"id\":" + quote(output.id) + ",\"name\":" + quote(output.name) +
         ",\"case_count\":" + std::to_string(output.log->trace_count()) +
         ",\"event_count\":" + std::to_string(output.log->event_count()) +
@@ -5049,7 +5049,7 @@ std::shared_ptr<const MinedSession> query_session(const httplib::Request& reques
   return session;
 }
 void validate_query_fields(const httplib::Request& request){
-  static const std::set<std::string> allowed={"engine","limit","source_id","mode","format"};
+  static const std::set<std::string> allowed={"engine","limit","source_id","mode","format","preserve_nulls"};
   for(const auto& [key,value]:request.params){(void)value;if(!allowed.contains(key))throw std::invalid_argument("unknown query parameter: "+key);}
   if(request.body.empty()||request.body.size()>1024u*1024u)throw std::invalid_argument("SQL must be nonempty and within 1 MiB");
 }
@@ -5105,14 +5105,14 @@ void handle_log_query_export(const httplib::Request& request,httplib::Response& 
   }else if(format=="xes"){
     const auto filtered=select_active_source_rows(*session,indices,mode=="cases");
     response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
-    minera::XesExportOptions options;options.preserve_nulls=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");
+    minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);response.set_content(minera::serialize_xes(filtered,options),"application/xml");
   }else throw std::invalid_argument("filter export format must be xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
 
 void handle_log_cluster(const httplib::Request& request,httplib::Response& response){
  try{
-  static const std::set<std::string> allowed={"source_id","name","format","activity_attribute"};
+  static const std::set<std::string> allowed={"source_id","name","format","activity_attribute","preserve_nulls"};
   for(const auto& [key,value]:request.params){(void)value;if(!allowed.contains(key)||request.params.count(key)!=1)throw std::invalid_argument("unknown or duplicate cluster parameter: "+key);}
   if(!request.has_param("source_id"))throw std::invalid_argument("source_id is required for case clustering");
   if(request.body.size()>1024u*1024u)throw std::invalid_argument("cluster regex exceeds 1 MiB");
@@ -5122,7 +5122,7 @@ void handle_log_cluster(const httplib::Request& request,httplib::Response& respo
   response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
   const auto format=request.has_param("format")?request.get_param_value("format"):"summary";
   if(format=="summary")response.set_content(minera::log_cluster_runtime::summary(filtered,name,request.body,indices,std::to_string(session->query_source_id)),"application/json");
-  else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
+  else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
   else if(format=="json")response.set_content(active_source_table_json_from_log_indices(*session,indices,true),"application/json");
   else throw std::invalid_argument("cluster format must be summary, xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
@@ -5239,7 +5239,7 @@ std::size_t clustering_index(std::string_view text) {
 void handle_clustering_export(const httplib::Request& request,
                               httplib::Response& response) {
   try {
-    static const std::set<std::string> allowed = {"source_id", "analysis_id", "selection", "format"};
+    static const std::set<std::string> allowed = {"source_id", "analysis_id", "selection", "format", "preserve_nulls"};
     for (const auto& [key, value] : request.params) {
       (void)value;
       if (!allowed.contains(key)) throw std::invalid_argument("unknown clustering export parameter: " + key);
@@ -5295,7 +5295,8 @@ void handle_clustering_export(const httplib::Request& request,
     response.set_header("X-Minera-Case-Count", std::to_string(selected.trace_count()));
     response.set_header("X-Minera-Event-Count", std::to_string(selected.event_count()));
     if (format == "xes") {
-      minera::XesExportOptions options; options.preserve_nulls = true;
+      minera::XesExportOptions options;
+      options.preserve_nulls = ocel_query_bool(request, "preserve_nulls", false);
       response.set_content(minera::serialize_xes(selected, options), "application/xml");
     } else if (format == "json") {
       std::vector<std::size_t> event_indices;
@@ -5888,8 +5889,7 @@ std::string anonymization_release_json(std::string result_json,
                                        const minera::EventLog& log,
                                        const MinedSession& session) {
   const auto quote = minera::embedding_runtime::detail::escape_json;
-  minera::XesExportOptions options;
-  options.preserve_nulls = true;
+  minera::XesExportOptions options;  // nulls omitted, as pm4py writes None/NaN
   return "{\"family\":\"ANONYMIZATION_RELEASE\",\"source_id\":" +
          quote(std::to_string(session.query_source_id)) + ",\"result\":" +
          result_json + ',' +
@@ -6572,6 +6572,10 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
       return request.has_param(std::string(name));
     };
     auto options = minera::parse_alignment_params(lookup, present);
+    // A client that gave up (closed the tab, aborted the fetch) gets nothing
+    // from a result; stop the search instead of finishing it for no one.
+    if (request.is_connection_closed)
+      options.cancelled = [&request] { return request.is_connection_closed(); };
     if (miner == "imported" && !request.has_param("alignment_activity_attribute"))
       options.activity_attribute = session->imported_activity_attribute;
     if (miner == "imported" && session->imported_document) {
@@ -6867,7 +6871,7 @@ std::string transformation_json(const MinedSession& session,
   }
   body += "],\"result\":" + result_json + ',';
   if (split && options) {
-    minera::XesExportOptions export_options; export_options.preserve_nulls = true;
+    minera::XesExportOptions export_options;  // nulls omitted, as pm4py writes None/NaN
     body += embedded_xes_fields("transformed_xes",
         [&] { return minera::serialize_xes(split->log, export_options); });
     const bool projected = options->target_key == "activity" || options->target_key == "concept:name";
@@ -7512,7 +7516,7 @@ void handle_case_relations(const httplib::Request& request,
             if (first) { activity = key; first = false; }
             complete = complete && !event.activity.empty() && key == activity;
           }
-          minera::XesExportOptions export_options; export_options.preserve_nulls = true;
+          minera::XesExportOptions export_options;  // nulls omitted, as pm4py writes None/NaN
           payload += ",\"open_log\":{\"xes\":" + quote(minera::serialize_xes(log, export_options)) +
               ",\"case_count\":" + std::to_string(log.trace_count()) +
               ",\"event_count\":" + std::to_string(log.event_count()) +
@@ -10948,6 +10952,31 @@ std::optional<std::string> repeated_request_control(const httplib::Request& requ
   return std::nullopt;
 }
 
+// Adds `token` to the response's Vary list unless it is already named, so the
+// CORS (Origin) and compression (Accept-Encoding) variations both reach a cache.
+void add_vary(httplib::Response& response, const std::string& token) {
+  const auto lower = [](std::string text) {
+    std::transform(text.begin(), text.end(), text.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+  };
+  std::string merged;
+  for (const auto& [name, value] : response.headers) {
+    if (lower(name) != "vary") continue;
+    std::istringstream items(value);
+    for (std::string item; std::getline(items, item, ',');) {
+      const auto first = item.find_first_not_of(" \t");
+      if (first == std::string::npos) continue;
+      item = item.substr(first, item.find_last_not_of(" \t") - first + 1);
+      if (item == "*" || lower(item) == lower(token)) return;
+    }
+    merged += (merged.empty() ? "" : ", ") + value;
+  }
+  for (auto it = response.headers.begin(); it != response.headers.end();)
+    it = lower(it->first) == "vary" ? response.headers.erase(it) : std::next(it);
+  response.set_header("Vary", merged.empty() ? token : merged + ", " + token);
+}
+
 std::uint64_t current_imported_model_id() {
   std::lock_guard<std::mutex> lock(g_session_mutex);
   return g_session ? g_session->imported_model_id : 0;
@@ -10983,12 +11012,36 @@ void reject_stale_imported_model(httplib::Response& response) {
 // handler runs, so a repair there would grow the body past its declared
 // length. Handlers, the pre-routing and the error handler call this; the
 // check is a single pass and clean bodies are left untouched.
+// XML and text bodies (PNML, BPMN, DFG, CSV exports) take the same U+FFFD
+// policy as raw characters (repair_text_utf8), so they stay well-formed UTF-8;
+// a body that names another charset, and binary types, are left alone.
+// Returns whether the body changed.
+bool repair_api_text_body(std::string& body, const std::string& content_type) {
+  if (body.empty()) return false;
+  std::string type = content_type;
+  std::transform(type.begin(), type.end(), type.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  if (type.starts_with("application/json")) {
+    if (minera::detail::is_clean_utf8(body)) return false;
+    body = active_source_safe_json(body);
+    return true;
+  }
+  const auto media = type.substr(0, type.find(';'));
+  const bool xml = media == "application/xml" || media == "text/xml" || media.ends_with("+xml");
+  if (!xml && !media.starts_with("text/")) return false;
+  if (const auto charset = type.find("charset="); charset != std::string::npos) {
+    auto name = type.substr(charset + 8);
+    name = name.substr(0, name.find_first_of("; "));
+    if (!name.empty() && name.front() == '"') name = name.substr(1, name.find('"', 1) - 1);
+    if (name != "utf-8" && name != "utf8") return false;
+  }
+  if (minera::detail::is_clean_text_utf8(body, xml)) return false;
+  body = minera::detail::repair_text_utf8(body, xml);
+  return true;
+}
+
 void repair_api_json_body(httplib::Response& response) {
-  if (response.body.empty() ||
-      !response.get_header_value("Content-Type").starts_with("application/json"))
-    return;
-  if (!minera::detail::is_clean_utf8(response.body))
-    response.body = active_source_safe_json(response.body);
+  repair_api_text_body(response.body, response.get_header_value("Content-Type"));
 }
 
 httplib::Server::Handler api_route_handler(std::string path,
@@ -11249,7 +11302,7 @@ int main(int argc, char** argv) {
   httplib::Server server;
   // Bound multipart bodies before the HTTP library buffers or parses them.
   server.set_payload_max_length(kMaxRequestPayloadBytes);
-  // JSON bodies are repaired before httplib frames them (repair_api_json_body
+  // JSON, XML and text bodies are repaired before httplib frames them (repair_api_json_body
   // in the route wrappers, the pre-routing and the error handler). This last
   // step is a safety net that keeps the framing honest: a body still holding
   // ill-formed bytes is repaired and its Content-Length recomputed. A Range
@@ -11258,18 +11311,15 @@ int main(int argc, char** argv) {
   server.set_post_routing_handler([](const httplib::Request& request, httplib::Response& response) {
 #if defined(CPPHTTPLIB_ZLIB_SUPPORT)
     // Text and JSON bodies are gzipped for a client that asks, so the
-    // representation varies with Accept-Encoding.
-    if (!response.has_header("Vary") &&
-        httplib::detail::can_compress_content_type(response.get_header_value("Content-Type")))
-      response.set_header("Vary", "Accept-Encoding");
+    // representation varies with Accept-Encoding (merged with Vary: Origin).
+    if (httplib::detail::can_compress_content_type(response.get_header_value("Content-Type")))
+      add_vary(response, "Accept-Encoding");
 #endif
     // A gzipped body was repaired before it was compressed (repair_api_json_body).
     if (!request.path.starts_with("/api/") || response.has_header("Content-Range") ||
-        response.has_header("Content-Encoding") || response.body.empty() ||
-        !response.get_header_value("Content-Type").starts_with("application/json") ||
-        minera::detail::is_clean_utf8(response.body))
+        response.has_header("Content-Encoding") ||
+        !repair_api_text_body(response.body, response.get_header_value("Content-Type")))
       return;
-    response.body = active_source_safe_json(response.body);
     if (response.has_header("Content-Length")) {
       response.headers.erase("Content-Length");  // set_header adds, not replaces
       response.set_header("Content-Length", std::to_string(response.body.size()));
@@ -11309,7 +11359,7 @@ int main(int argc, char** argv) {
     }
     if (!request.has_header("Origin")) return httplib::Server::HandlerResponse::Unhandled;
     const auto origin = request.get_header_value("Origin");
-    response.set_header("Vary", "Origin");
+    add_vary(response, "Origin");
     if (g_allowed_origins.contains(origin)) {
       response.set_header("Access-Control-Allow-Origin", origin);
       return httplib::Server::HandlerResponse::Unhandled;

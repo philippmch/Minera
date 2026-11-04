@@ -38,47 +38,47 @@
         <name><text>p10</text></name>
       </place>
       <transition id="t0">
-        <name><text>A</text></name>
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t0"/>
       </transition>
       <transition id="t1">
-        <name><text>B</text></name>
+        <name><text>A</text></name>
       </transition>
       <transition id="t2">
-        <name><text>C</text></name>
+        <name><text>B</text></name>
       </transition>
       <transition id="t3">
-        <name><text>D</text></name>
+        <name><text>C</text></name>
       </transition>
       <transition id="t4">
-        <name><text>E</text></name>
+        <name><text>D</text></name>
       </transition>
       <transition id="t5">
-        <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t5"/>
+        <name><text>E</text></name>
       </transition>
       <transition id="t6">
         <name><text>tau</text></name>
         <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t6"/>
       </transition>
-      <arc id="a0" source="p2" target="t0"/>
-      <arc id="a1" source="t0" target="p3"/>
+      <arc id="a0" source="p0" target="t0"/>
+      <arc id="a1" source="t0" target="p2"/>
       <arc id="a2" source="t0" target="p6"/>
-      <arc id="a3" source="p3" target="t1"/>
-      <arc id="a4" source="t1" target="p8"/>
-      <arc id="a5" source="p6" target="t2"/>
-      <arc id="a6" source="p7" target="t2"/>
-      <arc id="a7" source="t2" target="p9"/>
-      <arc id="a8" source="p4" target="t3"/>
-      <arc id="a9" source="t3" target="p7"/>
-      <arc id="a10" source="p5" target="t4"/>
-      <arc id="a11" source="t4" target="p10"/>
-      <arc id="a12" source="p0" target="t5"/>
-      <arc id="a13" source="t5" target="p2"/>
-      <arc id="a14" source="t5" target="p4"/>
-      <arc id="a15" source="t5" target="p5"/>
-      <arc id="a16" source="p8" target="t6"/>
-      <arc id="a17" source="p9" target="t6"/>
-      <arc id="a18" source="p10" target="t6"/>
+      <arc id="a3" source="t0" target="p7"/>
+      <arc id="a4" source="p2" target="t1"/>
+      <arc id="a5" source="t1" target="p3"/>
+      <arc id="a6" source="t1" target="p9"/>
+      <arc id="a7" source="p3" target="t2"/>
+      <arc id="a8" source="t2" target="p4"/>
+      <arc id="a9" source="p9" target="t3"/>
+      <arc id="a10" source="p10" target="t3"/>
+      <arc id="a11" source="t3" target="p5"/>
+      <arc id="a12" source="p6" target="t4"/>
+      <arc id="a13" source="t4" target="p10"/>
+      <arc id="a14" source="p7" target="t5"/>
+      <arc id="a15" source="t5" target="p8"/>
+      <arc id="a16" source="p4" target="t6"/>
+      <arc id="a17" source="p5" target="t6"/>
+      <arc id="a18" source="p8" target="t6"/>
       <arc id="a19" source="t6" target="p1"/>
     </page>
     <finalmarkings>

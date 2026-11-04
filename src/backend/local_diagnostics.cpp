@@ -60,6 +60,8 @@ LocalDiagnosticsResult discover_local_diagnostics(const EventLog& log,
   result.diagnostics.event_count = log.event_count();
 
   std::map<std::string, std::set<std::string>> members;
+  std::map<std::string, std::map<std::string, std::uint64_t>> tagged;
+  const bool group_attribute_mode = o.explicit_groups.empty();
   std::set<std::string> all_resources;
   if (!o.explicit_groups.empty()) {
     if (o.explicit_groups.size() > o.max_groups) throw std::invalid_argument("local_diagnostics group bound exceeded");
@@ -71,10 +73,29 @@ LocalDiagnosticsResult discover_local_diagnostics(const EventLog& log,
       all_resources.insert(set.begin(), set.end());
     }
     if (all_resources.size() > o.max_resources) throw std::invalid_argument("local_diagnostics resource bound exceeded");
+  } else {
+    // Group-attribute mode, as the reference apply_from_group_attribute: a
+    // group is the set of resources seen with that group value, and every
+    // event of a member then counts for each of its groups, whatever group
+    // value (if any) that particular event carries.
+    // Coverage alone stays on the tagged events: the share of a group's
+    // tagged events that each member performed.
+    for (const auto& tr : log.traces) for (const auto& e : tr.events) {
+      const std::string resource = value_for(e, o.resource_attribute, true);
+      if (!nonblank(resource)) continue;
+      const auto* gv = e.attribute(o.group_attribute);
+      if (!gv || !nonblank(*gv)) continue;
+      auto& set = members[*gv];
+      set.insert(resource);
+      all_resources.insert(resource);
+      if (nonblank(value_for(e, o.activity_attribute, false))) ++tagged[*gv][resource];
+      if (members.size() > o.max_groups) throw std::invalid_argument("local_diagnostics group bound exceeded");
+      if (set.size() > o.max_resources) throw std::invalid_argument("local_diagnostics resource bound exceeded");
+    }
   }
 
-  // Raw counts by group, resource and activity. Group-attribute mode derives
-  // membership from each event; explicit mode filters against the supplied map.
+  // Raw counts by group, resource and activity: every event of a member
+  // resource counts for each group that contains it.
   using Triple = std::map<std::string, std::map<std::string, std::map<std::string, std::uint64_t>>>;
   Triple counts;
   std::map<std::string, std::uint64_t> activity_totals;
@@ -88,17 +109,8 @@ LocalDiagnosticsResult discover_local_diagnostics(const EventLog& log,
     if (all_resources.size() > o.max_resources)
       throw std::invalid_argument("local_diagnostics resource bound exceeded");
     std::vector<std::string> groups;
-    if (!o.explicit_groups.empty()) {
-      for (const auto& [g, rs] : members) if (rs.contains(resource)) groups.push_back(g);
-      if (groups.empty()) { ++skipped; continue; }
-    } else {
-      const auto* gv = e.attribute(o.group_attribute);
-      if (!gv || !nonblank(*gv)) { ++skipped; continue; }
-      groups.push_back(*gv);
-      members[*gv].insert(resource);
-      if (members.size() > o.max_groups) throw std::invalid_argument("local_diagnostics group bound exceeded");
-      if (members[*gv].size() > o.max_resources) throw std::invalid_argument("local_diagnostics resource bound exceeded");
-    }
+    for (const auto& [g, rs] : members) if (rs.contains(resource)) groups.push_back(g);
+    if (groups.empty()) { ++skipped; continue; }
     for (const auto& g : groups) {
       ++counts[g][resource][activity];
     }
@@ -133,16 +145,23 @@ LocalDiagnosticsResult discover_local_diagnostics(const EventLog& log,
             ? static_cast<double>(group_count) / group_totals[g] : 0.0;
       }
     }
+    std::uint64_t coverage_total = group_totals[g];
+    if (group_attribute_mode) {
+      coverage_total = 0;
+      for (const auto& [r, n] : tagged[g]) { (void)r; coverage_total += n; }
+    }
     for (const auto& r : rs) {
       std::uint64_t resource_total = 0;
-      if (const auto group_it = counts.find(g); group_it != counts.end()) {
+      if (group_attribute_mode) {
+        if (const auto it = tagged[g].find(r); it != tagged[g].end()) resource_total = it->second;
+      } else if (const auto group_it = counts.find(g); group_it != counts.end()) {
         if (const auto resource_it = group_it->second.find(r); resource_it != group_it->second.end()) {
           for (const auto& [a, n] : resource_it->second) resource_total += n;
         }
       }
       if (add_metric_row()) {
-        result.group_coverage[g][r] = group_totals[g]
-            ? static_cast<double>(resource_total) / group_totals[g] : 0.0;
+        result.group_coverage[g][r] = coverage_total
+            ? static_cast<double>(resource_total) / coverage_total : 0.0;
       }
     }
   }

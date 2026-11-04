@@ -5,6 +5,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "minera/event_log.hpp"
 
@@ -24,11 +25,26 @@ struct AttributeStatisticsOptions {
   bool keep_once_per_case = false;
 };
 
+// One distinct value under Python dict-key equality: 1, 1.0 and True (and
+// 0, 0.0 and False) are one key, while the string '1' stays apart. `value`
+// and `type` (int, float, bool, str or date) are those of the first cell seen
+// for that key, as a Python dict keeps its first key.
+struct AttributeValueCount {
+  std::string value;
+  std::string type;
+  std::uint64_t count = 0;
+};
+
 struct AttributeStatisticsResult {
   AttributeStatisticsScope scope = AttributeStatisticsScope::kEvents;
   std::string attribute_key;
   bool keep_once_per_case = false;
+  // Counts by the first-seen text of each key. Distinct keys that only share
+  // a text (the string '1' and the int 1) add up here; `entries` keeps them
+  // apart.
   std::map<std::string, std::uint64_t> values;
+  // Every distinct key in first-seen order.
+  std::vector<AttributeValueCount> entries;
 };
 
 [[nodiscard]] AttributeStatisticsResult discover_attribute_statistics(

@@ -140,7 +140,7 @@ function FamilyGuide({family, form}: {family: OrganizationalFamily; form: Organi
   const guidance: Record<string, string> = {
     activity_frequency: "This metric requires an activity label.", average_duration_activity: "This metric requires an activity label. Durations use the selected timestamps.",
     average_workload: "This metric requires t2 and evaluates intervals active at t2.", multitasking: "This metric requires t1 and t2 and evaluates intervals wholly inside the slot; touching endpoints count as concurrent.",
-    interaction_two_resources: "This metric requires resource and second resource labels.", activity_completions: "This metric counts timestamped activity events, including lifecycle markers.",
+    interaction_two_resources: "This metric requires resource and second resource labels.", activity_completions: "This metric counts every timestamped event of the resource in the slot (one total per resource, any activity), including lifecycle markers.",
     case_completions: "The last selected case timestamp determines the time slot; every resource in the case receives credit.", fraction_case_completions: "The last selected case timestamp determines the time slot; every resource in the case receives credit.",
     average_case_duration: "A case with any selected timestamp in the time slot contributes its full duration.",
   };

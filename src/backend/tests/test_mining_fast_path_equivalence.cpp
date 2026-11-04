@@ -22,9 +22,11 @@
 #include "minera/powl_conversion.hpp"
 #include "minera/powl_discovery.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <functional>
 #include <map>
@@ -185,7 +187,92 @@ std::vector<NamedLog> logs() {
     }
     result.push_back({"parallel", build(t, rng)});
   }
+  {
+    // Uniformly random activities: the inductive net is a wide tau-flower,
+    // whose silent routing searches run to their cap.
+    Rng rng(7);
+    std::vector<std::vector<std::size_t>> t;
+    for (int c = 0; c < 90; ++c) {
+      std::vector<std::size_t> v;
+      const std::size_t len = 3 + rng.below(9);
+      for (std::size_t k = 0; k < len; ++k) v.push_back(rng.below(21));
+      t.push_back(v);
+    }
+    result.push_back({"random21", build(t, rng)});
+  }
   return result;
+}
+
+// Hand-built nets for the soundness search: a silent transition that pumps
+// tokens makes the uniform-cost model run unbounded, so the search falls
+// back to the marking-equation A* (with weighted arcs as well).
+struct NamedNet {
+  std::string name;
+  PetriNet net;
+};
+
+std::vector<NamedNet> pump_nets() {
+  std::vector<NamedNet> nets;
+  {
+    // src -A-> p1 -B-> sink; tau: p1 -> p1 + p2, p2 has no consumer.
+    PetriNet net;
+    net.set_activities({label(0), label(1)});
+    const auto src = net.add_place(), p1 = net.add_place(), p2 = net.add_place(),
+               sink = net.add_place();
+    net.set_source(src);
+    net.set_sink(sink);
+    net.add_transition(0, {src}, {p1});
+    net.add_transition(std::nullopt, {p1}, {p1, p2});
+    net.add_transition(1, {p1}, {sink});
+    nets.push_back({"pump", std::move(net)});
+  }
+  {
+    // As above with a drain for p2 behind a visible transition and a
+    // weighted pump (two tokens per firing).
+    PetriNet net;
+    net.set_activities({label(0), label(1), label(2)});
+    const auto src = net.add_place(), p1 = net.add_place(), p2 = net.add_place(),
+               p3 = net.add_place(), sink = net.add_place();
+    net.set_source(src);
+    net.set_sink(sink);
+    net.add_transition(0, {src}, {p1});
+    net.add_transition(std::nullopt, {p1}, {p1, p2, p2});
+    net.add_transition(2, {p2}, {p3});
+    net.add_transition(std::nullopt, {p3}, {});
+    net.add_transition(1, {p1}, {sink});
+    nets.push_back({"pump_drain", std::move(net)});
+  }
+  {
+    // Two concurrent tau pumps: their token counts multiply the free states,
+    // and only balanced counts can still reach the final marking.
+    PetriNet net;
+    net.set_activities({label(0), label(1), label(2)});
+    std::vector<std::size_t> p;
+    for (int i = 0; i < 7; ++i) p.push_back(net.add_place());
+    net.set_source(p[0]);
+    net.set_sink(p[6]);
+    net.add_transition(0, {p[0]}, {p[1], p[2]});
+    net.add_transition(std::nullopt, {p[1]}, {p[1], p[3]});
+    net.add_transition(std::nullopt, {p[2]}, {p[2], p[4]});
+    net.add_transition(1, {p[3], p[4]}, {p[5]});
+    net.add_transition(2, {p[1], p[2], p[5]}, {p[6]});
+    nets.push_back({"pump_parallel", std::move(net)});
+  }
+  return nets;
+}
+
+std::string alignment_text(const EventLog& log, const PetriNet& net,
+                           const DirectlyFollowsGraph& graph, AlignmentVariant variant,
+                           std::size_t max_states = 0) {
+  AlignmentOptions options;
+  options.variant = variant;
+  if (max_states) options.max_states = max_states;
+  const auto result = check_alignment(log, net, options);
+  std::ostringstream out;
+  out << alignment_json(result, graph) << '|' << result.diagnostics.visited_states << ' '
+      << result.diagnostics.queued_states << ' ' << result.diagnostics.traversed_arcs << ' '
+      << result.diagnostics.lp_solved << ' ' << result.diagnostics.closed_set_length;
+  return out.str();
 }
 
 std::string guarded(const std::function<std::string()>& body) {
@@ -222,6 +309,7 @@ std::map<std::string, std::string> outputs() {
   std::map<std::string, std::string> result;
   for (const auto& [name, log] : logs()) {
     const auto put = [&](const std::string& stage, std::string text) {
+      if (std::getenv("MINERA_PIN_PROGRESS")) std::fprintf(stderr, "%s/%s\n", name.c_str(), stage.c_str());
       result[name + "/" + stage] = std::move(text);
     };
     const auto graph = discover_directly_follows_graph(log);
@@ -310,6 +398,22 @@ std::map<std::string, std::string> outputs() {
             return out.str();
           }));
     }
+    // Alignments: the default (less-memory Dijkstra) and plain Dijkstra on
+    // the whole log, and state-equation A* (an LP per queued state, growing
+    // with the trace) on its first short traces, with search diagnostics.
+    EventLog short_log;
+    for (const auto& trace : log.traces)
+      if (trace.events.size() <= 8 && short_log.traces.size() < 4) short_log.traces.push_back(trace);
+    for (const auto& [id, net] : nets) {
+      for (const auto variant : {AlignmentVariant::kDijkstraLessMemory,
+                                 AlignmentVariant::kStateEquationAStar,
+                                 AlignmentVariant::kDijkstraNoHeuristics}) {
+        const bool lp = variant == AlignmentVariant::kStateEquationAStar;
+        put("align" + std::to_string(static_cast<int>(variant)) + "_" + id, guarded([&] {
+              return alignment_text(lp ? short_log : log, *net, graph, variant, lp ? 100 : 20000);
+            }));
+      }
+    }
     const auto alpha_decoration = decorate_model(log, alpha_net);
     const auto inductive_decoration = decorate_model(log, inductive_net);
     const auto heuristic_decoration = decorate_model(log, heuristic_net);
@@ -321,6 +425,22 @@ std::map<std::string, std::string> outputs() {
         &inductive_decoration, &heuristic_net, &heuristic_decoration, nullptr, nullptr,
         nullptr, &powl, &powl_net, &powl_decoration, &skeleton, &skeleton_conformance,
         &declare, &declare_conformance));
+  }
+  // The soundness search on nets that need the marking-equation fallback.
+  {
+    Rng rng(8);
+    const auto log = build({{0, 1}, {0, 2, 1}, {0, 2, 2, 1}, {1}, {0, 0, 1}}, rng);
+    const auto graph = discover_directly_follows_graph(log);
+    for (const auto& [name, net] : pump_nets()) {
+      result[name + "/sound"] = guarded([&] {
+        return std::string(final_marking_reachable(net) ? "sound" : "unsound");
+      });
+      for (const auto variant : {AlignmentVariant::kDijkstraLessMemory,
+                                 AlignmentVariant::kStateEquationAStar}) {
+        result[name + "/align" + std::to_string(static_cast<int>(variant))] =
+            guarded([&] { return alignment_text(log, net, graph, variant, 5000); });
+      }
+    }
   }
   return result;
 }

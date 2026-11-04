@@ -2,12 +2,14 @@
 // super-linear work: Declare discovery over a large alphabet (dense candidate
 // evaluation), POWL discovery on very long traces and on a large alphabet,
 // log skeleton discovery and conformance on one very long trace, model
-// footprints on a net whose transitions are always enabled, and token replay
-// of a heuristic net over a large alphabet (hidden-place routing). Before the
-// fast paths each case took from about forty seconds to several minutes in a
-// release build; the bounds below are well under that and loose enough for a
-// slower build. The outputs themselves are pinned by
-// test_mining_fast_path_equivalence.cpp.
+// footprints on a net whose transitions are always enabled, token replay of
+// a heuristic net over a large alphabet (hidden-place routing), and, on a
+// random log's inductive tau-flower, the soundness search, model
+// decoration's end-of-trace silent routing, and the alignment time budget
+// and cancel callback. Before the fast paths each case took from about forty
+// seconds to several minutes in a release build; the bounds below are well
+// under that and loose enough for a slower build. The outputs themselves are
+// pinned by test_mining_fast_path_equivalence.cpp.
 //
 // Run with a case name to run that case alone.
 #include "minera/alpha_miner.hpp"
@@ -16,6 +18,7 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/log_skeleton.hpp"
+#include "minera/model_decoration.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/powl_discovery.hpp"
 
@@ -209,6 +212,69 @@ void heuristic_replay_many_activities() {
   assert(result.fitness >= 0.0 && result.fitness <= 1.0);
 }
 
+// About 5k events of uniformly random activities over `acts` labels: over 21
+// the inductive net is a tau-flower of 86 places and 107 transitions (86
+// silent).
+EventLog random_log(std::size_t acts = 21) {
+  Rng rng(17);
+  std::vector<std::vector<std::size_t>> traces;
+  for (int c = 0; c < 520; ++c) traces.push_back(uniform(rng, acts, 2 + rng.below(17)));
+  return build(traces);
+}
+
+void soundness_random_inductive() {
+  // The uniform-cost model run exhausts its 200k expansions on the silent
+  // flower (66 places, 82 transitions over 16 labels), and the
+  // marking-equation A* then solves an LP per new marking.
+  const auto net = to_petri_net(discover_process_tree(random_log(16)));
+  assert(net.transitions().size() == 82);
+  assert(final_marking_reachable(net));
+}
+
+void decoration_random_inductive() {
+  // End-of-trace silent routing: hundreds of distinct end markings whose
+  // breadth-first searches run to their expansion cap.
+  const auto log = random_log();
+  const auto net = to_petri_net(discover_process_tree(log));
+  const auto decoration = decorate_model(log, net);
+  assert(decoration.trace_count == log.traces.size());
+}
+
+void alignment_budget_and_cancel() {
+  // The API default is no time limit; a total budget and a cancel callback
+  // must each stop a long alignment promptly with an uncomputed result.
+  const auto log = random_log();
+  const auto net = to_petri_net(discover_process_tree(log));
+  {
+    AlignmentOptions options;
+    options.max_total_time_seconds = 1.0;
+    const auto start = std::chrono::steady_clock::now();
+    const auto result = check_alignment(log, net, options);
+    const double seconds =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::fprintf(stderr, "  1 s budget: %.2f s, computed %d\n", seconds, result.computed);
+    assert(seconds < 4.0);
+    assert(result.computed || result.exhausted);
+  }
+  {
+    AlignmentOptions options;
+    const auto start = std::chrono::steady_clock::now();
+    std::size_t polls = 0;
+    options.cancelled = [&] {
+      ++polls;
+      return std::chrono::steady_clock::now() - start > std::chrono::milliseconds(300);
+    };
+    const auto result = check_alignment(log, net, options);
+    const double seconds =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    std::fprintf(stderr, "  cancel at 0.3 s: %.2f s, computed %d, %zu polls\n", seconds,
+                 result.computed, polls);
+    assert(seconds < 3.0);
+    assert(polls > 0);
+    assert(!result.computed && result.exhausted);
+  }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -221,6 +287,9 @@ int main(int argc, char** argv) {
       {"log_skeleton_one_long_trace", 30.0, 512, log_skeleton_one_long_trace},
       {"footprints_free_transitions", 30.0, 2048, footprints_free_transitions},
       {"heuristic_replay_many_activities", 30.0, 1024, heuristic_replay_many_activities},
+      {"soundness_random_inductive", 32.0, 1536, soundness_random_inductive},
+      {"decoration_random_inductive", 60.0, 512, decoration_random_inductive},
+      {"alignment_budget_and_cancel", 20.0, 2048, alignment_budget_and_cancel},
   };
   bool ran = false;
   for (const auto& test : cases) {

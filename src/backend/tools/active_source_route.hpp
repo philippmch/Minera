@@ -772,8 +772,8 @@ void deliver_published_mining(const httplib::Request& request, httplib::Response
   // httplib compresses only bodies it holds, not this fixed-length provider,
   // so a client that accepts gzip gets the repaired body gzipped here. A
   // Range request keeps the identity body, so its byte offsets stay those
-  // of the JSON.
-  if (request.ranges.empty() && !request.has_header("Range") &&
+  // of the JSON (httplib honours Range on GET only, so a POST mine has none).
+  if (request.ranges.empty() &&
       httplib::detail::encoding_type(request, response) == httplib::detail::EncodingType::Gzip &&
       httplib::detail::can_compress_content_type(type)) {
     if (auto compressed = gzip_mining_body(*body)) {

@@ -20,7 +20,7 @@ export function NativeDiscovery({family,data,available,mining,onUseModel}:{famil
   const i=(key:keyof typeof ilp,value:string)=>setIlp(form=>({...form,[key]:value}));const g=(key:keyof typeof genetic,value:string)=>setGenetic(form=>({...form,[key]:value}));
   return <>
     <section className="panel native-discovery"><div className="panel-head"><h2>{name} · Classic discovery</h2><span className="panel-meta">{data.dataset}</span></div>
-      <p className="query-intro">{family==="ilp"?"Discover a workflow net with bounded integer region search.":"Evolve a causal matrix and inspect its converted workflow net."} Adjust parameters, then mine the active source.</p>
+      <p className="query-intro">{family==="ilp"?"Discover a workflow net with bounded integer region search.":"Evolve a causal matrix and inspect its converted workflow net. The defaults are pm4py's (population 500, 100 generations): a run can take half a minute or more on a log the size of the sample log, so lower them for a quicker result."} Adjust parameters, then mine the active source.</p>
       {!available&&<p className="model-empty">Open a CSV or XES log to run this miner. Saved analysis JSON does not provide an active discovery source.</p>}
       <div className="query-setup"><button className="btn-ghost" disabled={!available||mining||pending} onClick={()=>void refresh()}>Reload source</button>{schema&&<p>Source: {schema.case_count} cases · {schema.event_count} events</p>}</div>
       <fieldset className="query-fields" disabled={disabled}><div className="query-options">

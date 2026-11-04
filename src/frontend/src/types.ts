@@ -3251,6 +3251,18 @@ export const DEFAULT_ALIGNMENT_OPTIONS: Required<Pick<AlignmentOptions, "variant
   cost_profile: "legacy",
 };
 
+/**
+ * Seconds the app lets one alignment request run when the global timeout is
+ * left empty. The backend's own default (like the reference's) is no limit,
+ * which can keep a large log or a hard model searching for many minutes.
+ */
+export const UI_ALIGNMENT_TIME_BUDGET_SECONDS = 60;
+
+/** The options the app sends: an unset global timeout gets the app's budget; 0 still means no limit. */
+export function withAlignmentTimeBudget(options: AlignmentOptions): AlignmentOptions {
+  return options.max_align_time === undefined ? { ...options, max_align_time: UI_ALIGNMENT_TIME_BUDGET_SECONDS } : options;
+}
+
 export interface AlignmentMove {
   type: AlignmentMoveType;
   /** Activity id of the move; null for a silent model (tau) transition. */

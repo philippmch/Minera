@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { alignDecomposed, alignModel, alignProcessTree, isUncomputedAlignmentPayload } from "../src/api";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { alignDecomposed, alignModel, alignmentQuery, alignProcessTree, isUncomputedAlignmentPayload } from "../src/api";
+import { AlignmentNotice } from "../src/components/Conformance";
+import { UI_ALIGNMENT_TIME_BUDGET_SECONDS, withAlignmentTimeBudget } from "../src/types";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -53,5 +57,45 @@ describe("uncomputed alignment results", () => {
   it("checked helpers still throw an error-only body", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ computed: false, error: "decomposition failed" }))));
     await expect(alignDecomposed("inductive")).rejects.toThrow("decomposition failed");
+  });
+});
+
+describe("the app's alignment time budget", () => {
+  it("fills an unset global timeout only; an explicit one, including 0 (no limit), is kept", () => {
+    expect(withAlignmentTimeBudget({})).toEqual({ max_align_time: UI_ALIGNMENT_TIME_BUDGET_SECONDS });
+    expect(withAlignmentTimeBudget({ variant: "state_equation_a_star", max_states: 5 }))
+      .toEqual({ variant: "state_equation_a_star", max_states: 5, max_align_time: UI_ALIGNMENT_TIME_BUDGET_SECONDS });
+    expect(withAlignmentTimeBudget({ max_align_time: 0 })).toEqual({ max_align_time: 0 });
+    expect(withAlignmentTimeBudget({ max_align_time: 600 })).toEqual({ max_align_time: 600 });
+    expect(alignmentQuery(withAlignmentTimeBudget({}))).toBe(`max_align_time=${UI_ALIGNMENT_TIME_BUDGET_SECONDS}`);
+  });
+
+  it("alignModel hands its abort signal to the request and rethrows the abort", async () => {
+    const seen: Array<RequestInit | undefined> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      seen.push(init);
+      if (init?.signal?.aborted) throw new DOMException("aborted", "AbortError");
+      return new Response(JSON.stringify(exhausted));
+    }));
+    const controller = new AbortController();
+    await expect(alignModel("inductive", {}, controller.signal)).resolves.toEqual(exhausted);
+    expect(seen[0]?.signal).toBe(controller.signal);
+    controller.abort();
+    await expect(alignModel("inductive", {}, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    await alignModel("inductive");
+    expect(seen[2]?.signal).toBeUndefined();
+  });
+
+  it("the exhausted notice names the app budget only when it applied", () => {
+    const withBudget = renderToStaticMarkup(createElement(AlignmentNotice, { minerName: "Inductive", exhausted: true, budgetSeconds: 60 }));
+    expect(withBudget).toContain("stops alignments after");
+    expect(withBudget).toContain("60");
+    expect(withBudget).toContain("Global timeout");
+    const explicit = renderToStaticMarkup(createElement(AlignmentNotice, { minerName: "Inductive", exhausted: true }));
+    expect(explicit).toContain("hit a");
+    expect(explicit).not.toContain("stops alignments after");
+    const unsound = renderToStaticMarkup(createElement(AlignmentNotice, { minerName: "Alpha", exhausted: false, budgetSeconds: 60 }));
+    expect(unsound).toContain("sound workflow net");
+    expect(unsound).not.toContain("stops alignments after");
   });
 });

@@ -128,8 +128,12 @@ void fixed_and_all_prefixes_match_contract() {
   assert(json.find("\"family\":\"LOG_UTIL\"") != std::string::npos);
   assert(json.find("\"metadata\":{\"extensions\":[{\"name\":\"Fixture\"") !=
          std::string::npos);
-  assert(json.find("\"properties\":[{\"key\":\"owner\"") !=
-         std::string::npos);
+  // Prefix traces are fresh traces, as in the reference: no trace
+  // attributes, properties or case id.
+  assert(json.find("\"properties\":[{\"key\":\"owner\"") == std::string::npos);
+  for (const auto& prefix : all.log.traces)
+    assert(prefix.attributes.empty() && prefix.properties.empty() && prefix.case_id.empty());
+  assert(all.log.traces[3].events.size() == 2 && all.log.traces[3].events[1].activity == "B");
   assert(json.find("\"change_indexes\":[[5,5,5],[9,9]]") != std::string::npos);
 }
 
@@ -154,10 +158,8 @@ void derived_prefix_logs_preserve_typed_case_context() {
   const auto all = get_log_with_prefixes(log);
   assert(all.log.traces.size() == 4);
   for (const auto& prefix : all.log.traces) {
-    assert(prefix.case_id == "42");
-    assert(prefix.case_id_source_key == "case.number");
-    assert(prefix.case_id_attribute &&
-           prefix.case_id_attribute->kind == AttributeKind::kInt);
+    assert(prefix.case_id.empty() && !prefix.case_id_attribute);
+    assert(prefix.case_id_source_key.empty());
   }
 }
 

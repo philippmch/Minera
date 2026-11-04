@@ -7351,7 +7351,16 @@ std::string attribute_statistics_json(
     write_json_string(out, value);
     out << ':' << count;
   }
-  out << "}}";
+  out << "},\"entries\":[";
+  for (std::size_t i = 0; i < result.entries.size(); ++i) {
+    if (i) out << ',';
+    out << "{\"value\":";
+    write_json_string(out, result.entries[i].value);
+    out << ",\"type\":";
+    write_json_string(out, result.entries[i].type);
+    out << ",\"count\":" << result.entries[i].count << '}';
+  }
+  out << "]}";
   return out.str();
 }
 

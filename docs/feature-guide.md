@@ -1065,6 +1065,15 @@ minera_export source.csv --genetic-mine --genetic-seed 17 --genetic-population-s
 minera_export source.csv --genetic-matrix-convert --genetic-conversion-variant to_petri_net
 ```
 
+Unset genetic fields on the server and CLI take the pm4py
+`discover_petri_net_genetic` wrapper defaults: population 500, 100 generations,
+elitism 0.01, crossover 1.0, mutation 0.01 and tournament sample 5, with a
+candidate bound of 50500 so the whole default search runs. A default tournament
+sample shrinks below a smaller explicit population. On the bundled
+`data/sample_event_log.csv` the default search takes about 28 s on a loaded
+4-core machine. The C++ `GeneticMinerOptions` keeps its smaller native defaults
+(32/20/0.10/0.80/0.10/3, bound 10000).
+
 These views add usable entry points while both packages retain their partial
 parity status. Complete reference optimizer/search/parameter behavior and input
 fallback conventions remain independent gates. In particular, a missing named
@@ -2318,6 +2327,8 @@ and conformance support log, stream, dataframe and lazyframe inputs constructed
 from the cached log. Select activity/case/completion/start fields, strictness,
 business hours and fractional weekly slots. An enabled blank slot override means
 no active time. Conformance retains native zeta values, including inf and -inf.
+A blank zeta uses 1, the pm4py `conformance_temporal_profile` default (the
+C++ library default stays 6).
 
 Download native profile JSON or choose Use this profile for temporal conformance.
 Profile JSON contains [source, target, mean_seconds, standard_deviation_seconds]

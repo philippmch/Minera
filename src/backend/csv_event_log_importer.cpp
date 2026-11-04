@@ -34,32 +34,42 @@ std::string trim(std::string value) {
   return value.substr(first, last - first + 1);
 }
 
+// Quoting follows pandas.read_csv's default tokenizer (quotechar '"',
+// doublequote), the reference's CSV path: a quote opens a quoted field only
+// as a field's first character; anywhere else in an unquoted field it is a
+// literal character (5" pipe). Inside a quoted field "" is one quote, and
+// text after the closing quote is appended to the field ("ab"cd is abcd).
+// An unterminated quoted field is an error, as read_csv's "EOF inside string".
+enum class CsvQuoteState { kFieldStart, kUnquoted, kQuoted, kQuoteInQuoted };
+
 std::vector<std::string> parse_csv_row(
     std::string_view row,
     char delimiter,
     bool trim_fields) {
   std::vector<std::string> fields;
   std::string field;
-  bool in_quotes = false;
+  auto state = CsvQuoteState::kFieldStart;
 
-  for (std::size_t i = 0; i < row.size(); ++i) {
-    const char ch = row[i];
-    if (ch == '"') {
-      if (in_quotes && i + 1 < row.size() && row[i + 1] == '"') {
-        field.push_back('"');
-        ++i;
-      } else {
-        in_quotes = !in_quotes;
-      }
-    } else if (ch == delimiter && !in_quotes) {
+  for (const char ch : row) {
+    if (state == CsvQuoteState::kQuoted) {
+      if (ch == '"') state = CsvQuoteState::kQuoteInQuoted;
+      else field.push_back(ch);
+    } else if (state == CsvQuoteState::kQuoteInQuoted && ch == '"') {
+      field.push_back('"');
+      state = CsvQuoteState::kQuoted;
+    } else if (ch == delimiter) {
       fields.push_back(trim_fields ? trim(std::move(field)) : std::move(field));
       field.clear();
+      state = CsvQuoteState::kFieldStart;
+    } else if (state == CsvQuoteState::kFieldStart && ch == '"') {
+      state = CsvQuoteState::kQuoted;
     } else {
       field.push_back(ch);
+      state = CsvQuoteState::kUnquoted;
     }
   }
 
-  if (in_quotes) {
+  if (state == CsvQuoteState::kQuoted) {
     throw std::runtime_error("CSV row contains an unterminated quoted field");
   }
 
@@ -69,24 +79,31 @@ std::vector<std::string> parse_csv_row(
 
 // A quoted field can span physical lines. Keep its exact CR/LF bytes; only an
 // unquoted record terminator is consumed. Escaped quotes retain their spelling
-// for the existing field parser to decode.
-bool read_csv_record(std::istream& input, std::string& record) {
+// for the field parser to decode; quotes follow the same rule as
+// parse_csv_row, so a literal quote inside an unquoted field does not open a
+// multi-line field.
+bool read_csv_record(std::istream& input, std::string& record, char delimiter) {
   record.clear();
-  bool in_quotes = false;
+  auto state = CsvQuoteState::kFieldStart;
   bool read_any = false;
   char ch;
   while (input.get(ch)) {
     read_any = true;
-    if (ch == '"') {
+    if (state == CsvQuoteState::kQuoted) {
       record.push_back(ch);
-      if (in_quotes && input.peek() == '"') {
-        input.get(ch);
-        record.push_back(ch);
-      } else in_quotes = !in_quotes;
-    } else if (!in_quotes && (ch == '\r' || ch == '\n')) {
+      if (ch == '"') state = CsvQuoteState::kQuoteInQuoted;
+    } else if (state == CsvQuoteState::kQuoteInQuoted && ch == '"') {
+      record.push_back(ch);
+      state = CsvQuoteState::kQuoted;
+    } else if (ch == '\r' || ch == '\n') {
       if (ch == '\r' && input.peek() == '\n') input.get(ch);
       return true;
-    } else record.push_back(ch);
+    } else {
+      record.push_back(ch);
+      state = ch == delimiter ? CsvQuoteState::kFieldStart
+            : state == CsvQuoteState::kFieldStart && ch == '"' ? CsvQuoteState::kQuoted
+            : CsvQuoteState::kUnquoted;
+    }
   }
   return read_any;
 }
@@ -844,12 +861,12 @@ CsvEventData import_csv_event_data_impl(
 
   std::string line;
   std::size_t line_number = 1;
-  if (!read_csv_record(input, line)) {
+  if (!read_csv_record(input, line, options.delimiter)) {
     return {};
   }
   // read_csv skips blank lines before the header too.
   while (reference_batch && is_reference_blank_line(line, options.delimiter)) {
-    if (!read_csv_record(input, line)) return {};
+    if (!read_csv_record(input, line, options.delimiter)) return {};
     ++line_number;
   }
 
@@ -930,7 +947,7 @@ CsvEventData import_csv_event_data_impl(
   std::vector<std::string> activity_tokens;
   std::vector<PendingRow> pending;
 
-  while (read_csv_record(input, line)) {
+  while (read_csv_record(input, line, options.delimiter)) {
     ++line_number;
     if (line.empty() ||
         (reference_batch && is_reference_blank_line(line, options.delimiter))) {

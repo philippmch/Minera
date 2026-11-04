@@ -419,10 +419,41 @@ using ProcessTreeToPetriNetVariant = ProcessTreePetriNetVariant;
 
 // Shared marking semantics for search and simulation code. The template keeps
 // the helper usable with signed replay markings and unsigned simulation ones.
+namespace detail {
+// Whether a token count is below a number of unit arcs.
+template <typename Token>
+[[nodiscard]] bool petri_tokens_below(const Token& value, std::size_t count) {
+  if constexpr (std::is_integral_v<Token> && std::is_signed_v<Token>) {
+    return value < 0 || static_cast<std::uint64_t>(value) < count;
+  } else if constexpr (std::is_integral_v<Token>) {
+    return static_cast<std::uint64_t>(value) < count;
+  } else {
+    return TokenInteger(value) < TokenInteger(count);
+  }
+}
+}  // namespace detail
+
 template <typename Token>
 [[nodiscard]] bool petri_transition_enabled(
     const PetriTransition& transition, const std::vector<Token>& marking) {
-  std::vector<std::size_t> required(marking.size(), 0);
+  // Repeated-unit endpoints: a place needs one token per arc. The arcs are
+  // counted in place instead of in a marking-sized table — the result is the
+  // same, since every arc is checked either way and none of them can throw.
+  if (transition.input_weights.empty() && transition.inputs.size() <= 32) {
+    const auto& inputs = transition.inputs;
+    for (std::size_t index = 0; index < inputs.size(); ++index) {
+      const auto place = inputs[index];
+      if (place >= marking.size()) return false;
+      std::size_t count = 1;
+      for (std::size_t earlier = 0; earlier < index; ++earlier) count += inputs[earlier] == place;
+      if (detail::petri_tokens_below(marking[place], count)) return false;
+    }
+    for (const auto place : transition.inhibitor_inputs) {
+      if (place >= marking.size() || marking[place] != 0) return false;
+    }
+    return true;
+  }
+  std::vector<std::size_t> required(transition.input_weights.empty() ? marking.size() : 0, 0);
   for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
     const auto place = transition.inputs[index];
     if (place >= marking.size()) return false;

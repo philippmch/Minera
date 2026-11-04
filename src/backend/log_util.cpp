@@ -115,8 +115,10 @@ LogPrefixResult get_log_with_prefixes(const EventLog& log) {
   result.log.traces.reserve(log.event_count() * 2);
   result.change_indexes.reserve(log.traces.size());
   for (const auto& source : log.traces) {
+    // As the reference get_log_with_log_prefixes, each prefix is a fresh
+    // trace: it carries the events only, without the trace's attributes,
+    // properties or case id.
     Trace cumulative;
-    copy_trace_context(source, cumulative);
     std::vector<std::size_t> changes;
     changes.reserve(source.events.size());
     for (const auto& event : source.events) {

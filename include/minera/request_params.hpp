@@ -173,9 +173,13 @@ struct MineParams {
   // this optional diagnostic into every analysis, so sparse/timestamp-less
   // logs retain the established permissive behavior unless explicitly opted
   // into strict validation.
+  // Request-level temporal conformance follows the pm4py wrapper
+  // conformance_temporal_profile, whose zeta defaults to 1.0; the library
+  // TemporalProfileOptions keeps the algorithm default of 6.
   TemporalProfileOptions temporal_profile = [] {
     TemporalProfileOptions options;
     options.strict_attributes = false;
+    options.zeta = 1.0;
     return options;
   }();
   TransitionSystemOptions transition_system;

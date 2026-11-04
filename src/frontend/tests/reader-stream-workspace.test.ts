@@ -54,7 +54,7 @@ describe("native event and trace reader workflows",()=>{
   });
   it("uses actual original/export bodies and validates reconnectable lists",async()=>{
     const s=parse();let fetch=vi.fn(async()=>new Response('{"sessions":['+csvRaw+']}'));vi.stubGlobal("fetch",fetch);expect(await listReaders()).toHaveLength(1);
-    fetch=vi.fn(async()=>new Response('original bytes'));vi.stubGlobal("fetch",fetch);expect(await (await readerOriginal(s.session_id)).text()).toBe('original bytes');expect(await (await readerExport(s.session_id,"read","xes","etree",true)).text()).toBe('original bytes');const calls=fetch.mock.calls as unknown as [string][];expect(calls[1][0]).toContain('scope=read');expect(calls[1][0]).toContain('gzip=true');
+    fetch=vi.fn(async()=>new Response('original bytes'));vi.stubGlobal("fetch",fetch);expect(await (await readerOriginal(s.session_id)).text()).toBe('original bytes');expect(await (await readerExport(s.session_id,"read","xes","etree",true)).text()).toBe('original bytes');const calls=fetch.mock.calls as unknown as [string][];expect(calls[1][0]).toContain('scope=read');expect(calls[1][0]).toContain('gzip=true');expect(calls[1][0]).toContain('preserve_nulls=false');
   });
   it("renders all reader selectors and clearly distinguishes source import from cursor reads",()=>{
     const html=renderToStaticMarkup(createElement(ReaderStreamWorkspace,{}));expect(html).toContain("XES whole-trace reader");expect(html).toContain("CSV event reader");expect(html).toContain("import the upload in memory");expect(html).toContain("Native reader cursors");expect(html).toContain("Activity prefix transform");

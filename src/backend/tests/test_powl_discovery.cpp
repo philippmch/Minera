@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -690,6 +691,38 @@ int main() {
   assert(simplified_optional.kind() == PowlNodeKind::kLoop);
   assert(simplified_optional.children()[0].kind() == PowlNodeKind::kSilent);
   assert(simplified_optional.children()[1].label() == "A");
+
+  // Brute force on many activities refuses a partition level that would pass
+  // its memory bound, before generating it, instead of allocating gigabytes
+  // (a 32-activity log needs 15,642,600 partitions into 29 groups).
+  {
+    EventLog many;
+    std::uint32_t seed = 20090;
+    const auto next = [&seed](std::uint32_t bound) {
+      seed = seed * 1664525u + 1013904223u;
+      return (seed >> 8) % bound;
+    };
+    const std::vector<std::string> names = [] {
+      std::vector<std::string> out;
+      for (int i = 0; i < 32; ++i) out.push_back("A" + std::to_string(i));
+      return out;
+    }();
+    for (int c = 0; c < 40; ++c) {
+      Trace trace;
+      const auto length = 3 + next(10);
+      for (std::uint32_t e = 0; e < length; ++e) trace.events.push_back(Event{"", names[next(32)]});
+      many.traces.push_back(std::move(trace));
+    }
+    Trace all;
+    for (const auto& name : names) all.events.push_back(Event{"", name});
+    many.traces.push_back(std::move(all));
+    PowlDiscoveryOptions bounded;
+    bounded.variant = PowlDiscoveryVariant::kBruteForce;
+    std::string message;
+    try { (void)discover_powl(many, bounded); } catch (const std::runtime_error& error) { message = error.what(); }
+    assert(message.find("POWL brute force would enumerate ") == 0);
+    assert(message.find("more than its memory bound allows") != std::string::npos);
+  }
 
   std::cout << "POWL discovery tests passed\n";
 }

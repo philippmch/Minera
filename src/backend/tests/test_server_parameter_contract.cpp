@@ -106,6 +106,108 @@ bool valid_utf8(const std::string& text) {
   return true;
 }
 
+// A small XML 1.0 well-formedness check (enough for the exports): valid UTF-8,
+// no characters XML cannot carry, one root element, start and end tags that
+// nest, quoted attributes, and only the predefined or numeric entities.
+bool well_formed_xml(const std::string& text) {
+  if (!valid_utf8(text)) return false;
+  for (std::size_t i = 0; i < text.size(); ++i) {
+    const auto byte = static_cast<unsigned char>(text[i]);
+    if (byte < 0x20 && byte != '\t' && byte != '\n' && byte != '\r') return false;
+    if (byte == 0xef && i + 2 < text.size() && static_cast<unsigned char>(text[i + 1]) == 0xbf &&
+        static_cast<unsigned char>(text[i + 2]) >= 0xbe)
+      return false;
+  }
+  const auto entity_ok = [&](std::size_t at) {
+    const auto end = text.find(';', at);
+    if (end == std::string::npos) return false;
+    const auto name = text.substr(at + 1, end - at - 1);
+    if (name == "lt" || name == "gt" || name == "amp" || name == "quot" || name == "apos") return true;
+    if (name.size() < 2 || name[0] != '#') return false;
+    const bool hex = name[1] == 'x';
+    if (name.size() == (hex ? 2u : 1u)) return false;
+    for (std::size_t k = hex ? 2 : 1; k < name.size(); ++k)
+      if (!(hex ? std::isxdigit(static_cast<unsigned char>(name[k])) : std::isdigit(static_cast<unsigned char>(name[k]))))
+        return false;
+    return true;
+  };
+  std::vector<std::string> open;
+  int roots = 0;
+  for (std::size_t i = 0; i < text.size();) {
+    if (text[i] == '&') {
+      if (!entity_ok(i)) return false;
+      ++i;
+      continue;
+    }
+    if (text[i] != '<') {
+      if (open.empty() && !std::isspace(static_cast<unsigned char>(text[i]))) return false;
+      ++i;
+      continue;
+    }
+    if (text.compare(i, 4, "<!--") == 0) {
+      const auto end = text.find("-->", i + 4);
+      if (end == std::string::npos) return false;
+      i = end + 3;
+      continue;
+    }
+    if (text.compare(i, 9, "<![CDATA[") == 0) {
+      const auto end = text.find("]]>", i + 9);
+      if (end == std::string::npos || open.empty()) return false;
+      i = end + 3;
+      continue;
+    }
+    if (text.compare(i, 2, "<?") == 0) {
+      const auto end = text.find("?>", i + 2);
+      if (end == std::string::npos) return false;
+      i = end + 2;
+      continue;
+    }
+    if (text.compare(i, 2, "<!") == 0) return false;  // no DTDs in the exports
+    // A start or end tag; quoted attribute values may hold '>'.
+    std::size_t at = i + 1;
+    const bool closing = at < text.size() && text[at] == '/';
+    if (closing) ++at;
+    const auto name_end = text.find_first_of(" \t\r\n/>", at);
+    if (name_end == std::string::npos || name_end == at) return false;
+    const auto name = text.substr(at, name_end - at);
+    at = name_end;
+    bool self_closing = false;
+    for (;;) {
+      while (at < text.size() && std::isspace(static_cast<unsigned char>(text[at]))) ++at;
+      if (at >= text.size()) return false;
+      if (text[at] == '>') { ++at; break; }
+      if (text[at] == '/' && !closing && at + 1 < text.size() && text[at + 1] == '>') {
+        self_closing = true;
+        at += 2;
+        break;
+      }
+      if (closing) return false;
+      const auto eq = text.find('=', at);
+      if (eq == std::string::npos) return false;
+      at = eq + 1;
+      while (at < text.size() && std::isspace(static_cast<unsigned char>(text[at]))) ++at;
+      if (at >= text.size() || (text[at] != '"' && text[at] != '\'')) return false;
+      const auto quote = text[at];
+      const auto value_end = text.find(quote, at + 1);
+      if (value_end == std::string::npos) return false;
+      for (auto k = at + 1; k < value_end; ++k) {
+        if (text[k] == '<') return false;
+        if (text[k] == '&' && !entity_ok(k)) return false;
+      }
+      at = value_end + 1;
+    }
+    if (closing) {
+      if (open.empty() || open.back() != name) return false;
+      open.pop_back();
+    } else {
+      if (open.empty() && roots++ > 0) return false;
+      if (!self_closing) open.push_back(name);
+    }
+    i = at;
+  }
+  return open.empty() && roots == 1;
+}
+
 bool contains(const httplib::Result& result, const std::string& needle) {
   return result && result->body.find(needle) != std::string::npos;
 }
@@ -731,6 +833,15 @@ int main(int argc, char** argv) {
                (!latin1 || r->body.find("Pr\\ufffdfung") != std::string::npos);
       };
 
+      // The XML exports carry the label as U+FFFD (a C0 control too, which
+      // XML 1.0 cannot hold even as a reference), so they stay well-formed.
+      for (const char* target : {"/api/pnml", "/api/bpmn"}) {
+        result = client.Get(target);
+        check(result && result->status == 200 && well_formed_xml(result->body) &&
+                  result->body.find(latin1 ? "Pr\xEF\xBF\xBD" "fung" : "A\xEF\xBF\xBDx") != std::string::npos,
+              label + " " + target + " is well-formed XML: " + describe(result));
+      }
+
       result = client.Get("/api/playout?miner=inductive&traces=3");
       check(result && result->status == 400 && contains(result, "\"error\"") &&
                 contains(result, refused) && utf8_without_controls(result->body),
@@ -816,6 +927,33 @@ int main(int argc, char** argv) {
       }
       check(repaired >= 8, "the sweep reached repaired bodies (" + std::to_string(repaired) + ")");
 
+      // XML and text exports take the same U+FFFD policy as raw characters,
+      // so PNML and BPMN parse as XML and the DFG text is valid UTF-8.
+      const std::string replaced = "Pr\xEF\xBF\xBD" "fung";
+      for (const char* target : {"/api/pnml", "/api/pnml?miner=alpha", "/api/bpmn", "/api/bpmn?miner=alpha",
+                                 "/api/dfg"}) {
+        const auto response = raw_exchange(port, "GET", target);
+        const auto what = std::string("GET ") + target + ": " + describe(response);
+        const bool text = response.header("Content-Type").starts_with("text/");
+        check(response.complete && response.status == 200 &&
+                  response.header("Content-Length") == std::to_string(response.body.size()) &&
+                  valid_utf8(response.body) && response.body.find(replaced) != std::string::npos,
+              "Latin-1 labels reach the export as U+FFFD for " + what);
+        if (!text)
+          check(response.header("Content-Type").starts_with("application/xml") && well_formed_xml(response.body),
+                "the export parses as XML for " + what);
+      }
+      // The same bodies gzipped inflate to the repaired bytes.
+#if defined(MINERA_TEST_HAS_ZLIB)
+      {
+        const auto plain = raw_exchange(port, "GET", "/api/pnml");
+        const auto gz = raw_exchange(port, "GET", "/api/pnml", "Accept-Encoding: gzip\r\n");
+        const auto inflated = gunzip(gz.body);
+        check(gz.header("Content-Encoding") == "gzip" && inflated && *inflated == plain.body,
+              "a gzipped PNML export inflates to the repaired body: " + describe(gz));
+      }
+#endif
+
       // A Range request slices the repaired body: 206 with exact framing.
       const auto full = raw_exchange(port, "GET", "/api/trie");
       check(full.complete && full.status == 200 && full.body.find("\\ufffd") != std::string::npos,
@@ -887,6 +1025,59 @@ int main(int argc, char** argv) {
       check(gz_mine.header("Content-Encoding").empty() &&
                 without_source_ids(gz_mine.body) == without_source_ids(plain_mine.body),
             "without zlib the mine is identity: " + describe(gz_mine));
+#endif
+
+      // Accept-Encoding is parsed with its q-values (one parser for httplib's
+      // compression and the streamed mine): q=0, identity alone or a higher
+      // identity preference get the identity body.
+      {
+        using httplib::detail::accepts_content_coding;
+        const std::vector<std::pair<std::string, bool>> cases = {
+            {"gzip", true}, {"GZIP", true}, {"x-gzip", true}, {"deflate, gzip;q=0.5", true},
+            {"gzip;q=1.000", true}, {"*", true}, {"*;q=0.1", true}, {"gzip ; q=0.001", true},
+            {"", false}, {"identity", false}, {"gzip;q=0", false}, {"gzip;q=0.000, identity", false},
+            {"gzip;q=0, *", false}, {"*;q=0", false}, {"deflate", false}, {"gzipx", false},
+            {"notgzip", false}, {"gzip;q=0.5, identity;q=1", false}, {"gzip;q=1.5", false},
+            {"gzip;q=abc", false}, {"gzip;q=0.0001", false}, {"identity;q=0, gzip;q=0.2", true},
+            {"br;q=1, gzip;q=0.9", true}, {"*;q=0, gzip", true}};
+        for (const auto& [header, expected] : cases)
+          check(accepts_content_coding(header, "gzip") == expected,
+                "Accept-Encoding \"" + header + "\" " + (expected ? "accepts" : "refuses") + " gzip");
+      }
+      const auto current_trie = raw_exchange(port, "GET", "/api/trie");  // the mines above replaced the source
+      for (const char* refuse : {"gzip;q=0, identity", "identity", "*;q=0", "gzip;q=0.2, identity;q=0.8"}) {
+        const auto plain = raw_exchange(port, "GET", "/api/trie", std::string("Accept-Encoding: ") + refuse + "\r\n");
+        check(plain.status == 200 && plain.header("Content-Encoding").empty() && plain.body == current_trie.body,
+              std::string("GET with Accept-Encoding: ") + refuse + " is identity: " + describe(plain));
+      }
+      const auto q0_mine = raw_exchange(port, "POST", mine_target("f3"), "Accept-Encoding: gzip;q=0, identity\r\n", log, "text/csv");
+      result = client.Post("/api/mine-ack?request_id=00000000-0000-4000-8000-0000000000f3", "", "application/x-www-form-urlencoded");
+      check(q0_mine.status == 200 && q0_mine.header("Content-Encoding").empty() &&
+                without_source_ids(q0_mine.body) == without_source_ids(plain_mine.body),
+            "a mine with gzip;q=0 is identity: " + describe(q0_mine));
+      // Range applies to GET only: a POST with Range gets the whole body.
+      const auto ranged_mine = raw_exchange(port, "POST", mine_target("f4"), "Range: bytes=0-15\r\n", log, "text/csv");
+      result = client.Post("/api/mine-ack?request_id=00000000-0000-4000-8000-0000000000f4", "", "application/x-www-form-urlencoded");
+      check(ranged_mine.status == 200 && ranged_mine.header("Content-Range").empty() &&
+                without_source_ids(ranged_mine.body) == without_source_ids(plain_mine.body),
+            "a POST mine ignores Range: " + describe(ranged_mine));
+      const auto ranged_post = raw_exchange(port, "POST", "/api/version", "Range: bytes=0-3\r\n", "");
+      const auto unranged_post = raw_exchange(port, "POST", "/api/version", "", "");
+      check(ranged_post.status == unranged_post.status && ranged_post.status != 206 &&
+                ranged_post.header("Content-Range").empty() && ranged_post.body == unranged_post.body,
+            "a POST ignores Range: " + describe(ranged_post));
+#if defined(MINERA_TEST_HAS_ZLIB)
+      // CORS and compression both vary the response: Vary names both.
+      const std::string origin = "Origin: http://127.0.0.1:" + std::to_string(port) + "\r\n";
+      const auto cors_gz = raw_exchange(port, "GET", "/api/trie", origin + "Accept-Encoding: gzip\r\n");
+      check(cors_gz.status == 200 && cors_gz.header("Content-Encoding") == "gzip" &&
+                cors_gz.header("Vary") == "Origin, Accept-Encoding",
+            "a gzipped CORS answer varies on Origin and Accept-Encoding: " + cors_gz.head);
+      const auto cors_mine = raw_exchange(port, "POST", mine_target("f5"), origin + "Accept-Encoding: gzip\r\n", log, "text/csv");
+      result = client.Post("/api/mine-ack?request_id=00000000-0000-4000-8000-0000000000f5", "", "application/x-www-form-urlencoded");
+      check(cors_mine.status == 200 && cors_mine.header("Content-Encoding") == "gzip" &&
+                cors_mine.header("Vary") == "Origin, Accept-Encoding",
+            "a gzipped CORS mine varies on Origin and Accept-Encoding: " + cors_mine.head);
 #endif
     }
 
@@ -1125,6 +1316,17 @@ int main(int argc, char** argv) {
                     contains(x, "\"estimated_events\":200,") && contains(x, "\"extra_columns\":0,") &&
                     contains(x, "\"estimated_bytes\":2048000,"),
                 name + " over the budget gets 413 MINE_LIMIT: " + describe(x));
+          // xes_max_traces stops the import after that many traces, so the
+          // estimate counts only their events (10 traces: 40 events, admitted).
+          items.push_back({"xes_max_traces", "10", "", ""});
+          const auto capped = limits.Post("/api/mine", items);
+          check(capped && capped->status == 200 && contains(capped, "\"event_count\": 40"),
+                name + " with xes_max_traces=10 is estimated on its first 10 traces: " + describe(capped));
+          items.back().content = "16";
+          const auto over = limits.Post("/api/mine", items);
+          check(over && over->status == 413 && contains(over, "\"limit\":\"max_mine_events\"") &&
+                    contains(over, "\"estimated_events\":64,"),
+                name + " with xes_max_traces=16 (64 events) passes --max-mine-events: " + describe(over));
         }
       }
       // The whole upload is imported, so sampling does not lift the cap.
@@ -1135,6 +1337,24 @@ int main(int argc, char** argv) {
       r = mine_on(limits, generated(15, 4), {});
       check(r && r->status == 200 && contains(r, "\"event_count\": 60"),
             "a log at --max-mine-events is admitted: " + describe(r));
+      // The estimate tokenizes quotes as the importer does: a stray quote in
+      // an unquoted field (5" pipe) is literal and does not open a field
+      // that swallows the remaining rows.
+      {
+        const auto stray = [&](int cases) {
+          auto csv = generated(cases, 4);
+          const auto first_row = csv.find('\n') + 1;
+          csv.replace(csv.find(",A0,", first_row), 4, ",5\" pipe,");
+          return csv;
+        };
+        r = mine_on(limits, stray(15), {});
+        check(r && r->status == 200 && contains(r, "\"event_count\": 60") && contains(r, "5\\\" pipe"),
+              "a stray quote is literal and the rows after it are imported: " + describe(r));
+        r = mine_on(limits, stray(20), {});
+        check(r && r->status == 413 && contains(r, "\"limit\":\"max_mine_events\"") &&
+                  contains(r, "\"estimated_events\":80,"),
+              "a stray quote does not hide rows from the estimate: " + describe(r));
+      }
 
       // One mine at a time; a cancel stops the running one at its next stage.
       const std::string slow_id = "00000000-0000-4000-8000-0000000000c1";

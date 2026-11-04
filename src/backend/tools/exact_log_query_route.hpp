@@ -91,7 +91,7 @@ void handle_exact_log_query(const httplib::Request& request,httplib::Response& r
             minera::record_exact_query_output(report,"json","application/json",bytes);
           }else{
             if(!selected_log)throw std::invalid_argument("the active source has no prepared EventLog for XES export");
-            minera::XesExportOptions options;options.preserve_nulls=true;
+            minera::XesExportOptions options;  // nulls omitted, as pm4py writes None/NaN
             const auto bytes=minera::serialize_xes(*selected_log,options);
             minera::record_exact_query_output(report,"xes","application/xml",bytes);
           }

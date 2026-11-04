@@ -1,7 +1,6 @@
 #include "minera/powl_conversion.hpp"
 
 #include "minera/conformance.hpp"
-#include "minera/petri_net_reduction.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -421,84 +420,102 @@ struct Fragment {
   std::size_t out = 0;
 };
 
+// POWL to Petri net as the reference convert_to_petri_net(powl) builds it:
+// the root sits between two inner places wired to source and sink by silent
+// transitions; a choice puts its children between its own two places; a loop
+// adds a silent entry into its do part, runs its redo part back from the do
+// exit, and leaves through a silent exit; a partial order gives every child
+// its own pair of places, a silent split into the children without
+// predecessors, one place per edge of the transitive reduction (a silent
+// transition after each child with successors and before each child with
+// predecessors) and a silent join out of the children without successors.
+// The reference then applies its simple reduction: first every silent
+// transition with one input place whose only producer and consumer are other
+// and that transition is folded into the producer (single entry), then every
+// silent transition with one output place produced only by it and consumed
+// by one other transition is folded into the consumer (single exit).
+// A frequent transition (optional or self-looping) is one visible transition
+// labelled "<label>\n[1,<max or ->]", as the reference FrequentTransition.
 class PowlBuilder {
  public:
   explicit PowlBuilder(const PowlNode& root) : root_(root) {}
 
   PetriNet run() {
     collect(root_);
-    net_.set_activities(labels_);
-    const std::size_t source = net_.add_place();
-    const std::size_t sink = net_.add_place();
-    net_.set_source(source);
-    net_.set_sink(sink);
-    build(root_, source, sink);
-    return reduce_petri_net(net_).net;
+    places_ = 2;  // source 0, sink 1
+    const std::size_t inner_in = add_place();
+    const std::size_t inner_out = add_place();
+    add(std::nullopt, {0}, {inner_in});
+    build(root_, inner_in, inner_out);
+    add(std::nullopt, {inner_out}, {1});
+    reduce();
+    return materialize();
   }
 
  private:
+  struct Raw {
+    std::optional<std::size_t> activity;
+    std::vector<std::size_t> inputs;
+    std::vector<std::size_t> outputs;
+    bool alive = true;
+  };
+
   const PowlNode& root_;
-  PetriNet net_;
   std::vector<std::string> labels_;
   std::map<std::string, std::size_t> label_ids_;
+  std::size_t places_ = 0;
+  std::vector<Raw> raw_;
+  std::vector<bool> removed_places_;
+
+  static std::string frequency_label(const PowlNode& node) {
+    const auto& f = node.frequency();
+    const bool skippable = f.minimum == 0;
+    const bool selfloop = !f.maximum.has_value();
+    if (!skippable && !selfloop) return node.label();
+    return node.label() + "\n[1," + (selfloop ? std::string("-") : std::to_string(*f.maximum)) + "]";
+  }
 
   void collect(const PowlNode& node) {
     if (node.kind() == PowlNodeKind::kTransition) {
-      if (label_ids_.find(node.label()) == label_ids_.end()) {
+      const auto label = frequency_label(node);
+      if (label_ids_.find(label) == label_ids_.end()) {
         const auto id = labels_.size();
-        label_ids_.emplace(node.label(), id);
-        labels_.push_back(node.label());
+        label_ids_.emplace(label, id);
+        labels_.push_back(label);
       }
     }
     for (const auto& child : node.children()) collect(child);
   }
 
-  std::size_t activity_id(const std::string& label) const {
-    return label_ids_.at(label);
-  }
-
-  void transition_frequency(const PowlNode& node, std::size_t in,
-                            std::size_t out) {
-    const auto f = node.frequency();
-    const auto activity = activity_id(node.label());
-    if (f.maximum && *f.maximum == 1) {
-      net_.add_transition(activity, {in}, {out});
-      if (f.minimum == 0) net_.add_transition(std::nullopt, {in}, {out});
-      return;
-    }
-    // One visible firing followed by zero or more cycles. The control place
-    // after the visible transition offers a silent exit or a silent return to
-    // the input; this preserves exactly one token on a completed run.
-    if (f.minimum == 0) net_.add_transition(std::nullopt, {in}, {out});
-    const std::size_t control = net_.add_place();
-    net_.add_transition(activity, {in}, {control});
-    net_.add_transition(std::nullopt, {control}, {out});
-    net_.add_transition(std::nullopt, {control}, {in});
+  std::size_t add_place() { return places_++; }
+  void add(std::optional<std::size_t> activity, std::vector<std::size_t> in,
+           std::vector<std::size_t> out) {
+    raw_.push_back({activity, std::move(in), std::move(out), true});
   }
 
   void build(const PowlNode& node, std::size_t in, std::size_t out) {
     switch (node.kind()) {
       case PowlNodeKind::kSilent:
-        net_.add_transition(std::nullopt, {in}, {out});
+        add(std::nullopt, {in}, {out});
         return;
       case PowlNodeKind::kTransition:
-        transition_frequency(node, in, out);
+        add(label_ids_.at(frequency_label(node)), {in}, {out});
         return;
       case PowlNodeKind::kXor:
         for (const auto& child : node.children()) build(child, in, out);
         return;
       case PowlNodeKind::kLoop: {
-        // Keep a private loop-entry place separate from the workflow source.
-        // The return edge must remain an explicit silent transition so reverse
-        // conversion can distinguish a loop from a sink escape.
-        const std::size_t loop_entry = net_.add_place();
-        net_.add_transition(std::nullopt, {in}, {loop_entry});
-        const std::size_t control = net_.add_place();
-        build(node.children().at(0), loop_entry, control);
-        net_.add_transition(std::nullopt, {control}, {out});
-        const std::size_t redo_out = net_.add_place();
-        build(node.children().at(1), control, redo_out);
-        net_.add_transition(std::nullopt, {redo_out}, {loop_entry});
+        const std::size_t entry = add_place();
+        const std::size_t exit = add_place();
+        add(std::nullopt, {in}, {entry});
+        build(node.children().at(0), entry, exit);
+        // The redo child ends in its own place, and a silent transition
+        // leads back to the entry (the reduction removes it unless the
+        // redo has several ways out).
+        const std::size_t redo_out = add_place();
+        build(node.children().at(1), exit, redo_out);
+        add(std::nullopt, {redo_out}, {entry});
+        add(std::nullopt, {exit}, {out});
         return;
       }
       case PowlNodeKind::kStrictPartialOrder:
@@ -507,61 +524,118 @@ class PowlBuilder {
     }
   }
 
-  void build_partial_order(const PowlNode& node, std::size_t in,
-                           std::size_t out) {
+  void build_partial_order(const PowlNode& node, std::size_t in, std::size_t out) {
     const auto& children = node.children();
     if (children.empty()) {
-      net_.add_transition(std::nullopt, {in}, {out});
+      add(std::nullopt, {in}, {out});
       return;
     }
     const std::size_t n = children.size();
-    std::vector<std::size_t> child_in(n), child_out(n), done(n);
+    std::vector<std::size_t> child_in(n), child_out(n);
     for (std::size_t i = 0; i < n; ++i) {
-      child_in[i] = net_.add_place();
-      child_out[i] = net_.add_place();
+      child_in[i] = add_place();
+      child_out[i] = add_place();
       build(children[i], child_in[i], child_out[i]);
     }
-    const auto reduction = node.transitive_reduction();
-    std::vector<std::vector<std::size_t>> deps(n);
-    std::vector<std::vector<std::size_t>> successors(n);
-    for (const auto [a, b] : reduction) {
-      const std::size_t dep = net_.add_place();
-      deps[b].push_back(dep);
-      successors[a].push_back(dep);
+    std::vector<std::vector<std::size_t>> preds(n), succs(n);
+    for (const auto [a, b] : node.transitive_reduction()) {
+      const std::size_t edge = add_place();
+      succs[a].push_back(edge);
+      preds[b].push_back(edge);
     }
-
-    std::vector<std::size_t> starts;
-    std::vector<std::size_t> ends;
+    std::vector<std::size_t> split, join;
     for (std::size_t i = 0; i < n; ++i) {
-      bool has_in = false;
-      bool has_out = false;
-      for (const auto [a, b] : reduction) {
-        has_in = has_in || b == i;
-        has_out = has_out || a == i;
-      }
-      if (!has_in) starts.push_back(i);
-      if (!has_out) ends.push_back(i);
+      if (preds[i].empty()) split.push_back(child_in[i]);
+      if (succs[i].empty()) join.push_back(child_out[i]);
     }
-    std::vector<std::size_t> initial_outputs;
-    initial_outputs.reserve(starts.size());
-    for (const auto i : starts) initial_outputs.push_back(child_in[i]);
-    net_.add_transition(std::nullopt, {in}, std::move(initial_outputs));
-
+    add(std::nullopt, {in}, split);
     for (std::size_t i = 0; i < n; ++i) {
-      if (!deps[i].empty()) {
-        net_.add_transition(std::nullopt, deps[i], {child_in[i]});
-      }
-      // A completion marker is only needed for terminal children. Nonterminal
-      // children expose their completion solely through dependency places.
-      if (successors[i].empty()) done[i] = net_.add_place();
-      std::vector<std::size_t> outputs = successors[i];
-      if (successors[i].empty()) outputs.push_back(done[i]);
-      net_.add_transition(std::nullopt, {child_out[i]}, std::move(outputs));
+      if (!succs[i].empty()) add(std::nullopt, {child_out[i]}, succs[i]);
+      if (!preds[i].empty()) add(std::nullopt, preds[i], {child_in[i]});
     }
-    std::vector<std::size_t> join_inputs;
-    join_inputs.reserve(ends.size());
-    for (const auto i : ends) join_inputs.push_back(done[i]);
-    net_.add_transition(std::nullopt, std::move(join_inputs), {out});
+    add(std::nullopt, join, {out});
+  }
+
+  // Producers and consumers of a live place.
+  std::vector<std::size_t> producers(std::size_t place) const {
+    std::vector<std::size_t> result;
+    for (std::size_t t = 0; t < raw_.size(); ++t)
+      if (raw_[t].alive)
+        for (const auto p : raw_[t].outputs) if (p == place) result.push_back(t);
+    return result;
+  }
+  std::vector<std::size_t> consumers(std::size_t place) const {
+    std::vector<std::size_t> result;
+    for (std::size_t t = 0; t < raw_.size(); ++t)
+      if (raw_[t].alive)
+        for (const auto p : raw_[t].inputs) if (p == place) result.push_back(t);
+    return result;
+  }
+
+  static void add_unique(std::vector<std::size_t>& values, std::size_t value) {
+    if (std::find(values.begin(), values.end(), value) == values.end()) values.push_back(value);
+  }
+
+  bool single_entry() {
+    for (std::size_t t = 0; t < raw_.size(); ++t) {
+      auto& silent = raw_[t];
+      if (!silent.alive || silent.activity || silent.inputs.size() != 1) continue;
+      const std::size_t place = silent.inputs.front();
+      const auto in = producers(place);
+      const auto out = consumers(place);
+      if (in.size() != 1 || out.size() != 1 || in.front() == t) continue;
+      auto& producer = raw_[in.front()];
+      producer.outputs.erase(std::remove(producer.outputs.begin(), producer.outputs.end(), place),
+                             producer.outputs.end());
+      for (const auto target : silent.outputs) add_unique(producer.outputs, target);
+      silent.alive = false;
+      removed_places_[place] = true;
+      return true;
+    }
+    return false;
+  }
+
+  bool single_exit() {
+    for (std::size_t t = 0; t < raw_.size(); ++t) {
+      auto& silent = raw_[t];
+      if (!silent.alive || silent.activity || silent.outputs.size() != 1) continue;
+      const std::size_t place = silent.outputs.front();
+      const auto in = producers(place);
+      const auto out = consumers(place);
+      if (in.size() != 1 || out.size() != 1 || out.front() == t) continue;
+      auto& consumer = raw_[out.front()];
+      consumer.inputs.erase(std::remove(consumer.inputs.begin(), consumer.inputs.end(), place),
+                            consumer.inputs.end());
+      for (const auto source : silent.inputs) add_unique(consumer.inputs, source);
+      silent.alive = false;
+      removed_places_[place] = true;
+      return true;
+    }
+    return false;
+  }
+
+  void reduce() {
+    removed_places_.assign(places_, false);
+    while (single_entry()) {}
+    while (single_exit()) {}
+  }
+
+  PetriNet materialize() const {
+    PetriNet net;
+    net.set_activities(labels_);
+    std::vector<std::size_t> ids(places_, 0);
+    for (std::size_t p = 0; p < places_; ++p)
+      if (!removed_places_[p]) ids[p] = net.add_place();
+    net.set_source(ids[0]);
+    net.set_sink(ids[1]);
+    for (const auto& t : raw_) {
+      if (!t.alive) continue;
+      std::vector<std::size_t> in, out;
+      for (const auto p : t.inputs) in.push_back(ids[p]);
+      for (const auto p : t.outputs) out.push_back(ids[p]);
+      net.add_transition(t.activity, std::move(in), std::move(out));
+    }
+    return net;
   }
 };
 

@@ -6052,6 +6052,18 @@ GeneticMinerOptions parse_genetic_miner_params(const FieldLookup& field) {
 GeneticMinerOptions parse_genetic_miner_params(
     const FieldLookup& field, const FieldPresence& present) {
   GeneticMinerOptions options;
+  // Server and CLI requests use the pm4py discover_petri_net_genetic wrapper
+  // defaults (population 500, 100 generations, elitism 0.01, crossover 1.0,
+  // mutation 0.01, tournament sample 5); the candidate bound admits the whole
+  // default search (500 initial + 100 x 500). The library options keep the
+  // smaller native defaults.
+  options.population_size = 500;
+  options.generations = 100;
+  options.elitism_rate = 0.01;
+  options.crossover_rate = 1.0;
+  options.mutation_rate = 0.01;
+  options.elitism_min_sample = 5;
+  options.max_states = 50500;
   const auto supplied = [&](std::string_view name) {
     return present ? present(name) : !field(name).empty();
   };
@@ -6102,6 +6114,10 @@ GeneticMinerOptions parse_genetic_miner_params(
     options.max_states = parse_positive_size(require("genetic_max_states"),
                                              "genetic_max_states");
   }
+  // A default tournament sample shrinks to fit a small explicit population.
+  if (!supplied("genetic_elitism_min_sample") &&
+      options.elitism_min_sample >= options.population_size)
+    options.elitism_min_sample = options.population_size - 1;
   if (options.elitism_min_sample >= options.population_size)
     throw std::invalid_argument(
         "genetic_elitism_min_sample: must be smaller than population size");

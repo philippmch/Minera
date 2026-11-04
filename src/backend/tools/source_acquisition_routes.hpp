@@ -358,7 +358,7 @@ void handle_acquired_exact_export(const httplib::Request& provided, httplib::Res
       } else {
         options.emplace();
         options->compress = ocel_query_bool(request, "gzip", false);
-        options->preserve_nulls = ocel_query_bool(request, "preserve_nulls", true);
+        options->preserve_nulls = ocel_query_bool(request, "preserve_nulls", false);
         options->infer_metadata = ocel_query_bool(request, "infer_metadata", false);
         if (request.has_param("variant")) options->variant = minera::parse_xes_export_variant(request.get_param_value("variant"));
         if (request.has_param("name")) options->name = request.get_param_value("name");
@@ -491,7 +491,7 @@ void handle_acquired_export(const httplib::Request& request,httplib::Response& r
       minera::XesExportOptions options;
       if(request.has_param("variant"))options.variant=minera::parse_xes_export_variant(request.get_param_value("variant"));
       options.compress=ocel_query_bool(request,"gzip",false);
-      options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",true);
+      options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);
       options.infer_metadata=ocel_query_bool(request,"infer_metadata",false);
       if(request.has_param("name"))options.name=request.get_param_value("name");
       response.set_content(minera::serialize_xes(s->acquired.log,options),*options.compress?"application/gzip":"application/xml");

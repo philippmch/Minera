@@ -662,6 +662,11 @@ struct AlignmentOptions {
   // and contain only non-negative token counts.
   std::vector<int> initial_marking;
   std::vector<int> final_marking;
+  // Polled during the search (every few hundred expansions, and between
+  // trace variants); once it returns true the alignment stops and reports
+  // itself uncomputed and exhausted, as a run out of time does. The server
+  // sets it to notice a client that disconnected. Unset never cancels.
+  std::function<bool()> cancelled;
 };
 
 struct AlignmentDiagnostics {

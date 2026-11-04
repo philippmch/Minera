@@ -1029,8 +1029,13 @@ min-start/max-end envelope as it is and rejects only an inverted envelope
 start and stop scanning later events at the first one that does not overlap
 even with touching endpoints, as the reference does, so an inverted event
 can hide a later overlap. Fuzzed 0/3,000 seeded logs (about one event in
-ten inverted) for all three statistics, strict and not;
-`minera_overlap_tests` pins the reference captures.
+ten inverted) for all three statistics with inclusive endpoints, and for
+concurrent activities with the reference's `strict` parameter too;
+`minera_overlap_tests` pins the reference captures. Strict endpoints for
+interval-event and case overlap (`overlap_strict=true`) are a native
+extension: the reference's interval-event and case overlap take no `strict`
+parameter, so there is no reference output to match there (black-box check,
+2026-11-04: 150/150 random logs match with inclusive endpoints).
 
 Passed-time evidence: `discover_passed_time` exposes `PRE`, `POST`, and
 `PREPOST` with neighbor rows in the order each directly-follows pair first
@@ -3738,6 +3743,17 @@ cycles, choices, and equal-neighborhood groups: both source groups are removed,
 their activity order is concatenated, and the result is appended before the
 next deterministic sort. This keeps multi-round projected child ordering
 stable across all dynamic variants.
+
+Declared: the brute-force partition bound. Brute force tries every partition
+of the activities into k groups, from k = n down, and Minera builds each level
+(S(n, k) partitions, a Stirling number of the second kind) before testing it.
+A level whose partitions would pass about 1 GiB is refused before it is built
+with a 400 that names the partition count and suggests another variant
+(`make_po_impl`, `minera_powl_discovery_tests`). The reference keeps
+enumerating: on a 32-activity, 145-event log (black-box run, 2026-11-04) it
+had not finished after 240 s, while Minera refuses at 29 groups (15,642,600
+partitions) after about 2 s and 0.5 GB. Logs whose cut is found before such a
+level are unchanged.
 
 Focused regressions cover ordered multi-activity redo behavior, different
 start/end boundary activities, prefix/suffix false positives, incomplete
@@ -13398,7 +13414,10 @@ Drawing is limited to 200 nodes; full native data and tables remain complete.
 All six utilities are usable: SPLIT_TRAIN_TEST, FIXED_PREFIXES, ALL_PREFIXES,
 UNTIL_ACTIVITY, TO_ACTIVITIES and FEATURE_SELECTION. Seeded train/test outputs
 retain the native floor(n*p)+1 boundary, capped to n. Fixed prefixes retain empty
-traces; all-prefixes retains repeated/empty prefixes and native change indices.
+traces; all-prefixes retains repeated/empty prefixes and native change indices,
+and, as the reference builds each prefix as a fresh trace, a prefix carries its
+events only: no trace attributes, properties or case id. The preparation
+outputs stay usable without them, since XES keeps each prefix as its own trace.
 Activity prefixes exclude the target and expose elapsed seconds. Multi-target
 preparation excludes cases containing another selected target, omits targets
 without remaining cases, and retains caller order for actual output logs.
@@ -14818,7 +14837,17 @@ input shapes, source/evaluated counts and original PNML markings are retained.
 
 Flat CSV inputs retain original parser rows. The shared CSV reader now accepts
 quoted LF/CRLF fields and escaped quotes while preserving source positions and
-existing grouped-log timestamp sorting. Declared empty CSV inputs resolve their
+existing grouped-log timestamp sorting. Quote placement follows the default
+`pandas.read_csv` tokenizer (2026-11-04): a quote opens a quoted field only as
+the field's first character, a quote elsewhere in an unquoted field is literal
+(`5" pipe`), and text after a closing quote joins the field (`"ab"cd` is
+`abcd`); an unterminated quoted field is still refused, as read_csv's "EOF
+inside string". The /api/mine size estimate tokenizes quotes the same way.
+Black-box fuzz of 3,000 generated files with random quote placements: every
+file both sides parse gives identical cells (2,591), and every "EOF inside
+string" is refused natively. Rows with more fields than the header (pandas:
+"Expected N fields" or an implicit index) and short rows are separate,
+unchanged field-count policies. Declared empty CSV inputs resolve their
 actual activity field in every shape, including custom/aliased columns and zero caps.
 
 Validation binds four native suites, 1,442 frontend tests, 221 application checks
@@ -17297,3 +17326,126 @@ Unseeded draws (`std::random_device`) are unchanged.
 - **Monte Carlo PETRI_SEMAPH_FIFO with `numpy_legacy_seed`:** exact on 426 of
   427 bank outcomes; see "Seeded Monte Carlo bank" for the residual.
 - **Genetic miner:** invariant-only, see "Genetic discovery bank".
+
+## Organizational metrics, POWL nets, defaults, statistics and XES nulls (2026-11-03)
+
+Fixes:
+
+- **Local diagnostics, group-attribute mode.** As the reference
+  `apply_from_group_attribute`, a group is the set of resources seen with
+  that `org:group` value, and every event of a member then counts for each of
+  its groups, whatever group value (if any) that event carries: focus, stake
+  and member contribution use these member events. Coverage alone stays on the
+  tagged events (a member's share of the events tagged with the group). An
+  event whose resource belongs to no group is skipped. Explicit-groups mode is
+  unchanged. r1 doing A (g1), B (g2), A (untagged) and r2 doing A (g2) gives
+  focus g1 {A: 2/3, B: 1}, stake g2 {A: 0.75, B: 0.25}, coverage g2 {r1: 0.5,
+  r2: 0.5} and contribution g2 r1 {A: 2, B: 1}. Test:
+  `minera_local_diagnostics_tests`.
+- **`activity_completions` is one total per resource.** The reference
+  `activity_completions(log, t1, t2, r)` takes no activity, so native returns
+  one row per resource with an empty activity, counting every timestamped
+  event of the resource in the slot; an activity selector no longer narrows
+  it. Trace A, B, C by x gives 3. The organizational workspace hint and the
+  frontend fixture follow. Test: `minera_resource_profiles_tests`.
+- **`average_duration_activity`, `average_workload` and `multitasking` on
+  lifecycle logs.** Imported CSV/XES logs follow the reference DataFrame path
+  (the project policy above): every timestamped event takes part whatever its
+  lifecycle, each case is stably sorted by timestamp, and an event's interval
+  runs from the previous event of its case (the first from itself). B
+  complete @0, D start @10, D complete @58 by x gives D 48 (the EventLog path
+  pairs lifecycles). A start @0, B start @5, A complete @10, B complete @15 by
+  alice gives workload 3.0 at t2 = 10 s (EventLog path 0.0). Fresh
+  comparison against `read_xes` DataFrames: 3,200 random calls over all
+  11 metrics, lifecycle logs included, differ only where the reference
+  returns NaN or raises (declared below). Tests:
+  `minera_resource_profiles_tests` (mixed, overlap, complete-start-complete
+  and workload cases checked against the reference).
+- **POWL to Petri net follows the reference construction.** No
+  `reduce_petri_net` pass any more: the root sits between two inner places
+  joined to source and sink by silent transitions; a choice puts its children
+  between its own places; a loop enters its do part through a silent
+  transition, runs its redo part from the do exit to its own place and back
+  to the entry through a silent transition, and leaves through a silent exit;
+  a partial order gets a silent split, one place per transitive-reduction
+  edge, silent transitions after each child with successors and before each
+  child with predecessors, and a silent join. Then the reference's simple
+  reduction folds single-entry and then single-exit silent transitions. A
+  `FrequentTransition` (optional or self-looping) is one visible transition
+  labelled `"<label>\n[1,<max or ->]"`. Fresh comparison: 1,800/1,800 random
+  POWL models (seeds 1 to 6, with and without frequency leaves) give
+  isomorphic nets (places, labels, arcs, markings), so token-based
+  generalization and simplicity on `discover_powl` nets now match. Tests:
+  `minera_powl_conversion_tests` and the conversion banks.
+- **Temporal-profile conformance zeta.** Requests through the shared request
+  parser (the server's temporal-conformance routes) default `temporal_zeta`
+  to 1.0, the `pm4py.conformance_temporal_profile` wrapper
+  default; the library `TemporalProfileOptions` keeps the algorithm default
+  of 6, as does streaming temporal conformance (no wrapper). Test:
+  `minera_request_params_tests`.
+- **Genetic defaults.** Server and CLI requests use the
+  `pm4py.discover_petri_net_genetic` wrapper defaults (population 500,
+  100 generations, elitism 0.01, crossover 1.0, mutation 0.01, tournament
+  sample 5) with a candidate bound of 50,500 so the whole default search can
+  run; a default tournament sample shrinks below a smaller explicit
+  population. On `data/sample_event_log.csv` (13 activities) the default
+  search took 28.2 s on a loaded 4-core machine (load average about 10) and
+  stopped after 59 generations on its stable-fitness rule. The library
+  `GeneticMinerOptions` keeps its native defaults (32/20/0.10/0.80/0.10/3,
+  bound 10,000). Tests: `minera_request_params_tests`, frontend
+  `discovery-model.test.ts`.
+- **Attribute statistics use Python dict-key equality** (the FS5 rule):
+  1, 1.0 and True are one key (0, 0.0 and False too), the string '1' stays
+  apart, and each key keeps its first-seen cell, in both count modes and for
+  trace attributes. The result gains `entries` (value, type, count in
+  first-seen order); `values` stays the map by first-seen text, where keys
+  that only share a text (the int 1 and the string '1') add up. Reference
+  `{1: 6, 0: 2, '1': 1, 2.5: 1}` is native `entries` 1/int 6, 1/str 1,
+  2.5/float 1, 0/int 2. Test: `minera_attribute_statistics_tests`.
+- **ALL_PREFIXES** prefix traces carry no trace attributes, properties or case
+  id (see Log utilities above). Test: `minera_log_util_tests`.
+- **Server XES downloads are pm4py-readable.** The default `read_xes` fails on
+  a `null="true"` int, float or date and misreads the other kinds (boolean
+  False, strings None; `line_by_line`/`chunk_regex` read the text "true"), so
+  server XES (filtered log-query, cluster and clustering exports, preparation,
+  anonymization, transformation and case-relation open logs, stream-reader and
+  source-acquisition exports) now omits null attributes, as pm4py's writer
+  does for None/NaN. `preserve_nulls=true` (or `xes_preserve_nulls=true` on
+  the plain XES export) opts into the markers on the routes that take it; the
+  frontend download helpers send `preserve_nulls=false` unless asked. Native
+  CLI tools that write XES files keep their markers. Tests: frontend
+  `source-acquisition-workspace.test.ts`, `reader-stream-workspace.test.ts`.
+
+Declarations (the reference raises; native keeps its result):
+
+- **Interval tree ties.** `log_to_intervals`, the open-paths interval tree
+  and `convert_log_to_time_intervals` raise `TypeError: '<' not supported
+  between instances of 'Event' and 'Event'` when two intervals tie on
+  (start, end) with different source events (one trace A, B, C at one
+  timestamp); native returns the intervals (2 there). 46 of 500 random logs;
+  the other 454 match.
+- **Resource-profile workload, multitasking and duration on lifecycle
+  logs.** The reference EventLog path raises `IndexError` when a trace holds
+  only unmatched start events and `ValueError('Start must be less than end')`
+  when a derived interval is reversed (B start @10, B complete @20,
+  A complete @15 by r3); native returns its value (0 or 1). The DataFrame
+  `average_duration_activity` returns NaN when no event matches, where native
+  raises "mean requires at least one data point" (a row cannot hold NaN), and
+  raises `AttributeError: Can only use .dt accessor` on some empty
+  selections, where native returns 0.
+- **Local diagnostics, explicit groups.** The reference raises `KeyError`
+  when a listed resource does not occur in the log; native computes with the
+  resources that occur.
+- **Frontend captures.** The 8 `powl_to_net-*` model-conversion captures
+  whose nets changed are recaptured from the current server with
+  `scripts/capture-workbench-fixtures.py`, which replays any
+  `*-request-manifest.json` against a running server and rewrites the
+  entries that changed (response, exports, sizes and digests). Captures that
+  embed `/api/mine` output (active-source workbench, structured POWL
+  discovery, cache seeds and records) still hold the earlier reduced POWL
+  nets, and the temporal-conformance capture with a fitted profile
+  (`behavior-analysis-conformance-native-profile.json`) was taken at zeta 6.
+  Their tests check internal consistency only. The active-source set also
+  differs from the current server in its BPMN and alignment output, and the
+  others' source inputs are not in the repository, so they are left for a
+  full recapture.

@@ -129,8 +129,17 @@ struct Interval {
 // lifecycle or a (case-insensitive) "complete" transition take part, sorted by
 // timestamp. Each one spans from its explicit start timestamp when one is
 // configured, else from the previous kept event (or itself, for the first).
+//
+// With every_transition (average_duration_activity, average_workload and
+// multitasking, which follow the reference DataFrame path that CSV/XES inputs
+// take): every timestamped event
+// takes part whatever its lifecycle, so an activity spans from the previous
+// event of its case in timestamp order. PM4Py 2.7.22 pandas variant:
+// B complete@0, D start@10, D complete@100 gives D 90 (the EventLog variant
+// pairs lifecycles and gives 100).
 std::vector<Interval> lifecycle_intervals(
-    const Trace& trace, const ResourceProfilesOptions& o) {
+    const Trace& trace, const ResourceProfilesOptions& o,
+    bool every_transition = false) {
   const auto complete_or_unmarked = [](const std::string& lifecycle) {
     if (lifecycle.empty()) return true;
     std::string lower = lifecycle;
@@ -142,7 +151,7 @@ std::vector<Interval> lifecycle_intervals(
   std::vector<Kept> kept;
   for (const auto& e : trace.events) {
     const auto t = parse_timestamp(timestamp_of(e, o));
-    if (!t || !std::isfinite(*t) || !complete_or_unmarked(e.lifecycle)) continue;
+    if (!t || !std::isfinite(*t) || (!every_transition && !complete_or_unmarked(e.lifecycle))) continue;
     kept.push_back({*t, &e});
   }
   std::stable_sort(kept.begin(), kept.end(), [](const Kept& a, const Kept& b) { return a.time < b.time; });
@@ -210,7 +219,8 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
   result.diagnostics.resource_count = names.size();
 
   using Key = std::pair<std::string, std::string>;
-  std::map<Key, std::uint64_t> freq, completions;
+  std::map<Key, std::uint64_t> freq;
+  std::map<std::string, std::uint64_t> completions;
   std::map<std::string, std::uint64_t> resource_events;
   std::map<std::string, std::set<std::string>> acts;
   std::map<std::string, std::set<std::string>> completed_cases;
@@ -241,8 +251,10 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
         ++resource_events[*resource];
         if (resource_matches(*resource, o) && activity_matches(activity, o)) {
           ++freq[{*resource, activity}]; acts[*resource].insert(activity);
-          ++completions[{*resource, activity}];
         }
+        // The reference activity_completions(log, t1, t2, r) has no activity
+        // argument: it counts every event the resource completes in the slot.
+        if (resource_matches(*resource, o)) ++completions[*resource];
       }
     }
     if (first && last) {
@@ -258,7 +270,9 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
       all_completed_cases.insert(case_id);
       for (const auto& rr : tr_resources) completed_cases[rr].insert(case_id);
     }
-    auto ints = lifecycle_intervals(tr, o);
+    auto ints = lifecycle_intervals(tr, o, o.metric == ResourceProfileMetric::kAverageDurationActivity ||
+                                               o.metric == ResourceProfileMetric::kAverageWorkload ||
+                                               o.metric == ResourceProfileMetric::kMultitasking);
     intervals.insert(intervals.end(), ints.begin(), ints.end());
   }
 
@@ -268,7 +282,7 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
     case ResourceProfileMetric::kActivityFrequency:
       for (const auto& [k,v] : freq) if (resource_matches(k.first, o) && activity_matches(k.second, o)) { const auto den = resource_events[k.first]; add_row(result,{k.first,k.second,"",den ? static_cast<double>(v)/den : 0.0,v},o.max_rows); } break;
     case ResourceProfileMetric::kActivityCompletions:
-      for (const auto& [k,v] : completions) if (resource_matches(k.first, o) && activity_matches(k.second, o)) add_row(result,{k.first,k.second,"",static_cast<double>(v),v},o.max_rows); break;
+      for (const auto& [r,v] : completions) add_row(result,{r,"","",static_cast<double>(v),v},o.max_rows); break;
     case ResourceProfileMetric::kCaseCompletions:
       for (const auto& [r,s] : completed_cases) if (resource_matches(r, o)) add_row(result,{r,"","",static_cast<double>(s.size()),static_cast<std::uint64_t>(s.size())},o.max_rows); break;
     case ResourceProfileMetric::kFractionCaseCompletions: {
@@ -372,8 +386,7 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
       throw std::invalid_argument("resource profiles: mean requires at least one data point");
     if (o.metric != ResourceProfileMetric::kInteractionTwoResources &&
         o.metric != ResourceProfileMetric::kSocialPosition) {
-      const bool by_activity = o.metric == ResourceProfileMetric::kActivityFrequency ||
-                               o.metric == ResourceProfileMetric::kActivityCompletions;
+      const bool by_activity = o.metric == ResourceProfileMetric::kActivityFrequency;
       add_row(result, {o.resource, by_activity ? o.activity : std::string{}, "", 0.0, 0}, o.max_rows);
     }
   }

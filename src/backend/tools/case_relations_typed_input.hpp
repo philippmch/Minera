@@ -107,8 +107,7 @@ inline std::string execute_typed_case_relations_json(std::string_view base_json,
         if (first) { activity = key; first = false; }
         complete = complete && !event.activity.empty() && key == activity;
       }
-      XesExportOptions export_options;
-      export_options.preserve_nulls = true;
+      XesExportOptions export_options;  // nulls omitted, as pm4py writes None/NaN
       const auto xes = serialize_xes(*projected, export_options);
       payload += ",\"open_log\":{\"xes\":" + q(xes) +
           ",\"case_count\":" + std::to_string(projected->trace_count()) +

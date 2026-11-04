@@ -4736,14 +4736,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2740",
+        "Content-Length": "2202",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "powl_to_net-native-optional.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-optional.response.json",
-        "bytes": 2740,
-        "sha256": "cc2ac9011f32669cd1370994296835e61535e4b4e39dba7413cb86b5e9db9684",
+        "bytes": 2202,
+        "sha256": "16267d5b943bf8f939a6a3ecbadf3181481d74687b8be9a15a5d172da63acc10",
         "status": 200
       },
       "family": "model_conversion",
@@ -4767,8 +4767,8 @@
         "result_pnml": {
           "filename": "powl_to_net-native-optional.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-optional.result_pnml.pnml",
-          "bytes": 1047,
-          "sha256": "b928267c14c2d7f6082aef80cde64fb420b805cd382ce59e5883972adcafd792",
+          "bytes": 788,
+          "sha256": "6bdc3436a66e58db01bc267ca240c262f7322f69fb5ac0838ed676d709408315",
           "format": "pnml"
         }
       }
@@ -4806,14 +4806,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3387",
+        "Content-Length": "2203",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "powl_to_net-native-repeat.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-repeat.response.json",
-        "bytes": 3387,
-        "sha256": "1431b83d1e087b97592025c04b6942f58045e0595e7a2316cf310e6952ea55ad",
+        "bytes": 2203,
+        "sha256": "8943d6943ff37ce329402813dfa4a756114832daf179fecdd3851c4fd3af9cfc",
         "status": 200
       },
       "family": "model_conversion",
@@ -4837,8 +4837,8 @@
         "result_pnml": {
           "filename": "powl_to_net-native-repeat.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-repeat.result_pnml.pnml",
-          "bytes": 1386,
-          "sha256": "8626335663a78350c8cf4823a0545ffe598fc8d1c14eda9e027a10e46164aa80",
+          "bytes": 788,
+          "sha256": "8c88998e184ad2f6a0adde8f2bb009a99beae1a4a0692d4f8b5bfb3ceaa62eac",
           "format": "pnml"
         }
       }
@@ -4876,14 +4876,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3963",
+        "Content-Length": "2212",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "powl_to_net-native-optional-repeat.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-optional-repeat.response.json",
-        "bytes": 3963,
-        "sha256": "409243b8fdf08450e768201873e888c01ddb4462274ad43762017fc65a01b0fb",
+        "bytes": 2212,
+        "sha256": "61170a4e7c7d5c8e951d7b613c6d9c23cccfc89a34b924d42bc576ba4230e0e9",
         "status": 200
       },
       "family": "model_conversion",
@@ -4907,8 +4907,8 @@
         "result_pnml": {
           "filename": "powl_to_net-native-optional-repeat.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-optional-repeat.result_pnml.pnml",
-          "bytes": 1651,
-          "sha256": "6a14a4006400dc7869771a1a7677c610920d1a8f7e8596c73a37245507188bc9",
+          "bytes": 788,
+          "sha256": "8c88998e184ad2f6a0adde8f2bb009a99beae1a4a0692d4f8b5bfb3ceaa62eac",
           "format": "pnml"
         }
       }
@@ -5086,14 +5086,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2951",
+        "Content-Length": "4243",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "powl_to_net-native-xor.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-xor.response.json",
-        "bytes": 2951,
-        "sha256": "d1a17d916c18efac77dd28305de7c8fe589908cba49aad9002d8ae13108fa948",
+        "bytes": 4243,
+        "sha256": "a49d72a30b859463774ef7ca8e3fcaefe8987d2ac06ff16ca38b4afc9c510d04",
         "status": 200
       },
       "family": "model_conversion",
@@ -5117,8 +5117,8 @@
         "result_pnml": {
           "filename": "powl_to_net-native-xor.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-xor.result_pnml.pnml",
-          "bytes": 1047,
-          "sha256": "b928267c14c2d7f6082aef80cde64fb420b805cd382ce59e5883972adcafd792",
+          "bytes": 1725,
+          "sha256": "1b40033c04aa4cd892539e08fa05bfd6fdc7f2d924bfdbfeac3aa425a83bb19a",
           "format": "pnml"
         }
       }
@@ -5163,7 +5163,7 @@
         "filename": "powl_to_net-native-loop.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-loop.response.json",
         "bytes": 4160,
-        "sha256": "5123d39ff5d8bda2543f4c2612d88744465de137f71a2de9a3220f389d4f3e66",
+        "sha256": "8314b720e641781aa2e0f2bf837279a37560c3a0c5cd298659a2d863476679dd",
         "status": 200
       },
       "family": "model_conversion",
@@ -5188,7 +5188,7 @@
           "filename": "powl_to_net-native-loop.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-loop.result_pnml.pnml",
           "bytes": 1633,
-          "sha256": "14e9ce978861e99cb13a1f35ccf7121f9e3d49d0373917f3e72a4ca37ec5f5c5",
+          "sha256": "0f52359d448aa53a4c73057e946855632aeea61a1a307dceee521a8e797c03c6",
           "format": "pnml"
         }
       }
@@ -5373,7 +5373,7 @@
         "filename": "powl_to_net-native-concurrent.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-concurrent.response.json",
         "bytes": 4486,
-        "sha256": "9bf4e7ff8b53b938a7252995084f59c2aaaf00040972f11b4551368a08616fec",
+        "sha256": "09621f59862dcd077088cf186b3b1fa6d101fd5121f6fe89ea461073e197c755",
         "status": 200
       },
       "family": "model_conversion",
@@ -5398,7 +5398,7 @@
           "filename": "powl_to_net-native-concurrent.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-concurrent.result_pnml.pnml",
           "bytes": 1871,
-          "sha256": "5e43eaa7275f2e67df8f6e8a2f90a2c6f0acb803d57c59b7f9bd4a7e62d8b640",
+          "sha256": "ca911177a6994400c6f6c41f8918058afe8ee414b1882abe11ed594470c01dec",
           "format": "pnml"
         }
       }
@@ -5863,7 +5863,7 @@
         "filename": "powl_to_net-native-non-block.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-non-block.response.json",
         "bytes": 6087,
-        "sha256": "7e46357b9979d3582d36a056a094dd0985c5eb11e620bab3f6817367a671721a",
+        "sha256": "9d32177bbd1e02d85b2638a60d6cc7384da42bd2615a8ef56c52ea03a6a8a8aa",
         "status": 200
       },
       "family": "model_conversion",
@@ -5888,7 +5888,7 @@
           "filename": "powl_to_net-native-non-block.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-non-block.result_pnml.pnml",
           "bytes": 2535,
-          "sha256": "deb7182e616c79b3afafe37073369b24f34f78a322a8dbd3f5819555ccece2c9",
+          "sha256": "c33cae94fae042d85eac5d5e55bbcf9d2ab558105831c83536819d6b1a408fd1",
           "format": "pnml"
         }
       }
@@ -5933,7 +5933,7 @@
         "filename": "powl_to_net-native-sparse-disconnected.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-sparse-disconnected.response.json",
         "bytes": 6971,
-        "sha256": "634844215080d23a48dd316459f7fa1eaa131c8dd1127184b0cce993dbef0ced",
+        "sha256": "cb4e8ecd4a3976925397803f9da3b6c2619bfced6ee353e094fcef1bca231df9",
         "status": 200
       },
       "family": "model_conversion",
@@ -5958,7 +5958,7 @@
           "filename": "powl_to_net-native-sparse-disconnected.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-sparse-disconnected.result_pnml.pnml",
           "bytes": 2954,
-          "sha256": "4515d40e2a7174c7fd30c8b21a2be1e873e6bd4a570cc6cb0fa287f489a5d1c6",
+          "sha256": "fb87ba47c2657b62a2f594885e00817e6160da215b0157fdbd87da2b09cea106",
           "format": "pnml"
         }
       }

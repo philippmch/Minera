@@ -172,6 +172,10 @@ void parse_mine_params_defaults_when_empty() {
   assert(params.spectrum.sample_size == 10000);
   assert(params.spectrum.sort_log);
   assert(!params.temporal_profile.strict_attributes);
+  // Request zeta follows pm4py.conformance_temporal_profile (zeta=1.0); the
+  // library options keep the algorithm default of 6.
+  assert(params.temporal_profile.zeta == 1.0);
+  assert(minera::TemporalProfileOptions{}.zeta == 6.0);
   assert(!params.batches);
   assert(params.batch_options.merge_distance_seconds == 900.0);
   assert(params.batch_options.min_batch_size == 2);
@@ -5834,13 +5838,25 @@ void genetic_params_contract() {
   assert(parsed.elitism_rate == 0.2 && parsed.crossover_rate == 0.8);
   assert(parsed.mutation_rate == 0.05 && parsed.elitism_min_sample == 4);
   assert(parsed.max_activities == 9 && parsed.max_states == 77);
+  // Unset fields take the pm4py wrapper defaults (the library keeps 32/20).
+  {
+    const auto defaults = minera::parse_genetic_miner_params(fields({}));
+    assert(defaults.population_size == 500 && defaults.generations == 100);
+    assert(defaults.elitism_rate == 0.01 && defaults.crossover_rate == 1.0);
+    assert(defaults.mutation_rate == 0.01 && defaults.elitism_min_sample == 5);
+    assert(defaults.max_states == 50500 && defaults.max_activities == 64);
+    assert(minera::GeneticMinerOptions{}.population_size == 32);
+    const auto small = minera::parse_genetic_miner_params(
+        fields({{"genetic_population_size", "4"}}));
+    assert(small.population_size == 4 && small.elitism_min_sample == 3);
+  }
   for (const auto& item : {
            std::pair{"genetic_population_size", "1"},
            std::pair{"genetic_generations", "-1"},
            std::pair{"genetic_elitism_rate", "nan"},
            std::pair{"genetic_crossover_rate", "1.1"},
            std::pair{"genetic_mutation_rate", "-0.1"},
-           std::pair{"genetic_elitism_min_sample", "32"},
+           std::pair{"genetic_elitism_min_sample", "500"},
            std::pair{"genetic_max_activities", "0"},
            std::pair{"genetic_max_states", "0"},
            std::pair{"genetic_seed", "-1"}}) {

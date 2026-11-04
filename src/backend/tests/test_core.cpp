@@ -776,6 +776,44 @@ void preserves_multiline_csv_fields_and_original_table_order() {
   assert(rejected);
 }
 
+// Quotes follow pandas.read_csv's default tokenizer (the reference's CSV
+// path): only a field's first character opens a quoted field; a quote inside
+// an unquoted field is literal, and text after a closing quote is appended.
+void follows_reference_csv_quote_placement() {
+  minera::CsvImportOptions options;
+  options.trim_fields = false;
+  const auto cells = [&](const std::string& text) {
+    std::istringstream input(text);
+    const auto imported = minera::import_csv_event_data(input, options);
+    std::vector<std::vector<std::string>> rows;
+    for (const auto& row : imported.table.rows) {
+      rows.emplace_back();
+      for (const auto& cell : row) rows.back().push_back(cell ? cell->value : "");
+    }
+    return rows;
+  };
+  using Rows = std::vector<std::vector<std::string>>;
+  // A stray quote no longer swallows the rest of the file (pandas keeps it).
+  assert((cells("case_id,activity,p\n1,5\" pipe,x\n2,b,y\n") ==
+          Rows{{"1", "5\" pipe", "x"}, {"2", "b", "y"}}));
+  assert((cells("case_id,activity,p\n1,a\"b,c\"d\n") == Rows{{"1", "a\"b", "c\"d"}}));
+  assert((cells("case_id,activity,p\n1,ab\",e\n2,x,y\n") == Rows{{"1", "ab\"", "e"}, {"2", "x", "y"}}));
+  // Text after a closing quote joins the field; a later quote is literal.
+  assert((cells("case_id,activity,p\n1,\"ab\"cd,e\n") == Rows{{"1", "abcd", "e"}}));
+  assert((cells("case_id,activity,p\n1,\"ab\"c\"d,e\n") == Rows{{"1", "abc\"d", "e"}}));
+  assert((cells("case_id,activity,p\n1,\"ab\" ,e\n") == Rows{{"1", "ab ", "e"}}));
+  // A quote after leading space is literal, so the comma splits the field.
+  assert((cells("case_id,activity,p,q\n1,A, \"a,b\"\n") == Rows{{"1", "A", " \"a", "b\""}}));
+  // Quoted fields keep "" and line breaks; a lone CR ends a record.
+  assert((cells("case_id,activity,p\n1,\"a\"\"b\",\"x\ny\"\n") == Rows{{"1", "a\"b", "x\ny"}}));
+  assert((cells("case_id,activity,p\r1,a\"b,c\r2,d,e\r") == Rows{{"1", "a\"b", "c"}, {"2", "d", "e"}}));
+  // An unterminated quoted field is still an error (read_csv: EOF inside string).
+  bool rejected = false;
+  try { (void)cells("case_id,activity,p\n1,\"a\"\",3\n2,b,c\n"); }
+  catch (const std::runtime_error& error) { rejected = std::string(error.what()) == "CSV row contains an unterminated quoted field"; }
+  assert(rejected);
+}
+
 void handles_quoted_csv_fields_and_timestamp_sorting() {
   const auto path = write_temp_log(
       "case_id,activity,timestamp\n"
@@ -7863,6 +7901,7 @@ int main() {
   imports_csv_and_discovers_directly_follows_graph();
   handles_quoted_csv_fields_and_timestamp_sorting();
   preserves_multiline_csv_fields_and_original_table_order();
+  follows_reference_csv_quote_placement();
   aggregates_repeated_trace_variants();
   inductive_miner_discovers_sequence();
   inductive_miner_discovers_exclusive_choice();

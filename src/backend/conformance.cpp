@@ -16,6 +16,7 @@
 #include <chrono>
 #include <limits>
 #include <map>
+#include <memory>
 #include <optional>
 #include <queue>
 #include <set>
@@ -110,6 +111,41 @@ struct MarkingHash {
           1099511628211ull;
     }
     return h;
+  }
+};
+
+// A view of a marking (a state's places without its trailing position), and
+// MarkingHash/equality over markings that also accept such a view, so a map
+// keyed by markings can be searched without building one.
+struct MarkingPrefix {
+  const int* data;
+  std::size_t size;
+};
+struct MarkingPrefixHash {
+  using is_transparent = void;
+  std::size_t operator()(const MarkingPrefix& v) const noexcept {
+    std::size_t h = 1469598103934665603ull;
+    for (std::size_t i = 0; i < v.size; ++i)
+      h = (h ^ static_cast<std::size_t>(static_cast<unsigned>(v.data[i]))) * 1099511628211ull;
+    return h;
+  }
+  std::size_t operator()(const std::vector<int>& v) const noexcept {
+    return (*this)(MarkingPrefix{v.data(), v.size()});
+  }
+};
+struct MarkingPrefixEqual {
+  using is_transparent = void;
+  static bool same(const int* a, std::size_t na, const int* b, std::size_t nb) noexcept {
+    return na == nb && std::equal(a, a + na, b);
+  }
+  bool operator()(const std::vector<int>& a, const std::vector<int>& b) const noexcept {
+    return a == b;
+  }
+  bool operator()(const MarkingPrefix& a, const std::vector<int>& b) const noexcept {
+    return same(a.data, a.size, b.data(), b.size());
+  }
+  bool operator()(const std::vector<int>& a, const MarkingPrefix& b) const noexcept {
+    return same(a.data(), a.size(), b.data, b.size);
   }
 };
 
@@ -655,7 +691,7 @@ class Replayer {
     }
     if (!enabled(marking, chosen) && options.walk_through_hidden_transitions) {
       if (net_.has_extended_arcs() && !has_supplied_hidden_paths(options)) {
-        const auto path = silent_path(marking, [&](const Marking& candidate) { return enabled(candidate, chosen); });
+        const auto path = silent_path_to_enable(marking, std::vector<std::size_t>{chosen});
         if (path) for (const auto transition : *path) emit(transition, true);
       } else {
         forward_route_hidden(marking, keys, chosen, place_names,
@@ -749,9 +785,7 @@ class Replayer {
       if (net_.has_extended_arcs() && !has_supplied_hidden_paths(options)) {
         // Inhibitor/reset-only transitions need not be reachable from a
         // marked ordinary input. Preserve enabled-state routing for these nets.
-        const auto path = silent_path(marking, [&](const Marking& candidate) {
-          return marking_has_final_places(candidate, final_);
-        });
+        const auto path = silent_path_to_final(marking);
         if (path) for (const auto transition : *path) emit(transition, false);
       } else for (std::size_t pass = 0; pass < 6 && !final_present(); ++pass) {
         const auto paths = forward_place_paths(keys, final_keys, place_names, options);
@@ -1083,7 +1117,7 @@ class Replayer {
       std::vector<std::size_t> result;
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
         if (!net_.transitions()[t].silent() &&
-            silent_path(marking, [&](const Marking& m) { return enabled(m, t); }))
+            silent_path_to_enable(marking, std::vector<std::size_t>{t}))
           result.push_back(t);
       }
       return result;
@@ -1789,6 +1823,275 @@ class Replayer {
     }
   }
 
+  // --- Flat silent search ---------------------------------------------------
+  // silent_path over markings stored as rows of 32-bit counts in one pool,
+  // deduplicated by an open-addressing table of row ids. It visits the same
+  // markings in the same order as silent_path — the frontier is FIFO, the
+  // silent transitions are tried in silent_transitions_ order, the cap counts
+  // the same expansions — so it returns the same path. It declines (returns
+  // kFlatDeclined) whenever a count, weight or threshold is outside what the
+  // rows hold, or an arc weight is invalid; the caller then runs silent_path.
+  struct FlatTransition {
+    bool ready = false;
+    bool usable = false;  // false: an invalid weight or per-call check
+    bool never = false;   // an input arc lies outside the marking
+    std::vector<std::pair<std::uint32_t, std::int64_t>> checks;  // place, required
+    std::vector<std::uint32_t> inhibitors;
+    std::vector<std::pair<std::uint32_t, std::int64_t>> inputs;   // consumed, arc order
+    std::vector<std::uint32_t> resets;
+    std::vector<std::pair<std::uint32_t, std::int64_t>> outputs;  // produced, arc order
+  };
+
+  // A built entry the flat search cannot use.
+  static FlatTransition declined_flat() {
+    FlatTransition entry;
+    entry.ready = true;
+    return entry;
+  }
+
+  static std::int64_t clamp_threshold(const TokenInteger& value) {
+    if (value.is_small()) return value.small_value();
+    return value > 0 ? std::numeric_limits<std::int64_t>::max()
+                     : std::numeric_limits<std::int64_t>::min();
+  }
+
+  [[nodiscard]] const FlatTransition& flat_transition(std::size_t t, std::size_t places) const {
+    if (flat_places_ != places) {
+      flat_transitions_.assign(net_.transitions().size(), FlatTransition{});
+      flat_places_ = places;
+    }
+    auto& entry = flat_transitions_[t];
+    if (entry.ready) return entry;
+    entry.ready = true;
+    const auto& transition = net_.transitions()[t];
+    FlatTransition built;
+    built.ready = true;
+    try {
+      const auto& checks = input_checks(t, places);
+      if (checks.per_call) { entry = std::move(built); return entry; }
+      built.never = checks.never;
+      for (const auto& check : checks.checks)
+        built.checks.emplace_back(static_cast<std::uint32_t>(check.place), clamp_threshold(check.required));
+      for (const auto place : transition.inhibitor_inputs) {
+        if (place >= places) built.never = true;
+        else built.inhibitors.push_back(static_cast<std::uint32_t>(place));
+      }
+      // fire_marking's weights, in its order.
+      for (std::size_t index = 0; index < transition.inputs.size(); ++index) {
+        const auto weight = arc_tokens(transition.input_arc_weight(index));
+        if (!weight.is_small() || transition.inputs[index] >= places) { entry = declined_flat(); return entry; }
+        built.inputs.emplace_back(static_cast<std::uint32_t>(transition.inputs[index]), weight.small_value());
+      }
+      for (const auto place : transition.reset_inputs) {
+        if (place >= places) { entry = declined_flat(); return entry; }
+        built.resets.push_back(static_cast<std::uint32_t>(place));
+      }
+      for (std::size_t index = 0; index < transition.outputs.size(); ++index) {
+        const auto weight = arc_tokens(transition.output_arc_weight(index));
+        if (!weight.is_small() || transition.outputs[index] >= places) { entry = declined_flat(); return entry; }
+        built.outputs.emplace_back(static_cast<std::uint32_t>(transition.outputs[index]), weight.small_value());
+      }
+    } catch (const std::exception&) {
+      entry = declined_flat();  // the generic search reproduces the failure
+      return entry;
+    }
+    built.usable = true;
+    entry = std::move(built);
+    return entry;
+  }
+
+  static bool flat_enabled(const FlatTransition& transition, const std::int32_t* row) noexcept {
+    if (transition.never) return false;
+    for (const auto& [place, required] : transition.checks)
+      if (row[place] < required) return false;
+    for (const auto place : transition.inhibitors)
+      if (row[place] != 0) return false;
+    return true;
+  }
+
+  // Applies fire_marking to `row`; false when a count leaves the 32-bit range.
+  static bool flat_fire(const FlatTransition& transition, std::int32_t* row) noexcept {
+    constexpr std::int64_t lo = std::numeric_limits<std::int32_t>::min();
+    constexpr std::int64_t hi = std::numeric_limits<std::int32_t>::max();
+    for (const auto& [place, weight] : transition.inputs) {
+      const std::int64_t value = std::int64_t(row[place]) - weight;
+      if (value < lo || value > hi) return false;
+      row[place] = static_cast<std::int32_t>(value);
+    }
+    for (const auto& input : transition.inputs)
+      if (row[input.first] < 0) row[input.first] = 0;
+    for (const auto place : transition.resets)
+      if (row[place] > 0) row[place] = 0;
+    for (const auto& [place, weight] : transition.outputs) {
+      const std::int64_t value = std::int64_t(row[place]) + weight;
+      if (value < lo || value > hi) return false;
+      row[place] = static_cast<std::int32_t>(value);
+    }
+    return true;
+  }
+
+  // What a flat search found: a path, proof of no path within the cap, or
+  // that it declined and silent_path must decide.
+  enum class FlatOutcome { kFound, kNone, kDeclined };
+
+  // `targets` non-null: the goal is any of them enabled; null: the goal is
+  // every final place marked (marking_has_final_places).
+  [[nodiscard]] FlatOutcome flat_silent_path(const Marking& start,
+                                             const std::vector<std::size_t>* targets,
+                                             std::vector<std::size_t>& path) const {
+    const std::size_t places = start.size();
+    std::vector<const FlatTransition*> silent;
+    silent.reserve(silent_transitions_.size());
+    for (const std::size_t s : silent_transitions_) {
+      const auto& flat = flat_transition(s, places);
+      if (!flat.usable) return FlatOutcome::kDeclined;
+      silent.push_back(&flat);
+    }
+    std::vector<const FlatTransition*> goal_transitions;
+    std::vector<std::uint32_t> final_places;
+    if (targets) {
+      for (const std::size_t t : *targets) {
+        const auto& flat = flat_transition(t, places);
+        if (!flat.usable) return FlatOutcome::kDeclined;
+        goal_transitions.push_back(&flat);
+      }
+    } else {
+      if (final_.size() < places) return FlatOutcome::kDeclined;
+      for (std::size_t place = 0; place < places; ++place)
+        if (final_[place] > 0) final_places.push_back(static_cast<std::uint32_t>(place));
+      // marking_has_final_places reads final_ over the marking's places only.
+    }
+    const auto goal = [&](const std::int32_t* row) {
+      if (targets) {
+        for (const auto* t : goal_transitions)
+          if (flat_enabled(*t, row)) return true;
+        return false;
+      }
+      for (const auto place : final_places)
+        if (row[place] <= 0) return false;
+      return true;
+    };
+
+    std::vector<std::int32_t> pool;
+    pool.reserve(places * 64);
+    pool.resize(places);
+    for (std::size_t place = 0; place < places; ++place) {
+      const auto& value = start[place];
+      if (!value.is_small() || value.small_value() < std::numeric_limits<std::int32_t>::min() ||
+          value.small_value() > std::numeric_limits<std::int32_t>::max())
+        return FlatOutcome::kDeclined;
+      pool[place] = static_cast<std::int32_t>(value.small_value());
+    }
+    if (goal(pool.data())) { path.clear(); return FlatOutcome::kFound; }
+
+    const auto row_hash = [&](std::size_t id) {
+      const std::int32_t* row = pool.data() + id * places;
+      std::uint64_t h = 0x9e3779b97f4a7c15ull ^ places;
+      for (std::size_t place = 0; place < places; ++place) {
+        h ^= static_cast<std::uint32_t>(row[place]) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      }
+      h ^= h >> 33; h *= 0xff51afd7ed558ccdull; h ^= h >> 33;
+      return h;
+    };
+    constexpr std::uint32_t kEmpty = std::numeric_limits<std::uint32_t>::max();
+    std::vector<std::uint32_t> table(1024, kEmpty);
+    std::vector<std::uint64_t> hashes;
+    std::vector<std::uint32_t> parent, via;
+    std::size_t used = 0;
+    // Returns true when the row `id` (the pool's last) is new.
+    const auto insert = [&](std::uint32_t id, std::uint64_t h) {
+      if ((used + 1) * 2 > table.size()) {
+        std::vector<std::uint32_t> grown(table.size() * 2, kEmpty);
+        const std::size_t mask = grown.size() - 1;
+        for (const auto existing : table) {
+          if (existing == kEmpty) continue;
+          std::size_t slot = hashes[existing] & mask;
+          while (grown[slot] != kEmpty) slot = (slot + 1) & mask;
+          grown[slot] = existing;
+        }
+        table.swap(grown);
+      }
+      const std::size_t mask = table.size() - 1;
+      std::size_t slot = h & mask;
+      const std::int32_t* row = pool.data() + std::size_t(id) * places;
+      while (table[slot] != kEmpty) {
+        const auto other = table[slot];
+        if (hashes[other] == h &&
+            std::equal(row, row + places, pool.data() + std::size_t(other) * places))
+          return false;
+        slot = (slot + 1) & mask;
+      }
+      table[slot] = id;
+      ++used;
+      return true;
+    };
+    hashes.push_back(row_hash(0));
+    parent.push_back(kEmpty);
+    via.push_back(kEmpty);
+    insert(0, hashes[0]);
+
+    std::vector<std::uint32_t> frontier{0};
+    std::size_t head = 0;
+    std::size_t expanded = 0;
+    while (head < frontier.size() && expanded++ < kSilentSearchCap) {
+      const std::uint32_t index = frontier[head++];
+      for (std::size_t k = 0; k < silent.size(); ++k) {
+        const auto& transition = *silent[k];
+        if (!flat_enabled(transition, pool.data() + std::size_t(index) * places)) continue;
+        if (hashes.size() >= kEmpty) return FlatOutcome::kDeclined;
+        const auto id = static_cast<std::uint32_t>(hashes.size());
+        pool.resize(pool.size() + places);
+        std::copy_n(pool.data() + std::size_t(index) * places, places,
+                    pool.data() + std::size_t(id) * places);
+        if (!flat_fire(transition, pool.data() + std::size_t(id) * places))
+          return FlatOutcome::kDeclined;
+        hashes.push_back(row_hash(id));
+        if (!insert(id, hashes.back())) {
+          hashes.pop_back();
+          pool.resize(pool.size() - places);
+          continue;
+        }
+        parent.push_back(index);
+        via.push_back(static_cast<std::uint32_t>(k));
+        if (goal(pool.data() + std::size_t(id) * places)) {
+          path.clear();
+          for (std::uint32_t i = id; i != 0; i = parent[i])
+            path.push_back(silent_transitions_[via[i]]);
+          std::reverse(path.begin(), path.end());
+          return FlatOutcome::kFound;
+        }
+        frontier.push_back(id);
+      }
+    }
+    return FlatOutcome::kNone;
+  }
+
+  // silent_path with an any-of-`targets`-enabled goal.
+  [[nodiscard]] std::optional<std::vector<std::size_t>> silent_path_to_enable(
+      const Marking& start, const std::vector<std::size_t>& targets) const {
+    std::vector<std::size_t> path;
+    switch (flat_silent_path(start, &targets, path)) {
+      case FlatOutcome::kFound: return path;
+      case FlatOutcome::kNone: return std::nullopt;
+      case FlatOutcome::kDeclined: break;
+    }
+    return silent_path(start, [&](const Marking& m) { return any_enabled(m, targets); });
+  }
+
+  // silent_path with the every-final-place-marked goal.
+  [[nodiscard]] std::optional<std::vector<std::size_t>> silent_path_to_final(
+      const Marking& start) const {
+    std::vector<std::size_t> path;
+    switch (flat_silent_path(start, nullptr, path)) {
+      case FlatOutcome::kFound: return path;
+      case FlatOutcome::kNone: return std::nullopt;
+      case FlatOutcome::kDeclined: break;
+    }
+    return silent_path(start, [&](const Marking& candidate) {
+      return marking_has_final_places(candidate, final_);
+    });
+  }
+
   // Breadth-first search over silent-transition firings for a marking meeting
   // `goal`. Returns the silent transitions to fire, or std::nullopt if `goal`
   // is unreachable without creating tokens. Visited states live in an arena
@@ -1891,6 +2194,9 @@ class Replayer {
       return path;
     };
 
+    // Each silent transition's produced tokens per place, built on first use
+    // (in the same order, so an invalid weight throws where it did).
+    std::vector<std::optional<Marking>> output_counts(net_.transitions().size());
     // The global transition-visit rule bounds the search by the number of
     // silent transitions, so the legacy variation needs no heuristic cap.
     while (!frontier.empty()) {
@@ -1902,9 +2208,13 @@ class Replayer {
         const auto& transition = net_.transitions()[s];
         if (transition.has_extended_arcs()) continue;
         bool output_covers = true;
-        Marking output_count(marking.size(), 0);
-        for (std::size_t index = 0; index < transition.outputs.size(); ++index)
-          output_count[transition.outputs[index]] += arc_tokens(transition.output_arc_weight(index));
+        if (!output_counts[s]) {
+          Marking built(marking.size(), 0);
+          for (std::size_t index = 0; index < transition.outputs.size(); ++index)
+            built[transition.outputs[index]] += arc_tokens(transition.output_arc_weight(index));
+          output_counts[s] = std::move(built);
+        }
+        const Marking& output_count = *output_counts[s];
         for (std::size_t p = 0; p < current.size(); ++p) {
           if (output_count[p] < current[p]) {
             output_covers = false;
@@ -1955,8 +2265,7 @@ class Replayer {
         })) {
       return;  // provably no silent route; the visible firing creates tokens
     }
-    const auto path = silent_path(
-        marking, [&](const Marking& m) { return any_enabled(m, targets); });
+    const auto path = silent_path_to_enable(marking, targets);
     if (!path) return;  // no silent route; the visible firing will create tokens
     for (const std::size_t s : *path) fire(marking, s, counts);
     if (fired) fired->insert(fired->end(), path->begin(), path->end());
@@ -1972,10 +2281,7 @@ class Replayer {
     const auto reachable = relaxed_silent_places(marking);
     for (std::size_t place = 0; place < final_.size() && place < reachable.size(); ++place)
       if (final_[place] > 0 && !reachable[place]) return;
-    const auto path = silent_path(
-        marking, [&](const Marking& candidate) {
-          return marking_has_final_places(candidate, final_);
-        });
+    const auto path = silent_path_to_final(marking);
     if (!path) return;
     for (const std::size_t s : *path) fire(marking, s, counts);
     if (fired) fired->insert(fired->end(), path->begin(), path->end());
@@ -1999,6 +2305,8 @@ class Replayer {
   mutable std::vector<std::optional<InputChecks>> input_checks_;
   bool place_closure_exact_ = false;
   std::vector<std::vector<std::size_t>> place_enables_;
+  mutable std::vector<FlatTransition> flat_transitions_;
+  mutable std::size_t flat_places_ = std::numeric_limits<std::size_t>::max();
 };
 
 // Collapses the log into distinct activity-id sequences with occurrence counts,
@@ -2343,61 +2651,162 @@ struct LpResult {
   std::vector<double> solution;  // per variable; empty when infeasible
 };
 
+// Constraint matrix as sparse rows: row i's nonzero entries are
+// [start[i], start[i + 1]) of col/val, in ascending column order.
+struct LpRows {
+  std::size_t columns = 0;
+  std::vector<std::size_t> start{0};
+  std::vector<std::size_t> col;
+  std::vector<double> val;
+};
+
+template <class Matrix>
+LpRows lp_rows(const Matrix& a, std::size_t rows, std::size_t columns) {
+  LpRows out;
+  out.columns = columns;
+  out.start.reserve(rows + 1);
+  for (std::size_t i = 0; i < rows; ++i) {
+    for (std::size_t j = 0; j < columns; ++j) {
+      const double v = a(i, j);
+      if (v != 0.0) {
+        out.col.push_back(j);
+        out.val.push_back(v);
+      }
+    }
+    out.start.push_back(out.col.size());
+  }
+  return out;
+}
+
+struct LpWorkspace {
+  std::vector<double> tab, z;
+  std::vector<std::size_t> basis, nonzero;
+  std::vector<char> negated;
+  std::vector<std::uint64_t> row_support, column_support, updated;
+};
+
+// Calls f(index) for each set bit of words[0, count), in ascending order.
+template <class F>
+inline void for_each_bit(const std::uint64_t* words, std::size_t count, F&& f) {
+  for (std::size_t w = 0; w < count; ++w) {
+    for (std::uint64_t x = words[w]; x != 0; x &= x - 1)
+      f(w * 64 + static_cast<std::size_t>(std::countr_zero(x)));
+  }
+}
+
 // Minimal dense two-phase primal simplex for `min c·x  s.t.  A·x = b, x >= 0`.
 // Sized for alignment heuristics (tens of rows and columns) and tuned for
 // robustness over speed: Bland's rule prevents cycling, and if the iteration
 // guard ever trips the caller falls back to a heuristic of zero rather than
 // risking an overestimate from an unfinished minimization.
-LpResult solve_lp(std::vector<std::vector<double>> a,
-                  std::vector<double> b,
-                  const std::vector<double>& c) {
+// Rows whose b is negative are negated on the way into the tableau. The
+// tableau is dense, but every loop that a zero entry cannot affect visits only
+// the row and column supports, in the dense loop's order: skipping x - f * 0
+// or x / p for x == 0 changes no nonzero value (at most a zero's sign, which
+// no comparison here can see), so the pivots, basis, objective and solution
+// are those of the plain dense sweep.
+LpResult solve_lp_sparse(const LpRows& a, std::vector<double> b,
+                         const std::vector<double>& c) {
   constexpr double kEps = 1e-9;
   const std::size_t m = b.size();
   const std::size_t n = c.size();
+  thread_local LpWorkspace ws;
 
-  // Normalize to b >= 0 so the artificial basis is feasible.
+  auto& negated = ws.negated;
+  negated.assign(m, 0);
   for (std::size_t i = 0; i < m; ++i) {
     if (b[i] < 0.0) {
-      for (auto& v : a[i]) v = -v;
+      negated[i] = 1;
       b[i] = -b[i];
     }
   }
 
-  // Tableau: constraint rows over [real vars | artificials | rhs], plus the
-  // reduced-cost row z (z[cols] holds minus the current objective).
   const std::size_t cols = n + m;
-  std::vector<std::vector<double>> tab(m, std::vector<double>(cols + 1, 0.0));
-  std::vector<std::size_t> basis(m);
+  const std::size_t width = cols + 1;
+  auto& tab = ws.tab;
+  tab.assign(m * width, 0.0);
+  const auto at = [&](std::size_t i, std::size_t j) -> double& { return tab[i * width + j]; };
+  auto& basis = ws.basis;
+  basis.resize(m);
+  auto& z = ws.z;
+  z.assign(cols + 1, 0.0);
+  // Supports: row i's columns and column j's rows that may hold a nonzero
+  // entry (a superset — eliminations may cancel). Every loop below that
+  // skips zero entries visits only these, in the same ascending order.
+  const std::size_t row_words = (width + 63) / 64;
+  const std::size_t column_words = (m + 63) / 64;
+  auto& row_support = ws.row_support;
+  auto& column_support = ws.column_support;
+  auto& updated = ws.updated;
+  row_support.assign(m * row_words, 0);
+  column_support.assign(cols * column_words, 0);
+  updated.assign(column_words, 0);
+  const auto mark = [&](std::size_t i, std::size_t j) {
+    row_support[i * row_words + j / 64] |= std::uint64_t{1} << (j % 64);
+    if (j < cols) column_support[j * column_words + i / 64] |= std::uint64_t{1} << (i % 64);
+  };
+  // Phase-1 reduced costs: 0 - column sums (artificials: 1 - 1). Each sum
+  // adds its column's nonzero entries in ascending row order, as a dense
+  // sweep would (adding a zero changes no sum).
   for (std::size_t i = 0; i < m; ++i) {
-    for (std::size_t j = 0; j < n; ++j) tab[i][j] = a[i][j];
-    tab[i][n + i] = 1.0;
-    tab[i][cols] = b[i];
+    double* const row = &tab[i * width];
+    const bool flip = negated[i] != 0;
+    for (std::size_t k = a.start[i]; k < a.start[i + 1]; ++k) {
+      const double v = flip ? -a.val[k] : a.val[k];
+      row[a.col[k]] = v;
+      z[a.col[k]] += v;
+      mark(i, a.col[k]);
+    }
+    row[n + i] = 1.0;
+    mark(i, n + i);
+    row[cols] = b[i];
+    mark(i, cols);
+    z[cols] += b[i];
     basis[i] = n + i;
   }
+  for (std::size_t j = 0; j < n; ++j) z[j] = 0.0 - z[j];
+  for (std::size_t j = n; j < cols; ++j) z[j] = 1.0 - 1.0;
+  z[cols] = 0.0 - z[cols];
 
-  std::vector<double> z(cols + 1, 0.0);
-
+  auto& nonzero = ws.nonzero;
+  nonzero.clear();
+  nonzero.reserve(width);
   const auto pivot = [&](std::size_t row, std::size_t col) {
-    const double p = tab[row][col];
-    for (auto& v : tab[row]) v /= p;
-    for (std::size_t i = 0; i < m; ++i) {
-      if (i == row || std::abs(tab[i][col]) < kEps) continue;
-      const double factor = tab[i][col];
-      for (std::size_t j = 0; j <= cols; ++j) tab[i][j] -= factor * tab[row][j];
+    double* const pivot_row = &tab[row * width];
+    const double p = pivot_row[col];
+    nonzero.clear();
+    const std::uint64_t* const pivot_support = &row_support[row * row_words];
+    for_each_bit(pivot_support, row_words, [&](std::size_t j) {
+      if (pivot_row[j] == 0.0) return;
+      pivot_row[j] /= p;
+      if (pivot_row[j] != 0.0) nonzero.push_back(j);
+    });
+    bool any = false;
+    for_each_bit(&column_support[col * column_words], column_words, [&](std::size_t i) {
+      if (i == row || std::abs(at(i, col)) < kEps) return;
+      double* const target = &tab[i * width];
+      const double factor = target[col];
+      for (const std::size_t j : nonzero) target[j] -= factor * pivot_row[j];
+      std::uint64_t* const target_support = &row_support[i * row_words];
+      for (std::size_t w = 0; w < row_words; ++w) target_support[w] |= pivot_support[w];
+      updated[i / 64] |= std::uint64_t{1} << (i % 64);
+      any = true;
+    });
+    if (any) {
+      for (const std::size_t j : nonzero) {
+        if (j == cols) continue;
+        std::uint64_t* const support = &column_support[j * column_words];
+        for (std::size_t w = 0; w < column_words; ++w) support[w] |= updated[w];
+      }
+      std::fill(updated.begin(), updated.end(), 0);
     }
     const double zf = z[col];
     if (std::abs(zf) > 0.0) {
-      for (std::size_t j = 0; j <= cols; ++j) z[j] -= zf * tab[row][j];
+      for (const std::size_t j : nonzero) z[j] -= zf * pivot_row[j];
     }
     basis[row] = col;
   };
 
-  // Dantzig pricing (steepest reduced cost) converges in far fewer pivots
-  // than Bland's rule; after a run of degenerate pivots the entering rule
-  // falls back to Bland's until progress resumes, which breaks cycles in
-  // practice — and the iteration guard (whose trip the caller treats as "no
-  // usable bound") backstops the pathological remainder. Leaving rows tie-
-  // break on the lowest basis index either way.
   std::size_t iterations_left = 200 + 50 * (m + n);
   std::size_t degenerate = 0;
   const auto iterate = [&](std::size_t allowed_cols) -> bool {
@@ -2419,60 +2828,52 @@ LpResult solve_lp(std::vector<std::vector<double>> a,
           }
         }
       }
-      if (enter == allowed_cols) return true;  // optimal
+      if (enter == allowed_cols) return true;
       std::size_t leave = m;
       double best_ratio = 0.0;
-      for (std::size_t i = 0; i < m; ++i) {
-        if (tab[i][enter] <= kEps) continue;
-        const double ratio = tab[i][cols] / tab[i][enter];
+      for_each_bit(&column_support[enter * column_words], column_words, [&](std::size_t i) {
+        if (at(i, enter) <= kEps) return;
+        const double ratio = at(i, cols) / at(i, enter);
         if (leave == m || ratio < best_ratio - kEps ||
             (ratio < best_ratio + kEps && basis[i] < basis[leave])) {
           leave = i;
           best_ratio = ratio;
         }
-      }
-      if (leave == m) return true;  // unbounded: impossible for our costs
-      if (tab[leave][cols] < kEps) {
+      });
+      if (leave == m) return true;
+      if (at(leave, cols) < kEps) {
         ++degenerate;
       } else {
         degenerate = 0;
       }
       pivot(leave, enter);
     }
-    return false;  // iteration guard tripped
+    return false;
   };
 
-  // Phase 1: minimize the artificial sum. Reduced costs under the artificial
-  // basis are 0 - sum of each column; the rhs entry starts at -sum(b).
-  for (std::size_t j = 0; j <= cols; ++j) {
-    double sum = 0.0;
-    for (std::size_t i = 0; i < m; ++i) sum += tab[i][j];
-    z[j] = (j >= n && j < cols ? 1.0 : 0.0) - sum;
-  }
   LpResult aborted;
   aborted.aborted = true;
   if (!iterate(cols)) return aborted;
-  if (-z[cols] > 1e-6) return {};  // artificials cannot vanish: infeasible
+  if (-z[cols] > 1e-6) return {};
 
-  // Pivot any degenerate artificial out of the basis where possible so phase 2
-  // can bar the artificial columns entirely.
   for (std::size_t i = 0; i < m; ++i) {
     if (basis[i] < n) continue;
-    for (std::size_t j = 0; j < n; ++j) {
-      if (std::abs(tab[i][j]) > kEps) {
-        pivot(i, j);
-        break;
-      }
-    }
+    std::size_t first = n;
+    for_each_bit(&row_support[i * row_words], row_words, [&](std::size_t j) {
+      if (first == n && j < n && std::abs(at(i, j)) > kEps) first = j;
+    });
+    if (first < n) pivot(i, first);
   }
 
-  // Phase 2: minimize the real objective from the phase-1 basis.
   std::fill(z.begin(), z.end(), 0.0);
   for (std::size_t j = 0; j < n; ++j) z[j] = c[j];
   for (std::size_t i = 0; i < m; ++i) {
     const double cb = basis[i] < n ? c[basis[i]] : 0.0;
     if (cb == 0.0) continue;
-    for (std::size_t j = 0; j <= cols; ++j) z[j] -= cb * tab[i][j];
+    const double* const row = &tab[i * width];
+    for_each_bit(&row_support[i * row_words], row_words, [&](std::size_t j) {
+      if (row[j] != 0.0) z[j] -= cb * row[j];
+    });
   }
   if (!iterate(n)) return aborted;
 
@@ -2481,9 +2882,17 @@ LpResult solve_lp(std::vector<std::vector<double>> a,
   result.objective = -z[cols];
   result.solution.assign(n, 0.0);
   for (std::size_t i = 0; i < m; ++i) {
-    if (basis[i] < n) result.solution[basis[i]] = tab[i][cols];
+    if (basis[i] < n) result.solution[basis[i]] = at(i, cols);
   }
   return result;
+}
+
+LpResult solve_lp(const std::vector<std::vector<double>>& a,
+                  std::vector<double> b,
+                  const std::vector<double>& c) {
+  const auto rows =
+      lp_rows([&](std::size_t i, std::size_t j) { return a[i][j]; }, b.size(), c.size());
+  return solve_lp_sparse(rows, std::move(b), c);
 }
 
 // Computes optimal alignments by an A* search over the synchronous product of
@@ -2497,6 +2906,21 @@ LpResult solve_lp(std::vector<std::vector<double>> a,
 // while expanding a fraction of the states plain Dijkstra visits, which is what
 // makes concurrent nets (parallel branches multiply the marking space)
 // alignable within the search cap.
+// Polls AlignmentOptions::cancelled every 256 calls (the callback may be a
+// system call); an unset callback never cancels.
+class CancelPoll {
+ public:
+  explicit CancelPoll(const std::function<bool()>& cancelled) : cancelled_(cancelled) {}
+  bool operator()() {
+    if (!cancelled_) return false;
+    return (++calls_ & 255u) == 0 && cancelled_();
+  }
+
+ private:
+  const std::function<bool()>& cancelled_;
+  std::size_t calls_ = 0;
+};
+
 class Aligner {
  public:
   explicit Aligner(
@@ -2592,6 +3016,18 @@ class Aligner {
       if (options.model_cost_function) value = options.model_cost_function(name, t);
       return value;
     };
+    // A cost callback is called per firing, as before; plain costs are
+    // looked up once per transition.
+    std::vector<double> plain_costs;
+    if (!options.model_cost_function) {
+      plain_costs.reserve(net_.transitions().size());
+      for (std::size_t t = 0; t < net_.transitions().size(); ++t)
+        plain_costs.push_back(transition_cost(t));
+    }
+    const auto cost_of = [&](std::size_t t) {
+      return options.model_cost_function ? transition_cost(t) : plain_costs[t];
+    };
+    Marking next;  // reused firing buffer
     Marking start = initial_;
     std::priority_queue<std::pair<double, Marking>,
                         std::vector<std::pair<double, Marking>>,
@@ -2601,7 +3037,9 @@ class Aligner {
     std::size_t expanded = 0;
     const std::size_t budget = options.max_states == 0 ? kAlignSearchCap : options.max_states;
     const auto started = std::chrono::steady_clock::now();
+    CancelPoll cancelled(options.cancelled);
     while (!queue.empty() && expanded++ < budget) {
+      if (cancelled()) return std::numeric_limits<double>::infinity();
       const double time_limit = options.max_total_time_seconds > 0.0 && options.max_time_seconds > 0.0
                                     ? std::min(options.max_total_time_seconds, options.max_time_seconds)
                                     : (options.max_total_time_seconds > 0.0 ? options.max_total_time_seconds
@@ -2616,12 +3054,14 @@ class Aligner {
       if (marking == final_) return cost;
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
         if (!enabled(marking, t)) continue;
-        const double next_cost = cost + transition_cost(t);
-        Marking next = fire(marking, t);
+        const double next_cost = cost + cost_of(t);
+        next = marking;
+        fire_petri_transition(net_.transitions()[t], next);
         const auto old = best.find(next);
         if (old != best.end() && old->second <= next_cost + 1e-9) continue;
-        best[next] = next_cost;
-        queue.push({next_cost, std::move(next)});
+        if (old != best.end()) old->second = next_cost;
+        else best.emplace(next, next_cost);
+        queue.push({next_cost, next});
       }
     }
     return std::numeric_limits<double>::infinity();
@@ -3215,8 +3655,7 @@ class Aligner {
       std::uint64_t seq = 0;
       std::size_t depth = 0;
       bool discounted_order = false;
-      State state;
-      std::size_t record = 0;
+      std::size_t record = 0;  // its state is records[record].state
       bool operator>(const Node& o) const {
         if (priority != o.priority) return priority > o.priority;
         if (cost != o.cost) return cost > o.cost;
@@ -3224,13 +3663,22 @@ class Aligner {
         return seq > o.seq;
       }
     };
-    std::priority_queue<Node, std::vector<Node>, std::greater<>> frontier;
+    // A binary heap on std::greater, popped exactly as std::priority_queue
+    // pops (pop_heap, then the back), so the node can be moved out.
+    std::vector<Node> frontier;
+    const auto frontier_push = [&](Node node) {
+      frontier.push_back(node);
+      std::push_heap(frontier.begin(), frontier.end(), std::greater<>{});
+    };
     // The discounted variant closes product states (marking + trace
     // position), deliberately ignoring path depth.  This keeps cyclic models
     // finite and deterministic rather than chasing an unattained discounted
     // infimum through repeated positive-cost cycles.
     std::unordered_map<State, double, MarkingHash> best;
-    std::unordered_map<Marking, std::vector<std::pair<std::size_t, double>>, MarkingHash>
+    // Keyed by the marking part of a state; looked up by a view of the state
+    // so a known marking is never copied.
+    std::unordered_map<Marking, std::vector<std::pair<std::size_t, double>>,
+                       MarkingPrefixHash, MarkingPrefixEqual>
         pareto_positions;
     best.emplace(start, 0.0);
     std::size_t lp_solved = 0;
@@ -3312,7 +3760,7 @@ class Aligner {
       return std::max(0.0, lp.objective);
     };
     records.push_back(PathRecord{kNoRecord, start, {}, false, false});
-    frontier.push(Node{0.0, lp_heuristic(start), 0, 0, discounted, start, 0});
+    frontier_push(Node{0.0, lp_heuristic(start), 0, 0, discounted, 0});
     struct GoalPath {
       double cost = 0.0;
       std::vector<AlignmentMove> moves;
@@ -3370,19 +3818,24 @@ class Aligner {
       }
       return key;
     };
+    CancelPoll cancelled(options.cancelled);
     const auto timed_out = [&]() {
-      return options.max_time_seconds > 0.0 &&
-             std::chrono::duration<double>(Clock::now() - start_time).count() >=
-                 options.max_time_seconds;
+      return (options.max_time_seconds > 0.0 &&
+              std::chrono::duration<double>(Clock::now() - start_time).count() >=
+                  options.max_time_seconds) ||
+             cancelled();
     };
+    State node_state, fired, synced;  // reused buffers
     while (!frontier.empty() && expanded < budget && !timed_out() &&
            records.size() < kStoredPathEntryCap) {
-      Node node = frontier.top();
-      frontier.pop();
-      const auto it_best = best.find(node.state);
+      std::pop_heap(frontier.begin(), frontier.end(), std::greater<>{});
+      const Node node = frontier.back();
+      frontier.pop_back();
+      node_state = records[node.record].state;
+      const auto it_best = best.find(node_state);
       if (it_best == best.end() || node.cost > it_best->second + 1e-9) continue;
-      if (discounted && !discounted_closed.insert(node.state).second) continue;
-      if (!generator && node.state == goal) {
+      if (discounted && !discounted_closed.insert(node_state).second) continue;
+      if (!generator && node_state == goal) {
         GoalPath path = reconstruct(node);
         if (path.prefixes.size() == len)
           path.prefixes.push_back(Marking(final_.begin(), final_.end()));
@@ -3390,14 +3843,14 @@ class Aligner {
         goal_cost = goals.front().cost;
         break;
       }
-      if (generator && node.state == goal) {
+      if (generator && node_state == goal) {
         if (node.cost > goal_cost + 1e-9) break;
         if (!std::isfinite(goal_cost)) goal_cost = node.cost;
         GoalPath path = reconstruct(node);
         if (path.prefixes.size() == len)
           path.prefixes.push_back(Marking(final_.begin(), final_.end()));
         const auto key = move_key(path.moves);
-        auto& seen = generator_seen[node.state];
+        auto& seen = generator_seen[node_state];
         if (seen.insert(key).second && goals.size() < alignment_limit) {
           goals.push_back(std::move(path));
         }
@@ -3405,11 +3858,12 @@ class Aligner {
         continue;
       }
       ++expanded;
-      const std::size_t pos = static_cast<std::size_t>(node.state.back());
+      const std::size_t pos = static_cast<std::size_t>(node_state.back());
       const double factor = discounted
                                 ? std::pow(exponent, -static_cast<double>(node.depth))
                                 : 1.0;
-      auto push = [&](State next, double edge_cost, AlignmentMove move,
+      // `child_state` is only read; the record copies it when it is queued.
+      auto push = [&](const State& child_state, double edge_cost, AlignmentMove move,
                       bool consume) {
         ++arcs;
         if (!std::isfinite(edge_cost) || edge_cost < 0.0) {
@@ -3418,29 +3872,33 @@ class Aligner {
         }
         Node child;
         child.discounted_order = node.discounted_order;
-        child.state = std::move(next);
-        if (discounted && discounted_closed.find(child.state) != discounted_closed.end()) return;
-        if (generator && path_contains(node.record, child.state)) return;
+        if (discounted && discounted_closed.find(child_state) != discounted_closed.end()) return;
+        if (generator && path_contains(node.record, child_state)) return;
         child.depth = node.depth + 1;
         child.seq = seq++;
         child.cost = node.cost + edge_cost * factor;
-        child.priority = child.cost + lp_heuristic(child.state);
+        child.priority = child.cost + lp_heuristic(child_state);
         if (!std::isfinite(child.priority)) return;
         // Configured variants retain tau/model routing moves explicitly;
         // an empty activity denotes a silent transition.
         const bool keep_move =
             !move.activity.empty() || move.type == AlignmentMoveType::kModel;
         const auto enqueue = [&]() {
-          records.push_back(PathRecord{node.record, child.state, std::move(move),
+          records.push_back(PathRecord{node.record, child_state, std::move(move),
                                        keep_move, consume});
           child.record = records.size() - 1;
-          frontier.push(std::move(child));
+          frontier_push(child);
           ++queued_total;
         };
         if (less_memory) {
-          Marking marking(child.state.begin(), child.state.end() - 1);
-          const std::size_t child_pos = static_cast<std::size_t>(child.state.back());
-          auto& frontier_points = pareto_positions[marking];
+          const MarkingPrefix marking{child_state.data(), child_state.size() - 1};
+          const std::size_t child_pos = static_cast<std::size_t>(child_state.back());
+          auto found_points = pareto_positions.find(marking);
+          if (found_points == pareto_positions.end())
+            found_points = pareto_positions.emplace(
+                Marking(child_state.begin(), child_state.end() - 1),
+                std::vector<std::pair<std::size_t, double>>{}).first;
+          auto& frontier_points = found_points->second;
           for (const auto& [prior_pos, prior_cost] : frontier_points)
             if ((!generator || prior_pos > child_pos || prior_cost < child.cost - 1e-9) &&
                 prior_pos >= child_pos && prior_cost <= child.cost + 1e-9) return;
@@ -3453,7 +3911,11 @@ class Aligner {
               frontier_points.end());
           frontier_points.emplace_back(child_pos, child.cost);
         }
-        const auto old = best.find(child.state);
+        const auto old = best.find(child_state);
+        const auto record_best = [&] {
+          if (old != best.end()) old->second = child.cost;
+          else best.emplace(child_state, child.cost);
+        };
         if (!generator) {
           if (old != best.end()) {
             if (child.cost > old->second + 1e-9) return;
@@ -3465,9 +3927,9 @@ class Aligner {
               return;
             }
           }
-          best[child.state] = child.cost;
+          record_best();
         } else if (old == best.end() || child.cost < old->second - 1e-9) {
-          best[child.state] = child.cost;
+          record_best();
         } else if (child.cost > old->second + 1e-9) {
           return;
         }
@@ -3477,24 +3939,24 @@ class Aligner {
       // pinned non-synchronous product ordering; compact mode emits it after
       // model successors so synchronous destinations are coalesced eagerly.
       if (!options.synchronous_dijkstra && pos < len) {
-        State next = node.state;
-        next.back() = static_cast<int>(pos + 1);
+        synced = node_state;
+        synced.back() = static_cast<int>(pos + 1);
         const std::string& activity = names[pos];
         double trace_cost = lookup_cost(options.trace_costs, activity, default_trace);
         if (pos < options.trace_costs_by_position.size()) trace_cost = options.trace_costs_by_position[pos];
         if (options.trace_cost_function) trace_cost = options.trace_cost_function(activity, pos);
-        push(std::move(next), trace_cost, {AlignmentMoveType::kLog, activity}, true);
+        push(synced, trace_cost, {AlignmentMoveType::kLog, activity}, true);
       }
       for (std::size_t order = 0; order < net_.transitions().size(); ++order) {
         const std::size_t t = options.synchronous_dijkstra
                                   ? order
                                   : net_.transitions().size() - 1 - order;
-        if (!enabled(node.state, t)) continue;
+        if (!enabled(node_state, t)) continue;
         const auto& tr = net_.transitions()[t];
-        State fired = node.state;
+        fired = node_state;
         fire_petri_transition(tr, fired);
         if (tr.silent()) {
-          push(std::move(fired), model_cost_for(t),
+          push(fired, model_cost_for(t),
                {AlignmentMoveType::kModel, {}, t}, false);
           continue;
         }
@@ -3506,25 +3968,25 @@ class Aligner {
         push(fired, model_cost,
              {AlignmentMoveType::kModel, activity, t}, false);
         if (pos < len && ids[pos] && *ids[pos] == *tr.activity) {
-          State synced = fired;
+          synced = fired;
           synced.back() = static_cast<int>(pos + 1);
           double sync_cost = lookup_cost(options.sync_costs, activity, default_sync);
           if (t < options.sync_costs_by_transition.size())
             sync_cost = options.sync_costs_by_transition[t];
           if (options.sync_cost_function) sync_cost = options.sync_cost_function(activity, t);
-          push(std::move(synced), sync_cost,
+          push(synced, sync_cost,
                {AlignmentMoveType::kSynchronous, activity, t}, true);
         }
       }
       if (options.synchronous_dijkstra && pos < len) {
-        State next = node.state;
-        next.back() = static_cast<int>(pos + 1);
+        synced = node_state;
+        synced.back() = static_cast<int>(pos + 1);
         const std::string& activity = names[pos];
         double trace_cost = lookup_cost(options.trace_costs, activity, default_trace);
         if (pos < options.trace_costs_by_position.size())
           trace_cost = options.trace_costs_by_position[pos];
         if (options.trace_cost_function) trace_cost = options.trace_cost_function(activity, pos);
-        push(std::move(next), trace_cost,
+        push(synced, trace_cost,
              {AlignmentMoveType::kLog, activity}, true);
       }
     }
@@ -3569,49 +4031,80 @@ class Aligner {
     return next;
   }
 
-  // Markings met by the model-run searches, each stored once.  Search
-  // entries refer to markings by id; ties in the frontier are still broken by
-  // comparing the markings themselves, so expansion order is unchanged.
+  // Markings met by the model-run searches, each stored once as a row of one
+  // flat pool. Search entries refer to markings by id; ties in the frontier
+  // are still broken by comparing the markings themselves (lexicographically,
+  // as std::vector compares), so expansion order is unchanged. A marking is
+  // copied into the pool only when it is new.
   class MarkingTable {
    public:
-    MarkingTable() : ids_(16, IdHash{this}, IdEqual{this}) {}
+    explicit MarkingTable(std::size_t places) : places_(places), slots_(1024, kEmpty) {}
     MarkingTable(const MarkingTable&) = delete;
     MarkingTable& operator=(const MarkingTable&) = delete;
 
     // Returns the id of the marking and whether it was added by this call.
-    std::pair<std::uint32_t, bool> intern(Marking marking) {
-      if (markings_.size() >= std::numeric_limits<std::uint32_t>::max())
-        throw std::length_error("model-run search marking table overflow");
-      const auto id = static_cast<std::uint32_t>(markings_.size());
-      hashes_.push_back(MarkingHash{}(marking));
-      markings_.push_back(std::move(marking));
-      const auto [found, inserted] = ids_.insert(id);
-      if (!inserted) {
-        markings_.pop_back();
-        hashes_.pop_back();
+    std::pair<std::uint32_t, bool> intern(const Marking& marking) {
+      const int* row = marking.data();
+      const std::uint64_t hash = row_hash(row);
+      if ((count_ + 1) * 2 > slots_.size()) grow();
+      const std::size_t mask = slots_.size() - 1;
+      std::size_t slot = hash & mask;
+      while (slots_[slot] != kEmpty) {
+        const auto other = slots_[slot];
+        if (hashes_[other] == hash && std::equal(row, row + places_, at(other)))
+          return {other, false};
+        slot = (slot + 1) & mask;
       }
-      return {*found, inserted};
+      if (count_ >= std::numeric_limits<std::uint32_t>::max() - 1)
+        throw std::length_error("model-run search marking table overflow");
+      const auto id = static_cast<std::uint32_t>(count_++);
+      // Fixed-size blocks: growing never copies (or transiently doubles) the
+      // stored markings.
+      if ((id & (kBlockRows - 1)) == 0)
+        blocks_.push_back(std::make_unique<int[]>(kBlockRows * places_));
+      std::copy(row, row + places_, blocks_.back().get() + (id & (kBlockRows - 1)) * places_);
+      hashes_.push_back(hash);
+      slots_[slot] = id;
+      return {id, true};
     }
-    [[nodiscard]] const Marking& operator[](std::uint32_t id) const {
-      return markings_[id];
+    [[nodiscard]] const int* at(std::uint32_t id) const {
+      return blocks_[id / kBlockRows].get() + std::size_t(id & (kBlockRows - 1)) * places_;
+    }
+    // Copies marking `id` into `out` (sized to the place count).
+    void copy(std::uint32_t id, Marking& out) const {
+      out.assign(at(id), at(id) + places_);
+    }
+    // std::vector's operator> on the two markings.
+    [[nodiscard]] bool greater(std::uint32_t left, std::uint32_t right) const {
+      return std::lexicographical_compare(at(right), at(right) + places_, at(left),
+                                          at(left) + places_);
     }
 
    private:
-    struct IdHash {
-      const MarkingTable* table;
-      std::size_t operator()(std::uint32_t id) const noexcept {
-        return table->hashes_[id];
+    static constexpr std::uint32_t kEmpty = std::numeric_limits<std::uint32_t>::max();
+    static constexpr std::uint32_t kBlockRows = 4096;  // a power of two
+    [[nodiscard]] std::uint64_t row_hash(const int* row) const {
+      std::uint64_t h = 1469598103934665603ull;
+      for (std::size_t p = 0; p < places_; ++p)
+        h = (h ^ static_cast<std::uint32_t>(row[p])) * 1099511628211ull;
+      h ^= h >> 32;
+      return h;
+    }
+    void grow() {
+      std::vector<std::uint32_t> grown(slots_.size() * 2, kEmpty);
+      const std::size_t mask = grown.size() - 1;
+      for (std::uint32_t id = 0; id < count_; ++id) {
+        std::size_t slot = hashes_[id] & mask;
+        while (grown[slot] != kEmpty) slot = (slot + 1) & mask;
+        grown[slot] = id;
       }
-    };
-    struct IdEqual {
-      const MarkingTable* table;
-      bool operator()(std::uint32_t left, std::uint32_t right) const noexcept {
-        return table->markings_[left] == table->markings_[right];
-      }
-    };
-    std::vector<Marking> markings_;
-    std::vector<std::size_t> hashes_;
-    std::unordered_set<std::uint32_t, IdHash, IdEqual> ids_;
+      slots_.swap(grown);
+    }
+    std::size_t places_;
+    std::size_t count_ = 0;
+    std::vector<std::unique_ptr<int[]>> blocks_;
+    std::vector<std::uint64_t> hashes_;
+    std::vector<std::uint32_t> slots_;
   };
 
   // Cheapest count of visible transitions on any run from the initial to the
@@ -3622,13 +4115,13 @@ class Aligner {
       std::chrono::steady_clock::time_point deadline,
       bool& exhausted) const {
     constexpr std::uint64_t kUnseen = std::numeric_limits<std::uint64_t>::max();
-    MarkingTable table;
+    MarkingTable table(initial_.size());
     std::vector<std::uint64_t> best;  // by marking id; kUnseen when absent
     using Entry = std::pair<std::uint64_t, std::uint32_t>;  // cost, marking id
     // Orders like std::greater over (cost, Marking).
     const auto later = [&](const Entry& left, const Entry& right) {
       if (left.first != right.first) return left.first > right.first;
-      return table[left.second] > table[right.second];
+      return table.greater(left.second, right.second);
     };
     std::priority_queue<Entry, std::vector<Entry>, decltype(later)> frontier(later);
     const auto start = table.intern(initial_).first;
@@ -3637,8 +4130,10 @@ class Aligner {
     const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
                                                         : options.max_states;
     std::size_t expanded = 0;
+    CancelPoll cancelled(options.cancelled);
+    Marking current, successor;
     while (!frontier.empty() && expanded < budget) {
-      if (std::chrono::steady_clock::now() >= deadline) {
+      if (std::chrono::steady_clock::now() >= deadline || cancelled()) {
         exhausted = true;
         return std::nullopt;
       }
@@ -3646,13 +4141,15 @@ class Aligner {
       const auto [cost, id] = frontier.top();
       frontier.pop();
       if (best[id] != kUnseen && cost > best[id]) continue;
-      const Marking& marking = table[id];
-      if (marking == final_) return cost;
+      table.copy(id, current);
+      if (current == final_) return cost;
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
-        if (!enabled(table[id], t)) continue;
+        if (!enabled(current, t)) continue;
         const std::uint64_t next_cost =
             cost + (net_.transitions()[t].silent() ? 0 : 1);
-        const auto [next, added] = table.intern(fire(table[id], t));
+        successor = current;
+        fire_petri_transition(net_.transitions()[t], successor);
+        const auto [next, added] = table.intern(successor);
         if (added) best.push_back(kUnseen);
         if (best[next] != kUnseen && best[next] <= next_cost) continue;
         best[next] = next_cost;
@@ -3673,13 +4170,16 @@ class Aligner {
     const std::size_t tcount = net_.transitions().size();
     std::vector<double> c(tcount, 0.0);
     for (std::size_t t = 0; t < tcount; ++t) c[t] = net_.transitions()[t].silent() ? 0.0 : 1.0;
-    const auto bound = [&](const Marking& marking) -> std::optional<std::uint64_t> {
-      std::vector<std::vector<double>> a(marking.size(), std::vector<double>(tcount, 0.0));
-      std::vector<double> b(marking.size(), 0.0);
-      for (std::size_t p = 0; p < marking.size(); ++p) b[p] = double(final_[p] - marking[p]);
-      for (std::size_t t = 0; t < tcount; ++t)
-        for (const auto& [p, coef] : incidence_[t]) a[p][t] = coef;
-      const auto lp = solve_lp(std::move(a), std::move(b), c);
+    // The incidence matrix as sparse rows; only b changes between markings.
+    std::vector<double> dense(initial_.size() * tcount, 0.0);
+    for (std::size_t t = 0; t < tcount; ++t)
+      for (const auto& [p, coef] : incidence_[t]) dense[p * tcount + t] = coef;
+    const auto a = lp_rows([&](std::size_t i, std::size_t j) { return dense[i * tcount + j]; },
+                           initial_.size(), tcount);
+    const auto bound = [&](const int* marking) -> std::optional<std::uint64_t> {
+      std::vector<double> b(initial_.size(), 0.0);
+      for (std::size_t p = 0; p < initial_.size(); ++p) b[p] = double(final_[p] - marking[p]);
+      const auto lp = solve_lp_sparse(a, std::move(b), c);
       if (lp.aborted) return 0;
       if (!lp.feasible) return std::nullopt;
       return static_cast<std::uint64_t>(std::max(0.0, std::ceil(lp.objective - 1e-6)));
@@ -3692,7 +4192,7 @@ class Aligner {
       bool bounded = false;
       std::optional<std::uint64_t> bound;
     };
-    MarkingTable table;
+    MarkingTable table(initial_.size());
     std::vector<Known> known;  // by marking id
     using Entry = std::tuple<std::uint64_t, std::uint64_t, std::uint32_t>;  // f, g, marking id
     // Orders like std::greater over (f, g, Marking).
@@ -3701,19 +4201,21 @@ class Aligner {
         return std::get<0>(left) > std::get<0>(right);
       if (std::get<1>(left) != std::get<1>(right))
         return std::get<1>(left) > std::get<1>(right);
-      return table[std::get<2>(left)] > table[std::get<2>(right)];
+      return table.greater(std::get<2>(left), std::get<2>(right));
     };
     std::priority_queue<Entry, std::vector<Entry>, decltype(later)> frontier(later);
     const auto start = table.intern(initial_).first;
-    known.push_back({0, true, bound(initial_)});
+    known.push_back({0, true, bound(initial_.data())});
     const auto start_bound = known[start].bound;
     if (!start_bound) return std::nullopt;
     frontier.push({*start_bound, 0, start});
     const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
                                                         : options.max_states;
     std::size_t expanded = 0;
+    CancelPoll cancelled(options.cancelled);
+    Marking current, successor;
     while (!frontier.empty() && expanded < budget) {
-      if (std::chrono::steady_clock::now() >= deadline) {
+      if (std::chrono::steady_clock::now() >= deadline || cancelled()) {
         exhausted = true;
         return std::nullopt;
       }
@@ -3722,15 +4224,18 @@ class Aligner {
       (void)f;
       frontier.pop();
       if (known[id].best != kUnseen && cost > known[id].best) continue;
-      if (table[id] == final_) return cost;
+      table.copy(id, current);
+      if (current == final_) return cost;
       for (std::size_t t = 0; t < tcount; ++t) {
-        if (!enabled(table[id], t)) continue;
+        if (!enabled(current, t)) continue;
         const std::uint64_t next_cost = cost + (net_.transitions()[t].silent() ? 0 : 1);
-        const auto [next, added] = table.intern(fire(table[id], t));
+        successor = current;
+        fire_petri_transition(net_.transitions()[t], successor);
+        const auto [next, added] = table.intern(successor);
         if (added) known.emplace_back();
         if (known[next].best != kUnseen && known[next].best <= next_cost) continue;
         if (!known[next].bounded) {
-          known[next].bound = bound(table[next]);
+          known[next].bound = bound(successor.data());
           known[next].bounded = true;
         }
         const auto h = known[next].bound;
@@ -3801,9 +4306,12 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
 
   std::unordered_map<Marking, std::uint32_t, MarkingHash> index;
   std::vector<const Marking*> by_id;  // map nodes are stable
-  const auto intern = [&](Marking m) {
+  // Copies a marking into the map only when it is new.
+  const auto intern = [&](const Marking& m) {
+    if (const auto found = index.find(m); found != index.end())
+      return std::make_pair(found->second, false);
     const auto [it, inserted] =
-        index.try_emplace(std::move(m), static_cast<std::uint32_t>(index.size()));
+        index.try_emplace(m, static_cast<std::uint32_t>(index.size()));
     if (inserted) by_id.push_back(&it->first);
     return std::make_pair(it->second, inserted);
   };
@@ -3811,10 +4319,11 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
   const auto enabled = [&](const Marking& m, const PetriTransition& t) {
     return petri_transition_enabled(t, m);
   };
-  const auto fire = [&](const Marking& m, const PetriTransition& t) {
-    Marking next = m;
-    fire_petri_transition(t, next);
-    return next;
+  Marking successor;  // reused firing buffer
+  const auto fire = [&](const Marking& m, const PetriTransition& t) -> const Marking& {
+    successor = m;
+    fire_petri_transition(t, successor);
+    return successor;
   };
 
   // Bounded breadth-first exploration. Only the silent edges are stored (for
@@ -4725,9 +5234,10 @@ AlignmentResult check_alignment(const EventLog& event_log,
   }
   const double baseline_model_cost = weighted_empty;
   for (const auto& variant : variants) {
-    if (options.max_total_time_seconds > 0.0 &&
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - total_start)
-                .count() >= options.max_total_time_seconds) {
+    if ((options.max_total_time_seconds > 0.0 &&
+         std::chrono::duration<double>(std::chrono::steady_clock::now() - total_start)
+                 .count() >= options.max_total_time_seconds) ||
+        (options.cancelled && options.cancelled())) {
       result.computed = false;
       result.exhausted = true;
       return result;

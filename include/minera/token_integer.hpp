@@ -20,21 +20,24 @@ namespace minera {
 
 // Exact signed token arithmetic. Decimal limbs keep interchange formatting
 // independent of machine integer width, including negative weighted counts.
+//
+// Every value that fits in a signed 64-bit integer is held inline, with no
+// allocation; only values beyond that range spill into heap decimal limbs.
+// The representation is canonical (a value has exactly one form), and every
+// observable result — decimal text, hash, ordering, conversions, the overflow
+// and range errors — is the one the limb arithmetic gives for the same value.
 class TokenInteger {
  public:
-  TokenInteger() = default;
+  TokenInteger() noexcept = default;
   template <std::integral Integer>
     requires (!std::same_as<Integer, bool> && sizeof(Integer) <= 8)
   TokenInteger(Integer value) {
-    std::uint64_t magnitude;
-    if constexpr (std::is_signed_v<Integer>) {
-      negative_ = value < 0;
-      magnitude = negative_ ? std::uint64_t(-(value + 1)) + 1
-                            : std::uint64_t(value);
-    } else magnitude = value;
-    while (magnitude) {
-      limbs_.push_back(static_cast<std::uint32_t>(magnitude % kBase));
-      magnitude /= kBase;
+    if constexpr (std::is_signed_v<Integer> || sizeof(Integer) < 8) {
+      small_ = static_cast<std::int64_t>(value);
+    } else if (value <= static_cast<std::uint64_t>(kMax)) {
+      small_ = static_cast<std::int64_t>(value);
+    } else {
+      wide_ = new Wide(Wide::from_magnitude(false, static_cast<std::uint64_t>(value)));
     }
   }
   explicit TokenInteger(std::string_view text) {
@@ -44,31 +47,59 @@ class TokenInteger {
       negative = text.front() == '-'; text.remove_prefix(1);
     }
     if (text.empty()) throw std::invalid_argument("token integer has no digits");
+    Wide parsed;
     for (const auto digit : text) {
       if (digit < '0' || digit > '9')
         throw std::invalid_argument("token integer contains a non-decimal digit");
       std::uint64_t carry = static_cast<unsigned>(digit - '0');
-      for (auto& limb : limbs_) {
+      for (auto& limb : parsed.limbs) {
         const auto value = std::uint64_t(limb) * 10 + carry;
         limb = static_cast<std::uint32_t>(value % kBase); carry = value / kBase;
       }
-      if (carry) limbs_.push_back(static_cast<std::uint32_t>(carry));
+      if (carry) parsed.limbs.push_back(static_cast<std::uint32_t>(carry));
     }
-    negative_ = negative && !limbs_.empty();
+    parsed.negative = negative && !parsed.limbs.empty();
+    assign(std::move(parsed));
   }
+  TokenInteger(const TokenInteger& other)
+      : small_(other.small_), wide_(other.wide_ ? new Wide(*other.wide_) : nullptr) {}
+  TokenInteger(TokenInteger&& other) noexcept : small_(other.small_), wide_(other.wide_) {
+    other.small_ = 0; other.wide_ = nullptr;
+  }
+  TokenInteger& operator=(const TokenInteger& other) {
+    if (this == &other) return *this;
+    if (!other.wide_) {
+      delete wide_; wide_ = nullptr; small_ = other.small_;
+    } else if (wide_) {
+      *wide_ = *other.wide_;
+    } else {
+      wide_ = new Wide(*other.wide_); small_ = 0;
+    }
+    return *this;
+  }
+  TokenInteger& operator=(TokenInteger&& other) noexcept {
+    if (this == &other) return *this;
+    delete wide_;
+    small_ = other.small_; wide_ = other.wide_;
+    other.small_ = 0; other.wide_ = nullptr;
+    return *this;
+  }
+  ~TokenInteger() { delete wide_; }
+
+  // The value as a signed 64-bit integer, when it has that form (no copy).
+  [[nodiscard]] bool is_small() const noexcept { return wide_ == nullptr; }
+  [[nodiscard]] std::int64_t small_value() const noexcept { return small_; }
+
   [[nodiscard]] std::string decimal() const {
-    if (limbs_.empty()) return "0";
-    std::string result = negative_ ? "-" : "";
-    result += std::to_string(limbs_.back());
-    for (std::size_t index = limbs_.size() - 1; index > 0; --index) {
-      const auto digits = std::to_string(limbs_[index - 1]);
-      result.append(9 - digits.size(), '0'); result += digits;
-    }
-    return result;
+    if (!wide_) return std::to_string(static_cast<long long>(small_));
+    return wide_->decimal();
   }
-  explicit operator bool() const noexcept { return !limbs_.empty(); }
+  explicit operator bool() const noexcept { return wide_ || small_ != 0; }
   explicit operator double() const {
-    const auto text = decimal();
+    // Round-to-nearest-even either way: the conversion of a 64-bit integer
+    // and the parse of its decimal text give the same binary64 value.
+    if (!wide_) return static_cast<double>(small_);
+    const auto text = wide_->decimal();
     double result = 0;
     const auto converted = std::from_chars(text.data(), text.data() + text.size(), result);
     if (converted.ec != std::errc{} || converted.ptr != text.data() + text.size())
@@ -78,73 +109,84 @@ class TokenInteger {
   template <std::integral Integer>
     requires (!std::same_as<Integer, bool> && sizeof(Integer) <= 8)
   explicit operator Integer() const {
-    const auto limit = std::is_signed_v<Integer>
-        ? std::uint64_t(std::numeric_limits<Integer>::max()) + (negative_ ? 1 : 0)
-        : std::uint64_t(std::numeric_limits<Integer>::max());
-    if (negative_ && !std::is_signed_v<Integer>)
-      throw std::overflow_error("negative token integer does not fit unsigned range");
-    std::uint64_t value = 0;
-    for (auto index = limbs_.size(); index > 0; --index) {
-      if (limbs_[index - 1] > limit || value > (limit - limbs_[index - 1]) / kBase)
+    if (wide_) return wide_->template to_integer<Integer>();
+    if constexpr (!std::is_signed_v<Integer>) {
+      if (small_ < 0)
+        throw std::overflow_error("negative token integer does not fit unsigned range");
+      if (static_cast<std::uint64_t>(small_) > std::uint64_t(std::numeric_limits<Integer>::max()))
         throw std::overflow_error("token integer does not fit requested range");
-      value = value * kBase + limbs_[index - 1];
+    } else {
+      if (small_ < std::int64_t(std::numeric_limits<Integer>::min()) ||
+          small_ > std::int64_t(std::numeric_limits<Integer>::max()))
+        throw std::overflow_error("token integer does not fit requested range");
     }
-    if constexpr (std::is_signed_v<Integer>) {
-      if (negative_) {
-        if (value == std::uint64_t(std::numeric_limits<Integer>::max()) + 1)
-          return std::numeric_limits<Integer>::min();
-        return -static_cast<Integer>(value);
-      }
-    }
-    return static_cast<Integer>(value);
+    return static_cast<Integer>(small_);
   }
   [[nodiscard]] std::size_t hash() const noexcept {
-    std::size_t value = negative_ ? 1 : 0;
-    for (const auto limb : limbs_) value = (value ^ limb) * 1099511628211ull;
-    return value ^ (limbs_.size() * 0x9e3779b97f4a7c15ull);
+    if (wide_) return wide_->hash();
+    const bool negative = small_ < 0;
+    std::uint64_t magnitude = negative ? std::uint64_t(-(small_ + 1)) + 1 : std::uint64_t(small_);
+    std::size_t value = negative ? 1 : 0;
+    std::size_t count = 0;
+    while (magnitude) {
+      value = (value ^ static_cast<std::uint32_t>(magnitude % kBase)) * 1099511628211ull;
+      magnitude /= kBase; ++count;
+    }
+    return value ^ (count * 0x9e3779b97f4a7c15ull);
   }
-  friend bool operator==(const TokenInteger&, const TokenInteger&) = default;
-  friend std::strong_ordering operator<=>(const TokenInteger& left, const TokenInteger& right) {
-    if (left.negative_ != right.negative_) return left.negative_ ? std::strong_ordering::less : std::strong_ordering::greater;
-    auto result = magnitude_compare(left, right);
-    if (left.negative_) result = -result;
+  friend bool operator==(const TokenInteger& left, const TokenInteger& right) noexcept {
+    if (!left.wide_ && !right.wide_) return left.small_ == right.small_;
+    if (!left.wide_ || !right.wide_) return false;  // canonical: a wide value never fits
+    return left.wide_->negative == right.wide_->negative && left.wide_->limbs == right.wide_->limbs;
+  }
+  friend std::strong_ordering operator<=>(const TokenInteger& left, const TokenInteger& right) noexcept {
+    if (!left.wide_ && !right.wide_) return left.small_ <=> right.small_;
+    // A wide value lies beyond every inline one of either sign.
+    if (!right.wide_) return left.wide_->negative ? std::strong_ordering::less : std::strong_ordering::greater;
+    if (!left.wide_) return right.wide_->negative ? std::strong_ordering::greater : std::strong_ordering::less;
+    const auto& l = *left.wide_;
+    const auto& r = *right.wide_;
+    if (l.negative != r.negative) return l.negative ? std::strong_ordering::less : std::strong_ordering::greater;
+    auto result = Wide::magnitude_compare(l, r);
+    if (l.negative) result = -result;
     return result < 0 ? std::strong_ordering::less : result > 0 ? std::strong_ordering::greater : std::strong_ordering::equal;
   }
   TokenInteger operator-() const {
-    auto result = *this;
-    if (!result.limbs_.empty()) result.negative_ = !result.negative_;
+    if (!wide_) {
+      if (small_ != kMin) return TokenInteger(-small_);
+    }
+    auto value = to_wide();
+    if (!value.limbs.empty()) value.negative = !value.negative;
+    TokenInteger result;
+    result.assign(std::move(value));
     return result;
   }
   TokenInteger& operator+=(const TokenInteger& other) {
-    if (negative_ == other.negative_) {
-      const auto count = std::max(limbs_.size(), other.limbs_.size());
-      limbs_.resize(count, 0); std::uint64_t carry = 0;
-      for (std::size_t index = 0; index < count; ++index) {
-        const auto value = std::uint64_t(limbs_[index]) + (index < other.limbs_.size() ? other.limbs_[index] : 0) + carry;
-        limbs_[index] = static_cast<std::uint32_t>(value % kBase); carry = value / kBase;
-      }
-      if (carry) limbs_.push_back(static_cast<std::uint32_t>(carry));
-    } else {
-      const auto order = magnitude_compare(*this, other);
-      if (order == 0) { limbs_.clear(); negative_ = false; }
-      else if (order > 0) subtract_magnitude(other);
-      else { auto result = other; result.subtract_magnitude(*this); *this = std::move(result); }
+    if (!wide_ && !other.wide_) {
+      std::int64_t sum;
+      if (!add_overflow(small_, other.small_, sum)) { small_ = sum; return *this; }
     }
+    auto value = to_wide();
+    value.add(other.wide_ ? *other.wide_ : Wide::from_small(other.small_));
+    assign(std::move(value));
     return *this;
   }
-  TokenInteger& operator-=(const TokenInteger& other) { return *this += -other; }
-  TokenInteger& operator*=(const TokenInteger& other) {
-    if (limbs_.empty() || other.limbs_.empty()) { limbs_.clear(); negative_ = false; return *this; }
-    std::vector<std::uint32_t> result(limbs_.size() + other.limbs_.size(), 0);
-    for (std::size_t left = 0; left < limbs_.size(); ++left) {
-      std::uint64_t carry = 0;
-      for (std::size_t right = 0; right < other.limbs_.size(); ++right) {
-        const auto value = std::uint64_t(limbs_[left]) * other.limbs_[right] + result[left + right] + carry;
-        result[left + right] = static_cast<std::uint32_t>(value % kBase); carry = value / kBase;
-      }
-      result[left + other.limbs_.size()] = static_cast<std::uint32_t>(carry);
+  TokenInteger& operator-=(const TokenInteger& other) {
+    if (!wide_ && !other.wide_) {
+      std::int64_t difference;
+      if (!sub_overflow(small_, other.small_, difference)) { small_ = difference; return *this; }
     }
-    negative_ = negative_ != other.negative_; limbs_ = std::move(result); normalize(); return *this;
+    return *this += -other;
+  }
+  TokenInteger& operator*=(const TokenInteger& other) {
+    if (!wide_ && !other.wide_) {
+      std::int64_t product;
+      if (!mul_overflow(small_, other.small_, product)) { small_ = product; return *this; }
+    }
+    auto value = to_wide();
+    value.multiply(other.wide_ ? *other.wide_ : Wide::from_small(other.small_));
+    assign(std::move(value));
+    return *this;
   }
   TokenInteger& operator++() { return *this += 1; }
   TokenInteger& operator--() { return *this -= 1; }
@@ -152,27 +194,174 @@ class TokenInteger {
   friend TokenInteger operator-(TokenInteger left, const TokenInteger& right) { return left -= right; }
   friend TokenInteger operator*(TokenInteger left, const TokenInteger& right) { return left *= right; }
   friend std::ostream& operator<<(std::ostream& stream, const TokenInteger& value) { return stream << value.decimal(); }
+
  private:
   static constexpr std::uint32_t kBase = 1'000'000'000;
-  std::vector<std::uint32_t> limbs_;
-  bool negative_ = false;
-  static int magnitude_compare(const TokenInteger& left, const TokenInteger& right) {
-    if (left.limbs_.size() != right.limbs_.size()) return left.limbs_.size() < right.limbs_.size() ? -1 : 1;
-    for (auto index = left.limbs_.size(); index > 0; --index)
-      if (left.limbs_[index - 1] != right.limbs_[index - 1]) return left.limbs_[index - 1] < right.limbs_[index - 1] ? -1 : 1;
-    return 0;
+  static constexpr std::int64_t kMax = std::numeric_limits<std::int64_t>::max();
+  static constexpr std::int64_t kMin = std::numeric_limits<std::int64_t>::min();
+
+  static bool add_overflow(std::int64_t a, std::int64_t b, std::int64_t& out) noexcept {
+    if ((b > 0 && a > kMax - b) || (b < 0 && a < kMin - b)) return true;
+    out = a + b;
+    return false;
   }
-  void normalize() { while (!limbs_.empty() && limbs_.back() == 0) limbs_.pop_back(); if (limbs_.empty()) negative_ = false; }
-  void subtract_magnitude(const TokenInteger& other) {
-    std::int64_t borrow = 0;
-    for (std::size_t index = 0; index < limbs_.size(); ++index) {
-      auto value = std::int64_t(limbs_[index]) - (index < other.limbs_.size() ? other.limbs_[index] : 0) - borrow;
-      borrow = value < 0;
-      if (borrow) value += kBase;
-      limbs_[index] = static_cast<std::uint32_t>(value);
+  static bool sub_overflow(std::int64_t a, std::int64_t b, std::int64_t& out) noexcept {
+    if ((b < 0 && a > kMax + b) || (b > 0 && a < kMin + b)) return true;
+    out = a - b;
+    return false;
+  }
+  static bool mul_overflow(std::int64_t a, std::int64_t b, std::int64_t& out) noexcept {
+    if (a == 0 || b == 0) {
+      out = 0;
+      return false;
     }
-    normalize();
+    if (a == -1) {
+      if (b == kMin) return true;
+      out = -b;
+      return false;
+    }
+    if (b == -1) {
+      if (a == kMin) return true;
+      out = -a;
+      return false;
+    }
+    if (a > 0 ? (b > 0 ? a > kMax / b : b < kMin / a)
+              : (b > 0 ? a < kMin / b : a < kMax / b)) return true;
+    out = a * b;
+    return false;
   }
+
+  // Signed magnitude in base-1e9 limbs, least significant first, with no
+  // leading zero limb and no negative zero: the arbitrary-precision form.
+  struct Wide {
+    std::vector<std::uint32_t> limbs;
+    bool negative = false;
+
+    static Wide from_magnitude(bool negative, std::uint64_t magnitude) {
+      Wide value;
+      while (magnitude) {
+        value.limbs.push_back(static_cast<std::uint32_t>(magnitude % kBase));
+        magnitude /= kBase;
+      }
+      value.negative = negative && !value.limbs.empty();
+      return value;
+    }
+    static Wide from_small(std::int64_t small) {
+      return from_magnitude(small < 0, small < 0 ? std::uint64_t(-(small + 1)) + 1 : std::uint64_t(small));
+    }
+    // The value as an int64 when it lies in that range.
+    [[nodiscard]] bool fits_small(std::int64_t& out) const noexcept {
+      if (limbs.size() > 3) return false;
+      if (limbs.size() == 3 && limbs[2] > 9) return false;
+      std::uint64_t magnitude = 0;
+      for (auto index = limbs.size(); index > 0; --index)
+        magnitude = magnitude * kBase + limbs[index - 1];  // < 1e19: no wrap
+      const std::uint64_t limit = std::uint64_t(kMax) + (negative ? 1 : 0);
+      if (magnitude > limit) return false;
+      out = negative ? (magnitude == std::uint64_t(kMax) + 1 ? kMin : -static_cast<std::int64_t>(magnitude))
+                     : static_cast<std::int64_t>(magnitude);
+      return true;
+    }
+    [[nodiscard]] std::string decimal() const {
+      if (limbs.empty()) return "0";
+      std::string result = negative ? "-" : "";
+      result += std::to_string(limbs.back());
+      for (std::size_t index = limbs.size() - 1; index > 0; --index) {
+        const auto digits = std::to_string(limbs[index - 1]);
+        result.append(9 - digits.size(), '0'); result += digits;
+      }
+      return result;
+    }
+    template <class Integer>
+    [[nodiscard]] Integer to_integer() const {
+      const auto limit = std::is_signed_v<Integer>
+          ? std::uint64_t(std::numeric_limits<Integer>::max()) + (negative ? 1 : 0)
+          : std::uint64_t(std::numeric_limits<Integer>::max());
+      if (negative && !std::is_signed_v<Integer>)
+        throw std::overflow_error("negative token integer does not fit unsigned range");
+      std::uint64_t value = 0;
+      for (auto index = limbs.size(); index > 0; --index) {
+        if (limbs[index - 1] > limit || value > (limit - limbs[index - 1]) / kBase)
+          throw std::overflow_error("token integer does not fit requested range");
+        value = value * kBase + limbs[index - 1];
+      }
+      if constexpr (std::is_signed_v<Integer>) {
+        if (negative) {
+          if (value == std::uint64_t(std::numeric_limits<Integer>::max()) + 1)
+            return std::numeric_limits<Integer>::min();
+          return -static_cast<Integer>(value);
+        }
+      }
+      return static_cast<Integer>(value);
+    }
+    [[nodiscard]] std::size_t hash() const noexcept {
+      std::size_t value = negative ? 1 : 0;
+      for (const auto limb : limbs) value = (value ^ limb) * 1099511628211ull;
+      return value ^ (limbs.size() * 0x9e3779b97f4a7c15ull);
+    }
+    static int magnitude_compare(const Wide& left, const Wide& right) {
+      if (left.limbs.size() != right.limbs.size()) return left.limbs.size() < right.limbs.size() ? -1 : 1;
+      for (auto index = left.limbs.size(); index > 0; --index)
+        if (left.limbs[index - 1] != right.limbs[index - 1]) return left.limbs[index - 1] < right.limbs[index - 1] ? -1 : 1;
+      return 0;
+    }
+    void normalize() { while (!limbs.empty() && limbs.back() == 0) limbs.pop_back(); if (limbs.empty()) negative = false; }
+    void subtract_magnitude(const Wide& other) {
+      std::int64_t borrow = 0;
+      for (std::size_t index = 0; index < limbs.size(); ++index) {
+        auto value = std::int64_t(limbs[index]) - (index < other.limbs.size() ? other.limbs[index] : 0) - borrow;
+        borrow = value < 0;
+        if (borrow) value += kBase;
+        limbs[index] = static_cast<std::uint32_t>(value);
+      }
+      normalize();
+    }
+    void add(const Wide& other) {
+      if (negative == other.negative) {
+        const auto count = std::max(limbs.size(), other.limbs.size());
+        limbs.resize(count, 0); std::uint64_t carry = 0;
+        for (std::size_t index = 0; index < count; ++index) {
+          const auto value = std::uint64_t(limbs[index]) + (index < other.limbs.size() ? other.limbs[index] : 0) + carry;
+          limbs[index] = static_cast<std::uint32_t>(value % kBase); carry = value / kBase;
+        }
+        if (carry) limbs.push_back(static_cast<std::uint32_t>(carry));
+      } else {
+        const auto order = magnitude_compare(*this, other);
+        if (order == 0) { limbs.clear(); negative = false; }
+        else if (order > 0) subtract_magnitude(other);
+        else { auto result = other; result.subtract_magnitude(*this); *this = std::move(result); }
+      }
+    }
+    void multiply(const Wide& other) {
+      if (limbs.empty() || other.limbs.empty()) { limbs.clear(); negative = false; return; }
+      std::vector<std::uint32_t> result(limbs.size() + other.limbs.size(), 0);
+      for (std::size_t left = 0; left < limbs.size(); ++left) {
+        std::uint64_t carry = 0;
+        for (std::size_t right = 0; right < other.limbs.size(); ++right) {
+          const auto value = std::uint64_t(limbs[left]) * other.limbs[right] + result[left + right] + carry;
+          result[left + right] = static_cast<std::uint32_t>(value % kBase); carry = value / kBase;
+        }
+        result[left + other.limbs.size()] = static_cast<std::uint32_t>(carry);
+      }
+      negative = negative != other.negative; limbs = std::move(result); normalize();
+    }
+  };
+
+  [[nodiscard]] Wide to_wide() const { return wide_ ? *wide_ : Wide::from_small(small_); }
+  // Stores `value` in canonical form: inline whenever it fits.
+  void assign(Wide&& value) {
+    std::int64_t small = 0;
+    if (value.fits_small(small)) {
+      delete wide_; wide_ = nullptr; small_ = small;
+    } else if (wide_) {
+      *wide_ = std::move(value); small_ = 0;
+    } else {
+      wide_ = new Wide(std::move(value)); small_ = 0;
+    }
+  }
+
+  std::int64_t small_ = 0;  // the value, when wide_ is null
+  Wide* wide_ = nullptr;     // owned; set exactly when the value exceeds int64
 };
 
 // Divide exact integers with binary64 round-to-nearest, ties-to-even. Converting

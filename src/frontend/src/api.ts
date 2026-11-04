@@ -1881,16 +1881,16 @@ export function alignmentQuery(options: AlignmentOptions = {}): string {
   return query.toString();
 }
 
-export async function alignModel(miner: string, options: AlignmentOptions = {}): Promise<Alignments> {
+export async function alignModel(miner: string, options: AlignmentOptions = {}, signal?: AbortSignal): Promise<Alignments> {
   // Build the query before the network try, so a parameter error is reported as itself.
   const query = alignmentQuery(options);
   const params = [`miner=${encodeURIComponent(miner)}`, query].filter(Boolean).join("&");
   let response: Response;
   try {
-    response = await importedModelFetch(`/api/align?${params}`, {
-      method: "POST",
-    });
-  } catch {
+    // Aborting closes the connection, and the backend stops the search.
+    response = await importedModelFetch(`/api/align?${params}`, signal ? { method: "POST", signal } : { method: "POST" });
+  } catch (cause) {
+    if (signal?.aborted) throw cause;
     throw new Error(
       "could not reach the Minera backend — is minera_server running?",
     );

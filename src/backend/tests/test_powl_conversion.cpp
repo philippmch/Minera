@@ -283,12 +283,24 @@ void petri_conversion_sound_and_deterministic() {
   const auto exactly_once = check(PowlNode::transition("A", {1, 1}),
                                   traces({t({"A"})}));
   assert(exactly_once.transitions().size() == 1);
-  check(PowlNode::transition("A", {0, 1}), traces({t({}), t({"A"})}));
-  check(PowlNode::transition("A", {1, std::nullopt}),
-        traces({t({"A"}), t({"A", "A"}), t({"A", "A", "A"})}));
-  check(PowlNode::transition("A", {0, std::nullopt}),
-        traces({t({}), t({"A"}), t({"A", "A"}),
-                t({"A", "A", "A"})}));
+  // As the reference FrequentTransition: one visible transition whose label
+  // carries the frequency, "<label>\n[1,<max or ->]".
+  const auto optional = check(PowlNode::transition("A", {0, 1}), traces({t({"A\n[1,1]"})}));
+  assert(optional.transitions().size() == 1);
+  check(PowlNode::transition("A", {1, std::nullopt}), traces({t({"A\n[1,-]"})}));
+  check(PowlNode::transition("A", {0, std::nullopt}), traces({t({"A\n[1,-]"})}));
+  // Reference structure: X(a,b,c) has 4 places and 5 transitions, and the
+  // loop *(a, X(tau, b)) keeps its silent redo return (5 places, 6
+  // transitions), as pm4py 2.7.22 convert_to_petri_net builds them.
+  {
+    const auto x3 = minera::to_petri_net(PowlNode::xor_node(
+        {PowlNode::transition("a"), PowlNode::transition("b"), PowlNode::transition("c")}));
+    assert(x3.place_count() == 4 && x3.transitions().size() == 5);
+    const auto loop = minera::to_petri_net(PowlNode::loop(
+        PowlNode::transition("a"),
+        PowlNode::xor_node({PowlNode::silent(), PowlNode::transition("b")})));
+    assert(loop.place_count() == 5 && loop.transitions().size() == 6);
+  }
   check(PowlNode::xor_node({PowlNode::transition("A"), PowlNode::transition("B")} ),
         traces({t({"A"}), t({"B"})}));
   check(PowlNode::loop(PowlNode::transition("A"), PowlNode::transition("B")),
@@ -432,13 +444,12 @@ void petri_to_powl_round_trips_structured_nets() {
     const auto actual = enumerate_language(recovered_net, 6, 160).traces;
     assert(actual == expected);
     assert(minera::final_marking_reachable(recovered_net));
+    // A frequent transition is one decorated visible transition in the net,
+    // so it comes back as a plain transition with that label.
     if (model.kind() == minera::PowlNodeKind::kTransition &&
-        model.self_loop()) {
-      assert(recovered.kind() == minera::PowlNodeKind::kLoop);
-    }
-    if (model.kind() == minera::PowlNodeKind::kTransition &&
-        model.skippable() && !model.self_loop()) {
-      assert(recovered.kind() == minera::PowlNodeKind::kXor);
+        (model.self_loop() || model.skippable())) {
+      assert(recovered.kind() == minera::PowlNodeKind::kTransition);
+      assert(recovered.label() == (model.self_loop() ? "A\n[1,-]" : "A\n[1,1]"));
     }
   }
 

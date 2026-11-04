@@ -23,6 +23,7 @@ import {
   type PetriMultiAlignmentOptions,
   type ProcessTreeReductionOptions,
   DEFAULT_ALIGNMENT_OPTIONS,
+  withAlignmentTimeBudget,
   type CaseAttributeStat,
   type Decisions,
   type EventAttributeStat,
@@ -259,7 +260,7 @@ export default function App() {
   // Returns a model's alignments: embedded (CLI exports), cached, or fetched
   // from the backend (server mines defer it). Stable except across data loads.
   const requestAlignment = useCallback(
-    async (minerId: string, options: AlignmentOptions = {}): Promise<Alignments> => {
+    async (minerId: string, options: AlignmentOptions = {}, signal?: AbortSignal): Promise<Alignments> => {
       const effective = { ...DEFAULT_ALIGNMENT_OPTIONS, ...options };
       const cacheKey = `${resultCacheScope()}|${minerId}|${JSON.stringify(effective)}`;
       const embedded = data?.conformance?.[minerId]?.alignments;
@@ -273,7 +274,9 @@ export default function App() {
       const generation = cacheGeneration.current, sourceId = liveSource.current;
     assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current);
       const sameModel = importedModelGuard(minerId);
-      const result = await alignModel(minerId, options); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel();
+      // The backend, like the reference, has no time limit by default; the app
+      // gives an unset global timeout its own budget so a hard model cannot hang the view.
+      const result = await alignModel(minerId, withAlignmentTimeBudget(options), signal); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel();
       alignCache.current = { ...alignCache.current, [cacheKey]: result };
       return result;
     },

@@ -96,7 +96,7 @@ void handle_reader_export(const httplib::Request& request,httplib::Response& res
     const auto scope=live_required(request,"scope"),format=live_required(request,"format");if(scope!="read"&&scope!="delivered")throw std::invalid_argument("reader export scope requires read or delivered");
     auto log=s->reader->selected_log(scope=="delivered");
     if(format=="json"){minera::LogConversionResult value;value.log=std::move(log);response.set_content(minera::log_conversion_json(value),"application/json");}
-    else if(format=="xes"){minera::XesExportOptions options;if(request.has_param("variant"))options.variant=minera::parse_xes_export_variant(request.get_param_value("variant"));options.compress=ocel_query_bool(request,"gzip",false);options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",true);options.infer_metadata=ocel_query_bool(request,"infer_metadata",false);response.set_content(minera::serialize_xes(log,options),*options.compress?"application/gzip":"application/xml");}
+    else if(format=="xes"){minera::XesExportOptions options;if(request.has_param("variant"))options.variant=minera::parse_xes_export_variant(request.get_param_value("variant"));options.compress=ocel_query_bool(request,"gzip",false);options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.infer_metadata=ocel_query_bool(request,"infer_metadata",false);response.set_content(minera::serialize_xes(log,options),*options.compress?"application/gzip":"application/xml");}
     else throw std::invalid_argument("reader export format requires json or xes");
   });
 }

@@ -71,7 +71,10 @@ static void reference_audit_contracts() {
   // the previous kept event: B gets 10s..15s, A's completion a zero interval.
   const auto mixed = one_case({timed("A", "r", 0, "start"), timed("A", "r", 10, "complete"), timed("B", "r", 15)});
   assert(only_value(query(mixed, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "B")) == 5.0);
-  assert(only_value(query(mixed, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "A")) == 0.0);
+  // average_duration_activity follows the reference DataFrame path (CSV/XES
+  // inputs): every event takes part, so A start@0 gives 0s and A complete@10
+  // 10s (PM4Py 2.7.22 pandas variant: 5.0; the EventLog variant gives 0.0).
+  assert(only_value(query(mixed, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "A")) == 5.0);
   assert(only_value(query(mixed, ResourceProfileMetric::kMultitasking, 0, 20, "r")) == 1.0);
   const auto upper = one_case({timed("A", "r", 0, "START"), timed("A", "r", 10, "COMPLETE"), timed("B", "r", 15, "COMPLETE")});
   assert(only_value(query(upper, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "B")) == 5.0);
@@ -215,8 +218,19 @@ int main() {
   duration.resource = "alice";
   duration.activity = "A";
   const auto durations = discover_resource_profiles(log, duration);
-  // Reference: A completes atomically at 10s in both cases, so 0s.
-  assert(durations.rows.size() == 1 && durations.rows[0].value == 0.0);
+  // Reference DataFrame path (PM4Py 2.7.22 pandas variant): A complete@10
+  // follows A start@0 (10s) in case a and is first in case b (0s), so 5s.
+  assert(durations.rows.size() == 1 && durations.rows[0].value == 5.0);
+  {
+    // Overlapping lifecycle intervals: B complete@0, D start@10 (r2),
+    // C complete@50, D complete@58 (x). DataFrame path: 8; without C: 48.
+    const auto overlap = one_case({timed("B", "r2", 0, "complete"), timed("D", "r2", 10, "start"),
+                                   timed("C", "r1", 50, "complete"), timed("D", "x", 58, "complete")});
+    assert(only_value(query(overlap, ResourceProfileMetric::kAverageDurationActivity, 0, 59, "x", "D")) == 8.0);
+    const auto csc = one_case({timed("B", "r2", 0, "complete"), timed("D", "r2", 10, "start"),
+                               timed("D", "x", 58, "complete")});
+    assert(only_value(query(csc, ResourceProfileMetric::kAverageDurationActivity, 0, 59, "x", "D")) == 48.0);
+  }
 
   ResourceProfilesOptions activity_completions;
   activity_completions.metric = ResourceProfileMetric::kActivityCompletions;
@@ -228,6 +242,20 @@ int main() {
   // The event-level metric counts timestamped activity events, including
   // explicit lifecycle markers, as the reference log variant does.
   assert(completion_events.rows.size() == 1 && completion_events.rows[0].count == 3);
+  {
+    // PM4Py 2.7.22 activity_completions(log, t1, t2, "x") takes no activity:
+    // one trace A, B, C by x gives 3, a single total per resource.
+    const auto abc = one_case({timed("A", "x", 1), timed("B", "x", 2), timed("C", "x", 3), timed("A", "y", 4)});
+    const auto per_resource = query(abc, ResourceProfileMetric::kActivityCompletions, 0, 10, "x");
+    assert(only_value(per_resource) == 3.0 && per_resource.rows[0].activity.empty());
+    const auto ignores_activity = query(abc, ResourceProfileMetric::kActivityCompletions, 0, 10, "x", "A");
+    assert(only_value(ignores_activity) == 3.0);
+    ResourceProfilesOptions all;
+    all.metric = ResourceProfileMetric::kActivityCompletions;
+    const auto every = discover_resource_profiles(abc, all);
+    assert(every.rows.size() == 2 && every.rows[0].resource == "x" && every.rows[0].value == 3.0 &&
+           every.rows[1].resource == "y" && every.rows[1].value == 1.0);
+  }
 
   ResourceProfilesOptions case_duration;
   case_duration.metric = ResourceProfileMetric::kAverageCaseDuration;
@@ -258,8 +286,11 @@ int main() {
   workload.metric = ResourceProfileMetric::kAverageWorkload;
   workload.t2 = "2024-01-01T00:00:10Z";
   const auto average_workload = discover_resource_profiles(overlap, workload);
-  // Reference: no interval is open across t2 = 10s (0.0); one is at 12s.
-  assert(only_value(average_workload) == 0.0);
+  // Reference DataFrame path (the path imported logs follow): every event
+  // spans from the previous event of its case, so the A complete@10 interval
+  // [5,10] ends at t2 = 10s and counts (3.0); the EventLog path pairs
+  // lifecycles and gives 0.0. Both give 2.0 at 12s.
+  assert(only_value(average_workload) == 3.0);
   workload.t2 = "2024-01-01T00:00:12Z";
   assert(only_value(discover_resource_profiles(overlap, workload)) == 2.0);
   {

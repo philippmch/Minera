@@ -8,7 +8,8 @@ export interface DiscoveryModel { family:"DISCOVERY_MODEL";source_id:string;resu
 export interface IlpForm { activity:string;start:string;end:string;alpha:string;noise:string;nodes:string;causal:string; }
 export interface GeneticForm { activity:string;timestamp:string;caseId:string;seed:string;population:string;generations:string;elitism:string;crossover:string;mutation:string;tournament:string;activities:string;states:string; }
 export const DEFAULT_ILP_FORM:IlpForm={activity:"",start:"▶",end:"■",alpha:"1",noise:"0",nodes:"100000",causal:""};
-export const DEFAULT_GENETIC_FORM:GeneticForm={activity:"",timestamp:"",caseId:"",seed:"0",population:"32",generations:"20",elitism:"0.1",crossover:"0.8",mutation:"0.1",tournament:"3",activities:"",states:"10000"};
+/** The pm4py discover_petri_net_genetic wrapper defaults, as the server uses them; the candidate bound admits the whole default search. */
+export const DEFAULT_GENETIC_FORM:GeneticForm={activity:"",timestamp:"",caseId:"",seed:"0",population:"500",generations:"100",elitism:"0.01",crossover:"1",mutation:"0.01",tournament:"5",activities:"",states:"50500"};
 function integer(text:string,label:string,min:number,max:number):number {const value=Number(text);if(!text.trim()||!Number.isSafeInteger(value)||value<min||value>max)throw new Error(`${label} must be an integer from ${min} through ${max}.`);return value;}
 function rate(text:string,label:string):number {const value=Number(text);if(!text.trim()||!Number.isFinite(value)||value<0||value>1)throw new Error(`${label} must be a finite number from 0 through 1.`);return value;}
 export function ilpOptions(form:IlpForm):ILPMinerOptions {

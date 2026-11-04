@@ -24,6 +24,7 @@
 #include <atomic>
 #include <cstdint>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -80,40 +81,63 @@ struct MineSizeEstimate {
   }
 };
 
-// Quote-aware CSV scan: data rows (non-blank lines after the header) and the
-// header's columns.
+// Quote-aware CSV scan: data rows (non-blank records after the header) and
+// the header's columns. Quotes follow the importer (read_csv_record): a quote
+// opens a quoted field only as a field's first character, "" inside one is a
+// literal quote, and a quote elsewhere in an unquoted field is literal text;
+// CR, LF and CRLF end a record outside quotes.
 MineSizeEstimate scan_csv_mine_size(std::string_view bytes, char delimiter) {
   MineSizeEstimate estimate;
   estimate.known = true;
   std::size_t i = 0;
   if (bytes.size() >= 3 && bytes.substr(0, 3) == "\xEF\xBB\xBF") i = 3;
-  bool header_done = false, in_quotes = false, row_has_text = false;
-  std::size_t field = 0, field_start = i;
+  enum class Quote { kFieldStart, kUnquoted, kQuoted, kQuoteInQuoted };
+  auto state = Quote::kFieldStart;
+  bool header_done = false, row_has_text = false, row_open = false;
+  std::size_t field = 0;
   const auto end_row = [&] {
     ++field;
     if (row_has_text) {
       if (!header_done) {estimate.columns = field; header_done = true;}
       else ++estimate.events;
     }
-    field = 0; row_has_text = false;
+    field = 0; row_has_text = false; row_open = false;
+    state = Quote::kFieldStart;
   };
   for (; i < bytes.size(); ++i) {
     const char c = bytes[i];
-    if (c == '"') {in_quotes = !in_quotes; row_has_text = true; continue;}
-    if (in_quotes) continue;
-    if (c == delimiter) {++field; field_start = i + 1; row_has_text = true;}
-    else if (c == '\n') {end_row(); field_start = i + 1;}
-    else if (c != '\r' && c != ' ' && c != '\t') row_has_text = true;
+    if (state == Quote::kQuoted) {
+      if (c == '"') state = Quote::kQuoteInQuoted;
+      continue;
+    }
+    if (state == Quote::kQuoteInQuoted && c == '"') {state = Quote::kQuoted; continue;}
+    if (c == '\r' || c == '\n') {
+      if (c == '\r' && i + 1 < bytes.size() && bytes[i + 1] == '\n') ++i;
+      end_row();
+      continue;
+    }
+    row_open = true;
+    if (c == delimiter) {++field; row_has_text = true; state = Quote::kFieldStart; continue;}
+    if (state == Quote::kFieldStart && c == '"') {state = Quote::kQuoted; row_has_text = true; continue;}
+    state = Quote::kUnquoted;
+    if (c != ' ' && c != '\t') row_has_text = true;
   }
-  if (field_start < bytes.size() || row_has_text) end_row();
+  if (row_open || state != Quote::kFieldStart) end_row();
   return estimate;
 }
 
 // XES: <event> elements and the attribute keys of the first trace and its
-// first event (each a column of the flattened log).
+// first event (each a column of the flattened log). With xes_max_traces the
+// importer stops after that many traces, so events past them are not counted
+// (as reader_estimated_events does).
 class XesMineScanner {
  public:
+  explicit XesMineScanner(std::size_t max_traces = std::numeric_limits<std::size_t>::max())
+      : max_traces_(max_traces) {}
+  // True once a trace past max_traces has started: nothing later is imported.
+  bool full() const {return full_;}
   void feed(std::string_view chunk) {
+    if (full_) return;
     // A tag cut by the chunk's end is carried into the next one.
     std::string text = std::move(carry_);
     carry_.clear();
@@ -132,6 +156,7 @@ class XesMineScanner {
         ++events_;
         if (state_ == kInFirstTrace) state_ = kInFirstEvent;
       } else if (tag.starts_with("<trace") && boundary(6)) {
+        if (++traces_ > max_traces_) {full_ = true; carry_.clear(); return;}
         if (state_ == kBeforeTrace) state_ = kInFirstTrace;
       } else if (tag.starts_with("</event") && state_ == kInFirstEvent) {
         state_ = kDone;
@@ -156,27 +181,31 @@ class XesMineScanner {
   enum State {kBeforeTrace, kInFirstTrace, kInFirstEvent, kDone};
   std::string carry_;
   std::uint64_t events_ = 0, keys_ = 0;
+  std::size_t traces_ = 0, max_traces_;
+  bool full_ = false;
   State state_ = kBeforeTrace;
 };
 
 // A gzip XES is counted as it inflates, up to the request's decompressed
 // bound; past it (or when corrupt) the importer refuses it with its own error.
-MineSizeEstimate scan_xes_mine_size(std::string_view bytes, std::size_t max_decompressed_bytes) {
-  XesMineScanner scanner;
+// The scan stops at the first trace past max_traces.
+MineSizeEstimate scan_xes_mine_size(std::string_view bytes, std::size_t max_decompressed_bytes,
+                                    std::size_t max_traces = std::numeric_limits<std::size_t>::max()) {
+  XesMineScanner scanner(max_traces);
   if (minera::detail::is_gzip_data(bytes)) {
 #if defined(CPPHTTPLIB_ZLIB_SUPPORT)
     httplib::detail::gzip_decompressor inflater;
     if (!inflater.is_valid()) return {};
     constexpr std::size_t kSlice = 1 << 20;
     std::size_t inflated = 0;
-    for (std::size_t offset = 0; offset < bytes.size(); offset += kSlice) {
+    for (std::size_t offset = 0; offset < bytes.size() && !scanner.full(); offset += kSlice) {
       const auto length = std::min(kSlice, bytes.size() - offset);
       if (!inflater.decompress(bytes.data() + offset, length, [&](const char* data, std::size_t size) {
             inflated += size;
             if (inflated > max_decompressed_bytes) return false;
             scanner.feed(std::string_view(data, size));
-            return true;
-          }))
+            return !scanner.full();
+          }) && !scanner.full())
         return {};
     }
 #else
@@ -185,7 +214,7 @@ MineSizeEstimate scan_xes_mine_size(std::string_view bytes, std::size_t max_deco
 #endif
   } else {
     constexpr std::size_t kSlice = 1 << 20;
-    for (std::size_t offset = 0; offset < bytes.size(); offset += kSlice)
+    for (std::size_t offset = 0; offset < bytes.size() && !scanner.full(); offset += kSlice)
       scanner.feed(bytes.substr(offset, std::min(kSlice, bytes.size() - offset)));
   }
   return scanner.result();
@@ -204,7 +233,7 @@ void check_mine_size_limit(const httplib::Request& request, const std::string& b
                            const std::string& dataset, const minera::MineParams& params) {
   if (active_source_field(request, "mining_input_format") == "table") return;  // JSON tables are not pre-scanned
   const bool xes = looks_like_xes(dataset, bytes);
-  const auto estimate = xes ? scan_xes_mine_size(bytes, params.xes.max_decompressed_bytes)
+  const auto estimate = xes ? scan_xes_mine_size(bytes, params.xes.max_decompressed_bytes, params.xes.max_traces)
                             : scan_csv_mine_size(bytes, params.csv.delimiter);
   if (!estimate.known) return;
   const auto budget = mine_memory_budget();

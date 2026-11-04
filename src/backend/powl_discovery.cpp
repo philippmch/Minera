@@ -1504,7 +1504,33 @@ std::optional<PowlNode> make_po_impl(const UVCL& log, State& s) {
   std::vector<std::vector<std::size_t>> groups;
   std::vector<std::pair<std::size_t, std::size_t>> order;
   if (s.opts.variant == PowlDiscoveryVariant::kBruteForce) {
+    // Each level materializes all S(n, k) partitions of the activities into k
+    // groups (Stirling numbers of the second kind), which passes gigabytes
+    // within a few levels of 20-40 activities. A level whose partitions would
+    // pass kBruteForceLevelBytes is refused before it is generated (the
+    // reference keeps enumerating; see the parity doc's POWL entry).
+    constexpr std::uint64_t kBruteForceLevelBytes = std::uint64_t{1} << 30;
+    constexpr auto kSaturated = std::numeric_limits<std::uint64_t>::max();
+    std::vector<std::uint64_t> stirling(n + 1, 0);  // S(m, j) for the current m
+    stirling[0] = 1;
+    for (std::size_t m = 1; m <= n; ++m)
+      for (std::size_t j = m; j >= 1; --j) {
+        const auto& previous = stirling[j - 1];
+        const auto scaled = stirling[j] > kSaturated / j ? kSaturated : stirling[j] * j;
+        stirling[j] = scaled > kSaturated - previous ? kSaturated : scaled + previous;
+        if (j == 1) stirling[0] = 0;
+      }
     for (std::size_t k = n; k >= 2 && groups.empty(); --k) {
+      // A partition holds k block vectors and n node ids; the recursion keeps
+      // about as many again alive while it builds the level.
+      const std::uint64_t per_partition = 2 * (24 + 40 * static_cast<std::uint64_t>(k) + 8 * n);
+      if (stirling[k] > kBruteForceLevelBytes / per_partition)
+        throw std::runtime_error(
+            "POWL brute force would enumerate " +
+            (stirling[k] == kSaturated ? std::string("more than 1.8e19") : std::to_string(stirling[k])) +
+            " partitions of " + std::to_string(n) + " activities into " + std::to_string(k) +
+            " groups, more than its memory bound allows; use powl_variant maximal or dynamic_clustering, "
+            "or filter the log to fewer activities");
       for (const auto& g : enumerate_partitions(n, k)) if (valid_partition(r, g)) { groups = g; break; }
       if (k == 2) break;
     }

@@ -1,6 +1,7 @@
 #include "minera/attribute_statistics.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/json_export.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 #include <cassert>
 #include <iostream>
@@ -8,6 +9,8 @@
 #include <map>
 #include <sstream>
 #include <stdexcept>
+#include <tuple>
+#include <vector>
 
 namespace {
 
@@ -135,6 +138,53 @@ int main() {
     options.attribute_key = "case_id";
     assert((minera::discover_attribute_statistics(mixed, options).values ==
             Counts{{"c1", 2}, {"c2", 2}}));
+  }
+
+  // Python dict-key equality, as pm4py.get_event_attribute_values and
+  // get_trace_attribute_values on the read_xes DataFrame (object columns):
+  // 1, 1.0 and True are one key (0, 0.0 and False too), the string '1'
+  // stays apart, and each key keeps its first-seen cell. Observed results:
+  // a1 events {1: 6, 0: 2, '1': 1, 2.5: 1}, once per case {1: 3, '1': 1,
+  // 0: 1, 2.5: 1}, case:tx {1: 10}; a2 events {True: 3, 0.0: 2}, once per
+  // case {True: 2, 0.0: 1}, case:tx {True: 5}.
+  {
+    using Entry = std::tuple<std::string, std::string, std::uint64_t>;
+    const auto entries = [](const minera::AttributeStatisticsResult& r) {
+      std::vector<Entry> out;
+      for (const auto& e : r.entries) out.emplace_back(e.value, e.type, e.count);
+      return out;
+    };
+    const auto load = [](const char* text) {
+      std::istringstream input(text);
+      return minera::import_xes_event_log(input);
+    };
+    const auto a1 = load(R"XES(<?xml version="1.0" encoding="UTF-8"?><log xes.version="1.0"><trace><string key="concept:name" value="c0"/><int key="tx" value="1"/><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:00"/><int key="x" value="1"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:01"/><float key="x" value="1.0"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:02"/><boolean key="x" value="true"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:03"/><string key="x" value="1"/></event></trace><trace><string key="concept:name" value="c1"/><boolean key="tx" value="true"/><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:00"/><boolean key="x" value="true"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:01"/><float key="x" value="2.5"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:02"/><int key="x" value="0"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:03"/><boolean key="x" value="false"/></event></trace><trace><string key="concept:name" value="c2"/><float key="tx" value="1.0"/><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:00"/><float key="x" value="1.0"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:01"/><int key="x" value="1"/></event></trace></log>)XES");
+    const auto a2 = load(R"XES(<?xml version="1.0" encoding="UTF-8"?><log xes.version="1.0"><trace><string key="concept:name" value="c0"/><boolean key="tx" value="true"/><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:00"/><boolean key="x" value="true"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:01"/><int key="x" value="1"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:02"/><float key="x" value="0.0"/></event><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:03"/><int key="x" value="0"/></event></trace><trace><string key="concept:name" value="c1"/><int key="tx" value="1"/><event><string key="concept:name" value="A"/><date key="time:timestamp" value="2020-01-01T00:00:00"/><float key="x" value="1.0"/></event></trace></log>)XES");
+    minera::AttributeStatisticsOptions o;
+    o.attribute_key = "x";
+    auto r = minera::discover_attribute_statistics(a1, o);
+    assert((entries(r) == std::vector<Entry>{{"1", "int", 6}, {"1", "str", 1},
+                                              {"2.5", "float", 1}, {"0", "int", 2}}));
+    // The text map adds keys that only share a text.
+    assert((r.values == std::map<std::string, std::uint64_t>{{"0", 2}, {"1", 7}, {"2.5", 1}}));
+    const auto json = minera::attribute_statistics_json(r);
+    assert(json.find("\"entries\":[{\"value\":\"1\",\"type\":\"int\",\"count\":6}") !=
+           std::string::npos);
+    o.keep_once_per_case = true;
+    assert((entries(minera::discover_attribute_statistics(a1, o)) ==
+            std::vector<Entry>{{"1", "int", 3}, {"1", "str", 1}, {"2.5", "float", 1},
+                               {"0", "int", 1}}));
+    assert((entries(minera::discover_attribute_statistics(a2, o)) ==
+            std::vector<Entry>{{"true", "bool", 2}, {"0.0", "float", 1}}));
+    o.keep_once_per_case = false;
+    assert((entries(minera::discover_attribute_statistics(a2, o)) ==
+            std::vector<Entry>{{"true", "bool", 3}, {"0.0", "float", 2}}));
+    o.scope = minera::AttributeStatisticsScope::kTraces;
+    o.attribute_key = "case:tx";
+    assert((entries(minera::discover_attribute_statistics(a1, o)) ==
+            std::vector<Entry>{{"1", "int", 10}}));
+    assert((entries(minera::discover_attribute_statistics(a2, o)) ==
+            std::vector<Entry>{{"true", "bool", 5}}));
   }
 
   bool rejected = false;

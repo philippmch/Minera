@@ -8,6 +8,7 @@
 // every other ill-formed byte sequence becomes one U+FFFD per maximal subpart
 // (Unicode 3.9 "U+FFFD substitution of maximal subparts"), which is what
 // Python's bytes.decode("utf-8", "replace") and the browser's TextDecoder do.
+// XML and text bodies take the same U+FFFD substitution (repair_text_utf8).
 
 #include <cstddef>
 #include <string>
@@ -93,6 +94,48 @@ inline std::string repair_json_utf8(std::string_view json) {
   std::string out;
   out.reserve(json.size());
   append_json_utf8(out, json);
+  return out;
+}
+
+// The same substitution for a body that is not JSON (XML, CSV, plain text),
+// where a JSON escape would be literal text: every ill-formed sequence, a
+// WTF-8 surrogate included, becomes one raw U+FFFD (EF BF BD) per maximal
+// subpart. With `xml`, the characters XML 1.0 cannot carry at all (C0
+// controls other than tab, LF and CR, and U+FFFE/U+FFFF) become U+FFFD too,
+// so the document stays well-formed. Identity on clean text.
+inline bool xml_forbidden_at(std::string_view text, std::size_t at) {
+  const auto byte = static_cast<unsigned char>(text[at]);
+  if (byte < 0x20) return byte != '\t' && byte != '\n' && byte != '\r';
+  return byte == 0xef && at + 2 < text.size() && static_cast<unsigned char>(text[at + 1]) == 0xbf &&
+         (static_cast<unsigned char>(text[at + 2]) == 0xbe || static_cast<unsigned char>(text[at + 2]) == 0xbf);
+}
+
+inline bool is_clean_text_utf8(std::string_view text, bool xml) {
+  for (std::size_t i = 0; i < text.size();) {
+    if (xml && xml_forbidden_at(text, i)) return false;
+    if (static_cast<unsigned char>(text[i]) < 0x80) { ++i; continue; }
+    const auto [length, valid] = utf8_unit(text, i);
+    if (!valid) return false;
+    i += length;
+  }
+  return true;
+}
+
+inline std::string repair_text_utf8(std::string_view text, bool xml) {
+  std::string out;
+  out.reserve(text.size());
+  for (std::size_t i = 0; i < text.size();) {
+    if (xml && xml_forbidden_at(text, i)) {
+      out += "\xEF\xBF\xBD";
+      i += static_cast<unsigned char>(text[i]) < 0x80 ? 1 : 3;
+      continue;
+    }
+    if (static_cast<unsigned char>(text[i]) < 0x80) { out += text[i++]; continue; }
+    const auto [length, valid] = utf8_unit(text, i);
+    if (valid) out.append(text.substr(i, length));
+    else out += "\xEF\xBF\xBD";
+    i += length;
+  }
   return out;
 }
 

@@ -11,6 +11,7 @@ import {
   type AlignmentVariant,
   type AlignmentCostProfile,
   DEFAULT_ALIGNMENT_OPTIONS,
+  UI_ALIGNMENT_TIME_BUDGET_SECONDS,
   type Decisions as DecisionsResult,
   type DecisionPoint,
   type MineraExport,
@@ -134,7 +135,7 @@ export function Conformance({
   playoutSourceId,
 }: {
   data: MineraExport;
-  onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
+  onRequestAlignment: (minerId: string, options?: AlignmentOptions, signal?: AbortSignal) => Promise<AlignmentsResult>;
   onRequestDecisions?: (minerId: string, options?: DecisionMiningOptions) => Promise<DecisionsResult>;
   onCheckModel?: (file: File, sourceId?: string, activityKey?: string, inferLegacyBoundaries?: boolean) => Promise<ImportedModelCheck>;
   initialModel?: {file:File;sourceId:string;activityKey?:string;inferLegacyBoundaries?:boolean}|null;
@@ -1991,7 +1992,7 @@ function Alignments({
   minerId: string;
   minerName: string;
   model: ModelConformance;
-  onRequestAlignment: (minerId: string, options?: AlignmentOptions) => Promise<AlignmentsResult>;
+  onRequestAlignment: (minerId: string, options?: AlignmentOptions, signal?: AbortSignal) => Promise<AlignmentsResult>;
 }) {
   const embedded = model.alignments;
   const [fetched, setFetched] = useState<AlignmentsResult | null>(embedded ?? null);
@@ -2020,11 +2021,14 @@ function Alignments({
     }
     if (!model.sound) return;  // unsound: nothing to fetch, the notice says why
     let cancelled = false;
+    // Leaving the view (or changing the options) aborts the request, and the
+    // backend stops a search nobody is waiting for.
+    const controller = new AbortController();
     setFetched(null);
     setError(null);
     setLoading(true);
     requestRef
-      .current(minerId, appliedOptions)
+      .current(minerId, appliedOptions, controller.signal)
       .then((result) => !cancelled && setFetched(result))
       .catch((cause) =>
         !cancelled && setError(cause instanceof Error ? cause.message : String(cause)),
@@ -2032,6 +2036,7 @@ function Alignments({
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [minerId, model.sound, embedded, appliedOptions]);
 
@@ -2073,13 +2078,19 @@ function Alignments({
         {settings}
         <section className="panel conf-panel">
           <p className="conf-loading">Computing optimal alignments</p>
+          {appliedOptions.max_align_time === undefined && (
+            <p className="conf-inline-note">
+              Stops after {UI_ALIGNMENT_TIME_BUDGET_SECONDS} s unless you set a global timeout (0 for no limit).
+            </p>
+          )}
         </section>
       </>
     );
   }
   // Sound but the search could not finish (reachable yet unbounded/too large).
   if (!fetched.computed) {
-    return <>{settings}<AlignmentNotice minerName={minerName} exhausted={fetched.exhausted} /></>;
+    return <>{settings}<AlignmentNotice minerName={minerName} exhausted={fetched.exhausted}
+      budgetSeconds={appliedOptions.max_align_time === undefined ? UI_ALIGNMENT_TIME_BUDGET_SECONDS : undefined} /></>;
   }
   return <>{settings}<AlignmentResultView data={data} alignments={fetched} /></>;
 }
@@ -2202,12 +2213,15 @@ export function cleanAlignmentOptions(options: AlignmentOptions): AlignmentOptio
 
 // Explains why a model could not be aligned: unsound (unreachable end state) or
 // exhausted (reachable but the search hit its bound).
-function AlignmentNotice({
+export function AlignmentNotice({
   minerName,
   exhausted,
+  budgetSeconds,
 }: {
   minerName: string;
   exhausted: boolean;
+  /** The app's own time budget, when it applied (the global timeout was left empty). */
+  budgetSeconds?: number;
 }) {
   return (
     <section className="panel conf-panel">
@@ -2216,12 +2230,21 @@ function AlignmentNotice({
         <div>
           <h3>Alignments unavailable for the {minerName} model</h3>
           {exhausted ? (
-            <p>
-              The {minerName} model is reachable, but the alignment search hit a
-              configured state or time limit before finding optimal alignments.
-              This can happen because the model is complex or admits unbounded
-              behavior, so partial numbers are not shown.
-            </p>
+            <>
+              <p>
+                The {minerName} model is reachable, but the alignment search hit a
+                configured state or time limit before finding optimal alignments.
+                This can happen because the model is complex or admits unbounded
+                behavior, so partial numbers are not shown.
+              </p>
+              {budgetSeconds !== undefined && (
+                <p>
+                  With no global timeout set, the app stops alignments after{" "}
+                  {budgetSeconds} s. To search longer, set <strong>Global timeout</strong>{" "}
+                  in the settings above (0 for no limit) and apply.
+                </p>
+              )}
+            </>
           ) : (
             <p>
               The {minerName} model isn't a <strong>sound workflow net</strong>:
