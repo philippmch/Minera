@@ -19,6 +19,7 @@
 
 #include "minera/timestamp.hpp"
 #include "minera/random.hpp"
+#include "exact_mean.hpp"
 
 namespace minera {
 namespace {
@@ -1073,15 +1074,17 @@ void finalize_case(CaseState& state, MonteCarloDiagnostics& diagnostics,
   }
   if (first_event_times.size() < 2) return 0.0;
   std::sort(first_event_times.begin(), first_event_times.end());
-  long double total = 0.0L;
+  // statistics.mean sums the float differences exactly and rounds the mean
+  // once; exact_mean does the same on every platform (a long double sum
+  // carried extra precision only on x86 and was plain double on ARM and MSVC).
+  std::vector<double> differences;
+  differences.reserve(first_event_times.size() - 1);
   for (std::size_t i = 1; i < first_event_times.size(); ++i) {
     const double difference = first_event_times[i] - first_event_times[i - 1];
     if (!std::isfinite(difference) || difference < 0.0) return 0.0;
-    total += static_cast<long double>(difference);
+    differences.push_back(difference);
   }
-  const long double mean =
-      total / static_cast<long double>(first_event_times.size() - 1);
-  const double result = static_cast<double>(mean);
+  const double result = detail::exact_mean(differences);
   return std::isfinite(result) && result >= 0.0 ? result : 0.0;
 }
 

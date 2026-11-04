@@ -90,7 +90,7 @@ void report(const std::string& line, const std::string& expected, const std::str
 
 void check_exp_mech(const std::string& line, std::size_t& failures) {
   std::istringstream in(line.substr(2));
-  long n = 0, expected = 0;
+  std::int64_t n = 0, expected = 0;
   std::string epsilon;
   std::uint64_t seed = 0;
   in >> n >> epsilon >> seed >> expected;
@@ -127,11 +127,11 @@ void check_relations(const std::string& line, std::size_t& failures) {
 
 void check_generate(const std::string& line, std::size_t& failures) {
   const auto parts = fields(line);
-  std::vector<std::pair<std::string, long>> frequencies;
+  std::vector<std::pair<std::string, std::int64_t>> frequencies;
   if (parts.at(0) != ".") {
     for (const auto& pair : split(parts[0], ' ')) {
       const auto at = pair.rfind('=');
-      frequencies.emplace_back(pair.substr(0, at), std::stol(pair.substr(at + 1)));
+      frequencies.emplace_back(pair.substr(0, at), std::stoll(pair.substr(at + 1)));
     }
   }
   report(line, parts.size() > 1 ? parts[1] : "", cases_text(reference_generate_variant_log(frequencies)), failures);

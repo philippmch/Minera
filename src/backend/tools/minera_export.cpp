@@ -593,7 +593,7 @@ minera::FootprintsAnalysis analyze_footprints(
 int usage(const char* program) {
   std::cerr << "Usage: " << program
             << " <event_log.csv|.xes> [options]\n"
-               "  A .xes file is imported as XES; any other file as CSV.\n"
+               "  A .xes or .xes.gz file is imported as XES; any other file as CSV.\n"
                "  A repeated option keeps its last value.\n"
                "  -o <path>                 Write JSON to <path> instead of stdout\n"
                "  --ltl-attribute-values-json <JSON> Exact ordered NativeString values\n"
@@ -735,9 +735,6 @@ int usage(const char* program) {
                "  --pripel-secure-random <bool> Use OS entropy for noise\n"
                "  --pripel-max-output-traces <n> Output trace cap\n"
                "  --pripel-max-distance <n>  Nearest-variant distance cap\n"
-               "                            recurse) or dfg (IMd: recurse on\n"
-               "                            the directly-follows graph alone,\n"
-               "                            scaling to huge logs)\n"
                "  --alpha-variant <id>      classic (default) or plus (short loops)\n"
                "  --alpha-plus-result      Emit Alpha+ graph with live/detached markings\n"
                "  --alpha-plus-alternatives Emit every Alpha+ boundary-cleanup alternative\n"

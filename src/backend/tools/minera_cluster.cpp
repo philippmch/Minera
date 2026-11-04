@@ -11,7 +11,7 @@
 
 int run_cluster(int argc,char** argv){
  try{
-  if(argc<2){std::cerr<<"Usage: minera_cluster LOG.csv|LOG.xes --regex PATTERN --runtime-url URL [--name NAME --activity-attribute KEY --filter-output LOG.xes]\n";return 2;}
+  if(argc<2){std::cerr<<"Usage: minera_cluster LOG.csv|LOG.xes --regex PATTERN --runtime-url URL [--name NAME --activity-attribute KEY --filter-output LOG.xes --table-output TABLE.json]\n";return 2;}
   std::string pattern,runtime,name,activity,output,table_output;bool has_pattern=false;
   for(int i=2;i<argc;++i){const std::string key=argv[i];if(i+1>=argc)throw std::invalid_argument("missing cluster option value");const std::string value=argv[++i];
    if(key=="--regex"){pattern=value;has_pattern=true;}else if(key=="--runtime-url")runtime=value;else if(key=="--name")name=value;else if(key=="--activity-attribute")activity=value;else if(key=="--filter-output")output=value;else if(key=="--table-output")table_output=value;else throw std::invalid_argument("unknown cluster option: "+key);

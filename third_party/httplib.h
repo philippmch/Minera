@@ -38,7 +38,10 @@
  *    its client has gone away (the upstream 0.20 name for the same check);
  *  - Accept-Encoding is parsed with its q-values (accepts_content_coding),
  *    so "gzip;q=0" or "identity" alone gets an uncompressed response.;
- *  - a Range header is honoured on GET only; other methods ignore it.
+ *  - a Range header is honoured on GET only; other methods ignore it;
+ *  - default_socket_options never sets SO_REUSEPORT (SO_REUSEADDR on POSIX,
+ *    SO_EXCLUSIVEADDRUSE on Windows), so a port already listening cannot be
+ *    bound a second time.
  * Upstream fixed the chunked case in 0.20.1 (CVE-2025-46728).
  */
 
@@ -2116,21 +2119,21 @@ inline uint64_t Response::get_header_value_u64(const std::string &key,
   return detail::get_header_value_u64(headers, key, def, id);
 }
 
+// MINERA PATCH: a listening port belongs to one server. Upstream sets
+// SO_REUSEPORT where it exists, which lets a second process bind a port that
+// is already listening (Linux then splits the connections between the two).
+// POSIX keeps SO_REUSEADDR only (a restart may rebind over TIME_WAIT, but a
+// live listener still makes bind fail with EADDRINUSE); Windows sets
+// SO_EXCLUSIVEADDRUSE only, since its SO_REUSEADDR would allow the same
+// hijack and the two options cannot be combined.
 inline void default_socket_options(socket_t sock) {
   int opt = 1;
 #ifdef _WIN32
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
-             reinterpret_cast<const char *>(&opt), sizeof(opt));
   setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
              reinterpret_cast<const char *>(&opt), sizeof(opt));
 #else
-#ifdef SO_REUSEPORT
-  setsockopt(sock, SOL_SOCKET, SO_REUSEPORT,
-             reinterpret_cast<const void *>(&opt), sizeof(opt));
-#else
   setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
              reinterpret_cast<const void *>(&opt), sizeof(opt));
-#endif
 #endif
 }
 

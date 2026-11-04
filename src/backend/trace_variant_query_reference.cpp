@@ -38,7 +38,7 @@ double pairwise_sum(const double* values, std::size_t n) {
   return pairwise_sum(values, half) + pairwise_sum(values + half, n - half);
 }
 
-long exp_mech(long n, double epsilon, rng::NumpyRandomState& rng) {
+std::int64_t exp_mech(std::int64_t n, double epsilon, rng::NumpyRandomState& rng) {
   const auto size = static_cast<std::size_t>(n);
   std::vector<double> weights(size), p(size);
   bool overflow = false;
@@ -62,7 +62,7 @@ long exp_mech(long n, double epsilon, rng::NumpyRandomState& rng) {
   for (std::size_t i = 0; i < size; ++i) cdf[i] = running += p[i];
   for (auto& value : cdf) value /= cdf.back();
   const double uniform = rng.random_sample();
-  return static_cast<long>(std::upper_bound(cdf.begin(), cdf.end(), uniform) - cdf.begin());
+  return static_cast<std::int64_t>(std::upper_bound(cdf.begin(), cdf.end(), uniform) - cdf.begin());
 }
 
 std::vector<std::string> split_key(const std::string& key) {
@@ -95,7 +95,7 @@ BehavioralAppropriatenessRelations reference_ba_relations(const std::vector<std:
   out.events = events;
   for (const auto& x : events) {
     for (const auto& y : events) {
-      long containing = 0, after = 0, before = 0;
+      std::int64_t containing = 0, after = 0, before = 0;
       for (const auto& trace : traces) {
         const auto first = std::find(trace.begin(), trace.end(), x);
         if (first == trace.end()) continue;
@@ -104,7 +104,7 @@ BehavioralAppropriatenessRelations reference_ba_relations(const std::vector<std:
         const auto last = std::find(trace.rbegin(), trace.rend(), x).base() - 1;
         if (std::find(trace.begin(), last, y) != last) ++before;
       }
-      const auto letter = [&](long hits) { return containing && hits == containing ? 'A' : hits ? 'S' : 'N'; };
+      const auto letter = [&](std::int64_t hits) { return containing && hits == containing ? 'A' : hits ? 'S' : 'N'; };
       out.follows[{x, y}] = letter(after);
       out.precedes[{x, y}] = letter(before);
     }
@@ -112,11 +112,11 @@ BehavioralAppropriatenessRelations reference_ba_relations(const std::vector<std:
   return out;
 }
 
-long reference_ba_violations(const BehavioralAppropriatenessRelations& relations, const std::vector<std::string>& prefix) {
+std::int64_t reference_ba_violations(const BehavioralAppropriatenessRelations& relations, const std::vector<std::string>& prefix) {
   std::vector<std::string> parts = prefix;
   const bool ended = !parts.empty() && parts.back() == kTraceVariantQueryTraceEnd;
   if (ended) parts.pop_back();
-  long violations = 0;
+  std::int64_t violations = 0;
   std::set<std::string> seen;
   for (const auto& x : parts) {
     if (!seen.insert(x).second) continue;
@@ -135,15 +135,15 @@ long reference_ba_violations(const BehavioralAppropriatenessRelations& relations
   return violations;
 }
 
-long reference_exp_mech(long n, double epsilon, std::uint32_t seed) {
+std::int64_t reference_exp_mech(std::int64_t n, double epsilon, std::uint32_t seed) {
   rng::NumpyRandomState rng(seed);
   return exp_mech(n, epsilon, rng);
 }
 
 std::vector<TraceVariantQueryReferenceCase> reference_generate_variant_log(
-    const std::vector<std::pair<std::string, long>>& trace_frequencies) {
+    const std::vector<std::pair<std::string, std::int64_t>>& trace_frequencies) {
   // A Python dict: a repeated key keeps its first place and its last count.
-  std::vector<std::pair<std::string, long>> frequencies;
+  std::vector<std::pair<std::string, std::int64_t>> frequencies;
   for (const auto& [key, count] : trace_frequencies) {
     const auto found = std::find_if(frequencies.begin(), frequencies.end(), [&](const auto& e) { return e.first == key; });
     if (found == frequencies.end()) {
@@ -157,7 +157,7 @@ std::vector<TraceVariantQueryReferenceCase> reference_generate_variant_log(
     std::vector<std::string> events;
     for (auto& piece : split_key(key))
       if (piece != kTraceVariantQueryTraceEnd) events.push_back(std::move(piece));
-    for (long i = 0; i < count; ++i) out.push_back({static_cast<long>(out.size()), events});
+    for (std::int64_t i = 0; i < count; ++i) out.push_back({static_cast<std::int64_t>(out.size()), events});
   }
   return out;
 }
@@ -172,7 +172,7 @@ std::vector<TraceVariantQueryReferenceCase> reference_sacofa_trace_variant_query
     for (const auto& event : trace)
       if (std::find(events.begin(), events.end(), event) == events.end()) events.push_back(event);
   const auto relations = reference_ba_relations(traces, events);
-  std::map<std::vector<std::string>, long> prefixes, ended_traces;
+  std::map<std::vector<std::string>, std::int64_t> prefixes, ended_traces;
   std::set<std::string> first_events;
   for (const auto& trace : traces) {
     for (std::size_t i = 1; i <= trace.size(); ++i) ++prefixes[std::vector<std::string>(trace.begin(), trace.begin() + i)];
@@ -183,13 +183,13 @@ std::vector<TraceVariantQueryReferenceCase> reference_sacofa_trace_variant_query
   struct Entry {
     std::vector<std::string> sequence;
     bool ended = false;
-    long count = 0;
+    std::int64_t count = 0;
   };
   rng::NumpyRandomState numpy_rng(options.seed);
   rng::PythonRandom python_rng(options.seed);
   std::vector<Entry> final_entries;
   std::vector<std::vector<std::string>> current{{}};
-  for (long n = 1; n <= options.k; ++n) {
+  for (std::int64_t n = 1; n <= options.k; ++n) {
     std::vector<Entry> level;
     for (const auto& prefix : current) {
       for (const auto& event : events) {
@@ -214,16 +214,16 @@ std::vector<TraceVariantQueryReferenceCase> reference_sacofa_trace_variant_query
       }
       (conforms ? conforming : rest).push_back(i);
     }
-    const long added = exp_mech(static_cast<long>(rest.size()) + 1, options.epsilon, numpy_rng);
+    const std::int64_t added = exp_mech(static_cast<std::int64_t>(rest.size()) + 1, options.epsilon, numpy_rng);
     if (stats) stats->selected_violation_count += static_cast<std::uint64_t>(added);
-    for (long i = 0; i < added; ++i) {
+    for (std::int64_t i = 0; i < added; ++i) {
       const auto at = static_cast<std::size_t>(python_rng.randbelow(rest.size()));
       conforming.push_back(rest[at]);
       rest.erase(rest.begin() + at);
     }
     for (const auto i : conforming) {
       const double noise = numpy_rng.laplace(0.0, 1.0 / options.epsilon);
-      level[i].count = std::max(0L, level[i].count + static_cast<long>(std::trunc(noise)));
+      level[i].count = std::max<std::int64_t>(0, level[i].count + static_cast<std::int64_t>(std::trunc(noise)));
     }
     if (n < options.k) {
       current.clear();
@@ -240,7 +240,7 @@ std::vector<TraceVariantQueryReferenceCase> reference_sacofa_trace_variant_query
   }
   std::vector<TraceVariantQueryReferenceCase> cases;
   for (const auto& entry : final_entries)
-    for (long i = 0; i < entry.count; ++i) cases.push_back({static_cast<long>(cases.size()), entry.sequence});
+    for (std::int64_t i = 0; i < entry.count; ++i) cases.push_back({static_cast<std::int64_t>(cases.size()), entry.sequence});
   return nonempty_cases(std::move(cases));
 }
 

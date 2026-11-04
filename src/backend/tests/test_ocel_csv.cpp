@@ -1,8 +1,12 @@
 #include "minera/ocel_csv.hpp"
+#include "minera/ocel_statistics.hpp"
+#include "minera/ocel_transform.hpp"
+#include "minera/ocel_xml.hpp"
 
 #include <cassert>
 #include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 
@@ -154,13 +158,194 @@ void follows_reference_csv_row_shapes() {
   assert(refused(header + row1, "Expected 3 fields in line 3, saw 4", &long_later));
 }
 
+// An object listed twice in one cell is two relations, as pm4py.read_ocel_csv
+// keeps one relation row per list entry. Observed on pm4py 2.7.22 for this
+// table: the relations below in this order, objects_ot_count counting each
+// repeat, ocel_flattening repeating the event, write_ocel_csv writing the
+// repeats back into the cell, and write_ocel2_xml / write_ocel2_sqlite (and
+// their readers) keeping them.
+void keeps_repeated_relations() {
+  const std::string events =
+      "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order,ocel:type:item\n"
+      "e1,2024-01-01T00:00:00,Create,\"['o1', 'o1']\",\"['i1']\"\n"
+      "e2,2024-01-02T00:00:00,Pack,['o1'],\"['i1', 'i2', 'i1']\"\n"
+      "e3,2024-01-03T00:00:00,Ship,\"['o1', 'o1', 'o1']\",['i2']\n";
+  const std::string objects = "ocel:oid,ocel:type\no1,order\ni1,item\ni2,item\n";
+  const auto relations = [](const minera::Ocel& log) {
+    std::string out;
+    for (const auto& relation : log.relations) out += relation.event_id + ">" + relation.object_id + ";";
+    return out;
+  };
+  const std::string expected =
+      "e1>o1;e1>o1;e1>i1;e2>o1;e2>i1;e2>i2;e2>i1;e3>o1;e3>o1;e3>o1;e3>i2;";
+  const auto log = minera::parse_ocel_csv(events, objects);
+  assert(relations(log) == expected);
+  assert(log.objects.size() == 3);
+  // Without an object table each object is listed once.
+  const auto event_only = minera::parse_ocel_csv(events);
+  assert(relations(event_only) == expected && event_only.objects.size() == 3);
+
+  const auto counts = minera::objects_ot_count(log);
+  assert(counts.at("e1").at("order") == 2 && counts.at("e1").at("item") == 1);
+  assert(counts.at("e2").at("item") == 3 && counts.at("e3").at("order") == 3);
+  const auto flat = minera::flatten_ocel_to_event_log(log, "order");
+  assert(flat.traces.size() == 1 && flat.traces[0].events.size() == 6);
+
+  // The writer needs no loss allowance for repeats and writes them back.
+  const auto written = minera::serialize_ocel_csv(log);
+  assert(written.find("\"['o1', 'o1']\"") != std::string::npos);
+  assert(written.find("\"['i1', 'i2', 'i1']\"") != std::string::npos);
+  assert(written.find("\"['o1', 'o1', 'o1']\"") != std::string::npos);
+  assert(relations(minera::parse_ocel_csv(written, minera::serialize_ocel_objects_csv(log))) ==
+         expected);
+  minera::OcelXmlExportOptions standard_xml;
+  standard_xml.format = minera::OcelXmlFormat::kStandard;
+  assert(relations(minera::parse_ocel_xml(minera::serialize_ocel_xml(log, standard_xml))) ==
+         expected);
+}
+
+// Object cells as pm4py.read_ocel_csv reads them, observed on pm4py 2.7.22:
+// a cell that is no Python list literal lists no objects (its event stays),
+// elements become ids as str() prints them, None and '' are skipped, and a
+// list, set or dict element raises TypeError (refused here).
+void reads_object_cells_as_pandas() {
+  const auto ids = [](const std::string& cell, minera::OcelCsvImportOptions options = {}) {
+    std::string events = "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order\n";
+    events += "e0,2024-01-01T00:00:00Z,a," + cell + "\ne1,2024-01-02T00:00:00Z,a,['z']\n";
+    const auto log = minera::parse_ocel_csv(events, options);
+    assert(log.events.size() == 2);
+    std::string out;
+    for (const auto& relation : log.relations)
+      if (relation.event_id == "e0") out += relation.object_id + ";";
+    return out;
+  };
+  const auto refused = [&](const std::string& cell, const std::string& expected) {
+    try {
+      (void)ids(cell);
+    } catch (const std::invalid_argument& error) {
+      return std::string(error.what()).find(expected) != std::string::npos;
+    }
+    return false;
+  };
+  // No Python literal, or no list: no objects.
+  for (const char* cell : {"[o1]", "\"['o1'\"", "[1+1]", "\"[float('nan')]\"", "\"('o1',)\"",
+                           "abc", "7", "\"['o1']x\"", "[007]", "[--1]", "[2j+1]", "[+True]",
+                           "\"[f'x']\"", "\"['a' b'y']\"", "\"[1 2]\"", "\"[1,,2]\"", "\"['o1'][0]\"",
+                           "\"['\\U00110000']\"", "\"['o1'] \\\n\""})
+    assert(ids(cell).empty());
+  minera::OcelCsvImportOptions untrimmed;
+  untrimmed.trim_fields = false;
+  assert(ids("\" ['o1']\"", untrimmed).empty());
+  assert(ids("\"['o1'] \"", untrimmed) == "o1;");
+  // Elements as str() prints them.
+  assert(ids("\"['o1', None, '', 'o2', b'']\"") == "o1;o2;");
+  assert(ids("\"['o1','o1']\"") == "o1;o1;");
+  assert(ids("\"[0, -1, +3, 0x10, 0b11, 0o7, 1_000, 00, -(1)]\"") == "0;-1;3;16;3;7;1000;0;-1;");
+  assert(ids("[12345678901234567890]") == "12345678901234567890;");
+  assert(ids("[0xFFFFFFFFFFFFFFFFFFFF]") == "1208925819614629174706175;");
+  assert(ids("\"[1e3, 1.5e-7, 1e16, 1., .5, -0.0, 1e999, 1_0.5]\"") ==
+         "1000.0;1.5e-07;1e+16;1.0;0.5;-0.0;inf;10.5;");
+  assert(ids("\"[True, ..., 3j, -1j, 1+2j, 1.5-0j, 1e5j]\"") ==
+         "True;Ellipsis;3j;(-0-1j);(1+2j);(1.5+0j);100000j;");
+  assert(ids("\"[b'o1', r'a\\b', u'x', rb'y', 'p' 'q', 'a' \"\"b\"\"]\"") == "o1;a\\b;x;y;pq;ab;");
+  assert(ids("\"['\\x41', '\\101', '\\u00e9', 'a\\q', 'o\\'1', \"\"\"\"\"\"a\nb\"\"\"\"\"\"]\"") ==
+         "A;A;\xc3\xa9;a\\q;o'1;a\nb;");
+  assert(ids("\"['o1', # c\n 'o2',]\"") == "o1;o2;");
+  assert(ids("\"['o1'] # c\"") == "o1;");
+  assert(ids("[]") == "" && ids("\"[ ]\"") == "");
+  // The reference raises.
+  assert(refused("[[]]", "unhashable type: 'list'"));
+  assert(refused("\"['o1', ['o2']]\"", "unhashable type: 'list'"));
+  assert(refused("\"[{'a'}]\"", "unhashable type: 'set'"));
+  assert(refused("\"[set()]\"", "unhashable type: 'set'"));
+  assert(refused("\"[{'a': 1}]\"", "unhashable type: 'dict'"));
+  assert(refused("\"['o1'],\"", "unhashable type: 'list'"));
+  assert(refused("\"[b'\\xff']\"", "UnicodeDecodeError"));
+  // Declared: what this reader does not support.
+  assert(refused("\"[('a',)]\"", "does not support"));
+  assert(refused("\"['\\N{LATIN SMALL LETTER E WITH ACUTE}']\"", "does not support"));
+  assert(refused("\"[1, 1.0]\"", "does not support"));
+  assert(refused("\"[1, '1']\"", "does not support"));
+
+  // A dropped row's cell (no object table) lists objects the same way.
+  const auto dropped = minera::parse_ocel_csv(
+      "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order\n"
+      ",2024-01-01T00:00:00Z,a,[o1]\n,2024-01-01T00:00:00Z,a,\"['o2']\"\n"
+      "e1,2024-01-02T00:00:00Z,a,['z']\n");
+  assert(dropped.objects.size() == 2 && dropped.objects[0].id == "o2");
+
+  // A delimiter right after a blank line a lone \r ends is dropped, as
+  // pandas drops it ("\r\r,5,6" reads as 5,6), before the header too; a line
+  // starting with spaces after such a blank line is refused.
+  const std::string header = "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order";
+  const auto shifted = minera::parse_ocel_csv(
+      "\r," + header + "\re1,2024-01-01T00:00:00Z,a,['o1']\r\r,e2,2024-01-02T00:00:00Z,b,['o2']\r"
+      "\n\r \r,e3,2024-01-03T00:00:00Z,c,['o3']\r\r\n,2024-01-04T00:00:00Z,d,['o4']\r");
+  assert(shifted.events.size() == 3 && shifted.objects.size() == 4);
+  assert(shifted.events[0].id == "e1" && shifted.events[1].id == "e2" && shifted.events[2].id == "e3");
+  bool spaces_refused = false;
+  try {
+    (void)minera::parse_ocel_csv(header + "\re1,2024-01-01T00:00:00Z,a,['o1']\r\r e2,2024-01-02T00:00:00Z,b,[]\r");
+  } catch (const std::invalid_argument& error) {
+    spaces_refused = std::string(error.what()).find("lone carriage return") != std::string::npos;
+  }
+  assert(spaces_refused);
+  // Data rows ended by a lone \r and \r\n-ended blank lines keep their cells.
+  const auto plain = minera::parse_ocel_csv(header + "\re1,2024-01-01T00:00:00Z,a,['o1']\r,2024-01-02T00:00:00Z,b,['o2']\r");
+  assert(plain.events.size() == 1 && plain.objects.size() == 2);
+}
+
+// The event timestamp column as DataFrame.to_csv writes it, observed on
+// pm4py 2.7.22 (read_ocel_csv, then write_ocel_csv): a naive column of
+// midnights as dates alone (the year unpadded), any other naive column with
+// the fraction digits its most precise value needs on every value, an aware
+// column value by value in the offset its values share.
+void writes_timestamps_as_pandas() {
+  const auto written = [](std::initializer_list<const char*> timestamps) {
+    std::string events = "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order\n";
+    int index = 0;
+    for (const auto* timestamp : timestamps)
+      events += "e" + std::to_string(index++) + "," + timestamp + ",a,['o1']\n";
+    const auto text = minera::serialize_ocel_csv(minera::parse_ocel_csv(events));
+    std::string out;
+    std::size_t line = text.find('\n') + 1;
+    while (line < text.size()) {
+      const auto first = text.find(',', line) + 1;
+      out += text.substr(first, text.find(',', first) - first) + ";";
+      line = text.find('\n', line) + 1;
+    }
+    return out;
+  };
+  assert(written({"2024-01-01 00:00:00", "2024-01-02 00:00:00"}) == "2024-01-01;2024-01-02;");
+  assert(written({"2024-01-01T00:00:00", "2024-01-02T00:00:00"}) == "2024-01-01;2024-01-02;");
+  assert(written({"0999-01-01 00:00:00", "2024-01-02 00:00:00"}) == "999-01-01;2024-01-02;");
+  assert(written({"0999-01-01 10:00:00", "2024-01-02 00:00:00"}) ==
+         "999-01-01 10:00:00;2024-01-02 00:00:00;");
+  assert(written({"2024-01-01 00:00:00", "2024-01-02 10:00:00"}) ==
+         "2024-01-01 00:00:00;2024-01-02 10:00:00;");
+  assert(written({"2024-01-01 00:00:00.000", "2024-01-02 00:00:00.123"}) ==
+         "2024-01-01 00:00:00.000;2024-01-02 00:00:00.123;");
+  assert(written({"2024-01-01 00:00:00.000000", "2024-01-02 00:00:00.000001"}) ==
+         "2024-01-01 00:00:00.000000;2024-01-02 00:00:00.000001;");
+  assert(written({"2024-01-01 00:00:00.100000000", "2024-01-02 00:00:00.000000000"}) ==
+         "2024-01-01 00:00:00.100;2024-01-02 00:00:00.000;");
+  assert(written({"2024-01-01 00:00:00.000000001", "2024-01-02 00:00:00.000000000"}) ==
+         "2024-01-01 00:00:00.000000001;2024-01-02 00:00:00.000000000;");
+  assert(written({"2024-01-01T00:00:00.500000Z", "2024-01-02T00:00:00.000000Z"}) ==
+         "2024-01-01 00:00:00.500000+00:00;2024-01-02 00:00:00+00:00;");
+  assert(written({"2024-01-01T00:00:00.500000+02:00", "2024-01-02T00:00:00.000000+02:00"}) ==
+         "2024-01-01 00:00:00.500000+02:00;2024-01-02 00:00:00+02:00;");
+  assert(written({"2024-01-01T00:00:00-05:30", "2024-01-02T00:00:00-05:30"}) ==
+         "2024-01-01 00:00:00-05:30;2024-01-02 00:00:00-05:30;");
+}
+
 }  // namespace
 
 int main() {
   const std::string events =
       "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:item,ocel:type:order,amount,note\n"
-      "e2,Ship,2024-01-02T00:00:00Z,\"['i2','i1']\",[o1],2.5,\"quoted, value\"\n"
-      "e1,Create,2024-01-01T00:00:00Z,[],[o1],2,\n";
+      "e2,Ship,2024-01-02T00:00:00Z,\"['i2','i1']\",['o1'],2.5,\"quoted, value\"\n"
+      "e1,Create,2024-01-01T00:00:00Z,[],['o1'],2,\n";
   const std::string objects =
       "ocel:oid,ocel:type,status\n"
       "o1,order,open\n"
@@ -200,6 +385,9 @@ int main() {
          "open");
   reference_capture_tests();
   follows_reference_csv_row_shapes();
+  keeps_repeated_relations();
+  writes_timestamps_as_pandas();
+  reads_object_cells_as_pandas();
 
   minera::OcelCsvImportOptions custom_import;
   custom_import.event_id_column = "event_id";
@@ -211,7 +399,7 @@ int main() {
   custom_import.delimiter = ';';
   const auto custom = minera::parse_ocel_csv(
       "event_id;activity_name;occurred_at;ref.item;score\n"
-      " e1 ; Pick ; 2024-01-01T00:00:00Z ; [i1] ; 4 \n",
+      " e1 ; Pick ; 2024-01-01T00:00:00Z ; ['i1'] ; 4 \n",
       "object_id;object_kind;state\n"
       "i1;item;ready\n",
       custom_import);
@@ -251,7 +439,7 @@ int main() {
 
   const std::string synthesized =
       "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:order\n"
-      "e1,A,2024-01-01T00:00:00Z,[o9]\n";
+      "e1,A,2024-01-01T00:00:00Z,['o9']\n";
   const auto synthesized_log = minera::parse_ocel_csv(synthesized);
   assert(synthesized_log.objects.size() == 1 &&
          synthesized_log.objects[0].id == "o9" &&
@@ -263,13 +451,8 @@ int main() {
   });
   throws([&] {
     (void)minera::parse_ocel_csv(
-        "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:order\n"
-        "e1,A,2024-01-01T00:00:00Z,[o1\n");
-  });
-  throws([&] {
-    (void)minera::parse_ocel_csv(
         "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:order,ocel:type:item\n"
-        "e1,A,2024-01-01T00:00:00Z,[o1],[o1]\n");
+        "e1,A,2024-01-01T00:00:00Z,['o1'],['o1']\n");
   });
   throws([&] {
     minera::Ocel invalid;

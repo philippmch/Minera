@@ -11,7 +11,7 @@
 
 int main(int argc,char** argv) {
   try {
-    if(argc<2){std::cerr<<"Usage: minera_reader_stream INPUT --kind csv_events|xes_events|xes_traces [--batch-size N] [--activity-prefix TEXT] [--accept-case TEXT] [--accept-activity TEXT] [--min-trace-events N] [--max-trace-events N] [--output-xes PATH]\n";return 2;}
+    if(argc<2){std::cerr<<"Usage: minera_reader_stream INPUT --kind csv_events|xes_events|xes_traces [--batch-size N] [--activity-prefix TEXT] [--accept-case TEXT] [--accept-activity TEXT] [--min-trace-events N] [--max-trace-events N] [--output-xes PATH] [--case-id-column NAME] [--activity-column NAME] [--timestamp-column NAME] [--csv-delimiter C] [--xes-parser NAME] [--xes-case-attribute KEY] [--xes-activity-attribute KEY] [--xes-timestamp-attribute KEY]\n";return 2;}
     minera::ReaderStreamOptions options;std::size_t batch_size=25,minimum=0,maximum=std::numeric_limits<std::size_t>::max();std::string prefix,output_path;std::optional<std::string> case_id,activity;
     const auto size=[](const std::string& value){std::size_t result=0;auto parsed=std::from_chars(value.data(),value.data()+value.size(),result);if(parsed.ec!=std::errc{}||parsed.ptr!=value.data()+value.size())throw std::invalid_argument("invalid integer option");return result;};
     const std::string path=argv[1];if(path.ends_with(".xes")||path.ends_with(".xes.gz"))options.kind=minera::ReaderStreamKind::kXesEvents;

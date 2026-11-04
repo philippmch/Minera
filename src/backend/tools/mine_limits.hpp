@@ -8,9 +8,10 @@
 // peak, 0.88 GB retained); the estimate uses 10 KiB per event for headroom,
 // and 2 KiB more per event for every further column. The cap
 // refuses a mine whose estimate passes the memory budget (half the physical
-// memory, or the cgroup limit when lower, unless --mine-memory-budget sets it)
-// or whose event count passes --max-mine-events, with 413 MINE_LIMIT, rather
-// than letting the server run out of memory part-way.
+// memory, or the cgroup or Windows job-object limit when lower, unless
+// --mine-memory-budget sets it) or whose event count passes --max-mine-events,
+// with 413 MINE_LIMIT, rather than letting the server run out of memory
+// part-way.
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -27,6 +28,7 @@
 #include <limits>
 #include <string>
 #include <string_view>
+#include <utility>
 
 constexpr std::uint64_t kMineBytesPerEvent = 10 * 1024;
 constexpr std::uint64_t kMineBytesPerExtraColumn = 2 * 1024;
@@ -44,6 +46,18 @@ std::uint64_t physical_memory_bytes() {
   MEMORYSTATUSEX status{};
   status.dwLength = sizeof status;
   if (GlobalMemoryStatusEx(&status)) total = status.ullTotalPhys;
+  // A job object's memory limit (a container, or a service started in a job)
+  // is the memory the server really has, like a cgroup limit on Linux. A null
+  // handle asks about the job of this process; outside a job the call fails.
+  JOBOBJECT_EXTENDED_LIMIT_INFORMATION job{};
+  if (QueryInformationJobObject(nullptr, JobObjectExtendedLimitInformation, &job, sizeof job, nullptr)) {
+    const DWORD flags = job.BasicLimitInformation.LimitFlags;
+    for (const auto& [flag, limit] : {std::pair{JOB_OBJECT_LIMIT_JOB_MEMORY, job.JobMemoryLimit},
+                                      std::pair{JOB_OBJECT_LIMIT_PROCESS_MEMORY, job.ProcessMemoryLimit}}) {
+      const auto bytes = static_cast<std::uint64_t>(limit);
+      if ((flags & flag) != 0 && bytes > 0 && (total == 0 || bytes < total)) total = bytes;
+    }
+  }
 #else
   const long pages = ::sysconf(_SC_PHYS_PAGES);
   const long page = ::sysconf(_SC_PAGESIZE);

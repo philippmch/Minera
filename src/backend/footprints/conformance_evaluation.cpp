@@ -77,43 +77,42 @@ double EvaluationUtility::fitness(
     const FootprintsExtensiveResult& conformance) {
   if (log.dfg.empty()) return 1.0;
 
-  long double sum_dfg = 0.0L;
+  // The reference sums the integer counts exactly, converts each sum to a
+  // double once and evaluates the formula in double. Integer sums followed
+  // by the same double steps reproduce that on every platform; long double
+  // arithmetic rounded differently on x86 only.
+  std::uint64_t dfg_total = 0;
   for (const auto& [pair, count] : log.dfg) {
     (void)pair;
-    sum_dfg += static_cast<long double>(count);
+    dfg_total += static_cast<std::uint64_t>(count);
   }
-  if (sum_dfg == 0.0L) return 1.0;
+  if (dfg_total == 0) return 1.0;
 
-  long double sum_deviations = 0.0L;
+  std::uint64_t deviation_total = 0;
   for (const auto& pair : conformance.footprints) {
     const auto it = log.dfg.find(pair);
     if (it != log.dfg.end()) {
-      sum_deviations += static_cast<long double>(it->second);
+      deviation_total += static_cast<std::uint64_t>(it->second);
     }
   }
 
-  const long double number_sequence =
-      static_cast<long double>(log.sequence.size());
-  const long double number_parallel =
-      static_cast<long double>(log.parallel.size());
-  const long double number_atomic =
-      static_cast<long double>(log.atomic_interleaving.size());
-  const long double number_start =
-      static_cast<long double>(log.start_activities.size());
-  const long double number_end =
-      static_cast<long double>(log.end_activities.size());
-  const long double number_relations =
-      number_sequence + number_parallel + number_atomic;
-  const long double denominator = number_relations + number_start + number_end;
-  if (denominator == 0.0L) return 1.0;
+  const std::uint64_t number_relations = log.sequence.size() +
+                                         log.parallel.size() +
+                                         log.atomic_interleaving.size();
+  const std::uint64_t number_boundary =
+      log.start_activities.size() + log.end_activities.size();
+  const std::uint64_t denominator = number_relations + number_boundary;
+  if (denominator == 0) return 1.0;
 
-  const long double relation_fit = (1.0L - sum_deviations / sum_dfg) *
-                                   number_relations;
-  const long double boundary_fit =
-      number_start + number_end -
-      static_cast<long double>(conformance.start_activities.size()) -
-      static_cast<long double>(conformance.end_activities.size());
-  return static_cast<double>((relation_fit + boundary_fit) / denominator);
+  const double sum_dfg = static_cast<double>(dfg_total);
+  const double sum_deviations = static_cast<double>(deviation_total);
+  const double relation_fit =
+      (1.0 - sum_deviations / sum_dfg) * static_cast<double>(number_relations);
+  const auto boundary_fit = static_cast<double>(
+      static_cast<std::int64_t>(number_boundary) -
+      static_cast<std::int64_t>(conformance.start_activities.size()) -
+      static_cast<std::int64_t>(conformance.end_activities.size()));
+  return (relation_fit + boundary_fit) / static_cast<double>(denominator);
 }
 
 FootprintsFitnessSummary EvaluationUtility::summarize(

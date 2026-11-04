@@ -1,6 +1,7 @@
 #include "minera/ocel_csv.hpp"
 
 #include "minera/timestamp.hpp"
+#include "ocel_csv_object_cell.hpp"
 #include "ocel_frame_types.hpp"
 
 #include <algorithm>
@@ -46,7 +47,9 @@ std::string trim(std::string value) {
 // field count (the header's, or more when that row is longer); a later row
 // with more fields is refused with read_csv's message, fields past the header
 // are dropped (index_col=False keeps the header's columns), and a short row
-// reads its missing trailing cells as missing values (empty here).
+// reads its missing trailing cells as missing values (empty here). After a
+// blank record ended by a lone "\r", a delimiter is dropped as pandas drops
+// it (see skip_after_lone_cr_blank).
 Table parse_table(std::string_view input, char delimiter, bool trim_fields,
                   const char* label) {
   if (delimiter == '"' || delimiter == '\r' || delimiter == '\n' ||
@@ -103,6 +106,23 @@ Table parse_table(std::string_view input, char delimiter, bool trim_fields,
     blank = true;
   };
 
+  // pandas' tokenizer quirk after a skipped blank record that a lone "\r"
+  // ends (observed black-box): a delimiter right after it is dropped, so
+  // "\r\r,5,6" reads as the row 5,6. A record that then starts with spaces or
+  // tabs before other text is misread by pandas (rows of garbage), so it is
+  // refused here. `i` is the position of the "\r".
+  const auto skip_after_lone_cr_blank = [&](std::size_t& i) {
+    std::size_t next = i + 1;
+    if (next < input.size() && input[next] == delimiter) i = next++;
+    if (next >= input.size() || (input[next] != ' ' && input[next] != '\t')) return;
+    while (next < input.size() && (input[next] == ' ' || input[next] == '\t')) ++next;
+    if (next < input.size() && input[next] != '\n' && input[next] != '\r') {
+      throw std::invalid_argument(
+          std::string(label) + " CSV line " + std::to_string(line + 1) +
+          " starts with spaces or tabs after a blank line ended by a lone carriage return, "
+          "which pandas.read_csv misreads; this reader refuses it");
+    }
+  };
   for (std::size_t i = 0; i < input.size(); ++i) {
     const char ch = input[i];
     if (state == State::kQuoted) {
@@ -115,8 +135,11 @@ Table parse_table(std::string_view input, char delimiter, bool trim_fields,
       blank = false;
       finish_field();
     } else if (ch == '\n' || ch == '\r') {
-      if (ch == '\r' && i + 1 < input.size() && input[i + 1] == '\n') ++i;
+      const bool lone_cr = ch == '\r' && !(i + 1 < input.size() && input[i + 1] == '\n');
+      if (ch == '\r' && !lone_cr) ++i;
+      const bool skipped = blank;
       finish_record();
+      if (skipped && lone_cr) skip_after_lone_cr_blank(i);
     } else if (state == State::kFieldStart && ch == '"') {
       blank = false;
       state = State::kQuoted;
@@ -166,120 +189,6 @@ std::size_t required_column(const Header& header, const std::string& name,
                                 name);
   }
   return it->second;
-}
-
-std::string unescape_list_string(std::string_view text, std::size_t& pos,
-                                 char quote) {
-  std::string value;
-  ++pos;
-  while (pos < text.size()) {
-    const char ch = text[pos++];
-    if (ch == quote) return value;
-    if (ch != '\\') {
-      value.push_back(ch);
-      continue;
-    }
-    if (pos >= text.size()) throw std::invalid_argument("unterminated object id escape");
-    const char escaped = text[pos++];
-    switch (escaped) {
-      case 'n': value.push_back('\n'); break;
-      case 'r': value.push_back('\r'); break;
-      case 't': value.push_back('\t'); break;
-      case '\\': value.push_back('\\'); break;
-      case '\'': value.push_back('\''); break;
-      case '"': value.push_back('"'); break;
-      case 'x': {
-        // Python's repr writes other control characters as \xNN.
-        unsigned code = 0;
-        for (int digit = 0; digit < 2; ++digit) {
-          if (pos >= text.size()) throw std::invalid_argument("short \\x escape in object id");
-          const char h = text[pos++];
-          code <<= 4;
-          if (h >= '0' && h <= '9') code += static_cast<unsigned>(h - '0');
-          else if (h >= 'a' && h <= 'f') code += static_cast<unsigned>(h - 'a' + 10);
-          else if (h >= 'A' && h <= 'F') code += static_cast<unsigned>(h - 'A' + 10);
-          else throw std::invalid_argument("bad \\x escape in object id");
-        }
-        if (code < 0x80) {
-          value.push_back(static_cast<char>(code));
-        } else {
-          value.push_back(static_cast<char>(0xc0 | (code >> 6)));
-          value.push_back(static_cast<char>(0x80 | (code & 0x3f)));
-        }
-        break;
-      }
-      default: value.push_back(escaped); break;
-    }
-  }
-  throw std::invalid_argument("unterminated quoted object id");
-}
-
-std::vector<std::string> parse_object_list(std::string_view text) {
-  const std::string owned = trim(std::string(text));
-  text = owned;
-  if (text.empty()) return {};
-  if (text.front() != '[' || text.back() != ']') {
-    throw std::invalid_argument("object reference cell must be a bracketed list");
-  }
-
-  std::vector<std::string> values;
-  std::unordered_set<std::string> seen;
-  std::size_t pos = 1;
-  bool expect_value = true;
-  while (true) {
-    while (pos < text.size() &&
-           (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' ||
-            text[pos] == '\n')) {
-      ++pos;
-    }
-    if (pos >= text.size()) throw std::invalid_argument("malformed object reference list");
-    if (text[pos] == ']') {
-      if (expect_value && !values.empty()) {
-        throw std::invalid_argument("object reference list has a trailing comma");
-      }
-      ++pos;
-      break;
-    }
-
-    std::string value;
-    if (text[pos] == '\'' || text[pos] == '"') {
-      value = unescape_list_string(text, pos, text[pos]);
-    } else {
-      const std::size_t begin = pos;
-      while (pos < text.size() && text[pos] != ',' && text[pos] != ']') ++pos;
-      value = trim(std::string(text.substr(begin, pos - begin)));
-      if (value.empty()) throw std::invalid_argument("empty object id in list");
-    }
-    if (value.empty()) throw std::invalid_argument("empty object id in list");
-    if (!seen.insert(value).second) {
-      throw std::invalid_argument("duplicate object id in one event row: " + value);
-    }
-    values.push_back(std::move(value));
-    expect_value = false;
-
-    while (pos < text.size() &&
-           (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' ||
-            text[pos] == '\n')) {
-      ++pos;
-    }
-    if (pos >= text.size()) throw std::invalid_argument("malformed object reference list");
-    if (text[pos] == ']') {
-      ++pos;
-      break;
-    }
-    if (text[pos] != ',') {
-      throw std::invalid_argument("object reference list expects a comma");
-    }
-    ++pos;
-    expect_value = true;
-  }
-  while (pos < text.size() &&
-         (text[pos] == ' ' || text[pos] == '\t' || text[pos] == '\r' ||
-          text[pos] == '\n')) {
-    ++pos;
-  }
-  if (pos != text.size()) throw std::invalid_argument("trailing object list data");
-  return values;
 }
 
 const OcelAttribute* find_attribute(const std::vector<OcelAttribute>& attrs,
@@ -434,8 +343,10 @@ void write_event_table(std::ostream& out, const Ocel& log,
     }
   }
 
+  // Every relation row is written, a repeated event-object pair as a
+  // repeated list entry, as the reference's get_extended_table aggregates
+  // the relation rows per event and type into lists.
   std::unordered_map<std::string, std::unordered_map<std::string, std::vector<std::string>>> refs;
-  std::set<std::pair<std::string, std::string>> seen_relations;
   std::vector<std::string> types;
   std::unordered_set<std::string> known_types;
   for (const auto& relation : log.relations) {
@@ -443,11 +354,6 @@ void write_event_table(std::ostream& out, const Ocel& log,
     const auto object_it = objects.by_id.find(relation.object_id);
     if (event_it == events.end() || object_it == objects.by_id.end()) {
       throw std::invalid_argument("OCEL relation references an unknown id");
-    }
-    if (!seen_relations.emplace(relation.event_id, relation.object_id).second) {
-      if (!options.allow_lossy)
-        throw std::invalid_argument("duplicate OCEL event-object relation");
-      continue;
     }
     const auto& type = object_it->second->type;
     if (known_types.insert(type).second) types.push_back(type);
@@ -483,9 +389,13 @@ void write_event_table(std::ostream& out, const Ocel& log,
 
   ocel_frame::Columns frame;
   for (const auto& event : log.events) frame.observe_row(event.attributes);
-  for (const auto& event : log.events) {
-    Row row{event.id, ocel_frame::utc_timestamp_text(event.timestamp, ' ', "+00:00"),
-            event.activity};
+  std::vector<std::string_view> timestamp_texts;
+  timestamp_texts.reserve(log.events.size());
+  for (const auto& event : log.events) timestamp_texts.emplace_back(event.timestamp);
+  auto timestamps = ocel_frame::pandas_timestamp_column_text(timestamp_texts);
+  for (std::size_t index = 0; index < log.events.size(); ++index) {
+    const auto& event = log.events[index];
+    Row row{event.id, std::move(timestamps[index]), event.activity};
     for (const auto& key : event_attributes) {
       const auto* attr = find_attribute(event.attributes, key);
       row.push_back(attr == nullptr ? std::string{}
@@ -652,13 +562,79 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   }
   std::unordered_map<std::string, std::string> object_types;
   for (const auto& object : object_list) object_types.emplace(object.id, object.type);
-  std::size_t event_index = 0;
+  // Every object cell of every row (dropped rows too) is read first: pandas
+  // types the relations' object ids from all their elements together (see
+  // infer_id_dtype), so [1] next to [None] relates "1.0".
+  std::vector<std::vector<std::optional<std::vector<ocel_csv_cell::Value>>>> cells;
+  cells.reserve(event_rows.size());
+  std::vector<const ocel_csv_cell::Value*> elements;
   for (const auto& [row_pointer, kept] : event_rows) {
-    if (!kept && object_table != nullptr) continue;
-    const auto& row = *row_pointer;
+    (void)kept;
+    auto& row_cells = cells.emplace_back();
+    for (const auto& column : object_columns)
+      row_cells.push_back(ocel_csv_cell::parse_object_cell((*row_pointer)[column.second]));
+  }
+  for (const auto& row_cells : cells)
+    for (const auto& cell : row_cells)
+      if (cell)
+        for (const auto& value : *cell) elements.push_back(&value);
+  const auto dtype = ocel_csv_cell::infer_id_dtype(elements);
+  // Without an object table the reference lists one object per value Python
+  // compares equal (its first occurrence; the distinct values typed together
+  // again), while each relation names the id its own entry got in the
+  // relations' column. Where the two disagree (1 and 1.0 in one file, 1 and
+  // '1', or [1] next to [None] beside [0] and [-0.0]), the reference relates
+  // ids it lists no object for, or lists one id twice, which a native OCEL
+  // cannot hold, so such a file is refused.
+  std::unordered_map<std::string, std::string> object_text_by_key;
+  if (object_table == nullptr) {
+    std::unordered_map<std::string, const ocel_csv_cell::Value*> first_by_key;
+    std::vector<const ocel_csv_cell::Value*> distinct;
+    for (const auto* value : elements) {
+      const auto id = ocel_csv_cell::element_id(*value, dtype, false);  // refuses containers
+      const auto key = id ? id->raw.key : value->kind == ocel_csv_cell::Value::Kind::kNone
+                                              ? std::string("n")
+                                              : "s" + value->text;
+      if (first_by_key.emplace(key, value).second) distinct.push_back(value);
+    }
+    const auto object_dtype = ocel_csv_cell::infer_id_dtype(distinct);
+    std::unordered_map<std::string, std::string> key_by_object_text;
+    for (const auto* value : distinct) {
+      const auto id = ocel_csv_cell::element_id(*value, object_dtype, false);
+      if (!id) continue;
+      object_text_by_key.emplace(id->raw.key, id->relation.text);
+      const auto [it, inserted] = key_by_object_text.emplace(id->relation.text, id->raw.key);
+      if (!inserted && it->second != id->raw.key)
+        throw std::invalid_argument(
+            "OCEL CSV object references of different Python types print as one object id (" +
+            id->relation.text +
+            ") in pm4py.read_ocel_csv, which lists that object twice; this reader does not "
+            "support them");
+    }
+  }
+  const auto check_reference = [&](const ocel_csv_cell::ElementId& id) {
+    const auto found = object_text_by_key.find(id.raw.key);
+    if (found != object_text_by_key.end() && found->second == id.relation.text) return;
+    throw std::invalid_argument(
+        "OCEL CSV object reference " + id.raw.text + " relates the id " + id.relation.text +
+        " in pm4py.read_ocel_csv, which lists its object as " +
+        (found == object_text_by_key.end() ? std::string("nothing") : found->second) +
+        " (values of different Python types, or pandas typing the ids as numbers); this "
+        "reader does not support them");
+  };
+  std::size_t event_index = 0;
+  for (std::size_t row_index = 0; row_index < event_rows.size(); ++row_index) {
+    const bool kept = event_rows[row_index].second;
     const OcelEvent* event = kept ? &log.events[event_index++] : nullptr;
-    for (const auto& [type, index] : object_columns) {
-      for (const auto& object_id : parse_object_list(row[index])) {
+    for (std::size_t column = 0; column < object_columns.size(); ++column) {
+      const auto& cell = cells[row_index][column];
+      if (!cell) continue;
+      const auto& type = object_columns[column].first;
+      for (const auto& value : *cell) {
+        const auto id = ocel_csv_cell::element_id(value, dtype, object_table != nullptr);
+        if (!id || (!kept && object_table != nullptr)) continue;
+        if (object_table == nullptr) check_reference(*id);
+        const auto& object_id = id->relation.text;
         const auto [it, inserted] = object_types.emplace(object_id, type);
         if (!inserted && it->second != type) {
           throw std::invalid_argument("object id appears under multiple types: " + object_id);

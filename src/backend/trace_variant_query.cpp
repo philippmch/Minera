@@ -272,12 +272,16 @@ std::size_t behavioral_violations(
   return violations;
 }
 
-long double mechanism_weight(long double exponent) {
-  static const long double kDoubleMaxLog =
-      std::log(static_cast<long double>(std::numeric_limits<double>::max()));
+// Plain double, as on ARM and MSVC (where long double is double anyway), so
+// a seed draws the same universe on every platform.
+double mechanism_weight(double exponent) {
+  static const double kDoubleMaxLog =
+      std::log(static_cast<double>(std::numeric_limits<double>::max()));
   if (exponent > kDoubleMaxLog)
-    return static_cast<long double>(std::numeric_limits<double>::max());
-  return std::exp(exponent);
+    return std::numeric_limits<double>::max();
+  // log(DBL_MAX) rounds up in double, so exp at the bound itself overflows.
+  const double weight = std::exp(exponent);
+  return std::isinf(weight) ? std::numeric_limits<double>::max() : weight;
 }
 
 std::size_t choose_universe(std::size_t violating_count, double epsilon,
@@ -288,31 +292,31 @@ std::size_t choose_universe(std::size_t violating_count, double epsilon,
   context.activities.push_back("universe:" + std::to_string(depth));
   const auto sample = sample_value(seed, context, 0x510e527fade682d1ULL,
                                    secure_random);
-  const long double step = static_cast<long double>(epsilon) / 2.0L;
+  const double step = static_cast<double>(epsilon) / 2.0;
   const auto maximum =
-      mechanism_weight(step * static_cast<long double>(violating_count));
-  long double total = 0.0L;
+      mechanism_weight(step * static_cast<double>(violating_count));
+  double total = 0.0;
   for (std::size_t i = 0; i <= violating_count; ++i) {
-    const long double score = static_cast<long double>(violating_count - i);
-    const long double exponent = step * score;
+    const double score = static_cast<double>(violating_count - i);
+    const double exponent = step * score;
     // The published exponential-mechanism implementation normalizes a
     // second exponential after computing the score weights. Preserve that
     // behavior while avoiding overflow for large epsilon values.
-    const long double raw = mechanism_weight(exponent);
-    const long double normalized = raw - maximum;
-    total += normalized < std::log(std::numeric_limits<long double>::min())
-                 ? 0.0L
+    const double raw = mechanism_weight(exponent);
+    const double normalized = raw - maximum;
+    total += normalized < std::log(std::numeric_limits<double>::min())
+                 ? 0.0
                  : std::exp(normalized);
   }
-  if (!(total > 0.0L) || !std::isfinite(static_cast<double>(total))) return 0;
-  const long double target = static_cast<long double>(uniform01(sample)) * total;
-  long double cumulative = 0.0L;
+  if (!(total > 0.0) || !std::isfinite(static_cast<double>(total))) return 0;
+  const double target = static_cast<double>(uniform01(sample)) * total;
+  double cumulative = 0.0;
   for (std::size_t i = 0; i <= violating_count; ++i) {
-    const long double score = static_cast<long double>(violating_count - i);
-    const long double exponent = step * score;
-    const long double raw = mechanism_weight(exponent);
-    const long double normalized = raw - maximum;
-    if (normalized >= std::log(std::numeric_limits<long double>::min()))
+    const double score = static_cast<double>(violating_count - i);
+    const double exponent = step * score;
+    const double raw = mechanism_weight(exponent);
+    const double normalized = raw - maximum;
+    if (normalized >= std::log(std::numeric_limits<double>::min()))
       cumulative += std::exp(normalized);
     if (target < cumulative) return i;
   }

@@ -5,6 +5,7 @@
 // the OCEL's typed values would get, Python's float and str reprs, and the
 // text pandas prints for a UTC timestamp.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -159,17 +160,17 @@ inline std::string python_str_repr(std::string_view text) {
   return out;
 }
 
-// The text pandas prints for a timestamp the reference holds as UTC:
-// "YYYY-MM-DD HH:MM:SS[.ffffff]+00:00" (separator ' ', suffix "+00:00"), or
-// with separator 'T' and suffix "Z" for the OCEL 1.0 XML date. A naive text
-// gets no suffix; text that is no timestamp is returned as is.
-inline std::string utc_timestamp_text(std::string_view text, char separator,
-                                      std::string_view suffix) {
-  const auto parsed = parse_timestamp_exact(text);
-  if (!parsed) return std::string(text);
-  std::int64_t seconds = parsed->seconds;
-  std::int64_t days = seconds / 86400;
-  std::int64_t rest = seconds % 86400;
+// A parsed timestamp's civil date and time of day (UTC for an aware one,
+// the wall clock for a naive one); nullopt outside years 1..9999.
+struct CivilTimestamp {
+  long long year, month, day, hour, minute, second;
+  std::uint32_t nanoseconds;
+  bool timezone_aware;
+};
+
+inline std::optional<CivilTimestamp> civil_timestamp(const ParsedExactTimestamp& parsed) {
+  std::int64_t days = parsed.seconds / 86400;
+  std::int64_t rest = parsed.seconds % 86400;
   if (rest < 0) {
     rest += 86400;
     --days;
@@ -185,23 +186,123 @@ inline std::string utc_timestamp_text(std::string_view text, char separator,
   const std::int64_t day = doy - (153 * mp + 2) / 5 + 1;
   const std::int64_t month = mp < 10 ? mp + 3 : mp - 9;
   if (month <= 2) ++year;
-  if (year < 1 || year > 9999) return std::string(text);
+  if (year < 1 || year > 9999) return std::nullopt;
+  return CivilTimestamp{static_cast<long long>(year), static_cast<long long>(month),
+                        static_cast<long long>(day), static_cast<long long>(rest / 3600),
+                        static_cast<long long>(rest / 60 % 60), static_cast<long long>(rest % 60),
+                        parsed.nanoseconds, parsed.timezone_aware};
+}
+
+// "Y-MM-DD<separator>HH:MM:SS" plus `digits` fraction digits (0, 3, 6 or 9),
+// the year zero-padded to four digits when `pad_year`.
+inline std::string civil_timestamp_text(const CivilTimestamp& time, char separator, int digits,
+                                        bool pad_year) {
   char buffer[64];
-  std::snprintf(buffer, sizeof buffer, "%04lld-%02lld-%02lld%c%02lld:%02lld:%02lld",
-                static_cast<long long>(year), static_cast<long long>(month),
-                static_cast<long long>(day), separator,
-                static_cast<long long>(rest / 3600),
-                static_cast<long long>(rest / 60 % 60),
-                static_cast<long long>(rest % 60));
+  std::snprintf(buffer, sizeof buffer, pad_year ? "%04lld-%02lld-%02lld%c%02lld:%02lld:%02lld"
+                                                : "%lld-%02lld-%02lld%c%02lld:%02lld:%02lld",
+                time.year, time.month, time.day, separator, time.hour, time.minute, time.second);
   std::string out(buffer);
-  if (parsed->nanoseconds != 0) {
-    if (parsed->nanoseconds % 1000 == 0)
-      std::snprintf(buffer, sizeof buffer, ".%06u", parsed->nanoseconds / 1000);
-    else
-      std::snprintf(buffer, sizeof buffer, ".%09u", parsed->nanoseconds);
+  if (digits > 0) {
+    unsigned fraction = time.nanoseconds;
+    for (int drop = 9 - digits; drop > 0; --drop) fraction /= 10;
+    std::snprintf(buffer, sizeof buffer, ".%0*u", digits, fraction);
     out += buffer;
   }
-  if (parsed->timezone_aware) out += suffix;
+  return out;
+}
+
+// The text pandas prints for a timestamp the reference holds as UTC:
+// "YYYY-MM-DD HH:MM:SS[.ffffff]+00:00" (separator ' ', suffix "+00:00"), or
+// with separator 'T' and suffix "Z" for the OCEL 1.0 XML date. A naive text
+// gets no suffix; text that is no timestamp is returned as is.
+inline std::string utc_timestamp_text(std::string_view text, char separator,
+                                      std::string_view suffix) {
+  const auto parsed = parse_timestamp_exact(text);
+  const auto time = parsed ? civil_timestamp(*parsed) : std::nullopt;
+  if (!time) return std::string(text);
+  const int digits = time->nanoseconds == 0 ? 0 : time->nanoseconds % 1000 == 0 ? 6 : 9;
+  auto out = civil_timestamp_text(*time, separator, digits, true);
+  if (time->timezone_aware) out += suffix;
+  return out;
+}
+
+// The texts DataFrame.to_csv writes for a timestamp column holding `texts`.
+// A column of naive timestamps is datetime64 and formatted as a whole: dates
+// alone ("2024-01-01", the year unpadded) when every value is a midnight,
+// otherwise "Y-MM-DD HH:MM:SS" with as many fraction digits as the most
+// precise value needs (3, 6 or 9) on every value. A column of aware
+// timestamps is written value by value as str() of each: in the offset the
+// values share (pm4py.read_ocel_csv keeps a fixed "+02:00"; the other native
+// importers store UTC), and in UTC when they do not share one. A column
+// mixing kinds or holding text that is no timestamp is written value by value
+// too, as utc_timestamp_text with suffix "+00:00" (observed black-box on
+// pm4py.write_ocel_csv).
+inline std::vector<std::string> pandas_timestamp_column_text(
+    const std::vector<std::string_view>& texts) {
+  std::vector<CivilTimestamp> times;
+  times.reserve(texts.size());
+  bool naive_column = true, aware_column = true;
+  std::optional<std::int32_t> offset;  // minutes, when every aware value shares it
+  bool one_offset = true;
+  std::vector<ParsedExactTimestamp> instants;
+  instants.reserve(texts.size());
+  for (const auto text : texts) {
+    const auto parsed = parse_timestamp_exact(text);
+    const auto time = parsed ? civil_timestamp(*parsed) : std::nullopt;
+    if (!time) {
+      naive_column = aware_column = false;
+      break;
+    }
+    (time->timezone_aware ? naive_column : aware_column) = false;
+    if (time->timezone_aware) {
+      if (offset && *offset != parsed->offset_minutes) one_offset = false;
+      offset = parsed->offset_minutes;
+    }
+    times.push_back(*time);
+    instants.push_back(*parsed);
+  }
+  std::vector<std::string> out;
+  out.reserve(texts.size());
+  if (aware_column && one_offset && offset && *offset != 0) {
+    char suffix[16];
+    const auto minutes = *offset < 0 ? -*offset : *offset;
+    std::snprintf(suffix, sizeof suffix, "%c%02d:%02d", *offset < 0 ? '-' : '+',
+                  static_cast<int>(minutes / 60), static_cast<int>(minutes % 60));
+    for (std::size_t index = 0; index < texts.size(); ++index) {
+      auto local = instants[index];
+      local.seconds += static_cast<std::int64_t>(*offset) * 60;
+      const auto time = civil_timestamp(local);
+      if (!time) {
+        out.push_back(utc_timestamp_text(texts[index], ' ', "+00:00"));
+        continue;
+      }
+      const int digits = time->nanoseconds == 0 ? 0 : time->nanoseconds % 1000 == 0 ? 6 : 9;
+      out.push_back(civil_timestamp_text(*time, ' ', digits, true) + suffix);
+    }
+    return out;
+  }
+  if (!naive_column || texts.empty()) {
+    for (const auto text : texts) out.push_back(utc_timestamp_text(text, ' ', "+00:00"));
+    return out;
+  }
+  bool dates_only = true;
+  int digits = 0;
+  for (const auto& time : times) {
+    if (time.hour != 0 || time.minute != 0 || time.second != 0 || time.nanoseconds != 0)
+      dates_only = false;
+    if (time.nanoseconds % 1000 != 0) digits = 9;
+    else if (time.nanoseconds % 1000000 != 0) digits = std::max(digits, 6);
+    else if (time.nanoseconds != 0) digits = std::max(digits, 3);
+  }
+  for (const auto& time : times) {
+    if (dates_only) {
+      char buffer[32];
+      std::snprintf(buffer, sizeof buffer, "%lld-%02lld-%02lld", time.year, time.month, time.day);
+      out.emplace_back(buffer);
+    } else {
+      out.push_back(civil_timestamp_text(time, ' ', digits, false));
+    }
+  }
   return out;
 }
 

@@ -1858,6 +1858,16 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_cancellation_tests minera_server)
     add_test(NAME minera_server_cancellation_tests
              COMMAND minera_server_cancellation_tests $<TARGET_FILE:minera_server>)
+    # A second server on a busy port exits with "port N is already in use"
+    # instead of sharing the first server's connections.
+    add_executable(minera_server_port_exclusive_tests
+      src/backend/tests/test_server_port_exclusive.cpp)
+    target_include_directories(minera_server_port_exclusive_tests PRIVATE third_party)
+    target_link_libraries(minera_server_port_exclusive_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_port_exclusive_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_port_exclusive_tests minera_server)
+    add_test(NAME minera_server_port_exclusive_tests
+             COMMAND minera_server_port_exclusive_tests $<TARGET_FILE:minera_server>)
   endif()
   # Recheck 61ebeee0 J2/J3: present empty resources are network nodes and
   # explicit empty profile selectors pick them (reference: edge ""->"" with

@@ -9,7 +9,11 @@
 // (install_signal_cleanup) uses only async-signal-safe calls (unlink and
 // rmdir on paths stored in advance) to remove the known files in each live
 // directory and the directory itself. It then re-raises the signal with the
-// default action, so the process still ends as it did before.
+// default action, so the process still ends as it did before. On Windows a
+// console control handler (Ctrl+C, Ctrl+Break, closing the console, logoff
+// or shutdown) does the same with DeleteFileW and RemoveDirectoryW, then lets
+// the default handler end the process; a file another thread still holds
+// open cannot be deleted there and is left behind.
 //
 // Header-only. The registry is an inline variable, so the core library and
 // the server share one copy.
@@ -27,6 +31,12 @@
 #include <system_error>
 
 #if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+// winsock2.h before windows.h, so a later winsock2.h include does not clash.
+#include <winsock2.h>
+#include <windows.h>
 #include <process.h>
 #else
 #include <signal.h>
@@ -47,15 +57,22 @@ namespace detail {
 inline constexpr std::size_t kSlots = 64;
 inline constexpr std::size_t kPathMax = 1024;
 enum SlotState : int { kFree = 0, kBusy = 1, kReady = 2 };
+// The native path character: Windows paths are UTF-16.
+#if defined(_WIN32)
+using PathChar = wchar_t;
+#else
+using PathChar = char;
+#endif
 struct Slot {
   std::atomic<int> state{kFree};
-  char path[kPathMax] = {};
+  PathChar path[kPathMax] = {};
 };
 inline Slot g_slots[kSlots];
 
-inline std::size_t append(char* out, std::size_t at, const char* text) noexcept {
-  while (*text != '\0' && at + 1 < kPathMax) out[at++] = *text++;
-  out[at] = '\0';
+template <typename Char>
+inline std::size_t append(PathChar* out, std::size_t at, const Char* text) noexcept {
+  while (*text != Char{0} && at + 1 < kPathMax) out[at++] = static_cast<PathChar>(*text++);
+  out[at] = PathChar{0};
   return at;
 }
 
@@ -80,6 +97,37 @@ inline void on_signal(int signal_number) noexcept {
   }
   // SA_RESETHAND restored the default action: end the process as before.
   ::raise(signal_number);
+}
+#else
+inline void remove_slot_files(const wchar_t* directory) noexcept {
+  wchar_t file[kPathMax];
+  for (const char* name : kKnownFiles) {
+    std::size_t at = append(file, 0, directory);
+    at = append(file, at, L"\\");
+    append(file, at, name);  // the known names are ASCII
+    ::DeleteFileW(file);
+  }
+  ::RemoveDirectoryW(directory);
+}
+
+inline BOOL WINAPI on_console_event(DWORD event) noexcept {
+  switch (event) {
+    case CTRL_C_EVENT:
+    case CTRL_BREAK_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_LOGOFF_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+      for (auto& slot : g_slots) {
+        int expected = kReady;
+        if (slot.state.compare_exchange_strong(expected, kBusy, std::memory_order_acquire))
+          remove_slot_files(slot.path);
+      }
+      break;
+    default:
+      break;
+  }
+  // Not handled: the next handler (by default ExitProcess) ends the process.
+  return FALSE;
 }
 #endif
 }  // namespace detail
@@ -119,6 +167,7 @@ class PrivateDirectory {
       if (std::filesystem::create_directory(candidate, error)) path_ = candidate;
     }
     if (path_.empty()) throw std::runtime_error("cannot create a private temporary directory");
+    register_slot();
 #endif
   }
   PrivateDirectory(const PrivateDirectory&) = delete;
@@ -138,12 +187,13 @@ class PrivateDirectory {
 
  private:
   void register_slot() noexcept {
-    const auto text = path_.string();
+    const auto& text = path_.native();
     if (text.size() + 32 >= detail::kPathMax) return;
     for (std::size_t i = 0; i < detail::kSlots; ++i) {
       int expected = detail::kFree;
       if (!detail::g_slots[i].state.compare_exchange_strong(expected, detail::kBusy)) continue;
-      std::memcpy(detail::g_slots[i].path, text.c_str(), text.size() + 1);
+      std::memcpy(detail::g_slots[i].path, text.c_str(),
+                  (text.size() + 1) * sizeof(detail::PathChar));
       detail::g_slots[i].state.store(detail::kReady, std::memory_order_release);
       slot_ = static_cast<int>(i);
       return;
@@ -155,7 +205,7 @@ class PrivateDirectory {
     int expected = detail::kReady;
     // If the signal handler claimed it, the process is ending anyway.
     if (detail::g_slots[slot_].state.compare_exchange_strong(expected, detail::kBusy)) {
-      detail::g_slots[slot_].path[0] = '\0';
+      detail::g_slots[slot_].path[0] = detail::PathChar{0};
       detail::g_slots[slot_].state.store(detail::kFree, std::memory_order_release);
     }
     slot_ = -1;
@@ -166,7 +216,8 @@ class PrivateDirectory {
 };
 
 // Installs the SIGTERM/SIGINT cleanup once; signals with a handler already
-// installed (or ignored) keep it.
+// installed (or ignored) keep it. On Windows it adds the console control
+// handler once, ahead of the default one.
 inline void install_signal_cleanup() noexcept {
 #if !defined(_WIN32)
   for (const int signal_number : {SIGTERM, SIGINT}) {
@@ -179,6 +230,9 @@ inline void install_signal_cleanup() noexcept {
     action.sa_flags = SA_RESETHAND;
     ::sigaction(signal_number, &action, nullptr);
   }
+#else
+  static std::atomic<bool> installed{false};
+  if (!installed.exchange(true)) ::SetConsoleCtrlHandler(detail::on_console_event, TRUE);
 #endif
 }
 

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { inlineMiningJson, inlineMiningValue, loadTraces, loadedTraces, markLiveTraces, retainTraces, traceFacts, traceLoad, useHasTimestamps } from "../src/mine-traces";
-import { classifyMiningJson } from "../src/active-mining-source";
+import { inlineMiningJson, inlineMiningRequest, inlineMiningValue, loadTraces, loadedTraces, markLiveTraces, retainTraces, traceFacts, traceLoad, useHasTimestamps } from "../src/mine-traces";
+import { activeMiningSourceRequest, classifyMiningJson, type ActiveDatasetResult, type ActiveMiningSourceDescriptor } from "../src/active-mining-source";
+import { readNativeResponse } from "../src/native-response";
 import { nativeJson } from "../src/native-json";
 import { initialTab, logLifecycles } from "../src/app-logic";
 import { isMineraExport, type MineraExport, type Trace } from "../src/types";
@@ -354,6 +355,36 @@ describe("exports carry the cases", () => {
     expect(filled.analysis.traces).toEqual(TRACES);
     expect(filled.analysis.trace_summary).toBeUndefined();
     expect(envelope.analysis.trace_summary).toBeDefined();
+  });
+  it("echoes include_traces=true in the envelope, as the full result's response does", async () => {
+    serve();
+    // The backend's echo: the multipart fields in name order, then the query
+    // fields; a selector value may hold escaped quotes and braces.
+    const controls = (includeTraces: string) => `{"case_column":"a\\\"}\\\\","include_traces":"${includeTraces}","mining_input_format":"auto","mining_request_id":"r1","mining_selectors_json":"{\\"case_id_key\\":\\"include_traces\\"}"}`;
+    const envelopeRaw = (analysis: string, includeTraces: string) => `{"family":"ACTIVE_SOURCE_MINING","source_id":"7","active_source":{"submitted_controls":{"include_traces":"false"}},"analysis":${analysis},"family_results":{},"submitted_controls":${controls(includeTraces)},"inductive_options":{"noise_threshold":0},"error":null}`;
+    const lazyEnvelope = envelopeRaw(lazyRaw, "false");
+    const envelope = JSON.parse(lazyEnvelope) as { analysis: MineraExport; submitted_controls: Record<string, string> };
+    markLiveTraces(envelope);
+    const text = await inlineMiningJson(envelope, lazyEnvelope, (v) => nativeJson(v, 2));
+    expect(text).toBe(envelopeRaw(fullRaw, "true"));
+    expect(JSON.parse(text).submitted_controls.case_column).toBe('a"}\\');
+    const filled = await inlineMiningValue(envelope);
+    expect(filled.submitted_controls).toEqual({ ...envelope.submitted_controls, include_traces: "true" });
+    expect(envelope.submitted_controls.include_traces).toBe("false");
+    // Without the received text the serialized envelope says the same.
+    expect(JSON.parse(await inlineMiningJson(envelope, undefined, (v) => nativeJson(v, 2))).submitted_controls.include_traces).toBe("true");
+  });
+  it("records the request that replays to the full result", async () => {
+    const fields: Array<[string, string]> = [["mining_request_id", "r1"], ["include_traces", "false"], ["case_column", "include_traces"]];
+    const request = { path: "/api/mine", fields };
+    expect(inlineMiningRequest(request)).toEqual({ path: "/api/mine", fields: [["mining_request_id", "r1"], ["include_traces", "true"], ["case_column", "include_traces"]] });
+    expect(request.fields[1]).toEqual(["include_traces", "false"]);
+    const exact = { path: "/api/mine", fields: [["mining_request_id", "r1"]] as Array<[string, string]> };
+    expect(inlineMiningRequest(exact)).toBe(exact);
+    // The "Download exact source mining request" file.
+    const mining = await readNativeResponse(respond(200, '{"family":"ACTIVE_SOURCE_MINING"}'), request) as ActiveDatasetResult;
+    const source = { file: new File(["x"], "log.csv"), sha256: "00", source_id: "7", options: {} } as unknown as ActiveMiningSourceDescriptor;
+    expect(JSON.parse(activeMiningSourceRequest(source, mining)).request.fields).toEqual([["mining_request_id", "r1"], ["include_traces", "true"], ["case_column", "include_traces"]]);
   });
   it("serializes in key order when the received text is not available", async () => {
     serve();

@@ -17788,9 +17788,10 @@ Tests: `minera_petri_analysis_tests` (`weighted_marking_equation_counts_arc_obje
   drops rows, so a dropped row with an unreadable timestamp still refuses
   the file. Fresh fuzz (400 random event tables, 172 with an object table,
   short, long and very short rows, blank lines, quoting): 145 both refuse
-  with the same pandas message, 4 both refuse a bad timestamp, 123 read the
-  same events, relations and objects, 48 the same except as declared below;
-  the other 80 are the open duplicate case below. Declared: an event with a
+  with the same pandas message, 4 both refuse a bad timestamp, 176 read the
+  same events, relations and objects, and 75 the same except as declared
+  below (before the duplicate fix below: 123, 48 and 80 refused natively).
+  Declared: an event with a
   missing timestamp is NaT in the reference and refused natively (`event
   CSV event X has no timestamp`), since a native event needs an instant;
   fields stay trimmed by default; NA spellings (`NA`, `null`, ...) in
@@ -17798,10 +17799,74 @@ Tests: `minera_petri_analysis_tests` (`weighted_marking_equation_counts_arc_obje
   as an empty log where pm4py raises KeyError; an object an event names but
   the object table lacks is added natively (type from its column, no
   attributes) so its relations resolve, where the reference keeps the
-  relation and lists no object (the 48). Found, open: the native reader
-  refuses an object listed twice in one cell (`duplicate object id in one
-  event row`), where the reference keeps both relations. Tests:
-  `minera_ocel_csv_tests` (`follows_reference_csv_row_shapes`).
+  relation and lists no object (the 75). Fixed: an object listed twice in
+  one cell (`"['o1', 'o1']"`) was refused (`duplicate object id in one event
+  row`), and the CSV writer refused repeated relations. The reference keeps
+  one relation per list entry, and the native reader and writer now do the
+  same. Downstream, the reference counts the repeats in the statistics
+  (`objects_ot_count`, activity and object-type associations), draws
+  self-loops in the OC-DFG, repeats the event in the flattened trace, writes
+  them to OCEL 2.0 JSON, XML and SQLite and to CSV, and reads them back from
+  XML, SQLite and CSV, while the OCEL 2.0 JSON and classic readers dedupe.
+  Native output matches each of these on a fixture with repeats in two
+  object types (0 OC-DFG differences; the same relations in every export;
+  the same read-back in both directions). Declared, unchanged: the native
+  `edge_associations` statistic counts an event-object pair once, so it
+  lacks the self-loop associations of `find_associations_per_edge` (this
+  applies to repeats from XML and SQLite input too). On the server,
+  `POST /api/ocel/io` CSV imports return the repeats in both JSON documents,
+  but the OCEL analysis and export routes take OCEL JSON, whose readers
+  dedupe as `read_ocel_json` and `read_ocel2_json` do, so the server
+  computes as the reference does after a JSON round trip; the CLI keeps the
+  repeats from a CSV, XML or SQLite input. Tests:
+  `minera_ocel_csv_tests` (`follows_reference_csv_row_shapes`,
+  `keeps_repeated_relations`).
+- **OCEL CSV object cells, lone carriage returns and written timestamps.**
+  Object cells now read as `pm4py.read_ocel_csv` reads them (observed
+  black-box): a cell that does not start with `[` or is no Python literal
+  (`[o1]`, `['o1'`, `[1+1]`, `[float('nan')]`, `['o1']x`) lists no objects
+  and its event stays, on kept and dropped rows alike (natively `[o1]` read
+  as `o1` and a malformed list refused the file). Elements become ids as
+  pandas prints them in one column typed from every element of every cell:
+  `str()` of each when any element is text (`[1, 'a', True, 1e3, 3j, b'x']`
+  lists `1`, `a`, `True`, `1000.0`, `3j`, `x`), floats or complex numbers
+  when the elements are numbers and None alone (`[1]` next to `[None]`
+  relates `1.0`); None and empty strings are skipped; string prefixes,
+  escapes, implicit concatenation, comments and newlines follow Python.
+  Without an object table a list, set or dict element raises the
+  reference's TypeError (`unhashable type`), and bytes that are not UTF-8
+  its UnicodeDecodeError; both refuse natively. In the event-log CSV and
+  OCEL CSV readers, a delimiter right after a skipped blank line that a
+  lone `\r` ends is dropped, as pandas' tokenizer drops it (`\r\r,5,6`
+  reads 5,6; also before the header). The OCEL CSV writer prints the
+  timestamp column as `DataFrame.to_csv` does: a naive column of midnights
+  as dates (`2024-01-01`, the year unpadded), other naive columns with the
+  fraction digits their most precise value needs on every value (3, 6 or
+  9), and an aware column value by value in the offset its values share.
+  Fuzz: 400 random OCEL event tables (object cells of every kind above,
+  `\n`, `\r\n` and lone `\r` endings, blank lines, rows starting with the
+  delimiter, about 30% with an object table): 192 read the same events, relations
+  and objects, 74 the same except the declared added objects, 69 both
+  refuse, 36 refused as declared below, 28 refused for an id under two
+  types (unchanged), 1 differs (a header starting with the delimiter, which
+  pandas names `Unnamed: 0`; unchanged); 400 random event-log CSVs with the
+  same line endings through `/api/mine`: 318 the same rows, 66 both refuse,
+  16 differ, all with that unnamed header column (unchanged). Declared: a
+  line starting with spaces or tabs after a blank line a lone `\r` ends,
+  which pandas misreads (it returns 131,073 rows of NaN for one such line),
+  is refused; tuple elements (and, with an object table, the list, set and
+  dict elements the reference prints) and `\N{...}` escapes are refused;
+  values whose relation ids and object ids disagree in the reference
+  (`[1, 1.0]`, `[1, '1']`, `[True]` next to `[1]`, or `[1]` next to `[None]`
+  without an object table, where the reference lists object `1.0` for
+  relations `1`, or the reverse) are refused, as a native OCEL cannot hold
+  relations to missing or repeated object ids. Unchanged: OCEL JSON and XML
+  readers keep a naive timestamp naive where the reference stores it as
+  UTC, so a CSV written from such a log prints it naive (now as a date at
+  midnight) where the reference prints `+00:00`. Tests:
+  `minera_ocel_csv_tests` (`reads_object_cells_as_pandas`,
+  `writes_timestamps_as_pandas`), `minera_core_tests`
+  (`csv_import_matches_reference_dataframe_flow`).
 - **Disconnect cancellation coverage.** The connection hook now also stops
   process-tree alignment (the four reference ports per trace, the native
   search per trace and every 256 expansions), decomposed alignment (per

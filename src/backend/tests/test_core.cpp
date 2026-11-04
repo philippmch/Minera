@@ -7587,6 +7587,21 @@ void csv_import_matches_reference_dataframe_flow() {
     const auto data = import("case_id,activity\n1,A\n1, \n", options);
     assert((activities(data.log) == std::vector<std::string>{"A", " "}));
   }
+  {
+    // pandas drops a delimiter right after a blank line that a lone \r ends
+    // ("\r\r,1,B" reads as 1,B), before the header too; a \r\n-ended blank
+    // line keeps it. A line starting with spaces after such a blank line,
+    // which pandas misreads, is refused.
+    const auto data = import("\r,case_id,activity\r1,A\r\r,1,B\r \r,1,C\r\r\n2,D\r");
+    assert((activities(data.log) == std::vector<std::string>{"A", "B", "C", "D"}));
+    bool refused = false;
+    try {
+      (void)import("case_id,activity\r1,A\r\r 1,B\r");
+    } catch (const std::runtime_error& error) {
+      refused = std::string(error.what()).find("lone carriage return") != std::string::npos;
+    }
+    assert(refused);
+  }
   const auto stamps = [&](const std::string& rows) {
     const auto data = import("case_id,activity,timestamp\n" + rows);
     std::vector<std::string> out;

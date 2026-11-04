@@ -56,6 +56,9 @@ int run_ocel(int argc, char** argv) {
       std::cerr << "lifecycle feature controls: --features-lifecycle-paths | --features-no-lifecycle-paths\n";
       std::cerr << "exact OTG thresholds: --otg-theta-by-relation-json JSON | --otg-theta-by-relation-file PATH; JSON is an array of [NativeString, finite-number-or-NaN/INF/-INF-string] pairs. Exact mode emits an OCEL_CONFORMANCE envelope with safe result, canonical graphs/options and original bytes. Cannot combine with five named relation aliases.\n";
       std::cerr << "flatten options: --flatten-object-type TYPE [--flatten-event-activity-attribute NAME] [--flatten-event-timestamp-attribute NAME]\n";
+      std::cerr << "feature attribute lists: --features-numeric-events A,B --features-string-events A,B --features-numeric-objects A,B --features-string-objects A,B (a backslash escapes a comma); --features-no-activity --features-no-timestamps --features-no-relations --features-no-endpoints --features-no-attribute-counts --features-no-interactions\n";
+      std::cerr << "OCPN discovery controls: --ocpn-variant im|imd (default im) --ocpn-noise-threshold F (default 0) --ocpn-double-arc-threshold F (default 0.8); --no-edge-performance skips OCDFG edge performance\n";
+      std::cerr << "conformance weights and thresholds: --alpha F --beta F --gamma F --delta F (default 1) --etot-theta F (default 0.1) --otg-theta F (default 0.2) --ocdfg-theta-activity F --ocdfg-theta-flow F (default 0); --real-graph is --real graph; --normative-csv-objects OBJECTS.csv pairs a CSV normative log with its object table\n";
       return 2;
     }
     std::string format = "classic", describe, features, discover, enrich, graph, split, conformance,

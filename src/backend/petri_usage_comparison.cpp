@@ -511,9 +511,11 @@ PetriUsageRecord record(std::size_t id, std::uint64_t log1, std::uint64_t log2,
   }
   result.total_occurrences = log1 + log2;
   if (result.total_occurrences != 0) {
-    result.direction = static_cast<double>(
-        (static_cast<long double>(log2) - static_cast<long double>(log1)) /
-        static_cast<long double>(result.total_occurrences));
+    // Python divides the exact integers and rounds once. Counts below 2^53
+    // convert exactly, so the double difference and quotient round the same
+    // way; a long double quotient rounded twice on x86 only.
+    result.direction = (static_cast<double>(log2) - static_cast<double>(log1)) /
+                       static_cast<double>(result.total_occurrences);
   }
   if (!std::isfinite(result.direction)) throw std::overflow_error("Petri usage direction is not finite");
   result.label = std::move(label_prefix) +

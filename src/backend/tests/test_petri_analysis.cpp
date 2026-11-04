@@ -1087,6 +1087,68 @@ void alignment_weighted_and_parallel_arcs() {
   try { (void)align_petri_log(log_of({{"a", "b"}}), unbounded, options); }
   catch (const OperationCancelled&) { cancelled = true; }
   assert(cancelled);
+
+  // The less-memory variants' own pruned search, on the same net and trace
+  // (the single-trace entry point skips the easy-soundness check): a cancel
+  // throws, and a search past its time is uncomputed, exhausted and marked
+  // as having reached the time limit, as the aligner reports it. A search
+  // past max_states is exhausted with time to spare.
+  for (const auto variant : {AlignmentVariant::kDijkstraLessMemory,
+                             AlignmentVariant::kGeneratorDijkstraLessMemory}) {
+    PetriTraceAlignmentOptions trace_options;
+    trace_options.variant = variant;
+    trace_options.max_states = std::numeric_limits<std::size_t>::max();
+    trace_options.cancelled = [] { return true; };
+    cancelled = false;
+    try { (void)align_petri_trace_all({"a", "b"}, unbounded, trace_options); }
+    catch (const OperationCancelled&) { cancelled = true; }
+    assert(cancelled);
+    trace_options.cancelled = nullptr;
+    trace_options.max_time_seconds = 0.05;
+    const auto timed = align_petri_trace_all({"a", "b"}, unbounded, trace_options);
+    assert(timed.size() == 1 && !timed[0].computed && timed[0].exhausted &&
+           timed[0].time_limit_reached && timed[0].diagnostics.visited_states > 0);
+    trace_options.max_time_seconds = 0.0;
+    trace_options.max_states = 50;
+    const auto bounded = align_petri_trace_all({"a", "b"}, unbounded, trace_options);
+    assert(bounded.size() == 1 && !bounded[0].computed && bounded[0].exhausted &&
+           !bounded[0].time_limit_reached);
+  }
+  // The other variants run the aligner, whose cancel now throws here too and
+  // whose time limit marks the entry. Eight parallel branches of three steps
+  // each against a trace of 40 foreign events give the uninformed search far
+  // more than 0.05 s of states.
+  std::vector<std::string> labels{"x"};
+  std::vector<CompactTransition> steps;
+  CompactTransition split{std::nullopt, {{0}, {1}}, {{}, {}}};
+  CompactTransition join{std::nullopt, {{}, {}}, {{33}, {1}}};
+  for (std::size_t branch = 0; branch < 8; ++branch) {
+    const std::size_t first = 1 + branch * 4;
+    split.outputs.places.push_back(first);
+    split.outputs.weights.push_back(1);
+    for (std::size_t step = 0; step < 3; ++step) {
+      labels.push_back("t" + std::to_string(branch) + std::to_string(step));
+      steps.push_back({labels.size() - 1, {{first + step}, {1}}, {{first + step + 1}, {1}}});
+    }
+    join.inputs.places.push_back(first + 3);
+    join.inputs.weights.push_back(1);
+  }
+  steps.push_back(split);
+  steps.push_back(join);
+  const auto leaky = compact_net(34, labels, steps);
+  const std::vector<std::string> foreign(40, "x");
+  PetriTraceAlignmentOptions plain;
+  plain.variant = AlignmentVariant::kDijkstraNoHeuristics;
+  plain.max_states = std::numeric_limits<std::size_t>::max();
+  plain.cancelled = [] { return true; };
+  cancelled = false;
+  try { (void)align_petri_trace(foreign, leaky, plain); }
+  catch (const OperationCancelled&) { cancelled = true; }
+  assert(cancelled);
+  plain.cancelled = nullptr;
+  plain.max_time_seconds = 0.05;
+  const auto timed = align_petri_trace(foreign, leaky, plain);
+  assert(!timed.computed && timed.exhausted && timed.time_limit_reached);
 }
 
 int main() {

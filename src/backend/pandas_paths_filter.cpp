@@ -156,8 +156,12 @@ bool arithmetic(const std::vector<EventTableIndexLabel>& labels){
   else return false;
  }
  if(numbers.size()<2)return true;
- const auto step=static_cast<long double>(numbers[1])-numbers[0];if(step==0)return false;
- for(std::size_t i=2;i<numbers.size();++i)if(static_cast<long double>(numbers[i])-numbers[i-1]!=step)return false;
+ // pandas (maybe_sequence_to_range / is_sequence_range) works in wrapping
+ // int64 arithmetic; unsigned differences reproduce it exactly everywhere,
+ // where a long double difference was exact only on x86.
+ const auto difference=[&](std::size_t i){return static_cast<unsigned long long>(numbers[i])-static_cast<unsigned long long>(numbers[i-1]);};
+ const auto step=difference(1);if(step==0)return false;
+ for(std::size_t i=2;i<numbers.size();++i)if(difference(i)!=step)return false;
  return true;
 }
 EventTable reorder(const EventTable& source,const std::vector<std::size_t>& order){

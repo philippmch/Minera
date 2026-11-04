@@ -1775,9 +1775,13 @@ std::optional<UVCL> filtered_log(const UVCL& log,
       add_variant(filtered, ranked.front().first, ranked.front().second);
       auto previous_retained = ranked.front().second;
       for (std::size_t i = 1; i < ranked.size(); ++i) {
-        if (static_cast<long double>(ranked[i].second) >
-            static_cast<long double>(previous_retained) *
-                options.filtering_threshold) {
+        // The reference rounds decreasing_factor * prev_var_count to a
+        // double and compares the integer count with it; counts below 2^53
+        // convert exactly. A long double product skipped that rounding on
+        // x86 only (e.g. 3 * (1/3) is 1.0 in double but just below 1 there).
+        if (static_cast<double>(ranked[i].second) >
+            options.filtering_threshold *
+                static_cast<double>(previous_retained)) {
           add_variant(filtered, ranked[i].first, ranked[i].second);
           previous_retained = ranked[i].second;
         } else {

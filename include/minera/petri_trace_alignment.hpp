@@ -25,6 +25,12 @@ struct PetriTraceAlignmentMove {
 
 struct PetriTraceAlignment {
   bool computed = false;  // false when the final marking is unreachable or a bound is hit
+  // When !computed, as AlignmentResult has them: true when max_states or
+  // max_time_seconds stopped the search (generator variants then return this
+  // one entry instead of an empty list), false when the final marking is
+  // unreachable; and, when exhausted, whether max_time_seconds had run out.
+  bool exhausted = false;
+  bool time_limit_reached = false;
   std::vector<PetriTraceAlignmentMove> alignment;
   // Variant cost units: STATE_EQUATION_A_STAR, DIJKSTRA_NO_HEURISTICS and the
   // generators charge 10000 per log or visible model move and 1 per silent
@@ -59,9 +65,10 @@ struct PetriTraceAlignmentOptions {
   std::vector<double> trace_costs;
   // Bounds as AlignmentOptions has them: seconds per search (zero means
   // unlimited) and a callback the server sets to notice a client that went
-  // away (unset never cancels). A search past either stops as one past
-  // max_states does; the log dispatcher's easy-soundness check refuses the
-  // net on time and throws OperationCancelled when cancelled.
+  // away (unset never cancels). A search past its time stops as one past
+  // max_states does, marked exhausted and time_limit_reached; a cancelled one
+  // throws OperationCancelled. The log dispatcher's easy-soundness check
+  // refuses the net on time and throws OperationCancelled when cancelled.
   double max_time_seconds = 0.0;
   std::function<bool()> cancelled;
 };

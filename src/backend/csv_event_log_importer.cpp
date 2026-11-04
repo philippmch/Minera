@@ -81,9 +81,12 @@ std::vector<std::string> parse_csv_row(
 // unquoted record terminator is consumed. Escaped quotes retain their spelling
 // for the field parser to decode; quotes follow the same rule as
 // parse_csv_row, so a literal quote inside an unquoted field does not open a
-// multi-line field.
-bool read_csv_record(std::istream& input, std::string& record, char delimiter) {
+// multi-line field. `lone_cr`, when given, tells whether the record ended
+// with a "\r" not followed by "\n".
+bool read_csv_record(std::istream& input, std::string& record, char delimiter,
+                     bool* lone_cr = nullptr) {
   record.clear();
+  if (lone_cr) *lone_cr = false;
   auto state = CsvQuoteState::kFieldStart;
   bool read_any = false;
   char ch;
@@ -97,6 +100,7 @@ bool read_csv_record(std::istream& input, std::string& record, char delimiter) {
       state = CsvQuoteState::kQuoted;
     } else if (ch == '\r' || ch == '\n') {
       if (ch == '\r' && input.peek() == '\n') input.get(ch);
+      else if (ch == '\r' && lone_cr) *lone_cr = true;
       return true;
     } else {
       record.push_back(ch);
@@ -181,6 +185,22 @@ bool is_reference_blank_line(std::string_view line, char delimiter) {
   return std::all_of(line.begin(), line.end(), [&](char ch) {
     return (ch == ' ' || ch == '\t') && ch != delimiter;
   });
+}
+
+// pandas' tokenizer quirk after a skipped blank line that a lone "\r" ends
+// (observed black-box on read_csv): a delimiter right after it is dropped,
+// so "\r\r,5,6" reads as the row 5,6 (shifted left). A line that then starts
+// with spaces or tabs before other text is misread by pandas (rows of
+// garbage), so it is refused. `record` is the line after the blank one.
+void apply_lone_cr_blank_quirk(std::string& record, char delimiter, std::size_t line_number) {
+  if (!record.empty() && record.front() == delimiter) record.erase(0, 1);
+  if (record.empty() || (record.front() != ' ' && record.front() != '\t') ||
+      record.front() == delimiter || is_reference_blank_line(record, delimiter))
+    return;
+  throw std::runtime_error(
+      "CSV line " + std::to_string(line_number) +
+      " starts with spaces or tabs after a blank line ended by a lone carriage return, "
+      "which pandas.read_csv misreads; this reader refuses it");
 }
 
 // pandas.read_csv's default NA spellings. The reference flow (read_csv, then
@@ -861,12 +881,25 @@ CsvEventData import_csv_event_data_impl(
 
   std::string line;
   std::size_t line_number = 1;
-  if (!read_csv_record(input, line, options.delimiter)) {
+  // Whether the last record was a blank line the batch import skipped and a
+  // lone "\r" ended (see apply_lone_cr_blank_quirk).
+  bool lone_cr = false, after_lone_cr_blank = false;
+  const auto read_record = [&]() {
+    if (!read_csv_record(input, line, options.delimiter, &lone_cr)) return false;
+    if (after_lone_cr_blank) apply_lone_cr_blank_quirk(line, options.delimiter, line_number + 1);
+    after_lone_cr_blank = false;
+    return true;
+  };
+  const auto skipped_blank = [&]() {
+    after_lone_cr_blank = reference_batch && lone_cr;
+  };
+  if (!read_record()) {
     return {};
   }
   // read_csv skips blank lines before the header too.
   while (reference_batch && is_reference_blank_line(line, options.delimiter)) {
-    if (!read_csv_record(input, line, options.delimiter)) return {};
+    skipped_blank();
+    if (!read_record()) return {};
     ++line_number;
   }
 
@@ -967,10 +1000,11 @@ CsvEventData import_csv_event_data_impl(
     return field_at(fields, index, line_number);
   };
 
-  while (read_csv_record(input, line, options.delimiter)) {
+  while (read_record()) {
     ++line_number;
     if (line.empty() ||
         (reference_batch && is_reference_blank_line(line, options.delimiter))) {
+      skipped_blank();
       continue;
     }
 

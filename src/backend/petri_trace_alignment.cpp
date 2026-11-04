@@ -85,6 +85,8 @@ std::vector<double> less_memory_silent_costs(const std::vector<std::string>& tra
 // cost. Equal-cost states pop deepest trace position first, then FIFO.
 struct PrunedSearchResult {
   bool found = false;
+  bool exhausted = false;           // max_states or max_time_seconds stopped it
+  bool time_limit_reached = false;  // max_time_seconds had run out
   double cost = 0.0;
   std::vector<std::vector<AlignmentMove>> alignments;
   AlignmentDiagnostics diagnostics;
@@ -204,7 +206,18 @@ PrunedSearchResult pruned_dijkstra(const std::vector<std::string>& trace, const 
     if (current.closed || entry.cost > current.cost) continue;
     const auto closed = closed_position.find(current.marking);
     if (closed != closed_position.end() && closed->second >= current.position) continue;
-    if (diagnostics.visited_states >= options.max_states || budget.exhausted()) break;
+    if (diagnostics.visited_states >= options.max_states) {
+      result.exhausted = true;
+      break;
+    }
+    // As the aligner does: a cancelled search throws, one past its time is
+    // uncomputed and marked as having reached the time limit.
+    if (budget.exhausted()) {
+      if (budget.cancelled()) throw OperationCancelled("alignment was cancelled");
+      result.exhausted = true;
+      result.time_limit_reached = true;
+      break;
+    }
     current.closed = true;
     ++diagnostics.visited_states;
     if (closed == closed_position.end()) closed_position.emplace(current.marking, current.position);
@@ -354,6 +367,8 @@ double reference_fitness(double cost, double bwc) {
 
 struct SearchOutcome {
   bool found = false;
+  bool exhausted = false;
+  bool time_limit_reached = false;
   double cost = 0.0;
   std::vector<std::vector<AlignmentMove>> alignments;
   AlignmentDiagnostics diagnostics;
@@ -509,11 +524,14 @@ SearchOutcome search(const std::vector<std::string>& trace, const PetriNet& net,
       exact_options.sync_costs.clear();
       const auto exact = check_alignment(single_trace_log(trace), net,
                                          search_options(trace, net, exact_options));
+      throw_if_cancelled(options.cancelled, "alignment was cancelled");
       if (exact.computed && !exact.variants.empty() &&
           exact.variants.front().cost == pruned.cost)
         pruned.alignments = exact.variants.front().optimal_alignments;
     }
     out.found = pruned.found;
+    out.exhausted = pruned.exhausted;
+    out.time_limit_reached = pruned.time_limit_reached;
     out.cost = pruned.cost;
     out.alignments = std::move(pruned.alignments);
     out.diagnostics = pruned.diagnostics;
@@ -524,7 +542,15 @@ SearchOutcome search(const std::vector<std::string>& trace, const PetriNet& net,
           ? check_alignment(single_trace_log(trace), unit_weight_net(net),
                             search_options(trace, net, options))
           : check_alignment(single_trace_log(trace), net, search_options(trace, net, options));
-  if (!result.computed || result.variants.empty()) return out;
+  if (!result.computed) {
+    // The aligner reports a cancelled search as exhausted; here it throws, as
+    // the pruned search does.
+    if (result.exhausted) throw_if_cancelled(options.cancelled, "alignment was cancelled");
+    out.exhausted = result.exhausted;
+    out.time_limit_reached = result.time_limit_reached;
+    return out;
+  }
+  if (result.variants.empty()) return out;
   const auto& variant = result.variants.front();
   out.found = true;
   out.cost = variant.cost;
@@ -539,6 +565,17 @@ std::vector<PetriTraceAlignment> run(const std::vector<std::string>& trace, cons
                                      const PetriTraceAlignmentOptions& options) {
   const auto result = search(trace, net, options);
   std::vector<PetriTraceAlignment> out;
+  // A search stopped by max_states or max_time_seconds proves nothing about
+  // the final marking: every variant reports one uncomputed, exhausted entry.
+  const auto stopped = [&out](const SearchOutcome& outcome) {
+    PetriTraceAlignment item;
+    item.exhausted = true;
+    item.time_limit_reached = outcome.time_limit_reached;
+    item.diagnostics = outcome.diagnostics;
+    out.push_back(std::move(item));
+    return out;
+  };
+  if (!result.found && result.exhausted) return stopped(result);
   if (!result.found) {
     // The reference returns no alignment (generators: an empty sequence)
     // when the final marking is unreachable; its discounted variant raises.
@@ -557,6 +594,7 @@ std::vector<PetriTraceAlignment> run(const std::vector<std::string>& trace, cons
     double value = 0.0;
     if (!discounted) {
       const auto empty = search({}, net, options);
+      if (!empty.found && empty.exhausted) return stopped(empty);
       if (!empty.found) {
         out.emplace_back();
         return out;

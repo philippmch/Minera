@@ -1,10 +1,15 @@
 #include "minera/precision_utils.hpp"
 
 #include <algorithm>
+#include <charconv>
+#include <cstdint>
+#include <cstdlib>
 #include <cmath>
 #include <map>
 #include <queue>
 #include <set>
+#include <string>
+#include <system_error>
 #include <tuple>
 
 namespace minera {
@@ -26,6 +31,68 @@ Activity event_activity(const Event& event, const std::string& key) {
   }
   throw PrecisionUtilsError("KeyError", "'" + key + "'");
 }
+
+// A groupby key: integer ids compare as exact int64 values (pandas keeps
+// ids past 2^53 apart), float ids as doubles, and an integer equals a float
+// of the same value. A long double key was exact only on x86; on ARM and
+// MSVC it is a double and merged large integer ids.
+struct CaseKey {
+  bool numeric = false;
+  bool integral = false;
+  std::int64_t integer = 0;
+  double real = 0.0;
+  std::string text;
+};
+
+CaseKey numeric_case_key(const std::string& value) {
+  CaseKey key;
+  key.numeric = true;
+  std::int64_t integer = 0;
+  const auto* end = value.data() + value.size();
+  if (const auto parsed = std::from_chars(value.data(), end, integer);
+      parsed.ec == std::errc{} && parsed.ptr == end) {
+    key.integral = true;
+    key.integer = integer;
+  } else {
+    key.real = std::strtod(value.c_str(), nullptr);
+  }
+  return key;
+}
+
+// -1, 0 or 1 for integer `lhs` against double `rhs`, exactly; NaN is last.
+int compare_integer_real(std::int64_t lhs, double rhs) {
+  if (std::isnan(rhs)) return -1;
+  if (rhs >= 0x1p63) return -1;
+  if (rhs < -0x1p63) return 1;
+  const double whole = std::trunc(rhs);
+  const auto truncated = static_cast<std::int64_t>(whole);
+  if (lhs != truncated) return lhs < truncated ? -1 : 1;
+  const double fraction = rhs - whole;
+  return fraction > 0 ? -1 : fraction < 0 ? 1 : 0;
+}
+
+int compare_reals(double lhs, double rhs) {
+  const bool left_nan = std::isnan(lhs), right_nan = std::isnan(rhs);
+  if (left_nan || right_nan) return left_nan == right_nan ? 0 : left_nan ? 1 : -1;
+  return lhs < rhs ? -1 : rhs < lhs ? 1 : 0;
+}
+
+struct CaseKeyLess {
+  bool operator()(const CaseKey& lhs, const CaseKey& rhs) const {
+    if (lhs.numeric != rhs.numeric) return lhs.numeric < rhs.numeric;
+    if (!lhs.numeric) return lhs.text < rhs.text;
+    int order = 0;
+    if (lhs.integral && rhs.integral)
+      order = lhs.integer < rhs.integer ? -1 : rhs.integer < lhs.integer ? 1 : 0;
+    else if (lhs.integral)
+      order = compare_integer_real(lhs.integer, rhs.real);
+    else if (rhs.integral)
+      order = -compare_integer_real(rhs.integer, lhs.real);
+    else
+      order = compare_reals(lhs.real, rhs.real);
+    return order < 0;
+  }
+};
 
 PrecisionLogPrefixes prefixes_of(const std::vector<std::vector<Activity>>& traces) {
   PrecisionLogPrefixes result;
@@ -81,13 +148,12 @@ PrecisionLogPrefixes precision_log_prefixes(const EventTable& table, const std::
   const auto case_column = column(table, case_id_key);
   const auto activity_column = column(table, activity_key);
   // Numeric case ids order by value, others as text; null cases are dropped.
-  using CaseKey = std::tuple<bool, long double, std::string>;
-  std::map<CaseKey, std::vector<Activity>> cases;
+  std::map<CaseKey, std::vector<Activity>, CaseKeyLess> cases;
   for (const auto& row : table.rows) {
     const auto& cell = row[case_column];
     if (is_null(cell)) continue;
     const bool numeric = cell->kind == AttributeKind::kInt || cell->kind == AttributeKind::kFloat;
-    const CaseKey key{numeric, numeric ? std::stold(cell->value) : 0.0L, numeric ? std::string() : cell->value};
+    const CaseKey key = numeric ? numeric_case_key(cell->value) : CaseKey{false, false, 0, 0.0, cell->value};
     const auto& activity = row[activity_column];
     cases[key].push_back(is_null(activity) ? Activity{} : Activity{activity->value});
   }

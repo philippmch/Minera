@@ -11199,7 +11199,7 @@ int usage(const char* program) {
             << " [options]\n"
                "  --port <port>      Listen port (default: 8484)\n"
                "  --frontend <dir>   Static frontend directory"
-               " (default: src/frontend/dist next to the working directory)\n"
+               " (default: src/frontend/dist, relative to the working directory)\n"
                "  --embedding-runtime-url <url> HTTP transformer runtime (POST /embed)\n"
                "  --llm-runtime-url <url> Optional language-model runtime (POST /complete)\n"
                "  --query-runtime-url <url> Optional DuckDB query runtime (POST /query)\n"
@@ -11217,6 +11217,29 @@ int usage(const char* program) {
                " (repeatable; the server's own port and the Vite ports 5173/4173"
                " on 127.0.0.1 and localhost are always allowed)\n";
   return 2;
+}
+
+// True when another socket already holds 127.0.0.1:<port>: a probe socket with
+// the server's own options fails to bind with "address in use" (Windows reports
+// a port held under SO_EXCLUSIVEADDRUSE as access denied).
+bool loopback_port_in_use(int port) {
+  const auto sock = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (sock == INVALID_SOCKET) return false;
+  httplib::default_socket_options(sock);
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_port = htons(static_cast<std::uint16_t>(port));
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  const bool in_use =
+      ::bind(sock, reinterpret_cast<const sockaddr*>(&address),
+             sizeof(address)) != 0 &&
+#ifdef _WIN32
+      (WSAGetLastError() == WSAEADDRINUSE || WSAGetLastError() == WSAEACCES);
+#else
+      errno == EADDRINUSE;
+#endif
+  httplib::detail::close_socket(sock);
+  return in_use;
 }
 
 }  // namespace
@@ -11804,6 +11827,17 @@ int main(int argc, char** argv) {
     server.set_mount_point("/", frontend_dir.string());
   }
 
+  // The port belongs to this server alone (the vendored httplib binds without
+  // SO_REUSEPORT): a second server on a busy port stops here instead of
+  // sharing its connections with the first.
+  if (!server.bind_to_port("127.0.0.1", port)) {
+    if (loopback_port_in_use(port))
+      std::cerr << "error: port " << port
+                << " is already in use; stop the other server or pass --port\n";
+    else
+      std::cerr << "error: cannot listen on port " << port << '\n';
+    return 1;
+  }
   std::cout << "minera " << minera::version_major << '.' << minera::version_minor
             << '.' << minera::version_patch << " - listening on http://localhost:"
             << port << '\n';
@@ -11817,7 +11851,7 @@ int main(int argc, char** argv) {
   minera::secure_temp::install_signal_cleanup();
   // Frees live and reader sessions nobody has used for the idle expiry.
   const StreamIdleReaper stream_idle_reaper;
-  if (!server.listen("127.0.0.1", port)) {
+  if (!server.listen_after_bind()) {
     std::cerr << "error: cannot listen on port " << port << '\n';
     return 1;
   }

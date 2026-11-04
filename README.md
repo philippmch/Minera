@@ -66,8 +66,9 @@ origin and on the Vite dev and preview ports (5173 and 4173). Add other
 origins with `--allow-origin https://example.org`, which you can repeat.
 
 The CLI tools in `build/` (`minera_export`, `minera_ocel`, `minera_playout`,
-`minera_dfg` and about 35 more) cover the same algorithms without the server.
-Run a tool without arguments to print its usage.
+`minera_dfg` and about 30 more) cover the same algorithms without the server.
+Run a tool with `--help` to print its usage; the few tools that do not take
+`--help` print it when run without arguments.
 
 The [feature guide](docs/feature-guide.md) describes every algorithm, CLI flag,
 API route and frontend workspace in detail.
@@ -124,13 +125,16 @@ By default the CSV importer expects `case_id`, `activity` and optionally
 
 ## Tests and CI
 
-`.github/workflows/ci.yml` runs four jobs on every push and pull request:
+`.github/workflows/ci.yml` runs five jobs on every push to `main`, every pull
+request and on manual dispatch:
 
-- **native**: Release build and the full `ctest` suite.
+- **native**: Release build and the full `ctest` suite on Ubuntu 24.04.
+- **native-cross**: the same build and `ctest` on macOS 26 and Windows
+  Server 2022.
 - **python**: the script tests (`python -m unittest discover -s scripts/tests`).
 - **frontend**: `tsc --noEmit` and `vitest run` in `src/frontend`.
-- **parity**: the parity verifier against the pinned reference commit, with
-  `--require-complete`.
+- **parity**: the parity verifier's self-tests, then the verifier against the
+  pinned reference commit, with `--require-complete`.
 
 To run the parity verifier locally, check out the reference at commit
 `0715c31f3f1d85924107d6aa5329806db69df899`, tag it `2.7.22`, and run:

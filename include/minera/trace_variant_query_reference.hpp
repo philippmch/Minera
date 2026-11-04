@@ -64,26 +64,26 @@ struct BehavioralAppropriatenessRelations {
     const std::vector<std::vector<std::string>>& traces, const std::vector<std::string>& events);
 
 // prefix may end with kTraceVariantQueryTraceEnd.
-[[nodiscard]] long reference_ba_violations(const BehavioralAppropriatenessRelations& relations,
+[[nodiscard]] std::int64_t reference_ba_violations(const BehavioralAppropriatenessRelations& relations,
                                            const std::vector<std::string>& prefix);
 
 // exp_mech(np.arange(n), epsilon) right after np.random.seed(seed).
-[[nodiscard]] long reference_exp_mech(long n, double epsilon, std::uint32_t seed);
+[[nodiscard]] std::int64_t reference_exp_mech(std::int64_t n, double epsilon, std::uint32_t seed);
 
 struct TraceVariantQueryReferenceCase {
-  long case_id = 0;
+  std::int64_t case_id = 0;
   std::vector<std::string> events;
 };
 
 // util.generate_pm4py_log: keys are prefixes joined by ">>>", TRACE_END left
 // out of the traces; empty traces are kept here.
 [[nodiscard]] std::vector<TraceVariantQueryReferenceCase> reference_generate_variant_log(
-    const std::vector<std::pair<std::string, long>>& trace_frequencies);
+    const std::vector<std::pair<std::string, std::int64_t>>& trace_frequencies);
 
 struct TraceVariantQueryReferenceOptions {
   double epsilon = 1.0;
-  long k = 0;  // prefix length
-  long p = 1;  // pruning
+  std::int64_t k = 0;  // prefix length
+  std::int64_t p = 1;  // pruning
   std::uint32_t seed = 0;
 };
 

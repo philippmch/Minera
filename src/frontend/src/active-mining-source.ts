@@ -4,6 +4,7 @@ import {isMineraExport, type MineraExport} from "./types";
 import {isOcelJsonDocument} from "./app-logic";
 import {nativeCell, nativeJson, nativeJsonBlob, parseNativeJson} from "./native-json";
 import {nativeResponseJson, nativeResponseRequest, readNativeResponse} from "./native-response";
+import {inlineMiningRequest} from "./mine-traces";
 import {diagnosticCsv, nativeObjectTables, type DiagnosticTable} from "./model-diagnostics";
 import {isWorkflowInputTable, workflowInputNativeBytes, type WorkflowInputTable} from "./workflow-input-workbench";
 import {TOKEN_REPLAY_IMPORT_CONTROLS, TOKEN_REPLAY_XES_BOOLEAN_CONTROLS} from "./token-replay-workbench";
@@ -140,10 +141,11 @@ export function activeMiningSourceTables(value: object): DiagnosticTable[] {
   return tables;
 }
 export function activeMiningSourceAllTablesCsv(tables: DiagnosticTable[]): string {const rows: unknown[][] = []; for (const table of tables) {if (!table.rows.length) table.columns.forEach((column, column_index) => rows.push([table.id, table.title, undefined, column_index, column, undefined])); table.rows.forEach((row, row_index) => table.columns.forEach((column, column_index) => rows.push([table.id, table.title, row_index, column_index, column, row[column_index]])));} return diagnosticCsv({id: "active_source_tables", title: "Every complete native source table", columns: ["table_id", "table_title", "row_index", "column_index", "column", "value"], rows});}
-/** `result` is the mining result to write (`mining` with its cases inline, see inlineMiningValue); `mining` names the request. */
-function activeMiningSourceReportValue(source: ActiveMiningSourceDescriptor, snapshot: object, mining?: ActiveDatasetResult, result = mining): object {return {family: "ACTIVE_EVENT_SOURCE_REPORT", source_id: source.source_id, original: {name: source.file.name, bytes: source.file.size, last_modified: source.file.lastModified, sha256: source.sha256}, mining_options: source.options, request: mining ? nativeResponseRequest(mining) ?? null : nativeResponseRequest(snapshot) ?? null, native_source: snapshot, mining_result: result ?? null};}
+/** `result` is the mining result to write (`mining` with its cases inline, see inlineMiningValue); `mining` names the request, recorded as the one that returns `result` (inlineMiningRequest when the cases were filled in). */
+function activeMiningSourceReportValue(source: ActiveMiningSourceDescriptor, snapshot: object, mining?: ActiveDatasetResult, result = mining): object {const request = mining ? nativeResponseRequest(mining) : nativeResponseRequest(snapshot); return {family: "ACTIVE_EVENT_SOURCE_REPORT", source_id: source.source_id, original: {name: source.file.name, bytes: source.file.size, last_modified: source.file.lastModified, sha256: source.sha256}, mining_options: source.options, request: request ? (mining && result !== mining ? inlineMiningRequest(request) : request) : null, native_source: snapshot, mining_result: result ?? null};}
 export function activeMiningSourceReport(source: ActiveMiningSourceDescriptor, snapshot: object, mining?: ActiveDatasetResult, result = mining): string {return nativeJson(activeMiningSourceReportValue(source, snapshot, mining, result), 2);}
-export function activeMiningSourceRequest(source: ActiveMiningSourceDescriptor, mining?: ActiveDatasetResult): string {return nativeJson({request: mining ? nativeResponseRequest(mining) ?? null : null, original: {name: source.file.name, bytes: source.file.size, sha256: source.sha256}, source_id: source.source_id, mining_options: source.options}, 2);}
+/** The request that replays to the full mining result (its cases inline, as the downloads write it). */
+export function activeMiningSourceRequest(source: ActiveMiningSourceDescriptor, mining?: ActiveDatasetResult): string {const request = mining ? nativeResponseRequest(mining) : undefined; return nativeJson({request: request ? inlineMiningRequest(request) : null, original: {name: source.file.name, bytes: source.file.size, sha256: source.sha256}, source_id: source.source_id, mining_options: source.options}, 2);}
 export function activeMiningSourceBytes(text: string): Uint8Array<ArrayBuffer> {return workflowInputNativeBytes(text);}
 /** `raw` is the response text as received; `referenced` says it named members by reference, which `value` and `envelope` hold expanded. */
 export interface ActiveMiningSourceRun {value: ActiveMiningSourceSnapshot; envelope: object; raw: string; referenced: boolean; tables: DiagnosticTable[];}

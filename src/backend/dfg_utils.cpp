@@ -423,10 +423,12 @@ DfgDirectionScores activity_direction_scores(
   const auto outgoing = outgoing_adjacency(dfg);
   DfgDirectionScores result;
   for (const auto& activity : selected) {
-    const auto out = static_cast<long double>(
-        adjacency_sum(outgoing, activity));
-    const auto in = static_cast<long double>(adjacency_sum(incoming, activity));
-    result.emplace(activity, static_cast<double>((out - in) / (in + out + 1.0L)));
+    // Python divides the exact integers and rounds once. Counts below 2^53
+    // convert exactly, so the double difference, sum and quotient round the
+    // same way; a long double quotient rounded twice on x86 only.
+    const auto out = static_cast<double>(adjacency_sum(outgoing, activity));
+    const auto in = static_cast<double>(adjacency_sum(incoming, activity));
+    result.emplace(activity, (out - in) / (in + out + 1.0));
   }
   return result;
 }

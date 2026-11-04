@@ -9,7 +9,8 @@
 // output, a script that mines with the default) are read in place. Only a
 // mining response this app received (markLiveTraces) loads from the backend:
 // an opened JSON file never does, and one saved without its cases says so.
-// Exports write the cases back in (inlineMiningJson, inlineMiningValue).
+// Exports write the cases back in (inlineMiningJson, inlineMiningValue), and
+// the requests they record ask for them (inlineMiningRequest).
 import { useEffect, useSyncExternalStore } from "react";
 import { backendFetch } from "./backend-fetch";
 import { parseInstant } from "./dotted-chart";
@@ -194,7 +195,63 @@ export async function inlineMiningValue<T extends object>(value: T): Promise<T> 
   const analysis = miningAnalysis(value);
   if (!analysis || analysis.traces || !analysis.trace_summary) return value;
   const filled = withTraces(analysis, await requireTraces(analysis));
-  return (analysis === (value as unknown) ? filled : { ...value, analysis: filled }) as T;
+  if (analysis === (value as unknown)) return filled as unknown as T;
+  // An envelope echoes the controls it was mined with; the full result's say
+  // include_traces=true.
+  const controls = (value as Record<string, unknown>).submitted_controls;
+  const echoed = record(controls) && controls.include_traces === "false" ? { submitted_controls: { ...controls, include_traces: "true" } } : {};
+  return { ...value, analysis: filled, ...echoed } as T;
+}
+
+/**
+ * The request of a mining result whose cases were left out
+ * (include_traces=false), as the request that returns the result with its
+ * cases inline: the same fields with include_traces=true. Replayed, it
+ * answers what inlineMiningJson writes. Other requests are returned as they
+ * are.
+ */
+export function inlineMiningRequest<T extends { fields?: Array<[string, string]> }>(request: T): T {
+  if (!request.fields?.some(([name, value]) => name === "include_traces" && value === "false")) return request;
+  return { ...request, fields: request.fields.map(([name, value]): [string, string] => [name, name === "include_traces" && value === "false" ? "true" : value]) };
+}
+
+const CONTROLS_KEY = ',"submitted_controls":{';
+
+/** The end of the JSON string starting at `from` (its opening quote), past its closing quote; -1 if unterminated. */
+function stringEnd(text: string, from: number): number {
+  for (let index = from + 1; index < text.length; ++index) {
+    if (text[index] === "\\") ++index;
+    else if (text[index] === '"') return index + 1;
+  }
+  return -1;
+}
+
+/**
+ * `raw` (an ACTIVE_SOURCE_MINING envelope's text) with its echo of
+ * include_traces=false said as include_traces=true, as the backend echoes the
+ * full result's request (unchanged without an echo); undefined when the echo
+ * is not in the backend's compact layout (an object of string fields, after
+ * the analysis).
+ */
+function echoInlineTraces(raw: string): string | undefined {
+  const start = raw.lastIndexOf(CONTROLS_KEY);
+  if (start < 0) return raw;
+  let out = "", copied = 0, index = start + CONTROLS_KEY.length;
+  if (raw[index] === "}") return raw;
+  for (;;) {
+    if (raw[index] !== '"') return undefined;
+    const keyEnd = stringEnd(raw, index);
+    if (keyEnd < 0 || raw[keyEnd] !== ":" || raw[keyEnd + 1] !== '"') return undefined;
+    const valueEnd = stringEnd(raw, keyEnd + 1);
+    if (valueEnd < 0) return undefined;
+    if (raw.slice(index, keyEnd) === '"include_traces"' && raw.slice(keyEnd + 1, valueEnd) === '"false"') {
+      out += raw.slice(copied, keyEnd + 1) + '"true"';
+      copied = valueEnd;
+    }
+    if (raw[valueEnd] === "}") return out + raw.slice(copied);
+    if (raw[valueEnd] !== ",") return undefined;
+    index = valueEnd + 1;
+  }
 }
 
 const SUMMARY_LINE = '\n  "trace_summary": {"traces": "on_demand"';
@@ -214,8 +271,12 @@ export async function inlineMiningJson(value: object, raw: string | undefined, s
   const start = raw?.indexOf(SUMMARY_LINE) ?? -1;
   // The summary is one line (its strings are escaped), ending at ",\n".
   const end = start >= 0 && raw!.indexOf(SUMMARY_LINE, start + 1) < 0 ? raw!.indexOf(",\n", start + SUMMARY_LINE.length) : -1;
-  if (raw && bytes !== undefined && end >= 0)
-    return raw.slice(0, start) + '\n  "traces": ' + bytes + raw.slice(end);
+  if (raw && bytes !== undefined && end >= 0) {
+    const spliced = raw.slice(0, start) + '\n  "traces": ' + bytes + raw.slice(end);
+    if (analysis === (value as unknown)) return spliced;
+    const echoed = echoInlineTraces(spliced);
+    if (echoed !== undefined) return echoed;
+  }
   return serialize(await inlineMiningValue(value));
 }
 

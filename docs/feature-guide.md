@@ -360,8 +360,9 @@ auto count = graph.edge_count("Register request", "Check ticket");
 
 By default, Minera expects CSV columns named `case_id`, `activity`, and
 optionally `timestamp`, `resource`, and `lifecycle`. If `timestamp` is present,
-events inside each trace are sorted lexicographically by timestamp, which fits
-ISO-8601 exports, and feeds the performance perspective; if `resource` is
+events inside each trace are ordered by their parsed instants (by the
+timestamp text only when some value does not parse) and cases are listed by
+case id, and the timestamp feeds the performance perspective; if `resource` is
 present it feeds the organizational perspective; if `lifecycle` is present its
 start/complete pairs feed the activity service times.
 
@@ -420,10 +421,14 @@ retries after `Retry-After` (for up to two minutes) instead of failing.
 A canceled or replaced mine checks its flag between stages (after the import
 and after each discovery and conformance step) and stops with the usual
 "mining request was canceled or replaced by a newer source request" 400; a
-mine that is neither runs exactly as before. Alignment and evaluation routes
-do not stop when the client disconnects (the vendored HTTP server cannot
-observe a disconnect while a handler runs, and the alignment engines take no
-cancellation callback).
+mine that is neither runs exactly as before. A client that disconnects (a
+closed tab or an aborted fetch) also stops the long routes: `/api/mine`
+between its stages and inside the reachability search, the conformance check
+and the model decorations, token replay, `/api/align`, the process-tree,
+decomposed, DFG and edit-distance alignments, the alignment and replay
+workbenches, the alignment-based fitness and precision of `/api/evaluate`,
+the ILP and genetic miners, concept drift and Monte Carlo. Such a request
+ends with a 400 and a canceled mine publishes nothing.
 
 **Compressed responses.** When the server is built with zlib it gzips JSON,
 XML and text responses for a client that sends `Accept-Encoding: gzip`, and
@@ -480,7 +485,8 @@ An opened log shows the raw events first; the views are:
   frequency thresholds are live sliders that re-mine the net in the browser,
   **Download … as PNML / as BPMN** buttons export any miner's model for
   ProM or a BPM suite (the inductive tree also **as PTML**), and **Simulate log (XES)** plays the model out
-  into a synthetic 100-case log,
+  into a synthetic log (1000 cases from a Petri net, pm4py's play-out default;
+  the other model families keep their own defaults),
 - **Conformance** — pick any miner (or upload a PNML workflow net, a BPMN
   2.0 process, or a PTML process tree from another tool) and any method: fitness, precision, generalization, and simplicity of
   the log against that model, plus a per-variant breakdown of where traces
@@ -582,8 +588,8 @@ generalization and composite evaluation, including custom miner activity fields.
 An entered Activity field remains an exact selector. The CLI's evaluation and
 standalone token-fitness commands use the same defaults.
 
-`minera_export` reads a `.xes` file as XES and any other file as CSV (the
-column/delimiter options apply to CSV only). It accepts options for custom
+`minera_export` reads a `.xes` or `.xes.gz` file as XES and any other file as
+CSV (the column/delimiter options apply to CSV only). It accepts options for custom
 column names and delimiters, plus log-filtering flags applied before discovery
 — for example, focus on the most common behavior:
 
@@ -722,7 +728,7 @@ fall-through switches, optional timestamp ordering, and activity, timestamp,
 and case-identifier selectors through the corresponding `--inductive-*` CLI
 options and `inductive_*` form fields. The other miner settings travel the same
 two routes: `--alpha-variant plus|classic` / `alpha_variant`, and the Heuristic
-Miner's `--dependency-threshold` / `dependency_threshold` (default 0.9),
+Miner's `--dependency-threshold` / `dependency_threshold` (default 0.5),
 `--and-threshold` / `and_threshold` (default 0.65), and
 `--min-edge-frequency` / `min_edge_frequency` (default 1). In the frontend all
 of them live in the **Filters & miner settings** panel, where every apply
@@ -1509,7 +1515,9 @@ retain the preceding usable result.
 
 CSV requires headers and cannot carry qualifiers, object/event links, object
 changes or globals. Event CSV alone also cannot retain object attributes. Loss
-allowance is explicit and does not bypass duplicate relation errors. Classic
+allowance is explicit. An object listed twice in one event's cell is read as
+two relations and written back as a repeated list entry, as
+`pm4py.read_ocel_csv` and `pm4py.write_ocel_csv` do. Classic
 JSON reimport follows the native duplicate-pair normalization convention;
 standard JSON, both XML formats and SQLite retain the full rich controlled
 fixture. XML writer allowance does not bypass native JSON-source validation.
@@ -2906,4 +2914,4 @@ See [validation and boundaries](feature-first-shared-table-metadata-validation.j
 
 ## Saved structural inputs
 
-The standalone Saved structures workspace works without a cached log. It converts supplied TrieModels to Petri nets and queries saved interval vectors while preserving caller order, duplicate entries and native indices. Existing structural downloads and reports can be reopened; original bytes, complete native constructors/results, serializer output and PNML exports stay separate. Both file pickers allow selecting the same file again. Validation passed 24 selected cases across 30 physical requests, 9140 frontend tests in 150 files, native targeted suites, portable fixtures, strict TypeScript/Vite and live checks. 7 handoffs used product File helpers; 2 retained raw native downloads. The source audit traces principal workflows for all 86 families, with seven audited extensions open; this does not establish full feature parity. Strict scope remains 46/86 packages, 199/387 modules and 228 incomplete units. Browser rendering remains unverified. See [validation](feature-first-saved-structures-validation.json).
+The standalone Saved structures workspace works without a cached log. It converts supplied TrieModels to Petri nets and queries saved interval vectors while preserving caller order, duplicate entries and native indices. Existing structural downloads and reports can be reopened; original bytes, complete native constructors/results, serializer output and PNML exports stay separate. Both file pickers allow selecting the same file again. Validation passed 24 selected cases across 30 physical requests, 9140 frontend tests in 150 files, native targeted suites, portable fixtures, strict TypeScript/Vite and live checks. 7 handoffs used product File helpers; 2 retained raw native downloads. The source audit traces principal workflows for all 86 families, with seven audited extensions open; this does not establish full feature parity. The coverage manifest (`docs/reference-2.7.22-coverage.json`) now marks all 86 packages and 387 modules complete. Browser rendering remains unverified. See [validation](feature-first-saved-structures-validation.json).
