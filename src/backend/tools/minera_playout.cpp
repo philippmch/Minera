@@ -77,8 +77,8 @@ int usage(const char* program) {
                "                     (default: 1000)\n"
                "  --start-time <ts>  DFG performance: first case start (default:\n"
                "                     epoch second 10000000)\n"
-               "                     After --dfg, --traces and --seed are refused;\n"
-               "                     use --dfg-traces and --dfg-seed.\n"
+               "                     --dfg refuses --traces and --seed (in any\n"
+               "                     order); use --dfg-traces and --dfg-seed.\n"
                "  --monte-carlo      Use bounded virtual-time Monte Carlo\n"
                "  --monte-carlo-simulations <n> Case count\n"
                "  --monte-carlo-activity-key <name> Generated activity attribute\n"
@@ -125,6 +125,7 @@ int main(int argc, char** argv) {
   // pm4py's basic Petri playout generates 1000 traces by default.
   options.traces = 1000;
   bool traces_supplied = false;
+  bool seed_supplied = false;
   minera::ExtensivePlayoutOptions extensive_options;
   bool extensive = false;
   bool extensive_control_used = false;
@@ -197,7 +198,7 @@ int main(int argc, char** argv) {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       output = value;
-    } else if (arg == "--traces" && !dfg) {
+    } else if (arg == "--traces") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       const auto parsed = strict_u64(value, arg);
@@ -210,12 +211,13 @@ int main(int argc, char** argv) {
       const auto parsed = strict_u64(value, arg);
       if (!parsed) return 2;
       options.max_steps = static_cast<std::size_t>(*parsed);
-    } else if (arg == "--seed" && !dfg) {
+    } else if (arg == "--seed") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
       const auto parsed = strict_u64(value, arg);
       if (!parsed) return 2;
       options.seed = *parsed;
+      seed_supplied = true;
     } else if (arg == "--extensive") {
       extensive = true;
     } else if (arg == "--dfg") {
@@ -328,6 +330,12 @@ int main(int argc, char** argv) {
   if (input.empty() || options.traces == 0 || options.max_steps == 0 ||
       extensive_options.max_length == 0) {
     return usage(argv[0]);
+  }
+  // Whichever comes first, --traces and --seed configure the Petri net
+  // playout only; with --dfg they would be ignored silently.
+  if (dfg && (traces_supplied || seed_supplied)) {
+    std::cerr << "error: --dfg does not take --traces or --seed; use --dfg-traces and --dfg-seed\n";
+    return 2;
   }
   if (stochastic_petri && (dfg || monte_carlo || extensive)) {
     std::cerr << "error: --stochastic-petri cannot be combined with another playout mode\n";

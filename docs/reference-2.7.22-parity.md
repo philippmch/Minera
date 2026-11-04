@@ -5344,7 +5344,11 @@ dense matrices, distinct and weighted variant summaries, directed graphs, and
 cyclic transitive predecessor/successor closure. Canonical native maps replace
 the source runtime's multiple container shapes; missing maxima use
 `std::optional`, while invalid adjacency rows and empty component assignment
-remain explicit errors.
+remain explicit errors. Declared: direction scores (`(out - in) / (in + out +
+1)`) match the reference's exactly rounded integer division while an
+activity's incoming and outgoing totals stay below 2^53; past that the native
+double arithmetic can round differently, and totals past 2^64 saturate
+(the function has no production caller).
 
 The dataframe statistics proofs cover global-shift and within-case-shift graph
 behavior, target-side selectors, cost nulls, custom aggregation, sorting and
@@ -13738,8 +13742,9 @@ CSV exposes six literal column/prefix selectors, delimiters and native trim,
 sort, reject and explicit loss controls. XML exposes construct rejection, byte
 limit, declaration and writer allowance; SQLite exposes reference validation
 and readable type names. XML allowance does not bypass native source validation.
-CSV requires headers, cannot carry globals/qualifiers/links/changes and still
-rejects repeated event/object pairs with loss enabled. Paired CSV uses the native
+CSV requires headers and cannot carry globals/qualifiers/links/changes; a
+repeated event/object pair is read and written as a repeated list entry, as
+`pm4py.read_ocel_csv` and `pm4py.write_ocel_csv` do. Paired CSV uses the native
 public two-file writer on one parsed source, retaining object attributes and
 orphans without loss consent. Owned temporary files are removed after success
 and failure. Existing ordinary export response shapes remain available.
@@ -16179,7 +16184,12 @@ Reference behaviour found (black box):
   to the set of following activities and counts it once per continuation;
   both dicts follow first appearance. A None activity inside a joined
   prefix raises TypeError. A DataFrame is read with cases in sorted case-id
-  order (numeric ids by value) and events in row order.
+  order (numeric ids by value) and events in row order. A uint64 column
+  keeps ids past INT64_MAX apart (`[2^63+1, 2^63, 2^63+1, 5]` gives
+  `({'a': {'c'}}, Counter({'a': 1}))`), and so does the native reader now
+  (before, such ids were read as doubles and merged). Declared: integer
+  ids past the uint64 range or below INT64_MIN (an object column of Python
+  ints, exact in the reference) still compare as doubles natively.
 - form_fake_log splits each key on "," into one event per part carrying only
   the activity key; traces have no attributes.
 - __search is a cheapest-first search from the initial marking over
@@ -17794,7 +17804,10 @@ Tests: `minera_petri_analysis_tests` (`weighted_marking_equation_counts_arc_obje
   Declared: an event with a
   missing timestamp is NaT in the reference and refused natively (`event
   CSV event X has no timestamp`), since a native event needs an instant;
-  fields stay trimmed by default; NA spellings (`NA`, `null`, ...) in
+  fields stay trimmed by default, also object reference cells, so
+  `" ['o1']"` relates `o1` natively where pandas keeps the leading space
+  and the reference lists no objects for that cell (`trim_fields=false`
+  matches the reference; declared); NA spellings (`NA`, `null`, ...) in
   attribute cells stay text where pandas reads NaN; a header-only file reads
   as an empty log where pm4py raises KeyError; an object an event names but
   the object table lacks is added natively (type from its column, no
@@ -17855,7 +17868,14 @@ Tests: `minera_petri_analysis_tests` (`weighted_marking_equation_counts_arc_obje
   line starting with spaces or tabs after a blank line a lone `\r` ends,
   which pandas misreads (it returns 131,073 rows of NaN for one such line),
   is refused; tuple elements (and, with an object table, the list, set and
-  dict elements the reference prints) and `\N{...}` escapes are refused;
+  dict elements the reference prints) and well-formed `\N{NAME}` escapes
+  in a cell that otherwise parses are refused, since this reader has no
+  Unicode name table (the reference relates `'\N{BULLET}'` as `•` and
+  lists nothing for an unknown name); a malformed `\N` escape (`'\N'`,
+  `'\N{}'`, `'\N{BULLET'`, `'\N{A_B}'`) or one in a cell that is no
+  literal (`['\N{BULLET}', o3]`) lists no objects, as in the reference,
+  and raw strings and bytes keep it as text (observed black-box on
+  `pm4py.read_ocel_csv`);
   values whose relation ids and object ids disagree in the reference
   (`[1, 1.0]`, `[1, '1']`, `[True]` next to `[1]`, or `[1]` next to `[None]`
   without an object table, where the reference lists object `1.0` for
@@ -17898,3 +17918,101 @@ Tests: `minera_petri_analysis_tests` (`weighted_marking_equation_counts_arc_obje
   Monte Carlo and edit distance stop within a second of a disconnect),
   `minera_server_cancellation_tests` (edit distance and two mines stop
   within a second of the client closing; the server keeps serving).
+
+## CSV header names, OCEL ids under two types and naive OCEL timestamps (2026-11-04)
+
+Three gaps left open by the previous round (its "Unchanged" items on the
+unnamed CSV header column, the OCEL id under two types and naive OCEL JSON/XML
+timestamps) are closed or declared. All evidence is black-box PM4Py 2.7.22
+(pandas 3.0.5) calls.
+
+- **CSV header names follow `pandas.read_csv`.** The event-log CSV importer
+  (batch path) and the OCEL CSV reader name columns as pandas does: an empty
+  name becomes `Unnamed: <position>` (a header starting or ending with the
+  delimiter, `a,,b`, and a blank name left by trimming), duplicates become
+  `a.1`, `a.2`, ... (named columns first, then the unnamed ones, skipping
+  names the header already holds: `a,a,a.1` reads `a`, `a.2`, `a.1`), names
+  are compared byte for byte (`x ` and `x` differ unless trimming), and a
+  UTF-8 BOM is dropped only at the very start of the file (a BOM after a
+  leading blank line stays in the first name, as pandas keeps it). Selectors
+  pick the first column of a name (`activity`, not `activity.1`); the
+  renamed ones are attributes. `case:x.1` is the trace attribute `x.1`. The
+  OCEL CSV reader then selects columns as `pm4py.read_ocel_csv` does:
+  `ocel:type:<T>` columns are object types (a duplicate `ocel:type:order.1`
+  is type `order.1`), a bare `ocel:type:` column is ignored, and every other
+  column, `ocel:eid.1` and unknown `ocel:` names included, is an event
+  attribute; the object table's `ocel:oid.1` or `Unnamed: 0` columns are
+  object attributes. Formerly both readers refused empty and duplicate
+  names, and the OCEL reader refused unknown `ocel:` columns. The CSV
+  stream reader (`csv.DictReader` semantics) keeps the header as written.
+  `/api/mine`'s size scan counts the columns as the importer names them and
+  drops a delimiter after a blank row a lone `\r` ends, as the importer
+  does. Fuzz: a header model checked against `read_csv` on 8,000 random
+  headers (0 mismatches); 800 random event-log CSVs (blank and repeated
+  names, `Unnamed: N` and `a.1` already present, spaces, BOMs, leading
+  blank lines, raw and trimmed) through `read_csv` + `format_dataframe`:
+  1,592 read the same columns, cases and attributes, 2 both refuse and 6
+  differ, all a BOM after a blank line that leaves no `timestamp` column,
+  which `format_dataframe` refuses and native imports untimed (its
+  `require_timestamp_column` default, unchanged); 1,000 random OCEL CSV
+  headers through `pm4py.read_ocel_csv`: 913 the same, 87 the same except
+  the declared added objects, 0 differ. Still unchanged: the case-relations
+  CSV reader refuses empty and repeated header names.
+- **An OCEL JSON object id listed under two types.** OCEL 2.0 JSON now reads
+  it as `read_ocel2_json` does: one object at the first listing's position,
+  with the last listing's type, attributes and O2O links; the object changes
+  of every listing are kept in document order, each value converted by its
+  listing's declared attribute type, and typed by the last listing. Classic
+  OCEL JSON reads repeated object and event keys as `json.load` does (the
+  last value at the first key's position), and an object change takes its
+  object's type whatever its own `ocel:type` says (also without repeats:
+  `"ocel:type": "zzz"` on an `order` object is an `order` change). Seven
+  fixtures (repeated ids with and without attributes, O2O, changes and
+  conflicting attribute types): events, objects, O2O and changes the same;
+  object type counts, flattening by either type and the exports follow.
+  Relations keep their event's list order where the reference frame lists
+  each event's relations reversed; that order differs without repeated ids
+  too and is unchanged. Declared: OCEL XML (2.0 and 1.0), SQLite and CSV
+  still refuse such an id, now naming both types. There the reference keeps
+  a row per listing (XML: objects `o1 order` and `o1 item`, relations typed
+  by the last listing, `ot_count` counting both, OC-DFG edges for `order`
+  while `activities_ot` lists only `item`, flattening by `order` empty;
+  SQLite: three object rows, all typed by the last, flattening repeats the
+  events, 8 rows for 5; CSV: `o1` as an `order` and an `item` object), which
+  a native OCEL, keyed by object id, cannot hold.
+- **Naive OCEL timestamps are stored as UTC.** `read_ocel2_json`,
+  `read_ocel_json`, both XML readers and the SQLite reader store a time
+  without an offset as UTC (`datetime64[us, UTC]`); native kept it naive, so
+  a CSV written from such a log printed `2024-01-01` where the reference
+  prints `2024-01-01 00:00:00+00:00`. Native now stores a naive event time
+  as `YYYY-MM-DDTHH:MM:SS[.ffffff]Z` and a naive object change as
+  `...+00:00` (the spellings the reference JSON writers use for event and
+  change times, so a native JSON written back without a fraction is theirs
+  byte for byte), and every exporter sees the UTC value: CSV
+  `2024-01-01 00:00:00+00:00`, OCEL 2.0 XML `2024-01-01T00:00:00+00:00`,
+  OCEL 1.0 XML `2024-01-01T00:00:00Z`, SQLite `2024-01-01 00:00:00+00:00`.
+  An OCEL 2.0 XML dateutil value without an offset stays naive, as the
+  reference keeps it; `pm4py.read_ocel_csv` keeps naive times naive and so
+  does native. The OCEL 1.0 XML writer now appends `Z` to a naive time (a
+  naive CSV log), as `pm4py.write_ocel_xml` does (`2024-01-01T00:00:00Z`;
+  natively no suffix). Checked over a naive fixture (an event date
+  attribute, fractions, a static and a changed object attribute) read by
+  all seven readers and written by all six writers: every event, change and
+  static time matches the reference writers' text, against 4 of 35 writer
+  outputs before, except the declared spellings below. Declared, unchanged:
+  the JSON writers write the stored text rather than the reference's
+  `...Z` without fraction (a naive CSV log writes `2024-01-01 00:00:00`
+  where the reference writes `2024-01-01T00:00:00Z`); OCEL 1.0 XML keeps
+  fractions; SQLite type-table names. Unchanged: date-typed attribute
+  values stay text where the OCEL 2.0 JSON/XML and OCEL 1.0 XML readers
+  convert them to UTC timestamps; an OCEL CSV log with a `+02:00` offset is
+  written in UTC by both XML writers where the reference writes the wall
+  clock (`+02:00` in 2.0, the wall clock with `Z` in 1.0), and a SQLite
+  input whose event table holds `ocel:activity` cannot be written as CSV.
+  Tests: `minera_core_tests` (`csv_header_names_follow_read_csv`),
+  `minera_ocel_csv_tests` (`names_columns_as_pandas`,
+  `refuses_an_id_under_two_types`,
+  `writes_naive_json_and_xml_timestamps_as_utc`), `minera_ocel_tests`
+  (`repeated_object_ids_contract`, `naive_timestamps_read_as_utc_contract`),
+  `minera_ocel_sqlite_tests` (naive and repeated-id fixtures),
+  `minera_recheck_regression_tests` (`ocel_wall_clock_order`).

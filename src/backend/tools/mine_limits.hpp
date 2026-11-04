@@ -96,7 +96,10 @@ struct MineSizeEstimate {
 };
 
 // Quote-aware CSV scan: data rows (non-blank records after the header) and
-// the header's columns. Quotes follow the importer (read_csv_record): a quote
+// the header's columns, every field of it a frame column as the importer
+// names it (an empty field is read_csv's "Unnamed: i", a repeated name
+// "name.1"). A UTF-8 BOM is dropped only at the start of the bytes, as the
+// importer and read_csv drop it. Quotes follow the importer (read_csv_record): a quote
 // opens a quoted field only as a field's first character, "" inside one is a
 // literal quote, and a quote elsewhere in an unquoted field is literal text;
 // CR, LF and CRLF end a record outside quotes. Row shapes follow the
@@ -130,8 +133,13 @@ MineSizeEstimate scan_csv_mine_size(std::string_view bytes, char delimiter) {
     }
     if (state == Quote::kQuoteInQuoted && c == '"') {state = Quote::kQuoted; continue;}
     if (c == '\r' || c == '\n') {
-      if (c == '\r' && i + 1 < bytes.size() && bytes[i + 1] == '\n') ++i;
+      const bool lone_cr = c == '\r' && !(i + 1 < bytes.size() && bytes[i + 1] == '\n');
+      if (c == '\r' && !lone_cr) ++i;
+      const bool blank = !row_has_text;
       end_row();
+      // After a blank line a lone CR ends, pandas drops a delimiter right
+      // after it, as the importer does (apply_lone_cr_blank_quirk).
+      if (blank && lone_cr && i + 1 < bytes.size() && bytes[i + 1] == delimiter) ++i;
       continue;
     }
     row_open = true;

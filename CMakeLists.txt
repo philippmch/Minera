@@ -1792,6 +1792,17 @@ if(MINERA_BUILD_TESTS)
   minera_cli_exit_test(minera_playout_rejects_junk_traces 2
                        "--traces: expected a non-negative integer"
                        $<TARGET_FILE:minera_playout> "${MINERA_SEQUENCE_PNML}" --traces 10x)
+  # --traces and --seed are Petri playout options: with --dfg they are
+  # refused whichever comes first, never ignored.
+  minera_cli_exit_test(minera_playout_dfg_rejects_traces_before 2
+                       "--dfg does not take --traces or --seed"
+                       $<TARGET_FILE:minera_playout> "${MINERA_AB_CSV}" --traces 5 --dfg)
+  minera_cli_exit_test(minera_playout_dfg_rejects_traces_after 2
+                       "--dfg does not take --traces or --seed"
+                       $<TARGET_FILE:minera_playout> "${MINERA_AB_CSV}" --dfg --traces 5)
+  minera_cli_exit_test(minera_playout_dfg_rejects_seed_before 2
+                       "--dfg does not take --traces or --seed"
+                       $<TARGET_FILE:minera_playout> "${MINERA_AB_CSV}" --seed 3 --dfg)
   minera_cli_exit_test(minera_streaming_tbr_rejects_negative_invisible 1
                        "--max-invisible: expected a non-negative integer"
                        $<TARGET_FILE:minera_streaming_tbr> "${MINERA_SEQUENCE_PNML}"

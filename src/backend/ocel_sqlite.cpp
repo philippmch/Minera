@@ -767,8 +767,17 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         throw std::runtime_error("SQLite object query failed");
       const auto id = column_string(statement.get(), 0);
       const auto type = column_string(statement.get(), 1);
-      if (id.empty() || !object_types.emplace(id, type).second)
+      if (id.empty())
         throw std::invalid_argument("OCEL SQLite object table contains duplicate or empty ids");
+      // The reference reader keeps one object row per type-table row, all
+      // typed by the id's last "object" row, so an id listed twice is two
+      // objects of one type (observed black-box), which a native OCEL cannot
+      // hold (declared).
+      if (const auto [it, added] = object_types.emplace(id, type); !added)
+        throw std::invalid_argument(
+            "OCEL SQLite object table contains duplicate or empty ids: " + id +
+            " is listed twice (types " + it->second + " and " + type +
+            "); pm4py keeps an object row for each, which a native OCEL cannot hold");
     }
   }
   const auto event_map = read_type_map(db, "event_map_type");

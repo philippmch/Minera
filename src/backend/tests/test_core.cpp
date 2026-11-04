@@ -7557,6 +7557,77 @@ void csv_case_aliases_are_opt_in_and_exact_columns_win() {
 // Reference flow: pandas.read_csv + pm4py.format_dataframe (PM4Py 2.7.22,
 // pandas 3.0.5). Rows with an NA case id or activity are dropped; textual
 // timestamps are parsed per cell like to_datetime(format="mixed", utc=True).
+void csv_header_names_follow_read_csv() {
+  using V = std::vector<std::string>;
+  const auto names = [](V fields) { return minera::reference_csv_header_names(std::move(fields)); };
+  // pandas 3.0.5 read_csv, observed black-box.
+  assert((names({"", "a", "b"}) == V{"Unnamed: 0", "a", "b"}));
+  assert((names({"a", "", "b", ""}) == V{"a", "Unnamed: 1", "b", "Unnamed: 3"}));
+  assert((names({"a", "a", "b"}) == V{"a", "a.1", "b"}));
+  assert((names({"a", "a", "a.1"}) == V{"a", "a.2", "a.1"}));
+  assert((names({"a", "a.2", "a", "a"}) == V{"a", "a.2", "a.1", "a.3"}));
+  assert((names({"a", "a.1", "a.1"}) == V{"a", "a.1", "a.1.1"}));
+  assert((names({"", "Unnamed: 0"}) == V{"Unnamed: 0.1", "Unnamed: 0"}));
+  assert((names({"", "Unnamed: 0", "Unnamed: 0"}) == V{"Unnamed: 0.2", "Unnamed: 0", "Unnamed: 0.1"}));
+  assert((names({"Unnamed: 1", "", ""}) == V{"Unnamed: 1", "Unnamed: 1.1", "Unnamed: 2"}));
+  assert((names({" a", "a", "a "}) == V{" a", "a", "a "}));
+
+  const auto import = [](const std::string& text, minera::CsvImportOptions options = {}) {
+    std::istringstream input(text);
+    return minera::import_csv_event_data(input, options);
+  };
+  {
+    // A pandas export's index column (a header starting with the delimiter)
+    // and a trailing delimiter are attributes "Unnamed: 0" and "Unnamed: 4",
+    // as format_dataframe keeps them.
+    const auto data = import(",case_id,activity,timestamp,\n0,1,A,2024-01-01,x\n1,1,B,2024-01-02,\n");
+    assert((data.table.columns == V{"Unnamed: 0", "case_id", "activity", "timestamp", "Unnamed: 4"}));
+    const auto& events = data.log.traces.at(0).events;
+    assert(events.size() == 2 && events[0].activity == "A");
+    assert(events[0].attribute("Unnamed: 0") && *events[0].attribute("Unnamed: 0") == "0");
+    assert(events[0].attribute("Unnamed: 4") && *events[0].attribute("Unnamed: 4") == "x");
+    assert(events[1].attribute("Unnamed: 4") == nullptr);
+  }
+  {
+    // Repeated names: the selector takes the first column, the others are
+    // attributes "activity.1" and case attribute "x.1".
+    const auto data = import("case_id,activity,activity,case:x,case:x\n1,A,Z,p,q\n");
+    assert((data.table.columns == V{"case_id", "activity", "activity.1", "case:x", "case:x.1"}));
+    const auto& trace = data.log.traces.at(0);
+    assert(trace.events.at(0).activity == "A");
+    assert(trace.events[0].attribute("activity.1") && *trace.events[0].attribute("activity.1") == "Z");
+    const auto case_attribute = [&](std::string_view key) -> std::string {
+      for (const auto& attribute : trace.attributes) if (attribute.key == key) return attribute.value;
+      return "<missing>";
+    };
+    assert(case_attribute("x") == "p" && case_attribute("x.1") == "q");
+    // A generated name is a column a selector can name.
+    minera::CsvImportOptions options;
+    options.activity_column = "activity.1";
+    assert(import("case_id,activity,activity\n1,A,Z\n", options).log.traces.at(0).events.at(0).activity == "Z");
+  }
+  {
+    // With trim_fields a blank name is empty, so unnamed; without, it is " ".
+    assert((import("case_id, ,activity\n1,v,A\n").table.columns == V{"case_id", "Unnamed: 1", "activity"}));
+    minera::CsvImportOptions options;
+    options.trim_fields = false;
+    assert((import("case_id, ,activity\n1,v,A\n", options).table.columns == V{"case_id", " ", "activity"}));
+  }
+  {
+    // read_csv drops a BOM only at the start of the file: a BOM line is
+    // blank, and a BOM after a blank line stays in the first name.
+    assert((import("\xEF\xBB\xBF\ncase_id,activity\n1,A\n").table.columns == V{"case_id", "activity"}));
+    assert((import("\xEF\xBB\xBF,case_id,activity\n0,1,A\n").table.columns == V{"Unnamed: 0", "case_id", "activity"}));
+    bool refused = false;
+    try {
+      (void)import("\n\xEF\xBB\xBF" "case_id,activity\n1,A\n");
+    } catch (const std::invalid_argument& error) {
+      refused = std::string(error.what()) == "CSV column not found: case_id";
+    }
+    assert(refused);
+  }
+}
+
 void csv_import_matches_reference_dataframe_flow() {
   const auto import = [](const std::string& text,
                          minera::CsvImportOptions options = {}) {
@@ -8060,6 +8131,7 @@ void csv_import_types_activities_case_attributes_and_relations_like_reference() 
 
 int main() {
   csv_import_matches_reference_dataframe_flow();
+  csv_header_names_follow_read_csv();
   csv_case_ids_follow_reference_dtype_inference_and_order();
   csv_import_types_activities_case_attributes_and_relations_like_reference();
   exact_mean_matches_python_statistics_goldens();

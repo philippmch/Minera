@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EVERYDAY_TOOLS, REFERENCE_TOOLS, groupTools, searchTools, type ToolGroup, type ToolId, type ToolSpec } from "../tools";
 import { BrandMark, LOG_FILE_ACCEPT, PaletteShortcut, ThemeToggle } from "./ui";
 
@@ -27,6 +27,14 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
   const reference = useMemo(() => groupTools(searchTools(query, REFERENCE_TOOLS)), [query]);
   const searching = query.trim().length > 0;
   const loaders = { sample: onLoadSample, ocel: onLoadOcelSample, resource: onLoadResourceSample };
+  // The Cancel button (and the disabled pickers) leave focus on the body when a
+  // load stops on this page; the drop zone takes it back.
+  const dropInput = useRef<HTMLInputElement>(null);
+  const wasMining = useRef(mining);
+  useEffect(() => {
+    if (wasMining.current && !mining && (!document.activeElement || document.activeElement === document.body)) dropInput.current?.focus();
+    wasMining.current = mining;
+  }, [mining]);
   return (
     <div className="landing">
       <header className="landing-bar reveal">
@@ -57,6 +65,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
 
         <label className={mining ? "landing-drop mining reveal" : "landing-drop reveal"}>
           <input
+            ref={dropInput}
             type="file"
             accept={LOG_FILE_ACCEPT}
             disabled={mining}

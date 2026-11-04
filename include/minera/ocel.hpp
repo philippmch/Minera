@@ -145,9 +145,13 @@ enum class OcelTimestampReader {
 // Each readable event timestamp is also stored as the value the reference
 // importer stores, so filters, features, statistics and exporters agree: the
 // ISO wall clock stamped UTC (JSON, XML), or the UTC instant (SQLite, an aware
-// dateutil fallback). A text the native timestamp parser already reads as
-// that UTC value with no non-zero offset is kept as is; any other becomes
-// "YYYY-MM-DDTHH:MM:SS[.ffffff]+00:00".
+// dateutil fallback); a naive text is stamped UTC too, as the reference
+// stores it, except a naive dateutil fallback, which stays naive. A text the
+// native timestamp parser already reads as that UTC value with an offset of
+// zero (Z, +00:00) is kept as is; a naive event time becomes
+// "YYYY-MM-DDTHH:MM:SS[.ffffff]Z" (the reference JSON writers' spelling of an
+// event time), any other text "YYYY-MM-DDTHH:MM:SS[.ffffff]+00:00". Object
+// change times are read the same way (a naive one becomes "...+00:00").
 void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader);
 // `nanoseconds` selects kInstantNanoseconds, otherwise kIsoFormat.
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);

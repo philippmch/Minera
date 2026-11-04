@@ -42,21 +42,41 @@ struct CaseKey {
   std::int64_t integer = 0;
   double real = 0.0;
   std::string text;
+  // An integral id past INT64_MAX (a uint64 column, which pandas keeps
+  // exact): `integer` is unused and `above` holds the value.
+  bool above_int64 = false;
+  std::uint64_t above = 0;
 };
+
+// Whether all of `text` is one decimal integer of type T.
+template <typename T>
+bool parse_whole(const std::string& text, T& out) {
+  const auto* end = text.data() + text.size();
+  const auto parsed = std::from_chars(text.data(), end, out);
+  return parsed.ec == std::errc{} && parsed.ptr == end;
+}
 
 CaseKey numeric_case_key(const std::string& value) {
   CaseKey key;
   key.numeric = true;
-  std::int64_t integer = 0;
-  const auto* end = value.data() + value.size();
-  if (const auto parsed = std::from_chars(value.data(), end, integer);
-      parsed.ec == std::errc{} && parsed.ptr == end) {
+  if (parse_whole(value, key.integer)) {
     key.integral = true;
-    key.integer = integer;
+  } else if (parse_whole(value, key.above)) {  // from_chars refuses '-' here
+    key.integral = true;
+    key.above_int64 = true;
   } else {
+    key.integer = 0;
     key.real = std::strtod(value.c_str(), nullptr);
   }
   return key;
+}
+
+// -1, 0 or 1 for an integer past INT64_MAX against double `rhs`; NaN is last.
+int compare_above_real(std::uint64_t lhs, double rhs) {
+  if (std::isnan(rhs) || rhs >= 0x1p64) return -1;
+  if (rhs < 0x1p63) return 1;
+  const auto whole = static_cast<std::uint64_t>(rhs);  // integral past 2^53
+  return lhs < whole ? -1 : whole < lhs ? 1 : 0;
 }
 
 // -1, 0 or 1 for integer `lhs` against double `rhs`, exactly; NaN is last.
@@ -82,12 +102,19 @@ struct CaseKeyLess {
     if (lhs.numeric != rhs.numeric) return lhs.numeric < rhs.numeric;
     if (!lhs.numeric) return lhs.text < rhs.text;
     int order = 0;
-    if (lhs.integral && rhs.integral)
-      order = lhs.integer < rhs.integer ? -1 : rhs.integer < lhs.integer ? 1 : 0;
-    else if (lhs.integral)
-      order = compare_integer_real(lhs.integer, rhs.real);
-    else if (rhs.integral)
-      order = -compare_integer_real(rhs.integer, lhs.real);
+    if (lhs.integral && rhs.integral) {
+      if (lhs.above_int64 || rhs.above_int64)
+        order = !lhs.above_int64 ? -1 : !rhs.above_int64 ? 1
+                : lhs.above < rhs.above ? -1 : rhs.above < lhs.above ? 1 : 0;
+      else
+        order = lhs.integer < rhs.integer ? -1 : rhs.integer < lhs.integer ? 1 : 0;
+    } else if (lhs.integral) {
+      order = lhs.above_int64 ? compare_above_real(lhs.above, rhs.real)
+                              : compare_integer_real(lhs.integer, rhs.real);
+    } else if (rhs.integral) {
+      order = -(rhs.above_int64 ? compare_above_real(rhs.above, lhs.real)
+                                : compare_integer_real(rhs.integer, lhs.real));
+    }
     else
       order = compare_reals(lhs.real, rhs.real);
     return order < 0;
@@ -153,7 +180,12 @@ PrecisionLogPrefixes precision_log_prefixes(const EventTable& table, const std::
     const auto& cell = row[case_column];
     if (is_null(cell)) continue;
     const bool numeric = cell->kind == AttributeKind::kInt || cell->kind == AttributeKind::kFloat;
-    const CaseKey key = numeric ? numeric_case_key(cell->value) : CaseKey{false, false, 0, 0.0, cell->value};
+    CaseKey key;
+    if (numeric) {
+      key = numeric_case_key(cell->value);
+    } else {
+      key.text = cell->value;
+    }
     const auto& activity = row[activity_column];
     cases[key].push_back(is_null(activity) ? Activity{} : Activity{activity->value});
   }

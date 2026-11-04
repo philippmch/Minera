@@ -305,6 +305,36 @@ void signed_activation_weights_normalize_enabled_sets() {
   }
 }
 
+// The inferred arrival ratio averages pandas Timedelta.total_seconds() of the
+// sorted case-start gaps (whole seconds + microseconds / 10**6), not gaps of
+// float epochs. Expected value from pm4py's Monte Carlo on the same CSV
+// (case_arrival_ratio 10.213296333333332; a Python-timedelta mean of exact
+// microseconds / 10**6 gives 10.213296333333334).
+void inferred_arrival_uses_exact_subsecond_gaps() {
+  const auto net = linear_net();
+  minera::EventLog input;
+  for (const char* start : {"2020-01-01 00:00:25.027945", "2020-01-01 00:00:00.123457",
+                            "2020-01-01 00:00:30.763346", "2020-01-01 00:00:02.626124"}) {
+    minera::Trace trace;
+    trace.case_id = start;
+    trace.events = {minera::Event{trace.case_id, "A", start}};
+    input.traces.push_back(std::move(trace));
+  }
+  minera::MonteCarloOptions options;
+  options.transition_weights = {1.0};
+  options.transition_durations = {{minera::MonteCarloDurationDistribution::kDeterministic, 1.0}};
+  const auto fitted = minera::fit_monte_carlo_options(input, net, options);
+  assert(fitted.case_arrival_ratio && *fitted.case_arrival_ratio == 0x1.46d352d500bf8p+3);
+  // One gap where pandas' sum and Python timedelta's division differ.
+  input.traces.resize(1);
+  minera::Trace second;
+  second.case_id = "late";
+  second.events = {minera::Event{"late", "A", "2020-01-01 00:00:47.429766"}};
+  input.traces.push_back(second);
+  const auto pair = minera::fit_monte_carlo_options(input, net, options);
+  assert(pair.case_arrival_ratio && *pair.case_arrival_ratio == 22.0 + 401821 / 1e6);
+}
+
 void source_log_fits_missing_weights_and_durations() {
   const auto net = sequential_net();
   minera::EventLog input;
@@ -1648,6 +1678,7 @@ int main() {
   weighted_and_parallel_arcs_move_their_weight();
   weighted_choices_and_exponential_replay();
   signed_activation_weights_normalize_enabled_sets();
+  inferred_arrival_uses_exact_subsecond_gaps();
   source_log_fits_missing_weights_and_durations();
   source_log_forces_duration_distributions();
   source_log_fitting_preserves_sparse_causal_records_and_overrides();

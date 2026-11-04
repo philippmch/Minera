@@ -15,6 +15,7 @@
 #include <string_view>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -896,6 +897,15 @@ CsvEventData import_csv_event_data_impl(
   if (!read_record()) {
     return {};
   }
+  // Strip a leading UTF-8 byte-order mark so the first column name still
+  // matches; spreadsheet exports routinely prepend one. read_csv drops it
+  // only at the start of the file: a BOM line is then blank, and a BOM after
+  // a blank line stays in the first column name.
+  if (line.size() >= 3 && static_cast<unsigned char>(line[0]) == 0xEF &&
+      static_cast<unsigned char>(line[1]) == 0xBB &&
+      static_cast<unsigned char>(line[2]) == 0xBF) {
+    line.erase(0, 3);
+  }
   // read_csv skips blank lines before the header too.
   while (reference_batch && is_reference_blank_line(line, options.delimiter)) {
     skipped_blank();
@@ -903,16 +913,14 @@ CsvEventData import_csv_event_data_impl(
     ++line_number;
   }
 
-  // Strip a leading UTF-8 byte-order mark so the first column name still
-  // matches; spreadsheet exports routinely prepend one.
-  if (line.size() >= 3 && static_cast<unsigned char>(line[0]) == 0xEF &&
-      static_cast<unsigned char>(line[1]) == 0xBB &&
-      static_cast<unsigned char>(line[2]) == 0xBF) {
-    line.erase(0, 3);
-  }
-
-  const auto header =
-      parse_csv_row(line, options.delimiter, options.trim_fields);
+  // The batch import names the columns as read_csv does: an empty name is
+  // "Unnamed: i" and repeats become "name.1", ... (a header starting or
+  // ending with the delimiter, a pandas export's index column), so those
+  // columns are attributes under that name and a selector finds the first
+  // of repeated names. With trim_fields a name of only whitespace is empty.
+  // Stream readers (csv.DictReader) keep the header as written.
+  auto header = parse_csv_row(line, options.delimiter, options.trim_fields);
+  if (reference_batch) header = reference_csv_header_names(std::move(header));
   auto columns = header_index(header);
   std::optional<std::size_t> case_alias_index;
   if (options.allow_case_id_aliases && !columns.contains(options.case_id_column)) {
@@ -1378,6 +1386,44 @@ ReferenceCsvColumn reference_csv_column(const std::vector<std::string>& cells) {
 
 std::string reference_csv_float_text(double value) {
   return python_float_text(value);
+}
+
+std::vector<std::string> reference_csv_header_names(std::vector<std::string> names) {
+  // Named columns first, then the unnamed ones, each in header order.
+  std::vector<std::size_t> order;
+  std::vector<std::size_t> unnamed;
+  order.reserve(names.size());
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    if (names[i].empty()) {
+      names[i] = "Unnamed: " + std::to_string(i);
+      unnamed.push_back(i);
+    } else {
+      order.push_back(i);
+    }
+  }
+  order.insert(order.end(), unnamed.begin(), unnamed.end());
+  const std::unordered_set<std::string> present(names.begin(), names.end());
+  // How many times each name has been taken; a repeat tries name.N from
+  // that count on, past every N the header itself already spells.
+  std::unordered_map<std::string, std::size_t> counts;
+  for (const auto i : order) {
+    const std::string base = names[i];
+    std::string column = base;
+    std::size_t count = counts[base];
+    while (count > 0) {
+      counts[base] = count + 1;
+      column = base + "." + std::to_string(count);
+      if (present.contains(column)) {
+        ++count;
+      } else {
+        const auto found = counts.find(column);
+        count = found == counts.end() ? 0 : found->second;
+      }
+    }
+    names[i] = column;
+    counts[column] = count + 1;
+  }
+  return names;
 }
 
 CsvEventData import_csv_event_data(

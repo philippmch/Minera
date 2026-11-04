@@ -1,5 +1,6 @@
 #include "conformance_evaluation.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -7,6 +8,39 @@
 #include "conformance_tree_visualization.hpp"
 
 namespace minera::footprints_conformance {
+
+namespace {
+
+// An unsigned 128-bit sum of uint64 counts in two words (portable: MSVC has
+// no unsigned __int128). to_double rounds to nearest, ties to even, as
+// Python's float(int) does.
+struct WideCount {
+  std::uint64_t high = 0;
+  std::uint64_t low = 0;
+
+  void add(std::uint64_t value) noexcept {
+    const std::uint64_t sum = low + value;
+    if (sum < low) ++high;
+    low = sum;
+  }
+  [[nodiscard]] bool zero() const noexcept { return high == 0 && low == 0; }
+  [[nodiscard]] double to_double() const noexcept {
+    if (high == 0) return static_cast<double>(low);
+    // Keep the top 64 significant bits and fold every dropped bit into the
+    // lowest one (a sticky bit): 64 bits leave 11 below the 53 a double
+    // keeps, so the one conversion of that word rounds as the full value
+    // would.
+    int shift = 0;
+    for (std::uint64_t rest = high; rest != 0; rest >>= 1) ++shift;
+    const std::uint64_t top =
+        shift == 64 ? high : (high << (64 - shift)) | (low >> shift);
+    const bool sticky =
+        shift == 64 ? low != 0 : (low & ((std::uint64_t{1} << shift) - 1)) != 0;
+    return std::ldexp(static_cast<double>(top | (sticky ? 1u : 0u)), shift);
+  }
+};
+
+}  // namespace
 
 Footprint EvaluationUtility::flatten(const std::vector<Footprint>& traces) {
   Footprint result;
@@ -77,22 +111,22 @@ double EvaluationUtility::fitness(
     const FootprintsExtensiveResult& conformance) {
   if (log.dfg.empty()) return 1.0;
 
-  // The reference sums the integer counts exactly, converts each sum to a
-  // double once and evaluates the formula in double. Integer sums followed
-  // by the same double steps reproduce that on every platform; long double
-  // arithmetic rounded differently on x86 only.
-  std::uint64_t dfg_total = 0;
+  // The reference sums the integer counts exactly (Python ints), converts
+  // each sum to a double once (correctly rounded) and evaluates the formula
+  // in double (observed black-box, also for sums past 2^64). Two-word sums
+  // hold any total of up to 2^64 counts, so they never wrap.
+  WideCount dfg_total;
   for (const auto& [pair, count] : log.dfg) {
     (void)pair;
-    dfg_total += static_cast<std::uint64_t>(count);
+    dfg_total.add(static_cast<std::uint64_t>(count));
   }
-  if (dfg_total == 0) return 1.0;
+  if (dfg_total.zero()) return 1.0;
 
-  std::uint64_t deviation_total = 0;
+  WideCount deviation_total;
   for (const auto& pair : conformance.footprints) {
     const auto it = log.dfg.find(pair);
     if (it != log.dfg.end()) {
-      deviation_total += static_cast<std::uint64_t>(it->second);
+      deviation_total.add(static_cast<std::uint64_t>(it->second));
     }
   }
 
@@ -104,8 +138,8 @@ double EvaluationUtility::fitness(
   const std::uint64_t denominator = number_relations + number_boundary;
   if (denominator == 0) return 1.0;
 
-  const double sum_dfg = static_cast<double>(dfg_total);
-  const double sum_deviations = static_cast<double>(deviation_total);
+  const double sum_dfg = dfg_total.to_double();
+  const double sum_deviations = deviation_total.to_double();
   const double relation_fit =
       (1.0 - sum_deviations / sum_dfg) * static_cast<double>(number_relations);
   const auto boundary_fit = static_cast<double>(

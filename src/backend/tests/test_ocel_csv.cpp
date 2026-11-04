@@ -264,6 +264,15 @@ void reads_object_cells_as_pandas() {
   // Declared: what this reader does not support.
   assert(refused("\"[('a',)]\"", "does not support"));
   assert(refused("\"['\\N{LATIN SMALL LETTER E WITH ACUTE}']\"", "does not support"));
+  assert(refused("\"['\\N{bullet}', 'o2']\"", "does not support"));
+  // A malformed \N escape, or one in a cell that is no literal, lists no
+  // objects, as pm4py.read_ocel_csv lists none (observed: the cell is a
+  // SyntaxError); raw strings and bytes keep the escape as text.
+  for (const char* cell : {"\"['\\N{BULLET']\"", "\"['\\N']\"", "\"['\\Nx']\"", "\"['\\N{}']\"",
+                           "\"['\\N{BUL_LET}']\"", "\"['\\N{BULLET}'\"", "\"['\\N{BULLET}'] x\"",
+                           "\"['\\N{BULLET}', o3]\""})
+    assert(ids(cell).empty());
+  assert(ids("\"[r'\\N{BULLET}', b'\\N{X}']\"") == "\\N{BULLET};\\N{X};");
   assert(refused("\"[1, 1.0]\"", "does not support"));
   assert(refused("\"[1, '1']\"", "does not support"));
 
@@ -339,6 +348,113 @@ void writes_timestamps_as_pandas() {
          "2024-01-01 00:00:00-05:30;2024-01-02 00:00:00-05:30;");
 }
 
+// Header shapes as pandas.read_csv names them and pm4py.read_ocel_csv then
+// selects the columns (observed black-box): an empty name is "Unnamed: i",
+// a repeat "name.1"; a repeated "ocel:type:order" lists objects of type
+// "order.1", any unselected column (also "ocel:eid.1", "ocel:foo") is an
+// attribute, and a bare "ocel:type:" column lists nothing.
+void names_columns_as_pandas() {
+  const auto text = [](const minera::OcelValue& value) { return std::get<std::string>(value); };
+  {
+    const auto log = minera::parse_ocel_csv(
+        ",ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order,\n0,e1,2024-01-01,A,['o1'],w\n");
+    assert(log.events.size() == 1 && log.events[0].attributes.size() == 2);
+    assert(log.events[0].attributes[0].key == "Unnamed: 0" && text(log.events[0].attributes[0].value) == "0");
+    assert(log.events[0].attributes[1].key == "Unnamed: 5" && text(log.events[0].attributes[1].value) == "w");
+    assert(log.objects.size() == 1 && log.objects[0].type == "order" && log.relations.size() == 1);
+  }
+  {
+    const auto log = minera::parse_ocel_csv(
+        "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order,ocel:type:order,ocel:eid,ocel:foo\n"
+        "e1,2024-01-01,A,['o1'],['o2'],x,y\n");
+    assert(log.objects.size() == 2 && log.objects[0].type == "order" && log.objects[1].type == "order.1");
+    assert(log.relations.size() == 2);
+    assert(log.events[0].attributes.size() == 2);
+    assert(log.events[0].attributes[0].key == "ocel:eid.1" && text(log.events[0].attributes[0].value) == "x");
+    assert(log.events[0].attributes[1].key == "ocel:foo");
+  }
+  {
+    const auto log = minera::parse_ocel_csv(
+        "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:\ne1,2024-01-01,A,['o1']\n");
+    assert(log.events.size() == 1 && log.events[0].attributes.empty());
+    assert(log.objects.empty() && log.relations.empty());
+  }
+  {
+    const auto log = minera::parse_ocel_csv(
+        "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order\ne1,2024-01-01,A,['o1']\n",
+        ",ocel:oid,ocel:type,ocel:oid\n0,o1,order,z\n");
+    assert(log.objects.size() == 1 && log.objects[0].attributes.size() == 2);
+    assert(log.objects[0].attributes[0].key == "Unnamed: 0");
+    assert(log.objects[0].attributes[1].key == "ocel:oid.1" && text(log.objects[0].attributes[1].value) == "z");
+  }
+}
+
+// An object id under two types: pm4py.read_ocel_csv lists it once per type
+// and keeps each relation's column type (observed black-box), which a native
+// OCEL cannot hold, so it is refused (declared), with or without an object
+// table.
+void refuses_an_id_under_two_types() {
+  const std::string events =
+      "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order,ocel:type:item\n"
+      "e1,2024-01-01,A,['o1'],['o1']\n";
+  const auto message = [](auto&& read) {
+    try {
+      (void)read();
+    } catch (const std::invalid_argument& error) {
+      return std::string(error.what());
+    }
+    return std::string();
+  };
+  assert(message([&] { return minera::parse_ocel_csv(events); }).starts_with(
+      "object id appears under multiple types: o1 (order and item)"));
+  assert(message([&] {
+           return minera::parse_ocel_csv(
+               "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:item\ne1,2024-01-01,A,['o1']\n",
+               "ocel:oid,ocel:type\no1,order\n");
+         }).starts_with("object id appears under multiple types: o1 (order and item)"));
+  assert(message([&] {
+           return minera::parse_ocel_csv(
+               "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:item\ne1,2024-01-01,A,['o1']\n",
+               "ocel:oid,ocel:type\no1,order\no1,item\n");
+         }).starts_with("duplicate object CSV id: o1"));
+}
+
+// A naive OCEL 2.0 JSON or XML timestamp is stored as UTC, as the reference
+// stores it, so a CSV written from it prints "+00:00" as pm4py's writer does
+// ("2024-01-01 00:00:00+00:00", not the naive date "2024-01-01").
+void writes_naive_json_and_xml_timestamps_as_utc() {
+  const auto log = minera::parse_ocel_json(
+      R"({"objectTypes":[{"name":"order","attributes":[]}],"eventTypes":[{"name":"A","attributes":[]}],)"
+      R"("objects":[{"id":"o1","type":"order"}],"events":[)"
+      R"({"id":"e1","type":"A","time":"2024-01-01T00:00:00","relationships":[{"objectId":"o1","qualifier":""}]},)"
+      R"({"id":"e2","type":"A","time":"2024-01-02T10:30:00.123456","relationships":[{"objectId":"o1","qualifier":""}]}]})");
+  const auto csv = minera::serialize_ocel_csv(log);
+  assert(csv.find("e1,2024-01-01 00:00:00+00:00,A") != std::string::npos);
+  assert(csv.find("e2,2024-01-02 10:30:00.123456+00:00,A") != std::string::npos);
+  minera::OcelXmlImportOptions xml_options;
+  const auto xml = minera::parse_ocel_xml(
+      "<log><events><event><string key=\"id\" value=\"e1\"/><date key=\"timestamp\" "
+      "value=\"2024-01-01T00:00:00\"/><string key=\"activity\" value=\"A\"/><list key=\"omap\">"
+      "<string key=\"object-id\" value=\"o1\"/></list><list key=\"vmap\"/></event></events>"
+      "<objects><object><string key=\"id\" value=\"o1\"/><string key=\"type\" value=\"order\"/>"
+      "<list key=\"ovmap\"/></object></objects></log>",
+      xml_options);
+  assert(minera::serialize_ocel_csv(xml).find("e1,2024-01-01 00:00:00+00:00,A") != std::string::npos);
+  // pm4py.read_ocel_csv keeps naive times naive; write_ocel_xml still
+  // appends "Z" and write_ocel2_xml prints the naive isoformat.
+  const auto naive = minera::parse_ocel_csv(
+      "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order\n"
+      "e1,2024-01-01 00:00:00,A,['o1']\n");
+  minera::OcelXmlExportOptions classic_xml;
+  classic_xml.allow_lossy = true;
+  assert(minera::serialize_ocel_xml(naive, classic_xml)
+             .find("<date key=\"timestamp\" value=\"2024-01-01T00:00:00Z\"/>") != std::string::npos);
+  minera::OcelXmlExportOptions standard_xml = classic_xml;
+  standard_xml.format = minera::OcelXmlFormat::kStandard;
+  const auto standard_text = minera::serialize_ocel_xml(naive, standard_xml);
+  assert(standard_text.find("time=\"2024-01-01T00:00:00\"") != std::string::npos);
+}
+
 }  // namespace
 
 int main() {
@@ -388,6 +504,9 @@ int main() {
   keeps_repeated_relations();
   writes_timestamps_as_pandas();
   reads_object_cells_as_pandas();
+  names_columns_as_pandas();
+  refuses_an_id_under_two_types();
+  writes_naive_json_and_xml_timestamps_as_utc();
 
   minera::OcelCsvImportOptions custom_import;
   custom_import.event_id_column = "event_id";
@@ -445,10 +564,9 @@ int main() {
          synthesized_log.objects[0].id == "o9" &&
          synthesized_log.objects[0].type == "order");
 
-  throws([&] {
-    (void)minera::parse_ocel_csv(
-        "ocel:eid,ocel:eid,ocel:activity,ocel:timestamp\n");
-  });
+  // A repeated column is "ocel:eid.1", as read_csv names it (pm4py reads an
+  // empty log from this header).
+  assert(minera::parse_ocel_csv("ocel:eid,ocel:eid,ocel:activity,ocel:timestamp\n").events.empty());
   throws([&] {
     (void)minera::parse_ocel_csv(
         "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:order,ocel:type:item\n"

@@ -21,6 +21,30 @@
 namespace minera {
 namespace {
 
+// The reference XML readers keep an object id listed twice as two object
+// rows (with their own types and attributes) while typing every relation to
+// it by the last listing, and their statistics, OC-DFG and flattening then
+// disagree on its type (observed black-box); a native OCEL holds one object
+// per id, so such a file is refused (declared).
+// The OCEL 1.0 XML event date: the UTC instant with a "Z", which the
+// reference writer appends to a naive time too (a naive OCEL CSV
+// timestamp is written "2024-01-01T00:00:00Z", observed black-box on
+// pm4py.write_ocel_xml).
+std::string classic_xml_timestamp_text(std::string_view text) {
+  auto out = ocel_frame::utc_timestamp_text(text, 'T', "Z");
+  const auto parsed = parse_timestamp_exact(text);
+  if (parsed && !parsed->timezone_aware) out += 'Z';
+  return out;
+}
+
+[[noreturn]] void throw_repeated_xml_object(const std::string& id, const std::string& first,
+                                            const std::string& last) {
+  throw std::invalid_argument(
+      "invalid or duplicate OCEL XML object: id " + id + " is listed twice (types " + first +
+      " and " + last + "); pm4py keeps both object rows and types its relations by the last "
+      "one, which a native OCEL cannot hold");
+}
+
 struct Node {
   std::string name;
   std::vector<std::pair<std::string, std::string>> attrs;
@@ -281,7 +305,8 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
                                           ? keyed_value(*on, "object-type")
                                           : keyed_value(*on, "type"))
                                    : attr_or(*on, "type", attr_or(*on, "object-type"));
-      if (id.empty() || type.empty() || !types.emplace(id, type).second) throw std::invalid_argument("invalid or duplicate OCEL XML object");
+      if (id.empty() || type.empty()) throw std::invalid_argument("invalid or duplicate OCEL XML object");
+      if (const auto [it, added] = types.emplace(id, type); !added) throw_repeated_xml_object(id, it->second, type);
       OcelObject o{id, type, {}};
       append_values_filtered(*on, o.attributes, reject_lists,
                              {"id", "object-id", "type", "object-type"});
@@ -372,7 +397,8 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
   for (const auto* objects : children(root, "objects"))
     for (const auto* on : children(*objects, "object")) {
       const std::string id = attr_or(*on, "id"), type = attr_or(*on, "type");
-      if (id.empty() || type.empty() || !types.emplace(id, type).second) throw std::invalid_argument("invalid or duplicate OCEL XML object");
+      if (id.empty() || type.empty()) throw std::invalid_argument("invalid or duplicate OCEL XML object");
+      if (const auto [it, added] = types.emplace(id, type); !added) throw_repeated_xml_object(id, it->second, type);
       OcelObject o{id, type, {}};
       if (const auto* a = child(*on, "attributes")) {
         // Grouped by name in first-appearance order, like the reference's
@@ -786,7 +812,7 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
       // Fields in the column order of a frame read from OCEL JSON.
       out << "    <event>\n      <string key=\"id\" value=\"" << esc(event.id)
           << "\"/>\n      <date key=\"timestamp\" value=\""
-          << esc(ocel_frame::utc_timestamp_text(event.timestamp, 'T', "Z"))
+          << esc(classic_xml_timestamp_text(event.timestamp))
           << "\"/>\n      <string key=\"activity\" value=\"" << esc(event.activity) << "\"/>\n";
       const auto& rows = rows_of(relations, event.id);
       std::unordered_set<std::string_view> listed;

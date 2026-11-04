@@ -4,7 +4,11 @@
 #include "../footprints/conformance_trace_extensive.hpp"
 
 #include <cassert>
+#include <cstdint>
 #include <initializer_list>
+#include <limits>
+#include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 
@@ -315,7 +319,35 @@ void table_projection_keeps_aliases_aligned_after_reordering() {
   assert(materialized.rows == table.rows);
 }
 
+// DFG totals past 2^64 (counts as JSON footprints may carry) neither wrap
+// nor lose the reference's rounding: exact sums, each rounded to a double
+// once (expected values from pm4py fp_fitness on the same dicts).
+void fitness_totals_past_uint64() {
+  const std::uint64_t max = std::numeric_limits<std::uint64_t>::max();
+  const auto fitness = [](std::map<FootprintPair, std::uint64_t> dfg,
+                          std::set<FootprintPair> deviations) {
+    Footprint log;
+    for (const auto& [pair, count] : dfg) log.sequence.insert(pair);
+    log.dfg = std::move(dfg);
+    log.start_activities = {"A"};
+    log.end_activities = {"D"};
+    FootprintsExtensiveResult conformance;
+    conformance.footprints = std::move(deviations);
+    conformance.end_activities = {"D"};
+    return fp_fitness(log, Footprint{}, conformance);
+  };
+  const std::uint64_t half = std::uint64_t{1} << 63;
+  assert(fitness({{{"A", "B"}, half}, {{"B", "C"}, half}}, {{"A", "B"}}) == 0x1p-1);
+  assert(fitness({{{"A", "B"}, max}, {{"B", "C"}, max}, {{"C", "D"}, max}},
+                 {{"A", "B"}, {"C", "D"}}) == 0x1.999999999999ap-2);
+  assert(fitness({{{"A", "B"}, max}, {{"B", "C"}, 3}, {{"C", "D"}, (std::uint64_t{1} << 53) + 1}},
+                 {{"B", "C"}}) == 0x1.999999999999ap-1);
+  assert(fitness({{{"A", "B"}, max}, {{"B", "C"}, max}, {{"C", "D"}, 12345}},
+                 {{"C", "D"}}) == 0x1.9999999999998p-1);
+}
+
 int main() {
+  fitness_totals_past_uint64();
   discovery_variants_are_deterministic();
   dfg_boundaries_are_inferred();
   conformance_variants_and_evaluation();

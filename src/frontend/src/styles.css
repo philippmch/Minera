@@ -230,6 +230,12 @@
 }
 /* The pannable map fills its frame, so tuck its ring just inside the border. */
 .map-wrap svg:focus-visible { outline-offset: -3px; }
+/* File pickers styled as a button, card or drop zone keep their input
+   transparent over the label, so the label shows the input's keyboard focus. */
+:is(.landing-drop, label.btn-open, .miner-card-upload):has(> input[type="file"]:focus-visible) {
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
+}
 
 html, body {
   margin: 0;
@@ -1169,6 +1175,9 @@ main p, main li, main summary { overflow-wrap: break-word; }
 .miner-card-upload {
   border-style: dashed;
 }
+/* The upload card's file input covers the card, transparent, so the card is a
+   tab stop like the miner cards beside it (a hidden input never takes focus). */
+.miner-card-upload input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 
 /* POWL's recursive structure is intentionally rendered as nested cards: this
    keeps XOR/loop/partial-order boundaries visible even on small screens. */
@@ -1515,12 +1524,22 @@ main p, main li, main summary { overflow-wrap: break-word; }
 }
 
 .variant {
-  padding: 13px 10px 13px 12px;
   border-bottom: 1px solid var(--line-soft);
-  cursor: pointer;
   position: relative;
   transition: background 0.15s ease;
 }
+.variant-select {
+  display: block;
+  width: 100%;
+  padding: 13px 10px 13px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.variant-select:focus-visible { outline: 2px solid var(--copper); outline-offset: -2px; }
 .variant:hover { background: rgba(32, 29, 24, 0.03); }
 .variant.active { background: var(--copper-soft); }
 .variant.active::before {

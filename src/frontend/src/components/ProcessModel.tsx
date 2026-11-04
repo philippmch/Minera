@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from "react";
+import { useStepFocus } from "../step-focus";
 import { downloadBlob } from "../download";
 import { type TreeLayout } from "../tree-layout";
 import { type PetriLayout } from "../petri-layout";
@@ -57,6 +58,7 @@ export function ProcessModel({
   onOpenPlayout,
 }: ProcessModelProps) {
   const [step, setStep] = useState<Step>("miner");
+  const flowRef = useStepFocus<HTMLDivElement>(step);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<string | null>(null);
 
@@ -74,7 +76,7 @@ export function ProcessModel({
   };
 
   return (
-    <div className="miner-flow reveal">
+    <div className="miner-flow reveal" ref={flowRef}>
       <nav className="miner-trail">
         <button
           className={step === "miner" ? "trail-item active" : "trail-item"}

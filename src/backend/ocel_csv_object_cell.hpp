@@ -13,7 +13,9 @@
 // "['o1'],", whose elements are lists) makes the reference raise TypeError:
 // unhashable type, and so does it here. Natively refused, as declared in
 // docs/reference-2.7.22-parity.md: tuple elements (and, with an object
-// table, the containers the reference prints), \N{...} escapes, lone
+// table, the containers the reference prints), well-formed \N{NAME}
+// escapes in a cell that otherwise parses (a malformed one, or one in a cell
+// that is no literal, lists no objects as in the reference), lone
 // surrogates, integers past 4300 digits, bytes with octal escapes past \377,
 // and elements whose relation ids and object ids disagree in the reference.
 
@@ -159,10 +161,14 @@ class Parser {
     return node;
   }
 
+  // Whether a string in the parsed cell holds a well-formed \N{NAME} escape.
+  [[nodiscard]] bool named_escape() const noexcept { return named_escape_; }
+
  private:
   std::string_view s_;
   std::size_t pos_ = 0;
   int depth_ = 0;
+  bool named_escape_ = false;
 
   bool newline_at(std::size_t at) const { return at < s_.size() && (s_[at] == '\n' || s_[at] == '\r'); }
   std::size_t newline_length(std::size_t at) const {
@@ -478,7 +484,26 @@ class Parser {
         append_utf8(out, code);
         continue;
       }
-      if (!is_bytes && escaped == 'N') unsupported("a \\N{...} escape");
+      if (!is_bytes && escaped == 'N') {
+        // Python reads "\N{NAME}" with NAME made of letters, digits, spaces
+        // and hyphens; anything else (no braces, an empty or unterminated
+        // name) is a SyntaxError, so the cell lists no objects. A well-formed
+        // name is refused only once the whole cell is known to parse, since
+        // this reader has no Unicode name table.
+        if (pos_ >= s_.size() || s_[pos_] != '{') fail();
+        std::size_t end = pos_ + 1;
+        while (end < s_.size() && s_[end] != '}') {
+          const char c = s_[end];
+          if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+                c == ' ' || c == '-'))
+            fail();
+          ++end;
+        }
+        if (end >= s_.size() || end == pos_ + 1) fail();
+        named_escape_ = true;
+        pos_ = end + 1;
+        continue;
+      }
       // An unknown escape keeps its backslash.
       out.push_back('\\');
       out.push_back(escaped);
@@ -730,6 +755,9 @@ inline std::optional<std::vector<Value>> parse_object_cell(std::string_view cell
   try {
     detail::Parser parser(cell);
     auto value = detail::evaluate(parser.parse_cell());
+    // Refused only for a cell that is otherwise a Python literal; an unknown
+    // name, a SyntaxError in the reference, is refused too (declared).
+    if (parser.named_escape()) detail::unsupported("a \\N{...} escape");
     return std::move(value.items);
   } catch (const detail::Failed&) {
     return std::nullopt;

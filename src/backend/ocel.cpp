@@ -79,6 +79,12 @@ class Parser {
                                   ocel_limit_text(limits_.max_bytes) +
                                   " OCEL limit");
   }
+  // A repeated object key keeps its first place and its last value, as
+  // Python's json.load (the reference OCEL JSON readers) builds a dict.
+  Parser& last_repeated_key_wins() {
+    last_repeated_key_wins_ = true;
+    return *this;
+  }
   Json parse() {
     skip();
     Json result = value(0);
@@ -171,9 +177,11 @@ class Parser {
       if (pos_ < input_.size() && input_[pos_] == '}') { ++pos_; return Json{std::move(object), {}}; }
       while (true) {
         skip(); if (pos_ >= input_.size() || input_[pos_] != '"') fail("object key must be string");
-        auto key = string_value(); if (object.find(key) != object.end()) fail("duplicate object key");
-        keys.push_back(key);
-        expect(':'); object.emplace(std::move(key), value(depth + 1)); skip();
+        auto key = string_value();
+        const bool repeated = object.find(key) != object.end();
+        if (repeated && !last_repeated_key_wins_) fail("duplicate object key");
+        if (!repeated) keys.push_back(key);
+        expect(':'); auto item = value(depth + 1); object.insert_or_assign(std::move(key), std::move(item)); skip();
         if (pos_ < input_.size() && input_[pos_] == '}') { ++pos_; break; }
         expect(',');
       }
@@ -213,6 +221,7 @@ class Parser {
   }
   std::string_view input_; const OcelJsonLimits& limits_; std::size_t pos_ = 0; std::size_t nodes_ = 0;
   bool unsigned_graph_counts_ = false;
+  bool last_repeated_key_wins_ = false;
 };
 
 const Json& required(const Json::Object& o, std::string_view key) {
@@ -536,7 +545,9 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
                          qualifier == nullptr ? std::string{} : str(*qualifier, "ocel:qualifier")});
     }
   }
-  if (const auto* ch = optional(root, "ocel:objectChanges")) { if (!ch->is_array()) throw std::invalid_argument("ocel:objectChanges must be array"); for (const auto& r : ch->array()) { const auto& rr = obj(r, "ocel:objectChanges"); OcelObjectChange c; c.object_id = str(required(rr, "ocel:oid"), "ocel:oid"); if (!types.count(c.object_id)) throw std::invalid_argument("object change references unknown object"); c.object_type = optional(rr, "ocel:type") ? str(*optional(rr, "ocel:type"), "ocel:type") : types[c.object_id]; c.timestamp = str(required(rr, "ocel:timestamp"), "ocel:timestamp"); c.field = str(required(rr, "ocel:field"), "ocel:field"); c.value = scalar(required(rr, c.field), c.field); log.object_changes.push_back(std::move(c)); } }
+  // A change has its object's type, as the reference reader gives it
+  // whatever the change's own "ocel:type" says (observed black-box).
+  if (const auto* ch = optional(root, "ocel:objectChanges")) { if (!ch->is_array()) throw std::invalid_argument("ocel:objectChanges must be array"); for (const auto& r : ch->array()) { const auto& rr = obj(r, "ocel:objectChanges"); OcelObjectChange c; c.object_id = str(required(rr, "ocel:oid"), "ocel:oid"); if (!types.count(c.object_id)) throw std::invalid_argument("object change references unknown object"); if (const auto* type = optional(rr, "ocel:type")) (void)str(*type, "ocel:type"); c.object_type = types[c.object_id]; c.timestamp = str(required(rr, "ocel:timestamp"), "ocel:timestamp"); c.field = str(required(rr, "ocel:field"), "ocel:field"); c.value = scalar(required(rr, c.field), c.field); log.object_changes.push_back(std::move(c)); } }
   for (const auto& category : {"ocel:global-log", "ocel:global-event", "ocel:global-object"}) if (const auto* g = optional(root, category)) { for (const auto& [key, value] : obj(*g, category)) { if (value.is_scalar()) log.globals[std::string(category) + "." + key] = scalar(value, key); } }
   for (const auto& r : log.o2o) if (!types.count(r.target_id)) throw std::invalid_argument("o2o relation references unknown object");
   return log;
@@ -563,13 +574,21 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
     bool has_time = false;
     std::string time;
   };
+  // An id listed twice (under another type, say) is one object, as the
+  // reference reader keeps it (observed black-box): in the place of its
+  // first listing with the type, attribute values and object relationships
+  // of its last one, while the attribute changes of every listing stay, in
+  // document order, each read with its own listing's declared types and all
+  // under the last type.
+  std::unordered_map<std::string, std::size_t> object_index;
+  std::vector<std::vector<OcelO2oRelation>> object_o2o;
   for (const auto& raw : object_array.array()) {
     const auto& x = obj(raw, "objects[]");
     const auto id = str(required(x, "id"), "id");
-    if ((!literal_names && id.empty()) || types.count(id))
-      throw std::invalid_argument("duplicate or empty object id");
+    if (!literal_names && id.empty())
+      throw std::invalid_argument("empty object id");
     const auto type = str(required(x, "type"), "type");
-    types.emplace(id, type);
+    types.insert_or_assign(id, type);
     OcelObject object{id, type, {}};
     if (const auto* aa = optional(x, "attributes")) {
       if (!aa->is_array())
@@ -608,21 +627,32 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
         }
       }
     }
-    log.objects.push_back(std::move(object));
-    log.object_type_attributes.try_emplace(type);
+    std::vector<OcelO2oRelation> o2o;
     if (const auto* rr = optional(x, "relationships")) {
       if (!rr->is_array())
         throw std::invalid_argument("object relationships must be array");
       for (const auto& r : rr->array()) {
         const auto& y = obj(r, "relationship");
-        log.o2o.push_back(
+        o2o.push_back(
             {id, str(required(y, "objectId"), "objectId"),
              optional(y, "qualifier")
                  ? str(*optional(y, "qualifier"), "qualifier")
                  : ""});
       }
     }
+    const auto [slot, added] = object_index.try_emplace(id, log.objects.size());
+    if (added) {
+      log.objects.push_back(std::move(object));
+      object_o2o.push_back(std::move(o2o));
+    } else {
+      log.objects[slot->second] = std::move(object);
+      object_o2o[slot->second] = std::move(o2o);
+    }
   }
+  for (auto& relations : object_o2o)
+    for (auto& relation : relations) log.o2o.push_back(std::move(relation));
+  for (auto& change : log.object_changes) change.object_type = types.at(change.object_id);
+  for (const auto& object : log.objects) log.object_type_attributes.try_emplace(object.type);
   const auto& event_array = required(root, "events");
   if (!event_array.is_array())
     throw std::invalid_argument("events must be array");
@@ -1047,7 +1077,10 @@ Ocel project_ocpn_labels(const Ocel& log,
 
 static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& limits,
                                  bool literal_names) {
-  const Json root = Parser(json, limits).parse();
+  // pm4py reads the document with json.load: an object id repeated in the
+  // classic "ocel:objects" (under another type, say) is the last entry, in
+  // the place of the first.
+  const Json root = Parser(json, limits).last_repeated_key_wins().parse();
   if (!root.is_object()) throw std::invalid_argument("OCEL root must be object");
   const auto& r = root.object();
   if(const auto* marker=optional(r,"minera:literalNames")) {
@@ -1391,7 +1424,9 @@ bool certainly_not_a_date(std::string_view text) {
 
 // "YYYY-MM-DDTHH:MM:SS[.ffffff|.fffffffff]+00:00" for a UTC value, the
 // isoformat of what the reference stores; native readers take it as is.
-std::string utc_timestamp_text(std::int64_t seconds, std::uint32_t nanoseconds) {
+// `suffix` replaces "+00:00": "Z" (the same UTC value) or "" (a naive one).
+std::string utc_timestamp_text(std::int64_t seconds, std::uint32_t nanoseconds,
+                               std::string_view suffix = "+00:00") {
   std::int64_t days = seconds >= 0 ? seconds / 86400 : -((-seconds + 86399) / 86400);
   const std::int64_t clock = seconds - days * 86400;
   // civil_from_days (Howard Hinnant).
@@ -1417,24 +1452,42 @@ std::string utc_timestamp_text(std::int64_t seconds, std::uint32_t nanoseconds) 
     length = std::snprintf(buffer, sizeof buffer, ".%06u", nanoseconds / 1000);
     out.append(buffer, static_cast<std::size_t>(length));
   }
-  return out + "+00:00";
+  return out.append(suffix);
 }
 
-std::string utc_timestamp_text(std::int64_t microseconds) {
+std::string utc_timestamp_text(std::int64_t microseconds, std::string_view suffix = "+00:00") {
   const std::int64_t seconds =
       microseconds >= 0 ? microseconds / 1000000 : -((-microseconds + 999999) / 1000000);
-  return utc_timestamp_text(seconds, static_cast<std::uint32_t>((microseconds - seconds * 1000000) * 1000));
+  return utc_timestamp_text(seconds, static_cast<std::uint32_t>((microseconds - seconds * 1000000) * 1000),
+                            suffix);
 }
 
-// Whether the native readers take `text` as the UTC value `microseconds`
-// with no non-zero offset of its own; otherwise the stored text is replaced
-// by utc_timestamp_text so filters, features, statistics and exporters see
-// the value the reference stores.
-bool natively_utc(std::string_view text, std::int64_t microseconds) {
+// Whether the native readers take `text` as the value `microseconds` the
+// reference stores: a UTC one (no non-zero offset of its own, and an offset
+// at all: the reference stamps a naive text UTC), or a naive one when
+// `aware` is false (an OCEL 2.0 XML dateutil value without an offset).
+// Otherwise the stored text is replaced (stored_timestamp_text) so filters,
+// features, statistics and exporters see the value the reference stores.
+bool natively_stored(std::string_view text, std::int64_t microseconds, bool aware = true) {
   const auto exact = parse_timestamp_exact(text);
-  if (!exact || (exact->timezone_aware && exact->offset_minutes != 0)) return false;
+  if (!exact || exact->timezone_aware != aware ||
+      (exact->timezone_aware && exact->offset_minutes != 0))
+    return false;
   const auto native = parse_timestamp_microseconds(text);
   return native && *native == microseconds;
+}
+
+// The text stored for `text` when natively_stored refuses it. A naive event
+// time is stamped "Z", as the reference JSON writers spell an event time, so
+// a naive document written back as JSON reads like theirs; an object change
+// (whose time they print as isoformat), an offset and a shape native does
+// not read become "+00:00", and a naive dateutil value stays naive.
+std::string stored_timestamp_text(std::string_view text, std::int64_t microseconds,
+                                  bool event, bool aware = true) {
+  if (!aware) return utc_timestamp_text(microseconds, "");
+  const auto exact = parse_timestamp_exact(text);
+  const bool naive = exact && !exact->timezone_aware;
+  return utc_timestamp_text(microseconds, event && naive ? "Z" : "+00:00");
 }
 
 }  // namespace
@@ -1503,17 +1556,21 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
   // stamped UTC for an ISO reading, the UTC instant for SQLite and for an
   // aware dateutil value, the wall clock for a naive one.
   std::vector<std::pair<std::size_t, std::string>> rewrites;
-  const auto store = [&](std::size_t index, std::int64_t microseconds) {
-    if (!natively_utc(log.events[index].timestamp, microseconds))
-      rewrites.emplace_back(index, utc_timestamp_text(microseconds));
+  const auto store = [&](std::size_t index, std::int64_t microseconds, bool aware = true) {
+    const auto& text = log.events[index].timestamp;
+    if (!natively_stored(text, microseconds, aware))
+      rewrites.emplace_back(index, stored_timestamp_text(text, microseconds, true, aware));
   };
   for (std::size_t index = 0; index < log.events.size(); ++index) {
     const auto& text = log.events[index].timestamp;
     if (reader == OcelTimestampReader::kInstantNanoseconds) {
       const auto instant = parse_timestamp_exact(text);
       if (!instant) { unknown = true; continue; }
+      // A naive text is the UTC instant, stamped as the reference does.
       if (instant->timezone_aware && instant->offset_minutes != 0)
         rewrites.emplace_back(index, utc_timestamp_text(instant->seconds, instant->nanoseconds));
+      else if (!instant->timezone_aware)
+        rewrites.emplace_back(index, utc_timestamp_text(instant->seconds, instant->nanoseconds, "Z"));
       keys.emplace_back(instant->seconds, instant->nanoseconds, index);
     } else if (reader == OcelTimestampReader::kIsoFormatOrFileOrder) {
       try {
@@ -1535,7 +1592,7 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
         aware = true;
       } else if (const auto lenient = dateutil_subset(text)) {
         (lenient->aware ? aware : naive) = true;
-        store(index, lenient->microseconds);
+        store(index, lenient->microseconds, lenient->aware);
         keys.emplace_back(lenient->microseconds, 0, index);
       } else if (certainly_not_a_date(text)) {
         throw std::invalid_argument("String does not contain a date: " + text);
@@ -1557,19 +1614,23 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
     if (text.starts_with("1970-01-01T00:00:00")) continue;
     if (reader == OcelTimestampReader::kInstantNanoseconds) {
       const auto instant = parse_timestamp_exact(text);
-      if (instant && instant->timezone_aware && instant->offset_minutes != 0)
+      if (instant && (!instant->timezone_aware || instant->offset_minutes != 0))
         change.timestamp = utc_timestamp_text(instant->seconds, instant->nanoseconds);
       continue;
     }
     std::optional<std::int64_t> microseconds;
+    bool aware = true;
     try {
       microseconds = iso_wall_microseconds(text);
     } catch (const std::invalid_argument&) {
       if (reader == OcelTimestampReader::kDateutil)
-        if (const auto lenient = dateutil_subset(text)) microseconds = lenient->microseconds;
+        if (const auto lenient = dateutil_subset(text)) {
+          microseconds = lenient->microseconds;
+          aware = lenient->aware;
+        }
     }
-    if (microseconds && !natively_utc(text, *microseconds))
-      change.timestamp = utc_timestamp_text(*microseconds);
+    if (microseconds && !natively_stored(text, *microseconds, aware))
+      change.timestamp = stored_timestamp_text(text, *microseconds, false, aware);
   }
   if (unknown) return;
   // pandas cannot order tz-naive values next to tz-aware ones (the message

@@ -11831,10 +11831,17 @@ int main(int argc, char** argv) {
   // SO_REUSEPORT): a second server on a busy port stops here instead of
   // sharing its connections with the first.
   if (!server.bind_to_port("127.0.0.1", port)) {
-    if (loopback_port_in_use(port))
+    if (loopback_port_in_use(port)) {
       std::cerr << "error: port " << port
                 << " is already in use; stop the other server or pass --port\n";
-    else
+#ifdef _WIN32
+      // SO_EXCLUSIVEADDRUSE also keeps the port while a just-stopped
+      // server's accepted connections are still closing (TIME_WAIT).
+      std::cerr << "note: on Windows a server that has just stopped can hold the port"
+                   " for up to a few minutes while its connections close; retry"
+                   " shortly or pass another --port\n";
+#endif
+    } else
       std::cerr << "error: cannot listen on port " << port << '\n';
     return 1;
   }

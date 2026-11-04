@@ -65,6 +65,16 @@ struct ReferenceCsvColumn {
 [[nodiscard]] ReferenceCsvColumn reference_csv_column(
     const std::vector<std::string>& cells);
 
+// The column names pandas.read_csv gives a header row's fields (observed
+// black-box on pandas 3.0.5): an empty field is "Unnamed: i", i being its
+// position, and a repeated name becomes "name.1", "name.2", ..., skipping
+// names the header already holds. Named columns keep their names first, so a
+// generated "Unnamed: 0" that a later field also spells is the one renamed
+// (",Unnamed: 0" reads "Unnamed: 0.1", "Unnamed: 0"); "a,a,a.1" reads "a",
+// "a.2", "a.1". Names are compared byte for byte (" a" and "a" differ).
+[[nodiscard]] std::vector<std::string> reference_csv_header_names(
+    std::vector<std::string> fields);
+
 // Python's repr of a float ("7.0", "0.1", "inf"), the text a float64 key
 // converted to str has.
 [[nodiscard]] std::string reference_csv_float_text(double value);

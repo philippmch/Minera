@@ -1,5 +1,7 @@
 #include "minera/ocel_csv.hpp"
 
+#include "minera/csv_event_log_importer.hpp"
+
 #include "minera/timestamp.hpp"
 #include "ocel_csv_object_cell.hpp"
 #include "ocel_frame_types.hpp"
@@ -168,16 +170,13 @@ Header read_header(const Table& table, const OcelCsvImportOptions& options,
     throw std::invalid_argument("OCEL CSV requires a header row");
   }
   if (table.empty()) throw std::invalid_argument(std::string(label) + " CSV is empty");
-  Header header{table.front(), {}};
-  for (std::size_t i = 0; i < header.names.size(); ++i) {
-    if (header.names[i].empty()) {
-      throw std::invalid_argument(std::string(label) + " CSV has an empty header");
-    }
-    if (!header.indexes.emplace(header.names[i], i).second) {
-      throw std::invalid_argument(std::string(label) +
-                                  " CSV has duplicate column: " + header.names[i]);
-    }
-  }
+  // Column names as read_csv gives them: an empty name (a header starting or
+  // ending with the delimiter) is "Unnamed: i" and a repeated one "name.1",
+  // so ",ocel:eid,..." has an "Unnamed: 0" attribute column and a second
+  // "ocel:type:order" column lists objects of type "order.1".
+  Header header{reference_csv_header_names(table.front()), {}};
+  for (std::size_t i = 0; i < header.names.size(); ++i)
+    header.indexes.emplace(header.names[i], i);
   return header;
 }
 
@@ -466,17 +465,19 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   const auto timestamp = required_column(event_header, options.timestamp_column, "event");
 
   std::vector<std::pair<std::string, std::size_t>> object_columns;
-  std::set<std::string> reserved{options.event_id_column, options.activity_column,
-                                 options.timestamp_column};
+  // Columns as pm4py.read_ocel_csv selects them (observed black-box): every
+  // prefixed column lists objects of the type its name ends with, except a
+  // bare prefix (no type), which lists none and is no attribute either; any
+  // other column, an unselected "ocel:" one included (a repeated
+  // "ocel:eid.1", "ocel:foo"), is an event attribute.
+  std::vector<std::size_t> ignored_columns;
   for (std::size_t i = 0; i < event_header.names.size(); ++i) {
     const auto& name = event_header.names[i];
+    if (i == event_id || i == activity || i == timestamp) continue;
     if (name.rfind(options.object_type_prefix, 0) == 0) {
       const std::string type = name.substr(options.object_type_prefix.size());
-      if (type.empty()) throw std::invalid_argument("event object column has an empty type");
-      object_columns.emplace_back(type, i);
-      reserved.insert(name);
-    } else if (reserved.count(name) == 0 && name.rfind("ocel:", 0) == 0) {
-      throw std::invalid_argument("unknown reserved OCEL CSV column: " + name);
+      if (type.empty()) ignored_columns.push_back(i);
+      else object_columns.emplace_back(type, i);
     }
   }
   // Objects in object-table order, then objects only the event table names
@@ -509,7 +510,9 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
         if (!value.empty()) object.attributes.push_back({object_header.names[i], value});
       }
       if (!object_index.emplace(id, object_list.size()).second) {
-        throw std::invalid_argument("duplicate object CSV id: " + id);
+        throw std::invalid_argument("duplicate object CSV id: " + id +
+                                    " (pm4py keeps a row for each listing, which a native OCEL "
+                                    "cannot hold)");
       }
       object_list.push_back(std::move(object));
     }
@@ -551,7 +554,8 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
     for (std::size_t i = 0; i < event_header.names.size(); ++i) {
       if (i == event_id || i == activity || i == timestamp ||
           std::any_of(object_columns.begin(), object_columns.end(),
-                      [i](const auto& column) { return column.second == i; })) {
+                      [i](const auto& column) { return column.second == i; }) ||
+          std::find(ignored_columns.begin(), ignored_columns.end(), i) != ignored_columns.end()) {
         continue;
       }
       const std::string value = row[i];
@@ -636,8 +640,15 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
         if (object_table == nullptr) check_reference(*id);
         const auto& object_id = id->relation.text;
         const auto [it, inserted] = object_types.emplace(object_id, type);
+        // pm4py.read_ocel_csv lists such an id once per type, each relation
+        // keeping its column's type, and its statistics, OC-DFG and
+        // flattening count it under both (observed black-box); a native
+        // OCEL holds one object per id (declared).
         if (!inserted && it->second != type) {
-          throw std::invalid_argument("object id appears under multiple types: " + object_id);
+          throw std::invalid_argument("object id appears under multiple types: " + object_id +
+                                      " (" + it->second + " and " + type +
+                                      "); pm4py lists it as one object per type, which a native "
+                                      "OCEL cannot hold");
         }
         if (object_index.emplace(object_id, object_list.size()).second) {
           object_list.push_back(OcelObject{object_id, type, {}});

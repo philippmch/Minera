@@ -384,7 +384,92 @@ void csv_orphans_survive_routes_contract() {
   assert(bad_marker);
 }
 
+// An object id listed twice, under two types, in a JSON document (observed
+// black-box on pm4py 2.7.22). OCEL 2.0 JSON: one object in the place of the
+// first listing, with the type, attribute values and object relationships
+// of the last; the attribute changes of every listing stay, in document
+// order, read with their own listing's declared types and under the last
+// type. Classic JSON: json.load keeps the last entry of a repeated key in the
+// place of the first; a change has its object's type whatever its own
+// "ocel:type" says.
+void repeated_object_ids_contract() {
+  const auto standard = minera::parse_ocel_json(
+      R"({"objectTypes":[{"name":"order","attributes":[{"name":"p","type":"float"}]},)"
+      R"({"name":"item","attributes":[{"name":"p","type":"string"},{"name":"r","type":"string"}]}],)"
+      R"("eventTypes":[{"name":"A","attributes":[]}],"objects":[)"
+      R"({"id":"o1","type":"order","attributes":[{"name":"p","value":"1","time":"1970-01-01T00:00:00Z"},)"
+      R"({"name":"p","value":"2","time":"2024-01-09T00:00:00Z"}],"relationships":[{"objectId":"o2","qualifier":"r1"}]},)"
+      R"({"id":"o2","type":"item","relationships":[{"objectId":"o1","qualifier":"r2"}]},)"
+      R"({"id":"o3","type":"item"},)"
+      R"({"id":"o1","type":"item","attributes":[{"name":"r","value":"R","time":"1970-01-01T00:00:00Z"},)"
+      R"({"name":"p","value":"7","time":"1970-01-01T00:00:00Z"},{"name":"p","value":"8","time":"2024-01-06T00:00:00Z"}],)"
+      R"("relationships":[{"objectId":"o3","qualifier":"r3"}]},)"
+      R"({"id":"o3","type":"order","relationships":[{"objectId":"o2","qualifier":"r4"}]}],)"
+      R"("events":[{"id":"e1","type":"A","time":"2024-01-01T00:00:00Z","relationships":[)"
+      R"({"objectId":"o1","qualifier":"x"},{"objectId":"o2","qualifier":"y"},{"objectId":"o3","qualifier":"y"}]}]})");
+  assert(standard.objects.size() == 3);
+  assert(standard.objects[0].id == "o1" && standard.objects[0].type == "item");
+  assert(standard.objects[0].attributes.size() == 2 && standard.objects[0].attributes[0].key == "r" &&
+         std::get<std::string>(standard.objects[0].attributes[1].value) == "7");
+  assert(standard.objects[1].id == "o2" && standard.objects[1].type == "item");
+  assert(standard.objects[2].id == "o3" && standard.objects[2].type == "order");
+  assert(standard.o2o.size() == 3);
+  assert(standard.o2o[0].source_id == "o1" && standard.o2o[0].target_id == "o3" && standard.o2o[0].qualifier == "r3");
+  assert(standard.o2o[1].qualifier == "r2" && standard.o2o[2].qualifier == "r4");
+  assert(standard.object_changes.size() == 2);
+  assert(standard.object_changes[0].object_type == "item" &&
+         std::get<double>(standard.object_changes[0].value) == 2.0 &&
+         standard.object_changes[0].timestamp == "2024-01-09T00:00:00Z");
+  assert(standard.object_changes[1].object_type == "item" &&
+         std::get<std::string>(standard.object_changes[1].value) == "8");
+
+  const auto classic = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:timestamp":"2024-01-01T00:00:00Z","ocel:activity":"A","ocel:vmap":{},"ocel:omap":["o1","o2"]}},)"
+      R"("ocel:objectChanges":[{"ocel:oid":"o1","ocel:type":"order","ocel:timestamp":"2024-01-02T00:00:00Z","ocel:field":"p","p":5}],)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{"p":1}},"o2":{"ocel:type":"item","ocel:ovmap":{}},)"
+      R"("o1":{"ocel:type":"item","ocel:ovmap":{"q":2}}}})");
+  assert(classic.objects.size() == 2 && classic.objects[0].id == "o1" && classic.objects[0].type == "item");
+  assert(classic.objects[0].attributes.size() == 1 && classic.objects[0].attributes[0].key == "q");
+  assert(classic.object_changes.size() == 1 && classic.object_changes[0].object_type == "item");
+  assert(classic.object_type_attributes.count("order") == 0);
+}
+
+// Naive JSON timestamps are stored as UTC, as every reference JSON and XML
+// reader stores them (datetime64[us, UTC]): an event time is stamped "Z" and
+// a change time "+00:00", the spellings of the reference JSON writers, so a
+// naive document written back as JSON reads like theirs. The epoch time of a
+// static value stays as written.
+void naive_timestamps_read_as_utc_contract() {
+  const auto log = minera::parse_ocel_json(
+      R"({"objectTypes":[{"name":"order","attributes":[{"name":"p","type":"string"}]}],)"
+      R"("eventTypes":[{"name":"A","attributes":[]}],"objects":[{"id":"o1","type":"order","attributes":[)"
+      R"({"name":"p","value":"P1","time":"1970-01-01T00:00:00"},{"name":"p","value":"P2","time":"2024-01-05T12:00:00"}]}],)"
+      R"("events":[{"id":"e2","type":"A","time":"2024-01-02T10:30:00.123456","relationships":[{"objectId":"o1"}]},)"
+      R"({"id":"e1","type":"A","time":"2024-01-01T00:00:00","relationships":[{"objectId":"o1"}]}]})");
+  assert(log.events.size() == 2 && log.events[0].id == "e1");
+  assert(log.events[0].timestamp == "2024-01-01T00:00:00Z");
+  assert(log.events[1].timestamp == "2024-01-02T10:30:00.123456Z");
+  assert(log.object_changes.size() == 1 && log.object_changes[0].timestamp == "2024-01-05T12:00:00+00:00");
+  const auto standard = minera::serialize_ocel_json(log, minera::OcelJsonFormat::kStandard);
+  assert(standard.find(R"("time":"2024-01-01T00:00:00Z")") != std::string::npos);
+  assert(standard.find(R"("time":"2024-01-05T12:00:00+00:00")") != std::string::npos);
+  assert(standard.find(R"("time":"1970-01-01T00:00:00Z")") != std::string::npos);
+  const auto classic = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:timestamp":"2024-01-01 08:00","ocel:activity":"A","ocel:vmap":{},"ocel:omap":["o1"]}},)"
+      R"("ocel:objectChanges":[{"ocel:oid":"o1","ocel:timestamp":"2024-01-02T00:00:00","ocel:field":"p","p":5}],)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+  assert(classic.events[0].timestamp == "2024-01-01T08:00:00Z");
+  assert(classic.object_changes[0].timestamp == "2024-01-02T00:00:00+00:00");
+  // An aware text is kept as written.
+  const auto aware = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:timestamp":"2024-01-01T08:00:00+00:00","ocel:activity":"A","ocel:omap":["o1"]}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+  assert(aware.events[0].timestamp == "2024-01-01T08:00:00+00:00");
+}
+
 int main() {
+  repeated_object_ids_contract();
+  naive_timestamps_read_as_utc_contract();
   json_limits_contract();
   json_order_contract();
   csv_orphans_survive_routes_contract();
@@ -621,14 +706,13 @@ int main() {
   }
   assert(malformed);
 
-  bool duplicate = false;
-  try {
-    (void)minera::parse_ocel_json(
-        R"({"ocel:objects":{"o":{"ocel:type":"x"}},"ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"t","ocel:omap":["o"]},"e":{"ocel:activity":"a","ocel:timestamp":"t","ocel:omap":["o"]}}})");
-  } catch (...) {
-    duplicate = true;
-  }
-  assert(duplicate);
+  // A repeated key is the last entry in the place of the first, as
+  // json.load reads it (pm4py.read_ocel_json keeps event "e" as "b").
+  const auto repeated = minera::parse_ocel_json(
+      R"({"ocel:objects":{"o":{"ocel:type":"x"}},"ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"2024-01-01","ocel:omap":["o"]},)"
+      R"("f":{"ocel:activity":"c","ocel:timestamp":"2024-01-03","ocel:omap":["o"]},"e":{"ocel:activity":"b","ocel:timestamp":"2024-01-02","ocel:omap":["o"]}}})");
+  assert(repeated.events.size() == 2 && repeated.events[0].id == "e" && repeated.events[0].activity == "b");
+  assert(repeated.relations.size() == 2);
 
   bool bad_o2o = false;
   try {

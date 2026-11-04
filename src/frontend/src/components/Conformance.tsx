@@ -1,4 +1,5 @@
 import {OriginalBoseWorkspace} from "./OriginalBoseWorkspace";
+import { useStepFocus } from "../step-focus";
 import { downloadBlob } from "../download";
 import {OriginalEditDistanceWorkspace} from "./OriginalEditDistanceWorkspace";
 import {LiteralControlsPanel} from "./LiteralControlsPanel";
@@ -165,6 +166,7 @@ export function Conformance({
   const [diagnosticHistory, setDiagnosticHistory] = useState<{analysisId:number;entries:DiagnosticEntry[]}>({analysisId,entries:[]});
   const diagnosticCounter = useRef(0);
   const [step, setStep] = useState<Step>("miner");
+  const flowRef = useStepFocus<HTMLDivElement>(step);
   const [minerId, setMinerId] = useState<string | null>(null);
   const [methodId, setMethodId] = useState<string | null>(null);
 
@@ -266,7 +268,7 @@ export function Conformance({
   ].filter((candidate): candidate is { id: string; label: string } => candidate !== null);
 
   return (
-    <div className="miner-flow reveal">
+    <div className="miner-flow reveal" ref={flowRef}>
       <nav className="miner-trail">
         <button
           className={step === "miner" ? "trail-item active" : "trail-item"}
@@ -340,7 +342,7 @@ export function Conformance({
                 <input
                   type="file"
                   accept=".pnml,.bpmn,.ptml,.xml"
-                  hidden
+                  aria-label={currentImported || data.conformance?.[IMPORTED] ? "Replace the imported model (PNML, BPMN or PTML)" : "Upload your model (PNML, BPMN or PTML)"}
                   disabled={importing}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -1089,12 +1091,25 @@ function ModelEvaluationResultView({ result }: { result: ModelEvaluation }) {
   </div>;
 }
 
+/** Above this many cases the reduction trace is chosen by number: a select with one option per case freezes the view. */
+export const REDUCTION_SELECT_LIMIT = 1000;
+
 // The trace to reduce, listed by case id. Cases loaded on demand are fetched
 // once the list is opened; until then the selected trace number is shown.
 export function ReductionTraceField({ data, traceIndex, onChange }: { data: MineraExport; traceIndex: number; onChange: (index: number) => void }) {
   const [wanted, setWanted] = useState(false);
-  const load = useTraces(data, wanted);
+  const many = data.trace_count > REDUCTION_SELECT_LIMIT;
+  const load = useTraces(data, wanted && !many);
   const want = () => setWanted(true);
+  // The typed number, kept while it is not (yet) a valid trace number.
+  const [draft, setDraft] = useState<string | null>(null);
+  if (many) {
+    const caseId = load.status === "ready" ? load.traces[traceIndex]?.case_id : undefined;
+    return <label>Trace number (1–{numberFormat.format(data.trace_count)})<input type="number" min={1} max={data.trace_count} step={1} value={draft ?? String(traceIndex + 1)}
+      onChange={e => { const text = e.target.value, n = Number(text); setDraft(text); if (text.trim() !== "" && Number.isInteger(n) && n >= 1 && n <= data.trace_count) onChange(n - 1); }}
+      onBlur={() => setDraft(null)} />
+      {caseId !== undefined && <small>Case {caseId}</small>}</label>;
+  }
   return <>
     <label>Trace<select value={traceIndex} onFocus={want} onPointerDown={want} onChange={e => onChange(Number(e.target.value))}>
       {load.status === "ready"

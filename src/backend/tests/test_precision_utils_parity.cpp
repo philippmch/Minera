@@ -12,9 +12,11 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -303,6 +305,30 @@ std::string check_search(const BankCase& item) {
   });
 }
 
+// uint64 case ids past INT64_MAX stay apart, as pandas keeps a uint64
+// column exact (observed on pm4py 2.7.22: get_log_prefixes on ids
+// [2^63+1, 2^63, 2^63+1, 5] gives ({'a': {'c'}}, Counter({'a': 1}))).
+bool unsigned_case_ids_stay_apart() {
+  EventTable table;
+  table.columns = {"case:concept:name", "concept:name"};
+  table.dtypes = {"uint64", "object"};
+  const std::vector<std::pair<std::string, std::string>> rows = {
+      {"9223372036854775809", "a"}, {"9223372036854775808", "b"}, {"9223372036854775809", "c"}, {"5", "d"}};
+  for (const auto& [id, activity] : rows) {
+    EventAttribute case_id, label;
+    case_id.key = "case:concept:name";
+    case_id.value = id;
+    case_id.kind = AttributeKind::kInt;
+    label.key = "concept:name";
+    label.value = activity;
+    table.rows.push_back({case_id, label});
+  }
+  const auto result = precision_log_prefixes(table, "concept:name");
+  return result.prefixes.size() == 1 && result.prefixes[0].first == "a" &&
+         result.prefixes[0].second == std::vector<std::optional<std::string>>{std::string("c")} &&
+         result.counts.size() == 1 && result.counts[0].first == "a" && result.counts[0].second == 1;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) try {
@@ -311,6 +337,10 @@ int main(int argc, char** argv) try {
     return 2;
   }
   std::size_t failures = 0;
+  if (!unsigned_case_ids_stay_apart()) {
+    std::cerr << "uint64 case ids past INT64_MAX merged\n";
+    ++failures;
+  }
   for (const auto& item : read_bank(argv[1])) {
     const auto failure = item.kind == "prefixes" ? check_prefixes(item)
                          : item.kind == "fake"   ? check_fake(item)

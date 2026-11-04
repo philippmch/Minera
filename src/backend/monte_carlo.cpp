@@ -1063,22 +1063,56 @@ void finalize_case(CaseState& state, MonteCarloDiagnostics& diagnostics,
 [[nodiscard]] double infer_case_arrival_seconds(
     const EventLog& input_log, std::string_view timestamp_key) {
   std::vector<double> first_event_times;
+  std::vector<ParsedExactTimestamp> exact_times;
+  bool all_exact = true;
   first_event_times.reserve(input_log.traces.size());
+  exact_times.reserve(input_log.traces.size());
   for (const auto& trace : input_log.traces) {
     if (trace.events.empty()) continue;
     const auto timestamp =
         selected_timestamp_value(trace.events.front(), timestamp_key);
     if (!timestamp) continue;
     const auto parsed = parse_timestamp(*timestamp);
-    if (parsed && std::isfinite(*parsed)) first_event_times.push_back(*parsed);
+    if (parsed && std::isfinite(*parsed)) {
+      first_event_times.push_back(*parsed);
+      const auto exact = parse_timestamp_exact(*timestamp);
+      if (exact) exact_times.push_back(*exact);
+      else all_exact = false;
+    }
   }
   if (first_event_times.size() < 2) return 0.0;
-  std::sort(first_event_times.begin(), first_event_times.end());
   // statistics.mean sums the float differences exactly and rounds the mean
   // once; exact_mean does the same on every platform (a long double sum
   // carried extra precision only on x86 and was plain double on ARM and MSVC).
   std::vector<double> differences;
   differences.reserve(first_event_times.size() - 1);
+  if (all_exact) {
+    // The reference subtracts the case starts as pandas Timestamps (also for
+    // XES, which pm4py.read_xes returns as a DataFrame) and takes
+    // Timedelta.total_seconds(): the whole seconds plus the microseconds
+    // (nanoseconds dropped) divided by 10**6, added in double (observed
+    // black-box; it differs from the exact microseconds / 10**6 of a Python
+    // timedelta in about 0.3% of gaps). Two float epochs subtracted lose the
+    // microseconds (a 2020 epoch double has a resolution of about 0.24 us).
+    const auto earlier = [](const ParsedExactTimestamp& a, const ParsedExactTimestamp& b) {
+      return std::tie(a.seconds, a.nanoseconds) < std::tie(b.seconds, b.nanoseconds);
+    };
+    std::sort(exact_times.begin(), exact_times.end(), earlier);
+    for (std::size_t i = 1; i < exact_times.size(); ++i) {
+      std::int64_t seconds = exact_times[i].seconds - exact_times[i - 1].seconds;
+      std::int64_t nanoseconds = static_cast<std::int64_t>(exact_times[i].nanoseconds) -
+                                 static_cast<std::int64_t>(exact_times[i - 1].nanoseconds);
+      if (nanoseconds < 0) {
+        nanoseconds += 1000000000;
+        --seconds;
+      }
+      differences.push_back(static_cast<double>(seconds) +
+                            static_cast<double>(nanoseconds / 1000) / 1e6);
+    }
+    const double result = detail::exact_mean(differences);
+    return std::isfinite(result) && result >= 0.0 ? result : 0.0;
+  }
+  std::sort(first_event_times.begin(), first_event_times.end());
   for (std::size_t i = 1; i < first_event_times.size(); ++i) {
     const double difference = first_event_times[i] - first_event_times[i - 1];
     if (!std::isfinite(difference) || difference < 0.0) return 0.0;

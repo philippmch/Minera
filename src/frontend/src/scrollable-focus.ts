@@ -3,7 +3,7 @@
 // scroll box, so this keeps every such box that actually overflows in the tab
 // order, and takes boxes that stop overflowing back out of it.
 
-const CANDIDATES = "pre, .efg-scroll, .query-table-wrap, .table-scroll";
+const CANDIDATES = "pre, .efg-scroll, .query-table-wrap, .table-scroll, .activity-table-scroll";
 const MARK = "data-scroll-focus";
 
 function scrolls(element: HTMLElement): boolean {

@@ -366,6 +366,54 @@ int main() {
          orphans.object_changes[0].object_id == "o1");
   std::filesystem::remove(orphan_path, ignored);
 
+  // Naive times read as UTC, as pm4py.read_ocel2_sqlite stores them
+  // (datetime64[us, UTC]): the event time is stamped "Z", the change time
+  // "+00:00", as the reference JSON writers print them. An id listed twice in
+  // the object table is refused: the reference keeps an object row per
+  // type-table row, all typed by the id's last "object" row (declared).
+  const auto naive_path = external_path.string() + ".naive.sqlite";
+  for (const bool repeated : {false, true}) {
+    std::filesystem::remove(naive_path, ignored);
+    sqlite3* naive_db = nullptr;
+    assert(sqlite3_open_v2(naive_path.c_str(), &naive_db,
+                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) == SQLITE_OK);
+    exec_sql(naive_db,
+             "CREATE TABLE event (ocel_id TEXT, ocel_type TEXT);"
+             "CREATE TABLE object (ocel_id TEXT, ocel_type TEXT);"
+             "CREATE TABLE event_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+             "CREATE TABLE object_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+             "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
+             "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);"
+             "CREATE TABLE event_Create (ocel_id TEXT, ocel_time TEXT);"
+             "CREATE TABLE object_order (ocel_id TEXT, ocel_time TEXT, status TEXT, ocel_changed_field TEXT);"
+             "INSERT INTO event VALUES ('e1', 'Create');"
+             "INSERT INTO object VALUES ('o1', 'order');"
+             "INSERT INTO event_map_type VALUES ('Create', 'Create');"
+             "INSERT INTO object_map_type VALUES ('order', 'order');"
+             "INSERT INTO event_Create VALUES ('e1', '2024-02-01 00:00:00');"
+             "INSERT INTO object_order VALUES ('o1', NULL, 'open', NULL);"
+             "INSERT INTO object_order VALUES ('o1', '2024-02-02 10:00:00.5', 'paid', 'status');"
+             "INSERT INTO event_object VALUES ('e1', 'o1', 'uses');");
+    if (repeated) exec_sql(naive_db, "INSERT INTO object VALUES ('o1', 'item');");
+    assert(sqlite3_close(naive_db) == SQLITE_OK);
+    if (repeated) {
+      bool refused = false;
+      try {
+        (void)minera::import_ocel_sqlite(naive_path);
+      } catch (const std::invalid_argument& error) {
+        refused = std::string(error.what()).find("o1 is listed twice (types order and item)") !=
+                  std::string::npos;
+      }
+      assert(refused);
+      continue;
+    }
+    const auto naive = minera::import_ocel_sqlite(naive_path);
+    assert(naive.events.size() == 1 && naive.events[0].timestamp == "2024-02-01T00:00:00Z");
+    assert(naive.object_changes.size() == 1 &&
+           naive.object_changes[0].timestamp == "2024-02-02T10:00:00.500000+00:00");
+  }
+  std::filesystem::remove(naive_path, ignored);
+
   std::filesystem::remove(path, ignored);
   std::filesystem::remove(external_path, ignored);
   return 0;
