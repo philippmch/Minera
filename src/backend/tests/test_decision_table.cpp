@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "minera/decision_mining.hpp"
 #include "minera/decision_table.hpp"
 
 namespace {
@@ -131,7 +132,34 @@ minera::EventLog custom_activity_log() {
 
 }  // namespace
 
+// A place is a decision point when it has two or more out-arc objects, as
+// the reference get_decision_points lists them: one arc of weight 2 (stored as
+// two repeated endpoints) is no choice, while two parallel arcs to one
+// transition are (the reference lists {'p1': ['b', 'b']}).
+void weighted_arc_is_not_a_decision_point() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto middle = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"A", "B"});
+  net.add_transition(0, {source}, {middle, middle});
+  net.add_transition(1, {middle, middle}, {sink});
+  minera::EventLog log;
+  for (int i = 0; i < 2; ++i) {
+    minera::Trace trace;
+    trace.case_id = "c" + std::to_string(i);
+    trace.events = {event("A", "1"), event("B", "2")};
+    for (auto& item : trace.events) item.case_id = trace.case_id;
+    log.traces.push_back(trace);
+  }
+  assert(minera::mine_decision_tables(log, net).tables.empty());
+  assert(minera::mine_decisions(log, net).decision_points.empty());
+}
+
 int main() {
+  weighted_arc_is_not_a_decision_point();
   const auto result = minera::mine_decision_tables(sample_log(), branching_net());
   assert(result.trace_count == 4);
   assert(result.observed_traces == 4);

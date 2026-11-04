@@ -1,5 +1,7 @@
 #include "minera/ilp_reference.hpp"
 
+#include "minera/cancellation.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -35,9 +37,12 @@ struct LpResult {
   double value = 0;
 };
 
-// Two-phase tableau simplex with Bland's rule.
+// Two-phase tableau simplex with Bland's rule. `cancelled`, when given, is
+// polled every 16 pivots (one LP over a large log can run for minutes) and
+// throws OperationCancelled; it never changes the pivots taken.
 LpResult solve_dense(const std::vector<double>& c, const std::vector<LpRow>& input_rows,
-                     const std::vector<double>& lo, const std::vector<double>& hi) {
+                     const std::vector<double>& lo, const std::vector<double>& hi,
+                     const std::function<bool()>* cancelled = nullptr) {
   const std::size_t n = c.size();
   for (std::size_t j = 0; j < n; ++j)
     if (lo[j] > hi[j] + kEps) return {};
@@ -120,8 +125,11 @@ LpResult solve_dense(const std::vector<double>& c, const std::vector<LpRow>& inp
     }
     basis[row] = column;
   };
+  std::size_t pivots = 0;
   auto run = [&](std::size_t allowed) -> bool {
     for (;;) {
+      if (cancelled && (++pivots & 15u) == 0)
+        throw_if_cancelled(*cancelled, "ILP discovery was cancelled");
       std::size_t entering = allowed;
       for (std::size_t j = 0; j < allowed; ++j)
         if (cost[j] < -kEps) {
@@ -181,11 +189,13 @@ LpResult solve_dense(const std::vector<double>& c, const std::vector<LpRow>& inp
 // relaxation is re-solved with every violated row until none is left.
 LpResult solve_generated(const std::vector<double>& c, const std::vector<LpRow>& fixed_rows,
                          const std::vector<LpRow>& lazy_rows, const std::vector<double>& lo,
-                         const std::vector<double>& hi) {
+                         const std::vector<double>& hi,
+                         const std::function<bool()>* cancelled = nullptr) {
   std::vector<LpRow> active = fixed_rows;
   std::vector<char> used(lazy_rows.size(), 0);
   for (;;) {
-    auto result = solve_dense(c, active, lo, hi);
+    if (cancelled) throw_if_cancelled(*cancelled, "ILP discovery was cancelled");
+    auto result = solve_dense(c, active, lo, hi, cancelled);
     if (result.status != LpStatus::kOptimal) return result;
     bool added = false;
     for (std::size_t r = 0; r < lazy_rows.size(); ++r) {
@@ -381,7 +391,7 @@ bool implicit(const WorkingNet& net, std::size_t p) {
   return solve_dense(c, rows, lo, hi).status == LpStatus::kOptimal;
 }
 
-void murata_reduction(WorkingNet& net) {
+void murata_reduction(WorkingNet& net, const std::function<bool()>& cancelled) {
   std::vector<std::string> names;
   for (const auto& place : net.places)
     if (!place.initial && !place.final) names.push_back(place.name);
@@ -389,6 +399,7 @@ void murata_reduction(WorkingNet& net) {
   for (const auto& name : names) {
     std::size_t p = 0;
     while (net.places[p].name != name) ++p;
+    throw_if_cancelled(cancelled, "ILP discovery was cancelled");
     if (implicit(net, p)) net.places.erase(net.places.begin() + static_cast<std::ptrdiff_t>(p));
   }
 }
@@ -507,15 +518,16 @@ ReferenceIlpNet reference_ilp_net(const std::vector<std::vector<std::string>>& t
     const std::size_t a = activity_index(model, producer);
     const std::size_t b = activity_index(model, consumer);
     const auto [lo, hi] = pair_bounds(model, a, b);
-    const auto result =
-        solve_generated(model.objective, model.final_rows, model.prefix_rows, lo, hi);
+    throw_if_cancelled(options.cancelled, "ILP discovery was cancelled");
+    const auto result = solve_generated(model.objective, model.final_rows,
+                                        model.prefix_rows, lo, hi, &options.cancelled);
     if (result.status != LpStatus::kOptimal) continue;
     auto place = round_place(model, result.x);
     if (!found.insert(place).second) continue;
     net.places.push_back({std::to_string(net.places.size()), place.first, place.second, 0, 0});
   }
 
-  murata_reduction(net);
+  murata_reduction(net, options.cancelled);
   simple_reduction(net);
 
   ReferenceIlpNet output;

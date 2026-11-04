@@ -2,20 +2,18 @@
 <log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
   <string key="concept:name" value="Independent process-tree alignment checked source"/>
   <trace>
-    <string key="case_id" value="case-31"/>
+    <string key="case_id" value="case-9"/>
     <event>
       <string key="activity" value="A"/>
-      <date key="timestamp" value="2024-01-01T00:31:01+00:00"/>
-      <string key="resource" value="R31"/>
-      <string key="payload" value="東京,;&quot;quoted&quot;
-A"/>
+      <date key="timestamp" value="2024-01-01T00:09:01+00:00"/>
+      <string key="resource" value="R9"/>
+      <string key="payload" value="東京,;&quot;quoted&quot;&#10;A"/>
     </event>
     <event>
       <string key="activity" value="B"/>
-      <date key="timestamp" value="2024-01-01T00:31:02+00:00"/>
-      <string key="resource" value="R31"/>
-      <string key="payload" value="東京,;&quot;quoted&quot;
-B"/>
+      <date key="timestamp" value="2024-01-01T00:09:02+00:00"/>
+      <string key="resource" value="R9"/>
+      <string key="payload" value="東京,;&quot;quoted&quot;&#10;B"/>
     </event>
   </trace>
 </log>

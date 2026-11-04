@@ -193,12 +193,29 @@ int main() {
   capped.max_states = 1;
   const auto capped_result = minera::check_alignment(exact, model, capped);
   assert(!capped_result.computed && capped_result.exhausted);
+  // The state bound stopped it, with no time limit configured.
+  assert(!capped_result.time_limit_reached);
+  {
+    const auto json = minera::alignment_json(capped_result, numeric_graph);
+    assert(json.find("\"error\": \"alignment search exhausted\", "
+                     "\"time_limit_reached\": false, \"fitness\": null") !=
+           std::string::npos);
+  }
+  // A generous time limit that does not run out still reports the state bound.
+  capped.max_total_time_seconds = 3600.0;
+  capped.max_time_seconds = 3600.0;
+  const auto capped_timed = minera::check_alignment(exact, model, capped);
+  assert(!capped_timed.computed && capped_timed.exhausted &&
+         !capped_timed.time_limit_reached);
 
   minera::AlignmentOptions timed;
   timed.variant = minera::AlignmentVariant::kDijkstraNoHeuristics;
   timed.max_total_time_seconds = 1e-12;
   const auto timed_result = minera::check_alignment(exact, model, timed);
   assert(!timed_result.computed && timed_result.exhausted);
+  assert(timed_result.time_limit_reached);
+  assert(minera::alignment_json(timed_result, numeric_graph)
+             .find("\"time_limit_reached\": true") != std::string::npos);
 
   // Generator variants expose a deduplicated optimal path collection.
   minera::AlignmentOptions generator;
@@ -249,6 +266,10 @@ int main() {
   timeout.max_time_seconds = 1e-12;
   const auto timeout_result = minera::check_alignment(log_of({"a", "b"}), model, timeout);
   assert(!timeout_result.computed && timeout_result.exhausted);
+  assert(timeout_result.time_limit_reached);
+  // Computed and unsound results carry no time_limit_reached key.
+  assert(minera::alignment_json(weighted_result, numeric_graph)
+             .find("time_limit_reached") == std::string::npos);
 
   minera::AlignmentOptions nan_cost;
   nan_cost.variant = minera::AlignmentVariant::kDijkstraNoHeuristics;
@@ -385,5 +406,6 @@ int main() {
   const auto preflight_result =
       minera::check_alignment(log_of({"finish"}), long_chain, preflight_cap);
   assert(!preflight_result.computed && preflight_result.exhausted);
+  assert(!preflight_result.time_limit_reached);
   return 0;
 }

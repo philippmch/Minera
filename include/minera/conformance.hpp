@@ -716,6 +716,10 @@ struct AlignmentResult {
   // either case the other fields are meaningless and `variants` is empty.
   bool computed = true;
   bool exhausted = false;  // when !computed: true = search bound hit, false = unsound
+  // When exhausted: true when a configured time limit (max_time_seconds or
+  // max_total_time_seconds) had run out, false when the search stopped on its
+  // state bound (or was cancelled) with time to spare.
+  bool time_limit_reached = false;
   double fitness = 1.0;               // cost-based log fitness in [0, 1]
   // Alignment-based escaping-edges precision: like token-replay precision it
   // asks how much extra behaviour the model allows at the states the log

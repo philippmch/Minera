@@ -171,24 +171,24 @@ class ProcessTreeBuilder {
 
   ProcessTreeNode transition(const PowlNode& node) {
     const auto leaf = ProcessTreeNode::leaf(activity_id(node.label()));
-    const auto& frequency = node.frequency();
-    if (frequency.minimum == 1 && frequency.maximum &&
-        *frequency.maximum == 1) {
-      return leaf;
-    }
+    // Same flags as pm4py's FrequentTransition: a minimum of 0 is
+    // skippable, an unbounded maximum self-loops, and finite bounds above
+    // one change nothing else.
+    const bool skippable = node.skippable();
+    const bool self_loop = node.self_loop();
+    if (!skippable && !self_loop) return leaf;
 
-    // A null maximum is the unbounded self-loop form. A silent redo allows
-    // the body to repeat without introducing an observable event.
-    const ProcessTreeNode repeated{
-        ProcessTreeOperator::kLoop, 0, {leaf, ProcessTreeNode::tau()}};
-    if (frequency.minimum == 0 && frequency.maximum &&
-        *frequency.maximum == 1) {
+    // A silent redo allows the body to repeat without introducing an
+    // observable event.
+    if (!self_loop) {
       return {ProcessTreeOperator::kExclusive, 0,
               {ProcessTreeNode::tau(), leaf}};
     }
-    if (frequency.minimum == 0) {
+    ProcessTreeNode repeated{
+        ProcessTreeOperator::kLoop, 0, {leaf, ProcessTreeNode::tau()}};
+    if (skippable) {
       return {ProcessTreeOperator::kExclusive, 0,
-              {ProcessTreeNode::tau(), repeated}};
+              {ProcessTreeNode::tau(), std::move(repeated)}};
     }
     return repeated;
   }
@@ -525,11 +525,9 @@ class PowlBuilder {
   }
 
   void build_partial_order(const PowlNode& node, std::size_t in, std::size_t out) {
+    // An empty order still gets its silent split and join (in -> nothing,
+    // nothing -> out), as in the reference, rather than one in -> out step.
     const auto& children = node.children();
-    if (children.empty()) {
-      add(std::nullopt, {in}, {out});
-      return;
-    }
     const std::size_t n = children.size();
     std::vector<std::size_t> child_in(n), child_out(n);
     for (std::size_t i = 0; i < n; ++i) {
@@ -614,10 +612,17 @@ class PowlBuilder {
     return false;
   }
 
+  // Folds until neither rule applies. A single-exit fold can open a new
+  // single-entry fold (an empty partial order's split and join leave a join
+  // with one input), which the reference folds too.
   void reduce() {
     removed_places_.assign(places_, false);
-    while (single_entry()) {}
-    while (single_exit()) {}
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      while (single_entry()) changed = true;
+      while (single_exit()) changed = true;
+    }
   }
 
   PetriNet materialize() const {

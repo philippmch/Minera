@@ -989,6 +989,7 @@ main p, main li, main summary { overflow-wrap: break-word; }
 }
 .petri-arrowhead { fill: var(--ink); opacity: 0.7; }
 .petri-arc.variable { stroke-dasharray: 5 3; stroke-width: 1.8; opacity: .8; }
+.petri-arc-weight { font-size: 11px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--paper); stroke-width: 3px; }
 
 .petri-place-box {
   fill: var(--paper-raised);

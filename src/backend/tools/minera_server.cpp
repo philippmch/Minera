@@ -1,4 +1,5 @@
 #include "minera/exact_filter_discovery_json.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/case_description_workbench_json.hpp"
 #include "minera/reference_log_filter_workbench.hpp"
 #include "minera/table_attribute_repetition_workbench.hpp"
@@ -1084,6 +1085,7 @@ minera::CorrelationVariantsAnalysis analyze_correlation_variants(
 #include "mine_limits.hpp"
 #include "active_source_options.hpp"
 #include "active_source_mining.hpp"
+#include "traces_route.hpp"
 
 void handle_mine(const httplib::Request& request, httplib::Response& response) {
   // A multipart mine reads its controls from form fields only, so a query
@@ -1101,6 +1103,16 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
   }
   FormFieldAuditScope field_audit;
   try {
+    // include_traces=false leaves the "traces" array out of the analysis (a
+    // "trace_summary" takes its place) and GET /api/traces serves it on
+    // demand; absent or true keeps the complete response.
+    const bool include_traces = !active_source_supplied(request, "include_traces") || [&] {
+      const auto value = active_source_field(request, "include_traces");
+      if (value != "true" && value != "false")
+        throw std::invalid_argument("include_traces expects true or false");
+      return value == "true";
+    }();
+    const minera::OmitAnalysisTraces omit_traces(!include_traces);
     const auto ticket = begin_active_mining(request);
     // The upload is read in place: a copy would hold the file twice.
     const std::string* csv = &request.body;
@@ -4452,6 +4464,14 @@ void handle_workflow_discovery(const httplib::Request& request,
 
 bool handle_literal_controls_request(const httplib::Request&, httplib::Response&, std::string_view);
 
+// A client that gave up (closed the tab, aborted the fetch) gets nothing from
+// a result. Long searches poll this callback and stop instead of finishing
+// for no one; it is empty when the transport cannot tell.
+std::function<bool()> connection_cancel_hook(const httplib::Request& request) {
+  if (!request.is_connection_closed) return {};
+  return [&request] { return request.is_connection_closed(); };
+}
+
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
 // not accept uploads or perform any implicit re-importing.
@@ -4489,7 +4509,8 @@ void handle_ilp_mine(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     const bool include_model = discovery_model_requested(request, *session);
-    const auto options = minera::parse_ilp_miner_params(lookup, present);
+    auto options = minera::parse_ilp_miner_params(lookup, present);
+    options.cancelled = connection_cancel_hook(request);
     if (options.max_nodes > kServerIlpMaxNodes) {
       throw std::invalid_argument("ilp_max_nodes exceeds the server safety cap");
     }
@@ -4546,7 +4567,8 @@ void handle_genetic_request(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     const bool include_model = discovery_model_requested(request, *session);
-    const auto options = minera::parse_genetic_miner_params(lookup, present);
+    auto options = minera::parse_genetic_miner_params(lookup, present);
+    options.cancelled = connection_cancel_hook(request);
     if (options.population_size > kServerGeneticMaxPopulation ||
         options.generations > kServerGeneticMaxGenerations ||
         options.max_states > kServerGeneticMaxStates) {
@@ -6572,10 +6594,7 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
       return request.has_param(std::string(name));
     };
     auto options = minera::parse_alignment_params(lookup, present);
-    // A client that gave up (closed the tab, aborted the fetch) gets nothing
-    // from a result; stop the search instead of finishing it for no one.
-    if (request.is_connection_closed)
-      options.cancelled = [&request] { return request.is_connection_closed(); };
+    options.cancelled = connection_cancel_hook(request);
     if (miner == "imported" && !request.has_param("alignment_activity_attribute"))
       options.activity_attribute = session->imported_activity_attribute;
     if (miner == "imported" && session->imported_document) {
@@ -8074,6 +8093,9 @@ void handle_evaluate(const httplib::Request& request,
       return request.has_param(std::string(name));
     };
     auto params = minera::parse_evaluation_params(lookup, present);
+    // Alignment-based fitness and precision stop when the client disconnects.
+    params.replay_fitness_options.alignment_options.cancelled = connection_cancel_hook(request);
+    params.precision_options.cancelled = connection_cancel_hook(request);
     const auto adapter = minera::parse_evaluation_input_adapter(lookup, present);
     const auto* evaluation_document = miner == "imported" && session->imported_document && !converted
         ? &*session->imported_document : nullptr;
@@ -11519,6 +11541,7 @@ int main(int argc, char** argv) {
   api_post(server, "/api/mine-ack", handle_mine_ack);
   api_get(server, "/api/active-source", handle_active_source);
   api_get(server, "/api/active-source-file", handle_active_source_file);
+  api_get(server, "/api/traces", handle_traces);
   api_post(server, "/api/ocel/discover", handle_ocel_discovery);
   api_post(server, "/api/ocel/split", handle_ocel_split);
   api_post(server, "/api/ocel/enrich", handle_ocel_enrichment);

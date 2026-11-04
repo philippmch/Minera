@@ -86,15 +86,32 @@ describe("the app's alignment time budget", () => {
     expect(seen[2]?.signal).toBeUndefined();
   });
 
-  it("the exhausted notice names the app budget only when it applied", () => {
-    const withBudget = renderToStaticMarkup(createElement(AlignmentNotice, { minerName: "Inductive", exhausted: true, budgetSeconds: 60 }));
-    expect(withBudget).toContain("stops alignments after");
-    expect(withBudget).toContain("60");
-    expect(withBudget).toContain("Global timeout");
-    const explicit = renderToStaticMarkup(createElement(AlignmentNotice, { minerName: "Inductive", exhausted: true }));
-    expect(explicit).toContain("hit a");
-    expect(explicit).not.toContain("stops alignments after");
-    const unsound = renderToStaticMarkup(createElement(AlignmentNotice, { minerName: "Alpha", exhausted: false, budgetSeconds: 60 }));
+  it("the exhausted notice names the app budget only when a time limit stopped the search", () => {
+    const render = (props: Parameters<typeof AlignmentNotice>[0]) => renderToStaticMarkup(createElement(AlignmentNotice, props));
+    const timed = render({ minerName: "Inductive", exhausted: true, timeLimitReached: true, budgetSeconds: 60 });
+    expect(timed).toContain("ran out of time");
+    expect(timed).toContain("stops alignments after");
+    expect(timed).toContain("60");
+    expect(timed).toContain("Global timeout");
+    const timedExplicit = render({ minerName: "Inductive", exhausted: true, timeLimitReached: true });
+    expect(timedExplicit).toContain("ran out of time");
+    expect(timedExplicit).not.toContain("stops alignments after");
+    expect(timedExplicit).toContain("Per-trace timeout");
+    // The state limit stopped it: no time-budget advice even though the budget applied.
+    const states = render({ minerName: "Inductive", exhausted: true, timeLimitReached: false, budgetSeconds: 60 });
+    expect(states).toContain("reached its state limit");
+    expect(states).toContain("State limit");
+    expect(states).not.toContain("stops alignments after");
+    expect(states).not.toContain("Global timeout");
+    // An older server that does not say which bound: neutral wording, no advice.
+    const unknown = render({ minerName: "Inductive", exhausted: true, budgetSeconds: 60 });
+    expect(unknown).toContain("hit a configured state or time limit");
+    expect(unknown).not.toContain("stops alignments after");
+    for (const markup of [timed, timedExplicit, states, unknown]) {
+      expect(markup).not.toContain("partial numbers");
+      expect(markup).toContain("No alignment fitness, precision or cost is available");
+    }
+    const unsound = render({ minerName: "Alpha", exhausted: false, timeLimitReached: true, budgetSeconds: 60 });
     expect(unsound).toContain("sound workflow net");
     expect(unsound).not.toContain("stops alignments after");
   });

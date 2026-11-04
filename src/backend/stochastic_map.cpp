@@ -1,4 +1,5 @@
 #include "minera/stochastic_map.hpp"
+#include "minera/petri_reference_arcs.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -564,7 +565,19 @@ StochasticMapFitResult fit_stochastic_map_with_report(
           }
         }
         consumed[place] = true;
-        if (marking[place] > 0) --marking[place];
+      }
+      // Each ordinary arc moves its own weight (repeated unit endpoints one
+      // token each); consumption stops at zero along the replayed sequence.
+      for (const auto& arc : petri_reference_arcs(transition, true)) {
+        const auto weight = arc.signed_weight();
+        auto& tokens = marking[arc.place];
+        if (weight >= 0) {
+          tokens = tokens > static_cast<std::uint64_t>(weight) ? tokens - static_cast<std::uint64_t>(weight) : 0;
+        } else {
+          if (tokens > std::numeric_limits<std::uint64_t>::max() - static_cast<std::uint64_t>(-(weight + 1)) - 1)
+            throw std::overflow_error("stochastic map: marking overflow");
+          tokens += static_cast<std::uint64_t>(-(weight + 1)) + 1;
+        }
       }
       for (const auto place : transition.reset_inputs) {
         marking[place] = 0;
@@ -596,11 +609,20 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       }
       std::vector<bool> produced(net.place_count(), false);
       for (const auto place : transition.outputs) {
-        if (marking[place] == std::numeric_limits<std::uint64_t>::max())
-          throw std::overflow_error("stochastic map: marking overflow");
-        ++marking[place];
         if (!produced[place]) arrivals[place].emplace_back(time, time_source);
         produced[place] = true;
+      }
+      for (const auto& arc : petri_reference_arcs(transition, false)) {
+        const auto weight = arc.signed_weight();
+        auto& tokens = marking[arc.place];
+        if (weight < 0) {
+          const auto magnitude = static_cast<std::uint64_t>(-(weight + 1)) + 1;
+          tokens = tokens > magnitude ? tokens - magnitude : 0;
+        } else {
+          if (tokens > std::numeric_limits<std::uint64_t>::max() - static_cast<std::uint64_t>(weight))
+            throw std::overflow_error("stochastic map: marking overflow");
+          tokens += static_cast<std::uint64_t>(weight);
+        }
       }
     }
   }

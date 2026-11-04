@@ -4186,7 +4186,7 @@
         "filename": "native-conformance-log.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-conformance-log.response.json",
         "bytes": 59513,
-        "sha256": "279c54b645dcf80eb95a8316b50b24d7e135b120ff6784dd330c66d907c9f55d",
+        "sha256": "347e294ea13856b6ef546bc6052cea16a7d82559ed6b19c92d51a3b5b767f8ca",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -4295,7 +4295,7 @@
         "filename": "native-conformance-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-conformance-stream.response.json",
         "bytes": 59525,
-        "sha256": "b45d742cd1c99ae8dc7d8a786551f795d94c17e73440a65dc05de6be268d1b03",
+        "sha256": "e033cf3354088bd321a02aa547725d02842bc8269f827ac3393d11d7018ab297",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -4404,7 +4404,7 @@
         "filename": "native-conformance-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-conformance-dataframe.response.json",
         "bytes": 59529,
-        "sha256": "b5b948e76a2fae5532c90c154b8798a8a63cd61d933e88bc4b1ea14d9b3c87f8",
+        "sha256": "81e5796302338f5bd1c87338c07e634749aaa20d0ad4e6fe27de79582c63f553",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -4513,7 +4513,7 @@
         "filename": "native-conformance-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-conformance-lazyframe.response.json",
         "bytes": 59527,
-        "sha256": "f9839706f3a7cbf2f8c1e5f2cb44b389c1f6cea6838e5598f1e214d1e1f33d29",
+        "sha256": "ca02daa5511ae5532c871950a5eff8d3b71909ac6dcfc853b7dcf2d466dd4cbf",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -4622,7 +4622,7 @@
         "filename": "native-conformance_view-log.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-conformance_view-log.response.json",
         "bytes": 59520,
-        "sha256": "8ac8ebb841962171799e09ced711a9065c45239bec17b8c8bf5632a09b8eb300",
+        "sha256": "9e061b45a12ca043accfde4fe0304ebc0cba172e7bbb45a6bdac196780f68c81",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -4731,7 +4731,7 @@
         "filename": "native-conformance_view-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-conformance_view-stream.response.json",
         "bytes": 59526,
-        "sha256": "637946775cfaf8e0b94aba6ea908db95570d4930f6bd61d1de3f6041b57612e3",
+        "sha256": "5ab2c910563e37f4df83e309443842873f36ced4f0435d8c2af781132c38ae1c",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -4840,7 +4840,7 @@
         "filename": "native-conformance_view-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-conformance_view-dataframe.response.json",
         "bytes": 59532,
-        "sha256": "d0efff9f194113920fd83aa13c1c0b1c7ebbe6088db0a4c2710754bbd783fa69",
+        "sha256": "e5e5e61cc45d9b9eec37ad1d34d94c0898b619b7a80a08be28dcd8416674a02c",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -4949,7 +4949,7 @@
         "filename": "native-conformance_view-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-conformance_view-lazyframe.response.json",
         "bytes": 59532,
-        "sha256": "e42ea38286599b3d0f3ff8fa2a576562a015f093039f8b565c26bb8eca8dd69a",
+        "sha256": "e2c3e9a784bcf702a16fb635c2f51f8667e2408690772c869a9a376001e62281",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -5045,7 +5045,7 @@
         "filename": "default-operation-and-native-options.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/default-operation-and-native-options.response.json",
         "bytes": 58147,
-        "sha256": "27ef69ed6945e0db899e8dec8970bf62c46bc08640c26247b5994d57e8c3d0a2",
+        "sha256": "f1a66209b767b59d0074f83b9d1eafe4a520d9691836c21ac3a6ab0ab68647cb",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -5143,7 +5143,7 @@
         "filename": "native-grouped-unused-case-conformance.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-grouped-unused-case-conformance.response.json",
         "bytes": 58152,
-        "sha256": "5e1cb3c502c536beffceda08487abc35e93005b914841bc8a2e9ae36699c47da",
+        "sha256": "db1c086fca89626598fabd6bf8651d59584f7507f8e2909275615936b8ac4376",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -5241,7 +5241,7 @@
         "filename": "native-grouped-unused-case-conformance_view.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-grouped-unused-case-conformance_view.response.json",
         "bytes": 58158,
-        "sha256": "9445522382fa25f636399ef6be5a5c331a1e33ec10e4808b2bacdb9cae26d91c",
+        "sha256": "80a9b746c98c713d15766f346c4e4248598aca71ef7bb0d5870fa8d4e9a68c2e",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -5343,7 +5343,7 @@
         "filename": "native-flat-blank-case-error-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-flat-blank-case-error-stream.response.json",
         "bytes": 57958,
-        "sha256": "757310546a62b8b0d148c54e799df56245b2c0ec25a9a7f527f7b098a3d6cca4",
+        "sha256": "e52358893f4e65acc68bea9d6458299d20a11838efe589b6ff084a9b6e7590df",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -5449,7 +5449,7 @@
         "filename": "native-flat-blank-case-error-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-flat-blank-case-error-dataframe.response.json",
         "bytes": 57964,
-        "sha256": "a1b67f500c5a65f345df301304c94587b60e263fe3f959097a1cbdcd00056acb",
+        "sha256": "3d200270fed7a117a7432928b3ad1d686d01150e7e1cc3b40046dd2ca9dffb87",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -5555,7 +5555,7 @@
         "filename": "native-flat-blank-case-error-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-flat-blank-case-error-lazyframe.response.json",
         "bytes": 57964,
-        "sha256": "27b4be11dbc8b90d33e6be38423d57190f018b0c5966a8b3b76c11afb5f35f7e",
+        "sha256": "585ff32b27e825b534b81e0a3e32f04965ff5668c4492a9689613c03c96854d3",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -5654,14 +5654,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82152",
+        "Content-Length": "82180",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-standalone-diagnostics-log.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-standalone-diagnostics-log.response.json",
-        "bytes": 82152,
-        "sha256": "a2ceca0052b4ad600b6e6d29e787a570e037421a1ea1c8a879dec8015a934902",
+        "bytes": 82180,
+        "sha256": "9b6b42dbe51826c2d2cb6d75de8aa55d5205dde9f59efac3ab7059aac584254e",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -5741,14 +5741,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82161",
+        "Content-Length": "82189",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-standalone-diagnostics-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-standalone-diagnostics-stream.response.json",
-        "bytes": 82161,
-        "sha256": "685b40b1bdee1840635fb0c71b65b73a2c1c7a623ab1b7769fc5438d4af9d683",
+        "bytes": 82189,
+        "sha256": "801c28c538d8b3b61c874c9856aa4d40dc9425eea64b92f5051fe01d29fbd85a",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -5828,14 +5828,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82166",
+        "Content-Length": "82194",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-standalone-diagnostics-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-standalone-diagnostics-dataframe.response.json",
-        "bytes": 82166,
-        "sha256": "3fa695ffc86d2c954772f7d4305497364944bd63ad12d7aef64cb4cf57425590",
+        "bytes": 82194,
+        "sha256": "ed0974b5ace7ef5e93c202f49e6e78a63b534b47323a7dad83edf2ed857d9555",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -5915,14 +5915,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82165",
+        "Content-Length": "82193",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-standalone-diagnostics-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-standalone-diagnostics-lazyframe.response.json",
-        "bytes": 82165,
-        "sha256": "236371b7c65699527e0f68b0569e27b4621ac6d8ba78df22729f14d113a1bc6e",
+        "bytes": 82193,
+        "sha256": "6ee5b479740379db52703ef03843b764c418a36a66bc8d6bc61c4cf96b512952",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6002,14 +6002,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82158",
+        "Content-Length": "82186",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-standalone-diagnostics_view-log.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-standalone-diagnostics_view-log.response.json",
-        "bytes": 82158,
-        "sha256": "a9925da3c9017a8258dbb96de5f80823e103dc4a6c64cd670b5499e9bdcdfd25",
+        "bytes": 82186,
+        "sha256": "ed15b87325bc20752bf1bd85eec96f8c6b33accec7f6df0dff1dd9d7522d44a0",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6089,14 +6089,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82164",
+        "Content-Length": "82192",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-standalone-diagnostics_view-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-standalone-diagnostics_view-stream.response.json",
-        "bytes": 82164,
-        "sha256": "15e6507c7041c9cb2554223feeb356eeff5bdc4cf2b1d7672237a36ea8e4f4e8",
+        "bytes": 82192,
+        "sha256": "59a945d61bc56be73f43632c42c658f2330a7e1d21cfde963f6bbdc048c24611",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6176,14 +6176,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82170",
+        "Content-Length": "82198",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-standalone-diagnostics_view-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-standalone-diagnostics_view-dataframe.response.json",
-        "bytes": 82170,
-        "sha256": "6755af857aa76e9cf2d54d48d9dc764addba1699d5470416919a64e3e56d1740",
+        "bytes": 82198,
+        "sha256": "6caff24b32ec3ea438bba079693aa914425f69c2d728e2d3678a630a7df16d67",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6263,14 +6263,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82170",
+        "Content-Length": "82198",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-standalone-diagnostics_view-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-standalone-diagnostics_view-lazyframe.response.json",
-        "bytes": 82170,
-        "sha256": "8f234daa7bbd8ed340e171dc551595ae2c5a40e1e7074fbc91301cd0b4a7ce10",
+        "bytes": 82198,
+        "sha256": "998f8e2b4d2674ee58a16d24ae0b0c0b5a80bd5fe001c4351ebbe9cbca2d344b",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6354,14 +6354,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82319",
+        "Content-Length": "82347",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-derived-diagnostics-log.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/typed-derived-diagnostics-log.response.json",
-        "bytes": 82319,
-        "sha256": "148c0b4365dee007820a025fe84358a001372aab051b60ea10b0df89de74197f",
+        "bytes": 82347,
+        "sha256": "1159c997abd988e57641b25e736abceebb8c3650c5b5b055f89c3de79e0d6085",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6461,14 +6461,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82331",
+        "Content-Length": "82359",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-derived-diagnostics-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/typed-derived-diagnostics-stream.response.json",
-        "bytes": 82331,
-        "sha256": "71d5bb2d7aa42cfe447fcf002237b0c31f14c4c201a9fe0bb2b135f028c7d0a4",
+        "bytes": 82359,
+        "sha256": "67c84aa4b191ed9d5398fe83d1b7876242d667e450faaa310747113c49709fbd",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6568,14 +6568,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82335",
+        "Content-Length": "82363",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-derived-diagnostics-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/typed-derived-diagnostics-dataframe.response.json",
-        "bytes": 82335,
-        "sha256": "0ae60327a4b8fbd3da3044326709242cfc8554cd8c9761344afd7f2f94286ff8",
+        "bytes": 82363,
+        "sha256": "61fb7eb15bd74046a69d84db2689813334dbae494fcdec77a0196518d46a5911",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6675,14 +6675,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82333",
+        "Content-Length": "82361",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-derived-diagnostics-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/typed-derived-diagnostics-lazyframe.response.json",
-        "bytes": 82333,
-        "sha256": "f6cdf6dc40d1134283948b43e65884b82eeb7bffdf0d8e77cb2c671273c25a4e",
+        "bytes": 82361,
+        "sha256": "544f478eb7dcef9c145ab2f45e69582c612f17334fa0f0929f373579a4734c9f",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6786,14 +6786,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "87033",
+        "Content-Length": "87061",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "derived-diagnostics-independent-regroup-error.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/derived-diagnostics-independent-regroup-error.response.json",
-        "bytes": 87033,
-        "sha256": "2331d5f1b61c88817d7329c08d6f995d69ac313c6ba8810f7a9e9730f3a662e0",
+        "bytes": 87061,
+        "sha256": "836b9ff04e67a2a469a49027bf61e6487304e3f96e9513322916fb581d99c37b",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -6898,7 +6898,7 @@
         "filename": "derived-diagnostics-independent-missing-error.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/derived-diagnostics-independent-missing-error.response.json",
         "bytes": 58495,
-        "sha256": "c6da8b4a93abc0589460fd6fd384add06774ffa4fb3b1379444f998738dda536",
+        "sha256": "bc716a275c80c62a07abc7187a2139022eb39ce89cb3647c7b363e6a4cb866cc",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -7005,7 +7005,7 @@
         "filename": "standalone-diagnostics-independent-missing-error.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-diagnostics-independent-missing-error.response.json",
         "bytes": 58294,
-        "sha256": "5784be5c6853dd578d84ebe0b0855dc537a4991119169aa9bd5e45c8a0eef770",
+        "sha256": "9517b2020d634590070ddc64033100a7fa5276937895d3f8ce9c924280769a14",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -7104,7 +7104,7 @@
         "filename": "derived-diagnostics-independent-blank-error.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/derived-diagnostics-independent-blank-error.response.json",
         "bytes": 58479,
-        "sha256": "d6121e649f280344911c521a1360f4c10437b00fe35e2fdd56b316cf7938f7d6",
+        "sha256": "2773d2190d1ec97c9c78261bf666f3fd24792ee6f2fddf28c01ed7870cbbb0fd",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -7211,7 +7211,7 @@
         "filename": "standalone-diagnostics-independent-blank-error.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-diagnostics-independent-blank-error.response.json",
         "bytes": 58278,
-        "sha256": "16ebc4603f4ecf48f04a1a865822827097dad72a05961644a1e77ac882b3b8d5",
+        "sha256": "a69f05602d12ffec128cd82399babd6beccff889ae00350c53d364a892fa02da",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -7302,7 +7302,7 @@
         "filename": "standalone-native-dev-count-overflow.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-native-dev-count-overflow.response.json",
         "bytes": 58339,
-        "sha256": "c2aa11d28f8875df77c477d0019a4bf10a0a05b5b2f9521dd38705598c85062e",
+        "sha256": "084a0d6d57e1bb6a25c3b371a6823ca18ea975a42df1b0031273f2d01ceeaf02",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -7393,7 +7393,7 @@
         "filename": "standalone-native-constraint-count-overflow.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-native-constraint-count-overflow.response.json",
         "bytes": 58353,
-        "sha256": "fa8bc3b8d12bfd33b11f57533da44768e0230f30bf89d90d773aa73643c4b405",
+        "sha256": "9669a4d975d4f5fcba3e7507f7cc4d3d6bdb302838570fc0a552e704c16e2c80",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -7484,7 +7484,7 @@
         "filename": "standalone-native-fitness-nan.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-native-fitness-nan.response.json",
         "bytes": 58279,
-        "sha256": "fcc6c181f976339558823103633644a832f308ebc12e09a264f4fbde47133150",
+        "sha256": "145d6542ca4056648054e86beeb6411090c726fce9e90a7a8e2f5030694341a6",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -7575,7 +7575,7 @@
         "filename": "standalone-native-fitness-inf.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-native-fitness-inf.response.json",
         "bytes": 58279,
-        "sha256": "80592a7eb388a3637881a1d4d98def5ec1593fa27670ca192e923bedbe91259a",
+        "sha256": "8d1552ddffeff2f5363cd0713cf4d7acb3fb07b99939c114d18408277c8b8c96",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -7666,7 +7666,7 @@
         "filename": "standalone-native-fitness-negative-inf.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-native-fitness-negative-inf.response.json",
         "bytes": 58299,
-        "sha256": "bcf3e9779ed28bb35b8dc075025c3d7a2b350d60625c7876c5bf7e1f1908a168",
+        "sha256": "b58313ac71a83e1b714954c6b14705cb13644a5235851d60efbf4f7d73c7164a",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -7757,7 +7757,7 @@
         "filename": "standalone-finite-fitness-below-zero.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-finite-fitness-below-zero.response.json",
         "bytes": 59332,
-        "sha256": "9e1ebfe02620662df3939c4f9bed099a0372f5f78603d354a475a764d7e336fc",
+        "sha256": "ad15d5ae48efc3a2f72ab3c60686be8e6d23d4f21ad11498c9db4ca25720cefb",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -7842,7 +7842,7 @@
         "filename": "standalone-finite-fitness-above-one.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-finite-fitness-above-one.response.json",
         "bytes": 59326,
-        "sha256": "31f044b5e5f201ae69ceaea9f5baa6a419f3cba8fadce66440446ee43bd5c5b4",
+        "sha256": "59214e54d47566e3bee90ef28a4ce02b4847c51f6cd63129eafd11b9b9bf41fe",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -7927,7 +7927,7 @@
         "filename": "standalone-finite-fitness-negative-zero.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-finite-fitness-negative-zero.response.json",
         "bytes": 59342,
-        "sha256": "1ef9ce3ad0d6cde7a0f9cd28869bef2ef61d21104146959d026e3a7f3e8c01cc",
+        "sha256": "db88c82fa4ecb784e3114252e9d56493be3e7b8fa9f5ac2946d9fe3f3eef7730",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -8012,7 +8012,7 @@
         "filename": "standalone-native-result-count-empty.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-native-result-count-empty.response.json",
         "bytes": 57427,
-        "sha256": "30dabdd68288afee1a55ed2c507434a41aed507b0173327b60d65752f9c85b64",
+        "sha256": "3b8a7e65b13ab4f121a234e776097ec4957414109326f0cd9c800b5734ef446b",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -8103,7 +8103,7 @@
         "filename": "standalone-native-result-count-short.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-native-result-count-short.response.json",
         "bytes": 58095,
-        "sha256": "b7dabe5c507de6f76d2329b0e72a84e0eec0e636b86815177756c690aa334f86",
+        "sha256": "258e3e5de30da2508223735d9232a3fe745bc47c0318c58e563e34079b8e6563",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -8195,14 +8195,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82951",
+        "Content-Length": "82979",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "standalone-native-null-case-cell.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/standalone-native-null-case-cell.response.json",
-        "bytes": 82951,
-        "sha256": "8562fadd14092537bb88a5016171d3bb2f7efff322810c5b8e8a173f65628eb6",
+        "bytes": 82979,
+        "sha256": "b01b165fe3b6f752cd3dfa3391f5209f785dccaab4ebd01ee632121803c2d022",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -8685,7 +8685,7 @@
         "filename": "source-xes-reader-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/source-xes-reader-iterparse.response.json",
         "bytes": 58147,
-        "sha256": "27ef69ed6945e0db899e8dec8970bf62c46bc08640c26247b5994d57e8c3d0a2",
+        "sha256": "f1a66209b767b59d0074f83b9d1eafe4a520d9691836c21ac3a6ab0ab68647cb",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -8783,7 +8783,7 @@
         "filename": "source-xes-reader-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/source-xes-reader-line_by_line.response.json",
         "bytes": 58147,
-        "sha256": "27ef69ed6945e0db899e8dec8970bf62c46bc08640c26247b5994d57e8c3d0a2",
+        "sha256": "f1a66209b767b59d0074f83b9d1eafe4a520d9691836c21ac3a6ab0ab68647cb",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -8881,7 +8881,7 @@
         "filename": "source-xes-reader-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/source-xes-reader-chunk_regex.response.json",
         "bytes": 58147,
-        "sha256": "27ef69ed6945e0db899e8dec8970bf62c46bc08640c26247b5994d57e8c3d0a2",
+        "sha256": "f1a66209b767b59d0074f83b9d1eafe4a520d9691836c21ac3a6ab0ab68647cb",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -8979,7 +8979,7 @@
         "filename": "source-xes-reader-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/source-xes-reader-iterparse_20.response.json",
         "bytes": 58147,
-        "sha256": "27ef69ed6945e0db899e8dec8970bf62c46bc08640c26247b5994d57e8c3d0a2",
+        "sha256": "f1a66209b767b59d0074f83b9d1eafe4a520d9691836c21ac3a6ab0ab68647cb",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -9077,7 +9077,7 @@
         "filename": "source-xes-reader-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/source-xes-reader-iterparse_mem_compressed.response.json",
         "bytes": 58147,
-        "sha256": "27ef69ed6945e0db899e8dec8970bf62c46bc08640c26247b5994d57e8c3d0a2",
+        "sha256": "f1a66209b767b59d0074f83b9d1eafe4a520d9691836c21ac3a6ab0ab68647cb",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -9175,7 +9175,7 @@
         "filename": "source-xes-reader-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/source-xes-reader-rustxes.response.json",
         "bytes": 61186,
-        "sha256": "40ef3d643e53fc49a18b38726d709c2ad2dcafc362af6393c03623f79b1d1d9b",
+        "sha256": "30241a954f6360dbf5f71058e0df6074150fe49c77f92ce39b6076d06d13d55f",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -9364,7 +9364,7 @@
         "filename": "source-gzip-original-bytes.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/source-gzip-original-bytes.response.json",
         "bytes": 57220,
-        "sha256": "eb8814d3164ad97d892738a66dd9c70127ecd53fbd5b62ba80b817f50dfdc595",
+        "sha256": "5c75f6f44fe90e988c6d6b598b7058e1b14ce477fe0c7e610d0fd16f7beb8da3",
         "status": 200
       },
       "family": "original_log_skeleton",
@@ -9812,7 +9812,7 @@
         "filename": "native-invalid-used-activity-0.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-invalid-used-activity-0.response.json",
         "bytes": 57959,
-        "sha256": "a66e05ee2c47ae41f74107df63b4477397cf63cfb8b5b31680898913de16c537",
+        "sha256": "b151e4dc314d193d7d9f187e19592c34cf2a7929724faab661b28b4498dfa4c1",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -9914,7 +9914,7 @@
         "filename": "native-invalid-used-activity-3.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-invalid-used-activity-3.response.json",
         "bytes": 57967,
-        "sha256": "52a7c6c7e792833d5740b4ee205e774549ef0505dfbe6c9d867d68bdc7607118",
+        "sha256": "db04cdd847cfeb1d763fb7a33dafcde36ad889e098e00c8cb7b31fe458c5743b",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -10016,7 +10016,7 @@
         "filename": "native-invalid-used-activity-7.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/native-invalid-used-activity-7.response.json",
         "bytes": 58009,
-        "sha256": "3dbcedfbdfe7ae76a113642768c68974f89c6fe2310c0750ba788530bd5eb89f",
+        "sha256": "07e575aa4476026aac5c09b7fd706c89f909332bf60089f1018004632cfddd53",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -10874,7 +10874,7 @@
         "filename": "preparation-results-incomplete.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/preparation-results-incomplete.response.json",
         "bytes": 57244,
-        "sha256": "460a2610a79b21af9201e83ca6ff64975e481a8616c1835852377cfeb668d07c",
+        "sha256": "88a62a19a6750b39920bca1f22e49b554f99e32e4bb30d1d413c28dde396f1d1",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -10956,7 +10956,7 @@
         "filename": "preparation-results-count-negative.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/preparation-results-count-negative.response.json",
         "bytes": 57362,
-        "sha256": "1885688d8a6b39ceeeb4e2655f8bc72377235ac0a4ddf54873c833381db849c7",
+        "sha256": "1b185134a96177065cbab06973061b4ec1f29d8f86a99768ced481e68f2bf476",
         "status": 400
       },
       "family": "original_log_skeleton",
@@ -11038,7 +11038,7 @@
         "filename": "preparation-results-count-overflow.response.json",
         "path": "src/frontend/tests/fixtures/original-log-skeleton-workbench/captures/preparation-results-count-overflow.response.json",
         "bytes": 57380,
-        "sha256": "f482c3e2acbde818ce93458645668edbf4886a6623248db42d75efc87baa02b8",
+        "sha256": "fde90f837d931f693ed05b6dcc6d4fe2eca4229989b13567c67ff2b5b5e8c2aa",
         "status": 400
       },
       "family": "original_log_skeleton",

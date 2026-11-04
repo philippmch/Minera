@@ -675,6 +675,11 @@ PetriNetReductionResult reduce_petri_net(
                     }))
       return unchanged(net, options);
   }
+  // The working net holds ordinary arcs as repeated unit endpoints. A compact
+  // side (parallel arc objects, or zero, signed or large weights) has no such
+  // form, and rewriting it as unit endpoints would change the net's tokens,
+  // so such a net is kept as it is.
+  if (net.has_compact_ordinary_arcs()) return unchanged(net, options);
 
   WorkingNet working;
   working.place_count = net.place_count();

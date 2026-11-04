@@ -1,6 +1,7 @@
 #include "minera/model_decoration.hpp"
 
 #include <deque>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -9,6 +10,7 @@
 #include <utility>
 
 #include "minera/conformance.hpp"
+#include "minera/petri_reference_arcs.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -81,7 +83,8 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
 
   // Token instants resting in each place, oldest first. nullopt marks a token
   // produced by an untimed event; it moves like any other but yields no wait.
-  std::vector<std::deque<std::optional<double>>> tokens(net.place_count());
+  std::vector<std::deque<std::pair<std::optional<double>, std::uint64_t>>> tokens(
+      net.place_count());
 
   for (std::size_t i = 0; i < log.traces.size(); ++i) {
     const auto& sequence = firing[variant_of[i]];
@@ -106,7 +109,7 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
           selected_timestamp(*it, timestamp_attribute));
       if (last_instant) break;
     }
-    tokens[net.source()].push_back(first_instant);
+    tokens[net.source()].emplace_back(first_instant, 1);
 
     // One firing list per consumed event — fired at that event's instant, or
     // untimed (yielding no wait samples) when the event has none — then one
@@ -119,19 +122,42 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
       for (const auto transition_id : (*sequence)[step]) {
         ++result.transition_counts[transition_id];
         const auto& transition = net.transitions()[transition_id];
-        for (const auto place : transition.inputs) {
-          ++result.place_counts[place];
+        // Each ordinary arc moves its own weight in tokens, as the replay
+        // fired it (repeated unit endpoints fold into one arc of that weight).
+        // Tokens are kept as runs of equal instants, so a large weight costs
+        // one entry, not one per token.
+        for (const auto& arc : petri_reference_arcs(transition, true)) {
+          if (arc.negative) continue;
+          const auto place = arc.place;
+          auto remaining = arc.weight;
+          result.place_counts[place] = remaining > TokenInteger(std::numeric_limits<std::uint64_t>::max() - result.place_counts[place])
+              ? std::numeric_limits<std::uint64_t>::max()
+              : result.place_counts[place] + static_cast<std::uint64_t>(remaining);
           // A clean replay never fires without its tokens; the guard is
           // belt-and-braces against an inconsistent sequence.
-          if (tokens[place].empty()) continue;
-          const auto produced = tokens[place].front();
-          tokens[place].pop_front();
-          if (produced && now && *now >= *produced) {
-            waits[place].push_back(*now - *produced);
+          while (remaining > 0 && !tokens[place].empty()) {
+            auto& [produced, count] = tokens[place].front();
+            const std::uint64_t taken = remaining < TokenInteger(count)
+                                            ? static_cast<std::uint64_t>(remaining)
+                                            : count;
+            if (produced && now && *now >= *produced) {
+              // One wait sample per token; refuse weights whose samples would
+              // not fit in memory rather than allocating them.
+              if (taken > (std::uint64_t{1} << 24) - waits[place].size())
+                throw std::length_error("model decoration: arc weight exceeds the wait sample limit");
+              waits[place].insert(waits[place].end(), taken, *now - *produced);
+            }
+            remaining = remaining - TokenInteger(taken);
+            count -= taken;
+            if (count == 0) tokens[place].pop_front();
           }
         }
-        for (const auto place : transition.outputs) {
-          tokens[place].push_back(now);
+        for (const auto& arc : petri_reference_arcs(transition, false)) {
+          if (arc.negative || arc.weight == 0) continue;
+          const auto count = arc.weight > TokenInteger(std::numeric_limits<std::uint64_t>::max())
+                                 ? std::numeric_limits<std::uint64_t>::max()
+                                 : static_cast<std::uint64_t>(arc.weight);
+          tokens[arc.place].emplace_back(now, count);
         }
       }
     }

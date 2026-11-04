@@ -30,14 +30,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "198773",
+        "Content-Length": "196263",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "default-operation-and-native-options.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/default-operation-and-native-options.response.json",
-        "bytes": 198773,
-        "sha256": "1a07a3cfecb2b19092ac2b8149f6679eb9ce44d5fb3b57953d96af04cdcd009a",
+        "bytes": 196263,
+        "sha256": "ca508ff34865207e3d5496fc5d23d84ceefeacf285def1e8550e4ced9f4d1200",
         "status": 200
       },
       "family": "playout",
@@ -68,8 +68,8 @@
         "generated_xes": {
           "filename": "default-operation-and-native-options.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/default-operation-and-native-options.generated_xes.xes",
-          "bytes": 21099,
-          "sha256": "90ca8b7844c3f50367cac3785bc7ba02850d39984277151b93cfb3dbca2e5eaa",
+          "bytes": 20597,
+          "sha256": "a2fe58c49034ea34d93a6ea5f8ece09779f7caa24fdcc99e01550869c6e2f504",
           "format": "xes"
         }
       },
@@ -118,14 +118,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12497",
+        "Content-Length": "12447",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "direct-petri_basic_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/direct-petri_basic_log.response.json",
-        "bytes": 12497,
-        "sha256": "20fa3a1225ca6a1a9f0baeabe949bb92ab0d3a16ddb2aed6a640fc0baa8ba855",
+        "bytes": 12447,
+        "sha256": "e9c7034685d1676318f8ef6e9fab5315fb1638cc4fea78854ff40c4dc1527890",
         "status": 200
       },
       "family": "playout",
@@ -155,8 +155,8 @@
         "generated_xes": {
           "filename": "direct-petri_basic_log.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/direct-petri_basic_log.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "304941e1860530fc5f79e1d81140af04bbea2eb6629a3a176d365f43a3ec171d",
+          "bytes": 613,
+          "sha256": "36841338771a5ac2842f65df73da01f5fbb2647f0b37df4bc1f0dcc52ed1fb6d",
           "format": "xes"
         }
       },
@@ -1162,14 +1162,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12881",
+        "Content-Length": "12831",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "basic-partial-log-preserved.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-partial-log-preserved.response.json",
-        "bytes": 12881,
-        "sha256": "199b58aa44fb8d5724d84c04748ade93a383dd4743afd09e09d38c4fe2fe583d",
+        "bytes": 12831,
+        "sha256": "229c68ef1e7b35cc28712e3c933d1df6acc581d13ee4a76108508004fc58e4a5",
         "status": 200
       },
       "family": "playout",
@@ -1199,8 +1199,8 @@
         "generated_xes": {
           "filename": "basic-partial-log-preserved.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-partial-log-preserved.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "304941e1860530fc5f79e1d81140af04bbea2eb6629a3a176d365f43a3ec171d",
+          "bytes": 613,
+          "sha256": "36841338771a5ac2842f65df73da01f5fbb2647f0b37df4bc1f0dcc52ed1fb6d",
           "format": "xes"
         }
       },
@@ -1417,14 +1417,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9000",
+        "Content-Length": "8975",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "basic-covering-final-accepts-extra-token.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-covering-final-accepts-extra-token.response.json",
-        "bytes": 9000,
-        "sha256": "9eb60558b91a5824034ae2034f47d305aec65a25aed0ca84214a1b241853c55b",
+        "bytes": 8975,
+        "sha256": "ccd21474cca56414d8feaf82347737ac38f2245951d6692088df42647c2d9395",
         "status": 200
       },
       "family": "playout",
@@ -1454,8 +1454,8 @@
         "generated_xes": {
           "filename": "basic-covering-final-accepts-extra-token.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-covering-final-accepts-extra-token.generated_xes.xes",
-          "bytes": 415,
-          "sha256": "0e7213e4ab6e3aa87a5d25bfb02a3f6a496d42907cd792c6bf537012297dfbc0",
+          "bytes": 410,
+          "sha256": "1d2348155fa3fbc04e3e50c1225517901c01f009a19740913953305fbd7b1a26",
           "format": "xes"
         }
       },
@@ -1995,14 +1995,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8966",
+        "Content-Length": "8941",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "explicit-empty-markings-remain-native.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/explicit-empty-markings-remain-native.response.json",
-        "bytes": 8966,
-        "sha256": "e1e8f0a46a6decf1ceced1b0ca0ce543b2afe4e652044e4d60600312f9699e9a",
+        "bytes": 8941,
+        "sha256": "c4a8978c64fe04db1df381d4ea9abfc93b19ccd2adde631fb235828fe86f4005",
         "status": 200
       },
       "family": "playout",
@@ -2032,8 +2032,8 @@
         "generated_xes": {
           "filename": "explicit-empty-markings-remain-native.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/explicit-empty-markings-remain-native.generated_xes.xes",
-          "bytes": 415,
-          "sha256": "0e7213e4ab6e3aa87a5d25bfb02a3f6a496d42907cd792c6bf537012297dfbc0",
+          "bytes": 410,
+          "sha256": "1d2348155fa3fbc04e3e50c1225517901c01f009a19740913953305fbd7b1a26",
           "format": "xes"
         }
       },
@@ -3450,14 +3450,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "99348",
+        "Content-Length": "99376",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "fit-typed-original-metadata.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/fit-typed-original-metadata.response.json",
-        "bytes": 99348,
-        "sha256": "aa05774fd9660ae0f6e6e51e389277a1bd85fcc7bf864fc5930531fdab511136",
+        "bytes": 99376,
+        "sha256": "d3dba2c40f121c1c686dc9c36f6bcd8eb33640354273d2f7cff31e594bb32587",
         "status": 200
       },
       "family": "playout",
@@ -3546,14 +3546,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "100721",
+        "Content-Length": "100749",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "fit-literal-selectors-preserve-wtf-and-nul.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/fit-literal-selectors-preserve-wtf-and-nul.response.json",
-        "bytes": 100721,
-        "sha256": "c6a5fc9718dd160f83bce3f3a85c34158c56f8cefc55c380527b0cb7fefdf40e",
+        "bytes": 100749,
+        "sha256": "da7520235ca0128840f8707e94c51480ce75dcd182ec63e784cbc7f331fb542e",
         "status": 200
       },
       "family": "playout",
@@ -3725,14 +3725,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10850",
+        "Content-Length": "10800",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-infer_initial_marking.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-infer_initial_marking.response.json",
-        "bytes": 10850,
-        "sha256": "db23e63af4d48562b4aabdbf27855150471943e157951f64e91cfe55448f9e8a",
+        "bytes": 10800,
+        "sha256": "590282c8e84dbb85a66799325628d659416e4e090d6b9d5dcc62c792ef276099",
         "status": 200
       },
       "family": "playout",
@@ -3762,8 +3762,8 @@
         "generated_xes": {
           "filename": "pnml-native-control-infer_initial_marking.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-infer_initial_marking.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "304941e1860530fc5f79e1d81140af04bbea2eb6629a3a176d365f43a3ec171d",
+          "bytes": 613,
+          "sha256": "36841338771a5ac2842f65df73da01f5fbb2647f0b37df4bc1f0dcc52ed1fb6d",
           "format": "xes"
         }
       },
@@ -3816,14 +3816,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10850",
+        "Content-Length": "10800",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-infer_final_marking.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-infer_final_marking.response.json",
-        "bytes": 10850,
-        "sha256": "ad8d0e08a669bb14ca764c02c23733432b9c812caa9936790bb07f6744f77b11",
+        "bytes": 10800,
+        "sha256": "c779d2890911c3dc8e1b3852b6eeb0c0c26ec981eed15430b84119f0d90b7cbf",
         "status": 200
       },
       "family": "playout",
@@ -3853,8 +3853,8 @@
         "generated_xes": {
           "filename": "pnml-native-control-infer_final_marking.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-infer_final_marking.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "304941e1860530fc5f79e1d81140af04bbea2eb6629a3a176d365f43a3ec171d",
+          "bytes": 613,
+          "sha256": "36841338771a5ac2842f65df73da01f5fbb2647f0b37df4bc1f0dcc52ed1fb6d",
           "format": "xes"
         }
       },
@@ -3907,14 +3907,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10848",
+        "Content-Length": "10798",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-import_stochastic_map.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-import_stochastic_map.response.json",
-        "bytes": 10848,
-        "sha256": "e3deea796b7fe7f8ac50c7e8a26fe6b575939e03cff36d92e2875c40d6a61316",
+        "bytes": 10798,
+        "sha256": "1a6936fd11145644b7ec012ff9228ab15dd84049f3d2a568a1c34d38aabe64d0",
         "status": 200
       },
       "family": "playout",
@@ -3944,8 +3944,8 @@
         "generated_xes": {
           "filename": "pnml-native-control-import_stochastic_map.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-import_stochastic_map.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "304941e1860530fc5f79e1d81140af04bbea2eb6629a3a176d365f43a3ec171d",
+          "bytes": 613,
+          "sha256": "36841338771a5ac2842f65df73da01f5fbb2647f0b37df4bc1f0dcc52ed1fb6d",
           "format": "xes"
         }
       },
@@ -3998,14 +3998,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10850",
+        "Content-Length": "10800",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-require_workflow_boundaries.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-require_workflow_boundaries.response.json",
-        "bytes": 10850,
-        "sha256": "9dd7e6535ac35fd5473624514a377c88bd2d1ff559084deffa9a2638f94a95d5",
+        "bytes": 10800,
+        "sha256": "544c616b57c81cab79605abbafcdce8654f32a6f8c0aa8780ebc40d2e94a2294",
         "status": 200
       },
       "family": "playout",
@@ -4035,8 +4035,8 @@
         "generated_xes": {
           "filename": "pnml-native-control-require_workflow_boundaries.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-require_workflow_boundaries.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "304941e1860530fc5f79e1d81140af04bbea2eb6629a3a176d365f43a3ec171d",
+          "bytes": 613,
+          "sha256": "36841338771a5ac2842f65df73da01f5fbb2647f0b37df4bc1f0dcc52ed1fb6d",
           "format": "xes"
         }
       },
@@ -4089,14 +4089,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10848",
+        "Content-Length": "10798",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-public_marking_semantics.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-public_marking_semantics.response.json",
-        "bytes": 10848,
-        "sha256": "4619fbd96b5e1bf53984d873aa81e60155263d893e90a4c52bdf7340291048ba",
+        "bytes": 10798,
+        "sha256": "d4b8dc88e1fafc6ff643380cf3332af3dac66e191b2efda756130f8cd66c3536",
         "status": 200
       },
       "family": "playout",
@@ -4126,8 +4126,8 @@
         "generated_xes": {
           "filename": "pnml-native-control-public_marking_semantics.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-public_marking_semantics.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "304941e1860530fc5f79e1d81140af04bbea2eb6629a3a176d365f43a3ec171d",
+          "bytes": 613,
+          "sha256": "36841338771a5ac2842f65df73da01f5fbb2647f0b37df4bc1f0dcc52ed1fb6d",
           "format": "xes"
         }
       },
@@ -4176,14 +4176,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11140",
+        "Content-Length": "11090",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-preserves-zero-key-membership.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-preserves-zero-key-membership.response.json",
-        "bytes": 11140,
-        "sha256": "5df2c7ead64ac8f8e6b10536b192825e7f2bd574d4a08f194c15916385ad54ff",
+        "bytes": 11090,
+        "sha256": "ba883bbab866ce983c1edea2f389cc3b70031b09c98e57fdc08a2b3c7d8229b2",
         "status": 200
       },
       "family": "playout",
@@ -4210,8 +4210,8 @@
         "generated_xes": {
           "filename": "pnml-preserves-zero-key-membership.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-preserves-zero-key-membership.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "304941e1860530fc5f79e1d81140af04bbea2eb6629a3a176d365f43a3ec171d",
+          "bytes": 613,
+          "sha256": "36841338771a5ac2842f65df73da01f5fbb2647f0b37df4bc1f0dcc52ed1fb6d",
           "format": "xes"
         }
       },
@@ -4334,14 +4334,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9017",
+        "Content-Length": "8992",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-explicit-marking-bypasses-import-conversion.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-explicit-marking-bypasses-import-conversion.response.json",
-        "bytes": 9017,
-        "sha256": "2e6a9f2bb7067c64e3c8135e4a61e0d4fd01598df91ae8663172f96885d66101",
+        "bytes": 8992,
+        "sha256": "b74447e91aeb12da310ee3bf6abe2f88a218af5679a88cdca6a07794342f7427",
         "status": 200
       },
       "family": "playout",
@@ -4370,8 +4370,8 @@
         "generated_xes": {
           "filename": "pnml-explicit-marking-bypasses-import-conversion.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-explicit-marking-bypasses-import-conversion.generated_xes.xes",
-          "bytes": 415,
-          "sha256": "0e7213e4ab6e3aa87a5d25bfb02a3f6a496d42907cd792c6bf537012297dfbc0",
+          "bytes": 410,
+          "sha256": "1d2348155fa3fbc04e3e50c1225517901c01f009a19740913953305fbd7b1a26",
           "format": "xes"
         }
       },
@@ -4420,14 +4420,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11648",
+        "Content-Length": "11598",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-extended-arcs-execute-natively.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-extended-arcs-execute-natively.response.json",
-        "bytes": 11648,
-        "sha256": "d20f34076071872e9e2e0133668b60c265c76509ad799d7da79c0edc0432e38f",
+        "bytes": 11598,
+        "sha256": "5fce5c91ae33a571ac8afe31d9a26f08d6a17bd8d21dcb2b03120d45066ebd26",
         "status": 200
       },
       "family": "playout",
@@ -4457,8 +4457,8 @@
         "generated_xes": {
           "filename": "pnml-extended-arcs-execute-natively.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-extended-arcs-execute-natively.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "304941e1860530fc5f79e1d81140af04bbea2eb6629a3a176d365f43a3ec171d",
+          "bytes": 613,
+          "sha256": "36841338771a5ac2842f65df73da01f5fbb2647f0b37df4bc1f0dcc52ed1fb6d",
           "format": "xes"
         }
       },
@@ -4511,14 +4511,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9437",
+        "Content-Length": "8317",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "declared-original-dfg_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/declared-original-dfg_result.response.json",
-        "bytes": 9437,
-        "sha256": "b189343aa6d7f904a7073510d41c5f37a840e86ad0460c0a57cbada0f3be85a9",
+        "bytes": 8317,
+        "sha256": "3038cfd60d75dccd912e6e39f0727a62c67e97fca00bba8de67795a2906a2a49",
         "status": 200
       },
       "family": "playout",
@@ -4548,8 +4548,8 @@
         "generated_xes": {
           "filename": "declared-original-dfg_result.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/declared-original-dfg_result.generated_xes.xes",
-          "bytes": 702,
-          "sha256": "3db675289f730e51db7f56dbf7e97ad47d57b31035158f3c34887379953d0fdb",
+          "bytes": 592,
+          "sha256": "2c8202124c399f020fb350467c4f1cf4864b2a45de557b61c0a56b64707ead64",
           "format": "xes"
         }
       },
@@ -4602,14 +4602,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9263",
+        "Content-Length": "8143",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "text-original-dfg_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/text-original-dfg_result.response.json",
-        "bytes": 9263,
-        "sha256": "dc94a15253c014abb3e5423f68e818beba9b1ec0de083bf8b98ba9afb25c39b2",
+        "bytes": 8143,
+        "sha256": "eabdbed434ef35dfce512650bf7ab36bf464b27bd66c14d39311d12da6c7bf86",
         "status": 200
       },
       "family": "playout",
@@ -4639,8 +4639,8 @@
         "generated_xes": {
           "filename": "text-original-dfg_result.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/text-original-dfg_result.generated_xes.xes",
-          "bytes": 702,
-          "sha256": "3db675289f730e51db7f56dbf7e97ad47d57b31035158f3c34887379953d0fdb",
+          "bytes": 592,
+          "sha256": "2c8202124c399f020fb350467c4f1cf4864b2a45de557b61c0a56b64707ead64",
           "format": "xes"
         }
       },
@@ -4693,14 +4693,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9255",
+        "Content-Length": "8135",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "declared-original-dfg_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/declared-original-dfg_log.response.json",
-        "bytes": 9255,
-        "sha256": "fbce3206b0c84e2683f374fffa484b716f1a15bd578c968aad05d19fa91d9ea7",
+        "bytes": 8135,
+        "sha256": "7345d9e1054b1790843596b847aa3d23c7364104d8a0db373c499f5359333c72",
         "status": 200
       },
       "family": "playout",
@@ -4730,8 +4730,8 @@
         "generated_xes": {
           "filename": "declared-original-dfg_log.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/declared-original-dfg_log.generated_xes.xes",
-          "bytes": 702,
-          "sha256": "3db675289f730e51db7f56dbf7e97ad47d57b31035158f3c34887379953d0fdb",
+          "bytes": 592,
+          "sha256": "2c8202124c399f020fb350467c4f1cf4864b2a45de557b61c0a56b64707ead64",
           "format": "xes"
         }
       },
@@ -4784,14 +4784,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9081",
+        "Content-Length": "7961",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "text-original-dfg_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/text-original-dfg_log.response.json",
-        "bytes": 9081,
-        "sha256": "f64d8bcd375114608d3bc651e31e2aaaea7f516fb9e408c3ac6f29b45853da32",
+        "bytes": 7961,
+        "sha256": "63223e5e554dcac164780139fd5dd33396288e169572ec01ee32cc426d5be51a",
         "status": 200
       },
       "family": "playout",
@@ -4821,8 +4821,8 @@
         "generated_xes": {
           "filename": "text-original-dfg_log.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/text-original-dfg_log.generated_xes.xes",
-          "bytes": 702,
-          "sha256": "3db675289f730e51db7f56dbf7e97ad47d57b31035158f3c34887379953d0fdb",
+          "bytes": 592,
+          "sha256": "2c8202124c399f020fb350467c4f1cf4864b2a45de557b61c0a56b64707ead64",
           "format": "xes"
         }
       },
@@ -4863,7 +4863,7 @@
         "bytes": 1543,
         "sha256": "07e6153b302c77ba79be16879ec4e722f72d125c73d916f5273f57e1c9b07fc0"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "model_file": {
           "filename": "owned-declared-performance.dfg.json",
@@ -4875,15 +4875,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17574",
+        "Content-Length": "3730",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "all21-dfg-controls-complete-performance.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/all21-dfg-controls-complete-performance.response.json",
-        "bytes": 17574,
-        "sha256": "dbac66c5070cc9e5ca466060daaa55dd2eef8d175d2e00fcafb46343bfaa11bd",
-        "status": 200
+        "bytes": 3730,
+        "sha256": "c614b4f462fd5075509c7939149b58575acde9e981b3ec752fdd856ee8a13ef9",
+        "status": 400
       },
       "family": "playout",
       "operation": "dfg_result",
@@ -4911,22 +4911,21 @@
           "bytes": 24,
           "sha256": "e361fc3e105fe549cc22aa44d136ed61857341eab1af495bcd4f80f53cb9b058",
           "format": "dfg"
-        },
-        "generated_xes": {
-          "filename": "all21-dfg-controls-complete-performance.generated_xes.xes",
-          "path": "src/frontend/tests/fixtures/playout-workbench/captures/all21-dfg-controls-complete-performance.generated_xes.xes",
-          "bytes": 1473,
-          "sha256": "654b09a4d13593fd092dea5e7f97ca22a59bee9dd0f4b57ab775c3865a1bf2b2",
-          "format": "xes"
         }
       },
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "DFG performance playout seed must be below 2^32 (numpy.random.seed)"
+      },
       "native_calls": [
         {
           "name": "dfg_playout_result(frequency, starts, ends, options, performance)",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "DFG performance playout seed must be below 2^32 (numpy.random.seed)"
+          }
         }
       ]
     },
@@ -4969,14 +4968,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12552",
+        "Content-Length": "11421",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-scalar.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar.response.json",
-        "bytes": 12552,
-        "sha256": "525ed0f267fd16f840adfc00d4db47eb6fa8bf928da5e904c8a41b97985160d2",
+        "bytes": 11421,
+        "sha256": "6bc6430544cfac7e6ea09b2666d8de2099b3a6f337b5e76d9e7faecbdf066a3f",
         "status": 200
       },
       "family": "playout",
@@ -5008,8 +5007,8 @@
         "generated_xes": {
           "filename": "dfg-performance-scalar.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar.generated_xes.xes",
-          "bytes": 1014,
-          "sha256": "1a7d12ea2a460f523948ce34e321d24fcddf55092994f9e03a885c02c06a5805",
+          "bytes": 905,
+          "sha256": "07244ceecbce2c5a3a9fcf0fd5158e3ccb70f98b2b83143472c018ff979fa4ab",
           "format": "xes"
         }
       },
@@ -5062,14 +5061,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12565",
+        "Content-Length": "11427",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-scalar-three.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar-three.response.json",
-        "bytes": 12565,
-        "sha256": "2dfca0b9be724d28e5b3bade39d761ae4114dc97ff82433a9af7b12521204e30",
+        "bytes": 11427,
+        "sha256": "20805ca22046f1d163acca1a63126b4107bf1e3c525702d351ee3d70e625477e",
         "status": 200
       },
       "family": "playout",
@@ -5101,8 +5100,8 @@
         "generated_xes": {
           "filename": "dfg-performance-scalar-three.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar-three.generated_xes.xes",
-          "bytes": 1021,
-          "sha256": "7c185328696e118b7ecdafbebee62e77c77964a7bcc42649cd1b88ae37a87d67",
+          "bytes": 905,
+          "sha256": "77e63c9e6e4151f78a1ba33cd804da80036c2ed086f39f346d6795f2f74ba146",
           "format": "xes"
         }
       },
@@ -5155,14 +5154,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12564",
+        "Content-Length": "11426",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-scalar-nine.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar-nine.response.json",
-        "bytes": 12564,
-        "sha256": "a1db684c392064996a7145f1d6f9760f201370ac5e0adb38b4d708eb58ce9439",
+        "bytes": 11426,
+        "sha256": "173dabdbe067f04a6e360cd01918f553bdaefbd2a71a6208cc85f602575ab336",
         "status": 200
       },
       "family": "playout",
@@ -5194,8 +5193,8 @@
         "generated_xes": {
           "filename": "dfg-performance-scalar-nine.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar-nine.generated_xes.xes",
-          "bytes": 1021,
-          "sha256": "b4090eb542371ef9270a6628a287a4bdf659339d07751259cd025ad02eea4ee1",
+          "bytes": 905,
+          "sha256": "925274abe1bde432c72847ad18521589100e1613ddf32403da532b8d46121fea",
           "format": "xes"
         }
       },
@@ -5248,14 +5247,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12567",
+        "Content-Length": "11429",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-vector.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-vector.response.json",
-        "bytes": 12567,
-        "sha256": "7c7066291953e62b1a2dc54ca39cbc3d1739a15b12028ba0a6bdd2805e8cddd3",
+        "bytes": 11429,
+        "sha256": "34985232745cf345131b2af27ffe5ccb62cc356a57a63fcadf30792d7aa124bf",
         "status": 200
       },
       "family": "playout",
@@ -5287,8 +5286,8 @@
         "generated_xes": {
           "filename": "dfg-performance-vector.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-vector.generated_xes.xes",
-          "bytes": 1021,
-          "sha256": "7c185328696e118b7ecdafbebee62e77c77964a7bcc42649cd1b88ae37a87d67",
+          "bytes": 905,
+          "sha256": "77e63c9e6e4151f78a1ba33cd804da80036c2ed086f39f346d6795f2f74ba146",
           "format": "xes"
         }
       },
@@ -5341,14 +5340,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12567",
+        "Content-Length": "11429",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-empty-vector.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-empty-vector.response.json",
-        "bytes": 12567,
-        "sha256": "3263a5670405e89212373f08de45b63628e48fb9ac18e3af74952b84c974d38a",
+        "bytes": 11429,
+        "sha256": "9891ff59b29e95be41e72baf9babf0d0c5c877fbf1ae6bbfbf78ea273fe53f2d",
         "status": 200
       },
       "family": "playout",
@@ -5380,8 +5379,8 @@
         "generated_xes": {
           "filename": "dfg-performance-empty-vector.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-empty-vector.generated_xes.xes",
-          "bytes": 1021,
-          "sha256": "b4090eb542371ef9270a6628a287a4bdf659339d07751259cd025ad02eea4ee1",
+          "bytes": 905,
+          "sha256": "925274abe1bde432c72847ad18521589100e1613ddf32403da532b8d46121fea",
           "format": "xes"
         }
       },
@@ -5434,14 +5433,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12828",
+        "Content-Length": "11690",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-summary.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-summary.response.json",
-        "bytes": 12828,
-        "sha256": "fd4b84c83fd3bc8504a4abc287226b551fa5ece068bf7ccf4156683eec479c7b",
+        "bytes": 11690,
+        "sha256": "7167f066e66c64bb08ee9ce18dde6a25862ed9235e5cd8800363fd62db81e556",
         "status": 200
       },
       "family": "playout",
@@ -5473,8 +5472,8 @@
         "generated_xes": {
           "filename": "dfg-performance-summary.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-summary.generated_xes.xes",
-          "bytes": 1021,
-          "sha256": "b4090eb542371ef9270a6628a287a4bdf659339d07751259cd025ad02eea4ee1",
+          "bytes": 905,
+          "sha256": "925274abe1bde432c72847ad18521589100e1613ddf32403da532b8d46121fea",
           "format": "xes"
         }
       },
@@ -5527,14 +5526,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2739",
+        "Content-Length": "2699",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-pointer-null.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-pointer-null.response.json",
-        "bytes": 2739,
-        "sha256": "a133a05189123bdbf425dc4aff2a97821c4d8ed4a53b1e843445b8336b01c8d0",
+        "bytes": 2699,
+        "sha256": "dadb49be79a0bf46d5d86d734aad32e02964e272f8a2e7bae28ff29972529321",
         "status": 400
       },
       "family": "playout",
@@ -5612,14 +5611,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12056",
+        "Content-Length": "10918",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-pointer-empty.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-pointer-empty.response.json",
-        "bytes": 12056,
-        "sha256": "7b0c276fc50c34924cc02c614c57463e32ff204896d85fd6622cb5b7706301fd",
+        "bytes": 10918,
+        "sha256": "43ca4cbe2fb85f1533212b538df5b4f541c2ce6a136180b4fa882e4ad44ef97c",
         "status": 200
       },
       "family": "playout",
@@ -5646,8 +5645,8 @@
         "generated_xes": {
           "filename": "dfg-performance-pointer-empty.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-pointer-empty.generated_xes.xes",
-          "bytes": 1007,
-          "sha256": "76b6185bc70134f311665decc9273bbb4f163cb746e181014c64d75eed5296fb",
+          "bytes": 891,
+          "sha256": "ed545e9a3da307d6e873e4652de5c2a67757f44a1149de447baf2431112d62f3",
           "format": "xes"
         }
       },
@@ -5700,14 +5699,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3222",
+        "Content-Length": "3182",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-invalid-performance-native-error.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-invalid-performance-native-error.response.json",
-        "bytes": 3222,
-        "sha256": "bc1e11b5ce9bb81114015ba87212c65827731b5b94ba7982c9215ba1ccc6aa5b",
+        "bytes": 3182,
+        "sha256": "db3bdb9ca5cf90c9775022e703bd96d5540bb241c0ff213a1015f27960260d26",
         "status": 400
       },
       "family": "playout",
@@ -5785,14 +5784,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "15656",
+        "Content-Length": "13969",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-cutoff-diagnostics.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-cutoff-diagnostics.response.json",
-        "bytes": 15656,
-        "sha256": "ac967952c8388d7cc508a3a413f3311f84166e12f874c46148dbe8a2d620187d",
+        "bytes": 13969,
+        "sha256": "0ffaa6bee1d9766654b517b47350fc45e2f0feffcf963d06128dcab2accdc343",
         "status": 200
       },
       "family": "playout",
@@ -5820,8 +5819,8 @@
         "generated_xes": {
           "filename": "dfg-performance-cutoff-diagnostics.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-cutoff-diagnostics.generated_xes.xes",
-          "bytes": 1407,
-          "sha256": "53a87e6590c806116b3ae571a1d38e7f08d32e775d3ed2ce35041a298b4a5be4",
+          "bytes": 1233,
+          "sha256": "561b34b55bdfe9cf3173f6787bbc00af33ef539c96149aba9fa66fbc65145371",
           "format": "xes"
         }
       },
@@ -5874,14 +5873,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4827",
+        "Content-Length": "8420",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-classic-complete-only-suppression.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-classic-complete-only-suppression.response.json",
-        "bytes": 4827,
-        "sha256": "a4bacad2fb0cb12e7c25aa625fa5edabb80f5bb0a75b94039c41c98935900602",
+        "bytes": 8420,
+        "sha256": "432aea2e2613a69e646713654540a13041139df8437412a58e5f76ea8cb73d40",
         "status": 200
       },
       "family": "playout",
@@ -5908,8 +5907,8 @@
         "generated_xes": {
           "filename": "dfg-classic-complete-only-suppression.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-classic-complete-only-suppression.generated_xes.xes",
-          "bytes": 207,
-          "sha256": "539cc1730d334db0a460e152d0dcf06554f785e0bb6eb0562603681301b69743",
+          "bytes": 592,
+          "sha256": "2c8202124c399f020fb350467c4f1cf4864b2a45de557b61c0a56b64707ead64",
           "format": "xes"
         }
       },
@@ -5962,14 +5961,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9794",
+        "Content-Length": "8763",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-full-integer-zero-entries.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-full-integer-zero-entries.response.json",
-        "bytes": 9794,
-        "sha256": "6c7dd224c61bd62c13def2dd1bfc6ae9bf374099a5685982dcc7a2845492d5c4",
+        "bytes": 8763,
+        "sha256": "faa7cbaaa357173366358697251c3a17046199f6d7ddde1e2bb2a97a7a1a2031",
         "status": 200
       },
       "family": "playout",
@@ -5993,9 +5992,16 @@
         "generated_xes": {
           "filename": "dfg-full-integer-zero-entries.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-full-integer-zero-entries.generated_xes.xes",
-          "bytes": 702,
-          "sha256": "3db675289f730e51db7f56dbf7e97ad47d57b31035158f3c34887379953d0fdb",
+          "bytes": 592,
+          "sha256": "2c8202124c399f020fb350467c4f1cf4864b2a45de557b61c0a56b64707ead64",
           "format": "xes"
+        },
+        "source_dfg": {
+          "filename": "dfg-full-integer-zero-entries.source_dfg.dfg",
+          "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-full-integer-zero-entries.source_dfg.dfg",
+          "bytes": 107,
+          "sha256": "8b3e5dad8a030dcf7765359adc165bce110a605df7a09c5ef31b77e0b935dbe4",
+          "format": "dfg"
         }
       },
       "executed": true,
@@ -6047,14 +6053,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12373",
+        "Content-Length": "10273",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-literal-activity-identity.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-literal-activity-identity.response.json",
-        "bytes": 12373,
-        "sha256": "c7c83c949f581f58116f366fec0aa313e8788cfb1b9786ee51a4a32e08e6306c",
+        "bytes": 10273,
+        "sha256": "1c63b510104a8a3b9d6f231417dc46d8effb895991e7cf4314f26653c5513875",
         "status": 200
       },
       "family": "playout",
@@ -6074,15 +6080,7 @@
         ],
         "declared_exact": true
       },
-      "exports": {
-        "generated_xes": {
-          "filename": "dfg-literal-activity-identity.generated_xes.xes",
-          "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-literal-activity-identity.generated_xes.xes",
-          "bytes": 1039,
-          "sha256": "8c9075be074e3c8a2be3b38583bb828b25c89262feeec4786f316dd126781687",
-          "format": "xes"
-        }
-      },
+      "exports": {},
       "executed": true,
       "error": null,
       "native_calls": [
@@ -6194,14 +6192,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "13803",
+        "Content-Length": "12804",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "constructor-original-tree_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_result.response.json",
-        "bytes": 13803,
-        "sha256": "50c31b08fe1bf0b090455722876939e5b7970cb9a95988a629387dc235dc1cd2",
+        "bytes": 12804,
+        "sha256": "8fd2383a34a428d195c36df7438889874e2064549ca39e58c5135483a9ec6fa5",
         "status": 200
       },
       "family": "playout",
@@ -6232,8 +6230,8 @@
         "generated_xes": {
           "filename": "constructor-original-tree_result.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_result.generated_xes.xes",
-          "bytes": 1248,
-          "sha256": "ea30e6039023f24dd64b19f99fac2029871d241885d2a69b46c215c49df61196",
+          "bytes": 690,
+          "sha256": "50900cc9beb085a1e63e861094174b93b5a5e5afcbf6154778106f1cc8112f15",
           "format": "xes"
         }
       },
@@ -6286,14 +6284,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "13961",
+        "Content-Length": "12962",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "ptml-original-tree_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_result.response.json",
-        "bytes": 13961,
-        "sha256": "59182c683c9676b05329f64cce5e54215b79f5fbb23770169ca5ac5ec9296eb6",
+        "bytes": 12962,
+        "sha256": "30328cd7bebd097416822c6c7ec7cb5e69e4231765e8d16bacfea75598f82134",
         "status": 200
       },
       "family": "playout",
@@ -6323,8 +6321,8 @@
         "generated_xes": {
           "filename": "ptml-original-tree_result.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_result.generated_xes.xes",
-          "bytes": 1248,
-          "sha256": "ea30e6039023f24dd64b19f99fac2029871d241885d2a69b46c215c49df61196",
+          "bytes": 690,
+          "sha256": "50900cc9beb085a1e63e861094174b93b5a5e5afcbf6154778106f1cc8112f15",
           "format": "xes"
         }
       },
@@ -6377,14 +6375,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "13746",
+        "Content-Length": "12747",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "constructor-original-tree_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_log.response.json",
-        "bytes": 13746,
-        "sha256": "45c8e51461ebccd364e2065395ad663590db0a3838ea95813aa24d2a7e0302e2",
+        "bytes": 12747,
+        "sha256": "560c086efba0125e2cb5a5250725743424504f4736a52826c088de2f13276371",
         "status": 200
       },
       "family": "playout",
@@ -6415,8 +6413,8 @@
         "generated_xes": {
           "filename": "constructor-original-tree_log.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_log.generated_xes.xes",
-          "bytes": 1248,
-          "sha256": "ea30e6039023f24dd64b19f99fac2029871d241885d2a69b46c215c49df61196",
+          "bytes": 690,
+          "sha256": "50900cc9beb085a1e63e861094174b93b5a5e5afcbf6154778106f1cc8112f15",
           "format": "xes"
         }
       },
@@ -6469,14 +6467,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "13904",
+        "Content-Length": "12905",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "ptml-original-tree_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_log.response.json",
-        "bytes": 13904,
-        "sha256": "76fa84c2411ebcb511a95d8f7360a658a6e54d234ade308051ed915a3f0be234",
+        "bytes": 12905,
+        "sha256": "cf28635eca955c900aed246037dbab0d55bd4b64dd56678213866fea2d03b10a",
         "status": 200
       },
       "family": "playout",
@@ -6506,8 +6504,8 @@
         "generated_xes": {
           "filename": "ptml-original-tree_log.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_log.generated_xes.xes",
-          "bytes": 1248,
-          "sha256": "ea30e6039023f24dd64b19f99fac2029871d241885d2a69b46c215c49df61196",
+          "bytes": 690,
+          "sha256": "50900cc9beb085a1e63e861094174b93b5a5e5afcbf6154778106f1cc8112f15",
           "format": "xes"
         }
       },
@@ -6567,7 +6565,7 @@
         "filename": "all12-tree-controls.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/all12-tree-controls.response.json",
         "bytes": 7669,
-        "sha256": "154aa6840d27e7398664a8c8d2587fa05a8ce4b092a6afe7dd51170bed6f9130",
+        "sha256": "26835f3c6da71c1b40241fe33ea87130c77ee14a19a5f86cc9a70149a9ee1ec3",
         "status": 200
       },
       "family": "playout",
@@ -6642,7 +6640,7 @@
         "bytes": 898,
         "sha256": "712f2f4fde659d664e53138f19bb2350704b35eaa4351ac754683110ebbefa58"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "model_file": {
           "filename": "owned-operator-loop.json",
@@ -6654,15 +6652,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "74461",
+        "Content-Length": "2955",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-loop-basic.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-loop-basic.response.json",
-        "bytes": 74461,
-        "sha256": "5b13896c9c50f2897d7b4264cf2a1bc52d62355f23d2042eaa9591a25b767514",
-        "status": 200
+        "bytes": 2955,
+        "sha256": "b828e72b9f8bac88824c8ecfa8b258b17d4e6417cceaa17dcac2c6c50cfe7004",
+        "status": 400
       },
       "family": "playout",
       "operation": "tree_result",
@@ -6685,22 +6683,21 @@
           "bytes": 489,
           "sha256": "f17d2d65069ef05e3be5634298e24c72560fa7c40be5302c07fbdd66328a9567",
           "format": "ptml"
-        },
-        "generated_xes": {
-          "filename": "tree-native-loop-basic.generated_xes.xes",
-          "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-loop-basic.generated_xes.xes",
-          "bytes": 7990,
-          "sha256": "fa46c7680e8ef4242d727d4ca1b735cf984bea3e88f56a3282159e6dcdc13515",
-          "format": "xes"
         }
       },
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "process-tree playout: a sampled trace has 7 visible events, above the max_steps / max_length safety bound of 5 (the reference has no bound; raise it to keep every trace)"
+      },
       "native_calls": [
         {
           "name": "process_tree_playout_result(tree, options)",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "process-tree playout: a sampled trace has 7 visible events, above the max_steps / max_length safety bound of 5 (the reference has no bound; raise it to keep every trace)"
+          }
         }
       ]
     },
@@ -6743,14 +6740,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17756",
+        "Content-Length": "16355",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-loop-extensive.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-loop-extensive.response.json",
-        "bytes": 17756,
-        "sha256": "bd577c5c298c95b0f38feff85dea4954cce8aed871eabd25c941c991f4b7dcc6",
+        "bytes": 16355,
+        "sha256": "d47fc1ae64ec0e5e31b10c24fe4ef917258408ace14ea3a18787197e2883a4b6",
         "status": 200
       },
       "family": "playout",
@@ -6778,8 +6775,8 @@
         "generated_xes": {
           "filename": "tree-native-loop-extensive.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-loop-extensive.generated_xes.xes",
-          "bytes": 1665,
-          "sha256": "0758819d7e0b4e7a998233f3fcac88cbd153a74f91617604d2bb3b7c7234b5d0",
+          "bytes": 900,
+          "sha256": "3d76c7aa1b75179d947499c406996667b05709c56fcd490ffce4369e0b2795b6",
           "format": "xes"
         }
       },
@@ -6820,7 +6817,7 @@
         "bytes": 903,
         "sha256": "f1ad9a741003509992ea5138deeaf50db1806a11f9be688cb2a95d520e1408a8"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "model_file": {
           "filename": "owned-operator-loop.json",
@@ -6832,15 +6829,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62231",
+        "Content-Length": "2965",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-loop-top_bottom.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-loop-top_bottom.response.json",
-        "bytes": 62231,
-        "sha256": "74187c2651bcac499482b796dbe99ad4ec3b423d1a076551b9f4c20978c353d3",
-        "status": 200
+        "bytes": 2965,
+        "sha256": "3e2869718ecdb608c9d19b08a1a78ed27db268dc343c2ec5e60bbcc36be0192a",
+        "status": 400
       },
       "family": "playout",
       "operation": "tree_result",
@@ -6863,22 +6860,21 @@
           "bytes": 489,
           "sha256": "f17d2d65069ef05e3be5634298e24c72560fa7c40be5302c07fbdd66328a9567",
           "format": "ptml"
-        },
-        "generated_xes": {
-          "filename": "tree-native-loop-top_bottom.generated_xes.xes",
-          "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-loop-top_bottom.generated_xes.xes",
-          "bytes": 6600,
-          "sha256": "f7e9dd26c349cfc260d9e1597ccc48e4869389eafce92440fea6c51025586048",
-          "format": "xes"
         }
       },
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "process-tree playout: a sampled trace has 7 visible events, above the max_steps / max_length safety bound of 5 (the reference has no bound; raise it to keep every trace)"
+      },
       "native_calls": [
         {
           "name": "process_tree_playout_result(tree, options)",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "process-tree playout: a sampled trace has 7 visible events, above the max_steps / max_length safety bound of 5 (the reference has no bound; raise it to keep every trace)"
+          }
         }
       ]
     },
@@ -7095,14 +7091,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4693",
+        "Content-Length": "4628",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-tau.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-tau.response.json",
-        "bytes": 4693,
-        "sha256": "68f12b0c9aa290b62658810c1abe80639b14eed77ef68ea26128a8fed6b7e94a",
+        "bytes": 4628,
+        "sha256": "90138704b9fe7ab2b66db4dd6aed93b85a0322a2f5e19363f984550b69b859d8",
         "status": 200
       },
       "family": "playout",
@@ -7130,8 +7126,8 @@
         "generated_xes": {
           "filename": "tree-native-operator-tau.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-tau.generated_xes.xes",
-          "bytes": 276,
-          "sha256": "1616554c8fdc7a983c00fbf5de93463fc2ec813d0479a7fd1ef6b181d3618078",
+          "bytes": 228,
+          "sha256": "b26fabe3acb0bb764d34dfb5298ebd420195f8687aa8c8b7eb1c29c39cc2a9d4",
           "format": "xes"
         }
       },
@@ -7184,14 +7180,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5893",
+        "Content-Length": "5694",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-activity.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-activity.response.json",
-        "bytes": 5893,
-        "sha256": "dd1193cb1f2b9a3abcad73203d915c6aeca37046098f0d4257a04eafb65cc318",
+        "bytes": 5694,
+        "sha256": "7a0d8565f50f42b35bf28654c0c420c33ab9af0a6199f26a3c6a58ded6148d5f",
         "status": 200
       },
       "family": "playout",
@@ -7219,8 +7215,8 @@
         "generated_xes": {
           "filename": "tree-native-operator-activity.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-activity.generated_xes.xes",
-          "bytes": 415,
-          "sha256": "0e7213e4ab6e3aa87a5d25bfb02a3f6a496d42907cd792c6bf537012297dfbc0",
+          "bytes": 298,
+          "sha256": "7c70cc37cd5ef99fa2b9eb163f0006f17e7f22aa6974ae391126cec2299b137c",
           "format": "xes"
         }
       },
@@ -7273,14 +7269,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7634",
+        "Content-Length": "7301",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-sequence.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-sequence.response.json",
-        "bytes": 7634,
-        "sha256": "91ed2f1b4a3095db6d23369015b0aee6accf0b2ab78f196446f254818fa564eb",
+        "bytes": 7301,
+        "sha256": "7cddcef930b903f92d6ef92459beafe28973ebfd857903620ada70936996b25c",
         "status": 200
       },
       "family": "playout",
@@ -7308,8 +7304,8 @@
         "generated_xes": {
           "filename": "tree-native-operator-sequence.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-sequence.generated_xes.xes",
-          "bytes": 554,
-          "sha256": "67d01487a5e16f212b5feed74876659403324abf00f996cf18e9403dc960414a",
+          "bytes": 368,
+          "sha256": "74bce0735df45d62b2abd6dc984e7f96b58ad4e131c424379423d2594dd02176",
           "format": "xes"
         }
       },
@@ -7362,14 +7358,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8323",
+        "Content-Length": "7925",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-exclusive.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-exclusive.response.json",
-        "bytes": 8323,
-        "sha256": "ac16263058ecfdc6a800f30c865d0fb70438b5f78af88e3e4ff15915e78cc095",
+        "bytes": 7925,
+        "sha256": "583e38bd25f9ef607ba3310c601a8113f82aa039008e4ccc6bba368927d87afc",
         "status": 200
       },
       "family": "playout",
@@ -7397,8 +7393,8 @@
         "generated_xes": {
           "filename": "tree-native-operator-exclusive.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-exclusive.generated_xes.xes",
-          "bytes": 623,
-          "sha256": "d37bdddad554edb6ed33668d7ead1c1b11572915982798580677b9ba9cddb75f",
+          "bytes": 389,
+          "sha256": "7802ca273ed2f1de983c072bc9aaf32f8a00b9fe496e6ca5d280d69c406245b5",
           "format": "xes"
         }
       },
@@ -7451,14 +7447,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10776",
+        "Content-Length": "10110",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-parallel.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-parallel.response.json",
-        "bytes": 10776,
-        "sha256": "918e1dd87351922cfc2f0d06e64eb72f21f24c75cb56bbef3df69cb6aad1be17",
+        "bytes": 10110,
+        "sha256": "d138f09c0d403d386a4475375e343343706a8147874b804b7a1772ce8d7e345b",
         "status": 200
       },
       "family": "playout",
@@ -7486,8 +7482,8 @@
         "generated_xes": {
           "filename": "tree-native-operator-parallel.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-parallel.generated_xes.xes",
-          "bytes": 901,
-          "sha256": "c3bbf5cc339305f50b18204d1e534cefe25cd31994a7616814fe5a8c2e2a46b1",
+          "bytes": 529,
+          "sha256": "f5496e607b97c30520bc47eb49543b4a6190b8ea0c49e34cf3c873b236b18984",
           "format": "xes"
         }
       },
@@ -7540,14 +7536,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14637",
+        "Content-Length": "13573",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-inclusive_choice.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-inclusive_choice.response.json",
-        "bytes": 14637,
-        "sha256": "84b13127aa737a7e88419a50629c226282f82df0dfa2a4f6c5660e7da2ee0f78",
+        "bytes": 13573,
+        "sha256": "3eb8bd128c18a2770cf65829e758c7df957a52f92d27b065a8ca253b900684ea",
         "status": 200
       },
       "family": "playout",
@@ -7575,8 +7571,8 @@
         "generated_xes": {
           "filename": "tree-native-operator-inclusive_choice.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-inclusive_choice.generated_xes.xes",
-          "bytes": 1317,
-          "sha256": "1319a1c372b2a4490e6b987e6c7bda54fb1627bea322e47bfcb62071799bddbf",
+          "bytes": 711,
+          "sha256": "706daa74df316a9951ee92ce25c0a8fc8ee1f92c596727e733892ebd95ee0da5",
           "format": "xes"
         }
       },
@@ -7629,14 +7625,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10797",
+        "Content-Length": "10131",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-interleaving.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-interleaving.response.json",
-        "bytes": 10797,
-        "sha256": "3d3ebcdad40b7bd0b2c19bc415830bfda87f0cd7bdc66a1bf58d0fccbc7aa7b9",
+        "bytes": 10131,
+        "sha256": "72f999a1d9183bcc741a247467aad0e0120ea3ace45a0303defa42c115f281b1",
         "status": 200
       },
       "family": "playout",
@@ -7664,8 +7660,8 @@
         "generated_xes": {
           "filename": "tree-native-operator-interleaving.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-interleaving.generated_xes.xes",
-          "bytes": 901,
-          "sha256": "c3bbf5cc339305f50b18204d1e534cefe25cd31994a7616814fe5a8c2e2a46b1",
+          "bytes": 529,
+          "sha256": "f5496e607b97c30520bc47eb49543b4a6190b8ea0c49e34cf3c873b236b18984",
           "format": "xes"
         }
       },

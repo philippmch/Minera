@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { downloadBlob } from "../download";
 import { caseRowEntries } from "../app-logic";
 import { type MineraExport, type Trace, numberFormat } from "../types";
+import { loadedTraces, useTraces } from "../mine-traces";
+import { TraceLoadNote } from "./TraceLoadNote";
 import {
   type DfgExportOptions,
   type XesExportOptions,
@@ -281,7 +283,9 @@ const UNAVAILABLE_EXPORT = "Open the original CSV or XES log to export it: this 
 const EXPORT_NOTE_ID = "log-export-unavailable";
 
 export function EventLogView({ data, available = true }: { data: MineraExport; available?: boolean }) {
-  const traces = data.traces ?? [];
+  const load = useTraces(data);
+  const traces = loadedTraces(load);
+  const waiting = load.status === "loading" || load.status === "error";
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
 
@@ -320,8 +324,8 @@ export function EventLogView({ data, available = true }: { data: MineraExport; a
       <div className="panel-head">
         <h2>Cases</h2>
         <span className="panel-meta">
-          {numberFormat.format(filtered.length)}
-          {query ? ` of ${numberFormat.format(traces.length)}` : ""} cases
+          {numberFormat.format(waiting ? data.trace_count : filtered.length)}
+          {query && !waiting ? ` of ${numberFormat.format(traces.length)}` : ""} cases
           {timeSpan &&
             ` · ${formatTimestamp(timeSpan.min)} — ${formatTimestamp(timeSpan.max)}`}
         </span>
@@ -340,6 +344,7 @@ export function EventLogView({ data, available = true }: { data: MineraExport; a
           }}
         />
       </div>
+      {waiting && <TraceLoadNote load={load} cases={data.trace_count} />}
       <ol className="case-list">
         {filtered.slice(0, limit).map(({ key, trace }) => (
           <CaseRow
@@ -357,7 +362,7 @@ export function EventLogView({ data, available = true }: { data: MineraExport; a
           Show more · {numberFormat.format(filtered.length - limit)} remaining
         </button>
       )}
-      {filtered.length === 0 && (
+      {filtered.length === 0 && !waiting && (
         <div className="case-empty">No cases match “{query}”.</div>
       )}
     </section>

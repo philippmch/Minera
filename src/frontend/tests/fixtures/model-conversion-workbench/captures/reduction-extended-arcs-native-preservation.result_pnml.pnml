@@ -3,30 +3,30 @@
   <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
     <name><text>Reduced original PNML model</text></name>
     <page id="page1">
-      <place id="p0">
-        <name><text>p0</text></name>
+      <place id="source">
+        <name><text>source</text></name>
         <initialMarking><text>1</text></initialMarking>
       </place>
-      <place id="p1">
-        <name><text>p1</text></name>
+      <place id="sink">
+        <name><text>sink</text></name>
       </place>
-      <place id="p2">
-        <name><text>p2</text></name>
+      <place id="reset-guard">
+        <name><text>reset-guard</text></name>
       </place>
-      <place id="p3">
-        <name><text>p3</text></name>
+      <place id="inhibitor-guard">
+        <name><text>inhibitor-guard</text></name>
       </place>
       <transition id="t0">
         <name><text>A</text></name>
       </transition>
-      <arc id="a0" source="p0" target="t0"/>
-      <arc id="a1" source="p2" target="t0"><arctype><text>reset</text></arctype></arc>
-      <arc id="a2" source="p3" target="t0"><arctype><text>inhibitor</text></arctype></arc>
-      <arc id="a3" source="t0" target="p1"/>
+      <arc id="a0" source="source" target="t0"/>
+      <arc id="a1" source="reset-guard" target="t0"><arctype><text>reset</text></arctype></arc>
+      <arc id="a2" source="inhibitor-guard" target="t0"><arctype><text>inhibitor</text></arctype></arc>
+      <arc id="a3" source="t0" target="sink"/>
     </page>
     <finalmarkings>
       <marking>
-        <place idref="p1"><text>1</text></place>
+        <place idref="sink"><text>1</text></place>
       </marking>
     </finalmarkings>
   </net>

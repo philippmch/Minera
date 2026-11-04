@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 
 #include "minera/event_log.hpp"
@@ -34,6 +35,9 @@ struct GeneticMinerOptions {
   // token replay, so cost grows with the alphabet.
   std::size_t max_activities = 64;
   std::size_t max_states = 10000;
+  // Polled before each candidate's fitness replay; returning true stops the
+  // search with OperationCancelled (cancellation.hpp). Unset never cancels.
+  std::function<bool()> cancelled;
 };
 
 struct GeneticMinerDiagnostics {

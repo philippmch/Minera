@@ -3,23 +3,23 @@
   <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
     <name><text>Independent Inductive discovery</text></name>
     <page id="page1">
-      <place id="p0">
-        <name><text>p0</text></name>
+      <place id="source">
+        <name><text>source</text></name>
         <initialMarking><text>1</text></initialMarking>
       </place>
-      <place id="p1">
-        <name><text>p1</text></name>
+      <place id="sink">
+        <name><text>sink</text></name>
       </place>
-      <transition id="t0">
+      <transition id="skip_1">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t0"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_1"/>
       </transition>
-      <arc id="a0" source="p0" target="t0"/>
-      <arc id="a1" source="t0" target="p1"/>
+      <arc id="a0" source="source" target="skip_1"/>
+      <arc id="a1" source="skip_1" target="sink"/>
     </page>
     <finalmarkings>
       <marking>
-        <place idref="p1"><text>1</text></place>
+        <place idref="sink"><text>1</text></place>
       </marking>
     </finalmarkings>
   </net>

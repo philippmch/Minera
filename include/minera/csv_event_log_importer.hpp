@@ -26,8 +26,9 @@ struct CsvImportOptions {
   bool allow_case_id_aliases = false;
   // The batch import (read_csv + format_dataframe) types the case-id and
   // activity columns (reference_csv_column_text), drops a row whose case id
-  // or activity is then missing, orders cases by their case-id text and skips
-  // lines of only spaces/tabs. The reference CSV
+  // or activity is then missing, or whose timestamp is NA once the timestamp
+  // column holds dates, orders cases by their case-id text and skips lines
+  // of only spaces/tabs. The reference CSV
   // event stream reader (csv.DictReader) keeps every row and passes those
   // cells on as literal text, so stream adapters set this to keep them.
   bool keep_na_first_class_values = false;

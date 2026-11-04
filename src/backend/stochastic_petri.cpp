@@ -211,17 +211,17 @@ std::vector<std::uint32_t> initial_marking(const PetriNet& net,
 
 void fire_checked(const PetriTransition& transition,
                   std::vector<std::uint32_t>& marking) {
-  for (const auto place : transition.inputs) {
-    if (place >= marking.size() || marking[place] == 0)
-      throw std::invalid_argument("stochastic Petri firing has an invalid input");
-    --marking[place];
-  }
-  for (const auto place : transition.outputs) {
-    if (place >= marking.size() ||
-        marking[place] == std::numeric_limits<std::uint32_t>::max())
-      throw std::invalid_argument(
-          "stochastic Petri firing would overflow a marking");
-    ++marking[place];
+  // Each ordinary arc consumes and produces its own weight (repeated unit
+  // endpoints one token each), like every other Petri firing.
+  if (!petri_transition_enabled(transition, marking))
+    throw std::invalid_argument("stochastic Petri firing has an invalid input");
+  for (const auto place : transition.outputs)
+    if (place >= marking.size())
+      throw std::invalid_argument("stochastic Petri firing would overflow a marking");
+  try {
+    fire_petri_transition(transition, marking);
+  } catch (const std::overflow_error&) {
+    throw std::invalid_argument("stochastic Petri firing would overflow a marking");
   }
 }
 

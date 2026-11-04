@@ -17,8 +17,8 @@ enum class PowlNodeKind {
 };
 
 struct PowlFrequency {
-  int minimum = 1;                         // Minimum frequency: 0 or 1
-  std::optional<int> maximum = 1;          // one, or null for unbounded
+  int minimum = 1;                         // 0 makes the transition skippable
+  std::optional<int> maximum = 1;          // null for unbounded (self-loop)
   friend bool operator==(const PowlFrequency&, const PowlFrequency&) = default;
 };
 
@@ -49,8 +49,7 @@ class PowlNode {
     return kind_ == PowlNodeKind::kTransition && frequency_.minimum == 0;
   }
   [[nodiscard]] bool self_loop() const noexcept {
-    return kind_ == PowlNodeKind::kTransition &&
-           (!frequency_.maximum || *frequency_.maximum > 1);
+    return kind_ == PowlNodeKind::kTransition && !frequency_.maximum;
   }
   [[nodiscard]] const std::vector<PowlNode>& children() const noexcept {
     return children_;

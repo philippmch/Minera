@@ -83,6 +83,7 @@ ILPMinerResult mine_ilp(const EventLog& event_log, const ILPMinerOptions& option
   reference.artificial_start_activity = options.artificial_start_activity;
   reference.artificial_end_activity = options.artificial_end_activity;
   if (!options.causal_relation.empty()) reference.causal_relation = options.causal_relation;
+  reference.cancelled = options.cancelled;
 
   ILPMinerResult result;
   const auto pairs = reference_ilp_causal_pairs(traces, reference);

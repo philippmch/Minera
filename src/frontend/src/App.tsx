@@ -51,7 +51,7 @@ import { PerformanceSpectrumView } from "./components/PerformanceSpectrum";
 import { Batches } from "./components/Batches";
 import { TimingDiscovery } from "./components/TimingDiscovery";
 import { BehaviorAnalysis } from "./components/BehaviorAnalysis";
-import { buildDottedChart } from "./dotted-chart";
+import { retainTraces, traceFacts } from "./mine-traces";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
@@ -277,7 +277,12 @@ export default function App() {
       // The backend, like the reference, has no time limit by default; the app
       // gives an unset global timeout its own budget so a hard model cannot hang the view.
       const result = await alignModel(minerId, withAlignmentTimeBudget(options), signal); assertMiningSourceBinding(sourceId, liveSource.current, generation, cacheGeneration.current); sameModel();
-      alignCache.current = { ...alignCache.current, [cacheKey]: result };
+      // A search a time limit stopped may finish on another try (on a less
+      // loaded machine, say), so it is not cached and reopening the view asks
+      // again. Older servers do not say which bound
+      // stopped an exhausted search; those are not cached either.
+      if (!(!result.computed && result.exhausted && result.time_limit_reached !== false))
+        alignCache.current = { ...alignCache.current, [cacheKey]: result };
       return result;
     },
     [data],
@@ -674,15 +679,18 @@ export default function App() {
 
   // Whether the log has any timestamped events to plot. Built once per load so
   // the Dotted Chart tab only appears when it would have something to show.
+  // Decided from the trace summary when the cases are loaded on demand.
   const hasDottedChart = useMemo(
     () => Boolean(
       data && (
-        (data.traces ? buildDottedChart(data.traces).rowCount > 0 : false) ||
+        traceFacts(data).hasTimestamps ||
         data.performance_spectrum || data.batch_discovery
       ),
     ),
     [data],
   );
+  // Cases loaded on demand belong to the analysis on screen only.
+  useEffect(() => { retainTraces(data); }, [data]);
 
   const selection = useMemo(
     () =>
@@ -730,7 +738,7 @@ export default function App() {
 
   const views = data
     ? VIEWS.filter((view) => {
-        if (view.id === "log") return Boolean(data.traces && data.traces.length > 0);
+        if (view.id === "log") return traceFacts(data).hasCases;
         if (view.id === "dotted") return hasDottedChart;
         if (view.id === "conformance") return Boolean(data.conformance);
         if (view.id === "resources") return Boolean(source || (data.resources && data.resources.resources.length > 0));

@@ -85,7 +85,11 @@ struct MineSizeEstimate {
 // the header's columns. Quotes follow the importer (read_csv_record): a quote
 // opens a quoted field only as a field's first character, "" inside one is a
 // literal quote, and a quote elsewhere in an unquoted field is literal text;
-// CR, LF and CRLF end a record outside quotes.
+// CR, LF and CRLF end a record outside quotes. Row shapes follow the
+// importer's read_csv rules without being checked here: fields a first data
+// row has beyond the header are an implicit index, not frame columns, so the
+// columns are the header's; short rows and rows the importer refuses for
+// having too many fields still count as rows (the import then answers 400).
 MineSizeEstimate scan_csv_mine_size(std::string_view bytes, char delimiter) {
   MineSizeEstimate estimate;
   estimate.known = true;

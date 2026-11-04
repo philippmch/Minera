@@ -1612,8 +1612,40 @@ void json_contract_is_stable() {
 
 }  // namespace
 
+void weighted_and_parallel_arcs_move_their_weight() {
+  // An imported PNML keeps weighted and parallel arcs as weighted arc
+  // occurrences; firing moves each arc's weight, as the reference's
+  // semantics.execute does (two unit arcs in, one arc of weight 2 out: the
+  // final marking of two sink tokens is reached).
+  minera::PetriNet net = minera::PetriNet::from_literal_storage([] {
+    minera::PetriNetLiteralStorage storage;
+    storage.place_count = 2;
+    storage.source_storage = 0;
+    storage.sink_storage = 1;
+    storage.has_source = storage.has_sink = true;
+    storage.activities = {"A"};
+    minera::PetriTransition transition;
+    transition.activity = 0;
+    transition.inputs = {0, 0};
+    transition.outputs = {1};
+    transition.input_weights = {minera::PetriArcWeight{1, false}, minera::PetriArcWeight{1, false}};
+    transition.output_weights = {minera::PetriArcWeight{2, false}};
+    storage.transitions.push_back(transition);
+    return storage;
+  }());
+  minera::MonteCarloOptions options;
+  options.simulations = 2;
+  options.max_steps = 8;
+  options.initial_marking = {2, 0};
+  options.final_marking = {0, 2};
+  const auto result = minera::monte_carlo(net, options);
+  assert(result.diagnostics.completed_cases == 2 && result.diagnostics.deadlocked_cases == 0);
+  assert(result.log.traces.front().events.size() == 1);
+}
+
 int main() {
   deterministic_seed_and_diagnostics();
+  weighted_and_parallel_arcs_move_their_weight();
   weighted_choices_and_exponential_replay();
   signed_activation_weights_normalize_enabled_sets();
   source_log_fits_missing_weights_and_durations();

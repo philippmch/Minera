@@ -27,6 +27,32 @@ export interface PetriArcLayout {
   transition: number;
   place: number;
   input: boolean;
+  /** The arc's weight when it is not 1, else null (no label is drawn). */
+  weight: string | null;
+  /** Where the weight label sits: the middle of the drawn arc. */
+  labelX: number;
+  labelY: number;
+}
+
+/**
+ * The arc objects of one transition side, each with its weight. A compact
+ * side lists one occurrence per arc object (parallel arcs included) with its
+ * own weight; otherwise an arc of weight w is w repeated endpoints of a place,
+ * folded back here into one arc.
+ */
+export function petriSideArcs(
+  places: readonly number[],
+  weights: readonly (number | string)[] | undefined,
+): { place: number; weight: string }[] {
+  if (weights && weights.length === places.length && weights.length > 0)
+    return places.map((place, i) => ({ place, weight: String(weights[i]) }));
+  const folded: { place: number; weight: number }[] = [];
+  for (const place of places) {
+    const found = folded.find((arc) => arc.place === place);
+    if (found) found.weight += 1;
+    else folded.push({ place, weight: 1 });
+  }
+  return folded.map(({ place, weight }) => ({ place, weight: String(weight) }));
 }
 
 export interface PetriLayout {
@@ -150,16 +176,19 @@ export function computePetriLayout(
     (succ.get(from) ?? succ.set(from, []).get(from)!).push(to);
     (pred.get(to) ?? pred.set(to, []).get(to)!).push(from);
   };
-  const arcs: { from: string; to: string }[] = [];
+  // One drawn arc per arc object, labelled with its weight (see
+  // petriSideArcs): a weight-2 arc is one arrow marked 2, two parallel arcs
+  // are two arrows.
+  const arcs: { from: string; to: string; weight: string }[] = [];
   net.transitions.forEach((transition, index) => {
     if (!connected(index)) return;
-    for (const place of transition.inputs) {
+    for (const { place, weight } of petriSideArcs(transition.inputs, transition.input_weights)) {
       link(placeKey(place), transKey(index));
-      arcs.push({ from: placeKey(place), to: transKey(index) });
+      arcs.push({ from: placeKey(place), to: transKey(index), weight });
     }
-    for (const place of transition.outputs) {
+    for (const { place, weight } of petriSideArcs(transition.outputs, transition.output_weights)) {
       link(transKey(index), placeKey(place));
-      arcs.push({ from: transKey(index), to: placeKey(place) });
+      arcs.push({ from: transKey(index), to: placeKey(place), weight });
     }
   });
 
@@ -405,7 +434,7 @@ export function computePetriLayout(
     }
   }
 
-  const arcLayouts: PetriArcLayout[] = arcs.map(({ from, to }, index) => {
+  const arcLayouts: PetriArcLayout[] = arcs.map(({ from, to, weight }, index) => {
     const s = srcPoint[index];
     const t = tgtPoint[index];
     const floor = skipFloor.get(index);
@@ -418,6 +447,9 @@ export function computePetriLayout(
       key: `${from}-${to}-${index}`, path, input,
       transition: Number((input ? to : from).slice(1)),
       place: Number((input ? from : to).slice(1)),
+      weight: weight === "1" ? null : weight,
+      labelX: (s.x + t.x) / 2,
+      labelY: floor === undefined ? (s.y + t.y) / 2 - 5 : floor - 5,
     };
   });
 

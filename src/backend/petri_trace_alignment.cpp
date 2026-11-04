@@ -1,5 +1,8 @@
 #include "minera/petri_trace_alignment.hpp"
+#include "minera/petri_analysis.hpp"
+#include "minera/petri_reference_arcs.hpp"
 
+#include <limits>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -8,6 +11,7 @@
 #include <optional>
 #include <functional>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
@@ -336,17 +340,30 @@ bool less_memory_variant(AlignmentVariant variant) {
 // The reference synchronous-product variants (everything except
 // DIJKSTRA_LESS_MEMORY) read every ordinary arc as weight 1: a weighted arc
 // moves one token. Repeated endpoints are PNML multiplicities and collapse too.
+// The net the reference aligns on when arcs are weighted or parallel. Its
+// synchronous product gives every arc object weight 1 and keeps parallel arcs,
+// and its search then fires a transition, as observed black-box, once each
+// input place holds one token per arc object from it, taking one token there
+// and putting one token per output arc object. As repeated unit endpoints: k
+// parallel input arcs from a place become k inputs and k - 1 outputs back to
+// it (enabled at k tokens, one consumed); outputs are one endpoint per arc.
 PetriNet unit_weight_net(const PetriNet& net) {
-  const auto unique = [](const std::vector<std::size_t>& places) {
-    std::vector<std::size_t> out;
-    for (const auto place : places)
-      if (std::find(out.begin(), out.end(), place) == out.end()) out.push_back(place);
-    return out;
-  };
   PetriNet copy;
   for (std::size_t p = 0; p < net.place_count(); ++p) copy.add_place();
-  for (const auto& transition : net.transitions())
-    copy.add_transition(transition.activity, unique(transition.inputs), unique(transition.outputs));
+  for (const auto& transition : net.transitions()) {
+    std::vector<std::size_t> inputs, outputs;
+    std::vector<std::pair<std::size_t, std::size_t>> counts;
+    for (const auto& arc : petri_reference_arcs(transition, true)) {
+      inputs.push_back(arc.place);
+      const auto found = std::find_if(counts.begin(), counts.end(),
+                                      [&](const auto& entry) { return entry.first == arc.place; });
+      if (found == counts.end()) counts.emplace_back(arc.place, 1);
+      else ++found->second;
+    }
+    for (const auto& [place, count] : counts) outputs.insert(outputs.end(), count - 1, place);
+    for (const auto& arc : petri_reference_arcs(transition, false)) outputs.push_back(arc.place);
+    copy.add_transition(transition.activity, std::move(inputs), std::move(outputs));
+  }
   copy.set_activities(net.activities());
   if (net.has_source()) copy.set_source(net.source());
   if (net.has_sink()) copy.set_sink(net.sink());
@@ -356,13 +373,70 @@ PetriNet unit_weight_net(const PetriNet& net) {
   return copy;
 }
 
-bool weighted_net(const PetriNet& net) {
+bool weighted_net(const PetriNet& net) { return petri_net_has_weighted_arcs(net); }
+
+// The public log dispatcher's easy-soundness check on a net with weighted or
+// parallel arcs, as observed black-box (98.9% of 1,500 random nets with
+// weighted and parallel arcs; the rest are unbounded or tie cases): the
+// marking equation's LP relaxation over the reference incidence (one -1/+1
+// per arc object) must be feasible, and the final marking must be reachable
+// when a transition is enabled once each input place holds the summed weight
+// of its arcs, takes the weight of one of them (the reference keeps whichever
+// arc its set yields last, here the last in document order) and puts the
+// summed weight of its output arcs. A search that passes max_states refuses
+// the net, as the reference does for the unbounded nets probed.
+bool reference_easy_sound(const PetriNet& net, const std::vector<int>& requested_initial,
+                          const std::vector<int>& requested_final, std::size_t max_states) {
+  const auto initial = workflow_marking(net, requested_initial, true);
+  const auto final = workflow_marking(net, requested_final, false);
+  if (!marking_equation_relaxation_feasible(net, Marking(initial.begin(), initial.end()),
+                                            Marking(final.begin(), final.end())))
+    return false;
+  struct Entry { std::size_t place; std::int64_t need, take; };
+  struct Step { std::vector<Entry> inputs; std::vector<std::pair<std::size_t, std::int64_t>> put; };
+  std::vector<Step> steps;
+  const auto checked_sum = [](std::int64_t lhs, std::int64_t rhs) {
+    if ((rhs > 0 && lhs > std::numeric_limits<std::int64_t>::max() - rhs) ||
+        (rhs < 0 && lhs < std::numeric_limits<std::int64_t>::min() - rhs))
+      throw std::overflow_error("easy-soundness arc weight overflow");
+    return lhs + rhs;
+  };
   for (const auto& transition : net.transitions()) {
-    if (transition.has_compact_ordinary_arcs()) return true;
-    for (const auto* places : {&transition.inputs, &transition.outputs})
-      for (std::size_t k = 0; k < places->size(); ++k)
-        if (std::find(places->begin(), places->begin() + k, (*places)[k]) != places->begin() + k)
-          return true;
+    Step step;
+    for (const auto& arc : petri_reference_arcs(transition, true)) {
+      const auto found = std::find_if(step.inputs.begin(), step.inputs.end(),
+                                      [&](const Entry& entry) { return entry.place == arc.place; });
+      if (found == step.inputs.end()) step.inputs.push_back({arc.place, arc.signed_weight(), arc.signed_weight()});
+      else { found->need = checked_sum(found->need, arc.signed_weight()); found->take = arc.signed_weight(); }
+    }
+    for (const auto& arc : petri_reference_arcs(transition, false)) {
+      const auto found = std::find_if(step.put.begin(), step.put.end(),
+                                      [&](const auto& entry) { return entry.first == arc.place; });
+      if (found == step.put.end()) step.put.emplace_back(arc.place, arc.signed_weight());
+      else found->second = checked_sum(found->second, arc.signed_weight());
+    }
+    steps.push_back(std::move(step));
+  }
+  std::vector<std::int64_t> start(initial.begin(), initial.end());
+  const std::vector<std::int64_t> goal(final.begin(), final.end());
+  std::set<std::vector<std::int64_t>> seen{start};
+  std::queue<std::vector<std::int64_t>> pending;
+  pending.push(start);
+  while (!pending.empty()) {
+    const auto marking = std::move(pending.front());
+    pending.pop();
+    if (marking == goal) return true;
+    for (const auto& step : steps) {
+      if (std::any_of(step.inputs.begin(), step.inputs.end(),
+                      [&](const Entry& entry) { return marking[entry.place] < entry.need; }))
+        continue;
+      auto next = marking;
+      for (const auto& entry : step.inputs) next[entry.place] = checked_sum(next[entry.place], -entry.take);
+      for (const auto& [place, weight] : step.put) next[place] = checked_sum(next[place], weight);
+      if (!seen.insert(next).second) continue;
+      if (seen.size() > max_states) return false;
+      pending.push(std::move(next));
+    }
   }
   return false;
 }
@@ -497,7 +571,12 @@ std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const Petr
   // The public log dispatcher first checks easy soundness and raises for a
   // net whose final marking is unreachable, where a single trace would get
   // None.
-  if (!final_marking_reachable(net, options.trace.initial_marking, options.trace.final_marking))
+  const bool easy_sound =
+      plain_net(net) && weighted_net(net)
+          ? reference_easy_sound(net, options.trace.initial_marking, options.trace.final_marking,
+                                 options.trace.max_states)
+          : final_marking_reachable(net, options.trace.initial_marking, options.trace.final_marking);
+  if (!easy_sound)
     throw std::invalid_argument("trying to apply alignments on a Petri net that is not easy sound");
   const bool standard = options.activity_key == "concept:name" || options.activity_key == "activity";
   std::map<std::vector<std::string>, PetriTraceAlignment> variants;

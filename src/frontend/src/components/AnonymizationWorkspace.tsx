@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { type MineraExport } from "../types";
+import { traceFacts } from "../mine-traces";
 import { requestLogQuerySchema, downloadQueryBlob, type LogQuerySchema } from "../log-query";
 import { attributeOptions, variantOptions, requestVariantRelease, requestAttributeRelease, releasedFile, releaseEventCount, type AnonymizationRelease, type VariantForm, type PripelForm, type NoiseMode } from "../anonymization";
 
@@ -26,7 +27,8 @@ function ReleaseView({release,onOpen}:{release:AnonymizationRelease;onOpen:(file
   </section>;
 }
 export function AnonymizationWorkspace({data,available,mining,onOpenReleased}:{data:MineraExport;available:boolean;mining:boolean;onOpenReleased:(file:File)=>void}) {
-  const maxLength=data.traces?.reduce((value,trace)=>Math.max(value,trace.events.length),0)??3;
+  // The longest case seeds the variant length; the trace summary carries it when the cases load on demand.
+  const maxLength=traceFacts(data).maxTraceLength??3;
   const [variants,setVariants]=useState<VariantForm>({variant:"sacofa",epsilon:"1",length:String(Math.min(20,Math.max(1,maxLength))),threshold:"1",noise:"secure",seed:"0",traces:"1000",variants:"10000"});
   const [attributes,setAttributes]=useState<PripelForm>({epsilon:"1",noise:"secure",seed:"0",traces:"1000",distance:"3",blocklist:""});
   const [schema,setSchema]=useState<LogQuerySchema|null>(null);const [variantRelease,setVariantRelease]=useState<AnonymizationRelease|null>(null);const [attributeRelease,setAttributeRelease]=useState<AnonymizationRelease|null>(null);const [queryFile,setQueryFile]=useState<File|null>(null);

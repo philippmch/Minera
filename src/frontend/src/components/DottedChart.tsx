@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { type MineraExport, numberFormat } from "../types";
 import { buildDottedChart } from "../dotted-chart";
+import { loadedTraces, useTraces } from "../mine-traces";
+import { TraceLoadNote } from "./TraceLoadNote";
 
 const WIDTH = 880;
 const ROW_STEP = 3; // vertical pixels per case at the natural size
@@ -20,7 +22,20 @@ interface DottedChartViewProps {
 }
 
 export function DottedChartView({ data }: DottedChartViewProps) {
-  const chart = useMemo(() => buildDottedChart(data.traces ?? []), [data]);
+  const load = useTraces(data);
+  const traces = loadedTraces(load);
+  const chart = useMemo(() => buildDottedChart(traces), [traces]);
+
+  if (load.status === "loading" || load.status === "error") {
+    return (
+      <section className="panel reveal">
+        <div className="panel-head">
+          <h2>Dotted Chart</h2>
+        </div>
+        <TraceLoadNote load={load} />
+      </section>
+    );
+  }
 
   if (chart.rowCount === 0) {
     return (

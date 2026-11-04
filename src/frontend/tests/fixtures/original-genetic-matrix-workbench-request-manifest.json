@@ -67,14 +67,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5987",
+        "Content-Length": "10528",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-default-conversion-without-cache.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-default-conversion-without-cache.response.json",
-        "bytes": 5987,
-        "sha256": "78d10b4ef828a2227ba24a6310099ee8ab1bbf738106395f7150dfe6633f69d8",
+        "bytes": 10528,
+        "sha256": "4c381bdd54c501e7fb373029a7e126f29da44601480a7037591c9150a76feb78",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -275,14 +275,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6055",
+        "Content-Length": "10596",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-alias-0.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-alias-0.response.json",
-        "bytes": 6055,
-        "sha256": "ba6b13ece6d5594db50b08bfacc92e7b01256e63a24f74907e24c69a43e048fa",
+        "bytes": 10596,
+        "sha256": "9a5e24afccb624e0ecf5c9e4b4c9744b4604d06b3cdf9999d9348c4466896c0c",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -433,14 +433,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6055",
+        "Content-Length": "10596",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-alias-1.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-alias-1.response.json",
-        "bytes": 6055,
-        "sha256": "19a6609121edf97fd63136e01a4d4e7e7e425d4d033f3c7322f5dbd94eee2dd1",
+        "bytes": 10596,
+        "sha256": "f19197d95c9a6eb0164dade5f45fe7dfb45155b0265331877af7ded15baee484",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -591,14 +591,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6049",
+        "Content-Length": "10590",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-alias-2.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-alias-2.response.json",
-        "bytes": 6049,
-        "sha256": "38c54671a0e7e3263457f696a666452b237090ed22b4743c74c3f0b622fbab3f",
+        "bytes": 10590,
+        "sha256": "02ca0cfcdc95ec277c27296be805504ff83e17b5c3c714cde46db1ccb0b543e5",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -749,14 +749,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6041",
+        "Content-Length": "10582",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-index-zero.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-index-zero.response.json",
-        "bytes": 6041,
-        "sha256": "3525648a3c9633027a54f45e998210b8ae7797ac448f130acfc88aedc37e88b0",
+        "bytes": 10582,
+        "sha256": "f0a7b2de5918d33be8233a52ae431c075227c6b4a0a25490f6282d419ef02150",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -909,14 +909,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6043",
+        "Content-Length": "10584",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-index-negative-zero.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-index-negative-zero.response.json",
-        "bytes": 6043,
-        "sha256": "308901d73f40fd4c64dc849324a80e0c725f9271179581bedd2e546e1457568b",
+        "bytes": 10584,
+        "sha256": "24ca50575aad03fcee9b232f38b39d2cc10cccc74f011bb2157be5fe078232c2",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -1069,14 +1069,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2405",
+        "Content-Length": "2877",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-unsupported-index-minus2147483648.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-unsupported-index-minus2147483648.response.json",
-        "bytes": 2405,
-        "sha256": "1d20bfe2f578e02d296b0fb94e8e40f4330683fc12acab73bc63781ad10f72da",
+        "bytes": 2877,
+        "sha256": "6a876ce1eff0d82d3da1b8a21cd5eff5ae85508511b5ece1d1b36f0e2d32780b",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -1194,14 +1194,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2378",
+        "Content-Length": "2850",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-unsupported-index-minus1.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-unsupported-index-minus1.response.json",
-        "bytes": 2378,
-        "sha256": "2a32ada80a4b1e9e25edd289b67cc98ac9fe29256469c7a9158ec0c3b4153ce8",
+        "bytes": 2850,
+        "sha256": "8b87014e763240253de955109189b3c213d91538debd35075e750450557c6582",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -1319,14 +1319,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2375",
+        "Content-Length": "2847",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-unsupported-index-1.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-unsupported-index-1.response.json",
-        "bytes": 2375,
-        "sha256": "5dd4ffc0be5ae1a624a1aa1f36dd7fbf0b90ec32ca45d54c3709a4dfd085ebad",
+        "bytes": 2847,
+        "sha256": "0ce8857f1cc0a1ed5aecc254cd2e63a068e18d8ca5702101809293930318daf8",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -1444,14 +1444,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2402",
+        "Content-Length": "2874",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-unsupported-index-2147483647.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-unsupported-index-2147483647.response.json",
-        "bytes": 2402,
-        "sha256": "99ff2e726ad9283ca7e9e5c48c5704e77346c5d449fb84177aacfdf732264fb8",
+        "bytes": 2874,
+        "sha256": "836d8b80d8e24830ca87078c994b98a9fdc2e27dc9dc80635812c6c5839703b1",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -1569,14 +1569,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6067",
+        "Content-Length": "10620",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-duplicate-sequence.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-duplicate-sequence.response.json",
-        "bytes": 6067,
-        "sha256": "50e8aeaff17f98ee72e4de9764496ba3be66bbb364c6c198d5a93714340d758f",
+        "bytes": 10620,
+        "sha256": "d752fae71c5591265beee094cf05d3e2e488f24d23fa7a5b2b407db26e4d3604",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -1748,14 +1748,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10166",
+        "Content-Length": "18339",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-unsorted-groups.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-unsorted-groups.response.json",
-        "bytes": 10166,
-        "sha256": "a74cfc0ec1ecbede6911ede11ee1e01baf696546bf3171cfd00db767cc8a93e0",
+        "bytes": 18339,
+        "sha256": "1319bb8fa67ee0131d3d3ec9bdae18186e41c6d8efabe4653c5daf3748f065d5",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -1936,14 +1936,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8070",
+        "Content-Length": "14345",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-xor.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-xor.response.json",
-        "bytes": 8070,
-        "sha256": "8add4dc7e743a404839b3eb0911aef0cbc2078ec42aa768546136458bb0c6975",
+        "bytes": 14345,
+        "sha256": "469874e19ed9ff6be0b0afb94bb84ad73f3db25105c934bc797d125bd3d3987d",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -2112,14 +2112,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8404",
+        "Content-Length": "14993",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-and.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-and.response.json",
-        "bytes": 8404,
-        "sha256": "1db382f7fb5588746ec5a2698228aa62f3abaa62187dbe01f062c4f4da9b8628",
+        "bytes": 14993,
+        "sha256": "0ba24c457fdf2228eb05bb08fde88d8d8b55920a31b8351c4c59a8325ab77c81",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -2289,14 +2289,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9988",
+        "Content-Length": "18150",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-loop.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-loop.response.json",
-        "bytes": 9988,
-        "sha256": "4f2fce3b7e266eba014994d2eb499b7ebbdd0558a5ed7fa3f7886508bcbfc5c3",
+        "bytes": 18150,
+        "sha256": "504671aa21f5e1e14b666f16044e3016df6b46a6df90e44dac78e44427bc558e",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -2458,14 +2458,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9988",
+        "Content-Length": "18060",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-inconsistent-groups.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-inconsistent-groups.response.json",
-        "bytes": 9988,
-        "sha256": "a8acf71c0dd94f2eb9a4b6d0eedaf47f9647edc730439c2e506ee2070163ed2e",
+        "bytes": 18060,
+        "sha256": "a2dc557aeba020aabf5ad9152968f96517690781d7cc5284fc0240d4fe7b6e4f",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -2615,14 +2615,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5850",
+        "Content-Length": "10275",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-disconnected.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-disconnected.response.json",
-        "bytes": 5850,
-        "sha256": "8913ebae4ccd3987c36afb27ab615dd660e954acbb7316795232202e7ce70f3a",
+        "bytes": 10275,
+        "sha256": "b46008921276766e0c45df1b7ba59bd04383048b2c9d7e4654e752238d7be0d5",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -2784,14 +2784,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5191",
+        "Content-Length": "9059",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-single-self-loop.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-single-self-loop.response.json",
-        "bytes": 5191,
-        "sha256": "1c4a15bd973c7f1d40a091d8f38b8567ea33f7ce3da018b110c89003d7d6b16a",
+        "bytes": 9059,
+        "sha256": "ffd8ff666b15f51f858f7e8086800de48c6f79d89a22ac77ebc202991a0b92f5",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -2939,14 +2939,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4013",
+        "Content-Length": "6880",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-empty.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-empty.response.json",
-        "bytes": 4013,
-        "sha256": "df7e27b8e1027f05045558ecb93f517d95518769ae0d0f1be40ded2e0b1ad944",
+        "bytes": 6880,
+        "sha256": "b8e84e82cfcb3be021b6b29d5e5fea6ca6cf8de6cf3819558f2f28f8d0a835e2",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -3104,14 +3104,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3938",
+        "Content-Length": "6805",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-default-empty.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-default-empty.response.json",
-        "bytes": 3938,
-        "sha256": "51c76a4154bec4ad0161681376c97ca8f456ee942fd6a0e6a2aef9e4c1a97dcd",
+        "bytes": 6805,
+        "sha256": "7682c13b55410957faed6cb0475590bff39b9212179c0789b8e5a0410cfd63f0",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -3269,14 +3269,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4910",
+        "Content-Length": "8547",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-single.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-single.response.json",
-        "bytes": 4910,
-        "sha256": "0465018395fb0b8aafa6850e653d8ac96350dab206f218f485b3b7b9fd69cd86",
+        "bytes": 8547,
+        "sha256": "8669d6ab872a526e26c6ce45b6d523c00cbe603fed25b1d526c4ebea10573859",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -3424,14 +3424,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6771",
+        "Content-Length": "11977",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-duplicate-labels.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-duplicate-labels.response.json",
-        "bytes": 6771,
-        "sha256": "adee92b7725fcb0ac631046420a1f1cae255b551355c7103b7b761329ed976cc",
+        "bytes": 11977,
+        "sha256": "b0d2f614563e6d981f1d3dafe3f4639e420613587cd381b50cd0345d0b4a7c9f",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -3579,14 +3579,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9232",
+        "Content-Length": "16382",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-literal-labels.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-literal-labels.response.json",
-        "bytes": 9232,
-        "sha256": "52b72caa26e211b97f1af9b8a2394f6cbceef85d0c8940875277feaafb340a1e",
+        "bytes": 16382,
+        "sha256": "756a4cf74f4c535cd2c8fcd74a2b054f0529aa88d37782fd8b8c67764c9a00e4",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -3734,14 +3734,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7212",
+        "Content-Length": "14143",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-escaped-lone-wtf-labels.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-escaped-lone-wtf-labels.response.json",
-        "bytes": 7212,
-        "sha256": "0cfe5de112229a709409953fd5d01b761d356e90471c58ea65eb3585934777af",
+        "bytes": 14143,
+        "sha256": "a67b7b33ca690420e4d4283c796ba4cfdac9dc79f4a39e4327bef36402b59021",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -3891,14 +3891,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5007",
+        "Content-Length": "8671",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-escaped-supplementary-label.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-escaped-supplementary-label.response.json",
-        "bytes": 5007,
-        "sha256": "eb8a21745b7939dec560ab54c7d0b111670deed6c94a9cb7d9510760d4a5ed73",
+        "bytes": 8671,
+        "sha256": "54e09cfcd82efcab09fd7a3b65db54d31818f52a9392c86e933e5f0c982220b1",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -4046,14 +4046,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6043",
+        "Content-Length": "10540",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-literal-unicode.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-literal-unicode.response.json",
-        "bytes": 6043,
-        "sha256": "c3cbcd251ee257e459b7e85a19c7370a0444204037fa2ca06a75ba667d985ef0",
+        "bytes": 10540,
+        "sha256": "9614aaae1d87d3934d4fba7684bbf0fc00870883a7deb49530e7d88db9d25161",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -4201,14 +4201,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6132",
+        "Content-Length": "10673",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-pretty-sequence.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-pretty-sequence.response.json",
-        "bytes": 6132,
-        "sha256": "cad555c619f1c95a0cf806e6b10481e103837add48df7ee400ee59b698e3fc97",
+        "bytes": 10673,
+        "sha256": "be291e177d6bdc55f63aa41e376efdd01f65f32abc532a0c2f0d24b0657f7f90",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -4358,14 +4358,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6001",
+        "Content-Length": "10542",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-model-reordered-keys.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-model-reordered-keys.response.json",
-        "bytes": 6001,
-        "sha256": "ef466f04f17815931e119c58ef0a029ff6201334a148ac93820232131e1cc081",
+        "bytes": 10542,
+        "sha256": "de012db4c896cce8ffcc0d2b95f78905bfc1e49d95ac008176f77198b63232ad",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -4515,14 +4515,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2309",
+        "Content-Length": "2765",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-empty-input-partition.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-empty-input-partition.matrix.response.json",
-        "bytes": 2309,
-        "sha256": "87c796fcfd3b01c0a2fafd5198c21407fdb99764fb12a97044d6d53c6f38808d",
+        "bytes": 2765,
+        "sha256": "7aa2b3590f942d20f7e08d4518f90ff937266f5fe901c6584f380135dee11991",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -4637,14 +4637,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2311",
+        "Content-Length": "2767",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-empty-output-partition.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-empty-output-partition.matrix.response.json",
-        "bytes": 2311,
-        "sha256": "f3bb6a5ddef1f2ecd239853ce27d41f87c61568a58a0dea397711b7322bd707a",
+        "bytes": 2767,
+        "sha256": "64f95296a1aad65aa2cb18240d644b7235fcee2fbb9f1224593b7f784758689c",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -4759,14 +4759,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2312",
+        "Content-Length": "2769",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-long-input.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-long-input.matrix.response.json",
-        "bytes": 2312,
-        "sha256": "87fd4724117cc98da9106b5c6cee3b8f64df7197ebd73e8f18e660da95036090",
+        "bytes": 2769,
+        "sha256": "da1320323b1b1e1180c9164275ee34ec1d6e0699d0ea3056577957aa6371555d",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -4881,14 +4881,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2314",
+        "Content-Length": "2771",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-long-output.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-long-output.matrix.response.json",
-        "bytes": 2314,
-        "sha256": "a1cd5865343418819aff10e9fcef86820e0daea5be7fe970fee25f5c744b25cf",
+        "bytes": 2771,
+        "sha256": "77116c28b734abaf38a2533c9490c2eb234e7938fda1dd32f18ac355c3db7fef",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -5003,14 +5003,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2221",
+        "Content-Length": "2671",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-missing-maps.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-missing-maps.matrix.response.json",
-        "bytes": 2221,
-        "sha256": "a69a7035b31c6ffc2cf07aefe6ee809c00c3e02a305b8d9949cab3d23ee950f0",
+        "bytes": 2671,
+        "sha256": "ee75072b818d0b4bcabaaa54475adaeae5cefca164325245df961489bc68318d",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -5125,14 +5125,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2320",
+        "Content-Length": "2777",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-out-of-range-input.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-out-of-range-input.matrix.response.json",
-        "bytes": 2320,
-        "sha256": "008496862011fed47f27901a6cb3146e1b9da032e8a7ac216f8b73a2c9bab081",
+        "bytes": 2777,
+        "sha256": "5806dd7ac8871888408b38451569cb9c038b0bdace42f2cde92194753f0d08fc",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -5247,14 +5247,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2322",
+        "Content-Length": "2779",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-out-of-range-output.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-out-of-range-output.matrix.response.json",
-        "bytes": 2322,
-        "sha256": "61b1b3375bb1392cfdb3992be98de7b902cc07c7e701b213984912eadb1dbf07",
+        "bytes": 2779,
+        "sha256": "568d4ac8fdb9e78da2652f14d84898f9c0a129621e4cb424ce8641f5c745706f",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -5369,14 +5369,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2289",
+        "Content-Length": "2741",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-short-input.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-short-input.matrix.response.json",
-        "bytes": 2289,
-        "sha256": "4fec3682fa3562829e22a58073d6b13f58682a5928c480496688a7a518601eb9",
+        "bytes": 2741,
+        "sha256": "01195116c7755c6076646482518769f7ec7aa8b91768c1e8166e39fa7c97f091",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -5491,14 +5491,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2291",
+        "Content-Length": "2743",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-short-output.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-short-output.matrix.response.json",
-        "bytes": 2291,
-        "sha256": "fa9aa8c76499558e9cd7d4a7f9bb1a30450cb885d7f46c344103cb6d34223601",
+        "bytes": 2743,
+        "sha256": "bb76aa6ec90a968e5c66dedd883ff0a0f98e32bd31fef0bf6ff58384621b0ae8",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -5613,14 +5613,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2399",
+        "Content-Length": "2875",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-size-t-max.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-size-t-max.matrix.response.json",
-        "bytes": 2399,
-        "sha256": "68d3a1fc267c05382eeb7f361bb263897dfe2a1a4f008800c8257d6c002495b1",
+        "bytes": 2875,
+        "sha256": "bed83d0b435eb437290eb7176c0ff47bbcb5d24e33f21cb1ffee45c97d3c01ed",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -5735,14 +5735,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2373",
+        "Content-Length": "2839",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-uint32-max-still-exact.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-uint32-max-still-exact.matrix.response.json",
-        "bytes": 2373,
-        "sha256": "adf023abed0abb297350c8f233ddb87d7946b731d756fcbc98439e946b313788",
+        "bytes": 2839,
+        "sha256": "d968e0766db726606540c85449e434fc1ce4b0497fce4b416924a9d6470734b5",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -5857,14 +5857,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2298",
+        "Content-Length": "2745",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-semantic-zero-activities-extra-map.matrix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-semantic-zero-activities-extra-map.matrix.response.json",
-        "bytes": 2298,
-        "sha256": "e40a4d63ce2e5f376a3de9d71fd20f0ac6bc1b2a0d656d3510c989856a9fb2df",
+        "bytes": 2745,
+        "sha256": "fc8661b0d61ae22ba3e8c31cd4c052559d6b03502046ac36e3cdec9d23770f71",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -5979,14 +5979,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3988",
+        "Content-Length": "6855",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-constructor-omit-activities.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-constructor-omit-activities.response.json",
-        "bytes": 3988,
-        "sha256": "6459cda00bcd387818386ac10010326ec9291f1df26bf2ce8ebde9287322b670",
+        "bytes": 6855,
+        "sha256": "c46bc83c77ae4ad036608b8956dd2ba63db949d2272b60d1a58bac30315b3e52",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -6136,14 +6136,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3980",
+        "Content-Length": "6847",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-constructor-omit-input.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-constructor-omit-input.response.json",
-        "bytes": 3980,
-        "sha256": "6ab9ec737be77ba4ec7a4656f6871eb6e97f9f8089528a69f230939ddb155eb8",
+        "bytes": 6847,
+        "sha256": "901b4442b14992d509f3664aca39854a39eb9b8b145ccc470164c84f139cf20a",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -6293,14 +6293,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3980",
+        "Content-Length": "6847",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-constructor-omit-output.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/native-constructor-omit-output.response.json",
-        "bytes": 3980,
-        "sha256": "a7b0331acbb53440c90b6004465515f73a1a2cf99719afd379c23932ce18884f",
+        "bytes": 6847,
+        "sha256": "4f489559399f40a7abc0b6ae2eadb769a6f3f4d6a0261021c20b72719bd28b0b",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -6450,14 +6450,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1716",
+        "Content-Length": "1965",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-activities-null.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-activities-null.response.json",
-        "bytes": 1716,
-        "sha256": "ab04b24fdda3623b945c98dd0143065b4cd245d529b707b917d6ded8c7060c5f",
+        "bytes": 1965,
+        "sha256": "f0b59c28e661aa7d90bd0e10c25b45ae25c888c7df1d7a4bcfb38ab17993c75e",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -6552,14 +6552,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1721",
+        "Content-Length": "1971",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-activities-numeric.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-activities-numeric.response.json",
-        "bytes": 1721,
-        "sha256": "7d59e2ec97ed5a8bf0e604b26e275a2c2f932cce9c1d453a10765e132697ee9f",
+        "bytes": 1971,
+        "sha256": "7f6fabdcdc5a264c391e0d1a4e3e4936ffe58c381f1070c04cca39ad2c3a4f45",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -6586,7 +6586,7 @@
       "executed": false,
       "error": {
         "type": "preparation_error",
-        "message": "Genetic matrix workbench JSON: expected a string",
+        "message": "Genetic matrix workbench JSON: expected an object",
         "exception_type": "invalid_argument"
       },
       "native_calls": []
@@ -6654,14 +6654,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1673",
+        "Content-Length": "1922",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-bom.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-bom.response.json",
-        "bytes": 1673,
-        "sha256": "773760a0da176ae8b4e770ebee003492a2e18c365f047ec9fe7fe7fad484564c",
+        "bytes": 1922,
+        "sha256": "f856fbdb36d28936c445652a6e24e0e938957f434c7ae0a633e34d8f0a8da11e",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -6756,14 +6756,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1753",
+        "Content-Length": "2002",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-decoded-duplicate-key.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-decoded-duplicate-key.response.json",
-        "bytes": 1753,
-        "sha256": "cf39c6a48b9930c5de412ad9c56f0e5c522a32b155073b4315ee837f0784b3da",
+        "bytes": 2002,
+        "sha256": "5ef0f3c9602acff9fe7e16745fbc8443e475caf7fd5f1251a5d5f2415b4a7c0e",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -6858,14 +6858,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1719",
+        "Content-Length": "1968",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-group-null.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-group-null.response.json",
-        "bytes": 1719,
-        "sha256": "9140ddd644a6d19019da48af62cae5f611aab0b6534f9a64386791c72966c7f8",
+        "bytes": 1968,
+        "sha256": "a476ef83a32178a3367b4ec53559494cc168866baa1595143fb1cef9481ece76",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -6960,14 +6960,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1747",
+        "Content-Length": "1996",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-member-bool.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-member-bool.response.json",
-        "bytes": 1747,
-        "sha256": "17487d44266925a606520c2f0fd21153134382157a13cf0ded0f81d2dde198b4",
+        "bytes": 1996,
+        "sha256": "55ee5056f8245e3f09bf0b831deb8e4809e950dcf7cc6090b173aaab6e6289e1",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7062,14 +7062,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1754",
+        "Content-Length": "2003",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-member-exponent.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-member-exponent.response.json",
-        "bytes": 1754,
-        "sha256": "86a4e88413f3f40354a3ca43157bd8248bb08510ee97af2b3aa500f9799a9009",
+        "bytes": 2003,
+        "sha256": "8ea83456e0be2f49aa364b4a58c44dd96f5d4c6976f311b057fdd14319be3bf1",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7164,14 +7164,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1748",
+        "Content-Length": "1997",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-member-float.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-member-float.response.json",
-        "bytes": 1748,
-        "sha256": "beee6cc2299ac457b8c381411cf77b337bdbe5f360ebac97d6a602af9b2bdc45",
+        "bytes": 1997,
+        "sha256": "07afdf460e74b6e7647ef6dc33643787cd79de9b59095e97a129965dbacdcec7",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7266,14 +7266,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1763",
+        "Content-Length": "2012",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-member-negative-zero.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-member-negative-zero.response.json",
-        "bytes": 1763,
-        "sha256": "dd6c9ffc7724dcc6181f48d0233823035cba0d9175227d575d0cbb145c693f56",
+        "bytes": 2012,
+        "sha256": "dc2b1000e28600f53d6db8fc47f401d45bf86256ffd481289cb2be9979ea4d0d",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7368,14 +7368,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1753",
+        "Content-Length": "2002",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-member-negative.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-member-negative.response.json",
-        "bytes": 1753,
-        "sha256": "82fd93bbb29a52549bd395c2f62acae8715aba4bd06808695dcb3b64169c7908",
+        "bytes": 2002,
+        "sha256": "b75018da91ab009945dd24046591e2708544bf67e9915cbf62533f159c1cbc9c",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7470,14 +7470,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1747",
+        "Content-Length": "1996",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-member-null.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-member-null.response.json",
-        "bytes": 1747,
-        "sha256": "bc5fb18f398fb59cc0629a5ff336e71989bd5983b13f48e13d29bb5c2427d3b2",
+        "bytes": 1996,
+        "sha256": "b978b9b5466b39d8e3589a94e7a6477faf1d4c9c9586d62b8e32ae393f5811d5",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7572,14 +7572,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1769",
+        "Content-Length": "2018",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-member-overflow.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-member-overflow.response.json",
-        "bytes": 1769,
-        "sha256": "e312b4194e60f73de134ea0caced7f7f1f6e6d076da8a9f33e288a3b0914499c",
+        "bytes": 2018,
+        "sha256": "f87d44f66cc3829df8fc949d343f6b2250807fa53b2d46a49e59360930f789b8",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7674,14 +7674,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1752",
+        "Content-Length": "2001",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-member-string.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-member-string.response.json",
-        "bytes": 1752,
-        "sha256": "1e7c59e32948ec6b1f2ec99d04d2d09ec85d1edabf5867f8daa02f000c0094f3",
+        "bytes": 2001,
+        "sha256": "9f5331a7b4f52f51e642eb1a43450a4892dabf30b86e06d89f6b64527b5a35f2",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7776,14 +7776,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1705",
+        "Content-Length": "1954",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-null.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-null.response.json",
-        "bytes": 1705,
-        "sha256": "016a9e0fc4884deac43f41ed9a51478b447cbddb1d3b51baf5c0c24ad01a2d18",
+        "bytes": 1954,
+        "sha256": "809f8b0fa6db88215822f9cb66743fd3667d197601ce2f45c92814fd78dca55d",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7878,14 +7878,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1707",
+        "Content-Length": "1956",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-object.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-object.response.json",
-        "bytes": 1707,
-        "sha256": "bfc79b1d9de4dd992cda27fd284d211dd794332ead037bb0cbf640a1ff50800b",
+        "bytes": 1956,
+        "sha256": "359198ab28b7336a7bc28b78d7244aa0433b4a1f89ef393a8403e3228f61822b",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -7980,14 +7980,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1729",
+        "Content-Length": "1978",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-input-partition-null.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-input-partition-null.response.json",
-        "bytes": 1729,
-        "sha256": "889257dc1525afb0a64f18017f1be1f1bfd5f19d8f70e08e2f74e8bcaa7c7c12",
+        "bytes": 1978,
+        "sha256": "df1f2935389dffe4afce49c658f7d4831a50de64821fc7b843fc928096ef4917",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -8082,14 +8082,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1706",
+        "Content-Length": "1955",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-malformed.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-malformed.response.json",
-        "bytes": 1706,
-        "sha256": "4cc4a4aab44b61234d3c86a9162deeef58dd57d215264481496b9d06626f3012",
+        "bytes": 1955,
+        "sha256": "3e605e0ee9433c16f9bdd737b69da129f45b1c29b2acfac42f7d2085ab08b1bf",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -8184,14 +8184,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1686",
+        "Content-Length": "1935",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-not-object.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-not-object.response.json",
-        "bytes": 1686,
-        "sha256": "61fa2469eb7251c802639ffab65bd97a5b131968669d19c77296168117937da3",
+        "bytes": 1935,
+        "sha256": "e4af619e1dc453ff2d55c7adf238591f615cec70fc61505f786b00d8766298e3",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -8286,14 +8286,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1688",
+        "Content-Length": "1937",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-null-model.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-null-model.response.json",
-        "bytes": 1688,
-        "sha256": "929ac6d47ba3ebfc0035b9db11432b6590d8cfb5d68dc8d829a02c1af51c7f23",
+        "bytes": 1937,
+        "sha256": "8e0c938ab6198f486551cd081d070f5358a3d202a236afccc0ee9d9e708aa49a",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -8388,14 +8388,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1772",
+        "Content-Length": "2021",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-output-member-overflow.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-output-member-overflow.response.json",
-        "bytes": 1772,
-        "sha256": "13686d7946057d42e338ebca1f19da34070b4f48f9af59a9486230e650b95bb4",
+        "bytes": 2021,
+        "sha256": "b1bae6e2f45741369ebf356586dd17993192d08d736cc778da23930a284c7db1",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -8490,14 +8490,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1727",
+        "Content-Length": "1976",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-output-wrong-nesting.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-output-wrong-nesting.response.json",
-        "bytes": 1727,
-        "sha256": "355843c01e2ad85c394f23b4e04497f8a2a24a9202f0ccc2cdf53b97cae8ecf5",
+        "bytes": 1976,
+        "sha256": "b67efdff992ee523f5bd8afe8e24a8e0b329029fa6fbfb9c48b4b3be5ee50870",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -8592,14 +8592,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1796",
+        "Content-Length": "2045",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-raw-control-in-string.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-raw-control-in-string.response.json",
-        "bytes": 1796,
-        "sha256": "b12e4319ed9ff9749406a7335637258c158ef39817ed1b55a7b684531fda63b2",
+        "bytes": 2045,
+        "sha256": "d89c9617bef65eba121419a57a4076828c53950df82713b43b7cd14387acee35",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -8694,14 +8694,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1802",
+        "Content-Length": "2051",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-raw-invalid-utf8.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-raw-invalid-utf8.response.json",
-        "bytes": 1802,
-        "sha256": "2cc95656fec10c6d3f32f436ee0d072c9874453dc3148787fcb4017156a9a6b9",
+        "bytes": 2051,
+        "sha256": "a1bc35978e1e313e05fdaf35325a2c8e4974b43f9fae102e45f3b678dd0ba2e8",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -8796,14 +8796,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1807",
+        "Content-Length": "2056",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-raw-lone-wtf8.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-raw-lone-wtf8.response.json",
-        "bytes": 1807,
-        "sha256": "79104e18d28f94bf83e7d9c4a6279c949f26a19c7a566793c16cb1687f2314bc",
+        "bytes": 2056,
+        "sha256": "8a414f7b2be2d71ecec75a70f67be59d16cd88edf783b07d14dcea12978e9dfd",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -8898,14 +8898,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1817",
+        "Content-Length": "2066",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-raw-paired-wtf8.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-raw-paired-wtf8.response.json",
-        "bytes": 1817,
-        "sha256": "22f6cfca3a0038f6b6b8eaf355e6faccfb0748a1846d08d9cf40e1cae1e64298",
+        "bytes": 2066,
+        "sha256": "588e125216c86435396ae22dc2e78ce255e232578bca58c0240929c1b9ef2a38",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9000,14 +9000,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1688",
+        "Content-Length": "1937",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-trailing.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-trailing.response.json",
-        "bytes": 1688,
-        "sha256": "d5912e4ff4b0b709bbfb8baecdf0834c39f926cbdcd05343371e977e97c24880",
+        "bytes": 1937,
+        "sha256": "d17a6b301671670023a086a58a42ead6158616840c6c7cf6ff0dcf6426bf69a2",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9102,14 +9102,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1724",
+        "Content-Length": "1973",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "parser-model-unknown-member.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/parser-model-unknown-member.response.json",
-        "bytes": 1724,
-        "sha256": "a0cdd1b332b514d469e75969490142eb595ebae9f6cdc31f5c14d2e530ba7fd6",
+        "bytes": 1973,
+        "sha256": "256bbaee05eed226781103a46ff1a3c16e19564d8b0510a2124396daa3399496",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9204,14 +9204,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1768",
+        "Content-Length": "2017",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-empty-alias.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-empty-alias.response.json",
-        "bytes": 1768,
-        "sha256": "d96e494d85053fe18e415a5103a7d268b413c3f6921a7c6ea62634396fc07545",
+        "bytes": 2017,
+        "sha256": "fc82394b52afb1137ea53f5a1f78fe9cdd9ee4d890de8c8032d22279c9a126cc",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9307,14 +9307,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1794",
+        "Content-Length": "2043",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-whitespace-prefix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-whitespace-prefix.response.json",
-        "bytes": 1794,
-        "sha256": "0041bcff817aea78111e75503517ac8b9e3198b6f67d144960e58bebf5881acb",
+        "bytes": 2043,
+        "sha256": "9291963b993765b4701c99b3905cbda572315e3536dadc00e244dacf3d85b516",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9410,14 +9410,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1794",
+        "Content-Length": "2043",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-whitespace-suffix.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-whitespace-suffix.response.json",
-        "bytes": 1794,
-        "sha256": "abf329ea668060d33f06397c23f5de9535cd40615fb39f604de866c8042dafd1",
+        "bytes": 2043,
+        "sha256": "1bbc2820bab33500d0c3ad4e08bc69f117143b1a938bf4a791bbcb38a71ebeb9",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9513,14 +9513,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1792",
+        "Content-Length": "2041",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-mixed-case.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-mixed-case.response.json",
-        "bytes": 1792,
-        "sha256": "402a9e68d917bda7a4214d65d0407e5dfe5ca98c3231e03c2ded2ae15586d572",
+        "bytes": 2041,
+        "sha256": "03413c7b7bd25d6d06ec1c7ba54b232dadb2f6486722e0528e123125acba7e6b",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9616,14 +9616,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1798",
+        "Content-Length": "2047",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-tab-alias.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-tab-alias.response.json",
-        "bytes": 1798,
-        "sha256": "235c5f8efd9d2d292304f494986ccfb302640831ad6cdd353fbb01fe1575454d",
+        "bytes": 2047,
+        "sha256": "411793bff689aaa62e10bf1dba4127b8ad7a2d37df7568f16de804cf1e5ec8c7",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9719,14 +9719,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1760",
+        "Content-Length": "2009",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-alias-null.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-alias-null.response.json",
-        "bytes": 1760,
-        "sha256": "73a5eb73254b53995c96d619de83a992feb74776e2e99ec3fcfa4d07aace4f05",
+        "bytes": 2009,
+        "sha256": "56e79206b410cdc46c6646ae566bae83a6d9e23388f12868747cd91b6fa8f180",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9822,14 +9822,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1754",
+        "Content-Length": "2003",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-alias-int.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-alias-int.response.json",
-        "bytes": 1754,
-        "sha256": "c4b744f3fcd61dc119599ca4aadb2ea0a600a6d11d34ef0d37f9878684dc0545",
+        "bytes": 2003,
+        "sha256": "4f98e2fd7f44946c595ae0ec24aa29d1b46519690229448ca3d042bcc239dfda",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -9925,14 +9925,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1756",
+        "Content-Length": "2005",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-alias-list.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-alias-list.response.json",
-        "bytes": 1756,
-        "sha256": "9c9e83f1ad9122c04bf4b0f7dd67e3ce8105ef00a22dd8ebbede1d7a1395087f",
+        "bytes": 2005,
+        "sha256": "b2b2d4aee093ce3d1f1811dec9bc10a2357a596e7a21bae20e1c3c06b6de139e",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10028,14 +10028,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1797",
+        "Content-Length": "2046",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-index-null.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-index-null.response.json",
-        "bytes": 1797,
-        "sha256": "0d932a7296f5ec2531fd36f50a4b81e37b24f7a9b174c11bc763c6709b4739be",
+        "bytes": 2046,
+        "sha256": "e2f5548b4e0b0e2bda19138f221571cc10a4d328871d5e1783cb6f222bf63041",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10131,14 +10131,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1799",
+        "Content-Length": "2048",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-index-string.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-index-string.response.json",
-        "bytes": 1799,
-        "sha256": "c01ac07387040b1d588826bd9c1c5ee1728b4989497473f9ddf9cd7fbbe0938d",
+        "bytes": 2048,
+        "sha256": "b6f4462c7219efc8d36963f9f166229a83e41589b7921b87c8e0360ac89264b8",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10234,14 +10234,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1797",
+        "Content-Length": "2046",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-index-bool.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-index-bool.response.json",
-        "bytes": 1797,
-        "sha256": "b7aa9c750afd15d2624d5adb09425c59255013475ee80442ea4becee794eab33",
+        "bytes": 2046,
+        "sha256": "7a1edee406288b1fb93b57f71b8dda6129147f1cbdc9bc112f3e3c670440544b",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10337,14 +10337,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1793",
+        "Content-Length": "2042",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-index-array.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-index-array.response.json",
-        "bytes": 1793,
-        "sha256": "fe6de84c4487d088643beb04912d49c1bf2630c8d2469e417e87fa9c2ecce260",
+        "bytes": 2042,
+        "sha256": "8830e3bd8caf84ecac9b766a4b2eaac6b1bb882a61d66fdab9727ab94f7aa9a1",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10440,14 +10440,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1802",
+        "Content-Length": "2051",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-index-high-overflow.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-index-high-overflow.response.json",
-        "bytes": 1802,
-        "sha256": "3d6937b50dbf27cb9c987dabdcf804082db67a1c06eab4680740e46d67e7570f",
+        "bytes": 2051,
+        "sha256": "789d640a661311104f2e227dd6552ab649e5410681ceec9450851fbdf7fc4f25",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10543,14 +10543,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1804",
+        "Content-Length": "2053",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-index-low-overflow.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-index-low-overflow.response.json",
-        "bytes": 1804,
-        "sha256": "599dec8dce097757c95c4a904f02b6bde123e4681554f3bbf79456d1231f12ee",
+        "bytes": 2053,
+        "sha256": "0c675276deca552d7fbfa276e7728e50a8de73347c1bb05635ba282b39b650de",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10646,14 +10646,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1857",
+        "Content-Length": "2106",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-named-and-index-zero.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-named-and-index-zero.response.json",
-        "bytes": 1857,
-        "sha256": "0c92f339aed9e3d3aba19dfa438f33bf227c660fc533a16c24c2fc5a26a6315e",
+        "bytes": 2106,
+        "sha256": "117e01e4f80cb7013522ed558685964a7d00363d1502c2097ab7a863e85d44e4",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10749,14 +10749,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1833",
+        "Content-Length": "2082",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-named-null-and-index.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-named-null-and-index.response.json",
-        "bytes": 1833,
-        "sha256": "9b5542086584dd2b83d6acec26be57630a9b7655e1097c782e5e22b53ead508e",
+        "bytes": 2082,
+        "sha256": "fca70d1290aac538d6d237dae55b5bd26fa59a5ffca750ced03376982d2d2cdd",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10852,14 +10852,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1782",
+        "Content-Length": "2031",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-mining-population-unknown.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-mining-population-unknown.response.json",
-        "bytes": 1782,
-        "sha256": "f0335eb53b510b5633287dcdab350aae8018ce2e61e8fa768c69e38a1097bb65",
+        "bytes": 2031,
+        "sha256": "0916eee91ee4405168deb6deadb1d077d5c30618ca6d52aa63507e01abf7c08b",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -10955,14 +10955,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1749",
+        "Content-Length": "1998",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-mining-seed-unknown.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-mining-seed-unknown.response.json",
-        "bytes": 1749,
-        "sha256": "6b40b81da72483c916be5f42ec2ccd02d368069bd26fd5d9ae8203791c010ace",
+        "bytes": 1998,
+        "sha256": "ef25c1e5ee2ce419d06e9c3beeeb76ae90544813f9e9a3d8f48d38de7d4b658e",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11058,14 +11058,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1803",
+        "Content-Length": "2052",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-index-nan-tag.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-index-nan-tag.response.json",
-        "bytes": 1803,
-        "sha256": "9bfe0f122d00830e3ec6e71a546ea1c9231b3cc4218216f1d0bdd32a26d014ed",
+        "bytes": 2052,
+        "sha256": "34d4a81d72b2df3bc2dbeb79d4f6d0b42ac9eb15e3750df987262b0824c76138",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11161,14 +11161,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1803",
+        "Content-Length": "2052",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-index-inf-tag.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-index-inf-tag.response.json",
-        "bytes": 1803,
-        "sha256": "ead38a2cc1067755985d46ce9383a7b54167069b2c5df6a2ad7cde6fcfabcd43",
+        "bytes": 2052,
+        "sha256": "5fa4cf9a09c2658bc33109fd246ab41456ffd33fd8cecc242d24fe3b8c5becbe",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11264,14 +11264,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1805",
+        "Content-Length": "2054",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-index-negative-inf-tag.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-index-negative-inf-tag.response.json",
-        "bytes": 1805,
-        "sha256": "dd0162df2b4c642186558f6e90b56250fa1fa0a38301acb57aaeaedd2cf13370",
+        "bytes": 2054,
+        "sha256": "09eff3cee1c25b6e8f3c3b9d47b0aac15264fdfa18069dbcb75a8bc6880b41f7",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11367,14 +11367,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1726",
+        "Content-Length": "1975",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-not-object.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-not-object.response.json",
-        "bytes": 1726,
-        "sha256": "9e880e5bee13fb09453f94b2d99b0261010e8ff927abbcb5c30316f1ce76ff1d",
+        "bytes": 1975,
+        "sha256": "c6d57e786ea68c05f1d7910a0a5b402abc5b4ae63bb67169c309bd5ae7f04389",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11468,14 +11468,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1730",
+        "Content-Length": "1979",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-null.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-null.response.json",
-        "bytes": 1730,
-        "sha256": "01736d905f447ab01d83037cdc1c25a35b8ae3cd6829d5ea30dfc04e0ee49865",
+        "bytes": 1979,
+        "sha256": "251a87cb979c68fd6ac6bcc0e712c28ea5d1b846ce3d0b8f8af15041fb31b332",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11569,14 +11569,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1793",
+        "Content-Length": "2042",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-fraction.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-fraction.response.json",
-        "bytes": 1793,
-        "sha256": "a497747efff58ae7561bd32681e3871b7d68228775538dbe34934ab0a1a1c9bc",
+        "bytes": 2042,
+        "sha256": "671a00d8a2754ca45c06d075c2590f4264cac46c25a15dd14e7298fbd2a968e0",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11670,14 +11670,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1795",
+        "Content-Length": "2044",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-negative-zero-float.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-negative-zero-float.response.json",
-        "bytes": 1795,
-        "sha256": "f54781d3c2f698146ff1fba27098875eaee1ea36a9ead286f34d96ebf2fb61f6",
+        "bytes": 2044,
+        "sha256": "eb9ca2a581be0df20af2061b7bd93ee3b93b42b1a936f5cc9a076495f141626f",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11771,14 +11771,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1793",
+        "Content-Length": "2042",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-exponent.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-exponent.response.json",
-        "bytes": 1793,
-        "sha256": "7c27fa07c9d2ec52818710e9d20b8a98a096918b213108b6d4a75813c669cc4d",
+        "bytes": 2042,
+        "sha256": "4aba5da921bce16d45ec4c9ea455231dd28c30e71373761244c9de5c1778228d",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11872,14 +11872,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1819",
+        "Content-Length": "2068",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-duplicate.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-duplicate.response.json",
-        "bytes": 1819,
-        "sha256": "34395547968f174a3aca8064465e7789c3f1bf3b0dacb607634a9f72a713920e",
+        "bytes": 2068,
+        "sha256": "bcc884c25d0f94adfeb054cc1f7031dda2f85a0de64a8b4c93a9580e6584d928",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -11973,14 +11973,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1754",
+        "Content-Length": "2003",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-malformed.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-malformed.response.json",
-        "bytes": 1754,
-        "sha256": "3f37207cc0d5aef1f20081bf0ae536d8562213a9b8128134a284d6237fc862f7",
+        "bytes": 2003,
+        "sha256": "cf525b247005eea62b3937d32f4e83fbf55cd9062407dba934f7e5317a603852",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12074,14 +12074,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1740",
+        "Content-Length": "1989",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-options-trailing.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-options-trailing.response.json",
-        "bytes": 1740,
-        "sha256": "84102fb402a4b2674212752fe4f6df55052144500fd12bd6b3355cd4883fadd0",
+        "bytes": 1989,
+        "sha256": "c8c23486fa65786effb515fc3c12542dedcfcd1575d9c642388bd30795514c73",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12175,14 +12175,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1749",
+        "Content-Length": "2059",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-binary-options-invalid-utf8.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-binary-options-invalid-utf8.response.json",
-        "bytes": 1749,
-        "sha256": "fb6c5d61788c85e231f6dc82316e15e6472221d82162f0d43c5827b82497d83f",
+        "bytes": 2059,
+        "sha256": "109695769d5d38ad3fb5584ce50c7921d0371cb215b7b22eb3f63587832cb3f7",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12276,14 +12276,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1804",
+        "Content-Length": "2053",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-binary-options-literal-nul.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-binary-options-literal-nul.response.json",
-        "bytes": 1804,
-        "sha256": "b6f3dfb9b0510a448c44829f2d9ba5922010aadada996ea8b7c5667491dc7823",
+        "bytes": 2053,
+        "sha256": "80ec0586dce4baa60462a898c6c62de53d403fb0d134fc32e8568b63a9b535d1",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12377,14 +12377,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1766",
+        "Content-Length": "2086",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-binary-options-paired-wtf8.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-binary-options-paired-wtf8.response.json",
-        "bytes": 1766,
-        "sha256": "cdbb61a5c2f50df3711ee1da2d53cebb63bb208bc2ce32b143a25ffe70decc1e",
+        "bytes": 2086,
+        "sha256": "d3b0f58ddcaea0d1da2c44354fc6a671759316e06e8e3dfe229d8857d56dc33e",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12471,14 +12471,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1381",
+        "Content-Length": "1630",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-missing-model.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-missing-model.response.json",
-        "bytes": 1381,
-        "sha256": "593ae5cb66eed9e02f04a41999043aa3381189ad0f9eb2fdc38322a10a3ba8c3",
+        "bytes": 1630,
+        "sha256": "57d619727c5ab6904bc373eeca79a0f95d1e0cf6808660105908502bdea3ba89",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12565,14 +12565,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1713",
+        "Content-Length": "1962",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-unknown-operation.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-unknown-operation.response.json",
-        "bytes": 1713,
-        "sha256": "2510aa43059924a758ab148e0f27df14cde1e2c50b01958174760d81dca098a0",
+        "bytes": 1962,
+        "sha256": "3b59b633ecb35cc3e8fd6d09bd7fa97c53514f50c721885cf982c5fe8a85371b",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12666,14 +12666,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1701",
+        "Content-Length": "1950",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-empty-operation.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-empty-operation.response.json",
-        "bytes": 1701,
-        "sha256": "5a3c804f96280bf6038d6e30a9a7d93497f98be16377c48d7c0b7eff60caf374",
+        "bytes": 1950,
+        "sha256": "898106ccf9bbfe29514e964258edcd6856a05eda54df72300f33bb0e1edad979",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12767,14 +12767,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1701",
+        "Content-Length": "1950",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-unknown-format.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-unknown-format.response.json",
-        "bytes": 1701,
-        "sha256": "b0af4e900866cf6b049dd776fe4fa24352ed10789ff76806820c52edee0b77bd",
+        "bytes": 1950,
+        "sha256": "47064f06596421a0947df11d029c90776ed7d0541ac03dd717ba440ca305318b",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12868,14 +12868,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1693",
+        "Content-Length": "1942",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-empty-format.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-empty-format.response.json",
-        "bytes": 1693,
-        "sha256": "52dc9e859f5fe199d766d1af94eba46f87f580fcd7836085b0ea08500d210a8b",
+        "bytes": 1942,
+        "sha256": "410ce8fd8cf48405311c468b484633aa9f2adbaf3cf222972b50a7ccd5414513",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -12980,14 +12980,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1889",
+        "Content-Length": "2138",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-forbidden-source-id.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-forbidden-source-id.response.json",
-        "bytes": 1889,
-        "sha256": "0f9b6521dc9bb504f34392a85271f5ecd9428db9e7eea75ce48880393eab8d38",
+        "bytes": 2138,
+        "sha256": "362a5775b76c8b3f416523be8b1ca3acfd0bad6e11ba6b2ca939a4ee2b369c77",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -13092,14 +13092,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1883",
+        "Content-Length": "2132",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-forbidden-miner.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-forbidden-miner.response.json",
-        "bytes": 1883,
-        "sha256": "abf3372d5269fa10575866d4b156a5ec10428ef17b6f48abfd342d3e264fe705",
+        "bytes": 2132,
+        "sha256": "5334495af70bb389510dc60489b856f33bef37e77ce34735e0a168cc77f89692",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -13204,14 +13204,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1895",
+        "Content-Length": "2144",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "configuration-forbidden-option-control.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/configuration-forbidden-option-control.response.json",
-        "bytes": 1895,
-        "sha256": "e1cb509875e99d5f2b371ac19bc6223e4f584a599bb179225bdf9adc6a8f9403",
+        "bytes": 2144,
+        "sha256": "cc2e04827a0766c50729d40ef8c3b55352ef6617c22657306b2601c802ab02d4",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -13294,14 +13294,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5810",
+        "Content-Length": "10351",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "offline-omitted-operation.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/offline-omitted-operation.response.json",
-        "bytes": 5810,
-        "sha256": "591ea1eebf9abbf9eeb41a9253e571b50baa92e3abbdbd2fa2a2030c750ba5cc",
+        "bytes": 10351,
+        "sha256": "49d1fc92b1e71d39c0fe7f30feb6e0513f508f5a2737c1a7072af7bed6fbf25c",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -13436,14 +13436,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5806",
+        "Content-Length": "10347",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "offline-omitted-model_format.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/offline-omitted-model_format.response.json",
-        "bytes": 5806,
-        "sha256": "c3d3b2fba7aeae343f9a81bc651540bc061dda251e879613c26017bedad27c77",
+        "bytes": 10347,
+        "sha256": "3cb5124b7bb3e4de69e0d947acc4d5b5340e91212408f9233a9c75a8c96f628c",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -13578,14 +13578,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5809",
+        "Content-Length": "10350",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "offline-omitted-options_json.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/offline-omitted-options_json.response.json",
-        "bytes": 5809,
-        "sha256": "e93cfce077a8f0dc6adbddf8e211cce91e2e9ebc3255a0ddfb02d0e245ba7cf8",
+        "bytes": 10350,
+        "sha256": "2f2d518a4dd0f72c0f9a9ec7891bf750e4a112f7318bece4b795715c9dcff3bb",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -13696,14 +13696,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5452",
+        "Content-Length": "9993",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "offline-omitted-all-controls.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/offline-omitted-all-controls.response.json",
-        "bytes": 5452,
-        "sha256": "9cf539e4b1ba42e264eb719def414fa9eec5ab13156707cfed555f1b982208ca",
+        "bytes": 9993,
+        "sha256": "a11894db05c174feaf434949245ecd13ba4c7037263a1886e1d7dbd25ed54662",
         "status": 200
       },
       "family": "original_genetic_matrix",
@@ -13860,14 +13860,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1907",
+        "Content-Length": "2156",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "boundary-duplicate-multipart-operation.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/boundary-duplicate-multipart-operation.response.json",
-        "bytes": 1907,
-        "sha256": "52119009f05a564e119d312d6b4d27d71dd593e86cb2c28578a52746d4b2b0c5",
+        "bytes": 2156,
+        "sha256": "58f1b319d5a1430341e4951a7744f654bf7579ad8766811756df094f4826bbf5",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -13970,14 +13970,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1914",
+        "Content-Length": "2163",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "boundary-duplicate-multipart-model_format.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/boundary-duplicate-multipart-model_format.response.json",
-        "bytes": 1914,
-        "sha256": "5f5abd4585d3a8f5932b9266f1daa5ce87de1949829bef94599a8e500381ddf2",
+        "bytes": 2163,
+        "sha256": "54016784edcbd1a46054bae7a56c47f3f6912b5f55c61719fbe31aff4493472d",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -14080,14 +14080,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1911",
+        "Content-Length": "2160",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "boundary-duplicate-multipart-options_json.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/boundary-duplicate-multipart-options_json.response.json",
-        "bytes": 1911,
-        "sha256": "a2cf59b51882f94dfa5b98e0a09da654b45f36c562f8cc79f794da040d987e69",
+        "bytes": 2160,
+        "sha256": "66bdc0eee076c967bd6181f697e42910e3200fc64f132361bd11c7e3c6b71709",
         "status": 400
       },
       "family": "original_genetic_matrix",
@@ -14179,14 +14179,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "66",
+        "Content-Length": "65",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "boundary-duplicate-multipart-model_file.response.json",
         "path": "src/frontend/tests/fixtures/original-genetic-matrix-workbench/captures/boundary-duplicate-multipart-model_file.response.json",
-        "bytes": 66,
-        "sha256": "029c9117a82836a3ea945719f5a859ad30e7093274342e2df924fe44488a42e6",
+        "bytes": 65,
+        "sha256": "3850b79ecbbc9f66547506045ef4df82dfe6a666cbdd8d502741a535d089372e",
         "status": 400
       },
       "family": "original_genetic_matrix",

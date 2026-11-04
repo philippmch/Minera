@@ -34,6 +34,27 @@ function assertFinite(layout: ReturnType<typeof computePetriLayout>): void {
 }
 
 describe("computePetriLayout", () => {
+  it("draws one labelled arc per arc object", () => {
+    // a consumes a weight-2 arc (two repeated endpoints) from the source and
+    // produces two parallel weight-1 arcs plus a weight-3 arc (compact side).
+    const net: PetriNetModel = {
+      place_count: 3,
+      source: 0,
+      sink: 2,
+      transitions: [
+        { activity: 0, inputs: [0, 0], outputs: [1, 1, 2], output_weights: [1, 1, 3] },
+        { activity: 1, inputs: [1], outputs: [2] },
+      ],
+    };
+    const layout = computePetriLayout(net, data(["a", "b"]));
+    const ofA = layout.arcs.filter((arc) => arc.transition === 0);
+    expect(ofA.filter((arc) => arc.input).map((arc) => arc.weight)).toEqual(["2"]);
+    expect(ofA.filter((arc) => !arc.input).map((arc) => [arc.place, arc.weight])).toEqual([[1, null], [1, null], [2, "3"]]);
+    expect(layout.arcs.filter((arc) => arc.transition === 1).every((arc) => arc.weight === null)).toBe(true);
+    assertFinite(layout);
+    for (const arc of layout.arcs) expect(Number.isFinite(arc.labelX) && Number.isFinite(arc.labelY)).toBe(true);
+  });
+
   it("lays out a simple sequence net with no unconnected lane", () => {
     // source -[a]-> p1 -[b]-> sink
     const net: PetriNetModel = {

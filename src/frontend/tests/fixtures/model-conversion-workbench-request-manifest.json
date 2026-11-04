@@ -853,14 +853,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8513",
+        "Content-Length": "8667",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduce_petri-original-pnml-pnml.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduce_petri-original-pnml-pnml.response.json",
-        "bytes": 8513,
-        "sha256": "4c777180ac109e2f43406dd4ba16364527dca09e178e3a218a09262fc227a616",
+        "bytes": 8667,
+        "sha256": "bf31808f5915978c4ad60e3aefe62fb4e211d718cbecf135b6ca00d464573758",
         "status": 200
       },
       "family": "model_conversion",
@@ -882,8 +882,8 @@
         "result_pnml": {
           "filename": "reduce_petri-original-pnml-pnml.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduce_petri-original-pnml-pnml.result_pnml.pnml",
-          "bytes": 1036,
-          "sha256": "f034b0caea94e2508e12f074df35643dbba509719ec29bf5c0f2f7700f09766d",
+          "bytes": 1190,
+          "sha256": "3e9ab59c61c66a7b2af6b6ab0cddf2b4cd1b25c37af56b03c8eed3d0a357feeb",
           "format": "pnml"
         }
       }
@@ -921,14 +921,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8513",
+        "Content-Length": "8667",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduce_petri-original-pnml-auto.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduce_petri-original-pnml-auto.response.json",
-        "bytes": 8513,
-        "sha256": "96198aefbe58e7c3e897e96aa05cfdec95dd5188a1e30ebc606bc7146ca57c18",
+        "bytes": 8667,
+        "sha256": "94333e2cacd7e5b5ec39ff385d7d024d29b02872242f494bddf2ea9728af77fc",
         "status": 200
       },
       "family": "model_conversion",
@@ -950,8 +950,8 @@
         "result_pnml": {
           "filename": "reduce_petri-original-pnml-auto.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduce_petri-original-pnml-auto.result_pnml.pnml",
-          "bytes": 1036,
-          "sha256": "f034b0caea94e2508e12f074df35643dbba509719ec29bf5c0f2f7700f09766d",
+          "bytes": 1190,
+          "sha256": "3e9ab59c61c66a7b2af6b6ab0cddf2b4cd1b25c37af56b03c8eed3d0a357feeb",
           "format": "pnml"
         }
       }
@@ -5226,14 +5226,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2304",
+        "Content-Length": "2765",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "powl_to_net-native-empty-spo.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-empty-spo.response.json",
-        "bytes": 2304,
-        "sha256": "869ee9368a92785de84d0ceff24181c009f8953bea67cf3031b16c06e856f97c",
+        "bytes": 2765,
+        "sha256": "f7c04ff128fa346145dab2779096c575a4322ba3da9c3dd47fec1432e98a6405",
         "status": 200
       },
       "family": "model_conversion",
@@ -5257,8 +5257,8 @@
         "result_pnml": {
           "filename": "powl_to_net-native-empty-spo.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_net-native-empty-spo.result_pnml.pnml",
-          "bytes": 874,
-          "sha256": "89c7cd5c2222ecaf5e249514254d76c1addaee16b3ec48a5d7d0af3310c166fc",
+          "bytes": 1049,
+          "sha256": "18c253c3c0264f90365bfe21c9df1de7c14e8932dae28ff2568bef3330a9a0e3",
           "format": "pnml"
         }
       }
@@ -8786,14 +8786,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12325",
+        "Content-Length": "12423",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-native-silent-chain-default-pnml.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-native-silent-chain-default-pnml.response.json",
-        "bytes": 12325,
-        "sha256": "256e5479545981a78ae639d04d2e06018ab6346000373d85b0d27997b1ba3fd9",
+        "bytes": 12423,
+        "sha256": "b6eab6507ffd82e53567e05df372d48d29940d4a31cd82d961316095263d458d",
         "status": 200
       },
       "family": "model_conversion",
@@ -8819,8 +8819,8 @@
         "result_pnml": {
           "filename": "reduction-native-silent-chain-default-pnml.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-native-silent-chain-default-pnml.result_pnml.pnml",
-          "bytes": 789,
-          "sha256": "7e8fa738faab4a3f2bbf8894d60e84d5dc19ca06a099e597811423835627cad3",
+          "bytes": 887,
+          "sha256": "20be669231bd33ad55f030957c3bbf626344f76f3552d1a53b7d665ba1aff787",
           "format": "pnml"
         }
       }
@@ -8866,14 +8866,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12343",
+        "Content-Length": "12441",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-marking-origin-explicit_json.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-marking-origin-explicit_json.response.json",
-        "bytes": 12343,
-        "sha256": "69b90fe90e94bfb3d3fefcf8f92cc7d838e411925f20c689c1e66ffbd54fc577",
+        "bytes": 12441,
+        "sha256": "4e0d09534dd28738a2f96a9b34413b9a885fafcacabe06985ecb6ef29eb150b2",
         "status": 200
       },
       "family": "model_conversion",
@@ -8899,8 +8899,8 @@
         "result_pnml": {
           "filename": "reduction-marking-origin-explicit_json.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-marking-origin-explicit_json.result_pnml.pnml",
-          "bytes": 789,
-          "sha256": "7e8fa738faab4a3f2bbf8894d60e84d5dc19ca06a099e597811423835627cad3",
+          "bytes": 887,
+          "sha256": "20be669231bd33ad55f030957c3bbf626344f76f3552d1a53b7d665ba1aff787",
           "format": "pnml"
         }
       }
@@ -8946,14 +8946,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12347",
+        "Content-Length": "12445",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-marking-origin-explicit_legacy.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-marking-origin-explicit_legacy.response.json",
-        "bytes": 12347,
-        "sha256": "c9ddaad57e336901375020985db4916666ee8a4bb47a2dbefb33ce5bc444fae5",
+        "bytes": 12445,
+        "sha256": "99b513699d7ff7c4dd733ccbbb043208b89e136d3cdfefd11de08abed1390218",
         "status": 200
       },
       "family": "model_conversion",
@@ -8979,8 +8979,8 @@
         "result_pnml": {
           "filename": "reduction-marking-origin-explicit_legacy.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-marking-origin-explicit_legacy.result_pnml.pnml",
-          "bytes": 789,
-          "sha256": "7e8fa738faab4a3f2bbf8894d60e84d5dc19ca06a099e597811423835627cad3",
+          "bytes": 887,
+          "sha256": "20be669231bd33ad55f030957c3bbf626344f76f3552d1a53b7d665ba1aff787",
           "format": "pnml"
         }
       }
@@ -9257,14 +9257,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12234",
+        "Content-Length": "12318",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-markings-zero.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-markings-zero.response.json",
-        "bytes": 12234,
-        "sha256": "77bf0a750fec23d949f58881bcb6c035b909911e506c371b93a322d8ec7c7362",
+        "bytes": 12318,
+        "sha256": "f7a94d52baa7443267d9de44cba778c489dc83931e23d9a7ab57df10c9df01e3",
         "status": 200
       },
       "family": "model_conversion",
@@ -9296,8 +9296,8 @@
         "result_pnml": {
           "filename": "reduction-markings-zero.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-markings-zero.result_pnml.pnml",
-          "bytes": 684,
-          "sha256": "eca1b69793cc4f5254890a0600e91d137a5f4dd02e1371e4c6cfb7ed21e6659e",
+          "bytes": 768,
+          "sha256": "b6ef67a7d187b564d54517481d17e30f76dbcc0a986b3e688963b73d92575c57",
           "format": "pnml"
         }
       }
@@ -9408,14 +9408,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14088",
+        "Content-Length": "14126",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-join-external-false-preserve-false.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-external-false-preserve-false.response.json",
-        "bytes": 14088,
-        "sha256": "c4edbab6d513c3587d9f1255085a1534b5f384a24a566658c5bf6a7197b6e61d",
+        "bytes": 14126,
+        "sha256": "bfe6f1e51480594db631082f26e6406d01f141693a1f9f3e5efe643a584577a3",
         "status": 200
       },
       "family": "model_conversion",
@@ -9440,8 +9440,8 @@
         "result_pnml": {
           "filename": "reduction-join-external-false-preserve-false.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-external-false-preserve-false.result_pnml.pnml",
-          "bytes": 1382,
-          "sha256": "f9be0f52716fa97662071be49a1cbd62935317ebf7c9dc0340ace2542c2d4b3d",
+          "bytes": 1420,
+          "sha256": "5dfe270c6db1779994c47c629c7354110c4ef83d1ff7193786c9cdcd55f1709e",
           "format": "pnml"
         }
       }
@@ -9483,14 +9483,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14087",
+        "Content-Length": "14125",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-join-external-false-preserve-true.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-external-false-preserve-true.response.json",
-        "bytes": 14087,
-        "sha256": "abed13602a05643aa441a0c94bda0af90c4a5a4d9a168a8efeeeb17b795045e6",
+        "bytes": 14125,
+        "sha256": "2a5204d32993c72b9a4cfea8196c79e9f80df049f61220b9c859288dffc8c26a",
         "status": 200
       },
       "family": "model_conversion",
@@ -9515,8 +9515,8 @@
         "result_pnml": {
           "filename": "reduction-join-external-false-preserve-true.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-external-false-preserve-true.result_pnml.pnml",
-          "bytes": 1382,
-          "sha256": "f9be0f52716fa97662071be49a1cbd62935317ebf7c9dc0340ace2542c2d4b3d",
+          "bytes": 1420,
+          "sha256": "5dfe270c6db1779994c47c629c7354110c4ef83d1ff7193786c9cdcd55f1709e",
           "format": "pnml"
         }
       }
@@ -9558,14 +9558,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16082",
+        "Content-Length": "16126",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-join-external-true-preserve-false.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-external-true-preserve-false.response.json",
-        "bytes": 16082,
-        "sha256": "2e589d20ae1fedc795d630877991f269f8f03c22be16cef23cac7d5076d44b91",
+        "bytes": 16126,
+        "sha256": "1bb47a2fc974e552413408c238344fba29e4e3c74155a8a59b399d9ae150aecb",
         "status": 200
       },
       "family": "model_conversion",
@@ -9590,8 +9590,8 @@
         "result_pnml": {
           "filename": "reduction-join-external-true-preserve-false.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-external-true-preserve-false.result_pnml.pnml",
-          "bytes": 1555,
-          "sha256": "0b4082a6a98cab2329937f85d5f78bae8283bbfbd1558f54898e817b7584a9ea",
+          "bytes": 1599,
+          "sha256": "7633ee1c5928ed27d67dec0a19c01edeb8bcb5a04d4f2ed1a0167b7203867448",
           "format": "pnml"
         }
       }
@@ -9633,14 +9633,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16696",
+        "Content-Length": "16763",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-join-external-true-preserve-true.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-external-true-preserve-true.response.json",
-        "bytes": 16696,
-        "sha256": "5f75dbd0cf716611fd941c43722881992dfefbeb434fe3c9d5d6ce1c6ec38e0c",
+        "bytes": 16763,
+        "sha256": "bc4486f9beea54323f04bb60c2351b33487cde55e7d1077b27eb747f70e3b0c8",
         "status": 200
       },
       "family": "model_conversion",
@@ -9665,8 +9665,8 @@
         "result_pnml": {
           "filename": "reduction-join-external-true-preserve-true.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-external-true-preserve-true.result_pnml.pnml",
-          "bytes": 1896,
-          "sha256": "8e5dfe205cc06aaf0d04494d0274a05b9075a7c1b21796aec0f535d97d081cb9",
+          "bytes": 1963,
+          "sha256": "5e8c24103371850c112844828f32371d7f2272d0a8fd02d26e0b7b18b46e0f8e",
           "format": "pnml"
         }
       }
@@ -9708,14 +9708,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16082",
+        "Content-Length": "16126",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-join-boolean-numeric-alias-0.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-boolean-numeric-alias-0.response.json",
-        "bytes": 16082,
-        "sha256": "2e589d20ae1fedc795d630877991f269f8f03c22be16cef23cac7d5076d44b91",
+        "bytes": 16126,
+        "sha256": "1bb47a2fc974e552413408c238344fba29e4e3c74155a8a59b399d9ae150aecb",
         "status": 200
       },
       "family": "model_conversion",
@@ -9740,8 +9740,8 @@
         "result_pnml": {
           "filename": "reduction-join-boolean-numeric-alias-0.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-boolean-numeric-alias-0.result_pnml.pnml",
-          "bytes": 1555,
-          "sha256": "0b4082a6a98cab2329937f85d5f78bae8283bbfbd1558f54898e817b7584a9ea",
+          "bytes": 1599,
+          "sha256": "7633ee1c5928ed27d67dec0a19c01edeb8bcb5a04d4f2ed1a0167b7203867448",
           "format": "pnml"
         }
       }
@@ -9783,14 +9783,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16696",
+        "Content-Length": "16763",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-join-boolean-numeric-alias-1.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-boolean-numeric-alias-1.response.json",
-        "bytes": 16696,
-        "sha256": "5f75dbd0cf716611fd941c43722881992dfefbeb434fe3c9d5d6ce1c6ec38e0c",
+        "bytes": 16763,
+        "sha256": "bc4486f9beea54323f04bb60c2351b33487cde55e7d1077b27eb747f70e3b0c8",
         "status": 200
       },
       "family": "model_conversion",
@@ -9815,8 +9815,8 @@
         "result_pnml": {
           "filename": "reduction-join-boolean-numeric-alias-1.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-join-boolean-numeric-alias-1.result_pnml.pnml",
-          "bytes": 1896,
-          "sha256": "8e5dfe205cc06aaf0d04494d0274a05b9075a7c1b21796aec0f535d97d081cb9",
+          "bytes": 1963,
+          "sha256": "5e8c24103371850c112844828f32371d7f2272d0a8fd02d26e0b7b18b46e0f8e",
           "format": "pnml"
         }
       }
@@ -9858,14 +9858,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12701",
+        "Content-Length": "12751",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-parallel-fusion-false.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-parallel-fusion-false.response.json",
-        "bytes": 12701,
-        "sha256": "fb49fd85e966a7131ba88f6ebeb19e195bb143574544d568e809915328b125a0",
+        "bytes": 12751,
+        "sha256": "f5f96546af558ec2efd52e608e301e28fb2fb73a793a6014ad5a046d524c9361",
         "status": 200
       },
       "family": "model_conversion",
@@ -9887,8 +9887,8 @@
         "result_pnml": {
           "filename": "reduction-parallel-fusion-false.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-parallel-fusion-false.result_pnml.pnml",
-          "bytes": 1647,
-          "sha256": "1ff9b4c3311f6f9b17d7ee087b8ba4284bd21a9f9f300e0506f6ce48372dd879",
+          "bytes": 1697,
+          "sha256": "e87429625aa4c58f885747a6e600bfe195f0159c8a8b05dc332766722c7329a2",
           "format": "pnml"
         }
       }
@@ -9930,14 +9930,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12592",
+        "Content-Length": "12624",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-parallel-fusion-true.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-parallel-fusion-true.response.json",
-        "bytes": 12592,
-        "sha256": "d5416b5c9890c0182eb663d33b4f3d0bd94a0d42cebd3f8a22a6155a169b3548",
+        "bytes": 12624,
+        "sha256": "e19a4a24fcbbb2a2aed330421d81773e26c7f80668660b781db0749346d9ffb0",
         "status": 200
       },
       "family": "model_conversion",
@@ -9959,8 +9959,8 @@
         "result_pnml": {
           "filename": "reduction-parallel-fusion-true.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-parallel-fusion-true.result_pnml.pnml",
-          "bytes": 1577,
-          "sha256": "b0e2b9528b26cf0630112be6cd977ecf904a9a9a4f34ed609c3e128c37fb5cda",
+          "bytes": 1609,
+          "sha256": "e2bbae8f871f61fd84acc20842874d4f5be5b21483422653dab905e5bc8e6855",
           "format": "pnml"
         }
       }
@@ -10006,14 +10006,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12658",
+        "Content-Length": "12690",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-parallel-fusion-markings-equal.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-parallel-fusion-markings-equal.response.json",
-        "bytes": 12658,
-        "sha256": "c8388c811315cb867c6fe7ec07a7431e9a07411eb15bb6b239936182886f55e0",
+        "bytes": 12690,
+        "sha256": "a52c01e69ccdaad83a6409907c3e9acd77f370493821e34f0abeddfaac7a4e28",
         "status": 200
       },
       "family": "model_conversion",
@@ -10036,8 +10036,8 @@
         "result_pnml": {
           "filename": "reduction-parallel-fusion-markings-equal.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-parallel-fusion-markings-equal.result_pnml.pnml",
-          "bytes": 1633,
-          "sha256": "61ef69fcb9ebccf8e1861049f574413b8b372ac225a2a360b745e55ce5254e88",
+          "bytes": 1665,
+          "sha256": "0b6cf5558dca87dfdad0c9096967b48258c04dce76f6f5bb3fa630d02d6d7274",
           "format": "pnml"
         }
       }
@@ -10083,14 +10083,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12766",
+        "Content-Length": "12816",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-parallel-fusion-markings-unequal.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-parallel-fusion-markings-unequal.response.json",
-        "bytes": 12766,
-        "sha256": "70e5f8c6d73e0fc813e0641ac59414e1ff8eae5e92fa1eb05ba4caf26992cb60",
+        "bytes": 12816,
+        "sha256": "3d650b3355c85b7fad8c88f247341b9c2aaf2bff8d2860abeecf9d2a44c02ee6",
         "status": 200
       },
       "family": "model_conversion",
@@ -10113,8 +10113,8 @@
         "result_pnml": {
           "filename": "reduction-parallel-fusion-markings-unequal.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-parallel-fusion-markings-unequal.result_pnml.pnml",
-          "bytes": 1703,
-          "sha256": "90226317f46eeff60f180cfb59ae7bbfa5307a22e581ac1186f13e8ceb422b98",
+          "bytes": 1753,
+          "sha256": "7169bc15c31b4d6d747735095188e550a507a94159e92d03dbb051adf1e29d9d",
           "format": "pnml"
         }
       }
@@ -10372,14 +10372,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "15461",
+        "Content-Length": "15532",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-abstraction-disabled.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-abstraction-disabled.response.json",
-        "bytes": 15461,
-        "sha256": "ff5a1e49eab6306888c9e7a5bc5b5efb8bac3d507a4872c055a1cfdf7c89d3bf",
+        "bytes": 15532,
+        "sha256": "20bde2f0b5a07b1f992dd20e8559fd0486a59f3c1441ae630a08562898c27ffc",
         "status": 200
       },
       "family": "model_conversion",
@@ -10401,8 +10401,8 @@
         "result_pnml": {
           "filename": "reduction-abstraction-disabled.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-abstraction-disabled.result_pnml.pnml",
-          "bytes": 1841,
-          "sha256": "2b3bec648ff4ffb09f5b73606115770124cfac03348ce1776d6cd31bf3653ec1",
+          "bytes": 1912,
+          "sha256": "043abac82676d87a0c0058eec11a707c38dd96bc0952ddca42fcf3319a19dc0b",
           "format": "pnml"
         }
       }
@@ -10444,14 +10444,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14900",
+        "Content-Length": "14951",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-abstraction-enabled.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-abstraction-enabled.response.json",
-        "bytes": 14900,
-        "sha256": "fc7fc9c5268a0283f218a1b71afa4847d2cd0b62c17ef01ff81a6e89c384a329",
+        "bytes": 14951,
+        "sha256": "813466eefa48d4cf34a84322adb27afffb08288d5266472a2ffec0854ed1bf9a",
         "status": 200
       },
       "family": "model_conversion",
@@ -10473,8 +10473,8 @@
         "result_pnml": {
           "filename": "reduction-abstraction-enabled.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-abstraction-enabled.result_pnml.pnml",
-          "bytes": 1546,
-          "sha256": "f0722073d9ecc84697cbcda1dbb15f235802285154694686cbd5d2fc0b0fb18a",
+          "bytes": 1597,
+          "sha256": "352dd1bc91d646b65e381cebb560da607842b519c9aa69ea061dbff2bd11209c",
           "format": "pnml"
         }
       }
@@ -10520,14 +10520,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "15526",
+        "Content-Length": "15597",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-abstraction-protected-positive.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-abstraction-protected-positive.response.json",
-        "bytes": 15526,
-        "sha256": "c3c86f230c2c9deea1683d592cf63ec190071bf080ea286e09bb3aadc446f336",
+        "bytes": 15597,
+        "sha256": "fc9a11541e0e732a35d10f78c84f8cedfbfc329413c70425299f5bd6262eed2d",
         "status": 200
       },
       "family": "model_conversion",
@@ -10549,8 +10549,8 @@
         "result_pnml": {
           "filename": "reduction-abstraction-protected-positive.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-abstraction-protected-positive.result_pnml.pnml",
-          "bytes": 1897,
-          "sha256": "a8482294e4991a5fa98b23cb9d19583af3d5d7e28eaa72aa2ad2e91ee60d5e40",
+          "bytes": 1968,
+          "sha256": "49088e8a6bbec7ba6bc7f70083fcd52642d7191515afcb81f274fe82af793d0d",
           "format": "pnml"
         }
       }
@@ -10657,14 +10657,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11399",
+        "Content-Length": "11425",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-native-many-to-one-transition-identities.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-native-many-to-one-transition-identities.response.json",
-        "bytes": 11399,
-        "sha256": "4394c2fff72fdaaca7d4326346cf2ce8cac6cd24570aec416e7bc3fc142651f6",
+        "bytes": 11425,
+        "sha256": "3ecfed360789b6b38fc10ea3190d427bb26e21014b9303909720fda9744282ba",
         "status": 200
       },
       "family": "model_conversion",
@@ -10686,8 +10686,8 @@
         "result_pnml": {
           "filename": "reduction-native-many-to-one-transition-identities.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-native-many-to-one-transition-identities.result_pnml.pnml",
-          "bytes": 1054,
-          "sha256": "4ad1c433957a955ec2672e1284a170db1f9bd7b89d70b108b92e8c95aae356af",
+          "bytes": 1080,
+          "sha256": "764ceb8c04d840de5491a89c29d3de4132ee87ea7c1404d79b6381f8295c3fc1",
           "format": "pnml"
         }
       }
@@ -10729,14 +10729,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6387",
+        "Content-Length": "6740",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-changed-false-retains-original-full-document.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-changed-false-retains-original-full-document.response.json",
-        "bytes": 6387,
-        "sha256": "ab24af80521a495c3ae75a5bec995264892ee97543f4fe91b6b9bcd644784ff3",
+        "bytes": 6740,
+        "sha256": "6e56e7617d92c4cc8eeb023b6faf01a1c179aee4f3801c0f4da7c84b14d38de2",
         "status": 200
       },
       "family": "model_conversion",
@@ -10751,8 +10751,8 @@
         "result_pnml": {
           "filename": "reduction-changed-false-retains-original-full-document.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-changed-false-retains-original-full-document.result_pnml.pnml",
-          "bytes": 835,
-          "sha256": "5f2f6fd85ed2462a454bf594b0b61818127007d1908b1023f4374a0159dda430",
+          "bytes": 1084,
+          "sha256": "7d285877ffb741047b902fa6352196a0cfe1fc6522886e38328c291bd1dfa04f",
           "format": "pnml"
         }
       }
@@ -10810,14 +10810,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6388",
+        "Content-Length": "6741",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-all-five-pnml-import-flags.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-all-five-pnml-import-flags.response.json",
-        "bytes": 6388,
-        "sha256": "3ffa329e466a494c702c4f12306e5d88e31583f3e8d293cef10fccfc07acd819",
+        "bytes": 6741,
+        "sha256": "6dad188bc2f4cdca3e57c0d876369c64e3fb26e5d1fd41b1925e167f0bc4bf6e",
         "status": 200
       },
       "family": "model_conversion",
@@ -10832,8 +10832,8 @@
         "result_pnml": {
           "filename": "reduction-all-five-pnml-import-flags.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-all-five-pnml-import-flags.result_pnml.pnml",
-          "bytes": 835,
-          "sha256": "5f2f6fd85ed2462a454bf594b0b61818127007d1908b1023f4374a0159dda430",
+          "bytes": 1084,
+          "sha256": "7d285877ffb741047b902fa6352196a0cfe1fc6522886e38328c291bd1dfa04f",
           "format": "pnml"
         }
       }
@@ -10871,14 +10871,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7897",
+        "Content-Length": "7983",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-extended-arcs-native-preservation.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-extended-arcs-native-preservation.response.json",
-        "bytes": 7897,
-        "sha256": "75e1de066e4c24980ee9abf62fde370cced80cbcb598439c05c3598b2280bce5",
+        "bytes": 7983,
+        "sha256": "08f8a75f6c7ddffcee606930d1207c8c25e2b188d0d00356e7d514245a2680f5",
         "status": 200
       },
       "family": "model_conversion",
@@ -10900,8 +10900,8 @@
         "result_pnml": {
           "filename": "reduction-extended-arcs-native-preservation.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-extended-arcs-native-preservation.result_pnml.pnml",
-          "bytes": 1115,
-          "sha256": "11ac85d2f8cdf042c54d69b833b47ba971c3d44c5af78f18852bf25ad8769626",
+          "bytes": 1201,
+          "sha256": "649125659bc4d5388e5ea2fba8a375afe1d6bb9474b6d65bded04975f1878cce",
           "format": "pnml"
         }
       }
@@ -10951,14 +10951,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5150",
+        "Content-Length": "5158",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reduction-native-raw-unset-boundary-metadata-rebuild.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-native-raw-unset-boundary-metadata-rebuild.response.json",
-        "bytes": 5150,
-        "sha256": "27ca091dd5857e3d1dea231d59c3d3ba83957fbf3f169c944be1ae7d214584fe",
+        "bytes": 5158,
+        "sha256": "30543ef7648b129fb5cc0a7cb72b4517f79f0090eeaf5cef373c6e7a5449576f",
         "status": 200
       },
       "family": "model_conversion",
@@ -10980,8 +10980,8 @@
         "result_pnml": {
           "filename": "reduction-native-raw-unset-boundary-metadata-rebuild.result_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/reduction-native-raw-unset-boundary-metadata-rebuild.result_pnml.pnml",
-          "bytes": 610,
-          "sha256": "996e43d4e443727008cc560c7837a0b08476bcfd68d8a71591fb7202bf341661",
+          "bytes": 618,
+          "sha256": "64747d1393b5d70f97dcb8d73ffdf9a32106f08a6734c5e03cef9e779cf09e86",
           "format": "pnml"
         }
       }

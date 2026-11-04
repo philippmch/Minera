@@ -1,4 +1,5 @@
 #include "minera/petri_usage_comparison.hpp"
+#include "minera/petri_reference_arcs.hpp"
 #include "petri_replay_internal.hpp"
 
 #include <map>
@@ -545,6 +546,11 @@ PetriUsageComparison compare_petri_usage(const PetriNet& net, const EventLog& lo
                                          const EventLog& log2,
                                          const PetriUsageComparisonOptions& options) {
   validate_net(net);
+  // This replay moves one token per arc endpoint. A net with weighted or
+  // parallel arcs goes through the token-replay composition instead, which
+  // moves each arc's weight as the reference does.
+  if (petri_net_has_weighted_arcs(net))
+    return compare_petri_usage_reference(net, log1, log2, options);
   const auto activity_attribute =
       normalize_activity_attribute(options.activity_attribute);
   const auto initial_marking = resolve_marking(

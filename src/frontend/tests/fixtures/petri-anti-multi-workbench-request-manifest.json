@@ -58,7 +58,7 @@
         "filename": "anti-csv-log.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-csv-log.response.json",
         "bytes": 198604,
-        "sha256": "570e01edf044b297499cacbb48a16c0924f862e579284662fa106bfeaec380e9",
+        "sha256": "db02e6e12519d5794e87174eaa589c8b59b73ab30a827e6ac946006088eb6640",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -89,7 +89,7 @@
           "filename": "anti-csv-log.source_xes.xes",
           "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-csv-log.source_xes.xes",
           "bytes": 17511,
-          "sha256": "2a3b8321a86d6f5de981171a949a5536ff8df1e6e357af2cd179ae10d7d53721",
+          "sha256": "28e1cef435bc26168151716c7f5796036626431daa030c5fe52e6b34d1558966",
           "format": "xes"
         }
       }
@@ -145,14 +145,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "144690",
+        "Content-Length": "144682",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-csv-trace.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-csv-trace.response.json",
-        "bytes": 144690,
-        "sha256": "d7e35a2de7346f933432d682d0a0d7d4b5f0b39b77c7a4a7497439c018ebd18b",
+        "bytes": 144682,
+        "sha256": "27cc764ffb35c6c1f553f508dc7caa17723b09f37a86127ada7939cdb2eeb020",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -182,8 +182,8 @@
         "source_xes": {
           "filename": "anti-csv-trace.source_xes.xes",
           "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-csv-trace.source_xes.xes",
-          "bytes": 770,
-          "sha256": "efdc6eac5a82aee7c15159b7cda8bcb809e2dadda7b86fcdcf16adba517e2c84",
+          "bytes": 767,
+          "sha256": "758c040202cc52203f6ab2b7eac96889c024e002c257787c97c2567f42ccc6a7",
           "format": "xes"
         }
       }
@@ -1221,14 +1221,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9824",
+        "Content-Length": "9395",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-words-perfect.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-perfect.response.json",
-        "bytes": 9824,
-        "sha256": "2074eb1da04b36a0932cf458cce552ba001821ebf094d0b3be2aa95d778d5304",
+        "bytes": 9395,
+        "sha256": "7eaeb73f2a00d33a8c6072658beb93f59f89149787398a2e754ff6463ab042e4",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -1254,13 +1254,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "anti-words-perfect.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-perfect.source_xes.xes",
-          "bytes": 443,
-          "sha256": "7b32d74a363d49dc8dd5e3319ee6bbaa29752653ed1b735b4e3aca6b82de263b",
-          "format": "xes"
         }
       }
     },
@@ -1315,14 +1308,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9874",
+        "Content-Length": "9445",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-words-deviation.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-deviation.response.json",
-        "bytes": 9874,
-        "sha256": "28abb8b877db386d4d8bc16fe7890c11c4a124ead025c8a3977ea8788be3f409",
+        "bytes": 9445,
+        "sha256": "2a507d0a3af77d548ed795f105e03ed6546ca68a08a343882db9918989948729",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -1348,13 +1341,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "anti-words-deviation.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-deviation.source_xes.xes",
-          "bytes": 443,
-          "sha256": "35f63d9fe0f02fb9feba89664fcd3196e9bd8c139ac31063f7689fc8e47b7eb2",
-          "format": "xes"
         }
       }
     },
@@ -1503,14 +1489,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8965",
+        "Content-Length": "8617",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-words-blank-value.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-blank-value.response.json",
-        "bytes": 8965,
-        "sha256": "d20df9ae0424a5144977929cf1eb52f4d6fa39832d333b4873ab824ed61304ff",
+        "bytes": 8617,
+        "sha256": "5fa6adab91740ba2da2e7b7968e28dfee041b12f2497813e651aa6d334d0b596",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -1536,13 +1522,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "anti-words-blank-value.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-blank-value.source_xes.xes",
-          "bytes": 372,
-          "sha256": "f214c41cf6966dcf5409d584f9aac95af5a9726c5ef18c14fd5cd8d48b234e03",
-          "format": "xes"
         }
       }
     },
@@ -1597,14 +1576,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9032",
+        "Content-Length": "8666",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-words-unicode-delimiter.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-unicode-delimiter.response.json",
-        "bytes": 9032,
-        "sha256": "2b16c60b845dde36ae4c048ce9c222d8a28c4f9c41ce56e6525f00dc416b6351",
+        "bytes": 8666,
+        "sha256": "3269ecf11c6e41f2f8765f2735a3e1dbf97f8be4c7714e42a50ffd8b7f630742",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -1630,13 +1609,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "anti-words-unicode-delimiter.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-unicode-delimiter.source_xes.xes",
-          "bytes": 389,
-          "sha256": "c4a8a7e3b0c788ce79ba853243594c7f48226117ddf57308aa1cb60bccf4d626",
-          "format": "xes"
         }
       }
     },
@@ -1691,14 +1663,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9920",
+        "Content-Length": "9479",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-words-wtf-nul.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-wtf-nul.response.json",
-        "bytes": 9920,
-        "sha256": "cc02687bf675a85270d4eedd9385fc23ddfa96b5806ec3c053d27f939a6cc183",
+        "bytes": 9479,
+        "sha256": "73d28e7b707dc0a06dfb01afd8107b662c91c3850234e5a0415f321d1fae1430",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -1724,13 +1696,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "anti-words-wtf-nul.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-words-wtf-nul.source_xes.xes",
-          "bytes": 447,
-          "sha256": "0970678544552b219d716b8629a9d2442b7712ff23ebf5a771f22832e526764c",
-          "format": "xes"
         }
       }
     },
@@ -2372,14 +2337,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9674",
+        "Content-Length": "9690",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-native-blank-selector-space.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-native-blank-selector-space.response.json",
-        "bytes": 9674,
-        "sha256": "a19ad4f8e42d73fbf7e19a6ee35ba0834c59113eed607e6e1e1f81b1e28c7879",
+        "bytes": 9690,
+        "sha256": "20972cad3d75311238cee1708670ad3c37cb4200945459d2b8c5a5574f7d2f12",
         "status": 400
       },
       "family": "petri_anti_multi_alignment",
@@ -2412,8 +2377,8 @@
         "source_xes": {
           "filename": "anti-native-blank-selector-space.source_xes.xes",
           "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-native-blank-selector-space.source_xes.xes",
-          "bytes": 427,
-          "sha256": "d23e672130146b1f273a43d8b1456aa869a9af3ef92d08a9bd39d07d9315e07f",
+          "bytes": 449,
+          "sha256": "b46cd117ca3cbedf92b41fe8142f2662efd13ed324f49d6ce5927102910613b3",
           "format": "xes"
         }
       }
@@ -2941,7 +2906,7 @@
         "filename": "multi-csv-log.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-csv-log.response.json",
         "bytes": 198581,
-        "sha256": "99eaf0d0e9edcd48f25420737f9f8d2fc32ee67b379b4293e6073ac75cf8a33c",
+        "sha256": "d1d144bb47d65e56522ca90f0a21ff67c9c7507365cb7a29c301e1cd86385f90",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -2972,7 +2937,7 @@
           "filename": "multi-csv-log.source_xes.xes",
           "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-csv-log.source_xes.xes",
           "bytes": 17511,
-          "sha256": "2a3b8321a86d6f5de981171a949a5536ff8df1e6e357af2cd179ae10d7d53721",
+          "sha256": "28e1cef435bc26168151716c7f5796036626431daa030c5fe52e6b34d1558966",
           "format": "xes"
         }
       }
@@ -3028,14 +2993,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "144667",
+        "Content-Length": "144659",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-csv-trace.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-csv-trace.response.json",
-        "bytes": 144667,
-        "sha256": "444877af9ee8ac2cdfca41566076908082021a42e7b84babfa991648f1f00c1f",
+        "bytes": 144659,
+        "sha256": "8be01dedcb1acf80b5b9952158abce408c13a151398cea880e5f4f9cfaa692b1",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -3065,8 +3030,8 @@
         "source_xes": {
           "filename": "multi-csv-trace.source_xes.xes",
           "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-csv-trace.source_xes.xes",
-          "bytes": 770,
-          "sha256": "efdc6eac5a82aee7c15159b7cda8bcb809e2dadda7b86fcdcf16adba517e2c84",
+          "bytes": 767,
+          "sha256": "758c040202cc52203f6ab2b7eac96889c024e002c257787c97c2567f42ccc6a7",
           "format": "xes"
         }
       }
@@ -4104,14 +4069,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9801",
+        "Content-Length": "9372",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-words-perfect.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-perfect.response.json",
-        "bytes": 9801,
-        "sha256": "2c4502e63fc22b3da170c964fe5e48f7cf5439eb06dc88fe1bbbcbcde5e8ebbd",
+        "bytes": 9372,
+        "sha256": "b16076dd805f16762fde8f19b368a86338f389fcfc279f707ec03ffe821d5469",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -4137,13 +4102,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "multi-words-perfect.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-perfect.source_xes.xes",
-          "bytes": 443,
-          "sha256": "7b32d74a363d49dc8dd5e3319ee6bbaa29752653ed1b735b4e3aca6b82de263b",
-          "format": "xes"
         }
       }
     },
@@ -4198,14 +4156,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9807",
+        "Content-Length": "9378",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-words-deviation.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-deviation.response.json",
-        "bytes": 9807,
-        "sha256": "28673ca85e8426579453b2871449509a520ced0374d42aa6b66e460450d9367d",
+        "bytes": 9378,
+        "sha256": "d4bc46cba77e5d977a59ae4b00aa24977fd6c82ab06648c6a92074b655e5033c",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -4231,13 +4189,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "multi-words-deviation.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-deviation.source_xes.xes",
-          "bytes": 443,
-          "sha256": "35f63d9fe0f02fb9feba89664fcd3196e9bd8c139ac31063f7689fc8e47b7eb2",
-          "format": "xes"
         }
       }
     },
@@ -4386,14 +4337,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8896",
+        "Content-Length": "8548",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-words-blank-value.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-blank-value.response.json",
-        "bytes": 8896,
-        "sha256": "7b157f4305c335564f1c2969cce5775276644d176197f45606c53bd845316f58",
+        "bytes": 8548,
+        "sha256": "9f0e6642c1599321a8838f56f20ac7b5805f69d256af3da0d2707cf0cbdc3bb5",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -4419,13 +4370,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "multi-words-blank-value.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-blank-value.source_xes.xes",
-          "bytes": 372,
-          "sha256": "f214c41cf6966dcf5409d584f9aac95af5a9726c5ef18c14fd5cd8d48b234e03",
-          "format": "xes"
         }
       }
     },
@@ -4480,14 +4424,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8963",
+        "Content-Length": "8597",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-words-unicode-delimiter.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-unicode-delimiter.response.json",
-        "bytes": 8963,
-        "sha256": "135576fd387d37f114a9e4de856e5534b0090dd9776efc44f9111b89dabf5d08",
+        "bytes": 8597,
+        "sha256": "3c768c0b2aeece163c5f99db6a2e257e1782af91f08587ab2bbb7a102753a8df",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -4513,13 +4457,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "multi-words-unicode-delimiter.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-unicode-delimiter.source_xes.xes",
-          "bytes": 389,
-          "sha256": "c4a8a7e3b0c788ce79ba853243594c7f48226117ddf57308aa1cb60bccf4d626",
-          "format": "xes"
         }
       }
     },
@@ -4574,14 +4511,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9853",
+        "Content-Length": "9412",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-words-wtf-nul.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-wtf-nul.response.json",
-        "bytes": 9853,
-        "sha256": "49d70fbcf4e926bd3adbd1a59ee8988445db30b2613eb2109162a66bc0eb0ded",
+        "bytes": 9412,
+        "sha256": "7e845f1df840c53dc51eef1c6990313d7056c9b50992448e77fe7a1ef9667a44",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -4607,13 +4544,6 @@
           "bytes": 1595,
           "sha256": "592f6eb4efa89683b93248bc4c0510cb7d72293600a0242612d67aacb685464d",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "multi-words-wtf-nul.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-words-wtf-nul.source_xes.xes",
-          "bytes": 447,
-          "sha256": "0970678544552b219d716b8629a9d2442b7712ff23ebf5a771f22832e526764c",
-          "format": "xes"
         }
       }
     },
@@ -5255,14 +5185,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9644",
+        "Content-Length": "9660",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-native-blank-selector-space.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-native-blank-selector-space.response.json",
-        "bytes": 9644,
-        "sha256": "d6d2e03f7e9303d61ce11476b1e6d34018e9cd12fcafddef95aa8cff89949cf1",
+        "bytes": 9660,
+        "sha256": "1c359a390d50534a474113a7fb4959b80a03bc167564e702bc03f11bcb3e30f9",
         "status": 400
       },
       "family": "petri_anti_multi_alignment",
@@ -5295,8 +5225,8 @@
         "source_xes": {
           "filename": "multi-native-blank-selector-space.source_xes.xes",
           "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-native-blank-selector-space.source_xes.xes",
-          "bytes": 427,
-          "sha256": "d23e672130146b1f273a43d8b1456aa869a9af3ef92d08a9bd39d07d9315e07f",
+          "bytes": 449,
+          "sha256": "b46cd117ca3cbedf92b41fe8142f2662efd13ed324f49d6ce5927102910613b3",
           "format": "xes"
         }
       }
@@ -7939,14 +7869,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8772",
+        "Content-Length": "8966",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-original-weighted-stochastic.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-original-weighted-stochastic.response.json",
-        "bytes": 8772,
-        "sha256": "88f60ca8c095881f15640abff03918712b05cf4a83f773a278e7d9fa7bc75677",
+        "bytes": 8966,
+        "sha256": "15feafb26a752ce40bb2d0a73fdc4abb0cbaf4651cf0c8c14ac8ab6b505812c9",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -8049,14 +7979,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8660",
+        "Content-Length": "8854",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-all-five-pnml-import-flags.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-all-five-pnml-import-flags.response.json",
-        "bytes": 8660,
-        "sha256": "a4b751347a4245af95106dee0c70acfdf2448d32e1d57c40ec4f6c35207139a8",
+        "bytes": 8854,
+        "sha256": "e695946b7009cf7fe7bb4c46b6ba87993c5c415000c28db45cf6942c4b549598",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -9319,14 +9249,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8749",
+        "Content-Length": "8943",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-original-weighted-stochastic.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-original-weighted-stochastic.response.json",
-        "bytes": 8749,
-        "sha256": "40fb49f6d4070b7eadd6cd9033b471de82c207265484ac4d2fc75cbd31f719fa",
+        "bytes": 8943,
+        "sha256": "adcbe61d2b1931b089c6f4a29db2206dff239bc71dec244ae52a33f130618ede",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -9429,14 +9359,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8637",
+        "Content-Length": "8831",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-all-five-pnml-import-flags.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-all-five-pnml-import-flags.response.json",
-        "bytes": 8637,
-        "sha256": "e6e05fbce19da816788a1b10b30d86e716add770467ad9cf66d6d24cf7991660",
+        "bytes": 8831,
+        "sha256": "8f0f4276f5e55b98592e860d16dc4888976788f670bd96cb2f66596a025eccf9",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -10100,14 +10030,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7310",
+        "Content-Length": "6942",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-original-model-wtf8-nul-empty-id.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-original-model-wtf8-nul-empty-id.response.json",
-        "bytes": 7310,
-        "sha256": "bb3a1da15345d1b1ca603efb5850b6eb97766865423be89ffe0b87b7259838aa",
+        "bytes": 6942,
+        "sha256": "10559e3ec5da1c0af53a1d153476fabb8e88cfaf6768a387e8a323ce0c3b5843",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -10133,13 +10063,6 @@
           "bytes": 1083,
           "sha256": "a4cae8d1316d2f0492e61f04b8a3437e5ee6e757a72560a57ec58d3302d6afbb",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "anti-original-model-wtf8-nul-empty-id.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-original-model-wtf8-nul-empty-id.source_xes.xes",
-          "bytes": 387,
-          "sha256": "5216556750f9f6bf5a5c6ca7a1ebfe883eb377a98b8496ca1b1d8a09c5f18d3f",
-          "format": "xes"
         }
       }
     },
@@ -10288,14 +10211,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7287",
+        "Content-Length": "6919",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-original-model-wtf8-nul-empty-id.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-original-model-wtf8-nul-empty-id.response.json",
-        "bytes": 7287,
-        "sha256": "af1dbd42c762d8afb64e5cbf4d36aa1064d8603d2d2be3022d92ac124dea7de9",
+        "bytes": 6919,
+        "sha256": "dade8883c88d95f8b9d6305aceefa8fc98de8bf0d53f02e413eb93d6d7ce7678",
         "status": 200
       },
       "family": "petri_anti_multi_alignment",
@@ -10321,13 +10244,6 @@
           "bytes": 1083,
           "sha256": "a4cae8d1316d2f0492e61f04b8a3437e5ee6e757a72560a57ec58d3302d6afbb",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "multi-original-model-wtf8-nul-empty-id.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-original-model-wtf8-nul-empty-id.source_xes.xes",
-          "bytes": 387,
-          "sha256": "5216556750f9f6bf5a5c6ca7a1ebfe883eb377a98b8496ca1b1d8a09c5f18d3f",
-          "format": "xes"
         }
       }
     },

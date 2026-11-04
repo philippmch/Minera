@@ -29,7 +29,12 @@ int main() {
   const auto optional = PowlNode::transition("A", PowlFrequency{0, std::nullopt});
   assert(optional.skippable() && optional.self_loop());
   assert(PowlNode::parse(optional.serialize()) == optional);
-  throws_invalid([] { PowlNode::transition("A", PowlFrequency{2, 1}); });
+  // Any nonnegative bounds are accepted, as pm4py's FrequentTransition does.
+  assert(!PowlNode::transition("A", PowlFrequency{2, 1}).skippable());
+  assert(!PowlNode::transition("A", PowlFrequency{0, 3}).self_loop());
+  assert(PowlNode::transition("A", PowlFrequency{2, std::nullopt}).self_loop());
+  throws_invalid([] { PowlNode::transition("A", PowlFrequency{-1, 1}); });
+  throws_invalid([] { PowlNode::transition("A", PowlFrequency{0, -1}); });
 
   // Arity and loop ordering.
   throws_invalid([] { PowlNode::xor_node({a()}); });

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -40,6 +41,9 @@ struct ReferenceIlpOptions {
   std::string artificial_end_activity = "■";
   // Explicit causal pairs in order (the reference's CAUSAL_RELATION keys).
   std::optional<std::vector<std::pair<std::string, std::string>>> causal_relation;
+  // Polled before each pair LP and each implicit-place LP; returning true
+  // stops with OperationCancelled (cancellation.hpp). Unset never cancels.
+  std::function<bool()> cancelled;
 };
 
 struct ReferenceIlpTransition {

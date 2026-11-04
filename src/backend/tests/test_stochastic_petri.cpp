@@ -383,7 +383,37 @@ void transient_work_budget_rejects_oversized_dense_requests() {
 
 }  // namespace
 
+// Firing moves each arc's weight: one weight-3 input arc and one weight-2
+// output arc (a compact side, as PNML import stores large or parallel arcs)
+// take {3, 0} to {0, 2} in one step.
+void weighted_arcs_move_their_weight() {
+  minera::PetriNetLiteralStorage storage;
+  storage.place_count = 2;
+  storage.source_storage = 0;
+  storage.sink_storage = 1;
+  storage.has_source = storage.has_sink = true;
+  storage.activities = {"A"};
+  minera::PetriTransition transition;
+  transition.activity = 0;
+  transition.inputs = {0};
+  transition.outputs = {1};
+  transition.input_weights = {minera::PetriArcWeight{3, false}};
+  transition.output_weights = {minera::PetriArcWeight{2, false}};
+  storage.transitions.push_back(transition);
+  const auto net = minera::PetriNet::from_literal_storage(storage);
+  minera::StochasticPetriOptions options;
+  options.transition_rates = {1.0};
+  options.initial_marking = {3, 0};
+  const auto result = minera::stochastic_petri_reachability(net, options);
+  assert(!result.exhausted && result.states.size() == 2);
+  std::vector<std::vector<std::uint32_t>> markings;
+  for (const auto& state : result.states) markings.push_back(state.marking);
+  std::sort(markings.begin(), markings.end());
+  assert(markings == (std::vector<std::vector<std::uint32_t>>{{0, 2}, {3, 0}}));
+}
+
 int main() {
+  weighted_arcs_move_their_weight();
   branching_states_and_generator_are_deterministic();
   immediate_states_and_duplicate_targets_are_handled();
   immediate_priorities_select_only_highest_enabled_firings();

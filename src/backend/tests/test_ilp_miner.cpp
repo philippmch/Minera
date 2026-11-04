@@ -1,4 +1,5 @@
 #include "minera/ilp_miner.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/ilp_reference.hpp"
 #include "minera/json_export.hpp"
 
@@ -178,4 +179,24 @@ int main() {
   rejects([&] { (void)mine_ilp(log_of({{"a", "b"}}), partial); });
 
   assert(!ilp_miner_json(first).empty());
+
+  // A cancel callback that never fires changes nothing; one that fires stops
+  // discovery with OperationCancelled.
+  {
+    const Rows rows{{"a", "b", "c", "d"}, {"a", "c", "b", "d"}};
+    ILPMinerOptions polled;
+    std::size_t polls = 0;
+    polled.cancelled = [&polls] { ++polls; return false; };
+    const auto expected = mine_ilp(log_of(rows));
+    const auto actual = mine_ilp(log_of(rows), polled);
+    assert(polls > 0);
+    assert(ilp_miner_json(actual) == ilp_miner_json(expected));
+    assert(arcs_of(actual.net) == arcs_of(expected.net));
+    std::size_t calls = 0;
+    polled.cancelled = [&calls] { return ++calls == 2; };
+    bool threw = false;
+    try { (void)mine_ilp(log_of(rows), polled); }
+    catch (const minera::OperationCancelled&) { threw = true; }
+    assert(threw && calls == 2);
+  }
 }

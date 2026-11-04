@@ -1,4 +1,5 @@
 #include "minera/genetic_miner.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/json_export.hpp"
 
 #include <algorithm>
@@ -249,5 +250,29 @@ int main() {
   try { (void)minera::genetic_miner_json(malformed); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
+
+  // A cancel callback that never fires is polled before every candidate and
+  // leaves the result byte-identical; one that fires stops with
+  // OperationCancelled and returns nothing.
+  {
+    minera::GeneticMinerOptions polled;
+    polled.seed = 17;
+    polled.population_size = 8;
+    polled.max_states = 128;
+    polled.generations = 4;
+    auto plain = polled;
+    std::size_t polls = 0;
+    polled.cancelled = [&polls] { ++polls; return false; };
+    const auto expected = minera::mine_genetic(chain_log(), plain);
+    const auto actual = minera::mine_genetic(chain_log(), polled);
+    assert(polls == actual.diagnostics.candidates_evaluated && polls > 0);
+    assert(minera::genetic_miner_json(actual) == minera::genetic_miner_json(expected));
+    std::size_t calls = 0;
+    polled.cancelled = [&calls] { return ++calls == 3; };
+    threw = false;
+    try { (void)minera::mine_genetic(chain_log(), polled); }
+    catch (const minera::OperationCancelled&) { threw = true; }
+    assert(threw && calls == 3);
+  }
   return 0;
 }

@@ -59,6 +59,10 @@ struct Builder {
       default:
         break;
     }
+    // align_process_tree rejects childless operators first; direct callers
+    // get an error rather than an empty choice or body.
+    if (source.children.empty())
+      throw ProcessTreeReferenceAlignmentError("process-tree DP alignment: operator without children");
     std::vector<std::unique_ptr<Node>> children;
     for (const auto& child : source.children) children.push_back(build(child));
     if (source.op != ProcessTreeOperator::kLoop) {
@@ -139,7 +143,16 @@ struct Aligner {
     return *best;
   }
 
+  // The reference reads a sequence's and a parallel's second child (and a
+  // loop's redo, below) by position, so a one-child operator raises
+  // IndexError when it is evaluated; the dispatcher then falls back to the
+  // native search.
+  static void require_two_children(const Node& node) {
+    if (node.children.size() < 2) throw ProcessTreeReferenceAlignmentError("list index out of range");
+  }
+
   Result sequence(const Node& node, const Segment& segment) {
+    require_two_children(node);
     std::optional<Result> best;
     long best_left = 0;
     for (std::size_t end = 0; end <= segment.size(); ++end) {
@@ -155,6 +168,7 @@ struct Aligner {
   }
 
   Result parallel(const Node& node, const Segment& segment) {
+    require_two_children(node);
     Result out;
     std::vector<const Result*> parts;
     for (const auto& child : node.children) {
@@ -181,6 +195,12 @@ struct Aligner {
   Result loop(const Node& node, const Segment& segment) {
     if (segment.empty()) return {};
     const std::size_t n = segment.size();
+    // A body that fits the whole segment exactly is the answer (nothing is
+    // cheaper, and the first cheapest below is the body on the whole
+    // segment); the reference returns it without evaluating the redo, so a
+    // loop without a redo child aligns only such segments.
+    if (const auto& whole = align(*node.children[0], segment); whole.cost == 0) return whole;
+    require_two_children(node);
     const auto part = [&](std::size_t i, std::size_t j) {
       return Segment(segment.begin() + static_cast<std::ptrdiff_t>(i), segment.begin() + static_cast<std::ptrdiff_t>(j));
     };

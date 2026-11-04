@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "minera/process_tree_alignment.hpp"
+#include "minera/process_tree_reference_alignment.hpp"
 
 using namespace minera;
 namespace {
@@ -17,6 +18,57 @@ ProcessTree interleaving2() { return ProcessTree({"a","b","c"}, ProcessTreeNode{
 ProcessTree nested() { return ProcessTree({"a","b","c","d"}, ProcessTreeNode{ProcessTreeOperator::kSequence,0,{
   ProcessTreeNode{ProcessTreeOperator::kExclusive,0,{ProcessTreeNode::leaf(0),ProcessTreeNode::leaf(1)}},
   ProcessTreeNode{ProcessTreeOperator::kParallel,0,{ProcessTreeNode::leaf(2),ProcessTreeNode::leaf(3)}}}}); }
+}
+
+// One-child operators (a loop without a redo, a sequence or parallel of one
+// child). The DP port used to dereference a missing redo or second child
+// (the frontend fixture dynamic_programming-native-one-body-loop crashed the
+// server). As probed on the reference: its DP aligns a redo-less loop only
+// where the body fits the whole segment exactly (empty segments included),
+// does not evaluate a loop's redo then (loop(a, ->(b)) aligns "a"), and
+// raises IndexError for any other segment and for every one-child sequence
+// or parallel it evaluates; align_process_tree then runs the native search.
+void one_child_operators() {
+  using Op = ProcessTreeOperator;
+  const auto one = [](Op op) { return ProcessTree({"a", "b"}, ProcessTreeNode{op, 0, {ProcessTreeNode::leaf(0)}}); };
+  ProcessTreeAlignmentOptions dp; dp.variant = ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING;
+  const auto fits = align_process_tree(log_of({"a"}), one(Op::kLoop), dp);
+  assert(fits.computed && fits.total_cost == 0 && fits.fitness == 1.0 &&
+         fits.diagnostics.message == "reference DYNAMIC_PROGRAMMING" &&
+         fits.traces.front().moves.size() == 1);
+  const std::string fallback = "native search (reference: list index out of range)";
+  for (const auto& trace : {std::vector<std::string>{"a", "a"}, std::vector<std::string>{"b"}}) {
+    const auto native = align_process_tree(log_of(trace), one(Op::kLoop), dp);
+    assert(native.computed && native.diagnostics.message.rfind(fallback, 0) == 0);
+  }
+  for (const auto op : {Op::kSequence, Op::kParallel}) {
+    const auto native = align_process_tree(log_of({"a"}), one(op), dp);
+    assert(native.computed && native.total_cost == 0 && native.diagnostics.message.rfind(fallback, 0) == 0);
+  }
+  const ProcessTree lazy({"a", "b"}, ProcessTreeNode{Op::kLoop, 0, {ProcessTreeNode::leaf(0),
+      ProcessTreeNode{Op::kSequence, 0, {ProcessTreeNode::leaf(1)}}}});
+  const auto unevaluated = align_process_tree(log_of({"a"}), lazy, dp);
+  assert(unevaluated.total_cost == 0 && unevaluated.diagnostics.message == "reference DYNAMIC_PROGRAMMING");
+  bool raised = false;
+  try { (void)reference_process_tree_dp_alignments(one(Op::kLoop), {{"a", "a"}}); }
+  catch (const ProcessTreeReferenceAlignmentError&) { raised = true; }
+  assert(raised);
+  raised = false;
+  try { (void)reference_process_tree_dp_alignments(ProcessTree({"a"}, ProcessTreeNode{Op::kExclusive, 0, {}}), {{"a"}}); }
+  catch (const ProcessTreeReferenceAlignmentError&) { raised = true; }
+  assert(raised);
+  // No variant crashes on one-child operators; MILP and the approximated
+  // variant refuse or fall back, as their own reference does.
+  for (auto v : {ProcessTreeAlignmentVariant::SEARCH_GRAPH_PT, ProcessTreeAlignmentVariant::DYNAMIC_PROGRAMMING,
+                 ProcessTreeAlignmentVariant::MILP, ProcessTreeAlignmentVariant::APPROXIMATED_ORIGINAL}) {
+    ProcessTreeAlignmentOptions o; o.variant = v;
+    for (const auto op : {Op::kLoop, Op::kSequence, Op::kExclusive, Op::kParallel, Op::kInclusiveChoice, Op::kInterleaving})
+      for (const auto& trace : {std::vector<std::string>{}, std::vector<std::string>{"a"},
+                                std::vector<std::string>{"a", "a"}, std::vector<std::string>{"b", "a"}}) {
+        try { (void)align_process_tree(log_of(trace), one(op), o); }
+        catch (const std::invalid_argument&) {}
+      }
+  }
 }
 
 int main() {
@@ -122,5 +174,6 @@ int main() {
   try { (void)align_process_tree(selected, seq({"a", "b"}), missing_selector); }
   catch (const std::invalid_argument&) { missing = true; }
   assert(missing);
+  one_child_operators();
   return 0;
 }

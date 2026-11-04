@@ -53,7 +53,7 @@
   <trace>
     <string key="concept:name" value="case_8"/>
     <event>
-      <string key="concept:name" value="A"/>
+      <string key="concept:name" value="B"/>
       <date key="time:timestamp" value="1970-01-12T13:53:41+00:00"/>
     </event>
   </trace>

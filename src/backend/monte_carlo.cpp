@@ -973,38 +973,54 @@ double pop_timestamp(std::vector<double>& values, RuntimeBudget& budget) {
   return result;
 }
 
+// Fires like the reference's semantics.execute: each ordinary arc moves its
+// weight (an imported PNML keeps weighted and parallel arcs as weighted
+// occurrences, see parse_pnml_document), a place whose count reaches zero
+// loses its marking key, and every output place gets one.
 void fire_transition(const PetriTransition& transition,
                      Marking& marking, std::vector<bool>& keys) {
   if (!petri_transition_enabled(transition, marking))
     throw std::runtime_error("Monte Carlo fired a disabled transition");
-  std::vector<std::uint64_t> required(marking.size(), 0);
-  for (const auto place : transition.inputs) {
-    if (place >= marking.size() ||
-        required[place] == std::numeric_limits<std::uint64_t>::max()) {
-      throw std::runtime_error("Monte Carlo input multiplicity overflow");
-    }
-    ++required[place];
-  }
-  for (std::size_t place = 0; place < marking.size(); ++place) {
-    if (required[place] > marking[place]) {
-      throw std::runtime_error("Monte Carlo fired a disabled transition");
-    }
-    marking[place] -= required[place];
-    if (required[place] != 0 && marking[place] == 0) keys[place] = false;
-  }
-  for (const auto place : transition.reset_inputs) {
+  for (const auto place : transition.inputs)
+    if (place >= marking.size()) throw std::runtime_error("Monte Carlo fired a disabled transition");
+  for (const auto place : transition.reset_inputs)
     if (place >= marking.size()) throw std::runtime_error("Monte Carlo reset place is invalid");
-    marking[place] = 0;
-    keys[place] = false;
-  }
-  for (const auto place : transition.outputs) {
-    if (place >= marking.size() ||
-        marking[place] == std::numeric_limits<std::uint64_t>::max()) {
-      throw std::overflow_error("Monte Carlo marking token overflow");
+  for (const auto place : transition.outputs)
+    if (place >= marking.size()) throw std::overflow_error("Monte Carlo marking token overflow");
+  if (!transition.has_compact_ordinary_arcs()) {
+    std::vector<std::uint64_t> required(marking.size(), 0);
+    for (const auto place : transition.inputs) {
+      if (required[place] == std::numeric_limits<std::uint64_t>::max())
+        throw std::runtime_error("Monte Carlo input multiplicity overflow");
+      ++required[place];
     }
-    ++marking[place];
-    keys[place] = true;
+    for (std::size_t place = 0; place < marking.size(); ++place) {
+      if (required[place] > marking[place])
+        throw std::runtime_error("Monte Carlo fired a disabled transition");
+      marking[place] -= required[place];
+      if (required[place] != 0 && marking[place] == 0) keys[place] = false;
+    }
+    for (const auto place : transition.reset_inputs) {
+      marking[place] = 0;
+      keys[place] = false;
+    }
+    for (const auto place : transition.outputs) {
+      if (marking[place] == std::numeric_limits<std::uint64_t>::max())
+        throw std::overflow_error("Monte Carlo marking token overflow");
+      ++marking[place];
+      keys[place] = true;
+    }
+    return;
   }
+  try {
+    fire_petri_transition(transition, marking);
+  } catch (const std::overflow_error&) {
+    throw std::overflow_error("Monte Carlo marking token overflow");
+  }
+  for (const auto place : transition.inputs)
+    if (marking[place] == 0) keys[place] = false;
+  for (const auto place : transition.reset_inputs) keys[place] = false;
+  for (const auto place : transition.outputs) keys[place] = true;
 }
 
 void finalize_case(CaseState& state, MonteCarloDiagnostics& diagnostics,

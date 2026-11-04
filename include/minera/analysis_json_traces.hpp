@@ -1,6 +1,11 @@
 #pragma once
 
+#include <string>
+
 namespace minera {
+
+class DirectlyFollowsGraph;
+struct EventLog;
 
 // While an instance lives on a thread, analysis_json and write_analysis_json
 // on that thread leave out the "traces" array (every other key is written as
@@ -16,5 +21,12 @@ class OmitAnalysisTraces {
  private:
   bool previous_;
 };
+
+// The "traces" array analysis_json writes inline (from "[" to "]"), byte for
+// byte, for the same log and graph. GET /api/traces serves it on demand to a
+// client that mined with include_traces=false; that mining response carries
+// a "trace_summary" object in its place.
+[[nodiscard]] std::string analysis_traces_json(const EventLog& log,
+                                               const DirectlyFollowsGraph& graph);
 
 }  // namespace minera

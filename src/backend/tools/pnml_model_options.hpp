@@ -22,7 +22,8 @@ namespace minera::tools {
   ModelConformance result;
   result.miner = std::move(miner);
   result.computed = false;
-  result.error = "Conformance for zero, signed or large ordinary arc weights is not available yet.";
+  // Compact sides: parallel arc objects, or zero, signed or large weights.
+  result.error = "Conformance for parallel arcs or zero, signed or large ordinary arc weights is not available yet.";
   return result;
 }
 

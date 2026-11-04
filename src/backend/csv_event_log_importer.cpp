@@ -947,6 +947,24 @@ CsvEventData import_csv_event_data_impl(
   std::vector<std::string> activity_tokens;
   std::vector<PendingRow> pending;
 
+  // Row shape in the batch import follows read_csv's default C parser. The
+  // first data row fixes the expected field count: when it has k fields more
+  // than the header, read_csv reads the first k fields of every row as the
+  // (implicit) index, which format_dataframe then discards, so the header
+  // names the fields after them. A later row with more fields than that is
+  // an error ("Expected N fields in line L, saw M", L counting records,
+  // blank ones included, as line_number does); a shorter row reads NaN in
+  // its missing trailing columns. Stream readers (csv.DictReader) keep their
+  // own shape rules: extra fields are ignored and a short row must still
+  // hold the first-class columns.
+  std::optional<std::size_t> expected_fields;
+  std::size_t index_fields = 0;
+  const auto cell_at = [&](const std::vector<std::string>& fields,
+                           std::size_t index) {
+    if (reference_batch) return index < fields.size() ? fields[index] : std::string{};
+    return field_at(fields, index, line_number);
+  };
+
   while (read_csv_record(input, line, options.delimiter)) {
     ++line_number;
     if (line.empty() ||
@@ -955,14 +973,39 @@ CsvEventData import_csv_event_data_impl(
     }
 
     auto fields = parse_csv_row(line, options.delimiter, options.trim_fields);
-    auto case_id = field_at(fields, case_index, line_number);
-    auto activity = field_at(fields, activity_index, line_number);
-    auto timestamp = timestamp_index
-                         ? field_at(fields, *timestamp_index, line_number)
-                         : std::string{};
-    auto resource = resource_index
-                        ? field_at(fields, *resource_index, line_number)
-                        : std::string{};
+    if (reference_batch) {
+      if (!expected_fields) {
+        index_fields = fields.size() > header.size() ? fields.size() - header.size() : 0;
+        expected_fields = header.size() + index_fields;
+      }
+      if (fields.size() > *expected_fields) {
+        const auto count = [](std::size_t n) {
+          return std::to_string(n) + (n == 1 ? " field" : " fields");
+        };
+        std::string message =
+            "CSV line " + std::to_string(line_number) + " has " + count(fields.size()) +
+            ", but rows of this file have at most " + count(*expected_fields);
+        if (index_fields > 0) {
+          message += " (the first data row has " + count(index_fields) +
+                     " more than the header, which read_csv reads as an index)";
+        } else {
+          message += ", as many as the header";
+        }
+        message += "; pandas.read_csv refuses the file: Error tokenizing data. C error: Expected " +
+                   std::to_string(*expected_fields) + " fields in line " +
+                   std::to_string(line_number) + ", saw " + std::to_string(fields.size());
+        throw std::invalid_argument(message);
+      }
+      fields.erase(fields.begin(),
+                   fields.begin() + static_cast<std::ptrdiff_t>(
+                                        std::min(index_fields, fields.size())));
+    }
+    auto case_id = cell_at(fields, case_index);
+    auto activity = cell_at(fields, activity_index);
+    auto timestamp = timestamp_index ? cell_at(fields, *timestamp_index)
+                                     : std::string{};
+    auto resource = resource_index ? cell_at(fields, *resource_index)
+                                   : std::string{};
 
     const std::size_t token = case_tokens.size();
     case_tokens.push_back(case_id);
@@ -978,10 +1021,11 @@ CsvEventData import_csv_event_data_impl(
     for (const auto index : case_attribute_indices) {
       // The batch import keeps blank cells too: the reference takes a case
       // attribute from one row only, which may be blank (missing).
-      if (index >= fields.size() || (!reference_batch && fields[index].empty()))
+      // A short row's missing cell is NaN there, like a blank one.
+      if (!reference_batch && (index >= fields.size() || fields[index].empty()))
         continue;
       row.case_attributes.push_back(EventAttribute{
-          header[index].substr(kCasePrefix.size()), fields[index],
+          header[index].substr(kCasePrefix.size()), cell_at(fields, index),
           AttributeKind::kString});
     }
 
@@ -1003,7 +1047,7 @@ CsvEventData import_csv_event_data_impl(
       event.resource_source_key = header[*resource_index];
     }
     if (lifecycle_index) {
-      event.lifecycle = field_at(fields, *lifecycle_index, line_number);
+      event.lifecycle = cell_at(fields, *lifecycle_index);
       event.lifecycle_state = event.lifecycle.empty()
                                   ? FirstClassAttributeState::kMissing
                                   : FirstClassAttributeState::kPresent;
@@ -1087,10 +1131,26 @@ CsvEventData import_csv_event_data_impl(
   std::vector<std::optional<std::string>> timestamp_texts;
   std::size_t parsed_timestamps = 0;
   std::optional<std::pair<std::size_t, std::string>> first_bad_timestamp;
+  // format_dataframe also drops a row whose timestamp is NA once the column
+  // converts to dates (some kept row's cell parses), as it drops one without
+  // a case id or activity. A column with no date keeps every row (see the
+  // conversion below), and stream readers keep NA spellings as values.
+  bool drop_untimed_rows = false;
+  if (reference_batch && timestamp_index) {
+    for (const auto& row : pending) {
+      if (!case_ids[row.token] || !activities[row.token]) continue;
+      const auto& timestamp = row.event.timestamp;
+      if (!is_reference_na_token(timestamp) && reference_timestamp_text(timestamp)) {
+        drop_untimed_rows = true;
+        break;
+      }
+    }
+  }
   for (auto& row : pending) {
     const auto& case_id = case_ids[row.token];
     const auto& activity = activities[row.token];
     if (!case_id || !activity) continue;
+    if (drop_untimed_rows && is_reference_na_token(row.event.timestamp)) continue;
     if (timestamp_index) {
       // Decided per column after the scan; see apply below.
       const auto& timestamp = row.event.timestamp;

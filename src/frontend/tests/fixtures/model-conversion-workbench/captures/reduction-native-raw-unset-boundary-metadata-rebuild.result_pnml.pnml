@@ -3,14 +3,14 @@
   <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
     <name><text>Reduced original PNML model</text></name>
     <page id="page1">
-      <place id="p0">
-        <name><text>p0</text></name>
+      <place id="only">
+        <name><text>only</text></name>
       </place>
       <transition id="t0">
         <name><text>A</text></name>
       </transition>
-      <arc id="a0" source="p0" target="t0"/>
-      <arc id="a1" source="t0" target="p0"/>
+      <arc id="a0" source="only" target="t0"/>
+      <arc id="a1" source="t0" target="only"/>
     </page>
     <finalmarkings>
       <marking>

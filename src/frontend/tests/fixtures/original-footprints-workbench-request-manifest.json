@@ -1087,7 +1087,7 @@
         "filename": "native-operation-diagnostics_log_model.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-operation-diagnostics_log_model.response.json",
         "bytes": 61572,
-        "sha256": "11a8f7f2816c28baa15e581927fd633794f496247f0c03ce585ce995ec164fc0",
+        "sha256": "53f585753204530af5aebe1bd85d818a88995313a7ab4232d24e6cefecc5a6be",
         "status": 200
       },
       "family": "original_footprints",
@@ -1275,7 +1275,7 @@
         "filename": "native-operation-diagnostics_trace_extensive.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-operation-diagnostics_trace_extensive.response.json",
         "bytes": 63156,
-        "sha256": "13e51597e4e64103ab1deddedde12ec4dc5354cb69935468aad0fbe85c94157b",
+        "sha256": "4e1cf4a7764ff7b3c36ffd3ed4426775bb5922e0356dd8c48409eda91780937c",
         "status": 200
       },
       "family": "original_footprints",
@@ -13083,7 +13083,7 @@
         "filename": "native-diagnostics_log_model-selector-99.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-selector-99.response.json",
         "bytes": 61606,
-        "sha256": "7e22d5ccf1d186420785abcc35099c75adaf2d1ea57d4b95e0aa0122678fecc1",
+        "sha256": "4706d616aff58369d6963310d9975cbd2c5327badb6278981c6f5aa17984408e",
         "status": 200
       },
       "family": "original_footprints",
@@ -13274,7 +13274,7 @@
         "filename": "native-diagnostics_log_model-selector-100.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-selector-100.response.json",
         "bytes": 61627,
-        "sha256": "d74ebb400ed6ee2620bb0e1ca82ea6d4c6cf041c41b8c1e550f2f96a1affaea6",
+        "sha256": "348dd361b44b472a4dbc5b874215f565419fddf3170db0bc11186dc6039faa48",
         "status": 200
       },
       "family": "original_footprints",
@@ -13465,7 +13465,7 @@
         "filename": "native-diagnostics_log_model-selector-101.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-selector-101.response.json",
         "bytes": 61627,
-        "sha256": "9b80ee9014c5d8e87994a4bd1a09c31bd3ccab5b670ee171bcd4cf71ff692926",
+        "sha256": "a6e6df4307e4273527919245ec0fbdbe010c76f82a6d2e14b70b3952e2f723bb",
         "status": 200
       },
       "family": "original_footprints",
@@ -13656,7 +13656,7 @@
         "filename": "native-diagnostics_log_model-selector-102.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-selector-102.response.json",
         "bytes": 61642,
-        "sha256": "b54a846d523ec2ac39ef4ad33cdb58b9970a2ef9ae7b7e5d162361aeb56bd8d4",
+        "sha256": "755371689943fac84d711c38fb2b31e0709aef1b6cf5727daeeba3df165c3f37",
         "status": 200
       },
       "family": "original_footprints",
@@ -13847,7 +13847,7 @@
         "filename": "native-diagnostics_log_model-selector-103.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-selector-103.response.json",
         "bytes": 61657,
-        "sha256": "31a854acd4170bc328ab7ff55f959da9fbde2abc39100b6811ecf39a9439a206",
+        "sha256": "5fa5c4669f8f8e6ada9f6eec055ebf6e0e852da79abe24088a3a2b578bf32b9a",
         "status": 200
       },
       "family": "original_footprints",
@@ -14038,7 +14038,7 @@
         "filename": "native-diagnostics_log_model-selector-104.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-selector-104.response.json",
         "bytes": 61654,
-        "sha256": "6d1f63369da02862f1a06c0361c0ae85674457b403b986e37e98679df011a21a",
+        "sha256": "44aa85ea3079cdc3881ccfb79fdc0d5ad7f38e43ded3c164120ca0ebaed73bb3",
         "status": 200
       },
       "family": "original_footprints",
@@ -14229,7 +14229,7 @@
         "filename": "native-diagnostics_log_model-missing-selector.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-missing-selector.response.json",
         "bytes": 61669,
-        "sha256": "12e06adb9596ae3691ba0b1b7296d1f4016bc9eba5395882e4ac54c937cf1681",
+        "sha256": "d56314d2a9b59fac47301cc6fcd712d417dde47e1fc108dc10e2bfd4df7c745a",
         "status": 400
       },
       "family": "original_footprints",
@@ -14418,7 +14418,7 @@
         "filename": "native-diagnostics_log_model-mismatch.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-mismatch.response.json",
         "bytes": 61296,
-        "sha256": "9a5203c88ffc91999f23531ea41c3910bfb739bb622bb794f946c861188705ef",
+        "sha256": "64e4f5f247a582714183e6926cb12cdb9c891c25cb3f5a49b914842317e3e283",
         "status": 400
       },
       "family": "original_footprints",
@@ -14607,7 +14607,7 @@
         "filename": "native-diagnostics_log_model-import-shape-log.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-import-shape-log.response.json",
         "bytes": 61572,
-        "sha256": "11a8f7f2816c28baa15e581927fd633794f496247f0c03ce585ce995ec164fc0",
+        "sha256": "53f585753204530af5aebe1bd85d818a88995313a7ab4232d24e6cefecc5a6be",
         "status": 200
       },
       "family": "original_footprints",
@@ -14796,7 +14796,7 @@
         "filename": "native-diagnostics_log_model-import-shape-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-import-shape-stream.response.json",
         "bytes": 61578,
-        "sha256": "a09f30481fc581e20bcbdeb3b3607d867b595bb47e63b235a577d3206fa437d1",
+        "sha256": "f77d2e72bfd7421e3b9700cc21f79e8b981d422054f8e3865e3562b00938ee56",
         "status": 200
       },
       "family": "original_footprints",
@@ -14985,7 +14985,7 @@
         "filename": "native-diagnostics_log_model-import-shape-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-import-shape-dataframe.response.json",
         "bytes": 61584,
-        "sha256": "09e75db516387005b32fd2c92cfe026289c2561446dbb303797078754797bce2",
+        "sha256": "6364c4ff9691f0ac1dd9f393dccbd31393375bb75b8db8f917cb235a9d4f7478",
         "status": 200
       },
       "family": "original_footprints",
@@ -15174,7 +15174,7 @@
         "filename": "native-diagnostics_log_model-import-shape-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_log_model-import-shape-lazyframe.response.json",
         "bytes": 61584,
-        "sha256": "a8b0558bfd296d3bd9c0d0061a11e7e4f66c347cc3d65645a0258353d977db72",
+        "sha256": "39dcef1dc00d225e843988e0a2ca1add821cd5b9ece3db5ce9d3eb1674799936",
         "status": 200
       },
       "family": "original_footprints",
@@ -15363,7 +15363,7 @@
         "filename": "native-diagnostics_trace_extensive-selector-111.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-selector-111.response.json",
         "bytes": 63190,
-        "sha256": "0bb4160c2481bae8d4c1033f4ba0a106b42b8bfcb6d044889e3fe8acb2ab9aeb",
+        "sha256": "0c859852849f3688e84dce5b713ca6a19f5cb64bb25b2638b1f5edc594a639ea",
         "status": 200
       },
       "family": "original_footprints",
@@ -15554,7 +15554,7 @@
         "filename": "native-diagnostics_trace_extensive-selector-112.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-selector-112.response.json",
         "bytes": 63211,
-        "sha256": "b0fc7ef89ac004f555120197c10aa3b577f7f050a3c99af2b7ba04abf623d2ef",
+        "sha256": "93a7ec861bffbdd7decc2fb37f99c740ebe48ba209da75a03c600c80c571aaaa",
         "status": 200
       },
       "family": "original_footprints",
@@ -15745,7 +15745,7 @@
         "filename": "native-diagnostics_trace_extensive-selector-113.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-selector-113.response.json",
         "bytes": 63211,
-        "sha256": "6e2b54427fc4ac2bb9399a970e96851ce0f6140704f829253d354d2e7852d880",
+        "sha256": "597adcafc447909ec710dc5566dd7329c3ac3611927a5e9e13341cea54b1f12f",
         "status": 200
       },
       "family": "original_footprints",
@@ -15936,7 +15936,7 @@
         "filename": "native-diagnostics_trace_extensive-selector-114.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-selector-114.response.json",
         "bytes": 63226,
-        "sha256": "bd58d019afd86802b3cd9e4fbfba7428bcffc2a337633892efcb76a35b23e11c",
+        "sha256": "6730248adb24f7b39d6d0388b80a958a02261f3e04b993082ced5308d6d58191",
         "status": 200
       },
       "family": "original_footprints",
@@ -16127,7 +16127,7 @@
         "filename": "native-diagnostics_trace_extensive-selector-115.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-selector-115.response.json",
         "bytes": 63241,
-        "sha256": "8c4feeb21b6c2f6ce16dc9c1973d41e62a1b62bc9116e530076132807635ac79",
+        "sha256": "8b1ce4301dcb7af6bc378412d12169a64ead68abcdc51d756e468adb08710974",
         "status": 200
       },
       "family": "original_footprints",
@@ -16318,7 +16318,7 @@
         "filename": "native-diagnostics_trace_extensive-selector-116.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-selector-116.response.json",
         "bytes": 63238,
-        "sha256": "19c0a5ead7347885ed8fe9dfbda0f52c66ae2ae8ff9b7549ffb9088c257d7231",
+        "sha256": "5fed6a134aeb3be0652ead7ef34c7ea72db9b744d1590e1159e3893795f3efff",
         "status": 200
       },
       "family": "original_footprints",
@@ -16509,7 +16509,7 @@
         "filename": "native-diagnostics_trace_extensive-missing-selector.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-missing-selector.response.json",
         "bytes": 62723,
-        "sha256": "73fcac516d8490b1531c62e768f7165dc592550c867bf0755b993bd08e24e674",
+        "sha256": "a7a46e07abb4f373bf869c4a2ee451e9e2cc9bacd0f1e7a9ae36732f4c98a3dd",
         "status": 400
       },
       "family": "original_footprints",
@@ -16698,7 +16698,7 @@
         "filename": "native-diagnostics_trace_extensive-mismatch.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-mismatch.response.json",
         "bytes": 61340,
-        "sha256": "f817017033edd56ccee259fc32c9fc9fc9db77701c65cb5406398a0ad60ce702",
+        "sha256": "5fc8830680f1a263d921fda2b37c9da871d26798aa205b114c44eae0bf286a55",
         "status": 400
       },
       "family": "original_footprints",
@@ -16887,7 +16887,7 @@
         "filename": "native-diagnostics_trace_extensive-import-shape-log.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-import-shape-log.response.json",
         "bytes": 63156,
-        "sha256": "13e51597e4e64103ab1deddedde12ec4dc5354cb69935468aad0fbe85c94157b",
+        "sha256": "4e1cf4a7764ff7b3c36ffd3ed4426775bb5922e0356dd8c48409eda91780937c",
         "status": 200
       },
       "family": "original_footprints",
@@ -17076,7 +17076,7 @@
         "filename": "native-diagnostics_trace_extensive-import-shape-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-import-shape-stream.response.json",
         "bytes": 63162,
-        "sha256": "1a744b58b18b9093a08255e19679134a44dac4e491b0e02490027717bc1acb96",
+        "sha256": "db3e4d3be0b1008460d2d790f06d757eb6792e03fcf943892016eb3682f7d8dd",
         "status": 200
       },
       "family": "original_footprints",
@@ -17265,7 +17265,7 @@
         "filename": "native-diagnostics_trace_extensive-import-shape-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-import-shape-dataframe.response.json",
         "bytes": 63168,
-        "sha256": "4d74151ab38957629150447c12b8f1e5b5fcf8aaf9aae08adec63956b72eea2f",
+        "sha256": "3599395c6e173650f33c09e127f47dd7f39c15df50c8614df6f42340adad36c6",
         "status": 200
       },
       "family": "original_footprints",
@@ -17454,7 +17454,7 @@
         "filename": "native-diagnostics_trace_extensive-import-shape-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-diagnostics_trace_extensive-import-shape-lazyframe.response.json",
         "bytes": 63168,
-        "sha256": "b89cf5903fe2d72a4a69da7873dd3db79f2378220c0a7c0090db5f083d43be72",
+        "sha256": "5bb121990218ccf998d03c5f01841a4eb3b5ff1f283096b041db3d312f7e7396",
         "status": 200
       },
       "family": "original_footprints",
@@ -17676,7 +17676,7 @@
         "filename": "native-discovery-entire_event_log-from-log.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-entire_event_log-from-log.response.json",
         "bytes": 64588,
-        "sha256": "45be1eb4107f7c6f36cccb4980fa4f8363c0f44e96019d10c3b964371379eed0",
+        "sha256": "661f73ad2c7135b2445ee1e10e7a413ee6206529b3a90e3fbfddd7cce359a3ad",
         "status": 200
       },
       "family": "original_footprints",
@@ -17912,7 +17912,7 @@
         "filename": "native-discovery-entire_event_log-from-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-entire_event_log-from-stream.response.json",
         "bytes": 64594,
-        "sha256": "c970c3466b4ee780c19e40aed5754f29a7d9c8637673c571e8fb5b55873b3485",
+        "sha256": "d22c8695e85fa9e6462bdf5354ec80a6d71319bd92adbfa090990326d50d3c21",
         "status": 200
       },
       "family": "original_footprints",
@@ -18148,7 +18148,7 @@
         "filename": "native-discovery-entire_event_log-from-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-entire_event_log-from-dataframe.response.json",
         "bytes": 64600,
-        "sha256": "783629259c39cfa729059bf6c1e91a02c667447f131a85005ca6a474f3af6b2f",
+        "sha256": "735fa4be8c2d1f44e211328e38794c535d12fa4d79068af6abba8be851e6ae3c",
         "status": 200
       },
       "family": "original_footprints",
@@ -18384,7 +18384,7 @@
         "filename": "native-discovery-entire_event_log-from-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-entire_event_log-from-lazyframe.response.json",
         "bytes": 64600,
-        "sha256": "5625e0ff588d5baa23b092b0196b8d169114c1802e90dae8d2095bf1a63e5416",
+        "sha256": "61d23cbf941228d55e8365e91108097985f952a486f42610f6991924ee75cbeb",
         "status": 200
       },
       "family": "original_footprints",
@@ -18642,7 +18642,7 @@
         "filename": "native-discovery-trace_by_trace-from-log.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-trace_by_trace-from-log.response.json",
         "bytes": 66305,
-        "sha256": "47a713963705cb19581585eb496a7dc93f67dc11310085c0ac33cf668356970e",
+        "sha256": "e67292f47cb8ee19f20a9dbdab05e4c4542aade06d0d9db3aa2a2f20325d115d",
         "status": 200
       },
       "family": "original_footprints",
@@ -18900,7 +18900,7 @@
         "filename": "native-discovery-trace_by_trace-from-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-trace_by_trace-from-stream.response.json",
         "bytes": 66311,
-        "sha256": "263d0f5b59086b72bb859a95ca062027867ecce7285c68cc6985ccd99dc2f485",
+        "sha256": "6b7859c3c9a359a4ff113767c14fd8a968ff43d78ab7c0cb865fd348927a8777",
         "status": 200
       },
       "family": "original_footprints",
@@ -19158,7 +19158,7 @@
         "filename": "native-discovery-trace_by_trace-from-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-trace_by_trace-from-dataframe.response.json",
         "bytes": 66317,
-        "sha256": "084b82c357e96363ba8a5f1280af60f39ece0b7dc3e794d44935357ac9871b26",
+        "sha256": "e79b8c51e3de640c4b28e3063eb7325ce41b636f5c38b927577587a0f9932f8d",
         "status": 200
       },
       "family": "original_footprints",
@@ -19416,7 +19416,7 @@
         "filename": "native-discovery-trace_by_trace-from-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-trace_by_trace-from-lazyframe.response.json",
         "bytes": 66317,
-        "sha256": "ae11f249e139b21e6585255f01dc74f6107b0863f7984ca7cfedb9ca23686017",
+        "sha256": "c2b7bc2614cb082aa8c6bf5c24c3fd79bf1cdb1a68c2f0d5edb9c9ca7fd5b0f2",
         "status": 200
       },
       "family": "original_footprints",
@@ -19652,7 +19652,7 @@
         "filename": "native-discovery-entire_dataframe-from-log.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-entire_dataframe-from-log.response.json",
         "bytes": 59154,
-        "sha256": "de4220e0cff2cbe95b0638fe6ada823629d91578d482ff5b1570865077416aec",
+        "sha256": "88d8316bd861dbeb850e9827becbde65fe39990b9232ce05ff164aa1375a3b07",
         "status": 200
       },
       "family": "original_footprints",
@@ -19888,7 +19888,7 @@
         "filename": "native-discovery-entire_dataframe-from-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-entire_dataframe-from-stream.response.json",
         "bytes": 59160,
-        "sha256": "7f6d0f4e3ff58800f85420ad2f9597a9bb7e752de53414a14d97ed4f02be7d45",
+        "sha256": "9b17af76fde97bd95ac263cc13eeadd06422de57da493454f6d5e4ae31b2146c",
         "status": 200
       },
       "family": "original_footprints",
@@ -20124,7 +20124,7 @@
         "filename": "native-discovery-entire_dataframe-from-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-entire_dataframe-from-dataframe.response.json",
         "bytes": 59166,
-        "sha256": "407dde88996c8d9361bb3dd27749f886d1a968d5956d9d9d794129832f9c4b7e",
+        "sha256": "df3446e61e1b2c85459741d9f76574654565f83fba4bb4cf8e0b3bef1d0532ec",
         "status": 200
       },
       "family": "original_footprints",
@@ -20360,7 +20360,7 @@
         "filename": "native-discovery-entire_dataframe-from-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-entire_dataframe-from-lazyframe.response.json",
         "bytes": 59166,
-        "sha256": "77aa1abf4b4f7e9230d58c4e349898a8d646afeca39f96a841db76920d9c6d0f",
+        "sha256": "af8102a16ba7de02f6db1f6038af92e743762c00430673008b29cf8bd8d2536c",
         "status": 200
       },
       "family": "original_footprints",
@@ -20596,7 +20596,7 @@
         "filename": "native-discovery-polars_lazyframes-from-log.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-polars_lazyframes-from-log.response.json",
         "bytes": 59157,
-        "sha256": "b7e2509a389e61e9cf91bbad9f5beee821a382c1fb197cafcad3ce7f56d22eab",
+        "sha256": "6e1c67b5e1ace8db668de02c6c8dc915f2fe003246f3aec8639962c0a2eb0e7c",
         "status": 200
       },
       "family": "original_footprints",
@@ -20832,7 +20832,7 @@
         "filename": "native-discovery-polars_lazyframes-from-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-polars_lazyframes-from-stream.response.json",
         "bytes": 59163,
-        "sha256": "654b8d89b19cb3b7c7248f91c4fcb99293ea82b494de8f75c5a733c443f0df87",
+        "sha256": "fb8d7c350e21049dce07f2671ffd25eb22d0fe7a115f6f933fcbafec4227f10e",
         "status": 200
       },
       "family": "original_footprints",
@@ -21068,7 +21068,7 @@
         "filename": "native-discovery-polars_lazyframes-from-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-polars_lazyframes-from-dataframe.response.json",
         "bytes": 59169,
-        "sha256": "c350011dfa4f22ccd48ee76bf8ab703b43fd71d676d7dceafd16435064aed896",
+        "sha256": "e06333c16949339bc11e7ea2a9629e1c3c5e37ad08a68c8cae13165fa3e61a11",
         "status": 200
       },
       "family": "original_footprints",
@@ -21304,7 +21304,7 @@
         "filename": "native-discovery-polars_lazyframes-from-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-polars_lazyframes-from-lazyframe.response.json",
         "bytes": 59169,
-        "sha256": "0a16aea9294a54bd4a17a29cedb69553e22febaf6e8aac6d8078161b50d2af46",
+        "sha256": "0752a3170fc2b6608d4aed4f91a1fd743c4aaf212ffc29d1efbc9fa5af6e8ab4",
         "status": 200
       },
       "family": "original_footprints",
@@ -21540,7 +21540,7 @@
         "filename": "native-source-default-scalar-adapter.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-source-default-scalar-adapter.response.json",
         "bytes": 64372,
-        "sha256": "c85de0bd897c287433cd274c50930e2a8d8ee90e63d070d3c1a36f4f9c98afb5",
+        "sha256": "cdd1850efed4db585e2d2eddf13ba1ee65f6a7c7e08083766845f8d407c15209",
         "status": 200
       },
       "family": "original_footprints",
@@ -21786,7 +21786,7 @@
         "filename": "native-source-default-vector-adapter.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-source-default-vector-adapter.response.json",
         "bytes": 65411,
-        "sha256": "a16ad0c4971f411044786ec536a1ffc6d8e1bb955210993d7f572c8c3444f6ab",
+        "sha256": "3613cca37e4bdfe2dabc3fbb51365c63c35afb1b71c364046afb4ab80ecc34a8",
         "status": 200
       },
       "family": "original_footprints",
@@ -22027,7 +22027,7 @@
         "filename": "native-independent-aux-diagnostics-log_model_traces.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-independent-aux-diagnostics-log_model_traces.response.json",
         "bytes": 65593,
-        "sha256": "a0c56d37ea5ec7e66d5212b40c13de4498349c8ff6b089454d097b3f7f2c77ba",
+        "sha256": "d031996ed31ec2f48db743d56f4f760db463e661592ff07e60b891f7a02c27eb",
         "status": 200
       },
       "family": "original_footprints",
@@ -22273,7 +22273,7 @@
         "filename": "native-primary-survives-aux-diagnostic-selector-log_model_traces.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-primary-survives-aux-diagnostic-selector-log_model_traces.response.json",
         "bytes": 65730,
-        "sha256": "e7ee0b0128db9cb299cb8df13c42bb83212a4f3f468806829359376590cc2d46",
+        "sha256": "816720ea381faaf90fd53ad4c9706ff1378b21c7d824aafe7d740095fae89571",
         "status": 200
       },
       "family": "original_footprints",
@@ -22523,7 +22523,7 @@
         "filename": "native-primary-survives-aux-diagnostic-cardinality-log_model_traces.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-primary-survives-aux-diagnostic-cardinality-log_model_traces.response.json",
         "bytes": 64506,
-        "sha256": "42bac57d9108c195b9a0926e55f73941923cb3f90a1aaa21da7ed3524f4cc300",
+        "sha256": "8891c9e2bb88977dbfa53bb1ef8dda9cc04569483e461e3165769eb27d329a04",
         "status": 200
       },
       "family": "original_footprints",
@@ -22784,7 +22784,7 @@
         "filename": "native-independent-aux-diagnostics-trace_extensive.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-independent-aux-diagnostics-trace_extensive.response.json",
         "bytes": 66760,
-        "sha256": "c40897fea9a8f625177112806bc19cede58e550ec848ab83c251a89b27fb9e2e",
+        "sha256": "b2f8fdd34c4649452a1153d9ddfbf7fd5f6bc50da213f5db5a591c9a64c36a1c",
         "status": 200
       },
       "family": "original_footprints",
@@ -23041,7 +23041,7 @@
         "filename": "native-primary-survives-aux-diagnostic-selector-trace_extensive.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-primary-survives-aux-diagnostic-selector-trace_extensive.response.json",
         "bytes": 66636,
-        "sha256": "c89e2a24da303b3c25e9af6cb751c4c5d08aeee2eaec11e07628065a817263cb",
+        "sha256": "d9a2daab4215e334a2bf86a5e6767de310c7f97eddf14996874f268069856ba5",
         "status": 200
       },
       "family": "original_footprints",
@@ -23302,7 +23302,7 @@
         "filename": "native-primary-survives-aux-diagnostic-cardinality-trace_extensive.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-primary-survives-aux-diagnostic-cardinality-trace_extensive.response.json",
         "bytes": 65112,
-        "sha256": "9f2fb01ebeea45ada4fc20cae9b4ea82ce813b45d721c6e994966b494f0c248f",
+        "sha256": "ea443097d631c71ca5767b3be672be15798c448259768325b898d83d2f7fcd4c",
         "status": 200
       },
       "family": "original_footprints",
@@ -24063,7 +24063,7 @@
         "filename": "native-source-primary-with-both-auxiliaries.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-source-primary-with-both-auxiliaries.response.json",
         "bytes": 68078,
-        "sha256": "5a31e31079cb45bc92abf8929ec3a723a9d052a7c7f47b9d378645630d6214bf",
+        "sha256": "23e06ec29a6b5ccc2264dce123b1706dacca6801b8ef46d43cf12be37c9a5da9",
         "status": 200
       },
       "family": "original_footprints",
@@ -24328,7 +24328,7 @@
         "filename": "native-discovery-explicit-default-activity_attribute.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-explicit-default-activity_attribute.response.json",
         "bytes": 64648,
-        "sha256": "c5c1f0c2b8e8eb9a790f467599396d48f6ac9b12beaf35d746a77a45e52f04ce",
+        "sha256": "82f46fc6d7fa232a61b8143970b493d2110d91063edc76a0c71a276ee9226206",
         "status": 200
       },
       "family": "original_footprints",
@@ -24563,7 +24563,7 @@
         "filename": "native-discovery-explicit-default-case_id_attribute.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-explicit-default-case_id_attribute.response.json",
         "bytes": 64651,
-        "sha256": "ce3cc213b03e44eab2ff9985ae0b9941ee156946c317c7b3f2be57f4bbdae92d",
+        "sha256": "92f09c071222056157096d882fc77a4c3068d6b5342a1d5902eb766242a88171",
         "status": 200
       },
       "family": "original_footprints",
@@ -24798,7 +24798,7 @@
         "filename": "native-discovery-explicit-default-timestamp_attribute.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-explicit-default-timestamp_attribute.response.json",
         "bytes": 64652,
-        "sha256": "7d6c0921910c9a864cf4b9d83a7ddb8c3158fc1c543dcbb5136b1405b67ac364",
+        "sha256": "68a45f21953fb3e3b82f70d31182d6fd27a4624b1875e5a9b1aaf99bbc3b34a7",
         "status": 200
       },
       "family": "original_footprints",
@@ -25033,7 +25033,7 @@
         "filename": "native-discovery-explicit-default-start_timestamp_attribute.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-explicit-default-start_timestamp_attribute.response.json",
         "bytes": 64650,
-        "sha256": "78189a01ea8d802270a1c05bdcd705f9852df31d2e071815b71f3c905875d733",
+        "sha256": "6a604bc8621f1f217ab777f81f861bf9a7edc19302dd87537c079a63e9758f0c",
         "status": 200
       },
       "family": "original_footprints",
@@ -25268,7 +25268,7 @@
         "filename": "native-discovery-explicit-default-index_attribute.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-explicit-default-index_attribute.response.json",
         "bytes": 64637,
-        "sha256": "fd9917367c01af4bd555e7b2ded300b2a95fed5a77def065b4476dd5b953db54",
+        "sha256": "d94c7fd5b46d818b16d98b60bae6faab763136ff5b52e2a6b174f18e16573a24",
         "status": 200
       },
       "family": "original_footprints",
@@ -25503,7 +25503,7 @@
         "filename": "native-discovery-explicit-default-sort_required.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-explicit-default-sort_required.response.json",
         "bytes": 64626,
-        "sha256": "017871be9fc90965898186f7cc7cf6e16fb391260de4acaf600ad6b29029e684",
+        "sha256": "81953802799185ad86691e7ca20bd01dd099de9a77bd0bec16cac633e83c5884",
         "status": 200
       },
       "family": "original_footprints",
@@ -25738,7 +25738,7 @@
         "filename": "native-discovery-explicit-default-initial_marking.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-explicit-default-initial_marking.response.json",
         "bytes": 64630,
-        "sha256": "5095d38c6d6aef3eaa84908eb912437edd85088c4925006e81c58693846479fd",
+        "sha256": "2f2e6e5db96b212e509508737d3b03cb8a75f0c132c0ccd2126839df564385df",
         "status": 200
       },
       "family": "original_footprints",
@@ -25973,7 +25973,7 @@
         "filename": "native-discovery-unused-exact-marking.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-unused-exact-marking.response.json",
         "bytes": 64741,
-        "sha256": "2180d4021a08e3e339040ca4412a7ec349218fbaa92a3c2723c8cc8f221cce6f",
+        "sha256": "5ce5ff9bf77d7c66921ff9602a84a283a69fec71526f31456c6a16f9fa856e79",
         "status": 200
       },
       "family": "original_footprints",
@@ -26208,7 +26208,7 @@
         "filename": "native-discovery-engaged-start-timestamp.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-engaged-start-timestamp.response.json",
         "bytes": 59299,
-        "sha256": "b629d272e29cf81a7be36d18f15c72f4bc52dc2f6d67c22211485dc90ea3e5ad",
+        "sha256": "744494fdf7f75725269d1223b80c500156290e25954084cf0bbecba88ec1b759",
         "status": 200
       },
       "family": "original_footprints",
@@ -26443,7 +26443,7 @@
         "filename": "native-discovery-engaged-empty-start-rejects.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-engaged-empty-start-rejects.response.json",
         "bytes": 63453,
-        "sha256": "c805db8ee691bc036fa061bb83d89aeeb3fadfc5a82ee437e411f0d168ec5785",
+        "sha256": "8f0da24972b7f2d3f8757a9121ea0fad9e81ca82c2ea19ee7c76f723247bae6f",
         "status": 400
       },
       "family": "original_footprints",
@@ -26665,7 +26665,7 @@
         "filename": "native-discovery-invalid-literal-activity_attribute.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-invalid-literal-activity_attribute.response.json",
         "bytes": 63405,
-        "sha256": "f32e186a1b53c23e1b7ecfcf446d080b291e431b534f15661ed1ec1faab9ff36",
+        "sha256": "ef1183b9f0bc069049069c10e3222d32371130a99fa2cc2861ca19236cecea72",
         "status": 400
       },
       "family": "original_footprints",
@@ -26888,7 +26888,7 @@
         "filename": "native-discovery-invalid-literal-case_id_attribute.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-invalid-literal-case_id_attribute.response.json",
         "bytes": 63385,
-        "sha256": "5a55f65528f6e141ee32e05fafac25ca08cf8e98c93363a673e534dfbfb2a22d",
+        "sha256": "17bd84dea700cde583ad0a99f796db150526ca3f77f5ec885bd5a6f745a0f270",
         "status": 400
       },
       "family": "original_footprints",
@@ -27111,7 +27111,7 @@
         "filename": "native-discovery-invalid-literal-timestamp_attribute.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-invalid-literal-timestamp_attribute.response.json",
         "bytes": 63405,
-        "sha256": "9d07b0d7b9afd581335863f3cda0efce075c385be8ed598df36d6b482cc6aee8",
+        "sha256": "3ffe11f80119235483cd33fb485104bcf8aef2cf18c0ca42c49e2cc5611e1871",
         "status": 400
       },
       "family": "original_footprints",
@@ -27294,14 +27294,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "155955",
+        "Content-Length": "156011",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-full-typed-source-diagnostics.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-full-typed-source-diagnostics.response.json",
-        "bytes": 155955,
-        "sha256": "29c01280331d822f9a636643abfafbfabe519488dbe1ad3aed43c76cfea28dcd",
+        "bytes": 156011,
+        "sha256": "a267c4c6ac13c34d58ff62e4d40b920162619968f710a1677484e637df7f0989",
         "status": 200
       },
       "family": "original_footprints",
@@ -27371,7 +27371,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -27512,14 +27512,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "142048",
+        "Content-Length": "142104",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-full-typed-source-entire_dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-full-typed-source-entire_dataframe.response.json",
-        "bytes": 142048,
-        "sha256": "ea90fe49e705acef44ea8a9a34c7981220a5a1bacc82108ac8652dbdb24b0f5a",
+        "bytes": 142104,
+        "sha256": "628e0bf0a8b13bb35e5b18f4127ecd3f049cc8bfd1f02f2f4f6fcb7640e02b77",
         "status": 200
       },
       "family": "original_footprints",
@@ -27604,7 +27604,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -27745,14 +27745,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "142051",
+        "Content-Length": "142107",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-full-typed-source-polars_lazyframes.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-full-typed-source-polars_lazyframes.response.json",
-        "bytes": 142051,
-        "sha256": "6fe984d4d6a85debc6e4078806599ac35f12fe9f844bb7171a2ad00b3ddc884d",
+        "bytes": 142107,
+        "sha256": "4d1ae3d4afc90d5ae9bc98afd599096654a8d6bde0968e772a3c56958ae2a77e",
         "status": 200
       },
       "family": "original_footprints",
@@ -27837,7 +27837,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -27978,14 +27978,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "143168",
+        "Content-Length": "143224",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-discovery-selectors-independent-from-source.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-selectors-independent-from-source.response.json",
-        "bytes": 143168,
-        "sha256": "344c2d8abb6bc6cc35414bf0bad1bcc27e03dd5d78665f81d3ac2a55f6f00fe6",
+        "bytes": 143224,
+        "sha256": "33a0499666533b8330b6d3de59d21f0f942e79e958b6c4aac6eee9a6760bf498",
         "status": 200
       },
       "family": "original_footprints",
@@ -28069,7 +28069,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -28184,7 +28184,7 @@
         "filename": "native-original-gzip-source.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-original-gzip-source.response.json",
         "bytes": 60894,
-        "sha256": "112f1f33e298a1f7723e0715c0144077dc892c7ab773414e0aeb2ff8bba013e4",
+        "sha256": "0da0bf24939aa66029ad4461f4b9b127f5e941df2698be16fecbcab246ad9ad4",
         "status": 200
       },
       "family": "original_footprints",
@@ -28383,7 +28383,7 @@
         "filename": "native-original-xes-reader-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-original-xes-reader-iterparse.response.json",
         "bytes": 61755,
-        "sha256": "aeeea5dc55945c4a3bbe267f5ff3f666aa1a67bb30e4d3196dacee0d86794dea",
+        "sha256": "ef149cd77d852dc92a74df96dcac16936e73e6206a4fc723b9c1b322ecdc3c10",
         "status": 200
       },
       "family": "original_footprints",
@@ -28580,7 +28580,7 @@
         "filename": "native-original-xes-reader-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-original-xes-reader-line_by_line.response.json",
         "bytes": 60061,
-        "sha256": "21e6409f92ed87b6761f615a306a3a508e3cd23adfed60c5614f2701c22ded0b",
+        "sha256": "6fb7a2c6d843e6f13f0e5e245f260ad4be08b79376e7f8d948466d7a1477ced2",
         "status": 200
       },
       "family": "original_footprints",
@@ -28777,7 +28777,7 @@
         "filename": "native-original-xes-reader-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-original-xes-reader-chunk_regex.response.json",
         "bytes": 61758,
-        "sha256": "d0cef572b026f6d91b63c12bcc4ee69173433d3c6368c1d90ccffd9a86352682",
+        "sha256": "2e76147b82546b0393ab934b160d6cfe7b6f8034e67a923416b6c85e3dadeb02",
         "status": 200
       },
       "family": "original_footprints",
@@ -28974,7 +28974,7 @@
         "filename": "native-original-xes-reader-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-original-xes-reader-iterparse_20.response.json",
         "bytes": 61759,
-        "sha256": "640ce0e4916b7e71fb13a8ed9ed7915c33e32c0f27ce17a249ec7267465d944f",
+        "sha256": "ac1eb20e687a263697420fa9160f2e984aa77a86321445e42af3f05a810ce94e",
         "status": 200
       },
       "family": "original_footprints",
@@ -29171,7 +29171,7 @@
         "filename": "native-original-xes-reader-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-original-xes-reader-iterparse_mem_compressed.response.json",
         "bytes": 61771,
-        "sha256": "1d24c1089a0631b2fb7140b6eed0234a6fffcee4e5b58b264deea8c0953ab54c",
+        "sha256": "c31591e0f58813d03fa66332f2c9e1708940eb035129388e45dcd39ae0282f26",
         "status": 200
       },
       "family": "original_footprints",
@@ -29368,7 +29368,7 @@
         "filename": "native-original-xes-reader-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-original-xes-reader-rustxes.response.json",
         "bytes": 63528,
-        "sha256": "06d6fb931f21e07e1c89296d50bf3bc81e5b746d554e4f758644a80bd8d176b5",
+        "sha256": "d061d3a3a734cdcdbd8c2b55adbcdd73985fb1414b2db65aad3e5602dd3f5644",
         "status": 200
       },
       "family": "original_footprints",
@@ -29675,7 +29675,7 @@
         "filename": "native-original-xes-import-all-controls.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-original-xes-import-all-controls.response.json",
         "bytes": 62129,
-        "sha256": "401df14fb5ab36f134a05271d397b8ec8f05ce3faaf7cf5aeaa3c081b0c08d8d",
+        "sha256": "e2ff3dd0c37849aafe06a2cb151c9d8574ed5d9e2dbcf37f22e3ce259bb92347",
         "status": 200
       },
       "family": "original_footprints",
@@ -30259,14 +30259,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "27031",
+        "Content-Length": "27063",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-raw-event-log-null-first-class-error.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-raw-event-log-null-first-class-error.response.json",
-        "bytes": 27031,
-        "sha256": "afad4845f154eeececd9eb6d74af0f582797767972fb8350bf772f65f67e327c",
+        "bytes": 27063,
+        "sha256": "189f2598722b50a87a817ce3adc8b0f26625723c17baa6b4eb6c58a9e576acec",
         "status": 400
       },
       "family": "original_footprints",
@@ -30324,7 +30324,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible integer native value",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -30399,14 +30399,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "27630",
+        "Content-Length": "27662",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-raw-event-log-all-storage-success.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-raw-event-log-all-storage-success.response.json",
-        "bytes": 27630,
-        "sha256": "8e502df9575464c2c5e5a1099f2807382ce2edea6ede36db565d5191cbb0bd31",
+        "bytes": 27662,
+        "sha256": "8055c7e11e9e2e4388a0fab0debf198210b7e766e68731c21b420a201d6de2ae",
         "status": 200
       },
       "family": "original_footprints",
@@ -30462,7 +30462,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible integer native value",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -30969,14 +30969,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7785",
+        "Content-Length": "7426",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-raw-custom-selector-first-match.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-raw-custom-selector-first-match.response.json",
-        "bytes": 7785,
-        "sha256": "c5341cca61e0be637d6b72dde437137a1c21ae555370925b1c206f71b6e3339e",
+        "bytes": 7426,
+        "sha256": "b70c79da1f7ec97c84ef64e491e50e90a381b62c1eab31429d616d82d248fa6a",
         "status": 200
       },
       "family": "original_footprints",
@@ -30994,13 +30994,6 @@
           "bytes": 59,
           "sha256": "a670db396bdc20319664696baefeb0af7690914302be8d9a6ce3fa8214e796b7",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-raw-custom-selector-first-match.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-raw-custom-selector-first-match.source_xes.xes",
-          "bytes": 486,
-          "sha256": "a6e7d1b015cdad0d79df774d5f51e64fb97487074328d7c185b4b2fcf1024b11",
-          "format": "xes"
         },
         "result_json": {
           "filename": "native-raw-custom-selector-first-match.result_json.json",
@@ -31039,8 +31032,12 @@
           "name": "to_xes(source_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -38921,7 +38918,7 @@
         "filename": "native-intentional-omitted-controls-native-operation-diagnostics_trace_extensive.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-intentional-omitted-controls-native-operation-diagnostics_trace_extensive.response.json",
         "bytes": 62187,
-        "sha256": "f5ab408c816f9a8d89eb4542f4468a042c5efd352eabbb9f4bfae2289bd4ba22",
+        "sha256": "09b791ba73f9573876278c37f21712c5d699854ff1c3e89fc82ecae60164140b",
         "status": 200
       },
       "family": "original_footprints",
@@ -39195,7 +39192,7 @@
         "filename": "native-intentional-omitted-controls-native-source-default-scalar-adapter.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-intentional-omitted-controls-native-source-default-scalar-adapter.response.json",
         "bytes": 63004,
-        "sha256": "f8efbe2a3aebb93d3dacd6b5d463f43921a8b55233ed2405923747a020d1853c",
+        "sha256": "f3e48f110d73a589fe0680e7c36b624e3a8d8fc1d87ff34a5636c7f0acc1a99b",
         "status": 200
       },
       "family": "original_footprints",
@@ -39355,7 +39352,7 @@
         "filename": "native-intentional-omitted-controls-native-source-default-vector-adapter.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-intentional-omitted-controls-native-source-default-vector-adapter.response.json",
         "bytes": 63850,
-        "sha256": "41d97a792cfabb16aa058a41b1d4c7cf117422c231704bc1500a08041e45630d",
+        "sha256": "7e73463653a91263c2f663536f736559471a73186106a9b84fdf5d09f2acb861",
         "status": 200
       },
       "family": "original_footprints",
@@ -40391,7 +40388,7 @@
         "bytes": 2037,
         "sha256": "8ff246f7163b1de14e5cb0b7b1fdb7626247d1f7bdfa22cea1cf97fba3f5884e"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "conformance_file": {
           "filename": "owned-original-violations-vector.json",
@@ -40409,15 +40406,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "63339",
+        "Content-Length": "6047",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-imported-source-paired-wtf8-comment.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-imported-source-paired-wtf8-comment.response.json",
-        "bytes": 63339,
-        "sha256": "42dc6d96f2653e90b43559b741da33f72d079c50a314980e4704b540b2f800f2",
-        "status": 200
+        "bytes": 6047,
+        "sha256": "1e1a56728a346d49e278b47feb89be4251c4f6cbe125dafea8497ae285782794",
+        "status": 400
       },
       "family": "original_footprints",
       "operation": "diagnostics_log_model",
@@ -40447,20 +40444,6 @@
           "bytes": 59,
           "sha256": "a670db396bdc20319664696baefeb0af7690914302be8d9a6ce3fa8214e796b7",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-imported-source-paired-wtf8-comment.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-imported-source-paired-wtf8-comment.source_xes.xes",
-          "bytes": 920,
-          "sha256": "8417583dea268f1dfe21310c159d6ff62e48331493ebb8fa399c629ce4a31797",
-          "format": "xes"
-        },
-        "result_json": {
-          "filename": "native-imported-source-paired-wtf8-comment.result_json.json",
-          "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-imported-source-paired-wtf8-comment.result_json.json",
-          "bytes": 110,
-          "sha256": "992ef1afef7a80d60a6f36d8bee96e65a2d463b2efc3825525410e8c49600b01",
-          "format": "json"
         }
       },
       "model": null,
@@ -40478,36 +40461,23 @@
         "sha256": "c06297cd368d07a6e03e93b71bd40fc9ff5cb2b0792f0bce78af38d8de1ad720"
       },
       "tree": null,
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "preparation_error",
+        "message": "XML is not well-formed: invalid UTF-8 byte sequence (the XES reader requires UTF-8) (line 2, column 28)",
+        "exception_type": "runtime_error"
+      },
       "native_calls": [
         {
           "name": "prepare_active_event_source(request, bytes, dataset, imports)",
           "stage": "preparation",
           "input_kind": "original_source_file",
-          "returned": true,
-          "error": null
-        },
-        {
-          "name": "ActiveEventSource::checked_log()",
-          "stage": "preparation",
-          "input_kind": "ActiveEventSource",
-          "returned": true,
-          "error": null
-        },
-        {
-          "name": "LogModelVariant::diagnostics(log, supplied_violations, case_id_key)",
-          "stage": "primary",
-          "input_kind": "EventLog",
-          "returned": true,
-          "error": null
-        },
-        {
-          "name": "to_xes(source_log)",
-          "stage": "export",
-          "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XML is not well-formed: invalid UTF-8 byte sequence (the XES reader requires UTF-8) (line 2, column 28)",
+            "exception_type": "runtime_error"
+          }
         }
       ]
     },

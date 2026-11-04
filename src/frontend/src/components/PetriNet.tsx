@@ -184,6 +184,11 @@ export function PetriNet({ layout, title, actions, decoration, annotations,
                 {annotations?.variableTransitions?.has(arc.transition) && <title>{annotations.variableTransitionDescription??'Variable object count'}</title>}
               </path>
             ))}
+            {layout.arcs.filter((arc) => arc.weight !== null).map((arc) => (
+              <text key={`${arc.key}-weight`} className="petri-arc-weight" x={arc.labelX} y={arc.labelY} textAnchor="middle">
+                {arc.weight}
+              </text>
+            ))}
           </g>
           <g>
             {layout.places.map((place) => {

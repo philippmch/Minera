@@ -1,4 +1,5 @@
 #include "minera/evaluation.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/pnml.hpp"
 #include "cyclomatic_unicode.hpp"
@@ -1440,6 +1441,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
   alignment_options.activity_attribute = activity_attribute;
   alignment_options.initial_marking = options.initial_marking;
   alignment_options.final_marking = options.final_marking;
+  alignment_options.cancelled = options.cancelled;
   if (options.max_states == 0) {
     out.computed = false;
     out.exhausted = true;
@@ -1497,6 +1499,7 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
     double escaping_total = 0.0;
     for (const auto& [prefix, info] : prefixes) {
       if (info.frequency == 0) continue;
+      throw_if_cancelled(options.cancelled, "precision evaluation was cancelled");
       std::vector<Marking> markings;
       if (prefix.empty()) {
         markings.push_back(initial_marking);

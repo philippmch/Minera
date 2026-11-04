@@ -980,14 +980,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "72049",
+        "Content-Length": "72081",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-filter-zero-discards-all-context.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-filter-zero-discards-all-context.response.json",
-        "bytes": 72049,
-        "sha256": "1a04af90dcbef0998faf8293e7e03263c98f95348515fcd2f68fd9706a1d793b",
+        "bytes": 72081,
+        "sha256": "fffe1be47933a4a8cb61ccf03bf2b7cb6ace93e941732d4afc8f1a80fa89ef84",
         "status": 200
       },
       "family": "original_embedding",
@@ -1064,7 +1064,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible integer native value",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -1168,14 +1168,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "124013",
+        "Content-Length": "124077",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-filter-positive-preserves-all-ten-metadata-fields.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-filter-positive-preserves-all-ten-metadata-fields.response.json",
-        "bytes": 124013,
-        "sha256": "0e6738f44c15a4017d3600b154cd75243d3bd0901a0484e5dd10bf67329afac7",
+        "bytes": 124077,
+        "sha256": "5434b2271d3d2cdae4df706155c70839a05f29d05e981a0ab18fc26c91d418f7",
         "status": 200
       },
       "family": "original_embedding",
@@ -1246,7 +1246,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible integer native value",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -1257,7 +1257,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible integer native value",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -3987,14 +3987,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14963",
+        "Content-Length": "14121",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-selected-field-20.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-20.response.json",
-        "bytes": 14963,
-        "sha256": "c43bb03dc1e16417770ae0fa9245a10a34039b82d3f2e7bbd66b2dbb548be674",
+        "bytes": 14121,
+        "sha256": "da3f7485117d6e9a8769633f1a397c8875d4cb8304a37fd1dd469ec36a1d2e24",
         "status": 200
       },
       "family": "original_embedding",
@@ -4018,13 +4018,6 @@
           "bytes": 1244,
           "sha256": "4f760717ade8460951cbfc2ac254276cd0e81ec1ced82882d4bf99197b77cedb",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-selected-field-20.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-20.source_xes.xes",
-          "bytes": 492,
-          "sha256": "717799d4c04d4fb69b213f50239f8e88487ad167e06a2d8ea407fc4d1e614c7c",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-selected-field-20.prepared_embeddings_json.json",
@@ -4071,8 +4064,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -4157,14 +4154,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "15007",
+        "Content-Length": "14165",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-selected-field-21.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-21.response.json",
-        "bytes": 15007,
-        "sha256": "7608aa5e0e4edd16b83f7e24a74f5ef54861100e93e2c99abdc5c8f7689dc618",
+        "bytes": 14165,
+        "sha256": "426491e0af6d3de94594e0bfb2bf8c2858b1c79a9bbfafc6d2f6abc208c46089",
         "status": 200
       },
       "family": "original_embedding",
@@ -4188,13 +4185,6 @@
           "bytes": 1244,
           "sha256": "4f760717ade8460951cbfc2ac254276cd0e81ec1ced82882d4bf99197b77cedb",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-selected-field-21.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-21.source_xes.xes",
-          "bytes": 492,
-          "sha256": "717799d4c04d4fb69b213f50239f8e88487ad167e06a2d8ea407fc4d1e614c7c",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-selected-field-21.prepared_embeddings_json.json",
@@ -4241,8 +4231,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -4327,14 +4321,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14966",
+        "Content-Length": "14124",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-selected-field-22.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-22.response.json",
-        "bytes": 14966,
-        "sha256": "a77c85112d1a4035f51a7947e2d68d05bbf396eb393e98e788ca8a9ea75a17c1",
+        "bytes": 14124,
+        "sha256": "b5fb22bcd69e780783842450ce436e15153cb63ae306711bc40d4be5ba2d210e",
         "status": 200
       },
       "family": "original_embedding",
@@ -4358,13 +4352,6 @@
           "bytes": 1244,
           "sha256": "4f760717ade8460951cbfc2ac254276cd0e81ec1ced82882d4bf99197b77cedb",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-selected-field-22.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-22.source_xes.xes",
-          "bytes": 492,
-          "sha256": "717799d4c04d4fb69b213f50239f8e88487ad167e06a2d8ea407fc4d1e614c7c",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-selected-field-22.prepared_embeddings_json.json",
@@ -4411,8 +4398,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -4497,14 +4488,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "15021",
+        "Content-Length": "14179",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-selected-field-23.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-23.response.json",
-        "bytes": 15021,
-        "sha256": "b3904a0fa93b0a01a363b705052f653f195251d53e23e8d8f689e46a10d69a9b",
+        "bytes": 14179,
+        "sha256": "0162baa24402ada7e5597a24a81ceb95adda30b792a2dbaee4a474fad2097fce",
         "status": 200
       },
       "family": "original_embedding",
@@ -4528,13 +4519,6 @@
           "bytes": 1244,
           "sha256": "4f760717ade8460951cbfc2ac254276cd0e81ec1ced82882d4bf99197b77cedb",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-selected-field-23.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-23.source_xes.xes",
-          "bytes": 492,
-          "sha256": "717799d4c04d4fb69b213f50239f8e88487ad167e06a2d8ea407fc4d1e614c7c",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-selected-field-23.prepared_embeddings_json.json",
@@ -4581,8 +4565,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -4667,14 +4655,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14955",
+        "Content-Length": "14113",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-selected-field-24.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-24.response.json",
-        "bytes": 14955,
-        "sha256": "18df440f184cad7fe990104375f6573d85b7564d1d0815bfa13f742d2521ef9f",
+        "bytes": 14113,
+        "sha256": "e1ad2264e915e22c04478bf10a261b9df0b6ef0db9817f496af7da93580c9782",
         "status": 200
       },
       "family": "original_embedding",
@@ -4698,13 +4686,6 @@
           "bytes": 1244,
           "sha256": "4f760717ade8460951cbfc2ac254276cd0e81ec1ced82882d4bf99197b77cedb",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-selected-field-24.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-24.source_xes.xes",
-          "bytes": 492,
-          "sha256": "717799d4c04d4fb69b213f50239f8e88487ad167e06a2d8ea407fc4d1e614c7c",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-selected-field-24.prepared_embeddings_json.json",
@@ -4751,8 +4732,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -4837,14 +4822,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14999",
+        "Content-Length": "14157",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-selected-field-25.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-25.response.json",
-        "bytes": 14999,
-        "sha256": "1f0d621862c09281b84242de23bb89e66c5be845bab511e4dfca0b1730b9637d",
+        "bytes": 14157,
+        "sha256": "8f54be2ccb1e19e2c920c29157342aee80ba1cd8fa7f1c2552de3596d94e6fce",
         "status": 200
       },
       "family": "original_embedding",
@@ -4868,13 +4853,6 @@
           "bytes": 1244,
           "sha256": "4f760717ade8460951cbfc2ac254276cd0e81ec1ced82882d4bf99197b77cedb",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-selected-field-25.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-25.source_xes.xes",
-          "bytes": 492,
-          "sha256": "717799d4c04d4fb69b213f50239f8e88487ad167e06a2d8ea407fc4d1e614c7c",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-selected-field-25.prepared_embeddings_json.json",
@@ -4921,8 +4899,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -5007,14 +4989,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "15377",
+        "Content-Length": "14535",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-selected-field-26.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-26.response.json",
-        "bytes": 15377,
-        "sha256": "786ae1d6e8bae91b46aa1b7fd53d4840240934a57e6bef4f48aba6f3022e8edc",
+        "bytes": 14535,
+        "sha256": "063d34753ae3f3e7df573520106266d4a50c58bc1f0f657170d7e258384162b6",
         "status": 200
       },
       "family": "original_embedding",
@@ -5038,13 +5020,6 @@
           "bytes": 1244,
           "sha256": "4f760717ade8460951cbfc2ac254276cd0e81ec1ced82882d4bf99197b77cedb",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-selected-field-26.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-26.source_xes.xes",
-          "bytes": 492,
-          "sha256": "717799d4c04d4fb69b213f50239f8e88487ad167e06a2d8ea407fc4d1e614c7c",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-selected-field-26.prepared_embeddings_json.json",
@@ -5091,8 +5066,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -6086,14 +6065,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "132815",
+        "Content-Length": "165575",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-xes-log.response.json",
-        "bytes": 132815,
-        "sha256": "1003c92bd26bf8da64538c97ae3fd99f5b2cb3d11bcdba905d1dbd6005283dc9",
+        "bytes": 165575,
+        "sha256": "50a6aba6e58aead7b00c068c061a73e31ddb578dcf3257aceaf790d52dc3398b",
         "status": 200
       },
       "family": "original_embedding",
@@ -6305,14 +6284,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "132827",
+        "Content-Length": "165587",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-xes-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-xes-stream.response.json",
-        "bytes": 132827,
-        "sha256": "85b51d4346cce5ed1ccf794fc28be2bffcc755614da3409cfc702bda71d66b46",
+        "bytes": 165587,
+        "sha256": "63ef2502d419b83d1c219ff42a050fbb4ec40f58c534ac8990241a2b50ce6d8b",
         "status": 200
       },
       "family": "original_embedding",
@@ -6524,14 +6503,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "132839",
+        "Content-Length": "165599",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-xes-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-xes-dataframe.response.json",
-        "bytes": 132839,
-        "sha256": "0e2a3f952a29dba37e458172f119a39a996dadeb746b7304cf26bb771b81b1f4",
+        "bytes": 165599,
+        "sha256": "5807c2aecc59fa6e0fc76c521b8d1c14e272e950f64b7dee81cb0733587520c1",
         "status": 200
       },
       "family": "original_embedding",
@@ -6743,14 +6722,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "132839",
+        "Content-Length": "165599",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-xes-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-xes-lazyframe.response.json",
-        "bytes": 132839,
-        "sha256": "a634e0be644ad5e72aa56e1ae9d0b7024e6cd84e74499d2ac064bbba8824e756",
+        "bytes": 165599,
+        "sha256": "7195894ba05872cd733194ca26761dbcbcd95dc2ec732a1967be2ccc27905b08",
         "status": 200
       },
       "family": "original_embedding",
@@ -6962,14 +6941,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "131482",
+        "Content-Length": "164242",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-gzip-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-gzip-xes-log.response.json",
-        "bytes": 131482,
-        "sha256": "3e19e33e677975dd6981522cd69e965152bd8be18c2e6485b6c1c0de176367e4",
+        "bytes": 164242,
+        "sha256": "c1c0bd1731a35bb56eb5ba5a105b00c877dc6156520a7c1671ab0fdda8a20f7a",
         "status": 200
       },
       "family": "original_embedding",
@@ -7181,14 +7160,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "131494",
+        "Content-Length": "164254",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-gzip-xes-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-gzip-xes-stream.response.json",
-        "bytes": 131494,
-        "sha256": "952bf81fac3f882a8ddf33b1997d9d7e964c4c68de0adc9019d969e6f5d2a71c",
+        "bytes": 164254,
+        "sha256": "5545c6b34ae62674f34e233a69f3dba5482e565a9f23993c57e1fa5adf327aed",
         "status": 200
       },
       "family": "original_embedding",
@@ -7400,14 +7379,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "131506",
+        "Content-Length": "164266",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-gzip-xes-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-gzip-xes-dataframe.response.json",
-        "bytes": 131506,
-        "sha256": "4f376207456cbf7c3e2e54e8ea491b8c3eb9500029c513d62c11ff7743982a39",
+        "bytes": 164266,
+        "sha256": "863c7085cbcecff6e609ab4ed24e525d3013825833e30a34b0b64454fcca64f0",
         "status": 200
       },
       "family": "original_embedding",
@@ -7619,14 +7598,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "131506",
+        "Content-Length": "164266",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-gzip-xes-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-gzip-xes-lazyframe.response.json",
-        "bytes": 131506,
-        "sha256": "095f1c242703287b34bc6d37e79ada82546b7f5523e9665a2221d7e36b3c3305",
+        "bytes": 164266,
+        "sha256": "71e212d7eaf3fe6ea324b3e949ddaba0104d4c984905259a77f2a9c40fb448bd",
         "status": 200
       },
       "family": "original_embedding",
@@ -7838,14 +7817,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "418620",
+        "Content-Length": "418676",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-typed-table-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-typed-table-log.response.json",
-        "bytes": 418620,
-        "sha256": "a4ad67570e2390554185b3f136f3d9f0115e643fb5d54315d8cccdf25551795f",
+        "bytes": 418676,
+        "sha256": "503ea7143928d16522996f07a80a5c34767d258ed8cb1007565a104a45c4da82",
         "status": 200
       },
       "family": "original_embedding",
@@ -7934,7 +7913,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -8054,14 +8033,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "418632",
+        "Content-Length": "418688",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-typed-table-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-typed-table-stream.response.json",
-        "bytes": 418632,
-        "sha256": "142800065eeadb2f8eef6fd4cd4c7bf9e1b6ba79efecda37c56ed2f3859c5437",
+        "bytes": 418688,
+        "sha256": "9fc3c361dffb444934a6a035c4a344b072b0586a835524ba23fd06eef1efd313",
         "status": 200
       },
       "family": "original_embedding",
@@ -8150,7 +8129,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -8270,14 +8249,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "418644",
+        "Content-Length": "418700",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-typed-table-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-typed-table-dataframe.response.json",
-        "bytes": 418644,
-        "sha256": "07b31b67c2f35315079fa22bcd884ac32956e07379e84a282e92dbd0e2002127",
+        "bytes": 418700,
+        "sha256": "23f51f0df751f71bb6f2d7d0da1e1450cf22ab2c3c672acafa1dec485c35822f",
         "status": 200
       },
       "family": "original_embedding",
@@ -8366,7 +8345,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -8486,14 +8465,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "418644",
+        "Content-Length": "418700",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-typed-table-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-typed-table-lazyframe.response.json",
-        "bytes": 418644,
-        "sha256": "6db06ccdfbb403ba241a023ddea29d6094c84d641a6a06392e7c395b39b78a70",
+        "bytes": 418700,
+        "sha256": "692d3d3c252c77ee268b426088d409a51a0f655c5bdc4ad7e9b45f881ba2837f",
         "status": 200
       },
       "family": "original_embedding",
@@ -8582,7 +8561,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -10603,14 +10582,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "142175",
+        "Content-Length": "174935",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-filter_embeddings_top_k-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-filter_embeddings_top_k-xes-log.response.json",
-        "bytes": 142175,
-        "sha256": "b70e7720533baa01577c7f304f031b83af766190da1daf63597db786664b7490",
+        "bytes": 174935,
+        "sha256": "9f72c47800dda77098730d3784b66f90e8597e565ff41914885a20bbd4f631b0",
         "status": 200
       },
       "family": "original_embedding",
@@ -10844,14 +10823,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "140842",
+        "Content-Length": "173602",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-filter_embeddings_top_k-gzip-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-filter_embeddings_top_k-gzip-xes-log.response.json",
-        "bytes": 140842,
-        "sha256": "55d3ab756598bc3973513fb85be915eb0dfa15aed61a6379c83d1c9eebd339b1",
+        "bytes": 173602,
+        "sha256": "00b24541cc575e014a0256ad8f888b88d6a27c2879055476119a338ae1616d15",
         "status": 200
       },
       "family": "original_embedding",
@@ -11085,14 +11064,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "445188",
+        "Content-Length": "445300",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-filter_embeddings_top_k-typed-table-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-filter_embeddings_top_k-typed-table-log.response.json",
-        "bytes": 445188,
-        "sha256": "33806d3e13496549d92d2b6f6382a40bca46a07718ce29cb478c359c9f478a0f",
+        "bytes": 445300,
+        "sha256": "1ce68f18b992c053a740f977edad35b64fcdd3c180c65f097c6dede76c7e3f6d",
         "status": 200
       },
       "family": "original_embedding",
@@ -11179,7 +11158,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -11190,7 +11169,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -12620,14 +12599,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "134797",
+        "Content-Length": "167557",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-embedding_similarity-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-embedding_similarity-xes-log.response.json",
-        "bytes": 134797,
-        "sha256": "456a4ecc3dfdc2588ce53f1c8ea81b23940b7a63ede74bb9e62d5d99afddc0e3",
+        "bytes": 167557,
+        "sha256": "ba141f6e7d04a256f29f4dff56f894210707376a842d4bf2eb36bde0dd6bc64f",
         "status": 200
       },
       "family": "original_embedding",
@@ -12882,14 +12861,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "133464",
+        "Content-Length": "166224",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-embedding_similarity-gzip-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-embedding_similarity-gzip-xes-log.response.json",
-        "bytes": 133464,
-        "sha256": "b1521584285ff46fcbe1143d4fa1605fc8f8788dfd4246ee9d0d7467cdcaeea5",
+        "bytes": 166224,
+        "sha256": "e68de56a452fa029b95433ca083a6e892ac95b92c18bc943e95b07159bd34ea7",
         "status": 200
       },
       "family": "original_embedding",
@@ -13144,14 +13123,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "420726",
+        "Content-Length": "420782",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-to_embeddings-embedding_similarity-typed-table-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-to_embeddings-embedding_similarity-typed-table-log.response.json",
-        "bytes": 420726,
-        "sha256": "2037d6455e011d5f9edd2d8d35cea59ae01591be829f3b450e9ac5497151d6dd",
+        "bytes": 420782,
+        "sha256": "8741940a84e8fad4725aad0c2fbd80c82db2e8d01312f7a660110b1307ab1654",
         "status": 200
       },
       "family": "original_embedding",
@@ -13259,7 +13238,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -15656,14 +15635,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "74345",
+        "Content-Length": "74377",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-vectors-all-storage.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-vectors-all-storage.response.json",
-        "bytes": 74345,
-        "sha256": "193d1fc972f318888e00b77133604d400196434e7e505b9435a2c10f9fa4d18d",
+        "bytes": 74377,
+        "sha256": "4e735c8ec98fb24f6e8f7e8c76bacd5eb3c6457c9e09360a012ef85bad5ab58b",
         "status": 200
       },
       "family": "original_embedding",
@@ -15727,7 +15706,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible integer native value",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -28042,14 +28021,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12536",
+        "Content-Length": "11903",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-legacy-successful-invalid-json-text.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-legacy-successful-invalid-json-text.response.json",
-        "bytes": 12536,
-        "sha256": "e789f26c0a66598d14d690a89b1f68ee060b0fd9a4a5cb4843f165698cbb372e",
+        "bytes": 11903,
+        "sha256": "707c4a34ecc6f3d7c12a6aa5d639f207938493c8ac49ea49d59e6a22d923b581",
         "status": 200
       },
       "family": "original_embedding",
@@ -28072,13 +28051,6 @@
           "bytes": 905,
           "sha256": "425ac6ba268652f39e1e1d72c2596b89c37573ebc3716be7369dfcab179cd156",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-legacy-successful-invalid-json-text.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-legacy-successful-invalid-json-text.source_xes.xes",
-          "bytes": 351,
-          "sha256": "bb01b28e2a5af405b2f821653c8a537e5fa2845394dac02a8b48bcfd43ed972d",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-legacy-successful-invalid-json-text.prepared_embeddings_json.json",
@@ -28125,8 +28097,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -47534,14 +47510,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "418685",
+        "Content-Length": "418741",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-embedding-native-discovery-selectors-independent-from-source.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-embedding-native-discovery-selectors-independent-from-source.response.json",
-        "bytes": 418685,
-        "sha256": "8d0198477202fa405915ce3812ebada02713cf694264d54110e4ef2594a36c5c",
+        "bytes": 418741,
+        "sha256": "34f77d6b78f1c54ea6a335394d774d84029391bc8e856780143ab0b1d63d2ec0",
         "status": 200
       },
       "family": "original_embedding",
@@ -47627,7 +47603,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -47758,14 +47734,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "133128",
+        "Content-Length": "165888",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-embedding-native-original-xes-reader-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-embedding-native-original-xes-reader-iterparse.response.json",
-        "bytes": 133128,
-        "sha256": "dd6495bdea2db060b43f3d12704153d28defd57d918d52b331458f50517f9682",
+        "bytes": 165888,
+        "sha256": "fb504fecac16d741ac800c86c7c91bebcd166e65ca53b993e2d49111ffc0b2c8",
         "status": 200
       },
       "family": "original_embedding",
@@ -47985,14 +47961,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "129206",
+        "Content-Length": "159254",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-embedding-native-original-xes-reader-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-embedding-native-original-xes-reader-line_by_line.response.json",
-        "bytes": 129206,
-        "sha256": "daf43e7155b950b4f1e4e375631c49731d96092bbb846efa5ed4ba8989cf13cd",
+        "bytes": 159254,
+        "sha256": "618e958cb70b5a5cb0db943c63fce7e4cb2d9ee939186813fa39084dbdbbc788",
         "status": 200
       },
       "family": "original_embedding",
@@ -48212,14 +48188,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "133131",
+        "Content-Length": "165891",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-embedding-native-original-xes-reader-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-embedding-native-original-xes-reader-chunk_regex.response.json",
-        "bytes": 133131,
-        "sha256": "6b80d4d81722d89e517e7f996221a89bb369d4ce8f1da100798a335c4d108271",
+        "bytes": 165891,
+        "sha256": "e71964dee85a57c96b5bdec66276f5e4fbb425983cdd9cc628fad00b91fc6f2a",
         "status": 200
       },
       "family": "original_embedding",
@@ -48439,14 +48415,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "133132",
+        "Content-Length": "165892",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-embedding-native-original-xes-reader-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-embedding-native-original-xes-reader-iterparse_20.response.json",
-        "bytes": 133132,
-        "sha256": "5e983377ae1012a0a7bc8e0bad985e3ccb0bf589ac2083211eac542b43b0f516",
+        "bytes": 165892,
+        "sha256": "ddea5f04ce7b48cbb403463124d3d91a42d14d3858a59e0bfb9e3d171d435611",
         "status": 200
       },
       "family": "original_embedding",
@@ -48666,14 +48642,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "133144",
+        "Content-Length": "165904",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-embedding-native-original-xes-reader-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-embedding-native-original-xes-reader-iterparse_mem_compressed.response.json",
-        "bytes": 133144,
-        "sha256": "b654e251ec3de1de98aee9bcca19d3ac47454b16855a925b3c6d9ca52e1038c8",
+        "bytes": 165904,
+        "sha256": "ead3f93d9989e66ab492acc13bb35225148f0a762ded2c0e0dd53a8c61697fc6",
         "status": 200
       },
       "family": "original_embedding",
@@ -48893,14 +48869,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "136521",
+        "Content-Length": "170301",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-embedding-native-original-xes-reader-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-embedding-native-original-xes-reader-rustxes.response.json",
-        "bytes": 136521,
-        "sha256": "f0b71cf48fd8b75ffce7c595ed908a449bb97a91308535514f5b5d56006b5e9f",
+        "bytes": 170301,
+        "sha256": "56952c9dd8794544afe5e93a56a498a784d400a9cd398fa099b57cfc1cd5aa10",
         "status": 200
       },
       "family": "original_embedding",
@@ -49230,14 +49206,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "131274",
+        "Content-Length": "161322",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-embedding-native-original-xes-import-all-controls.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-embedding-native-original-xes-import-all-controls.response.json",
-        "bytes": 131274,
-        "sha256": "d01d44936dc7112a83eecaccc237af450528d4211e9894db98fe1d91aea19bc9",
+        "bytes": 161322,
+        "sha256": "076b04cd0b7ead742342eeef29f4bf8af305702b368de5f6efe8599ca53c2f28",
         "status": 200
       },
       "family": "original_embedding",
@@ -49728,14 +49704,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "418831",
+        "Content-Length": "418887",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-typed-table-all-five-literal-selectors.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-typed-table-all-five-literal-selectors.response.json",
-        "bytes": 418831,
-        "sha256": "53d03bf481e680af89a19a52c68b25d6ffac95a725f8b920ce21e243f951198f",
+        "bytes": 418887,
+        "sha256": "598880e4255a9c9e49b411e8295dbba1a907ef6aec5354ab5f1ab4bce67bfea1",
         "status": 200
       },
       "family": "original_embedding",
@@ -49820,7 +49796,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES cannot represent a native NA attribute",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         },
@@ -49924,14 +49900,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "74971",
+        "Content-Length": "72137",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-wrapped-log-filter.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-wrapped-log-filter.response.json",
-        "bytes": 74971,
-        "sha256": "ce9a56f39d61cd65ab09b70fbd55cd7b0b0ae76d183caf46fda69fadaaa33206",
+        "bytes": 72137,
+        "sha256": "11fa53dec6eb74a9ae6acfae737c4bc31f9038ba9ab1b4f89cc477951a3bcc02",
         "status": 200
       },
       "family": "original_embedding",
@@ -49961,13 +49937,6 @@
           "sha256": "9e5edc89cb58fa9469ffdee1145da5ede93b40bd9a49eaced9725cdab6de9e43",
           "format": "json"
         },
-        "source_xes": {
-          "filename": "native-wrapped-log-filter.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-wrapped-log-filter.source_xes.xes",
-          "bytes": 851,
-          "sha256": "d0f7b7eedf49535a28b2ea44b42190fa13fb50b7189ab6f79ada5d1bd8c34488",
-          "format": "xes"
-        },
         "result_json": {
           "filename": "native-wrapped-log-filter.result_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-wrapped-log-filter.result_json.json",
@@ -49981,13 +49950,6 @@
           "bytes": 5088,
           "sha256": "4e7e2910bc41c3de73c0305b9e7d38c53bfa82a8154c0a368dbf143c4c1925f5",
           "format": "json"
-        },
-        "filtered_xes": {
-          "filename": "native-wrapped-log-filter.filtered_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-wrapped-log-filter.filtered_xes.xes",
-          "bytes": 685,
-          "sha256": "41f04248e48ad49b9bbcb083dfcc3fad284b86847b6f17d6b75e15bfab36d489",
-          "format": "xes"
         }
       },
       "source": {
@@ -50018,15 +49980,23 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "to_xes(filtered_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -50104,14 +50074,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "47359",
+        "Content-Length": "45777",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-wrapped-log-to_embeddings.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-wrapped-log-to_embeddings.response.json",
-        "bytes": 47359,
-        "sha256": "ed8331cbc506c9743a234370d45c2df9c38ee5e1135906a08a8300b7fd146cdc",
+        "bytes": 45777,
+        "sha256": "f14dec390e168013f0c73281264d3920e2b54eff95f83d1254f8a32bce6d7fd3",
         "status": 200
       },
       "family": "original_embedding",
@@ -50140,13 +50110,6 @@
           "bytes": 5957,
           "sha256": "9e5edc89cb58fa9469ffdee1145da5ede93b40bd9a49eaced9725cdab6de9e43",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-wrapped-log-to_embeddings.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-wrapped-log-to_embeddings.source_xes.xes",
-          "bytes": 851,
-          "sha256": "d0f7b7eedf49535a28b2ea44b42190fa13fb50b7189ab6f79ada5d1bd8c34488",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-wrapped-log-to_embeddings.prepared_embeddings_json.json",
@@ -50193,8 +50156,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -50296,14 +50263,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "49365",
+        "Content-Length": "47783",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-wrapped-log-similarity_log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-wrapped-log-similarity_log.response.json",
-        "bytes": 49365,
-        "sha256": "5a5a45eb7879d954a066307514a9f7d29b8327f395f0a5ba81485912c33e7dc9",
+        "bytes": 47783,
+        "sha256": "93ecf4e93ba3da5b9f15ad46547a8d6b9b03ceb83ea2688679474f0ece286ec8",
         "status": 200
       },
       "family": "original_embedding",
@@ -50332,13 +50299,6 @@
           "bytes": 5957,
           "sha256": "9e5edc89cb58fa9469ffdee1145da5ede93b40bd9a49eaced9725cdab6de9e43",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-wrapped-log-similarity_log.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-wrapped-log-similarity_log.source_xes.xes",
-          "bytes": 851,
-          "sha256": "d0f7b7eedf49535a28b2ea44b42190fa13fb50b7189ab6f79ada5d1bd8c34488",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-wrapped-log-similarity_log.prepared_embeddings_json.json",
@@ -50404,8 +50364,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -50858,14 +50822,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "47690",
+        "Content-Length": "46108",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-options-byte-embedding_model.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-options-byte-embedding_model.response.json",
-        "bytes": 47690,
-        "sha256": "57792e61643c55355d3652054a7840e01bf2408a62109fb98bf9ac4b70504d8b",
+        "bytes": 46108,
+        "sha256": "b1f53e54aeae96f5a38753c996df8bb6b3ec3cfcf4eebfaf6da308646931724a",
         "status": 200
       },
       "family": "original_embedding",
@@ -50890,13 +50854,6 @@
           "bytes": 5957,
           "sha256": "9e5edc89cb58fa9469ffdee1145da5ede93b40bd9a49eaced9725cdab6de9e43",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-options-byte-embedding_model.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-options-byte-embedding_model.source_xes.xes",
-          "bytes": 851,
-          "sha256": "d0f7b7eedf49535a28b2ea44b42190fa13fb50b7189ab6f79ada5d1bd8c34488",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-options-byte-embedding_model.prepared_embeddings_json.json",
@@ -50943,8 +50900,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -51029,14 +50990,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "47666",
+        "Content-Length": "46084",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-options-byte-attribute_key.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-options-byte-attribute_key.response.json",
-        "bytes": 47666,
-        "sha256": "8f61701f16da224426892ff8e2746881361ebb9601f1a255e9cb3a998589ad51",
+        "bytes": 46084,
+        "sha256": "f43b4e0780b215129879cc9ce121754415e5d53a9adf044a92b928b4042eeef7",
         "status": 200
       },
       "family": "original_embedding",
@@ -51061,13 +51022,6 @@
           "bytes": 5957,
           "sha256": "9e5edc89cb58fa9469ffdee1145da5ede93b40bd9a49eaced9725cdab6de9e43",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-options-byte-attribute_key.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-options-byte-attribute_key.source_xes.xes",
-          "bytes": 851,
-          "sha256": "d0f7b7eedf49535a28b2ea44b42190fa13fb50b7189ab6f79ada5d1bd8c34488",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-options-byte-attribute_key.prepared_embeddings_json.json",
@@ -51114,8 +51068,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -51200,14 +51158,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "47429",
+        "Content-Length": "45847",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-options-byte-event_id_key.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-options-byte-event_id_key.response.json",
-        "bytes": 47429,
-        "sha256": "281ce47d5c4d1872f1de2cf2671a82e5014e5d370ff30986ac45c67a8a291e10",
+        "bytes": 45847,
+        "sha256": "6852c7062de15ca7692523ba6bfc9eddc3c9ba894ff6ab4b2a132625c202b74b",
         "status": 200
       },
       "family": "original_embedding",
@@ -51232,13 +51190,6 @@
           "bytes": 5957,
           "sha256": "9e5edc89cb58fa9469ffdee1145da5ede93b40bd9a49eaced9725cdab6de9e43",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-options-byte-event_id_key.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-options-byte-event_id_key.source_xes.xes",
-          "bytes": 851,
-          "sha256": "d0f7b7eedf49535a28b2ea44b42190fa13fb50b7189ab6f79ada5d1bd8c34488",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-options-byte-event_id_key.prepared_embeddings_json.json",
@@ -51285,8 +51236,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -51717,14 +51672,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "57985",
+        "Content-Length": "56421",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-byte-case-id-ff-filter.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-ff-filter.response.json",
-        "bytes": 57985,
-        "sha256": "8feada815bb3345f070b6e8cb98b51dda7668d07f02e8c01bd67cd291858d6e6",
+        "bytes": 56421,
+        "sha256": "714c268ee4293cd960ed2e0121edae3dbe88d0333ada080330e2e8ed8a23a584",
         "status": 200
       },
       "family": "original_embedding",
@@ -51750,13 +51705,6 @@
           "sha256": "0fb8add77ad407ea55d221f18c72e2d141f8d60ce5268059693c25880df752d9",
           "format": "json"
         },
-        "source_xes": {
-          "filename": "native-import-byte-case-id-ff-filter.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-ff-filter.source_xes.xes",
-          "bytes": 447,
-          "sha256": "13de0cab31ab45b112974f72bd8f5ebf79950d090d1ecaefd328c63cb6a39afd",
-          "format": "xes"
-        },
         "result_json": {
           "filename": "native-import-byte-case-id-ff-filter.result_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-ff-filter.result_json.json",
@@ -51770,13 +51718,6 @@
           "bytes": 1328,
           "sha256": "0fb8add77ad407ea55d221f18c72e2d141f8d60ce5268059693c25880df752d9",
           "format": "json"
-        },
-        "filtered_xes": {
-          "filename": "native-import-byte-case-id-ff-filter.filtered_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-ff-filter.filtered_xes.xes",
-          "bytes": 454,
-          "sha256": "672dc5aaba79212e8430c7a64708d129c34407d8ae782048680e5b647f4a6b86",
-          "format": "xes"
         }
       },
       "source": {
@@ -51821,15 +51762,23 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "to_xes(filtered_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -51940,14 +51889,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "51007",
+        "Content-Length": "50233",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-byte-case-id-ff-to_embeddings.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-ff-to_embeddings.response.json",
-        "bytes": 51007,
-        "sha256": "46dff40af4d3603f4bb3f459ef3e96741901aadd6785b5f22c0273fd19e5de4c",
+        "bytes": 50233,
+        "sha256": "ef1967e0df0c3745b95c0969865707da953e8da2d7cf922e3f142429db7ab045",
         "status": 200
       },
       "family": "original_embedding",
@@ -51972,13 +51921,6 @@
           "bytes": 1328,
           "sha256": "0fb8add77ad407ea55d221f18c72e2d141f8d60ce5268059693c25880df752d9",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-import-byte-case-id-ff-to_embeddings.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-ff-to_embeddings.source_xes.xes",
-          "bytes": 447,
-          "sha256": "13de0cab31ab45b112974f72bd8f5ebf79950d090d1ecaefd328c63cb6a39afd",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-import-byte-case-id-ff-to_embeddings.prepared_embeddings_json.json",
@@ -52039,8 +51981,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -52175,14 +52121,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "58231",
+        "Content-Length": "56667",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-byte-generic-attribute-ff-filter.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-ff-filter.response.json",
-        "bytes": 58231,
-        "sha256": "54e20b65ddce20d6a8ea4aaa758b244be71aacc7f18b7741d66a118d002a6e26",
+        "bytes": 56667,
+        "sha256": "44f1fe48f0c4324c5e9c8d1910f57e8508ca478fc7b642a93217ecccb3199b1b",
         "status": 200
       },
       "family": "original_embedding",
@@ -52208,13 +52154,6 @@
           "sha256": "b312dbd015ca72407e78a54b1e69392dcef57e896023aef2ca34bee3f952968d",
           "format": "json"
         },
-        "source_xes": {
-          "filename": "native-import-byte-generic-attribute-ff-filter.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-ff-filter.source_xes.xes",
-          "bytes": 447,
-          "sha256": "168068da9187f9569ab6dd4e035fb7222df4314d0503f172b43b65eea5d28567",
-          "format": "xes"
-        },
         "result_json": {
           "filename": "native-import-byte-generic-attribute-ff-filter.result_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-ff-filter.result_json.json",
@@ -52228,13 +52167,6 @@
           "bytes": 1342,
           "sha256": "b312dbd015ca72407e78a54b1e69392dcef57e896023aef2ca34bee3f952968d",
           "format": "json"
-        },
-        "filtered_xes": {
-          "filename": "native-import-byte-generic-attribute-ff-filter.filtered_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-ff-filter.filtered_xes.xes",
-          "bytes": 454,
-          "sha256": "86edd76e4e56ae497e3f89c2de831da39f7a3efa9971d01b6248f83328b3b28b",
-          "format": "xes"
         }
       },
       "source": {
@@ -52279,15 +52211,23 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "to_xes(filtered_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -52398,14 +52338,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "51070",
+        "Content-Length": "50296",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-byte-generic-attribute-ff-to_embeddings.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-ff-to_embeddings.response.json",
-        "bytes": 51070,
-        "sha256": "3f63a3b08d5a970c7b79c018d42e2a19396990d1de327d914b8f417283aaa762",
+        "bytes": 50296,
+        "sha256": "71c0d208dd94f05a4dc5d1d70f2d22c8abb156004a3706593aef400633f9edc4",
         "status": 200
       },
       "family": "original_embedding",
@@ -52430,13 +52370,6 @@
           "bytes": 1342,
           "sha256": "b312dbd015ca72407e78a54b1e69392dcef57e896023aef2ca34bee3f952968d",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-import-byte-generic-attribute-ff-to_embeddings.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-ff-to_embeddings.source_xes.xes",
-          "bytes": 447,
-          "sha256": "168068da9187f9569ab6dd4e035fb7222df4314d0503f172b43b65eea5d28567",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-import-byte-generic-attribute-ff-to_embeddings.prepared_embeddings_json.json",
@@ -52497,8 +52430,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -52633,14 +52570,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "58485",
+        "Content-Length": "56901",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-byte-case-id-pair-filter.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-pair-filter.response.json",
-        "bytes": 58485,
-        "sha256": "2df79b3cf83f9d56c75e70bfb79228bf9e5006d85efa7f2866bcf9dcff326a4d",
+        "bytes": 56901,
+        "sha256": "df6e02040632e39389fa6d807bf7addbf8364ac991502350885aa14e0511b406",
         "status": 200
       },
       "family": "original_embedding",
@@ -52666,13 +52603,6 @@
           "sha256": "cc65b413908bb94558306189313311885bfb8d0e9df907f89f31a8fe27ba39e0",
           "format": "json"
         },
-        "source_xes": {
-          "filename": "native-import-byte-case-id-pair-filter.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-pair-filter.source_xes.xes",
-          "bytes": 452,
-          "sha256": "cc1b1327a6f7ba0f585e15e210d3b72ddabe70acba69a9de4679015648d2e536",
-          "format": "xes"
-        },
         "result_json": {
           "filename": "native-import-byte-case-id-pair-filter.result_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-pair-filter.result_json.json",
@@ -52686,13 +52616,6 @@
           "bytes": 1348,
           "sha256": "cc65b413908bb94558306189313311885bfb8d0e9df907f89f31a8fe27ba39e0",
           "format": "json"
-        },
-        "filtered_xes": {
-          "filename": "native-import-byte-case-id-pair-filter.filtered_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-pair-filter.filtered_xes.xes",
-          "bytes": 459,
-          "sha256": "b8419548367ac8cf64bbea2e47085b1c3104195750aafdd4070a5ea6d98f560c",
-          "format": "xes"
         }
       },
       "source": {
@@ -52737,15 +52660,23 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "to_xes(filtered_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -52856,14 +52787,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "51467",
+        "Content-Length": "50683",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-byte-case-id-pair-to_embeddings.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-pair-to_embeddings.response.json",
-        "bytes": 51467,
-        "sha256": "cc25c9d096c3875c1cc477282b7dfa0443ae220f7864b2e7e3b82acb2c0e18ad",
+        "bytes": 50683,
+        "sha256": "ee4dea1a700c0fe6af316a48192b9dd733aa4a4cdab174afa24ddf82c01f8867",
         "status": 200
       },
       "family": "original_embedding",
@@ -52888,13 +52819,6 @@
           "bytes": 1348,
           "sha256": "cc65b413908bb94558306189313311885bfb8d0e9df907f89f31a8fe27ba39e0",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-import-byte-case-id-pair-to_embeddings.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-case-id-pair-to_embeddings.source_xes.xes",
-          "bytes": 452,
-          "sha256": "cc1b1327a6f7ba0f585e15e210d3b72ddabe70acba69a9de4679015648d2e536",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-import-byte-case-id-pair-to_embeddings.prepared_embeddings_json.json",
@@ -52955,8 +52879,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -53091,14 +53019,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "58591",
+        "Content-Length": "57007",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-byte-generic-attribute-pair-filter.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-pair-filter.response.json",
-        "bytes": 58591,
-        "sha256": "22ed183800326bb849c4b8e91c3a3232fe5d1ade7b286c084a2afff1873d4347",
+        "bytes": 57007,
+        "sha256": "9fe413f1cf6fb8d93db64ad21b12c80ebc5861c1bec71402e1e82814f30467d1",
         "status": 200
       },
       "family": "original_embedding",
@@ -53124,13 +53052,6 @@
           "sha256": "57b1f38ea69009fdbcaa28e8039e276d0f5156a3ed1b62afbf4857785da2f428",
           "format": "json"
         },
-        "source_xes": {
-          "filename": "native-import-byte-generic-attribute-pair-filter.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-pair-filter.source_xes.xes",
-          "bytes": 452,
-          "sha256": "337570bc2b41a3939c9e3c48d873c681aca21b0c517414ad7e33bda93192bdf7",
-          "format": "xes"
-        },
         "result_json": {
           "filename": "native-import-byte-generic-attribute-pair-filter.result_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-pair-filter.result_json.json",
@@ -53144,13 +53065,6 @@
           "bytes": 1352,
           "sha256": "57b1f38ea69009fdbcaa28e8039e276d0f5156a3ed1b62afbf4857785da2f428",
           "format": "json"
-        },
-        "filtered_xes": {
-          "filename": "native-import-byte-generic-attribute-pair-filter.filtered_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-pair-filter.filtered_xes.xes",
-          "bytes": 459,
-          "sha256": "b832b5451f681e3d5146d73c235bd214949200417a4e35b591e65bc059dc5c96",
-          "format": "xes"
         }
       },
       "source": {
@@ -53195,15 +53109,23 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "to_xes(filtered_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -53314,14 +53236,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "51370",
+        "Content-Length": "50586",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-import-byte-generic-attribute-pair-to_embeddings.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-pair-to_embeddings.response.json",
-        "bytes": 51370,
-        "sha256": "6178f6a5beb08f3e451727e39419a7781f92771c7723705bcfcbe59b07aa8702",
+        "bytes": 50586,
+        "sha256": "1c3714de244449c4edf6a58ded472392f0d93c488187b1cbb23e1dd078f6b15b",
         "status": 200
       },
       "family": "original_embedding",
@@ -53346,13 +53268,6 @@
           "bytes": 1352,
           "sha256": "57b1f38ea69009fdbcaa28e8039e276d0f5156a3ed1b62afbf4857785da2f428",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-import-byte-generic-attribute-pair-to_embeddings.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-import-byte-generic-attribute-pair-to_embeddings.source_xes.xes",
-          "bytes": 452,
-          "sha256": "337570bc2b41a3939c9e3c48d873c681aca21b0c517414ad7e33bda93192bdf7",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-import-byte-generic-attribute-pair-to_embeddings.prepared_embeddings_json.json",
@@ -53413,8 +53328,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -53532,14 +53451,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "142536",
+        "Content-Length": "142528",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-raw-table-byte-wrapper-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-raw-table-byte-wrapper-log.response.json",
-        "bytes": 142536,
-        "sha256": "0a2fdb63d641250ef1ebed7833d26fa556bc8e2d08d69aa19fef24ddde41ed3b",
+        "bytes": 142528,
+        "sha256": "668858f869ab079b00ea64c9b22006a93d8cffdb1dfc336ea11824e380a9947a",
         "status": 200
       },
       "family": "original_embedding",
@@ -53631,7 +53550,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible unsigned integer native value",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
             "exception_type": "invalid_argument"
           }
         },
@@ -53751,14 +53670,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "142548",
+        "Content-Length": "142540",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-raw-table-byte-wrapper-stream.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-raw-table-byte-wrapper-stream.response.json",
-        "bytes": 142548,
-        "sha256": "dad749fc6f76935354330e134b5bf0edab9906558b3c1ac0a5ab4ce83a645dc2",
+        "bytes": 142540,
+        "sha256": "91c4be93976a07666f518d54be5a238d0a5227218aa62863a3c50e171031713f",
         "status": 200
       },
       "family": "original_embedding",
@@ -53850,7 +53769,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible unsigned integer native value",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
             "exception_type": "invalid_argument"
           }
         },
@@ -53970,14 +53889,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "142560",
+        "Content-Length": "142552",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-raw-table-byte-wrapper-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-raw-table-byte-wrapper-dataframe.response.json",
-        "bytes": 142560,
-        "sha256": "5d32b05352103c1f08c2c6dd9a7d30d1a47f0d5d92492402b3002023e0e1ab4a",
+        "bytes": 142552,
+        "sha256": "8f1f8ed2c220c1d5d3c74e4f29c17f83423d67be10e40a8fe453c3adedd790f6",
         "status": 200
       },
       "family": "original_embedding",
@@ -54069,7 +53988,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible unsigned integer native value",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
             "exception_type": "invalid_argument"
           }
         },
@@ -54189,14 +54108,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "142560",
+        "Content-Length": "142552",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-raw-table-byte-wrapper-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-raw-table-byte-wrapper-lazyframe.response.json",
-        "bytes": 142560,
-        "sha256": "5e6b8b737abeb8189938db4fe930dc00774e25b3747a681dd7e423e5a5c31fcd",
+        "bytes": 142552,
+        "sha256": "cf30d055a93758efb3b59be924ea363c623b9b1f1f61f5d970cacaa7191d1def",
         "status": 200
       },
       "family": "original_embedding",
@@ -54288,7 +54207,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible unsigned integer native value",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
             "exception_type": "invalid_argument"
           }
         },
@@ -54375,14 +54294,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "52305",
+        "Content-Length": "50723",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-reopen-wrapped-source-download.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-reopen-wrapped-source-download.response.json",
-        "bytes": 52305,
-        "sha256": "bf4f71459af70e8af2cd7608c335d9e3d824bccc715b815dd3f3e39a3e49ad08",
+        "bytes": 50723,
+        "sha256": "e331dae7dd860754b87045b1eb9a0552a734be4ddca66747b9aa3726354231fc",
         "status": 200
       },
       "family": "original_embedding",
@@ -54405,13 +54324,6 @@
           "bytes": 5957,
           "sha256": "9e5edc89cb58fa9469ffdee1145da5ede93b40bd9a49eaced9725cdab6de9e43",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-reopen-wrapped-source-download.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-reopen-wrapped-source-download.source_xes.xes",
-          "bytes": 851,
-          "sha256": "d0f7b7eedf49535a28b2ea44b42190fa13fb50b7189ab6f79ada5d1bd8c34488",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-reopen-wrapped-source-download.prepared_embeddings_json.json",
@@ -54458,8 +54370,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -54544,14 +54460,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "44992",
+        "Content-Length": "43756",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-reopen-filtered-byte-download.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-reopen-filtered-byte-download.response.json",
-        "bytes": 44992,
-        "sha256": "0fa500d5ba5a5e44eccc118f5c75219a1e9b7625bbd8cc746d19f53de1a02354",
+        "bytes": 43756,
+        "sha256": "a2ef2d64782e06c89de42970acca9185716cd66a568a1f2518225a7cb0de1c5a",
         "status": 200
       },
       "family": "original_embedding",
@@ -54574,13 +54490,6 @@
           "bytes": 5088,
           "sha256": "4e7e2910bc41c3de73c0305b9e7d38c53bfa82a8154c0a368dbf143c4c1925f5",
           "format": "json"
-        },
-        "source_xes": {
-          "filename": "native-reopen-filtered-byte-download.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-reopen-filtered-byte-download.source_xes.xes",
-          "bytes": 678,
-          "sha256": "1618bb1cb251a1af885ec84e6899b7a3dc05f9cee2392408c29060cd7900871e",
-          "format": "xes"
         },
         "prepared_embeddings_json": {
           "filename": "native-reopen-filtered-byte-download.prepared_embeddings_json.json",
@@ -54627,8 +54536,12 @@
           "name": "to_xes(input_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "serialize_embeddings_json(embeddings)",
@@ -54713,14 +54626,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "42966",
+        "Content-Length": "42958",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-reopen-byte-table-source-log.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-reopen-byte-table-source-log.response.json",
-        "bytes": 42966,
-        "sha256": "0e46efd3e52fe9d398f6bfe80beee3595df8904fe615188ee493a17af6451ac0",
+        "bytes": 42958,
+        "sha256": "df78047d78a95a30e2952f6c16efc402580507b5dea2d6184bacee90c0fb6df9",
         "status": 200
       },
       "family": "original_embedding",
@@ -54792,7 +54705,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible unsigned integer native value",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
             "exception_type": "invalid_argument"
           }
         },

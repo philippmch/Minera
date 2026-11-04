@@ -603,7 +603,7 @@
         "filename": "csv-original-simulate_log.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/csv-original-simulate_log.response.json",
         "bytes": 57243,
-        "sha256": "3895171db62a285fe683ae85d7bd37401dd05663e54b17d48b1b15f7bc506bc8",
+        "sha256": "7deba1f34023dbcbd183b6eef4676de31a079d287f86643e345dd74665cafa7a",
         "status": 200
       },
       "family": "monte_carlo",
@@ -799,7 +799,7 @@
         "filename": "csv-original-fit_then_simulate.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/csv-original-fit_then_simulate.response.json",
         "bytes": 58537,
-        "sha256": "f13ffaeb32f6b5be7796bc8b93fe9e81730caf91ace5673e6fe81809c886927c",
+        "sha256": "c1bcef12e0bba46267317cc1feaccb176170ffb8147da548837f2e0d8b9e2ba4",
         "status": 200
       },
       "family": "monte_carlo",
@@ -1787,14 +1787,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "111135",
+        "Content-Length": "111163",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-original-eventlog-preparation.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/typed-original-eventlog-preparation.response.json",
-        "bytes": 111135,
-        "sha256": "3156490a25842f236daf891333a973fa59b4f6b103056adb08751cb7ab7e4037",
+        "bytes": 111163,
+        "sha256": "ce47daba92d7a10ddd7fda85f37f21730384409b93bbc3933b9c5d60d8585e87",
         "status": 200
       },
       "family": "monte_carlo",
@@ -1984,14 +1984,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "111742",
+        "Content-Length": "110910",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-literal-unicode-wtf-nul-selectors.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/typed-literal-unicode-wtf-nul-selectors.response.json",
-        "bytes": 111742,
-        "sha256": "04d2953429512f68380e06d00d1ce1b754cd22abe091cc0e5910e83e72cbbf94",
+        "bytes": 110910,
+        "sha256": "8872a9386da9b160b31360b87f0d7ab4eff1f902a85ec0076fc67ed10c6d260b",
         "status": 200
       },
       "family": "monte_carlo",
@@ -2023,13 +2023,6 @@
           "bytes": 1349,
           "sha256": "b81ea266276b181fb30f3dc2d2d7f54d397a1ce71b092aa0cd95b107b4a6b38b",
           "format": "pnml"
-        },
-        "generated_xes": {
-          "filename": "typed-literal-unicode-wtf-nul-selectors.generated_xes.xes",
-          "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/typed-literal-unicode-wtf-nul-selectors.generated_xes.xes",
-          "bytes": 818,
-          "sha256": "25b0e8f0177ac2b2a77456a6540c466fcd86cda635d23fc1d575eacae5904014",
-          "format": "xes"
         }
       },
       "executed": true,
@@ -2082,14 +2075,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "18859",
+        "Content-Length": "17543",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "all27-native-options-full-integer-and-ieee.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/all27-native-options-full-integer-and-ieee.response.json",
-        "bytes": 18859,
-        "sha256": "e176eba3b24fac869dd556e32b8dd4f245c5606964a97e53184926d05600bfd0",
+        "bytes": 17543,
+        "sha256": "a11d503347390b8aee4fbe6c38088ccfdd5dcb593ff654ce7afbc1ab0ee15502",
         "status": 200
       },
       "family": "monte_carlo",
@@ -2118,13 +2111,6 @@
           "bytes": 911,
           "sha256": "02c4d93bfc5c1f776966ea1d7dfa6831a1df85cdc44c3cf496b27587b56e7340",
           "format": "pnml"
-        },
-        "generated_xes": {
-          "filename": "all27-native-options-full-integer-and-ieee.generated_xes.xes",
-          "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/all27-native-options-full-integer-and-ieee.generated_xes.xes",
-          "bytes": 1222,
-          "sha256": "36cdcda9457c44f3a93f92b2dfe848861081de2003d22367c9f0db46c687e8ea",
-          "format": "xes"
         }
       },
       "executed": true,
@@ -2851,7 +2837,7 @@
         "filename": "conditional-signed-duration-normal.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/conditional-signed-duration-normal.response.json",
         "bytes": 14623,
-        "sha256": "0f671c6d1ec28efe7b9d2f9994a361fa55cad05bfed09ebfb66e226e1ec9547c",
+        "sha256": "8dbae5faf399110242f9bc96193a0858ad62716a10ca554a241df2f4c7b5325a",
         "status": 200
       },
       "family": "monte_carlo",
@@ -2934,7 +2920,7 @@
         "filename": "conditional-signed-duration-uniform.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/conditional-signed-duration-uniform.response.json",
         "bytes": 14563,
-        "sha256": "b0ab35569590f118bf3c2cea5b89765e5da381b7091d8c1e7ba20bc88d84779a",
+        "sha256": "f9f275537c6c76b51c8f7b2c9a881ec9aae8025cd9510e466c29721dd72d5d04",
         "status": 200
       },
       "family": "monte_carlo",
@@ -3017,7 +3003,7 @@
         "filename": "conditional-signed-duration-exponential.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/conditional-signed-duration-exponential.response.json",
         "bytes": 14563,
-        "sha256": "7700555a474c0ef3d25402daed3e12b7b620b236367446e44301f7a7b6bce00c",
+        "sha256": "5cdc94a0e9f8e68dab7a7970c3d93538105176ab1f5b5a1386bbbb7e6be2de5b",
         "status": 200
       },
       "family": "monte_carlo",
@@ -3093,14 +3079,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14564",
+        "Content-Length": "14616",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "conditional-signed-duration-lognormal.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/conditional-signed-duration-lognormal.response.json",
-        "bytes": 14564,
-        "sha256": "0b6c9a0e98481668d5605ebf293ca0f30bd4e28c2919ef41f7a2467060cb6be4",
+        "bytes": 14616,
+        "sha256": "68704d73a05631c7ad2a6a95c5b7cf8941fe13f2a746b5349d92d7719de3051a",
         "status": 200
       },
       "family": "monte_carlo",
@@ -3127,7 +3113,7 @@
           "filename": "conditional-signed-duration-lognormal.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/conditional-signed-duration-lognormal.generated_xes.xes",
           "bytes": 856,
-          "sha256": "c18431d35e387554bb8dccca4ece89b8127c83c4c1fa70bbc2d4a583fa5617dd",
+          "sha256": "60d44f2911f93077e7cf1f7b8c1f724b5ded766c3e942563b8f7a6fc52929add",
           "format": "xes"
         }
       },
@@ -3176,14 +3162,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14551",
+        "Content-Length": "14542",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "conditional-signed-duration-gamma.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/conditional-signed-duration-gamma.response.json",
-        "bytes": 14551,
-        "sha256": "be256e07c914813bac1f12bb7ed5e240ea948d8d50e1c226287cc5fa2c78893e",
+        "bytes": 14542,
+        "sha256": "2dd0974c2b3f9f329ffafc722aa2fc13d07a74aae39f6f51e0f9d493c4b0d3ce",
         "status": 200
       },
       "family": "monte_carlo",
@@ -3210,7 +3196,7 @@
           "filename": "conditional-signed-duration-gamma.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/conditional-signed-duration-gamma.generated_xes.xes",
           "bytes": 856,
-          "sha256": "5633c6d75ebb5dbdd3b44b8f545991fc3d2e1a0749430e80d67c76b5cd9a78a4",
+          "sha256": "d5d36c79b5fa71482a0b06ad94dbcc3ff041cb2c02b17b0ae8d829edc530efdc",
           "format": "xes"
         }
       },
@@ -3819,7 +3805,7 @@
         "filename": "signed-enabled-set-signed-zero-sum.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/signed-enabled-set-signed-zero-sum.response.json",
         "bytes": 25920,
-        "sha256": "f9df9c587aba9abfb077c3505b412eeb9bbb8802fcb06f374cd13ec52fa95afb",
+        "sha256": "5619c6091349038ca42ba05786e12097f7ca37e9bb3c00f7ee5b47a256d8a8c0",
         "status": 200
       },
       "family": "monte_carlo",
@@ -3846,7 +3832,7 @@
           "filename": "signed-enabled-set-signed-zero-sum.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/signed-enabled-set-signed-zero-sum.generated_xes.xes",
           "bytes": 1875,
-          "sha256": "93110528d0bbc7f8b61bcd1d814d4d5230f484bb839a99346ed2be89d16e219a",
+          "sha256": "6903f133268a0f87bddf4535915a76aef0df8a502b5491667d56088a61ff08a4",
           "format": "xes"
         }
       },
@@ -3902,7 +3888,7 @@
         "filename": "signed-enabled-set-zero-sum.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/signed-enabled-set-zero-sum.response.json",
         "bytes": 25918,
-        "sha256": "a2031c9dcbf5c37a816347c3a7e6e6d28c8061c3f18b9c7538a4c19d3335b07d",
+        "sha256": "b5343eaf9369051826a8589a9b4b6813cbf9737bc6b3e818b85da0360f726963",
         "status": 200
       },
       "family": "monte_carlo",
@@ -3929,7 +3915,7 @@
           "filename": "signed-enabled-set-zero-sum.generated_xes.xes",
           "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/signed-enabled-set-zero-sum.generated_xes.xes",
           "bytes": 1875,
-          "sha256": "93110528d0bbc7f8b61bcd1d814d4d5230f484bb839a99346ed2be89d16e219a",
+          "sha256": "6903f133268a0f87bddf4535915a76aef0df8a502b5491667d56088a61ff08a4",
           "format": "xes"
         }
       },
@@ -5536,14 +5522,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11617",
+        "Content-Length": "11807",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-parallel-occurrences-and-weighted-arcs.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/pnml-parallel-occurrences-and-weighted-arcs.response.json",
-        "bytes": 11617,
-        "sha256": "70872363dcf99bfd30805cdf20a0d5c4a88a5e0f0c504416442c0dca66051f6b",
+        "bytes": 11807,
+        "sha256": "d880c7237074298977e7e2eff2d07dfc37e0c9cdc59c40f7d111700c91d235a1",
         "status": 200
       },
       "family": "monte_carlo",

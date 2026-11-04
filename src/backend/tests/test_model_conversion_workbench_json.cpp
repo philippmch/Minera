@@ -161,7 +161,9 @@ void powl_snapshots_preserve_native_getters_text_and_order() {
   const auto numeric = PowlNode::sequence({PowlNode::transition("9"), PowlNode::transition("1")});
   contains(serialize_model_conversion_powl_json(numeric), "\"label\":\"9\"");
   assert(!numeric.serialize().empty());
-  rejects([] { (void)PowlNode::transition("a", PowlFrequency{2, 1}); });
+  // pm4py builds FrequentTransition("a", 2, 1) as a plain "a" (neither skippable
+  // nor a self loop), so a minimum above the maximum is accepted.
+  (void)PowlNode::transition("a", PowlFrequency{2, 1});
 }
 
 void real_native_conversion_results_cover_all_five_overloads() {

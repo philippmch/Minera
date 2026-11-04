@@ -9,10 +9,12 @@
 namespace minera {
 namespace {
 
+// pm4py's FrequentTransition accepts any bounds: it is skippable when the
+// minimum is 0 and self-looping when the maximum is unbounded, and other
+// values only change its label. Negative bounds have no text form.
 void validate_frequency(const PowlFrequency& f) {
-  if ((f.minimum != 0 && f.minimum != 1) ||
-      (f.maximum && (*f.maximum != 1 || *f.maximum < f.minimum))) {
-    throw std::invalid_argument("POWL frequency must be min 0/1 and max one/unbounded");
+  if (f.minimum < 0 || (f.maximum && *f.maximum < 0)) {
+    throw std::invalid_argument("POWL frequency bounds must be nonnegative");
   }
 }
 

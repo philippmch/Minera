@@ -527,19 +527,16 @@ ReachGraph build_reachability(const PetriNet& net,
     initial[net.source()] = 1;
   }
 
+  // Fires like petri_transition_enabled checks: each ordinary arc moves its
+  // weight (the reference's semantics.execute), parallel arcs each their own.
   auto fire = [places](Marking marking, const PetriTransition& transition) {
-    for (const auto place : transition.inputs) {
-      if (place >= places || marking[place] == 0)
-        throw std::runtime_error("Petri reachability fired a disabled transition");
-      --marking[place];
-    }
-    for (const auto place : transition.reset_inputs)
-      if (place < places) marking[place] = 0;
-    for (const auto place : transition.outputs) {
-      if (place >= places ||
-          marking[place] == std::numeric_limits<std::uint64_t>::max())
-        throw std::runtime_error("Petri reachability marking overflow");
-      ++marking[place];
+    for (const auto* side : {&transition.inputs, &transition.outputs, &transition.reset_inputs})
+      for (const auto place : *side)
+        if (place >= places) throw std::runtime_error("Petri reachability fired a disabled transition");
+    try {
+      fire_petri_transition(transition, marking);
+    } catch (const std::overflow_error&) {
+      throw std::runtime_error("Petri reachability marking overflow");
     }
     return marking;
   };

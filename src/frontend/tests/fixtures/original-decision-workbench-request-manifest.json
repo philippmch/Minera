@@ -257,7 +257,7 @@
         "filename": "default-decision_mining.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/default-decision_mining.response.json",
         "bytes": 447560,
-        "sha256": "3e3c758c3135509d6277b698006ab5ef7fd706bf4515abfa10c201dcd1e90b46",
+        "sha256": "2ab5ec1ca3012b4dc77c48296eb45832039a03c17fc996f3ffd360c6de543dea",
         "status": 200
       },
       "family": "original_decision",
@@ -353,7 +353,7 @@
         "filename": "default-decision_tables.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/default-decision_tables.response.json",
         "bytes": 447991,
-        "sha256": "c3005c656421cbaaad729c78c18f8fd7c66cfe28c362bea2834d1886d7931273",
+        "sha256": "2d267f3d1879a4bad53b16e6c4d4bf363e73785a456047fab6e491c5a09c7f38",
         "status": 200
       },
       "family": "original_decision",
@@ -449,7 +449,7 @@
         "filename": "default-data_petri_net.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/default-data_petri_net.response.json",
         "bytes": 451523,
-        "sha256": "0cb85a045a0ba2894bad1dc06ceaaf64c9496da652540651c003c1c3ca8a7753",
+        "sha256": "d7ac609368e0be7ffd2602614f4c9ac1c635dd478c061259db62abb8c242bb5f",
         "status": 200
       },
       "family": "original_decision",
@@ -543,7 +543,7 @@
         "filename": "default-operation-and-omitted-options.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/default-operation-and-omitted-options.response.json",
         "bytes": 447560,
-        "sha256": "3e3c758c3135509d6277b698006ab5ef7fd706bf4515abfa10c201dcd1e90b46",
+        "sha256": "2ab5ec1ca3012b4dc77c48296eb45832039a03c17fc996f3ffd360c6de543dea",
         "status": 200
       },
       "family": "original_decision",
@@ -639,7 +639,7 @@
         "filename": "all-options-decision_mining.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/all-options-decision_mining.response.json",
         "bytes": 448148,
-        "sha256": "e5e5f7681fd1e785d3c5a01d0c0e6dfc4917f7579de576c7c2a8bbc6553f0551",
+        "sha256": "64e095733f3f3bca4483f4a5b8d49cbf1b04681b0e47aa19b9f4b7591a6ca42f",
         "status": 200
       },
       "family": "original_decision",
@@ -736,7 +736,7 @@
         "filename": "all-options-decision_tables.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/all-options-decision_tables.response.json",
         "bytes": 448254,
-        "sha256": "a7940934e0d812fbf3b3e222b50f734239c1b2de41211049507135a4b737cfa4",
+        "sha256": "4093539cbeee5e22676994761e6b6080beb3ec914dfe67bd28b49899a3e4bd55",
         "status": 200
       },
       "family": "original_decision",
@@ -833,7 +833,7 @@
         "filename": "all-options-data_petri_net.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/all-options-data_petri_net.response.json",
         "bytes": 451325,
-        "sha256": "7bed399680f22b2e662da90f22ec59ecae720bffab042935bec89d02cdd79a54",
+        "sha256": "709f79850de1c235516ce385876684848688b423698e7aa503e8a9cbb3caee63",
         "status": 200
       },
       "family": "original_decision",
@@ -937,7 +937,7 @@
         "filename": "independent-table-defaults.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/independent-table-defaults.response.json",
         "bytes": 447999,
-        "sha256": "36436c045a35e11591716cf47c6fb71c41796679eb21dc72539df5846d208207",
+        "sha256": "b84f81adbddb4226dfdc0d3777e4f93a8bc0087c3d70d3b3dc44765666d4c603",
         "status": 200
       },
       "family": "original_decision",
@@ -1032,7 +1032,7 @@
         "filename": "independent-table-outer-trace-true.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/independent-table-outer-trace-true.response.json",
         "bytes": 448062,
-        "sha256": "61e196817f2a4a4bdfb744b7d609cc60b927aa792ebd7941fb468ed7665fb240",
+        "sha256": "6bdac0821809fe09261df0ef781a26ea6172115c1437fcf76116d5a2ca076642",
         "status": 200
       },
       "family": "original_decision",
@@ -1127,7 +1127,7 @@
         "filename": "table-outer-empty-name-is-not-all.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/table-outer-empty-name-is-not-all.response.json",
         "bytes": 447841,
-        "sha256": "c5188da3cd3c66cf2f61b91b9ee378754e97bd421c6e7f4a05c3d04e78179b56",
+        "sha256": "6ef5f3f863d131363c2aefdbfd3c6e6e65820b6af1b435ddd2990de166e83527",
         "status": 200
       },
       "family": "original_decision",
@@ -1222,7 +1222,7 @@
         "filename": "mining-empty-attribute-member-native-error.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/mining-empty-attribute-member-native-error.response.json",
         "bytes": 447063,
-        "sha256": "7ed90c6ababe4cdab81b9e363a70b232e83183f8f1041aea4d35c127bc4793d6",
+        "sha256": "989e093082a33b250ea8bd18c213a96669ad508ebeb6cdea4b7d85ba13ac5c0b",
         "status": 400
       },
       "family": "original_decision",
@@ -1320,7 +1320,7 @@
         "filename": "guarded-diagnostics-only-clears-points.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/guarded-diagnostics-only-clears-points.response.json",
         "bytes": 451089,
-        "sha256": "143ab3bbb6f9bed639f79e5a4e016de39c6b1195ee48efba97ee6f3ab195e518",
+        "sha256": "2ee4883f56f2ef699970044ebf182b163e280aa7129f4487f2677ca14f6cc6f2",
         "status": 200
       },
       "family": "original_decision",
@@ -1423,7 +1423,7 @@
         "filename": "guarded-shallow-majority-record.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/guarded-shallow-majority-record.response.json",
         "bytes": 451223,
-        "sha256": "4789dbb0808bd5bde1577d486d20ad55fc2c35cea33db83b39d66b9a1444c147",
+        "sha256": "288c2c2d4e0c1097046a90c32acdf5d3b8f5587c020d1da3227275c665e305eb",
         "status": 200
       },
       "family": "original_decision",
@@ -1524,7 +1524,7 @@
         "filename": "decision-depth-zero-root-only.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/decision-depth-zero-root-only.response.json",
         "bytes": 447350,
-        "sha256": "9f78a8c8536b94b9f92af6916c4e33d9c4cb8eeecd915bbeb625dfe1f2ee5aa8",
+        "sha256": "6395d64c8c32096a26c8636b031c2b60f0bbd2bc7a61a8fb1db4adf0993427ba",
         "status": 200
       },
       "family": "original_decision",
@@ -1618,7 +1618,7 @@
         "filename": "choice-event-feature-does-not-leak.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/choice-event-feature-does-not-leak.response.json",
         "bytes": 447405,
-        "sha256": "6e90add7b11b07a8e51e019e105cd7bac076822236c488a1296500d03b3fcb73",
+        "sha256": "ad7dc590c3c0d8fa3608d0b4e00b2e79145f440c2460414a88d835370920e28c",
         "status": 200
       },
       "family": "original_decision",
@@ -1712,7 +1712,7 @@
         "filename": "native-table-lookback-1.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-table-lookback-1.response.json",
         "bytes": 650850,
-        "sha256": "791e1e915d26f189668adabc32a5c77d4b9e8405dd3d77e1291d6c649764ca47",
+        "sha256": "a0613713bb6518b0ba2fdac5e672fe1f3abfcebd5e9111db236e42a865ca566a",
         "status": 200
       },
       "family": "original_decision",
@@ -1807,7 +1807,7 @@
         "filename": "native-table-lookback-2.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-table-lookback-2.response.json",
         "bytes": 651438,
-        "sha256": "755024ea69ca481fc15aa775a7204764eca384c1957751f29219c7976c02bfba",
+        "sha256": "6d6e437ec07c5a55b25d293d14bd406cc970ee1f093e3d1b9c13e7f1c02dd082",
         "status": 200
       },
       "family": "original_decision",
@@ -1902,7 +1902,7 @@
         "filename": "native-table-lookback-64.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-table-lookback-64.response.json",
         "bytes": 651440,
-        "sha256": "4e7f2ba6c38a97c3b25730b0cc83abe829d27ea6983d51e77e29f6463a8e2812",
+        "sha256": "7ac33906b7a02d81ca92028ae6a66254ca292c1a49e4ddcb1c363d1a7bb84a8c",
         "status": 200
       },
       "family": "original_decision",
@@ -1997,7 +1997,7 @@
         "filename": "native-lookback-error-decision_tables-0.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-lookback-error-decision_tables-0.response.json",
         "bytes": 447201,
-        "sha256": "b131f5a0a684e550b67b0a43408fea274e0ba42befa305fbbd8cba299db8ed22",
+        "sha256": "aad055c4cf4585632a8e3e58bc870c222fbfa7288f2d32ee356cdd729c9328b1",
         "status": 400
       },
       "family": "original_decision",
@@ -2095,7 +2095,7 @@
         "filename": "native-lookback-error-decision_tables-65.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-lookback-error-decision_tables-65.response.json",
         "bytes": 447211,
-        "sha256": "20b88b9b7903c9191daca130ac4a392f0b62141889f62244ed517a625119fe9d",
+        "sha256": "7d9cd9f37a99824ece1d0a32234cbb1440a8bd1de7b604c323e7fb02a847523b",
         "status": 400
       },
       "family": "original_decision",
@@ -2193,7 +2193,7 @@
         "filename": "native-lookback-error-decision_tables-18446744073709551615.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-lookback-error-decision_tables-18446744073709551615.response.json",
         "bytes": 447247,
-        "sha256": "71a95db76c126e42c3dd27531b29c38fcb2d56d68473381fc3b2a9bb56df74fa",
+        "sha256": "335fb48b8c90596fa8fc6f6ababe6d02043b572fed85b960174ff69997cda528",
         "status": 400
       },
       "family": "original_decision",
@@ -2291,7 +2291,7 @@
         "filename": "native-lookback-error-data_petri_net-0.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-lookback-error-data_petri_net-0.response.json",
         "bytes": 447238,
-        "sha256": "2b677d3131c9481ec38b2edeaa4e8014076a0cfc83be1695a583a11717f9aa5c",
+        "sha256": "bdddb7f66a09e0c25ac004075d446be63bdf4a98757651caef2fb6659089456a",
         "status": 400
       },
       "family": "original_decision",
@@ -2389,7 +2389,7 @@
         "filename": "native-lookback-error-data_petri_net-65.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-lookback-error-data_petri_net-65.response.json",
         "bytes": 447248,
-        "sha256": "6f488ce575ef101e4ed7ffc32b4fea3df147774a1b1f96ede099cd943630e5c9",
+        "sha256": "5cdc1e5be641f5547e4d797e90e565f83cd4c8fddb653a3ce165dd7a106faaff",
         "status": 400
       },
       "family": "original_decision",
@@ -2487,7 +2487,7 @@
         "filename": "native-lookback-error-data_petri_net-18446744073709551615.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-lookback-error-data_petri_net-18446744073709551615.response.json",
         "bytes": 447284,
-        "sha256": "14443506bc1c1ebf44b72bce39ad8327f853c905ee1ece7d8635c58479e1720c",
+        "sha256": "5e443ce82ac4d7da7d11ffb3fa8f5c7cb3e2b21cff982f346b701851fb389489",
         "status": 400
       },
       "family": "original_decision",
@@ -2585,7 +2585,7 @@
         "filename": "native-first-class-activity-0.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-first-class-activity-0.response.json",
         "bytes": 447556,
-        "sha256": "00e953562e97dd09c0cc04fc68e125774cc61bd085c2213129787e5c052eec7d",
+        "sha256": "9ea29253aee2a0a89529a2059c1deb07f8d8c92dc266ec9ff0d9f9b62bc1abe3",
         "status": 200
       },
       "family": "original_decision",
@@ -2680,7 +2680,7 @@
         "filename": "native-first-class-activity-8.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-first-class-activity-8.response.json",
         "bytes": 447568,
-        "sha256": "1599802db3ee32ae1155722f685dc460ad38c98b9a6d255832debc8cf6796f75",
+        "sha256": "53a7e83c5527fa54bc61941065e4bcd22c51ee44ad73c9231b131cf3920b323f",
         "status": 200
       },
       "family": "original_decision",
@@ -2775,7 +2775,7 @@
         "filename": "native-first-class-activity-12.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-first-class-activity-12.response.json",
         "bytes": 447580,
-        "sha256": "1a9715d7a4ff783d9d729bbaa81ed6b365a6fee9e206c62dc4608374ea3a81d8",
+        "sha256": "63ba1506aa4580b709fa5608d9ae074e844d7381e7e9e97d64c2b34a11297909",
         "status": 200
       },
       "family": "original_decision",
@@ -2870,7 +2870,7 @@
         "filename": "native-custom-generic-activity.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-custom-generic-activity.response.json",
         "bytes": 496548,
-        "sha256": "d440dac2ced5a22d36d970e1185b3170751eb9780cf724123293c14e6a1b65c9",
+        "sha256": "b3e82b6ff2ae389f8ef8c56528b1a89392a395890806df40aa1eca9883395f9b",
         "status": 200
       },
       "family": "original_decision",
@@ -2903,7 +2903,7 @@
           "filename": "native-custom-generic-activity.source_xes.xes",
           "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-custom-generic-activity.source_xes.xes",
           "bytes": 11720,
-          "sha256": "154fc7494875392411e7534823f059fb14b6780188cfcb62425f055bf9bb1122",
+          "sha256": "bb236d2af4b77191289900948f1ec2315c06ca2d480bc286c79fc5f21f7baabb",
           "format": "xes"
         }
       },
@@ -2965,7 +2965,7 @@
         "filename": "native-missing-generic-activity.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-missing-generic-activity.response.json",
         "bytes": 447093,
-        "sha256": "5d2f7a971c3583f320b98fa615cd684d13d1dffa212e52852af418cb46e29d01",
+        "sha256": "e8d8f206a580a3f052e920118efa028e3a192b5809482289456dae3840cf6fe6",
         "status": 400
       },
       "family": "original_decision",
@@ -3063,7 +3063,7 @@
         "filename": "exact-uint64-native-controls-and-literal-lists.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/exact-uint64-native-controls-and-literal-lists.response.json",
         "bytes": 447627,
-        "sha256": "62ff73775f46e91ca651df163637a27a1d68f6509ed67f3325ef9729e2b74333",
+        "sha256": "e5b6f44ac00c06bb6e72874fdcfec354210c6ca63ed6edd02a5e153be5d3f6b5",
         "status": 200
       },
       "family": "original_decision",
@@ -3155,14 +3155,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "689563",
+        "Content-Length": "668119",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "literal-unicode-wtf-nul-context-feature.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/literal-unicode-wtf-nul-context-feature.response.json",
-        "bytes": 689563,
-        "sha256": "bbd967768ae5d572061becc76ebc7cd43fc563303814e4e6d631737b562c8628",
+        "bytes": 668119,
+        "sha256": "8d5cb6b275ee6cc93d70b27ea381f3c62e1da73573b2954420a4481e7883f476",
         "status": 200
       },
       "family": "original_decision",
@@ -3190,13 +3190,6 @@
           "bytes": 1369,
           "sha256": "05f398b6de10bd607889c652403cf7272ef5343cadce91a9c415dad5a77f3368",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "literal-unicode-wtf-nul-context-feature.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/literal-unicode-wtf-nul-context-feature.source_xes.xes",
-          "bytes": 18915,
-          "sha256": "551a815815d851ae78a0b7976f7e4d6effbf893c4fc1ccd741028ffafed7c72d",
-          "format": "xes"
         }
       },
       "executed": true,
@@ -3261,7 +3254,7 @@
         "filename": "source-xes-importer-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-xes-importer-iterparse.response.json",
         "bytes": 447560,
-        "sha256": "3e3c758c3135509d6277b698006ab5ef7fd706bf4515abfa10c201dcd1e90b46",
+        "sha256": "2ab5ec1ca3012b4dc77c48296eb45832039a03c17fc996f3ffd360c6de543dea",
         "status": 200
       },
       "family": "original_decision",
@@ -3360,7 +3353,7 @@
         "filename": "source-xes-importer-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-xes-importer-line_by_line.response.json",
         "bytes": 447560,
-        "sha256": "3e3c758c3135509d6277b698006ab5ef7fd706bf4515abfa10c201dcd1e90b46",
+        "sha256": "2ab5ec1ca3012b4dc77c48296eb45832039a03c17fc996f3ffd360c6de543dea",
         "status": 200
       },
       "family": "original_decision",
@@ -3459,7 +3452,7 @@
         "filename": "source-xes-importer-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-xes-importer-chunk_regex.response.json",
         "bytes": 447560,
-        "sha256": "3e3c758c3135509d6277b698006ab5ef7fd706bf4515abfa10c201dcd1e90b46",
+        "sha256": "2ab5ec1ca3012b4dc77c48296eb45832039a03c17fc996f3ffd360c6de543dea",
         "status": 200
       },
       "family": "original_decision",
@@ -3558,7 +3551,7 @@
         "filename": "source-xes-importer-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-xes-importer-iterparse_20.response.json",
         "bytes": 447560,
-        "sha256": "3e3c758c3135509d6277b698006ab5ef7fd706bf4515abfa10c201dcd1e90b46",
+        "sha256": "2ab5ec1ca3012b4dc77c48296eb45832039a03c17fc996f3ffd360c6de543dea",
         "status": 200
       },
       "family": "original_decision",
@@ -3657,7 +3650,7 @@
         "filename": "source-xes-importer-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-xes-importer-iterparse_mem_compressed.response.json",
         "bytes": 447560,
-        "sha256": "3e3c758c3135509d6277b698006ab5ef7fd706bf4515abfa10c201dcd1e90b46",
+        "sha256": "2ab5ec1ca3012b4dc77c48296eb45832039a03c17fc996f3ffd360c6de543dea",
         "status": 200
       },
       "family": "original_decision",
@@ -3756,7 +3749,7 @@
         "filename": "source-xes-importer-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-xes-importer-rustxes.response.json",
         "bytes": 450364,
-        "sha256": "50e5cd92079c0436dcca2bef9eac213dcfd839484aecc6e454d1eb9b47f85906",
+        "sha256": "22eaf5b0235edef6d5b233c3e160b1957daf29044411eaf2bad0477192ae5436",
         "status": 200
       },
       "family": "original_decision",
@@ -3950,7 +3943,7 @@
         "filename": "source-binary-gzip-original.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-binary-gzip-original.response.json",
         "bytes": 437910,
-        "sha256": "b9942f39afad6073c4087158bf58fe80a7ae0d95749924fe113535fb245b7bfb",
+        "sha256": "168acc8adf856c2c06f42cd81083b194a7e8bb3ef7fe1da69843243a3bdcdf88",
         "status": 200
       },
       "family": "original_decision",
@@ -4045,7 +4038,7 @@
         "filename": "source-flat-csv-complete-metadata.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-flat-csv-complete-metadata.response.json",
         "bytes": 336901,
-        "sha256": "6caf35e5ef15645f3cabc93f8536db57ab56ccd46e79e8cd601b2cd6cd27e555",
+        "sha256": "a59c9f5b3d5e9abadd60eb4eaa97753fb481873fcafd73c1e07d56d642fb7a5e",
         "status": 200
       },
       "family": "original_decision",
@@ -4077,7 +4070,7 @@
           "filename": "source-flat-csv-complete-metadata.source_xes.xes",
           "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-flat-csv-complete-metadata.source_xes.xes",
           "bytes": 13668,
-          "sha256": "be2fa50e6c781a337a934f5abd3ab1a9c19fbb8f31d914b22640dfad2c9fe35e",
+          "sha256": "bc80c57c94a09e0856479ca49e9a52398ad530d43a273feccb3fc647ec406e4f",
           "format": "xes"
         }
       },
@@ -4163,7 +4156,7 @@
         "filename": "source-csv-explicit-import-controls.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-csv-explicit-import-controls.response.json",
         "bytes": 336911,
-        "sha256": "62ea079eca0d489b2b589b37cface98b2bbb7ea1348db70fbab821637c8db605",
+        "sha256": "1e64de060d1bc9e012fff921a90e947385787e1c06d5ea650e1bf9c78233a04d",
         "status": 200
       },
       "family": "original_decision",
@@ -4195,7 +4188,7 @@
           "filename": "source-csv-explicit-import-controls.source_xes.xes",
           "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-csv-explicit-import-controls.source_xes.xes",
           "bytes": 13668,
-          "sha256": "be2fa50e6c781a337a934f5abd3ab1a9c19fbb8f31d914b22640dfad2c9fe35e",
+          "sha256": "bc80c57c94a09e0856479ca49e9a52398ad530d43a273feccb3fc647ec406e4f",
           "format": "xes"
         }
       },
@@ -4254,14 +4247,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "678377",
+        "Content-Length": "657893",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "source-typed-original-metadata.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-typed-original-metadata.response.json",
-        "bytes": 678377,
-        "sha256": "e7ffbb55605ce235a37ce4ed463fbf8ad4f8833d6aa49556d5c121d8271d841b",
+        "bytes": 657893,
+        "sha256": "57e79e076c33de5303af95c79a22e9e98f50d362f2d4a194215d79bdac395664",
         "status": 200
       },
       "family": "original_decision",
@@ -4289,13 +4282,6 @@
           "bytes": 1369,
           "sha256": "05f398b6de10bd607889c652403cf7272ef5343cadce91a9c415dad5a77f3368",
           "format": "pnml"
-        },
-        "source_xes": {
-          "filename": "source-typed-original-metadata.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/source-typed-original-metadata.source_xes.xes",
-          "bytes": 18275,
-          "sha256": "d724ce7ceb82a3de90b684424ebc925f45d07e1bdfcc27fd958dbec640e0f5f3",
-          "format": "xes"
         }
       },
       "executed": true,
@@ -4736,7 +4722,7 @@
         "filename": "normative-no-decision-model.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/normative-no-decision-model.response.json",
         "bytes": 444056,
-        "sha256": "49db2c4ce3ed37116adc914be28b6fe7162b5f2245f8ddd4b023e75ce225167c",
+        "sha256": "390693cf3e67d40a20d68f355f8efed79a4c677c9466c85d8f6c3449d01f6c9d",
         "status": 200
       },
       "family": "original_decision",
@@ -4834,7 +4820,7 @@
         "filename": "pnml-control-infer_initial_marking.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/pnml-control-infer_initial_marking.response.json",
         "bytes": 447561,
-        "sha256": "b4fa01f3b8ce6a330e8f314e5f9cc90b783cb86dc7c4d477a859337c16265518",
+        "sha256": "ff60d1d83e7d7dacf947fdb66f965caf2873c6335c2f0bb31e7425a34ebae7df",
         "status": 200
       },
       "family": "original_decision",
@@ -4935,7 +4921,7 @@
         "filename": "pnml-control-infer_final_marking.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/pnml-control-infer_final_marking.response.json",
         "bytes": 447561,
-        "sha256": "05902c1283222c7eaa887052b609404b812e0e2940b33e49dc5e98c3e13c9067",
+        "sha256": "91a7f58413d7619ef321e3981144a5e3d173d9fe893217fd5cce6f3b2cff221c",
         "status": 200
       },
       "family": "original_decision",
@@ -5036,7 +5022,7 @@
         "filename": "pnml-control-import_stochastic_map.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/pnml-control-import_stochastic_map.response.json",
         "bytes": 447559,
-        "sha256": "e0c293cfb4a0f12525614f5bdae8ba5ed033455e2eb1fdb794af95140ad1abec",
+        "sha256": "8c8f43325b775e05d34540fa4c0cc33dcadcec6dff24effd66a2683cd8cc7263",
         "status": 200
       },
       "family": "original_decision",
@@ -5137,7 +5123,7 @@
         "filename": "pnml-control-require_workflow_boundaries.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/pnml-control-require_workflow_boundaries.response.json",
         "bytes": 447561,
-        "sha256": "5a3eb2db29ee47dfae0ab1785098f47b75e5c27f4a2ef4f9ef506e17095f2ce3",
+        "sha256": "a27a745880fbca5e63c3c15a598fba127bd49b04c1ed74f1db7a4cf7c354eb1b",
         "status": 200
       },
       "family": "original_decision",
@@ -5238,7 +5224,7 @@
         "filename": "pnml-control-public_marking_semantics.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/pnml-control-public_marking_semantics.response.json",
         "bytes": 447559,
-        "sha256": "ca5ed5302fe8b6714712ed103be491d25d35e74d10dcf0c07ed3ae4e0f6208ef",
+        "sha256": "bbedffc769f6dffe655606cf7a379599801daf03f97c68a6b1d758354e097ad8",
         "status": 200
       },
       "family": "original_decision",
@@ -5335,7 +5321,7 @@
         "filename": "arbitrary-document-counts-never-narrowed.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/arbitrary-document-counts-never-narrowed.response.json",
         "bytes": 447685,
-        "sha256": "5c63478e852de8cf05e7badd8592ec4347bb59329d207f6235e22e008bc36e36",
+        "sha256": "ee2122d259fc5c7f9f7e197a41c2937f9ccaaf85b6f04cc3cc137b478001484e",
         "status": 200
       },
       "family": "original_decision",
@@ -5431,7 +5417,7 @@
         "filename": "original-zero-marking-membership.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/original-zero-marking-membership.response.json",
         "bytes": 448090,
-        "sha256": "9ef68ea7db35b7470a8c19f26854a893f0166c4d40de614fb1b82db827f1ff2a",
+        "sha256": "a3f7270addc1dcff980eaf2783795ad4eb247f7d85ffda2af67b459bf4c97884",
         "status": 200
       },
       "family": "original_decision",
@@ -5526,7 +5512,7 @@
         "filename": "native-alignment-backed-observation.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-alignment-backed-observation.response.json",
         "bytes": 469334,
-        "sha256": "869c859c16cea094a6f81bd7b9a732146bef9a4d3cede62270d93fb68c58ff32",
+        "sha256": "d01588b1541de6fb47344e017e5c84bdf95b359ac0ce289aa2bc530cdd5c8744",
         "status": 200
       },
       "family": "original_decision",
@@ -5622,7 +5608,7 @@
         "filename": "native-semantic-error-depth.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-semantic-error-depth.response.json",
         "bytes": 447044,
-        "sha256": "98cd0d935a64dacde178efe8bc690968bcfbf37b674785bfd09dc02351a934c6",
+        "sha256": "5d7d28c08c2101d9e78a731816cf6b01dd7ce06b1f0b41f529ea94c1aa4f8729",
         "status": 400
       },
       "family": "original_decision",
@@ -5720,7 +5706,7 @@
         "filename": "native-semantic-error-split.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-semantic-error-split.response.json",
         "bytes": 447056,
-        "sha256": "f29dcbabf9fe393f27571b63e61599f7d4de4687fcbef7b182b0ada0f9afbe41",
+        "sha256": "efed6890f2f48d41cc7c0ac98a997af5ef92e2b32fdbb9c2ccdaf2dd35e4362b",
         "status": 400
       },
       "family": "original_decision",
@@ -5818,7 +5804,7 @@
         "filename": "native-semantic-error-leaf.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-semantic-error-leaf.response.json",
         "bytes": 447051,
-        "sha256": "eb022735e36802d4c2ef1fe706ca87b1294cd5944ee058abc2835f253b890e52",
+        "sha256": "000b9b3fe2f74f3467c37c004a0189ea19fa949770117c3720063bdcc7bc9420",
         "status": 400
       },
       "family": "original_decision",
@@ -5916,7 +5902,7 @@
         "filename": "native-semantic-error-categories.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-semantic-error-categories.response.json",
         "bytes": 447071,
-        "sha256": "69d45ab6b43af200c6ffd56668180c86e7fb4255033073b4c46d07b86effe0dc",
+        "sha256": "39aa4c02043eef6623872420103a9bdaa94226276cf7d8c0cc672c04b59c9d62",
         "status": 400
       },
       "family": "original_decision",
@@ -6014,7 +6000,7 @@
         "filename": "native-semantic-error-thresholds.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-semantic-error-thresholds.response.json",
         "bytes": 447071,
-        "sha256": "6cffef1147903f741a5a7ca6b9e295e10b61758f2eb0529aac5ac2b91a56c4a7",
+        "sha256": "a573107338816827f3d22b48a456b288502105c9ac9a51e694cef957be29ce38",
         "status": 400
       },
       "family": "original_decision",
@@ -6112,7 +6098,7 @@
         "filename": "native-semantic-error-gain-nan.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-semantic-error-gain-nan.response.json",
         "bytes": 447047,
-        "sha256": "2e57ab6a80c5f7c4c6e0dacad689d793d8bb2208b02955b4cae9ed084f9e7b43",
+        "sha256": "7144940ae024e054890b3cccdfaa074ddf481e069c2b1eb3ef62182a9a8c8d64",
         "status": 400
       },
       "family": "original_decision",
@@ -6210,7 +6196,7 @@
         "filename": "native-semantic-error-gain-inf.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-semantic-error-gain-inf.response.json",
         "bytes": 447047,
-        "sha256": "be2cc4af80764ab0c66f4d69bc67b104ef011b8a1cf990f362c94d681daa67df",
+        "sha256": "8681aa8a6ac3864258f01c20a3a6ff86058217e326ff00f770766c3dc41c7d27",
         "status": 400
       },
       "family": "original_decision",
@@ -6308,7 +6294,7 @@
         "filename": "native-semantic-error-gain-negative.response.json",
         "path": "src/frontend/tests/fixtures/original-decision-workbench/captures/native-semantic-error-gain-negative.response.json",
         "bytes": 447041,
-        "sha256": "2a383e82ecd9f9b31e0c504c22e809da3fc973e742771e9a2d44a0ddd90eba49",
+        "sha256": "72faa450ee2ec33812d0cbf3c7e49b84746d410b84884a7a673d4d04ff4416d0",
         "status": 400
       },
       "family": "original_decision",

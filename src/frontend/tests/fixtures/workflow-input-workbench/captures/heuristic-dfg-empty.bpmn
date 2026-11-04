@@ -1,7 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
   <process id="process" name="Independent workflow discovery" isExecutable="false">
-    <startEvent id="StartEvent_0"/>
-    <endEvent id="EndEvent_1"/>
+    <startEvent id="StartEvent_0" name="start">
+      <outgoing>Flow_4</outgoing>
+    </startEvent>
+    <endEvent id="EndEvent_1" name="end">
+      <incoming>Flow_5</incoming>
+    </endEvent>
+    <exclusiveGateway id="exclusiveGateway_2" gatewayDirection="Unspecified">
+      <incoming>Flow_4</incoming>
+    </exclusiveGateway>
+    <exclusiveGateway id="exclusiveGateway_3" gatewayDirection="Unspecified">
+      <outgoing>Flow_5</outgoing>
+    </exclusiveGateway>
+    <sequenceFlow id="Flow_4" sourceRef="StartEvent_0" targetRef="exclusiveGateway_2"/>
+    <sequenceFlow id="Flow_5" sourceRef="exclusiveGateway_3" targetRef="EndEvent_1"/>
   </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_process">
+    <bpmndi:BPMNPlane id="BPMNPlane_process" bpmnElement="process">
+      <bpmndi:BPMNShape id="StartEvent_0_di" bpmnElement="StartEvent_0">
+        <dc:Bounds x="82" y="82" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="242" y="82" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="exclusiveGateway_2_di" bpmnElement="exclusiveGateway_2">
+        <dc:Bounds x="235" y="195" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="exclusiveGateway_3_di" bpmnElement="exclusiveGateway_3">
+        <dc:Bounds x="75" y="195" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="118" y="100"/>
+        <di:waypoint x="235" y="220"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="125" y="220"/>
+        <di:waypoint x="242" y="100"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
 </definitions>

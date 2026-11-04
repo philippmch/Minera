@@ -41,14 +41,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "239459",
+        "Content-Length": "241795",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-log-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-log.response.json",
-        "bytes": 239459,
-        "sha256": "5e4c2b8cea436162f721563bf9da6e69ea111c46d07a15b5c7e7f38e67afbf69",
+        "bytes": 241795,
+        "sha256": "140714075705f0bdbb42edf9ac4f8edcae5cd3debef1cbdd6a4daa241ca8c135",
         "status": 200
       },
       "family": "inductive",
@@ -63,15 +63,15 @@
         "pnml": {
           "filename": "csv-log-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-log.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-log-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-log.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -84,8 +84,8 @@
         "source_xes": {
           "filename": "csv-log-log.source_xes.xes",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-log.source_xes.xes",
-          "bytes": 17640,
-          "sha256": "29e6e6231a9a391fa71f2f518cd9e32f8c21ce8fe383b0f9c6282e6a70eb9265",
+          "bytes": 17896,
+          "sha256": "ac2aab29ec15df048b08a5370ca58c9b50e2eafbd1f7675d5f64607386381ec7",
           "format": "xes"
         }
       }
@@ -127,14 +127,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "212380",
+        "Content-Length": "214524",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-log-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-stream.response.json",
-        "bytes": 212380,
-        "sha256": "221e47213bad525d452c1b92b1c8b0c514d5f9532963ec6fadb1ed9d49db2e21",
+        "bytes": 214524,
+        "sha256": "0b4703d40ebf978d25d567cbffde21ee48d37efe3cecfa921cea4afee06f5c46",
         "status": 200
       },
       "family": "inductive",
@@ -149,15 +149,15 @@
         "pnml": {
           "filename": "csv-log-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-stream.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-log-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-stream.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -213,14 +213,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "212383",
+        "Content-Length": "214527",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-log-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-dataframe.response.json",
-        "bytes": 212383,
-        "sha256": "646e11a73ee9fb4c14aebfed4d83926bb1ea0bbc6e27cecd60b31b40622dc21c",
+        "bytes": 214527,
+        "sha256": "d6dd513f66014240a80384849110fcb56201077fab652d81b6a2aaf102f9f623",
         "status": 200
       },
       "family": "inductive",
@@ -235,15 +235,15 @@
         "pnml": {
           "filename": "csv-log-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-dataframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-log-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-dataframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -299,14 +299,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "212383",
+        "Content-Length": "214527",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-log-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-lazyframe.response.json",
-        "bytes": 212383,
-        "sha256": "aadf91075454dc5817dfb4b866867db44f82281101602971e94b6ad7040d9555",
+        "bytes": 214527,
+        "sha256": "7443480f890e435852f611d7f129ab6c80f56d03e4718a8cab0946a228e6e176",
         "status": 200
       },
       "family": "inductive",
@@ -321,15 +321,15 @@
         "pnml": {
           "filename": "csv-log-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-lazyframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-log-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-log-lazyframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -389,14 +389,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "175538",
+        "Content-Length": "177682",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-log.response.json",
-        "bytes": 175538,
-        "sha256": "e30cfc92fab7a19e084673d5e6ada3593dae08a97c3b52e38b6268da80d83848",
+        "bytes": 177682,
+        "sha256": "e740780c6d89c6ef870ce3e8ce0a7c012eb3d29456b2bfaaadc5db943aeb60a6",
         "status": 200
       },
       "family": "inductive",
@@ -411,15 +411,15 @@
         "pnml": {
           "filename": "xes-log-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-log.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-log.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -479,14 +479,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "210319",
+        "Content-Length": "212463",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-stream.response.json",
-        "bytes": 210319,
-        "sha256": "b073916d1b4923978495e6b1e7f7e5687f269fabb729e61dd381c826d1ecc546",
+        "bytes": 212463,
+        "sha256": "630b8043049bacbca1aad551690d4ceea08a9bdfe23eeffa2754adaa5933f2c5",
         "status": 200
       },
       "family": "inductive",
@@ -501,15 +501,15 @@
         "pnml": {
           "filename": "xes-log-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-stream.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-stream.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -569,14 +569,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "210322",
+        "Content-Length": "212466",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-dataframe.response.json",
-        "bytes": 210322,
-        "sha256": "4755193223ce19e83f16ba27b96e1aa6115901a4522598cd99b50d782003978b",
+        "bytes": 212466,
+        "sha256": "4952cb1d94fc8a4263fad268c0beb0a985cea290bd592bf14327faa29e2bae9d",
         "status": 200
       },
       "family": "inductive",
@@ -591,15 +591,15 @@
         "pnml": {
           "filename": "xes-log-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-dataframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-dataframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -659,14 +659,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "210322",
+        "Content-Length": "212466",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-lazyframe.response.json",
-        "bytes": 210322,
-        "sha256": "11e23c4f35da3c35f839a13e2344c25fa2193a77367f446123ab03b0c1c5bc40",
+        "bytes": 212466,
+        "sha256": "b296982badb3369db370f487c45c8f1cb5c1f80dfb65a9f4bf9ceca2b8e57542",
         "status": 200
       },
       "family": "inductive",
@@ -681,15 +681,15 @@
         "pnml": {
           "filename": "xes-log-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-lazyframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-lazyframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -757,14 +757,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16926",
+        "Content-Length": "19070",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-iterparse.response.json",
-        "bytes": 16926,
-        "sha256": "cb7ec2d75ab1934cc8743f777b3e9fabab32053a8fde368585943516fe9c0fd6",
+        "bytes": 19070,
+        "sha256": "62847af07067757b80947b84a8af6447a864477bb9da9f94f7496cbf3d94f3f8",
         "status": 200
       },
       "family": "inductive",
@@ -779,15 +779,15 @@
         "pnml": {
           "filename": "xes-log-iterparse.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-iterparse.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-iterparse.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-iterparse.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -855,14 +855,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16926",
+        "Content-Length": "19070",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-line_by_line.response.json",
-        "bytes": 16926,
-        "sha256": "cb7ec2d75ab1934cc8743f777b3e9fabab32053a8fde368585943516fe9c0fd6",
+        "bytes": 19070,
+        "sha256": "62847af07067757b80947b84a8af6447a864477bb9da9f94f7496cbf3d94f3f8",
         "status": 200
       },
       "family": "inductive",
@@ -877,15 +877,15 @@
         "pnml": {
           "filename": "xes-log-line_by_line.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-line_by_line.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-line_by_line.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-line_by_line.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -953,14 +953,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16926",
+        "Content-Length": "19070",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-iterparse_20.response.json",
-        "bytes": 16926,
-        "sha256": "cb7ec2d75ab1934cc8743f777b3e9fabab32053a8fde368585943516fe9c0fd6",
+        "bytes": 19070,
+        "sha256": "62847af07067757b80947b84a8af6447a864477bb9da9f94f7496cbf3d94f3f8",
         "status": 200
       },
       "family": "inductive",
@@ -975,15 +975,15 @@
         "pnml": {
           "filename": "xes-log-iterparse_20.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-iterparse_20.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-iterparse_20.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-iterparse_20.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -1051,14 +1051,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16926",
+        "Content-Length": "19070",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-iterparse_mem_compressed.response.json",
-        "bytes": 16926,
-        "sha256": "cb7ec2d75ab1934cc8743f777b3e9fabab32053a8fde368585943516fe9c0fd6",
+        "bytes": 19070,
+        "sha256": "62847af07067757b80947b84a8af6447a864477bb9da9f94f7496cbf3d94f3f8",
         "status": 200
       },
       "family": "inductive",
@@ -1073,15 +1073,15 @@
         "pnml": {
           "filename": "xes-log-iterparse_mem_compressed.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-iterparse_mem_compressed.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-iterparse_mem_compressed.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-iterparse_mem_compressed.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -1149,14 +1149,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17898",
+        "Content-Length": "20042",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-rustxes.response.json",
-        "bytes": 17898,
-        "sha256": "bc1e1c2a6ca3d488b5787960b4e0b0071d4988289eb4ddb8a172ba278daa4f97",
+        "bytes": 20042,
+        "sha256": "15693509934d2a7b31f1313d4cb5d5c2687d0153a5bcc68a7e5c508b1605461a",
         "status": 200
       },
       "family": "inductive",
@@ -1171,15 +1171,15 @@
         "pnml": {
           "filename": "xes-log-rustxes.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-rustxes.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-rustxes.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-rustxes.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -1247,14 +1247,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16926",
+        "Content-Length": "19070",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-log-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-chunk_regex.response.json",
-        "bytes": 16926,
-        "sha256": "cb7ec2d75ab1934cc8743f777b3e9fabab32053a8fde368585943516fe9c0fd6",
+        "bytes": 19070,
+        "sha256": "62847af07067757b80947b84a8af6447a864477bb9da9f94f7496cbf3d94f3f8",
         "status": 200
       },
       "family": "inductive",
@@ -1269,15 +1269,15 @@
         "pnml": {
           "filename": "xes-log-chunk_regex.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-chunk_regex.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-log-chunk_regex.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-log-chunk_regex.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -1337,14 +1337,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "58443",
+        "Content-Length": "64497",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-log-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-log.response.json",
-        "bytes": 58443,
-        "sha256": "c598370ff2575d69a53da0d6a5f4e2fb7ed425423a4b64425e349686b92e34a3",
+        "bytes": 64497,
+        "sha256": "2727113d221d26fcfca4bd935db54fd6acb7fab2fc25b1bb9ddc11a97f203536",
         "status": 200
       },
       "family": "inductive",
@@ -1359,15 +1359,15 @@
         "pnml": {
           "filename": "typed-log-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-log.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "df6f694011848bea642fdc1e01096bce8512eb9cb5b0cdf77ad9ae8b2f052475",
+          "bytes": 2610,
+          "sha256": "45df7581367b7ae1e755e6e65caecfb54950d5e87c87e2c50a12885013c44ac9",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-log-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-log.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "a262ef1bc5293f623d8781691ca4b62ffbf0eff08f1dd286ec23d67ae32cbe18",
+          "bytes": 4991,
+          "sha256": "8a7eb948af6b3165a43f97d5f8eddd63dc15e4b0a3dd81e9bfb0bc48306654d9",
           "format": "bpmn"
         },
         "ptml": {
@@ -1420,14 +1420,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31958",
+        "Content-Length": "38012",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-log-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-stream.response.json",
-        "bytes": 31958,
-        "sha256": "8f1615c22e4ddc3ab4019f33ed37fb219dfa13f6a0dc3005b3f413a804e734b0",
+        "bytes": 38012,
+        "sha256": "1c8d8e4810b94429ebfc0f2d18f698669b81c0896ae22e875a752dc3d61785ff",
         "status": 200
       },
       "family": "inductive",
@@ -1442,15 +1442,15 @@
         "pnml": {
           "filename": "typed-log-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-stream.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-log-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-stream.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -1510,14 +1510,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31961",
+        "Content-Length": "38015",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-log-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-dataframe.response.json",
-        "bytes": 31961,
-        "sha256": "49c3a41734c5d41cfd9b327724ebf25c0ef36d710f2389ec2880b13f65bbb03f",
+        "bytes": 38015,
+        "sha256": "b084aece10334c8fdc25d3653969b52dc992430c5632fd8df8a3a100cfc8faac",
         "status": 200
       },
       "family": "inductive",
@@ -1532,15 +1532,15 @@
         "pnml": {
           "filename": "typed-log-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-dataframe.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-log-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-dataframe.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -1600,14 +1600,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31961",
+        "Content-Length": "38015",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-log-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-lazyframe.response.json",
-        "bytes": 31961,
-        "sha256": "06f0cbfbaaf5d912d39779d206de29f098502d969a7c97cb96d7762a717dd924",
+        "bytes": 38015,
+        "sha256": "5ab8268085d29ce5c4b4a474ad0cd0abcd35e3a8fe6c5a75264884b38219517d",
         "status": 200
       },
       "family": "inductive",
@@ -1622,15 +1622,15 @@
         "pnml": {
           "filename": "typed-log-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-lazyframe.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-log-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-log-lazyframe.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -1686,14 +1686,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "239463",
+        "Content-Length": "241799",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-imf-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-log.response.json",
-        "bytes": 239463,
-        "sha256": "e715fa47d6ec62a280397b4600bb68c23f385924f70855e842f69e3673f3cdd1",
+        "bytes": 241799,
+        "sha256": "5c4899fa0e4d792605b142da53f333d713a2c74164abee6ce519cac0fc64b0fb",
         "status": 200
       },
       "family": "inductive",
@@ -1708,15 +1708,15 @@
         "pnml": {
           "filename": "csv-imf-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-log.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-imf-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-log.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -1729,8 +1729,8 @@
         "source_xes": {
           "filename": "csv-imf-log.source_xes.xes",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-log.source_xes.xes",
-          "bytes": 17640,
-          "sha256": "29e6e6231a9a391fa71f2f518cd9e32f8c21ce8fe383b0f9c6282e6a70eb9265",
+          "bytes": 17896,
+          "sha256": "ac2aab29ec15df048b08a5370ca58c9b50e2eafbd1f7675d5f64607386381ec7",
           "format": "xes"
         }
       }
@@ -1772,14 +1772,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "212384",
+        "Content-Length": "214528",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-imf-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-stream.response.json",
-        "bytes": 212384,
-        "sha256": "10c9a0c4be832ba82e0f99cc27ad937087684344c7ade5030944d1b3356fec2f",
+        "bytes": 214528,
+        "sha256": "4dd1af8d26537cd6dbcb234723796cf0efbb95ee1ef6ae6a1e12f67f1b09f5fc",
         "status": 200
       },
       "family": "inductive",
@@ -1794,15 +1794,15 @@
         "pnml": {
           "filename": "csv-imf-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-stream.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-imf-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-stream.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -1858,14 +1858,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "212387",
+        "Content-Length": "214531",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-imf-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-dataframe.response.json",
-        "bytes": 212387,
-        "sha256": "77d69b41c7571494c545f10b85b1a51750807b9bc253b86f4615b74b031c5a0d",
+        "bytes": 214531,
+        "sha256": "46b4d285c1e9270f6b616a77ea98854397e0db2a09e4583f54c306d7442bd452",
         "status": 200
       },
       "family": "inductive",
@@ -1880,15 +1880,15 @@
         "pnml": {
           "filename": "csv-imf-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-dataframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-imf-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-dataframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -1944,14 +1944,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "212387",
+        "Content-Length": "214531",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-imf-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-lazyframe.response.json",
-        "bytes": 212387,
-        "sha256": "f1a690120ffcdfeb15c46a708d47cc5b6fd4de8b9609c97a7e13f24dba83416e",
+        "bytes": 214531,
+        "sha256": "19cdfeecefc826647434371e7d489ed6387361d81ec3e402bfa34f3554eda4af",
         "status": 200
       },
       "family": "inductive",
@@ -1966,15 +1966,15 @@
         "pnml": {
           "filename": "csv-imf-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-lazyframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-imf-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-imf-lazyframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -2034,14 +2034,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "175542",
+        "Content-Length": "177686",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-log.response.json",
-        "bytes": 175542,
-        "sha256": "8df1fc203850e8ad6e307fa5f77be7f19681eefb7a0bcbb99ded9aadd8e31f05",
+        "bytes": 177686,
+        "sha256": "42c172226b7170e9f04fc61b1653d646e58e5e53a22dbfe99012b88a8a3aea2a",
         "status": 200
       },
       "family": "inductive",
@@ -2056,15 +2056,15 @@
         "pnml": {
           "filename": "xes-imf-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-log.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-log.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -2124,14 +2124,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "210323",
+        "Content-Length": "212467",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-stream.response.json",
-        "bytes": 210323,
-        "sha256": "55280647c4fef18944b2fd3fecae5ce45b0c7009cb2858e679383585224696e2",
+        "bytes": 212467,
+        "sha256": "ae2a23b23bb945cc641eadfb5669fb6a7b0117b0b29f090b3bd51f5c8a6a8807",
         "status": 200
       },
       "family": "inductive",
@@ -2146,15 +2146,15 @@
         "pnml": {
           "filename": "xes-imf-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-stream.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-stream.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -2214,14 +2214,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "210326",
+        "Content-Length": "212470",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-dataframe.response.json",
-        "bytes": 210326,
-        "sha256": "cfe61a1de51d38b7b50d1d99b0e01a58c77376043e31c81126ebfcc99ed3575d",
+        "bytes": 212470,
+        "sha256": "ef905e8627e8c156e57b12c5724486ff6e8a7aa048d734175c0c60e9d4550fb8",
         "status": 200
       },
       "family": "inductive",
@@ -2236,15 +2236,15 @@
         "pnml": {
           "filename": "xes-imf-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-dataframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-dataframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -2304,14 +2304,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "210326",
+        "Content-Length": "212470",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-lazyframe.response.json",
-        "bytes": 210326,
-        "sha256": "4f800c62fc81eaa6be807d43b7bf54ba6001cd5cce58e585b87f241b05d78767",
+        "bytes": 212470,
+        "sha256": "ef87f304627506e44cbce8f752d792a5a3299297893b8605c3764c66edc3369b",
         "status": 200
       },
       "family": "inductive",
@@ -2326,15 +2326,15 @@
         "pnml": {
           "filename": "xes-imf-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-lazyframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-lazyframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -2402,14 +2402,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-iterparse.response.json",
-        "bytes": 16930,
-        "sha256": "932ca6a8459114f22f8674ef35b2251234d3600bb27af8906f1ceb7e61d6e52c",
+        "bytes": 19074,
+        "sha256": "4bdd5f53e9cebfded07ad14a148e81cbe31280d16f0a4826d2dc5babe2c56750",
         "status": 200
       },
       "family": "inductive",
@@ -2424,15 +2424,15 @@
         "pnml": {
           "filename": "xes-imf-iterparse.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-iterparse.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-iterparse.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-iterparse.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -2500,14 +2500,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-line_by_line.response.json",
-        "bytes": 16930,
-        "sha256": "932ca6a8459114f22f8674ef35b2251234d3600bb27af8906f1ceb7e61d6e52c",
+        "bytes": 19074,
+        "sha256": "4bdd5f53e9cebfded07ad14a148e81cbe31280d16f0a4826d2dc5babe2c56750",
         "status": 200
       },
       "family": "inductive",
@@ -2522,15 +2522,15 @@
         "pnml": {
           "filename": "xes-imf-line_by_line.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-line_by_line.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-line_by_line.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-line_by_line.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -2598,14 +2598,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-iterparse_20.response.json",
-        "bytes": 16930,
-        "sha256": "932ca6a8459114f22f8674ef35b2251234d3600bb27af8906f1ceb7e61d6e52c",
+        "bytes": 19074,
+        "sha256": "4bdd5f53e9cebfded07ad14a148e81cbe31280d16f0a4826d2dc5babe2c56750",
         "status": 200
       },
       "family": "inductive",
@@ -2620,15 +2620,15 @@
         "pnml": {
           "filename": "xes-imf-iterparse_20.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-iterparse_20.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-iterparse_20.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-iterparse_20.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -2696,14 +2696,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-iterparse_mem_compressed.response.json",
-        "bytes": 16930,
-        "sha256": "932ca6a8459114f22f8674ef35b2251234d3600bb27af8906f1ceb7e61d6e52c",
+        "bytes": 19074,
+        "sha256": "4bdd5f53e9cebfded07ad14a148e81cbe31280d16f0a4826d2dc5babe2c56750",
         "status": 200
       },
       "family": "inductive",
@@ -2718,15 +2718,15 @@
         "pnml": {
           "filename": "xes-imf-iterparse_mem_compressed.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-iterparse_mem_compressed.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-iterparse_mem_compressed.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-iterparse_mem_compressed.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -2794,14 +2794,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17902",
+        "Content-Length": "20046",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-rustxes.response.json",
-        "bytes": 17902,
-        "sha256": "d1b9f5c82e15da2a3e471d89ea9323497daede96ee3f9764e1632da55142ce71",
+        "bytes": 20046,
+        "sha256": "9bc73b2696351b531401860153b648fa5865c3e8b5c765f6697766957f5602c3",
         "status": 200
       },
       "family": "inductive",
@@ -2816,15 +2816,15 @@
         "pnml": {
           "filename": "xes-imf-rustxes.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-rustxes.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-rustxes.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-rustxes.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -2892,14 +2892,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-imf-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-chunk_regex.response.json",
-        "bytes": 16930,
-        "sha256": "932ca6a8459114f22f8674ef35b2251234d3600bb27af8906f1ceb7e61d6e52c",
+        "bytes": 19074,
+        "sha256": "4bdd5f53e9cebfded07ad14a148e81cbe31280d16f0a4826d2dc5babe2c56750",
         "status": 200
       },
       "family": "inductive",
@@ -2914,15 +2914,15 @@
         "pnml": {
           "filename": "xes-imf-chunk_regex.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-chunk_regex.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-imf-chunk_regex.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-imf-chunk_regex.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -2982,14 +2982,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "58447",
+        "Content-Length": "64501",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-imf-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-log.response.json",
-        "bytes": 58447,
-        "sha256": "23d61eef85b039bc84937d565488f5e0dcde766627f358f6f7c67e14b892d4ce",
+        "bytes": 64501,
+        "sha256": "7acfba374d1518355ff9dd1631a8d4d940911005a68a8c93314559c1f16574c5",
         "status": 200
       },
       "family": "inductive",
@@ -3004,15 +3004,15 @@
         "pnml": {
           "filename": "typed-imf-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-log.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "df6f694011848bea642fdc1e01096bce8512eb9cb5b0cdf77ad9ae8b2f052475",
+          "bytes": 2610,
+          "sha256": "45df7581367b7ae1e755e6e65caecfb54950d5e87c87e2c50a12885013c44ac9",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-imf-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-log.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "a262ef1bc5293f623d8781691ca4b62ffbf0eff08f1dd286ec23d67ae32cbe18",
+          "bytes": 4991,
+          "sha256": "8a7eb948af6b3165a43f97d5f8eddd63dc15e4b0a3dd81e9bfb0bc48306654d9",
           "format": "bpmn"
         },
         "ptml": {
@@ -3065,14 +3065,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31962",
+        "Content-Length": "38016",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-imf-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-stream.response.json",
-        "bytes": 31962,
-        "sha256": "477df23fe82366282a2596335885c98ff80255a1665028af282e47517afbdf59",
+        "bytes": 38016,
+        "sha256": "ad0cbd2448aac4ec26782b69105be60d99ea893f3027293863e00b6466e57534",
         "status": 200
       },
       "family": "inductive",
@@ -3087,15 +3087,15 @@
         "pnml": {
           "filename": "typed-imf-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-stream.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-imf-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-stream.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -3155,14 +3155,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31965",
+        "Content-Length": "38019",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-imf-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-dataframe.response.json",
-        "bytes": 31965,
-        "sha256": "6b8dafdb3e8160bcc363634f517322a3a50b79465f5dbf12ed0e1d6e3b370f1f",
+        "bytes": 38019,
+        "sha256": "1c90c923f150ea5e4a80abe759cb3c6cfb7857fbb1cc9dc77b66951ce3dc649a",
         "status": 200
       },
       "family": "inductive",
@@ -3177,15 +3177,15 @@
         "pnml": {
           "filename": "typed-imf-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-dataframe.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-imf-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-dataframe.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -3245,14 +3245,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31965",
+        "Content-Length": "38019",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-imf-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-lazyframe.response.json",
-        "bytes": 31965,
-        "sha256": "2019b364fabad016c753fe9eb33d6acdde03a01f008687c3cf2011609124dd25",
+        "bytes": 38019,
+        "sha256": "179a0d0d77aaa30f8f7a309b5f9c0c5fa21679634578a941458bcd6b92d7ef83",
         "status": 200
       },
       "family": "inductive",
@@ -3267,15 +3267,15 @@
         "pnml": {
           "filename": "typed-imf-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-lazyframe.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-imf-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-imf-lazyframe.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -3331,14 +3331,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "239463",
+        "Content-Length": "241799",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-dfg-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-log.response.json",
-        "bytes": 239463,
-        "sha256": "89e3e04bdf61740bc8310f9c8082b9e6a865abb39c02c28edb400f62e6039495",
+        "bytes": 241799,
+        "sha256": "5dce7bdae8625ad560fd71ed92c7738dce544bd9bffd116f0ed6c02912755787",
         "status": 200
       },
       "family": "inductive",
@@ -3353,15 +3353,15 @@
         "pnml": {
           "filename": "csv-dfg-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-log.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-dfg-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-log.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -3374,8 +3374,8 @@
         "source_xes": {
           "filename": "csv-dfg-log.source_xes.xes",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-log.source_xes.xes",
-          "bytes": 17640,
-          "sha256": "29e6e6231a9a391fa71f2f518cd9e32f8c21ce8fe383b0f9c6282e6a70eb9265",
+          "bytes": 17896,
+          "sha256": "ac2aab29ec15df048b08a5370ca58c9b50e2eafbd1f7675d5f64607386381ec7",
           "format": "xes"
         }
       }
@@ -3417,14 +3417,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "212384",
+        "Content-Length": "214528",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-dfg-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-stream.response.json",
-        "bytes": 212384,
-        "sha256": "05cce69bd0605171718eac70208a8d24a002b41fc5f92eb4230579ece194dd17",
+        "bytes": 214528,
+        "sha256": "104021807e43b999e74ad52ca0be63fd32074b451ff4fb1c6dce42e564340682",
         "status": 200
       },
       "family": "inductive",
@@ -3439,15 +3439,15 @@
         "pnml": {
           "filename": "csv-dfg-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-stream.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-dfg-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-stream.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -3503,14 +3503,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "212387",
+        "Content-Length": "214531",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-dfg-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-dataframe.response.json",
-        "bytes": 212387,
-        "sha256": "a12b22f9eb2076eb62640702c2c403d33de006d075ea328e7e78a17be2d47afe",
+        "bytes": 214531,
+        "sha256": "cadcfda2a3608cb548265d8ab637bb79d5dab73fef6be3cfd08f7bf755dbca27",
         "status": 200
       },
       "family": "inductive",
@@ -3525,15 +3525,15 @@
         "pnml": {
           "filename": "csv-dfg-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-dataframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-dfg-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-dataframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -3589,14 +3589,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "212387",
+        "Content-Length": "214531",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-dfg-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-lazyframe.response.json",
-        "bytes": 212387,
-        "sha256": "8087e1b40b939199fe46602b7da724784af750f8d2764c2b1715cd67e43bdf84",
+        "bytes": 214531,
+        "sha256": "259a9f75c906c4131fc57f71a3c448df988cc402d025e835a91cf3ebb83b32c7",
         "status": 200
       },
       "family": "inductive",
@@ -3611,15 +3611,15 @@
         "pnml": {
           "filename": "csv-dfg-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-lazyframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "csv-dfg-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/csv-dfg-lazyframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -3679,14 +3679,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "175542",
+        "Content-Length": "177686",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-log.response.json",
-        "bytes": 175542,
-        "sha256": "84e9350893443bd7eed771f60652fab441e435e1d42d3da94272e719812f0eb4",
+        "bytes": 177686,
+        "sha256": "beda8136fa647d150ccead375bf3ca49aa8b0761d08fda95f71856c22eb334c8",
         "status": 200
       },
       "family": "inductive",
@@ -3701,15 +3701,15 @@
         "pnml": {
           "filename": "xes-dfg-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-log.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-log.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -3769,14 +3769,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "210323",
+        "Content-Length": "212467",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-stream.response.json",
-        "bytes": 210323,
-        "sha256": "7d0b4aaafc97c0b1d450f0e09ee125f4d93cc437b052e7134d70f3e7c42aa3cf",
+        "bytes": 212467,
+        "sha256": "442e18e68862f45d3bd19acb0cfae4350e8008de8bc6efdee490cbb3d565d7c0",
         "status": 200
       },
       "family": "inductive",
@@ -3791,15 +3791,15 @@
         "pnml": {
           "filename": "xes-dfg-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-stream.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-stream.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -3859,14 +3859,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "210326",
+        "Content-Length": "212470",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-dataframe.response.json",
-        "bytes": 210326,
-        "sha256": "a88661fcf24249ddce54312b806b3a03d78001bba65d7c6bde899637f7c9aac7",
+        "bytes": 212470,
+        "sha256": "663b01b0a9999ff1874399acaf205f22f1718686b370cdc0a6c17249f43b82fc",
         "status": 200
       },
       "family": "inductive",
@@ -3881,15 +3881,15 @@
         "pnml": {
           "filename": "xes-dfg-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-dataframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-dataframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -3949,14 +3949,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "210326",
+        "Content-Length": "212470",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-lazyframe.response.json",
-        "bytes": 210326,
-        "sha256": "bd090d3ab043161d7cd615335984341b4e8c8de40b6b977754feed5cda914e63",
+        "bytes": 212470,
+        "sha256": "923cf4f2c7705dce2816fe7d6791ae69e3828a2c99193225b00e9713a44bcb17",
         "status": 200
       },
       "family": "inductive",
@@ -3971,15 +3971,15 @@
         "pnml": {
           "filename": "xes-dfg-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-lazyframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-lazyframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -4047,14 +4047,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-iterparse.response.json",
-        "bytes": 16930,
-        "sha256": "02aa33b3b54d4129958ecb97c7efef5a5d4aa9e6921df16d44929f607a07ba77",
+        "bytes": 19074,
+        "sha256": "7682f477496b1cda1e525764e932de7712994f6c8b99223fc20cc744e90435ba",
         "status": 200
       },
       "family": "inductive",
@@ -4069,15 +4069,15 @@
         "pnml": {
           "filename": "xes-dfg-iterparse.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-iterparse.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-iterparse.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-iterparse.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -4145,14 +4145,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-line_by_line.response.json",
-        "bytes": 16930,
-        "sha256": "02aa33b3b54d4129958ecb97c7efef5a5d4aa9e6921df16d44929f607a07ba77",
+        "bytes": 19074,
+        "sha256": "7682f477496b1cda1e525764e932de7712994f6c8b99223fc20cc744e90435ba",
         "status": 200
       },
       "family": "inductive",
@@ -4167,15 +4167,15 @@
         "pnml": {
           "filename": "xes-dfg-line_by_line.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-line_by_line.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-line_by_line.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-line_by_line.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -4243,14 +4243,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-iterparse_20.response.json",
-        "bytes": 16930,
-        "sha256": "02aa33b3b54d4129958ecb97c7efef5a5d4aa9e6921df16d44929f607a07ba77",
+        "bytes": 19074,
+        "sha256": "7682f477496b1cda1e525764e932de7712994f6c8b99223fc20cc744e90435ba",
         "status": 200
       },
       "family": "inductive",
@@ -4265,15 +4265,15 @@
         "pnml": {
           "filename": "xes-dfg-iterparse_20.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-iterparse_20.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-iterparse_20.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-iterparse_20.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -4341,14 +4341,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-iterparse_mem_compressed.response.json",
-        "bytes": 16930,
-        "sha256": "02aa33b3b54d4129958ecb97c7efef5a5d4aa9e6921df16d44929f607a07ba77",
+        "bytes": 19074,
+        "sha256": "7682f477496b1cda1e525764e932de7712994f6c8b99223fc20cc744e90435ba",
         "status": 200
       },
       "family": "inductive",
@@ -4363,15 +4363,15 @@
         "pnml": {
           "filename": "xes-dfg-iterparse_mem_compressed.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-iterparse_mem_compressed.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-iterparse_mem_compressed.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-iterparse_mem_compressed.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -4439,14 +4439,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17902",
+        "Content-Length": "20046",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-rustxes.response.json",
-        "bytes": 17902,
-        "sha256": "46bc973cb02d60c5432751cf6403aec052beda56037bf11790470cb1109c796b",
+        "bytes": 20046,
+        "sha256": "3b4ff898ffe6bb8faa2ce8f88fca9a00c3402388c0afb1b5be8e4daf6c77a18e",
         "status": 200
       },
       "family": "inductive",
@@ -4461,15 +4461,15 @@
         "pnml": {
           "filename": "xes-dfg-rustxes.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-rustxes.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-rustxes.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-rustxes.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -4537,14 +4537,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16930",
+        "Content-Length": "19074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-dfg-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-chunk_regex.response.json",
-        "bytes": 16930,
-        "sha256": "02aa33b3b54d4129958ecb97c7efef5a5d4aa9e6921df16d44929f607a07ba77",
+        "bytes": 19074,
+        "sha256": "7682f477496b1cda1e525764e932de7712994f6c8b99223fc20cc744e90435ba",
         "status": 200
       },
       "family": "inductive",
@@ -4559,15 +4559,15 @@
         "pnml": {
           "filename": "xes-dfg-chunk_regex.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-chunk_regex.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "xes-dfg-chunk_regex.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/xes-dfg-chunk_regex.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -4627,14 +4627,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "58447",
+        "Content-Length": "64501",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-dfg-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-log.response.json",
-        "bytes": 58447,
-        "sha256": "74acb05cd8b6bc0ac6a409b7736bc5e1f7443522689095b9236b8feca6e79cc7",
+        "bytes": 64501,
+        "sha256": "a0d6909d2f44ef576b9a9f992d757370570b57b32b9e922b975c515afc295b13",
         "status": 200
       },
       "family": "inductive",
@@ -4649,15 +4649,15 @@
         "pnml": {
           "filename": "typed-dfg-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-log.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "df6f694011848bea642fdc1e01096bce8512eb9cb5b0cdf77ad9ae8b2f052475",
+          "bytes": 2610,
+          "sha256": "45df7581367b7ae1e755e6e65caecfb54950d5e87c87e2c50a12885013c44ac9",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-dfg-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-log.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "a262ef1bc5293f623d8781691ca4b62ffbf0eff08f1dd286ec23d67ae32cbe18",
+          "bytes": 4991,
+          "sha256": "8a7eb948af6b3165a43f97d5f8eddd63dc15e4b0a3dd81e9bfb0bc48306654d9",
           "format": "bpmn"
         },
         "ptml": {
@@ -4710,14 +4710,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31962",
+        "Content-Length": "38016",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-dfg-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-stream.response.json",
-        "bytes": 31962,
-        "sha256": "00eb2b91d1ebf52c651852246c523fdb7183cd9c7e00e9211bb8c8bd7a3dd442",
+        "bytes": 38016,
+        "sha256": "0057efddea4f323a0c0c3531a04028e2574dfc535b5505c6a29f21c9bf3ae83d",
         "status": 200
       },
       "family": "inductive",
@@ -4732,15 +4732,15 @@
         "pnml": {
           "filename": "typed-dfg-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-stream.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-dfg-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-stream.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -4800,14 +4800,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31965",
+        "Content-Length": "38019",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-dfg-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-dataframe.response.json",
-        "bytes": 31965,
-        "sha256": "352666ea5c698e820a09b89556cdfc43ec496c403e319eec1beef6015def61ba",
+        "bytes": 38019,
+        "sha256": "af8e011c6a02cc753c71528da31c47683b47764036cfac731eb9d61649e46929",
         "status": 200
       },
       "family": "inductive",
@@ -4822,15 +4822,15 @@
         "pnml": {
           "filename": "typed-dfg-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-dataframe.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-dfg-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-dataframe.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -4890,14 +4890,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31965",
+        "Content-Length": "38019",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-dfg-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-lazyframe.response.json",
-        "bytes": 31965,
-        "sha256": "60b9e8a9cb1e719b6c9d57df0b3e621a7afcda9151976d4601ba82389228965c",
+        "bytes": 38019,
+        "sha256": "036ae614319d3a83b1706f2f52a111a8443d9775e4efb03d387092dc245c79bc",
         "status": 200
       },
       "family": "inductive",
@@ -4912,15 +4912,15 @@
         "pnml": {
           "filename": "typed-dfg-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-lazyframe.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-dfg-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-dfg-lazyframe.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -4984,14 +4984,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "175537",
+        "Content-Length": "177681",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "grouped-explicit-sort.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/grouped-explicit-sort.response.json",
-        "bytes": 175537,
-        "sha256": "ec0d829437a9ff8c7ba77a4efa75a4dc09202b0a89a53f438ef259da856bfde0",
+        "bytes": 177681,
+        "sha256": "e79439e7eae68baf18bd3b80de263aaf32b1d67ec1f4f4bf542a0427cb3aeee3",
         "status": 200
       },
       "family": "inductive",
@@ -5006,15 +5006,15 @@
         "pnml": {
           "filename": "grouped-explicit-sort.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/grouped-explicit-sort.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "grouped-explicit-sort.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/grouped-explicit-sort.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -5078,14 +5078,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10243",
+        "Content-Length": "12387",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "grouped-missing-case-time-opportunistic.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/grouped-missing-case-time-opportunistic.response.json",
-        "bytes": 10243,
-        "sha256": "8d17f2991d5e5a2f4cd213af88a5c8da5400b3913c7a78a22f9222630c8a707d",
+        "bytes": 12387,
+        "sha256": "177a333fa50ef5baead780f70f6e8aab134ec98e9bce009e04c0913d6cc41f45",
         "status": 200
       },
       "family": "inductive",
@@ -5100,15 +5100,15 @@
         "pnml": {
           "filename": "grouped-missing-case-time-opportunistic.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/grouped-missing-case-time-opportunistic.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "grouped-missing-case-time-opportunistic.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/grouped-missing-case-time-opportunistic.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -5348,14 +5348,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11122",
+        "Content-Length": "13266",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "grouped-custom-regroup.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/grouped-custom-regroup.response.json",
-        "bytes": 11122,
-        "sha256": "9ec62ba2ed878d7bbabee0d9484e83c141f979ecde40b1334b64e7b39ba85955",
+        "bytes": 13266,
+        "sha256": "6cde9a57a4cbe6c87276d82545498012d28650ceacc9c714d7eed4ad144ec1f1",
         "status": 200
       },
       "family": "inductive",
@@ -5370,15 +5370,15 @@
         "pnml": {
           "filename": "grouped-custom-regroup.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/grouped-custom-regroup.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "grouped-custom-regroup.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/grouped-custom-regroup.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -5442,14 +5442,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "175538",
+        "Content-Length": "177682",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "conversion-standard.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/conversion-standard.response.json",
-        "bytes": 175538,
-        "sha256": "e30cfc92fab7a19e084673d5e6ada3593dae08a97c3b52e38b6268da80d83848",
+        "bytes": 177682,
+        "sha256": "e740780c6d89c6ef870ce3e8ce0a7c012eb3d29456b2bfaaadc5db943aeb60a6",
         "status": 200
       },
       "family": "inductive",
@@ -5464,15 +5464,15 @@
         "pnml": {
           "filename": "conversion-standard.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/conversion-standard.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "e1235e4a171051de92642009f67e1d34e36776eb284014db02fd9c044d11e078",
+          "bytes": 1268,
+          "sha256": "8a0e4ea27e42f37adaf85c9cf6de72cfdc7ea1fa56e0c0eb5a5a698bddc784bf",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "conversion-standard.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/conversion-standard.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -5536,14 +5536,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "177031",
+        "Content-Length": "178881",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "conversion-transition_bordered.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/conversion-transition_bordered.response.json",
-        "bytes": 177031,
-        "sha256": "45b1b1c334a5955f771b0367617502524ebb5ccce4df7936c8975df80927b9a0",
+        "bytes": 178881,
+        "sha256": "c57d471f71e608979ddfe9780cfd078b7b798f2199ed7b3088b294e3fcc92ace",
         "status": 200
       },
       "family": "inductive",
@@ -5565,8 +5565,8 @@
         "bpmn": {
           "filename": "conversion-transition_bordered.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/conversion-transition_bordered.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "b8f0f54ae18f3979d5b4fb9756d1b671963759c49db4a1b401c303fc84dfd637",
+          "bytes": 2420,
+          "sha256": "6e12c6bfcd22728f27c33f028eb13fc292abeb7670ac9a025877c99cc2d5cccf",
           "format": "bpmn"
         },
         "ptml": {
@@ -5626,14 +5626,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31731",
+        "Content-Length": "37785",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-literal-whitespace-selectors.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-literal-whitespace-selectors.response.json",
-        "bytes": 31731,
-        "sha256": "a22641ad73730cf2fbef848516cbef9dd7f8929a361b67202c80c2e5e1c62339",
+        "bytes": 37785,
+        "sha256": "513b6a77f3103269950033847c0219b8d6595881481743294cfa5372c301b8e4",
         "status": 200
       },
       "family": "inductive",
@@ -5648,15 +5648,15 @@
         "pnml": {
           "filename": "typed-literal-whitespace-selectors.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-literal-whitespace-selectors.pnml.pnml",
-          "bytes": 1460,
-          "sha256": "5c7b2b1557f0024c390d9d6cf337c378b6c6c6a70b94e4593580a0999164a867",
+          "bytes": 2610,
+          "sha256": "2f7406fea817131dc6ed71b4adec1358acbf52b66657cbbead9763a27ac61556",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-literal-whitespace-selectors.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-literal-whitespace-selectors.bpmn.bpmn",
-          "bytes": 1323,
-          "sha256": "6cdd090a958640d6f1be7dc164b07ed0735b0ba9e1360de4cbb98e9e9083c699",
+          "bytes": 4991,
+          "sha256": "0bfc98f03e590210e167043ed8d43c53a65a7e80a97b6d69153e1874d9671bea",
           "format": "bpmn"
         },
         "ptml": {
@@ -5716,14 +5716,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "15444",
+        "Content-Length": "17588",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-selected-case-wins-stale-role-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-log.response.json",
-        "bytes": 15444,
-        "sha256": "7e732779acb467d545638e31b6e64ba0179715a79218561a60c4d36f7e5f157a",
+        "bytes": 17588,
+        "sha256": "537a8211de8315519a8873ae32c83fee4f4f310972fd95308a209338b4f2cf59",
         "status": 200
       },
       "family": "inductive",
@@ -5738,15 +5738,15 @@
         "pnml": {
           "filename": "typed-selected-case-wins-stale-role-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-log.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-selected-case-wins-stale-role-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-log.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -5806,14 +5806,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10463",
+        "Content-Length": "12607",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-selected-case-wins-stale-role-stream.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-stream.response.json",
-        "bytes": 10463,
-        "sha256": "bf72ccf69f6d57358ce75c630d7417cde2efd39aad5e16c3abb7d64c7b6e36e4",
+        "bytes": 12607,
+        "sha256": "3815b046eb8dc19556247f3556187263b6d67a0b96beaf842d0eb1c1b6114575",
         "status": 200
       },
       "family": "inductive",
@@ -5828,15 +5828,15 @@
         "pnml": {
           "filename": "typed-selected-case-wins-stale-role-stream.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-stream.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-selected-case-wins-stale-role-stream.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-stream.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -5896,14 +5896,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10466",
+        "Content-Length": "12610",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-selected-case-wins-stale-role-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-dataframe.response.json",
-        "bytes": 10466,
-        "sha256": "fb5eef314d8258dec4f3992b0f614472f8c259b38daeeb6b029089638ceb5c32",
+        "bytes": 12610,
+        "sha256": "3c94559d528e26d2ee29ca84141ebd64bd5ca7b64850716ba760776304ee7ea2",
         "status": 200
       },
       "family": "inductive",
@@ -5918,15 +5918,15 @@
         "pnml": {
           "filename": "typed-selected-case-wins-stale-role-dataframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-dataframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-selected-case-wins-stale-role-dataframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-dataframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -5986,14 +5986,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10466",
+        "Content-Length": "12610",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-selected-case-wins-stale-role-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-lazyframe.response.json",
-        "bytes": 10466,
-        "sha256": "61dd5fefb64c33274414297e740a9df278b5ea07747cf0844fb3dd017177f2c2",
+        "bytes": 12610,
+        "sha256": "05f884959cbf7835a67d99aa802df0410b3073c8382ad8faba56ddb2f28eb4c4",
         "status": 200
       },
       "family": "inductive",
@@ -6008,15 +6008,15 @@
         "pnml": {
           "filename": "typed-selected-case-wins-stale-role-lazyframe.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-lazyframe.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-selected-case-wins-stale-role-lazyframe.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-case-wins-stale-role-lazyframe.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -6908,14 +6908,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6911",
+        "Content-Length": "8485",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-selected-native-na-case-activity.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-native-na-case-activity.response.json",
-        "bytes": 6911,
-        "sha256": "182e4bf31b3a4a21d56d8ad061add66a1abc64d57349ae871f9534c039dcf53f",
+        "bytes": 8485,
+        "sha256": "2b0419a8be66683307ec4bed6a9f4c864de4f2bf914c459af92e7025e6ac9edb",
         "status": 200
       },
       "family": "inductive",
@@ -6930,15 +6930,15 @@
         "pnml": {
           "filename": "typed-selected-native-na-case-activity.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-native-na-case-activity.pnml.pnml",
-          "bytes": 802,
-          "sha256": "f4a8d73aed59304c5cdbb1250d47e23ea18c6b41e85face0f94db03f47c53c96",
+          "bytes": 924,
+          "sha256": "744bdcf570d46c0554230c382429ac7bd622473816710ab62b54a07f108340a4",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-selected-native-na-case-activity.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-selected-native-na-case-activity.bpmn.bpmn",
-          "bytes": 602,
-          "sha256": "865520d55e9f0d7d50bf7f0c4d976b36e77272f63c1a2a8ba0dfea1b8670c6a1",
+          "bytes": 1917,
+          "sha256": "6d35a7e28b29c1afcc1ef5ffc3eef5eec39be109d9379f81f11136f3d5ee0d41",
           "format": "bpmn"
         },
         "ptml": {
@@ -6998,14 +6998,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8916",
+        "Content-Length": "9943",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-grouped-single-null-tau.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-grouped-single-null-tau.response.json",
-        "bytes": 8916,
-        "sha256": "53f289001b1b98ba56ad2a242e1aaea2637e64b665f807e14310d7a3127b640a",
+        "bytes": 9943,
+        "sha256": "29447a4575ee716f384ed3bc039bb09d63193120919d7a6c70355ab915e5041e",
         "status": 200
       },
       "family": "inductive",
@@ -7020,15 +7020,15 @@
         "pnml": {
           "filename": "typed-grouped-single-null-tau.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-grouped-single-null-tau.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-grouped-single-null-tau.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-grouped-single-null-tau.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -7216,14 +7216,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9056",
+        "Content-Length": "10630",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-grouped-present-empty-activity.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-grouped-present-empty-activity.response.json",
-        "bytes": 9056,
-        "sha256": "5345900e03f3df0c2d7c4e449f5416832e4af0346afd0e1544c1a6d866e6cea1",
+        "bytes": 10630,
+        "sha256": "e76592650b786ade0f54377059d7ff556651971511d68f2a22adcd99b7c0ac2c",
         "status": 200
       },
       "family": "inductive",
@@ -7238,15 +7238,15 @@
         "pnml": {
           "filename": "typed-grouped-present-empty-activity.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-grouped-present-empty-activity.pnml.pnml",
-          "bytes": 792,
-          "sha256": "1f7927273bb58944454db9eaa698a851ea9dcf816ed90631ebfe78476c3a7edf",
+          "bytes": 914,
+          "sha256": "ab8f436f34ca6e5caaa03b801275aee3b868c77593ee1c86a8ff916d91893180",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "typed-grouped-present-empty-activity.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/typed-grouped-present-empty-activity.bpmn.bpmn",
-          "bytes": 592,
-          "sha256": "a471477af2147b781cf6ebc5fe4b7f57b70e74d313968d61d9089c0c9e68c617",
+          "bytes": 1907,
+          "sha256": "a7bf32dce5f1ec062ffa65ccb2afd0b55598c0391d9d8fdece3b7cc45d462a6e",
           "format": "bpmn"
         },
         "ptml": {
@@ -7302,14 +7302,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3542",
+        "Content-Length": "4569",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-log-empty.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-empty.response.json",
-        "bytes": 3542,
-        "sha256": "ae9c077cd281346b53af0dc2e0007c7ff71ff35e9097fb1546c22d2d9f0b6eb6",
+        "bytes": 4569,
+        "sha256": "5e9c0bfd9ed2880b873d6e68cffc98507f6ee2edb8fb18262227e2dd71deb24d",
         "status": 200
       },
       "family": "inductive",
@@ -7324,15 +7324,15 @@
         "pnml": {
           "filename": "variants-log-empty.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-empty.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-log-empty.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-empty.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -7381,14 +7381,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3619",
+        "Content-Length": "4646",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-log-zero-only.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-zero-only.response.json",
-        "bytes": 3619,
-        "sha256": "fcd5832518ab9ad3e318b170a0f2c2e3854522984af5f78c42a9c05018a702f1",
+        "bytes": 4646,
+        "sha256": "c32b47302c43d467345c7fd1cdd733d5913615e687354f442a4b0b8453453330",
         "status": 200
       },
       "family": "inductive",
@@ -7403,15 +7403,15 @@
         "pnml": {
           "filename": "variants-log-zero-only.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-zero-only.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-log-zero-only.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-zero-only.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -7460,14 +7460,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4709",
+        "Content-Length": "6853",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-log-zero-registry.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-zero-registry.response.json",
-        "bytes": 4709,
-        "sha256": "fac703e38386e552b95354cd6593bfa6c25de2677f3f447342e22f548f4418ef",
+        "bytes": 6853,
+        "sha256": "0e0c1f0bc98e4df73423a5bf9f834915611b8fd1d82ff36eb98a7d43c400a77f",
         "status": 200
       },
       "family": "inductive",
@@ -7482,15 +7482,15 @@
         "pnml": {
           "filename": "variants-log-zero-registry.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-zero-registry.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-log-zero-registry.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-zero-registry.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -7539,14 +7539,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4646",
+        "Content-Length": "6790",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-log-uint64.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-uint64.response.json",
-        "bytes": 4646,
-        "sha256": "9bde1fb242d385806990c2bc3d56a47a351494294a8c9e8ef6f54be107c0bc68",
+        "bytes": 6790,
+        "sha256": "31187535b38f82a525dbbba857c29b0b02d22a94881740bd3ab8854894ddc1a9",
         "status": 200
       },
       "family": "inductive",
@@ -7561,15 +7561,15 @@
         "pnml": {
           "filename": "variants-log-uint64.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-uint64.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-log-uint64.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-uint64.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -7618,14 +7618,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3638",
+        "Content-Length": "4665",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-log-duplicate-wrap.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-duplicate-wrap.response.json",
-        "bytes": 3638,
-        "sha256": "1734447959997e2562b04491da2cb5cc56ed9347efb041f01947a48e68521f27",
+        "bytes": 4665,
+        "sha256": "de70bee8dcfffbb4fa5c5f3df7415ed7d78dd68cad80a03ef5b0bb653a85ec03",
         "status": 200
       },
       "family": "inductive",
@@ -7640,15 +7640,15 @@
         "pnml": {
           "filename": "variants-log-duplicate-wrap.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-duplicate-wrap.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-log-duplicate-wrap.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-duplicate-wrap.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -7697,14 +7697,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4671",
+        "Content-Length": "6815",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-log-duplicate-rows.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-duplicate-rows.response.json",
-        "bytes": 4671,
-        "sha256": "6527100a41a323e92556bddcc34c8620268bd1cc8384941e07f2aa711d2c590e",
+        "bytes": 6815,
+        "sha256": "9193decf03fe4ba1735f8d97197f2441ac3fd7c42bc5b74a39eda064a5daed5f",
         "status": 200
       },
       "family": "inductive",
@@ -7719,15 +7719,15 @@
         "pnml": {
           "filename": "variants-log-duplicate-rows.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-duplicate-rows.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-log-duplicate-rows.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-duplicate-rows.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -7776,14 +7776,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3612",
+        "Content-Length": "4639",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-log-empty-word.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-empty-word.response.json",
-        "bytes": 3612,
-        "sha256": "6b35462a6c67b0f5f23f2cd3827883cf7f247d01fabda734658086ef8af662ac",
+        "bytes": 4639,
+        "sha256": "d190b7e467355ececa36960335d1efd524c78feab558d2ef7e768e1d20569615",
         "status": 200
       },
       "family": "inductive",
@@ -7798,15 +7798,15 @@
         "pnml": {
           "filename": "variants-log-empty-word.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-empty-word.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-log-empty-word.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-empty-word.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -7855,14 +7855,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6523",
+        "Content-Length": "9811",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-log-literal-labels.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-literal-labels.response.json",
-        "bytes": 6523,
-        "sha256": "d2f267b2b344234e473cc32831a9089feb96270d179a468cfe02ea4857279a83",
+        "bytes": 9811,
+        "sha256": "c44bd5bc03cee259cde281633107b9b20c8ecbf2b4fd065d8691d0b3dc5d6c54",
         "status": 200
       },
       "family": "inductive",
@@ -7877,15 +7877,15 @@
         "pnml": {
           "filename": "variants-log-literal-labels.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-literal-labels.pnml.pnml",
-          "bytes": 1552,
-          "sha256": "988524e71e1e870d8dee07dbb477aa3dc33dd5b924f1964ef655ac65484e31f5",
+          "bytes": 1992,
+          "sha256": "9448e24eba04488c6d6f7085f8946af315e29664a3170d4a86e3d38cfde18f24",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-log-literal-labels.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-literal-labels.bpmn.bpmn",
-          "bytes": 957,
-          "sha256": "6ea777b8afe111c10d069ebb8b66b0b6dad464c37be450296d32ff999451217a",
+          "bytes": 3467,
+          "sha256": "b01e2fe4fa6663a552112304474da445d11304466b2bc3249c77081e13f315c5",
           "format": "bpmn"
         },
         "ptml": {
@@ -7934,14 +7934,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3546",
+        "Content-Length": "4573",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-imf-empty.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-empty.response.json",
-        "bytes": 3546,
-        "sha256": "da60f33b60e92b32908ca7f0c0b744d70a66b487d9c1d8b78292a75cb43adfed",
+        "bytes": 4573,
+        "sha256": "54267cb8a761fd3604f8b21a86e25f15147978370fdf841cd2a151acc14c76fd",
         "status": 200
       },
       "family": "inductive",
@@ -7956,15 +7956,15 @@
         "pnml": {
           "filename": "variants-imf-empty.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-empty.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-imf-empty.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-empty.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -8013,14 +8013,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3623",
+        "Content-Length": "4650",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-imf-zero-only.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-zero-only.response.json",
-        "bytes": 3623,
-        "sha256": "17aac1ecad39d282b1c3e579e7027d425400e7d582dd09b38433c995c41de104",
+        "bytes": 4650,
+        "sha256": "a1a70246bddf945a8994ba67eb5de03746eca03a53c2156dfdcbec5cfb4d80be",
         "status": 200
       },
       "family": "inductive",
@@ -8035,15 +8035,15 @@
         "pnml": {
           "filename": "variants-imf-zero-only.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-zero-only.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-imf-zero-only.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-zero-only.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -8092,14 +8092,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4713",
+        "Content-Length": "6857",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-imf-zero-registry.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-zero-registry.response.json",
-        "bytes": 4713,
-        "sha256": "ce3d585e15703a9e8a45bcc991a00a6a03676470fd3540ce5fe022babb61b5c8",
+        "bytes": 6857,
+        "sha256": "b3c6c917b03074d0d224fc6dcc1faa9e1c61d0927f7be46e723a84669b659a6b",
         "status": 200
       },
       "family": "inductive",
@@ -8114,15 +8114,15 @@
         "pnml": {
           "filename": "variants-imf-zero-registry.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-zero-registry.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-imf-zero-registry.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-zero-registry.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -8171,14 +8171,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4650",
+        "Content-Length": "6794",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-imf-uint64.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-uint64.response.json",
-        "bytes": 4650,
-        "sha256": "02cf8cff4b22531229f75a75f3885324708bcb473e68b5c8cf23e23e2686a968",
+        "bytes": 6794,
+        "sha256": "abac005fead38be6df8bccbbd3a733958d3473c599406a4f1dc7929152d457f8",
         "status": 200
       },
       "family": "inductive",
@@ -8193,15 +8193,15 @@
         "pnml": {
           "filename": "variants-imf-uint64.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-uint64.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-imf-uint64.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-uint64.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -8250,14 +8250,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3642",
+        "Content-Length": "4669",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-imf-duplicate-wrap.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-duplicate-wrap.response.json",
-        "bytes": 3642,
-        "sha256": "3d4b955e89a94d21502a5a7fad064cb99aaf31db369109f8b40d0d5f1ef84b04",
+        "bytes": 4669,
+        "sha256": "abea8454270106a37ad3655f4e39001ca231fd89a06bcdb750c614cbb9453abb",
         "status": 200
       },
       "family": "inductive",
@@ -8272,15 +8272,15 @@
         "pnml": {
           "filename": "variants-imf-duplicate-wrap.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-duplicate-wrap.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-imf-duplicate-wrap.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-duplicate-wrap.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -8329,14 +8329,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4675",
+        "Content-Length": "6819",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-imf-duplicate-rows.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-duplicate-rows.response.json",
-        "bytes": 4675,
-        "sha256": "ad0908c7784ca507b08c53778c3e25493a4b38cce2079fd10e721425ffba8c19",
+        "bytes": 6819,
+        "sha256": "e9cdd624d4198b02ff8d35a0cadb0bc2db96483a49ea90f14c62a1ed8626e68c",
         "status": 200
       },
       "family": "inductive",
@@ -8351,15 +8351,15 @@
         "pnml": {
           "filename": "variants-imf-duplicate-rows.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-duplicate-rows.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-imf-duplicate-rows.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-duplicate-rows.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -8408,14 +8408,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3616",
+        "Content-Length": "4643",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-imf-empty-word.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-empty-word.response.json",
-        "bytes": 3616,
-        "sha256": "38db68d33b078067514ed3c0111f5d9efb0700f8d8fc33498be12fd77bc18e19",
+        "bytes": 4643,
+        "sha256": "f0ff5237625e12b3032596a9b985831af0d029545436c5a7aa626290d2760810",
         "status": 200
       },
       "family": "inductive",
@@ -8430,15 +8430,15 @@
         "pnml": {
           "filename": "variants-imf-empty-word.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-empty-word.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-imf-empty-word.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-empty-word.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -8487,14 +8487,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6527",
+        "Content-Length": "9815",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-imf-literal-labels.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-literal-labels.response.json",
-        "bytes": 6527,
-        "sha256": "fe77f1eeb3f54d30aaac836e5968e81464bb59cd2788713deba28d0c6c7772b5",
+        "bytes": 9815,
+        "sha256": "2fb341c0359276e033e580beffb6eafd5beb3119ed5b779af7ddafa3cda3377d",
         "status": 200
       },
       "family": "inductive",
@@ -8509,15 +8509,15 @@
         "pnml": {
           "filename": "variants-imf-literal-labels.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-literal-labels.pnml.pnml",
-          "bytes": 1552,
-          "sha256": "988524e71e1e870d8dee07dbb477aa3dc33dd5b924f1964ef655ac65484e31f5",
+          "bytes": 1992,
+          "sha256": "9448e24eba04488c6d6f7085f8946af315e29664a3170d4a86e3d38cfde18f24",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-imf-literal-labels.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-literal-labels.bpmn.bpmn",
-          "bytes": 957,
-          "sha256": "6ea777b8afe111c10d069ebb8b66b0b6dad464c37be450296d32ff999451217a",
+          "bytes": 3467,
+          "sha256": "b01e2fe4fa6663a552112304474da445d11304466b2bc3249c77081e13f315c5",
           "format": "bpmn"
         },
         "ptml": {
@@ -8566,14 +8566,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3546",
+        "Content-Length": "4573",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-dfg-empty.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-empty.response.json",
-        "bytes": 3546,
-        "sha256": "8829afba6d3531320259c73d18913b082453ad0aca3151a30b2282582a9806a0",
+        "bytes": 4573,
+        "sha256": "a6e4a8af6823a3b420c841b300d640eeeb5d30a8e5e44c5e29ba2c03bf7ce8fe",
         "status": 200
       },
       "family": "inductive",
@@ -8588,15 +8588,15 @@
         "pnml": {
           "filename": "variants-dfg-empty.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-empty.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-dfg-empty.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-empty.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -8645,14 +8645,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3623",
+        "Content-Length": "4650",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-dfg-zero-only.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-zero-only.response.json",
-        "bytes": 3623,
-        "sha256": "56ce7b77fbead856a02f58ba303eb883e33178ae67bde460889f463dbab087c5",
+        "bytes": 4650,
+        "sha256": "858cf7e3dc4b2942b5de5960f542cf47715e34762ef4c099c7b6ec79463182bf",
         "status": 200
       },
       "family": "inductive",
@@ -8667,15 +8667,15 @@
         "pnml": {
           "filename": "variants-dfg-zero-only.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-zero-only.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-dfg-zero-only.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-zero-only.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -8724,14 +8724,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4713",
+        "Content-Length": "6857",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-dfg-zero-registry.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-zero-registry.response.json",
-        "bytes": 4713,
-        "sha256": "9be8ae871049ba91d0dd4a35dd12d23f4939b37a48294882e20bb34b6d4e0266",
+        "bytes": 6857,
+        "sha256": "1c605285af5f2b4df1e9cb0c2d283511b0cd83c1e83fce87845157bb6af3c21a",
         "status": 200
       },
       "family": "inductive",
@@ -8746,15 +8746,15 @@
         "pnml": {
           "filename": "variants-dfg-zero-registry.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-zero-registry.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-dfg-zero-registry.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-zero-registry.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -8803,14 +8803,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4650",
+        "Content-Length": "6794",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-dfg-uint64.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-uint64.response.json",
-        "bytes": 4650,
-        "sha256": "dd841d9cd8998c80d02b29a871cd664559ad6c9a8fcf356a6bc84c176a7402ff",
+        "bytes": 6794,
+        "sha256": "f2ece0e27f6706e56047a66ab99dff7ddfc73e4034618d25c59c72cb4bf3ac98",
         "status": 200
       },
       "family": "inductive",
@@ -8825,15 +8825,15 @@
         "pnml": {
           "filename": "variants-dfg-uint64.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-uint64.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-dfg-uint64.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-uint64.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -8882,14 +8882,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3642",
+        "Content-Length": "4669",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-dfg-duplicate-wrap.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-duplicate-wrap.response.json",
-        "bytes": 3642,
-        "sha256": "c574bd15af116e63a4f104ea47bf4411f3a72f0812254c78e8c8737d1454edfb",
+        "bytes": 4669,
+        "sha256": "28c7f21b20f3528bb70da261b2a0aef9106b1d8ebce5a119756cf491b8277ff3",
         "status": 200
       },
       "family": "inductive",
@@ -8904,15 +8904,15 @@
         "pnml": {
           "filename": "variants-dfg-duplicate-wrap.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-duplicate-wrap.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-dfg-duplicate-wrap.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-duplicate-wrap.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -8961,14 +8961,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4675",
+        "Content-Length": "6819",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-dfg-duplicate-rows.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-duplicate-rows.response.json",
-        "bytes": 4675,
-        "sha256": "b723f61fce3ed3d984d792a2d09bec243101fe5d755876932a0ecf90671dd129",
+        "bytes": 6819,
+        "sha256": "588b254dc20a8f8bfdc17abc0ce7216fd45d8e4a8725e717978d87a16dbdf96e",
         "status": 200
       },
       "family": "inductive",
@@ -8983,15 +8983,15 @@
         "pnml": {
           "filename": "variants-dfg-duplicate-rows.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-duplicate-rows.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-dfg-duplicate-rows.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-duplicate-rows.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -9040,14 +9040,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3616",
+        "Content-Length": "4643",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-dfg-empty-word.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-empty-word.response.json",
-        "bytes": 3616,
-        "sha256": "054de752cee7e2fa5efc90c7058e423b8cdc6474921449124ab7c5aab3af52e6",
+        "bytes": 4643,
+        "sha256": "47729ff5d13850c5ffaef41e150acbecf225a3c91a6815875a947e8247d1f559",
         "status": 200
       },
       "family": "inductive",
@@ -9062,15 +9062,15 @@
         "pnml": {
           "filename": "variants-dfg-empty-word.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-empty-word.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-dfg-empty-word.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-empty-word.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {
@@ -9119,14 +9119,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6527",
+        "Content-Length": "9815",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-dfg-literal-labels.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-literal-labels.response.json",
-        "bytes": 6527,
-        "sha256": "5aab5cb3fc2c2fa9c5741675e58e673664b8e2a8e2731fa0105536407c8fc0bb",
+        "bytes": 9815,
+        "sha256": "142343504452d506e63f96ff65e20f66416db75345fa8a8accb6562f7654834d",
         "status": 200
       },
       "family": "inductive",
@@ -9141,15 +9141,15 @@
         "pnml": {
           "filename": "variants-dfg-literal-labels.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-literal-labels.pnml.pnml",
-          "bytes": 1552,
-          "sha256": "988524e71e1e870d8dee07dbb477aa3dc33dd5b924f1964ef655ac65484e31f5",
+          "bytes": 1992,
+          "sha256": "9448e24eba04488c6d6f7085f8946af315e29664a3170d4a86e3d38cfde18f24",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-dfg-literal-labels.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-literal-labels.bpmn.bpmn",
-          "bytes": 957,
-          "sha256": "6ea777b8afe111c10d069ebb8b66b0b6dad464c37be450296d32ff999451217a",
+          "bytes": 3467,
+          "sha256": "b01e2fe4fa6663a552112304474da445d11304466b2bc3249c77081e13f315c5",
           "format": "bpmn"
         },
         "ptml": {
@@ -9202,14 +9202,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9374",
+        "Content-Length": "15244",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-noise-log-0.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-log-0.response.json",
-        "bytes": 9374,
-        "sha256": "ab33fbed9e32391823963f40fa66f79370dbd55aba05a36035ee6a88ddf2b8cb",
+        "bytes": 15244,
+        "sha256": "9c4d31a1b554523eac6eb054c27602d140a377ad2e8f27e49b4e66e212b432db",
         "status": 200
       },
       "family": "inductive",
@@ -9224,15 +9224,15 @@
         "pnml": {
           "filename": "variants-noise-log-0.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-log-0.pnml.pnml",
-          "bytes": 2306,
-          "sha256": "a23526ea7e90be84d3c65eccd93347b9e2eddaa651307c8ec8f3f8bc8822a7ee",
+          "bytes": 2829,
+          "sha256": "e3eceee21aee64b3506f94be0b0e97b416ef27ef7729e94b0d7f294a86c1777a",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-noise-log-0.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-log-0.bpmn.bpmn",
-          "bytes": 1700,
-          "sha256": "64751c5eb5be99cb0b20b59bbbe817b41d09dfab13f6a46cd6835d3d45cb9b38",
+          "bytes": 6524,
+          "sha256": "73c9db43f003b82dd4ef5e64d7bd92c61a61c19df1cce04f6d40a7bdb3f7362f",
           "format": "bpmn"
         },
         "ptml": {
@@ -9285,14 +9285,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9390",
+        "Content-Length": "15260",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-noise-log-0_2.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-log-0_2.response.json",
-        "bytes": 9390,
-        "sha256": "aa622a8b85862e873c5b223a9db65843d2dc320ed49a4849dba11055b57558f7",
+        "bytes": 15260,
+        "sha256": "803d46c1325dc17e263d5391dc2d0d422de7c1d68a4f5c6104ebf1bd1d55b6c8",
         "status": 200
       },
       "family": "inductive",
@@ -9307,15 +9307,15 @@
         "pnml": {
           "filename": "variants-noise-log-0_2.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-log-0_2.pnml.pnml",
-          "bytes": 2306,
-          "sha256": "a23526ea7e90be84d3c65eccd93347b9e2eddaa651307c8ec8f3f8bc8822a7ee",
+          "bytes": 2829,
+          "sha256": "e3eceee21aee64b3506f94be0b0e97b416ef27ef7729e94b0d7f294a86c1777a",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-noise-log-0_2.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-log-0_2.bpmn.bpmn",
-          "bytes": 1700,
-          "sha256": "64751c5eb5be99cb0b20b59bbbe817b41d09dfab13f6a46cd6835d3d45cb9b38",
+          "bytes": 6524,
+          "sha256": "73c9db43f003b82dd4ef5e64d7bd92c61a61c19df1cce04f6d40a7bdb3f7362f",
           "format": "bpmn"
         },
         "ptml": {
@@ -9368,14 +9368,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9378",
+        "Content-Length": "15248",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-noise-imf-0.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-imf-0.response.json",
-        "bytes": 9378,
-        "sha256": "6105771b476245fb5461f989e0414f4d8a0a32dff9e5430a0e6364d3662357f1",
+        "bytes": 15248,
+        "sha256": "3cbc2d8d43029c40096023c25b56ff4e9ae45d86e642cbac88212b91fda3e43b",
         "status": 200
       },
       "family": "inductive",
@@ -9390,15 +9390,15 @@
         "pnml": {
           "filename": "variants-noise-imf-0.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-imf-0.pnml.pnml",
-          "bytes": 2306,
-          "sha256": "a23526ea7e90be84d3c65eccd93347b9e2eddaa651307c8ec8f3f8bc8822a7ee",
+          "bytes": 2829,
+          "sha256": "e3eceee21aee64b3506f94be0b0e97b416ef27ef7729e94b0d7f294a86c1777a",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-noise-imf-0.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-imf-0.bpmn.bpmn",
-          "bytes": 1700,
-          "sha256": "64751c5eb5be99cb0b20b59bbbe817b41d09dfab13f6a46cd6835d3d45cb9b38",
+          "bytes": 6524,
+          "sha256": "73c9db43f003b82dd4ef5e64d7bd92c61a61c19df1cce04f6d40a7bdb3f7362f",
           "format": "bpmn"
         },
         "ptml": {
@@ -9451,14 +9451,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7824",
+        "Content-Length": "12382",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-noise-imf-0_2.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-imf-0_2.response.json",
-        "bytes": 7824,
-        "sha256": "76b195eddfe2b8715f8ac015a32bffadd6602335751f0c11f80303354487d406",
+        "bytes": 12382,
+        "sha256": "b28ff62875fca4c85453a7f381bd5cffef31dfd8606e57daf155f32c94003871",
         "status": 200
       },
       "family": "inductive",
@@ -9473,15 +9473,15 @@
         "pnml": {
           "filename": "variants-noise-imf-0_2.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-imf-0_2.pnml.pnml",
-          "bytes": 1799,
-          "sha256": "a5e5db643781b834de4171dc037bfe36469d2d65a834d0b061dc45b7cb5ac407",
+          "bytes": 2257,
+          "sha256": "d96a29777f47527422a78b92fdda39d7943083fb3ec4fc254d7c1de10d5cae44",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-noise-imf-0_2.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-imf-0_2.bpmn.bpmn",
-          "bytes": 1325,
-          "sha256": "a18101123333e661c8f556b39cf65d7331f4843710cdc2b4275ddcf72660bfb6",
+          "bytes": 4994,
+          "sha256": "5623d716815398d098efa473fbbfc561a5d49f650259cb651938283da8584962",
           "format": "bpmn"
         },
         "ptml": {
@@ -9534,14 +9534,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8328",
+        "Content-Length": "15717",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-noise-dfg-0.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-dfg-0.response.json",
-        "bytes": 8328,
-        "sha256": "b5064d911dd825d5ad359e07d46a82567d12fdc75e036b0c5db816cd78a46874",
+        "bytes": 15717,
+        "sha256": "ac5eca0a22b7a082d38c27cc4d1088f36c4cc744e9651db8cabb4368c3a2d972",
         "status": 200
       },
       "family": "inductive",
@@ -9556,15 +9556,15 @@
         "pnml": {
           "filename": "variants-noise-dfg-0.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-dfg-0.pnml.pnml",
-          "bytes": 1651,
-          "sha256": "6fe8f21b9828b47f5cb62b9a13830b30418aaafca5221dbffd9c888b52448a99",
+          "bytes": 2823,
+          "sha256": "3b425c1b29d4c229cb878bae83c6dd53918dd0c35a7863987c517943bbbf2c29",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-noise-dfg-0.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-dfg-0.bpmn.bpmn",
-          "bytes": 1805,
-          "sha256": "921f0f309893a58d185fabd940ee2b8a15604e0b1d59456d485ccb28fc597d65",
+          "bytes": 6864,
+          "sha256": "92072a16fbea93af5acb26f7826118c24308325048b56763c390d58438b0691e",
           "format": "bpmn"
         },
         "ptml": {
@@ -9617,14 +9617,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8344",
+        "Content-Length": "15733",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-noise-dfg-0_2.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-dfg-0_2.response.json",
-        "bytes": 8344,
-        "sha256": "bfbe622b9c690c50fd1f8ff3295fbfbf79817c980ae12d4b7f4f25969e43da0e",
+        "bytes": 15733,
+        "sha256": "8318c031695052de610c08225f7e302b3b4b5aa342d99d1453988c883808fe0e",
         "status": 200
       },
       "family": "inductive",
@@ -9639,15 +9639,15 @@
         "pnml": {
           "filename": "variants-noise-dfg-0_2.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-dfg-0_2.pnml.pnml",
-          "bytes": 1651,
-          "sha256": "6fe8f21b9828b47f5cb62b9a13830b30418aaafca5221dbffd9c888b52448a99",
+          "bytes": 2823,
+          "sha256": "3b425c1b29d4c229cb878bae83c6dd53918dd0c35a7863987c517943bbbf2c29",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-noise-dfg-0_2.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-noise-dfg-0_2.bpmn.bpmn",
-          "bytes": 1805,
-          "sha256": "921f0f309893a58d185fabd940ee2b8a15604e0b1d59456d485ccb28fc597d65",
+          "bytes": 6864,
+          "sha256": "92072a16fbea93af5acb26f7826118c24308325048b56763c390d58438b0691e",
           "format": "bpmn"
         },
         "ptml": {
@@ -9696,14 +9696,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6989",
+        "Content-Length": "10969",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-strict-sequence.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-strict-sequence.response.json",
-        "bytes": 6989,
-        "sha256": "a9413dbda634fbf495c239e813807bb34bf2d99e74747c13737a7dd9a131f0ef",
+        "bytes": 10969,
+        "sha256": "5fb5e8baf0e256c19e1e297c9b57bb5776f5e03f2bd814bbdc9fc686266788ae",
         "status": 200
       },
       "family": "inductive",
@@ -9718,15 +9718,15 @@
         "pnml": {
           "filename": "variants-strict-sequence.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-strict-sequence.pnml.pnml",
-          "bytes": 1552,
-          "sha256": "2c7b03126a20806e06f2fd227edd9f7cbaf96ad1b961655bc04b1d22d413545e",
+          "bytes": 1905,
+          "sha256": "db0aa7a2d67aacd14735e6621ccf9bf184289838aa00becd607b75d8bc0ee7d5",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-strict-sequence.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-strict-sequence.bpmn.bpmn",
-          "bytes": 1206,
-          "sha256": "ec548ae785dd583f4474bc750694c029cccc0c4532b8d3e1699dabeef1becdb6",
+          "bytes": 4469,
+          "sha256": "abe69f6f14ad3d698c4a90bc0c854a0a77c04680d6d1f5a76c563d2eb6c46077",
           "format": "bpmn"
         },
         "ptml": {
@@ -9779,14 +9779,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8135",
+        "Content-Length": "13387",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-normal-sequence.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-normal-sequence.response.json",
-        "bytes": 8135,
-        "sha256": "d4986707a5b260202f227b21573bb66bb1c27e5a054a05c3ecb7553b679d61eb",
+        "bytes": 13387,
+        "sha256": "a670ff1b59675f3b73702a2ded6c099d18397a0ef33731c969a566f3c0463521",
         "status": 200
       },
       "family": "inductive",
@@ -9801,15 +9801,15 @@
         "pnml": {
           "filename": "variants-normal-sequence.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-normal-sequence.pnml.pnml",
-          "bytes": 1817,
-          "sha256": "949a28a54a5e4417c492bfd97b185304ad09c1ada0439150da6cfc4d9da3f62c",
+          "bytes": 2188,
+          "sha256": "20d846dd621b7e1d33aa26914827bc2bb1d8112bb3f5bf745d30c180a21f265c",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-normal-sequence.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-normal-sequence.bpmn.bpmn",
-          "bytes": 1594,
-          "sha256": "f79b0b73db18f9f43bf251bce605ed8b9b555ecb82275ad5e6fb1a85bc23204e",
+          "bytes": 6018,
+          "sha256": "3c5145c9357e4637ac92430be84291a466f1ad8c0016aef4695dad45b9736733",
           "format": "bpmn"
         },
         "ptml": {
@@ -9858,14 +9858,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8990",
+        "Content-Length": "14296",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-specialized-fallthrough.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-specialized-fallthrough.response.json",
-        "bytes": 8990,
-        "sha256": "672f5235e134d47c34e3e370ac59fcf1759e4b2c043d5f1809e93fdd3f4da669",
+        "bytes": 14296,
+        "sha256": "baaf57b5d0e727182b252305a5518c9c81b602c90188ccd426d1701c5c2184c2",
         "status": 200
       },
       "family": "inductive",
@@ -9880,15 +9880,15 @@
         "pnml": {
           "filename": "variants-specialized-fallthrough.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-specialized-fallthrough.pnml.pnml",
-          "bytes": 2398,
-          "sha256": "d4ca8014ff1836407a67747106fc428c6c58a27451370b0dd2c6c7ddef3a2bc0",
+          "bytes": 2822,
+          "sha256": "ea884997cd153dd13f50d3e4e2e7f177441c4e198b0c2f3bd2233b0afc5466eb",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-specialized-fallthrough.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-specialized-fallthrough.bpmn.bpmn",
-          "bytes": 1579,
-          "sha256": "7bbe106e4e4b84d725cd1b6336b496b302a650b84fe765775d918613818ca08f",
+          "bytes": 5999,
+          "sha256": "597ed67118cab36f4f5aa7d66074a5860fd86735bcf0d1409ac9683df75b8b59",
           "format": "bpmn"
         },
         "ptml": {
@@ -9941,14 +9941,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7295",
+        "Content-Length": "14776",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-disabled-fallthrough.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-disabled-fallthrough.response.json",
-        "bytes": 7295,
-        "sha256": "e106d81c203002412c371706bd6e7dcbb43f5856a229064f9e1c82d005be80c3",
+        "bytes": 14776,
+        "sha256": "b53e53dc0d3faff652c301b19120b88c3802628a013cbcce17cd2bf890775c9b",
         "status": 200
       },
       "family": "inductive",
@@ -9963,15 +9963,15 @@
         "pnml": {
           "filename": "variants-disabled-fallthrough.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-disabled-fallthrough.pnml.pnml",
-          "bytes": 1404,
-          "sha256": "b88c357dbe817f8b048958f52117a7e17996fd615ad550c0aa26c9bec397ec56",
+          "bytes": 2829,
+          "sha256": "e6d703bde81b4089bf5111fbca5dac1640c83b71be2c2ad6acf732bca8c12088",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "variants-disabled-fallthrough.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-disabled-fallthrough.bpmn.bpmn",
-          "bytes": 1686,
-          "sha256": "5f2d339ee4954f7df8ec1a16f5219d9c03097ef99d318bff3a286af7f1619edc",
+          "bytes": 6341,
+          "sha256": "168c143b18a9a04cfa782b3b7ac4c01c141db6806b2d2ddefc446a73cf59eb25",
           "format": "bpmn"
         },
         "ptml": {
@@ -10040,14 +10040,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "175538",
+        "Content-Length": "177682",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "all-native-option-switches.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/all-native-option-switches.response.json",
-        "bytes": 175538,
-        "sha256": "6101ed357b133f8534efb2376c22d217b1a0081f823eab1e31d4631e1bf87a1b",
+        "bytes": 177682,
+        "sha256": "ea4eb5616a5b832f45ebb72289b505c01f4fff948b31377faa6d95ab2fdc0223",
         "status": 200
       },
       "family": "inductive",
@@ -10062,15 +10062,15 @@
         "pnml": {
           "filename": "all-native-option-switches.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/all-native-option-switches.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "all-native-option-switches.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/all-native-option-switches.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -10130,14 +10130,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5108",
+        "Content-Length": "7252",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "direct-graph-requested-log.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-graph-requested-log.response.json",
-        "bytes": 5108,
-        "sha256": "20f9b0f572384c266b61efdbd7191e73b03598258363fcdebbf43fe6e45639db",
+        "bytes": 7252,
+        "sha256": "e2a1b2a5f005b94fe9f14b5a253361679c96c8c8e946f15d248a5739bf8a2312",
         "status": 200
       },
       "family": "inductive",
@@ -10152,15 +10152,15 @@
         "pnml": {
           "filename": "direct-graph-requested-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-graph-requested-log.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "direct-graph-requested-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-graph-requested-log.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -10213,14 +10213,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5111",
+        "Content-Length": "7255",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "direct-graph-requested-imf.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-graph-requested-imf.response.json",
-        "bytes": 5111,
-        "sha256": "8c4081b9f56b3d892591dbe3726ce48faa1a8906262f8cd46102c95dd229964a",
+        "bytes": 7255,
+        "sha256": "c6ceedc362c86e57ff69a032e288e609f1e7c711dac1d4e3ce0a7afa83daeea6",
         "status": 200
       },
       "family": "inductive",
@@ -10235,15 +10235,15 @@
         "pnml": {
           "filename": "direct-graph-requested-imf.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-graph-requested-imf.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "direct-graph-requested-imf.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-graph-requested-imf.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -10296,14 +10296,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5111",
+        "Content-Length": "7255",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "direct-graph-requested-dfg.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-graph-requested-dfg.response.json",
-        "bytes": 5111,
-        "sha256": "ff32b9bae7bfbe78740947693584ffe6815e8610313994df5bd132b968ecd969",
+        "bytes": 7255,
+        "sha256": "06a4149031e131200746044c6bceb6557921f46fe4a334062716e1a14b899f00",
         "status": 200
       },
       "family": "inductive",
@@ -10318,15 +10318,15 @@
         "pnml": {
           "filename": "direct-graph-requested-dfg.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-graph-requested-dfg.pnml.pnml",
-          "bytes": 1040,
-          "sha256": "56cd1de1b29ef768f35f33bd7c06d236baf4f7c6e44e617dac529f6f3182146d",
+          "bytes": 1268,
+          "sha256": "678965a129e981830e4800058fab63c3e6583609b228050d81e95d69662c563e",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "direct-graph-requested-dfg.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-graph-requested-dfg.bpmn.bpmn",
-          "bytes": 708,
-          "sha256": "29aa69c4465582d504a7f5a7671b64f793e74d00e37399f6b197be2fd85fd609",
+          "bytes": 2420,
+          "sha256": "ce71fd055cea474ac00a7622de71fe25f302ced5320e00f94585e2dfeb5d9526",
           "format": "bpmn"
         },
         "ptml": {
@@ -10375,14 +10375,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3700",
+        "Content-Length": "4727",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "direct-empty-graph-tau.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-empty-graph-tau.response.json",
-        "bytes": 3700,
-        "sha256": "51cbfedb7c3400e5ef07edf9e08db50977aad31992f7f26cf76d59da49d5b453",
+        "bytes": 4727,
+        "sha256": "8d9f5e7760749bdbb50cdf84c24e6a33e9da8b5ba02fd5fb50eb96d7a5a3d986",
         "status": 200
       },
       "family": "inductive",
@@ -10397,15 +10397,15 @@
         "pnml": {
           "filename": "direct-empty-graph-tau.pnml.pnml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-empty-graph-tau.pnml.pnml",
-          "bytes": 885,
-          "sha256": "6fd316f53cdbdbec611ef5002c19848944b7957d22ae7a5694769ff7e99c0604",
+          "bytes": 921,
+          "sha256": "f0823eeb489ec414ada405644868ee0e8e1f81f863e3c08b8f48bc10e06c2a16",
           "format": "pnml"
         },
         "bpmn": {
           "filename": "direct-empty-graph-tau.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/direct-empty-graph-tau.bpmn.bpmn",
-          "bytes": 478,
-          "sha256": "b47908fe1e6b5b2eacde4d48c5502256b6e0f372c5f0eada3cb5cdd50175fb33",
+          "bytes": 1396,
+          "sha256": "9acdc2868df4cf24a49436c2ef9e1b60e2d3ea6616b35f9f6560cad0c4096304",
           "format": "bpmn"
         },
         "ptml": {

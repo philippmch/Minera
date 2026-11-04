@@ -2,39 +2,36 @@
 <log xes.version="1849-2016" xes.features="nested-attributes" xmlns="http://www.xes-standard.org/">
   <string key="concept:name" value="Generated playout log"/>
   <trace>
-    <string key="concept:name" value="case_1"/>
-    <string key="case:concept:name" value="case_1"/>
+    <string key="concept:name" value="0"/>
     <event>
       <string key="concept:name" value="A"/>
-      <date key="time:timestamp" value="2026-01-01T00:00:00+00:00"/>
+      <date key="time:timestamp" value="1970-04-26T17:46:41+00:00"/>
     </event>
     <event>
       <string key="concept:name" value="A"/>
-      <date key="time:timestamp" value="2026-01-01T00:00:00+00:00"/>
-    </event>
-  </trace>
-  <trace>
-    <string key="concept:name" value="case_2"/>
-    <string key="case:concept:name" value="case_2"/>
-    <event>
-      <string key="concept:name" value="A"/>
-      <date key="time:timestamp" value="2026-01-01T00:00:01+00:00"/>
-    </event>
-    <event>
-      <string key="concept:name" value="A"/>
-      <date key="time:timestamp" value="2026-01-01T00:00:01+00:00"/>
+      <date key="time:timestamp" value="1970-04-26T17:46:41+00:00"/>
     </event>
   </trace>
   <trace>
-    <string key="concept:name" value="case_3"/>
-    <string key="case:concept:name" value="case_3"/>
+    <string key="concept:name" value="1"/>
     <event>
       <string key="concept:name" value="A"/>
-      <date key="time:timestamp" value="2026-01-01T00:00:02+00:00"/>
+      <date key="time:timestamp" value="1970-04-26T17:46:42+00:00"/>
     </event>
     <event>
       <string key="concept:name" value="A"/>
-      <date key="time:timestamp" value="2026-01-01T00:00:02+00:00"/>
+      <date key="time:timestamp" value="1970-04-26T17:46:42+00:00"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="concept:name" value="2"/>
+    <event>
+      <string key="concept:name" value="A"/>
+      <date key="time:timestamp" value="1970-04-26T17:46:43+00:00"/>
+    </event>
+    <event>
+      <string key="concept:name" value="A"/>
+      <date key="time:timestamp" value="1970-04-26T17:46:43+00:00"/>
     </event>
   </trace>
 </log>

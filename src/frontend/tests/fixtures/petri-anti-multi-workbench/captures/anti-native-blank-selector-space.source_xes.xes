@@ -4,12 +4,10 @@
   <trace>
     <string key="concept:name" value="trace_words"/>
     <event>
-      <string key=" 	
-" value="A"/>
+      <string key=" &#9;&#13;&#10;" value="A"/>
     </event>
     <event>
-      <string key=" 	
-" value="B"/>
+      <string key=" &#9;&#13;&#10;" value="B"/>
     </event>
   </trace>
 </log>

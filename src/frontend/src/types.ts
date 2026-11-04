@@ -2563,6 +2563,13 @@ export interface PetriTransition {
   reset_inputs?: number[];
   /** Optional inhibitor arcs emitted by extended Petri-net serializers. */
   inhibitor_inputs?: number[];
+  /**
+   * Per-occurrence weights of a compact side (parallel arc objects, or zero,
+   * signed or large weights), parallel to inputs/outputs. Without them an arc
+   * of weight w is w repeated endpoints of one place.
+   */
+  input_weights?: (number | string)[];
+  output_weights?: (number | string)[];
 }
 
 export interface PetriNetModel {
@@ -3310,6 +3317,12 @@ export interface Alignments {
   computed: boolean;
   /** When !computed: true = search bound hit (reachable but too large), false = unsound. */
   exhausted: boolean;
+  /**
+   * When exhausted: true when a time limit (the global or per-trace timeout)
+   * stopped the search, false when its state limit did. Absent from older
+   * servers and exports, which did not say.
+   */
+  time_limit_reached?: boolean;
   /**
    * Cost-based fitness in [0, 1]: how cheaply the log aligns to the model.
    * Null when !computed (exports from older versions wrote 1 there).
@@ -6904,6 +6917,35 @@ export interface DataPetriNetResult {
   decision_tables?: DecisionTablesResult;
 }
 
+/** What a mining response without its traces says about them. */
+export interface TraceSummary {
+  /** The traces are served by GET /api/traces?source_id=. */
+  traces: "on_demand";
+  trace_count: number;
+  event_count: number;
+  /** Events of the longest case. */
+  max_trace_length: number;
+  /** Cases with at least one event that carries a timestamp. */
+  timestamped_trace_count: number;
+  has_timestamps: boolean;
+  has_lifecycles: boolean;
+  /** Distinct lifecycle transitions, in first-seen order. */
+  lifecycles: string[];
+}
+
+export function isTraceSummary(value: unknown, traceCount: number, eventCount: number): value is TraceSummary {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const summary = value as TraceSummary;
+  const count = (n: unknown) => Number.isSafeInteger(n) && (n as number) >= 0;
+  return summary.traces === "on_demand" && summary.trace_count === traceCount && summary.event_count === eventCount &&
+    count(summary.max_trace_length) && summary.max_trace_length <= eventCount &&
+    count(summary.timestamped_trace_count) && summary.timestamped_trace_count <= traceCount &&
+    summary.has_timestamps === summary.timestamped_trace_count > 0 &&
+    Array.isArray(summary.lifecycles) && summary.lifecycles.every((item) => typeof item === "string" && item !== "") &&
+    new Set(summary.lifecycles).size === summary.lifecycles.length &&
+    summary.has_lifecycles === summary.lifecycles.length > 0;
+}
+
 export interface MineraExport {
   dataset: string;
   /** Cached HTTP source identity; absent from standalone and legacy exports. */
@@ -6913,8 +6955,14 @@ export interface MineraExport {
   generator?: string;
   trace_count: number;
   event_count: number;
-  /** Raw event log; absent in exports from older minera_export versions. */
+  /**
+   * Raw event log; absent in exports from older minera_export versions and in
+   * mining responses requested with include_traces=false, which carry
+   * `trace_summary` instead (see mine-traces.ts for loading them).
+   */
   traces?: Trace[];
+  /** Stands in for `traces` when the backend serves them on demand (GET /api/traces). */
+  trace_summary?: TraceSummary;
   /** Compatibility log-level attributes, when generic attributes exist. */
   log_attributes?: Record<string, string | null>;
   /** Ordered recursive log-level attribute details. */
@@ -7079,7 +7127,7 @@ function isMineraTraceEvent(value: unknown, activityCount?: number): value is Tr
       (Array.isArray(event.attribute_details) && event.attribute_details.every(isMineraAttributeDetail)));
 }
 
-function isMineraTrace(value: unknown, activityCount?: number): value is Trace {
+export function isMineraTrace(value: unknown, activityCount?: number): value is Trace {
   if (!value || typeof value !== "object" || typeof (value as Trace).case_id !== "string" ||
       !Array.isArray((value as Trace).events) ||
       !(value as Trace).events.every((event) =>
@@ -7203,6 +7251,8 @@ export function isMineraExport(value: unknown): value is MineraExport {
     );
     if (eventCount !== data.event_count) return false;
   }
+  if (data.trace_summary !== undefined &&
+      (data.traces !== undefined || !isTraceSummary(data.trace_summary, traceCount, data.event_count))) return false;
   if (data.log_attributes !== undefined && !isNullableStringRecord(data.log_attributes)) return false;
   if (data.log_attribute_details !== undefined &&
       (!Array.isArray(data.log_attribute_details) ||

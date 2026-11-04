@@ -135,6 +135,10 @@ struct PrecisionOptions {
   // Token replay's per-place silent-path tie order (see TokenReplayOptions).
   // PNML document entry points default it to the imported arc order.
   std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
+  // Alignment-based variants poll it as AlignmentOptions::cancelled does (and
+  // ALIGN_ETCONFORMANCE before each prefix, throwing OperationCancelled).
+  // Unset never cancels; token-based precision ignores it.
+  std::function<bool()> cancelled;
 };
 
 struct GeneralizationOptions {

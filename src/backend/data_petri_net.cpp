@@ -1,4 +1,5 @@
 #include "minera/data_petri_net.hpp"
+#include "minera/petri_reference_arcs.hpp"
 
 #include <algorithm>
 #include <iomanip>
@@ -148,11 +149,12 @@ DataPetriNet mine_data_petri_net(const EventLog& log, const PetriNet& net,
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());
   for (std::size_t transition = 0; transition < net.transitions().size();
        ++transition) {
-    for (const auto place : net.transitions()[transition].inputs) {
+    for (const auto place : net.transitions()[transition].inputs)
       if (place >= outgoing.size())
         throw std::invalid_argument("data Petri net transition place is invalid");
-      outgoing[place].push_back(transition);
-    }
+    // One entry per arc object, matching the decision points' branches.
+    for (const auto& arc : petri_reference_arcs(net.transitions()[transition], true))
+      outgoing[arc.place].push_back(transition);
   }
 
   std::map<std::size_t, std::vector<GuardGroup>> groups;

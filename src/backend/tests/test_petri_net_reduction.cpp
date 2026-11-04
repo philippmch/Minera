@@ -226,7 +226,37 @@ void join_bridge_preservation_is_opt_in_and_requires_external_producer() {
 
 }  // namespace
 
+// A compact side (here two parallel arcs into the middle place) has no
+// repeated-unit form, so a net holding one is returned unchanged rather than
+// rewritten with unit arcs. Without the parallel arcs the silent step folds.
+void compact_arc_nets_are_kept() {
+  minera::PetriNetLiteralStorage storage;
+  storage.place_count = 3;
+  storage.source_storage = 0;
+  storage.sink_storage = 2;
+  storage.has_source = storage.has_sink = true;
+  storage.activities = {"A"};
+  minera::PetriTransition silent;
+  silent.inputs = {0};
+  silent.outputs = {1, 1};
+  silent.output_weights = {minera::PetriArcWeight{1, false}, minera::PetriArcWeight{1, false}};
+  minera::PetriTransition visible;
+  visible.activity = 0;
+  visible.inputs = {1};
+  visible.outputs = {2};
+  storage.transitions = {silent, visible};
+  const auto net = minera::PetriNet::from_literal_storage(storage);
+  const auto kept = minera::reduce_petri_net(net, {});
+  assert(kept.net.transitions().size() == 2);
+  assert(kept.net.transitions()[0].output_weights.size() == 2);
+  storage.transitions[0].outputs = {1};
+  storage.transitions[0].output_weights.clear();
+  const auto folded = minera::reduce_petri_net(minera::PetriNet::from_literal_storage(storage), {});
+  assert(folded.net.transitions().size() == 1);
+}
+
 int main() {
+  compact_arc_nets_are_kept();
   unchanged_transition_identity_including_extended_and_early_return();
   nonadjacent_duplicate_transition_identities_follow_the_survivor();
   fused_transition_identities_shift_after_an_earlier_removal();

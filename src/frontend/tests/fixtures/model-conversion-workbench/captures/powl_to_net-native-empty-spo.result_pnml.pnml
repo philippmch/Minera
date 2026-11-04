@@ -14,8 +14,12 @@
         <name><text>tau</text></name>
         <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t0"/>
       </transition>
+      <transition id="t1">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t1"/>
+      </transition>
       <arc id="a0" source="p0" target="t0"/>
-      <arc id="a1" source="t0" target="p1"/>
+      <arc id="a1" source="t1" target="p1"/>
     </page>
     <finalmarkings>
       <marking>

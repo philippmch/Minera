@@ -1,4 +1,5 @@
 #include "minera/petri_analysis.hpp"
+#include "minera/petri_reference_arcs.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -344,38 +345,53 @@ WorkflowMarkings resolved_woflan_markings(const PetriNet& net,
   return result;
 }
 
-std::vector<std::int64_t> arc_weights(const std::vector<std::size_t>& arcs,
-                                      std::size_t places) {
-  std::vector<std::int64_t> weights(places, 0);
-  for (const auto place : arcs) ++weights[place];
-  return weights;
-}
-
 bool enabled(const Marking& marking, const PetriTransition& transition) {
   return petri_transition_enabled(transition, marking);
 }
 
+// Fires like enabled() checks: each ordinary arc moves its weight (repeated
+// unit endpoints one token each), as the reference semantics.execute does.
 bool fire(const Marking& marking, const PetriTransition& transition,
           Marking& next) {
   if (!enabled(marking, transition)) return false;
   next = marking;
-  for (const auto p : transition.inputs) --next[p];
-  for (const auto p : transition.reset_inputs) next[p] = 0;
-  for (const auto p : transition.outputs) {
-    if (next[p] == std::numeric_limits<std::int64_t>::max()) return false;
-    ++next[p];
+  try {
+    fire_petri_transition(transition, next);
+  } catch (const std::overflow_error&) {
+    return false;
   }
   return true;
 }
 
+// The reference incidence matrix counts arc objects, not weights (marking
+// equations). The Woflan invariant stages use petri_weighted_incidence.
 std::vector<std::vector<double>> incidence(const PetriNet& net) {
-  std::vector<std::vector<double>> matrix(
-      net.place_count(), std::vector<double>(net.transitions().size(), 0.0));
-  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
-    for (const auto p : net.transitions()[t].inputs) matrix[p][t] -= 1.0;
-    for (const auto p : net.transitions()[t].outputs) matrix[p][t] += 1.0;
+  return petri_reference_incidence(net);
+}
+
+// Coverability step with omega (kOmega) coordinates: an omega place satisfies
+// every arc and keeps omega. Each ordinary arc is checked and moved by its own
+// weight, like enabled()/fire() above.
+bool cover_fire(const Marking& marking, const PetriTransition& transition,
+                std::int64_t omega, Marking& next) {
+  const auto inputs = petri_reference_arcs(transition, true);
+  for (const auto& arc : inputs) {
+    if (arc.place >= marking.size()) return false;
+    if (marking[arc.place] != omega && marking[arc.place] < arc.signed_weight()) return false;
   }
-  return matrix;
+  next = marking;
+  for (const auto& arc : inputs) {
+    if (next[arc.place] == omega) continue;
+    next[arc.place] = std::max<std::int64_t>(0, next[arc.place] - arc.signed_weight());
+  }
+  for (const auto& arc : petri_reference_arcs(transition, false)) {
+    if (arc.place >= next.size()) return false;
+    if (next[arc.place] == omega) continue;
+    const auto weight = arc.signed_weight();
+    if (weight > 0 && next[arc.place] > std::numeric_limits<std::int64_t>::max() - weight) return false;
+    next[arc.place] = std::max<std::int64_t>(0, next[arc.place] + weight);
+  }
+  return true;
 }
 
 // Two-phase dense simplex for max c*x subject to A*x<=b, x>=0.
@@ -631,7 +647,7 @@ std::vector<std::size_t> recover_sequence(
 // that the place belongs to a positive P-invariant.  The existing simplex is
 // deliberately reused here so the analysis remains self-contained.
 std::vector<std::vector<double>> invariant_basis(const PetriNet& net) {
-  const auto c = incidence(net);
+  const auto c = petri_weighted_incidence(net);
   const std::size_t places = net.place_count();
   std::vector<std::vector<double>> constraints;
   std::vector<double> bounds;
@@ -1092,20 +1108,8 @@ CoverabilityResult coverability_search(const PetriNet& net,
     queue.pop();
     for (std::size_t t = 0; t < net.transitions().size(); ++t) {
       const auto& transition = net.transitions()[t];
-      bool is_enabled = true;
-      std::vector<std::int64_t> next = nodes[id].marking;
-      const auto required = arc_weights(transition.inputs, next.size());
-      for (std::size_t p = 0; p < next.size(); ++p) {
-        if (next[p] != kOmega && next[p] < required[p]) {
-          is_enabled = false;
-          break;
-        }
-      }
-      if (!is_enabled) continue;
-      for (const auto p : transition.inputs)
-        if (next[p] != kOmega) --next[p];
-      for (const auto p : transition.outputs)
-        if (next[p] != kOmega) ++next[p];
+      std::vector<std::int64_t> next;
+      if (!cover_fire(nodes[id].marking, transition, kOmega, next)) continue;
 
       bool accelerated = false;
       std::vector<bool> accelerated_places(next.size(), false);
@@ -1201,24 +1205,7 @@ bool restricted_fire(const Marking& marking, const PetriTransition& transition,
   // silently interpreted with ordinary incidence semantics.
   if (!transition.reset_inputs.empty() || !transition.inhibitor_inputs.empty())
     return false;
-  std::vector<std::size_t> required(marking.size(), 0);
-  for (const auto place : transition.inputs) {
-    if (place >= marking.size()) return false;
-    if (marking[place] != kOmega) {
-      ++required[place];
-      if (marking[place] < static_cast<std::int64_t>(required[place]))
-        return false;
-    }
-  }
-  next = marking;
-  for (const auto place : transition.inputs)
-    if (next[place] != kOmega) --next[place];
-  for (const auto place : transition.outputs) {
-    if (next[place] == kOmega) continue;
-    if (next[place] == std::numeric_limits<std::int64_t>::max()) return false;
-    ++next[place];
-  }
-  return true;
+  return cover_fire(marking, transition, kOmega, next);
 }
 
 RestrictedCoverabilityResult restricted_coverability_search(
@@ -1322,6 +1309,26 @@ WorkflowMarkings default_workflow_markings(const PetriNet& net) {
   result.initial[net.source()] = 1;
   result.final[net.sink()] = 1;
   return result;
+}
+
+bool marking_equation_relaxation_feasible(const PetriNet& net, const Marking& initial,
+                                          const Marking& final) {
+  if (initial.size() != net.place_count() || final.size() != net.place_count())
+    throw std::invalid_argument("marking dimension does not match net");
+  const auto matrix = incidence(net);
+  std::vector<std::vector<double>> inequalities;
+  std::vector<double> bounds;
+  for (std::size_t p = 0; p < net.place_count(); ++p) {
+    const double delta = static_cast<double>(final[p]) - static_cast<double>(initial[p]);
+    inequalities.push_back(matrix[p]);
+    bounds.push_back(delta);
+    auto negative = matrix[p];
+    for (auto& x : negative) x = -x;
+    inequalities.push_back(std::move(negative));
+    bounds.push_back(-delta);
+  }
+  return solve_linear_program(inequalities, bounds,
+                              std::vector<double>(net.transitions().size(), 1.0)).feasible;
 }
 
 MarkingEquationResult solve_marking_equation(const PetriNet& net,
@@ -1696,7 +1703,7 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   }
   const PetriNet* structural_net = short_circuited ? &*short_circuited : &net;
   if (validation_error.empty()) {
-    const auto structural_incidence = incidence(*structural_net);
+    const auto structural_incidence = petri_weighted_incidence(*structural_net);
     result.place_invariant_basis = invariant_basis(*structural_net);
     result.uncovered_places = uncovered_from_vectors(
         result.place_invariant_basis, structural_net->place_count());
@@ -2027,8 +2034,18 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
   const bool no_dead_tasks = options.variant == SoundnessVariant::kWoflan
                                  ? result.dead_tasks.empty()
                                  : result.dead_transitions.empty();
+  // On a net with weighted or parallel arcs the reference reports unsound
+  // whenever the weighted incidence leaves a place outside every S-component,
+  // whatever the net's behaviour (observed black-box for check_soundness and
+  // woflan: every such net probed is unsound, while an S-coverable one keeps
+  // the behavioural verdict).
+  const bool weighted_s_cover_unsound =
+      petri_net_has_weighted_arcs(net) && result.s_components.has_value() &&
+      !result.uniform_invariant_search_exhausted &&
+      !result.uncovered_places_s_component.empty();
   const bool sound = result.final_reachable && result.option_to_complete &&
-                     result.proper_completion && no_dead_tasks;
+                     result.proper_completion && no_dead_tasks &&
+                     !weighted_s_cover_unsound;
   result.status = sound ? SoundnessStatus::SOUND : SoundnessStatus::UNSOUND;
   result.computed = true;
   if (options.diagnostics) {
@@ -2056,6 +2073,9 @@ SoundnessResult analyze_soundness(const PetriNet& net, const SoundnessOptions& o
     if (!result.uncovered_places_s_component.empty())
       result.diagnostic_messages.push_back(
           "S-component coverage is missing for one or more places");
+    if (weighted_s_cover_unsound)
+      result.diagnostic_messages.push_back(
+          "a net with weighted or parallel arcs that is not S-coverable is unsound");
     if (options.variant != SoundnessVariant::kWoflan &&
         !result.dead_transitions.empty())
       result.diagnostic_messages.push_back("the net contains dead transitions");

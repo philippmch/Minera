@@ -14197,14 +14197,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5643",
+        "Content-Length": "5631",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-weight-double-storage-subnormal-evaluate_pair.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-weight-double-storage-subnormal-evaluate_pair.response.json",
-        "bytes": 5643,
-        "sha256": "8114eacda6b2aaa67ea7336a6d4b4a9f3fd8e89d3b67ccd6c8f258915c1d5e09",
+        "bytes": 5631,
+        "sha256": "b14b770ddb01e889be265d5f338e0ba510783d166a660bd9f314d21dd601fd0c",
         "status": 200
       },
       "family": "original_emd",
@@ -14253,8 +14253,8 @@
         "legacy_emd_json": {
           "filename": "native-weight-double-storage-subnormal-evaluate_pair.legacy_emd_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-weight-double-storage-subnormal-evaluate_pair.legacy_emd_json.json",
-          "bytes": 122,
-          "sha256": "2f2d1c6bdfd75bb40b19bc2332bee0f16e03210e8c0398bc2b4a2defc1a00c1b",
+          "bytes": 116,
+          "sha256": "7277fb5b59bd28d769a8a14f415a511e17b2e7c93f9cf1eb6947be87ec367485",
           "format": "json"
         }
       },
@@ -14485,14 +14485,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5646",
+        "Content-Length": "5668",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-weight-double-storage-uint53-double-rounding-evaluate_pair.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-weight-double-storage-uint53-double-rounding-evaluate_pair.response.json",
-        "bytes": 5646,
-        "sha256": "a30ab59a7ceb670ce046f042003bb5c74fc0cd88f5f8bb3a262b614cd508b89b",
+        "bytes": 5668,
+        "sha256": "539611c0d5b70ff3d84e90344f4091bd44e20f2bdf17edff278811ea58e15eda",
         "status": 200
       },
       "family": "original_emd",
@@ -14541,8 +14541,8 @@
         "legacy_emd_json": {
           "filename": "native-weight-double-storage-uint53-double-rounding-evaluate_pair.legacy_emd_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-weight-double-storage-uint53-double-rounding-evaluate_pair.legacy_emd_json.json",
-          "bytes": 120,
-          "sha256": "b4ac05c5e2054ee69f84d478b705e2fdef695cca5e5a09169f5fc8b2da667b69",
+          "bytes": 131,
+          "sha256": "49c41fd3336d155132885d11d6d5d99e55e41a5aed778774a6ead7f9051974b8",
           "format": "json"
         }
       },
@@ -14773,14 +14773,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5681",
+        "Content-Length": "5703",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-weight-double-storage-max-finite-evaluate_pair.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-weight-double-storage-max-finite-evaluate_pair.response.json",
-        "bytes": 5681,
-        "sha256": "49d039a45419bee533c264fe14dd02a1da82922c3e76cfd10bcfcda9c068ce05",
+        "bytes": 5703,
+        "sha256": "3bb5faab94ae4639cbacf1d94494a75a9f1b53a6584cd15775937ee4c8c286f1",
         "status": 200
       },
       "family": "original_emd",
@@ -14829,8 +14829,8 @@
         "legacy_emd_json": {
           "filename": "native-weight-double-storage-max-finite-evaluate_pair.legacy_emd_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-weight-double-storage-max-finite-evaluate_pair.legacy_emd_json.json",
-          "bytes": 122,
-          "sha256": "c71408da767b5cabef9cf7a3e59cb0cc9e3304163dece0baafd780a7ed692d41",
+          "bytes": 133,
+          "sha256": "9c98729d02e97bdc4235b730114287305e95c361a9a8d80260b1c7cba21a16bf",
           "format": "json"
         }
       },
@@ -52849,14 +52849,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5347",
+        "Content-Length": "5693",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-normalized-levenshtein-empty-vs-single-evaluate_pair.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-vs-single-evaluate_pair.response.json",
-        "bytes": 5347,
-        "sha256": "1a0e1cb2e441f7a6efeedd7843ac49e6a41b6b97ad16110ab76648c2ebad11ab",
+        "bytes": 5693,
+        "sha256": "4408ee60063e6f16c471ab465386bd94d1a4cf524faccbb34ac276db388397fe",
         "status": 200
       },
       "family": "original_emd",
@@ -52897,15 +52897,15 @@
         "result_json": {
           "filename": "native-normalized-levenshtein-empty-vs-single-evaluate_pair.result_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-vs-single-evaluate_pair.result_json.json",
-          "bytes": 119,
-          "sha256": "8cf85eb2d931b718b769ef3f4b0bdb2132e4939edf2fb0cd3e0e943f93605988",
+          "bytes": 187,
+          "sha256": "a392069b0659ab01ce05c3f8c57f3a8103a3090370c08e571d2360962ced330a",
           "format": "json"
         },
         "legacy_emd_json": {
           "filename": "native-normalized-levenshtein-empty-vs-single-evaluate_pair.legacy_emd_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-vs-single-evaluate_pair.legacy_emd_json.json",
-          "bytes": 111,
-          "sha256": "c560db2f431dbdca1577696237ff2418328d58fec6679127a63eaefaf59e20ee",
+          "bytes": 178,
+          "sha256": "8f23804500b06853787479bee7b91bef0ced9816e37293170f9398115bd1e0a3",
           "format": "json"
         }
       },
@@ -52981,7 +52981,7 @@
         "bytes": 735,
         "sha256": "f031e044f0d05f3ccd884d5040e19eae49adeb03355c2d7901d8fe5ed4e88214"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "left_file": {
           "filename": "owned-metric-left-empty-vs-single.language.json",
@@ -52999,15 +52999,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4476",
+        "Content-Length": "4578",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-normalized-levenshtein-empty-vs-single-distance_pair.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-vs-single-distance_pair.response.json",
-        "bytes": 4476,
-        "sha256": "d6b9c946d56e8f1cdfc58fc32d37f778bda6b6dc75988bfa87f00671a8be8a8b",
-        "status": 200
+        "bytes": 4578,
+        "sha256": "c3cf50ce72a592ececa6ac8fb30fd3ac747e6f36b1cb45f2fb275f64acb13266",
+        "status": 400
       },
       "family": "original_emd",
       "operation": "distance_pair",
@@ -53043,13 +53043,6 @@
           "bytes": 108,
           "sha256": "3954faad81ac1ba0e89b99d980a25355ce3bf933979af45ad88f24f6a1a096bc",
           "format": "json"
-        },
-        "result_json": {
-          "filename": "native-normalized-levenshtein-empty-vs-single-distance_pair.result_json.json",
-          "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-vs-single-distance_pair.result_json.json",
-          "bytes": 3,
-          "sha256": "d0ff5974b6aa52cf562bea5921840c032a860a91a3512f7fe8f768f6bbe005f6",
-          "format": "json"
         }
       },
       "left": {
@@ -53065,15 +53058,23 @@
         "sha256": "0c0dbc39d8a64c40506c09e66446384e281b13e66a9d7777054946698607b5f5"
       },
       "source": null,
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "normalized Levenshtein distance is undefined for two empty traces",
+        "exception_type": "invalid_argument"
+      },
       "native_calls": [
         {
           "name": "earth_movers_distance(left,right,options)",
           "stage": "primary",
           "input_kind": "StochasticLanguage pair",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "normalized Levenshtein distance is undefined for two empty traces",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -53993,14 +53994,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5361",
+        "Content-Length": "5707",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-normalized-levenshtein-empty-label-distinct-evaluate_pair.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-label-distinct-evaluate_pair.response.json",
-        "bytes": 5361,
-        "sha256": "669d016f1a70d4a3bd3d95b5aea0d3baf0683b543855a1bbed5a5c8abe4b2aa9",
+        "bytes": 5707,
+        "sha256": "831f8ed73087af43c6f372c2570a8a1a37b2661ba93f770dee6d3c576438a14d",
         "status": 200
       },
       "family": "original_emd",
@@ -54041,15 +54042,15 @@
         "result_json": {
           "filename": "native-normalized-levenshtein-empty-label-distinct-evaluate_pair.result_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-label-distinct-evaluate_pair.result_json.json",
-          "bytes": 119,
-          "sha256": "8cf85eb2d931b718b769ef3f4b0bdb2132e4939edf2fb0cd3e0e943f93605988",
+          "bytes": 187,
+          "sha256": "a392069b0659ab01ce05c3f8c57f3a8103a3090370c08e571d2360962ced330a",
           "format": "json"
         },
         "legacy_emd_json": {
           "filename": "native-normalized-levenshtein-empty-label-distinct-evaluate_pair.legacy_emd_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-label-distinct-evaluate_pair.legacy_emd_json.json",
-          "bytes": 111,
-          "sha256": "c560db2f431dbdca1577696237ff2418328d58fec6679127a63eaefaf59e20ee",
+          "bytes": 178,
+          "sha256": "8f23804500b06853787479bee7b91bef0ced9816e37293170f9398115bd1e0a3",
           "format": "json"
         }
       },
@@ -54125,7 +54126,7 @@
         "bytes": 744,
         "sha256": "709b991e970c1090ab51fcb0a2610e0fb364498f72059c59e94605347c3ce577"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "left_file": {
           "filename": "owned-metric-left-empty-label-distinct.language.json",
@@ -54143,15 +54144,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4490",
+        "Content-Length": "4592",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-normalized-levenshtein-empty-label-distinct-distance_pair.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-label-distinct-distance_pair.response.json",
-        "bytes": 4490,
-        "sha256": "18b69b223d08e80f6aa9abed4412669cc55d94a54198b908e4e228a89670201b",
-        "status": 200
+        "bytes": 4592,
+        "sha256": "a6cadeb0d2f529ea09d59b61c79fca854a3eeca5a290994b3a7bdeabfd9308d9",
+        "status": 400
       },
       "family": "original_emd",
       "operation": "distance_pair",
@@ -54187,13 +54188,6 @@
           "bytes": 108,
           "sha256": "3954faad81ac1ba0e89b99d980a25355ce3bf933979af45ad88f24f6a1a096bc",
           "format": "json"
-        },
-        "result_json": {
-          "filename": "native-normalized-levenshtein-empty-label-distinct-distance_pair.result_json.json",
-          "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-normalized-levenshtein-empty-label-distinct-distance_pair.result_json.json",
-          "bytes": 3,
-          "sha256": "d0ff5974b6aa52cf562bea5921840c032a860a91a3512f7fe8f768f6bbe005f6",
-          "format": "json"
         }
       },
       "left": {
@@ -54209,15 +54203,23 @@
         "sha256": "4ba2c53bbaefcd46edb50841f9bb23187fcdbf650c25e6a159e28065de3e7307"
       },
       "source": null,
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "normalized Levenshtein distance is undefined for two empty traces",
+        "exception_type": "invalid_argument"
+      },
       "native_calls": [
         {
           "name": "earth_movers_distance(left,right,options)",
           "stage": "primary",
           "input_kind": "StochasticLanguage pair",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "normalized Levenshtein distance is undefined for two empty traces",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -58136,14 +58138,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5189",
+        "Content-Length": "5535",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-constructor-empty-word-default-evaluate_pair.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-constructor-empty-word-default-evaluate_pair.response.json",
-        "bytes": 5189,
-        "sha256": "13b602a81f0c86d1a7675dd101af6935f4521cc6eea1be71c901708710531e9c",
+        "bytes": 5535,
+        "sha256": "d80074c5a2237f2c8cf9b1fcfa30392ec420e1d39a39e5040da69534a05be8b5",
         "status": 200
       },
       "family": "original_emd",
@@ -58185,15 +58187,15 @@
         "result_json": {
           "filename": "native-constructor-empty-word-default-evaluate_pair.result_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-constructor-empty-word-default-evaluate_pair.result_json.json",
-          "bytes": 119,
-          "sha256": "278553ffb6ea82e09592569041ed12522d283e11b47eea860b5adbd860c4243b",
+          "bytes": 187,
+          "sha256": "a392069b0659ab01ce05c3f8c57f3a8103a3090370c08e571d2360962ced330a",
           "format": "json"
         },
         "legacy_emd_json": {
           "filename": "native-constructor-empty-word-default-evaluate_pair.legacy_emd_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-constructor-empty-word-default-evaluate_pair.legacy_emd_json.json",
-          "bytes": 111,
-          "sha256": "fb8b570bd536d7c98a87e7f19e656dca16eaff38675d562ae3d1d829cf4cb9e7",
+          "bytes": 178,
+          "sha256": "8f23804500b06853787479bee7b91bef0ced9816e37293170f9398115bd1e0a3",
           "format": "json"
         }
       },
@@ -58269,7 +58271,7 @@
         "bytes": 651,
         "sha256": "81b1719ee88c823b7e37c8936cfdf6df0a2970ea209300a0e9a96975e6111a33"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "left_file": {
           "filename": "owned-empty-word-default.language.json",
@@ -58287,15 +58289,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4318",
+        "Content-Length": "4420",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-constructor-empty-word-default-distance_pair.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-constructor-empty-word-default-distance_pair.response.json",
-        "bytes": 4318,
-        "sha256": "149974cf1e8c5ef99e4e08864b7e1d3d2b7745b141ca4d30a72cc372d5f7b1f3",
-        "status": 200
+        "bytes": 4420,
+        "sha256": "84b1aed9495a26b1314022233c980c1d360da40274fc44a0a2a362870775806e",
+        "status": 400
       },
       "family": "original_emd",
       "operation": "distance_pair",
@@ -58332,13 +58334,6 @@
           "bytes": 108,
           "sha256": "3954faad81ac1ba0e89b99d980a25355ce3bf933979af45ad88f24f6a1a096bc",
           "format": "json"
-        },
-        "result_json": {
-          "filename": "native-constructor-empty-word-default-distance_pair.result_json.json",
-          "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-constructor-empty-word-default-distance_pair.result_json.json",
-          "bytes": 3,
-          "sha256": "8aed642bf5118b9d3c859bd4be35ecac75b6e873cce34e7b6f554b06f75550d7",
-          "format": "json"
         }
       },
       "left": {
@@ -58354,15 +58349,23 @@
         "sha256": "bb182c51556efe16cfee712c6d8128d20b35deca2675956211d6aaf88ce2cb6a"
       },
       "source": null,
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "normalized Levenshtein distance is undefined for two empty traces",
+        "exception_type": "invalid_argument"
+      },
       "native_calls": [
         {
           "name": "earth_movers_distance(left,right,options)",
           "stage": "primary",
           "input_kind": "StochasticLanguage pair",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "normalized Levenshtein distance is undefined for two empty traces",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -58818,14 +58821,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17671",
+        "Content-Length": "16481",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-derive-byte-activities-false.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-derive-byte-activities-false.response.json",
-        "bytes": 17671,
-        "sha256": "031fde0d55985c1de73ef8313fa5ba476bff0468f5a15cc2d71cb016293eeefc",
+        "bytes": 16481,
+        "sha256": "1b5e5cd84c1272db0e8836eaa14c9f2d37b3964744bdc88ecd605109a7456a13",
         "status": 200
       },
       "family": "original_emd",
@@ -58861,13 +58864,6 @@
           "sha256": "d5130336429758b577cdd633ea50f3cf9243df89ce9077093a05cef7a48f15ea",
           "format": "json"
         },
-        "source_xes": {
-          "filename": "native-derive-byte-activities-false.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-derive-byte-activities-false.source_xes.xes",
-          "bytes": 655,
-          "sha256": "1204ec9ee8829dae0a9455f2f660ea98c963de49ec07789cc3fcb7a2d6dfcea4",
-          "format": "xes"
-        },
         "result_json": {
           "filename": "native-derive-byte-activities-false.result_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-derive-byte-activities-false.result_json.json",
@@ -58898,8 +58894,12 @@
           "name": "to_xes(source_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -58955,14 +58955,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "58097",
+        "Content-Length": "58129",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-derive-all-storage-false.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-derive-all-storage-false.response.json",
-        "bytes": 58097,
-        "sha256": "e993bec80477f278af503f24cf924a3ca547862997461137f6acff956ffdf6ab",
+        "bytes": 58129,
+        "sha256": "8f3d7f973bb7b1ad13455a3a223341237cf2ba6716e575ffcc3ef941f7a37cde",
         "status": 200
       },
       "family": "original_emd",
@@ -59020,7 +59020,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible integer native value",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -59478,14 +59478,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17765",
+        "Content-Length": "16575",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-derive-byte-activities-true.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-derive-byte-activities-true.response.json",
-        "bytes": 17765,
-        "sha256": "22ca1e1eea3369257f2efda07f61aaee53b0d95a1490964b73ed1a82f89364a1",
+        "bytes": 16575,
+        "sha256": "5263f9f6a00c597e7af39707564fedbda9321aa8de5c601d74d64c6956fcf0ff",
         "status": 200
       },
       "family": "original_emd",
@@ -59521,13 +59521,6 @@
           "sha256": "d5130336429758b577cdd633ea50f3cf9243df89ce9077093a05cef7a48f15ea",
           "format": "json"
         },
-        "source_xes": {
-          "filename": "native-derive-byte-activities-true.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-derive-byte-activities-true.source_xes.xes",
-          "bytes": 655,
-          "sha256": "1204ec9ee8829dae0a9455f2f660ea98c963de49ec07789cc3fcb7a2d6dfcea4",
-          "format": "xes"
-        },
         "result_json": {
           "filename": "native-derive-byte-activities-true.result_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-derive-byte-activities-true.result_json.json",
@@ -59558,8 +59551,12 @@
           "name": "to_xes(source_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },
@@ -59615,14 +59612,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "58095",
+        "Content-Length": "58127",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-derive-all-storage-true.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-derive-all-storage-true.response.json",
-        "bytes": 58095,
-        "sha256": "a1a7e9fbfa478d71268a7de1e1c57eabfb0f3c07f86c6ac4fc25d67aaffa9133",
+        "bytes": 58127,
+        "sha256": "7a82b58ae1f9e1e42242321f979912d03027b030a16130284ae522cd8c5e089c",
         "status": 200
       },
       "family": "original_emd",
@@ -59680,7 +59677,7 @@
           "returned": false,
           "error": {
             "type": "native_error",
-            "message": "XES attribute has an incompatible integer native value",
+            "message": "XES cannot represent this text: character U+0000 is not allowed in XML",
             "exception_type": "invalid_argument"
           }
         }
@@ -75201,14 +75198,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "20053",
+        "Content-Length": "18863",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-reopen-full-byte-source-download.response.json",
         "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-reopen-full-byte-source-download.response.json",
-        "bytes": 20053,
-        "sha256": "85af778692e8f24158d1cac13b7f59560fc6c8426ca7945df474272407ec7597",
+        "bytes": 18863,
+        "sha256": "424cf6abf0c8854ba59894331f8fa9a23b788f0574c48f579e8b62e5b4cd6265",
         "status": 200
       },
       "family": "original_emd",
@@ -75245,13 +75242,6 @@
           "sha256": "d5130336429758b577cdd633ea50f3cf9243df89ce9077093a05cef7a48f15ea",
           "format": "json"
         },
-        "source_xes": {
-          "filename": "native-reopen-full-byte-source-download.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-reopen-full-byte-source-download.source_xes.xes",
-          "bytes": 655,
-          "sha256": "1204ec9ee8829dae0a9455f2f660ea98c963de49ec07789cc3fcb7a2d6dfcea4",
-          "format": "xes"
-        },
         "result_json": {
           "filename": "native-reopen-full-byte-source-download.result_json.json",
           "path": "src/frontend/tests/fixtures/original-emd-workbench/captures/native-reopen-full-byte-source-download.result_json.json",
@@ -75282,8 +75272,12 @@
           "name": "to_xes(source_log)",
           "stage": "export",
           "input_kind": "EventLog",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "XES cannot represent this text: invalid UTF-8 byte sequence",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },

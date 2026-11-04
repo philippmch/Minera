@@ -67,6 +67,8 @@ import { ModelDiagnosticsInspection } from "./ModelDiagnosticsInspection";
 import { parseDiagnosticWeight, type DiagnosticEntry } from "../model-diagnostics";
 
 import { ReplayResultFitness } from "./ReplayResultFitness";
+import { traceFacts, useTraces } from "../mine-traces";
+import { TraceLoadNote } from "./TraceLoadNote";
 
 type Step = "miner" | "method" | "result";
 
@@ -1087,6 +1089,25 @@ function ModelEvaluationResultView({ result }: { result: ModelEvaluation }) {
   </div>;
 }
 
+// The trace to reduce, listed by case id. Cases loaded on demand are fetched
+// once the list is opened; until then the selected trace number is shown.
+export function ReductionTraceField({ data, traceIndex, onChange }: { data: MineraExport; traceIndex: number; onChange: (index: number) => void }) {
+  const [wanted, setWanted] = useState(false);
+  const load = useTraces(data, wanted);
+  const want = () => setWanted(true);
+  return <>
+    <label>Trace<select value={traceIndex} onFocus={want} onPointerDown={want} onChange={e => onChange(Number(e.target.value))}>
+      {load.status === "ready"
+        ? load.traces.map((trace, i) => <option key={i} value={i}>#{i + 1} · {trace.case_id}</option>)
+        : <>
+            {traceFacts(data).hasCases && <option value={traceIndex}>#{traceIndex + 1}</option>}
+            {load.status === "loading" && <option disabled value="">Loading {numberFormat.format(data.trace_count)} cases…</option>}
+          </>}
+    </select></label>
+    {load.status === "error" && <TraceLoadNote load={load} />}
+  </>;
+}
+
 function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditDistance, onRequestProcessTree, onRequestDecomposed, onRequestPetriAnti, onRequestPetriMulti, onRequestReduction, onRequestEmd }: {
   data: MineraExport;
   importedAvailable?: boolean;
@@ -1185,7 +1206,7 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
   const runDecomposed = async () => { if (!onRequestDecomposed) return; await runOther("decomposed", () => onRequestDecomposed(petriMiner, { ...decomposedOptions, initial_marking: parseMarkingInput(decomposedText.initial_marking), final_marking: parseMarkingInput(decomposedText.final_marking), activity_log_costs: parseCostMap(decomposedText.activity_log_costs), activity_model_costs: parseCostMap(decomposedText.activity_model_costs), activity_sync_costs: parseCostMap(decomposedText.activity_sync_costs) }), setDecomposed); };
   const runAnti = async () => { if (!onRequestPetriAnti) return; await runOther("anti", () => onRequestPetriAnti(petriMiner, { ...advancedOptions, initial_marking: parseMarkingInput(petriText.antiInitial), final_marking: parseMarkingInput(petriText.antiFinal) }), setAnti); };
   const runMulti = async () => { if (!onRequestPetriMulti) return; await runOther("multi", () => onRequestPetriMulti(petriMiner, { ...multiOptions, initial_marking: parseMarkingInput(petriText.multiInitial), final_marking: parseMarkingInput(petriText.multiFinal) }), setMulti); };
-  const runReduction = async () => { if (!onRequestReduction || !data.process_tree || !data.traces?.length) return; await runOther("reduction", () => onRequestReduction(traceIndex, reductionOptions), setReduced); };
+  const runReduction = async () => { if (!onRequestReduction || !data.process_tree || !traceFacts(data).hasCases) return; await runOther("reduction", () => onRequestReduction(traceIndex, reductionOptions), setReduced); };
   const inspectionEntries: AlignmentEntry[] = [];
   if (dfg) inspectionEntries.push({ kind: "dfg", label: "DFG classic", result: dfg });
   if (edit) inspectionEntries.push({ kind: "edit", label: "Edit distance", result: edit });
@@ -1214,7 +1235,7 @@ function OtherAlignments({ data, importedAvailable, onRequestDfg, onRequestEditD
       </div>
       <div className="other-align-card"><h3>Decomposed recomposition</h3><p>RECOMPOS_MAXIMAL alignment over a selected Petri miner.</p><label>Petri miner<select value={petriMiner} onChange={e => setPetriMiner(e.target.value)}>{petriMiners.map(m => <option key={m} value={m}>{m}</option>)}</select></label><div className="align-settings-grid"><label>Border threshold<input type="number" min={0} value={decomposedOptions.threshold_border_agreement ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, threshold_border_agreement: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Trace time (s)<input type="number" min={0} step={0.1} value={decomposedOptions.max_time_trace ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, max_time_trace: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Total time (s)<input type="number" min={0} step={0.1} value={decomposedOptions.max_time_total ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, max_time_total: e.target.value ? Number(e.target.value) : undefined })} /></label><label>State limit<input type="number" min={1} value={decomposedOptions.max_states ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, max_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Total states<input type="number" min={1} value={decomposedOptions.max_total_states ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, max_total_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Use cache<select value={String(decomposedOptions.use_cache ?? true)} onChange={e => setDecomposedOptions({ ...decomposedOptions, use_cache: e.target.value === "true" })}><option value="true">On</option><option value="false">Off</option></select></label><label>Clear cache<select value={String(decomposedOptions.clear_cache ?? false)} onChange={e => setDecomposedOptions({ ...decomposedOptions, clear_cache: e.target.value === "true" })}><option value="false">Keep</option><option value="true">Before run</option></select></label><label>Log cost<input type="number" min={0} value={decomposedOptions.log_move_cost ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, log_move_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Model cost<input type="number" min={0} value={decomposedOptions.model_move_cost ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, model_move_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Tau cost<input type="number" min={0} value={decomposedOptions.tau_model_cost ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, tau_model_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Sync cost<input type="number" min={0} value={decomposedOptions.sync_cost ?? ""} onChange={e => setDecomposedOptions({ ...decomposedOptions, sync_cost: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Initial marking<input placeholder="0,1" value={decomposedText.initial_marking} onChange={e => setDecomposedText({ ...decomposedText, initial_marking: e.target.value })} /></label><label>Final marking<input placeholder="2,3" value={decomposedText.final_marking} onChange={e => setDecomposedText({ ...decomposedText, final_marking: e.target.value })} /></label><label>Activity log costs<input placeholder="A=10000" value={decomposedText.activity_log_costs} onChange={e => setDecomposedText({ ...decomposedText, activity_log_costs: e.target.value })} /></label><label>Activity model costs<input placeholder="A=10000" value={decomposedText.activity_model_costs} onChange={e => setDecomposedText({ ...decomposedText, activity_model_costs: e.target.value })} /></label><label>Activity sync costs<input placeholder="A=0" value={decomposedText.activity_sync_costs} onChange={e => setDecomposedText({ ...decomposedText, activity_sync_costs: e.target.value })} /></label></div>{petriMiners.length === 0 && <small>No Petri model is available in this analysis.</small>}<button className="button" disabled={!onRequestDecomposed || petriMiners.length === 0 || busy !== null} onClick={() => void runDecomposed()}>{busy === "decomposed" ? "Aligning…" : "Run decomposed alignment"}</button>{decomposed && <DecomposedResultView result={decomposed} />}</div>
       <div className="other-align-card"><h3>Petri anti / multi</h3><p>VERSION_DISCOUNTED_A_STAR objectives over the selected miner.</p><label>Petri miner<select value={petriMiner} onChange={e => setPetriMiner(e.target.value)}>{petriMiners.map(m => <option key={m} value={m}>{m}</option>)}</select></label><div className="align-settings-grid"><label>Anti exponent<input type="number" min={1.01} step={0.1} placeholder="2" value={advancedOptions.exponent ?? ""} onChange={e => setAdvancedOptions({ ...advancedOptions, exponent: optionalNumber(e.target.value) })} /></label><label>Anti limit<input type="number" min={1} value={advancedOptions.marking_limit ?? ""} onChange={e => setAdvancedOptions({ ...advancedOptions, marking_limit: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Anti max states<input type="number" min={0} value={advancedOptions.max_states ?? ""} onChange={e => setAdvancedOptions({ ...advancedOptions, max_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Anti epsilon<input type="number" min={0} step={0.001} placeholder="0.005" value={advancedOptions.epsilon ?? ""} onChange={e => setAdvancedOptions({ ...advancedOptions, epsilon: optionalNumber(e.target.value) })} /></label><label>Anti initial<input placeholder="0,1" value={petriText.antiInitial} onChange={e => setPetriText({ ...petriText, antiInitial: e.target.value })} /></label><label>Anti final<input placeholder="2,3" value={petriText.antiFinal} onChange={e => setPetriText({ ...petriText, antiFinal: e.target.value })} /></label><label>Multi exponent<input type="number" min={1.01} step={0.1} placeholder="2" value={multiOptions.exponent ?? ""} onChange={e => setMultiOptions({ ...multiOptions, exponent: optionalNumber(e.target.value) })} /></label><label>Multi limit<input type="number" min={1} value={multiOptions.marking_limit ?? ""} onChange={e => setMultiOptions({ ...multiOptions, marking_limit: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Multi max states<input type="number" min={0} value={multiOptions.max_states ?? ""} onChange={e => setMultiOptions({ ...multiOptions, max_states: e.target.value ? Number(e.target.value) : undefined })} /></label><label>Multi initial<input placeholder="0,1" value={petriText.multiInitial} onChange={e => setPetriText({ ...petriText, multiInitial: e.target.value })} /></label><label>Multi final<input placeholder="2,3" value={petriText.multiFinal} onChange={e => setPetriText({ ...petriText, multiFinal: e.target.value })} /></label></div><button className="button" disabled={!onRequestPetriAnti || petriMiners.length === 0 || busy !== null} onClick={() => void runAnti()}>{busy === "anti" ? "Aligning…" : "Run anti-alignment"}</button><button className="button" disabled={!onRequestPetriMulti || petriMiners.length === 0 || busy !== null} onClick={() => void runMulti()}>{busy === "multi" ? "Aligning…" : "Run multi-alignment"}</button>{anti && <PetriResultView kind="anti" result={anti} />}{multi && <PetriResultView kind="multi" result={multi} />}</div>
-      <div className="other-align-card"><h3>Process-tree reduction</h3><p>Reduce the inductive tree for one trace using TREE_TR_BASED.</p><label>Trace<select value={traceIndex} onChange={e => setTraceIndex(Number(e.target.value))}>{(data.traces ?? []).map((trace, i) => <option key={i} value={i}>#{i + 1} · {trace.case_id}</option>)}</select></label><label>Activity key<input placeholder="concept:name" value={reductionOptions.activity_key ?? ""} onChange={e => setReductionOptions({ ...reductionOptions, activity_key: e.target.value || undefined })} /></label><button className="button" disabled={!onRequestReduction || !data.process_tree || !data.traces?.length || busy !== null} onClick={() => void runReduction()}>{busy === "reduction" ? "Reducing…" : "Reduce process tree"}</button>{reduced && <><small>Reduced tree returned for trace #{reduced.trace_index + 1}.</small><details><summary>Show reduced tree</summary><pre className="json-preview">{JSON.stringify(reduced.process_tree, null, 2)}</pre></details></>}</div>
+      <div className="other-align-card"><h3>Process-tree reduction</h3><p>Reduce the inductive tree for one trace using TREE_TR_BASED.</p><ReductionTraceField data={data} traceIndex={traceIndex} onChange={setTraceIndex} /><label>Activity key<input placeholder="concept:name" value={reductionOptions.activity_key ?? ""} onChange={e => setReductionOptions({ ...reductionOptions, activity_key: e.target.value || undefined })} /></label><button className="button" disabled={!onRequestReduction || !data.process_tree || !traceFacts(data).hasCases || busy !== null} onClick={() => void runReduction()}>{busy === "reduction" ? "Reducing…" : "Reduce process tree"}</button>{reduced && <><small>Reduced tree returned for trace #{reduced.trace_index + 1}.</small><details><summary>Show reduced tree</summary><pre className="json-preview">{JSON.stringify(reduced.process_tree, null, 2)}</pre></details></>}</div>
       <div className="other-align-card">
         <h3>Process tree</h3>
         <p>Align the latest mined inductive process tree against every trace.</p>
@@ -2090,6 +2111,7 @@ function Alignments({
   // Sound but the search could not finish (reachable yet unbounded/too large).
   if (!fetched.computed) {
     return <>{settings}<AlignmentNotice minerName={minerName} exhausted={fetched.exhausted}
+      timeLimitReached={fetched.time_limit_reached}
       budgetSeconds={appliedOptions.max_align_time === undefined ? UI_ALIGNMENT_TIME_BUDGET_SECONDS : undefined} /></>;
   }
   return <>{settings}<AlignmentResultView data={data} alignments={fetched} /></>;
@@ -2212,17 +2234,25 @@ export function cleanAlignmentOptions(options: AlignmentOptions): AlignmentOptio
 }
 
 // Explains why a model could not be aligned: unsound (unreachable end state) or
-// exhausted (reachable but the search hit its bound).
+// exhausted (reachable but the search hit its bound). For an exhausted search,
+// `timeLimitReached` says which bound stopped it: a time limit (true) or the
+// state limit (false); older servers leave it undefined.
 export function AlignmentNotice({
   minerName,
   exhausted,
+  timeLimitReached,
   budgetSeconds,
 }: {
   minerName: string;
   exhausted: boolean;
+  timeLimitReached?: boolean;
   /** The app's own time budget, when it applied (the global timeout was left empty). */
   budgetSeconds?: number;
 }) {
+  const stoppedBy =
+    timeLimitReached === true ? "ran out of time"
+      : timeLimitReached === false ? "reached its state limit"
+        : "hit a configured state or time limit";
   return (
     <section className="panel conf-panel">
       <div className="conf-notice">
@@ -2232,16 +2262,28 @@ export function AlignmentNotice({
           {exhausted ? (
             <>
               <p>
-                The {minerName} model is reachable, but the alignment search hit a
-                configured state or time limit before finding optimal alignments.
-                This can happen because the model is complex or admits unbounded
-                behavior, so partial numbers are not shown.
+                The {minerName} model is reachable, but the alignment search{" "}
+                {stoppedBy} before finding optimal alignments. This can happen
+                because the model is complex or admits unbounded behavior. No
+                alignment fitness, precision or cost is available for this run.
               </p>
-              {budgetSeconds !== undefined && (
+              {timeLimitReached === true && budgetSeconds !== undefined && (
                 <p>
                   With no global timeout set, the app stops alignments after{" "}
                   {budgetSeconds} s. To search longer, set <strong>Global timeout</strong>{" "}
                   in the settings above (0 for no limit) and apply.
+                </p>
+              )}
+              {timeLimitReached === true && budgetSeconds === undefined && (
+                <p>
+                  To search longer, raise <strong>Global timeout</strong> or{" "}
+                  <strong>Per-trace timeout</strong> in the settings above and apply.
+                </p>
+              )}
+              {timeLimitReached === false && (
+                <p>
+                  To search further, raise <strong>State limit</strong> in the
+                  settings above and apply.
                 </p>
               )}
             </>

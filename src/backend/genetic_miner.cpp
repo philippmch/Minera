@@ -1,5 +1,7 @@
 #include "minera/genetic_miner.hpp"
 
+#include "minera/cancellation.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -518,6 +520,7 @@ GeneticMinerResult mine_genetic(const EventLog& event_log,
         result.diagnostics.exhausted = true;
         break;
       }
+      throw_if_cancelled(options.cancelled, "genetic mining was cancelled");
       candidate.fitness = reference_genetic_fitness(
           to_reference_matrix(candidate.individual, log.names), log.conformance_log);
       ++result.diagnostics.candidates_evaluated;

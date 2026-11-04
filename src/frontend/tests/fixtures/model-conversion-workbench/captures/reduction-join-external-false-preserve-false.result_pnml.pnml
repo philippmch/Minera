@@ -3,15 +3,15 @@
   <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
     <name><text>Reduced original PNML model</text></name>
     <page id="page1">
-      <place id="p0">
-        <name><text>p0</text></name>
+      <place id="source">
+        <name><text>source</text></name>
         <initialMarking><text>1</text></initialMarking>
       </place>
-      <place id="p1">
-        <name><text>p1</text></name>
+      <place id="join">
+        <name><text>join</text></name>
       </place>
-      <place id="p2">
-        <name><text>p2</text></name>
+      <place id="sink">
+        <name><text>sink</text></name>
       </place>
       <transition id="t0">
         <name><text>a</text></name>
@@ -25,18 +25,18 @@
       <transition id="t3">
         <name><text>d</text></name>
       </transition>
-      <arc id="a0" source="p0" target="t0"/>
-      <arc id="a1" source="t0" target="p1"/>
-      <arc id="a2" source="p0" target="t1"/>
-      <arc id="a3" source="t1" target="p1"/>
-      <arc id="a4" source="p1" target="t2"/>
-      <arc id="a5" source="t2" target="p2"/>
-      <arc id="a6" source="p1" target="t3"/>
-      <arc id="a7" source="t3" target="p2"/>
+      <arc id="a0" source="source" target="t0"/>
+      <arc id="a1" source="t0" target="join"/>
+      <arc id="a2" source="source" target="t1"/>
+      <arc id="a3" source="t1" target="join"/>
+      <arc id="a4" source="join" target="t2"/>
+      <arc id="a5" source="t2" target="sink"/>
+      <arc id="a6" source="join" target="t3"/>
+      <arc id="a7" source="t3" target="sink"/>
     </page>
     <finalmarkings>
       <marking>
-        <place idref="p2"><text>1</text></place>
+        <place idref="sink"><text>1</text></place>
       </marking>
     </finalmarkings>
   </net>

@@ -3,23 +3,160 @@
   <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
     <name><text>Independent process-tree alignment model</text></name>
     <page id="page1">
-      <place id="p0">
-        <name><text>p0</text></name>
+      <place id="source">
+        <name><text>source</text></name>
         <initialMarking><text>1</text></initialMarking>
       </place>
-      <place id="p1">
-        <name><text>p1</text></name>
+      <place id="sink">
+        <name><text>sink</text></name>
       </place>
-      <transition id="t0">
+      <place id="p_3">
+        <name><text>p_3</text></name>
+      </place>
+      <place id="p_4">
+        <name><text>p_4</text></name>
+      </place>
+      <place id="p_5">
+        <name><text>p_5</text></name>
+      </place>
+      <place id="p_8">
+        <name><text>p_8</text></name>
+      </place>
+      <place id="p_9">
+        <name><text>p_9</text></name>
+      </place>
+      <place id="p_12">
+        <name><text>p_12</text></name>
+      </place>
+      <place id="p_13">
+        <name><text>p_13</text></name>
+      </place>
+      <place id="p_16">
+        <name><text>p_16</text></name>
+      </place>
+      <place id="p_17">
+        <name><text>p_17</text></name>
+      </place>
+      <place id="p_20">
+        <name><text>p_20</text></name>
+      </place>
+      <place id="p_21">
+        <name><text>p_21</text></name>
+      </place>
+      <place id="p_24">
+        <name><text>p_24</text></name>
+      </place>
+      <place id="p_25">
+        <name><text>p_25</text></name>
+      </place>
+      <place id="p_28">
+        <name><text>p_28</text></name>
+      </place>
+      <place id="p_29">
+        <name><text>p_29</text></name>
+      </place>
+      <place id="p_32">
+        <name><text>p_32</text></name>
+      </place>
+      <place id="p_33">
+        <name><text>p_33</text></name>
+      </place>
+      <transition id="tauSplit_1">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t0"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="tauSplit_1"/>
       </transition>
-      <arc id="a0" source="p0" target="t0"/>
-      <arc id="a1" source="t0" target="p1"/>
+      <transition id="tauJoin_2">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="tauJoin_2"/>
+      </transition>
+      <transition id="iTrans_3">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="iTrans_3"/>
+      </transition>
+      <transition id="iTrans_6">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="iTrans_6"/>
+      </transition>
+      <transition id="iTrans_9">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="iTrans_9"/>
+      </transition>
+      <transition id="iTrans_12">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="iTrans_12"/>
+      </transition>
+      <transition id="iTrans_15">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="iTrans_15"/>
+      </transition>
+      <transition id="iTrans_18">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="iTrans_18"/>
+      </transition>
+      <transition id="iTrans_21">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="iTrans_21"/>
+      </transition>
+      <transition id="iTrans_24">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="iTrans_24"/>
+      </transition>
+      <arc id="a0" source="source" target="tauSplit_1"/>
+      <arc id="a1" source="tauSplit_1" target="p_3"/>
+      <arc id="a2" source="tauSplit_1" target="p_4"/>
+      <arc id="a3" source="tauSplit_1" target="p_8"/>
+      <arc id="a4" source="tauSplit_1" target="p_12"/>
+      <arc id="a5" source="tauSplit_1" target="p_16"/>
+      <arc id="a6" source="tauSplit_1" target="p_20"/>
+      <arc id="a7" source="tauSplit_1" target="p_24"/>
+      <arc id="a8" source="tauSplit_1" target="p_28"/>
+      <arc id="a9" source="tauSplit_1" target="p_32"/>
+      <arc id="a10" source="p_3" target="tauJoin_2"/>
+      <arc id="a11" source="p_5" target="tauJoin_2"/>
+      <arc id="a12" source="p_9" target="tauJoin_2"/>
+      <arc id="a13" source="p_13" target="tauJoin_2"/>
+      <arc id="a14" source="p_17" target="tauJoin_2"/>
+      <arc id="a15" source="p_21" target="tauJoin_2"/>
+      <arc id="a16" source="p_25" target="tauJoin_2"/>
+      <arc id="a17" source="p_29" target="tauJoin_2"/>
+      <arc id="a18" source="p_33" target="tauJoin_2"/>
+      <arc id="a19" source="tauJoin_2" target="sink"/>
+      <arc id="a20" source="p_3" target="iTrans_3"/>
+      <arc id="a21" source="p_4" target="iTrans_3"/>
+      <arc id="a22" source="iTrans_3" target="p_3"/>
+      <arc id="a23" source="iTrans_3" target="p_5"/>
+      <arc id="a24" source="p_3" target="iTrans_6"/>
+      <arc id="a25" source="p_8" target="iTrans_6"/>
+      <arc id="a26" source="iTrans_6" target="p_3"/>
+      <arc id="a27" source="iTrans_6" target="p_9"/>
+      <arc id="a28" source="p_3" target="iTrans_9"/>
+      <arc id="a29" source="p_12" target="iTrans_9"/>
+      <arc id="a30" source="iTrans_9" target="p_3"/>
+      <arc id="a31" source="iTrans_9" target="p_13"/>
+      <arc id="a32" source="p_3" target="iTrans_12"/>
+      <arc id="a33" source="p_16" target="iTrans_12"/>
+      <arc id="a34" source="iTrans_12" target="p_3"/>
+      <arc id="a35" source="iTrans_12" target="p_17"/>
+      <arc id="a36" source="p_3" target="iTrans_15"/>
+      <arc id="a37" source="p_20" target="iTrans_15"/>
+      <arc id="a38" source="iTrans_15" target="p_3"/>
+      <arc id="a39" source="iTrans_15" target="p_21"/>
+      <arc id="a40" source="p_3" target="iTrans_18"/>
+      <arc id="a41" source="p_24" target="iTrans_18"/>
+      <arc id="a42" source="iTrans_18" target="p_3"/>
+      <arc id="a43" source="iTrans_18" target="p_25"/>
+      <arc id="a44" source="p_3" target="iTrans_21"/>
+      <arc id="a45" source="p_28" target="iTrans_21"/>
+      <arc id="a46" source="iTrans_21" target="p_3"/>
+      <arc id="a47" source="iTrans_21" target="p_29"/>
+      <arc id="a48" source="p_3" target="iTrans_24"/>
+      <arc id="a49" source="p_32" target="iTrans_24"/>
+      <arc id="a50" source="iTrans_24" target="p_3"/>
+      <arc id="a51" source="iTrans_24" target="p_33"/>
     </page>
     <finalmarkings>
       <marking>
-        <place idref="p1"><text>1</text></place>
+        <place idref="sink"><text>1</text></place>
       </marking>
     </finalmarkings>
   </net>

@@ -58,7 +58,7 @@
         "filename": "dfg_classic-csv-log.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg_classic-csv-log.response.json",
         "bytes": 137462,
-        "sha256": "28c4564c81bf31eec4148633da4bc89c49f4933494ec9380355e966808510b9f",
+        "sha256": "2dddba731785f563c9bc9669632e404164316127fbcb7610d21b8b5cdfd0b7cf",
         "status": 200
       },
       "mode": "DFG_CLASSIC",
@@ -137,7 +137,7 @@
         "filename": "dfg_classic-csv-trace.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg_classic-csv-trace.response.json",
         "bytes": 129826,
-        "sha256": "05c2df7a7ea05216cc0240b815433a76e0a6233364df17bd00855967ed0be563",
+        "sha256": "ef7614c4098b4c025cab0584a3c1553b434b4acb20cd9d0f6527411c13557a9a",
         "status": 200
       },
       "mode": "DFG_CLASSIC",
@@ -1268,14 +1268,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "142762",
+        "Content-Length": "140237",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-csv-log.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-csv-log.response.json",
-        "bytes": 142762,
-        "sha256": "ad945433f7d0a5ddd918f46c0ecf24e1c15c6211ccc1f0ac087c6e0138fc1d08",
+        "bytes": 140237,
+        "sha256": "02eebeacb39586a6c48f7e9cc58cb7ad26a738ffe4441da42db2b1eb9aa7d5cc",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -1347,14 +1347,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "133053",
+        "Content-Length": "132978",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-csv-trace.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-csv-trace.response.json",
-        "bytes": 133053,
-        "sha256": "1dec772810ae916bb5cf4dc8bab025f275db26d12adf77d2393e636c4709cd61",
+        "bytes": 132978,
+        "sha256": "9a8b161b3d87e0ed4fefa7a01075700b35ba6383e9e9aaa6d18a693048679363",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -1422,14 +1422,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "91030",
+        "Content-Length": "88505",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-xes-log.response.json",
-        "bytes": 91030,
-        "sha256": "1e238b8aeb23ad265ae22624cfc9de6d9d973c5135a11af5602998e2121d70a6",
+        "bytes": 88505,
+        "sha256": "691b46590b20424f380d3e2bcee4c2e3fc7fae5a8c6621cb299c398c16457a6e",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -1501,14 +1501,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "81321",
+        "Content-Length": "81246",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-xes-trace.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-xes-trace.response.json",
-        "bytes": 81321,
-        "sha256": "2404c96a9d9a882c4b0ac7356227fbfb837e3fc0bcca88a210b26be1b21a8be1",
+        "bytes": 81246,
+        "sha256": "b72a778441395f608640b35a94ea2d0d96907c098d033df770ab25572f8883af",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -1588,14 +1588,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10187",
+        "Content-Length": "10033",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-xes-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-xes-iterparse.response.json",
-        "bytes": 10187,
-        "sha256": "212a53cfee5be3320faf0671dad7f397f1aa9b4df3f34efb45c6ef45684c35bb",
+        "bytes": 10033,
+        "sha256": "a4903363221d739baaac5a4b8307ef0c9cd38d7b598ba407b6122afaec439af6",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -1675,14 +1675,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10187",
+        "Content-Length": "10033",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-xes-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-xes-line_by_line.response.json",
-        "bytes": 10187,
-        "sha256": "212a53cfee5be3320faf0671dad7f397f1aa9b4df3f34efb45c6ef45684c35bb",
+        "bytes": 10033,
+        "sha256": "a4903363221d739baaac5a4b8307ef0c9cd38d7b598ba407b6122afaec439af6",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -1762,14 +1762,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10187",
+        "Content-Length": "10033",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-xes-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-xes-iterparse_20.response.json",
-        "bytes": 10187,
-        "sha256": "212a53cfee5be3320faf0671dad7f397f1aa9b4df3f34efb45c6ef45684c35bb",
+        "bytes": 10033,
+        "sha256": "a4903363221d739baaac5a4b8307ef0c9cd38d7b598ba407b6122afaec439af6",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -1849,14 +1849,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10187",
+        "Content-Length": "10033",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-xes-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-xes-iterparse_mem_compressed.response.json",
-        "bytes": 10187,
-        "sha256": "212a53cfee5be3320faf0671dad7f397f1aa9b4df3f34efb45c6ef45684c35bb",
+        "bytes": 10033,
+        "sha256": "a4903363221d739baaac5a4b8307ef0c9cd38d7b598ba407b6122afaec439af6",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -1936,14 +1936,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10422",
+        "Content-Length": "10268",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-xes-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-xes-rustxes.response.json",
-        "bytes": 10422,
-        "sha256": "c0b56e581cbe58918f1d52ed22b918bf61b03c4dd31c268b090190ed7d7f39d4",
+        "bytes": 10268,
+        "sha256": "5c2d6091a80c67b9bd74e23977d795452e449ff378308f28027a3362a1ea9126",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -2023,14 +2023,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10187",
+        "Content-Length": "10033",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-xes-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-xes-chunk_regex.response.json",
-        "bytes": 10187,
-        "sha256": "212a53cfee5be3320faf0671dad7f397f1aa9b4df3f34efb45c6ef45684c35bb",
+        "bytes": 10033,
+        "sha256": "a4903363221d739baaac5a4b8307ef0c9cd38d7b598ba407b6122afaec439af6",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -2098,14 +2098,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4548",
+        "Content-Length": "4469",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-words-deviation.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-words-deviation.response.json",
-        "bytes": 4548,
-        "sha256": "3c8ecc394dfd872da73e835ff346d7b97d77655619a6808711aaea8d1c250ffc",
+        "bytes": 4469,
+        "sha256": "611c0186a18330974df5bac7d3d01a0b060a69894bc3a07f3d9023f47a9d5326",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -2248,14 +2248,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4458",
+        "Content-Length": "4371",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-words-empty.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-words-empty.response.json",
-        "bytes": 4458,
-        "sha256": "c68509b2e74958efca0af8aa5f854a8d6190a9f3d6112f69abf260356e656436",
+        "bytes": 4371,
+        "sha256": "23a7e15bb01b77b54a0cb002ec1c281f63b719dedccb7eb0ddf1490d69ee4835",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -2327,14 +2327,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "23350",
+        "Content-Length": "23172",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-typed-log.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-typed-log.response.json",
-        "bytes": 23350,
-        "sha256": "0be541e50ab095cd09be57cad22217700125517127d06f730a37c248d56e63e6",
+        "bytes": 23172,
+        "sha256": "427ed31a2963ec3ac43d152e1dde57cb7a79438d1347c2e3ae61bcd5948f8036",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -2410,14 +2410,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "23052",
+        "Content-Length": "22872",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-typed-trace.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-typed-trace.response.json",
-        "bytes": 23052,
-        "sha256": "d8eac8ad8da054b98888cfd8d0c3e581982d67565a9730f9d4a7df7f5f737348",
+        "bytes": 22872,
+        "sha256": "71119649e7b5942aee285c0a3884d4b79d3e9a936eaad5f048cce124646b4704",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -2496,7 +2496,7 @@
         "filename": "dfg-log-both-projections.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-log-both-projections.response.json",
         "bytes": 190432,
-        "sha256": "a0ea9e88f44aa3d4495bba7f4508d397a9cffa49059f3463c7be35ad6c6d0c45",
+        "sha256": "c77042f9b3808325be85ffed808682a955de3fdb332835bb9b4235414ec32e84",
         "status": 200
       },
       "mode": "DFG_CLASSIC",
@@ -2519,7 +2519,7 @@
           "filename": "dfg-log-both-projections.projected.xes",
           "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-log-both-projections.projected.xes",
           "bytes": 14292,
-          "sha256": "5326589d7690e8ed9a5d300609d039f75a75e87ca57b30ce4408ac43d80643dd",
+          "sha256": "70d4bcde7690be41478b4bfee1c5c47c300157c493dca809663f8e31d0cc25ed",
           "format": "xes"
         }
       }
@@ -2582,7 +2582,7 @@
         "filename": "dfg-projection-log.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-projection-log.response.json",
         "bytes": 190287,
-        "sha256": "62cf3251fabd1c5aa328d0fa9524749b24c16cc9f9ef405bd123845c29135a8f",
+        "sha256": "c7590a4aab1777cfba09cd5b3fbbc2cf4edc19f1df92a7eca74976b495d89451",
         "status": 200
       },
       "mode": "DFG_CLASSIC",
@@ -2605,7 +2605,7 @@
           "filename": "dfg-projection-log.projected.xes",
           "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-projection-log.projected.xes",
           "bytes": 14292,
-          "sha256": "5326589d7690e8ed9a5d300609d039f75a75e87ca57b30ce4408ac43d80643dd",
+          "sha256": "70d4bcde7690be41478b4bfee1c5c47c300157c493dca809663f8e31d0cc25ed",
           "format": "xes"
         }
       }
@@ -2668,7 +2668,7 @@
         "filename": "dfg-projection-metrics.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-projection-metrics.response.json",
         "bytes": 137607,
-        "sha256": "78f7e82f3687df9a6e4df9dedfb35f484a330da407b5fd89b2953755bb90d972",
+        "sha256": "77ba1a33bcf92daed4003548be81d2f568db89f330e32bbb40221776e730036d",
         "status": 200
       },
       "mode": "DFG_CLASSIC",
@@ -2747,7 +2747,7 @@
         "filename": "dfg-projection-none.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-projection-none.response.json",
         "bytes": 137462,
-        "sha256": "28c4564c81bf31eec4148633da4bc89c49f4933494ec9380355e966808510b9f",
+        "sha256": "2dddba731785f563c9bc9669632e404164316127fbcb7610d21b8b5cdfd0b7cf",
         "status": 200
       },
       "mode": "DFG_CLASSIC",
@@ -3115,14 +3115,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1688",
+        "Content-Length": "1689",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-structured-zero.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-structured-zero.response.json",
-        "bytes": 1688,
-        "sha256": "9e43d0a510af7f8154f1c0612c683e0ff7ab9c6415dc75f92d710f6388609a0d",
+        "bytes": 1689,
+        "sha256": "b965a5d9513f562829974257e676c31a09fad48f693ccc926239c5d79a488f6c",
         "status": 200
       },
       "mode": "DFG_CLASSIC",
@@ -3133,7 +3133,15 @@
       "model_format": "dfg_json",
       "executed": true,
       "error": null,
-      "exports": {}
+      "exports": {
+        "model": {
+          "filename": "dfg-structured-zero.model.dfg",
+          "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-structured-zero.model.dfg",
+          "bytes": 24,
+          "sha256": "8aca19af27fd6681b4f01c01b512e08d0f55e79edbef456bea0d516fd72c14b9",
+          "format": "dfg"
+        }
+      }
     },
     {
       "id": "dfg-structured-empty-boundaries",
@@ -3264,7 +3272,7 @@
         "filename": "dfg-log-no-accept.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-log-no-accept.response.json",
         "bytes": 129686,
-        "sha256": "a72b2fc8d0f5d5aa7e389c62ae25826a59112a580cb4fda9e07a4ee551698717",
+        "sha256": "930dc2a519be2e06b092357c40ec0a3c5b6e088703a08270a3e7000c1e130eaa",
         "status": 400
       },
       "mode": "DFG_CLASSIC",
@@ -3437,7 +3445,7 @@
         "filename": "dfg-empty-dfg_sync_cost_json.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-empty-dfg_sync_cost_json.response.json",
         "bytes": 129690,
-        "sha256": "15032a65f7bdd1b79edb61a2af27487769ae2eef038f3c1d7b4c2f7950d61b89",
+        "sha256": "3fdc5b03deaf6cff81acf3e97f64b30369b6e04362c482b2c1bbece6a69955e9",
         "status": 400
       },
       "mode": "DFG_CLASSIC",
@@ -3519,7 +3527,7 @@
         "filename": "dfg-unknown-dfg_sync_cost_json.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-unknown-dfg_sync_cost_json.response.json",
         "bytes": 129712,
-        "sha256": "50f75321bfc62ce3d537ddce8b60e04a0821581138a879441eb13e8dda289c11",
+        "sha256": "61307b1e0b19c37c04c3c86747a35a8e32b3c1212e72456d8e709e47d8ac609a",
         "status": 400
       },
       "mode": "DFG_CLASSIC",
@@ -3601,7 +3609,7 @@
         "filename": "dfg-empty-dfg_model_move_cost_json.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-empty-dfg_model_move_cost_json.response.json",
         "bytes": 129689,
-        "sha256": "88804223d2d5bf69c6f32aee1fce1f4e70158dd2cd4cf58fccda07187b2dfded",
+        "sha256": "9b70edea0269c4048245b5374aee82bd291e559fa454b9b3fcd4a4b0c045cc18",
         "status": 400
       },
       "mode": "DFG_CLASSIC",
@@ -3683,7 +3691,7 @@
         "filename": "dfg-unknown-dfg_model_move_cost_json.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-unknown-dfg_model_move_cost_json.response.json",
         "bytes": 129711,
-        "sha256": "a4d2e8d3009a1bb3b344ef641f71c454864393848fe036ce07f96b2387d428b1",
+        "sha256": "2768b1143938da883b9595d339a7740395dc2b39f79ed665ac2c16cb1bd502fa",
         "status": 400
       },
       "mode": "DFG_CLASSIC",
@@ -3765,7 +3773,7 @@
         "filename": "dfg-empty-dfg_log_move_cost_json.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-empty-dfg_log_move_cost_json.response.json",
         "bytes": 129687,
-        "sha256": "a6876b5347d54617570d38eb1dd63f5b611d9025436266d78d26105db6c0a46f",
+        "sha256": "754b07bc66f84104b7a6f377cbdf4a76a0d42e4e22223fe41aa3fd30a863b471",
         "status": 400
       },
       "mode": "DFG_CLASSIC",
@@ -3847,7 +3855,7 @@
         "filename": "dfg-unknown-dfg_log_move_cost_json.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-unknown-dfg_log_move_cost_json.response.json",
         "bytes": 129709,
-        "sha256": "8ba2857a6c70f5f60c23e051424610abb2e8ae0da1fea252331d79113be395ed",
+        "sha256": "9c4b67e89736d24811fba21b565fb9b1268b024b8370b5e4ceb2809b34c5043f",
         "status": 400
       },
       "mode": "DFG_CLASSIC",
@@ -3929,7 +3937,7 @@
         "filename": "dfg-empty-dfg_internal_log_move_cost_json.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-empty-dfg_internal_log_move_cost_json.response.json",
         "bytes": 129696,
-        "sha256": "292391917049c8a7809bb54daff5eceea6faf4a17ba8c29297e6be59ca88a1a0",
+        "sha256": "7d6cf67b70e9d33d575697be6020313a53543d6f80ec38667dee6484e9e5ff3f",
         "status": 400
       },
       "mode": "DFG_CLASSIC",
@@ -4011,7 +4019,7 @@
         "filename": "dfg-unknown-dfg_internal_log_move_cost_json.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-unknown-dfg_internal_log_move_cost_json.response.json",
         "bytes": 129718,
-        "sha256": "ab42c71345497e3af7f9429c7b364e4fe208129d5ec6177b31c2161b3fd7d381",
+        "sha256": "c6d649f5b986c87ee27e094f3d7c5d213f5daab3bee87ea2bd3e7cf1f0fa5c6d",
         "status": 400
       },
       "mode": "DFG_CLASSIC",
@@ -4729,14 +4737,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8164",
+        "Content-Length": "8188",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "recompos_maximal-empty-case-wins-stale-role.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/recompos_maximal-empty-case-wins-stale-role.response.json",
-        "bytes": 8164,
-        "sha256": "4a52af8b92846d3e5d0cf3ce2869e5873eddc070f51ec454488102823c2f1621",
+        "bytes": 8188,
+        "sha256": "f3f1edc8b8fb4d3140e7047ec707c49064c1f36470ca0c84bc8c5b882955eb7f",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -5038,7 +5046,7 @@
         "filename": "decomposed-zero-max_states.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/decomposed-zero-max_states.response.json",
         "bytes": 132715,
-        "sha256": "49915a76d074470bb29d2d224a71b61143e5798d620cdeb95068212865ce48e3",
+        "sha256": "5ef9c54b302f5c0a4c352ec501e973f079a8b1ce8a0fc058d04cab7e84ad7579",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -5117,7 +5125,7 @@
         "filename": "decomposed-zero-max_total_states.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/decomposed-zero-max_total_states.response.json",
         "bytes": 132714,
-        "sha256": "5101e1260c9aa42eeea4ec934cb15d8c91392d0c4bf688f928f1840a629f5fd4",
+        "sha256": "73113ca9e1242a709e7aa369aec9e0dc32fc5af96f396e8f95572cde8ac9a145",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -5196,7 +5204,7 @@
         "filename": "decomposed-exhausted-native-result.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/decomposed-exhausted-native-result.response.json",
         "bytes": 137609,
-        "sha256": "cd2b821b6adb87c75d0a5457f1856402f1267d341c7c75692d9ebee9aa8232aa",
+        "sha256": "ad911795262754de66755bb4b07242ba19788eb1c05fb0d62c45ad40218ba691",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -5284,14 +5292,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "142850",
+        "Content-Length": "140370",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "decomposed-clear-cache-and-exact-costs.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/decomposed-clear-cache-and-exact-costs.response.json",
-        "bytes": 142850,
-        "sha256": "9ce3a02799c2e8b0f98c23034f7f746478147bdad88027e2c99579a9b043ee75",
+        "bytes": 140370,
+        "sha256": "095e52610bf3013211ef41a92466c0223e63ad73038fa154ac0fc44c0eaea2a4",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -5810,14 +5818,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4581",
+        "Content-Length": "4565",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "decomposed-silent-null-label.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/decomposed-silent-null-label.response.json",
-        "bytes": 4581,
-        "sha256": "e7c0c43b46ceaf391e70e241465ebfd120a19c0b6c903140e511279db9e4ac1c",
+        "bytes": 4565,
+        "sha256": "e50b9f8244e3986912bb1a75a17a8318f7d2ad3b558129a42380ed701c2a2108",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",
@@ -5967,14 +5975,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3628",
+        "Content-Length": "3588",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "decomposed-empty-trace-visible-empty-model.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/decomposed-empty-trace-visible-empty-model.response.json",
-        "bytes": 3628,
-        "sha256": "0aa073dd545f5bb18c71fe1971e76eeab302e33a1f1a42f0e19e62e15db70b69",
+        "bytes": 3588,
+        "sha256": "aa6073ff6190fa074a959b766dc46a301ce5100d148b143c60b660112cd2570f",
         "status": 200
       },
       "mode": "RECOMPOS_MAXIMAL",

@@ -3,15 +3,15 @@
   <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
     <name><text>Reduced original PNML model</text></name>
     <page id="page1">
-      <place id="p0">
-        <name><text>p0</text></name>
+      <place id="source">
+        <name><text>source</text></name>
         <initialMarking><text>1</text></initialMarking>
       </place>
-      <place id="p1">
-        <name><text>p1</text></name>
+      <place id="left">
+        <name><text>left</text></name>
       </place>
-      <place id="p2">
-        <name><text>p2</text></name>
+      <place id="sink">
+        <name><text>sink</text></name>
       </place>
       <transition id="t0">
         <name><text>tau</text></name>
@@ -24,16 +24,16 @@
         <name><text>tau</text></name>
         <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t2"/>
       </transition>
-      <arc id="a0" source="p0" target="t0"/>
-      <arc id="a1" source="t0" target="p1"><inscription><text>2</text></inscription></arc>
-      <arc id="a2" source="p1" target="t1"><inscription><text>2</text></inscription></arc>
-      <arc id="a3" source="t1" target="p1"><inscription><text>2</text></inscription></arc>
-      <arc id="a4" source="p1" target="t2"><inscription><text>2</text></inscription></arc>
-      <arc id="a5" source="t2" target="p2"/>
+      <arc id="a0" source="source" target="t0"/>
+      <arc id="a1" source="t0" target="left"><inscription><text>2</text></inscription></arc>
+      <arc id="a2" source="left" target="t1"><inscription><text>2</text></inscription></arc>
+      <arc id="a3" source="t1" target="left"><inscription><text>2</text></inscription></arc>
+      <arc id="a4" source="left" target="t2"><inscription><text>2</text></inscription></arc>
+      <arc id="a5" source="t2" target="sink"/>
     </page>
     <finalmarkings>
       <marking>
-        <place idref="p2"><text>1</text></place>
+        <place idref="sink"><text>1</text></place>
       </marking>
     </finalmarkings>
   </net>

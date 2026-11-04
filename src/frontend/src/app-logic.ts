@@ -1,6 +1,7 @@
 import {hasExactFilters} from "./exact-filter-controls";
 import { type FilterOptions, type MinerOptions } from "./api";
 import { type MineraExport } from "./types";
+import { traceFacts } from "./mine-traces";
 import {
   DECLARE_TEMPLATES,
   FOOTPRINTS_DEFAULT_DISCOVERY_VARIANTS,
@@ -15,7 +16,7 @@ export type Tab = "log" | "dotted" | "timing" | "behavior" | "dfg" | "model" | "
  * that is never rendered.
  */
 export function initialTab(data: MineraExport): Tab {
-  return data.traces && data.traces.length > 0 ? "log" : "dfg";
+  return traceFacts(data).hasCases ? "log" : "dfg";
 }
 
 /**
@@ -286,15 +287,8 @@ export function hasActiveFilters(filters: FilterOptions): boolean {
  * Empty for a log of atomic events; feeds the lifecycle filter chips.
  */
 export function logLifecycles(data: MineraExport): string[] {
-  const seen: string[] = [];
-  for (const trace of data.traces ?? []) {
-    for (const event of trace.events) {
-      if (event.lifecycle && !seen.includes(event.lifecycle)) {
-        seen.push(event.lifecycle);
-      }
-    }
-  }
-  return seen;
+  // From the traces when the analysis carries them, else from its trace summary.
+  return [...traceFacts(data).lifecycles];
 }
 
 /**

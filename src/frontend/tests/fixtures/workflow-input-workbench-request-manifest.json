@@ -42,14 +42,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "144637",
+        "Content-Length": "146497",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-log.response.json",
         "status": 200,
-        "sha256": "be766f69a283f17bd574ce7e4446409ccc18ef689a510ed2bd3e1ccddd4bdc44",
-        "bytes": 144637
+        "sha256": "5f8a0707c7c4f05e187ea8f194206baaa1aa43ef162381c19d30cbf3aa31cc81",
+        "bytes": 146497
       },
       "family": "alpha",
       "variant": "classic",
@@ -65,8 +65,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-log.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-log.ptml",
@@ -114,14 +114,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "169419",
+        "Content-Length": "171279",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-stream.response.json",
         "status": 200,
-        "sha256": "58c1df6d5c529af0a51148b83d0ce41410d56c305ee564130529300a4a41331b",
-        "bytes": 169419
+        "sha256": "14901c0748f0846b17460b5f81b794f46ed3f1785ee55a8e8799f0964c158639",
+        "bytes": 171279
       },
       "family": "alpha",
       "variant": "classic",
@@ -137,8 +137,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-stream.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-stream.ptml",
@@ -186,14 +186,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "169369",
+        "Content-Length": "173506",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-dataframe.response.json",
         "status": 200,
-        "sha256": "8ab9cdbef3a8304571a11892b5ed6d26e2153f6ebd8def0b684477165e69625a",
-        "bytes": 169369
+        "sha256": "b3d51b7755c687ff9813a1670149ceb10ff9886d8ee800f7d19e2c27c9605e29",
+        "bytes": 173506
       },
       "family": "alpha",
       "variant": "classic",
@@ -209,8 +209,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-dataframe.bpmn",
-          "sha256": "c7a15fba3e0d325eb9c9041082ba4ee5cff4e7f5173a372a75577ca4ff586759",
-          "bytes": 998
+          "sha256": "ced6a47a9a48e8a11712582047c12ddf2509443d458821321d6ae2bf6c05a79f",
+          "bytes": 4833
         }
       }
     },
@@ -253,14 +253,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "169369",
+        "Content-Length": "173506",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-lazyframe.response.json",
         "status": 200,
-        "sha256": "015936cdd9da458a7509e92b84b1e76d6f45b282bdf5dbbb2e796eafdc2ba10c",
-        "bytes": 169369
+        "sha256": "0eb8ffe6c21fd11d6653fe77a68ddbb06855cdd2c04b3967d712ab1b9834fa40",
+        "bytes": 173506
       },
       "family": "alpha",
       "variant": "classic",
@@ -276,8 +276,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-classic-lazyframe.bpmn",
-          "sha256": "c7a15fba3e0d325eb9c9041082ba4ee5cff4e7f5173a372a75577ca4ff586759",
-          "bytes": 998
+          "sha256": "ced6a47a9a48e8a11712582047c12ddf2509443d458821321d6ae2bf6c05a79f",
+          "bytes": 4833
         }
       }
     },
@@ -320,14 +320,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "145168",
+        "Content-Length": "147028",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-log.response.json",
         "status": 200,
-        "sha256": "c519539957e89e06212c34b2ea79fec1ff896fe8c075370097fd1b688a39c854",
-        "bytes": 145168
+        "sha256": "dc956d0cfed75b2a829f7b7606c83435affa109f7259610afd9058a9b06b47fa",
+        "bytes": 147028
       },
       "family": "alpha",
       "variant": "plus",
@@ -343,8 +343,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-log.bpmn",
-          "sha256": "7e749f4c003e4ba049ac8d65dd18a7ba43b0e5b29d2c72835445b20de36bba40",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-log.ptml",
@@ -392,14 +392,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "169950",
+        "Content-Length": "171810",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-stream.response.json",
         "status": 200,
-        "sha256": "934ff71dcc3d2fc31ebcf226d8d17f03d69dd74a0298914ff268648675ac8d65",
-        "bytes": 169950
+        "sha256": "7f77b1c10a8412c3fe49fa918b41d4e9d794b723e42710d36e664c9f2d5b72c5",
+        "bytes": 171810
       },
       "family": "alpha",
       "variant": "plus",
@@ -415,8 +415,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-stream.bpmn",
-          "sha256": "676cbd7456ea4e7eb6a9d4c309bdef6ba8ca31f9c1012dbb59721fdb4a0a38e0",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-stream.ptml",
@@ -464,14 +464,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "169953",
+        "Content-Length": "171813",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-dataframe.response.json",
         "status": 200,
-        "sha256": "a9aacd792809afb26a6a8b39ccc76c7a82127b5927f8b9b3c85003bae4f68a98",
-        "bytes": 169953
+        "sha256": "d3d7797eb2d59f491428d79270dfebd8d68eaa7b77fd73cbf00585ea2a294fe2",
+        "bytes": 171813
       },
       "family": "alpha",
       "variant": "plus",
@@ -487,8 +487,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-dataframe.bpmn",
-          "sha256": "676cbd7456ea4e7eb6a9d4c309bdef6ba8ca31f9c1012dbb59721fdb4a0a38e0",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-dataframe.ptml",
@@ -536,14 +536,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "169953",
+        "Content-Length": "171813",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-lazyframe.response.json",
         "status": 200,
-        "sha256": "70cc6f12648b81c3819ea9c1bb383c4f45fe4b7d6eed56e13422133db9f05c25",
-        "bytes": 169953
+        "sha256": "1d71010103d273bd48b0b726f7f6ef0d52c6605a3bea252aecc73a35f194d0b2",
+        "bytes": 171813
       },
       "family": "alpha",
       "variant": "plus",
@@ -559,8 +559,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-lazyframe.bpmn",
-          "sha256": "676cbd7456ea4e7eb6a9d4c309bdef6ba8ca31f9c1012dbb59721fdb4a0a38e0",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-alpha-plus-lazyframe.ptml",
@@ -608,14 +608,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "148659",
+        "Content-Length": "150519",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-log.response.json",
         "status": 200,
-        "sha256": "2e11578531336c7a1d8db34a562afe43409ab766e1ba5433c94cc64ea05a6dce",
-        "bytes": 148659
+        "sha256": "58156b3d625e6fc59dba9a5ff517137a4b6a97aea344f7314fcee7b77f72c287",
+        "bytes": 150519
       },
       "family": "heuristic",
       "variant": "classic",
@@ -631,8 +631,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-log.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-log.ptml",
@@ -680,14 +680,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "173441",
+        "Content-Length": "175301",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-stream.response.json",
         "status": 200,
-        "sha256": "868871fb074d74d3021d49fae10cc8da6886e05194788fd1be9da4fe1f8a65c7",
-        "bytes": 173441
+        "sha256": "1d0b9fcba7d3bc0d47a47f5224348f5c89aac83a35875030cc30c93176b6e49a",
+        "bytes": 175301
       },
       "family": "heuristic",
       "variant": "classic",
@@ -703,8 +703,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-stream.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-stream.ptml",
@@ -752,14 +752,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "173444",
+        "Content-Length": "175304",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-dataframe.response.json",
         "status": 200,
-        "sha256": "83d0d199269696bded7b87405861c04f3cdf4e5d9e9fed98253cc21401845af1",
-        "bytes": 173444
+        "sha256": "1f297b052a0217f312bacb0e7aa5042f324bfb26bffdaf2a5cac5da37b0a1795",
+        "bytes": 175304
       },
       "family": "heuristic",
       "variant": "classic",
@@ -775,8 +775,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-dataframe.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-dataframe.ptml",
@@ -824,14 +824,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "173444",
+        "Content-Length": "175304",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-lazyframe.response.json",
         "status": 200,
-        "sha256": "0c1fa01ba69734673bc394d80b610fc865de443338fa0f0109d19b9bbe677448",
-        "bytes": 173444
+        "sha256": "923d02f67d2543cd6ce9b28dc059503cb6873ff16ea5a956ff5c9aff4fa2fa2b",
+        "bytes": 175304
       },
       "family": "heuristic",
       "variant": "classic",
@@ -847,8 +847,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-lazyframe.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-classic-lazyframe.ptml",
@@ -896,14 +896,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "149161",
+        "Content-Length": "151021",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-log.response.json",
         "status": 200,
-        "sha256": "ee581914c0bc6c8b44ebe26508e6abbe3593604890850ba2a91f0d623cc6c0c6",
-        "bytes": 149161
+        "sha256": "47916832baa5ecbdffac50205642ab0278b1d2e27ccd3f8cf795d86c63e45e6e",
+        "bytes": 151021
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -919,8 +919,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-log.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-log.ptml",
@@ -968,14 +968,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "173943",
+        "Content-Length": "175803",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-stream.response.json",
         "status": 200,
-        "sha256": "42a226d9dbf06d5b143162ad2519d1a1bb7e2279b84033b9d75d9232ae897d56",
-        "bytes": 173943
+        "sha256": "70c7f3bd73e48542327d549b1879591f552fa958354e15a5528c7f0a247c5a1e",
+        "bytes": 175803
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -991,8 +991,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-stream.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-stream.ptml",
@@ -1040,14 +1040,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "173946",
+        "Content-Length": "175806",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-dataframe.response.json",
         "status": 200,
-        "sha256": "27aeb5a679deca292ee9677814fcbcd1edd1010f6ed39260530fb38e73c21cca",
-        "bytes": 173946
+        "sha256": "a3b016c16fcb61df08ec2249c63799f2218e43c5c73e1e4606ef5d468365a8d4",
+        "bytes": 175806
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -1063,8 +1063,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-dataframe.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-dataframe.ptml",
@@ -1112,14 +1112,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "173946",
+        "Content-Length": "175806",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-lazyframe.response.json",
         "status": 200,
-        "sha256": "e914936ae8197f61dbc1da04bf0051b94c0ff5c84aea7b21689a19ea799248fc",
-        "bytes": 173946
+        "sha256": "2eb6ac5ba84e6d0221ac5e7d7d954b2091fbec1cc6cde6c94f30b0f986156933",
+        "bytes": 175806
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -1135,8 +1135,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-lazyframe.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/csv-heuristic-plusplus-lazyframe.ptml",
@@ -1188,14 +1188,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "63881",
+        "Content-Length": "65741",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-log.response.json",
         "status": 200,
-        "sha256": "95239a6770ae38674c78341d4c6cad775eaf97c25cfe187c685b3e2b6a49dd23",
-        "bytes": 63881
+        "sha256": "93a2c0bba24f8474ee1c18c5ad38da41ff8f056685fe3b9b66f17d2589e7295c",
+        "bytes": 65741
       },
       "family": "alpha",
       "variant": "classic",
@@ -1211,8 +1211,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-log.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-log.ptml",
@@ -1264,14 +1264,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "162961",
+        "Content-Length": "164821",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-stream.response.json",
         "status": 200,
-        "sha256": "db8a254b1d71622806eafb740a57d6434433bfbb5158c3e752f85045be670276",
-        "bytes": 162961
+        "sha256": "6ed11ec61c0ed590f79316f4ae2d1b9f17a5833136f7592e1006d0e7b5c6708d",
+        "bytes": 164821
       },
       "family": "alpha",
       "variant": "classic",
@@ -1287,8 +1287,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-stream.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-stream.ptml",
@@ -1340,14 +1340,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "162911",
+        "Content-Length": "167048",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-dataframe.response.json",
         "status": 200,
-        "sha256": "21ca92bc057d96a28a8e8a1a8ece23a1b9cacae879f22deb52438e3806882d96",
-        "bytes": 162911
+        "sha256": "45ee585a70ff86c654d1c2a6b088dbd104d4cd9c6bd15cee912b22e4ac7067c7",
+        "bytes": 167048
       },
       "family": "alpha",
       "variant": "classic",
@@ -1363,8 +1363,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-dataframe.bpmn",
-          "sha256": "c7a15fba3e0d325eb9c9041082ba4ee5cff4e7f5173a372a75577ca4ff586759",
-          "bytes": 998
+          "sha256": "ced6a47a9a48e8a11712582047c12ddf2509443d458821321d6ae2bf6c05a79f",
+          "bytes": 4833
         }
       }
     },
@@ -1411,14 +1411,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "162911",
+        "Content-Length": "167048",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-lazyframe.response.json",
         "status": 200,
-        "sha256": "90efd86c9430beec2af7b926a25e949547e0ae3cc6f65ae1972ec74525904758",
-        "bytes": 162911
+        "sha256": "6d11957ed2247f05322a3ba4071bd302e630dc5e19fbd93da6a2f30efa68b69d",
+        "bytes": 167048
       },
       "family": "alpha",
       "variant": "classic",
@@ -1434,8 +1434,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-classic-lazyframe.bpmn",
-          "sha256": "c7a15fba3e0d325eb9c9041082ba4ee5cff4e7f5173a372a75577ca4ff586759",
-          "bytes": 998
+          "sha256": "ced6a47a9a48e8a11712582047c12ddf2509443d458821321d6ae2bf6c05a79f",
+          "bytes": 4833
         }
       }
     },
@@ -1482,14 +1482,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "64412",
+        "Content-Length": "66272",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-log.response.json",
         "status": 200,
-        "sha256": "18d9325be50b2c1d98000330d2f5f0b07aad9001800780bb310bebbcb693ea5e",
-        "bytes": 64412
+        "sha256": "3b39805d10b5303c474477a9228e107e236622e6bdae19ecc9266973e058bc9f",
+        "bytes": 66272
       },
       "family": "alpha",
       "variant": "plus",
@@ -1505,8 +1505,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-log.bpmn",
-          "sha256": "676cbd7456ea4e7eb6a9d4c309bdef6ba8ca31f9c1012dbb59721fdb4a0a38e0",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-log.ptml",
@@ -1558,14 +1558,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "163492",
+        "Content-Length": "165352",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-stream.response.json",
         "status": 200,
-        "sha256": "7a768fdac46ad36d377a177a78b5fdf8b00f0fc4e0b7c2e50734f3e55a26f96d",
-        "bytes": 163492
+        "sha256": "ce967a57a1a8b99e01a5afd8965993d4d29ce62c79ae4fc0d0a4e3a37f4d7669",
+        "bytes": 165352
       },
       "family": "alpha",
       "variant": "plus",
@@ -1581,8 +1581,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-stream.bpmn",
-          "sha256": "676cbd7456ea4e7eb6a9d4c309bdef6ba8ca31f9c1012dbb59721fdb4a0a38e0",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-stream.ptml",
@@ -1634,14 +1634,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "163495",
+        "Content-Length": "165355",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-dataframe.response.json",
         "status": 200,
-        "sha256": "35a250b69b6ba102a9cc5ffcb6e9b116fcab4b5a03104eb8ad3a9174df873a3c",
-        "bytes": 163495
+        "sha256": "22541ad6ea699661164081dcaddbc8cf989c96c68dd6cee0acd107bfb59bef33",
+        "bytes": 165355
       },
       "family": "alpha",
       "variant": "plus",
@@ -1657,8 +1657,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-dataframe.bpmn",
-          "sha256": "676cbd7456ea4e7eb6a9d4c309bdef6ba8ca31f9c1012dbb59721fdb4a0a38e0",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-dataframe.ptml",
@@ -1710,14 +1710,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "163495",
+        "Content-Length": "165355",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-lazyframe.response.json",
         "status": 200,
-        "sha256": "c30cf0e5c3a74767394aea1713b1b2dd4d5d09ffba02b52379dcd33c66b8e72e",
-        "bytes": 163495
+        "sha256": "17c5afa92edd12370008d621b8d03183e4d27b35cf05d8e806b9817e5e2d8b1a",
+        "bytes": 165355
       },
       "family": "alpha",
       "variant": "plus",
@@ -1733,8 +1733,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-lazyframe.bpmn",
-          "sha256": "676cbd7456ea4e7eb6a9d4c309bdef6ba8ca31f9c1012dbb59721fdb4a0a38e0",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-alpha-plus-lazyframe.ptml",
@@ -1786,14 +1786,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "67921",
+        "Content-Length": "69781",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-log.response.json",
         "status": 200,
-        "sha256": "11ad495300000c7a2e19616aa79310afd573e021d78b9613aef1136d1bf1bfa4",
-        "bytes": 67921
+        "sha256": "21aa56e8b2adfec0552d202742acca9b2406f25150c158804e181cdbfa021aa1",
+        "bytes": 69781
       },
       "family": "heuristic",
       "variant": "classic",
@@ -1809,8 +1809,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-log.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-log.ptml",
@@ -1862,14 +1862,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "167001",
+        "Content-Length": "168861",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-stream.response.json",
         "status": 200,
-        "sha256": "a731f696285f1700a8874689d6b2bd97175b2dd5301f73482987ec27b351ee4f",
-        "bytes": 167001
+        "sha256": "3c5ed4bcbeba23f6531f326c38b1e0be6d3dff0551e6337d64b4f24d5cdbff9e",
+        "bytes": 168861
       },
       "family": "heuristic",
       "variant": "classic",
@@ -1885,8 +1885,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-stream.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-stream.ptml",
@@ -1938,14 +1938,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "167004",
+        "Content-Length": "168864",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-dataframe.response.json",
         "status": 200,
-        "sha256": "5391331753cafa2ddd45c5fa8b1c2bcbba443d0b6e1a49ca648efca41d7a58e4",
-        "bytes": 167004
+        "sha256": "cae3b0fd91497e082701255905a6553d40966fa056e759a371e6bd2f4a41d66a",
+        "bytes": 168864
       },
       "family": "heuristic",
       "variant": "classic",
@@ -1961,8 +1961,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-dataframe.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-dataframe.ptml",
@@ -2014,14 +2014,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "167004",
+        "Content-Length": "168864",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-lazyframe.response.json",
         "status": 200,
-        "sha256": "4e4840c046649b54b5ba919b4813cb8abc22c5aa1ca676e67ccc66a3b96595ab",
-        "bytes": 167004
+        "sha256": "bb4d8213324d038beadd88913af343d8613dd4106956c289e959caacbb2099a0",
+        "bytes": 168864
       },
       "family": "heuristic",
       "variant": "classic",
@@ -2037,8 +2037,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-lazyframe.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-classic-lazyframe.ptml",
@@ -2090,14 +2090,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "68423",
+        "Content-Length": "70283",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-log.response.json",
         "status": 200,
-        "sha256": "f46c988c62782453024d219ae0a85f607ff1eec84b2dd6019098775f7a603909",
-        "bytes": 68423
+        "sha256": "13fbad82142a1410e918bc1240fb64a41b80c8263d78cb57f5d3e8447cf1e791",
+        "bytes": 70283
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -2113,8 +2113,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-log.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-log.ptml",
@@ -2166,14 +2166,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "167503",
+        "Content-Length": "169363",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-stream.response.json",
         "status": 200,
-        "sha256": "cac680b0344486fff4ed40c8e136cb788493e635a16076a60474f714e0502d6e",
-        "bytes": 167503
+        "sha256": "b7358c2d913fc3692795c5a05485e32a7c9b5c842ab1f73ef954b45a206428d5",
+        "bytes": 169363
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -2189,8 +2189,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-stream.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-stream.ptml",
@@ -2242,14 +2242,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "167506",
+        "Content-Length": "169366",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-dataframe.response.json",
         "status": 200,
-        "sha256": "906b9cebc14b9adb20372ba2c6ab644e580d51726c334177a8704a869f4cd795",
-        "bytes": 167506
+        "sha256": "ee1da5d538e5939a82d2a2d2317761627269210cfcf2d6cdf727b64790c32adf",
+        "bytes": 169366
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -2265,8 +2265,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-dataframe.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-dataframe.ptml",
@@ -2318,14 +2318,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "167506",
+        "Content-Length": "169366",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-lazyframe.response.json",
         "status": 200,
-        "sha256": "0ef068efed38ab1f2484565f2fbc85ba65a4f8ca78d614790cb38ad71a0c28a7",
-        "bytes": 167506
+        "sha256": "ad44fcc5e6cb7daddb51992751bbdad5f58b452dc67a2c83c0b047873e047af6",
+        "bytes": 169366
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -2341,8 +2341,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-lazyframe.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-heuristic-plusplus-lazyframe.ptml",
@@ -2402,14 +2402,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8215",
+        "Content-Length": "10075",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-iterparse.response.json",
         "status": 200,
-        "sha256": "276c36e155a2582c875879205ec40451123cab13ab72de5366990bddcc02c642",
-        "bytes": 8215
+        "sha256": "f5644e625b3bb423f6175a0227a067ebc1780613f1437f210378e3332007f511",
+        "bytes": 10075
       },
       "family": "alpha",
       "variant": "classic",
@@ -2425,8 +2425,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-iterparse.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-iterparse.ptml",
@@ -2486,14 +2486,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8215",
+        "Content-Length": "10075",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-line_by_line.response.json",
         "status": 200,
-        "sha256": "276c36e155a2582c875879205ec40451123cab13ab72de5366990bddcc02c642",
-        "bytes": 8215
+        "sha256": "f5644e625b3bb423f6175a0227a067ebc1780613f1437f210378e3332007f511",
+        "bytes": 10075
       },
       "family": "alpha",
       "variant": "classic",
@@ -2509,8 +2509,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-line_by_line.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-line_by_line.ptml",
@@ -2570,14 +2570,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8215",
+        "Content-Length": "10075",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-iterparse_20.response.json",
         "status": 200,
-        "sha256": "276c36e155a2582c875879205ec40451123cab13ab72de5366990bddcc02c642",
-        "bytes": 8215
+        "sha256": "f5644e625b3bb423f6175a0227a067ebc1780613f1437f210378e3332007f511",
+        "bytes": 10075
       },
       "family": "alpha",
       "variant": "classic",
@@ -2593,8 +2593,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-iterparse_20.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-iterparse_20.ptml",
@@ -2654,14 +2654,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8215",
+        "Content-Length": "10075",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-iterparse_mem_compressed.response.json",
         "status": 200,
-        "sha256": "276c36e155a2582c875879205ec40451123cab13ab72de5366990bddcc02c642",
-        "bytes": 8215
+        "sha256": "f5644e625b3bb423f6175a0227a067ebc1780613f1437f210378e3332007f511",
+        "bytes": 10075
       },
       "family": "alpha",
       "variant": "classic",
@@ -2677,8 +2677,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-iterparse_mem_compressed.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-iterparse_mem_compressed.ptml",
@@ -2738,14 +2738,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8566",
+        "Content-Length": "10426",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-rustxes.response.json",
         "status": 200,
-        "sha256": "1f9c30c75d5347e9d2d6de09580d7799cec6263abfcfa0985e9d5b62bc345c7c",
-        "bytes": 8566
+        "sha256": "87ec401729049e4bdcd3fb2ab5bd7c5dde97827e96f10bdec477de81a7ec70b4",
+        "bytes": 10426
       },
       "family": "alpha",
       "variant": "classic",
@@ -2761,8 +2761,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-rustxes.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-rustxes.ptml",
@@ -2822,14 +2822,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8215",
+        "Content-Length": "10075",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-chunk_regex.response.json",
         "status": 200,
-        "sha256": "276c36e155a2582c875879205ec40451123cab13ab72de5366990bddcc02c642",
-        "bytes": 8215
+        "sha256": "f5644e625b3bb423f6175a0227a067ebc1780613f1437f210378e3332007f511",
+        "bytes": 10075
       },
       "family": "alpha",
       "variant": "classic",
@@ -2845,8 +2845,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-chunk_regex.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/xes-importer-chunk_regex.ptml",
@@ -2898,14 +2898,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "37946",
+        "Content-Length": "41925",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-log.response.json",
         "status": 200,
-        "sha256": "77f088ea7ef8fe2986d12f611919763be9594e3701f2f31c55335d1aae9f90ae",
-        "bytes": 37946
+        "sha256": "a601eb78bb8605eed16924027872576a3fef4d2c0da1c62444e4053bf23fc795",
+        "bytes": 41925
       },
       "family": "alpha",
       "variant": "classic",
@@ -2921,8 +2921,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-log.bpmn",
-          "sha256": "6d6f74fa2f03cb78094a80113276b543b7c2cb425af75617f6f4af87214443dc",
-          "bytes": 1321
+          "sha256": "5530bf57cf344c497fd0c6dea8d2a2b2d7d7901c52cabf63dcb10cbbab7991fb",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-log.ptml",
@@ -2974,14 +2974,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "37949",
+        "Content-Length": "41928",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-stream.response.json",
         "status": 200,
-        "sha256": "e001c46cdb3c1e6489f0a84bea5169911a2a49360a1032b9530ca7dd4d6ff441",
-        "bytes": 37949
+        "sha256": "49ef2f729574cd2b1dbec12bdd9688678c8f29a9a3283b2897722e2c69c5271a",
+        "bytes": 41928
       },
       "family": "alpha",
       "variant": "classic",
@@ -2997,8 +2997,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-stream.bpmn",
-          "sha256": "6d6f74fa2f03cb78094a80113276b543b7c2cb425af75617f6f4af87214443dc",
-          "bytes": 1321
+          "sha256": "5530bf57cf344c497fd0c6dea8d2a2b2d7d7901c52cabf63dcb10cbbab7991fb",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-stream.ptml",
@@ -3050,14 +3050,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "37952",
+        "Content-Length": "41936",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-dataframe.response.json",
         "status": 200,
-        "sha256": "1344492e561065c49fcf39f72d4820206d353f8b22cedd2feb2105c80abfb3ac",
-        "bytes": 37952
+        "sha256": "5f95f37ae5f2aa3b981c27d8ced8dca2ba0c8e9defd36df20206ed83588eba70",
+        "bytes": 41936
       },
       "family": "alpha",
       "variant": "classic",
@@ -3073,8 +3073,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-dataframe.bpmn",
-          "sha256": "59839639c68dd1a6186fd6bcd5632cd66aa8f629a6fedcdb9188442327ed5592",
-          "bytes": 1321
+          "sha256": "c2ad76faba2f4d17da44e20f0d4d042a096df584581c67ad593fad33baea73a5",
+          "bytes": 5009
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-dataframe.ptml",
@@ -3126,14 +3126,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "37952",
+        "Content-Length": "41936",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-lazyframe.response.json",
         "status": 200,
-        "sha256": "769ec2a0c7c3d97c7ed7c6f5ae8b4f2d9e87ff21df1200fe2a15cd30d1136048",
-        "bytes": 37952
+        "sha256": "f2647a44471071ff0e5a28f824cb25144f0ad85522c656747000bc35d5ba2dbd",
+        "bytes": 41936
       },
       "family": "alpha",
       "variant": "classic",
@@ -3149,8 +3149,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-lazyframe.bpmn",
-          "sha256": "59839639c68dd1a6186fd6bcd5632cd66aa8f629a6fedcdb9188442327ed5592",
-          "bytes": 1321
+          "sha256": "c2ad76faba2f4d17da44e20f0d4d042a096df584581c67ad593fad33baea73a5",
+          "bytes": 5009
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-lazyframe.ptml",
@@ -3202,14 +3202,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "38642",
+        "Content-Length": "42621",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-log.response.json",
         "status": 200,
-        "sha256": "d3f92588da13703d9edcc830582e0fd61bba9c486a58859bae0c11d6a6e9dc8c",
-        "bytes": 38642
+        "sha256": "c7009b08d6304054f79c87eee0b9ad354c977551e70f4940131a4a9c05f57577",
+        "bytes": 42621
       },
       "family": "alpha",
       "variant": "plus",
@@ -3225,8 +3225,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-log.bpmn",
-          "sha256": "a762820a9d89a3a1ebd6a019712c78ab8cb8801ebfab00640ee0d533a74d87ee",
-          "bytes": 1321
+          "sha256": "17c71df9b91e3d01878c2e7ab81542e7f6fffee8da7ada58075e29185e4854bd",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-log.ptml",
@@ -3278,14 +3278,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "38645",
+        "Content-Length": "42624",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-stream.response.json",
         "status": 200,
-        "sha256": "f250c8f9b95fe7b47bdf06b297c6bf1c5ffe6b16f09e44520e2b5aee802c1cb7",
-        "bytes": 38645
+        "sha256": "866b76c3e29fbc33a9ebb41016b92f59214970ebc7825bb3f2a2b68468a2e4c2",
+        "bytes": 42624
       },
       "family": "alpha",
       "variant": "plus",
@@ -3301,8 +3301,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-stream.bpmn",
-          "sha256": "a762820a9d89a3a1ebd6a019712c78ab8cb8801ebfab00640ee0d533a74d87ee",
-          "bytes": 1321
+          "sha256": "17c71df9b91e3d01878c2e7ab81542e7f6fffee8da7ada58075e29185e4854bd",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-stream.ptml",
@@ -3354,14 +3354,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "38648",
+        "Content-Length": "42627",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-dataframe.response.json",
         "status": 200,
-        "sha256": "dd402432b375993168423858ff36f94af4d6554f4c69b4a0ebd9718c54e33878",
-        "bytes": 38648
+        "sha256": "ff37d60e3fde460e71ad87e2e115b65874b8d072fa35bcec73b2252d1b873bdc",
+        "bytes": 42627
       },
       "family": "alpha",
       "variant": "plus",
@@ -3377,8 +3377,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-dataframe.bpmn",
-          "sha256": "a762820a9d89a3a1ebd6a019712c78ab8cb8801ebfab00640ee0d533a74d87ee",
-          "bytes": 1321
+          "sha256": "17c71df9b91e3d01878c2e7ab81542e7f6fffee8da7ada58075e29185e4854bd",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-dataframe.ptml",
@@ -3430,14 +3430,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "38648",
+        "Content-Length": "42627",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-lazyframe.response.json",
         "status": 200,
-        "sha256": "c651d171266bc48a51ebedc8d468001bd3d997b1d38c49d879192af2442e7187",
-        "bytes": 38648
+        "sha256": "a205feaaed04074ebf48cb11f4a2f45108184e833d951db0c0dc817974b82900",
+        "bytes": 42627
       },
       "family": "alpha",
       "variant": "plus",
@@ -3453,8 +3453,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-lazyframe.bpmn",
-          "sha256": "a762820a9d89a3a1ebd6a019712c78ab8cb8801ebfab00640ee0d533a74d87ee",
-          "bytes": 1321
+          "sha256": "17c71df9b91e3d01878c2e7ab81542e7f6fffee8da7ada58075e29185e4854bd",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-lazyframe.ptml",
@@ -3506,14 +3506,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43932",
+        "Content-Length": "47911",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-log.response.json",
         "status": 200,
-        "sha256": "df1f58ee7a6925a92344c4f741b56085277f13af3e952061b17eddeeaea44930",
-        "bytes": 43932
+        "sha256": "b920576fca8b8d82157bd9a28669f9d397b8b69571e31e76e5db71d24e8b1b74",
+        "bytes": 47911
       },
       "family": "heuristic",
       "variant": "classic",
@@ -3529,8 +3529,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-log.bpmn",
-          "sha256": "6d6f74fa2f03cb78094a80113276b543b7c2cb425af75617f6f4af87214443dc",
-          "bytes": 1321
+          "sha256": "5530bf57cf344c497fd0c6dea8d2a2b2d7d7901c52cabf63dcb10cbbab7991fb",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-log.ptml",
@@ -3582,14 +3582,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43935",
+        "Content-Length": "47914",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-stream.response.json",
         "status": 200,
-        "sha256": "dcf93212f9ee18ffc7833943e1c64d03744618da1d4eeb729a94120ee096c7ee",
-        "bytes": 43935
+        "sha256": "b44f4735add26bf6907f23b3bc588100db9f630495655d50de3023ef1c5847b6",
+        "bytes": 47914
       },
       "family": "heuristic",
       "variant": "classic",
@@ -3605,8 +3605,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-stream.bpmn",
-          "sha256": "6d6f74fa2f03cb78094a80113276b543b7c2cb425af75617f6f4af87214443dc",
-          "bytes": 1321
+          "sha256": "5530bf57cf344c497fd0c6dea8d2a2b2d7d7901c52cabf63dcb10cbbab7991fb",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-stream.ptml",
@@ -3658,14 +3658,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43938",
+        "Content-Length": "47917",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-dataframe.response.json",
         "status": 200,
-        "sha256": "e025fde21720b8591de73633fdcc85ab414985472665e04f0e4abb2858623753",
-        "bytes": 43938
+        "sha256": "60dff5d953f20b0a6655e3e3e9b0656f6396b1592f257206f093ecf0352ac2fe",
+        "bytes": 47917
       },
       "family": "heuristic",
       "variant": "classic",
@@ -3681,8 +3681,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-dataframe.bpmn",
-          "sha256": "6d6f74fa2f03cb78094a80113276b543b7c2cb425af75617f6f4af87214443dc",
-          "bytes": 1321
+          "sha256": "5530bf57cf344c497fd0c6dea8d2a2b2d7d7901c52cabf63dcb10cbbab7991fb",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-dataframe.ptml",
@@ -3734,14 +3734,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43938",
+        "Content-Length": "47917",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-lazyframe.response.json",
         "status": 200,
-        "sha256": "748fd2eea89920a87c0ca30624dc0e3ebe2009a65cda20055b1014c89266d0a5",
-        "bytes": 43938
+        "sha256": "bd300c02c1949dfa4343a0a6f4e59b661c31e9c2cef66920efd5f61509f6f94e",
+        "bytes": 47917
       },
       "family": "heuristic",
       "variant": "classic",
@@ -3757,8 +3757,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-lazyframe.bpmn",
-          "sha256": "6d6f74fa2f03cb78094a80113276b543b7c2cb425af75617f6f4af87214443dc",
-          "bytes": 1321
+          "sha256": "5530bf57cf344c497fd0c6dea8d2a2b2d7d7901c52cabf63dcb10cbbab7991fb",
+          "bytes": 5004
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-classic-lazyframe.ptml",
@@ -3810,14 +3810,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "42560",
+        "Content-Length": "47571",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-plusplus-log.response.json",
         "status": 200,
-        "sha256": "8b1ddb2dce1fc3009bea5511b3e9b6acebedfdb9116916e5bb1c46191094015b",
-        "bytes": 42560
+        "sha256": "d3c3eb0ef6142bdb46d4228c62e156ecbd30a942c238e53fa247b04a820022b8",
+        "bytes": 47571
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -3833,8 +3833,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-plusplus-log.bpmn",
-          "sha256": "924e3750ce5d4657e9787eef4fe8e79b841612903ce9affd1874d9f57e092adf",
-          "bytes": 1242
+          "sha256": "2f0446bd9efbed4548f69f2080296dc8a56376858b516c73ff8541b5b4e6050b",
+          "bytes": 5883
         }
       }
     },
@@ -3881,14 +3881,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "42563",
+        "Content-Length": "47574",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-plusplus-stream.response.json",
         "status": 200,
-        "sha256": "b4f10e70965ac34e8e4279b154bb0592b760df122666e2892d97c4ebe863639e",
-        "bytes": 42563
+        "sha256": "44433bbf444fc489e167d0c2c90555847fd0ff63df9810ecaea2dfb3582a3671",
+        "bytes": 47574
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -3904,8 +3904,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-plusplus-stream.bpmn",
-          "sha256": "924e3750ce5d4657e9787eef4fe8e79b841612903ce9affd1874d9f57e092adf",
-          "bytes": 1242
+          "sha256": "2f0446bd9efbed4548f69f2080296dc8a56376858b516c73ff8541b5b4e6050b",
+          "bytes": 5883
         }
       }
     },
@@ -3952,14 +3952,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "42566",
+        "Content-Length": "47577",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-plusplus-dataframe.response.json",
         "status": 200,
-        "sha256": "07c6fd39fd9bc178484728860cfc96a148b5c3b04a7a180229600c9f3d70ad86",
-        "bytes": 42566
+        "sha256": "2e10f89716a6aed4aef4f27d0ec6fdf5505a13dd9cfe8348ea196cc51ac2753a",
+        "bytes": 47577
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -3975,8 +3975,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-plusplus-dataframe.bpmn",
-          "sha256": "924e3750ce5d4657e9787eef4fe8e79b841612903ce9affd1874d9f57e092adf",
-          "bytes": 1242
+          "sha256": "2f0446bd9efbed4548f69f2080296dc8a56376858b516c73ff8541b5b4e6050b",
+          "bytes": 5883
         }
       }
     },
@@ -4023,14 +4023,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "42566",
+        "Content-Length": "47577",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-plusplus-lazyframe.response.json",
         "status": 200,
-        "sha256": "1329929a77b757717215be0ca2e4336ae6b56fa4ca2a2a482f658266b7564737",
-        "bytes": 42566
+        "sha256": "1b273a9401311017a744c943007034622ce0c1776752810cda2014778eefab15",
+        "bytes": 47577
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -4046,8 +4046,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-heuristic-plusplus-lazyframe.bpmn",
-          "sha256": "924e3750ce5d4657e9787eef4fe8e79b841612903ce9affd1874d9f57e092adf",
-          "bytes": 1242
+          "sha256": "2f0446bd9efbed4548f69f2080296dc8a56376858b516c73ff8541b5b4e6050b",
+          "bytes": 5883
         }
       }
     },
@@ -4094,14 +4094,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "37462",
+        "Content-Length": "43717",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-completion-order.response.json",
         "status": 200,
-        "sha256": "71d9d54a61595e9466fe2f02ca73235db10aac906eca488d624ca86f8ada648e",
-        "bytes": 37462
+        "sha256": "7e8f40c739b57e5ac474991567d117752f866ba501ee3e87f4c1da4c804e97c2",
+        "bytes": 43717
       },
       "family": "alpha",
       "variant": "classic",
@@ -4117,8 +4117,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-completion-order.bpmn",
-          "sha256": "003d6aaab8bbbc90fd7c940a66d75bad250accbb777fa00829159db1249d9753",
-          "bytes": 1620
+          "sha256": "87708ad5a4b0de9e4232803b81a26eb4fb2315a5eecf78d58d33c83b4cefaf07",
+          "bytes": 7415
         }
       }
     },
@@ -4169,14 +4169,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "37952",
+        "Content-Length": "41936",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-case-only-order.response.json",
         "status": 200,
-        "sha256": "1344492e561065c49fcf39f72d4820206d353f8b22cedd2feb2105c80abfb3ac",
-        "bytes": 37952
+        "sha256": "5f95f37ae5f2aa3b981c27d8ced8dca2ba0c8e9defd36df20206ed83588eba70",
+        "bytes": 41936
       },
       "family": "alpha",
       "variant": "classic",
@@ -4192,8 +4192,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-case-only-order.bpmn",
-          "sha256": "59839639c68dd1a6186fd6bcd5632cd66aa8f629a6fedcdb9188442327ed5592",
-          "bytes": 1321
+          "sha256": "c2ad76faba2f4d17da44e20f0d4d042a096df584581c67ad593fad33baea73a5",
+          "bytes": 5009
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-case-only-order.ptml",
@@ -4253,14 +4253,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "36591",
+        "Content-Length": "42635",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-no-sort.response.json",
         "status": 200,
-        "sha256": "abb0e83baf89196688bf564426e02a6bc3461aed70056be99a96bf4233e856e0",
-        "bytes": 36591
+        "sha256": "9d74f5900ebfd8085f0e1a9e1eb1c94ad7de39aa3fd3b23b77573bc9c16bd90a",
+        "bytes": 42635
       },
       "family": "alpha",
       "variant": "classic",
@@ -4276,8 +4276,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-no-sort.bpmn",
-          "sha256": "481c3a1de5e5eb94af7fe320e27fef15cdf0d6caf12142117ec6848af0d0f0e3",
-          "bytes": 1163
+          "sha256": "9c561166f65efb5f892afef5ea1539d2df4cc7a2c80efd5588dcfe3b45af07fc",
+          "bytes": 6763
         }
       }
     },
@@ -4324,14 +4324,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43620",
+        "Content-Length": "48631",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-success.response.json",
         "status": 200,
-        "sha256": "dec8e59a8b69111deedd09061a7c7bf1b43bacc3a53d84b3715a0bfd5f1520c1",
-        "bytes": 43620
+        "sha256": "c4cc249d7f0d1d7fbf604d73301dff34ca73fe2292cdb4f6c0e3cff1256f1fc5",
+        "bytes": 48631
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -4347,8 +4347,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-success.bpmn",
-          "sha256": "bee8a60c880108db7f3382e24df232a9acc1b60857e71cd00c2510c12d4056fe",
-          "bytes": 1242
+          "sha256": "6ba29e1ab1fe4d9c1b782978ff8f74dbe2bdef6f062fbd5b19514a1161783abe",
+          "bytes": 5883
         }
       }
     },
@@ -4395,14 +4395,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43528",
+        "Content-Length": "48539",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-literal-empty-case.response.json",
         "status": 200,
-        "sha256": "69b850dd578bd4bc8c2a7a7481cafd25c3007fc8ea2560686147f61b42347e99",
-        "bytes": 43528
+        "sha256": "a87ce2a1db4ee6ad1abf1621c0baf1280c034308910d0f6b343a01b272a80d88",
+        "bytes": 48539
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -4418,8 +4418,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-literal-empty-case.bpmn",
-          "sha256": "bee8a60c880108db7f3382e24df232a9acc1b60857e71cd00c2510c12d4056fe",
-          "bytes": 1242
+          "sha256": "6ba29e1ab1fe4d9c1b782978ff8f74dbe2bdef6f062fbd5b19514a1161783abe",
+          "bytes": 5883
         }
       }
     },
@@ -4466,14 +4466,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43533",
+        "Content-Length": "48544",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-literal-empty-activity.response.json",
         "status": 200,
-        "sha256": "e00ea6bc2c00a3c24bf1a5a040cafbef4f0ca80a1289bf4896a104cf5142ed07",
-        "bytes": 43533
+        "sha256": "587ec8aa4bae20053d94aac448113c1c6b70accb1527aef22e903f11d95b3f73",
+        "bytes": 48544
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -4489,8 +4489,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-literal-empty-activity.bpmn",
-          "sha256": "bee8a60c880108db7f3382e24df232a9acc1b60857e71cd00c2510c12d4056fe",
-          "bytes": 1242
+          "sha256": "6ba29e1ab1fe4d9c1b782978ff8f74dbe2bdef6f062fbd5b19514a1161783abe",
+          "bytes": 5883
         }
       }
     },
@@ -4537,14 +4537,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43516",
+        "Content-Length": "48527",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-literal-empty-timestamp.response.json",
         "status": 200,
-        "sha256": "f2672f89ec55fc34fb27a5c643e4480c1a48c649161d491601229182cda6efbb",
-        "bytes": 43516
+        "sha256": "6d622f48b548b6ae5a675fe8f5f2c6419eac0b6d1765418f8d71ea5cf793435f",
+        "bytes": 48527
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -4560,8 +4560,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-literal-empty-timestamp.bpmn",
-          "sha256": "bee8a60c880108db7f3382e24df232a9acc1b60857e71cd00c2510c12d4056fe",
-          "bytes": 1242
+          "sha256": "6ba29e1ab1fe4d9c1b782978ff8f74dbe2bdef6f062fbd5b19514a1161783abe",
+          "bytes": 5883
         }
       }
     },
@@ -4608,14 +4608,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43525",
+        "Content-Length": "48536",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-literal-empty-start.response.json",
         "status": 200,
-        "sha256": "e1deee72563362b9b1b45c196fc81acec1b365851a86b46308c10b85d20f1d2c",
-        "bytes": 43525
+        "sha256": "ff8835860b8937ac383d849fb0203b2caee17f06584fb61b6b4ac178dd301a9b",
+        "bytes": 48536
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -4631,8 +4631,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/mutable-literal-empty-start.bpmn",
-          "sha256": "bee8a60c880108db7f3382e24df232a9acc1b60857e71cd00c2510c12d4056fe",
-          "bytes": 1242
+          "sha256": "6ba29e1ab1fe4d9c1b782978ff8f74dbe2bdef6f062fbd5b19514a1161783abe",
+          "bytes": 5883
         }
       }
     },
@@ -4738,14 +4738,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5358",
+        "Content-Length": "6952",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-plus-detached.response.json",
         "status": 200,
-        "sha256": "2385aa46bfb67db130caab9e0a8012fbdaa44d5c0cba1226ce2b4864996e5ce5",
-        "bytes": 5358
+        "sha256": "d516d398e3b59eea2d6484c640a13aed770bc8e9123dca5330c92134e1b5535e",
+        "bytes": 6952
       },
       "family": "alpha",
       "variant": "plus",
@@ -4756,8 +4756,8 @@
       "exports": {
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-plus-detached.bpmn",
-          "sha256": "8d5636f0c9f8c90bb4a44d52c5a54cd71960af8ff7684cd4a6081181c601d4d4",
-          "bytes": 490
+          "sha256": "62acdc121d34b07a0ec1039e1d535f3c23ba30f5052887b6500d1d1358ad97ac",
+          "bytes": 1970
         }
       }
     },
@@ -4804,14 +4804,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7589",
+        "Content-Length": "9018",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-null-blank.response.json",
         "status": 200,
-        "sha256": "f32943214df8453a11578592de5bbc13cb48bacb8ab501869221dcc1c447e171",
-        "bytes": 7589
+        "sha256": "102efb6f0eefe450b3f4b8581d5171b2e1bea3b3c48077354a0d05292cd77bd2",
+        "bytes": 9018
       },
       "family": "alpha",
       "variant": "classic",
@@ -4827,8 +4827,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-null-blank.bpmn",
-          "sha256": "a04cc873c4e2e2263bec5a0368d2721f1feb96f2efc9e188c6062c424ad6674f",
-          "bytes": 591
+          "sha256": "70f50f0a6d34a14779a27c184dec74add409079105d583e1086668fef89380dd",
+          "bytes": 1916
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-classic-null-blank.ptml",
@@ -4880,14 +4880,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8121",
+        "Content-Length": "9550",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-null-blank.response.json",
         "status": 200,
-        "sha256": "df82306860257d534e13cf28bd23d6158ef3c507c7b70e897398d8f91709a512",
-        "bytes": 8121
+        "sha256": "419d3be731e374cd395b147d013b02625948810ea84f6d076bc730a123331608",
+        "bytes": 9550
       },
       "family": "alpha",
       "variant": "plus",
@@ -4903,8 +4903,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-null-blank.bpmn",
-          "sha256": "795d186779a78b0cedb254f89ea00b74a121f39a44bc55b33b10906a7104ab40",
-          "bytes": 591
+          "sha256": "70f50f0a6d34a14779a27c184dec74add409079105d583e1086668fef89380dd",
+          "bytes": 1916
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-alpha-plus-null-blank.ptml",
@@ -4956,14 +4956,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9699",
+        "Content-Length": "11559",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/stale-role-alpha.response.json",
         "status": 200,
-        "sha256": "bff9cc58b77b93525ebf7b094d88f6b0a814b7a80a826ff1945e088eaeaa986d",
-        "bytes": 9699
+        "sha256": "6f8e8155d8d1c51aaf6a4e6aa185a0909c372746989b32a2a9c92e08d4a455e9",
+        "bytes": 11559
       },
       "family": "alpha",
       "variant": "classic",
@@ -4979,8 +4979,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/stale-role-alpha.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/stale-role-alpha.ptml",
@@ -5032,14 +5032,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "13643",
+        "Content-Length": "15503",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/stale-role-heuristic.response.json",
         "status": 200,
-        "sha256": "cf1bea7ba9f59efc3f98434c36e9b669b4e0c096136cbd085f1e07195ae5a880",
-        "bytes": 13643
+        "sha256": "13369780315600ec151356bd92ca658fbc99fa850f7d10e743eddd97b4737fcb",
+        "bytes": 15503
       },
       "family": "heuristic",
       "variant": "classic",
@@ -5055,8 +5055,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/stale-role-heuristic.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/stale-role-heuristic.ptml",
@@ -5104,14 +5104,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4682",
+        "Content-Length": "6542",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-sparse.response.json",
         "status": 200,
-        "sha256": "db9a2a381fcb2055a5b6950108f7f74d8e1a79fbcf09da4b682539f94b6fa078",
-        "bytes": 4682
+        "sha256": "b49751c171b7064d59ec06687132b5d282c7e28caa452670fd0583f960a315a0",
+        "bytes": 6542
       },
       "family": "alpha",
       "variant": "classic",
@@ -5127,8 +5127,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-sparse.bpmn",
-          "sha256": "f4345ef50be0569ab9245dcde068ccd78efb2acde675e6fc2a4fd70e5ffa12c4",
-          "bytes": 721
+          "sha256": "d1d5c42ecf18cb3abe512bb5dc017fb76a293b58c949390a9964561ceeb531c5",
+          "bytes": 2443
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-sparse.ptml",
@@ -5176,14 +5176,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4072",
+        "Content-Length": "7987",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-explicit-empty.response.json",
         "status": 200,
-        "sha256": "2201488dbb19336b4d353314bc963091b9c9972fcbf8964c49dfd2ea44b12083",
-        "bytes": 4072
+        "sha256": "6a25caee719dc5c8f0652571ab54cb273cbda0551cffa8c81ea9ce9d6ed59f82",
+        "bytes": 7987
       },
       "family": "alpha",
       "variant": "classic",
@@ -5199,8 +5199,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-explicit-empty.bpmn",
-          "sha256": "57fb9e83282212b528dfe4b67199a8d6e5c3e6b945567deb7711116f3b9dfa26",
-          "bytes": 563
+          "sha256": "e74e2b8bf04a3b818c5a60ca1dc6d92b26cea8f8063957e86c997889321b5ed6",
+          "bytes": 4192
         }
       }
     },
@@ -5243,14 +5243,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4053",
+        "Content-Length": "7968",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-clean.response.json",
         "status": 200,
-        "sha256": "659d5101598c1f835b900d056203ef58cedd728f8f417c4a414c8007f95e51e5",
-        "bytes": 4053
+        "sha256": "24ef2cfe4304cd5125489a074e4fd9526d453e19a5a17195c9ae224f7f1e35b7",
+        "bytes": 7968
       },
       "family": "alpha",
       "variant": "classic",
@@ -5266,8 +5266,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-clean.bpmn",
-          "sha256": "57fb9e83282212b528dfe4b67199a8d6e5c3e6b945567deb7711116f3b9dfa26",
-          "bytes": 563
+          "sha256": "e74e2b8bf04a3b818c5a60ca1dc6d92b26cea8f8063957e86c997889321b5ed6",
+          "bytes": 4192
         }
       }
     },
@@ -5310,14 +5310,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4718",
+        "Content-Length": "10110",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-graph.response.json",
         "status": 200,
-        "sha256": "1610683d0c3e808dcf5a9dddba3b2e0e6140793236c8ffe5e87046b17b194170",
-        "bytes": 4718
+        "sha256": "e7740183120db27763e0df142280bd86bd5b9862ab577c79a3eaec89b65ced2f",
+        "bytes": 10110
       },
       "family": "alpha",
       "variant": "classic",
@@ -5333,8 +5333,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-graph.bpmn",
-          "sha256": "a976ebd42ba46c6469c2885c38aa60661b9143b0d6d29c0445f5c5dd1d208dcd",
-          "bytes": 607
+          "sha256": "1c2e6edcc07824525605777fcecd49e6d3e486d3f8b588a0415aa090fc2216ee",
+          "bytes": 5605
         }
       }
     },
@@ -5377,14 +5377,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4717",
+        "Content-Length": "6577",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-wide.response.json",
         "status": 200,
-        "sha256": "43869ef6080f72db9d9c28a3e4c0670434f765e1fe278a2fc0c3a2f75161e554",
-        "bytes": 4717
+        "sha256": "ee8ee135ffda73f6082b14bdfeab1b49c4ad41e59b43508ebec2b097e95a4527",
+        "bytes": 6577
       },
       "family": "alpha",
       "variant": "classic",
@@ -5400,8 +5400,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-wide.bpmn",
-          "sha256": "f4345ef50be0569ab9245dcde068ccd78efb2acde675e6fc2a4fd70e5ffa12c4",
-          "bytes": 721
+          "sha256": "d1d5c42ecf18cb3abe512bb5dc017fb76a293b58c949390a9964561ceeb531c5",
+          "bytes": 2443
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/alpha-dfg-wide.ptml",
@@ -5524,14 +5524,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12884",
+        "Content-Length": "14744",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-full.response.json",
         "status": 200,
-        "sha256": "5e7bf86411a354a42c54331701dfbc826fffc60a606c4e99ffa030f42d7b7d1a",
-        "bytes": 12884
+        "sha256": "cf8cbec019064b261f611b7787aff269bc33bcca4163ae7e2871cb21d60c007f",
+        "bytes": 14744
       },
       "family": "heuristic",
       "variant": "classic",
@@ -5547,8 +5547,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-full.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-full.ptml",
@@ -5604,14 +5604,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4568",
+        "Content-Length": "6580",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-empty.response.json",
         "status": 200,
-        "sha256": "d9708521ba07695a09b9022be01560e171a37ba0fb9a10dd56eff246324fe864",
-        "bytes": 4568
+        "sha256": "ede853d84b435007b99dd6c76ce1c4a8e06033f72b0606d0b8025bec3884ebac",
+        "bytes": 6580
       },
       "family": "heuristic",
       "variant": "classic",
@@ -5627,8 +5627,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-empty.bpmn",
-          "sha256": "1c33285379041472ff5fab28455f9626604a0583f3f00c4eefb4bcecc74efb9f",
-          "bytes": 397
+          "sha256": "95a6c5455ac81e4ddf51ce07313a97d575c205a490a22ca3b1a32321958db710",
+          "bytes": 2265
         }
       }
     },
@@ -5679,14 +5679,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12886",
+        "Content-Length": "16425",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-wide.response.json",
         "status": 200,
-        "sha256": "71b8765b2a9426c66cc872eb47d72c399c6d6c04f98ac589c3528cd9ccf8fe4b",
-        "bytes": 12886
+        "sha256": "30d9d64310f1ed4d8bb35183f498fc3b417e666bda2ea748e938e45654de04e4",
+        "bytes": 16425
       },
       "family": "heuristic",
       "variant": "classic",
@@ -5702,8 +5702,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-wide.bpmn",
-          "sha256": "dc3e9cfe1f33127ff6cfda470cbcb2f3437e4424260ff8dffd26e4d4a25e54bb",
-          "bytes": 1204
+          "sha256": "16881ace7388efa33ca2c7e108d89e525be4f9237e92c7a3bf0f9da00141a98b",
+          "bytes": 4481
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-wide.ptml",
@@ -5759,14 +5759,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7497",
+        "Content-Length": "9357",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-nonfinite.response.json",
         "status": 200,
-        "sha256": "6aa1fd19c13a794c4410dbdee4874e537933eeed9c3a5cefb7beed92cabc2802",
-        "bytes": 7497
+        "sha256": "89cda58769ad7acf55af701eedad8db1b1410542271b816b76aa4d2ca6ad14d8",
+        "bytes": 9357
       },
       "family": "heuristic",
       "variant": "classic",
@@ -5782,8 +5782,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-nonfinite.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-nonfinite.ptml",
@@ -5839,14 +5839,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "13930",
+        "Content-Length": "15790",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-deep.response.json",
         "status": 200,
-        "sha256": "8fd9a21eb94b32f9b4467892dc54d94803028c2d3d97a5f2880aa988e2b4dd2c",
-        "bytes": 13930
+        "sha256": "693725cf768270f1b3079b8b5847e0a6b60ae1ecbba7709bde01e8bc4af17b37",
+        "bytes": 15790
       },
       "family": "heuristic",
       "variant": "classic",
@@ -5862,8 +5862,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-deep.bpmn",
-          "sha256": "50d83e91b437833d42c14dd0e9f364745e7d2e36439754740b51ad6c40d38302",
-          "bytes": 707
+          "sha256": "2e4f256ff347062fabc35abb1e7a3013b132a321c79f15d6b184cf59fb001a76",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-deep.ptml",
@@ -5915,14 +5915,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "37993",
+        "Content-Length": "41977",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-wtf8-label.response.json",
         "status": 200,
-        "sha256": "7c2f964f81adc17dc22f27e71bbb1cf4c299da470e528eba99a09c9f1e72bb37",
-        "bytes": 37993
+        "sha256": "4c3d61d064dc04c1b7662447152a6f96b2f1f3906b0ae4db358637ed41c6343b",
+        "bytes": 41977
       },
       "family": "alpha",
       "variant": "classic",
@@ -5938,12 +5938,12 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-wtf8-label.bpmn",
-          "sha256": "f4ecab83ef1d16a419f0cffaf87ced6136cc28cdc65197aacec992ade8429f4e",
-          "bytes": 1323
+          "sha256": "1190a74ae3f7e0f310f86d4d2f2a4c3370a137e425737003b65cd0d440d70bd4",
+          "bytes": 5011
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/typed-wtf8-label.ptml",
-          "sha256": "6fa08ea8682642d507c38f77ff2a925637b11e9d7993e2add581ad58c7b26607",
+          "sha256": "0b539e52049c38954daa51984dfe33c28dbf2dc5819b9de7e74343844a85140e",
           "bytes": 786
         }
       }
@@ -5995,14 +5995,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "68423",
+        "Content-Length": "70283",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-negative0_5.response.json",
         "status": 200,
-        "sha256": "f46c988c62782453024d219ae0a85f607ff1eec84b2dd6019098775f7a603909",
-        "bytes": 68423
+        "sha256": "13fbad82142a1410e918bc1240fb64a41b80c8263d78cb57f5d3e8447cf1e791",
+        "bytes": 70283
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -6018,8 +6018,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-negative0_5.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-negative0_5.ptml",
@@ -6075,14 +6075,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "68423",
+        "Content-Length": "70283",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-2_25.response.json",
         "status": 200,
-        "sha256": "f46c988c62782453024d219ae0a85f607ff1eec84b2dd6019098775f7a603909",
-        "bytes": 68423
+        "sha256": "13fbad82142a1410e918bc1240fb64a41b80c8263d78cb57f5d3e8447cf1e791",
+        "bytes": 70283
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -6098,8 +6098,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-2_25.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-2_25.ptml",
@@ -6155,14 +6155,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "64222",
+        "Content-Length": "66234",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-NaN.response.json",
         "status": 200,
-        "sha256": "86ac2bcfaab1e1bc33676fdedd255dc6c5d4f8f7ff861848c201b9107a968f79",
-        "bytes": 64222
+        "sha256": "cb8344f29c10f0d75343527b2888ea42709f75021148a30e574468abc413f681",
+        "bytes": 66234
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -6178,8 +6178,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-NaN.bpmn",
-          "sha256": "1c33285379041472ff5fab28455f9626604a0583f3f00c4eefb4bcecc74efb9f",
-          "bytes": 397
+          "sha256": "95a6c5455ac81e4ddf51ce07313a97d575c205a490a22ca3b1a32321958db710",
+          "bytes": 2265
         }
       }
     },
@@ -6230,14 +6230,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "64222",
+        "Content-Length": "66234",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-Inf.response.json",
         "status": 200,
-        "sha256": "86ac2bcfaab1e1bc33676fdedd255dc6c5d4f8f7ff861848c201b9107a968f79",
-        "bytes": 64222
+        "sha256": "cb8344f29c10f0d75343527b2888ea42709f75021148a30e574468abc413f681",
+        "bytes": 66234
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -6253,8 +6253,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-Inf.bpmn",
-          "sha256": "1c33285379041472ff5fab28455f9626604a0583f3f00c4eefb4bcecc74efb9f",
-          "bytes": 397
+          "sha256": "95a6c5455ac81e4ddf51ce07313a97d575c205a490a22ca3b1a32321958db710",
+          "bytes": 2265
         }
       }
     },
@@ -6305,14 +6305,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "68423",
+        "Content-Length": "70283",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-negativeInfinity.response.json",
         "status": 200,
-        "sha256": "f46c988c62782453024d219ae0a85f607ff1eec84b2dd6019098775f7a603909",
-        "bytes": 68423
+        "sha256": "13fbad82142a1410e918bc1240fb64a41b80c8263d78cb57f5d3e8447cf1e791",
+        "bytes": 70283
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -6328,8 +6328,8 @@
         },
         "bpmn": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-negativeInfinity.bpmn",
-          "sha256": "35b48b33803261f82a7ff8d5ebb90fc0317625b1993cbf4050047bd728b33f2e",
-          "bytes": 707
+          "sha256": "846688418c4dc7a37a6450aeb1aa925fa9e78c93709da4a6981031c3164712e7",
+          "bytes": 2429
         },
         "ptml": {
           "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-negativeInfinity.ptml",

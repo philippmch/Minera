@@ -1,4 +1,5 @@
 #include "minera/bpmn.hpp"
+#include "minera/petri_reference_arcs.hpp"
 #include "minera/petri_net_reduction.hpp"
 
 #include <algorithm>
@@ -398,8 +399,16 @@ BpmnGraph net_bpmn_graph(const PetriNet& net) {
   if (start) graph.flow(*start, place_node[net.source()]);
   if (end) graph.flow(place_node[net.sink()], *end);
   for (const auto& transition : net.transitions()) {
-    const auto& inputs = transition.inputs;
-    const auto& outputs = transition.outputs;
+    // One flow per reference arc object: a weighted arc stored as repeated
+    // unit endpoints is one arc (weights do not shape the diagram), while
+    // parallel arcs stay distinct arcs, as the reference converter reads them.
+    const auto arc_places = [&](bool input) {
+      std::vector<std::size_t> out;
+      for (const auto& arc : petri_reference_arcs(transition, input)) out.push_back(arc.place);
+      return out;
+    };
+    const auto inputs = arc_places(true);
+    const auto outputs = arc_places(false);
     std::size_t entry = 0;
     std::size_t exit = 0;
     if (!transition.silent()) {

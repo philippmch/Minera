@@ -814,6 +814,80 @@ void follows_reference_csv_quote_placement() {
   assert(rejected);
 }
 
+// Row shapes follow pandas.read_csv's default C parser (probed on pandas
+// 3.0.5): the first data row fixes the field count; k extra fields there are
+// an implicit index (dropped by format_dataframe, so the header names the
+// fields after them); a later row with more fields is refused with the
+// parser's line number (records, blank ones included); short rows read NaN.
+void follows_reference_csv_row_shapes() {
+  using Rows = std::vector<std::vector<std::string>>;
+  const auto cells = [](const std::string& text) {
+    std::istringstream input(text);
+    const auto imported = minera::import_csv_event_data(input, minera::CsvImportOptions{});
+    Rows rows;
+    for (const auto& row : imported.table.rows) {
+      rows.emplace_back();
+      for (const auto& cell : row) rows.back().push_back(cell ? cell->value : "<NaN>");
+    }
+    return rows;
+  };
+  const auto refused = [](const std::string& text, const std::string& expected) {
+    std::istringstream input(text);
+    try { (void)minera::import_csv_event_data(input, minera::CsvImportOptions{}); }
+    catch (const std::invalid_argument& error) {
+      return std::string(error.what()).find(expected) != std::string::npos;
+    }
+    return false;
+  };
+  const std::string header = "case_id,activity,timestamp\n";
+  // A trailing delimiter on every row: the first field becomes the index.
+  assert((cells(header + "9,c1,A,\n8,c1,B,\n") ==
+          Rows{{"c1", "A", ""}, {"c1", "B", ""}}));
+  assert((cells(header + "9,c1,A\n8,c1,B\n") == Rows{{"9", "c1", "A"}, {"8", "c1", "B"}}));
+  // Two extra fields: a two-level index; later rows may be shorter.
+  assert((cells(header + "i,j,c1,A,t1\ni,j,c1,B\n") ==
+          Rows{{"c1", "A", "t1"}, {"c1", "B", "<NaN>"}}));
+  // A row no longer than the index has only NaN columns (and is dropped).
+  assert((cells(header + "i,c1,A,t1\ni\n") == Rows{{"c1", "A", "t1"}}));
+  // Whitespace-only and empty lines before the first data row are skipped.
+  assert((cells(header + "  \n\n9,c1,A,\n") == Rows{{"c1", "A", ""}}));
+  // More fields than the first data row: refused, as read_csv refuses.
+  assert(refused(header + "c1,A,2020-01-01\nc1,B,2020-01-02,\n",
+                 "Expected 3 fields in line 3, saw 4"));
+  assert(refused(header + "c1,A,2020-01-01\nc1,B,2020-01-02,x,y\n",
+                 "Expected 3 fields in line 3, saw 5"));
+  assert(refused(header + "9,c1,A,2020-01-01\n8,c1,B,2020-01-02,x\n",
+                 "Expected 4 fields in line 3, saw 5"));
+  // Line numbers count records, blank lines included, not physical lines.
+  assert(refused("\n" + header + "c1,A,2020-01-01\n\n  \nc1,B,2020-01-02,x\n",
+                 "Expected 3 fields in line 6, saw 4"));
+  assert(refused(header + "c1,\"A\nB\",2020-01-01\nc1,B,2020-01-02,x\n",
+                 "Expected 3 fields in line 3, saw 4"));
+  // A short first data row does not lower the count; later rows may not
+  // exceed the header.
+  assert(refused(header + "c1\nc1,B,2020-01-02,x\n", "Expected 3 fields in line 3, saw 4"));
+  // Short rows read NaN: a missing case id, activity or (in a date column)
+  // timestamp drops the row, as format_dataframe does; nothing is refused.
+  std::istringstream short_rows(header + "c1,A,2020-01-01\nc1,B\nc2\n");
+  const auto imported = minera::import_csv_event_data(short_rows, minera::CsvImportOptions{});
+  assert(imported.log.trace_count() == 1 && imported.log.event_count() == 1);
+  assert(imported.log.traces.front().events.front().activity == "A");
+  // A missing case-id cell is NaN like an empty one, so integer ids become floats.
+  std::istringstream float_ids("activity,case_id\nA,1\nB\n");
+  assert(minera::import_csv_event_data(float_ids, minera::CsvImportOptions{}).log.traces.front().case_id == "1.0");
+  // Stream readers (csv.DictReader) keep their shape rules: extra fields
+  // are ignored and a short row must hold the first-class columns.
+  minera::CsvImportOptions stream;
+  stream.keep_na_first_class_values = true;
+  std::istringstream long_stream(header + "c1,A,2020-01-01,x\n");
+  assert(minera::import_csv_event_data(long_stream, stream).log.traces.front().case_id == "c1");
+  std::istringstream short_stream(header + "c1\n");
+  bool short_refused = false;
+  try { (void)minera::import_csv_event_data(short_stream, stream); }
+  catch (const std::runtime_error& error) { short_refused = std::string(error.what()).find("too few fields") != std::string::npos; }
+  assert(short_refused);
+}
+
 void handles_quoted_csv_fields_and_timestamp_sorting() {
   const auto path = write_temp_log(
       "case_id,activity,timestamp\n"
@@ -2235,6 +2309,38 @@ void parse_bpmn_rejects_unsupported_models() {
   }));
   // No process at all.
   assert(throws([] { (void)minera::parse_bpmn("<definitions/>"); }));
+}
+
+// A weighted arc moves its weight in tokens: "a" puts two tokens on the
+// middle place through one weight-2 arc (two repeated endpoints) and "b"
+// takes both, so the middle place counts two consumed tokens and two wait
+// samples per case, and the sink one.
+void decorate_model_moves_arc_weights() {
+  minera::PetriNet net;
+  const auto source = net.add_place(), middle = net.add_place(), sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"a", "b"});
+  net.add_transition(0, {source}, {middle, middle});
+  net.add_transition(1, {middle, middle}, {sink});
+  minera::EventLog log;
+  minera::Trace trace;
+  trace.case_id = "c1";
+  for (const auto& [activity, timestamp] : std::vector<std::pair<std::string, std::string>>{
+           {"a", "2024-01-01T10:00:00Z"}, {"b", "2024-01-01T10:01:00Z"}}) {
+    minera::Event event;
+    event.case_id = trace.case_id;
+    event.activity = activity;
+    event.timestamp = timestamp;
+    trace.events.push_back(std::move(event));
+  }
+  log.traces.push_back(std::move(trace));
+  const auto decoration = minera::decorate_model(log, net);
+  assert(decoration.decorated_traces == 1);
+  assert(decoration.place_counts[source] == 1);
+  assert(decoration.place_counts[middle] == 2);
+  assert(decoration.place_waits[middle].count == 2);
+  assert(decoration.place_waits[middle].mean == 60.0);
 }
 
 void decorate_model_counts_firings_and_waits() {
@@ -4549,11 +4655,14 @@ void filter_event_log_follows_dataframe_cells() {
 }
 
 void importer_rejects_malformed_rows() {
-  // Too few fields for the declared header.
+  // More fields than the first data row (read_csv: "Expected 2 fields in
+  // line 3, saw 3"). Too few fields are NaN there, so a short row is read
+  // and then dropped for its missing activity.
   assert(throws([] {
-    const auto path = write_temp_log("case_id,activity\n1\n");
+    const auto path = write_temp_log("case_id,activity\n1,A\n1,B,x\n");
     (void)minera::import_csv_event_log(path);
   }));
+  assert(minera::import_csv_event_log(write_temp_log("case_id,activity\n1\n")).event_count() == 0);
   // A timestamp the reference conversion cannot read leaves its column
   // untyped there, and every reference consumer rejects it.
   assert(throws([] {
@@ -7507,19 +7616,28 @@ void csv_import_matches_reference_dataframe_flow() {
                *minera::parse_timestamp(events[0].timestamp) == 5400.0);
     assert(data.table.rows[0][2]->value == "2024-01-02 10:00:00");
   }
-  // Blank/NA timestamps in a date column remain explicit missing values.
+  // format_dataframe drops a row whose timestamp is blank/NA once the column
+  // holds dates, as it drops one without a case id or activity: the log and
+  // the flat table both lose it, and a case left without rows disappears.
   {
     const auto data = import(
-        "case_id,activity,timestamp\n1,A,\n1,B,NaN\n1,C,01/02/2024 10:00\n");
-    std::size_t missing = 0;
-    for (const auto& event : data.log.traces[0].events) {
-      if (event.activity == "C") continue;
-      assert(event.timestamp.empty());
-      assert(event.timestamp_state == minera::FirstClassAttributeState::kMissing);
-      ++missing;
-    }
-    assert(missing == 2);
-    assert(data.table.rows[1][2]->value.empty());
+        "case_id,activity,timestamp\n1,A,\n1,B,NaN\n1,C,01/02/2024 10:00\n"
+        "2,D,NA\n");
+    assert(data.log.traces.size() == 1);
+    assert(data.log.traces[0].case_id == "1");
+    assert(data.log.traces[0].events.size() == 1);
+    assert(data.log.traces[0].events[0].activity == "C");
+    assert(data.log.traces[0].events[0].timestamp == "2024-01-02 10:00:00");
+    assert(data.table.rows.size() == 1);
+    assert(data.table.rows[0][1]->value == "C");
+  }
+  // Stream readers (csv.DictReader) keep those rows, NA spellings literal.
+  {
+    minera::CsvImportOptions stream;
+    stream.keep_na_first_class_values = true;
+    const auto data = import(
+        "case_id,activity,timestamp\n1,A,\n1,B,NaN\n1,C,01/02/2024 10:00\n", stream);
+    assert(data.log.traces.size() == 1 && data.log.traces[0].events.size() == 3);
   }
   // A column without any date keeps its opaque text (native contract).
   {
@@ -7902,6 +8020,7 @@ int main() {
   handles_quoted_csv_fields_and_timestamp_sorting();
   preserves_multiline_csv_fields_and_original_table_order();
   follows_reference_csv_quote_placement();
+  follows_reference_csv_row_shapes();
   aggregates_repeated_trace_variants();
   inductive_miner_discovers_sequence();
   inductive_miner_discovers_exclusive_choice();
@@ -7963,6 +8082,7 @@ int main() {
   parse_bpmn_supports_inclusive_gateway_blocks();
   parse_bpmn_rejects_unsupported_models();
   decorate_model_counts_firings_and_waits();
+  decorate_model_moves_arc_weights();
   decorate_model_skips_deviating_and_untimed_traces();
   decorate_model_treats_missing_custom_timestamps_as_untimed();
   ptml_round_trip_preserves_replay_behavior();

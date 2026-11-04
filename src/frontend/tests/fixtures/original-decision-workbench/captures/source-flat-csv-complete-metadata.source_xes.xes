@@ -40,158 +40,6 @@
     </event>
   </trace>
   <trace>
-    <string key="case_id" value="case2"/>
-    <event>
-      <string key="activity" value="A"/>
-      <date key="timestamp" value="2026-01-01T00:00:04+00:00"/>
-      <string key="resource" value="r2"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="12"/>
-      <string key="region" value="north"/>
-    </event>
-    <event>
-      <string key="activity" value="B"/>
-      <date key="timestamp" value="2026-01-01T00:00:05+00:00"/>
-      <string key="resource" value="r2"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="999"/>
-      <string key="region" value="late"/>
-    </event>
-  </trace>
-  <trace>
-    <string key="case_id" value="case3"/>
-    <event>
-      <string key="activity" value="A"/>
-      <date key="timestamp" value="2026-01-01T00:00:06+00:00"/>
-      <string key="resource" value="r3"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="13"/>
-      <string key="region" value="north"/>
-    </event>
-    <event>
-      <string key="activity" value="B"/>
-      <date key="timestamp" value="2026-01-01T00:00:07+00:00"/>
-      <string key="resource" value="r3"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="999"/>
-      <string key="region" value="late"/>
-    </event>
-  </trace>
-  <trace>
-    <string key="case_id" value="case4"/>
-    <event>
-      <string key="activity" value="A"/>
-      <date key="timestamp" value="2026-01-01T00:00:08+00:00"/>
-      <string key="resource" value="r4"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="14"/>
-      <string key="region" value="north"/>
-    </event>
-    <event>
-      <string key="activity" value="B"/>
-      <date key="timestamp" value="2026-01-01T00:00:09+00:00"/>
-      <string key="resource" value="r4"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="999"/>
-      <string key="region" value="late"/>
-    </event>
-  </trace>
-  <trace>
-    <string key="case_id" value="case5"/>
-    <event>
-      <string key="activity" value="A"/>
-      <date key="timestamp" value="2026-01-01T00:00:10+00:00"/>
-      <string key="resource" value="r5"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="15"/>
-      <string key="region" value="north"/>
-    </event>
-    <event>
-      <string key="activity" value="B"/>
-      <date key="timestamp" value="2026-01-01T00:00:11+00:00"/>
-      <string key="resource" value="r5"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="999"/>
-      <string key="region" value="late"/>
-    </event>
-  </trace>
-  <trace>
-    <string key="case_id" value="case6"/>
-    <event>
-      <string key="activity" value="A"/>
-      <date key="timestamp" value="2026-01-01T00:00:12+00:00"/>
-      <string key="resource" value="r6"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="16"/>
-      <string key="region" value="north"/>
-    </event>
-    <event>
-      <string key="activity" value="B"/>
-      <date key="timestamp" value="2026-01-01T00:00:13+00:00"/>
-      <string key="resource" value="r6"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="999"/>
-      <string key="region" value="late"/>
-    </event>
-  </trace>
-  <trace>
-    <string key="case_id" value="case7"/>
-    <event>
-      <string key="activity" value="A"/>
-      <date key="timestamp" value="2026-01-01T00:00:14+00:00"/>
-      <string key="resource" value="r7"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="17"/>
-      <string key="region" value="north"/>
-    </event>
-    <event>
-      <string key="activity" value="B"/>
-      <date key="timestamp" value="2026-01-01T00:00:15+00:00"/>
-      <string key="resource" value="r7"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="999"/>
-      <string key="region" value="late"/>
-    </event>
-  </trace>
-  <trace>
-    <string key="case_id" value="case8"/>
-    <event>
-      <string key="activity" value="A"/>
-      <date key="timestamp" value="2026-01-01T00:00:16+00:00"/>
-      <string key="resource" value="r8"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="18"/>
-      <string key="region" value="north"/>
-    </event>
-    <event>
-      <string key="activity" value="B"/>
-      <date key="timestamp" value="2026-01-01T00:00:17+00:00"/>
-      <string key="resource" value="r8"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="999"/>
-      <string key="region" value="late"/>
-    </event>
-  </trace>
-  <trace>
-    <string key="case_id" value="case9"/>
-    <event>
-      <string key="activity" value="A"/>
-      <date key="timestamp" value="2026-01-01T00:00:18+00:00"/>
-      <string key="resource" value="r9"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="19"/>
-      <string key="region" value="north"/>
-    </event>
-    <event>
-      <string key="activity" value="B"/>
-      <date key="timestamp" value="2026-01-01T00:00:19+00:00"/>
-      <string key="resource" value="r9"/>
-      <string key="lifecycle" value="complete"/>
-      <string key="amount" value="999"/>
-      <string key="region" value="late"/>
-    </event>
-  </trace>
-  <trace>
     <string key="case_id" value="case10"/>
     <event>
       <string key="activity" value="A"/>
@@ -376,6 +224,158 @@
       <string key="activity" value="C"/>
       <date key="timestamp" value="2026-01-01T00:00:39+00:00"/>
       <string key="resource" value="r19"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="999"/>
+      <string key="region" value="late"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="case2"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:04+00:00"/>
+      <string key="resource" value="r2"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="12"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:05+00:00"/>
+      <string key="resource" value="r2"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="999"/>
+      <string key="region" value="late"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="case3"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:06+00:00"/>
+      <string key="resource" value="r3"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="13"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:07+00:00"/>
+      <string key="resource" value="r3"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="999"/>
+      <string key="region" value="late"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="case4"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:08+00:00"/>
+      <string key="resource" value="r4"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="14"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:09+00:00"/>
+      <string key="resource" value="r4"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="999"/>
+      <string key="region" value="late"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="case5"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:10+00:00"/>
+      <string key="resource" value="r5"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="15"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:11+00:00"/>
+      <string key="resource" value="r5"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="999"/>
+      <string key="region" value="late"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="case6"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:12+00:00"/>
+      <string key="resource" value="r6"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="16"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:13+00:00"/>
+      <string key="resource" value="r6"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="999"/>
+      <string key="region" value="late"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="case7"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:14+00:00"/>
+      <string key="resource" value="r7"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="17"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:15+00:00"/>
+      <string key="resource" value="r7"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="999"/>
+      <string key="region" value="late"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="case8"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:16+00:00"/>
+      <string key="resource" value="r8"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="18"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:17+00:00"/>
+      <string key="resource" value="r8"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="999"/>
+      <string key="region" value="late"/>
+    </event>
+  </trace>
+  <trace>
+    <string key="case_id" value="case9"/>
+    <event>
+      <string key="activity" value="A"/>
+      <date key="timestamp" value="2026-01-01T00:00:18+00:00"/>
+      <string key="resource" value="r9"/>
+      <string key="lifecycle" value="complete"/>
+      <string key="amount" value="19"/>
+      <string key="region" value="north"/>
+    </event>
+    <event>
+      <string key="activity" value="B"/>
+      <date key="timestamp" value="2026-01-01T00:00:19+00:00"/>
+      <string key="resource" value="r9"/>
       <string key="lifecycle" value="complete"/>
       <string key="amount" value="999"/>
       <string key="region" value="late"/>

@@ -3,27 +3,45 @@
   <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
     <name><text>Independent process-tree alignment model</text></name>
     <page id="page1">
-      <place id="p0">
-        <name><text>p0</text></name>
+      <place id="source">
+        <name><text>source</text></name>
         <initialMarking><text>1</text></initialMarking>
       </place>
-      <place id="p1">
-        <name><text>p1</text></name>
+      <place id="sink">
+        <name><text>sink</text></name>
       </place>
-      <transition id="t0">
+      <place id="p_3">
+        <name><text>p_3</text></name>
+      </place>
+      <place id="p_4">
+        <name><text>p_4</text></name>
+      </place>
+      <transition id="tau_1">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="tau_1"/>
+      </transition>
+      <transition id="tau_2">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="tau_2"/>
+      </transition>
+      <transition id="00000000-0000-4000-8000-000000000000">
         <name><text>A</text></name>
       </transition>
-      <transition id="t1">
+      <transition id="00000000-0000-4000-8000-000000000001">
         <name><text>B</text></name>
       </transition>
-      <arc id="a0" source="p0" target="t0"/>
-      <arc id="a1" source="t0" target="p1"/>
-      <arc id="a2" source="p0" target="t1"/>
-      <arc id="a3" source="t1" target="p1"/>
+      <arc id="a0" source="source" target="tau_1"/>
+      <arc id="a1" source="tau_1" target="p_3"/>
+      <arc id="a2" source="p_4" target="tau_2"/>
+      <arc id="a3" source="tau_2" target="sink"/>
+      <arc id="a4" source="p_3" target="00000000-0000-4000-8000-000000000000"/>
+      <arc id="a5" source="00000000-0000-4000-8000-000000000000" target="p_4"/>
+      <arc id="a6" source="p_3" target="00000000-0000-4000-8000-000000000001"/>
+      <arc id="a7" source="00000000-0000-4000-8000-000000000001" target="p_4"/>
     </page>
     <finalmarkings>
       <marking>
-        <place idref="p1"><text>1</text></place>
+        <place idref="sink"><text>1</text></place>
       </marking>
     </finalmarkings>
   </net>

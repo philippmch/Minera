@@ -14846,8 +14846,8 @@ inside string". The /api/mine size estimate tokenizes quotes the same way.
 Black-box fuzz of 3,000 generated files with random quote placements: every
 file both sides parse gives identical cells (2,591), and every "EOF inside
 string" is refused natively. Rows with more fields than the header (pandas:
-"Expected N fields" or an implicit index) and short rows are separate,
-unchanged field-count policies. Declared empty CSV inputs resolve their
+"Expected N fields" or an implicit index) and short rows follow read_csv
+too since 2026-11-04 (see "CSV row shapes follow `pandas.read_csv`"). Declared empty CSV inputs resolve their
 actual activity field in every shape, including custom/aliased columns and zero caps.
 
 Validation binds four native suites, 1,442 frontend tests, 221 application checks
@@ -16526,12 +16526,11 @@ values and passing controls.
 
 Declared exceptions (not equivalent, kept on purpose):
 
-- **Weighted arcs in linear analysis (DC4).** The reference marking equation
-  counts every arc once regardless of its weight (objectives 2/4/6 for the
-  weight 1/2/3 sequence) and rejects weight-2/3 nets as not easy sound in
-  alignment precision and fitness. Native analysis uses the weights, so those
-  nets solve with objective 2 and are accepted. Parity is claimed for
-  unit-weight nets only; `minera_petri_analysis_tests` pins both values.
+- **Weighted arcs in linear analysis (DC4).** Lifted on 2026-11-04: the
+  marking equation now counts every arc object once, as the reference does
+  (objectives 2/4/6 for the weight 1/2/3 sequence), see "Arc weights and
+  parallel arcs across Petri code paths" below; `minera_petri_analysis_tests`
+  pins the reference values.
 - **Malformed OCEL (C3).** Native OCEL statistics reject duplicate ids and
   dangling relations that the public association helpers accept.
 - **Streaming.** The streaming surface stays Partial and outside the 86/387
@@ -17436,16 +17435,279 @@ Declarations (the reference raises; native keeps its result):
 - **Local diagnostics, explicit groups.** The reference raises `KeyError`
   when a listed resource does not occur in the log; native computes with the
   resources that occur.
-- **Frontend captures.** The 8 `powl_to_net-*` model-conversion captures
-  whose nets changed are recaptured from the current server with
-  `scripts/capture-workbench-fixtures.py`, which replays any
-  `*-request-manifest.json` against a running server and rewrites the
-  entries that changed (response, exports, sizes and digests). Captures that
-  embed `/api/mine` output (active-source workbench, structured POWL
-  discovery, cache seeds and records) still hold the earlier reduced POWL
-  nets, and the temporal-conformance capture with a fitted profile
-  (`behavior-analysis-conformance-native-profile.json`) was taken at zeta 6.
-  Their tests check internal consistency only. The active-source set also
-  differs from the current server in its BPMN and alignment output, and the
-  others' source inputs are not in the repository, so they are left for a
-  full recapture.
+- **Frontend captures.** All 16 `*-request-manifest.json` sets were
+  replayed with `scripts/capture-workbench-fixtures.py` against a server
+  built from the 2026-11-04 working tree (a fresh server per manifest) and
+  the changed entries recaptured with `--write` (1,008 of 2,673 entries;
+  a second replay then matches every entry). The changes come from the
+  intended work since the captures were taken: case order by case id,
+  tree-to-net and reduction names, BPMN layout, token-replay precision,
+  summary active-source snapshots, zeta 1 and POWL nets, the XES writer's
+  NUL / invalid UTF-8 refusals, seeded playout and Monte Carlo draws,
+  reference ports of the decomposed and tree alignments, and 7 entries that
+  now answer 400 (normalized Levenshtein with an empty trace, strict XML,
+  DFG playout seed range, tree playout bound). One change was a regression
+  and was fixed instead (Monte Carlo arc weights, below). The script now
+  keeps a manifest's CRLF line ends, refreshes the exports the input
+  workbenches return as top-level fields (`pnml`, `ptml`, `bpmn`,
+  `source_xes`, `model_export`, ...) and the embedding workbench's hex
+  artifacts, which it used to drop; an export that is now null (the XES
+  writer's refusals, the 400s) loses its record, as the tests expect, and
+  one that is newly produced gets a record (2 entries). It also updates the
+  expected status and the manifest fields that mirror the response
+  (`operation`, `executed`, `error`, `native_calls`, `variant`, ...), which
+  the fixture tests compare. The active-source fixture test accepts the
+  summary snapshot that mining responses embed (complete states come from
+  /api/active-source). The 48 frontend test files that read these
+  fixtures pass.
+  The standalone captures (not in a manifest) record only their source
+  file's name, and none of those sources is in the repository, so they
+  were not replayed and still hold their earlier output; their tests check
+  internal consistency only. By source:
+  - `owned-structured.csv` (11): `structured-discovery-inductive-*`
+    (`controls`, `dfg`, `imf`, `log`), `structured-discovery-powl-*`
+    (`brute_force`, `controls`, `dynamic_clustering`,
+    `dynamic_clustering_plain`, `maximal`, `tree`; these hold the earlier
+    reduced POWL nets) and `workflow-discovery-structured-alpha`.
+  - `owned-behavior.csv` (38): every `behavior-analysis-*` capture
+    (conformance, correlation, self-distances, temporal profiles); the
+    fitted-profile one, `behavior-analysis-conformance-native-profile`, was
+    taken at zeta 6.
+  - `owned-adapters.csv` (2): `structured-discovery-{inductive,powl}-adapted`.
+  - `owned-constraints.csv` (13): `constraint-discovery-{declare,skeleton}-*`.
+  - `owned-decisions.csv` (5): `decision-workspace-*`.
+  - `owned-dfg.xes` (30): `dfg-discovery-*`.
+  - `owned-discovery.csv` (7): `workflow-discovery-{alpha,heuristic}-*`.
+  - `owned-graph.csv` (20): `graph-discovery-{footprints,transition}-*`.
+  - `owned-organization.xes` (7) and `owned-resource-less.xes` (2):
+    `organizational-workbench-2-*`.
+  - `owned-simulation-source.csv` (6): `simulation-workspace-*`.
+  - `owned-timing.csv` (17): `timing-discovery-{batches,spectrum}-*`.
+
+## Process-tree DP one-child operators, CSV row shapes and Monte Carlo arc weights (2026-11-04)
+
+- **DP process-tree alignment, one-child operators.** The
+  `DYNAMIC_PROGRAMMING` port dereferenced a missing child when a sequence,
+  parallel or loop operator had one child (a one-child loop crashed the
+  server: `/api/align-process-tree-workbench` entry
+  `dynamic_programming-native-one-body-loop`). The reference reads the
+  second child (a loop's redo) by position and raises `IndexError` when it
+  evaluates it; the port now raises at the same points and the dispatcher
+  falls back to the native search ("native search (reference: list index out
+  of range)"). A loop whose body fits the whole segment returns that body
+  without reading the redo, as the reference does, so `*(a)` on `[a]` is the
+  reference result (cost 0, fitness 1) and `[a, a]` falls back; an operator
+  without children is refused before the DP runs. Fuzz: 8,400 random
+  requests to `/api/align-process-tree-workbench` and
+  `/api/align-graph-workbench` on an ASan build answer 200 or 400 only.
+  Tests: `minera_process_tree_alignment_tests` (`one_child_operators`).
+- **CSV row shapes follow `pandas.read_csv`.** The batch CSV importer now
+  reads row lengths the way the default C parser does. When the first data
+  row has k more fields than the header, its first k fields become the
+  implicit index, which `format_dataframe` discards (a trailing delimiter on
+  every row is the common case); a later row longer than header + k is
+  refused with read_csv's own message, "Expected N fields in line L, saw M"
+  (L counts records from the top of the file, blank lines included, a
+  multi-line quoted record once), in a 400 that also says how many fields
+  the rows may have; a short row is padded with empty (NaN) cells, so a row
+  without its activity or case id is dropped, and so is one without a
+  timestamp once the timestamp column holds dates, as `format_dataframe`
+  drops it (see "CSV rows without a timestamp are dropped" below). Before,
+  extra fields were ignored and short rows refused. The
+  /api/mine size estimate already counted these rows and its columns are the
+  header's, so its 413 decision is unchanged. Stream readers (csv.DictReader
+  in the reference) keep their rules. Black-box fuzz against read_csv +
+  format_dataframe, 3,000 files with random row lengths, blank and
+  delimiter-only lines: every refusal matches pandas with the same N, L and
+  M (802 files); every file both read gives the same rows apart from the
+  timestamp and dtype policies of that run (rows without a timestamp were
+  then kept and are now dropped, see below; unparseable or all-empty
+  timestamp columns, which format_dataframe refuses, in 102 files). Tests:
+  `minera_core_tests` (`follows_reference_csv_row_shapes`),
+  `minera_server_parameter_contract_tests`.
+- **Monte Carlo firing honours arc weights.** Since PNML parallel arcs are
+  read as one weighted occurrence, Monte Carlo moved one token per arc and
+  deadlocked nets with weighted or parallel arcs (a capture's net with two
+  parallel inputs and a weight-2 output ended with 0 of 2 cases complete).
+  Firing now moves each arc's weight, as the reference
+  `semantics.execute` does (2 of 2 complete). Tests:
+  `minera_monte_carlo_tests` (`weighted_and_parallel_arcs_move_their_weight`).
+
+## Empty POWL orders, POWL frequency bounds, alignment stop reasons, disconnect cancellation and untimed CSV rows (2026-11-04)
+
+- **Empty POWL partial orders.** `convert_to_petri_net` gives an empty
+  partial order (`PO=(nodes={}, order={})`) a silent split with no outputs
+  and a silent join with no inputs, wherever it is nested; native built one
+  silent `in -> out` step (2 places and 1 transition at the top level where
+  the reference has 2 and 2). The general partial-order construction now
+  runs for no children too, and the simple reduction repeats its
+  single-entry and single-exit passes until neither folds, because a
+  single-exit fold next to an empty order can open a single-entry fold
+  (`PO=(nodes={A, PO=(nodes={}, order={})}, order={})` is one `A` from
+  source to sink in both). Fresh comparison through
+  `/api/model-conversion-workbench`: 4,800 random POWL models (where
+  counted, 233 of 4,200 hold an empty order and 1,478 a new frequency
+  bound) give isomorphic nets in 4,799; the earlier 1,800-model bank still
+  matches 1,800/1,800. Declared:
+  the reference compares partial orders by value, so two empty orders that
+  are children of one partial order are one node of its order relation; it
+  then keeps an extra silent transition without arcs, or raises
+  `ValueError: Cannot generate transitive reduction! Reflexivity detected!`
+  when one precedes the other. Native treats them as distinct children (the
+  one remaining diff above). Tests: `minera_powl_conversion_tests`
+  (`empty_partial_order_matches_reference_nets`).
+- **POWL frequency bounds.** The text form `T("label",min,max|*)` now takes
+  any nonnegative bounds, as `FrequentTransition(label, min, max)` does: a
+  minimum of 0 is skippable, an unbounded maximum (`*`, the reference's
+  `"-"`) self-loops, and other values only change the label
+  (`T("A",0,3)` is `"A\n[1,3]"`, `T("A",2,*)` is `"A\n[1,-]"`, `T("A",2,5)`
+  is `"A"`). Native refused anything but 0/1 and 1/unbounded. `self_loop()`
+  is now exactly "unbounded maximum" (a finite maximum above 1 used to
+  count), and the process-tree conversion maps the two flags as before
+  (optional: `X(tau, a)`, self-loop: `*(a, tau)`). Negative bounds have no
+  text form and are still refused by the native constructor. Tests:
+  `minera_powl_tests`, `minera_powl_conversion_tests`
+  (`frequency_bounds_follow_reference_flags`).
+- **Why an alignment search stopped.** An exhausted `/api/align` result
+  (and every serializer that writes `AlignmentResult`) now carries
+  `time_limit_reached`: true when a configured time limit (`max_align_time`
+  or `max_align_time_trace`) had run out, false when the state limit stopped
+  the search with time to spare. Computed and unsound results do not carry
+  the key. The Conformance view gives the app's 60-second time-budget advice
+  only when a time limit stopped the search, names the state limit when that
+  stopped it, and no longer says partial numbers are hidden (no fitness,
+  precision or cost exists for such a run). A time-stopped result (or one
+  from a server that does not say) is not cached, so reopening the view
+  retries; state-bound results stay cached, as they are deterministic.
+  Native extension (the reference has no time limit). Tests:
+  `minera_alignment_variants_tests`, `alignment-uncomputed.test.ts`.
+- **Disconnect cancellation.** `/api/genetic-mine` (and
+  `/api/genetic-matrix-convert`), `/api/ilp-mine` and `/api/evaluate`
+  (alignment-based fitness and precision) now stop when the client
+  disconnects, as `/api/align` already did, through the same
+  `Request::is_connection_closed` hook: the genetic miner polls before each
+  candidate's fitness replay, ILP before each pair LP, every 16 simplex
+  pivots and before each implicit-place LP, and alignment-based precision
+  before each prefix (its alignments use `AlignmentOptions::cancelled`). A
+  cancelled run throws `OperationCancelled` and returns nothing, so no
+  partial result is cached. Measured on the sample log (genetic) and a
+  noisy 14-activity log (ILP, alignment-based fitness), closing the socket
+  1 s after sending: in the 9 s from sending, the previous server used
+  8.9 s of CPU for each (it kept computing), the new one 1.0 to 1.3 s (the
+  second before the close). Uncancelled responses match the previous
+  server (timing fields aside) on 21 of 23 genetic, ILP, evaluate and align
+  requests; the other two differ only by the new `time_limit_reached` key
+  and a time-limited search's counters. Native extension. Tests: `minera_genetic_miner_tests`,
+  `minera_ilp_miner_tests`.
+- **CSV rows without a timestamp are dropped.** `format_dataframe` drops a
+  row whose timestamp is NA (an empty cell or a pandas NA spelling) together
+  with rows missing a case id or activity, with its "Some rows of the Pandas
+  data frame have been removed" warning; a case left without rows
+  disappears. The batch CSV importer kept those rows as untimed events. It
+  now drops them once the timestamp column converts to dates (some kept
+  row's cell parses); a column with no date keeps every row, as before (the
+  reference refuses such a frame), and stream readers keep NA spellings as
+  literal values. The CSV row-shape entry above states the same policy. Fresh
+  comparison against `read_csv` + `format_dataframe` +
+  `convert_to_event_log`: 508/508 random files that the reference reads give
+  the same cases and activity sequences (416 of them with dropped NA
+  timestamps); the other 92 have no date in the column, which the reference
+  refuses and native keeps. Tests: `minera_core_tests`
+  (`csv_import_matches_reference_dataframe_flow`,
+  `follows_reference_csv_row_shapes`),
+  `minera_server_parameter_contract_tests`.
+
+## Arc weights and parallel arcs across Petri code paths (2026-11-04)
+
+Since PNML import keeps parallel arcs and zero, signed or large weights as
+one weighted occurrence per arc object (a weight-w arc otherwise becomes w
+repeated endpoints), every path that moved or checked one token per endpoint
+was audited. Black-box comparisons used random nets with weights 1 to 3 and
+parallel duplicates (49 + 55 general nets with random markings; 39 + 60
+workflow nets from random process trees with scaled, unbalanced and parallel
+arcs), written by the reference `write_pnml` and read by both sides; the
+second set of each was fresh after the fixes.
+
+Changed to follow the reference:
+- **Marking equation and Woflan invariants.** The classic marking equation
+  adds -1/+1 per arc object, whatever its weight (parallel arcs count twice),
+  as `incidence_matrix.construct` does, so DC4 is lifted. Woflan's
+  S-component, uniform and weighted invariant stages use a weighted incidence
+  (each arc object adds its signed weight: weights 2 and -1 in parallel sum to
+  1), which reproduces the reference's uncovered places on every probe. On a
+  net with weighted or parallel arcs that is not S-coverable both soundness
+  variants now report unsound, as `check_soundness` and `woflan` do on every
+  such net probed (even when the net behaves soundly); an S-coverable one
+  keeps the behavioural verdict. Reachability, coverability and the
+  restricted coverability tree fire each arc by its weight. Fresh workflow
+  nets: soundness 60/60; Woflan 38/38 where the reference returns (it raises
+  `AttributeError: module 'pm4py.util.nx_utils' has no attribute
+  'topological_sort'` on the other 22, after printing "unsound"; native
+  answers unsound).
+- **Alignment dispatcher on weighted or parallel arcs.** The easy-soundness
+  gate follows the reference check as observed: the LP relaxation of the
+  arc-object marking equation must be feasible, and the final marking must
+  be reachable when a transition needs the summed weight of its arcs from a
+  place, takes one arc's weight there and puts the summed weight of its
+  output arcs; a search beyond `max_states` refuses the net (1,483 of 1,500
+  random nets with parallel arcs agree; the rest are unbounded or tie
+  cases). The searches that run on the synchronous product (state-equation
+  A*, Dijkstra without heuristics, discounted A*) see every arc object with
+  weight 1 and, like the reference, enable a transition with k parallel arcs
+  from a place at k tokens there but take one (`<a, c, b>` costs 20001 where
+  firing the net would give 0); DIJKSTRA_LESS_MEMORY fires the net itself
+  with its weights, as its reference variant does. Fresh workflow nets 60/60,
+  fresh general nets 52/55 (two the reference refuses, one negative-token
+  net).
+- **BPMN conversion** draws one flow per arc object (a weight-2 arc once, two
+  parallel arcs twice), as `convert_to_bpmn` does.
+- **Decision mining, decision tables and data Petri nets** count a place's
+  out-arc objects: one weight-2 arc is no decision point, while two parallel
+  arcs to one transition are one (the reference lists `{'p1': ['b', 'b']}`);
+  a firing gives one row per decision place.
+- **Stochastic Petri reachability, the stochastic map and model decorations**
+  move each arc's weight (decorations keep tokens as runs of equal instants).
+  The older Petri usage comparison replay moves one token per endpoint, so a
+  weighted or parallel-arc net goes through the token-replay composition.
+- **Footprints of a net** build their reachability graph with the shared
+  weighted firing.
+- **Frontend Petri renderer** draws one arc per arc object and labels weights
+  other than 1.
+
+Already weight-aware, rechecked: token replay (R1; fresh 54/55, one
+set-order tie), streaming token replay (S5), basic and extensive playout
+(fresh 55/55 and 60/60), Monte Carlo (entry above), net footprints (55/55,
+60/60), PNML export (each arc with its weight, 55/55). Not applicable: OCPN
+(discovered nets have unit arcs; variable arcs are flags) and PTML (trees).
+
+Kept as native behaviour, declared:
+- **Negative tokens.** `semantics.execute` subtracts every arc and can leave a
+  negative count (two parallel unit arcs from a one-token place give -1);
+  native consumption stops at zero, as `weak_execute` does. Nets that reach
+  such markings differ in reachability, marking equation and alignments.
+- **Fractional marking equations.** The reference solves the LP and returns
+  `int()` of the objective and of each count (1.5 gives 1); native solves the
+  integer program (`lower_bound` keeps the LP optimum), so a fractional
+  optimum differs (6 of the 115 fresh nets).
+- **Decomposed alignments** are unchanged: the reference port reads a weight-w
+  arc as w unit arcs, which keeps the pinned agreement on the conformance
+  bank (routing weighted nets to the native search lost three rows), and a
+  compact side uses the native search. Not compared further: the reference
+  decomposition does not return on a direct weight-2 probe.
+- **Reduction** returns a net with a compact side unchanged (its rules rewrite
+  unit endpoints only).
+- Interactive conformance on compact sides stays gated; its message now names
+  parallel arcs.
+
+Found, not arc related, open: `convert_to_bpmn` connects the end event from
+every place of the final marking; native connects the sink only, so all 12
+fresh general nets whose final marking holds two or more places differ by
+one flow (and two by one node).
+
+Tests: `minera_petri_analysis_tests` (`weighted_marking_equation_counts_arc_objects`,
+`woflan_weighted_and_parallel_arcs`, `alignment_weighted_and_parallel_arcs`,
+`classic_equation_requires_integer_solutions`), `minera_decision_table_tests`
+(`weighted_arc_is_not_a_decision_point`), `minera_stochastic_petri_tests`
+(`weighted_arcs_move_their_weight`), `minera_petri_net_reduction_tests`
+(`compact_arc_nets_are_kept`), `minera_core_tests`
+(`decorate_model_moves_arc_weights`), frontend `petri-layout.test.ts`.

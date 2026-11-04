@@ -325,6 +325,104 @@ void petri_conversion_sound_and_deterministic() {
   assert(first.transitions().size() == second.transitions().size());
 }
 
+// Shape of a converted net up to place renaming: the place count and, per
+// transition, its label and its input/output places written as "s" (source),
+// "f" (sink) or "p" (inner).
+struct NetShape {
+  std::size_t places = 0;
+  std::multiset<std::string> transitions;
+  bool operator==(const NetShape&) const = default;
+};
+
+NetShape net_shape(const minera::PetriNet& net) {
+  NetShape shape;
+  shape.places = net.place_count();
+  const auto roles = [&](const std::vector<std::size_t>& places) {
+    std::multiset<char> sorted;
+    for (const auto place : places)
+      sorted.insert(place == net.source() ? 's' : place == net.sink() ? 'f' : 'p');
+    return std::string(sorted.begin(), sorted.end());
+  };
+  for (const auto& transition : net.transitions()) {
+    const std::string label =
+        transition.activity ? net.activities()[*transition.activity] : "tau";
+    shape.transitions.insert(label + "|" + roles(transition.inputs) + ">" +
+                             roles(transition.outputs));
+  }
+  return shape;
+}
+
+// pm4py 2.7.22 convert_to_petri_net gives an empty partial order a silent
+// split with no outputs and a silent join with no inputs, wherever it is
+// nested; the simple reduction then folds whatever it can around them.
+void empty_partial_order_matches_reference_nets() {
+  const auto empty = [] { return PowlNode::strict_partial_order({}, {}); };
+  const auto a = [] { return PowlNode::transition("A"); };
+  const auto shape = [](std::size_t places,
+                        std::initializer_list<std::string> transitions) {
+    return NetShape{places, std::multiset<std::string>(transitions)};
+  };
+  assert(net_shape(minera::to_petri_net(empty())) ==
+         shape(2, {"tau|s>", "tau|>f"}));
+  assert(net_shape(minera::to_petri_net(PowlNode::parse("PO=(nodes={}, order={})"))) ==
+         shape(2, {"tau|s>", "tau|>f"}));
+  assert(net_shape(minera::to_petri_net(
+             PowlNode::strict_partial_order({empty()}, {}))) ==
+         shape(2, {"tau|s>", "tau|>f"}));
+  assert(net_shape(minera::to_petri_net(PowlNode::xor_node({a(), empty()}))) ==
+         shape(4, {"A|p>p", "tau|>p", "tau|s>p", "tau|p>", "tau|p>f"}));
+  assert(net_shape(minera::to_petri_net(
+             PowlNode::strict_partial_order({a(), empty()}, {{0, 1}}))) ==
+         shape(2, {"A|s>", "tau|>f"}));
+  assert(net_shape(minera::to_petri_net(
+             PowlNode::strict_partial_order({empty(), a()}, {{0, 1}}))) ==
+         shape(2, {"tau|s>", "A|>f"}));
+  assert(net_shape(minera::to_petri_net(
+             PowlNode::strict_partial_order({a(), empty()}, {}))) ==
+         shape(2, {"A|s>f"}));
+  assert(net_shape(minera::to_petri_net(PowlNode::loop(empty(), a()))) ==
+         shape(4, {"A|p>p", "tau|>p", "tau|s>p", "tau|p>", "tau|p>f"}));
+  assert(net_shape(minera::to_petri_net(PowlNode::loop(a(), empty()))) ==
+         shape(4, {"A|p>p", "tau|>p", "tau|s>p", "tau|p>", "tau|p>f"}));
+}
+
+// The text form T("label",min,max|*) accepts the bounds pm4py's
+// FrequentTransition takes: min 0 is skippable, an unbounded max
+// self-loops, and other bounds only change the label.
+void frequency_bounds_follow_reference_flags() {
+  struct Case {
+    std::string text;
+    bool skippable;
+    bool self_loop;
+    std::string label;
+  };
+  for (const auto& c : std::vector<Case>{
+           {"T(\"A\",0,3)", true, false, "A\n[1,3]"},
+           {"T(\"A\",2,*)", false, true, "A\n[1,-]"},
+           {"T(\"A\",2,5)", false, false, "A"},
+           {"T(\"A\",5,*)", false, true, "A\n[1,-]"},
+           {"T(\"A\",0,0)", true, false, "A\n[1,0]"},
+           {"T(\"A\",3,1)", false, false, "A"},
+           {"T(\"A\",0,1)", true, false, "A\n[1,1]"},
+           {"T(\"A\",1,*)", false, true, "A\n[1,-]"},
+           {"T(\"A\",1,1)", false, false, "A"}}) {
+    const auto node = PowlNode::parse(c.text);
+    assert(node.skippable() == c.skippable);
+    assert(node.self_loop() == c.self_loop);
+    assert(PowlNode::parse(node.serialize()) == node);
+    const auto net = minera::to_petri_net(node);
+    assert(net_shape(net) == (NetShape{2, {c.label + "|s>f"}}));
+    const auto tree = minera::to_process_tree(node);
+    const auto expected_op =
+        c.skippable ? Op::kExclusive : c.self_loop ? Op::kLoop : Op::kActivity;
+    assert(tree.root().op == expected_op);
+  }
+  const auto nested = minera::to_petri_net(
+      PowlNode::parse("X ( T(\"A\",0,3), T(\"B\",2,*) )"));
+  assert(net_shape(nested) ==
+         (NetShape{4, {"tau|s>p", "A\n[1,3]|p>p", "B\n[1,-]|p>p", "tau|p>f"}}));
+}
+
 void workflow_net_to_process_tree_is_strict() {
   const std::vector<PowlNode> models{
       PowlNode::silent(),
@@ -755,6 +853,8 @@ int main() {
   process_tree_to_powl_variations();
   powl_to_process_tree_preserves_blocks_and_frequencies();
   petri_conversion_sound_and_deterministic();
+  empty_partial_order_matches_reference_nets();
+  frequency_bounds_follow_reference_flags();
   workflow_net_to_process_tree_is_strict();
   powl_ptml_uses_strict_workflow_semantics();
   petri_to_powl_round_trips_structured_nets();

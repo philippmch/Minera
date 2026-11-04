@@ -1,4 +1,5 @@
 #include "minera/decision_mining.hpp"
+#include "minera/petri_reference_arcs.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -340,9 +341,11 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
 
   // Outgoing transitions per place; a place with several is a decision point.
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());
+  // One entry per arc object, as the reference lists a place's out-arcs: a
+  // weight-2 arc counts once and two parallel arcs twice.
   for (std::size_t t = 0; t < net.transitions().size(); ++t) {
-    for (const std::size_t place : net.transitions()[t].inputs) {
-      outgoing[place].push_back(t);
+    for (const auto& arc : petri_reference_arcs(net.transitions()[t], true)) {
+      outgoing[arc.place].push_back(t);
     }
   }
   std::vector<int> decision_index(net.place_count(), -1);
@@ -385,7 +388,12 @@ DecisionMiningResult mine_decisions(const EventLog& log, const PetriNet& net,
       if (move.transition != static_cast<std::size_t>(-1) &&
           move.transition < net.transitions().size()) {
         const std::size_t t = move.transition;
-        for (const std::size_t place : net.transitions()[t].inputs) {
+        // One row per firing and decision place, however many arcs join them.
+        std::vector<std::size_t> input_places;
+        for (const auto& arc : petri_reference_arcs(net.transitions()[t], true))
+          if (std::find(input_places.begin(), input_places.end(), arc.place) == input_places.end())
+            input_places.push_back(arc.place);
+        for (const std::size_t place : input_places) {
           const int d = decision_index[place];
           if (d < 0) continue;
           const auto& choices = outgoing[place];

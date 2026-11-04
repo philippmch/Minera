@@ -1,1 +1,1 @@
-{"variant": "pyemd", "distance": 0, "computed": true, "normalized": false, "use_fast_emd": true, "error": null}
+{"variant": "pyemd", "distance": null, "computed": false, "normalized": false, "use_fast_emd": true, "error": "normalized Levenshtein distance is undefined for two empty traces"}

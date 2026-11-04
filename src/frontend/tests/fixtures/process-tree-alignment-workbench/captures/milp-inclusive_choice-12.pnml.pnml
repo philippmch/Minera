@@ -3,395 +3,527 @@
   <net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel">
     <name><text>Independent process-tree alignment model</text></name>
     <page id="page1">
-      <place id="p0">
-        <name><text>p0</text></name>
+      <place id="source">
+        <name><text>source</text></name>
         <initialMarking><text>1</text></initialMarking>
       </place>
-      <place id="p1">
-        <name><text>p1</text></name>
+      <place id="sink">
+        <name><text>sink</text></name>
       </place>
-      <place id="p2">
-        <name><text>p2</text></name>
+      <place id="p_3">
+        <name><text>p_3</text></name>
       </place>
-      <place id="p3">
-        <name><text>p3</text></name>
+      <place id="p_4">
+        <name><text>p_4</text></name>
       </place>
-      <place id="p4">
-        <name><text>p4</text></name>
+      <place id="p_5">
+        <name><text>p_5</text></name>
       </place>
-      <place id="p5">
-        <name><text>p5</text></name>
+      <place id="p_6">
+        <name><text>p_6</text></name>
       </place>
-      <place id="p6">
-        <name><text>p6</text></name>
+      <place id="p_7">
+        <name><text>p_7</text></name>
       </place>
-      <place id="p7">
-        <name><text>p7</text></name>
+      <place id="p_8">
+        <name><text>p_8</text></name>
       </place>
-      <place id="p8">
-        <name><text>p8</text></name>
+      <place id="p_9">
+        <name><text>p_9</text></name>
       </place>
-      <place id="p9">
-        <name><text>p9</text></name>
+      <place id="p_10">
+        <name><text>p_10</text></name>
       </place>
-      <place id="p10">
-        <name><text>p10</text></name>
+      <place id="p_11">
+        <name><text>p_11</text></name>
       </place>
-      <place id="p11">
-        <name><text>p11</text></name>
+      <place id="p_12">
+        <name><text>p_12</text></name>
       </place>
-      <place id="p12">
-        <name><text>p12</text></name>
+      <place id="p_13">
+        <name><text>p_13</text></name>
       </place>
-      <place id="p13">
-        <name><text>p13</text></name>
+      <place id="p_14">
+        <name><text>p_14</text></name>
       </place>
-      <place id="p14">
-        <name><text>p14</text></name>
+      <place id="p_15">
+        <name><text>p_15</text></name>
       </place>
-      <place id="p15">
-        <name><text>p15</text></name>
+      <place id="p_16">
+        <name><text>p_16</text></name>
       </place>
-      <place id="p16">
-        <name><text>p16</text></name>
+      <place id="p_17">
+        <name><text>p_17</text></name>
       </place>
-      <place id="p17">
-        <name><text>p17</text></name>
+      <place id="p_18">
+        <name><text>p_18</text></name>
       </place>
-      <place id="p18">
-        <name><text>p18</text></name>
+      <place id="p_19">
+        <name><text>p_19</text></name>
       </place>
-      <place id="p19">
-        <name><text>p19</text></name>
+      <place id="p_20">
+        <name><text>p_20</text></name>
       </place>
-      <place id="p20">
-        <name><text>p20</text></name>
+      <place id="p_21">
+        <name><text>p_21</text></name>
       </place>
-      <place id="p21">
-        <name><text>p21</text></name>
+      <place id="p_22">
+        <name><text>p_22</text></name>
       </place>
-      <place id="p22">
-        <name><text>p22</text></name>
+      <place id="p_23">
+        <name><text>p_23</text></name>
       </place>
-      <place id="p23">
-        <name><text>p23</text></name>
+      <place id="p_24">
+        <name><text>p_24</text></name>
       </place>
-      <place id="p24">
-        <name><text>p24</text></name>
+      <place id="p_25">
+        <name><text>p_25</text></name>
       </place>
-      <place id="p25">
-        <name><text>p25</text></name>
+      <place id="p_26">
+        <name><text>p_26</text></name>
       </place>
-      <place id="p26">
-        <name><text>p26</text></name>
+      <place id="p_27">
+        <name><text>p_27</text></name>
       </place>
-      <place id="p27">
-        <name><text>p27</text></name>
+      <place id="p_28">
+        <name><text>p_28</text></name>
       </place>
-      <transition id="t0">
+      <place id="p_29">
+        <name><text>p_29</text></name>
+      </place>
+      <place id="p_30">
+        <name><text>p_30</text></name>
+      </place>
+      <place id="p_31">
+        <name><text>p_31</text></name>
+      </place>
+      <place id="p_32">
+        <name><text>p_32</text></name>
+      </place>
+      <place id="p_33">
+        <name><text>p_33</text></name>
+      </place>
+      <place id="p_34">
+        <name><text>p_34</text></name>
+      </place>
+      <place id="p_35">
+        <name><text>p_35</text></name>
+      </place>
+      <place id="p_36">
+        <name><text>p_36</text></name>
+      </place>
+      <place id="p_37">
+        <name><text>p_37</text></name>
+      </place>
+      <place id="p_38">
+        <name><text>p_38</text></name>
+      </place>
+      <place id="p_39">
+        <name><text>p_39</text></name>
+      </place>
+      <place id="p_40">
+        <name><text>p_40</text></name>
+      </place>
+      <transition id="tauSplit_1">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t0"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="tauSplit_1"/>
       </transition>
-      <transition id="t1">
+      <transition id="tauJoin_2">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t1"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="tauJoin_2"/>
       </transition>
-      <transition id="t2">
+      <transition id="inclusiveStart_3">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t2"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_3"/>
       </transition>
-      <transition id="t3">
+      <transition id="inclusiveLater_4">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t3"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_4"/>
       </transition>
-      <transition id="t4">
+      <transition id="inclusiveSkip_5">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t4"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_5"/>
       </transition>
-      <transition id="t5">
+      <transition id="skip_6">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t5"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_6"/>
       </transition>
-      <transition id="t6">
+      <transition id="inclusiveStart_7">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t6"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_7"/>
       </transition>
-      <transition id="t7">
+      <transition id="inclusiveLater_8">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t7"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_8"/>
       </transition>
-      <transition id="t8">
+      <transition id="inclusiveSkip_9">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t8"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_9"/>
       </transition>
-      <transition id="t9">
+      <transition id="skip_10">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t9"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_10"/>
       </transition>
-      <transition id="t10">
+      <transition id="inclusiveStart_11">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t10"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_11"/>
       </transition>
-      <transition id="t11">
+      <transition id="inclusiveLater_12">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t11"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_12"/>
       </transition>
-      <transition id="t12">
+      <transition id="inclusiveSkip_13">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t12"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_13"/>
       </transition>
-      <transition id="t13">
+      <transition id="skip_14">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t13"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_14"/>
       </transition>
-      <transition id="t14">
+      <transition id="inclusiveStart_15">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t14"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_15"/>
       </transition>
-      <transition id="t15">
+      <transition id="inclusiveLater_16">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t15"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_16"/>
       </transition>
-      <transition id="t16">
+      <transition id="inclusiveSkip_17">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t16"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_17"/>
       </transition>
-      <transition id="t17">
+      <transition id="skip_18">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t17"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_18"/>
       </transition>
-      <transition id="t18">
+      <transition id="inclusiveStart_19">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t18"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_19"/>
       </transition>
-      <transition id="t19">
+      <transition id="inclusiveLater_20">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t19"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_20"/>
       </transition>
-      <transition id="t20">
+      <transition id="inclusiveSkip_21">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t20"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_21"/>
       </transition>
-      <transition id="t21">
+      <transition id="skip_22">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t21"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_22"/>
       </transition>
-      <transition id="t22">
+      <transition id="inclusiveStart_23">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t22"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_23"/>
       </transition>
-      <transition id="t23">
+      <transition id="inclusiveLater_24">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t23"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_24"/>
       </transition>
-      <transition id="t24">
+      <transition id="inclusiveSkip_25">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t24"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_25"/>
       </transition>
-      <transition id="t25">
+      <transition id="skip_26">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t25"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_26"/>
       </transition>
-      <transition id="t26">
+      <transition id="inclusiveStart_27">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t26"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_27"/>
       </transition>
-      <transition id="t27">
+      <transition id="inclusiveLater_28">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t27"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_28"/>
       </transition>
-      <transition id="t28">
+      <transition id="inclusiveSkip_29">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t28"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_29"/>
       </transition>
-      <transition id="t29">
+      <transition id="skip_30">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t29"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_30"/>
       </transition>
-      <transition id="t30">
+      <transition id="inclusiveStart_31">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t30"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_31"/>
       </transition>
-      <transition id="t31">
+      <transition id="inclusiveLater_32">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t31"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_32"/>
       </transition>
-      <transition id="t32">
+      <transition id="inclusiveSkip_33">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t32"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_33"/>
       </transition>
-      <transition id="t33">
+      <transition id="skip_34">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t33"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_34"/>
       </transition>
-      <transition id="t34">
+      <transition id="inclusiveStart_35">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t34"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_35"/>
       </transition>
-      <transition id="t35">
+      <transition id="inclusiveLater_36">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t35"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_36"/>
       </transition>
-      <transition id="t36">
+      <transition id="inclusiveSkip_37">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t36"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_37"/>
       </transition>
-      <transition id="t37">
+      <transition id="skip_38">
         <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="t37"/>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_38"/>
       </transition>
-      <arc id="a0" source="p4" target="t0"/>
-      <arc id="a1" source="t0" target="p5"/>
-      <arc id="a2" source="p2" target="t1"/>
-      <arc id="a3" source="p4" target="t1"/>
-      <arc id="a4" source="t1" target="p3"/>
-      <arc id="a5" source="t1" target="p5"/>
-      <arc id="a6" source="p3" target="t2"/>
-      <arc id="a7" source="p4" target="t2"/>
-      <arc id="a8" source="t2" target="p3"/>
-      <arc id="a9" source="t2" target="p5"/>
-      <arc id="a10" source="p6" target="t3"/>
-      <arc id="a11" source="t3" target="p7"/>
-      <arc id="a12" source="p2" target="t4"/>
-      <arc id="a13" source="p6" target="t4"/>
-      <arc id="a14" source="t4" target="p3"/>
-      <arc id="a15" source="t4" target="p7"/>
-      <arc id="a16" source="p3" target="t5"/>
-      <arc id="a17" source="p6" target="t5"/>
-      <arc id="a18" source="t5" target="p3"/>
-      <arc id="a19" source="t5" target="p7"/>
-      <arc id="a20" source="p8" target="t6"/>
-      <arc id="a21" source="t6" target="p9"/>
-      <arc id="a22" source="p2" target="t7"/>
-      <arc id="a23" source="p8" target="t7"/>
-      <arc id="a24" source="t7" target="p3"/>
-      <arc id="a25" source="t7" target="p9"/>
-      <arc id="a26" source="p3" target="t8"/>
-      <arc id="a27" source="p8" target="t8"/>
-      <arc id="a28" source="t8" target="p3"/>
-      <arc id="a29" source="t8" target="p9"/>
-      <arc id="a30" source="p10" target="t9"/>
-      <arc id="a31" source="t9" target="p11"/>
-      <arc id="a32" source="p2" target="t10"/>
-      <arc id="a33" source="p10" target="t10"/>
-      <arc id="a34" source="t10" target="p3"/>
-      <arc id="a35" source="t10" target="p11"/>
-      <arc id="a36" source="p3" target="t11"/>
-      <arc id="a37" source="p10" target="t11"/>
-      <arc id="a38" source="t11" target="p3"/>
-      <arc id="a39" source="t11" target="p11"/>
-      <arc id="a40" source="p12" target="t12"/>
-      <arc id="a41" source="t12" target="p13"/>
-      <arc id="a42" source="p2" target="t13"/>
-      <arc id="a43" source="p12" target="t13"/>
-      <arc id="a44" source="t13" target="p3"/>
-      <arc id="a45" source="t13" target="p13"/>
-      <arc id="a46" source="p3" target="t14"/>
-      <arc id="a47" source="p12" target="t14"/>
-      <arc id="a48" source="t14" target="p3"/>
-      <arc id="a49" source="t14" target="p13"/>
-      <arc id="a50" source="p14" target="t15"/>
-      <arc id="a51" source="t15" target="p15"/>
-      <arc id="a52" source="p2" target="t16"/>
-      <arc id="a53" source="p14" target="t16"/>
-      <arc id="a54" source="t16" target="p3"/>
-      <arc id="a55" source="t16" target="p15"/>
-      <arc id="a56" source="p3" target="t17"/>
-      <arc id="a57" source="p14" target="t17"/>
-      <arc id="a58" source="t17" target="p3"/>
-      <arc id="a59" source="t17" target="p15"/>
-      <arc id="a60" source="p16" target="t18"/>
-      <arc id="a61" source="t18" target="p17"/>
-      <arc id="a62" source="p2" target="t19"/>
-      <arc id="a63" source="p16" target="t19"/>
-      <arc id="a64" source="t19" target="p3"/>
-      <arc id="a65" source="t19" target="p17"/>
-      <arc id="a66" source="p3" target="t20"/>
-      <arc id="a67" source="p16" target="t20"/>
-      <arc id="a68" source="t20" target="p3"/>
-      <arc id="a69" source="t20" target="p17"/>
-      <arc id="a70" source="p18" target="t21"/>
-      <arc id="a71" source="t21" target="p19"/>
-      <arc id="a72" source="p2" target="t22"/>
-      <arc id="a73" source="p18" target="t22"/>
-      <arc id="a74" source="t22" target="p3"/>
-      <arc id="a75" source="t22" target="p19"/>
-      <arc id="a76" source="p3" target="t23"/>
-      <arc id="a77" source="p18" target="t23"/>
-      <arc id="a78" source="t23" target="p3"/>
-      <arc id="a79" source="t23" target="p19"/>
-      <arc id="a80" source="p20" target="t24"/>
-      <arc id="a81" source="t24" target="p21"/>
-      <arc id="a82" source="p2" target="t25"/>
-      <arc id="a83" source="p20" target="t25"/>
-      <arc id="a84" source="t25" target="p3"/>
-      <arc id="a85" source="t25" target="p21"/>
-      <arc id="a86" source="p3" target="t26"/>
-      <arc id="a87" source="p20" target="t26"/>
-      <arc id="a88" source="t26" target="p3"/>
-      <arc id="a89" source="t26" target="p21"/>
-      <arc id="a90" source="p22" target="t27"/>
-      <arc id="a91" source="t27" target="p23"/>
-      <arc id="a92" source="p2" target="t28"/>
-      <arc id="a93" source="p22" target="t28"/>
-      <arc id="a94" source="t28" target="p3"/>
-      <arc id="a95" source="t28" target="p23"/>
-      <arc id="a96" source="p3" target="t29"/>
-      <arc id="a97" source="p22" target="t29"/>
-      <arc id="a98" source="t29" target="p3"/>
-      <arc id="a99" source="t29" target="p23"/>
-      <arc id="a100" source="p24" target="t30"/>
-      <arc id="a101" source="t30" target="p25"/>
-      <arc id="a102" source="p2" target="t31"/>
-      <arc id="a103" source="p24" target="t31"/>
-      <arc id="a104" source="t31" target="p3"/>
-      <arc id="a105" source="t31" target="p25"/>
-      <arc id="a106" source="p3" target="t32"/>
-      <arc id="a107" source="p24" target="t32"/>
-      <arc id="a108" source="t32" target="p3"/>
-      <arc id="a109" source="t32" target="p25"/>
-      <arc id="a110" source="p26" target="t33"/>
-      <arc id="a111" source="t33" target="p27"/>
-      <arc id="a112" source="p2" target="t34"/>
-      <arc id="a113" source="p26" target="t34"/>
-      <arc id="a114" source="t34" target="p3"/>
-      <arc id="a115" source="t34" target="p27"/>
-      <arc id="a116" source="p3" target="t35"/>
-      <arc id="a117" source="p26" target="t35"/>
-      <arc id="a118" source="t35" target="p3"/>
-      <arc id="a119" source="t35" target="p27"/>
-      <arc id="a120" source="p0" target="t36"/>
-      <arc id="a121" source="t36" target="p2"/>
-      <arc id="a122" source="t36" target="p4"/>
-      <arc id="a123" source="t36" target="p6"/>
-      <arc id="a124" source="t36" target="p8"/>
-      <arc id="a125" source="t36" target="p10"/>
-      <arc id="a126" source="t36" target="p12"/>
-      <arc id="a127" source="t36" target="p14"/>
-      <arc id="a128" source="t36" target="p16"/>
-      <arc id="a129" source="t36" target="p18"/>
-      <arc id="a130" source="t36" target="p20"/>
-      <arc id="a131" source="t36" target="p22"/>
-      <arc id="a132" source="t36" target="p24"/>
-      <arc id="a133" source="t36" target="p26"/>
-      <arc id="a134" source="p3" target="t37"/>
-      <arc id="a135" source="p5" target="t37"/>
-      <arc id="a136" source="p7" target="t37"/>
-      <arc id="a137" source="p9" target="t37"/>
-      <arc id="a138" source="p11" target="t37"/>
-      <arc id="a139" source="p13" target="t37"/>
-      <arc id="a140" source="p15" target="t37"/>
-      <arc id="a141" source="p17" target="t37"/>
-      <arc id="a142" source="p19" target="t37"/>
-      <arc id="a143" source="p21" target="t37"/>
-      <arc id="a144" source="p23" target="t37"/>
-      <arc id="a145" source="p25" target="t37"/>
-      <arc id="a146" source="p27" target="t37"/>
-      <arc id="a147" source="t37" target="p1"/>
+      <transition id="inclusiveStart_39">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_39"/>
+      </transition>
+      <transition id="inclusiveLater_40">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_40"/>
+      </transition>
+      <transition id="inclusiveSkip_41">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_41"/>
+      </transition>
+      <transition id="skip_42">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_42"/>
+      </transition>
+      <transition id="inclusiveStart_43">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_43"/>
+      </transition>
+      <transition id="inclusiveLater_44">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_44"/>
+      </transition>
+      <transition id="inclusiveSkip_45">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_45"/>
+      </transition>
+      <transition id="skip_46">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_46"/>
+      </transition>
+      <transition id="inclusiveStart_47">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveStart_47"/>
+      </transition>
+      <transition id="inclusiveLater_48">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveLater_48"/>
+      </transition>
+      <transition id="inclusiveSkip_49">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="inclusiveSkip_49"/>
+      </transition>
+      <transition id="skip_50">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_50"/>
+      </transition>
+      <arc id="a0" source="source" target="tauSplit_1"/>
+      <arc id="a1" source="tauSplit_1" target="p_4"/>
+      <arc id="a2" source="tauSplit_1" target="p_5"/>
+      <arc id="a3" source="tauSplit_1" target="p_8"/>
+      <arc id="a4" source="tauSplit_1" target="p_11"/>
+      <arc id="a5" source="tauSplit_1" target="p_14"/>
+      <arc id="a6" source="tauSplit_1" target="p_17"/>
+      <arc id="a7" source="tauSplit_1" target="p_20"/>
+      <arc id="a8" source="tauSplit_1" target="p_23"/>
+      <arc id="a9" source="tauSplit_1" target="p_26"/>
+      <arc id="a10" source="tauSplit_1" target="p_29"/>
+      <arc id="a11" source="tauSplit_1" target="p_32"/>
+      <arc id="a12" source="tauSplit_1" target="p_35"/>
+      <arc id="a13" source="tauSplit_1" target="p_38"/>
+      <arc id="a14" source="p_7" target="tauJoin_2"/>
+      <arc id="a15" source="p_10" target="tauJoin_2"/>
+      <arc id="a16" source="p_13" target="tauJoin_2"/>
+      <arc id="a17" source="p_16" target="tauJoin_2"/>
+      <arc id="a18" source="p_19" target="tauJoin_2"/>
+      <arc id="a19" source="p_22" target="tauJoin_2"/>
+      <arc id="a20" source="p_25" target="tauJoin_2"/>
+      <arc id="a21" source="p_28" target="tauJoin_2"/>
+      <arc id="a22" source="p_31" target="tauJoin_2"/>
+      <arc id="a23" source="p_34" target="tauJoin_2"/>
+      <arc id="a24" source="p_37" target="tauJoin_2"/>
+      <arc id="a25" source="p_40" target="tauJoin_2"/>
+      <arc id="a26" source="p_3" target="tauJoin_2"/>
+      <arc id="a27" source="tauJoin_2" target="sink"/>
+      <arc id="a28" source="p_4" target="inclusiveStart_3"/>
+      <arc id="a29" source="p_5" target="inclusiveStart_3"/>
+      <arc id="a30" source="inclusiveStart_3" target="p_3"/>
+      <arc id="a31" source="inclusiveStart_3" target="p_6"/>
+      <arc id="a32" source="p_3" target="inclusiveLater_4"/>
+      <arc id="a33" source="p_5" target="inclusiveLater_4"/>
+      <arc id="a34" source="inclusiveLater_4" target="p_3"/>
+      <arc id="a35" source="inclusiveLater_4" target="p_6"/>
+      <arc id="a36" source="p_3" target="inclusiveSkip_5"/>
+      <arc id="a37" source="p_5" target="inclusiveSkip_5"/>
+      <arc id="a38" source="inclusiveSkip_5" target="p_3"/>
+      <arc id="a39" source="inclusiveSkip_5" target="p_7"/>
+      <arc id="a40" source="p_6" target="skip_6"/>
+      <arc id="a41" source="skip_6" target="p_7"/>
+      <arc id="a42" source="p_4" target="inclusiveStart_7"/>
+      <arc id="a43" source="p_8" target="inclusiveStart_7"/>
+      <arc id="a44" source="inclusiveStart_7" target="p_3"/>
+      <arc id="a45" source="inclusiveStart_7" target="p_9"/>
+      <arc id="a46" source="p_3" target="inclusiveLater_8"/>
+      <arc id="a47" source="p_8" target="inclusiveLater_8"/>
+      <arc id="a48" source="inclusiveLater_8" target="p_3"/>
+      <arc id="a49" source="inclusiveLater_8" target="p_9"/>
+      <arc id="a50" source="p_3" target="inclusiveSkip_9"/>
+      <arc id="a51" source="p_8" target="inclusiveSkip_9"/>
+      <arc id="a52" source="inclusiveSkip_9" target="p_3"/>
+      <arc id="a53" source="inclusiveSkip_9" target="p_10"/>
+      <arc id="a54" source="p_9" target="skip_10"/>
+      <arc id="a55" source="skip_10" target="p_10"/>
+      <arc id="a56" source="p_4" target="inclusiveStart_11"/>
+      <arc id="a57" source="p_11" target="inclusiveStart_11"/>
+      <arc id="a58" source="inclusiveStart_11" target="p_3"/>
+      <arc id="a59" source="inclusiveStart_11" target="p_12"/>
+      <arc id="a60" source="p_3" target="inclusiveLater_12"/>
+      <arc id="a61" source="p_11" target="inclusiveLater_12"/>
+      <arc id="a62" source="inclusiveLater_12" target="p_3"/>
+      <arc id="a63" source="inclusiveLater_12" target="p_12"/>
+      <arc id="a64" source="p_3" target="inclusiveSkip_13"/>
+      <arc id="a65" source="p_11" target="inclusiveSkip_13"/>
+      <arc id="a66" source="inclusiveSkip_13" target="p_3"/>
+      <arc id="a67" source="inclusiveSkip_13" target="p_13"/>
+      <arc id="a68" source="p_12" target="skip_14"/>
+      <arc id="a69" source="skip_14" target="p_13"/>
+      <arc id="a70" source="p_4" target="inclusiveStart_15"/>
+      <arc id="a71" source="p_14" target="inclusiveStart_15"/>
+      <arc id="a72" source="inclusiveStart_15" target="p_3"/>
+      <arc id="a73" source="inclusiveStart_15" target="p_15"/>
+      <arc id="a74" source="p_3" target="inclusiveLater_16"/>
+      <arc id="a75" source="p_14" target="inclusiveLater_16"/>
+      <arc id="a76" source="inclusiveLater_16" target="p_3"/>
+      <arc id="a77" source="inclusiveLater_16" target="p_15"/>
+      <arc id="a78" source="p_3" target="inclusiveSkip_17"/>
+      <arc id="a79" source="p_14" target="inclusiveSkip_17"/>
+      <arc id="a80" source="inclusiveSkip_17" target="p_3"/>
+      <arc id="a81" source="inclusiveSkip_17" target="p_16"/>
+      <arc id="a82" source="p_15" target="skip_18"/>
+      <arc id="a83" source="skip_18" target="p_16"/>
+      <arc id="a84" source="p_4" target="inclusiveStart_19"/>
+      <arc id="a85" source="p_17" target="inclusiveStart_19"/>
+      <arc id="a86" source="inclusiveStart_19" target="p_3"/>
+      <arc id="a87" source="inclusiveStart_19" target="p_18"/>
+      <arc id="a88" source="p_3" target="inclusiveLater_20"/>
+      <arc id="a89" source="p_17" target="inclusiveLater_20"/>
+      <arc id="a90" source="inclusiveLater_20" target="p_3"/>
+      <arc id="a91" source="inclusiveLater_20" target="p_18"/>
+      <arc id="a92" source="p_3" target="inclusiveSkip_21"/>
+      <arc id="a93" source="p_17" target="inclusiveSkip_21"/>
+      <arc id="a94" source="inclusiveSkip_21" target="p_3"/>
+      <arc id="a95" source="inclusiveSkip_21" target="p_19"/>
+      <arc id="a96" source="p_18" target="skip_22"/>
+      <arc id="a97" source="skip_22" target="p_19"/>
+      <arc id="a98" source="p_4" target="inclusiveStart_23"/>
+      <arc id="a99" source="p_20" target="inclusiveStart_23"/>
+      <arc id="a100" source="inclusiveStart_23" target="p_3"/>
+      <arc id="a101" source="inclusiveStart_23" target="p_21"/>
+      <arc id="a102" source="p_3" target="inclusiveLater_24"/>
+      <arc id="a103" source="p_20" target="inclusiveLater_24"/>
+      <arc id="a104" source="inclusiveLater_24" target="p_3"/>
+      <arc id="a105" source="inclusiveLater_24" target="p_21"/>
+      <arc id="a106" source="p_3" target="inclusiveSkip_25"/>
+      <arc id="a107" source="p_20" target="inclusiveSkip_25"/>
+      <arc id="a108" source="inclusiveSkip_25" target="p_3"/>
+      <arc id="a109" source="inclusiveSkip_25" target="p_22"/>
+      <arc id="a110" source="p_21" target="skip_26"/>
+      <arc id="a111" source="skip_26" target="p_22"/>
+      <arc id="a112" source="p_4" target="inclusiveStart_27"/>
+      <arc id="a113" source="p_23" target="inclusiveStart_27"/>
+      <arc id="a114" source="inclusiveStart_27" target="p_3"/>
+      <arc id="a115" source="inclusiveStart_27" target="p_24"/>
+      <arc id="a116" source="p_3" target="inclusiveLater_28"/>
+      <arc id="a117" source="p_23" target="inclusiveLater_28"/>
+      <arc id="a118" source="inclusiveLater_28" target="p_3"/>
+      <arc id="a119" source="inclusiveLater_28" target="p_24"/>
+      <arc id="a120" source="p_3" target="inclusiveSkip_29"/>
+      <arc id="a121" source="p_23" target="inclusiveSkip_29"/>
+      <arc id="a122" source="inclusiveSkip_29" target="p_3"/>
+      <arc id="a123" source="inclusiveSkip_29" target="p_25"/>
+      <arc id="a124" source="p_24" target="skip_30"/>
+      <arc id="a125" source="skip_30" target="p_25"/>
+      <arc id="a126" source="p_4" target="inclusiveStart_31"/>
+      <arc id="a127" source="p_26" target="inclusiveStart_31"/>
+      <arc id="a128" source="inclusiveStart_31" target="p_3"/>
+      <arc id="a129" source="inclusiveStart_31" target="p_27"/>
+      <arc id="a130" source="p_3" target="inclusiveLater_32"/>
+      <arc id="a131" source="p_26" target="inclusiveLater_32"/>
+      <arc id="a132" source="inclusiveLater_32" target="p_3"/>
+      <arc id="a133" source="inclusiveLater_32" target="p_27"/>
+      <arc id="a134" source="p_3" target="inclusiveSkip_33"/>
+      <arc id="a135" source="p_26" target="inclusiveSkip_33"/>
+      <arc id="a136" source="inclusiveSkip_33" target="p_3"/>
+      <arc id="a137" source="inclusiveSkip_33" target="p_28"/>
+      <arc id="a138" source="p_27" target="skip_34"/>
+      <arc id="a139" source="skip_34" target="p_28"/>
+      <arc id="a140" source="p_4" target="inclusiveStart_35"/>
+      <arc id="a141" source="p_29" target="inclusiveStart_35"/>
+      <arc id="a142" source="inclusiveStart_35" target="p_3"/>
+      <arc id="a143" source="inclusiveStart_35" target="p_30"/>
+      <arc id="a144" source="p_3" target="inclusiveLater_36"/>
+      <arc id="a145" source="p_29" target="inclusiveLater_36"/>
+      <arc id="a146" source="inclusiveLater_36" target="p_3"/>
+      <arc id="a147" source="inclusiveLater_36" target="p_30"/>
+      <arc id="a148" source="p_3" target="inclusiveSkip_37"/>
+      <arc id="a149" source="p_29" target="inclusiveSkip_37"/>
+      <arc id="a150" source="inclusiveSkip_37" target="p_3"/>
+      <arc id="a151" source="inclusiveSkip_37" target="p_31"/>
+      <arc id="a152" source="p_30" target="skip_38"/>
+      <arc id="a153" source="skip_38" target="p_31"/>
+      <arc id="a154" source="p_4" target="inclusiveStart_39"/>
+      <arc id="a155" source="p_32" target="inclusiveStart_39"/>
+      <arc id="a156" source="inclusiveStart_39" target="p_3"/>
+      <arc id="a157" source="inclusiveStart_39" target="p_33"/>
+      <arc id="a158" source="p_3" target="inclusiveLater_40"/>
+      <arc id="a159" source="p_32" target="inclusiveLater_40"/>
+      <arc id="a160" source="inclusiveLater_40" target="p_3"/>
+      <arc id="a161" source="inclusiveLater_40" target="p_33"/>
+      <arc id="a162" source="p_3" target="inclusiveSkip_41"/>
+      <arc id="a163" source="p_32" target="inclusiveSkip_41"/>
+      <arc id="a164" source="inclusiveSkip_41" target="p_3"/>
+      <arc id="a165" source="inclusiveSkip_41" target="p_34"/>
+      <arc id="a166" source="p_33" target="skip_42"/>
+      <arc id="a167" source="skip_42" target="p_34"/>
+      <arc id="a168" source="p_4" target="inclusiveStart_43"/>
+      <arc id="a169" source="p_35" target="inclusiveStart_43"/>
+      <arc id="a170" source="inclusiveStart_43" target="p_3"/>
+      <arc id="a171" source="inclusiveStart_43" target="p_36"/>
+      <arc id="a172" source="p_3" target="inclusiveLater_44"/>
+      <arc id="a173" source="p_35" target="inclusiveLater_44"/>
+      <arc id="a174" source="inclusiveLater_44" target="p_3"/>
+      <arc id="a175" source="inclusiveLater_44" target="p_36"/>
+      <arc id="a176" source="p_3" target="inclusiveSkip_45"/>
+      <arc id="a177" source="p_35" target="inclusiveSkip_45"/>
+      <arc id="a178" source="inclusiveSkip_45" target="p_3"/>
+      <arc id="a179" source="inclusiveSkip_45" target="p_37"/>
+      <arc id="a180" source="p_36" target="skip_46"/>
+      <arc id="a181" source="skip_46" target="p_37"/>
+      <arc id="a182" source="p_4" target="inclusiveStart_47"/>
+      <arc id="a183" source="p_38" target="inclusiveStart_47"/>
+      <arc id="a184" source="inclusiveStart_47" target="p_3"/>
+      <arc id="a185" source="inclusiveStart_47" target="p_39"/>
+      <arc id="a186" source="p_3" target="inclusiveLater_48"/>
+      <arc id="a187" source="p_38" target="inclusiveLater_48"/>
+      <arc id="a188" source="inclusiveLater_48" target="p_3"/>
+      <arc id="a189" source="inclusiveLater_48" target="p_39"/>
+      <arc id="a190" source="p_3" target="inclusiveSkip_49"/>
+      <arc id="a191" source="p_38" target="inclusiveSkip_49"/>
+      <arc id="a192" source="inclusiveSkip_49" target="p_3"/>
+      <arc id="a193" source="inclusiveSkip_49" target="p_40"/>
+      <arc id="a194" source="p_39" target="skip_50"/>
+      <arc id="a195" source="skip_50" target="p_40"/>
     </page>
     <finalmarkings>
       <marking>
-        <place idref="p1"><text>1</text></place>
+        <place idref="sink"><text>1</text></place>
       </marking>
     </finalmarkings>
   </net>

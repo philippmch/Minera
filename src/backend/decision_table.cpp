@@ -1,4 +1,5 @@
 #include "minera/decision_table.hpp"
+#include "minera/petri_reference_arcs.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -78,11 +79,12 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
   std::vector<std::vector<std::size_t>> outgoing(net.place_count());
   for (std::size_t transition = 0; transition < net.transitions().size();
        ++transition) {
-    for (const auto place : net.transitions()[transition].inputs) {
+    for (const auto place : net.transitions()[transition].inputs)
       if (place >= outgoing.size())
         throw std::invalid_argument("decision table transition place is invalid");
-      outgoing[place].push_back(transition);
-    }
+    // One entry per arc object (a weight-2 arc once, parallel arcs twice).
+    for (const auto& arc : petri_reference_arcs(net.transitions()[transition], true))
+      outgoing[arc.place].push_back(transition);
   }
   std::vector<int> decision_index(net.place_count(), -1);
   std::vector<std::size_t> decision_places;
@@ -142,7 +144,12 @@ RawTables collect_rows(const EventLog& log, const PetriNet& net,
       if (move.transition != static_cast<std::size_t>(-1) &&
           move.transition < net.transitions().size()) {
         const std::size_t transition = move.transition;
-        for (const std::size_t place : net.transitions()[transition].inputs) {
+        // One row set per firing and decision place, however many arcs join them.
+        std::vector<std::size_t> input_places;
+        for (const auto& arc : petri_reference_arcs(net.transitions()[transition], true))
+          if (std::find(input_places.begin(), input_places.end(), arc.place) == input_places.end())
+            input_places.push_back(arc.place);
+        for (const std::size_t place : input_places) {
           const int decision = decision_index[place];
           if (decision < 0) continue;
           const auto& choices = outgoing[place];

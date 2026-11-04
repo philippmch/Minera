@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -34,6 +35,9 @@ struct ILPMinerOptions {
   // Upper bound on the number of causal pairs, i.e. LP solves; discovery
   // fails rather than exceeding it.
   std::size_t max_nodes = 100000;
+  // Polled before each LP solve; returning true stops discovery with
+  // OperationCancelled (cancellation.hpp). Unset never cancels.
+  std::function<bool()> cancelled;
 };
 
 struct ILPMinerDiagnostics {

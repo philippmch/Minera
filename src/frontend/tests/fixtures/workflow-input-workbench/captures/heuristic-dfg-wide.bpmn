@@ -1,19 +1,93 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" targetNamespace="http://minera.dev/bpmn" id="definitions">
   <process id="process" name="Independent workflow discovery" isExecutable="false">
-    <startEvent id="StartEvent_0"/>
-    <endEvent id="EndEvent_1"/>
-    <exclusiveGateway id="exclusiveGateway_2"/>
-    <exclusiveGateway id="exclusiveGateway_4"/>
-    <task id="Activity_5" name="A"/>
-    <task id="Activity_6" name="B"/>
-    <task id="Activity_7" name="C"/>
-    <sequenceFlow id="Flow_3" sourceRef="exclusiveGateway_2" targetRef="EndEvent_1"/>
-    <sequenceFlow id="Flow_8" sourceRef="StartEvent_0" targetRef="Activity_5"/>
-    <sequenceFlow id="Flow_9" sourceRef="exclusiveGateway_4" targetRef="Activity_6"/>
-    <sequenceFlow id="Flow_10" sourceRef="exclusiveGateway_4" targetRef="Activity_7"/>
-    <sequenceFlow id="Flow_11" sourceRef="Activity_5" targetRef="exclusiveGateway_4"/>
-    <sequenceFlow id="Flow_12" sourceRef="Activity_6" targetRef="exclusiveGateway_2"/>
-    <sequenceFlow id="Flow_13" sourceRef="Activity_7" targetRef="exclusiveGateway_2"/>
+    <startEvent id="StartEvent_0" name="start">
+      <outgoing>Flow_5</outgoing>
+    </startEvent>
+    <endEvent id="EndEvent_1" name="end">
+      <incoming>Flow_6</incoming>
+    </endEvent>
+    <exclusiveGateway id="exclusiveGateway_3" gatewayDirection="Unspecified">
+      <incoming>Flow_12</incoming>
+      <incoming>Flow_15</incoming>
+      <outgoing>Flow_6</outgoing>
+    </exclusiveGateway>
+    <exclusiveGateway id="exclusiveGateway_4" gatewayDirection="Unspecified">
+      <incoming>Flow_9</incoming>
+      <outgoing>Flow_11</outgoing>
+      <outgoing>Flow_14</outgoing>
+    </exclusiveGateway>
+    <task id="Activity_7" name="A">
+      <incoming>Flow_5</incoming>
+      <outgoing>Flow_9</outgoing>
+    </task>
+    <task id="Activity_10" name="B">
+      <incoming>Flow_11</incoming>
+      <outgoing>Flow_12</outgoing>
+    </task>
+    <task id="Activity_13" name="C">
+      <incoming>Flow_14</incoming>
+      <outgoing>Flow_15</outgoing>
+    </task>
+    <sequenceFlow id="Flow_5" sourceRef="StartEvent_0" targetRef="Activity_7"/>
+    <sequenceFlow id="Flow_6" sourceRef="exclusiveGateway_3" targetRef="EndEvent_1"/>
+    <sequenceFlow id="Flow_9" sourceRef="Activity_7" targetRef="exclusiveGateway_4"/>
+    <sequenceFlow id="Flow_11" sourceRef="exclusiveGateway_4" targetRef="Activity_10"/>
+    <sequenceFlow id="Flow_12" sourceRef="Activity_10" targetRef="exclusiveGateway_3"/>
+    <sequenceFlow id="Flow_14" sourceRef="exclusiveGateway_4" targetRef="Activity_13"/>
+    <sequenceFlow id="Flow_15" sourceRef="Activity_13" targetRef="exclusiveGateway_3"/>
   </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_process">
+    <bpmndi:BPMNPlane id="BPMNPlane_process" bpmnElement="process">
+      <bpmndi:BPMNShape id="StartEvent_0_di" bpmnElement="StartEvent_0">
+        <dc:Bounds x="82" y="82" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="882" y="82" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="exclusiveGateway_3_di" bpmnElement="exclusiveGateway_3">
+        <dc:Bounds x="715" y="75" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="exclusiveGateway_4_di" bpmnElement="exclusiveGateway_4">
+        <dc:Bounds x="395" y="75" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_7_di" bpmnElement="Activity_7">
+        <dc:Bounds x="210" y="60" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_10_di" bpmnElement="Activity_10">
+        <dc:Bounds x="530" y="60" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_13_di" bpmnElement="Activity_13">
+        <dc:Bounds x="530" y="180" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="118" y="100"/>
+        <di:waypoint x="210" y="100"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="765" y="100"/>
+        <di:waypoint x="882" y="100"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="310" y="100"/>
+        <di:waypoint x="395" y="100"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="445" y="100"/>
+        <di:waypoint x="530" y="100"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="630" y="100"/>
+        <di:waypoint x="715" y="100"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="445" y="100"/>
+        <di:waypoint x="530" y="220"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="630" y="220"/>
+        <di:waypoint x="715" y="100"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
 </definitions>

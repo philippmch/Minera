@@ -5189,10 +5189,26 @@ AlignmentResult check_alignment(const EventLog& event_log,
           ? total_start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                              std::chrono::duration<double>(preflight_limit))
           : std::chrono::steady_clock::time_point::max();
+  // Whether a search that stopped short stopped on a time limit: the total
+  // limit, or the per-search limit of the call that began at `call_start`,
+  // has run out. The searches compare their elapsed time with these same
+  // limits, so a time stop always satisfies this and a state-bound stop
+  // only does when the clock had run out as well.
+  const auto out_of_time = [&](std::chrono::steady_clock::time_point call_start,
+                               double call_limit) {
+    const auto now = std::chrono::steady_clock::now();
+    return (options.max_total_time_seconds > 0.0 &&
+            std::chrono::duration<double>(now - total_start).count() >=
+                options.max_total_time_seconds) ||
+           (call_limit > 0.0 &&
+            std::chrono::duration<double>(now - call_start).count() >= call_limit);
+  };
   const Aligner aligner(net, options, preflight_deadline);
   if (!aligner.reachable()) {
     result.computed = false;
     result.exhausted = aligner.reachability_exhausted();
+    result.time_limit_reached =
+        result.exhausted && out_of_time(total_start, preflight_limit);
     return result;
   }
   const auto variants = collect_variants(event_log, aligner,
@@ -5209,18 +5225,22 @@ AlignmentResult check_alignment(const EventLog& event_log,
     if (remaining <= 0.0) {
       result.computed = false;
       result.exhausted = true;
+      result.time_limit_reached = true;
       return result;
     }
     if (baseline_options.max_time_seconds <= 0.0 ||
         remaining < baseline_options.max_time_seconds)
       baseline_options.max_time_seconds = remaining;
   }
+  const auto baseline_start = std::chrono::steady_clock::now();
   if (options.variant == AlignmentVariant::kDiscountedAStar ||
       options.model_cost_function || options.sync_cost_function || options.trace_cost_function) {
     const auto empty = aligner.align_configured({}, {}, baseline_options);
     if (empty.primary.capped) {
       result.computed = false;
       result.exhausted = true;
+      result.time_limit_reached =
+          out_of_time(baseline_start, baseline_options.max_time_seconds);
       return result;
     }
     weighted_empty = empty.primary.cost;
@@ -5230,6 +5250,8 @@ AlignmentResult check_alignment(const EventLog& event_log,
   if (!std::isfinite(weighted_empty)) {
     result.computed = false;
     result.exhausted = true;
+    result.time_limit_reached =
+        out_of_time(baseline_start, baseline_options.max_time_seconds);
     return result;
   }
   const double baseline_model_cost = weighted_empty;
@@ -5240,6 +5262,7 @@ AlignmentResult check_alignment(const EventLog& event_log,
         (options.cancelled && options.cancelled())) {
       result.computed = false;
       result.exhausted = true;
+      result.time_limit_reached = out_of_time(total_start, 0.0);
       return result;
     }
     AlignmentOptions trace_options = options;
@@ -5264,6 +5287,7 @@ AlignmentResult check_alignment(const EventLog& event_log,
       }
       trace_options.trace_cost_function = {};
     }
+    const auto trace_start = std::chrono::steady_clock::now();
     auto configured = aligner.align_configured(variant.ids, variant.names, trace_options);
     result.diagnostics.visited_states += configured.diagnostics.visited_states;
     result.diagnostics.queued_states = std::max(
@@ -5283,6 +5307,8 @@ AlignmentResult check_alignment(const EventLog& event_log,
     if (configured.primary.capped) {
       result.computed = false;
       result.exhausted = true;
+      result.time_limit_reached =
+          out_of_time(trace_start, trace_options.max_time_seconds);
       result.variants.clear();
       return result;
     }

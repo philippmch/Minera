@@ -1,10 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { downloadBlob } from "../download";
 import { requestEmbeddings } from "../api";
 import { DEFAULT_EMBEDDING_SEARCH, LOCAL_EMBEDDING_MODEL, embeddingSearchOptions, embeddingSearchError, type EmbeddingSearchSettings } from "../embedding-search";
-import { type EmbeddingApiResult, type MineraExport, numberFormat } from "../types";
+import { type EmbeddingApiResult, type MineraExport, type Trace, numberFormat } from "../types";
+import { loadedTraces, useTraces, type TraceLoad } from "../mine-traces";
+import { TraceLoadNote } from "./TraceLoadNote";
 
 const PAGE_SIZE = 20;
+
+/** The activity sequence a case result shows, once the cases are loaded. */
+export function embeddingCaseSequence(data: MineraExport, load: TraceLoad, trace: Trace | undefined): string {
+  if (trace) return trace.events.map(event => data.activities[event.activity]?.name ?? "?").join(" → ");
+  if (load.status === "loading" || load.status === "idle") return "Loading the sequence…";
+  if (load.status === "error") return "Sequence unavailable: the cases could not be loaded";
+  return "Sequence not included in this export";
+}
 
 export function EmbeddingSearch({ data, available, mining }: { data: MineraExport; available: boolean; mining: boolean }) {
   const [settings, setSettings] = useState({ ...DEFAULT_EMBEDDING_SEARCH });
@@ -51,7 +61,10 @@ export function EmbeddingSearch({ data, available, mining }: { data: MineraExpor
   };
   const isSearch = result?.family === "TO_EMBEDDINGS_SIMILARITY";
   const pageCount = Math.ceil((result?.items.length ?? 0) / PAGE_SIZE);
-  const traces = new Map(data.traces?.map(trace => [trace.case_id, trace]) ?? []);
+  // Case results show each case's activity sequence, read from the cases.
+  const load = useTraces(data, result?.variant === "cases_transformers");
+  const loaded = loadedTraces(load);
+  const traces = useMemo(() => new Map(loaded.map(trace => [trace.case_id, trace])), [loaded]);
 
   return <section className="panel embedding-panel reveal">
     <div className="panel-head">
@@ -97,12 +110,13 @@ export function EmbeddingSearch({ data, available, mining }: { data: MineraExpor
         <div><h3>{isSearch ? "Matching text" : "Embedding vectors"}</h3><p className="panel-meta">{numberFormat.format(result.items.length)} {result.variant === "cases_transformers" ? "cases" : "events"} · {result.dimensions ?? "unknown"} dimensions · {result.embedding_model ?? "legacy encoder"}</p></div>
         <button className="btn-ghost" type="button" onClick={download}>Download JSON</button>
       </div>
+      {result.variant === "cases_transformers" && load.status === "error" && <TraceLoadNote load={load} />}
       {result.family === "TO_EMBEDDINGS_SIMILARITY" && <p className="embedding-query">Query: <strong>{result.target}</strong><span>Cosine similarity · higher scores mean closer text</span></p>}
       {result.items.length === 0 ? <p className="model-empty">No items in this log.</p> : <div className="embedding-table-wrap"><table className="activity-table">
         <thead><tr><th>{result.variant === "cases_transformers" ? "Case ID" : "Event ID"}</th><th>{isSearch ? "Cosine score" : "Vector preview · first 8 values"}</th>{result.variant === "cases_transformers" && <th>Activity sequence</th>}</tr></thead>
         <tbody>{result.items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((item, index) => <tr key={`${index}-${item.id}`}>
           <td>{item.id}</td><td className="embedding-values">{"score" in item ? item.score.toFixed(6) : item.embedding.slice(0, 8).map(value => value.toFixed(5)).join(", ")}</td>
-          {result.variant === "cases_transformers" && <td>{traces.get(item.id)?.events.map(event => data.activities[event.activity]?.name ?? "?").join(" → ") ?? "Sequence not included in this export"}</td>}
+          {result.variant === "cases_transformers" && <td>{embeddingCaseSequence(data, load, traces.get(item.id))}</td>}
         </tr>)}</tbody>
       </table></div>}
       {pageCount > 1 && <div className="embedding-pagination"><button className="btn-ghost" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><span className="panel-meta">Page {page + 1} of {pageCount}</span><button className="btn-ghost" disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)}>Next</button></div>}

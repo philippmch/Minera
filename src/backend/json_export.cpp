@@ -21,6 +21,7 @@
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -1953,6 +1954,11 @@ void write_alignments(std::ostream& out,
                                ? "alignment search exhausted"
                                : "alignment not computed: final marking "
                                  "unreachable or invalid alignment options");
+    // Which bound stopped an exhausted search: a time limit, or the state
+    // bound with time to spare.
+    if (alignments.exhausted)
+      out << ", \"time_limit_reached\": "
+          << (alignments.time_limit_reached ? "true" : "false");
     out << ", \"fitness\": null, \"precision\": null";
   } else {
     out << ", \"fitness\": " << alignments.fitness << ", \"precision\": ";
@@ -4318,6 +4324,160 @@ OmitAnalysisTraces::~OmitAnalysisTraces() {
   t_omit_analysis_traces = previous_;
 }
 
+namespace {
+
+// The "traces" array of an analysis document, from "[" to "]": every case
+// with its events, activities given as ids of `graph`. analysis_json writes
+// these bytes inline unless OmitAnalysisTraces is active; GET /api/traces
+// serves the same bytes on demand.
+void write_analysis_traces(std::ostream& out, const EventLog& log,
+                           const DirectlyFollowsGraph& graph) {
+  out << "[\n";
+  for (std::size_t i = 0; i < log.traces.size(); ++i) {
+    const auto& trace = log.traces[i];
+    out << "    {\"case_id\": ";
+    write_json_string(out, trace.case_id);
+    out << ", \"case_id_state\": ";
+    write_json_string(
+        out, first_class_state_name(
+                 effective_first_class_state(trace.case_id_state,
+                                             trace.case_id)));
+    out << ", \"case_id_source_key\": ";
+    write_json_string(out, trace.case_id_source_key);
+    write_optional_attribute_detail(out, "case_id_attribute",
+                                    trace.case_id_attribute);
+    if (!trace.attributes.empty()) {
+      out << ", \"attributes\": ";
+      write_attribute_object(out, trace.attributes);
+      out << ", \"attribute_details\": ";
+      write_attribute_details(out, trace.attributes);
+    }
+    if (!trace.properties.empty()) {
+      out << ", \"properties\": ";
+      write_attribute_object(out, trace.properties);
+      out << ", \"property_details\": ";
+      write_attribute_details(out, trace.properties);
+    }
+    out << ", \"events\": [";
+    for (std::size_t j = 0; j < trace.events.size(); ++j) {
+      const auto& event = trace.events[j];
+      out << "{\"activity\": " << *graph.activity_id(event.activity)
+          << ", \"timestamp\": ";
+      write_json_string(out, event.timestamp);
+      out << ", \"input_order\": " << event.input_order;
+      out << ", \"case_id_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.case_id_state,
+                                               event.case_id)));
+      out << ", \"case_id_source_key\": ";
+      write_json_string(out, event.case_id_source_key);
+      out << ", \"activity_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.activity_state,
+                                               event.activity)));
+      out << ", \"activity_source_key\": ";
+      write_json_string(out, event.activity_source_key);
+      write_optional_attribute_detail(out, "activity_attribute",
+                                      event.activity_attribute);
+      out << ", \"timestamp_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.timestamp_state,
+                                               event.timestamp)));
+      out << ", \"timestamp_source_key\": ";
+      write_json_string(out, event.timestamp_source_key);
+      write_optional_attribute_detail(out, "timestamp_attribute",
+                                      event.timestamp_attribute);
+      if (effective_first_class_state(event.resource_state, event.resource) !=
+          FirstClassAttributeState::kMissing) {
+        out << ", \"resource\": ";
+        write_json_string(out, event.resource);
+      }
+      out << ", \"resource_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.resource_state,
+                                               event.resource)));
+      out << ", \"resource_source_key\": ";
+      write_json_string(out, event.resource_source_key);
+      write_optional_attribute_detail(out, "resource_attribute",
+                                      event.resource_attribute);
+      if (effective_first_class_state(event.lifecycle_state,
+                                      event.lifecycle) !=
+          FirstClassAttributeState::kMissing) {
+        out << ", \"lifecycle\": ";
+        write_json_string(out, event.lifecycle);
+      }
+      out << ", \"lifecycle_state\": ";
+      write_json_string(
+          out, first_class_state_name(
+                   effective_first_class_state(event.lifecycle_state,
+                                               event.lifecycle)));
+      out << ", \"lifecycle_source_key\": ";
+      write_json_string(out, event.lifecycle_source_key);
+      write_optional_attribute_detail(out, "lifecycle_attribute",
+                                      event.lifecycle_attribute);
+      if (!event.attributes.empty()) {
+        out << ", \"attributes\": ";
+        write_attribute_object(out, event.attributes);
+        out << ", \"attribute_details\": ";
+        write_attribute_details(out, event.attributes);
+      }
+      out << '}' << (j + 1 < trace.events.size() ? ", " : "");
+    }
+    out << "]}" << (i + 1 < log.traces.size() ? "," : "") << '\n';
+  }
+  out << "  ]";
+}
+
+// What a client needs from the traces without loading them: their count,
+// the longest case, how many cases have a timestamped event (the dotted
+// chart rows) and the distinct lifecycle transitions in first-seen order.
+void write_analysis_trace_summary(std::ostream& out, const EventLog& log) {
+  std::size_t max_length = 0, timestamped = 0, events = 0;
+  std::vector<std::string> lifecycles;
+  std::unordered_set<std::string> seen;
+  for (const auto& trace : log.traces) {
+    max_length = std::max(max_length, trace.events.size());
+    events += trace.events.size();
+    bool timed = false;
+    for (const auto& event : trace.events) {
+      // The client plots every event whose timestamp text it can parse;
+      // a non-empty text is the server's (generous) stand-in for that.
+      if (!event.timestamp.empty()) timed = true;
+      if (!event.lifecycle.empty() &&
+          effective_first_class_state(event.lifecycle_state, event.lifecycle) !=
+              FirstClassAttributeState::kMissing &&
+          seen.insert(event.lifecycle).second)
+        lifecycles.push_back(event.lifecycle);
+    }
+    if (timed) ++timestamped;
+  }
+  out << "{\"traces\": \"on_demand\", \"trace_count\": " << log.traces.size()
+      << ", \"event_count\": " << events
+      << ", \"max_trace_length\": " << max_length
+      << ", \"timestamped_trace_count\": " << timestamped
+      << ", \"has_timestamps\": " << (timestamped > 0 ? "true" : "false")
+      << ", \"has_lifecycles\": " << (lifecycles.empty() ? "false" : "true")
+      << ", \"lifecycles\": [";
+  for (std::size_t i = 0; i < lifecycles.size(); ++i) {
+    if (i) out << ", ";
+    write_json_string(out, lifecycles[i]);
+  }
+  out << "]}";
+}
+
+}  // namespace
+
+std::string analysis_traces_json(const EventLog& log,
+                                 const DirectlyFollowsGraph& graph) {
+  std::ostringstream out;
+  write_analysis_traces(out, log, graph);
+  return std::move(out).str();
+}
+
 void write_analysis_json(std::ostream& out,
                          std::string_view dataset,
                          const EventLog& log,
@@ -4461,104 +4621,15 @@ void write_analysis_json(std::ostream& out,
   out << ",\n";
 
   if (!t_omit_analysis_traces) {
-  out << "  \"traces\": [\n";
-  for (std::size_t i = 0; i < log.traces.size(); ++i) {
-    const auto& trace = log.traces[i];
-    out << "    {\"case_id\": ";
-    write_json_string(out, trace.case_id);
-    out << ", \"case_id_state\": ";
-    write_json_string(
-        out, first_class_state_name(
-                 effective_first_class_state(trace.case_id_state,
-                                             trace.case_id)));
-    out << ", \"case_id_source_key\": ";
-    write_json_string(out, trace.case_id_source_key);
-    write_optional_attribute_detail(out, "case_id_attribute",
-                                    trace.case_id_attribute);
-    if (!trace.attributes.empty()) {
-      out << ", \"attributes\": ";
-      write_attribute_object(out, trace.attributes);
-      out << ", \"attribute_details\": ";
-      write_attribute_details(out, trace.attributes);
-    }
-    if (!trace.properties.empty()) {
-      out << ", \"properties\": ";
-      write_attribute_object(out, trace.properties);
-      out << ", \"property_details\": ";
-      write_attribute_details(out, trace.properties);
-    }
-    out << ", \"events\": [";
-    for (std::size_t j = 0; j < trace.events.size(); ++j) {
-      const auto& event = trace.events[j];
-      out << "{\"activity\": " << *graph.activity_id(event.activity)
-          << ", \"timestamp\": ";
-      write_json_string(out, event.timestamp);
-      out << ", \"input_order\": " << event.input_order;
-      out << ", \"case_id_state\": ";
-      write_json_string(
-          out, first_class_state_name(
-                   effective_first_class_state(event.case_id_state,
-                                               event.case_id)));
-      out << ", \"case_id_source_key\": ";
-      write_json_string(out, event.case_id_source_key);
-      out << ", \"activity_state\": ";
-      write_json_string(
-          out, first_class_state_name(
-                   effective_first_class_state(event.activity_state,
-                                               event.activity)));
-      out << ", \"activity_source_key\": ";
-      write_json_string(out, event.activity_source_key);
-      write_optional_attribute_detail(out, "activity_attribute",
-                                      event.activity_attribute);
-      out << ", \"timestamp_state\": ";
-      write_json_string(
-          out, first_class_state_name(
-                   effective_first_class_state(event.timestamp_state,
-                                               event.timestamp)));
-      out << ", \"timestamp_source_key\": ";
-      write_json_string(out, event.timestamp_source_key);
-      write_optional_attribute_detail(out, "timestamp_attribute",
-                                      event.timestamp_attribute);
-      if (effective_first_class_state(event.resource_state, event.resource) !=
-          FirstClassAttributeState::kMissing) {
-        out << ", \"resource\": ";
-        write_json_string(out, event.resource);
-      }
-      out << ", \"resource_state\": ";
-      write_json_string(
-          out, first_class_state_name(
-                   effective_first_class_state(event.resource_state,
-                                               event.resource)));
-      out << ", \"resource_source_key\": ";
-      write_json_string(out, event.resource_source_key);
-      write_optional_attribute_detail(out, "resource_attribute",
-                                      event.resource_attribute);
-      if (effective_first_class_state(event.lifecycle_state,
-                                      event.lifecycle) !=
-          FirstClassAttributeState::kMissing) {
-        out << ", \"lifecycle\": ";
-        write_json_string(out, event.lifecycle);
-      }
-      out << ", \"lifecycle_state\": ";
-      write_json_string(
-          out, first_class_state_name(
-                   effective_first_class_state(event.lifecycle_state,
-                                               event.lifecycle)));
-      out << ", \"lifecycle_source_key\": ";
-      write_json_string(out, event.lifecycle_source_key);
-      write_optional_attribute_detail(out, "lifecycle_attribute",
-                                      event.lifecycle_attribute);
-      if (!event.attributes.empty()) {
-        out << ", \"attributes\": ";
-        write_attribute_object(out, event.attributes);
-        out << ", \"attribute_details\": ";
-        write_attribute_details(out, event.attributes);
-      }
-      out << '}' << (j + 1 < trace.events.size() ? ", " : "");
-    }
-    out << "]}" << (i + 1 < log.traces.size() ? "," : "") << '\n';
-  }
-  out << "  ],\n";
+    out << "  \"traces\": ";
+    write_analysis_traces(out, log, graph);
+    out << ",\n";
+  } else {
+    // The traces are served on demand (GET /api/traces); the summary keeps
+    // what a client needs to decide which log views to offer.
+    out << "  \"trace_summary\": ";
+    write_analysis_trace_summary(out, log);
+    out << ",\n";
   }
 
   out << "  \"activities\": ";

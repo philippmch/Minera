@@ -48,6 +48,12 @@ struct MarkingEquationResult {
 [[nodiscard]] MarkingEquationResult solve_marking_equation(
     const PetriNet& net, const MarkingEquationOptions& options = {});
 
+// Whether the LP relaxation of the marking equation (the reference incidence
+// matrix, one -1/+1 per arc object whatever its weight) has a solution
+// x >= 0 with initial + C x = final. Reset and inhibitor arcs are ignored.
+[[nodiscard]] bool marking_equation_relaxation_feasible(
+    const PetriNet& net, const Marking& initial, const Marking& final);
+
 enum class ExtendedMarkingEquationVariant { CLASSIC };
 
 struct ExtendedMarkingEquationOptions {

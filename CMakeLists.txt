@@ -1822,6 +1822,21 @@ if(MINERA_BUILD_TESTS)
     add_test(NAME minera_server_parameter_contract_tests
              COMMAND minera_server_parameter_contract_tests
                      $<TARGET_FILE:minera_server> "${MINERA_AB_CSV}")
+    # /api/mine?include_traces=false and GET /api/traces: the on-demand traces
+    # are the inline "traces" bytes, and a stale source answers 409.
+    add_executable(minera_server_traces_route_tests
+      src/backend/tests/test_server_traces_route.cpp)
+    target_include_directories(minera_server_traces_route_tests PRIVATE third_party)
+    target_link_libraries(minera_server_traces_route_tests PRIVATE Threads::Threads)
+    if(ZLIB_FOUND)
+      # The client inflates the gzipped traces it asks for.
+      target_compile_definitions(minera_server_traces_route_tests PRIVATE CPPHTTPLIB_ZLIB_SUPPORT)
+      target_link_libraries(minera_server_traces_route_tests PRIVATE ZLIB::ZLIB)
+    endif()
+    target_compile_features(minera_server_traces_route_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_traces_route_tests minera_server)
+    add_test(NAME minera_server_traces_route_tests
+             COMMAND minera_server_traces_route_tests $<TARGET_FILE:minera_server>)
   endif()
   # Recheck 61ebeee0 J2/J3: present empty resources are network nodes and
   # explicit empty profile selectors pick them (reference: edge ""->"" with

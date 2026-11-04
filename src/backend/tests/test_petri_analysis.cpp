@@ -1,16 +1,53 @@
 #include "minera/petri_analysis.hpp"
 #include "minera/petri_analysis_json.hpp"
+#include "minera/event_log.hpp"
+#include "minera/petri_trace_alignment.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 using namespace minera;
 
 namespace {
+
+// A net whose transitions list compact sides: one occurrence per PNML arc
+// object with its own weight (parallel arcs, zero or signed weights), as
+// parse_pnml_document stores them. A side without weights keeps repeated
+// unit endpoints. Place 0 is the source, place_count - 1 the sink.
+struct CompactArcs { std::vector<std::size_t> places; std::vector<std::int64_t> weights; };
+struct CompactTransition { std::optional<std::size_t> activity; CompactArcs inputs, outputs; };
+PetriNet compact_net(std::size_t places, std::vector<std::string> activities,
+                     const std::vector<CompactTransition>& transitions) {
+  PetriNetLiteralStorage storage;
+  storage.place_count = places;
+  storage.source_storage = 0;
+  storage.sink_storage = places - 1;
+  storage.has_source = storage.has_sink = true;
+  storage.activities = std::move(activities);
+  const auto weights = [](const std::vector<std::int64_t>& values) {
+    std::vector<PetriArcWeight> out;
+    for (const auto value : values)
+      out.push_back(PetriArcWeight{static_cast<std::uint64_t>(value < 0 ? -value : value), value < 0});
+    return out;
+  };
+  for (const auto& spec : transitions) {
+    PetriTransition transition;
+    transition.activity = spec.activity;
+    transition.inputs = spec.inputs.places;
+    transition.outputs = spec.outputs.places;
+    transition.input_weights = weights(spec.inputs.weights);
+    transition.output_weights = weights(spec.outputs.weights);
+    storage.transitions.push_back(std::move(transition));
+  }
+  return PetriNet::from_literal_storage(std::move(storage));
+}
 
 PetriNet chain() {
   PetriNet net;
@@ -130,8 +167,11 @@ void classic_equation_requires_integer_solutions() {
   const auto source = net.add_place(), sink = net.add_place();
   net.set_source(source);
   net.set_sink(sink);
-  net.add_transition(0, {source, source}, {sink, sink});
-  net.add_transition(1, {source}, {sink});
+  (void)source; (void)sink;
+  // "double" holds two parallel unit arcs on each side (arc objects count
+  // once each, so its column is -2/+2 and the relaxation picks it half).
+  net = compact_net(2, {"double", "single"},
+      {{0, {{0, 0}, {1, 1}}, {{1, 1}, {1, 1}}}, {1, {{0}, {}}, {{1}, {}}}});
 
   MarkingEquationOptions options;
   options.initial_marking = {1, 0};
@@ -900,12 +940,10 @@ void caps_markings_determinism_and_weights() {
 
 }  // namespace
 
-// Declared exception (2026-10-27 audit, DC4): for the sequence A -> B with
-// every arc weighted w and w tokens in/out, the reference marking equation
-// reports 2w (it counts each arc once, ignoring its weight) and rejects the
-// w > 1 nets as not easy sound. Native analysis keeps the weights, so both
-// transitions fire once. Unit weights match the reference exactly.
-void weighted_marking_equation_is_a_declared_exception() {
+// The reference marking equation adds -1/+1 per arc object, whatever its
+// weight (formerly declared DC4): for the sequence A -> B with every arc of
+// weight w and w tokens in/out it reports 2w, and native now does too.
+void weighted_marking_equation_counts_arc_objects() {
   for (const std::int64_t w : {1, 2, 3}) {
     minera::PetriNet net;
     const auto p0 = net.add_place(), p1 = net.add_place(), p2 = net.add_place();
@@ -918,12 +956,121 @@ void weighted_marking_equation_is_a_declared_exception() {
     options.transition_costs = {1.0, 1.0};
     const auto result = minera::solve_marking_equation(net, options);
     assert(result.computed && result.feasible);
-    assert(result.objective == 2.0);  // reference: 2, 4, 6
+    assert(result.objective == 2.0 * static_cast<double>(w));  // reference: 2, 4, 6
+  }
+  // Two parallel unit arcs count twice: a -> pm (x2) -> b, one token in and
+  // out, gives the reference objective 2 as well.
+  const auto parallel = compact_net(3, {"a", "b"},
+      {{0, {{0}, {1}}, {{1, 1}, {1, 1}}}, {1, {{1, 1}, {1, 1}}, {{2}, {1}}}});
+  minera::MarkingEquationOptions options;
+  options.initial_marking = {1, 0, 0};
+  options.final_marking = {0, 0, 1};
+  options.transition_costs = {1.0, 1.0};
+  const auto result = minera::solve_marking_equation(parallel, options);
+  assert(result.computed && result.feasible && result.objective == 2.0);
+}
+
+// Woflan's invariant stages use a weighted incidence (each arc object adds
+// its signed weight), so an AND branch whose arcs weigh 2 is outside every
+// S-component, and a net with weighted or parallel arcs that is not
+// S-coverable is unsound, as the reference reports even when the net behaves
+// soundly. Parallel weights 2 and -1 sum to 1 and keep the net S-coverable
+// and sound. Black-box values: woflan and check_soundness False, False, True.
+void woflan_weighted_and_parallel_arcs() {
+  // ps -a-> p1, p2 (weight 2); p1 -b-> q1; p2 (2) -c-> q2; q1, q2 -d-> pe.
+  PetriNet branch;
+  branch.set_activities({"a", "b", "c", "d"});
+  for (int i = 0; i < 6; ++i) branch.add_place();
+  branch.set_source(0); branch.set_sink(5);
+  branch.add_transition(0, {0}, {1, 2, 2});
+  branch.add_transition(1, {1}, {3});
+  branch.add_transition(2, {2, 2}, {4});
+  branch.add_transition(3, {3, 4}, {5});
+  // ps -a-> pm (weight 2) -b(2)-> pe and its parallel-arc twin.
+  PetriNet doubled;
+  doubled.set_activities({"a", "b"});
+  for (int i = 0; i < 3; ++i) doubled.add_place();
+  doubled.set_source(0); doubled.set_sink(2);
+  doubled.add_transition(0, {0}, {1, 1});
+  doubled.add_transition(1, {1, 1}, {2});
+  const auto parallel = compact_net(3, {"a", "b"},
+      {{0, {{0}, {1}}, {{1, 1}, {1, 1}}}, {1, {{1, 1}, {1, 1}}, {{2}, {1}}}});
+  const auto cancelling = compact_net(3, {"a", "b"},
+      {{0, {{0}, {1}}, {{1, 1}, {2, -1}}}, {1, {{1}, {1}}, {{2}, {1}}}});
+  for (const auto variant : {SoundnessVariant::kSoundness, SoundnessVariant::kWoflan}) {
+    SoundnessOptions options;
+    options.variant = variant;
+    const auto split = analyze_soundness(branch, options);
+    assert(split.computed && split.status == SoundnessStatus::UNSOUND);
+    assert(split.uncovered_places_s_component == std::vector<std::size_t>({2, 4}));
+    assert(split.uncovered_places_uniform == std::vector<std::size_t>({2, 4}));
+    assert(analyze_soundness(doubled, options).status == SoundnessStatus::UNSOUND);
+    assert(analyze_soundness(parallel, options).status == SoundnessStatus::UNSOUND);
+    const auto sound = analyze_soundness(cancelling, options);
+    assert(sound.status == SoundnessStatus::SOUND && sound.uncovered_places_s_component.empty());
   }
 }
 
+// The log dispatcher on weighted and parallel arcs, against reference values:
+// the weight-2 sequence is easy sound and aligns <a, b> at cost 0, its
+// parallel-arc twin is refused as not easy sound, and on the synchronous
+// product (every arc weight 1, parallel arcs kept) a transition with k
+// parallel input arcs from a place needs k tokens there but takes one, so
+// <a, c, b> cannot finish through c and b (20001; 10001 for <a, b>).
+void alignment_weighted_and_parallel_arcs() {
+  const auto log_of = [](std::vector<std::vector<std::string>> traces) {
+    EventLog log;
+    for (std::size_t i = 0; i < traces.size(); ++i) {
+      Trace trace;
+      trace.case_id = std::to_string(i);
+      for (const auto& activity : traces[i]) {
+        Event event;
+        event.case_id = trace.case_id;
+        event.activity = activity;
+        trace.events.push_back(event);
+      }
+      log.traces.push_back(trace);
+    }
+    return log;
+  };
+  // The reference default variant (state-equation A*).
+  PetriLogAlignmentOptions options;
+  options.trace.variant = AlignmentVariant::kStateEquationAStar;
+  PetriNet doubled;
+  doubled.set_activities({"a", "b"});
+  for (int i = 0; i < 3; ++i) doubled.add_place();
+  doubled.set_source(0); doubled.set_sink(2);
+  doubled.add_transition(0, {0}, {1, 1});
+  doubled.add_transition(1, {1, 1}, {2});
+  const auto weighted = align_petri_log(log_of({{"a", "b"}, {"a", "c", "b"}}), doubled, options);
+  assert(weighted.size() == 2 && weighted[0].computed && weighted[0].cost == 0.0);
+  assert(weighted[1].computed && weighted[1].cost == 10000.0);
+  const auto parallel = compact_net(3, {"a", "b"},
+      {{0, {{0}, {1}}, {{1, 1}, {1, 1}}}, {1, {{1, 1}, {1, 1}}, {{2}, {1}}}});
+  bool refused = false;
+  try { (void)align_petri_log(log_of({{"a", "b"}}), parallel, options); }
+  catch (const std::invalid_argument&) { refused = true; }
+  assert(refused);
+  // ps -a-> pm; pm -c-> pq (x2); pq (x2) -b-> pe; pm -tau-> pe.
+  const auto sync = compact_net(4, {"a", "b", "c"},
+      {{0, {{0}, {}}, {{1}, {}}},
+       {2, {{1}, {}}, {{2, 2}, {1, 1}}},
+       {1, {{2, 2}, {1, 1}}, {{3}, {}}},
+       {std::nullopt, {{1}, {}}, {{3}, {}}}});
+  const auto aligned = align_petri_log(log_of({{"a", "c", "b"}, {"a", "b"}}), sync, options);
+  assert(aligned.size() == 2 && aligned[0].computed && aligned[0].cost == 20001.0);
+  assert(aligned[1].computed && aligned[1].cost == 10001.0);
+  // DIJKSTRA_LESS_MEMORY fires the net itself (each arc its own weight), so
+  // c and b synchronise there: 0 and 10000, as the reference variant gives.
+  options.trace.variant = AlignmentVariant::kDijkstraLessMemory;
+  const auto direct = align_petri_log(log_of({{"a", "c", "b"}, {"a", "b"}}), sync, options);
+  assert(direct[0].computed && direct[0].cost == 0.0 && direct[1].cost == 10000.0);
+}
+
 int main() {
-  weighted_marking_equation_is_a_declared_exception();
+  weighted_marking_equation_counts_arc_objects();
+  woflan_weighted_and_parallel_arcs();
+  alignment_weighted_and_parallel_arcs();
   classic_equation();
   incidence_feasible_not_realizable();
   classic_equation_requires_integer_solutions();

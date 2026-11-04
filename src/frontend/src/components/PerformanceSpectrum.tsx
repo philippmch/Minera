@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { type MineraExport, formatDuration, numberFormat } from "../types";
 import { buildSpectrum, serverSpectrumToSpectrum } from "../performance-spectrum";
+import { loadedTraces, useTraces } from "../mine-traces";
+import { TraceLoadNote } from "./TraceLoadNote";
 
 const WIDTH = 880;
 const BAND_H = 96; // vertical distance between two pattern steps
@@ -11,6 +13,8 @@ const MAX_DRAWN_LINES = 2000;
 interface PerformanceSpectrumViewProps {
   data: MineraExport;
   nativeOnly?: boolean;
+  /** The pattern to start from (activity ids); empty by default. */
+  initialPattern?: number[];
 }
 
 // The performance spectrum: pick two or more activities as a pattern, and
@@ -19,20 +23,24 @@ interface PerformanceSpectrumViewProps {
 // averaged waiting time gives one number, the spectrum shows the flow times
 // evolving over the log's lifetime — batching as line bundles, overtaking as
 // crossings, slow cases as the flattest diagonals (colored by tercile).
-export function PerformanceSpectrumView({ data,nativeOnly=false }: PerformanceSpectrumViewProps) {
+export function PerformanceSpectrumView({ data,nativeOnly=false,initialPattern }: PerformanceSpectrumViewProps) {
   const activities = data.activities;
   // The pattern under construction: activity ids, in order. Starts as a
   // sensible two-step default so the view is never an empty form.
-  const [pattern, setPattern] = useState<number[]>([]);
+  const [pattern, setPattern] = useState<number[]>(() => initialPattern ?? []);
+  // A client-side spectrum reads the cases; they load once a step is picked.
+  const load = useTraces(data, !nativeOnly && pattern.length > 0);
+  const traces = loadedTraces(load);
 
   const spectrum = useMemo(
     () => pattern.length > 0
-      ? buildSpectrum(data.traces ?? [], pattern)
+      ? buildSpectrum(traces, pattern)
       : data.performance_spectrum
         ? serverSpectrumToSpectrum(data.performance_spectrum)
-        : buildSpectrum(data.traces ?? [], pattern),
-    [data, pattern],
+        : buildSpectrum(traces, pattern),
+    [data, traces, pattern],
   );
+  const waiting = pattern.length >= 2 && (load.status === "loading" || load.status === "error");
   const serverMode = pattern.length === 0 && Boolean(data.performance_spectrum);
   const serverActivities = spectrum.activities ?? [];
   const axisNames = serverMode
@@ -107,7 +115,9 @@ export function PerformanceSpectrumView({ data,nativeOnly=false }: PerformanceSp
         )}
       </div>}
 
-      {!serverMode && pattern.length < 2 ? (
+      {waiting ? (
+        <TraceLoadNote load={load} />
+      ) : !serverMode && pattern.length < 2 ? (
         <p className="empty-note">
           Pick two or more activities: each case that performs them in a row
           draws one line from step to step at the instants they happened.

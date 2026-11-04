@@ -1,1 +1,1 @@
-{"variant": "pyemd", "distance": 4.94066e-324, "computed": true, "normalized": false, "use_fast_emd": true, "error": null}
+{"variant": "pyemd", "distance": 5e-324, "computed": true, "normalized": false, "use_fast_emd": true, "error": null}

@@ -1784,16 +1784,30 @@ function waitFor(ms: number, signal?: AbortSignal): Promise<void> {
 
 const finiteNumber = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
+/** How much of the analysis a mine response carries. */
+export interface MineResponseOptions {
+  /**
+   * true keeps the "traces" array inline in the response. By default the app
+   * mines without it and loads the cases on demand (GET /api/traces).
+   */
+  includeTraces?: boolean;
+}
+
 /** Upload the unchanged original file and retain typed source-only outcomes. */
 export async function mineActiveDataset(
   file: File,
-  options: MineOptions = {},
+  options: MineOptions & MineResponseOptions = {},
   signal?: AbortSignal,
 ): Promise<ActiveDatasetResult> {
   if (file.size > MAX_UPLOAD_BYTES) throw new Error(uploadTooLargeMessage(file.size));
   const form = new FormData();
   if (hasExactFilters(options)) form.append("log", file); else form.append("log", file, file.name);
   const fields = mineFormEntries({...options, miningRequestId: options.miningRequestId ?? crypto.randomUUID()});
+  // The cases are left out of the response (a trace summary stands in) and
+  // loaded on demand by the views that read them (mine-traces.ts). An exact
+  // native-control mine sends only the controls the user supplied, as its
+  // provenance records them, so it keeps the traces inline.
+  if (options.includeTraces !== true && !hasExactFilters(options)) fields.push(["include_traces", "false"]);
   for (const [name, value] of fields) {if (hasExactFilters(options)) appendNativeMultipartField(form, name, value); else form.append(name, value);}
   appendExactFilterFiles(form, options);
 
@@ -1847,7 +1861,7 @@ export async function mineActiveDataset(
   return parsed;
 }
 /** Historical callers require an analysis; the active-source API retains independent native failures. */
-export async function mineCsv(file: File, options: MineOptions = {}, signal?: AbortSignal): Promise<MineraExport> {const value = await mineActiveDataset(file, options, signal); if (isActiveSourceMining(value)) {if (value.analysis) return value.analysis; throw new Error(value.error?.message ?? "The source is active, but no classic analysis is available. Inspect its native family results.");} return value;}
+export async function mineCsv(file: File, options: MineOptions & MineResponseOptions = {}, signal?: AbortSignal): Promise<MineraExport> {const value = await mineActiveDataset(file, options, signal); if (isActiveSourceMining(value)) {if (value.analysis) return value.analysis; throw new Error(value.error?.message ?? "The source is active, but no classic analysis is available. Inspect its native family results.");} return value;}
 
 /**
  * Asks the backend to align the most recently mined log against one miner's

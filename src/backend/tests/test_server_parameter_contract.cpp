@@ -1355,6 +1355,32 @@ int main(int argc, char** argv) {
                   contains(r, "\"estimated_events\":80,"),
               "a stray quote does not hide rows from the estimate: " + describe(r));
       }
+      // Row shapes follow read_csv: a trailing delimiter on every row makes
+      // the first field an implicit index (not a column of the frame), so
+      // the estimate keeps the header's columns and every row; a later row
+      // longer than the first data row is a 400 with read_csv's message.
+      {
+        const auto trailing = [&](int cases) {
+          std::string csv;
+          std::istringstream lines(generated(cases, 4));
+          std::string line;
+          bool first = true;
+          while (std::getline(lines, line)) {csv += line + (first ? "" : ",") + "\n"; first = false;}
+          return csv;
+        };
+        r = mine_on(limits, trailing(15), {});
+        check(r && r->status == 200 && contains(r, "\"event_count\": 60"),
+              "a trailing delimiter on every row is an implicit index, not a refusal: " + describe(r));
+        r = mine_on(limits, trailing(20), {});
+        check(r && r->status == 413 && contains(r, "\"estimated_events\":80,") &&
+                  contains(r, "\"extra_columns\":0,"),
+              "the implicit index adds no column to the estimate: " + describe(r));
+        auto longer = generated(2, 2);
+        longer.insert(longer.size() - 1, ",extra");
+        r = mine_on(limits, longer, {});
+        check(r && r->status == 400 && contains(r, "Expected 3 fields in line 5, saw 4"),
+              "a row longer than the first data row is refused like read_csv: " + describe(r));
+      }
 
       // One mine at a time; a cancel stops the running one at its next stage.
       const std::string slow_id = "00000000-0000-4000-8000-0000000000c1";
