@@ -30,6 +30,7 @@
 // moves then do not spell the trace), and in rare loop ties it prefers a
 // different decomposition of equal cost.
 
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -57,7 +58,10 @@ struct ProcessTreeReferenceAlignment {
   double fitness = 0.0;
 };
 
+// `cancelled` is polled before each trace; once it returns true the call
+// throws OperationCancelled (minera/cancellation.hpp).
 [[nodiscard]] std::vector<ProcessTreeReferenceAlignment> reference_process_tree_dp_alignments(
-    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces);
+    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces,
+    const std::function<bool()>& cancelled = {});
 
 }  // namespace minera

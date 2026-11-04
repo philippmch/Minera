@@ -1,4 +1,4 @@
-// GET /api/traces?source_id=: the traces of the active source's analysis on
+// GET /api/traces?source_id=&run_id=: the traces of the active source's analysis on
 // demand. A client that mines with include_traces=false gets a mining
 // response without the "traces" array (about two thirds of a large body) and
 // a "trace_summary" in its place; the views that need the cases fetch them
@@ -35,19 +35,40 @@ void deliver_large_json(const httplib::Request& request, httplib::Response& resp
       [shared](bool) mutable noexcept { shared.reset(); });
 }
 
+// The run id every trace summary of this server process carries (see
+// set_analysis_trace_run_id): random, so a restarted server whose source ids
+// count from 1 again never matches a summary from an earlier run.
+std::string new_analysis_trace_run_id() {
+  std::random_device device;
+  std::uint64_t bits = (static_cast<std::uint64_t>(device()) << 32) ^ device();
+  bits ^= static_cast<std::uint64_t>(std::chrono::system_clock::now().time_since_epoch().count());
+  static constexpr char digits[] = "0123456789abcdef";
+  std::string id(16, '0');
+  for (auto& digit : id) { digit = digits[bits & 15U]; bits >>= 4; }
+  return id;
+}
+
 void handle_traces(const httplib::Request& request, httplib::Response& response) {
   try {
     for (const auto& [key, value] : request.params) {
       (void)value;
-      if (key != "source_id") throw std::invalid_argument("unknown traces parameter: " + key);
+      if (key != "source_id" && key != "run_id") throw std::invalid_argument("unknown traces parameter: " + key);
     }
     if (!request.has_param("source_id"))
       throw std::invalid_argument("source_id is required for /api/traces");
+    if (!request.has_param("run_id"))
+      throw std::invalid_argument("run_id is required for /api/traces");
     std::shared_ptr<const MinedSession> session;
     { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
     if (!session) {
       response.status = 409;
       response.set_content(error_json("no mined log; mine a log first"), "application/json");
+      return;
+    }
+    const auto& run_id = minera::analysis_trace_run_id();
+    if (request.get_param_value("run_id") != run_id) {
+      response.status = 409;
+      response.set_content(error_json("the backend restarted since this log was mined; mine it again"), "application/json");
       return;
     }
     const auto source_id = std::to_string(session->query_source_id);
@@ -59,6 +80,7 @@ void handle_traces(const httplib::Request& request, httplib::Response& response)
     const auto& log = require_prepared_log(*session);
     std::string body = minera::analysis_traces_json(log, require_graph(*session));
     const std::string head = "{\"family\":\"ANALYSIS_TRACES\",\"source_id\":" + active_source_quote(source_id) +
+        ",\"run_id\":" + active_source_quote(run_id) +
         ",\"trace_count\":" + std::to_string(log.trace_count()) +
         ",\"event_count\":" + std::to_string(log.event_count()) + ",\"traces\":";
     body.reserve(head.size() + body.size() + 1);

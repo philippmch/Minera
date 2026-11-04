@@ -1,4 +1,5 @@
 #include "minera/edit_distance_alignment.hpp"
+#include "minera/cancellation.hpp"
 
 #include "minera/dfg_variants.hpp"
 #include "minera/log_conversion.hpp"
@@ -1464,6 +1465,7 @@ std::vector<EditDistanceAlignment> align_edit_distance(
   std::map<Variant, EditDistanceAlignment> cache;
   std::vector<EditDistanceAlignment> result;
   result.reserve(source.traces.size());
+  CancellationCheck cancelled(options.cancelled, "edit-distance alignment was cancelled", 64);
   for (const auto& trace : source.traces) {
     Variant source_variant = activities_of(trace, options.activity_attribute);
     auto cached = cache.find(source_variant);
@@ -1471,6 +1473,7 @@ std::vector<EditDistanceAlignment> align_edit_distance(
       std::size_t selected = 0;
       std::size_t selected_distance = options.perform_anti_alignment ? 0 : std::numeric_limits<std::size_t>::max();
       for (std::size_t ti = 0; ti < targets.size(); ++ti) {
+        cancelled();
         const std::size_t distance = levenshtein(source_variant, targets[ti].activities);
         bool better = options.perform_anti_alignment ? distance > selected_distance
                                                        : distance < selected_distance;

@@ -49,6 +49,22 @@ void write_bpmn(std::ostream& out,
 [[nodiscard]] std::string to_bpmn(const PetriNet& net,
                                   std::string_view name = "process");
 
+// The same conversion for a net with explicit markings (one entry per place),
+// as the reference `convert_to_bpmn(net, im, fm)` reads them: the start and
+// end events are always present, the start event feeds every place holding
+// initial tokens and every place holding final tokens feeds the end event
+// (an empty marking leaves its event without flows). Throws
+// std::invalid_argument when a marking's size differs from the place count.
+void write_bpmn(std::ostream& out, const PetriNet& net,
+                const TokenMarking& initial_marking,
+                const TokenMarking& final_marking,
+                std::string_view name = "process");
+
+[[nodiscard]] std::string to_bpmn(const PetriNet& net,
+                                  const TokenMarking& initial_marking,
+                                  const TokenMarking& final_marking,
+                                  std::string_view name = "process");
+
 // Parses a BPMN 2.0 model into a workflow net. The first non-empty <process>
 // is read (namespace prefixes are ignored; the reference merges every pool
 // instead).

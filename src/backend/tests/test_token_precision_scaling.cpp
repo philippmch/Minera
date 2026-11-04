@@ -14,7 +14,18 @@
 #include "../evaluation_internal.hpp"
 #include "../petri_replay_internal.hpp"
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef PSAPI_VERSION
+#define PSAPI_VERSION 2  // GetProcessMemoryInfo from kernel32, no psapi.lib
+#endif
+#include <windows.h>
+#include <psapi.h>
+#else
 #include <sys/resource.h>
+#endif
 
 #include <cassert>
 #include <chrono>
@@ -221,10 +232,23 @@ void walk_matches_materialised_prefixes() {
   assert(scored >= 40);
 }
 
+// Peak resident set size in KiB. ru_maxrss is KiB on Linux but bytes on
+// macOS; Windows reports the peak working set in bytes.
 long peak_rss_kib() {
+#if defined(_WIN32)
+  PROCESS_MEMORY_COUNTERS counters{};
+  counters.cb = sizeof counters;
+  if (!GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof counters)) return 0;
+  return static_cast<long>(counters.PeakWorkingSetSize / 1024);
+#else
   rusage usage{};
   getrusage(RUSAGE_SELF, &usage);
+#if defined(__APPLE__)
+  return static_cast<long>(usage.ru_maxrss / 1024);
+#else
   return usage.ru_maxrss;
+#endif
+#endif
 }
 
 // 250 traces of 400 events over a flower: about 100k distinct prefixes holding

@@ -1,4 +1,5 @@
 #include "minera/conformance.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/token_replay_error.hpp"
 #include "evaluation_internal.hpp"
 #include "petri_replay_internal.hpp"
@@ -4522,7 +4523,9 @@ ConformanceResult check_conformance(const EventLog& event_log,
 
   std::vector<std::uint64_t> executions(net.transitions().size(), 0);
   std::vector<std::uint64_t> variant_executions;
+  CancellationCheck cancelled(options.cancelled, "token replay was cancelled", 16);
   for (const auto& variant : variants) {
+    cancelled();
     variant_executions.assign(net.transitions().size(), 0);
     const bool backwards = options.variant == TokenReplayVariant::kBackwards;
     const auto backwards_outcome =
@@ -4575,6 +4578,8 @@ ConformanceResult check_conformance(const EventLog& event_log,
         sequence.steps.push_back({variant.labels[step], variant.identities[step]});
     }
     result.precision = detail::token_etconformance_precision(sequences, net, options);
+  } catch (const OperationCancelled&) {
+    throw;
   } catch (const std::runtime_error&) {
     // Silent-search budgets (the enabled-label worklist and the routing
     // searches) refuse to produce a partial value.
@@ -4714,7 +4719,9 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
   }
   std::vector<TokenReplayTraceDiagnostics> result;
   result.reserve(event_log.traces.size());
+  CancellationCheck cancelled(options.cancelled, "token replay was cancelled", 16);
   for (const auto& trace : event_log.traces) {
+    cancelled();
     TokenReplayTraceDiagnostics row;
     row.trace_index = result.size();
     row.case_id = trace.case_id;
@@ -5419,8 +5426,10 @@ std::vector<ActivityDeviation> summarize_alignment_moves(
 
 std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
 replay_firing_sequences(const PetriNet& net,
-                        const std::vector<std::vector<std::string>>& variants) {
+                        const std::vector<std::vector<std::string>>& variants,
+                        const std::function<bool()>& cancelled) {
   const Replayer replayer(net);
+  CancellationCheck check_cancelled(cancelled, "model replay was cancelled", 8);
   // Each cached step holds two markings; a log whose variants keep reaching
   // new markings would otherwise grow the cache without bound. About 256 MiB
   // of markings, estimated from the place count, is kept between variants.
@@ -5431,6 +5440,7 @@ replay_firing_sequences(const PetriNet& net,
   std::vector<std::optional<std::vector<std::vector<std::size_t>>>> result;
   result.reserve(variants.size());
   for (const auto& variant : variants) {
+    check_cancelled();
     std::vector<std::optional<std::size_t>> ids;
     ids.reserve(variant.size());
     for (const auto& name : variant) {
@@ -5526,7 +5536,9 @@ void detail::forward_token_prefix_walk_impl(
   std::size_t current = 0;
   bool stopped = false;
   std::vector<std::size_t> path;
+  CancellationCheck cancelled(options.cancelled, "token replay was cancelled", 64);
   for (std::size_t index = 0; index < trie.scored.size(); ++index) {
+    cancelled();
     const auto target = trie.scored[index];
     path.clear();
     auto node = target;
@@ -5568,6 +5580,15 @@ void detail::forward_token_prefix_walk_impl(
 
 bool final_marking_reachable(const PetriNet& net) {
   return final_marking_reachable(net, {}, {});
+}
+
+bool final_marking_reachable(const PetriNet& net, const std::function<bool()>& cancelled) {
+  AlignmentOptions options;
+  options.cancelled = cancelled;
+  const bool reachable = Aligner(net, options).reachable();
+  // A cancelled search reports the final marking unreachable.
+  if (!reachable) throw_if_cancelled(cancelled, "reachability search was cancelled");
+  return reachable;
 }
 
 bool final_marking_reachable(const PetriNet& net,

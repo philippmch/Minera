@@ -42,6 +42,7 @@ void handle_replay_duration_workbench(const httplib::Request& request, httplib::
   }
   if(analysis.mode=="saved_diagnostics"&&!document)throw std::invalid_argument(model_error.empty()?"saved diagnostic reanalysis requires the original PNML model":model_error);
   auto options=minera::tools::default_replay_input_options(source_log,params.token_replay,analysis.activity_attribute.has_value()||params.token_replay_activity_attribute_supplied);
+  options.cancelled=connection_cancel_hook(request);
   if(source&&(detected_format=="table"||present("mining_selectors_json"))){
    if(!present("token_replay_activity_attribute")&&!analysis.activity_attribute)options.activity_attribute=source->selectors().activity_key;
    if(!present("token_replay_case_id_attribute"))options.case_id_attribute=source->selectors().case_id_key;

@@ -2341,6 +2341,27 @@ void decorate_model_moves_arc_weights() {
   assert(decoration.place_counts[middle] == 2);
   assert(decoration.place_waits[middle].count == 2);
   assert(decoration.place_waits[middle].mean == 60.0);
+
+  // A weight whose wait samples would not fit one by one decorates too (as
+  // runs of one value): two cases move 2^25 + 1 tokens each through the
+  // middle place, after 60 s and 120 s.
+  const std::uint64_t tokens = (std::uint64_t{1} << 25) + 1;
+  const minera::TokenInteger big = tokens;
+  net.set_ordinary_arc_weights(0, {}, {{big, false}, {0, false}});
+  net.set_ordinary_arc_weights(1, {{big, false}, {0, false}}, {});
+  minera::Trace slower = log.traces.front();
+  slower.case_id = "c2";
+  slower.events[1].timestamp = "2024-01-01T10:02:00Z";
+  log.traces.push_back(std::move(slower));
+  const auto weighted = minera::decorate_model(log, net);
+  assert(weighted.decorated_traces == 2);
+  assert(weighted.place_counts[middle] == 2 * tokens);
+  const auto& waits = weighted.place_waits[middle];
+  assert(waits.count == 2 * tokens);
+  assert(waits.min == 60.0 && waits.max == 120.0);
+  assert(waits.median == 90.0);  // the two middle samples are 60 and 120
+  assert(waits.total == 60.0 * static_cast<double>(tokens) + 120.0 * static_cast<double>(tokens));
+  assert(waits.mean == 90.0);
 }
 
 void decorate_model_counts_firings_and_waits() {
@@ -7631,6 +7652,35 @@ void csv_import_matches_reference_dataframe_flow() {
     assert(data.table.rows.size() == 1);
     assert(data.table.rows[0][1]->value == "C");
   }
+  // The column's conversion is decided from every row, rows without a case
+  // id or activity too (reference values): a date on a dropped row still
+  // makes the column dates, so the untimed rows go and the log is empty...
+  {
+    const auto data = import("case_id,activity,timestamp\n1,A,\n1,B,\n,C,2024-01-01 10:00\n");
+    assert(data.log.traces.empty() && data.table.rows.empty());
+  }
+  // ... and an unconvertible cell on a dropped row refuses the frame.
+  const auto refused_timestamp = [&](const std::string& rows, const std::string& expected) {
+    try { (void)import("case_id,activity,timestamp\n" + rows); }
+    catch (const std::runtime_error& error) { return std::string(error.what()).find(expected) != std::string::npos; }
+    return false;
+  };
+  assert(refused_timestamp("1,A,2024-01-01 10:00\n,B,garbage\n", "row 3 has a timestamp 'garbage'"));
+  // NaT, NAT and nat are missing dates: their rows are dropped, and a column
+  // of them alone is a date column whose rows all go. Other spellings refuse.
+  {
+    const auto data = import("case_id,activity,timestamp\n1,A,2024-01-01 10:00\n1,B,NaT\n"
+                             "2,C,NAT\n2,D,nat\n2,E,2024-01-02 10:00\n");
+    assert((activities(data.log) == std::vector<std::string>{"A", "E"}));
+    assert(import("case_id,activity,timestamp\n1,A,NaT\n1,B,\n").log.traces.empty());
+  }
+  assert(refused_timestamp("1,A,2024-01-01 10:00\n1,B,Nat\n", "timestamp 'Nat'"));
+  // A whitespace-only timestamp is text to the reference: with dates in the
+  // column it refuses the frame (trim_fields would otherwise blank it).
+  assert(refused_timestamp("1,A,2024-01-01 10:00\n1,B, \n", "row 3 has a whitespace-only timestamp"));
+  assert(refused_timestamp("1,A,2024-01-01 10:00\n,B,\t\n", "row 3 has a whitespace-only timestamp"));
+  // A column without dates keeps it as an untimed event (native contract).
+  assert(import("case_id,activity,timestamp\n1,A, \n1,B,\n").log.event_count() == 2);
   // Stream readers (csv.DictReader) keep those rows, NA spellings literal.
   {
     minera::CsvImportOptions stream;

@@ -46,7 +46,7 @@ std::uint64_t physical_memory_bytes() {
   if (GlobalMemoryStatusEx(&status)) total = status.ullTotalPhys;
 #else
   const long pages = ::sysconf(_SC_PHYS_PAGES);
-  const long page = ::sysconf(_SC_PAGE_SIZE);
+  const long page = ::sysconf(_SC_PAGESIZE);
   if (pages > 0 && page > 0) total = static_cast<std::uint64_t>(pages) * static_cast<std::uint64_t>(page);
 #endif
 #if defined(__linux__)

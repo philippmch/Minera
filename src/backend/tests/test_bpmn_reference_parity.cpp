@@ -147,10 +147,28 @@ ParsedBpmn parse_exported(const std::string& xml) {
 
 // Reference Petri-to-BPMN structure (node kinds, task names, gateway
 // directions and the labelled flow multiset), plus the diagram interchange
-// every node and flow gets.
+// every node and flow gets. Nets are read with their markings as the
+// reference reads them (general nets included: the start event feeds every
+// initially marked place, every finally marked place feeds the end event);
+// a workflow net whose markings are one token on its source and sink also
+// converts the same way without them.
 void petri_export_matches_reference_structure() {
+  PnmlImportOptions general;
+  general.infer_initial_marking = false;
+  general.infer_final_marking = false;
+  general.require_workflow_boundaries = false;
   for (const auto& test : kExportCases) {
-    const auto xml = to_bpmn(parse_pnml(test.pnml));
+    const auto document = parse_pnml_document(test.pnml, general);
+    const auto xml = to_bpmn(document.net, document.initial_marking, document.final_marking);
+    const auto single = [](const TokenMarking& marking, std::size_t place) {
+      for (std::size_t p = 0; p < marking.size(); ++p)
+        if (marking[p] != TokenInteger(p == place ? 1 : 0)) return false;
+      return true;
+    };
+    if (document.net.has_source() && document.net.has_sink() &&
+        single(document.initial_marking, document.net.source()) &&
+        single(document.final_marking, document.net.sink()))
+      assert(to_bpmn(document.net) == xml);
     const auto parsed = parse_exported(xml);
     report(test.name, parsed.nodes, test.nodes);
     report(test.name, parsed.flows, test.flows);

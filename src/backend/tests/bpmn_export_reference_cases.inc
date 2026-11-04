@@ -927,3 +927,91 @@ R"PNML(<?xml version='1.0' encoding='UTF-8'?>
 </pnml>)PNML",
 {"endEvent||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "startEvent||Unspecified", "task|c|Unspecified", "task|d|Unspecified", "task|é|Unspecified", "task|é|Unspecified"},
 {"exclusiveGateway||Unspecified>endEvent||Unspecified", "exclusiveGateway||Unspecified>exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified>exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified>exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified>task|c|Unspecified", "exclusiveGateway||Unspecified>task|d|Unspecified", "exclusiveGateway||Unspecified>task|é|Unspecified", "exclusiveGateway||Unspecified>task|é|Unspecified", "startEvent||Unspecified>exclusiveGateway||Unspecified", "task|c|Unspecified>exclusiveGateway||Unspecified", "task|d|Unspecified>exclusiveGateway||Unspecified", "task|é|Unspecified>exclusiveGateway||Unspecified", "task|é|Unspecified>exclusiveGateway||Unspecified"}},
+// General nets read with their markings (pm4py 2.7.22 convert_to_bpmn(net, im, fm)):
+// several marked places, empty markings, a place in both markings, weights.
+{"general_two_starts_two_ends.pnml",
+R"PNML(<pnml><net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel"><page id="n0">
+<place id="p0"><name><text>p0</text></name><initialMarking><text>1</text></initialMarking></place>
+<place id="p1"><name><text>p1</text></name><initialMarking><text>1</text></initialMarking></place>
+<place id="p2"><name><text>p2</text></name></place>
+<place id="p3"><name><text>p3</text></name></place>
+<transition id="t0"><name><text>A</text></name></transition>
+<transition id="t1"><name><text>B</text></name></transition>
+<arc id="a0" source="p0" target="t0"></arc>
+<arc id="a1" source="t0" target="p2"></arc>
+<arc id="a2" source="p1" target="t1"></arc>
+<arc id="a3" source="t1" target="p3"></arc>
+</page><finalmarkings><marking><place idref="p2"><text>1</text></place><place idref="p3"><text>1</text></place></marking></finalmarkings></net></pnml>)PNML",
+{"endEvent||Unspecified", "startEvent||Unspecified", "task|A|Unspecified", "task|B|Unspecified"},
+{"startEvent||Unspecified>task|A|Unspecified", "startEvent||Unspecified>task|B|Unspecified", "task|A|Unspecified>endEvent||Unspecified", "task|B|Unspecified>endEvent||Unspecified"}},
+{"general_empty_markings.pnml",
+R"PNML(<pnml><net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel"><page id="n0">
+<place id="p0"><name><text>p0</text></name></place>
+<place id="p1"><name><text>p1</text></name></place>
+<transition id="t0"><name><text>A</text></name></transition>
+<arc id="a0" source="p0" target="t0"></arc>
+<arc id="a1" source="t0" target="p1"></arc>
+</page><finalmarkings><marking></marking></finalmarkings></net></pnml>)PNML",
+{"endEvent||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "startEvent||Unspecified", "task|A|Unspecified"},
+{"exclusiveGateway||Unspecified>task|A|Unspecified", "task|A|Unspecified>exclusiveGateway||Unspecified"}},
+{"general_isolated_marked_place.pnml",
+R"PNML(<pnml><net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel"><page id="n0">
+<place id="source"><name><text>source</text></name><initialMarking><text>1</text></initialMarking></place>
+<place id="sink"><name><text>sink</text></name></place>
+<place id="q"><name><text>q</text></name><initialMarking><text>1</text></initialMarking></place>
+<transition id="t0"><name><text>A</text></name></transition>
+<arc id="a0" source="source" target="t0"></arc>
+<arc id="a1" source="t0" target="sink"></arc>
+</page><finalmarkings><marking><place idref="sink"><text>1</text></place><place idref="q"><text>1</text></place></marking></finalmarkings></net></pnml>)PNML",
+{"endEvent||Unspecified", "startEvent||Unspecified", "task|A|Unspecified"},
+{"startEvent||Unspecified>endEvent||Unspecified", "startEvent||Unspecified>task|A|Unspecified", "task|A|Unspecified>endEvent||Unspecified"}},
+{"general_pass_through_weighted.pnml",
+R"PNML(<pnml><net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel"><page id="n0">
+<place id="p0"><name><text>p0</text></name><initialMarking><text>2</text></initialMarking></place>
+<place id="p1"><name><text>p1</text></name></place>
+<place id="p2"><name><text>p2</text></name></place>
+<transition id="t0"><name><text>A</text></name></transition>
+<transition id="t1"><name><text>t1</text></name><toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="xt1"/></transition>
+<transition id="t2"><name><text>B</text></name></transition>
+<arc id="a0" source="p0" target="t0"><inscription><text>2</text></inscription></arc>
+<arc id="a1" source="t0" target="p1"></arc>
+<arc id="a2" source="p1" target="t1"></arc>
+<arc id="a3" source="t1" target="p0"></arc>
+<arc id="a4" source="p1" target="t2"></arc>
+<arc id="a5" source="t2" target="p2"><inscription><text>3</text></inscription></arc>
+</page><finalmarkings><marking><place idref="p0"><text>1</text></place><place idref="p2"><text>3</text></place></marking></finalmarkings></net></pnml>)PNML",
+{"endEvent||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "startEvent||Unspecified", "task|A|Unspecified", "task|B|Unspecified"},
+{"exclusiveGateway||Unspecified>endEvent||Unspecified", "exclusiveGateway||Unspecified>exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified>task|A|Unspecified", "exclusiveGateway||Unspecified>task|B|Unspecified", "startEvent||Unspecified>exclusiveGateway||Unspecified", "task|A|Unspecified>exclusiveGateway||Unspecified", "task|B|Unspecified>endEvent||Unspecified"}},
+{"general_inner_final_place.pnml",
+R"PNML(<pnml><net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel"><page id="n0">
+<place id="source"><name><text>source</text></name><initialMarking><text>1</text></initialMarking></place>
+<place id="p1"><name><text>p1</text></name></place>
+<place id="sink"><name><text>sink</text></name></place>
+<transition id="t0"><name><text>A</text></name></transition>
+<transition id="t1"><name><text>B</text></name></transition>
+<arc id="a0" source="source" target="t0"></arc>
+<arc id="a1" source="t0" target="p1"></arc>
+<arc id="a2" source="p1" target="t1"></arc>
+<arc id="a3" source="t1" target="sink"></arc>
+</page><finalmarkings><marking><place idref="p1"><text>1</text></place><place idref="sink"><text>2</text></place></marking></finalmarkings></net></pnml>)PNML",
+{"endEvent||Unspecified", "exclusiveGateway||Unspecified", "startEvent||Unspecified", "task|A|Unspecified", "task|B|Unspecified"},
+{"exclusiveGateway||Unspecified>endEvent||Unspecified", "exclusiveGateway||Unspecified>task|B|Unspecified", "startEvent||Unspecified>task|A|Unspecified", "task|A|Unspecified>exclusiveGateway||Unspecified", "task|B|Unspecified>endEvent||Unspecified"}},
+{"general_random_weighted.pnml",
+R"PNML(<pnml><net id="net1" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel"><page id="n0">
+<place id="p0"><name><text>p0</text></name></place>
+<place id="p1"><name><text>p1</text></name><initialMarking><text>2</text></initialMarking></place>
+<place id="p2"><name><text>p2</text></name><initialMarking><text>3</text></initialMarking></place>
+<place id="p3"><name><text>p3</text></name></place>
+<place id="p4"><name><text>p4</text></name></place>
+<transition id="t0"><name><text>C</text></name></transition>
+<transition id="t1"><name><text>A</text></name></transition>
+<arc id="a0" source="p4" target="t0"></arc>
+<arc id="a1" source="t0" target="p3"></arc>
+<arc id="a2" source="t1" target="p0"><inscription><text>2</text></inscription></arc>
+<arc id="a3" source="p4" target="t1"></arc>
+<arc id="a4" source="p3" target="t1"></arc>
+<arc id="a5" source="p1" target="t1"></arc>
+<arc id="a6" source="p1" target="t0"></arc>
+</page><finalmarkings><marking><place idref="p0"><text>3</text></place><place idref="p1"><text>2</text></place></marking></finalmarkings></net></pnml>)PNML",
+{"endEvent||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "exclusiveGateway||Unspecified", "parallelGateway||Converging", "parallelGateway||Converging", "startEvent||Unspecified", "task|A|Unspecified", "task|C|Unspecified"},
+{"exclusiveGateway||Unspecified>endEvent||Unspecified", "exclusiveGateway||Unspecified>parallelGateway||Converging", "exclusiveGateway||Unspecified>parallelGateway||Converging", "exclusiveGateway||Unspecified>parallelGateway||Converging", "exclusiveGateway||Unspecified>parallelGateway||Converging", "parallelGateway||Converging>task|A|Unspecified", "parallelGateway||Converging>task|C|Unspecified", "startEvent||Unspecified>exclusiveGateway||Unspecified", "startEvent||Unspecified>exclusiveGateway||Unspecified", "task|A|Unspecified>endEvent||Unspecified", "task|C|Unspecified>parallelGateway||Converging"}},

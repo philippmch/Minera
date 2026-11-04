@@ -40,7 +40,7 @@ export function PerformanceSpectrumView({ data,nativeOnly=false,initialPattern }
         : buildSpectrum(traces, pattern),
     [data, traces, pattern],
   );
-  const waiting = pattern.length >= 2 && (load.status === "loading" || load.status === "error");
+  const waiting = pattern.length >= 2 && (load.status === "loading" || load.status === "error" || (load.status === "unavailable" && !!data.trace_summary));
   const serverMode = pattern.length === 0 && Boolean(data.performance_spectrum);
   const serverActivities = spectrum.activities ?? [];
   const axisNames = serverMode

@@ -102,6 +102,7 @@ void handle_graph_alignment_workbench(const httplib::Request& request,
     auto dfg_options = is_dfg ? minera::parse_dfg_alignment_params(parser_lookup, parser_presence) : minera::DfgAlignmentOptions{};
     auto decomposed_options = is_dfg ? minera::DecomposedAlignmentOptions{}
         : minera::parse_graph_alignment_decomposed_params(parser_lookup, parser_presence);
+    dfg_options.cancelled = decomposed_options.cancelled = connection_cancel_hook(request);
     std::string case_selector = present("alignment_case_id_attribute") ? lookup("alignment_case_id_attribute") : "case:concept:name";
     for (const auto& [key, value] : selectors) {
       if (key == "alignment_case_id_attribute") case_selector = value;

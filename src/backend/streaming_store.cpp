@@ -238,6 +238,15 @@ void set_blocking(NativeSocket socket, bool blocking) {
 using NativeSocket = int;
 constexpr NativeSocket kInvalidSocket = -1;
 
+// A peer that closed the connection must fail the write, not end the process
+// with SIGPIPE: Linux takes MSG_NOSIGNAL per call, while macOS and the BSDs
+// may lack it and set SO_NOSIGPIPE on the socket instead (see SocketConnection).
+#if defined(MSG_NOSIGNAL)
+constexpr int kSendFlags = MSG_NOSIGNAL;
+#else
+constexpr int kSendFlags = 0;
+#endif
+
 void ensure_socket_runtime() {}
 int socket_error() { return errno; }
 bool connect_in_progress(int error) {
@@ -297,6 +306,10 @@ class SocketConnection {
                                            address->ai_protocol));
       if (candidate == kInvalidSocket) continue;
       try {
+#if !defined(_WIN32) && defined(SO_NOSIGPIPE)
+        const int no_sigpipe = 1;
+        setsockopt(candidate, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
+#endif
         set_blocking(candidate, false);
         const int connected = connect(candidate, address->ai_addr,
                                       static_cast<int>(address->ai_addrlen));
@@ -356,7 +369,7 @@ class SocketConnection {
                             static_cast<int>(data.size() - offset), 0);
 #else
       const ssize_t sent = send(socket_, data.data() + offset,
-                                data.size() - offset, MSG_NOSIGNAL);
+                                data.size() - offset, kSendFlags);
 #endif
       if (sent <= 0) throw std::runtime_error("remote store write failed");
       offset += static_cast<std::size_t>(sent);

@@ -1,4 +1,5 @@
 #include "minera/monte_carlo.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -1265,7 +1266,9 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
     }
     advance(state);
   }
+  CancellationCheck cancelled(options.cancelled, "Monte Carlo simulation was cancelled");
   while (!queue.empty()) {
+    cancelled();
     const auto entry = queue.top();
     queue.pop();
     auto& state = cases[entry.case_index];
@@ -1409,6 +1412,7 @@ MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
   fit.replay.transition_names = fitted.transition_names;
   fit.replay.initial_marking_keys = fitted.initial_marking_keys;
   fit.replay.final_marking_keys = fitted.final_marking_keys;
+  fit.replay.cancelled = fitted.cancelled;
   fitted.stochastic_map = fit_stochastic_map_with_report(input_log, net, fit).map;
   return fitted;
 }

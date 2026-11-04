@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -75,6 +76,11 @@ struct ProcessTreeAlignmentOptions {
   // Setting max_states or a per-trace time limit also selects the native
   // search, as does a tree the variant's port rejects.
   bool native_search = false;
+  // Polled while the computation runs (the server sets it to notice a client
+  // that disconnected); once it returns true the call throws
+  // OperationCancelled (minera/cancellation.hpp) and returns nothing. Unset
+  // never cancels, and a run that is not cancelled is unchanged.
+  std::function<bool()> cancelled;
 };
 
 // fitness = 1 - cost / (trace length + floor), not clamped, where the floor is

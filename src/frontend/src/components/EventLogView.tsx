@@ -285,7 +285,8 @@ const EXPORT_NOTE_ID = "log-export-unavailable";
 export function EventLogView({ data, available = true }: { data: MineraExport; available?: boolean }) {
   const load = useTraces(data);
   const traces = loadedTraces(load);
-  const waiting = load.status === "loading" || load.status === "error";
+  // "unavailable" with a summary: a file saved without its cases.
+  const waiting = load.status === "loading" || load.status === "error" || (load.status === "unavailable" && !!data.trace_summary);
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(PAGE_SIZE);
 

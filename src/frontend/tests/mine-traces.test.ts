@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { loadTraces, loadedTraces, retainTraces, traceFacts, traceLoad } from "../src/mine-traces";
+import { inlineMiningJson, inlineMiningValue, loadTraces, loadedTraces, markLiveTraces, retainTraces, traceFacts, traceLoad, useHasTimestamps } from "../src/mine-traces";
+import { classifyMiningJson } from "../src/active-mining-source";
+import { nativeJson } from "../src/native-json";
 import { initialTab, logLifecycles } from "../src/app-logic";
 import { isMineraExport, type MineraExport, type Trace } from "../src/types";
 import { mineActiveDataset } from "../src/api";
@@ -29,18 +31,22 @@ const base = {
   edges: [{ source: 0, target: 1, count: 1 }], variants: [],
 };
 
-/** A mining response requested with include_traces=false. Each call is a new mine. */
+const RUN = "0123456789abcdef";
+
+/** A mining response requested with include_traces=false, as received from the backend. Each call is a new mine. */
 function lazy(sourceId = "7", overrides: Partial<MineraExport["trace_summary"]> = {}): MineraExport {
-  return { ...base, source_id: sourceId, trace_summary: {
+  const data = { ...base, source_id: sourceId, trace_summary: {
     traces: "on_demand", trace_count: 2, event_count: 3, max_trace_length: 2,
-    timestamped_trace_count: 2, has_timestamps: true, has_lifecycles: true, lifecycles: ["start", "complete"], ...overrides,
+    timestamped_trace_count: 2, has_timestamps: true, has_lifecycles: true, lifecycles: ["start", "complete"], run_id: RUN, ...overrides,
   } } as MineraExport;
+  markLiveTraces(data);
+  return data;
 }
 
 const inline = (): MineraExport => ({ ...base, traces: TRACES } as MineraExport);
 
 const tracesBody = (sourceId: string, traces: unknown = TRACES, extra: object = {}) =>
-  JSON.stringify({ family: "ANALYSIS_TRACES", source_id: sourceId, trace_count: 2, event_count: 3, traces, ...extra });
+  JSON.stringify({ family: "ANALYSIS_TRACES", source_id: sourceId, run_id: RUN, trace_count: 2, event_count: 3, traces, ...extra });
 
 function respond(status: number, body: string) {
   return new Response(body, { status, headers: { "Content-Type": "application/json" } });
@@ -113,7 +119,7 @@ describe("loading the traces on demand", () => {
     expect(traceLoad(data).status).toBe("loading");
     await Promise.all([first, loadTraces(data), loadTraces({ ...data })]);
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(String((fetch.mock.calls[0] as unknown[])[0])).toBe("/api/traces?source_id=7");
+    expect(String((fetch.mock.calls[0] as unknown[])[0])).toBe(`/api/traces?source_id=7&run_id=${RUN}`);
     expect(loadedTraces(traceLoad(data))).toEqual(TRACES);
     await loadTraces(data);
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -161,6 +167,7 @@ describe("loading the traces on demand", () => {
       [200, tracesBody("7", TRACES.slice(0, 1))],
       [200, tracesBody("7", [{ case_id: "x", events: [{ activity: 5, timestamp: "" }] }, TRACES[1]])],
       [200, tracesBody("7", TRACES, { family: "OTHER" })],
+      [200, tracesBody("7", TRACES, { run_id: "fedcba9876543210" })],
       [200, "not json"],
     ];
     for (const [status, body] of cases) {
@@ -184,6 +191,8 @@ describe("mining without inline traces", () => {
     const result = await mineActiveDataset(file);
     expect(sent[0].get("include_traces")).toBe("false");
     expect(result).toMatchObject({ trace_summary: { traces: "on_demand" } });
+    // The response the app received may load its cases from the backend.
+    expect(traceLoad(result as MineraExport).status).toBe("idle");
     await mineActiveDataset(file, { includeTraces: true });
     expect(sent[1].has("include_traces")).toBe(false);
   });
@@ -278,5 +287,107 @@ describe("the readers of the cases", () => {
     const html = render(createElement(AnonymizationWorkspace, { data, available: false, mining: false, onOpenReleased: () => undefined }));
     expect(html).toMatch(/value="2"/);
     expect(traceLoad(data).status).toBe("idle");
+  });
+});
+
+describe("opened files never load cases from the backend", () => {
+  const saved = () => (classifyMiningJson(JSON.stringify(lazy("7"))) as { data: MineraExport }).data;
+  it("an opened summary-only file is unavailable and sends no request", async () => {
+    const fetch = vi.fn(async () => respond(200, tracesBody("7")));
+    vi.stubGlobal("fetch", fetch);
+    const data = saved();
+    expect(traceLoad(data).status).toBe("unavailable");
+    await loadTraces(data);
+    expect(fetch).not.toHaveBeenCalled();
+    // The views it describes say that its cases were not saved.
+    expect(traceFacts(data)).toMatchObject({ hasCases: true, hasTimestamps: true });
+    expect(render(createElement(EventLogView, { data }))).toContain("saved without its cases");
+    expect(render(createElement(DottedChartView, { data }))).toContain("saved without its cases");
+    await expect(inlineMiningValue(data)).rejects.toThrow(/saved without its cases/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("a summary without the server run cannot load", async () => {
+    const fetch = vi.fn(async () => respond(200, tracesBody("7")));
+    vi.stubGlobal("fetch", fetch);
+    const data = lazy("7", { run_id: undefined });
+    expect(traceLoad(data).status).toBe("unavailable");
+    await loadTraces(data);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("an opened file with inline traces reads them in place", () => {
+    const data = (classifyMiningJson(JSON.stringify(inline())) as { data: MineraExport }).data;
+    expect(loadedTraces(traceLoad(data))).toEqual(TRACES);
+  });
+});
+
+describe("exports carry the cases", () => {
+  // The backend's layout: one top-level key per line, the summary on one line.
+  const summaryLine = `  "trace_summary": {"traces": "on_demand", "trace_count": 2, "event_count": 3, "max_trace_length": 2, "timestamped_trace_count": 2, "has_timestamps": true, "has_lifecycles": true, "lifecycles": ["start", "complete"], "run_id": "${RUN}"},\n`;
+  const tracesText = '[\n    {"case_id": "case-1", "events": [{"activity": 0, "timestamp": "2024-01-01T08:00:00Z", "lifecycle": "start"}, {"activity": 1, "timestamp": "2024-01-01T09:00:00Z", "lifecycle": "complete"}]},\n    {"case_id": "case-2", "events": [{"activity": 0, "timestamp": "2024-01-02T08:00:00Z", "lifecycle": "complete"}]}\n  ]';
+  const head = '{\n  "dataset": "orders.csv",\n  "trace_count": 2,\n  "event_count": 3,\n';
+  const tail = '  "activities": [{"name": "Register", "count": 2, "start_count": 2, "end_count": 1}, {"name": "Ship", "count": 1, "start_count": 0, "end_count": 1}],\n  "edges": [{"source": 0, "target": 1, "count": 1}],\n  "variants": []\n,"source_id":"7"}';
+  const lazyRaw = head + summaryLine + tail;
+  const fullRaw = head + `  "traces": ${tracesText},\n` + tail;
+  const serve = () => {
+    const fetch = vi.fn(async () => respond(200, `{"family":"ANALYSIS_TRACES","source_id":"7","run_id":"${RUN}","trace_count":2,"event_count":3,"traces":${tracesText}}`));
+    vi.stubGlobal("fetch", fetch);
+    return fetch;
+  };
+  it("writes the received bytes with the fetched traces, as include_traces=true sends them", async () => {
+    const fetch = serve();
+    const value = JSON.parse(lazyRaw) as MineraExport;
+    markLiveTraces(value);
+    expect(await inlineMiningJson(value, lazyRaw, (v) => nativeJson(v, 2))).toBe(fullRaw);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    // The cases are loaded once and shared with the views.
+    expect(loadedTraces(traceLoad(value))).toEqual(TRACES);
+  });
+  it("nests the traces into an ACTIVE_SOURCE_MINING envelope", async () => {
+    serve();
+    // The backend nests the bound analysis (with its source_id) as it is.
+    const envelopeRaw = `{"family":"ACTIVE_SOURCE_MINING","source_id":"7","analysis":${lazyRaw},"family_results":{}}`;
+    const envelope = JSON.parse(envelopeRaw) as { analysis: MineraExport };
+    markLiveTraces(envelope);
+    const text = await inlineMiningJson(envelope, envelopeRaw, (v) => nativeJson(v, 2));
+    expect(text).toBe(envelopeRaw.replace(summaryLine, `  "traces": ${tracesText},\n`));
+    const filled = await inlineMiningValue(envelope);
+    expect(filled.analysis.traces).toEqual(TRACES);
+    expect(filled.analysis.trace_summary).toBeUndefined();
+    expect(envelope.analysis.trace_summary).toBeDefined();
+  });
+  it("serializes in key order when the received text is not available", async () => {
+    serve();
+    const value = lazy("7");
+    const text = await inlineMiningJson(value, undefined, (v) => nativeJson(v, 2));
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    expect(Object.keys(parsed)).toEqual(Object.keys(value).map((key) => key === "trace_summary" ? "traces" : key));
+    expect(parsed.traces).toEqual(TRACES);
+  });
+  it("leaves a result that carries its traces as it is", async () => {
+    const fetch = serve();
+    const value = inline();
+    expect(await inlineMiningValue(value)).toBe(value);
+    expect(await inlineMiningJson(value, "raw", () => "serialized")).toBe("raw");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("refuses to save without the cases when they cannot be loaded", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => respond(409, JSON.stringify({ error: "the backend restarted since this log was mined; mine it again" }))));
+    await expect(inlineMiningJson(lazy("7"), lazyRaw, (v) => nativeJson(v, 2))).rejects.toThrow(/no longer holds this log/);
+  });
+});
+
+describe("the Timeline decides from parseable timestamps", () => {
+  const Probe = ({ data }: { data: MineraExport }) => createElement("i", null, String(useHasTimestamps(data)));
+  it("follows the summary until the cases load, then whether any parses", async () => {
+    const untimed: Trace[] = [{ case_id: "case-1", events: [{ activity: 0, timestamp: "not a date" }, { activity: 1, timestamp: "" }] },
+      { case_id: "case-2", events: [{ activity: 0, timestamp: "soon" }] }];
+    const data = lazy("7");
+    expect(render(createElement(Probe, { data }))).toBe("<i>true</i>");
+    vi.stubGlobal("fetch", vi.fn(async () => respond(200, tracesBody("7", untimed))));
+    await loadTraces(data);
+    expect(traceLoad(data).status).toBe("ready");
+    expect(render(createElement(Probe, { data }))).toBe("<i>false</i>");
+    expect(render(createElement(Probe, { data: inline() }))).toBe("<i>true</i>");
+    expect(render(createElement(Probe, { data: { ...base, traces: untimed } as MineraExport }))).toBe("<i>false</i>");
   });
 });

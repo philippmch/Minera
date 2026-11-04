@@ -84,6 +84,7 @@ void handle_process_tree_alignment_workbench(const httplib::Request& request,
     const auto parser_lookup = [&](std::string_view key) {return selectors.contains(std::string(key)) ? std::string{} : lookup(key);};
     const auto parser_presence = [&](std::string_view key) {return !selectors.contains(std::string(key)) && present(key);};
     auto options = minera::parse_process_tree_alignment_params(parser_lookup, parser_presence);
+    options.cancelled = connection_cancel_hook(request);
     const auto imports = minera::parse_mine_params(parser_lookup, parser_presence);
     auto case_selector = present("alignment_case_id_attribute") ? lookup("alignment_case_id_attribute") : std::string("case:concept:name");
     for (const auto& [key, value] : selectors) {

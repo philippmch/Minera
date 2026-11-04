@@ -1,4 +1,5 @@
 #include "minera/process_tree_reference_alignment.hpp"
+#include "minera/cancellation.hpp"
 
 #include <cstddef>
 #include <map>
@@ -238,7 +239,8 @@ struct Aligner {
 }  // namespace
 
 std::vector<ProcessTreeReferenceAlignment> reference_process_tree_dp_alignments(
-    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces) {
+    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces,
+    const std::function<bool()>& cancelled) {
   std::map<std::string, int> ids;
   Builder builder{tree, ids};
   const auto root = builder.build(tree.root());
@@ -257,6 +259,7 @@ std::vector<ProcessTreeReferenceAlignment> reference_process_tree_dp_alignments(
   const double floor = static_cast<double>(aligner.align(*root, {}).cost);
   std::vector<ProcessTreeReferenceAlignment> out;
   for (const auto& trace : traces) {
+    throw_if_cancelled(cancelled, "process-tree alignment was cancelled");
     const auto& result = aligner.align(*root, encode(trace));
     ProcessTreeReferenceAlignment alignment;
     alignment.cost = static_cast<double>(result.cost);

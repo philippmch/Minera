@@ -263,6 +263,7 @@ import { readAlignmentResponse } from "./alignment-inspection";
 import { nativeResponseFailure, readNativeResponse } from "./native-response";
 import { importedModelFetch, importedModelIdOf, setImportedModelId } from "./imported-model-binding";
 import {isActiveSourceMining, miningSourceFields, type ActiveDatasetResult, type MiningInputOptions} from "./active-mining-source";
+import {markLiveTraces} from "./mine-traces";
 
 export interface CsvOptions {
   caseColumn?: string;
@@ -1843,6 +1844,8 @@ export async function mineActiveDataset(
   const parsed: unknown = exactRun?.value ?? await readNativeResponse(response, {path: "/api/mine", fields});
   if (exactRun && (!response.ok || exactRun.value.family === "EXACT_FILTER_DISCOVERY")) throw new OwnedExactFilterResult(exactRun);
   signal?.throwIfAborted();
+  // This response's summary (if any) may fetch its cases from the backend.
+  if (response.ok) markLiveTraces(parsed);
   if (isActiveSourceMining(parsed)) return parsed;
   if (parsed !== null && typeof parsed === "object" && "error" in parsed) {
     if (exactRun) throw new OwnedExactFilterResult(exactRun);

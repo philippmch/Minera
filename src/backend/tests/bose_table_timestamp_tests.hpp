@@ -64,7 +64,7 @@ inline TimestampRun run_timestamp_table(const std::string& standard_time,
   std::mt19937 rng(0);
   auto result = minera::apply_concept_drift_table(
       timestamp_table(standard_time, custom_time), options, rng);
-  return {std::move(result), rng()};
+  return {std::move(result), static_cast<std::uint32_t>(rng())};
 }
 
 inline void expect_epoch(const std::string& value, double expected,

@@ -321,6 +321,11 @@ struct TokenReplayOptions {
   // contain every root place exactly once; detached marking identities are not
   // included. Absence retains native place index order.
   std::optional<std::vector<std::size_t>> place_fitness_order;
+  // Polled while the computation runs (the server sets it to notice a client
+  // that disconnected); once it returns true the call throws
+  // OperationCancelled (minera/cancellation.hpp) and returns nothing. Unset
+  // never cancels, and a run that is not cancelled is unchanged.
+  std::function<bool()> cancelled;
 };
 
 struct TokenReplayTraceReference {
@@ -746,9 +751,12 @@ struct AlignmentResult {
 // leftover tokens at the end) yields nullopt instead, because a forced
 // replay's firings would not be a real path through the model. Feeds decision
 // mining, which must know which transition consumed which place's token.
+// `cancelled` is polled between variants; once it returns true the call
+// throws OperationCancelled.
 [[nodiscard]] std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
 replay_firing_sequences(const PetriNet& net,
-                        const std::vector<std::vector<std::string>>& variants);
+                        const std::vector<std::vector<std::string>>& variants,
+                        const std::function<bool()>& cancelled = {});
 
 // Per-activity tally of alignment moves across the whole log — the aggregate
 // behind the per-variant alignments: how often the activity aligned
@@ -776,6 +784,10 @@ struct ActivityDeviation {
 // alignment. Cheap: a single shortest-run search. The Alpha Miner can produce
 // nets that fail this (e.g. concurrent start/end activities overflow the sink).
 [[nodiscard]] bool final_marking_reachable(const PetriNet& net);
+// The same search, polling `cancelled`; once it returns true the call throws
+// OperationCancelled.
+[[nodiscard]] bool final_marking_reachable(const PetriNet& net,
+                                           const std::function<bool()>& cancelled);
 // Empty markings select the corresponding workflow defaults. Nonempty
 // markings must contain one nonnegative token count per place.
 [[nodiscard]] bool final_marking_reachable(

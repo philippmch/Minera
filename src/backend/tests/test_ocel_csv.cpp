@@ -66,6 +66,94 @@ void reference_capture_tests() {
   assert(std::get<std::string>(reread.events[1].attributes[1].value) == "True");
 }
 
+// Row shapes and quoting follow pandas.read_csv(index_col=False), which
+// pm4py.read_ocel_csv uses for both tables (observed on pm4py 2.7.22 with
+// pandas 3.0.5): blank lines are skipped but counted, the first data row
+// fixes the field count, fields past the header are dropped, a later longer
+// row is refused with read_csv's message, short rows read missing cells, and
+// a row whose id or activity (object id or type) is missing is dropped.
+void follows_reference_csv_row_shapes() {
+  const std::string header = "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order,cost\n";
+  const auto refused = [](const std::string& events, const std::string& expected,
+                          const std::string* objects = nullptr) {
+    try {
+      (void)(objects ? minera::parse_ocel_csv(events, *objects) : minera::parse_ocel_csv(events));
+    } catch (const std::invalid_argument& error) {
+      return std::string(error.what()).find(expected) != std::string::npos;
+    }
+    return false;
+  };
+  const auto ids = [](const minera::Ocel& log) {
+    std::string out;
+    for (const auto& event : log.events) out += event.id + ":" + event.activity + "(" +
+        std::to_string(event.attributes.size()) + ")";
+    out += "|";
+    for (const auto& relation : log.relations) out += relation.event_id + ">" + relation.object_id + ";";
+    out += "|";
+    for (const auto& object : log.objects) out += object.id + ":" + object.type + "(" +
+        std::to_string(object.attributes.size()) + ")";
+    return out;
+  };
+  const std::string row1 = "e1,2024-01-01T00:00:00Z,A,['o1'],5\n";
+  // A short row reads its missing cells as missing values.
+  assert(ids(minera::parse_ocel_csv(header + row1 + "e2,2024-01-02T00:00:00Z,B\n")) ==
+         "e1:A(1)e2:B(0)|e1>o1;|o1:order(0)");
+  // A missing id or activity drops the row; without an object table its
+  // objects are still listed.
+  assert(ids(minera::parse_ocel_csv(header + row1 + "e2,2024-01-02T00:00:00Z\n")) ==
+         "e1:A(1)|e1>o1;|o1:order(0)");
+  assert(ids(minera::parse_ocel_csv(header + "e0,2024-01-01T00:00:00Z,,['o9'],5\n" +
+                                    ",2024-01-01T00:00:00Z,B,['o8'],5\n" + row1)) ==
+         "e1:A(1)|e1>o1;|o9:order(0)o8:order(0)o1:order(0)");
+  // A missing timestamp is NaT in the reference, which a native event cannot hold.
+  assert(refused(header + "e1,,A,['o1'],5\n", "has no timestamp"));
+  // The reference parses timestamps before it drops rows, so a dropped row's
+  // unreadable timestamp refuses the file.
+  assert(refused(header + row1 + "e2,extra,,['o1'],5\n", "not ISO-8601: extra"));
+  assert(refused(header + row1 + ",extra,B,['o1'],5\n", "not ISO-8601: extra"));
+  // Fields past the header are dropped when the first data row is longer.
+  assert(ids(minera::parse_ocel_csv(header + "e1,2024-01-01T00:00:00Z,A,['o1'],5,x,y\n"
+                                             "e2,2024-01-02T00:00:00Z,B,['o1'],6,z\n")) ==
+         "e1:A(1)e2:B(1)|e1>o1;e2>o1;|o1:order(0)");
+  // A later row longer than the first data row is refused like read_csv.
+  assert(refused(header + row1 + "e2,2024-01-02T00:00:00Z,B,['o1'],6,x\n",
+                 "Expected 5 fields in line 3, saw 6"));
+  assert(refused(header + "e1,2024-01-01T00:00:00Z,A,['o1'],5,x\n"
+                          "e2,2024-01-02T00:00:00Z,B,['o1'],6,y,z\n",
+                 "Expected 6 fields in line 3, saw 7"));
+  assert(refused(header + "e1,2024-01-01T00:00:00Z\ne2,2024-01-02T00:00:00Z,B,['o1'],6,y\n",
+                 "Expected 5 fields in line 3, saw 6"));
+  // Blank and whitespace-only lines are skipped but count as lines; a quoted
+  // field spanning lines is one.
+  assert(ids(minera::parse_ocel_csv("\n" + header + "\n  \n\t\n" + row1 + "\n")) ==
+         "e1:A(1)|e1>o1;|o1:order(0)");
+  assert(refused("\n" + header + row1 + "\n  \ne2,2024-01-02T00:00:00Z,B,['o1'],6,x\n",
+                 "Expected 5 fields in line 6, saw 6"));
+  assert(refused(header + "e1,2024-01-01T00:00:00Z,\"A\nB\",['o1'],5\n"
+                          "e2,2024-01-02T00:00:00Z,B,['o1'],6,x\n",
+                 "Expected 5 fields in line 3, saw 6"));
+  // Quoting: a quote inside an unquoted field is literal, text after a
+  // closing quote is appended, "" is one quote, and an open quote is an error.
+  const auto activity_of = [&](const std::string& cell) {
+    return minera::parse_ocel_csv(header + "e1,2024-01-01T00:00:00Z," + cell + ",['o1'],5\n")
+        .events.at(0).activity;
+  };
+  assert(activity_of("A\"x") == "A\"x");
+  assert(activity_of("\"A\"x") == "Ax");
+  assert(activity_of("\"A,B\"x") == "A,Bx");
+  assert(activity_of("\"A\"\"B\"") == "A\"B");
+  assert(activity_of("\"A\nB\"") == "A\nB");
+  assert(refused(header + row1 + "e2,2024-01-02T00:00:00Z,\"B,['o1'],6\n", "unterminated quote"));
+  // The object table follows the same shapes; a missing id or type drops the row.
+  const std::string objects = "ocel:oid,ocel:type,size\n,order,3\no2,,3\no3\no1,order\n\n";
+  assert(ids(minera::parse_ocel_csv(header + row1, objects)) == "e1:A(1)|e1>o1;|o1:order(0)");
+  const std::string long_first = "ocel:oid,ocel:type,size\no1,order,3,x\n";
+  assert(ids(minera::parse_ocel_csv(header + row1, long_first)) == "e1:A(1)|e1>o1;|o1:order(1)");
+  const std::string long_later = "ocel:oid,ocel:type,size\no1,order,3\no2,order,4,x\n";
+  assert(refused(header + row1, "object CSV line 3 has 4 fields", &long_later));
+  assert(refused(header + row1, "Expected 3 fields in line 3, saw 4", &long_later));
+}
+
 }  // namespace
 
 int main() {
@@ -111,6 +199,7 @@ int main() {
   assert(std::get<std::string>(round.objects[0].attributes[0].value) ==
          "open");
   reference_capture_tests();
+  follows_reference_csv_row_shapes();
 
   minera::OcelCsvImportOptions custom_import;
   custom_import.event_id_column = "event_id";

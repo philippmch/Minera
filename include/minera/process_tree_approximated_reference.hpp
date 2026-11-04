@@ -195,8 +195,11 @@ struct ProcessTreeApproximatedAlignment {
 // max_process_tree_height is 0). Throws ProcessTreeApproximatedReferenceError
 // where the reference raises (an operator with one child, or other than the
 // four it supports).
+// `cancelled` is polled before each trace; once it returns true the call
+// throws OperationCancelled (minera/cancellation.hpp).
 [[nodiscard]] std::vector<std::optional<ProcessTreeApproximatedAlignment>> reference_approximated_alignments(
     const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces,
-    const ProcessTreeApproximatedOptions& options = {}, const ProcessTreeApproximatedOracle& oracle = {});
+    const ProcessTreeApproximatedOptions& options = {}, const ProcessTreeApproximatedOracle& oracle = {},
+    const std::function<bool()>& cancelled = {});
 
 }  // namespace minera

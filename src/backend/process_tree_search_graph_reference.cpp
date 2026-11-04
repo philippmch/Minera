@@ -1,4 +1,5 @@
 #include "minera/process_tree_search_graph_reference.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <map>
@@ -698,11 +699,13 @@ ProcessTreeSearchGraphAlignment reference_search_graph_align_variant(const Proce
 }
 
 std::vector<ProcessTreeSearchGraphAlignment> reference_search_graph_alignments(
-    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces) {
+    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces,
+    const std::function<bool()>& cancelled) {
   const long long best_worst = reference_search_graph_align_variant(tree, {}).cost;
   std::vector<ProcessTreeSearchGraphAlignment> out;
   out.reserve(traces.size());
   for (const auto& trace : traces) {
+    throw_if_cancelled(cancelled, "process-tree alignment was cancelled");
     ProcessTreeSearchGraphAlignment aligned = reference_search_graph_align_variant(tree, trace);
     const long long denominator = best_worst + static_cast<long long>(trace.size());
     aligned.fitness =

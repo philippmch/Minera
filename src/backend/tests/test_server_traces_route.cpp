@@ -6,9 +6,12 @@
 //  - include_traces=false leaves it out, puts a "trace_summary" in its place
 //    and changes nothing else in the analysis, on the classic and on the
 //    native (active-source) mining path;
-//  - GET /api/traces?source_id= serves the inline "traces" bytes exactly,
-//    gzipped or not, and answers 409 for a source that is not the active one
-//    (or when nothing was mined) and 400 for a malformed request.
+//  - GET /api/traces?source_id=&run_id= serves the inline "traces" bytes
+//    exactly, gzipped or not, and answers 409 for a source that is not the
+//    active one, for a run_id of another server run (a restarted server
+//    counts source ids from 1 again) or when nothing was mined, and 400 for
+//    a malformed request;
+//  - the summary counts a case as timestamped only when a timestamp parses.
 //
 // Usage: minera_server_traces_route_tests <minera_server>
 
@@ -62,6 +65,15 @@ int free_port() {
 // The first "source_id" string value of a body, or "" when there is none.
 std::string source_id_of(const std::string& body) {
   const std::string key = "\"source_id\":\"";
+  const auto at = body.find(key);
+  if (at == std::string::npos) return "";
+  const auto end = body.find('"', at + key.size());
+  return end == std::string::npos ? "" : body.substr(at + key.size(), end - at - key.size());
+}
+
+// The server run a trace summary (", \"run_id\": \"...\"") names, or "".
+std::string run_id_of(const std::string& body) {
+  const std::string key = "\"run_id\": \"";
   const auto at = body.find(key);
   if (at == std::string::npos) return "";
   const auto end = body.find('"', at + key.size());
@@ -125,31 +137,47 @@ int main(int argc, char** argv) {
       "c2,Prüfen,2024-01-02T10:00:00Z,Bo,complete\n"
       "c2,Archive,2024-01-02T11:00:00Z,Cy,complete\n";
 
+  // Starts a server on a free port; 0 when it cannot be spawned.
+  const auto start_server = [&](int port) -> pid_t {
+    const std::string port_text = std::to_string(port);
+    std::vector<std::string> args = {argv[1], "--port", port_text, "--frontend",
+                                     "/nonexistent-minera-frontend"};
+    std::vector<char*> raw;
+    for (auto& arg : args) raw.push_back(arg.data());
+    raw.push_back(nullptr);
+    pid_t pid = 0;
+    if (::posix_spawn(&pid, argv[1], nullptr, nullptr, raw.data(), environ) != 0) return 0;
+    return pid;
+  };
+  const auto await_ready = [](httplib::Client& to) {
+    for (int attempt = 0; attempt < 200; ++attempt) {
+      if (auto result = to.Get("/api/version"); result && result->status == 200) return true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    return false;
+  };
+  const auto stop_server = [](pid_t pid) {
+    ::kill(pid, SIGTERM);
+    int status = 0;
+    ::waitpid(pid, &status, 0);
+  };
+
   const int port = free_port();
-  const std::string port_text = std::to_string(port);
-  std::vector<std::string> args = {argv[1], "--port", port_text, "--frontend",
-                                   "/nonexistent-minera-frontend"};
-  std::vector<char*> raw;
-  for (auto& arg : args) raw.push_back(arg.data());
-  raw.push_back(nullptr);
-  pid_t server = 0;
-  if (::posix_spawn(&server, argv[1], nullptr, nullptr, raw.data(), environ) != 0) {
+  pid_t server = start_server(port);
+  if (server == 0) {
     std::cerr << "cannot start " << argv[1] << '\n';
     return 2;
   }
 
   httplib::Client client("127.0.0.1", port);
   client.set_read_timeout(60, 0);
-  bool ready = false;
-  for (int attempt = 0; attempt < 200 && !ready; ++attempt) {
-    if (auto result = client.Get("/api/version"); result && result->status == 200) ready = true;
-    else std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  }
+  const bool ready = await_ready(client);
   check(ready, "server answers /api/version");
+  std::string first_run;
 
   if (ready) {
-    const auto mine = [&](std::vector<std::pair<std::string, std::string>> fields) {
-      httplib::MultipartFormDataItems items = {{"log", log, "log.csv", "text/csv"}};
+    const auto mine = [&](std::vector<std::pair<std::string, std::string>> fields, const std::string& text = "") {
+      httplib::MultipartFormDataItems items = {{"log", text.empty() ? log : text, "log.csv", "text/csv"}};
       for (auto& [name, value] : fields) items.push_back({name, value, "", ""});
       return client.Post("/api/mine", items);
     };
@@ -160,9 +188,17 @@ int main(int argc, char** argv) {
     };
 
     // Nothing mined yet: the route has no source to serve.
-    auto r = traces("?source_id=1");
+    auto r = traces("?source_id=1&run_id=0");
     check(r && r->status == 409 && r->body.find("mine a log first") != std::string::npos,
           "traces before any mine answer 409: " + describe(r));
+
+    // Every summary of this server names its run.
+    const auto probe = mine({{"include_traces", "false"}});
+    const std::string run = probe ? run_id_of(probe->body) : "";
+    first_run = run;
+    check(run.size() == 16 && run.find_first_not_of("0123456789abcdef") == std::string::npos,
+          "the trace summary names the server run: " + describe(probe));
+    const std::string run_query = "&run_id=" + run;
 
     // The default keeps the traces inline (scripts and tests rely on it).
     const auto full = mine({});
@@ -189,12 +225,12 @@ int main(int argc, char** argv) {
     const std::vector<bool> encodings = {false};  // this client cannot inflate
 #endif
     for (const bool gzip : encodings) {
-      r = traces("?source_id=" + explicit_id, gzip);
+      r = traces("?source_id=" + explicit_id + run_query, gzip);
       check(r && r->status == 200, std::string("traces of the active source") + (gzip ? " (gzip)" : "") + ": " + describe(r));
       if (r && r->status == 200) {
         check(r->get_header_value("Content-Type").starts_with("application/json"), "traces are JSON");
         check(r->body.starts_with("{\"family\":\"ANALYSIS_TRACES\",\"source_id\":\"" + explicit_id +
-                                  "\",\"trace_count\":2,\"event_count\":7,\"traces\":"),
+                                  "\",\"run_id\":\"" + run + "\",\"trace_count\":2,\"event_count\":7,\"traces\":"),
               "traces name their family, source and counts: " + r->body.substr(0, 160));
         check(served_traces(r->body) == full_traces,
               std::string("GET /api/traces is byte-identical to the inline traces") + (gzip ? " (gzip)" : ""));
@@ -204,7 +240,7 @@ int main(int argc, char** argv) {
     {
       httplib::Client raw_client("127.0.0.1", port);
       raw_client.set_decompress(false);
-      auto gz = raw_client.Get("/api/traces?source_id=" + explicit_id, {{"Accept-Encoding", "gzip"}});
+      auto gz = raw_client.Get("/api/traces?source_id=" + explicit_id + run_query, {{"Accept-Encoding", "gzip"}});
       check(gz && gz->status == 200 && gz->get_header_value("Content-Encoding") == "gzip" &&
                 gz->body.size() > 2 && static_cast<unsigned char>(gz->body[0]) == 0x1f &&
                 static_cast<unsigned char>(gz->body[1]) == 0x8b,
@@ -219,35 +255,42 @@ int main(int argc, char** argv) {
     check(lazy_body.find(kTracesLine) == std::string::npos, "include_traces=false leaves the traces out");
     check(lazy_body.find("  \"trace_summary\": {\"traces\": \"on_demand\", \"trace_count\": 2, \"event_count\": 7, "
                          "\"max_trace_length\": 4, \"timestamped_trace_count\": 2, \"has_timestamps\": true, "
-                         "\"has_lifecycles\": true, \"lifecycles\": [\"start\", \"complete\"]},\n") != std::string::npos,
+                         "\"has_lifecycles\": true, \"lifecycles\": [\"start\", \"complete\"], \"run_id\": \"" + run + "\"},\n") != std::string::npos,
           "include_traces=false writes the trace summary: " + lazy_body.substr(0, 400));
     check(analysis_part(without_line(lazy_body, kSummaryLine)) ==
               analysis_part(without_line(full_body, kTracesLine)),
           "the summary-only analysis equals the complete one without its traces");
     check(lazy_body.size() < full_body.size(), "the summary-only body is smaller");
     const auto lazy_id = source_id_of(lazy_body);
-    r = traces("?source_id=" + lazy_id);
+    r = traces("?source_id=" + lazy_id + run_query);
     check(r && r->status == 200 && served_traces(r->body) == full_traces,
           "the summary-only source serves the inline traces byte for byte: " + describe(r));
 
     // Another source than the active one: 409, like the other session routes.
-    r = traces("?source_id=" + full_id);
+    r = traces("?source_id=" + full_id + run_query);
     check(r && r->status == 409 && r->body.find("source log changed") != std::string::npos,
           "traces of a replaced source answer 409: " + describe(r));
-    r = traces("?source_id=not-a-source");
+    r = traces("?source_id=not-a-source" + run_query);
     check(r && r->status == 409, "traces of an unknown source answer 409: " + describe(r));
+    // The active source of another server run: 409.
+    r = traces("?source_id=" + lazy_id + "&run_id=0000000000000000");
+    check(r && r->status == 409 && r->body.find("backend restarted") != std::string::npos,
+          "traces of another server run answer 409: " + describe(r));
     // Malformed requests: 400.
     r = traces("");
     check(r && r->status == 400 && r->body.find("source_id is required") != std::string::npos,
           "traces without a source answer 400: " + describe(r));
-    r = traces("?source_id=" + lazy_id + "&limit=1");
+    r = traces("?source_id=" + lazy_id);
+    check(r && r->status == 400 && r->body.find("run_id is required") != std::string::npos,
+          "traces without a run answer 400: " + describe(r));
+    r = traces("?source_id=" + lazy_id + run_query + "&limit=1");
     check(r && r->status == 400 && r->body.find("unknown traces parameter: limit") != std::string::npos,
           "traces reject unknown parameters: " + describe(r));
     r = mine({{"include_traces", "no"}});
     check(r && r->status == 400 && r->body.find("include_traces expects true or false") != std::string::npos,
           "mine rejects an invalid include_traces: " + describe(r));
     // The rejected mine left the active source alone.
-    r = traces("?source_id=" + lazy_id);
+    r = traces("?source_id=" + lazy_id + run_query);
     check(r && r->status == 200, "a rejected mine keeps the active source's traces: " + describe(r));
 
     // The native (active-source) mining path nests the analysis; the same
@@ -264,15 +307,48 @@ int main(int argc, char** argv) {
       check(native_lazy->body.find(kTracesLine) == std::string::npos &&
                 native_lazy->body.find(kSummaryLine) != std::string::npos,
             "the native summary-only analysis has a trace summary instead of traces");
-      r = traces("?source_id=" + source_id_of(native_lazy->body));
+      check(run_id_of(native_lazy->body) == run, "the native summary names the server run");
+      r = traces("?source_id=" + source_id_of(native_lazy->body) + run_query);
       check(r && r->status == 200 && served_traces(r->body) == native_traces,
             "the native source serves its inline traces byte for byte: " + describe(r));
     }
-  }
 
-  ::kill(server, SIGTERM);
-  int status = 0;
-  ::waitpid(server, &status, 0);
+    // Timestamps that do not parse as dates (an integer column) mark no case
+    // as timestamped, so the client offers no dotted chart for them.
+    const auto counted = mine({{"include_traces", "false"}},
+                              "case_id,activity,timestamp\nc1,A,1\nc1,B,2\nc2,A,3\n");
+    check(counted && counted->status == 200 &&
+              counted->body.find("\"timestamped_trace_count\": 0, \"has_timestamps\": false") != std::string::npos,
+          "unparseable timestamps are not counted: " + describe(counted));
+  }
+  stop_server(server);
+
+  // A restarted server counts its source ids from 1 again; a summary of the
+  // first run never loads the second run's traces.
+  if (ready && !first_run.empty()) {
+    const int second_port = free_port();
+    const pid_t second = start_server(second_port);
+    check(second != 0, "a second server starts");
+    if (second != 0) {
+      httplib::Client again("127.0.0.1", second_port);
+      again.set_read_timeout(60, 0);
+      if (await_ready(again)) {
+        httplib::MultipartFormDataItems items = {{"log", log, "log.csv", "text/csv"}, {"include_traces", "false", "", ""}};
+        const auto mined = again.Post("/api/mine", items);
+        const auto id = mined ? source_id_of(mined->body) : "";
+        const auto second_run = mined ? run_id_of(mined->body) : "";
+        check(id == "1", "the restarted server's first source is 1 again: " + describe(mined));
+        check(!second_run.empty() && second_run != first_run, "each server run has its own run id");
+        auto r = again.Get("/api/traces?source_id=" + id + "&run_id=" + first_run);
+        check(r && r->status == 409, "a summary of the earlier run answers 409 after a restart: " + describe(r));
+        r = again.Get("/api/traces?source_id=" + id + "&run_id=" + second_run);
+        check(r && r->status == 200, "the current run serves its traces: " + describe(r));
+      } else {
+        check(false, "the second server answers /api/version");
+      }
+      stop_server(second);
+    }
+  }
   if (g_failures != 0) {
     std::cerr << g_failures << " traces route check(s) failed\n";
     return 1;

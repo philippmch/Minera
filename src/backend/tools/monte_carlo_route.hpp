@@ -39,6 +39,7 @@ void handle_monte_carlo_workbench(const httplib::Request& request,
     const auto submitted = minera::parse_monte_carlo_workbench_options(
         supplied("options_json") ? field("options_json") : "{}", &members);
     auto configured = submitted;
+    configured.cancelled = connection_cancel_hook(request);
     minera::PnmlImportOptions imports;
     const auto boolean_option = [&](std::string_view name, bool& value) {
       if (supplied(name)) value = petri_anti_multi_boolean(field(name), name);

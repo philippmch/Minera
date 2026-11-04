@@ -1244,7 +1244,17 @@ std::optional<ProcessTreeNode> ActivityConcurrentFallThrough::apply(
     const std::size_t worker_count =
         std::min<std::size_t>(2, candidates.size());
     std::vector<std::exception_ptr> errors(worker_count);
-    std::vector<std::jthread> workers;
+    // std::thread rather than std::jthread: Apple's libc++ (and libc++
+    // before 20) ships jthread only behind -fexperimental-library. The guard
+    // joins whatever started if a later thread fails to start.
+    std::vector<std::thread> workers;
+    struct JoinAll {
+      std::vector<std::thread>& threads;
+      ~JoinAll() {
+        for (auto& thread : threads)
+          if (thread.joinable()) thread.join();
+      }
+    } join_all{workers};
     workers.reserve(worker_count);
     for (std::size_t worker = 0; worker < worker_count; ++worker) {
       workers.emplace_back([&, worker] {
@@ -1263,6 +1273,7 @@ std::optional<ProcessTreeNode> ActivityConcurrentFallThrough::apply(
       });
     }
     for (auto& worker : workers) worker.join();
+    workers.clear();
     for (const auto& error : errors) {
       if (error) std::rethrow_exception(error);
     }

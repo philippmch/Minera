@@ -46,6 +46,7 @@
 
 #include <array>
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -135,6 +136,8 @@ struct ProcessTreeMilpAlignment {
 // gives no cost; an infeasible program (the empty trace on a root loop with a
 // tau do) throws ProcessTreeMilpReferenceError, where the reference reports
 // whatever its solver left behind.
+// `cancelled` is polled before each trace; once it returns true the call
+// throws OperationCancelled (minera/cancellation.hpp).
 [[nodiscard]] ProcessTreeMilpAlignment reference_milp_align(const ProcessTree& tree,
                                                             const std::vector<std::string>& trace);
 
@@ -144,6 +147,7 @@ struct ProcessTreeMilpAlignment {
 // ProcessTreeMilpReferenceError where the empty trace has no cost (a tau root,
 // where the reference raises a TypeError) or an infeasible program.
 [[nodiscard]] std::vector<ProcessTreeMilpAlignment> reference_milp_alignments(
-    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces);
+    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces,
+    const std::function<bool()>& cancelled = {});
 
 }  // namespace minera

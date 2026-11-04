@@ -17460,6 +17460,12 @@ Declarations (the reference raises; native keeps its result):
   summary snapshot that mining responses embed (complete states come from
   /api/active-source). The 48 frontend test files that read these
   fixtures pass.
+  The recaptured entries are self-referential: `--write` takes their
+  expected status and fields from Minera's own responses, so a clean replay
+  shows that the fixtures match the current server, not that the server
+  matches the reference. They are regression baselines, not parity
+  evidence; in particular the 7 entries that now answer 400 and the changed
+  conformance key order were not compared with the reference here.
   The standalone captures (not in a manifest) record only their source
   file's name, and none of those sources is in the repository, so they
   were not replayed and still hold their earlier output; their tests check
@@ -17511,8 +17517,9 @@ Declarations (the reference raises; native keeps its result):
   multi-line quoted record once), in a 400 that also says how many fields
   the rows may have; a short row is padded with empty (NaN) cells, so a row
   without its activity or case id is dropped, and so is one without a
-  timestamp once the timestamp column holds dates, as `format_dataframe`
-  drops it (see "CSV rows without a timestamp are dropped" below). Before,
+  timestamp once the timestamp column holds dates (decided from every row),
+  as `format_dataframe` drops it (see "CSV rows without a timestamp are
+  dropped" below). Before,
   extra fields were ignored and short rows refused. The
   /api/mine size estimate already counted these rows and its columns are the
   header's, so its 413 decision is unchanged. Stream readers (csv.DictReader
@@ -17604,15 +17611,37 @@ Declarations (the reference raises; native keeps its result):
   with rows missing a case id or activity, with its "Some rows of the Pandas
   data frame have been removed" warning; a case left without rows
   disappears. The batch CSV importer kept those rows as untimed events. It
-  now drops them once the timestamp column converts to dates (some kept
-  row's cell parses); a column with no date keeps every row, as before (the
-  reference refuses such a frame), and stream readers keep NA spellings as
-  literal values. The CSV row-shape entry above states the same policy. Fresh
-  comparison against `read_csv` + `format_dataframe` +
-  `convert_to_event_log`: 508/508 random files that the reference reads give
-  the same cases and activity sequences (416 of them with dropped NA
-  timestamps); the other 92 have no date in the column, which the reference
-  refuses and native keeps. Tests: `minera_core_tests`
+  now drops them once the timestamp column converts to dates. The column is
+  converted before any row is dropped, so the decision reads every row,
+  including rows without a case id or activity: a date on such a row still
+  makes the column dates (and the untimed kept rows go), and a cell there
+  that cannot be converted refuses the frame like one on a kept row. A
+  literal `NaT`, `NAT` or `nat` is a missing date (its row is dropped, and a
+  column of them alone converts and loses every row); other spellings such
+  as `Nat` refuse. A whitespace-only timestamp is text to `to_datetime`, so
+  with dates in the column it refuses the frame although `trim_fields`
+  blanks other whitespace ("CSV row N has a whitespace-only timestamp").
+  A column with no date keeps every row, as before (the reference refuses
+  such a frame: "the dataframe should (at least) contain a column of type
+  date"), and stream readers keep NA spellings as literal values. The CSV
+  row-shape entry above states the same policy. Declared, not matched: with
+  an implicit index the reference's columns shift, and `format_dataframe`
+  then also converts date-like text in a shifted case-id or activity column
+  (activity `2024-01-01T00:37:00` becomes `2024-01-01 00:37:00+00:00`), and
+  it drops NaN-timestamp rows when any other column holds dates although the
+  timestamp column holds none; native converts the selected timestamp column
+  only. A timestamp padded with spaces is trimmed (`" NaT"` is then
+  dropped, where the reference refuses it; padded dates parse on both
+  sides). Fresh comparison against `read_csv` + `format_dataframe` +
+  `convert_to_event_log` on 2,000 random files (NaT spellings,
+  whitespace-only cells and dates only on dropped rows included): all 516
+  read refusals match; of the 917 files the reference reads, 862 give the
+  same cases and activity sequences and the other 55 are the implicit-index
+  shifts above (53 differ, 2 refused by native); of the 567 the reference
+  refuses, native refuses 238 and keeps the 329 whose column has no date.
+  The tree before this change matched 796 of the 917 and kept 93 refused
+  frames with date-like text in the column (whitespace or NaT cells next to
+  dates, mostly). Tests: `minera_core_tests`
   (`csv_import_matches_reference_dataframe_flow`,
   `follows_reference_csv_row_shapes`),
   `minera_server_parameter_contract_tests`.
@@ -17651,7 +17680,9 @@ Changed to follow the reference:
   place, takes one arc's weight there and puts the summed weight of its
   output arcs; a search beyond `max_states` refuses the net (1,483 of 1,500
   random nets with parallel arcs agree; the rest are unbounded or tie
-  cases). The searches that run on the synchronous product (state-equation
+  cases). As a native extension, the trace options' `max_time_seconds`
+  refuses it the same way and `cancelled` stops it with OperationCancelled,
+  as they bound the alignment searches themselves. The searches that run on the synchronous product (state-equation
   A*, Dijkstra without heuristics, discounted A*) see every arc object with
   weight 1 and, like the reference, enable a transition with k parallel arcs
   from a place at k tokens there but take one (`<a, c, b>` costs 20001 where
@@ -17667,6 +17698,11 @@ Changed to follow the reference:
   a firing gives one row per decision place.
 - **Stochastic Petri reachability, the stochastic map and model decorations**
   move each arc's weight (decorations keep tokens as runs of equal instants).
+  A decoration keeps a place's first 2^24 wait samples one by one and any
+  further ones as runs of one value, so a huge weight never fails a mine:
+  such a place's count saturates at 2^64 - 1 and its total adds value ×
+  count per run (native extension; places within the bound are summarized
+  exactly as before).
   The older Petri usage comparison replay moves one token per endpoint, so a
   weighted or parallel-arc net goes through the token-replay composition.
 - **Footprints of a net** build their reachability graph with the shared
@@ -17699,10 +17735,10 @@ Kept as native behaviour, declared:
 - Interactive conformance on compact sides stays gated; its message now names
   parallel arcs.
 
-Found, not arc related, open: `convert_to_bpmn` connects the end event from
-every place of the final marking; native connects the sink only, so all 12
-fresh general nets whose final marking holds two or more places differ by
-one flow (and two by one node).
+Found, not arc related: `convert_to_bpmn` connects the end event from
+every place of the final marking; native connected the sink only, so all 12
+fresh general nets whose final marking holds two or more places differed by
+one flow (and two by one node). Fixed in the next section.
 
 Tests: `minera_petri_analysis_tests` (`weighted_marking_equation_counts_arc_objects`,
 `woflan_weighted_and_parallel_arcs`, `alignment_weighted_and_parallel_arcs`,
@@ -17711,3 +17747,89 @@ Tests: `minera_petri_analysis_tests` (`weighted_marking_equation_counts_arc_obje
 (`weighted_arcs_move_their_weight`), `minera_petri_net_reduction_tests`
 (`compact_arc_nets_are_kept`), `minera_core_tests`
 (`decorate_model_moves_arc_weights`), frontend `petri-layout.test.ts`.
+
+## BPMN marking events, OCEL CSV row shapes and disconnect cancellation coverage (2026-11-04)
+
+- **BPMN from a marked net.** `convert_to_bpmn(net, im, fm)` always creates
+  the start and end events, draws a flow from the start event to every place
+  with tokens in the initial marking and from every place with tokens in the
+  final marking to the end event (empty markings leave the events
+  unconnected; a place in both markings with no arcs becomes start → end once
+  its one-in, one-out gateway collapses). Native drew them from the source
+  and sink only. `to_bpmn(net, initial_marking, final_marking)` (and
+  `write_bpmn`) now follow the markings; `to_bpmn(net)` keeps the
+  source/sink form, which equals the marked form for a workflow net with one
+  token on each. Fresh comparison through the PNML reader with the markings
+  as written: 80 random general nets (41 with two or more initially marked
+  places, 48 with two or more finally marked places, 11 and 7 with an empty
+  marking, 78 with weighted arcs) and 60 workflow nets from random trees
+  (56 with weights, 51 with parallel arc elements) match nodes, task names,
+  gateway directions and the flow multiset in 140 of 140 (12 of 55 general
+  nets differed before). The server's model-exchange route still refuses
+  BPMN for nets that are not single-token workflow nets, unchanged. Tests:
+  `minera_bpmn_reference_parity_tests` (six new general-net cases: several
+  marked places, empty markings, a place in both markings, a pass-through
+  weighted place, an inner final place, a random weighted net).
+- **OCEL CSV row shapes.** `pm4py.read_ocel_csv` reads both tables with
+  `pandas.read_csv`, and the native reader now follows it: blank lines
+  (empty or spaces and tabs only) are skipped but still counted; the first
+  data row sets the width (the header's or longer: the extra fields are
+  dropped, as pandas does with a ParserWarning); a later, longer row refuses
+  the file with the pandas message (`Expected N fields in line L, saw M`,
+  where L counts records, header and blank lines included, and a multi-line
+  quoted field once); short rows read missing cells. Quoting follows the C
+  tokenizer: a quote opens a quoted field only as its first character, text
+  after a closing quote is appended (`"A"x` reads `Ax`), `""` is a quote
+  inside quotes, quoted fields may span lines, and an unterminated quote
+  refuses the file. An event row with a missing id or activity is dropped
+  (and, without an object table, its objects are still listed, as the
+  reference collects them from every row); an object row with a missing id
+  or type is dropped. The reference parses the timestamp column before it
+  drops rows, so a dropped row with an unreadable timestamp still refuses
+  the file. Fresh fuzz (400 random event tables, 172 with an object table,
+  short, long and very short rows, blank lines, quoting): 145 both refuse
+  with the same pandas message, 4 both refuse a bad timestamp, 123 read the
+  same events, relations and objects, 48 the same except as declared below;
+  the other 80 are the open duplicate case below. Declared: an event with a
+  missing timestamp is NaT in the reference and refused natively (`event
+  CSV event X has no timestamp`), since a native event needs an instant;
+  fields stay trimmed by default; NA spellings (`NA`, `null`, ...) in
+  attribute cells stay text where pandas reads NaN; a header-only file reads
+  as an empty log where pm4py raises KeyError; an object an event names but
+  the object table lacks is added natively (type from its column, no
+  attributes) so its relations resolve, where the reference keeps the
+  relation and lists no object (the 48). Found, open: the native reader
+  refuses an object listed twice in one cell (`duplicate object id in one
+  event row`), where the reference keeps both relations. Tests:
+  `minera_ocel_csv_tests` (`follows_reference_csv_row_shapes`).
+- **Disconnect cancellation coverage.** The connection hook now also stops
+  process-tree alignment (the four reference ports per trace, the native
+  search per trace and every 256 expansions), decomposed alignment (per
+  variant in the reference port, per trace and search step natively), DFG
+  alignment (per search step and per variant), edit-distance alignment (per
+  target comparison), token replay forward and backward (per trace; also the
+  token conformance check, its precision prefix walk and Monte Carlo's
+  fitting replay), concept drift (per sub-log and permutation), Monte Carlo
+  (per scheduler event), the Petri, process-tree and graph alignment
+  workbenches, the replay workbenches, `/api/evaluate`'s decomposed fitness
+  and `/api/mine`: between its stages, inside the reachability search, the
+  conformance check and the model decorations, which take most of a mine
+  (about 120 of 140 s on the log below). A cancelled call throws
+  `OperationCancelled`; every route answers 400 and a cancelled mine
+  publishes nothing. Measured on a 5,000-case, 50,000-event log over 14
+  random activities, closing the socket during the run: edit distance
+  against itself (35 s uncancelled) closed at 3 s used 7.8 s of CPU in the
+  next 8 s on the previous server and 0.06 s on the new one; `/api/mine`
+  closed at 30 s 7.9 s and 0.10 s; closing a mine at 4, 6, 8, 10, 13, 16 or
+  20 s stops it within 0.15 s of CPU. Uncancelled responses are byte-equal
+  to the previous server for process-tree, DFG, decomposed and edit-distance
+  alignment and concept drift, and the mine response differs only in its
+  `source_id` counter. Concept drift's work bounds cap a run at about a
+  second, so it is never long. The session discovery routes measured
+  (`/api/discover-workflow` alpha, heuristic, IMf and POWL) answer in under
+  a second on this log and are not hooked. Native extension. Tests:
+  `minera_cancellation_hooks_tests` (each hook polls, leaves an uncancelled
+  result unchanged and throws once it fires; DFG alignment, concept drift,
+  Monte Carlo and edit distance stop within a second of a disconnect),
+  `minera_server_cancellation_tests` (edit distance and two mines stop
+  within a second of the client closing; the server keeps serving).

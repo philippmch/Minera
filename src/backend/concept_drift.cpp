@@ -1,4 +1,5 @@
 #include "minera/concept_drift.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1055,9 +1056,11 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
     result.sublog_start_timestamps.reserve(sublog_count);
   }
   std::size_t cumulative_events = 0;
+  CancellationCheck cancelled(options.cancelled, "concept drift detection was cancelled", 32);
 
   for (std::size_t start = 0; start < log.traces.size();
        start += options.sub_log_size) {
+    cancelled();
     const std::size_t end = std::min(
         log.traces.size(),
         start > std::numeric_limits<std::size_t>::max() - options.sub_log_size
@@ -1102,6 +1105,7 @@ ConceptDriftResult detect_concept_drift(const EventLog& log,
       double exceedances = 0.0;
       for (std::size_t permutation = 0; permutation < options.num_permutations;
            ++permutation) {
+        cancelled();
         exceedances += permutation_p_value(first, second, rng);
       }
       const double p_value = exceedances / options.num_permutations;

@@ -185,7 +185,7 @@ int main() {
   };
   const auto make = [](std::vector<std::vector<std::pair<std::string, std::string>>> cases) {
     minera::EventLog out;
-    double t = 0;
+    std::size_t t = 0;  // input_order (a double here is a narrowing error on Clang and MSVC)
     for (std::size_t c = 0; c < cases.size(); ++c) {
       const auto id = std::to_string(c + 1);
       minera::Trace trace{id, {}, {}};

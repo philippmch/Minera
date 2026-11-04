@@ -9,6 +9,7 @@
 //
 // Usage: minera_server_parameter_contract_tests <minera_server> <log.csv>
 
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <sys/time.h>
@@ -360,6 +361,11 @@ int connect_loopback(int port) {
   return fd;
 }
 
+// macOS has no MSG_NOSIGNAL; main ignores SIGPIPE there instead.
+#if !defined(MSG_NOSIGNAL)
+#define MSG_NOSIGNAL 0
+#endif
+
 bool send_all(int fd, const std::string& data) {
   for (std::size_t sent = 0; sent < data.size();) {
     const auto n = ::send(fd, data.data() + sent, data.size() - sent, MSG_NOSIGNAL);
@@ -464,6 +470,9 @@ int main(int argc, char** argv) {
     std::cerr << "usage: " << argv[0] << " <minera_server> <log.csv>\n";
     return 2;
   }
+  // A send to a server that already closed the connection must fail, not
+  // end the test (MSG_NOSIGNAL is Linux-only).
+  ::signal(SIGPIPE, SIG_IGN);
   std::ifstream log_file(argv[2], std::ios::binary);
   std::stringstream log_stream;
   log_stream << log_file.rdbuf();

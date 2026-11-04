@@ -1,4 +1,5 @@
 #include "minera/process_tree_alignment.hpp"
+#include "minera/cancellation.hpp"
 
 #include "minera/dfg_variants.hpp"
 #include "minera/process_tree_approximated_reference.hpp"
@@ -182,6 +183,8 @@ struct Limits {
       timed_out = total_timed_out = true;
       return false;
     }
+    if (o.cancelled && (expanded & 255u) == 255u)
+      throw_if_cancelled(o.cancelled, "process-tree alignment was cancelled");
     ++expanded;
     return true;
   }
@@ -622,7 +625,7 @@ std::vector<std::optional<ProcessTreeTraceAlignment>> reference_rows(
   };
   switch (options.variant) {
     case ProcessTreeAlignmentVariant::kDynamicProgramming: {
-      const auto aligned = reference_process_tree_dp_alignments(tree, traces);
+      const auto aligned = reference_process_tree_dp_alignments(tree, traces, options.cancelled);
       for (std::size_t i = 0; i < traces.size(); ++i) {
         auto row = row_of(traces[i]);
         for (const auto& move : aligned[i].moves) {
@@ -639,7 +642,7 @@ std::vector<std::optional<ProcessTreeTraceAlignment>> reference_rows(
     case ProcessTreeAlignmentVariant::kSearchGraphPt: {
       std::vector<std::string> labels;
       preorder_labels(tree.root(), tree, labels);
-      const auto aligned = reference_search_graph_alignments(tree, traces);
+      const auto aligned = reference_search_graph_alignments(tree, traces, options.cancelled);
       for (std::size_t i = 0; i < traces.size(); ++i) {
         auto row = row_of(traces[i]);
         for (const auto& move : aligned[i].alignment) {
@@ -654,7 +657,7 @@ std::vector<std::optional<ProcessTreeTraceAlignment>> reference_rows(
       break;
     }
     case ProcessTreeAlignmentVariant::kMilp: {
-      const auto aligned = reference_milp_alignments(tree, traces);
+      const auto aligned = reference_milp_alignments(tree, traces, options.cancelled);
       for (std::size_t i = 0; i < traces.size(); ++i) {
         if (!aligned[i].cost) {
           rows.push_back(std::nullopt);
@@ -673,7 +676,7 @@ std::vector<std::optional<ProcessTreeTraceAlignment>> reference_rows(
       ProcessTreeApproximatedOptions approximated;
       approximated.max_trace_length = options.max_trace_length;
       approximated.max_tree_height = options.max_process_tree_height;
-      const auto aligned = reference_approximated_alignments(tree, traces, approximated);
+      const auto aligned = reference_approximated_alignments(tree, traces, approximated, {}, options.cancelled);
       for (std::size_t i = 0; i < traces.size(); ++i) {
         if (!aligned[i]) {
           rows.push_back(std::nullopt);
@@ -865,8 +868,10 @@ ProcessTreeAlignmentResult align_process_tree(
   std::size_t unique_variants = 0;
   std::size_t approximation_loop_fallbacks = 0;
   bool total_deadline_reached = false;
+  CancellationCheck cancelled(options.cancelled, "process-tree alignment was cancelled", 16);
 
   for (const auto& trace : log.traces) {
+    cancelled();
     ProcessTreeTraceAlignment row;
     row.trace.reserve(trace.events.size());
     for (const auto& event : trace.events)

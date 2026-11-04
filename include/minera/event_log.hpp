@@ -153,7 +153,11 @@ class NativeAttributeValue
     Base::swap(other);
     std::swap(scalar_identity_, other.scalar_identity_);
   }
-  friend void swap(NativeAttributeValue& left, NativeAttributeValue& right) noexcept(noexcept(left.swap(right))) {
+  // The class is still incomplete here for clang with libc++ (Apple's
+  // toolchain), so the condition names the complete Base rather than
+  // left.swap(right).
+  friend void swap(NativeAttributeValue& left, NativeAttributeValue& right) noexcept(
+      noexcept(std::declval<Base&>().swap(std::declval<Base&>()))) {
     left.swap(right);
   }
   [[nodiscard]] std::uint64_t scalar_identity() const noexcept { return scalar_identity_; }

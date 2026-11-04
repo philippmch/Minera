@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -50,6 +51,11 @@ struct DecomposedAlignmentOptions {
   // By default standard costs without time or state limits run the reference
   // port (decomposed_reference.hpp); true always runs the native search.
   bool native_search = false;
+  // Polled while the computation runs (the server sets it to notice a client
+  // that disconnected); once it returns true the call throws
+  // OperationCancelled (minera/cancellation.hpp) and returns nothing. Unset
+  // never cancels, and a run that is not cancelled is unchanged.
+  std::function<bool()> cancelled;
 };
 
 struct DecomposedAlignmentTrace {

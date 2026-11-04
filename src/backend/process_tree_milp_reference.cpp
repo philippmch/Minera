@@ -1,4 +1,5 @@
 #include "minera/process_tree_milp_reference.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -619,7 +620,8 @@ ProcessTreeMilpAlignment reference_milp_align(const ProcessTree& tree, const std
 }
 
 std::vector<ProcessTreeMilpAlignment> reference_milp_alignments(const ProcessTree& tree,
-                                                                const std::vector<std::vector<std::string>>& traces) {
+                                                                const std::vector<std::vector<std::string>>& traces,
+                                                                const std::function<bool()>& cancelled) {
   // apply aligns each variant once, the empty trace first.
   std::map<std::vector<std::string>, ProcessTreeMilpAlignment> variants;
   const ProcessTreeMilpAlignment& empty = variants.emplace(std::vector<std::string>{}, reference_milp_align(tree, {}))
@@ -628,6 +630,7 @@ std::vector<ProcessTreeMilpAlignment> reference_milp_alignments(const ProcessTre
   const double floor = std::round((*empty.cost + 1e-14) * 1e13) / 1e13;
   std::vector<ProcessTreeMilpAlignment> out;
   for (const auto& trace : traces) {
+    throw_if_cancelled(cancelled, "process-tree alignment was cancelled");
     auto found = variants.find(trace);
     if (found == variants.end()) found = variants.emplace(trace, reference_milp_align(tree, trace)).first;
     ProcessTreeMilpAlignment aligned = found->second;

@@ -46,6 +46,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <random>
 #include <sstream>
 #include <set>
 #include <string>
@@ -1081,6 +1082,14 @@ minera::CorrelationVariantsAnalysis analyze_correlation_variants(
   return result;
 }
 
+// A client that gave up (closed the tab, aborted the fetch) gets nothing from
+// a result. Long searches poll this callback and stop instead of finishing
+// for no one; it is empty when the transport cannot tell.
+std::function<bool()> connection_cancel_hook(const httplib::Request& request) {
+  if (!request.is_connection_closed) return {};
+  return [&request] { return request.is_connection_closed(); };
+}
+
 #include "active_source_route.hpp"
 #include "mine_limits.hpp"
 #include "active_source_options.hpp"
@@ -1159,7 +1168,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         prepare_active_event_source(request, *csv, dataset, params, &paired_csv_import_error, true));
     // A canceled or superseded request stops between stages with the same
     // answer publish_active_mining gives; the stages themselves are unchanged.
-    const auto checkpoint = [&] {abort_if_mining_canceled(ticket);};
+    // A client that disconnected stops there too, and inside the decorations.
+    const auto disconnected = connection_cancel_hook(request);
+    const auto checkpoint = [&] {
+      abort_if_mining_canceled(ticket);
+      minera::throw_if_cancelled(disconnected, "mining request was cancelled: the client disconnected");
+    };
     checkpoint();
     if(minera::exact_heuristic_options_requested([&](std::string_view key){return active_source_supplied(request,key);}))params.heuristic=exact_heuristic_options;
     minera::record_exact_effective_options(params);
@@ -1377,9 +1391,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       replay_options = minera::tools::default_replay_input_options(
           *conformance_log, std::move(replay_options),
           params.token_replay_activity_attribute_supplied);
+      replay_options.cancelled = disconnected;
       checkpoint();
       return minera::ModelConformance{std::move(id),
-                                      minera::final_marking_reachable(petri),
+                                      minera::final_marking_reachable(petri, disconnected),
                                       minera::check_conformance(
                                            *conformance_log, petri,
                                            replay_options),
@@ -1403,14 +1418,15 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // Frequency/performance annotations for every miner's Petri-net view:
     // one more token replay per net, cheap enough to compute up front.
     checkpoint();
-    const auto petri_decoration = minera::decorate_model(alpha_log, net);
-    const auto inductive_decoration =
-        minera::decorate_model(inductive_log, inductive_net);
+    const auto petri_decoration = minera::decorate_model(
+        alpha_log, net, "concept:name", "time:timestamp", disconnected);
+    const auto inductive_decoration = minera::decorate_model(
+        inductive_log, inductive_net, "concept:name", "time:timestamp", disconnected);
     const auto heuristic_decoration = minera::decorate_model(
         log, heuristic_net, params.heuristic.activity_attribute,
-        params.heuristic.timestamp_attribute);
+        params.heuristic.timestamp_attribute, disconnected);
     const auto powl_decoration = minera::decorate_model(
-        powl_log, powl_net, params.powl.activity_key, params.powl.timestamp_key);
+        powl_log, powl_net, params.powl.activity_key, params.powl.timestamp_key, disconnected);
 
     checkpoint();
     std::string body = minera::analysis_json(
@@ -4464,14 +4480,6 @@ void handle_workflow_discovery(const httplib::Request& request,
 
 bool handle_literal_controls_request(const httplib::Request&, httplib::Response&, std::string_view);
 
-// A client that gave up (closed the tab, aborted the fetch) gets nothing from
-// a result. Long searches poll this callback and stop instead of finishing
-// for no one; it is empty when the transport cannot tell.
-std::function<bool()> connection_cancel_hook(const httplib::Request& request) {
-  if (!request.is_connection_closed) return {};
-  return [&request] { return request.is_connection_closed(); };
-}
-
 // Cached-session adapter for the bounded classic ILP miner. The log is
 // intentionally taken from the latest /api/mine session so this endpoint does
 // not accept uploads or perform any implicit re-importing.
@@ -6059,9 +6067,10 @@ void handle_token_replay(const httplib::Request& request,
     import_options.import_stochastic_map = false;
     const auto document = minera::parse_pnml_document(
         request.get_file_value("model").content, import_options);
-    const auto options = minera::tools::default_replay_input_options(
+    auto options = minera::tools::default_replay_input_options(
         log, minera::tools::pnml_replay_options(document, params.token_replay),
         params.token_replay_activity_attribute_supplied);
+    options.cancelled = connection_cancel_hook(request);
     response.set_content(minera::token_replay_result_json(
         minera::replay_token_result(log, document.net, options)), "application/json");
   } catch (const std::exception& error) {
@@ -6104,6 +6113,7 @@ void handle_token_replay_workbench(const httplib::Request& request,
     auto options = minera::tools::default_replay_input_options(
         source_log, minera::tools::pnml_replay_options(document, params.token_replay),
         params.token_replay_activity_attribute_supplied);
+    options.cancelled = connection_cancel_hook(request);
     if (typed_source || present("mining_selectors_json")) {
       if (!present("token_replay_activity_attribute")) options.activity_attribute = owned_source.selectors().activity_key;
       if (!present("token_replay_case_id_attribute")) options.case_id_attribute = owned_source.selectors().case_id_key;
@@ -6217,6 +6227,7 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
     };
     const auto params = minera::parse_mine_params(lookup, present);
     auto options = minera::parse_alignment_params(lookup, present);
+    options.cancelled = connection_cancel_hook(request);
     const auto adapter = minera::parse_alignment_input_adapter(lookup, present);
     const auto& file = request.get_file_value("log");
     const auto& model_file = request.get_file_value("model");
@@ -6708,6 +6719,7 @@ void handle_concept_drift(const httplib::Request& request,
     auto options = minera::parse_concept_drift_params(lookup, present);
     // The route reports partition sizes only, so no sub-log is copied.
     options.materialize_sublogs = false;
+    options.cancelled = connection_cancel_hook(request);
     const auto result = minera::detect_concept_drift(require_prepared_log(*session), options);
     response.set_content(minera::concept_drift_json(result), "application/json");
   } catch (const std::exception& error) {
@@ -8096,6 +8108,8 @@ void handle_evaluate(const httplib::Request& request,
     // Alignment-based fitness and precision stop when the client disconnects.
     params.replay_fitness_options.alignment_options.cancelled = connection_cancel_hook(request);
     params.precision_options.cancelled = connection_cancel_hook(request);
+    if (params.replay_fitness_options.decomposed_alignment_options)
+      params.replay_fitness_options.decomposed_alignment_options->cancelled = connection_cancel_hook(request);
     const auto adapter = minera::parse_evaluation_input_adapter(lookup, present);
     const auto* evaluation_document = miner == "imported" && session->imported_document && !converted
         ? &*session->imported_document : nullptr;
@@ -8440,7 +8454,8 @@ void handle_align_process_tree(const httplib::Request& request,
       const auto key = std::string(name);
       return request.has_param(key) || request.has_file(key);
     };
-    const auto options = minera::parse_process_tree_alignment_params(lookup, present);
+    auto options = minera::parse_process_tree_alignment_params(lookup, present);
+    options.cancelled = connection_cancel_hook(request);
     const auto result = minera::align_process_tree(cached_model_log(*session,"inductive"),
                                                    require_process_tree(*session),
                                                    options);
@@ -8472,7 +8487,7 @@ void handle_align_decomposed(const httplib::Request& request, httplib::Response&
         throw std::invalid_argument(
             "unknown decomposed alignment parameter: " + key);
     }
-    const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_decomposed_alignment_params(lookup,present); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(require_prepared_log(*session),o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::align_decomposed(*alignment_log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
+    const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_decomposed_alignment_params(lookup,present); o.cancelled=connection_cancel_hook(request); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(require_prepared_log(*session),o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::align_decomposed(*alignment_log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
   catch(const std::exception& e){response.status=400; response.set_content(error_json(e.what()),"application/json");}
 }
 
@@ -8571,6 +8586,7 @@ void handle_align_dfg(const httplib::Request& request, httplib::Response& respon
     const auto lookup = [&](std::string_view n) { const auto key=std::string(n); if (request.has_param(key)) return request.get_param_value(key); if (request.has_file(key)) return request.get_file_value(key).content; return std::string{}; };
     const auto present = [&](std::string_view n) { const auto key=std::string(n); return request.has_param(key) || request.has_file(key); };
     auto options = minera::parse_dfg_alignment_params(lookup, present);
+    options.cancelled = connection_cancel_hook(request);
     const auto projection = present("projection") ? lookup("projection") : std::string("none");
     if (projection != "none" && projection != "log" && projection != "metrics") throw std::invalid_argument("projection expects none, log, or metrics");
     minera::DfgStatisticalOptions dopt; dopt.window = 1; dopt.activity_attribute = options.activity_attribute; dopt.timestamp_attribute = options.timestamp_attribute; const auto dfg = minera::discover_frequency_dfg(require_prepared_log(*session), dopt);
@@ -8603,6 +8619,7 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
     const auto lookup = [&](std::string_view n) { const auto key=std::string(n); if (request.has_param(key)) return request.get_param_value(key); if (request.has_file(key)) return request.get_file_value(key).content; return std::string{}; };
     const auto present = [&](std::string_view n) { const auto key=std::string(n); return request.has_param(key) || request.has_file(key); };
     auto options = minera::parse_edit_distance_params(lookup, present);
+    options.cancelled = connection_cancel_hook(request);
     if (cached_source_uses_bound_defaults(*session)) {
       const auto& selectors = session->active_source->selectors();
       if (!present("edit_activity_attribute")) options.activity_attribute = selectors.activity_key;
@@ -9008,6 +9025,7 @@ void handle_monte_carlo_json(const httplib::Request& request,
         lookup, present, map_record_limit);
     cached_imported_monte_carlo_context(request, *session, selected_miner, options);
     validate_monte_carlo_server_limits(options, selected);
+    options.cancelled = connection_cancel_hook(request);
     std::optional<minera::EventLog> projected_powl_log;
     const minera::EventLog* simulation_log =
         &cached_model_log(*session, selected_miner);
@@ -11214,6 +11232,7 @@ int main(int argc, char** argv) {
   mallopt(M_MMAP_THRESHOLD, 1 << 20);
 #endif
 #endif
+  minera::set_analysis_trace_run_id(new_analysis_trace_run_id());
   int port = 8484;
   std::filesystem::path frontend_dir = "src/frontend/dist";
   std::string embedding_runtime_url;
@@ -11786,7 +11805,7 @@ int main(int argc, char** argv) {
   }
 
   std::cout << "minera " << minera::version_major << '.' << minera::version_minor
-            << '.' << minera::version_patch << " â€” listening on http://localhost:"
+            << '.' << minera::version_patch << " - listening on http://localhost:"
             << port << '\n';
   if (!has_frontend) {
     std::cout << "note: frontend directory not found (" << frontend_dir.string()

@@ -565,8 +565,14 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
     if (contains(heuristics.end_activities, a)) {
       out_alts.push_back({sink});  // finishing is one more alternative
     }
-    net.add_transition(a, merge(std::move(in_alts), true),
-                       merge(std::move(out_alts), false));
+    // merge() adds places and transitions, so the two calls must be
+    // sequenced: as function arguments their order is unspecified (GCC and
+    // MSVC evaluate right to left, Clang left to right), which numbered the
+    // net differently on macOS. The output side goes first, as the pinned
+    // GCC results expect.
+    auto outputs = merge(std::move(out_alts), false);
+    auto inputs = merge(std::move(in_alts), true);
+    net.add_transition(a, std::move(inputs), std::move(outputs));
   }
   PetriNetReductionOptions reduction_options;
   reduction_options.preserve_join_bridges = true;

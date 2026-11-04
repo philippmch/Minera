@@ -3,6 +3,7 @@
 #include <any>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <set>
@@ -59,6 +60,11 @@ struct EditDistanceOptions {
   // Case field used when an EventDataView table or stream is converted to an
   // EventLog. It does not affect an EventLog whose traces are already grouped.
   std::string case_id_attribute = "case:concept:name";
+  // Polled while the computation runs (the server sets it to notice a client
+  // that disconnected); once it returns true the call throws
+  // OperationCancelled (minera/cancellation.hpp) and returns nothing. Unset
+  // never cancels, and a run that is not cancelled is unchanged.
+  std::function<bool()> cancelled;
 };
 
 struct EditDistanceAlignment {

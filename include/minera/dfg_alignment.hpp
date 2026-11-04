@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <map>
 #include <optional>
@@ -52,6 +53,11 @@ struct DfgAlignmentOptions {
   // keeps the random draw. Names must differ from each other, from every
   // model activity and from the trace's activities.
   std::optional<std::pair<std::string, std::string>> routing_names;
+  // Polled while the computation runs (the server sets it to notice a client
+  // that disconnected); once it returns true the call throws
+  // OperationCancelled (minera/cancellation.hpp) and returns nothing. Unset
+  // never cancels, and a run that is not cancelled is unchanged.
+  std::function<bool()> cancelled;
 };
 
 struct DfgAlignmentResult {

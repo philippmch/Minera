@@ -6919,7 +6919,7 @@ export interface DataPetriNetResult {
 
 /** What a mining response without its traces says about them. */
 export interface TraceSummary {
-  /** The traces are served by GET /api/traces?source_id=. */
+  /** The traces are served by GET /api/traces?source_id=&run_id=. */
   traces: "on_demand";
   trace_count: number;
   event_count: number;
@@ -6931,6 +6931,8 @@ export interface TraceSummary {
   has_lifecycles: boolean;
   /** Distinct lifecycle transitions, in first-seen order. */
   lifecycles: string[];
+  /** The server run holding the traces; GET /api/traces requires it back. */
+  run_id?: string;
 }
 
 export function isTraceSummary(value: unknown, traceCount: number, eventCount: number): value is TraceSummary {
@@ -6943,7 +6945,8 @@ export function isTraceSummary(value: unknown, traceCount: number, eventCount: n
     summary.has_timestamps === summary.timestamped_trace_count > 0 &&
     Array.isArray(summary.lifecycles) && summary.lifecycles.every((item) => typeof item === "string" && item !== "") &&
     new Set(summary.lifecycles).size === summary.lifecycles.length &&
-    summary.has_lifecycles === summary.lifecycles.length > 0;
+    summary.has_lifecycles === summary.lifecycles.length > 0 &&
+    (summary.run_id === undefined || typeof summary.run_id === "string" && summary.run_id !== "");
 }
 
 export interface MineraExport {

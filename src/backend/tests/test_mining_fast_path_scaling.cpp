@@ -22,7 +22,18 @@
 #include "minera/petri_net.hpp"
 #include "minera/powl_discovery.hpp"
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef PSAPI_VERSION
+#define PSAPI_VERSION 2  // GetProcessMemoryInfo from kernel32, no psapi.lib
+#endif
+#include <windows.h>
+#include <psapi.h>
+#else
 #include <sys/resource.h>
+#endif
 
 #include <cassert>
 #include <chrono>
@@ -109,10 +120,23 @@ EventLog many_activities_log() {
   return build(traces);
 }
 
+// Peak resident set size in KiB. ru_maxrss is KiB on Linux but bytes on
+// macOS; Windows reports the peak working set in bytes.
 long peak_rss_kib() {
+#if defined(_WIN32)
+  PROCESS_MEMORY_COUNTERS counters{};
+  counters.cb = sizeof counters;
+  if (!GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof counters)) return 0;
+  return static_cast<long>(counters.PeakWorkingSetSize / 1024);
+#else
   rusage usage{};
   getrusage(RUSAGE_SELF, &usage);
+#if defined(__APPLE__)
+  return static_cast<long>(usage.ru_maxrss / 1024);
+#else
   return usage.ru_maxrss;
+#endif
+#endif
 }
 
 struct Case {

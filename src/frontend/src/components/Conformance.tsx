@@ -1104,7 +1104,7 @@ export function ReductionTraceField({ data, traceIndex, onChange }: { data: Mine
             {load.status === "loading" && <option disabled value="">Loading {numberFormat.format(data.trace_count)} cases…</option>}
           </>}
     </select></label>
-    {load.status === "error" && <TraceLoadNote load={load} />}
+    {(load.status === "error" || (load.status === "unavailable" && !!data.trace_summary)) && <TraceLoadNote load={load} />}
   </>;
 }
 

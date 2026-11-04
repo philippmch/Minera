@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string_view>
 #include <vector>
 
@@ -37,12 +38,14 @@ struct ModelDecoration {
 // Decorates `net` with the replay of `log`. Tokens are matched
 // first-in-first-out per place, and a silent transition fires at the instant
 // of the event whose consumption triggered it (the routing to the sink at the
-// case's last instant).
+// case's last instant). `cancelled` is polled during the replay; once it
+// returns true the call throws OperationCancelled.
 [[nodiscard]] ModelDecoration decorate_model(const EventLog& log,
                                              const PetriNet& net,
                                              std::string_view activity_attribute =
                                                  "concept:name",
                                              std::string_view timestamp_attribute =
-                                                 "time:timestamp");
+                                                 "time:timestamp",
+                                             const std::function<bool()>& cancelled = {});
 
 }  // namespace minera

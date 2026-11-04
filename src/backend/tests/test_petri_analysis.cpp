@@ -2,6 +2,7 @@
 #include "minera/petri_analysis_json.hpp"
 #include "minera/event_log.hpp"
 #include "minera/petri_trace_alignment.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -1065,6 +1066,27 @@ void alignment_weighted_and_parallel_arcs() {
   options.trace.variant = AlignmentVariant::kDijkstraLessMemory;
   const auto direct = align_petri_log(log_of({{"a", "c", "b"}, {"a", "b"}}), sync, options);
   assert(direct[0].computed && direct[0].cost == 0.0 && direct[1].cost == 10000.0);
+
+  // The easy-soundness search honours the aligner's time limit and
+  // cancellation. "pump" adds two tokens to the middle place, which "b"
+  // empties two at a time from an odd count, so the final marking is never
+  // reached although the marking equation's relaxation is feasible, and the
+  // search grows without bound.
+  const auto unbounded = compact_net(3, {"a", "pump", "b"},
+      {{0, {{0}, {1}}, {{1}, {1}}}, {1, {{1}, {1}}, {{1}, {3}}}, {2, {{1}, {2}}, {{2}, {1}}}});
+  options.trace.variant = AlignmentVariant::kStateEquationAStar;
+  options.trace.max_states = std::numeric_limits<std::size_t>::max();
+  options.trace.max_time_seconds = 0.05;
+  refused = false;
+  try { (void)align_petri_log(log_of({{"a", "b"}}), unbounded, options); }
+  catch (const std::invalid_argument&) { refused = true; }
+  assert(refused);
+  options.trace.max_time_seconds = 0.0;
+  options.trace.cancelled = [] { return true; };
+  bool cancelled = false;
+  try { (void)align_petri_log(log_of({{"a", "b"}}), unbounded, options); }
+  catch (const OperationCancelled&) { cancelled = true; }
+  assert(cancelled);
 }
 
 int main() {

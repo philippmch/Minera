@@ -29,4 +29,11 @@ class OmitAnalysisTraces {
 [[nodiscard]] std::string analysis_traces_json(const EventLog& log,
                                                const DirectlyFollowsGraph& graph);
 
+// A token naming this server run, set once at startup before any request.
+// When it is set, every "trace_summary" carries it as "run_id" and GET
+// /api/traces requires it back, so a summary saved or held from an earlier
+// run (whose source ids restart at 1) never loads another log's traces.
+void set_analysis_trace_run_id(std::string run_id);
+[[nodiscard]] const std::string& analysis_trace_run_id();
+
 }  // namespace minera

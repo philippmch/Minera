@@ -275,7 +275,13 @@ struct Database {
   }
 };
 
-std::string uri_of(const std::filesystem::path& path) { return "file:" + path.string() + "?mode=ro"; }
+// SQLite takes UTF-8 names (and URIs) on every platform; path.string() is
+// the ANSI code page on Windows.
+std::string utf8_name(const std::filesystem::path& path) {
+  const auto text = path.u8string();
+  return std::string(reinterpret_cast<const char*>(text.data()), text.size());
+}
+std::string uri_of(const std::filesystem::path& path) { return "file:" + utf8_name(path) + "?mode=ro"; }
 #endif
 
 const char* const kChromeTransitions[] = {"LINK",  "TYPED",      "AUTO_BOOKMARK", "AUTO_SUBFRAME", "MANUAL_SUBFRAME", "GENERATED",
@@ -748,7 +754,7 @@ ConnectorReferenceFrame reference_firefox_history(const std::filesystem::path& d
   (void)database;
   throw std::runtime_error("firefox history: SQLite support is unavailable");
 #else
-  Database db(database.string(), SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
+  Database db(utf8_name(database), SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE);
   const auto rows = db.query(
       "SELECT p.url, v.visit_date, p.title, v.visit_type, v.session, v.from_visit, p.visit_count, p.typed, p.frecency, "
       "p.guid FROM moz_historyvisits v JOIN moz_places p ON v.place_id = p.id");

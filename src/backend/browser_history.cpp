@@ -28,9 +28,11 @@ constexpr std::size_t kMaxEvents = 10'000'000;
 class Database {
  public:
   explicit Database(const std::filesystem::path& path) {
-    const auto name = path.string();
+    // SQLite takes UTF-8 names on every platform; path.string() is the ANSI
+    // code page on Windows and garbles (or throws on) non-ASCII profiles.
+    const auto name = path.u8string();
     const auto status = sqlite3_open_v2(
-        name.c_str(), &db_, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nullptr);
+        reinterpret_cast<const char*>(name.c_str()), &db_, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nullptr);
     if (status != SQLITE_OK) {
       const std::string message = db_ ? sqlite3_errmsg(db_) : "unknown error";
       if (db_) sqlite3_close(db_);

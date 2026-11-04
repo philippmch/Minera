@@ -60,8 +60,11 @@ class Statement {
 class Database {
  public:
   Database(const std::filesystem::path& path, int flags) {
-    const auto name = path.string();
-    const auto status = sqlite3_open_v2(name.c_str(), &db_, flags, nullptr);
+    // SQLite takes UTF-8 names on every platform; path.string() is the ANSI
+    // code page on Windows and garbles (or throws on) a non-ASCII temp dir.
+    const auto name = path.u8string();
+    const auto status =
+        sqlite3_open_v2(reinterpret_cast<const char*>(name.c_str()), &db_, flags, nullptr);
     if (status != SQLITE_OK) {
       const std::string message = db_ == nullptr
                                       ? "unable to open database"

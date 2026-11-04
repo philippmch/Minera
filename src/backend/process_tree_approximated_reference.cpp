@@ -1,4 +1,5 @@
 #include "minera/process_tree_approximated_reference.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -873,13 +874,15 @@ std::size_t reference_approximated_cost(const ProcessTreeApproximatedMoves& alig
 
 std::vector<std::optional<ProcessTreeApproximatedAlignment>> reference_approximated_alignments(
     const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces,
-    const ProcessTreeApproximatedOptions& options, const ProcessTreeApproximatedOracle& oracle) {
+    const ProcessTreeApproximatedOptions& options, const ProcessTreeApproximatedOracle& oracle,
+    const std::function<bool()>& cancelled) {
   const ProcessTree binary = reference_approximated_binary_tree(tree);
   Aligner aligner(binary, options, oracle);
   const double best_worst = static_cast<double>(dijkstra(NetBuilder(binary).build(binary.root()), {}).second);
   std::map<Trace, std::optional<ProcessTreeApproximatedAlignment>> done;
   std::vector<std::optional<ProcessTreeApproximatedAlignment>> out;
   for (const auto& trace : traces) {
+    throw_if_cancelled(cancelled, "process-tree alignment was cancelled");
     auto found = done.find(trace);
     if (found == done.end()) {
       std::optional<ProcessTreeApproximatedAlignment> result;

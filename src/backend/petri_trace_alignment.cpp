@@ -1,9 +1,11 @@
 #include "minera/petri_trace_alignment.hpp"
 #include "minera/petri_analysis.hpp"
 #include "minera/petri_reference_arcs.hpp"
+#include "minera/cancellation.hpp"
 
 #include <limits>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <unordered_map>
@@ -20,6 +22,28 @@ namespace minera {
 namespace {
 
 constexpr double kStandardMoveCost = 10000.0;
+
+// max_time_seconds and cancelled, polled every 256 steps as the Aligner
+// polls its callback: true once the search must stop.
+class SearchBudget {
+ public:
+  explicit SearchBudget(const PetriTraceAlignmentOptions& options)
+      : options_(options), started_(std::chrono::steady_clock::now()) {}
+  bool exhausted() {
+    if ((++calls_ & 255u) != 0) return false;
+    if (options_.cancelled && options_.cancelled()) return cancelled_ = true;
+    return options_.max_time_seconds > 0.0 &&
+           std::chrono::duration<double>(std::chrono::steady_clock::now() - started_).count() >=
+               options_.max_time_seconds;
+  }
+  [[nodiscard]] bool cancelled() const { return cancelled_; }
+
+ private:
+  const PetriTraceAlignmentOptions& options_;
+  std::chrono::steady_clock::time_point started_;
+  unsigned calls_ = 0;
+  bool cancelled_ = false;
+};
 
 bool generator_variant(AlignmentVariant variant) {
   return variant == AlignmentVariant::kGeneratorDijkstraNoHeuristics ||
@@ -172,6 +196,7 @@ PrunedSearchResult pruned_dijkstra(const std::vector<std::string>& trace, const 
   queue.push({0.0, 0, seq++, 0});
   ++diagnostics.queued_states;
   std::optional<std::size_t> target;
+  SearchBudget budget(options);
   while (!queue.empty()) {
     const auto entry = queue.top();
     queue.pop();
@@ -179,7 +204,7 @@ PrunedSearchResult pruned_dijkstra(const std::vector<std::string>& trace, const 
     if (current.closed || entry.cost > current.cost) continue;
     const auto closed = closed_position.find(current.marking);
     if (closed != closed_position.end() && closed->second >= current.position) continue;
-    if (diagnostics.visited_states >= options.max_states) break;
+    if (diagnostics.visited_states >= options.max_states || budget.exhausted()) break;
     current.closed = true;
     ++diagnostics.visited_states;
     if (closed == closed_position.end()) closed_position.emplace(current.marking, current.position);
@@ -256,6 +281,8 @@ AlignmentOptions search_options(const std::vector<std::string>& trace, const Pet
   search.final_marking = options.final_marking;
   search.max_states = options.max_states;
   search.max_alignments = options.max_alignments;
+  search.max_time_seconds = options.max_time_seconds;
+  search.cancelled = options.cancelled;
   switch (options.variant) {
     case AlignmentVariant::kDijkstraLessMemory:
     case AlignmentVariant::kGeneratorDijkstraLessMemory:
@@ -384,9 +411,12 @@ bool weighted_net(const PetriNet& net) { return petri_net_has_weighted_arcs(net)
 // of its arcs, takes the weight of one of them (the reference keeps whichever
 // arc its set yields last, here the last in document order) and puts the
 // summed weight of its output arcs. A search that passes max_states refuses
-// the net, as the reference does for the unbounded nets probed.
+// the net, as the reference does for the unbounded nets probed, and so does
+// one past max_time_seconds; a cancelled one throws OperationCancelled.
 bool reference_easy_sound(const PetriNet& net, const std::vector<int>& requested_initial,
-                          const std::vector<int>& requested_final, std::size_t max_states) {
+                          const std::vector<int>& requested_final,
+                          const PetriTraceAlignmentOptions& options) {
+  const auto max_states = options.max_states;
   const auto initial = workflow_marking(net, requested_initial, true);
   const auto final = workflow_marking(net, requested_final, false);
   if (!marking_equation_relaxation_feasible(net, Marking(initial.begin(), initial.end()),
@@ -422,7 +452,12 @@ bool reference_easy_sound(const PetriNet& net, const std::vector<int>& requested
   std::set<std::vector<std::int64_t>> seen{start};
   std::queue<std::vector<std::int64_t>> pending;
   pending.push(start);
+  SearchBudget budget(options);
   while (!pending.empty()) {
+    if (budget.exhausted()) {
+      if (budget.cancelled()) throw OperationCancelled("easy-soundness check was cancelled");
+      return false;
+    }
     const auto marking = std::move(pending.front());
     pending.pop();
     if (marking == goal) return true;
@@ -574,7 +609,7 @@ std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const Petr
   const bool easy_sound =
       plain_net(net) && weighted_net(net)
           ? reference_easy_sound(net, options.trace.initial_marking, options.trace.final_marking,
-                                 options.trace.max_states)
+                                 options.trace)
           : final_marking_reachable(net, options.trace.initial_marking, options.trace.final_marking);
   if (!easy_sound)
     throw std::invalid_argument("trying to apply alignments on a Petri net that is not easy sound");
@@ -583,6 +618,7 @@ std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const Petr
   std::vector<PetriTraceAlignment> out;
   out.reserve(log.traces.size());
   for (const auto& trace : log.traces) {
+    throw_if_cancelled(options.trace.cancelled, "alignment was cancelled");
     std::vector<std::string> activities;
     activities.reserve(trace.events.size());
     for (const auto& event : trace.events) {

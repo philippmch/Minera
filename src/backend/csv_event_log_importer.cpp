@@ -939,6 +939,8 @@ CsvEventData import_csv_event_data_impl(
   struct PendingRow {
     std::size_t line_number = 0;
     std::size_t token = 0;
+    // The timestamp cell held only whitespace, which trim_fields blanked.
+    bool blank_timestamp = false;
     Event event;
     std::vector<EventAttribute> case_attributes;
     EventTable::Row table_row;
@@ -972,7 +974,13 @@ CsvEventData import_csv_event_data_impl(
       continue;
     }
 
-    auto fields = parse_csv_row(line, options.delimiter, options.trim_fields);
+    // to_datetime cannot convert a whitespace-only timestamp (it is text to
+    // the reference), so the batch import tells it apart from an empty cell
+    // before trim_fields blanks it.
+    const bool untrimmed_timestamp =
+        reference_batch && options.trim_fields && timestamp_index.has_value();
+    auto fields = parse_csv_row(line, options.delimiter,
+                                options.trim_fields && !untrimmed_timestamp);
     if (reference_batch) {
       if (!expected_fields) {
         index_fields = fields.size() > header.size() ? fields.size() - header.size() : 0;
@@ -1000,6 +1008,14 @@ CsvEventData import_csv_event_data_impl(
                    fields.begin() + static_cast<std::ptrdiff_t>(
                                         std::min(index_fields, fields.size())));
     }
+    bool blank_timestamp = false;
+    if (untrimmed_timestamp) {
+      if (*timestamp_index < fields.size()) {
+        const auto& cell = fields[*timestamp_index];
+        blank_timestamp = !cell.empty() && cell.find_first_not_of(" \t\r\n") == std::string::npos;
+      }
+      for (auto& field : fields) field = trim(std::move(field));
+    }
     auto case_id = cell_at(fields, case_index);
     auto activity = cell_at(fields, activity_index);
     auto timestamp = timestamp_index ? cell_at(fields, *timestamp_index)
@@ -1018,6 +1034,7 @@ CsvEventData import_csv_event_data_impl(
     PendingRow row;
     row.line_number = line_number;
     row.token = token;
+    row.blank_timestamp = blank_timestamp;
     for (const auto index : case_attribute_indices) {
       // The batch import keeps blank cells too: the reference takes a case
       // attribute from one row only, which may be blank (missing).
@@ -1132,25 +1149,45 @@ CsvEventData import_csv_event_data_impl(
   std::size_t parsed_timestamps = 0;
   std::optional<std::pair<std::size_t, std::string>> first_bad_timestamp;
   // format_dataframe also drops a row whose timestamp is NA once the column
-  // converts to dates (some kept row's cell parses), as it drops one without
-  // a case id or activity. A column with no date keeps every row (see the
+  // converts to dates, as it drops one without a case id or activity. The
+  // conversion is decided from every row of the column, rows without a case
+  // id or activity too: a cell that parses, or a NaT spelling (to_datetime
+  // reads `NaT`, `NAT` and `nat` as missing dates), makes the column dates,
+  // and then a cell that cannot be converted (a whitespace-only one too)
+  // refuses the frame. A column with no date keeps every row (see the
   // conversion below), and stream readers keep NA spellings as values.
+  const auto nat_timestamp = [](std::string_view text) {
+    return text == "NaT" || text == "NAT" || text == "nat";
+  };
   bool drop_untimed_rows = false;
+  std::optional<std::pair<std::size_t, std::string>> first_unconverted_timestamp;
   if (reference_batch && timestamp_index) {
     for (const auto& row : pending) {
-      if (!case_ids[row.token] || !activities[row.token]) continue;
       const auto& timestamp = row.event.timestamp;
-      if (!is_reference_na_token(timestamp) && reference_timestamp_text(timestamp)) {
-        drop_untimed_rows = true;
-        break;
+      if (row.blank_timestamp) {
+        if (!first_unconverted_timestamp)
+          first_unconverted_timestamp = std::make_pair(row.line_number, std::string{});
+        continue;
       }
+      if (is_reference_na_token(timestamp)) continue;
+      if (nat_timestamp(timestamp)) {
+        drop_untimed_rows = true;
+        continue;
+      }
+      // Once the column holds dates, the scan below parses the kept rows.
+      if (drop_untimed_rows && case_ids[row.token] && activities[row.token]) continue;
+      if (reference_timestamp_text(timestamp)) drop_untimed_rows = true;
+      else if (!first_unconverted_timestamp)
+        first_unconverted_timestamp = std::make_pair(row.line_number, timestamp);
     }
   }
   for (auto& row : pending) {
     const auto& case_id = case_ids[row.token];
     const auto& activity = activities[row.token];
     if (!case_id || !activity) continue;
-    if (drop_untimed_rows && is_reference_na_token(row.event.timestamp)) continue;
+    if (drop_untimed_rows && (is_reference_na_token(row.event.timestamp) ||
+                              nat_timestamp(row.event.timestamp)))
+      continue;
     if (timestamp_index) {
       // Decided per column after the scan; see apply below.
       const auto& timestamp = row.event.timestamp;
@@ -1216,12 +1253,17 @@ CsvEventData import_csv_event_data_impl(
   // the frame, and keeping it would silently yield untimed events. A column
   // with no date at all keeps its opaque text, the established native
   // contract for non-temporal timestamp selectors.
-  if (timestamp_index && parsed_timestamps > 0) {
+  if (timestamp_index && (reference_batch ? drop_untimed_rows : parsed_timestamps > 0)) {
+    if (first_unconverted_timestamp &&
+        (!first_bad_timestamp || first_unconverted_timestamp->first < first_bad_timestamp->first))
+      first_bad_timestamp = first_unconverted_timestamp;
     if (first_bad_timestamp) {
+      const auto& text = first_bad_timestamp->second;
       throw std::runtime_error(
-          "CSV row " + std::to_string(first_bad_timestamp->first) +
-          " has a timestamp '" + first_bad_timestamp->second +
-          "' in column '" + header[*timestamp_index] +
+          "CSV row " + std::to_string(first_bad_timestamp->first) + " has " +
+          (text.empty() ? std::string("a whitespace-only timestamp")
+                        : "a timestamp '" + text + "'") +
+          " in column '" + header[*timestamp_index] +
           "' that cannot be parsed as a date/time");
     }
     for (auto& trace : log.traces) {

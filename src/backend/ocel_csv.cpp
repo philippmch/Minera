@@ -35,13 +35,20 @@ std::string trim(std::string value) {
   return value.substr(first, last - first + 1);
 }
 
-bool blank_row(const Row& row) {
-  return std::all_of(row.begin(), row.end(), [](const std::string& cell) {
-    return cell.empty();
-  });
-}
-
-Table parse_table(std::string_view input, char delimiter, bool trim_fields) {
+// Both tables are read as pandas.read_csv(..., index_col=False) reads them,
+// the reference OCEL CSV path. Quoting follows its default C tokenizer: a
+// quote opens a quoted field only as a field's first character (anywhere
+// else it is literal), "" inside a quoted field is one quote, text after the
+// closing quote is appended to the field ("ab"cd is abcd), a quoted field may
+// span lines, and an unterminated one is an error. Records that are empty or
+// hold only spaces and tabs are skipped but still count as lines; the first
+// remaining record is the header. Row shapes: the first data row fixes the
+// field count (the header's, or more when that row is longer); a later row
+// with more fields is refused with read_csv's message, fields past the header
+// are dropped (index_col=False keeps the header's columns), and a short row
+// reads its missing trailing cells as missing values (empty here).
+Table parse_table(std::string_view input, char delimiter, bool trim_fields,
+                  const char* label) {
   if (delimiter == '"' || delimiter == '\r' || delimiter == '\n' ||
       delimiter == '\0') {
     throw std::invalid_argument("invalid CSV delimiter");
@@ -52,64 +59,78 @@ Table parse_table(std::string_view input, char delimiter, bool trim_fields) {
     input.remove_prefix(3);
   }
 
+  enum class State { kFieldStart, kUnquoted, kQuoted, kQuoteInQuoted };
   Table rows;
   Row row;
   std::string field;
-  bool quoted = false;
-  bool quote_closed = false;
-  bool saw_any = false;
+  auto state = State::kFieldStart;
+  bool blank = true;  // the record so far holds only spaces and tabs
+  std::size_t line = 0;
+  std::size_t expected = 0;
   const auto finish_field = [&]() {
     row.push_back(trim_fields ? trim(std::move(field)) : std::move(field));
     field.clear();
-    quote_closed = false;
+    state = State::kFieldStart;
   };
-  const auto finish_row = [&]() {
+  const auto finish_record = [&]() {
+    ++line;
+    if (blank) {
+      row.clear();
+      field.clear();
+      state = State::kFieldStart;
+      return;
+    }
     finish_field();
+    if (!rows.empty()) {
+      const auto width = rows.front().size();
+      if (rows.size() == 1) expected = std::max(width, row.size());
+      if (row.size() > expected) {
+        const auto fields = [](std::size_t n) {
+          return std::to_string(n) + (n == 1 ? " field" : " fields");
+        };
+        throw std::invalid_argument(
+            std::string(label) + " CSV line " + std::to_string(line) + " has " +
+            fields(row.size()) + ", but rows of this file have at most " +
+            fields(expected) +
+            "; pandas.read_csv refuses the file: Error tokenizing data. C error: Expected " +
+            std::to_string(expected) + " fields in line " + std::to_string(line) +
+            ", saw " + std::to_string(row.size()));
+      }
+      row.resize(width);
+    }
     rows.push_back(std::move(row));
     row = Row{};
-    saw_any = false;
+    blank = true;
   };
 
   for (std::size_t i = 0; i < input.size(); ++i) {
     const char ch = input[i];
-    if (quoted) {
-      if (ch == '"') {
-        if (i + 1 < input.size() && input[i + 1] == '"') {
-          field.push_back('"');
-          ++i;
-        } else {
-          quoted = false;
-          quote_closed = true;
-        }
-      } else {
-        field.push_back(ch);
-      }
-      saw_any = true;
-      continue;
-    }
-
-    if (ch == '"') {
-      if (!field.empty() || quote_closed) {
-        throw std::invalid_argument("CSV quote must start a field");
-      }
-      quoted = true;
-      saw_any = true;
+    if (state == State::kQuoted) {
+      if (ch == '"') state = State::kQuoteInQuoted;
+      else field.push_back(ch);
+    } else if (state == State::kQuoteInQuoted && ch == '"') {
+      field.push_back('"');
+      state = State::kQuoted;
     } else if (ch == delimiter) {
+      blank = false;
       finish_field();
-      saw_any = true;
     } else if (ch == '\n' || ch == '\r') {
       if (ch == '\r' && i + 1 < input.size() && input[i + 1] == '\n') ++i;
-      finish_row();
+      finish_record();
+    } else if (state == State::kFieldStart && ch == '"') {
+      blank = false;
+      state = State::kQuoted;
     } else {
-      if (quote_closed && ch != ' ' && ch != '\t') {
-        throw std::invalid_argument("CSV data follows a closed quoted field");
-      }
+      if (ch != ' ' && ch != '\t') blank = false;
       field.push_back(ch);
-      saw_any = true;
+      state = State::kUnquoted;
     }
   }
-  if (quoted) throw std::invalid_argument("CSV contains an unterminated quote");
-  if (saw_any || !field.empty() || !row.empty()) finish_row();
+  if (state == State::kQuoted) {
+    throw std::invalid_argument(std::string(label) +
+                                " CSV contains an unterminated quote");
+  }
+  finish_record();
   return rows;
 }
 
@@ -145,25 +166,6 @@ std::size_t required_column(const Header& header, const std::string& name,
                                 name);
   }
   return it->second;
-}
-
-std::string cell(const Row& row, std::size_t index, std::size_t line,
-                 const char* label) {
-  if (row.size() <= index) {
-    throw std::invalid_argument(std::string(label) + " CSV row " +
-                                std::to_string(line) + " has too few fields");
-  }
-  return row[index];
-}
-
-void validate_row_width(const Row& row, std::size_t width, std::size_t line,
-                        const char* label) {
-  if (row.size() != width) {
-    throw std::invalid_argument(std::string(label) + " CSV row " +
-                                std::to_string(line) + " has " +
-                                std::to_string(row.size()) + " fields; expected " +
-                                std::to_string(width));
-  }
 }
 
 std::string unescape_list_string(std::string_view text, std::size_t& pos,
@@ -585,11 +587,11 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
     }
     for (std::size_t row_index = 1; row_index < object_table->size(); ++row_index) {
       const auto& row = (*object_table)[row_index];
-      if (blank_row(row)) continue;
-      validate_row_width(row, object_header.names.size(), row_index + 1, "object");
-      const std::string id = cell(row, object_id, row_index + 1, "object");
-      const std::string type = cell(row, object_type, row_index + 1, "object");
-      if (id.empty() || type.empty()) throw std::invalid_argument("object CSV requires non-empty id and type");
+      // A missing id or type (an empty cell or a short row) is NaN in the
+      // reference frame, which drops the row.
+      const std::string& id = row[object_id];
+      const std::string& type = row[object_type];
+      if (id.empty() || type.empty()) continue;
       OcelObject object{id, type, {}};
       for (std::size_t i = 0; i < object_header.names.size(); ++i) {
         if (i == object_id || i == object_type) continue;
@@ -606,16 +608,28 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   // types only the timestamp); empty cells are missing values.
   Ocel log;
   std::unordered_set<std::string> event_ids;
-  std::vector<const Row*> event_rows;
+  // Every data row in file order, and whether it became an event.
+  std::vector<std::pair<const Row*, bool>> event_rows;
   for (std::size_t row_index = 1; row_index < event_table.size(); ++row_index) {
     const auto& row = event_table[row_index];
-    if (blank_row(row)) continue;
-    validate_row_width(row, event_header.names.size(), row_index + 1, "event");
-    OcelEvent event{cell(row, event_id, row_index + 1, "event"),
-                    cell(row, activity, row_index + 1, "event"),
-                    cell(row, timestamp, row_index + 1, "event"), {}};
-    if (event.id.empty() || event.activity.empty() || event.timestamp.empty()) {
-      throw std::invalid_argument("event CSV requires non-empty id, activity, and timestamp");
+    // A missing id or activity (an empty cell or a short row) is NaN in the
+    // reference frame, which drops the event; without an object table its
+    // objects are still listed, as the reference collects them from every
+    // row. A missing timestamp is NaT there, which a native event cannot hold.
+    // The reference parses the timestamp column before it drops rows, so a
+    // dropped row's unreadable timestamp still refuses the file.
+    if (row[event_id].empty() || row[activity].empty()) {
+      if (options.sort_events_by_timestamp && !row[timestamp].empty() &&
+          !parse_timestamp(row[timestamp])) {
+        throw std::invalid_argument("event CSV timestamp is not ISO-8601: " + row[timestamp]);
+      }
+      event_rows.emplace_back(&row, false);
+      continue;
+    }
+    OcelEvent event{row[event_id], row[activity], row[timestamp], {}};
+    if (event.timestamp.empty()) {
+      throw std::invalid_argument("event CSV event " + event.id +
+                                  " has no timestamp (the reference reads NaT)");
     }
     if (!event_ids.insert(event.id).second) {
       throw std::invalid_argument("duplicate event CSV id: " + event.id);
@@ -634,13 +648,15 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
       if (!value.empty()) event.attributes.push_back({event_header.names[i], value});
     }
     log.events.push_back(std::move(event));
-    event_rows.push_back(&row);
+    event_rows.emplace_back(&row, true);
   }
   std::unordered_map<std::string, std::string> object_types;
   for (const auto& object : object_list) object_types.emplace(object.id, object.type);
-  for (std::size_t event_index = 0; event_index < log.events.size(); ++event_index) {
-    const auto& row = *event_rows[event_index];
-    const auto& event = log.events[event_index];
+  std::size_t event_index = 0;
+  for (const auto& [row_pointer, kept] : event_rows) {
+    if (!kept && object_table != nullptr) continue;
+    const auto& row = *row_pointer;
+    const OcelEvent* event = kept ? &log.events[event_index++] : nullptr;
     for (const auto& [type, index] : object_columns) {
       for (const auto& object_id : parse_object_list(row[index])) {
         const auto [it, inserted] = object_types.emplace(object_id, type);
@@ -650,7 +666,7 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
         if (object_index.emplace(object_id, object_list.size()).second) {
           object_list.push_back(OcelObject{object_id, type, {}});
         }
-        log.relations.push_back({event.id, object_id, ""});
+        if (event) log.relations.push_back({event->id, object_id, ""});
       }
     }
   }
@@ -671,14 +687,14 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
 
 Ocel parse_ocel_csv(std::string_view event_table,
                     const OcelCsvImportOptions& options) {
-  const auto events = parse_table(event_table, options.delimiter, options.trim_fields);
+  const auto events = parse_table(event_table, options.delimiter, options.trim_fields, "event");
   return parse_tables(events, nullptr, options);
 }
 
 Ocel parse_ocel_csv(std::string_view event_table, std::string_view object_table,
                     const OcelCsvImportOptions& options) {
-  const auto events = parse_table(event_table, options.delimiter, options.trim_fields);
-  const auto objects = parse_table(object_table, options.delimiter, options.trim_fields);
+  const auto events = parse_table(event_table, options.delimiter, options.trim_fields, "event");
+  const auto objects = parse_table(object_table, options.delimiter, options.trim_fields, "object");
   return parse_tables(events, &objects, options);
 }
 

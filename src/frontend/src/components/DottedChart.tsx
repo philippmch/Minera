@@ -26,7 +26,7 @@ export function DottedChartView({ data }: DottedChartViewProps) {
   const traces = loadedTraces(load);
   const chart = useMemo(() => buildDottedChart(traces), [traces]);
 
-  if (load.status === "loading" || load.status === "error") {
+  if (load.status === "loading" || load.status === "error" || (load.status === "unavailable" && !!data.trace_summary)) {
     return (
       <section className="panel reveal">
         <div className="panel-head">

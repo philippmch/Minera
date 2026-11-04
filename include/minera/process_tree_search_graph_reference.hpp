@@ -42,6 +42,7 @@
 // raise ProcessTreeSearchGraphReferenceError.
 
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -204,7 +205,10 @@ struct ProcessTreeSearchGraphAlignment {
 // search_graph_pt.apply over traces, with preorder candidates: the empty
 // trace's cost is the best worst cost, and fitness = 1 - cost / (best worst
 // cost + trace length), or 0 when that is 0.
+// `cancelled` is polled before each trace; once it returns true the call
+// throws OperationCancelled (minera/cancellation.hpp).
 [[nodiscard]] std::vector<ProcessTreeSearchGraphAlignment> reference_search_graph_alignments(
-    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces);
+    const ProcessTree& tree, const std::vector<std::vector<std::string>>& traces,
+    const std::function<bool()>& cancelled = {});
 
 }  // namespace minera

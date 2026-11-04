@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -56,6 +57,13 @@ struct PetriTraceAlignmentOptions {
   std::vector<double> model_costs;
   std::vector<double> sync_costs;
   std::vector<double> trace_costs;
+  // Bounds as AlignmentOptions has them: seconds per search (zero means
+  // unlimited) and a callback the server sets to notice a client that went
+  // away (unset never cancels). A search past either stops as one past
+  // max_states does; the log dispatcher's easy-soundness check refuses the
+  // net on time and throws OperationCancelled when cancelled.
+  double max_time_seconds = 0.0;
+  std::function<bool()> cancelled;
 };
 
 // Aligns one trace (activity labels) with the reference variant semantics.

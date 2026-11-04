@@ -2,6 +2,7 @@
 #include "minera/analysis_json_traces.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/pnml.hpp"
+#include "minera/timestamp.hpp"
 #include "root_cause_trace_key.hpp"
 
 #include <algorithm>
@@ -4313,7 +4314,14 @@ std::string token_replay_traces_json(
 
 namespace {
 thread_local bool t_omit_analysis_traces = false;
+std::string g_analysis_trace_run_id;
 }  // namespace
+
+void set_analysis_trace_run_id(std::string run_id) {
+  g_analysis_trace_run_id = std::move(run_id);
+}
+
+const std::string& analysis_trace_run_id() { return g_analysis_trace_run_id; }
 
 OmitAnalysisTraces::OmitAnalysisTraces(bool omit)
     : previous_(t_omit_analysis_traces) {
@@ -4444,9 +4452,10 @@ void write_analysis_trace_summary(std::ostream& out, const EventLog& log) {
     events += trace.events.size();
     bool timed = false;
     for (const auto& event : trace.events) {
-      // The client plots every event whose timestamp text it can parse;
-      // a non-empty text is the server's (generous) stand-in for that.
-      if (!event.timestamp.empty()) timed = true;
+      // A case counts when one of its timestamps parses by the server's
+      // rules (parse_timestamp); the client plots what Date.parse reads and
+      // hides the dotted chart when nothing parses once the cases load.
+      if (!timed && !event.timestamp.empty() && parse_timestamp(event.timestamp)) timed = true;
       if (!event.lifecycle.empty() &&
           effective_first_class_state(event.lifecycle_state, event.lifecycle) !=
               FirstClassAttributeState::kMissing &&
@@ -4466,7 +4475,13 @@ void write_analysis_trace_summary(std::ostream& out, const EventLog& log) {
     if (i) out << ", ";
     write_json_string(out, lifecycles[i]);
   }
-  out << "]}";
+  out << ']';
+  // The server run these traces live in: GET /api/traces refuses another.
+  if (!g_analysis_trace_run_id.empty()) {
+    out << ", \"run_id\": ";
+    write_json_string(out, g_analysis_trace_run_id);
+  }
+  out << '}';
 }
 
 }  // namespace

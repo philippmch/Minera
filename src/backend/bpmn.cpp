@@ -384,20 +384,43 @@ void write_bpmn_document(std::ostream& out, std::string_view name,
 // (converging when it has several inputs) and an exclusive gateway otherwise.
 // Exclusive gateways with exactly one incoming and one outgoing flow are then
 // collapsed into direct flows.
-BpmnGraph net_bpmn_graph(const PetriNet& net) {
+//
+// With markings (the reference's `convert_to_bpmn(net, im, fm)`), the start and
+// end events always exist: the start event feeds every place holding initial
+// tokens and every place holding final tokens feeds the end event, so an
+// empty marking leaves its event without flows. Without them, the source and
+// the sink stand for single-token markings and an unset one has no event.
+BpmnGraph net_bpmn_graph(const PetriNet& net,
+                         const TokenMarking* initial_marking = nullptr,
+                         const TokenMarking* final_marking = nullptr) {
   BpmnGraph graph;
   const auto places = net.place_count();
+  const bool marked = initial_marking && final_marking;
+  if (marked && (initial_marking->size() != places || final_marking->size() != places))
+    throw std::invalid_argument("BPMN conversion markings must have one entry per place");
+  const auto boundary = [&](const TokenMarking* marking, bool has, std::size_t place) {
+    std::vector<std::size_t> out;
+    if (marking) {
+      for (std::size_t p = 0; p < places; ++p)
+        if ((*marking)[p] > TokenInteger{0}) out.push_back(p);
+    } else if (has && place < places) {
+      out.push_back(place);
+    }
+    return out;
+  };
+  const auto start_places = boundary(initial_marking, net.has_source(), net.source());
+  const auto end_places = boundary(final_marking, net.has_sink(), net.sink());
   std::optional<std::size_t> start;
   std::optional<std::size_t> end;
-  if (net.has_source() && net.source() < places)
+  if (marked || !start_places.empty())
     start = graph.add("startEvent", "StartEvent", "start");
-  if (net.has_sink() && net.sink() < places)
+  if (marked || !end_places.empty())
     end = graph.add("endEvent", "EndEvent", "end");
   std::vector<std::size_t> place_node(places);
   for (std::size_t p = 0; p < places; ++p)
     place_node[p] = graph.add("exclusiveGateway", "exclusiveGateway", std::nullopt, "Unspecified");
-  if (start) graph.flow(*start, place_node[net.source()]);
-  if (end) graph.flow(place_node[net.sink()], *end);
+  for (const auto place : start_places) graph.flow(*start, place_node[place]);
+  for (const auto place : end_places) graph.flow(place_node[place], *end);
   for (const auto& transition : net.transitions()) {
     // One flow per reference arc object: a weighted arc stored as repeated
     // unit endpoints is one arc (weights do not shape the diagram), while
@@ -488,6 +511,19 @@ void write_bpmn(std::ostream& out,
 std::string to_bpmn(const PetriNet& net, std::string_view name) {
   std::ostringstream out;
   write_bpmn(out, net, name);
+  return out.str();
+}
+
+void write_bpmn(std::ostream& out, const PetriNet& net,
+                const TokenMarking& initial_marking,
+                const TokenMarking& final_marking, std::string_view name) {
+  write_bpmn_document(out, name, net_bpmn_graph(net, &initial_marking, &final_marking));
+}
+
+std::string to_bpmn(const PetriNet& net, const TokenMarking& initial_marking,
+                    const TokenMarking& final_marking, std::string_view name) {
+  std::ostringstream out;
+  write_bpmn(out, net, initial_marking, final_marking, name);
   return out.str();
 }
 

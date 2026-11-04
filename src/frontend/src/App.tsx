@@ -51,7 +51,7 @@ import { PerformanceSpectrumView } from "./components/PerformanceSpectrum";
 import { Batches } from "./components/Batches";
 import { TimingDiscovery } from "./components/TimingDiscovery";
 import { BehaviorAnalysis } from "./components/BehaviorAnalysis";
-import { retainTraces, traceFacts } from "./mine-traces";
+import { retainTraces, traceFacts, useHasTimestamps } from "./mine-traces";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
 import { EventLogView } from "./components/EventLogView";
@@ -679,15 +679,17 @@ export default function App() {
 
   // Whether the log has any timestamped events to plot. Built once per load so
   // the Dotted Chart tab only appears when it would have something to show.
-  // Decided from the trace summary when the cases are loaded on demand.
+  // Decided from the trace summary when the cases are loaded on demand, and
+  // again once they load: none of them may parse in this browser.
+  const hasTimestamps = useHasTimestamps(data);
   const hasDottedChart = useMemo(
     () => Boolean(
       data && (
-        traceFacts(data).hasTimestamps ||
+        hasTimestamps ||
         data.performance_spectrum || data.batch_discovery
       ),
     ),
-    [data],
+    [data, hasTimestamps],
   );
   // Cases loaded on demand belong to the analysis on screen only.
   useEffect(() => { retainTraces(data); }, [data]);

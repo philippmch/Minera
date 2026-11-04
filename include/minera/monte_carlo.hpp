@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -145,6 +146,11 @@ struct MonteCarloOptions {
   // counts. Positive counts require keys when membership is supplied.
   std::vector<bool> initial_marking_keys;
   std::vector<bool> final_marking_keys;
+  // Polled while fitting and simulating (the server sets it to notice a
+  // client that disconnected); once it returns true the call throws
+  // OperationCancelled (minera/cancellation.hpp) and returns nothing. Unset
+  // never cancels, and a run that is not cancelled is unchanged.
+  std::function<bool()> cancelled;
 };
 
 struct MonteCarloDiagnostics {

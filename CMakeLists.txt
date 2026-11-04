@@ -21,7 +21,10 @@ if(NOT MSVC)
   add_compile_options(-ffp-contract=off)
 else()
   # Generated fixture tables exceed COFF's default 2^16 sections per object.
-  add_compile_options(/bigobj)
+  # Sources are UTF-8 without a BOM and the core spells labels such as "▶",
+  # "■" and "μs" literally; without /utf-8 MSVC reads them in the runner's
+  # ANSI code page and re-encodes them (C4819), so read and emit UTF-8.
+  add_compile_options(/bigobj /utf-8)
 endif()
 
 # Reuse earlier compilations when ccache is installed; a rebuild after a small
@@ -1174,6 +1177,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_genetic_miner_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_genetic_miner_tests COMMAND minera_genetic_miner_tests)
 
+  # Disconnect hooks of the long alignment, replay, drift and simulation calls.
+  add_executable(minera_cancellation_hooks_tests
+    src/backend/tests/test_cancellation_hooks.cpp
+  )
+  target_link_libraries(minera_cancellation_hooks_tests PRIVATE minera::core)
+  target_compile_features(minera_cancellation_hooks_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_cancellation_hooks_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_cancellation_hooks_tests COMMAND minera_cancellation_hooks_tests)
+
   add_executable(minera_genetic_matrix_conversion_tests
     src/backend/tests/test_genetic_matrix_conversion.cpp
   )
@@ -1837,6 +1849,15 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_traces_route_tests minera_server)
     add_test(NAME minera_server_traces_route_tests
              COMMAND minera_server_traces_route_tests $<TARGET_FILE:minera_server>)
+    # A long route whose client disconnects stops within a second.
+    add_executable(minera_server_cancellation_tests
+      src/backend/tests/test_server_cancellation.cpp)
+    target_include_directories(minera_server_cancellation_tests PRIVATE third_party)
+    target_link_libraries(minera_server_cancellation_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_cancellation_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_cancellation_tests minera_server)
+    add_test(NAME minera_server_cancellation_tests
+             COMMAND minera_server_cancellation_tests $<TARGET_FILE:minera_server>)
   endif()
   # Recheck 61ebeee0 J2/J3: present empty resources are network nodes and
   # explicit empty profile selectors pick them (reference: edge ""->"" with

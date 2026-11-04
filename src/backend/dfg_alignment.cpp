@@ -1,4 +1,5 @@
 #include "minera/dfg_alignment.hpp"
+#include "minera/cancellation.hpp"
 #include "root_cause_unicode.hpp"
 
 #include <algorithm>
@@ -345,7 +346,9 @@ DfgAlignmentResult align_impl(const std::vector<std::string>& trace,
   // the largest closed position is sufficient to represent this frontier.
   std::vector<std::optional<std::size_t>> closed_position(m.nodes.size());
   std::size_t visited=0, closed=0; std::size_t goal=std::numeric_limits<std::size_t>::max();
+  CancellationCheck cancelled(o.cancelled, "DFG alignment was cancelled");
   while(!pq.empty()) {
+    cancelled();
     auto q=pq.top();pq.pop(); State cur=states[q.idx];
     ++visited;
     if (o.max_visited_states && visited>o.max_visited_states) throw std::runtime_error("DFG alignment state limit exceeded");
@@ -448,6 +451,7 @@ DfgAlignmentLogResult align_log_on_dfg(const EventLog& log,const DfgFrequency& d
     auto a = activity_word(t, o.activity_attribute);
     auto it=cache.find(a);
     if(it==cache.end()) {
+      throw_if_cancelled(o.cancelled, "DFG alignment was cancelled");
       auto result = align_impl(a,model,o);
       if (result.computed) {
         double bwc = baseline.cost;

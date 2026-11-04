@@ -2,8 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <set>
+#include <functional>
 #include <random>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -41,6 +42,11 @@ struct ConceptDriftOptions {
   // matching *_ranges fields (always filled) then describe every partition by
   // trace indices into the input log, without copying any trace.
   bool materialize_sublogs = true;
+  // Polled while the computation runs (the server sets it to notice a client
+  // that disconnected); once it returns true the call throws
+  // OperationCancelled (minera/cancellation.hpp) and returns nothing. Unset
+  // never cancels, and a run that is not cancelled is unchanged.
+  std::function<bool()> cancelled;
 };
 
 // Traces [begin, end) of the input log, and the number of events they hold.

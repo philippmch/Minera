@@ -1,4 +1,5 @@
 #include "minera/decomposed_alignment.hpp"
+#include "minera/cancellation.hpp"
 
 #include "minera/decomposed_reference.hpp"
 #include "minera/dfg_variants.hpp"
@@ -91,7 +92,9 @@ SearchResult search(const LocalNet& net, const std::vector<std::string>& trace,
   struct Node { SearchKey k; double c; std::size_t parent; DecomposedAlignmentMove move; };
   std::vector<Node> nodes; std::unordered_map<SearchKey,double,SearchHash> best;
   nodes.push_back({SearchKey{net.initial,0},0,npos,{}}); q.push({0,0}); best[nodes[0].k]=0;
+  CancellationCheck cancelled(o.cancelled, "decomposed alignment was cancelled");
   while (!q.empty()) {
+    cancelled();
     if (deadline != std::chrono::steady_clock::time_point::max() && std::chrono::steady_clock::now() >= deadline) { r.timed_out=true; break; }
     auto qi=q.top(); q.pop(); auto& n=nodes[qi.node]; auto bi=best.find(n.k); if (bi==best.end() || bi->second != n.c) continue;
     const SearchKey current_key = n.k; const double current_cost = n.c;
@@ -339,8 +342,13 @@ std::optional<DecomposedAlignmentResult> reference_align_decomposed(
     if (index.emplace(trace, distinct.size()).second) distinct.push_back(trace);
   const auto shaped = reference_net(net, o);
   std::vector<DecomposedReferenceResult> aligned;
+  DecomposedReferenceOracle oracle;
+  if (o.cancelled)
+    oracle.variant = [&o](const std::vector<std::string>&) {
+      throw_if_cancelled(o.cancelled, "decomposed alignment was cancelled");
+    };
   try {
-    aligned = reference_decomposed_alignments(shaped, distinct);
+    aligned = reference_decomposed_alignments(shaped, distinct, oracle);
   } catch (const DecomposedReferenceError&) {
     return std::nullopt;  // the reference never returns on this log
   }
@@ -435,7 +443,8 @@ DecomposedAlignmentResult native_align_decomposed(const EventLog& log,const Petr
   if(!bw_search.found&&!bw_unreachable){out.complete=false;out.timed_out=bw_search.timed_out;out.exhausted=bw_search.exhausted; for(const auto& src:log.traces){DecomposedAlignmentTrace row; row.complete=false; row.timed_out=bw_search.timed_out; row.exhausted=bw_search.exhausted; for(const auto&e:src.events) row.activities.push_back(selected_activity(e, o.activity_attribute)); out.traces.push_back(std::move(row));} return out;} double bw=0; for(const auto& m:bw_search.moves) if(m.model && *m.model!=">>") bw+=move_cost(m,o); out.best_worst_cost=bw;
   using VecHash=std::function<std::size_t(const std::vector<std::string>&)>; std::unordered_map<std::vector<std::string>,DecomposedAlignmentTrace,VecHash> row_cache(0,[](const auto&v){std::size_t h=0;for(const auto&s:v)for(unsigned char c:s)h=h*131+c;return h;});
   double total_worst=0; std::size_t total_states=bw_search.visited; bool global_state_abort = total_states > o.max_total_states; if (global_state_abort) { out.complete=false; out.exhausted=true; } std::unordered_map<std::string,SearchResult> component_cache;
-  for(const auto& src:log.traces){ std::vector<std::string> names; names.reserve(src.events.size()); for(const auto&e:src.events) names.push_back(selected_activity(e, o.activity_attribute));
+  CancellationCheck cancelled(o.cancelled, "decomposed alignment was cancelled", 16);
+  for(const auto& src:log.traces){ cancelled(); std::vector<std::string> names; names.reserve(src.events.size()); for(const auto&e:src.events) names.push_back(selected_activity(e, o.activity_attribute));
     const double trace_worst = trace_worst_cost(bw, names, o);
     const auto trace_started = std::chrono::steady_clock::now();
     auto trace_deadline = deadline;
