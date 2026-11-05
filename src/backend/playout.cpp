@@ -238,6 +238,12 @@ std::vector<std::uint32_t> stochastic_marking(
 
 namespace {
 
+// A 64-bit glibc malloc chunk for a request of `bytes`.
+std::size_t visited_allocation_bytes(std::size_t bytes) {
+  if (bytes == 0) return 0;
+  return std::max<std::size_t>(32, (bytes + 8 + 15) / 16 * 16);
+}
+
 EventLog stochastic_playout_impl(const PetriNet& net,
                                  const StochasticPlayoutOptions& options,
                                  PlayoutVisitedResult* visited_result) {
@@ -290,8 +296,30 @@ EventLog stochastic_playout_impl(const PetriNet& net,
 
   std::mt19937_64 engine(options.seed);
   EventLog log;
-  log.traces.reserve(options.traces);
-  if (visited_result) visited_result->traces.reserve(options.traces);
+  // A visited-elements run returns no log, so it builds none.
+  if (!visited_result) log.traces.reserve(options.traces);
+  // Run-wide work bounds (unset by default): every firing counts, silent
+  // ones included, and a visited-elements run counts its marking entries
+  // and the bytes its buffers hold (playout_visited_bytes).
+  std::size_t visited_bytes = 0;
+  const auto charge_visited_bytes = [&](std::size_t bytes) {
+    if (options.max_visited_bytes != 0 &&
+        (bytes > options.max_visited_bytes ||
+         visited_bytes > options.max_visited_bytes - bytes))
+      throw std::length_error(
+          "stochastic playout: the visited elements would hold more than " +
+          std::to_string(options.max_visited_bytes) +
+          " bytes; lower stochastic_traces or stochastic_max_steps");
+    visited_bytes += bytes;
+  };
+  if (visited_result) {
+    const auto& traces = visited_result->traces;
+    if (options.traces > traces.max_size())
+      throw std::length_error("stochastic playout: too many traces");
+    charge_visited_bytes(
+        visited_allocation_bytes(options.traces * sizeof(PlayoutVisitedTrace)));
+    visited_result->traces.reserve(options.traces);
+  }
   std::vector<std::uint64_t> marking(places, 0);
   const auto resolve_marking = [&](const std::vector<std::uint32_t>& requested,
                                    std::size_t boundary,
@@ -316,8 +344,6 @@ EventLog stochastic_playout_impl(const PetriNet& net,
   const auto is_final = [&](const std::vector<std::uint64_t>& candidate) {
     return candidate == final_marking;
   };
-  // Run-wide work bounds (unset by default): every firing counts, silent
-  // ones included, and a visited-elements run counts its marking entries.
   std::size_t total_firings = 0;
   std::size_t visited_entries = 0;
   const auto count_visited_marking = [&] {
@@ -331,27 +357,45 @@ EventLog stochastic_playout_impl(const PetriNet& net,
   };
   CancellationCheck check_cancelled(options.cancelled, "stochastic playout cancelled");
 
+  const auto marking_bytes = visited_allocation_bytes(places * sizeof(std::uint32_t));
+  // Appends a visited element, growing the buffer itself so that the bytes
+  // bound sees each allocation (old and new buffer both live) beforehand.
+  const auto push_visited = [&](PlayoutVisitedTrace& visited,
+                                PlayoutVisitedElement element) {
+    if (visited.size() == visited.capacity()) {
+      const auto capacity = visited.capacity();
+      const auto grown = capacity < 8 ? std::size_t{8} : capacity * 2;
+      if (grown > visited.max_size())
+        throw std::length_error("stochastic playout: a visited trace is too long");
+      const auto old_bytes = visited_allocation_bytes(capacity * sizeof(PlayoutVisitedElement));
+      charge_visited_bytes(visited_allocation_bytes(grown * sizeof(PlayoutVisitedElement)));
+      visited.reserve(grown);
+      visited_bytes -= old_bytes;
+    }
+    visited.push_back(std::move(element));
+  };
+  const auto visited_marking = [&] {
+    count_visited_marking();
+    charge_visited_bytes(marking_bytes);
+    PlayoutVisitedElement element;
+    element.kind = PlayoutVisitedElementKind::MARKING;
+    element.marking.reserve(marking.size());
+    for (const auto value : marking) {
+      if (value > std::numeric_limits<std::uint32_t>::max())
+        throw std::invalid_argument(
+            "stochastic visited marking exceeds uint32 range");
+      element.marking.push_back(static_cast<std::uint32_t>(value));
+    }
+    return element;
+  };
+
   for (std::size_t c = 0; c < options.traces; ++c) {
     Trace trace;
-    trace.case_id = "case_" + std::to_string(c + 1);
+    if (!visited_result) trace.case_id = "case_" + std::to_string(c + 1);
     PlayoutVisitedTrace visited;
-    if (visited_result) {
-      visited.reserve(options.max_steps * 2 + 1);
-      visited.push_back({PlayoutVisitedElementKind::MARKING, {}, 0});
-      count_visited_marking();
-    }
     double now = options.start + static_cast<double>(c) * options.case_interval;
     marking = initial_marking;
-    if (visited_result) {
-      auto& initial = visited.front().marking;
-      initial.reserve(marking.size());
-      for (const auto value : marking) {
-        if (value > std::numeric_limits<std::uint32_t>::max())
-          throw std::invalid_argument(
-              "stochastic visited marking exceeds uint32 range");
-        initial.push_back(static_cast<std::uint32_t>(value));
-      }
-    }
+    if (visited_result) push_visited(visited, visited_marking());
 
     // The reference stochastic playout (observed by distribution): a case
     // stops once it holds max_steps visible events (silent firings do not
@@ -410,21 +454,9 @@ EventLog stochastic_playout_impl(const PetriNet& net,
             " transitions with " + std::to_string(visible) +
             " visible events (silent livelock)");
       if (visited_result) {
-        visited.push_back(
-            {PlayoutVisitedElementKind::TRANSITION, {}, selected});
-        count_visited_marking();
-        PlayoutVisitedElement element;
-        element.kind = PlayoutVisitedElementKind::MARKING;
-        element.marking.reserve(marking.size());
-        for (const auto value : marking) {
-          if (value > std::numeric_limits<std::uint32_t>::max())
-            throw std::invalid_argument(
-                "stochastic visited marking exceeds uint32 range");
-          element.marking.push_back(static_cast<std::uint32_t>(value));
-        }
-        visited.push_back(std::move(element));
-      }
-      if (!fired.silent()) {
+        push_visited(visited, {PlayoutVisitedElementKind::TRANSITION, {}, selected});
+        push_visited(visited, visited_marking());
+      } else if (!fired.silent()) {
         Event event;
         event.case_id = trace.case_id;
         event.activity = net.activities()[*fired.activity];
@@ -435,8 +467,8 @@ EventLog stochastic_playout_impl(const PetriNet& net,
       }
     }
 
-    log.traces.push_back(std::move(trace));
     if (visited_result) visited_result->traces.push_back(std::move(visited));
+    else log.traces.push_back(std::move(trace));
   }
   return log;
 }
@@ -465,6 +497,17 @@ std::string source_log_first_class_key(const EventLog& log, bool activity) {
 EventLog stochastic_playout(const PetriNet& net,
                             const StochasticPlayoutOptions& options) {
   return stochastic_playout_impl(net, options, nullptr);
+}
+
+std::size_t playout_visited_bytes(const PlayoutVisitedResult& result) {
+  std::size_t bytes = visited_allocation_bytes(
+      result.traces.capacity() * sizeof(PlayoutVisitedTrace));
+  for (const auto& trace : result.traces) {
+    bytes += visited_allocation_bytes(trace.capacity() * sizeof(PlayoutVisitedElement));
+    for (const auto& element : trace)
+      bytes += visited_allocation_bytes(element.marking.capacity() * sizeof(std::uint32_t));
+  }
+  return bytes;
 }
 
 PlayoutVisitedResult stochastic_playout_visited(

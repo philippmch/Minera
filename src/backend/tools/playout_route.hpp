@@ -210,20 +210,38 @@ void handle_playout_workbench(const httplib::Request& request,
         else invoke("extensive_playout_visited(net, options)", [&] {result = minera::extensive_playout_visited(document->net, options);});
       } else if (petri_mode) {
         // The server's stochastic bounds (bound_server_stochastic_playout):
-        // every firing counts, visited storage is bounded, a disconnect
-        // cancels.
+        // every firing counts, a visited run and its JSON stay within the
+        // per-request memory budget, a disconnect cancels.
         auto options = std::get<minera::StochasticPlayoutOptions>(configured);
         const bool visited_operation = operation == "petri_stochastic_visited" ||
                                        operation == "petri_stochastic_visited_from_source";
         bound_server_stochastic_playout(options, document->net, visited_operation, request);
+        // The visited JSON is wrapped and concatenated into the response; a
+        // result over the budget is dropped, so it is never serialized.
+        const auto check_visited_peak = [&] {
+          try {
+            const auto& visited = std::get<minera::PlayoutVisitedResult>(result);
+            check_server_stochastic_visited_peak(
+                visited, minera::playout_workbench_result_json_bytes(visited), 5);
+          } catch (...) {
+            result = std::monostate{};
+            throw;
+          }
+        };
         if (operation == "petri_stochastic_log")
           invoke("stochastic_playout(net, options)", [&] {result = minera::stochastic_playout(document->net, options);});
         else if (operation == "petri_stochastic_visited")
-          invoke("stochastic_playout_visited(net, options)", [&] {result = minera::stochastic_playout_visited(document->net, options);});
+          invoke("stochastic_playout_visited(net, options)", [&] {
+            result = minera::stochastic_playout_visited(document->net, options);
+            check_visited_peak();
+          });
         else if (operation == "petri_stochastic_log_from_source")
           invoke("stochastic_playout(net, source_log, options)", [&] {result = minera::stochastic_playout(document->net, source->checked_log(), options);});
         else if (operation == "petri_stochastic_visited_from_source")
-          invoke("stochastic_playout_visited(net, source_log, options)", [&] {result = minera::stochastic_playout_visited(document->net, source->checked_log(), options);});
+          invoke("stochastic_playout_visited(net, source_log, options)", [&] {
+            result = minera::stochastic_playout_visited(document->net, source->checked_log(), options);
+            check_visited_peak();
+          });
         else invoke("fit_stochastic_transition_weights(net, source_log, options)", [&] {
           result = minera::fit_stochastic_transition_weights(document->net, source->checked_log(), options);
         });

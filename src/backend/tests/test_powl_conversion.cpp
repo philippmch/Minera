@@ -222,6 +222,20 @@ void process_tree_to_powl_variations() {
     }
     assert(rejected);
   }
+
+  // A transition-free net names the tree conversion (its PTML export) and
+  // keeps the POWL wording for the POWL conversion.
+  minera::PetriNet bare;
+  bare.set_source(bare.add_place());
+  bare.set_sink(bare.add_place());
+  const auto message = [&](auto convert) {
+    try { (void)convert(); } catch (const std::invalid_argument& error) { return std::string(error.what()); }
+    return std::string("<none>");
+  };
+  assert(message([&] { return minera::to_process_tree(bare); }) ==
+         "workflow-net to process tree conversion requires a transition");
+  assert(message([&] { return minera::to_powl(bare); }) ==
+         "workflow-net to POWL conversion requires a transition");
 }
 
 void powl_to_process_tree_preserves_blocks_and_frequencies() {

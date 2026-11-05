@@ -18620,19 +18620,35 @@ Fixed:
   (traces · max_steps ≤ 1,000,000) does not bound the work: `/api/playout`
   and the playout workbench also cap every firing of a run, visible or
   silent, at 10,000,000, and stop when the client disconnects. A
-  visited-elements run stores two elements per firing and each marking's
-  place counts; that storage is budgeted at 512 MiB (about 96 bytes a firing
-  plus 4 bytes a place per marking), so its firing cap scales with the
-  place count: 5.1 million firings on a 2-place net, 3 million on 20 places,
-  1 million on 100, enough for a run that fills the visible budget with a
-  silent firing or two per visible event on a typical discovered net (the
-  marking entries are also capped at 128 million). A run past a cap is
-  refused with 400 ("the run would fire more than … transitions"). The
-  library defaults
-  (`StochasticPlayoutOptions::max_total_firings`,
-  `max_visited_marking_entries`, `cancelled`) set none, as the reference.
-  (A net with a weight-500 silent self-loop and traces=100 once ran the
-  server out of memory with visited elements; traces=1000 took 32 s.)
+  visited-elements run is held to a peak of about 512 MiB per request:
+  - While it runs, its buffers (two elements per firing, each marking's
+    place counts, counted by allocation as `playout_visited_bytes` does,
+    a growing buffer with its old and new allocation) may not pass 512 MiB
+    (`StochasticPlayoutOptions::max_visited_bytes`). It builds no event log
+    beside them (it used to build and discard one, about 1.4 KB a visible
+    event).
+  - Before its JSON is built, the exact document size is counted without
+    building it, and the result's bytes plus that size times the copies
+    that live at once must fit in 512 MiB: 3 on `/api/playout` (the body,
+    which is now written into one buffer of exactly its size; its UTF-8
+    repair copy; the gzip output) and 5 on the playout workbench (its
+    wrapped and concatenated response).
+  - A run past a bound is refused with 400 ("the visited elements would hold
+    more than … bytes", "… would exceed the server's 512 MiB response
+    budget", "the run would fire more than … transitions"). Measured on a
+    self-loop net, a run fits about 1.3 million firings on 2 places,
+    940,000 on 20 and 390,000 on 100 through `/api/playout` (600,000,
+    470,000 and 240,000 through the workbench), so a run that fills the
+    1,000,000 visible-event budget on a larger net is now refused; long
+    activity names in the `/api/playout` JSON lower these further. (The
+    previous per-place firing cap budgeted only the elements: with the
+    discarded event log and the JSON copies a capped run could peak well
+    over 2 GB.)
+  The library defaults (`StochasticPlayoutOptions::max_total_firings`,
+  `max_visited_marking_entries`, `max_visited_bytes`, `cancelled`) set
+  none, as the reference. (A net with a weight-500 silent self-loop and
+  traces=100 once ran the server out of memory with visited elements;
+  traces=1000 took 32 s.)
 - **OCEL global scopes.** An event or object scope that a read did not declare
   is written with the reference defaults (`{"ocel:activity": "__INVALID__"}`,
   `{"ocel:type": "__INVALID__"}`) by the OCEL 1.0 JSON and XML writers; the
@@ -18833,7 +18849,11 @@ names (`format_dataframe` does not rename them to `org:resource` /
 the download with the default selectors, so the case id, activity and
 timestamp are found. An XES source keeps its keys (a custom timestamp
 attribute such as `clock` stays `clock`, as `read_xes` plus `write_xes`
-keeps it), and native exports keep source keys. Test: `minera_xes_io_tests`
+keeps it), and native exports keep source keys. A table (typed EventTable
+JSON) source keeps its keys too, also with custom selector columns: the
+renaming happens in `format_dataframe`, which a DataFrame handed to
+`write_xes` as it is never went through, so its columns are written under
+their own names. Test: `minera_xes_io_tests`
 (`standard_key_exports_rename_csv_projections`).
 
 Declared:
@@ -18945,6 +18965,18 @@ Fixes:
   refused. Model exchange also reports a DFG net the reader cannot take back
   as `conversion_error` with the DFG data. Test:
   `minera_dfg_conversion_tests` (`boundary_activities_outside_edges`).
+  Such a net now reaches the consumers, so two follow-ups:
+  - Decomposed alignment of a net without transitions raises (400 on
+    `/api/align-decomposed`): pm4py's `decomposed.apply` raises
+    `ValueError: m must be a positive integer` on it, whatever the log,
+    where native returned fitness 1 with no moves. A net with only silent
+    transitions still aligns at cost 0 and fitness 1, as pm4py does. Test:
+    `minera_decomposed_alignment_tests`.
+  - Its PTML export (and `net_to_tree`) now says "workflow-net to process
+    tree conversion requires a transition" instead of naming the POWL
+    conversion; `net_to_powl` keeps the POWL wording (pm4py raises "not a
+    WF-net" for both). Test: `minera_powl_conversion_tests`. The recorded
+    workbench captures keep the old text.
 
 Declared:
 
@@ -18964,11 +18996,21 @@ Declared:
 
 Fuzzed against `pandas.read_csv` + `pm4py.format_dataframe` and
 `pm4py.read_xes` (DataFrame), 300 cases per category, seed 7 after fixes.
-CSV timestamps (16 shape categories, 4,800 cases) and `minera_format_dataframe`
-(300 with `timest_format`, 300 mixed) have no mismatch left; CSV parsing
-(9 categories, 2,700) and XES (9 categories, 2,700) differ only as declared
-below, apart from 2 XES column-dtype cases (metadata and duplicate keys)
-not yet examined.
+CSV parsing (9 categories, 2,700) and XES (9 categories, 2,700) differ only
+as declared below, apart from 2 XES column-dtype cases (metadata and
+duplicate keys) not yet examined.
+
+CSV timestamps were not clean, as first claimed here: a review fuzz (seed
+23, 3,000 multi-row columns) still found about 130 mismatching columns
+(lowercase `utc` 83, `.`-separated dates with a nanosecond fraction 23,
+hour-only offsets before trimmed padding 5, years such as `8 May 0001` 8,
+large offsets past year 9999 6, other 5). After the follow-up fixes below, two new
+3,000-column sets (seed 31 with the shapes above; seed 32 with 60% of the
+cells from short-year, month-name, zone-case, `.`-date and large-offset
+shapes) leave no mismatch except the declared ones: 70 and 152 columns
+without any date that native keeps as text (declared below), and 6 cells
+of seed 32 (year 0, and offsets past ±14:00 whose instant leaves years
+1..9999 by more than the ±14:00 shift absorbs).
 
 Fixed:
 
@@ -18991,6 +19033,34 @@ Fixed:
   repeated key keeps the first position with the last value; a later list
   attribute under a first-class key drops the earlier scalar selection; a
   nested `org:resource` keeps its document column position.
+- **Timestamp follow-up (review).**
+  - An hour-only offset before trimmed padding
+    (`2024-07-05T05:10:33.6525764 +00 `) is a dateutil shape on the
+    importer's fallback path too: microseconds, so a column with it and
+    1500-01-01 imports instead of being refused as out of the nanosecond
+    range.
+  - The nanosecond rule counts the fraction after the seconds, not after
+    the first `.`, so `2024.10.09 06:17:12.186788426` beside 1500-01-01
+    leaves the column unconverted (CSV refused, `format_dataframe` keeps
+    text).
+  - Only uppercase `UTC` and `GMT` are zone names; `utc`, `Utc`, `gmt`
+    fail as in pandas.
+  - Years follow dateutil: a year joined by `-`, `/` or `.` with three or
+    four digits is literal (`8-May-0001` is year 1, `075.08.22` year 75),
+    one with one or two digits is two-digit; a year separated by white
+    space is a number, two-digit below 100 (`8 May 0001` and
+    `13 09 0001` are 2001). A first number that cannot be a day is the
+    two-digit year (`40-03-03`, `40 Sep 28`, `0040 Sep 28` are 2040), a
+    leading three-digit token is a year when joined or from 100 on, and
+    plain space-separated numbers are ordered month-first unless the first
+    cannot be a month (`009 08 05` is 2005-09-08).
+  - A space-separated `YYYY MM DD` is on pandas' ISO path (nanoseconds
+    kept); a cell that leaves the ISO path (lowercase `z`, `UTC`, AM/PM,
+    ...) is read by dateutil as three numbers (`0040 09 14T14:41:11 z` is
+    2040-09-14, `0001 09 28T11:46:53 z` is 2028-01-09).
+  - An offset past ±14:00 whose UTC instant leaves years 1..9999
+    (`9999-12-31T20:00:00-15:00`) is stored as the same instant at -14:00
+    or +14:00 when that wall clock fits, instead of refusing the column.
 
 Tests: `minera_core_tests` (`csv_timestamps_follow_pandas_resolution_and_offsets`,
 `csv_events_order_at_nanoseconds`), `minera_dataframe_format_tests`
@@ -19001,6 +19071,11 @@ Declared:
 
 - **Field trimming (declared).** `trim_fields` defaults to true; pandas keeps
   padding in string cells.
+- **Year 0 and far offsets (declared).** pandas holds year 0
+  (`0000-12-26`, `0000 06 17`) and an instant such as
+  `9999-12-31T23:59:00-23:59` (UTC 10000-01-01); the native timestamp
+  holds years 1 to 9999, so such a column is refused. A large offset that
+  is kept is stored at ±14:00 or UTC, not with its own offset.
 - **Invalid UTF-8 CSV (declared).** Latin-1 bytes are read; pandas raises
   `UnicodeDecodeError`.
 - **Epoch and date-free timestamp columns (declared).** Kept as opaque text,

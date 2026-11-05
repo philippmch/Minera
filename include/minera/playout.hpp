@@ -117,6 +117,11 @@ struct StochasticPlayoutOptions {
   // Polled while the run fires (see minera/cancellation.hpp); returning true
   // throws OperationCancelled. Unset never cancels.
   std::function<bool()> cancelled;
+  // Bound on the memory the visited elements of a visited-elements run hold,
+  // in bytes as playout_visited_bytes counts them; 0 sets none. The run
+  // checks it before each allocation and throws std::length_error instead of
+  // growing past it.
+  std::size_t max_visited_bytes = 0;
 };
 
 // Plays out a Petri net into a synthetic event log, as the reference
@@ -180,6 +185,11 @@ struct PlayoutVisitedResult {
 [[nodiscard]] PlayoutVisitedResult stochastic_playout_visited(
     const PetriNet& net, const EventLog& source_log,
     const StochasticPlayoutOptions& options = {});
+
+// The heap bytes a visited result holds: its trace, element and marking
+// buffers by capacity, each rounded as a 64-bit glibc malloc chunk (16-byte
+// granules with an 8-byte header, 32 bytes at least).
+[[nodiscard]] std::size_t playout_visited_bytes(const PlayoutVisitedResult& result);
 
 // Fits one activation weight per transition as the reference stochastic
 // playout does with a source log: the activation/enabling ratios of

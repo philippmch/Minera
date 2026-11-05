@@ -2985,8 +2985,12 @@ inline void for_each_bit(const std::uint64_t* words, std::size_t count, F&& f) {
 // or x / p for x == 0 changes no nonzero value (at most a zero's sign, which
 // no comparison here can see), so the pivots, basis, objective and solution
 // are those of the plain dense sweep.
+// With `dual`, a solved feasible program also leaves its optimal dual there
+// (y with y·b = objective and c - yA >= 0 within the pivoting tolerance), read
+// off the final reduced costs of the artificial columns; nothing else
+// changes.
 LpResult solve_lp_sparse(const LpRows& a, std::vector<double> b,
-                         const std::vector<double>& c) {
+                         const std::vector<double>& c, std::vector<double>* dual = nullptr) {
   constexpr double kEps = 1e-9;
   const std::size_t m = b.size();
   const std::size_t n = c.size();
@@ -3164,6 +3168,12 @@ LpResult solve_lp_sparse(const LpRows& a, std::vector<double> b,
   for (std::size_t i = 0; i < m; ++i) {
     if (basis[i] < n) result.solution[basis[i]] = at(i, cols);
   }
+  if (dual) {
+    // Artificial column n + i is e_i, so its reduced cost is -(c_B B^-1)_i,
+    // the dual of tableau row i; a row negated on the way in negates it back.
+    dual->assign(m, 0.0);
+    for (std::size_t i = 0; i < m; ++i) (*dual)[i] = negated[i] ? z[n + i] : -z[n + i];
+  }
   return result;
 }
 
@@ -3199,6 +3209,122 @@ class CancelPoll {
  private:
   const std::function<bool()>& cancelled_;
   std::size_t calls_ = 0;
+};
+
+// Markings met by the model-run searches and the model-footprint
+// exploration, each stored once as a row of one flat pool and numbered in
+// the order they were first met. Search entries refer to markings by id;
+// ties in the frontier are still broken by comparing the markings themselves
+// (lexicographically, as std::vector compares), so expansion order is
+// unchanged. A marking is copied into the pool only when it is new.
+class MarkingTable {
+ public:
+  explicit MarkingTable(std::size_t places) : places_(places), slots_(1024, kEmpty) {}
+  MarkingTable(const MarkingTable&) = delete;
+  MarkingTable& operator=(const MarkingTable&) = delete;
+
+  // Returns the id of the marking and whether it was added by this call.
+  std::pair<std::uint32_t, bool> intern(const Marking& marking) {
+    return intern(marking.data(), row_hash(marking.data()));
+  }
+  // Interns `count` markings stored back to back in `rows`, in order, and
+  // calls visit(k, id, added) for the k-th. Their slots are prefetched first
+  // (the probes of a large table miss the cache), so the ids are those of
+  // interning them one at a time.
+  template <class Visit>
+  void intern_batch(const int* rows, std::size_t count, Visit&& visit) {
+    batch_hashes_.resize(count);
+    for (std::size_t k = 0; k < count; ++k) {
+      batch_hashes_[k] = row_hash(rows + k * places_);
+    }
+    for (std::size_t k = 0; k < count; ++k) {
+      const auto [id, added] = intern(rows + k * places_, batch_hashes_[k]);
+      visit(k, id, added);
+    }
+  }
+  std::pair<std::uint32_t, bool> intern(const int* row, std::uint64_t hash) {
+    if ((count_ + 1) * 2 > slots_.size()) grow();
+    const std::size_t mask = slots_.size() - 1;
+    std::size_t slot = hash & mask;
+    while (slots_[slot] != kEmpty) {
+      const auto other = slots_[slot];
+      if (hashes_[other] == hash && std::equal(row, row + places_, at(other)))
+        return {other, false};
+      slot = (slot + 1) & mask;
+    }
+    if (count_ >= std::numeric_limits<std::uint32_t>::max() - 1)
+      throw std::length_error("model-run search marking table overflow");
+    const auto id = static_cast<std::uint32_t>(count_++);
+    // Fixed-size blocks: growing never copies (or transiently doubles) the
+    // stored markings.
+    if ((id & (kBlockRows - 1)) == 0)
+      blocks_.push_back(std::make_unique_for_overwrite<int[]>(kBlockRows * places_));
+    std::copy(row, row + places_, blocks_.back().get() + (id & (kBlockRows - 1)) * places_);
+    hashes_.push_back(hash);
+    slots_[slot] = id;
+    return {id, true};
+  }
+  // The id of a stored marking, or std::nullopt.
+  [[nodiscard]] std::optional<std::uint32_t> find(const Marking& marking) const {
+    const int* row = marking.data();
+    const std::uint64_t hash = row_hash(row);
+    const std::size_t mask = slots_.size() - 1;
+    for (std::size_t slot = hash & mask; slots_[slot] != kEmpty; slot = (slot + 1) & mask) {
+      const auto other = slots_[slot];
+      if (hashes_[other] == hash && std::equal(row, row + places_, at(other))) return other;
+    }
+    return std::nullopt;
+  }
+  [[nodiscard]] std::size_t size() const { return count_; }
+  [[nodiscard]] const int* at(std::uint32_t id) const {
+    return blocks_[id / kBlockRows].get() + std::size_t(id & (kBlockRows - 1)) * places_;
+  }
+  // Copies marking `id` into `out` (sized to the place count).
+  void copy(std::uint32_t id, Marking& out) const {
+    out.assign(at(id), at(id) + places_);
+  }
+  // std::vector's operator> on the two markings.
+  [[nodiscard]] bool greater(std::uint32_t left, std::uint32_t right) const {
+    return std::lexicographical_compare(at(right), at(right) + places_, at(left),
+                                        at(left) + places_);
+  }
+
+ private:
+  static constexpr std::uint32_t kEmpty = std::numeric_limits<std::uint32_t>::max();
+  static constexpr std::uint32_t kBlockRows = 4096;  // a power of two
+  // Only the slot layout depends on the hash (ids follow insertion order):
+  // two independent multiply chains, then a final mix for the low bits the
+  // mask keeps.
+  [[nodiscard]] std::uint64_t row_hash(const int* row) const {
+    std::uint64_t a = 0x9E3779B97F4A7C15ull, b = 0xC2B2AE3D27D4EB4Full;
+    std::size_t p = 0;
+    for (; p + 1 < places_; p += 2) {
+      a = (a ^ static_cast<std::uint32_t>(row[p])) * 0xFF51AFD7ED558CCDull;
+      b = (b ^ static_cast<std::uint32_t>(row[p + 1])) * 0xC4CEB9FE1A85EC53ull;
+    }
+    if (p < places_) a = (a ^ static_cast<std::uint32_t>(row[p])) * 0xFF51AFD7ED558CCDull;
+    std::uint64_t h = a ^ ((b << 29) | (b >> 35));
+    h ^= h >> 33;
+    h *= 0xFF51AFD7ED558CCDull;
+    h ^= h >> 33;
+    return h;
+  }
+  void grow() {
+    std::vector<std::uint32_t> grown(slots_.size() * 2, kEmpty);
+    const std::size_t mask = grown.size() - 1;
+    for (std::uint32_t id = 0; id < count_; ++id) {
+      std::size_t slot = hashes_[id] & mask;
+      while (grown[slot] != kEmpty) slot = (slot + 1) & mask;
+      grown[slot] = id;
+    }
+    slots_.swap(grown);
+  }
+  std::size_t places_;
+  std::size_t count_ = 0;
+  std::vector<std::unique_ptr<int[]>> blocks_;
+  std::vector<std::uint64_t> hashes_;
+  std::vector<std::uint32_t> slots_;
+  std::vector<std::uint64_t> batch_hashes_;
 };
 
 class Aligner {
@@ -4311,82 +4437,6 @@ class Aligner {
     return next;
   }
 
-  // Markings met by the model-run searches, each stored once as a row of one
-  // flat pool. Search entries refer to markings by id; ties in the frontier
-  // are still broken by comparing the markings themselves (lexicographically,
-  // as std::vector compares), so expansion order is unchanged. A marking is
-  // copied into the pool only when it is new.
-  class MarkingTable {
-   public:
-    explicit MarkingTable(std::size_t places) : places_(places), slots_(1024, kEmpty) {}
-    MarkingTable(const MarkingTable&) = delete;
-    MarkingTable& operator=(const MarkingTable&) = delete;
-
-    // Returns the id of the marking and whether it was added by this call.
-    std::pair<std::uint32_t, bool> intern(const Marking& marking) {
-      const int* row = marking.data();
-      const std::uint64_t hash = row_hash(row);
-      if ((count_ + 1) * 2 > slots_.size()) grow();
-      const std::size_t mask = slots_.size() - 1;
-      std::size_t slot = hash & mask;
-      while (slots_[slot] != kEmpty) {
-        const auto other = slots_[slot];
-        if (hashes_[other] == hash && std::equal(row, row + places_, at(other)))
-          return {other, false};
-        slot = (slot + 1) & mask;
-      }
-      if (count_ >= std::numeric_limits<std::uint32_t>::max() - 1)
-        throw std::length_error("model-run search marking table overflow");
-      const auto id = static_cast<std::uint32_t>(count_++);
-      // Fixed-size blocks: growing never copies (or transiently doubles) the
-      // stored markings.
-      if ((id & (kBlockRows - 1)) == 0)
-        blocks_.push_back(std::make_unique<int[]>(kBlockRows * places_));
-      std::copy(row, row + places_, blocks_.back().get() + (id & (kBlockRows - 1)) * places_);
-      hashes_.push_back(hash);
-      slots_[slot] = id;
-      return {id, true};
-    }
-    [[nodiscard]] const int* at(std::uint32_t id) const {
-      return blocks_[id / kBlockRows].get() + std::size_t(id & (kBlockRows - 1)) * places_;
-    }
-    // Copies marking `id` into `out` (sized to the place count).
-    void copy(std::uint32_t id, Marking& out) const {
-      out.assign(at(id), at(id) + places_);
-    }
-    // std::vector's operator> on the two markings.
-    [[nodiscard]] bool greater(std::uint32_t left, std::uint32_t right) const {
-      return std::lexicographical_compare(at(right), at(right) + places_, at(left),
-                                          at(left) + places_);
-    }
-
-   private:
-    static constexpr std::uint32_t kEmpty = std::numeric_limits<std::uint32_t>::max();
-    static constexpr std::uint32_t kBlockRows = 4096;  // a power of two
-    [[nodiscard]] std::uint64_t row_hash(const int* row) const {
-      std::uint64_t h = 1469598103934665603ull;
-      for (std::size_t p = 0; p < places_; ++p)
-        h = (h ^ static_cast<std::uint32_t>(row[p])) * 1099511628211ull;
-      h ^= h >> 32;
-      return h;
-    }
-    void grow() {
-      std::vector<std::uint32_t> grown(slots_.size() * 2, kEmpty);
-      const std::size_t mask = grown.size() - 1;
-      for (std::uint32_t id = 0; id < count_; ++id) {
-        std::size_t slot = hashes_[id] & mask;
-        while (grown[slot] != kEmpty) slot = (slot + 1) & mask;
-        grown[slot] = id;
-      }
-      slots_.swap(grown);
-    }
-    std::size_t places_;
-    std::size_t count_ = 0;
-    std::vector<std::unique_ptr<int[]>> blocks_;
-    std::vector<std::uint64_t> hashes_;
-    std::vector<std::uint32_t> slots_;
-  };
-
   // Cheapest count of visible transitions on any run from the initial to the
   // final marking, found by the same uniform-cost search with no trace, or
   // std::nullopt when the final marking is unreachable within the search bound.
@@ -4412,6 +4462,8 @@ class Aligner {
     std::size_t expanded = 0;
     CancelPoll cancelled(options.cancelled);
     Marking current, successor;
+    std::vector<std::size_t> fired;
+    std::vector<int> successors;
     while (!frontier.empty() && expanded < budget) {
       if (std::chrono::steady_clock::now() >= deadline || cancelled()) {
         exhausted = true;
@@ -4423,18 +4475,24 @@ class Aligner {
       if (best[id] != kUnseen && cost > best[id]) continue;
       table.copy(id, current);
       if (current == final_) return cost;
+      // The successors in transition order, interned as one batch.
+      fired.clear();
+      successors.clear();
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
         if (!enabled(current, t)) continue;
-        const std::uint64_t next_cost =
-            cost + (net_.transitions()[t].silent() ? 0 : 1);
         successor = current;
         fire_petri_transition(net_.transitions()[t], successor);
-        const auto [next, added] = table.intern(successor);
+        fired.push_back(t);
+        successors.insert(successors.end(), successor.begin(), successor.end());
+      }
+      table.intern_batch(successors.data(), fired.size(), [&](std::size_t k, std::uint32_t next, bool added) {
+        const std::uint64_t next_cost =
+            cost + (net_.transitions()[fired[k]].silent() ? 0 : 1);
         if (added) best.push_back(kUnseen);
-        if (best[next] != kUnseen && best[next] <= next_cost) continue;
+        if (best[next] != kUnseen && best[next] <= next_cost) return;
         best[next] = next_cost;
         frontier.push({next_cost, next});
-      }
+      });
     }
     exhausted = !frontier.empty();
     return std::nullopt;  // final marking unreachable: the net is not a sound WF-net
@@ -4443,26 +4501,114 @@ class Aligner {
   // shortest_model_run as an A* whose heuristic is the marking-equation bound
   // on the visible transitions still to fire; markings from which the final
   // marking is unreachable by the marking equation are dropped.
+  //
+  // The bound of a successor is solved lazily. A successor enters the
+  // frontier as a pending entry keyed (g + l, g, marking), where l is a lower
+  // bound on its marking-equation bound h (0, or a dual bound below), and its
+  // LP is solved only when the pending entry reaches the top: it is dropped
+  // there (an infeasible marking, which the eager search never queues) or
+  // queued again with its exact key (g + h, g, marking). Keys are distinct (a
+  // marking is queued again only at a strictly lower g), so whenever an exact
+  // entry is on top it is the least key the eager search (every bound solved
+  // when its successor is generated) would hold: both expand the same entries
+  // in the same order, count the same expansions against the budget and
+  // return the same cost and `exhausted`, while the LPs of the successors a
+  // search stopped by its budget never reaches are never solved. Each
+  // marking's bound is still solved at most once.
+  //
+  // The dual bound: the optimal dual y of any solved program is feasible for
+  // all of them (c - yA >= 0 does not involve b), so y·(final - m) <= h(m)
+  // for every marking m by weak duality. The duals of solves whose pending
+  // bound fell short are kept (up to kDualPool), and a successor's l is the
+  // best of them, rounded down with a margin far beyond the solver's
+  // tolerance, so l never exceeds the rounded-up bound the LP gives.
   [[nodiscard]] std::optional<std::uint64_t> pruned_model_run(
       const AlignmentOptions& options,
       std::chrono::steady_clock::time_point deadline,
       bool& exhausted) const {
     const std::size_t tcount = net_.transitions().size();
+    const std::size_t places = initial_.size();
     std::vector<double> c(tcount, 0.0);
     for (std::size_t t = 0; t < tcount; ++t) c[t] = net_.transitions()[t].silent() ? 0.0 : 1.0;
     // The incidence matrix as sparse rows; only b changes between markings.
-    std::vector<double> dense(initial_.size() * tcount, 0.0);
+    std::vector<double> dense(places * tcount, 0.0);
     for (std::size_t t = 0; t < tcount; ++t)
       for (const auto& [p, coef] : incidence_[t]) dense[p * tcount + t] = coef;
     const auto a = lp_rows([&](std::size_t i, std::size_t j) { return dense[i * tcount + j]; },
-                           initial_.size(), tcount);
-    const auto bound = [&](const int* marking) -> std::optional<std::uint64_t> {
-      std::vector<double> b(initial_.size(), 0.0);
-      for (std::size_t p = 0; p < initial_.size(); ++p) b[p] = double(final_[p] - marking[p]);
-      const auto lp = solve_lp_sparse(a, std::move(b), c);
+                           places, tcount);
+    std::vector<double> dual;
+    // Integral optimal solutions (transition, count) of recent markings.
+    using Plan = std::vector<std::pair<std::uint32_t, std::uint32_t>>;
+    constexpr std::size_t kPlans = std::size_t{1} << 16;
+    std::unordered_map<std::uint32_t, Plan> plans;
+    std::queue<std::uint32_t> plan_order;  // oldest first, for eviction
+    const auto keep_plan = [&](std::uint32_t id, Plan plan) {
+      if (plans.size() >= kPlans) {
+        plans.erase(plan_order.front());
+        plan_order.pop();
+      }
+      if (plans.emplace(id, std::move(plan)).second) plan_order.push(id);
+    };
+    const auto bound = [&](const int* marking, std::vector<double>* dual_out, std::uint32_t id = std::numeric_limits<std::uint32_t>::max()) -> std::optional<std::uint64_t> {
+      std::vector<double> b(places, 0.0);
+      for (std::size_t p = 0; p < places; ++p) b[p] = double(final_[p] - marking[p]);
+      const auto lp = solve_lp_sparse(a, std::move(b), c, dual_out);
       if (lp.aborted) return 0;
       if (!lp.feasible) return std::nullopt;
+      if (id != std::numeric_limits<std::uint32_t>::max() && std::abs(lp.objective - std::round(lp.objective)) < 1e-9) {
+        Plan plan;
+        bool integral = true;
+        for (std::size_t t = 0; t < tcount && integral; ++t) {
+          const double x = lp.solution[t];
+          const double whole = std::round(x);
+          integral = std::abs(x - whole) < 1e-9 && whole >= 0.0 && whole < 1e9;
+          if (integral && whole >= 1.0)
+            plan.emplace_back(static_cast<std::uint32_t>(t), static_cast<std::uint32_t>(whole));
+        }
+        if (integral) keep_plan(id, std::move(plan));
+      }
       return static_cast<std::uint64_t>(std::max(0.0, std::ceil(lp.objective - 1e-6)));
+    };
+    // Kept duals: y, y·final and y·A_t per transition.
+    struct Dual {
+      std::vector<double> y, per_transition;
+      double at_final = 0.0;
+    };
+    constexpr std::size_t kDualPool = 64;
+    std::vector<Dual> pool;
+    // Keeps the dual of the solve just made when it is feasible for every
+    // transition (checked again here, to the solver's pivoting tolerance).
+    const auto keep_dual = [&] {
+      if (pool.size() >= kDualPool || dual.size() != places) return;
+      Dual kept;
+      kept.per_transition.assign(tcount, 0.0);
+      for (std::size_t t = 0; t < tcount; ++t) {
+        double yat = 0.0;
+        for (const auto& [p, coef] : incidence_[t]) yat += dual[p] * coef;
+        if (!std::isfinite(yat) || yat > c[t] + 1e-7) return;
+        kept.per_transition[t] = yat;
+      }
+      for (std::size_t p = 0; p < places; ++p) {
+        if (!std::isfinite(dual[p])) return;
+        kept.at_final += dual[p] * double(final_[p]);
+      }
+      kept.y = dual;
+      pool.push_back(std::move(kept));
+    };
+    // y·(final - m) for each kept dual at the marking being expanded.
+    std::vector<double> at_current;
+    std::vector<std::size_t> marked;
+    std::vector<char> derived;
+    Plan parent_plan;
+    std::vector<std::size_t> fired;
+    std::vector<int> successors;
+    const auto dual_bound = [&](std::size_t t) -> std::uint64_t {
+      double best = 0.0;
+      for (std::size_t k = 0; k < at_current.size(); ++k)
+        best = std::max(best, at_current[k] - pool[k].per_transition[t]);
+      // Rounded down: at most the LP's rounded-up bound unless the dual's
+      // error (1e-7 per firing, plus rounding) came near a whole unit.
+      return static_cast<std::uint64_t>(std::floor(best + 1e-6));
     };
     constexpr std::uint64_t kUnseen = std::numeric_limits<std::uint64_t>::max();
     // The bound depends on the marking alone (solve_lp is deterministic), so
@@ -4472,57 +4618,124 @@ class Aligner {
       bool bounded = false;
       std::optional<std::uint64_t> bound;
     };
-    MarkingTable table(initial_.size());
+    MarkingTable table(places);
     std::vector<Known> known;  // by marking id
-    using Entry = std::tuple<std::uint64_t, std::uint64_t, std::uint32_t>;  // f, g, marking id
+    struct Entry {
+      std::uint64_t f, g;
+      std::uint32_t id;
+      bool pending;  // f is g plus a lower bound; the marking's LP is not applied yet
+    };
     // Orders like std::greater over (f, g, Marking).
     const auto later = [&](const Entry& left, const Entry& right) {
-      if (std::get<0>(left) != std::get<0>(right))
-        return std::get<0>(left) > std::get<0>(right);
-      if (std::get<1>(left) != std::get<1>(right))
-        return std::get<1>(left) > std::get<1>(right);
-      return table.greater(std::get<2>(left), std::get<2>(right));
+      if (left.f != right.f) return left.f > right.f;
+      if (left.g != right.g) return left.g > right.g;
+      return table.greater(left.id, right.id);
     };
     std::priority_queue<Entry, std::vector<Entry>, decltype(later)> frontier(later);
     const auto start = table.intern(initial_).first;
-    known.push_back({0, true, bound(initial_.data())});
+    known.push_back({0, true, bound(initial_.data(), nullptr)});
     const auto start_bound = known[start].bound;
     if (!start_bound) return std::nullopt;
-    frontier.push({*start_bound, 0, start});
+    frontier.push({*start_bound, 0, start, false});
     const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
                                                         : options.max_states;
     std::size_t expanded = 0;
     CancelPoll cancelled(options.cancelled);
+    const auto out_of_time = [&] {
+      return std::chrono::steady_clock::now() >= deadline || cancelled();
+    };
     Marking current, successor;
-    while (!frontier.empty() && expanded < budget) {
-      if (std::chrono::steady_clock::now() >= deadline || cancelled()) {
+    for (;;) {
+      // Bring an exact entry to the top: the frontier the eager search would
+      // hold is empty exactly when none is left.
+      while (!frontier.empty() && frontier.top().pending) {
+        if (out_of_time()) {
+          exhausted = true;
+          return std::nullopt;
+        }
+        auto entry = frontier.top();
+        frontier.pop();
+        auto& marking = known[entry.id];
+        if (!marking.bounded) {
+          marking.bound = bound(table.at(entry.id), &dual, entry.id);
+          marking.bounded = true;
+          // The kept duals fell short of this bound: keep this one too.
+          if (marking.bound && *marking.bound > entry.f - entry.g) keep_dual();
+        }
+        if (!marking.bound) continue;
+        entry.f = entry.g + *marking.bound;
+        entry.pending = false;
+        frontier.push(entry);
+      }
+      if (frontier.empty() || expanded >= budget) break;
+      if (out_of_time()) {
         exhausted = true;
         return std::nullopt;
       }
       ++expanded;
-      const auto [f, cost, id] = frontier.top();
+      const auto [f, cost, id, pending] = frontier.top();
       (void)f;
+      (void)pending;
       frontier.pop();
       if (known[id].best != kUnseen && cost > known[id].best) continue;
       table.copy(id, current);
       if (current == final_) return cost;
+      marked.clear();
+      for (std::size_t p = 0; p < places; ++p)
+        if (current[p] != 0) marked.push_back(p);
+      // A copy: keeping the successors' plans may evict this one.
+      const auto found_plan = plans.find(id);
+      const bool planned = found_plan != plans.end();
+      if (planned) parent_plan = found_plan->second;
+      derived.assign(tcount, 0);
+      if (planned) for (const auto& [t, count] : parent_plan) derived[t] = 1;
+      at_current.assign(pool.size(), 0.0);
+      for (std::size_t k = 0; k < pool.size(); ++k) {
+        double ym = 0.0;
+        for (const auto p : marked) ym += pool[k].y[p] * double(current[p]);
+        at_current[k] = pool[k].at_final - ym;
+      }
+      // The successors in transition order, interned as one batch.
+      fired.clear();
+      successors.clear();
       for (std::size_t t = 0; t < tcount; ++t) {
         if (!enabled(current, t)) continue;
-        const std::uint64_t next_cost = cost + (net_.transitions()[t].silent() ? 0 : 1);
         successor = current;
         fire_petri_transition(net_.transitions()[t], successor);
-        const auto [next, added] = table.intern(successor);
-        if (added) known.emplace_back();
-        if (known[next].best != kUnseen && known[next].best <= next_cost) continue;
-        if (!known[next].bounded) {
-          known[next].bound = bound(successor.data());
-          known[next].bounded = true;
-        }
-        const auto h = known[next].bound;
-        if (!h) continue;
-        known[next].best = next_cost;
-        frontier.push({next_cost + *h, next_cost, next});
+        fired.push_back(t);
+        successors.insert(successors.end(), successor.begin(), successor.end());
       }
+      table.intern_batch(successors.data(), fired.size(), [&](std::size_t k, std::uint32_t next, bool added) {
+        const std::size_t t = fired[k];
+        const std::uint64_t next_cost = cost + (net_.transitions()[t].silent() ? 0 : 1);
+        if (added) known.emplace_back();
+        if (known[next].best != kUnseen && known[next].best <= next_cost) return;
+        if (known[next].bounded) {
+          // Solved before: an infeasible marking is never queued, as in the
+          // eager search.
+          const auto h = known[next].bound;
+          if (!h) return;
+          known[next].best = next_cost;
+          frontier.push({next_cost + *h, next_cost, next, false});
+        } else if (derived[t] && *known[id].bound >= std::uint64_t(c[t])) {
+          known[next].bounded = true;
+          known[next].bound = *known[id].bound - std::uint64_t(c[t]);
+          known[next].best = next_cost;
+          frontier.push({next_cost + *known[next].bound, next_cost, next, false});
+          Plan rest;
+          rest.reserve(parent_plan.size());
+          for (const auto& [u, count] : parent_plan)
+            if (u != t) rest.emplace_back(u, count);
+            else if (count > 1) rest.emplace_back(u, count - 1);
+          keep_plan(next, std::move(rest));
+        } else {
+          // Recording the cost of a marking that may still prove infeasible
+          // changes nothing: such a marking is never queued with an exact key,
+          // so the best cost only skips pending entries that would be dropped.
+          known[next].best = next_cost;
+          frontier.push({next_cost + dual_bound(t), next_cost, next, true});
+        }
+      });
     }
     exhausted = !frontier.empty();
     return std::nullopt;
@@ -4587,17 +4800,13 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
   const std::size_t acts = names.size();
   const std::size_t words = (acts + 63) / 64;
 
-  std::unordered_map<Marking, std::uint32_t, MarkingHash> index;
-  std::vector<const Marking*> by_id;  // map nodes are stable
-  // Copies a marking into the map only when it is new.
-  const auto intern = [&](const Marking& m) {
-    if (const auto found = index.find(m); found != index.end())
-      return std::make_pair(found->second, false);
-    const auto [it, inserted] =
-        index.try_emplace(m, static_cast<std::uint32_t>(index.size()));
-    if (inserted) by_id.push_back(&it->first);
-    return std::make_pair(it->second, inserted);
-  };
+  // Markings by id in the order they were met, each stored once in one flat
+  // pool (no node or vector per marking).
+  MarkingTable index(initial.size());
+  const auto intern = [&](const Marking& m) { return index.intern(m); };
+  Marking current;  // the marking being expanded or scanned, copied out of the pool
+  std::vector<const PetriTransition*> fired;
+  std::vector<int> successors;
 
   const auto enabled = [&](const Marking& m, const PetriTransition& t) {
     return petri_transition_enabled(t, m);
@@ -4617,6 +4826,7 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
   std::queue<std::uint32_t> frontier;
   frontier.push(intern(initial).first);
   std::size_t expanded = 0;
+  const auto marking_count = [&] { return index.size(); };
   while (!frontier.empty()) {
     if (expanded++ >= kFootprintCap) {
       exhausted = true;
@@ -4625,18 +4835,25 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
     check_cancelled();
     const std::uint32_t id = frontier.front();
     frontier.pop();
-    if (was_expanded.size() < by_id.size()) was_expanded.resize(by_id.size(), 0);
+    if (was_expanded.size() < marking_count()) was_expanded.resize(marking_count(), 0);
     was_expanded[id] = 1;
-    const Marking& current = *by_id[id];
+    index.copy(id, current);
+    // The successors in transition order, interned as one batch.
+    fired.clear();
+    successors.clear();
     for (const auto& transition : net.transitions()) {
       if (!enabled(current, transition)) continue;
-      const auto [next, inserted] = intern(fire(current, transition));
-      if (transition.silent()) silent_edges.emplace_back(id, next);
-      if (inserted) frontier.push(next);
+      fire(current, transition);
+      fired.push_back(&transition);
+      successors.insert(successors.end(), successor.begin(), successor.end());
     }
+    index.intern_batch(successors.data(), fired.size(), [&](std::size_t k, std::uint32_t next, bool inserted) {
+      if (fired[k]->silent()) silent_edges.emplace_back(id, next);
+      if (inserted) frontier.push(next);
+    });
   }
 
-  const std::size_t count = by_id.size();
+  const std::size_t count = marking_count();
   was_expanded.resize(count, 0);
 
   // labels[m]: bitset of activities enabled at m after silent moves only.
@@ -4655,7 +4872,7 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
   };
   for (std::uint32_t id = 0; id < count; ++id) {
     check_cancelled();
-    const Marking& current = *by_id[id];
+    index.copy(id, current);
     for (const auto& transition : net.transitions()) {
       if (transition.silent() || !enabled(current, transition)) continue;
       labels[id * words + *transition.activity / 64] |=
@@ -4688,12 +4905,12 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
   for (std::uint32_t id = 0; id < count; ++id) {
     check_cancelled();
     if (!was_expanded[id]) continue;
-    const Marking& current = *by_id[id];
+    index.copy(id, current);
     for (const auto& transition : net.transitions()) {
       if (transition.silent() || !enabled(current, transition)) continue;
       const auto found = index.find(fire(current, transition));
-      if (found == index.end()) continue;
-      const std::uint32_t next = found->second;
+      if (!found) continue;
+      const std::uint32_t next = *found;
       const std::size_t row = *transition.activity * words;
       for (std::size_t w = 0; w < words; ++w)
         follows[row + w] |= labels[next * words + w];

@@ -963,6 +963,28 @@ void stochastic_run_bounds_count_silent_firings() {
   assert(refused);
   options.max_visited_marking_entries = 0;
 
+  // The visited bytes bound sees every buffer before it is allocated (a
+  // growing buffer counts its old and new allocation), so a run never holds
+  // more, and a bound the run stays within changes nothing (same elements).
+  const auto held = minera::playout_visited_bytes(visited);
+  assert(held > visited.traces.front().size() * sizeof(minera::PlayoutVisitedElement));
+  options.max_visited_bytes = held * 2;
+  const auto exact = minera::stochastic_playout_visited(net, options);
+  assert(exact.traces == visited.traces && minera::playout_visited_bytes(exact) <= held);
+  options.max_visited_bytes = held / 2;
+  refused = false;
+  try {
+    (void)minera::stochastic_playout_visited(net, options);
+  } catch (const std::length_error& error) {
+    refused = std::string(error.what()).find("bytes") != std::string::npos;
+  }
+  assert(refused);
+  options.max_visited_bytes = 0;
+  // The visited serialization is sized exactly.
+  const auto document = minera::serialize_stochastic_playout_visited_json(net, visited);
+  assert(document.size() == minera::stochastic_playout_visited_json_bytes(net, visited));
+  assert(document.capacity() == document.size());
+
   // A cancellation callback stops the run (polled every 256 checks).
   std::size_t polls = 0;
   options.cancelled = [&polls] { return ++polls > 3; };

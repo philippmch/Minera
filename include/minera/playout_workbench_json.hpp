@@ -49,5 +49,8 @@ namespace minera {
     const DfgPlayoutResult& result);
 [[nodiscard]] std::string serialize_playout_workbench_result_json(
     const ProcessTreePlayoutResult& result);
+// The exact size of serialize_playout_workbench_result_json(result)'s
+// document, counted without building it.
+[[nodiscard]] std::size_t playout_workbench_result_json_bytes(const PlayoutVisitedResult& result);
 
 }  // namespace minera

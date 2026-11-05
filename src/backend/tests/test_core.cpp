@@ -8333,6 +8333,65 @@ void csv_timestamps_follow_pandas_resolution_and_offsets() {
   assert((stamps("1,A,2024-01-01t10:00:00.123456789\n1,B,3000-01-01\n") ==
           V{"2024-01-01 10:00:00.123456", "3000-01-01"}));
   assert((stamps("1,A,2262-04-11 23:47:16.854775807\n1,B,1677-09-21 00:12:43.145224193\n").size() == 2));
+  // An hour-only offset before trimmed white space is a dateutil shape on
+  // the fallback path too: microseconds, so any year fits.
+  assert((stamps("1,A,2024-07-05T05:10:33.6525764 +00 \n1,B,1500-01-01\n") ==
+          V{"1500-01-01", "2024-07-05 05:10:33.652576+00:00"}));
+  assert((stamps("1,A,\"2024/07/20T13:22:51.0911582-13 \"\n") ==
+          V{"2024-07-20 13:22:51.091158-13:00"}));
+  // The fraction is the one after the seconds, not a '.' date separator.
+  assert(refused("1,A,2024.10.09 06:17:12.186788426\n1,B,1500-01-01\n"));
+  assert((stamps("1,A,2024.10.09 06:17:12.186788\n1,B,1500-01-01\n").size() == 2));
+  const auto unconvertible = [&](const std::string& rows) {
+    try { (void)import(rows); }
+    catch (const std::runtime_error& error) {
+      return std::string(error.what()).find("cannot be parsed") != std::string::npos;
+    }
+    return false;
+  };
+  // Only uppercase UTC and GMT are zone names.
+  assert(unconvertible("1,A,2024-01-01\n1,B,2024-07-05 11:46:53 utc\n"));
+  assert(unconvertible("1,A,2024-01-01\n1,B,2024-07-05 11:46:53 Gmt\n"));
+  assert((stamps("1,A,2024-07-05 11:46:53UTC\n") == V{"2024-07-05 11:46:53+00:00"}));
+  // dateutil years: a year joined by '-', '/' or '.' with three or four
+  // digits is literal; a space-separated year below 100 is two-digit, and a
+  // leading number below 100 before a month name is not a year.
+  const auto one = [&](const std::string& cell) { return stamps("1,A,\"" + cell + "\"\n").at(0); };
+  assert(one("8 May 0001 11:46:53") == "2001-05-08 11:46:53");
+  assert(one("Tue, May 8, 0001 11:46:53") == "2001-05-08 11:46:53");
+  assert(one("8-May-0001 11:46:53") == "0001-05-08 11:46:53");
+  assert(one("May.8.0001 11:46:53") == "0001-05-08 11:46:53");
+  assert(one("8 May 1 11:46:53") == "2001-05-08 11:46:53");
+  assert(one("8-May-099 11:46:53") == "0099-05-08 11:46:53");
+  assert(one("13 09 099 11:46:53") == "1999-09-13 11:46:53");
+  assert(one("13/09/0001 11:46:53") == "0001-09-13 11:46:53");
+  assert(one("13 09 0000 11:46:53") == "2000-09-13 11:46:53");
+  assert(one("0001 Sep 28") == "2028-09-01 00:00:00");
+  assert(one("0040 Sep 28 11:46:53") == "2040-09-28 11:46:53");
+  assert(one("40-Sep-28 11:46:53") == "2040-09-28 11:46:53");
+  assert(one("0001-Sep-28 11:46:53") == "0001-09-28 11:46:53");
+  assert(one("0001 09 28 11:46:53") == "0001-09-28 11:46:53");
+  assert(unconvertible("1,A,2024-01-01\n1,B,8-May-0000 11:46:53\n"));
+  // A leading short year: three joined digits are literal, a first number
+  // that cannot be a day is a two-digit year, and white space separates
+  // plain numbers that dateutil orders month-first.
+  assert(one("075.08.22") == "0075-08-22 00:00:00");
+  assert(one("999-Nov-20") == "0999-11-20 00:00:00");
+  assert(one("40-03-03") == "2040-03-03 00:00:00");
+  assert(one("075 06 11") == "2075-06-11 00:00:00");
+  assert(one("009 08 05") == "2005-09-08 00:00:00");
+  assert(one("028 12 19") == "2019-12-28 00:00:00");
+  assert(one("075 Apr 4") == "2075-04-04 00:00:00");
+  // Space-separated YYYY MM DD is on the ISO path (nanoseconds kept); off it
+  // dateutil reads the three numbers.
+  assert(one("1999 05 10 08:20:25.322054301") == "1999-05-10 08:20:25.322054301");
+  assert(one("0040 09 14T14:41:11 z") == "2040-09-14 14:41:11+00:00");
+  assert(one("0001 09 28T11:46:53 z") == "2028-01-09 11:46:53+00:00");
+  // A large offset whose UTC instant leaves years 1..9999 keeps the instant
+  // at -14:00 or +14:00 when that wall clock fits.
+  assert(one("9999-12-31T20:00:00-15:00") == "9999-12-31 21:00:00-14:00");
+  assert(one("0001-01-01T03:00:00+15:00") == "0001-01-01 02:00:00+14:00");
+  assert(unconvertible("1,A,2024-01-01\n1,B,9999-12-31T23:59:00-23:59\n"));
 }
 
 int main() {

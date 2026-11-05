@@ -402,6 +402,10 @@ std::optional<DecomposedAlignmentResult> reference_align_decomposed(
 // native search below.
 DecomposedAlignmentResult align_decomposed(const EventLog& log,const PetriNet& net,const DecomposedAlignmentOptions& o){
   validate_selector(o.activity_attribute);
+  // pm4py 2.7.22 raises "m must be a positive integer" on a net without
+  // transitions, whatever the log; a net with only silent ones aligns.
+  if (net.transitions().empty())
+    throw std::invalid_argument("decomposed alignment requires a net with at least one transition");
   const DecomposedAlignmentOptions defaults;
   if (!o.native_search && valid(o) && o.variant == DecomposedAlignmentVariant::kRecomposMaximal &&
       o.max_states == defaults.max_states && o.max_total_states == defaults.max_total_states)

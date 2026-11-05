@@ -326,6 +326,14 @@ void str_timestamps_follow_public_parsing() {
             "2024-01-02T10:00:00.123456+00:00|3", "2024-01-01T19:00:00+00:00|4"}));
   assert((times({"1676-08-06T22:42:56.412861583", "2000-08-23 07:25:55"}, std::nullopt) ==
           V{"1676-08-06T22:42:56.412861583|1", "2000-08-23 07:25:55|2"}));
+  // The nanosecond fraction follows the seconds even after a '.' date.
+  assert((times({"2024.10.09 06:17:12.186788426", "1500-01-01"}, std::nullopt) ==
+          V{"2024.10.09 06:17:12.186788426|1", "1500-01-01|2"}));
+  assert((times({"2024.10.09 06:17:12.186788", "1500-01-01"}, std::nullopt) ==
+          V{"2024-10-09T06:17:12.186788+00:00|1", "1500-01-01T00:00:00+00:00|2"}));
+  // Lowercase zone names do not parse, so the column stays text.
+  assert((times({"2024-07-05 11:46:53 utc", "2024-01-01"}, std::nullopt) ==
+          V{"2024-07-05 11:46:53 utc|1", "2024-01-01|2"}));
   // The case ids stay text: "1" no longer reads as a day with "%d %b %Y".
   assert((times({"21 Nov 2005 09:40", "x 21 Mar 2030 12:50 later"}, "%d %b %Y %H:%M") ==
           V{"2005-11-21T09:40:00+00:00|1", "2030-03-21T12:50:00+00:00|2"}));

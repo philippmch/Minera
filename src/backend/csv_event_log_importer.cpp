@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <optional>
 #include <stdexcept>
@@ -310,6 +311,17 @@ int expand_two_digit_year(unsigned year) {
   return expanded;
 }
 
+// The year of a date token read with `digits` digits. dateutil keeps a year
+// joined to the rest of the date by '-', '/' or '.' as text, so three or four
+// digits are literal ("8-May-0001" is year 1); a year standing alone after
+// white space is read as a number, so any value below 100 is a two-digit
+// year ("8 May 0001" is 2001).
+std::optional<int> reference_year(unsigned value, std::size_t digits, bool joined) {
+  if (digits == 0) return std::nullopt;
+  if (joined ? digits <= 2 : value < 100) return expand_two_digit_year(value);
+  return static_cast<int>(value);
+}
+
 // A recognized cell in ISO spelling. `iso_path` marks the shapes pandas reads
 // with its ISO-8601 parser (YYYY-M-D with `-`, `/` or `.`, a `T` or single
 // space before a two-digit HH:MM:SS clock, a `.` fraction, an uppercase `Z`
@@ -325,6 +337,9 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
   in.skip_spaces();
   int year = 0, month = 0, day = 0;
   bool iso_path = true;
+  // A space-separated YYYY MM DD: pandas reads it on its ISO path, but a cell
+  // that leaves that path reaches dateutil, which reads three numbers.
+  std::optional<std::array<unsigned, 3>> spaced_numbers;
 
   // Optional leading weekday name ("Tue 01/02/2024", "Tuesday, Jan 2 2024").
   if (std::isalpha(static_cast<unsigned char>(in.peek()))) {
@@ -354,21 +369,29 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
     if (in.digits(d, 2) == 0) return std::nullopt;
     if (in.peek() == ',') ++in.pos;
     if (!date_separator(in.peek())) return std::nullopt;
+    const bool joined = in.peek() != ' ';
     ++in.pos;
     in.skip_spaces();
     const auto year_digits = in.digits(y, 4);
-    if (year_digits == 4) year = static_cast<int>(y);
-    else if (year_digits == 2) year = expand_two_digit_year(y);
-    else return std::nullopt;
+    const auto parsed_year = reference_year(y, year_digits, joined);
+    if (!parsed_year) return std::nullopt;
+    year = *parsed_year;
     day = static_cast<int>(d);
   } else {
     unsigned first = 0;
     const auto first_digits = in.digits(first, 4);
-    if (first_digits == 0 || first_digits == 3) return std::nullopt;
+    if (first_digits == 0) return std::nullopt;
     const char sep = in.peek();
     if (!date_separator(sep)) return std::nullopt;
     ++in.pos;
-    if (first_digits == 4 && std::isalpha(static_cast<unsigned char>(in.peek()))) {
+    const bool joined = sep != ' ';
+    // dateutil keeps a token joined by '-', '/' or '.' as text, so a leading
+    // three-digit one is a literal year ("075.08.22" is year 75); white
+    // space separates numbers, so "075 06 11" reads as 75, 6, 11.
+    const bool leading_year =
+        first_digits == 4 || (first_digits == 3 && (joined || first >= 100));
+    if (first_digits == 3) iso_path = false;
+    if (leading_year && std::isalpha(static_cast<unsigned char>(in.peek()))) {
       // YYYY-Mon-D
       iso_path = false;
       month = month_from_name(in.word());
@@ -378,9 +401,19 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       if (in.digits(d, 2) == 0) return std::nullopt;
       year = static_cast<int>(first);
       day = static_cast<int>(d);
-    } else if (first_digits == 4) {
-      // YYYY-M-D in any of the separators.
-      if (sep == ' ') iso_path = false;
+      // Space-separated, a leading number below 100 is not a year: it is
+      // the day when it can be one, and the trailing number is the year.
+      if (!joined && first < 100) {
+        if (first <= 31) {
+          day = static_cast<int>(first);
+          year = expand_two_digit_year(d);
+        } else {
+          year = expand_two_digit_year(first);
+        }
+      }
+    } else if (leading_year) {
+      // YYYY-M-D in any of the separators (space-separated too on the ISO
+      // path; see the dateutil reading after the clock).
       unsigned m = 0, d = 0;
       if (in.digits(m, 2) == 0 || in.peek() != sep) return std::nullopt;
       ++in.pos;
@@ -388,6 +421,7 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       year = static_cast<int>(first);
       month = static_cast<int>(m);
       day = static_cast<int>(d);
+      if (!joined) spaced_numbers = std::array<unsigned, 3>{first, m, d};
     } else if (std::isalpha(static_cast<unsigned char>(in.peek()))) {
       // D Mon YYYY / D-Mon-YYYY
       iso_path = false;
@@ -396,32 +430,47 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       ++in.pos;
       unsigned y = 0;
       const auto year_digits = in.digits(y, 4);
-      if (year_digits == 4) year = static_cast<int>(y);
-      else if (year_digits == 2) year = expand_two_digit_year(y);
-      else return std::nullopt;
+      const auto parsed_year = reference_year(y, year_digits, joined);
+      if (!parsed_year) return std::nullopt;
+      year = *parsed_year;
       day = static_cast<int>(first);
+      // A first number that cannot be a day is the year ("40 Sep 28").
+      if (first > 31 && year_digits <= 2 && y >= 1 && y <= 31) {
+        year = expand_two_digit_year(first);
+        day = static_cast<int>(y);
+      }
     } else {
-      // A/B/YYYY: month-first unless the first number cannot be a month.
+      // A/B/C: year-first when the first number cannot be a day ("40-03-03"),
+      // else month-first unless the first number cannot be a month.
       iso_path = false;
       unsigned second = 0, y = 0;
       if (in.digits(second, 2) == 0 || in.peek() != sep) return std::nullopt;
       ++in.pos;
       const auto year_digits = in.digits(y, 4);
-      if (year_digits == 4) year = static_cast<int>(y);
-      else if (year_digits == 2) year = expand_two_digit_year(y);
-      else return std::nullopt;
-      if (first > 12 && second <= 12) {
-        day = static_cast<int>(first);
+      if (year_digits == 0) return std::nullopt;
+      if (first > 31) {
+        if (year_digits > 2) return std::nullopt;
+        year = expand_two_digit_year(first);
         month = static_cast<int>(second);
+        day = static_cast<int>(y);
       } else {
-        month = static_cast<int>(first);
-        day = static_cast<int>(second);
+        year = *reference_year(y, year_digits, joined);
+        if (first > 12) {
+          day = static_cast<int>(first);
+          month = static_cast<int>(second);
+        } else {
+          month = static_cast<int>(first);
+          day = static_cast<int>(second);
+        }
       }
     }
   }
-  if (year < 1 || month < 1 || month > 12 || day < 1 ||
-      day > month_days(year, month))
-    return std::nullopt;
+  const auto valid_date = [&] {
+    return year >= 1 && month >= 1 && month <= 12 && day >= 1 &&
+           day <= month_days(year, month);
+  };
+  // A space-separated YYYY MM DD is checked once its reading is known.
+  if (!spaced_numbers && !valid_date()) return std::nullopt;
   // Trailing white space after a date alone is ignored.
   if (const auto saved = in.pos; true) {
     in.skip_spaces();
@@ -516,31 +565,65 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
         offset = buffer;
       } else {
         iso_path = false;
-        const auto zone = in.word();
-        if (zone != "utc" && zone != "gmt") return std::nullopt;
+        // Only the uppercase names are zones; "utc" or "Gmt" fail.
+        const auto zone_start = in.pos;
+        in.word();
+        const auto zone = in.text.substr(zone_start, in.pos - zone_start);
+        if (zone != "UTC" && zone != "GMT") return std::nullopt;
         offset = "+00:00";
       }
       in.skip_spaces();
     }
   }
   if (!in.done()) return std::nullopt;
+  if (spaced_numbers && !iso_path) {
+    // dateutil's order for three plain numbers: year-first when the first
+    // cannot be a day, day-first when it cannot be a month, else month-first;
+    // a year below 100 is two-digit ("0040 09 14T14:41:11 z" is 2040).
+    const auto [a, b, c] = *spaced_numbers;
+    const auto year_of = [](unsigned value) {
+      return value < 100 ? expand_two_digit_year(value) : static_cast<int>(value);
+    };
+    if (a > 31) {
+      year = year_of(a); month = static_cast<int>(b); day = static_cast<int>(c);
+    } else if (a > 12) {
+      day = static_cast<int>(a); month = static_cast<int>(b); year = year_of(c);
+    } else {
+      month = static_cast<int>(a); day = static_cast<int>(b); year = year_of(c);
+    }
+  }
+  if (spaced_numbers && !valid_date()) return std::nullopt;
 
   // pandas accepts offsets up to 23:59 where the native timestamp grammar
-  // stops at 14:00; such a cell is stored as its UTC instant.
+  // stops at 14:00; such a cell is stored as its UTC instant. When that
+  // instant leaves years 1..9999 (pandas still holds it), the same instant is
+  // stored at the nearest offset the grammar allows, -14:00 or +14:00, if
+  // its wall clock fits; otherwise the cell counts as unconvertible.
   if (offset_minutes > 14 * 60 || offset_minutes < -14 * 60) {
     using namespace std::chrono;
-    const auto local = sys_days{std::chrono::year{year} / month / day} + hours{hour} +
-                       minutes{minute - offset_minutes};
-    const auto date = floor<days>(local);
-    const year_month_day ymd{date};
-    const hh_mm_ss clock{local - date};
-    year = static_cast<int>(ymd.year());
-    month = static_cast<int>(static_cast<unsigned>(ymd.month()));
-    day = static_cast<int>(static_cast<unsigned>(ymd.day()));
-    hour = static_cast<int>(clock.hours().count());
-    minute = static_cast<int>(clock.minutes().count());
-    offset = "+00:00";
-    if (year < 1 || year > 9999) return std::nullopt;
+    const auto wall = sys_days{std::chrono::year{year} / month / day} + hours{hour} +
+                      minutes{minute};
+    const auto set_clock = [&](sys_time<minutes> local, int stored_offset) {
+      const auto date = floor<days>(local);
+      const year_month_day ymd{date};
+      const hh_mm_ss clock{local - date};
+      const int stored_year = static_cast<int>(ymd.year());
+      if (stored_year < 1 || stored_year > 9999) return false;
+      year = stored_year;
+      month = static_cast<int>(static_cast<unsigned>(ymd.month()));
+      day = static_cast<int>(static_cast<unsigned>(ymd.day()));
+      hour = static_cast<int>(clock.hours().count());
+      minute = static_cast<int>(clock.minutes().count());
+      char text[8];
+      std::snprintf(text, sizeof(text), "%c%02d:00", stored_offset < 0 ? '-' : '+',
+                    std::abs(stored_offset) / 60);
+      offset = text;
+      return true;
+    };
+    const auto utc = wall - minutes{offset_minutes};
+    const int nearest = offset_minutes < 0 ? -14 * 60 : 14 * 60;
+    if (!set_clock(utc, 0) && !set_clock(utc + minutes{nearest}, nearest))
+      return std::nullopt;
   }
   // dateutil keeps microseconds only.
   if (!iso_path && fraction.size() > 6) fraction.resize(6);
@@ -553,9 +636,13 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
   return NormalizedTimestamp{out + offset, iso_path};
 }
 
-// The digits after the first '.' or ',' of a timestamp text.
+// The digits of the seconds fraction of a timestamp text: those after the
+// first '.' or ',' that follows the clock's first ':' (a date may use '.' as
+// its separator, "2024.10.09 06:17:12.186788426").
 std::size_t timestamp_fraction_digits(std::string_view text) {
-  const auto dot = text.find_first_of(".,");
+  const auto colon = text.find(':');
+  if (colon == std::string_view::npos) return 0;
+  const auto dot = text.find_first_of(".,", colon);
   if (dot == std::string_view::npos) return 0;
   std::size_t end = dot + 1;
   while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) ++end;
@@ -586,7 +673,7 @@ std::optional<ReferenceTimestamp> reference_timestamp(const std::string& value,
       return ReferenceTimestamp{value, true};
     return ReferenceTimestamp{std::move(normalized->text), false};
   }
-  auto normalized = normalize_reference_timestamp(value);
+  auto normalized = normalize_reference_timestamp(padded ? value + " " : value);
   if (normalized && parse_timestamp_exact(normalized->text))
     return ReferenceTimestamp{std::move(normalized->text),
                               normalized->iso_path && digits > 6};

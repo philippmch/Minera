@@ -53,6 +53,7 @@ import { BehaviorAnalysis } from "./components/BehaviorAnalysis";
 import { retainTraces, traceFacts, useHasTimestamps } from "./mine-traces";
 import { ActivityTable } from "./components/ActivityTable";
 import { Landing } from "./components/Landing";
+import { useMineProgress } from "./mine-progress";
 import { EventLogView } from "./components/EventLogView";
 import { EventuallyFollows } from "./components/EventuallyFollows";
 import { DfgVariants } from "./components/DfgVariants";
@@ -189,6 +190,9 @@ export default function App() {
   const [dragging, setDragging] = useState(false);
   const [tab, setTab] = useState<Tab>("log");
   const [mining, setMining] = useState(false);
+  // The mining_request_id of the load in progress, whose stages the overlay polls (GET /api/mine-progress).
+  const [miningRequestId, setMiningRequestId] = useState<string | null>(null);
+  const miningProgress = useMineProgress(mining ? miningRequestId : null);
   const [visualizationDraft,setVisualizationDraft]=useState<{generation:number;draft:VisualizationDraft}|null>(null);
   const [discoveryModelDraft,setDiscoveryModelDraft]=useState<{generation:number;file:File;sourceId:string;activityKey?:string;inferLegacyBoundaries?:boolean}|null>(null);
   const ocelQuestions=useRef<HTMLDetailsElement|null>(null);
@@ -247,7 +251,7 @@ export default function App() {
   // A failed load: roll the backend back in case it published the session before the response failed to arrive,
   // or the response arrived but could not be applied (it was never acknowledged).
   const failSourceLoad = (pending: {request_id: string; posted: boolean; previousSource: string | null} | null) => {if (pending) handBackLiveSource(pending.previousSource, pending.posted ? sendCancel(pending.request_id) : Promise.resolve(undefined));};
-  const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; setMining(true); setError(null); return {ticket, controller, cancelsSettled: cancelBarrier.current};};
+  const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; setMiningRequestId(ticket.request_id); setMining(true); setError(null); return {ticket, controller, cancelsSettled: cancelBarrier.current};};
   useEffect(() => () => {sourceGate.current.invalidate(); const pending = sourceRequest.current; pending?.controller.abort(); if (pending?.posted) void cancelMiningRequest(pending.request_id); ocelRequest.current?.abort();}, []);
   // A run on the imported model is stale once another model has been imported, even though its source is unchanged.
   const importedModelGuard = (miner: string | undefined) => {const generation = importedModelGeneration.current; return () => {if (miner === "imported" && generation !== importedModelGeneration.current) throw new Error("The imported model changed while this request was pending; run it again.");};};
@@ -943,6 +947,7 @@ export default function App() {
           error={error}
           mining={mining}
           onCancel={cancelSourceLoad}
+          progress={miningProgress}
         />
         {palette}
         {dropveil}

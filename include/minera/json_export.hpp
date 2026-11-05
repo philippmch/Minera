@@ -341,6 +341,10 @@ void write_analysis_json(std::ostream& out,
     const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_stochastic_playout_visited_json(
     const PetriNet& net, const PlayoutVisitedResult& result);
+// The exact size of serialize_stochastic_playout_visited_json's document,
+// counted without building it.
+[[nodiscard]] std::size_t stochastic_playout_visited_json_bytes(
+    const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_extensive_playout_visited_json(
     const PetriNet& net, const PlayoutVisitedResult& result);
 [[nodiscard]] std::string serialize_stochastic_petri_json(

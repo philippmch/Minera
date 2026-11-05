@@ -1878,6 +1878,16 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_cancellation_tests minera_server)
     add_test(NAME minera_server_cancellation_tests
              COMMAND minera_server_cancellation_tests $<TARGET_FILE:minera_server>)
+    # GET /api/mine-progress reports a running mine's stages to another
+    # connection, and cancel-mine stops the work inside a long stage.
+    add_executable(minera_server_mine_progress_tests
+      src/backend/tests/test_server_mine_progress.cpp)
+    target_include_directories(minera_server_mine_progress_tests PRIVATE third_party)
+    target_link_libraries(minera_server_mine_progress_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_mine_progress_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_mine_progress_tests minera_server)
+    add_test(NAME minera_server_mine_progress_tests
+             COMMAND minera_server_mine_progress_tests $<TARGET_FILE:minera_server>)
     # A second server on a busy port exits with "port N is already in use"
     # instead of sharing the first server's connections.
     add_executable(minera_server_port_exclusive_tests

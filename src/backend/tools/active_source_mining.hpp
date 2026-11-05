@@ -26,10 +26,14 @@ void handle_active_source_mining(const httplib::Request& request,
   // A client that disconnected stops the request too, before a family and
   // inside the model decorations.
   const auto disconnected = connection_cancel_hook(request);
+  // Inside a family, a cancel-mine (or a newer source request) stops the
+  // long searches too (mine_progress.hpp).
+  const auto cancelled = mining_cancel_hook(ticket, disconnected);
   const auto run = [&](const std::string& family, std::string_view input_kind, const auto& call) {
     // A canceled or superseded request stops before its next family.
     abort_if_mining_canceled(ticket);
     minera::throw_if_cancelled(disconnected, "mining request was cancelled: the client disconnected");
+    mine_progress_stage(family);
     std::string result = "null", error = "null";
     bool native_returned = false;
     try {result = call(native_returned);}
@@ -217,12 +221,12 @@ void handle_active_source_mining(const httplib::Request& request,
   };
   std::optional<minera::ModelDecoration> alpha_decoration, inductive_decoration, heuristic_decoration, powl_decoration;
   for (const auto& [name, petri] : session->nets) run(name + "_decoration", "model_prepared_log", [&](bool& native_returned) {
-    if (name == "alpha") alpha_decoration = minera::decorate_model(cached_model_log(*session, name), petri, "concept:name", "time:timestamp", disconnected);
-    else if (name == "inductive") inductive_decoration = minera::decorate_model(cached_model_log(*session, name), petri, "concept:name", "time:timestamp", disconnected);
-    else if (name == "heuristic") heuristic_decoration = minera::decorate_model(require_prepared_log(*session), petri, params.heuristic.activity_attribute, params.heuristic.timestamp_attribute, disconnected);
+    if (name == "alpha") alpha_decoration = minera::decorate_model(cached_model_log(*session, name), petri, "concept:name", "time:timestamp", cancelled);
+    else if (name == "inductive") inductive_decoration = minera::decorate_model(cached_model_log(*session, name), petri, "concept:name", "time:timestamp", cancelled);
+    else if (name == "heuristic") heuristic_decoration = minera::decorate_model(require_prepared_log(*session), petri, params.heuristic.activity_attribute, params.heuristic.timestamp_attribute, cancelled);
     else {
       const auto projected = project_powl_activity(require_prepared_log(*session), params.powl.activity_key, params.powl.timestamp_key, params.powl.case_id_key);
-      powl_decoration = minera::decorate_model(projected, petri, params.powl.activity_key, params.powl.timestamp_key, disconnected);
+      powl_decoration = minera::decorate_model(projected, petri, params.powl.activity_key, params.powl.timestamp_key, cancelled);
     }
     native_returned = true;
     return "{\"representation\":\"analysis_presentation\"}";
@@ -261,8 +265,8 @@ void handle_active_source_mining(const httplib::Request& request,
           options.activity_attribute = name == "alpha" ? params.alpha.activity_attribute : name == "inductive" ? params.inductive.activity_key : name == "heuristic" ? params.heuristic.activity_attribute : params.powl.activity_key;
         options = minera::tools::default_replay_input_options(log, std::move(options), params.token_replay_activity_attribute_supplied);
         options_overrides[name + "_conformance"] = active_source_token_replay_options_json(options);
-        options.cancelled = disconnected;
-        conformance.push_back({name, minera::final_marking_reachable(petri, disconnected), minera::check_conformance(log, petri, options), minera::check_footprints(log, petri), std::nullopt});
+        options.cancelled = cancelled;
+        conformance.push_back({name, minera::final_marking_reachable(petri, cancelled), minera::check_conformance(log, petri, options), minera::check_footprints(log, petri), std::nullopt});
         native_returned = true;
         return "{\"representation\":\"analysis_presentation\"}";
       });

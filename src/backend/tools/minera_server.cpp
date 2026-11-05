@@ -1117,29 +1117,38 @@ std::function<bool()> connection_cancel_hook(const httplib::Request& request) {
 // workbench). Silent firings do not count towards max_steps, so the visible
 // budget (traces * max_steps <= 1,000,000) does not bound the work: every
 // firing of a run counts, and a disconnect cancels. A visited-elements run
-// stores two elements per firing (about 96 bytes) and each marking's place
-// counts (4 bytes a place); that storage is budgeted at 512 MiB, so its
-// firing cap scales with the place count (5.1 million firings on a 2-place
-// net, 3 million on 20 places, 1 million on 100), which a run that fills the
-// visible budget on a typical net stays under.
+// is held to 512 MiB of peak memory per request: its buffers are bounded by
+// that while it runs (max_visited_bytes), and before its JSON is built the
+// exact document size, times the copies that live beside the result, must
+// fit in what the result leaves (check_server_stochastic_visited_peak).
 constexpr std::size_t kServerStochasticFirings = 10'000'000;
 constexpr std::size_t kServerStochasticVisitedBytes = std::size_t{512} << 20;
 
 void bound_server_stochastic_playout(minera::StochasticPlayoutOptions& options,
-                                     const minera::PetriNet& net, bool visited,
+                                     const minera::PetriNet&, bool visited,
                                      const httplib::Request& request) {
   options.max_total_firings = kServerStochasticFirings;
-  if (visited) {
-    options.max_total_firings = std::min<std::size_t>(
-        kServerStochasticFirings,
-        kServerStochasticVisitedBytes / (96 + 4 * net.place_count()));
-    options.max_visited_marking_entries = kServerStochasticVisitedBytes / 4;
-  }
+  if (visited) options.max_visited_bytes = kServerStochasticVisitedBytes;
   options.cancelled = connection_cancel_hook(request);
+}
+
+// `copies` is how many documents of `json_bytes` live at the peak: the
+// playout route's body (1), its UTF-8 repair copy and the gzip output (3 in
+// all); the workbench also wraps and concatenates it (5).
+void check_server_stochastic_visited_peak(const minera::PlayoutVisitedResult& visited,
+                                          std::size_t json_bytes, std::size_t copies) {
+  const auto held = minera::playout_visited_bytes(visited);
+  if (held > kServerStochasticVisitedBytes ||
+      json_bytes > (kServerStochasticVisitedBytes - held) / copies)
+    throw std::length_error(
+        "stochastic playout: the visited elements and their " + std::to_string(json_bytes) +
+        "-byte JSON would exceed the server's 512 MiB response budget; lower "
+        "stochastic_traces or stochastic_max_steps");
 }
 
 #include "active_source_route.hpp"
 #include "mine_limits.hpp"
+#include "mine_progress.hpp"
 #include "active_source_options.hpp"
 #include "active_source_mining.hpp"
 #include "traces_route.hpp"
@@ -1159,6 +1168,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     return;
   }
   FormFieldAuditScope field_audit;
+  // The running mine's ticket, so a stage stopped by its cancel answers as a
+  // cancel between stages does.
+  std::shared_ptr<ActiveMiningTicket> running_ticket;
   try {
     // include_traces=false leaves the "traces" array out of the analysis (a
     // "trace_summary" takes its place) and GET /api/traces serves it on
@@ -1171,6 +1183,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     }();
     const minera::OmitAnalysisTraces omit_traces(!include_traces);
     const auto ticket = begin_active_mining(request);
+    running_ticket = ticket;
+    // GET /api/mine-progress reports these stages (kMineStages in all; the
+    // native-source dispatch reports its own families instead).
+    constexpr std::size_t kMineStages = 26;
+    MineProgress progress(ticket->id, kMineStages, "Reading the event log");
     // The upload is read in place: a copy would hold the file twice.
     const std::string* csv = &request.body;
     std::string dataset = "event log";
@@ -1217,12 +1234,17 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // A canceled or superseded request stops between stages with the same
     // answer publish_active_mining gives; the stages themselves are unchanged.
     // A client that disconnected stops there too, and inside the decorations.
+    // The long stages poll `cancelled`: a disconnect, or a cancel-mine (or a
+    // newer source request) for this mine, stops them part-way.
     const auto disconnected = connection_cancel_hook(request);
-    const auto checkpoint = [&] {
+    const auto cancelled = mining_cancel_hook(ticket, disconnected);
+    // Between stages; `next` is the stage that follows.
+    const auto checkpoint = [&](std::string_view next) {
       abort_if_mining_canceled(ticket);
       minera::throw_if_cancelled(disconnected, "mining request was cancelled: the client disconnected");
+      mine_progress_stage(next);
     };
-    checkpoint();
+    checkpoint("Directly-follows graph");
     if(minera::exact_heuristic_options_requested([&](std::string_view key){return active_source_supplied(request,key);}))params.heuristic=exact_heuristic_options;
     minera::record_exact_effective_options(params);
     const auto literal_source_selectors = active_source_supplied(request, "mining_selectors_json")
@@ -1237,6 +1259,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     if (active_source->file().format == "table" ||
         active_source->selected_kind() != minera::EventDataKind::kEventLog || !literal_source_selectors.empty() || minera::exact_filter_discovery_recording()) {
       ticket->native_source_dispatch = true;
+      mine_progress_total(0);
       handle_active_source_mining(request, response, dataset, params, active_source, ticket, paired_csv_import_error);
       return;
     }
@@ -1286,11 +1309,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       minera::register_correlation_activities(
           graph, *correlation_variants_analysis);
     }
-    checkpoint();
+    checkpoint("Temporal profile and transition system");
     // Quadratic in the trace length: one long case can keep it busy for
-    // minutes, so a disconnect stops it.
+    // minutes, so a disconnect (or a cancel) stops it.
     const auto temporal_profile =
-        minera::discover_temporal_profile(log, params.temporal_profile, disconnected);
+        minera::discover_temporal_profile(log, params.temporal_profile, cancelled);
     const auto minimum_self_distances =
         discover_selected_minimum_self_distances(
             log, params.minimum_self_distance);
@@ -1308,7 +1331,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     for (const auto& transition : transition_system.transitions()) {
       if (transition.label) graph.ensure_activity(*transition.label);
     }
-    checkpoint();
+    checkpoint("Inductive miner");
     // A preparation that changed nothing is dropped and the checked log
     // shared, so the session keeps one copy instead of three.
     auto inductive_prepared =
@@ -1320,16 +1343,16 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // in turn (minutes on logs with hundreds of activities), so a disconnect
     // stops it.
     auto inductive_discovery = params.inductive;
-    inductive_discovery.cancelled = disconnected;
+    inductive_discovery.cancelled = cancelled;
     const auto tree = minera::discover_process_tree(log, inductive_discovery);
-    checkpoint();
+    checkpoint("Alpha miner");
     for (const auto& activity : tree.activities()) {
       graph.ensure_activity(activity);
     }
     const auto inductive_graph =
         minera::discover_directly_follows_graph(inductive_log);
     const auto net = minera::discover_petri_net(log, params.alpha);
-    checkpoint();
+    checkpoint("Heuristics miner");
     auto alpha_prepared =
         minera::normalize_alpha_event_log(log, params.alpha);
     const bool alpha_is_log = prepared_log_is_identity(alpha_prepared, log);
@@ -1340,11 +1363,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     for (const auto& activity : net.activities())
       graph.ensure_activity(activity);
     const auto heuristics = minera::discover_heuristics_net(log, params.heuristic);
-    checkpoint();
+    checkpoint("POWL miner");
     // Its fall-throughs try every activity of a sublog in turn (minutes on
     // logs with hundreds of activities), so a disconnect stops it.
-    const auto powl = minera::discover_powl(log, params.powl, disconnected);
-    checkpoint();
+    const auto powl = minera::discover_powl(log, params.powl, cancelled);
+    checkpoint("Model footprints");
     register_powl_labels(graph, powl);
     const auto powl_log = project_powl_activity(
         log, params.powl.activity_key, params.powl.timestamp_key,
@@ -1360,7 +1383,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         analyze_footprints(log, graph, alpha_log, tree, powl,
                            inductive_net, net,
                            heuristic_net, powl_net, params.footprints);
-    checkpoint();
+    checkpoint("Performance and resources");
     const auto performance = minera::compute_performance_metrics(
         log, graph, dataframe_performance_source(active_source.get()));
     const auto variant_durations =
@@ -1377,12 +1400,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     if (params.batches) {
       batch_discovery = discover_selected_batches(log, params.batch_options);
     }
-    checkpoint();
+    checkpoint("Log skeleton");
     const auto log_skeleton =
         minera::discover_log_skeleton(log, params.log_skeleton);
     const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
         log, log_skeleton, params.log_skeleton);
-    checkpoint();
+    checkpoint("Declare constraints");
     const auto declare =
         minera::discover_declare(log, params.declare_options);
     const auto declare_conformance =
@@ -1402,7 +1425,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       }
     }
 
-    checkpoint();
+    checkpoint("Overlap analysis");
     std::optional<minera::IntervalEventOverlapCounts> overlap_interval_events;
     std::optional<minera::CaseOverlapCounts> overlap_cases;
     std::optional<minera::ConcurrentActivityOverlapResult>
@@ -1450,22 +1473,25 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       replay_options = minera::tools::default_replay_input_options(
           *conformance_log, std::move(replay_options),
           params.token_replay_activity_attribute_supplied);
-      replay_options.cancelled = disconnected;
-      checkpoint();
-      return minera::ModelConformance{std::move(id),
-                                      minera::final_marking_reachable(petri, disconnected),
-                                      minera::check_conformance(
-                                           *conformance_log, petri,
-                                           replay_options),
-                                      // The model's marking exploration can take
-                                      // seconds; a disconnect stops it.
-                                      minera::check_footprints(
-                                          is_powl ? powl_log
-                                          : is_inductive ? inductive_log
-                                          : is_alpha ? alpha_log
-                                                     : log,
-                                          petri, std::vector<int>{}, disconnected),
-                                      std::nullopt};
+      replay_options.cancelled = cancelled;
+      const std::string net_name = is_inductive ? "Inductive net" : is_alpha ? "Alpha net"
+                                   : is_powl ? "POWL net" : "Heuristics net";
+      checkpoint(net_name + ": reachability");
+      // In the order the braced initializer evaluated them.
+      const bool sound = minera::final_marking_reachable(petri, cancelled);
+      mine_progress_stage(net_name + ": token replay");
+      auto token_replay = minera::check_conformance(*conformance_log, petri, replay_options);
+      mine_progress_stage(net_name + ": footprints");
+      // The model's marking exploration can take seconds; a disconnect (or a
+      // cancel) stops it.
+      auto model_footprints = minera::check_footprints(
+          is_powl ? powl_log
+          : is_inductive ? inductive_log
+          : is_alpha ? alpha_log
+                     : log,
+          petri, std::vector<int>{}, cancelled);
+      return minera::ModelConformance{std::move(id), sound, std::move(token_replay),
+                                      std::move(model_footprints), std::nullopt};
     };
     const std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),
@@ -1473,18 +1499,18 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 
     // Frequency/performance annotations for every miner's Petri-net view:
     // one more token replay per net, cheap enough to compute up front.
-    checkpoint();
+    checkpoint("Model decorations");
     const auto petri_decoration = minera::decorate_model(
-        alpha_log, net, "concept:name", "time:timestamp", disconnected);
+        alpha_log, net, "concept:name", "time:timestamp", cancelled);
     const auto inductive_decoration = minera::decorate_model(
-        inductive_log, inductive_net, "concept:name", "time:timestamp", disconnected);
+        inductive_log, inductive_net, "concept:name", "time:timestamp", cancelled);
     const auto heuristic_decoration = minera::decorate_model(
         log, heuristic_net, params.heuristic.activity_attribute,
-        params.heuristic.timestamp_attribute, disconnected);
+        params.heuristic.timestamp_attribute, cancelled);
     const auto powl_decoration = minera::decorate_model(
-        powl_log, powl_net, params.powl.activity_key, params.powl.timestamp_key, disconnected);
+        powl_log, powl_net, params.powl.activity_key, params.powl.timestamp_key, cancelled);
 
-    checkpoint();
+    checkpoint("Writing the response");
     std::string body = minera::analysis_json(
         dataset, log, graph, &tree, &net, &heuristics, &conformance,
         &performance, &resources, &variant_durations, &eventually,
@@ -1575,6 +1601,14 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
   } catch (const MineLimitError& error) {
     response.status = 413;
     response.set_content(error.body, "application/json");
+  } catch (const minera::OperationCancelled& error) {
+    // A stage stopped part-way by this mine's cancel answers as the stage
+    // boundary would have (abort_if_mining_canceled).
+    response.status = 400;
+    response.set_content(error_json(mining_ticket_canceled(running_ticket)
+                                        ? "mining request was canceled or replaced by a newer source request"
+                                        : error.what()),
+                         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");
@@ -9656,6 +9690,8 @@ void handle_playout(const httplib::Request& request,
                                        selected, *fit_log, options)
                                  : minera::stochastic_playout_visited(
                                        selected, options);
+        check_server_stochastic_visited_peak(
+            visited, minera::stochastic_playout_visited_json_bytes(selected, visited), 3);
         response.set_content(
             minera::serialize_stochastic_playout_visited_json(selected,
                                                                 visited),
@@ -11776,6 +11812,7 @@ int main(int argc, char** argv) {
     deliver_published_mining(request, response);
   });
   api_post(server, "/api/cancel-mine", handle_cancel_mine);
+  api_get(server, "/api/mine-progress", handle_mine_progress);
   api_post(server, "/api/mine-ack", handle_mine_ack);
   api_get(server, "/api/active-source", handle_active_source);
   api_get(server, "/api/active-source-file", handle_active_source_file);

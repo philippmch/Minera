@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EVERYDAY_TOOLS, REFERENCE_TOOLS, groupTools, searchTools, type ToolGroup, type ToolId, type ToolSpec } from "../tools";
 import { BrandMark, LOG_FILE_ACCEPT, PaletteShortcut, ThemeToggle } from "./ui";
+import { mineProgressText, type MineProgress } from "../mine-progress";
 
 interface LandingProps {
   onOpenFile: (file: File) => void;
@@ -13,6 +14,8 @@ interface LandingProps {
   mining: boolean;
   /** Stops the load in progress; shown as a Cancel button while mining. */
   onCancel?: () => void;
+  /** The backend's progress on this load's mine (GET /api/mine-progress), while mining. */
+  progress?: MineProgress | null;
 }
 
 const SAMPLES = [
@@ -21,7 +24,7 @@ const SAMPLES = [
   { key: "resource", title: "Resource handovers", detail: "Small log with resources", text: "Mine a sample with resource relationships" },
 ] as const;
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, onOpenTool, onOpenPalette, error, mining, onCancel }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, onOpenTool, onOpenPalette, error, mining, onCancel, progress }: LandingProps) {
   const [query, setQuery] = useState("");
   const groups = useMemo(() => groupTools(searchTools(query, EVERYDAY_TOOLS)), [query]);
   const reference = useMemo(() => groupTools(searchTools(query, REFERENCE_TOOLS)), [query]);
@@ -85,7 +88,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
         </label>
 
         {mining && onCancel
-          ? <div className="landing-error landing-status" role="status">Mining the event log… <button className="btn-ghost landing-cancel" onClick={onCancel}>Cancel</button></div>
+          ? <div className="landing-error landing-status" role="status">Mining the event log… <MiningProgress progress={progress} /><button className="btn-ghost landing-cancel" onClick={onCancel}>Cancel</button></div>
           : error && <div className="error-banner landing-error" role="alert">{error}</div>}
 
         <div className="landing-samples reveal" aria-label="Sample data">
@@ -160,5 +163,20 @@ function ToolGroups({ groups, onOpenTool }: { groups: { group: ToolGroup; tools:
         </div>
       ))}
     </>
+  );
+}
+
+/** The running mine's stage, stage count and elapsed time; nothing until the backend reports this mine. */
+export function MiningProgress({ progress }: { progress?: MineProgress | null }) {
+  const text = mineProgressText(progress ?? null);
+  if (!text || !progress) return null;
+  const total = progress.stagesTotal ?? undefined;
+  return (
+    <span className="landing-progress">
+      {total !== undefined && progress.stagesDone !== undefined && (
+        <progress className="landing-progress-bar" max={total} value={Math.min(progress.stagesDone, total)} aria-label="Mining stages done" />
+      )}
+      <span className="landing-progress-text">{progress.canceling ? `Stopping… ${text}` : text}</span>
+    </span>
   );
 }

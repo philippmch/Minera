@@ -1863,7 +1863,11 @@ ProcessTreeNode fold_reference_tree(ProcessTreeNode node) {
 
 ProcessTree to_process_tree(const PetriNet& net) {
   // Invalid nets keep the reconstruction's own errors; a valid workflow net
-  // of one transition is then refused as the reference refuses it.
+  // of one transition is then refused as the reference refuses it. A net
+  // without transitions is named here, since the tree (and so its PTML
+  // export) is what the caller asked for, not a POWL model.
+  if (!net.has_extended_arcs() && net.transitions().empty())
+    throw std::invalid_argument("workflow-net to process tree conversion requires a transition");
   const auto powl = PetriToPowlBuilder(net, false).run();
   reject_reference_single_transition(net);
   auto tree = ProcessTreeBuilder(true).run(powl);

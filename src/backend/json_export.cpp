@@ -4,6 +4,7 @@
 #include "minera/pnml.hpp"
 #include "minera/timestamp.hpp"
 #include "root_cause_trace_key.hpp"
+#include "sized_output.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -6247,10 +6248,9 @@ std::string pnml_document_json(const PnmlDocument& document) {
 
 namespace {
 
-std::string serialize_playout_visited_json_variant(
-    const PetriNet& net, const PlayoutVisitedResult& result,
-    std::string_view variant) {
-  std::ostringstream out;
+void write_playout_visited_json(std::ostream& out, const PetriNet& net,
+                                const PlayoutVisitedResult& result,
+                                std::string_view variant) {
   out << "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":";
   write_json_string(out, variant);
   out << ",\"truncated\":" << (result.truncated ? "true" : "false")
@@ -6292,10 +6292,26 @@ std::string serialize_playout_visited_json_variant(
     out << ']';
   }
   out << "]}";
-  return out.str();
+}
+
+// Sized first, so the document occupies one buffer of exactly its size.
+std::string serialize_playout_visited_json_variant(
+    const PetriNet& net, const PlayoutVisitedResult& result,
+    std::string_view variant) {
+  const auto write = [&](std::ostream& out) {
+    write_playout_visited_json(out, net, result, variant);
+  };
+  return detail::sized_output(write, detail::output_size(write));
 }
 
 }  // namespace
+
+std::size_t stochastic_playout_visited_json_bytes(
+    const PetriNet& net, const PlayoutVisitedResult& result) {
+  return detail::output_size([&](std::ostream& out) {
+    write_playout_visited_json(out, net, result, "STOCHASTIC_PLAYOUT");
+  });
+}
 
 std::string serialize_playout_visited_json(
     const PetriNet& net, const PlayoutVisitedResult& result) {

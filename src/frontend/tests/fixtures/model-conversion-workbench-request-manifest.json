@@ -8309,14 +8309,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2093",
+        "Content-Length": "2101",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "net_to_tree-native-error-empty.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-error-empty.response.json",
-        "bytes": 2093,
-        "sha256": "9bb7ea3eef42ba58dea303397081e1248caed639b350d7709e7a7fad0c9a11a9",
+        "bytes": 2101,
+        "sha256": "beaae73d16da01c5bf8de4106bb3a83986c21b5cdf1e3e71770d6e81ae685a03",
         "status": 400
       },
       "family": "model_conversion",
@@ -8325,7 +8325,7 @@
       "executed": false,
       "error": {
         "type": "native_error",
-        "message": "workflow-net to POWL conversion requires a transition"
+        "message": "workflow-net to process tree conversion requires a transition"
       },
       "coverage_tags": {
         "error": "requires a transition"

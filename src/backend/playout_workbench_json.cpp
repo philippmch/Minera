@@ -1,4 +1,5 @@
 #include "minera/playout_workbench_json.hpp"
+#include "sized_output.hpp"
 #include "minera/active_event_source.hpp"
 #include "minera/graph_alignment_workbench_json.hpp"
 
@@ -631,8 +632,9 @@ std::string serialize_playout_workbench_options_json(const ProcessTreePlayoutOpt
   return out.str();
 }
 
-std::string serialize_playout_workbench_result_json(const PlayoutVisitedResult& result) {
-  auto out = output();
+namespace {
+
+void write_visited_result_json(std::ostream& out, const PlayoutVisitedResult& result) {
   out << "{\"traces\":";
   array_json(out, result.traces, [](std::ostream& stream, const PlayoutVisitedTrace& trace) {
     array_json(stream, trace, visited_element_json);
@@ -641,7 +643,20 @@ std::string serialize_playout_workbench_result_json(const PlayoutVisitedResult& 
   out << ",\"trace_limit_reached\":"; boolean(out, result.trace_limit_reached);
   out << ",\"state_limit_reached\":"; boolean(out, result.state_limit_reached);
   out << '}';
-  return out.str();
+}
+
+}  // namespace
+
+// Sized first, so the document occupies one buffer of exactly its size.
+std::string serialize_playout_workbench_result_json(const PlayoutVisitedResult& result) {
+  const auto write = [&](std::ostream& out) { write_visited_result_json(out, result); };
+  return detail::sized_output(write, playout_workbench_result_json_bytes(result),
+                              std::locale::classic());
+}
+
+std::size_t playout_workbench_result_json_bytes(const PlayoutVisitedResult& result) {
+  return detail::output_size(
+      [&](std::ostream& out) { write_visited_result_json(out, result); }, std::locale::classic());
 }
 
 std::string serialize_playout_workbench_result_json(const DfgPlayoutResult& result) {

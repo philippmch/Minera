@@ -65,6 +65,24 @@ int main() {
   auto dup = align_decomposed(log_of({{"a","b"},{"a","b"}}), n);
   assert(dup.traces.size() == 2 && dup.diagnostics.components > 1 && dup.diagnostics.cache_hits > 0);
   assert(dup.total_cost == 0.0 && dup.fitness == 1.0);
+  {
+    // pm4py raises on a net without transitions (also for an empty log); a
+    // net with only a silent transition aligns at cost zero, fitness one.
+    PetriNet bare; const auto p0 = bare.add_place(), p1 = bare.add_place();
+    bare.set_source(p0); bare.set_sink(p1);
+    for (const auto& traces : {log_of({{"a","b"}}), log_of({})}) {
+      bool raised = false;
+      try { (void)align_decomposed(traces, bare); }
+      catch (const std::invalid_argument& error) {
+        raised = std::string(error.what()).find("at least one transition") != std::string::npos;
+      }
+      assert(raised);
+    }
+    bare.add_transition(std::nullopt, {p0}, {p1});
+    const auto silent = align_decomposed(log_of({{"a","b"},{"a"}}), bare);
+    assert(silent.complete && silent.total_cost == 0.0 && silent.fitness == 1.0);
+    assert(silent.traces[0].alignment.empty() && silent.traces[0].best_worst_cost == 20000.0);
+  }
   auto same_empty = align_decomposed(log_of({{}}), same_label_chain());
   auto same_exact = align_decomposed(log_of({{"a","a"}}), same_label_chain());
   assert(same_empty.complete && same_empty.traces[0].cost==0.0 && same_empty.traces[0].alignment.empty());

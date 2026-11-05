@@ -5604,14 +5604,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6580",
+        "Content-Length": "6588",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/heuristic-dfg-empty.response.json",
         "status": 200,
-        "sha256": "ede853d84b435007b99dd6c76ce1c4a8e06033f72b0606d0b8025bec3884ebac",
-        "bytes": 6580
+        "sha256": "020c16cba4bee252ff705fe95e19fdcc98e4a41b42ed0e290db82edbdbee58ba",
+        "bytes": 6588
       },
       "family": "heuristic",
       "variant": "classic",
@@ -6155,14 +6155,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "66234",
+        "Content-Length": "66242",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-NaN.response.json",
         "status": 200,
-        "sha256": "cb8344f29c10f0d75343527b2888ea42709f75021148a30e574468abc413f681",
-        "bytes": 66234
+        "sha256": "73da0b6c413577e15b2ae5213621414e59aeb741527ed3bacbed8e6e06fec9b5",
+        "bytes": 66242
       },
       "family": "heuristic",
       "variant": "plusplus",
@@ -6230,14 +6230,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "66234",
+        "Content-Length": "66242",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "path": "src/frontend/tests/fixtures/workflow-input-workbench/captures/plusplus-cutoff-Inf.response.json",
         "status": 200,
-        "sha256": "cb8344f29c10f0d75343527b2888ea42709f75021148a30e574468abc413f681",
-        "bytes": 66234
+        "sha256": "73da0b6c413577e15b2ae5213621414e59aeb741527ed3bacbed8e6e06fec9b5",
+        "bytes": 66242
       },
       "family": "heuristic",
       "variant": "plusplus",
