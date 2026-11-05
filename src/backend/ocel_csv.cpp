@@ -216,6 +216,18 @@ std::string value_text(const OcelValue& value, bool float_column = false) {
   return ocel_frame::python_str(value);
 }
 
+// An attribute cell: a value of an attribute the owner's catalog declares a
+// date is printed as to_csv prints the reference's datetime64[us, UTC]
+// column ("2024-02-01 08:30:00+00:00", value by value).
+std::string csv_attribute_text(const OcelAttribute& attribute, const OcelTypeCatalog& catalog,
+                               const std::string& owner, ocel_frame::Dtype dtype) {
+  if (const auto* text = ocel_frame::declared_date(catalog, owner, attribute.key)
+                             ? ocel_frame::date_value_text(attribute.value)
+                             : nullptr)
+    return ocel_frame::utc_timestamp_text(*text, ' ', "+00:00");
+  return value_text(attribute.value, dtype == ocel_frame::Dtype::kFloat64);
+}
+
 std::string escape_csv(std::string_view value, char delimiter) {
   bool quote = false;
   if (value.find_first_of(std::string("\"\r\n") + delimiter) !=
@@ -398,7 +410,8 @@ void write_event_table(std::ostream& out, const Ocel& log,
     for (const auto& key : event_attributes) {
       const auto* attr = find_attribute(event.attributes, key);
       row.push_back(attr == nullptr ? std::string{}
-                                    : value_text(attr->value, frame.dtype(key) == ocel_frame::Dtype::kFloat64));
+                                    : csv_attribute_text(*attr, log.event_type_attributes,
+                                                         event.activity, frame.dtype(key)));
     }
     const auto event_it = refs.find(event.id);
     for (const auto& type : types) {
@@ -451,7 +464,8 @@ void write_object_table(std::ostream& out, const Ocel& log,
     for (const auto& key : attributes) {
       const auto* attr = find_attribute(object.attributes, key);
       row.push_back(attr == nullptr ? std::string{}
-                                    : value_text(attr->value, frame.dtype(key) == ocel_frame::Dtype::kFloat64));
+                                    : csv_attribute_text(*attr, log.object_type_attributes,
+                                                         object.type, frame.dtype(key)));
     }
     write_row(out, row, options.delimiter);
   }

@@ -2,25 +2,79 @@
 // their original holders so inspection and CSV do not round native uint64 values.
 const literals=new WeakMap<object,Map<string,string>>();
 export function parseNativeJson(raw:string):unknown {
-  const value:unknown=JSON.parse(raw);const end=raw.trimEnd().length;
+  const value:unknown=JSON.parse(raw);
   // A linear scanner: JSON.parse above already validated the text, so tokens only
   // need to be delimited. Regular expressions over string tokens backtrack per
   // character and overflow the engine's stack on multi-megabyte strings.
-  const number=/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;let position=0;
-  const next=():string=>{
-    while(position<end){const c=raw.charCodeAt(position);if(c===32||c===9||c===10||c===13)++position;else break;}
-    const start=position,c=raw[position];
-    if(c==='"'){let i=position+1;for(;;){const quote=raw.indexOf('"',i);if(quote<0)throw new Error("Invalid native JSON token.");let slashes=0;for(let j=quote-1;j>start&&raw.charCodeAt(j)===92;--j)++slashes;i=quote+1;if(slashes%2===0)break;}position=i;return raw.slice(start,position);}
-    if(c==="{"||c==="}"||c==="["||c==="]"||c===","||c===":"){++position;return c;}
-    for(const word of ["true","false","null"])if(raw.startsWith(word,position)){position+=word.length;return word;}
-    number.lastIndex=position;const match=number.exec(raw);if(!match)throw new Error("Invalid native JSON token.");position=number.lastIndex;return match[0];
-  };let token=next();
-  const advance=()=>{if(position<end)token=next();else token="";};
-  const walk=(current:unknown,parent?:object,key?:string):void=>{
-    const start=token;
-    if(start==="{"){advance();while(token!=="}"){const name=JSON.parse(token) as string;advance();advance();const holder=current&&typeof current==="object"&&!Array.isArray(current)?current as Record<string,unknown>:undefined;walk(holder?.[name],holder,name);if(token!==",")break;advance();}advance();}
-    else if(start==="["){advance();let i=0;while(token!=="]"){const holder=Array.isArray(current)?current:undefined;walk(holder?.[i],holder,String(i++));if(token!==",")break;advance();}advance();}
-    else {if(parent&&key!==undefined){if(typeof current==="number"&&/^-?\d/.test(start)&&String(current)!==start){const map=literals.get(parent)??new Map<string,string>();map.set(key,start);literals.set(parent,map);}else literals.get(parent)?.delete(key);}advance();}
+  // A mine response has millions of tokens, so the scan allocates only for what it
+  // keeps: a key is read only when its member is a container or a number JavaScript
+  // would print differently, and a plain integer of at most 15 digits (which always
+  // prints as written) is never cut out of the text at all.
+  let p=0;
+  const space=():number=>{for(;;){const c=raw.charCodeAt(p);if(c===32||c===9||c===10||c===13)++p;else return c;}};
+  // The end of the string token opening at `start`.
+  const stringEnd=(start:number):number=>{let i=start+1;for(;;){const quote=raw.indexOf('"',i);if(quote<0)throw new Error("Invalid native JSON token.");let slashes=0;for(let j=quote-1;j>start&&raw.charCodeAt(j)===92;--j)++slashes;i=quote+1;if(slashes%2===0)return i;}};
+  const keyText=(start:number,end:number):string=>{const body=raw.slice(start+1,end-1);return body.indexOf("\\")<0?body:JSON.parse(raw.slice(start,end)) as string;};
+  // Moves past the number token at p; true when the token is an integer of at most
+  // 15 digits other than -0, which String(number) reproduces exactly.
+  const number=():boolean=>{
+    const start=p;let c=raw.charCodeAt(p);if(c===45)c=raw.charCodeAt(++p);
+    if(c<48||c>57)throw new Error("Invalid native JSON token.");
+    const digits=p;while(c>=48&&c<=57)c=raw.charCodeAt(++p);
+    let plain=p-digits<=15&&!(raw.charCodeAt(start)===45&&p-digits===1&&raw.charCodeAt(digits)===48);
+    if(c===46){plain=false;c=raw.charCodeAt(++p);while(c>=48&&c<=57)c=raw.charCodeAt(++p);}
+    if(c===101||c===69){plain=false;c=raw.charCodeAt(++p);if(c===43||c===45)c=raw.charCodeAt(++p);while(c>=48&&c<=57)c=raw.charCodeAt(++p);}
+    return plain;
+  };
+  // Records (or forgets) the number token raw[start, p) of holder[key], as the
+  // holder's kept literal when JavaScript would print the parsed number differently.
+  const keep=(holder:object,kept:Map<string,string>|undefined,key:string,member:unknown,start:number):Map<string,string>|undefined=>{
+    const token=raw.slice(start,p);
+    if(typeof member==="number"&&String(member)!==token){if(!kept){kept=new Map<string,string>();literals.set(holder,kept);}kept.set(key,token);}
+    else kept?.delete(key);
+    return kept;
+  };
+  // Moves past a string, true, false or null token at p (its first character is c).
+  const skip=(c:number)=>{if(c===34)p=stringEnd(p);else if(c===116||c===110)p+=4;else if(c===102)p+=5;else throw new Error("Invalid native JSON token.");};
+  const walk=(current:unknown):void=>{
+    const c=space();
+    if(c===123){
+      ++p;
+      const holder=current&&typeof current==="object"&&!Array.isArray(current)?current as Record<string,unknown>:undefined;
+      let kept=holder?literals.get(holder):undefined;
+      if(space()===125){++p;return;}
+      for(;;){
+        space();const keyStart=p;p=stringEnd(p);const keyEnd=p;
+        space();++p;
+        const v=space();
+        if(v===123||v===91)walk(holder?.[keyText(keyStart,keyEnd)]);
+        else if(v===45||v>=48&&v<=57){
+          const start=p;
+          if(number()){if(kept)kept.delete(keyText(keyStart,keyEnd));}
+          else if(holder){const key=keyText(keyStart,keyEnd);kept=keep(holder,kept,key,holder[key],start);}
+        }
+        else {skip(v);if(kept)kept.delete(keyText(keyStart,keyEnd));}
+        const separator=space();++p;if(separator!==44)return;
+      }
+    }
+    if(c===91){
+      ++p;
+      const holder=Array.isArray(current)?current:undefined;
+      let kept=holder?literals.get(holder):undefined;
+      if(space()===93){++p;return;}
+      for(let i=0;;++i){
+        const v=space();
+        if(v===123||v===91)walk(holder?.[i]);
+        else if(v===45||v>=48&&v<=57){
+          const start=p;
+          if(number()){if(kept)kept.delete(String(i));}
+          else if(holder)kept=keep(holder,kept,String(i),holder[i],start);
+        }
+        else {skip(v);if(kept)kept.delete(String(i));}
+        const separator=space();++p;if(separator!==44)return;
+      }
+    }
+    if(c===45||c>=48&&c<=57)number();else skip(c);
   };
   walk(value);return value;
 }

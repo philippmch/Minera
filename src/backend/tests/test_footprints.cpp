@@ -346,8 +346,51 @@ void fitness_totals_past_uint64() {
                  {{"C", "D"}}) == 0x1.9999999999998p-1);
 }
 
+// pm4py fp_fitness raises ZeroDivisionError when every dfg count is 0 (also
+// with no relations or boundary activities) and when a non-zero dfg comes
+// with no relation and no start or end activity; an empty dfg gives 1.0
+// (observed black-box on the same dicts). Native refuses the first two.
+void fitness_zero_divisions_refuse() {
+  const auto refuses = [](const Footprint& log) {
+    try {
+      (void)fp_fitness(log, Footprint{}, FootprintsExtensiveResult{});
+    } catch (const std::invalid_argument& error) {
+      return std::string(error.what()).find("ZeroDivisionError") !=
+             std::string::npos;
+    }
+    return false;
+  };
+  Footprint zero;
+  zero.dfg = {{{"A", "B"}, 0}, {{"B", "C"}, 0}};
+  zero.sequence = {{"A", "B"}, {"B", "C"}};
+  zero.start_activities = {"A"};
+  zero.end_activities = {"C"};
+  assert(refuses(zero));
+  Footprint bare;
+  bare.dfg = {{{"A", "B"}, 0}};
+  assert(refuses(bare));
+  Footprint no_relations;
+  no_relations.dfg = {{{"A", "B"}, 1}};
+  assert(refuses(no_relations));
+  bool summary_refused = false;
+  try {
+    (void)fp_fitness(std::vector<Footprint>{zero}, Footprint{},
+                     std::vector<FootprintsExtensiveResult>{
+                         FootprintsExtensiveResult{}});
+  } catch (const std::invalid_argument&) {
+    summary_refused = true;
+  }
+  assert(summary_refused);
+  Footprint empty_dfg;
+  empty_dfg.start_activities = {"A"};
+  empty_dfg.end_activities = {"B"};
+  assert(fp_fitness(empty_dfg, Footprint{}, FootprintsExtensiveResult{}) ==
+         1.0);
+}
+
 int main() {
   fitness_totals_past_uint64();
+  fitness_zero_divisions_refuse();
   discovery_variants_are_deterministic();
   dfg_boundaries_are_inferred();
   conformance_variants_and_evaluation();

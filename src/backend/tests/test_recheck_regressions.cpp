@@ -331,7 +331,9 @@ void ocel_wall_clock_order(){
  check(feature(extract_ocel_features(mixed,OcelFeatureVariant::kEvents),"@@event_timestamp")==1577854800.0,"OCEL event timestamp feature uses the stored wall clock");
  check(serialize_ocel_json(mixed,OcelJsonFormat::kStandard).find(R"("time":"2020-01-01T05:00:00+00:00")")!=std::string::npos,"OCEL JSON export writes the stored UTC value");
  const auto week=parse_ocel_json(ocel2_json({"2024-W01-1T00:30:00,5"}));
- check(week.events[0].timestamp=="2024-01-01T00:30:00.500000+00:00","OCEL JSON stores an ISO week date natively readable");
+ // A naive shape parse_timestamp_exact does not read is stamped "Z" like
+ // any naive event time (the reference JSON writers' spelling).
+ check(week.events[0].timestamp=="2024-01-01T00:30:00.500000Z","OCEL JSON stores an ISO week date natively readable");
  const auto aware=parse_ocel_xml(ocel2_xml({"2020-01-01T07:00:00","Jan 1 2020 10:00 +0500"}));
  check(aware.events[0].timestamp=="2020-01-01T05:00:00+00:00"&&aware.events[1].timestamp=="2020-01-01T07:00:00Z","OCEL XML stores an aware dateutil value as its UTC instant and stamps a naive ISO value UTC");
  const auto database=std::filesystem::temp_directory_path()/"minera_recheck_mixed_offsets.sqlite";

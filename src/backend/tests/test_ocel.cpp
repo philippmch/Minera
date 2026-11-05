@@ -610,8 +610,17 @@ int main() {
          standard_round.relations.size() == log.relations.size() &&
          standard_round.o2o.size() == log.o2o.size() &&
          standard_round.e2e.size() == log.e2e.size() &&
-         standard_round.object_changes.size() == log.object_changes.size() &&
          standard_round.globals == log.globals);
+  // The status change of o1, which has no static status, is written alone
+  // (as write_ocel2_json writes it) and reads back as the base value, as
+  // pm4py reads its own export.
+  assert(standard.find("\"value\":null") == std::string::npos);
+  assert(standard_round.object_changes.empty());
+  assert(std::any_of(standard_round.objects[0].attributes.begin(),
+                     standard_round.objects[0].attributes.end(), [](const auto& attribute) {
+                       return attribute.key == "status" &&
+                              attribute.value == minera::OcelValue(std::string("shipped"));
+                     }));
 
   const std::string standard_fixture = R"json({
     "ocelVersion":"2.0",

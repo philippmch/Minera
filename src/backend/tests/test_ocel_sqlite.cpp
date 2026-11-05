@@ -1,4 +1,5 @@
 #include "minera/ocel_sqlite.hpp"
+#include "minera/ocel_csv.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -413,6 +414,78 @@ int main() {
            naive.object_changes[0].timestamp == "2024-02-02T10:00:00.500000+00:00");
   }
   std::filesystem::remove(naive_path, ignored);
+
+  // pm4py.write_ocel2_sqlite adds an "ocel:activity" column to each event
+  // type table and pm4py.read_ocel2_sqlite ignores it (the event table's
+  // type is the activity even when the column says otherwise), so such a
+  // file converts to OCEL CSV as the reference writes it (observed
+  // black-box, naive and aware): "e1,2024-02-01 00:00:00+00:00,Create,v,['o1']".
+  const auto activity_path = external_path.string() + ".activity.sqlite";
+  for (const bool aware : {false, true}) {
+    std::filesystem::remove(activity_path, ignored);
+    sqlite3* activity_db = nullptr;
+    assert(sqlite3_open_v2(activity_path.c_str(), &activity_db,
+                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) == SQLITE_OK);
+    exec_sql(activity_db,
+             "CREATE TABLE event (ocel_id TEXT, ocel_type TEXT);"
+             "CREATE TABLE object (ocel_id TEXT, ocel_type TEXT);"
+             "CREATE TABLE event_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+             "CREATE TABLE object_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+             "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
+             "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);"
+             "CREATE TABLE event_Create (ocel_id TEXT, ocel_time TIMESTAMP, \"ocel:activity\" TEXT, x TEXT);"
+             "CREATE TABLE object_order (ocel_id TEXT, status TEXT);"
+             "INSERT INTO event VALUES ('e1', 'Create');"
+             "INSERT INTO object VALUES ('o1', 'order');"
+             "INSERT INTO event_map_type VALUES ('Create', 'Create');"
+             "INSERT INTO object_map_type VALUES ('order', 'order');"
+             "INSERT INTO object_order VALUES ('o1', 'open');"
+             "INSERT INTO event_object VALUES ('e1', 'o1', 'uses');");
+    exec_sql(activity_db, aware ? "INSERT INTO event_Create VALUES ('e1', '2024-02-01 00:00:00+02:00', 'X', 'v');"
+                                : "INSERT INTO event_Create VALUES ('e1', '2024-02-01 00:00:00', 'X', 'v');");
+    assert(sqlite3_close(activity_db) == SQLITE_OK);
+    const auto read = minera::import_ocel_sqlite(activity_path);
+    assert(read.events.size() == 1 && read.events[0].activity == "Create");
+    assert(read.events[0].attributes.size() == 1 && read.events[0].attributes[0].key == "x");
+    assert(!read.event_type_attributes.at("Create").contains("ocel:activity"));
+    minera::OcelCsvExportOptions csv_options;
+    csv_options.allow_lossy = true;  // the CSV drops the qualifier "uses"
+    const auto csv = minera::serialize_ocel_csv(read, csv_options);
+    assert(csv.find(aware ? "e1,2024-01-31 22:00:00+00:00,Create,v,['o1']"
+                          : "e1,2024-02-01 00:00:00+00:00,Create,v,['o1']") != std::string::npos);
+  }
+  std::filesystem::remove(activity_path, ignored);
+
+  // The writer prints a date-declared attribute as the reference writes a
+  // datetime64 column (TIMESTAMP, "2024-02-01 08:30:00+00:00") and the
+  // events of a log whose times share an offset in that offset
+  // ("2024-01-01 10:00:00+02:00"; observed black-box on write_ocel2_sqlite).
+  {
+    minera::Ocel dated;
+    dated.events = {{"e1", "A", "2024-01-01 10:00:00+02:00", {{"d", std::string("2024-02-01T08:30:00Z")}}},
+                    {"e2", "A", "2024-01-01 11:00:00+02:00", {{"d", std::string("2024-02-02T08:30:00.5Z")}}}};
+    dated.objects = {{"o1", "order", {}}};
+    dated.relations = {{"e1", "o1", ""}, {"e2", "o1", ""}};
+    dated.event_type_attributes["A"]["d"] = "date";
+    dated.object_type_attributes["order"];
+    const auto dated_path = external_path.string() + ".dated.sqlite";
+    std::filesystem::remove(dated_path, ignored);
+    minera::export_ocel_sqlite(dated, dated_path);
+    sqlite3* dated_db = nullptr;
+    assert(sqlite3_open_v2(dated_path.c_str(), &dated_db, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+    const auto table = "\"event_" +
+                       first_text(dated_db, "SELECT ocel_type_map FROM event_map_type WHERE ocel_type = ?1", "A") +
+                       "\"";
+    assert(first_text(dated_db, "SELECT ocel_time FROM " + table + " WHERE ocel_id = ?1", "e1") ==
+           "2024-01-01 10:00:00+02:00");
+    assert(first_text(dated_db, "SELECT d FROM " + table + " WHERE ocel_id = ?1", "e2") ==
+           "2024-02-02 08:30:00.500000+00:00");
+    const auto bare = table.substr(1, table.size() - 2);
+    assert(first_text(dated_db, "SELECT type FROM pragma_table_info('" + bare + "') WHERE name = ?1", "d") ==
+           "TIMESTAMP");
+    assert(sqlite3_close(dated_db) == SQLITE_OK);
+    std::filesystem::remove(dated_path, ignored);
+  }
 
   std::filesystem::remove(path, ignored);
   std::filesystem::remove(external_path, ignored);

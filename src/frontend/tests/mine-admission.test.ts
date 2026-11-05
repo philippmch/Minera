@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {MINE_BUSY_MESSAGE, MineLimitError, mineActiveDataset} from "../src/api";
+import {MINE_BUSY_CANCELING_MESSAGE, MINE_BUSY_MESSAGE, MINE_BUSY_WAIT_MS, MineLimitError, mineActiveDataset} from "../src/api";
 
 afterEach(() => {vi.unstubAllGlobals(); vi.useRealTimers();});
 
@@ -12,6 +12,25 @@ describe("mining admission (one mine at a time, size cap)", () => {
     vi.stubGlobal("fetch", fetch);
     await expect(mineActiveDataset(new File(["case_id,activity,timestamp\n"], "log.csv"))).rejects.toThrow(MINE_BUSY_MESSAGE);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no cancel this tab cannot give for a mine started elsewhere", () => {
+    // This tab cancels its own mine before it starts another, so a busy mine that is not canceling runs in
+    // another tab, window or client: the message must not ask this tab to cancel it.
+    expect(MINE_BUSY_MESSAGE).not.toMatch(/wait or cancel it/);
+    expect(MINE_BUSY_MESSAGE).toMatch(/another tab, window or client/);
+    expect(MINE_BUSY_MESSAGE).toMatch(/where it was started/);
+  });
+
+  it("says a canceled mine is still stopping when waiting for it runs out", async () => {
+    vi.useFakeTimers();
+    const fetch = vi.fn(async () => json(503, {family: "MINE_BUSY", canceling: true, retry_after_seconds: 30}, {"Retry-After": "30"}));
+    vi.stubGlobal("fetch", fetch);
+    const mined = mineActiveDataset(new File(["x"], "log.csv"));
+    const outcome = expect(mined).rejects.toThrow(MINE_BUSY_CANCELING_MESSAGE);
+    await vi.advanceTimersByTimeAsync(MINE_BUSY_WAIT_MS);
+    await outcome;
+    expect(fetch.mock.calls.length).toBeGreaterThan(1);
   });
 
   it("retries after Retry-After while a canceled mine winds down", async () => {

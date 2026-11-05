@@ -17956,8 +17956,9 @@ timestamps) are closed or declared. All evidence is black-box PM4Py 2.7.22
   which `format_dataframe` refuses and native imports untimed (its
   `require_timestamp_column` default, unchanged); 1,000 random OCEL CSV
   headers through `pm4py.read_ocel_csv`: 913 the same, 87 the same except
-  the declared added objects, 0 differ. Still unchanged: the case-relations
-  CSV reader refuses empty and repeated header names.
+  the declared added objects, 0 differ. The case-relations CSV reader,
+  which still refused empty and repeated header names, follows since the
+  next section.
 - **An OCEL JSON object id listed under two types.** OCEL 2.0 JSON now reads
   it as `read_ocel2_json` does: one object at the first listing's position,
   with the last listing's type, attributes and O2O links; the object changes
@@ -17969,10 +17970,11 @@ timestamps) are closed or declared. All evidence is black-box PM4Py 2.7.22
   `"ocel:type": "zzz"` on an `order` object is an `order` change). Seven
   fixtures (repeated ids with and without attributes, O2O, changes and
   conflicting attribute types): events, objects, O2O and changes the same;
-  object type counts, flattening by either type and the exports follow.
-  Relations keep their event's list order where the reference frame lists
-  each event's relations reversed; that order differs without repeated ids
-  too and is unchanged. Declared: OCEL XML (2.0 and 1.0), SQLite and CSV
+  object type counts, flattening by either type and the exports follow,
+  except that OCEL 2.0 JSON `objectTypes` keeps the declared catalog (see
+  the next section). Relations keep their event's list order; the
+  reference's order there depends on `PYTHONHASHSEED` (see the next
+  section, which replaces the "reversed" wording of this round). Declared: OCEL XML (2.0 and 1.0), SQLite and CSV
   still refuse such an id, now naming both types. There the reference keeps
   a row per listing (XML: objects `o1 order` and `o1 item`, relations typed
   by the last listing, `ot_count` counting both, OC-DFG edges for `order`
@@ -17988,7 +17990,8 @@ timestamps) are closed or declared. All evidence is black-box PM4Py 2.7.22
   as `YYYY-MM-DDTHH:MM:SS[.ffffff]Z` and a naive object change as
   `...+00:00` (the spellings the reference JSON writers use for event and
   change times, so a native JSON written back without a fraction is theirs
-  byte for byte), and every exporter sees the UTC value: CSV
+  byte for byte; a basic shape such as `20200101T100000` is spelled `...Z`
+  too since the next section), and every exporter sees the UTC value: CSV
   `2024-01-01 00:00:00+00:00`, OCEL 2.0 XML `2024-01-01T00:00:00+00:00`,
   OCEL 1.0 XML `2024-01-01T00:00:00Z`, SQLite `2024-01-01 00:00:00+00:00`.
   An OCEL 2.0 XML dateutil value without an offset stays naive, as the
@@ -18003,7 +18006,8 @@ timestamps) are closed or declared. All evidence is black-box PM4Py 2.7.22
   the JSON writers write the stored text rather than the reference's
   `...Z` without fraction (a naive CSV log writes `2024-01-01 00:00:00`
   where the reference writes `2024-01-01T00:00:00Z`); OCEL 1.0 XML keeps
-  fractions; SQLite type-table names. Unchanged: date-typed attribute
+  fractions; SQLite type-table names. Unchanged here, fixed in the next
+  section: date-typed attribute
   values stay text where the OCEL 2.0 JSON/XML and OCEL 1.0 XML readers
   convert them to UTC timestamps; an OCEL CSV log with a `+02:00` offset is
   written in UTC by both XML writers where the reference writes the wall
@@ -18016,3 +18020,214 @@ timestamps) are closed or declared. All evidence is black-box PM4Py 2.7.22
   (`repeated_object_ids_contract`, `naive_timestamps_read_as_utc_contract`),
   `minera_ocel_sqlite_tests` (naive and repeated-id fixtures),
   `minera_recheck_regression_tests` (`ocel_wall_clock_order`).
+
+## OCEL date attributes, CSV offsets, SQLite activity columns, relation order, case-relation headers and footprints fitness (2026-11-04)
+
+Items left open or undeclared by the previous rounds, each reproduced first
+against black-box PM4Py 2.7.22 (pandas 3.0.5) calls.
+
+- **Date-typed OCEL attribute values.** Per reader: `read_ocel2_json`,
+  `read_ocel2_xml` and `read_ocel_xml` convert the values of date attributes
+  (OCEL 2.0 JSON: a declared type naming `date` or `time` in any case;
+  OCEL 2.0 XML: one naming `date`, case-sensitive, so `time`, `timestamp`
+  and `Date` stay text; OCEL 1.0: a `<date>` value) to `datetime64[us, UTC]`: the ISO wall clock with its offset
+  dropped (`2024-02-01T08:30:00+02:00` is 08:30 UTC), a naive text as UTC,
+  for event, static object and object-change values. `read_ocel_json`
+  (even with `"date"` in `ocel:eventTypes`), `read_ocel2_sqlite` (also for
+  `TIMESTAMP` columns) and `read_ocel_csv` keep the text. On a value it cannot
+  read, the OCEL 2.0 JSON reader keeps the raw value, the OCEL 2.0 XML reader
+  falls back to dateutil and raises `String does not contain a date: X`, and
+  the OCEL 1.0 XML reader raises `Invalid isoformat string: 'X'`. Native
+  readers now do the same (`convert_ocel_date_attributes`): an event or
+  object value is stored as `YYYY-MM-DDTHH:MM:SS[.ffffff]Z`, a change value
+  as `...+00:00`, and the OCEL 1.0 XML reader catalogues `<date>` keys as
+  `date`. The writers print an attribute the catalog declares a date as the
+  reference writes a datetime64 column: OCEL 2.0 XML
+  `2024-02-01T08:30:00+00:00` (fractions kept), OCEL 1.0 XML
+  `<date key="d" value="2024-02-01T08:30:00Z"/>`, CSV and SQLite
+  `2024-02-01 08:30:00+00:00` value by value, the SQLite column typed
+  `TIMESTAMP`. Checked on a fixture with offset, naive, date-only, fractional,
+  unreadable and changed date values through every reader and writer: every
+  date value matches except as declared. Declared: the JSON writers write
+  the stored text (the reference drops fractions: `2024-02-02T08:30:00Z` for
+  `.123456`), as for event times; OCEL 1.0 XML keeps fractions; classic OCEL
+  JSON keeps its declared `date` types in the catalog, so a value read from
+  it is written as a date by the XML, CSV and SQLite writers where the
+  reference keeps the text and declares `string` (classic JSON is the
+  native transport between routes, which must keep the declaration of a log
+  read from OCEL 2.0); the writers take any catalog type naming `date` or
+  `time` (any case) as a date, also after an OCEL 2.0 XML input, whose
+  reader converts only `date`. Tests: `minera_ocel_csv_tests`
+  (`date_attributes_read_as_reference`), `minera_ocel_sqlite_tests`
+  (dated writer fixture).
+- **OCEL CSV times with an offset.** `read_ocel_csv` keeps a `+02:00` column
+  as `datetime64[us, UTC+02:00]` (mixed offsets raise there), and the
+  writers print its wall clock: OCEL 2.0 XML `2024-01-01T10:00:00+02:00`,
+  OCEL 1.0 XML `2024-01-01T10:00:00Z`, SQLite `2024-01-01 10:00:00+02:00`,
+  CSV `2024-01-01 10:00:00+02:00`. Native XML and SQLite writers wrote UTC;
+  when every event time shares one non-zero offset they now write that wall
+  clock (CSV already did). Times that do not share an offset stay UTC.
+  Declared, unchanged: the JSON writers write the stored text
+  (`2024-01-01 10:00:00+02:00` where the reference writes
+  `2024-01-01T10:00:00Z`). Test: `minera_ocel_csv_tests`
+  (`writes_offset_csv_wall_clock_in_xml`), `minera_ocel_sqlite_tests`.
+- **SQLite to OCEL CSV.** `pm4py.write_ocel2_sqlite` writes an
+  `ocel:activity` column into each event type table; `read_ocel2_sqlite`
+  ignores it (the `event` table's type is the activity even when the column
+  holds another value). The native reader kept it as an event attribute,
+  so a reference-written file (naive or aware) could not be written as OCEL
+  CSV (`event attribute collides with an OCEL CSV column: ocel:activity`)
+  and the JSON writers listed the attribute. The column is now skipped, also
+  in the type catalog; the round trip writes the reference's event table
+  (`e1,2024-02-01 00:00:00+00:00,Create,v,['o1']`, aware
+  `e1,2024-01-31 22:00:00+00:00,...`). Declared, unchanged: the reference
+  object table of a SQLite input lists `ocel:type` after the attributes
+  (`ocel:oid,status,ocel:type`), native writes it second. Test:
+  `minera_ocel_sqlite_tests` (activity-column fixture, naive and aware).
+- **Relation order within an event (declared).** Only `read_ocel2_json`
+  changes it, and not by reversing: each event's relations come out in
+  set-iteration order, which differs between `PYTHONHASHSEED` values
+  (`o5,o2,o7,o1,o3,o8` in the file read as `835721`, `752831`, `328571`,
+  `187235` under seeds 0 to 3; two relations come out in either order).
+  `read_ocel_json`, both XML readers and `read_ocel2_sqlite` keep the file
+  order, `read_ocel_csv` the order of the type columns, and all six writers
+  keep the frame order, under every seed tried. Native keeps the file order
+  everywhere, as no seed-free order exists to match. This replaces the
+  "reversed" wording of the previous round.
+- **Case-relations CSV header names.** Both relation readers
+  (`parse_case_relations_csv`, `parse_case_relations_table_csv`, used by the
+  CLI and server merges) now name columns as `pandas.read_csv` does, with
+  the importer's `reference_csv_header_names`: `Unnamed: <i>` for an empty
+  name, `a.1`, `a.2`, ... for repeats past names already present; the
+  selectors take the first column of a name. Checked with `read_csv` +
+  `case_relations.apply` (`,case_id_LEFT,case_id_RIGHT,note,note` merges with
+  `Unnamed: 0` and `note.1` columns; `case_id_LEFT,case_id_RIGHT,case_id_LEFT`
+  with `case_id_LEFT.1`). Declared: names are trimmed like the cells, so a
+  name of spaces is `Unnamed: <i>` where pandas keeps `' '`. Test:
+  `minera_case_relations_tests`.
+- **Footprints fitness with zero dfg counts.** `fp_fitness` raises
+  `ZeroDivisionError: float division by zero` when every dfg count of the
+  log footprint is 0 (also with no relations) and when a non-empty dfg comes
+  with no sequence, parallel or interleaving relation and no start or end
+  activity, for a footprint and for a list of trace footprints; an empty dfg
+  gives 1.0. Native returned 1.0 in both cases and now refuses with
+  `std::invalid_argument` naming the ZeroDivisionError. Discovered footprints
+  never have such counts, so `/api/mine` is unaffected; the footprints
+  workbench reports the refusal in its `fitness.error` field. Tests:
+  `minera_footprints_tests` (`fitness_zero_divisions_refuse`),
+  `minera_footprints_workbench_json_tests`.
+- **Prefixed OCEL attributes.** An OCEL CSV can carry attributes named
+  `ocel:foo`, `ocel:eid.1` or `ocel:oid`. `write_ocel2_json` and
+  `write_ocel2_xml` drop them (and their type declarations),
+  `write_ocel_xml` drops them from objects and writes event ones on the event
+  without the prefix, outside `vmap` (`<string key="foo" value="w"/>`, left
+  out of `attribute-names`); SQLite, CSV and flattening keep them. Native
+  writers now match these three. Declared: `write_ocel_json` drops object
+  ones and writes event ones as keys of the event entry (`"ocel:foo": "w"`
+  beside `ocel:vmap`), which `read_ocel_json` ignores; native classic JSON,
+  the transport between routes, keeps both in the maps.
+- **OCEL 2.0 JSON change-only attributes.** For a field without a static
+  value, `write_ocel2_json` writes only its change entries; native wrote an
+  extra `{"time": "1970-01-01T00:00:00Z", "value": null}` base entry (both
+  for an OCEL 2.0 input whose last listing has no static value and for a
+  classic input). It no longer does; a reader takes the first change as the
+  base, as the reference reads its own export. Declared: with an object id
+  listed under two types, `objectTypes` lists only the last type's
+  attributes (`B{p}`) in the reference, while native keeps the declared
+  catalog (`A{p}`, `B{p}`), as for every declared-only type; and the
+  reference declares a change-only field `string` (`a` holding 5) where
+  native types it by its values (`int`).
+- **Classic JSON change times with an offset.** `read_ocel_json` stores an
+  `ocel:objectChanges` time as its UTC instant
+  (`2020-01-03T00:00:00+01:00` is 2020-01-02 23:00 UTC,
+  `2020-01-03 00:00:00.5-02:30` 02:30:00.5), while its event times and every
+  OCEL 2.0 reader keep the wall clock. Native kept the wall clock and now
+  stores the instant (for offsets the native timestamp parser reads).
+  Test: `minera_ocel_csv_tests` (`reference_writer_shapes`, which also
+  covers the three items above).
+- **Naive basic ISO times.** A naive OCEL 2.0 JSON or XML event time in a
+  shape the native timestamp parser does not read (`20200101T100000`) was
+  stored `...+00:00`; it is now `...Z`, the reference JSON writers' spelling
+  (`2024-W01-1T00:30:00,5` too, `minera_recheck_regression_tests`).
+
+Tests run (scratch build, each alone under a 4 GiB address-space limit):
+`minera_footprints_tests`, `minera_footprints_workbench_json_tests`,
+`minera_case_relations_tests`, `minera_ocel_csv_tests`,
+`minera_ocel_sqlite_tests`, `minera_ocel_tests` (OCEL 2.0 JSON round trip of
+a change-only field), `minera_ocel_xml_tests`,
+`minera_recheck_regression_tests`, `minera_core_tests`,
+`minera_ocel_filter_tests`, `minera_ocel_statistics_tests`,
+`minera_ocel_transform_tests`, `minera_ocel_exact_filter_controls_tests`,
+`minera_ocel_codeath_module_tests` and the three OC-DFG control and
+performance suites all pass.
+
+## Fresh sweep: transition systems, organizational mining, log statistics and OC discovery (2026-11-04)
+
+Random logs (1-12 cases, 1-7 activities, ties, millisecond and sub-second
+steps, shuffled CSV rows and out-of-order XES events) were run through
+`minera_export`, `minera_ocel` and, for transition systems, the
+`/api/discover-graph` route, and compared with pm4py 2.7.22 public calls. CSV
+inputs are compared with `format_dataframe` frames (or the converted log where
+the native variant is a log variant), XES inputs with
+`read_xes(return_legacy_log_object=True)`.
+
+Fixes:
+
+- **Eventually-follows sorts each case by timestamp.** The reference
+  (`discover_eventually_follows_graph` and
+  `statistics.eventually_follows.log.get`) stably sorts every case by
+  timestamp before counting position pairs, so a log whose events are out of
+  time order counts in time order: A@5, B@1, C@3 gives B→C, B→A, C→A. Native
+  counted in trace order (8 of 150 XES logs differed). Ties keep trace order
+  and timestamps compare at microseconds, as Python datetimes do. Declared:
+  the reference raises KeyError on an untimed event; native keeps the trace
+  order of a trace that holds one. Test: `minera_overlap_tests`
+  (`eventually_follows_timestamp_order_reference`).
+- **Case arrival and dispersion averages use `statistics.mean`.** The
+  reference averages the gaps exactly and rounds once; native summed in
+  doubles, an ulp off in 22 of 150 logs (four starts at 00:28:54.365,
+  03:21:57.038, 03:43:54.029 and 04:53:21.015 give 5288.883333333333, not
+  5288.883333333334). Test: `minera_case_arrival_tests`.
+
+Matched without changes: transition systems (all views, both directions,
+windows -2 to 10, occurrence data; 1,200 CLI logs, 150 more with the
+resource as activity key and 120 server CSV logs), handover of work (beta 0
+to 1), working together, subcontracting (n 1 to 4), log and pandas variants,
+and roles (400 logs, plus 150 for role order);
+local diagnostics from `org:group` (300 logs); OC-DFG with and without
+business hours and OCPN (im, imd, token-based-replay annotation counters,
+nets up to isomorphism; 700 OCELs); case durations, start/end activities,
+variants as counts, rework, minimum self-distances and witnesses (300 logs
+after the fixes, plus 75 CSV logs against the `format_dataframe` frame).
+
+Declared:
+
+- **Set and multiset transition systems with equal-valued states made in one
+  step.** When a step's source and target windows have the same set or
+  multiset value and neither exists yet, the reference creates two states and
+  keeps both in its state set only when their `repr` differ. A set's `repr`
+  follows string hashing, so the number of root states, which of the two a
+  later lookup returns, and how many transitions with equal endpoint values
+  and label appear vary with `PYTHONHASHSEED` (l398: 35 states for 38 of 41
+  seeds, 36 for 3; `A,C,A` twice under multiset forward window 2 gives 3 or
+  4 transitions). Native keeps one root per value, takes the first-registered
+  state and one transition per value triple. The sweep checks invariants for
+  these logs: equal sets of state values and transition triples and equal
+  transition occurrences merged by value.
+- **Joint-activities weights to the last bits.** The reference is
+  `scipy.stats.pearsonr` (SciPy 1.17.1) on the per-resource activity count
+  vectors; its rounding could not be reproduced black-box (it is not the
+  textbook two-pass formula, `np.corrcoef`, or the unit-vector dot product:
+  `pearsonr(x, x)` is 0.9999999999999997 for x = 1,1,1,0,0,2). Native
+  computes the two-pass formula; 39 of 79 logs differ by a few ulps
+  (relative error below 1e-12), every other weight, NaN and error matches.
+- **Empty OCEL.** On an OCEL without events (as the reference reader leaves
+  it when no event has a relationship) `discover_ocdfg` and
+  `discover_oc_petri_net` raise KeyError (`ocel:timestamp` or `ocel:type`);
+  native returns the empty result.
+- **Orders not claimed.** `originator_importance` key order of a merged role
+  follows the reference's merge sequence (native lists resources by name;
+  roles, activities and counts match); `get_start_activities` keys keep
+  first appearance (native sorts by name); the analysis `variants` list is
+  ordered by count, not by first appearance as `get_variants_as_tuples`.
+  `get_activity_position_summary` has no native entry point.

@@ -120,7 +120,15 @@ double EvaluationUtility::fitness(
     (void)pair;
     dfg_total.add(static_cast<std::uint64_t>(count));
   }
-  if (dfg_total.zero()) return 1.0;
+  // The reference divides by the summed counts and then by the number of
+  // relations and boundary activities, so either being zero raises
+  // ZeroDivisionError (observed black-box on fp_fitness); native refuses.
+  if (dfg_total.zero()) {
+    throw std::invalid_argument(
+        "footprint fitness is undefined: every dfg count of the log "
+        "footprint is 0 (the reference raises ZeroDivisionError: float "
+        "division by zero)");
+  }
 
   WideCount deviation_total;
   for (const auto& pair : conformance.footprints) {
@@ -136,7 +144,13 @@ double EvaluationUtility::fitness(
   const std::uint64_t number_boundary =
       log.start_activities.size() + log.end_activities.size();
   const std::uint64_t denominator = number_relations + number_boundary;
-  if (denominator == 0) return 1.0;
+  if (denominator == 0) {
+    throw std::invalid_argument(
+        "footprint fitness is undefined: the log footprint has dfg counts but "
+        "no sequence, parallel or interleaving relation and no start or end "
+        "activity (the reference raises ZeroDivisionError: float division by "
+        "zero)");
+  }
 
   const double sum_dfg = dfg_total.to_double();
   const double sum_deviations = deviation_total.to_double();

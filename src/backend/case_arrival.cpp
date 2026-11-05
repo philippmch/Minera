@@ -10,6 +10,7 @@
 #include <tuple>
 #include <utility>
 
+#include "exact_mean.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -158,10 +159,11 @@ double elapsed(double start, double end, std::string_view start_text,
   return business_elapsed(*local_start, *local_end, slots);
 }
 
+// The reference averages the gaps with statistics.mean: the exact sum
+// divided by the count, rounded once (a running double sum can be an ulp off).
 double average_gaps(std::vector<double> values) {
   if (values.empty()) return 0.0;
-  return std::accumulate(values.begin(), values.end(), 0.0) /
-         static_cast<double>(values.size());
+  return detail::exact_mean(values);
 }
 
 }  // namespace

@@ -35,7 +35,10 @@ export interface ActiveMiningSourceDescriptor {file: File; sha256: string; forma
 export interface ActiveSourceMining extends Record<string, unknown> {family: "ACTIVE_SOURCE_MINING"; source_id: string; active_source: ActiveMiningSourceSnapshot; analysis: MineraExport | null; family_results: Record<string, unknown>; error: null | {type: string; message: string};}
 export type ActiveDatasetResult = MineraExport | ActiveSourceMining;
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
-const count = (holder: object, key: string | number): boolean => typeof (holder as Record<string, unknown>)[String(key)] === "number" && /^(?:0|[1-9]\d*)$/.test(String(nativeCell(holder, key)));
+// A non-negative integer as written: a kept literal must be plain digits; a number without one prints as digits when
+// it is an integer in [0, 1e21) other than -0 (the same answer as testing String(number), without building the text
+// for each of a large source's row ordinals).
+const count = (holder: object, key: string | number): boolean => {const member = (holder as Record<string, unknown>)[String(key)]; if (typeof member !== "number") return false; const cell = nativeCell(holder, key); return cell === member ? Number.isInteger(member) && member >= 0 && member < 1e21 && !Object.is(member, -0) : /^(?:0|[1-9]\d*)$/.test(String(cell));};
 /** The native input parser validates cell/default semantics after the untouched File is uploaded. */
 export function isMiningInputTable(value: unknown): value is MiningInputTable {
   return object(value) && Array.isArray(value.columns) && value.columns.every(column => typeof column === "string") && Array.isArray(value.rows) && value.rows.every(row => Array.isArray(row) && row.length === (value.columns as string[]).length && row.every(cell => cell === null || object(cell))) && (value.dtypes === undefined || Array.isArray(value.dtypes) && value.dtypes.every(dtype => typeof dtype === "string")) && (value.index === undefined || value.index === null || object(value.index)) && (value.categorical_dtypes === undefined || Array.isArray(value.categorical_dtypes)) && (value.attributes === undefined || Array.isArray(value.attributes) && value.attributes.every(object)) && (value.metadata === undefined || object(value.metadata));

@@ -296,7 +296,10 @@ export function logLifecycles(data: MineraExport): string[] {
  * divides by zero on a log with no edges (e.g. a single-activity log).
  */
 export function maxEdgeCount(data: MineraExport): number {
-  return Math.max(1, ...data.edges.map((edge) => edge.count));
+  // A loop, not Math.max(...counts): spreading a very large edge list overflows the call stack.
+  let max = 1;
+  for (const edge of data.edges) if (edge.count > max) max = edge.count;
+  return max;
 }
 
 /** Whether an opened file is a pre-mined JSON export rather than a raw CSV log. */

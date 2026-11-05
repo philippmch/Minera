@@ -1747,8 +1747,18 @@ export function uploadTooLargeMessage(size?: number): string {
   return `the upload${actual} is larger than the ${limit} limit of the Minera backend; compress an XES log as .xes.gz, which Minera reads directly`;
 }
 
-/** The backend mines one log at a time (503 MINE_BUSY for any other). */
-export const MINE_BUSY_MESSAGE = "Another log is being mined — wait or cancel it.";
+/**
+ * The backend mines one log at a time (503 MINE_BUSY for any other). This tab
+ * cancels its own earlier mine before it starts another and then waits for it
+ * (the backend reports it as "canceling"), so a mine still running without a
+ * cancel was started elsewhere: in another tab or window, or by another client
+ * of the same server. Its Cancel button is there, not here, so the message
+ * offers no cancel. (The backend's own MINE_BUSY text, which says "wait or
+ * cancel it", is written for whichever client started that mine.)
+ */
+export const MINE_BUSY_MESSAGE = "Another log is being mined on this Minera server, from another tab, window or client. Try again when it finishes, or cancel it where it was started.";
+/** A canceled mine that still held the backend's slot when this mine stopped waiting for it. */
+export const MINE_BUSY_CANCELING_MESSAGE = "The Minera server is still stopping a canceled mine. Try again in a moment.";
 /** How long a mine waits for a canceled mine that still holds the backend's single slot. */
 export const MINE_BUSY_WAIT_MS = 120_000;
 
@@ -1835,8 +1845,8 @@ export async function mineActiveDataset(
     }
     const retryHeader = Number(response.headers.get("Retry-After"));
     const retrySeconds = Number.isFinite(retryHeader) && retryHeader > 0 ? retryHeader : finiteNumber(admission.retry_after_seconds) ?? 1;
-    if (admission.canceling !== true || Date.now() - started + retrySeconds * 1000 > MINE_BUSY_WAIT_MS)
-      throw new Error(MINE_BUSY_MESSAGE);
+    if (admission.canceling !== true) throw new Error(MINE_BUSY_MESSAGE);
+    if (Date.now() - started + retrySeconds * 1000 > MINE_BUSY_WAIT_MS) throw new Error(MINE_BUSY_CANCELING_MESSAGE);
     await waitFor(retrySeconds * 1000, signal);
   }
 

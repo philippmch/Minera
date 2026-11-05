@@ -68,6 +68,45 @@ void eventually_follows_interval_reference() {
   assert(thrown);
 }
 
+// Reference capture (pm4py 2.7.22 discover_eventually_follows_graph and
+// statistics.eventually_follows.log.get on a legacy EventLog): each case is
+// sorted stably by timestamp before the position pairs are counted.
+void eventually_follows_timestamp_order_reference() {
+  const auto ev = [](const char* activity, int second) {
+    Event e;
+    e.activity = activity;
+    char text[32];
+    std::snprintf(text, sizeof text, "2024-01-01T00:00:%02dZ", second);
+    e.timestamp = text;
+    return e;
+  };
+  const auto counts_of = [](const EventLog& log) {
+    const auto graph = discover_directly_follows_graph(log);
+    std::map<std::pair<std::string, std::string>, std::uint64_t> counts;
+    for (const auto& edge : discover_eventually_follows(log, graph))
+      counts[{graph.activities()[edge.source], graph.activities()[edge.target]}] = edge.count;
+    return counts;
+  };
+  using Counts = std::map<std::pair<std::string, std::string>, std::uint64_t>;
+  EventLog unsorted;
+  unsorted.traces.push_back(Trace{"c0", {ev("A", 5), ev("B", 1), ev("C", 3)}});
+  unsorted.traces.push_back(Trace{"c1", {ev("X", 0)}});
+  assert((counts_of(unsorted) == Counts{{{"B", "C"}, 1}, {{"B", "A"}, 1}, {{"C", "A"}, 1}}));
+  // Equal timestamps keep their trace order.
+  EventLog ties;
+  ties.traces.push_back(Trace{"c0", {ev("A", 5), ev("B", 5), ev("C", 3)}});
+  assert((counts_of(ties) == Counts{{{"C", "A"}, 1}, {{"C", "B"}, 1}, {{"A", "B"}, 1}}));
+  EventLog repeats;
+  repeats.traces.push_back(Trace{"c0", {ev("A", 1), ev("A", 0), ev("B", 3), ev("A", 2)}});
+  assert((counts_of(repeats) == Counts{{{"A", "A"}, 3}, {{"A", "B"}, 3}}));
+  // Declared: the reference raises KeyError on an untimed event; native keeps
+  // the trace order of a trace that holds one.
+  EventLog untimed;
+  untimed.traces.push_back(Trace{"c0", {ev("A", 5), ev("B", 1)}});
+  untimed.traces[0].events[1].timestamp.clear();
+  assert((counts_of(untimed) == Counts{{{"A", "B"}, 1}}));
+}
+
 // Reference capture (pm4py 2.7.22 statistics.overlap.interval_events,
 // overlap.cases and concurrent_activities, start_timestamp_key) on events that
 // start after they complete (minutes). Interval-event overlap raises
@@ -139,6 +178,7 @@ void inverted_interval_reference() {
 
 int main() {
   eventually_follows_interval_reference();
+  eventually_follows_timestamp_order_reference();
   inverted_interval_reference();
   Trace a{"a", {event("2024-01-01T00:00:00Z", "2024-01-01T00:00:10Z")}};
   Trace b{"b", {event("2024-01-01T00:00:10Z", "2024-01-01T00:00:20Z")}};

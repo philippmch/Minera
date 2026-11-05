@@ -26,12 +26,18 @@ export function focusLostStep(root: HTMLElement | null, doc: Document = document
   return true;
 }
 
-/** A ref for a wizard's root that restores lost focus whenever `step` changes (not on mount). */
+/**
+ * A ref for a wizard's root that restores lost focus whenever `step` changes
+ * (not on mount). The step last seen is compared rather than a "mounted" flag:
+ * StrictMode runs a mount's effect twice with its refs kept, so a flag set by
+ * the first run let the second one move focus as if the step had changed.
+ */
 export function useStepFocus<T extends HTMLElement>(step: unknown) {
   const root = useRef<T>(null);
-  const mounted = useRef(false);
+  const shown = useRef(step);
   useEffect(() => {
-    if (!mounted.current) { mounted.current = true; return; }
+    if (Object.is(shown.current, step)) return;
+    shown.current = step;
     focusLostStep(root.current);
   }, [step]);
   return root;

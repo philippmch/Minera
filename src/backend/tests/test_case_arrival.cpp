@@ -34,6 +34,18 @@ int main() {
   assert(json.find("\"arrival_average\":7200") != std::string::npos);
   assert(std::abs(minera::get_case_arrival_average(log) - 7200.0) < 1e-9);
 
+  // Reference capture (pm4py 2.7.22 get_case_arrival_avg and
+  // get_case_dispersion_avg): the gaps are averaged as statistics.mean does,
+  // the exact sum rounded once. A running double sum gives 5288.883333333334.
+  minera::EventLog exact;
+  exact.traces = {trace("2024-01-01T00:28:54.365Z", "2024-01-01T00:28:54.365Z"),
+                  trace("2024-01-01T03:21:57.038Z", "2024-01-01T03:21:57.038Z"),
+                  trace("2024-01-01T03:43:54.029Z", "2024-01-01T03:43:54.029Z"),
+                  trace("2024-01-01T04:53:21.015Z", "2024-01-01T04:53:21.015Z")};
+  const auto exact_result = minera::discover_case_arrival(exact);
+  assert(exact_result.arrival_average == 5288.883333333333);
+  assert(exact_result.dispersion_average == 5288.883333333333);
+
   minera::CaseArrivalOptions options;
   options.use_business_hours = true;
   options.business_hour_slots = {{8.0 * 3600.0, 12.0 * 3600.0}};

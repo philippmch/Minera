@@ -832,6 +832,12 @@ void merge_standard_type(std::string& current, const OcelValue& value) {
 using StandardTypeTable =
     std::map<std::string, std::map<std::string, std::string>>;
 
+// pm4py.write_ocel2_json, write_ocel2_xml and write_ocel_json (objects) drop
+// an attribute whose name starts with "ocel:" (an OCEL CSV column such as
+// "ocel:foo" or "ocel:eid.1"), which their frames take for a reserved column
+// (observed black-box).
+bool reference_drops_attribute(std::string_view key) { return key.starts_with("ocel:"); }
+
 void collect_standard_types(const Ocel& log, StandardTypeTable& object_types,
                             StandardTypeTable& event_types) {
   object_types = log.object_type_attributes;
@@ -854,6 +860,11 @@ void collect_standard_types(const Ocel& log, StandardTypeTable& object_types,
       if (declared.empty()) merge_standard_type(declared, attribute.value);
     }
   }
+  // write_ocel2_json drops "ocel:"-prefixed attributes (see
+  // reference_drops_attribute), also from the type tables.
+  for (auto* table : {&object_types, &event_types})
+    for (auto& [type, attributes] : *table)
+      std::erase_if(attributes, [](const auto& entry) { return reference_drops_attribute(entry.first); });
 }
 
 void write_standard_type_table(std::ostringstream& out,
@@ -1102,6 +1113,9 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   }
   sort_ocel_events_by_timestamp(result, standard ? OcelTimestampReader::kIsoFormat
                                                  : OcelTimestampReader::kIsoFormatOrFileOrder);
+  // read_ocel2_json converts declared date values (a text it cannot read
+  // stays); read_ocel_json keeps them as text.
+  if (standard) convert_ocel_date_attributes(result, OcelTimestampReader::kIsoFormatOrFileOrder);
   // Every reference reader (OCEL 1.0 and 2.0 JSON alike) drops events and
   // objects that take part in no event-object relation. A document Minera
   // wrote for an OCEL that holds such entries (an OCEL CSV import, whose
@@ -1486,7 +1500,16 @@ std::string stored_timestamp_text(std::string_view text, std::int64_t microsecon
                                   bool event, bool aware = true) {
   if (!aware) return utc_timestamp_text(microseconds, "");
   const auto exact = parse_timestamp_exact(text);
-  const bool naive = exact && !exact->timezone_aware;
+  // An ISO shape the native parser does not read ("20200101T100000") is
+  // naive when it still reads with a "Z" appended (an offset would not).
+  bool naive = exact && !exact->timezone_aware;
+  if (!exact) {
+    try {
+      naive = iso_wall_microseconds(std::string(text) + "Z") == microseconds;
+    } catch (const std::invalid_argument&) {
+      naive = false;
+    }
+  }
   return utc_timestamp_text(microseconds, event && naive ? "Z" : "+00:00");
 }
 
@@ -1537,6 +1560,65 @@ void drop_unrelated_ocel_entries(Ocel& log) {
   erase_if(log.object_changes, [&](const OcelObjectChange& change) {
     return !related_objects.count(change.object_id);
   });
+}
+
+void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader) {
+  // read_ocel2_xml converts a type naming "date" (case-sensitive: "Date",
+  // "time" and "timestamp" stay text), read_ocel2_json one naming "date" or
+  // "time" in any case (observed black-box).
+  const auto declared = [reader](const OcelTypeCatalog& catalog, const std::string& owner,
+                                 const std::string& key) {
+    const auto schema = catalog.find(owner);
+    if (schema == catalog.end()) return false;
+    const auto found = schema->second.find(key);
+    if (found == schema->second.end()) return false;
+    if (reader == OcelTimestampReader::kDateutil)
+      return found->second.find("date") != std::string::npos;
+    const auto type = lower_ascii(found->second);
+    return type.find("date") != std::string::npos || type.find("time") != std::string::npos;
+  };
+  const auto convert = [&](OcelValue& value, bool change) {
+    auto* text = std::get_if<std::string>(&value);
+    if (text == nullptr) return;
+    std::optional<std::int64_t> microseconds;
+    bool aware = true;
+    try {
+      microseconds = iso_wall_microseconds(*text);
+    } catch (const std::invalid_argument&) {
+      if (reader == OcelTimestampReader::kIsoFormat) throw;
+      if (reader != OcelTimestampReader::kDateutil) return;
+      if (const auto lenient = dateutil_subset(*text)) {
+        microseconds = lenient->microseconds;
+        aware = lenient->aware;
+      } else if (certainly_not_a_date(*text)) {
+        throw std::invalid_argument("String does not contain a date: " + *text);
+      } else {
+        return;  // a shape native does not read: kept as written
+      }
+    }
+    // A change value keeps "+00:00", an event or object value "Z", as the
+    // reference JSON writers spell them.
+    if (natively_stored(*text, *microseconds, aware) && !(change && text->ends_with('Z'))) return;
+    *text = utc_timestamp_text(*microseconds, !aware ? "" : change ? "+00:00" : "Z");
+  };
+  for (auto& event : log.events)
+    for (auto& attribute : event.attributes)
+      if (declared(log.event_type_attributes, event.activity, attribute.key))
+        convert(attribute.value, false);
+  std::unordered_map<std::string_view, std::string_view> object_types;
+  for (auto& object : log.objects) {
+    object_types.emplace(object.id, object.type);
+    for (auto& attribute : object.attributes)
+      if (declared(log.object_type_attributes, object.type, attribute.key))
+        convert(attribute.value, false);
+  }
+  for (auto& change : log.object_changes) {
+    std::string type = change.object_type;
+    if (type.empty())
+      if (const auto found = object_types.find(change.object_id); found != object_types.end())
+        type = std::string(found->second);
+    if (declared(log.object_type_attributes, type, change.field)) convert(change.value, true);
+  }
 }
 
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds) {
@@ -1622,6 +1704,14 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
     bool aware = true;
     try {
       microseconds = iso_wall_microseconds(text);
+      // read_ocel_json converts an "ocel:objectChanges" time to its UTC
+      // instant ("2020-01-03T00:00:00+01:00" is 2020-01-02 23:00 UTC), while
+      // its event times and every OCEL 2.0 reader keep the wall clock
+      // (observed black-box). The offset is the one the native parser reads.
+      if (reader == OcelTimestampReader::kIsoFormatOrFileOrder)
+        if (const auto exact = parse_timestamp_exact(text);
+            exact && exact->timezone_aware && exact->offset_minutes != 0)
+          *microseconds -= static_cast<std::int64_t>(exact->offset_minutes) * 60 * 1000000;
     } catch (const std::invalid_argument&) {
       if (reader == OcelTimestampReader::kDateutil)
         if (const auto lenient = dateutil_subset(text)) {
@@ -1838,6 +1928,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
     bool first = true;
     for (const auto& attribute_value : attrs) {
       const auto* attribute = &attribute_value;
+      if (reference_drops_attribute(attribute->key)) continue;
       if (!first) out << ',';
       first = false;
       out << "{\"name\":";
@@ -1914,12 +2005,10 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
       bool attribute_first = true;
       std::vector<const OcelAttribute*> static_attributes;
       for (const auto& attribute : object->attributes)
-        static_attributes.push_back(&attribute);
-      std::set<std::string> static_fields;
+        if (!reference_drops_attribute(attribute.key)) static_attributes.push_back(&attribute);
       for (const auto* attribute : static_attributes) {
         if (!attribute_first) out << ',';
         attribute_first = false;
-        static_fields.insert(attribute->key);
         out << "{\"name\":";
         write_string(out, attribute->key);
         out << ",\"time\":\"1970-01-01T00:00:00Z\"";
@@ -1934,16 +2023,11 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
         return std::tie(left->timestamp, left->field, left->object_type) <
                std::tie(right->timestamp, right->field, right->object_type);
       });
-      std::set<std::string> seeded_fields;
+      // A field without a static value gets no base entry: write_ocel2_json
+      // writes only its changes (observed black-box), and a reader takes
+      // the first change as the base, as pm4py reads its own export.
       for (const auto* change : changes) {
-        if (!static_fields.count(change->field) &&
-            seeded_fields.insert(change->field).second) {
-          if (!attribute_first) out << ',';
-          attribute_first = false;
-          out << "{\"name\":";
-          write_string(out, change->field);
-          out << ",\"time\":\"1970-01-01T00:00:00Z\",\"value\":null}";
-        }
+        if (reference_drops_attribute(change->field)) continue;
         if (!attribute_first) out << ',';
         attribute_first = false;
         out << "{\"name\":";

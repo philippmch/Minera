@@ -1,8 +1,7 @@
 import { type ReactNode, useState } from "react";
 import { useStepFocus } from "../step-focus";
 import { downloadBlob } from "../download";
-import { type TreeLayout } from "../tree-layout";
-import { type PetriLayout } from "../petri-layout";
+import { type ModelLayouts, type ModelNet } from "../model-layouts";
 import { type MineraExport } from "../types";
 import { MINER_GROUPS, type MinerVariant } from "../miners";
 import { fetchBpmn, fetchPlayout, fetchPnml, fetchPtml, type CsvOptions } from "../api";
@@ -24,15 +23,8 @@ type Step = "miner" | "variant" | "result";
 interface ProcessModelProps {
   /** The analysis, used to mine the heuristic miner's dependency graph live. */
   data: MineraExport;
-  /** Layout for the inductive miner's process tree, if the export carries one. */
-  treeLayout: TreeLayout | null;
-  /** Layout for the alpha miner's Petri net, if the export carries one. */
-  petriLayout: PetriLayout | null;
-  /** Layout for the inductive model's workflow net, if the export carries one. */
-  inductivePetriLayout: PetriLayout | null;
-  /** Layout for the heuristic model's workflow net, if the export carries one. */
-  heuristicPetriLayout: PetriLayout | null;
-  powlPetriLayout: PetriLayout | null;
+  /** The analysis's process tree and workflow nets, each laid out only when the shown model needs it. */
+  layouts: ModelLayouts;
   /** Whether the backend can export PNML (a log was mined this session). */
   canExportPnml: boolean;
   /** Mined source the shown models came from; binds playout to it. */
@@ -46,11 +38,7 @@ interface ProcessModelProps {
 // shown. The breadcrumb steps back to any earlier choice.
 export function ProcessModel({
   data,
-  treeLayout,
-  petriLayout,
-  inductivePetriLayout,
-  heuristicPetriLayout,
-  powlPetriLayout,
+  layouts,
   canExportPnml,
   playoutSourceId,
   mining = false,
@@ -153,11 +141,7 @@ export function ProcessModel({
           minerId={group.id}
           groupName={group.name}
           data={data}
-          treeLayout={treeLayout}
-          petriLayout={petriLayout}
-          inductivePetriLayout={inductivePetriLayout}
-          heuristicPetriLayout={heuristicPetriLayout}
-          powlPetriLayout={powlPetriLayout}
+          layouts={layouts}
           canExportPnml={canExportPnml}
           playoutSourceId={playoutSourceId}
           mining={mining}
@@ -174,11 +158,7 @@ interface ModelResultProps {
   minerId: string;
   groupName: string;
   data: MineraExport;
-  treeLayout: TreeLayout | null;
-  petriLayout: PetriLayout | null;
-  inductivePetriLayout: PetriLayout | null;
-  heuristicPetriLayout: PetriLayout | null;
-  powlPetriLayout: PetriLayout | null;
+  layouts: ModelLayouts;
   canExportPnml: boolean;
   playoutSourceId?: string;
   mining: boolean;
@@ -197,11 +177,7 @@ function ModelResult({
   minerId,
   groupName,
   data,
-  treeLayout,
-  petriLayout,
-  inductivePetriLayout,
-  heuristicPetriLayout,
-  powlPetriLayout,
+  layouts,
   canExportPnml,
   playoutSourceId,
   mining,
@@ -223,7 +199,8 @@ function ModelResult({
   ) : null;
   // The workflow-discovery panels export the model they discover; the model mined with this analysis (the one
   // conformance checks) stays exportable beside them.
-  const savedNet = ({alpha: petriLayout, heuristic: heuristicPetriLayout, inductive: inductivePetriLayout, powl: powlPetriLayout} as Record<string, PetriLayout | null>)[minerId] ?? null;
+  // Only whether the analysis carries the net: the workflow-discovery panels lay out what they show themselves.
+  const savedNet = (["alpha", "heuristic", "inductive", "powl"] as const).includes(minerId as ModelNet) && layouts.hasNet(minerId as ModelNet);
   const saved = actions && savedNet ? (
     <section className="panel saved-model-exports" aria-label="Analysis model exports">
       <div className="panel-head"><h2>Model mined with this analysis</h2><span className="panel-meta">{groupName} · analysis settings</span></div>
@@ -243,8 +220,8 @@ function ModelResult({
 
   // The primary-view ⇄ workflow-net flip, offered when the export carries the
   // net (older exports lack it and simply show no toggle).
-  const netToggle = (primaryLabel: string, netLayout: PetriLayout | null) =>
-    netLayout ? (
+  const netToggle = (primaryLabel: string, hasNet: boolean) =>
+    hasNet ? (
       <div className="map-mode" role="group" aria-label="Model view">
         <button
           className={asNet ? "mode-btn" : "mode-btn active"}
@@ -262,14 +239,15 @@ function ModelResult({
     ) : null;
 
   if (variant.artifact === "process-tree") {
-    if (asNet && inductivePetriLayout) {
+    const inductiveNet = asNet ? layouts.net("inductive") : null;
+    if (inductiveNet) {
       return (
         <PetriNet
-          layout={inductivePetriLayout}
+          layout={inductiveNet}
           title={groupName}
           actions={
             <>
-              {netToggle("Tree", inductivePetriLayout)}
+              {netToggle("Tree", layouts.hasNet("inductive"))}
               {actions}
             </>
           }
@@ -277,13 +255,14 @@ function ModelResult({
         />
       );
     }
+    const treeLayout = layouts.tree();
     return treeLayout ? (
       <ProcessTree
         layout={treeLayout}
         title={groupName}
         actions={
           <>
-            {netToggle("Tree", inductivePetriLayout)}
+            {netToggle("Tree", layouts.hasNet("inductive"))}
             {actions}
           </>
         }
@@ -297,14 +276,15 @@ function ModelResult({
   }
 
   if (variant.artifact === "dependency-graph") {
-    if (asNet && heuristicPetriLayout) {
+    const heuristicNet = asNet ? layouts.net("heuristic") : null;
+    if (heuristicNet) {
       return (
         <PetriNet
-          layout={heuristicPetriLayout}
+          layout={heuristicNet}
           title={groupName}
           actions={
             <>
-              {netToggle("Dependency graph", heuristicPetriLayout)}
+              {netToggle("Dependency graph", layouts.hasNet("heuristic"))}
               {actions}
             </>
           }
@@ -320,7 +300,7 @@ function ModelResult({
         title={groupName}
         actions={
           <>
-            {netToggle("Dependency graph", heuristicPetriLayout)}
+            {netToggle("Dependency graph", layouts.hasNet("heuristic"))}
             {actions}
           </>
         }
@@ -329,14 +309,15 @@ function ModelResult({
   }
 
   if (variant.artifact === "powl") {
-    if (asNet && powlPetriLayout) {
+    const powlNet = asNet ? layouts.net("powl") : null;
+    if (powlNet) {
       return (
         <PetriNet
-          layout={powlPetriLayout}
+          layout={powlNet}
           title={groupName}
           actions={
             <>
-              {netToggle("POWL", powlPetriLayout)}
+              {netToggle("POWL", layouts.hasNet("powl"))}
               {actions}
             </>
           }
@@ -351,7 +332,7 @@ function ModelResult({
         title={groupName}
         actions={
           <>
-            {netToggle("POWL", powlPetriLayout)}
+            {netToggle("POWL", layouts.hasNet("powl"))}
             {actions}
           </>
         }
@@ -413,6 +394,7 @@ function ModelResult({
     );
   }
 
+  const petriLayout = layouts.net("alpha");
   return petriLayout ? (
     <PetriNet
       layout={petriLayout}

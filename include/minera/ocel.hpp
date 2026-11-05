@@ -156,6 +156,22 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader);
 // `nanoseconds` selects kInstantNanoseconds, otherwise kIsoFormat.
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);
 
+// Converts the string values of attributes the type catalogs declare as
+// dates (a type naming "date" or "time" in any case; for kDateutil, as
+// read_ocel2_xml, one naming "date") to the UTC timestamp the reference
+// reader stores, as pm4py.read_ocel2_json, read_ocel2_xml and read_ocel_xml
+// do (read_ocel_json, read_ocel2_sqlite and read_ocel_csv keep the text;
+// observed black-box). The ISO reading keeps the wall clock stamped UTC (an
+// offset is dropped, a naive text is UTC). kIsoFormatOrFileOrder (OCEL 2.0
+// JSON) keeps a text it cannot read; kIsoFormat (OCEL 1.0 XML) throws the
+// reference's "Invalid isoformat string"; kDateutil (OCEL 2.0 XML) falls back
+// to the dateutil subset (an aware value is its UTC instant, a naive one
+// stays naive) and throws "String does not contain a date" for a text that
+// certainly is none. An event or object value is spelled "...[.ffffff]Z", a
+// change value "...+00:00" (the reference JSON writers' spellings), unless the
+// text already is that UTC value. Non-string values are kept.
+void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader);
+
 // Keeps only the events and objects that take part in at least one
 // event-object relation, as every reference OCEL JSON, XML and SQLite reader
 // does after reading (the OCEL CSV reader keeps them). Relations to a dropped

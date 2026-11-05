@@ -1387,11 +1387,10 @@ std::vector<CaseRelation> parse_case_relations_csv(std::istream& input,
     }
   }
   if (header.empty()) throw std::invalid_argument("case relations: missing header");
-  std::set<std::string> header_names;
-  for (const auto& name : header) {
-    if (!header_names.insert(name).second)
-      throw std::invalid_argument("case relations: duplicate header " + name);
-  }
+  // The reference reads the relations frame with read_csv, which names an
+  // empty header "Unnamed: i" and repeats "name.1", ...; the selectors find
+  // the first column of a name.
+  header = reference_csv_header_names(std::move(header));
   const auto find_column = [&](const std::string& name) {
     const auto it = std::find(header.begin(), header.end(), name);
     if (it == header.end())
@@ -1426,14 +1425,8 @@ EventTable parse_case_relations_table_csv(std::istream& input) {
   if (header.empty())
     throw std::invalid_argument("case relations: missing header");
 
-  std::set<std::string> header_names;
-  for (const auto& name : header) {
-    if (name.empty())
-      throw std::invalid_argument(
-          "case relations: relation header names must not be empty");
-    if (!header_names.insert(name).second)
-      throw std::invalid_argument("case relations: duplicate header " + name);
-  }
+  // Header names follow read_csv, as in parse_case_relations_csv.
+  header = reference_csv_header_names(std::move(header));
 
   EventTable table;
   table.columns = header;

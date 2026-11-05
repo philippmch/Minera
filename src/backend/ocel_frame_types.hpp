@@ -6,6 +6,7 @@
 // text pandas prints for a UTC timestamp.
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -304,6 +305,70 @@ inline std::vector<std::string> pandas_timestamp_column_text(
     }
   }
   return out;
+}
+
+// The offset (minutes) that every value of an aware timestamp column shares,
+// when it is not zero. pm4py.read_ocel_csv keeps such a column with its
+// fixed offset (datetime64[us, UTC+02:00]; mixed offsets raise there), and
+// the reference writers print each value's wall clock in it (observed
+// black-box: OCEL 2.0 XML "2024-01-01T10:00:00+02:00", OCEL 1.0 XML
+// "2024-01-01T10:00:00Z", SQLite "2024-01-01 10:00:00+02:00"). The other
+// native importers store UTC, which gives nullopt.
+inline std::optional<std::int32_t> shared_nonzero_offset(
+    const std::vector<std::string_view>& texts) {
+  std::optional<std::int32_t> offset;
+  for (const auto text : texts) {
+    const auto parsed = parse_timestamp_exact(text);
+    if (!parsed || !parsed->timezone_aware) return std::nullopt;
+    if (offset && *offset != parsed->offset_minutes) return std::nullopt;
+    offset = parsed->offset_minutes;
+  }
+  if (!offset || *offset == 0) return std::nullopt;
+  return offset;
+}
+
+// `text` as utc_timestamp_text prints it, but in the wall clock of
+// `offset_minutes` (nullopt: UTC) and followed by `suffix`, or by the offset
+// itself ("+02:00") when `suffix` is nullopt.
+inline std::string offset_timestamp_text(std::string_view text, char separator,
+                                         std::optional<std::int32_t> offset_minutes,
+                                         std::optional<std::string_view> suffix) {
+  if (!offset_minutes) return utc_timestamp_text(text, separator, suffix.value_or("+00:00"));
+  auto parsed = parse_timestamp_exact(text);
+  if (!parsed || !parsed->timezone_aware)
+    return utc_timestamp_text(text, separator, suffix.value_or("+00:00"));
+  parsed->seconds += static_cast<std::int64_t>(*offset_minutes) * 60;
+  const auto time = civil_timestamp(*parsed);
+  if (!time) return utc_timestamp_text(text, separator, suffix.value_or("+00:00"));
+  const int digits = time->nanoseconds == 0 ? 0 : time->nanoseconds % 1000 == 0 ? 6 : 9;
+  auto out = civil_timestamp_text(*time, separator, digits, true);
+  if (suffix) return out.append(*suffix);
+  char buffer[16];
+  const auto minutes = *offset_minutes < 0 ? -*offset_minutes : *offset_minutes;
+  std::snprintf(buffer, sizeof buffer, "%c%02d:%02d", *offset_minutes < 0 ? '-' : '+',
+                static_cast<int>(minutes / 60), static_cast<int>(minutes % 60));
+  return out.append(buffer);
+}
+
+// Whether a catalog declares `key` of `owner` a date ("date", "time",
+// "timestamp", ... in any case), as the reference OCEL 2.0 readers convert.
+inline bool declared_date(const OcelTypeCatalog& catalog, const std::string& owner,
+                          const std::string& key) {
+  const auto schema = catalog.find(owner);
+  if (schema == catalog.end()) return false;
+  const auto found = schema->second.find(key);
+  if (found == schema->second.end()) return false;
+  std::string lowered = found->second;
+  for (auto& ch : lowered) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  return lowered.find("date") != std::string::npos || lowered.find("time") != std::string::npos;
+}
+
+// A date attribute's string value as a timestamp text, or nullptr when the
+// value is no string or the text is no timestamp (kept as written).
+inline const std::string* date_value_text(const OcelValue& value) {
+  const auto* text = std::get_if<std::string>(&value);
+  if (text == nullptr || !parse_timestamp_exact(*text)) return nullptr;
+  return text;
 }
 
 }  // namespace minera::ocel_frame

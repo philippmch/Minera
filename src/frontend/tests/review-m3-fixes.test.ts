@@ -143,6 +143,56 @@ describe("focus after a wizard step change", () => {
     expect(title.focused).toBe(false);
     expect(focusLostStep(null, doc(body))).toBe(false);
   });
+
+  // useStepFocus under a minimal hook runtime that mounts as StrictMode does:
+  // refs are attached before effects run, and the mount's effects run, are
+  // cleaned up and run again, with refs kept.
+  it("does not move focus when a wizard mounts under StrictMode, only when its step changes", async () => {
+    type Effect = { fn: () => void | (() => void); deps: unknown[]; cleanup?: void | (() => void) };
+    const refs: { current: unknown }[] = [], effects: Effect[] = [];
+    let refAt = 0, effectAt = 0, mounting = true, pending: (() => void)[] = [];
+    vi.resetModules();
+    vi.doMock("react", () => ({
+      useRef: (initial: unknown) => (refs[refAt++] ??= { current: initial }),
+      useEffect: (fn: Effect["fn"], deps: unknown[]) => {
+        const at = effectAt++, before = effects[at];
+        if (before && deps.every((d, i) => Object.is(d, before.deps[i]))) return;
+        pending.push(() => {
+          if (before?.cleanup) before.cleanup();
+          const effect: Effect = { fn, deps, cleanup: fn() };
+          if (mounting) { if (effect.cleanup) effect.cleanup(); effect.cleanup = fn(); }
+          effects[at] = effect;
+        });
+      },
+    }));
+    try {
+      const { useStepFocus } = await import("../src/step-focus");
+      const title = element("H2");
+      const root = rootWith({ ".miner-step-title": title });
+      const focus = vi.fn();
+      vi.stubGlobal("document", { activeElement: body, body });
+      title.focus = () => { focus(); title.focused = true; };
+      const render = (step: string) => {
+        refAt = effectAt = 0; pending = [];
+        useStepFocus<HTMLElement>(step).current = root;
+        for (const run of pending) run();
+      };
+      render("miner");
+      expect(focus).not.toHaveBeenCalled();
+      mounting = false;
+      render("miner");
+      expect(focus).not.toHaveBeenCalled();
+      render("variant");
+      expect(focus).toHaveBeenCalledTimes(1);
+      render("variant");
+      expect(focus).toHaveBeenCalledTimes(1);
+      render("miner");
+      expect(focus).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.doUnmock("react");
+      vi.resetModules();
+    }
+  });
 });
 
 describe("keyboard-scrollable activity table", () => {

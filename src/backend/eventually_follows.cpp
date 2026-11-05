@@ -1,6 +1,7 @@
 #include "minera/eventually_follows.hpp"
 
 #include <algorithm>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 
@@ -88,14 +89,42 @@ std::vector<EventuallyFollowsEdge> discover_eventually_follows(
     return edges_of(counts, n);
   }
 
+  // The reference sorts every case stably by its timestamp before counting
+  // (an event log whose events are out of time order counts in time order).
+  // Python datetimes hold microseconds, so ties are compared at that
+  // precision. The reference raises KeyError on an untimed event; native keeps
+  // the trace order of a trace with an untimed or unreadable timestamp.
+  struct TimedId {
+    std::int64_t time = 0;
+    std::size_t id = 0;
+  };
+  std::vector<TimedId> timed;
   std::vector<std::size_t> ids;
   for (const auto& trace : log.traces) {
     ids.clear();
     ids.reserve(trace.events.size());
+    timed.clear();
+    bool all_timed = true;
     for (const auto& event : trace.events) {
-      if (const auto id = graph.activity_id(event.activity)) {
-        ids.push_back(*id);
+      const auto id = graph.activity_id(event.activity);
+      if (all_timed) {
+        const auto time = event.timestamp.empty()
+                              ? std::nullopt
+                              : parse_timestamp_microseconds(event.timestamp);
+        if (time) {
+          if (id) timed.push_back({*time, *id});
+        } else {
+          all_timed = false;
+        }
       }
+      if (id) ids.push_back(*id);
+    }
+    if (all_timed) {
+      std::stable_sort(timed.begin(), timed.end(),
+                       [](const TimedId& left, const TimedId& right) {
+                         return left.time < right.time;
+                       });
+      for (std::size_t i = 0; i < timed.size(); ++i) ids[i] = timed[i].id;
     }
     for (std::size_t i = 0; i < ids.size(); ++i) {
       const std::size_t row = ids[i] * n;

@@ -324,14 +324,21 @@ std::map<std::string, const OcelValue*> attribute_values(
   return result;
 }
 
+// A TIMESTAMP column (an attribute the catalog declares a date) holds each
+// timestamp text as pandas prints the reference's datetime64[us, UTC] value.
 void bind_type_attributes(sqlite3_stmt* statement, int start_index,
                           const TypeColumns& columns,
                           const std::vector<OcelAttribute>& attributes) {
   const auto values = attribute_values(attributes);
   for (std::size_t index = 0; index < columns.size(); ++index) {
     const auto value = values.find(columns[index].first);
-    if (value == values.end()) bind_null(statement, start_index + static_cast<int>(index));
-    else bind_scalar(statement, start_index + static_cast<int>(index), *value->second);
+    const int position = start_index + static_cast<int>(index);
+    if (value == values.end()) bind_null(statement, position);
+    else if (const auto* text = columns[index].second == "TIMESTAMP"
+                                    ? ocel_frame::date_value_text(*value->second)
+                                    : nullptr)
+      bind_text(statement, position, ocel_frame::utc_timestamp_text(*text, ' ', "+00:00"));
+    else bind_scalar(statement, position, *value->second);
   }
 }
 
@@ -630,6 +637,9 @@ void read_type_catalog(sqlite3* db,
     const auto table = std::string(table_prefix) + mapped;
     for (const auto& column : table_columns(db, table)) {
       if (reserved_type_column(column.name)) continue;
+      // The reference writer adds the activity to each event type table,
+      // and its reader takes the activity from the event table only.
+      if (table_prefix == "event_" && column.name == "ocel:activity") continue;
       schema[column.name] =
           column.declared_type.empty() ? "string"
                                        : declared_sql_type(column.declared_type);
@@ -810,7 +820,12 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         attributes != event_attributes.end()) {
       event.attributes = attributes->second;
     } else if (const auto* row = rows.find(id)) {
-      event.attributes = row->attributes;
+      // pm4py.write_ocel2_sqlite writes an "ocel:activity" column into each
+      // event type table; pm4py.read_ocel2_sqlite ignores it (the event
+      // table's type is the activity, whatever the column holds), so it is
+      // no attribute (observed black-box).
+      for (const auto& attribute : row->attributes)
+        if (attribute.key != "ocel:activity") event.attributes.push_back(attribute);
     }
     log.events.push_back(std::move(event));
     log.event_type_attributes.try_emplace(activity);
@@ -999,14 +1014,20 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
     // column by the kinds of its values in the table). Timestamps are written
     // as pandas prints them. The exact typed values and declared schemas live
     // in the attribute and catalog tables above and below.
+    // An attribute the owner's catalog declares a date is a TIMESTAMP
+    // column, as the reference writes a datetime64 frame column.
     const auto table_columns_for = [](const ocel_frame::Columns& frame,
-                                      const ocel_frame::Columns& table_values) {
+                                      const ocel_frame::Columns& table_values,
+                                      const OcelTypeCatalog& catalog,
+                                      const std::string& owner) {
       TypeColumns columns;
       for (const auto& name : frame.names()) {
         if (reserved_type_column(name) || name == "ocel:activity") continue;
         const auto* stats = table_values.stats(name);
         if (stats == nullptr || stats->present == 0) continue;
-        columns.emplace_back(name, ocel_frame::sql_type(frame.dtype(name), *stats));
+        columns.emplace_back(name, ocel_frame::declared_date(catalog, owner, name)
+                                       ? std::string("TIMESTAMP")
+                                       : ocel_frame::sql_type(frame.dtype(name), *stats));
       }
       return columns;
     };
@@ -1031,6 +1052,14 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
     const auto pandas_time = [](const std::string& text) {
       return ocel_frame::utc_timestamp_text(text, ' ', "+00:00");
     };
+    // A CSV log whose times share an offset is written in that offset, as
+    // the reference writes such a column (see shared_nonzero_offset).
+    const auto event_offset = [&] {
+      std::vector<std::string_view> texts;
+      texts.reserve(events.size());
+      for (const auto* event : events) texts.emplace_back(event->timestamp);
+      return ocel_frame::shared_nonzero_offset(texts);
+    }();
     ocel_frame::Columns event_frame;
     std::map<std::string, std::vector<const OcelEvent*>> events_by_activity;
     for (const auto* event : events) {
@@ -1042,12 +1071,16 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
       const auto& rows = events_by_activity[activity];
       ocel_frame::Columns table_values;
       for (const auto* event : rows) table_values.observe_row(event->attributes);
-      const auto columns = table_columns_for(event_frame, table_values);
+      const auto columns =
+          table_columns_for(event_frame, table_values, log.event_type_attributes, activity);
       Statement statement(db, create_table(table, {"ocel_id", "ocel_time", "ocel:activity"},
                                            columns, {}));
       for (const auto* event : rows) {
         bind_text(statement.get(), 1, event->id);
-        bind_text(statement.get(), 2, pandas_time(event->timestamp));
+        bind_text(statement.get(), 2,
+                  event_offset ? ocel_frame::offset_timestamp_text(event->timestamp, ' ',
+                                                                   event_offset, std::nullopt)
+                               : pandas_time(event->timestamp));
         bind_text(statement.get(), 3, event->activity);
         bind_type_attributes(statement.get(), 4, columns, event->attributes);
         step_done(db, statement.get());
@@ -1087,7 +1120,8 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
         frame.observe(change->field, change->value);
         table_values.observe(change->field, change->value);
       }
-      const auto columns = table_columns_for(frame, table_values);
+      const auto columns =
+          table_columns_for(frame, table_values, log.object_type_attributes, type);
       const std::vector<std::string> trailing =
           has_changes ? std::vector<std::string>{"ocel_changed_field", "ocel_time"}
                       : std::vector<std::string>{};

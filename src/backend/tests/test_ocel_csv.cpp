@@ -455,6 +455,199 @@ void writes_naive_json_and_xml_timestamps_as_utc() {
   assert(standard_text.find("time=\"2024-01-01T00:00:00\"") != std::string::npos);
 }
 
+// pm4py.read_ocel_csv keeps a "+02:00" column as datetime64[us, UTC+02:00]
+// and the XML writers print its wall clock: "+02:00" in OCEL 2.0 XML, the
+// wall clock labelled "Z" in OCEL 1.0 XML (observed black-box). Times that
+// do not share one offset stay UTC (the reference refuses to read them).
+void writes_offset_csv_wall_clock_in_xml() {
+  const auto log = minera::parse_ocel_csv(
+      "ocel:eid,ocel:timestamp,ocel:activity,d,ocel:type:order\n"
+      "e1,2024-01-01 10:00:00+02:00,A,2024-05-01 10:00:00+02:00,['o1']\n"
+      "e2,2024-01-01 11:30:00+02:00,B,x,\"['o1', 'o2']\"\n");
+  minera::OcelXmlExportOptions standard;
+  standard.format = minera::OcelXmlFormat::kStandard;
+  standard.allow_lossy = true;
+  const auto xml2 = minera::serialize_ocel_xml(log, standard);
+  assert(xml2.find("time=\"2024-01-01T10:00:00+02:00\"") != std::string::npos);
+  assert(xml2.find("time=\"2024-01-01T11:30:00+02:00\"") != std::string::npos);
+  // A text attribute stays text.
+  assert(xml2.find(">2024-05-01 10:00:00+02:00</attribute>") != std::string::npos);
+  minera::OcelXmlExportOptions classic;
+  classic.allow_lossy = true;
+  const auto xml1 = minera::serialize_ocel_xml(log, classic);
+  assert(xml1.find("<date key=\"timestamp\" value=\"2024-01-01T10:00:00Z\"/>") != std::string::npos);
+  assert(xml1.find("<date key=\"timestamp\" value=\"2024-01-01T11:30:00Z\"/>") != std::string::npos);
+  assert(minera::serialize_ocel_csv(log).find("e1,2024-01-01 10:00:00+02:00,A") != std::string::npos);
+  const auto mixed = minera::parse_ocel_csv(
+      "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order\n"
+      "e1,2024-01-01 10:00:00+02:00,A,['o1']\n"
+      "e2,2024-01-01 11:30:00Z,B,['o1']\n");
+  assert(minera::serialize_ocel_xml(mixed, standard).find("time=\"2024-01-01T08:00:00+00:00\"") !=
+         std::string::npos);
+}
+
+// Date-typed attribute values: pm4py.read_ocel2_json, read_ocel2_xml and
+// read_ocel_xml convert them to UTC timestamps (the wall clock, its offset
+// dropped; a naive text is UTC), while read_ocel_json, read_ocel2_sqlite and
+// read_ocel_csv keep the text. The reference writers print a datetime64
+// column as OCEL 2.0 XML "2024-02-01T08:30:00+00:00", OCEL 1.0 XML <date>
+// "...Z", CSV and SQLite "2024-02-01 08:30:00+00:00" (observed black-box on
+// the same fixture).
+void date_attributes_read_as_reference() {
+  const std::string standard_json =
+      R"({"objectTypes":[{"name":"order","attributes":[{"name":"od","type":"date"},{"name":"p","type":"string"}]}],)"
+      R"("eventTypes":[{"name":"A","attributes":[{"name":"d","type":"date"},{"name":"s","type":"string"}]}],)"
+      R"("objects":[{"id":"o1","type":"order","attributes":[{"name":"od","value":"2024-03-01T10:00:00+02:00","time":"1970-01-01T00:00:00Z"},)"
+      R"({"name":"p","value":"2024-03-01T10:00:00+02:00","time":"1970-01-01T00:00:00Z"},{"name":"od","value":"2024-03-05","time":"2024-01-05T12:00:00Z"}]},)"
+      R"({"id":"o2","type":"order","attributes":[{"name":"od","value":"notadate","time":"1970-01-01T00:00:00Z"}]}],)"
+      R"("events":[{"id":"e1","type":"A","time":"2024-01-01T00:00:00Z","attributes":[{"name":"d","value":"2024-02-01T08:30:00+02:00"},{"name":"s","value":"2024-02-01"}],)"
+      R"("relationships":[{"objectId":"o1","qualifier":"q1"},{"objectId":"o2","qualifier":"q2"}]},)"
+      R"({"id":"e2","type":"A","time":"2024-01-02T00:00:00Z","attributes":[{"name":"d","value":"2024-02-02T08:30:00.123456"}],"relationships":[{"objectId":"o1","qualifier":"q"}]}]})";
+  const auto log = minera::parse_ocel_json(standard_json);
+  const auto text = [](const minera::OcelValue& value) { return std::get<std::string>(value); };
+  assert(text(log.events[0].attributes[0].value) == "2024-02-01T08:30:00Z");
+  assert(text(log.events[0].attributes[1].value) == "2024-02-01");  // a string attribute
+  assert(text(log.events[1].attributes[0].value) == "2024-02-02T08:30:00.123456Z");
+  assert(text(log.objects[0].attributes[0].value) == "2024-03-01T10:00:00Z");
+  assert(text(log.objects[0].attributes[1].value) == "2024-03-01T10:00:00+02:00");
+  assert(text(log.objects[1].attributes[0].value) == "notadate");  // kept, as the reference keeps it
+  assert(log.object_changes.size() == 1 &&
+         text(log.object_changes[0].value) == "2024-03-05T00:00:00+00:00");
+
+  minera::OcelXmlExportOptions standard;
+  standard.format = minera::OcelXmlFormat::kStandard;
+  standard.allow_lossy = true;
+  const auto xml2 = minera::serialize_ocel_xml(log, standard);
+  assert(xml2.find(">2024-02-01T08:30:00+00:00</attribute>") != std::string::npos);
+  assert(xml2.find(">2024-02-02T08:30:00.123456+00:00</attribute>") != std::string::npos);
+  assert(xml2.find(">2024-03-05T00:00:00+00:00</attribute>") != std::string::npos);
+  minera::OcelXmlExportOptions classic;
+  classic.allow_lossy = true;
+  const auto xml1 = minera::serialize_ocel_xml(log, classic);
+  assert(xml1.find("<date key=\"d\" value=\"2024-02-01T08:30:00Z\"/>") != std::string::npos);
+  assert(xml1.find("<date key=\"od\" value=\"2024-03-01T10:00:00Z\"/>") != std::string::npos);
+  assert(xml1.find("<string key=\"s\" value=\"2024-02-01\"/>") != std::string::npos);
+  minera::OcelCsvExportOptions csv_options;
+  csv_options.allow_lossy = true;
+  const auto csv = minera::serialize_ocel_csv(log, csv_options);
+  assert(csv.find(",2024-02-01 08:30:00+00:00,2024-02-01,") != std::string::npos);
+  assert(csv.find(",2024-02-02 08:30:00.123456+00:00,,") != std::string::npos);
+  assert(minera::serialize_ocel_objects_csv(log, csv_options)
+             .find("o1,order,2024-03-01 10:00:00+00:00,") != std::string::npos);
+
+  // Both XML readers convert too, and read back what the writers wrote
+  // (without the unreadable value, which both reference XML readers refuse).
+  minera::OcelXmlImportOptions xml_options;
+  auto readable = log;
+  readable.objects[1].attributes.clear();
+  const auto readable_xml2 = minera::serialize_ocel_xml(readable, standard);
+  const auto readable_xml1 = minera::serialize_ocel_xml(readable, classic);
+  for (const auto* written : {&readable_xml2, &readable_xml1}) {
+    const auto back = minera::parse_ocel_xml(*written, xml_options);
+    const auto& value = back.events[0].attributes[0].value;
+    assert(text(value) == "2024-02-01T08:30:00+00:00" || text(value) == "2024-02-01T08:30:00Z");
+  }
+  const auto classic_xml = std::string(
+      "<log><events><event><string key=\"id\" value=\"e1\"/><date key=\"timestamp\" "
+      "value=\"2024-01-01T00:00:00Z\"/><string key=\"activity\" value=\"A\"/><list key=\"omap\">"
+      "<string key=\"object-id\" value=\"o1\"/></list><list key=\"vmap\">"
+      "<date key=\"d\" value=\"DATE\"/></list></event></events>"
+      "<objects><object><string key=\"id\" value=\"o1\"/><string key=\"type\" value=\"order\"/>"
+      "<list key=\"ovmap\"/></object></objects></log>");
+  const auto with = [&](std::string value) {
+    auto document = classic_xml;
+    document.replace(document.find("DATE"), 4, value);
+    return document;
+  };
+  const auto offset = minera::parse_ocel_xml(with("2024-02-01T08:30:00+02:00"), xml_options);
+  assert(text(offset.events[0].attributes[0].value) == "2024-02-01T08:30:00Z");
+  assert(offset.event_type_attributes.at("A").at("d") == "date");
+  bool refused = false;
+  try {
+    (void)minera::parse_ocel_xml(with("notadate"), xml_options);
+  } catch (const std::invalid_argument& error) {
+    refused = std::string(error.what()) == "Invalid isoformat string: 'notadate'";
+  }
+  assert(refused);
+  auto bad_standard = readable_xml2;
+  bad_standard.replace(bad_standard.find(">2024-02-01T08:30:00+00:00<"), 27, ">notadate<");
+  refused = false;
+  try {
+    (void)minera::parse_ocel_xml(bad_standard, xml_options);
+  } catch (const std::invalid_argument& error) {
+    refused = std::string(error.what()) == "String does not contain a date: notadate";
+  }
+  assert(refused);
+
+  // read_ocel_json and read_ocel_csv keep date texts.
+  const auto classic_json = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:timestamp":"2024-01-01T00:00:00Z","ocel:activity":"A",)"
+      R"("ocel:vmap":{"d":"2024-02-01T08:30:00+02:00"},"ocel:omap":["o1"]}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}},"ocel:eventTypes":{"A":{"d":"date"}}})");
+  assert(text(classic_json.events[0].attributes[0].value) == "2024-02-01T08:30:00+02:00");
+}
+
+// Round M review items (observed black-box on pm4py 2.7.22):
+// "ocel:"-prefixed attributes are dropped by write_ocel2_json and
+// write_ocel2_xml, and write_ocel_xml writes them on the event without the
+// prefix (outside vmap) and drops them from objects; write_ocel2_json writes
+// only the changes of a field without a static value; read_ocel_json stores
+// an object change time with an offset as its UTC instant; a naive basic ISO
+// event time reads as "...Z".
+void reference_writer_shapes() {
+  const auto log = minera::parse_ocel_csv(
+      "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:A,,ocel:foo,ocel:type:,ocel:eid,ocel:oid\n"
+      "e1,go,2020-01-01 00:00:00,\"['o1']\",v,w,\"['o3']\",e9,zz\n",
+      "ocel:oid,ocel:type,ocel:oid.1,q\no1,A,x1,z1\n");
+  const auto standard_json = minera::serialize_ocel_json(log, minera::OcelJsonFormat::kStandard);
+  assert(standard_json.find("ocel:foo") == std::string::npos &&
+         standard_json.find("ocel:eid.1") == std::string::npos &&
+         standard_json.find("ocel:oid.1") == std::string::npos &&
+         standard_json.find("\"ocel:oid\"") == std::string::npos);
+  assert(standard_json.find(R"({"name":"Unnamed: 4","value":"v"})") != std::string::npos);
+  minera::OcelXmlExportOptions standard;
+  standard.format = minera::OcelXmlFormat::kStandard;
+  standard.allow_lossy = true;
+  const auto xml2 = minera::serialize_ocel_xml(log, standard);
+  assert(xml2.find("ocel:") == std::string::npos);
+  assert(xml2.find("name=\"Unnamed: 4\"") != std::string::npos);
+  minera::OcelXmlExportOptions classic;
+  classic.allow_lossy = true;
+  const auto xml1 = minera::serialize_ocel_xml(log, classic);
+  assert(xml1.find("      <string key=\"foo\" value=\"w\"/>\n      <string key=\"eid.1\" value=\"e9\"/>\n"
+                   "      <string key=\"oid\" value=\"zz\"/>\n      <list key=\"omap\">") != std::string::npos);
+  assert(xml1.find("ocel:") == std::string::npos && xml1.find("x1") == std::string::npos);
+  assert(xml1.find("<string key=\"attribute-name\" value=\"Unnamed: 4\"/>") != std::string::npos);
+  // Declared: classic JSON, the native transport, keeps them in vmap.
+  assert(minera::serialize_ocel_json(log).find("\"ocel:foo\":\"w\"") != std::string::npos);
+
+  const auto changes_only = minera::parse_ocel_json(
+      R"({"objectTypes":[{"name":"A","attributes":[{"name":"p","type":"string"}]},{"name":"B","attributes":[]}],)"
+      R"("eventTypes":[{"name":"go","attributes":[]}],)"
+      R"("objects":[{"id":"o1","type":"A","attributes":[{"name":"p","time":"1970-01-01T00:00:00Z","value":"x"},)"
+      R"({"name":"p","time":"2020-01-03T00:00:00Z","value":"y"}]},{"id":"o1","type":"B","attributes":[]}],)"
+      R"("events":[{"id":"e1","type":"go","time":"2020-01-01T10:00:00Z","attributes":[],"relationships":[{"objectId":"o1","qualifier":""}]}]})");
+  const auto written = minera::serialize_ocel_json(changes_only, minera::OcelJsonFormat::kStandard);
+  assert(written.find("\"value\":null") == std::string::npos);
+  assert(written.find(R"("attributes":[{"name":"p","value":"y","time":"2020-01-03T00:00:00Z"}])") !=
+         std::string::npos);
+
+  const auto classic_changes = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:activity":"go","ocel:timestamp":"2020-01-01T00:00:00","ocel:vmap":{},"ocel:omap":["o1"]}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"A","ocel:ovmap":{"a":1}}},)"
+      R"("ocel:objectChanges":[{"ocel:oid":"o1","ocel:timestamp":"2020-01-02T00:00:00","ocel:field":"a","a":5},)"
+      R"({"ocel:oid":"o1","ocel:timestamp":"2020-01-03T00:00:00+01:00","ocel:field":"a","a":6}]})");
+  assert(classic_changes.object_changes.size() == 2);
+  assert(classic_changes.object_changes[0].timestamp == "2020-01-02T00:00:00+00:00");
+  assert(classic_changes.object_changes[1].timestamp == "2020-01-02T23:00:00+00:00");
+
+  const auto basic = minera::parse_ocel_json(
+      R"({"objectTypes":[{"name":"A","attributes":[]}],"eventTypes":[{"name":"go","attributes":[]}],)"
+      R"("objects":[{"id":"o1","type":"A"}],"events":[{"id":"e1","type":"go","time":"20200101T100000",)"
+      R"("relationships":[{"objectId":"o1","qualifier":""}]}]})");
+  assert(basic.events[0].timestamp == "2020-01-01T10:00:00Z");
+}
+
 }  // namespace
 
 int main() {
@@ -507,6 +700,9 @@ int main() {
   names_columns_as_pandas();
   refuses_an_id_under_two_types();
   writes_naive_json_and_xml_timestamps_as_utc();
+  writes_offset_csv_wall_clock_in_xml();
+  date_attributes_read_as_reference();
+  reference_writer_shapes();
 
   minera::OcelCsvImportOptions custom_import;
   custom_import.event_id_column = "event_id";

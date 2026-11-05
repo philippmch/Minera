@@ -584,8 +584,36 @@ void parses_relation_table_with_extra_columns() {
     }
     assert(threw);
   };
-  expect_bad("lhs,rhs,lhs\nL1,R1,duplicate\n");
-  expect_bad(",rhs\nL1,R1\n");
+  // Header names follow pandas.read_csv (checked black-box against
+  // read_csv + case_relations.apply): an empty name is "Unnamed: <i>", a
+  // repeat "name.1", ... past names the header already holds, and the
+  // selectors take the first column of a name.
+  {
+    std::istringstream named(
+        ",lhs,rhs,note,note,lhs,note.1, \n0,L1,R1,x,y,Q,z,w\n");
+    const auto table = parse_case_relations_table_csv(named);
+    assert((table.columns ==
+            std::vector<std::string>{"Unnamed: 0", "lhs", "rhs", "note",
+                                     "note.2", "lhs.1", "note.1",
+                                     "Unnamed: 7"}));
+    assert(table.rows.size() == 1 && table.rows[0][5]->value == "Q");
+    std::istringstream selected(
+        "case_id_LEFT,case_id_RIGHT,case_id_LEFT,,x\nL1,R1,Q,w,v\n");
+    assert((parse_case_relations_csv(selected) ==
+            std::vector<CaseRelation>{{"L1", "R1"}}));
+    std::istringstream unnamed(",case_id_LEFT,,case_id_RIGHT\n0,L1,u,R1\n");
+    assert((parse_case_relations_csv(unnamed) ==
+            std::vector<CaseRelation>{{"L1", "R1"}}));
+    std::istringstream renamed_only("case_id_LEFT,case_id_LEFT\nL1,R1\n");
+    bool missing = false;
+    try {
+      (void)parse_case_relations_csv(renamed_only);
+    } catch (const std::invalid_argument& error) {
+      missing = std::string(error.what()).find("missing column case_id_RIGHT") !=
+                std::string::npos;
+    }
+    assert(missing);
+  }
   expect_bad("lhs,rhs,extra\nL1,R1\n");
   expect_bad("lhs,rhs\n\"L1,R1\n");
 }

@@ -30,9 +30,7 @@ import {
   type MineraExport,
   type OcelDiscoveryResult,
 } from "./types";
-import { computeLayout } from "./layout";
-import { computeTreeLayout } from "./tree-layout";
-import { computePetriLayout } from "./petri-layout";
+import { modelLayouts } from "./model-layouts";
 import { Sidebar, type SidebarDataset } from "./components/Sidebar";
 import { CommandPalette, paletteCommands } from "./components/CommandPalette";
 import { Advanced, PageHeader } from "./components/ui";
@@ -632,48 +630,12 @@ export default function App() {
     };
   }, []);
 
-  // fontsReady re-runs the layout once the display fonts are available, so
-  // node boxes are sized against the real text metrics.
-  const layout = useMemo(
-    () => (data ? computeLayout(data) : null),
-    [data, fontsReady],
-  );
-
-  const treeLayout = useMemo(
-    () =>
-      data && data.process_tree
-        ? computeTreeLayout(data.process_tree, data)
-        : null,
-    [data, fontsReady],
-  );
-
-  const petriLayout = useMemo(
-    () =>
-      data && data.petri_net ? computePetriLayout(data.petri_net, data) : null,
-    [data, fontsReady],
-  );
-
-  const inductivePetriLayout = useMemo(
-    () =>
-      data && data.inductive_petri_net
-        ? computePetriLayout(data.inductive_petri_net, data)
-        : null,
-    [data, fontsReady],
-  );
-
-  const heuristicPetriLayout = useMemo(
-    () =>
-      data && data.heuristic_petri_net
-        ? computePetriLayout(data.heuristic_petri_net, data)
-        : null,
-    [data, fontsReady],
-  );
-
-  const powlPetriLayout = useMemo(
-    () =>
-      data && data.powl_petri_net
-        ? computePetriLayout(data.powl_petri_net, data)
-        : null,
+  // The diagrams are laid out on demand, by the view that shows them, and kept for
+  // this analysis: a view that shows none of them never pays for their layout. fontsReady
+  // starts them over once the display fonts are available, so node boxes are sized
+  // against the real text metrics.
+  const layouts = useMemo(
+    () => (data ? modelLayouts(data) : null),
     [data, fontsReady],
   );
 
@@ -963,7 +925,7 @@ export default function App() {
       ocelWorkspace,
     );
   }
-  if (!data || !layout) {
+  if (!data || !layouts) {
     return (
       <>
         <Landing
@@ -982,7 +944,6 @@ export default function App() {
       </>
     );
   }
-  const maxEdge = maxEdgeCount(data);
   // The body, header and sidebar all follow the view actually shown: a re-mine
   // (applyFilters keeps the tab) can remove the view that was selected.
   const view = viewById(shownTab);
@@ -1027,11 +988,7 @@ export default function App() {
             onOpenPlayout={loadFile}
             key={cacheGeneration.current}
             data={data}
-            treeLayout={treeLayout}
-            petriLayout={petriLayout}
-            inductivePetriLayout={inductivePetriLayout}
-            heuristicPetriLayout={heuristicPetriLayout}
-            powlPetriLayout={powlPetriLayout}
+            layouts={layouts}
             canExportPnml={sourceAvailable}
             playoutSourceId={sourceAvailable && source ? source.source_id : undefined}
             mining={mining}
@@ -1092,9 +1049,9 @@ export default function App() {
         <main className="layout">
           <Advanced className="dfg-discovery-section" title="Configure DFG discovery" hint="Statistical and causal DFG variants on the current source"><DfgDiscovery key={cacheGeneration.current} data={data} available={sourceAvailable} mining={mining}/></Advanced>
           <ProcessMap
-            layout={layout}
+            layout={layouts.processMap()}
             threshold={threshold}
-            maxEdgeCount={maxEdge}
+            maxEdgeCount={maxEdgeCount(data)}
             onThresholdChange={setThreshold}
             selection={selection}
             caseDuration={data.performance?.case_duration}
