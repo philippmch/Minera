@@ -19,6 +19,7 @@
 
 #include "minera/timestamp.hpp"
 #include "full_double.hpp"
+#include "performance_arithmetic.hpp"
 
 namespace minera {
 namespace {
@@ -817,7 +818,31 @@ double flow_time(const TableRow& source, const TableRow& target,
   if (!options.business_hours) {
     if (polars && source.completion_exact && target_start_exact)
       return polars_whole_seconds(*source.completion_exact, *target_start_exact);
+    // pandas: Timedelta.total_seconds of the exact gap; epoch doubles would
+    // lose the sub-second part.
+    if (source.completion_exact && target_start_exact &&
+        target_start_exact->seconds - source.completion_exact->seconds <= 9000000000LL &&
+        target_start_exact->seconds - source.completion_exact->seconds >= -9000000000LL)
+      return detail::dataframe_gap_seconds(
+          (target_start_exact->seconds - source.completion_exact->seconds) * 1000000000LL +
+          (static_cast<std::int64_t>(target_start_exact->nanoseconds) -
+           source.completion_exact->nanoseconds));
     return target_start - *source.completion;
+  }
+  if (!polars) {
+    // pandas holds UTC timestamps (a CSV offset is converted), so business
+    // time runs on the UTC clock, from exact microseconds.
+    const auto source_utc = source.completion_text
+                                ? parse_timestamp_microseconds(*source.completion_text)
+                                : std::nullopt;
+    const auto target_utc = target_start_text
+                                ? parse_timestamp_microseconds(*target_start_text)
+                                : std::nullopt;
+    if (!source_utc || !target_utc)
+      throw std::invalid_argument(
+          "DFG table discovery: invalid business-hours timestamp");
+    return detail::business_elapsed_microseconds(*source_utc, *target_utc,
+                                                 normalized_slots(options));
   }
   const auto source_local = source.completion_text
                                 ? local_wall_timestamp(*source.completion_text)
@@ -832,10 +857,24 @@ double flow_time(const TableRow& source, const TableRow& target,
                           normalized_slots(options));
 }
 
-DfgPerformanceSummary summarize_values(const std::vector<double>& values) {
+DfgPerformanceSummary summarize_values(const std::vector<double>& values,
+                                       bool polars) {
   DfgPerformanceSummary result;
   result.count = static_cast<std::uint64_t>(values.size());
   if (values.empty()) return result;
+  if (!polars) {
+    // pandas groupby: Kahan sum, sum / count mean, Welford deviation (NaN
+    // for one observation).
+    const auto aggregates = detail::aggregate_performance(values, true);
+    result.sum = aggregates.sum;
+    result.mean = aggregates.mean;
+    result.median = aggregates.median;
+    result.minimum = aggregates.minimum;
+    result.maximum = aggregates.maximum;
+    result.standard_deviation = values.size() > 1
+        ? aggregates.stdev : std::numeric_limits<double>::quiet_NaN();
+    return result;
+  }
   result.sum = std::accumulate(values.begin(), values.end(), 0.0);
   result.mean = result.sum / static_cast<double>(values.size());
   const auto [minimum, maximum] =
@@ -881,7 +920,7 @@ DfgPerformanceValue select_value(const DfgPerformanceSummary& summary,
 DfgPerformanceStatistics performance_statistics(
     const std::vector<double>& observations, const DfgTableOptions& options,
     bool polars) {
-  auto summary = summarize_values(observations);
+  auto summary = summarize_values(observations, polars);
   // Polars aggregates skip null durations and give null (NaN here) for an
   // edge with none left (except sum, which is 0), and a null sample
   // deviation for one observation.
@@ -956,6 +995,12 @@ DfgTableResult discover_table_dfg(const EventTable& table,
       computes_duration ||
       (backend == DfgTableBackend::kPandas && timestamp_sort_requested);
   const bool polars = backend == DfgTableBackend::kPolars;
+  if (!polars && (computes_duration || options.measure == DfgTableMeasure::kCost) &&
+      !options.custom_aggregation &&
+      options.performance_aggregation == DfgPerformanceAggregation::kStandardDeviation)
+    // The eager adapter calls a groupby method named after the key, and
+    // pandas has no SeriesGroupBy.stdev.
+    throw std::invalid_argument("'SeriesGroupBy' object has no attribute 'stdev'");
   if (polars && (computes_duration || options.measure == DfgTableMeasure::kCost) &&
       !options.custom_aggregation) {
     // The lazy adapter names its aggregations differently from the eager one.

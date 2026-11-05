@@ -35,6 +35,26 @@ minera::Ocel sample() {
 int main() {
   const auto log = sample();
 
+  // filter_ocel_event_attribute / filter_ocel_object_attribute select on the
+  // frame's id, activity and type columns too (pm4py 2.7.22, fuzzed on 320
+  // OCELs through /api/ocel/filter): native matched no event before.
+  const auto by_activity = minera::filter_ocel_event_attribute(
+      log, "ocel:activity", {std::string("ship"), std::string("inspect")});
+  assert(by_activity.events.size() == 2 && by_activity.events[0].id == "e2" &&
+         by_activity.events[1].id == "e3" && by_activity.objects.size() == 2);
+  const auto not_create = minera::filter_ocel_event_attribute(
+      log, "ocel:activity", {std::string("create")}, false);
+  assert(not_create.events.size() == 2 && not_create.events[0].id == "e2");
+  const auto by_id = minera::filter_ocel_event_attribute(log, "ocel:eid", {std::string("e1")});
+  assert(by_id.events.size() == 1 && by_id.relations.size() == 2);
+  // Strings never equal the datetime timestamp column.
+  assert(minera::filter_ocel_event_attribute(
+             log, "ocel:timestamp", {std::string("2024-01-01T00:00:00Z")}).events.empty());
+  const auto typed_items = minera::filter_ocel_object_attribute(log, "ocel:type", {std::string("Item")});
+  assert(typed_items.objects.size() == 2 && typed_items.objects[0].id == "o2" && typed_items.events.size() == 2);
+  const auto not_o1 = minera::filter_ocel_object_attribute(log, "ocel:oid", {std::string("o1")}, false);
+  assert(not_o1.objects.size() == 2 && not_o1.objects[0].id == "o2");
+
   const auto web = minera::filter_ocel_event_attribute(
       log, "channel", {std::string("web")});
   assert(web.events.size() == 2 && web.objects.size() == 3);

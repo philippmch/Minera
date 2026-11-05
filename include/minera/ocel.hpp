@@ -84,6 +84,13 @@ struct Ocel {
   std::vector<OcelE2eRelation> e2e;
   std::vector<OcelObjectChange> object_changes;
   std::map<std::string, OcelValue> globals;
+  // Whether the event and object global scopes are declared, even when they
+  // hold nothing: an OCEL 2.0 JSON read declares both (empty), a classic JSON
+  // read declares the scopes its file lists, every other reader none. The
+  // OCEL 1.0 JSON and XML writers fill an undeclared scope with the
+  // reference defaults (ocel:activity / ocel:type "__INVALID__").
+  bool global_event_scope = false;
+  bool global_object_scope = false;
   OcelTypeCatalog event_type_attributes;
   OcelTypeCatalog object_type_attributes;
   OcelTableColumns table_columns;
@@ -193,6 +200,12 @@ void convert_ocel_date_value(OcelValue& value, OcelTimestampReader reader, bool 
 // a log without relations ends up with no events and no objects. Order,
 // multiplicity and the type catalogs are kept.
 void drop_unrelated_ocel_entries(Ocel& log);
+
+// True for a global the reference OCEL 1.0 writers produce by themselves: the
+// "__INVALID__" defaults of the event and object scopes and the computed log
+// scope (version, ordering, attribute names, object types). Writers that have
+// no global scopes drop these without loss.
+bool ocel_reference_generated_global(std::string_view key, const OcelValue& value);
 
 // Reads OCEL 1.0 or 2.0 JSON as the reference readers do, including the
 // drop of unrelated events and objects, unless the document carries

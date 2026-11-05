@@ -13,6 +13,7 @@
 #include "minera/conformance.hpp"
 #include "minera/petri_reference_arcs.hpp"
 #include "minera/timestamp.hpp"
+#include "performance_arithmetic.hpp"
 
 namespace minera {
 
@@ -42,6 +43,21 @@ std::string_view selected_timestamp(const Event& event,
   // A missing custom timestamp makes this event untimed. Do not substitute the
   // canonical event timestamp: callers may deliberately select a sparse field.
   return {};
+}
+
+// An event's exact instant; unparseable text or an instant beyond the range
+// of int64-nanosecond gaps is untimed.
+std::optional<ParsedExactTimestamp> exact_instant(std::string_view text) {
+  auto instant = parse_timestamp_exact(text);
+  if (instant && (instant->seconds > 4000000000LL || instant->seconds < -4000000000LL))
+    instant.reset();
+  return instant;
+}
+
+std::optional<std::int64_t> nanoseconds_between(const ParsedExactTimestamp& start,
+                                                const ParsedExactTimestamp& end) {
+  return (end.seconds - start.seconds) * 1000000000LL +
+         (static_cast<std::int64_t>(end.nanoseconds) - start.nanoseconds);
 }
 
 // Wait samples a place keeps one by one; beyond this, further samples are
@@ -132,7 +148,7 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
 
   // Token instants resting in each place, oldest first. nullopt marks a token
   // produced by an untimed event; it moves like any other but yields no wait.
-  std::vector<std::deque<std::pair<std::optional<double>, std::uint64_t>>> tokens(
+  std::vector<std::deque<std::pair<std::optional<ParsedExactTimestamp>, std::uint64_t>>> tokens(
       net.place_count());
 
   for (std::size_t i = 0; i < log.traces.size(); ++i) {
@@ -146,15 +162,15 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
     // The initial token carries the case's first instant, so its wait in the
     // source measures delay before the process starts moving, not the span
     // back to some epoch.
-    std::optional<double> first_instant;
+    std::optional<ParsedExactTimestamp> first_instant;
     for (const auto& event : trace.events) {
-      first_instant = parse_timestamp(
+      first_instant = exact_instant(
           selected_timestamp(event, timestamp_attribute));
       if (first_instant) break;
     }
-    std::optional<double> last_instant;
+    std::optional<ParsedExactTimestamp> last_instant;
     for (auto it = trace.events.rbegin(); it != trace.events.rend(); ++it) {
-      last_instant = parse_timestamp(
+      last_instant = exact_instant(
           selected_timestamp(*it, timestamp_attribute));
       if (last_instant) break;
     }
@@ -165,7 +181,7 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
     // for the routing to the sink, at the case's last instant.
     for (std::size_t step = 0; step < sequence->size(); ++step) {
       const auto now = step < trace.events.size()
-                           ? parse_timestamp(selected_timestamp(
+                           ? exact_instant(selected_timestamp(
                                  trace.events[step], timestamp_attribute))
                            : last_instant;
       for (const auto transition_id : (*sequence)[step]) {
@@ -189,13 +205,17 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
             const std::uint64_t taken = remaining < TokenInteger(count)
                                             ? static_cast<std::uint64_t>(remaining)
                                             : count;
-            if (produced && now && *now >= *produced) {
+            const auto gap = produced && now ? nanoseconds_between(*produced, *now)
+                                             : std::optional<std::int64_t>{};
+            if (gap && *gap >= 0) {
               // One wait sample per token; samples that would not fit one by
-              // one are kept as a run instead.
+              // one are kept as a run instead. The wait is the exact gap
+              // (timedelta seconds), not a difference of epoch doubles.
+              const double wait = detail::eventlog_gap_seconds(*gap);
               if (wait_runs[place].empty() && taken <= kExpandedWaitSamples - waits[place].size())
-                waits[place].insert(waits[place].end(), taken, *now - *produced);
+                waits[place].insert(waits[place].end(), taken, wait);
               else
-                wait_runs[place].emplace_back(*now - *produced, taken);
+                wait_runs[place].emplace_back(wait, taken);
             }
             remaining = remaining - TokenInteger(taken);
             count -= taken;

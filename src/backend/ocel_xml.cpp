@@ -435,10 +435,9 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
     if (c.object_id.empty() || c.field.empty()) throw std::invalid_argument("invalid OCEL XML object change");
     log.object_changes.push_back(std::move(c));
     }
-  for (const auto& g : root.children) if (local(g.name) == "global") {
-    const std::string scope = attr_or(g, "scope"); std::vector<OcelAttribute> vals; append_values(g, vals, reject_lists);
-    for (auto& a : vals) log.globals[(scope.empty() ? std::string("global") : "ocel:global-" + scope) + "." + a.key] = std::move(a.value);
-  }
+  // read_ocel_xml reads no <global> scope (observed black-box: a custom event
+  // global and the written defaults both read as no globals), so the OCEL 1.0
+  // writers then fill the event and object scopes with their defaults.
 }
 
 void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
@@ -850,7 +849,12 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
     for (const auto& [key, value] : log.globals)
       if (key.starts_with(prefix))
         write_classic_value(entries, value, std::string_view(key).substr(prefix.size()), "    ");
-    const auto text = entries.str();
+    auto text = entries.str();
+    // write_ocel_xml fills an undeclared scope with its default.
+    if (text.empty() && scope == "event" && !log.global_event_scope)
+      text = "    <string key=\"ocel:activity\" value=\"__INVALID__\"/>\n";
+    if (text.empty() && scope == "object" && !log.global_object_scope)
+      text = "    <string key=\"ocel:type\" value=\"__INVALID__\"/>\n";
     if (text.empty()) out << "  <global scope=\"" << scope << "\"/>\n";
     else out << "  <global scope=\"" << scope << "\">\n" << text << "  </global>\n";
   }

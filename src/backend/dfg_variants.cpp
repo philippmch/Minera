@@ -13,6 +13,7 @@
 #include "minera/timestamp.hpp"
 
 #include "business_hours.hpp"
+#include "performance_arithmetic.hpp"
 
 namespace minera {
 namespace {
@@ -71,31 +72,18 @@ const std::string& timestamp_value(const Event& event,
       options.timestamp_attribute + "'");
 }
 
-DfgPerformanceSummary summarize(const std::vector<double>& values) {
+DfgPerformanceSummary summarize(const std::vector<double>& values,
+                                bool dataframe) {
   DfgPerformanceSummary result;
   result.count = static_cast<std::uint64_t>(values.size());
   if (values.empty()) return result;
-  result.sum = std::accumulate(values.begin(), values.end(), 0.0);
-  result.mean = result.sum / static_cast<double>(values.size());
-  const auto [minimum, maximum] =
-      std::minmax_element(values.begin(), values.end());
-  result.minimum = *minimum;
-  result.maximum = *maximum;
-  auto ordered = values;
-  std::sort(ordered.begin(), ordered.end());
-  const std::size_t middle = ordered.size() / 2;
-  result.median = ordered.size() % 2 == 0
-                      ? (ordered[middle - 1] + ordered[middle]) / 2.0
-                      : ordered[middle];
-  if (values.size() > 1) {
-    double squared = 0.0;
-    for (const double value : values) {
-      const double delta = value - result.mean;
-      squared += delta * delta;
-    }
-    result.standard_deviation =
-        std::sqrt(squared / static_cast<double>(values.size() - 1));
-  }
+  const auto aggregates = detail::aggregate_performance(values, dataframe);
+  result.sum = aggregates.sum;
+  result.mean = aggregates.mean;
+  result.median = aggregates.median;
+  result.minimum = aggregates.minimum;
+  result.maximum = aggregates.maximum;
+  result.standard_deviation = aggregates.stdev;
   return result;
 }
 
@@ -319,13 +307,16 @@ DfgTripleFrequency discover_frequency_triples(
 DfgPerformance discover_performance_dfg(
     const EventLog& log, const DfgStatisticalOptions& options) {
   std::map<DfgActivityPair, std::vector<double>> observations;
+  const bool dataframe = options.dataframe_arithmetic;
   const auto slots = options.use_business_hours
                          ? detail::normalize_business_hour_slots(
                                options.business_hour_slots,
                                options.business_hour_slots_explicit,
                                "DFG discovery")
                          : std::vector<BusinessHourSlot>{};
-  for (const auto& trace : log.traces) {
+  for (const auto* trace_pointer :
+       detail::traces_in_aggregation_order(log, dataframe)) {
+    const auto& trace = *trace_pointer;
     for (std::size_t i = 1; i < trace.events.size(); ++i) {
       const auto& previous = trace.events[i - 1];
       const auto& current = trace.events[i];
@@ -335,17 +326,30 @@ DfgPerformance discover_performance_dfg(
       const auto current_start_text = start_timestamp(current, options);
       const double current_start =
           required_timestamp(current_start_text, "start");
-      double elapsed = current_start - previous_complete;
+      // Gaps come from the exact instants: epoch doubles would lose the
+      // sub-second part (one microsecond in 2026 reads 9.5e-7).
+      const auto gap = detail::exact_gap_nanoseconds(previous_complete_text,
+                                                     current_start_text);
+      double elapsed = gap ? detail::gap_seconds(*gap, dataframe)
+                           : current_start - previous_complete;
       if (options.use_business_hours) {
-        const auto previous_local =
-            detail::local_wall_timestamp(previous_complete_text);
-        const auto current_local = detail::local_wall_timestamp(current_start_text);
-        if (!previous_local || !current_local) {
+        // The DataFrame path counts business time on the UTC clock (a CSV
+        // offset is converted; an XES import already holds wall-clock UTC);
+        // an EventLog uses each timestamp's own wall clock.
+        const auto previous_wall =
+            dataframe ? parse_timestamp_microseconds(previous_complete_text)
+                      : detail::local_wall_timestamp_microseconds(
+                            previous_complete_text);
+        const auto current_wall =
+            dataframe ? parse_timestamp_microseconds(current_start_text)
+                      : detail::local_wall_timestamp_microseconds(
+                            current_start_text);
+        if (!previous_wall || !current_wall) {
           throw std::invalid_argument(
               "DFG discovery: invalid business-hours timestamp");
         }
-        elapsed = detail::business_elapsed_seconds(*previous_local, *current_local,
-                                                   slots);
+        elapsed = detail::business_elapsed_microseconds(*previous_wall,
+                                                        *current_wall, slots);
       }
       observations[{activity_value(previous, options),
                     activity_value(current, options)}].push_back(
@@ -355,7 +359,7 @@ DfgPerformance discover_performance_dfg(
 
   DfgPerformance result;
   for (auto& [pair, values] : observations) {
-    const auto summary = summarize(values);
+    const auto summary = summarize(values, dataframe);
     result.emplace(pair,
                    DfgPerformanceStatistics{
                        summary, values,

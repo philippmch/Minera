@@ -160,14 +160,18 @@ Cases project_log(const EventLog& log, const std::set<std::string>& requested,
   for (const auto& trace : log.traces) {
     CaseEvents events;
     events.reserve(trace.events.size());
+    // input_order is the event's import position (0 for the first CSV row);
+    // a trace whose events all carry 0 never recorded it, and then the
+    // position in the trace stands in for it.
+    const bool ordered = std::any_of(trace.events.begin(), trace.events.end(),
+                                     [](const Event& event) { return event.input_order != 0; });
     for (std::size_t position = 0; position < trace.events.size(); ++position) {
       const auto& event = trace.events[position];
       const auto* activity = event_attribute(event, options.activity_attribute);
       if (!is_requested(requested, activity)) continue;
       const double instant =
           selected_timestamp(event, options.timestamp_attribute);
-      const std::size_t source_order =
-          event.input_order == 0 ? position : event.input_order;
+      const std::size_t source_order = ordered ? event.input_order : position;
       events.push_back(
           {selected_case(trace, event, options.case_id_attribute), *activity,
            instant, source_order});

@@ -66,9 +66,17 @@ struct PerformanceMetrics {
 // Events whose timestamps do not parse are skipped, so a partially-timed or
 // untimed log yields empty stats rather than an error. The `graph` supplies the
 // activity ids the edge timings are reported against.
+//
+// Every gap is taken from the exact instants, and the edge statistics follow
+// pm4py.discover_performance_dfg: `dataframe_arithmetic` false is its EventLog
+// path (gaps floored to the microsecond, total = Python sum, mean =
+// statistics.mean), true its DataFrame path, which CSV and XES imports take
+// (pandas Timedelta gaps, Kahan total, mean = total / count). Medians, minima
+// and maxima agree on both paths.
 [[nodiscard]] PerformanceMetrics compute_performance_metrics(
     const EventLog& log,
-    const DirectlyFollowsGraph& graph);
+    const DirectlyFollowsGraph& graph,
+    bool dataframe_arithmetic = false);
 
 // Case throughput time (first-to-last event) summarized per trace variant. The
 // returned vector is aligned to `graph.variants()` order, so entry i describes

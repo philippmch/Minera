@@ -53,7 +53,7 @@ import {
   type ConceptDriftResult,
   numberFormat,
 } from "../types";
-import { fetchDfgPlayout, fetchPlayout, fetchBasicPlayoutVisited, fetchExtensivePlayoutVisited, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
+import { fetchDfgPlayout, fetchPlayout, fetchProcessTreePlayoutDownload, fetchBasicPlayoutVisited, fetchExtensivePlayoutVisited, parseDfgCostMapInput, parseMarkingInput, comparePetriUsage, type ImportedModelCheck, type ConceptDriftOptions, type DecisionMiningOptions } from "../api";
 import {
   CONFORMANCE_METHODS,
   deviatingActivities,
@@ -578,13 +578,15 @@ function ProcessTreePlayoutPanel({ dataset, available, tree, sourceId }: { datas
   const [options, setOptions] = useState<ProcessTreePlayoutOptions>({ variant: "TOPBOTTOM", traces: 100, max_trace_cap: 1000 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const run = async () => {
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setTruncated(false);
     try {
       if (sourceId === undefined) throw new Error(PLAYOUT_NEEDS_SOURCE);
-      const xes = await fetchPlayout("process_tree", options, sourceId);
-      const blob = new Blob([xes], { type: "application/xml" });
+      const download = await fetchProcessTreePlayoutDownload(options, sourceId);
+      const blob = new Blob([download.xes], { type: "application/xml" });
       downloadBlob(blob, `${dataset.replace(/\.[^.]+$/, "")}-process_tree-playout.xes`);
+      setTruncated(download.truncated);
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   };
@@ -611,6 +613,7 @@ function ProcessTreePlayoutPanel({ dataset, available, tree, sourceId }: { datas
       {tooLong !== null && <p className="conf-inline-note" role="status" data-testid="extensive-too-long">Every trace of this tree has at least {tooLong} activities. Extensive playout on the server allows a max length of at most {SERVER_EXTENSIVE_MAX_LENGTH} (left empty, it uses the shortest trace length, {tooLong}), so no trace fits. <button type="button" className="btn-ghost" onClick={useSampling}>Use top-bottom sampling</button></p>}
       {sourceId === undefined && <p className="conf-inline-note">{PLAYOUT_NEEDS_SOURCE}</p>}
       <button className="button" disabled={busy || sourceId === undefined || (tooLong !== null && options.max_length === undefined)} onClick={() => void run()}>{busy ? "Generating…" : "Download process-tree playout"}</button>
+      {truncated && <p className="conf-inline-note" role="status" data-testid="process-tree-playout-truncated">The downloaded log is truncated: the server stopped at its word budget or at the max trace cap ({options.max_trace_cap ?? 10000} traces), so some traces of the model are missing. Lower the max length or raise the max trace cap (at most 10000) to keep more.</p>}
       {error && <p className="conf-inline-note">{error}</p>}
     </>}
   </section>;

@@ -214,6 +214,7 @@ class ReferenceExtensive {
 
   std::set<Word> run() { return play(tree_.root()); }
   [[nodiscard]] bool truncated() const { return budget_.exhausted || capped_; }
+  [[nodiscard]] bool budget_spent() const { return budget_.exhausted; }
 
  private:
   long long min_len(const ProcessTreeNode& n) {
@@ -273,21 +274,56 @@ class ReferenceExtensive {
     return max_length_ - (root_min_ - min_len(n));
   }
 
-  std::set<Word> keep(const ProcessTreeNode& n, std::set<Word> words) {
-    const long long bound = upper(n);
+  // Whether keep(n, ...) keeps a word of this length.
+  bool keeps(const ProcessTreeNode& n, std::size_t length) {
+    const auto size = static_cast<long long>(length);
     ExtensiveLength rest = root_max_;
     const auto own = max_len(n);
     rest.loops -= own.loops;
     rest.finite -= own.finite;
+    const bool short_enough = size <= upper(n);
+    const bool long_enough = rest.loops > 0 || size + rest.finite >= min_length_;
+    return short_enough && long_enough;
+  }
+
+  std::set<Word> keep(const ProcessTreeNode& n, std::set<Word> words) {
     for (auto it = words.begin(); it != words.end();) {
-      const auto size = static_cast<long long>(it->size());
-      const bool short_enough = size <= bound;
-      const bool long_enough = rest.loops > 0 || size + rest.finite >= min_length_;
-      if (short_enough && long_enough) ++it;
+      if (keeps(n, it->size())) ++it;
       else it = words.erase(it);
     }
     return words;
   }
+
+  // The reference's choice and loop nodes stop collecting words once they
+  // hold more than max_limit_num_traces kept words (so at most one more than
+  // the limit). Which words that leaves follows the reference's set order;
+  // here the first ones in generation order stay. Words past the cap mark
+  // the result truncated.
+  class WordCap {
+   public:
+    WordCap(std::size_t limit, bool& capped) : limit_(limit), capped_(capped) {}
+    // Whether `word` (kept by its node when `kept`) may join `out`; false
+    // once the cap is reached and a further new kept word arrives, which
+    // also marks the run truncated and stops the node.
+    bool admit(const std::set<Word>& out, const Word& word, bool kept) {
+      if (!kept) return true;
+      if (out.contains(word)) return true;
+      if (count_ > limit_) {
+        capped_ = true;
+        stopped_ = true;
+        return false;
+      }
+      ++count_;
+      return true;
+    }
+    [[nodiscard]] bool stopped() const { return stopped_; }
+
+   private:
+    std::size_t limit_;
+    bool& capped_;
+    std::size_t count_ = 0;
+    bool stopped_ = false;
+  };
 
   // Takes one word from the budget into `out`; false once the budget is
   // spent, so the caller stops generating.
@@ -295,28 +331,6 @@ class ReferenceExtensive {
     check_();
     if (!budget_.take()) return false;
     out.insert(std::move(word));
-    return true;
-  }
-
-  // Emits every interleaving of a and b; stops (returning false) as soon as
-  // `emit` does. Without the stop, two long words have C(|a|+|b|, |a|)
-  // interleavings to walk after the budget is spent.
-  bool interleavings(const Word& a, const Word& b, std::size_t i,
-                     std::size_t j, Word& current,
-                     const std::function<bool(const Word&)>& emit) {
-    if (i == a.size() && j == b.size()) return emit(current);
-    if (i < a.size()) {
-      current.push_back(a[i]);
-      const bool go_on = interleavings(a, b, i + 1, j, current, emit);
-      current.pop_back();
-      if (!go_on) return false;
-    }
-    if (j < b.size()) {
-      current.push_back(b[j]);
-      const bool go_on = interleavings(a, b, i, j + 1, current, emit);
-      current.pop_back();
-      if (!go_on) return false;
-    }
     return true;
   }
 
@@ -328,7 +342,15 @@ class ReferenceExtensive {
         return keep(n, {Word{tree_.activities().at(n.activity)}});
       case ProcessTreeOperator::kExclusive: {
         std::set<Word> out;
-        for (const auto& child : n.children) out.merge(play(child));
+        WordCap cap(max_traces_, capped_);
+        for (const auto& child : n.children) {
+          // Every child is played, as in the reference, even past the cap.
+          auto words = play(child);
+          for (auto& word : words) {
+            if (cap.stopped()) break;
+            if (cap.admit(out, word, true)) out.insert(std::move(word));
+          }
+        }
         return out;
       }
       case ProcessTreeOperator::kSequence: {
@@ -355,34 +377,81 @@ class ReferenceExtensive {
         return keep(n, std::move(current));
       }
       case ProcessTreeOperator::kParallel: {
+        // The reference takes one word of every child (the children's words
+        // in product order) and emits all their shuffles, choosing the next
+        // symbol from the lowest child first. It counts every shuffle it
+        // emits, repeated ones included, of combinations whose length the
+        // node keeps, and stops after max_limit_num_traces of them; the
+        // node's words are the distinct ones emitted. Which combinations
+        // come first follows its set order (declared); here the children's
+        // words go in word order.
         const long long bound = upper(n);
-        std::set<Word> current{Word{}};
-        for (const auto& child : n.children) {
-          const auto words = play(child);
-          std::set<Word> next;
-          for (const auto& left : current) {
-            if (budget_.exhausted) break;
-            for (const auto& right : words) {
-              check_();
-              if (static_cast<long long>(left.size() + right.size()) > bound) continue;
-              if (budget_.exhausted) break;
-              Word scratch;
-              if (!interleavings(left, right, 0, 0, scratch,
-                                 [&](const Word& word) { return add(next, word); }))
-                break;
+        const std::size_t k = n.children.size();
+        std::vector<std::set<Word>> played;
+        played.reserve(k);
+        for (const auto& child : n.children) played.push_back(play(child));
+        std::set<Word> out;
+        std::vector<long long> rest_min(k + 1, 0);
+        for (std::size_t i = k; i-- > 0;) {
+          if (played[i].empty()) return out;
+          rest_min[i] = rest_min[i + 1] + static_cast<long long>(
+                                              std::min_element(played[i].begin(), played[i].end(),
+                                                               [](const Word& a, const Word& b) {
+                                                                 return a.size() < b.size();
+                                                               })->size());
+        }
+        std::vector<const Word*> pick(k, nullptr);
+        std::vector<std::size_t> position(k, 0);
+        Word current;
+        std::size_t emitted = 0;
+        bool stop = false;
+        std::function<bool(std::size_t)> shuffle = [&](std::size_t total) -> bool {
+          if (current.size() == total) {
+            check_();
+            if (!budget_.take()) return false;
+            out.insert(current);
+            if (++emitted >= max_traces_) {
+              capped_ = true;
+              stop = true;
+              return false;
             }
+            return true;
           }
-          current = std::move(next);
-        }
-        auto kept = keep(n, std::move(current));
-        // The reference stops a parallel cut at max_limit_num_traces words;
-        // which words it keeps follows its set order. Here the first ones
-        // in word order are kept and the result is marked truncated.
-        if (kept.size() > max_traces_) {
-          capped_ = true;
-          kept.erase(std::next(kept.begin(), static_cast<std::ptrdiff_t>(max_traces_)), kept.end());
-        }
-        return kept;
+          for (std::size_t c = 0; c < k; ++c) {
+            if (position[c] == pick[c]->size()) continue;
+            current.push_back((*pick[c])[position[c]]);
+            ++position[c];
+            const bool go_on = shuffle(total);
+            --position[c];
+            current.pop_back();
+            if (!go_on) return false;
+          }
+          return true;
+        };
+        std::function<void(std::size_t, long long)> combine = [&](std::size_t i, long long length) {
+          if (stop || budget_.exhausted) return;
+          if (i == k) {
+            check_();
+            // A combination the node drops (too short) is not emitted; it
+            // still costs one word of the budget, as its shuffles once did.
+            if (!keeps(n, static_cast<std::size_t>(length))) {
+              (void)budget_.take();
+              return;
+            }
+            (void)shuffle(static_cast<std::size_t>(length));
+            return;
+          }
+          for (const auto& word : played[i]) {
+            if (stop || budget_.exhausted) return;
+            const long long longer = length + static_cast<long long>(word.size());
+            // Words only grow: a prefix past the node's bound is dropped early.
+            if (longer + rest_min[i + 1] > bound) continue;
+            pick[i] = &word;
+            combine(i + 1, longer);
+          }
+        };
+        combine(0, 0);
+        return out;
       }
       case ProcessTreeOperator::kLoop: {
         const long long bound = upper(n);
@@ -394,15 +463,23 @@ class ReferenceExtensive {
             (void)play(n.children[i]);
         }
         std::set<Word> out;
-        for (const auto& word : body)
-          if (static_cast<long long>(word.size()) <= bound) add(out, word);
+        WordCap cap(max_traces_, capped_);
+        for (const auto& word : body) {
+          if (static_cast<long long>(word.size()) > bound) continue;
+          if (!cap.admit(out, word, keeps(n, word.size()))) break;
+          add(out, word);
+        }
         std::set<Word> current = out;
-        for (std::size_t round = 0; round < max_loops_ && !current.empty() && !budget_.exhausted; ++round) {
+        for (std::size_t round = 0; round < max_loops_ && !current.empty() &&
+                                    !budget_.exhausted && !cap.stopped(); ++round) {
+          // Rounds go breadth first, as the reference's: every word of a
+          // round is generated (and counted against the cap) before the next.
           std::set<Word> next;
+          bool grew = false;
           for (const auto& prefix : current) {
-            if (budget_.exhausted) break;
+            if (budget_.exhausted || cap.stopped()) break;
             for (const auto& r : redo) {
-              if (budget_.exhausted) break;
+              if (budget_.exhausted || cap.stopped()) break;
               for (const auto& d : body) {
                 check_();
                 if (static_cast<long long>(prefix.size() + r.size() + d.size()) > bound) continue;
@@ -410,13 +487,14 @@ class ReferenceExtensive {
                 Word joined = prefix;
                 joined.insert(joined.end(), r.begin(), r.end());
                 joined.insert(joined.end(), d.begin(), d.end());
+                if (!cap.admit(out, joined, keeps(n, joined.size()))) break;
+                Word word = joined;
                 if (!add(next, std::move(joined))) break;
+                grew = out.insert(std::move(word)).second || grew;
               }
             }
           }
           // A round that adds no new word leaves the later rounds unchanged.
-          bool grew = false;
-          for (const auto& word : next) grew = out.insert(word).second || grew;
           if (!grew) break;
           current = std::move(next);
         }
@@ -783,6 +861,18 @@ ProcessTreePlayoutResult process_tree_playout_result(
     });
     ProcessTreePlayoutResult result;
     result.truncated = engine.truncated();
+    if (result.truncated && !engine.budget_spent()) {
+      // A capped node left words out, but they may not reach the result
+      // (a loop that never runs its redo, a length bound further up): the
+      // result is truncated only when the uncapped language differs, or
+      // when that run itself spends the word budget.
+      ReferenceExtensive uncapped(tree, options.min_length, options.max_length,
+                                  options.max_loop_occurrences,
+                                  std::numeric_limits<std::size_t>::max(), 250000,
+                                  options.cancelled);
+      const auto full = uncapped.run();
+      result.truncated = uncapped.budget_spent() || full != unique;
+    }
     // Declared extension: a cap on the final words (a server bound).
     if (options.output_trace_cap != 0 && words.size() > options.output_trace_cap) {
       words.resize(options.output_trace_cap);

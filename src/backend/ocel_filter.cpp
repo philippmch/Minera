@@ -371,8 +371,13 @@ Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key
   }
   Ocel filtered = log;
   filter_records(filtered.events, [&](const OcelEvent& event) {
+    // The id and activity are columns of the reference events frame, so
+    // filter_ocel_event_attribute selects on them (ocel:timestamp holds
+    // datetimes, which no given value equals, as a missing key matches none).
     const bool matches =
-        has_attribute_value(event.attributes, attribute_key, values);
+        attribute_key == "ocel:eid" ? contains_value(values, OcelValue(event.id))
+        : attribute_key == "ocel:activity" ? contains_value(values, OcelValue(event.activity))
+        : has_attribute_value(event.attributes, attribute_key, values);
     return positive ? matches : !matches;
   });
   return propagate_event_filter(std::move(filtered));
@@ -611,8 +616,11 @@ Ocel filter_ocel_object_attribute(const Ocel& log,
   }
   Ocel filtered = log;
   filter_records(filtered.objects, [&](const OcelObject& object) {
+    // The id and type are columns of the reference objects frame.
     const bool matches =
-        has_attribute_value(object.attributes, attribute_key, values);
+        attribute_key == "ocel:oid" ? contains_value(values, OcelValue(object.id))
+        : attribute_key == "ocel:type" ? contains_value(values, OcelValue(object.type))
+        : has_attribute_value(object.attributes, attribute_key, values);
     return positive ? matches : !matches;
   });
   return propagate_object_filter(std::move(filtered));

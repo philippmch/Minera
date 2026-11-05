@@ -4590,6 +4590,48 @@ private:
   RequestReadDeadline::State previous_;
 };
 
+// MINERA PATCH: Content-Length is 1*DIGIT (RFC 9110 8.6). A recipient may
+// accept a comma-separated list of one repeated value ("5, 5", left by an
+// intermediary that merged duplicate fields); only responses (the client
+// side) take that list here, a request must send the single value.
+inline bool content_length_is_decimal(const std::string &value,
+                                      bool allow_repeated_list) {
+  const auto decimal = [](const std::string &text) {
+    return !text.empty() &&
+           text.find_first_not_of("0123456789") == std::string::npos;
+  };
+  if (decimal(value)) { return true; }
+  if (!allow_repeated_list || value.find(',') == std::string::npos) {
+    return false;
+  }
+  std::string first;
+  size_t begin = 0;
+  while (begin <= value.size()) {
+    auto end = value.find(',', begin);
+    if (end == std::string::npos) { end = value.size(); }
+    auto item = value.substr(begin, end - begin);
+    const auto from = item.find_first_not_of(" \t");
+    const auto to = item.find_last_not_of(" \t");
+    item = from == std::string::npos ? std::string()
+                                     : item.substr(from, to - from + 1);
+    if (!decimal(item) || (!first.empty() && item != first)) { return false; }
+    first = item;
+    begin = end + 1;
+  }
+  return true;
+}
+
+// MINERA PATCH: see Server::process_request.
+inline bool has_ambiguous_framing(const Headers &headers) {
+  const auto lengths = headers.equal_range("Content-Length");
+  if (lengths.first == lengths.second) { return false; }
+  if (headers.find("Transfer-Encoding") != headers.end()) { return true; }
+  for (auto it = lengths.first; it != lengths.second; ++it) {
+    if (it->second != lengths.first->second) { return true; }
+  }
+  return false;
+}
+
 template <typename T>
 bool read_content(Stream &strm, T &x, size_t payload_max_length, int &status,
                   Progress progress, ContentReceiverWithProgress receiver,
@@ -4616,10 +4658,12 @@ bool read_content(Stream &strm, T &x, size_t payload_max_length, int &status,
           ret = read_content_chunked(strm, x, bounded);
         } else if (!has_header(x.headers, "Content-Length")) {
           ret = read_content_without_length(strm, bounded);
-        } else if (std::string(get_header_value(x.headers, "Content-Length", "", 0))
-                       .find_first_not_of("0123456789") != std::string::npos) {
-          // MINERA PATCH: a Content-Length that is not a decimal number (a
-          // negative one included) is malformed (400), not oversized (413).
+        } else if (!content_length_is_decimal(
+                       get_header_value(x.headers, "Content-Length", "", 0),
+                       std::is_same<T, Response>::value)) {
+          // MINERA PATCH: a Content-Length that is not a decimal number (an
+          // empty or negative one included) is malformed (400), not
+          // oversized (413). A response may repeat one value as a list.
           ret = false;
         } else {
           auto len = get_header_value_u64(x.headers, "Content-Length", 0, 0);
@@ -7427,6 +7471,20 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
   req.local_port = local_port;
   req.set_header("LOCAL_ADDR", req.local_addr);
   req.set_header("LOCAL_PORT", std::to_string(req.local_port));
+
+  // MINERA PATCH: ambiguous body framing (RFC 9112 6.1, 6.3): Transfer-Encoding
+  // with Content-Length, Content-Length fields that disagree, or one that is
+  // not a decimal number is refused with 400 and the connection closed,
+  // whatever the method, so no intermediary can read a different body
+  // boundary than the server.
+  if (detail::has_ambiguous_framing(req.headers) ||
+      (req.has_header("Content-Length") &&
+       !detail::content_length_is_decimal(req.get_header_value("Content-Length"),
+                                          false))) {
+    res.status = StatusCode::BadRequest_400;
+    connection_closed = true;
+    return write_response(strm, true, req, res);
+  }
 
   // MINERA PATCH: Range is defined for GET only (RFC 9110 14.2); any other
   // method ignores it and gets the whole representation.

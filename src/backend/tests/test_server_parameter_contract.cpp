@@ -466,6 +466,51 @@ std::string describe(const RawResponse& response) {
 
 }  // namespace
 
+// The vendored client (the server's runtime calls) reads a response whose
+// Content-Length repeats one value as a list ("5, 5", RFC 9112 6.3) and
+// refuses a list of different values or an empty one.
+void client_content_length_list_contract() {
+  const auto answer = [](const std::string& length) {
+    const int listener = ::socket(AF_INET, SOCK_STREAM, 0);
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_port = 0;
+    if (::bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof address) != 0 ||
+        ::listen(listener, 1) != 0)
+      std::abort();
+    socklen_t size = sizeof address;
+    ::getsockname(listener, reinterpret_cast<sockaddr*>(&address), &size);
+    const int port = ntohs(address.sin_port);
+    std::thread peer([listener, length] {
+      const int fd = ::accept(listener, nullptr, nullptr);
+      if (fd >= 0) {
+        char buffer[4096];
+        (void)::recv(fd, buffer, sizeof buffer, 0);
+        send_all(fd, "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " +
+                         length + "\r\n\r\nhello");
+        ::shutdown(fd, SHUT_RDWR);
+        ::close(fd);
+      }
+      ::close(listener);
+    });
+    httplib::Client client("127.0.0.1", port);
+    client.set_read_timeout(5, 0);
+    auto result = client.Get("/");
+    peer.join();
+    return result;
+  };
+  for (const std::string list : {"5, 5", "5,5", "5 ,\t5"}) {
+    const auto result = answer(list);
+    check(result && result->status == 200 && result->body == "hello",
+          "the client reads a response with Content-Length \"" + list + "\": " + describe(result));
+  }
+  for (const std::string list : {"5, 6", "", "5,"}) {
+    const auto result = answer(list);
+    check(!result, "the client refuses a response with Content-Length \"" + list + "\": " + describe(result));
+  }
+}
+
 int main(int argc, char** argv) {
   if (argc != 3) {
     std::cerr << "usage: " << argv[0] << " <minera_server> <log.csv>\n";
@@ -474,6 +519,7 @@ int main(int argc, char** argv) {
   // A send to a server that already closed the connection must fail, not
   // end the test (MSG_NOSIGNAL is Linux-only).
   ::signal(SIGPIPE, SIG_IGN);
+  client_content_length_list_contract();
   std::ifstream log_file(argv[2], std::ios::binary);
   std::stringstream log_stream;
   log_stream << log_file.rdbuf();
@@ -713,6 +759,21 @@ int main(int argc, char** argv) {
     result = client.Get("/api/playout?miner=dfg&dfg_playout_variant=performance&dfg_playout_max_steps=5000&dfg_playout_traces=1000");
     check(result && result->status == 400 && contains(result, "event budget"),
           "an explicit over-budget DFG count is rejected: " + describe(result));
+    // EXTENSIVE process-tree playout cut at max_trace_cap says so: the JSON
+    // answer in "truncated", the XES download in X-Minera-Truncated.
+    result = client.Get("/api/playout?miner=process_tree&variant=EXTENSIVE&max_length=6&max_trace_cap=1&return_set_strings=true");
+    check(result && result->status == 200 &&
+              result->get_header_value("X-Minera-Truncated") ==
+                  (contains(result, "\"truncated\":true") ? "true" : "false"),
+          "process-tree playout JSON and its truncation header agree: " + describe(result));
+    const bool tree_truncated = result && result->get_header_value("X-Minera-Truncated") == "true";
+    result = client.Get("/api/playout?miner=process_tree&variant=EXTENSIVE&max_length=6&max_trace_cap=1");
+    check(result && result->status == 200 && count(result->body, "<trace>") <= 1 &&
+              result->get_header_value("X-Minera-Truncated") == (tree_truncated ? "true" : "false"),
+          "the process-tree playout XES download carries X-Minera-Truncated: " + describe(result));
+    result = client.Get("/api/playout?miner=process_tree&variant=EXTENSIVE&max_length=0");
+    check(result && result->status == 200 && result->get_header_value("X-Minera-Truncated") == "false",
+          "an untruncated process-tree playout says X-Minera-Truncated: false: " + describe(result));
     // Item 9: an empty number is not zero.
     result = client.Get("/api/playout?miner=inductive&start=");
     check(result && result->status == 400, "empty start is rejected: " + describe(result));
@@ -1515,6 +1576,42 @@ int main(int argc, char** argv) {
                 bad_length.body.find("Content-Length header must be") != std::string::npos,
             "Content-Length " + length + " gets 400 with the error envelope: " + describe(bad_length));
     }
+    // Ambiguous framing (RFC 9112): an empty Content-Length, Content-Length
+    // fields that disagree and Transfer-Encoding next to Content-Length get
+    // 400 with the envelope and a closed connection, whatever the method.
+    const auto framing = [&](const std::string& request_line, const std::string& headers,
+                             const std::string& body) {
+      const int fd = connect_loopback(port);
+      if (fd < 0) return RawResponse{};
+      send_all(fd, request_line + " HTTP/1.1\r\n" + host_header(port) + headers + "\r\n" + body);
+      return read_raw_response(fd);
+    };
+    const struct {
+      std::string line, headers, body, message;
+    } ambiguous[] = {
+        {"POST /api/mine", "Content-Type: text/csv\r\nContent-Length: \r\n", "",
+         "Content-Length header must be"},
+        {"POST /api/mine", "Content-Type: text/csv\r\nContent-Length: 2\r\nContent-Length: 30\r\n",
+         "{}", "Content-Length headers that disagree"},
+        {"POST /api/mine", "Content-Type: text/csv\r\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\n",
+         "0\r\n\r\n", "both Transfer-Encoding and Content-Length"},
+        {"GET /api/version", "Transfer-Encoding: chunked\r\nContent-Length: 30\r\n", "0\r\n\r\n",
+         "both Transfer-Encoding and Content-Length"},
+        {"GET /api/version", "Content-Length: 1x\r\n", "", "Content-Length header must be"},
+    };
+    for (const auto& item : ambiguous) {
+      const auto refused = framing(item.line, item.headers, item.body);
+      check(refused.status == 400 && valid_json(refused.body) &&
+                refused.body.find(item.message) != std::string::npos &&
+                refused.header("Connection") == "close",
+            item.line + " with ambiguous framing gets 400, the envelope and a close: " +
+                describe(refused));
+    }
+    // Repeating one Content-Length value is not ambiguous: the request is
+    // framed and routed (POST to a GET route answers 405).
+    const auto repeated = framing("POST /api/version",
+                                  "Connection: close\r\nContent-Length: 2\r\nContent-Length: 2\r\n", "{}");
+    check(repeated.status == 405, "a repeated equal Content-Length is accepted: " + describe(repeated));
   }
 
   // Address-space limits (ulimit -v, prlimit --as). The default mining memory

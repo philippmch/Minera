@@ -132,6 +132,8 @@ std::set<std::pair<std::string, std::string>> interaction_edges(
 Ocel filter_objects(const Ocel& log, const ObjectIds& selected) {
   Ocel result;
   result.globals = log.globals;
+  result.global_event_scope = log.global_event_scope;
+  result.global_object_scope = log.global_object_scope;
   result.event_type_attributes = log.event_type_attributes;
   result.object_type_attributes = log.object_type_attributes;
   std::set<std::string> event_ids;
@@ -173,6 +175,8 @@ std::vector<Ocel> filter_disjoint_objects(const Ocel& log,
   for (std::size_t index = 0; index < sets.size(); ++index) {
     auto& part = result[index];
     part.globals = log.globals;
+    part.global_event_scope = log.global_event_scope;
+    part.global_object_scope = log.global_object_scope;
     part.event_type_attributes = log.event_type_attributes;
     part.object_type_attributes = log.object_type_attributes;
     for (const auto& id : sets[index]) owner.emplace(id, index);

@@ -5119,6 +5119,10 @@ export function dfgPlayoutQuery(options: DfgPlayoutOptions = {}): string {
 }
 
 async function fetchPlayoutText(path: string, init?: RequestInit): Promise<string> {
+  return (await fetchPlayoutResponse(path, init)).text();
+}
+
+async function fetchPlayoutResponse(path: string, init?: RequestInit): Promise<Response> {
   let response: Response;
   try {
     response = init === undefined ? await importedModelFetch(path) : await importedModelFetch(path, init);
@@ -5134,7 +5138,20 @@ async function fetchPlayoutText(path: string, init?: RequestInit): Promise<strin
     }
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
-  return response.text();
+  return response;
+}
+
+/** Process-tree playout XES and whether the server cut it short: the
+ * X-Minera-Truncated header is true when the EXTENSIVE word budget or the
+ * max_trace_cap output bound left words out (the XES itself has no flag). */
+export async function fetchProcessTreePlayoutDownload(
+  options: ProcessTreePlayoutOptions = {}, sourceId?: string,
+): Promise<{ xes: string; truncated: boolean }> {
+  const query = processTreePlayoutQuery(options);
+  const response = await fetchPlayoutResponse(
+    playoutUrl(`/api/playout?miner=process_tree${query ? `&${query}` : ""}`, sourceId),
+  );
+  return { xes: await response.text(), truncated: response.headers.get("X-Minera-Truncated") === "true" };
 }
 
 /** Fetches Monte Carlo XES from the playout endpoint with an explicit mode. */

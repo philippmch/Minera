@@ -68,8 +68,9 @@ struct PlayoutOptions {
 struct StochasticPlayoutOptions {
   // Number of cases to simulate.
   std::size_t traces = 1000;
-  // Firing cap per case.  Silent firings count towards this cap, preventing
-  // an unsound net from livelocking without adding visible events.
+  // Visible-event cap per case, as the reference's maxTraceLength: silent
+  // firings do not count (a silent livelock raises after
+  // max(1,000,000, 1000 * (max_steps + 1)) firings).
   std::size_t max_steps = 1000;
   // Seed for transition choices; equal options reproduce equal logs.
   std::uint64_t seed = 1;
@@ -82,7 +83,9 @@ struct StochasticPlayoutOptions {
   // default to 1.0; all-zero weights among enabled transitions are sampled
   // uniformly.
   std::vector<double> transition_weights;
-  // Stop a case as soon as the exact workflow final marking is reached.
+  // In the exact final marking "stop" is one more option of weight 1.0
+  // beside the enabled transitions, as in the reference (a case there with
+  // nothing enabled stops). False never stops a case at the final marking.
   bool stop_at_final = true;
   // Optional explicit marker vectors. An empty vector keeps the workflow
   // source/sink defaults; a supplied vector must match the place count.
@@ -92,7 +95,9 @@ struct StochasticPlayoutOptions {
   // below performs fitting directly; this flag keeps the request in one
   // option object while preserving the original aggregate fields.
   bool fit_from_log = false;
-  // Bound deterministic replay states per source trace while fitting.
+  // Retained for compatibility and still validated (it must be positive):
+  // source-log fitting now uses the reference token replay of
+  // fit_stochastic_map_with_report, which has its own bounds.
   std::size_t fitting_max_states = 200000;
   // Opt-in structured output for stochastic playout adapters. The ordinary
   // stochastic_playout API continues to return an EventLog. Appended to keep
@@ -146,7 +151,8 @@ struct PlayoutVisitedResult {
 // Samples enabled Petri-net transitions according to transition_weights and
 // returns one synthetic trace per requested case.  Input arc multiplicity is
 // honoured when determining enablement (and when firing), silent transitions
-// route tokens without appending events, and max_steps bounds every firing.
+// route tokens without appending events, and max_steps bounds the visible
+// events of a case.
 [[nodiscard]] EventLog stochastic_playout(
     const PetriNet& net, const StochasticPlayoutOptions& options = {});
 
@@ -161,11 +167,12 @@ struct PlayoutVisitedResult {
     const PetriNet& net, const EventLog& source_log,
     const StochasticPlayoutOptions& options = {});
 
-// Replays a source log deterministically against the net and returns one
-// activation weight per transition. Silent transitions and duplicate labels
-// are resolved by stable transition order. Reachable transitions touched but
-// not selected receive zero; transitions never reached retain the neutral
-// weight one. Explicit transition weights always take precedence below.
+// Fits one activation weight per transition as the reference stochastic
+// playout does with a source log: the activation/enabling ratios of
+// get_map_from_log_and_net (fit_stochastic_map_with_report, token replay on
+// the playout markings). Enabled transitions never selected receive zero;
+// transitions the map lacks keep the reference's weight one. Explicit
+// transition weights always take precedence below.
 [[nodiscard]] std::vector<double> fit_stochastic_transition_weights(
     const PetriNet& net, const EventLog& source_log,
     const StochasticPlayoutOptions& options);

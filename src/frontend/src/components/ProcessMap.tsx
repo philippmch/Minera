@@ -196,7 +196,7 @@ export function ProcessMap({
                       y={edge.label.y + 3}
                     >
                       {showTime
-                        ? formatDuration(edge.duration ?? 0)
+                        ? formatDuration(edge.duration)
                         : numberFormat.format(edge.count)}
                     </text>
                   )}

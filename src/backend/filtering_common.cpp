@@ -576,8 +576,15 @@ FilteringNumericKde get_kde_numeric_attribute(const std::vector<double>& values,
   const double high = data.back();
   const std::int64_t count = std::max<std::int64_t>(floor_div(graph_points, 2), 2);
   auto grid = linspace(low, high, count);
-  if ((low > 0 && high > 0) || (low < 0 && high < 0)) {
-    const auto geometric = geomspace(low, high, count);
+  // One-signed data adds a geometric grid whose end nearest zero is held at
+  // least 1e-6 away from it, as the reference's
+  // geomspace(max(min, 1e-6), max) and -geomspace(|min|, max(|max|, 1e-6)).
+  if (low > 0 && high > 0) {
+    const auto geometric = geomspace(std::max(low, 1e-6), high, count);
+    grid.insert(grid.end(), geometric.begin(), geometric.end());
+  } else if (low < 0 && high < 0) {
+    auto geometric = geomspace(std::fabs(low), std::max(std::fabs(high), 1e-6), count);
+    for (auto& value : geometric) value = -value;
     grid.insert(grid.end(), geometric.begin(), geometric.end());
   }
   std::sort(grid.begin(), grid.end());

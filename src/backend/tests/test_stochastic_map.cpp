@@ -249,12 +249,60 @@ void public_statistics_regressions() {
   assert(fixed_fit.transitions[0].activation_weight == 1);
 }
 
+// Reference statistics (pm4py 2.7.22 get_map_from_log_and_net and
+// single_element_statistics, fuzzed black-box): the marking drops a place
+// whose count falls to zero or below, and a firing that leaves no place
+// listed ends the trace: that firing is counted (enabled and activated) but
+// its performance is not, and later firings are not counted at all. A zero
+// initial key keeps the marking listed until a firing consumes from it.
+void empty_marking_ends_trace_statistics() {
+  PetriNet net;
+  const auto source = net.add_place();
+  const auto other = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"c"});
+  net.add_transition(0, {source}, {});  // consumes the only token
+  // Reference: c (enabled 1, activated 1, performance []) for "c c".
+  const auto stopped = fit_stochastic_map_with_report(events({{"c", 0}, {"c", 5}}), net);
+  assert(stopped.statistics.size() == 1 && stopped.statistics[0].activations == 1 &&
+         stopped.statistics[0].enablings == 1 && stopped.statistics[0].performance.empty());
+  // An explicit zero-token key keeps the marking listed: (2, 2, [0]).
+  StochasticMapFitOptions keyed;
+  keyed.replay.initial_marking = {1, 0, 0};
+  keyed.replay.initial_marking_keys = {true, true, false};
+  const auto listed = fit_stochastic_map_with_report(events({{"c", 0}, {"c", 5}}), net, keyed);
+  assert(listed.statistics[0].activations == 2 && listed.statistics[0].enablings == 2 &&
+         listed.statistics[0].performance == std::vector<double>({0}));
+  (void)other;
+
+  // c consumes the start token, f only produces into the end place. "c f"
+  // stops after c; "f c" counts both firings: c 2/3, f 1/3 (native gave
+  // f 1/2 before).
+  PetriNet generator;
+  const auto start = generator.add_place();
+  const auto end = generator.add_place();
+  generator.set_source(start);
+  generator.set_sink(end);
+  generator.set_activities({"c", "f"});
+  generator.add_transition(0, {start}, {});
+  generator.add_transition(1, {}, {end});
+  auto log = events({{"c", 0}, {"f", 1}});
+  log.traces.push_back(events({{"f", 0}, {"c", 1}}).traces.front());
+  const auto fitted = fit_stochastic_map(log, generator);
+  assert(fitted.transitions.size() == 2);
+  assert(std::abs(fitted.transitions[0].activation_weight - 2.0 / 3.0) < 1e-12);
+  assert(std::abs(fitted.transitions[1].activation_weight - 1.0 / 3.0) < 1e-12);
+}
+
 }  // namespace
 
 int main() {
   exact_timestamp_regressions();
   public_distribution_regressions();
   public_statistics_regressions();
+  empty_marking_ends_trace_statistics();
   const auto net = linear_net();
   const auto log = timed_log();
 

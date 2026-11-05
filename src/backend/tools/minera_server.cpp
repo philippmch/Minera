@@ -45,6 +45,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <optional>
 #include <random>
 #include <sstream>
@@ -1035,6 +1036,20 @@ minera::DfgStatisticalVariant dfg_statistical_variant(
   return minera::DfgStatisticalVariant::kNative;
 }
 
+// pm4py.discover_performance_dfg on a CSV or XES import runs on a DataFrame;
+// only a native table source is an EventLog. Performance numbers (process
+// map, DFG performance variant) follow the matching arithmetic.
+bool dataframe_performance_source(const minera::ActiveEventSource* source) {
+  return source != nullptr && source->file().format != "table";
+}
+
+minera::DfgStatisticalOptions dfg_statistics_for_source(
+    minera::DfgStatisticalOptions options,
+    const minera::ActiveEventSource* source) {
+  options.dataframe_arithmetic = dataframe_performance_source(source);
+  return options;
+}
+
 minera::DfgVariantsAnalysis analyze_dfg_variants(
     const minera::EventLog& log,
     const std::vector<std::string>& statistical_variants,
@@ -1218,7 +1233,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         !params.dfg_causal_variants.empty()) {
       dfg_variants_analysis = analyze_dfg_variants(
           log, params.dfg_statistical_variants, params.dfg_causal_variants,
-          params.dfg_statistics);
+          dfg_statistics_for_source(params.dfg_statistics,
+                                    active_source.get()));
     }
     std::optional<minera::CorrelationVariantsAnalysis>
         correlation_variants_analysis;
@@ -1303,7 +1319,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                            inductive_net, net,
                            heuristic_net, powl_net, params.footprints);
     checkpoint();
-    const auto performance = minera::compute_performance_metrics(log, graph);
+    const auto performance = minera::compute_performance_metrics(
+        log, graph, dataframe_performance_source(active_source.get()));
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
@@ -3710,7 +3727,7 @@ void handle_dfg_discovery(const httplib::Request& request,
     if (params.dfg_statistical_variants.empty() && params.dfg_causal_variants.empty()) throw std::invalid_argument("select at least one statistical or causal DFG variant");
     auto graph = minera::discover_directly_follows_graph(require_prepared_log(*session));
     register_activity_selector_values(graph, require_prepared_log(*session), params.dfg_statistics.activity_attribute);
-    const auto variants = analyze_dfg_variants(require_prepared_log(*session), params.dfg_statistical_variants, params.dfg_causal_variants, params.dfg_statistics);
+    const auto variants = analyze_dfg_variants(require_prepared_log(*session), params.dfg_statistical_variants, params.dfg_causal_variants, dfg_statistics_for_source(params.dfg_statistics, session->active_source.get()));
     std::optional<minera::OmitAnalysisTraces> omit_traces(std::in_place, !analysis_include_traces(request));
     const auto result = minera::analysis_json(
       /* dataset */ session->dataset,
@@ -9656,6 +9673,9 @@ void handle_playout(const httplib::Request& request,
       }
       options.cancelled = connection_cancel_hook(request);
       const auto result = minera::process_tree_playout_result(tree, options);
+      // The XES download has no truncated member, so the header says it
+      // (the JSON answer carries "truncated" as well).
+      response.set_header("X-Minera-Truncated", result.truncated ? "true" : "false");
       if (options.return_set_strings) {
         response.set_content(
             minera::serialize_process_tree_playout_json(result),
@@ -11128,10 +11148,31 @@ void repair_api_json_body(httplib::Response& response) {
   repair_api_text_body(response.body, response.get_header_value("Content-Type"));
 }
 
-// Handlers answer any std::exception with 400 and its message; running out of
-// memory is the server's condition, not a malformed request.
+// Handlers answer any std::exception with 400 and its message, so the
+// exception's type is gone by the time the route wrapper sees the response.
+// The new-handler records the failed allocation on its own thread instead
+// (operator new calls it before throwing std::bad_alloc, on every standard
+// library), and the wrapper resets the record when a handler starts.
+thread_local bool t_allocation_failed = false;
+
+void record_allocation_failure() {
+  t_allocation_failed = true;
+  throw std::bad_alloc();
+}
+
+// A 400 that carries std::bad_alloc's message (whatever the standard library
+// calls it: "std::bad_alloc", MSVC's "bad allocation") after an allocation
+// of this request failed, or that is exactly that message.
+bool out_of_memory_response(const httplib::Response& response) {
+  if (response.status != 400) return false;
+  static const std::string what = std::bad_alloc().what();
+  if (response.body == error_json(what)) return true;
+  return t_allocation_failed && response.body.find(what) != std::string::npos;
+}
+
+// Running out of memory is the server's condition, not a malformed request.
 void report_out_of_memory(httplib::Response& response) {
-  if (response.status != 400 || response.body != error_json("std::bad_alloc")) return;
+  if (!out_of_memory_response(response)) return;
   response.status = 503;
   response.set_content(
       error_json("the server ran out of memory for this request; retry with a smaller input "
@@ -11143,6 +11184,7 @@ httplib::Server::Handler api_route_handler(std::string path,
                                            httplib::Server::Handler handler) {
   return [path = std::move(path), handler = std::move(handler)](
              const httplib::Request& request, httplib::Response& response) {
+    t_allocation_failed = false;
     struct RepairOnExit {
       httplib::Response& response;
       ~RepairOnExit() { try { report_out_of_memory(response); repair_api_json_body(response); } catch (...) {} }
@@ -11207,6 +11249,7 @@ void api_post(httplib::Server& server, const std::string& path,
   server.Post(path, [handler = std::move(handler)](const httplib::Request& request,
                                                    httplib::Response& response,
                                                    const httplib::ContentReader& reader) {
+    t_allocation_failed = false;
     handler(request, response, reader);
     report_out_of_memory(response);
     repair_api_json_body(response);
@@ -11247,8 +11290,13 @@ httplib::Server::HandlerResponse api_error_body(const httplib::Request& request,
               std::to_string(CPPHTTPLIB_REQUEST_URI_MAX_LENGTH) +
               "-byte limit; send long controls in the request body";
   } else if (response.status == 400 && request.has_header("Content-Length") &&
-             request.get_header_value("Content-Length").find_first_not_of("0123456789") !=
-                 std::string::npos) {
+             request.has_header("Transfer-Encoding")) {
+    message = "a request must not carry both Transfer-Encoding and Content-Length";
+  } else if (response.status == 400 && httplib::detail::has_ambiguous_framing(request.headers)) {
+    message = "the request carries Content-Length headers that disagree";
+  } else if (response.status == 400 && request.has_header("Content-Length") &&
+             !httplib::detail::content_length_is_decimal(
+                 request.get_header_value("Content-Length"), false)) {
     message = "the Content-Length header must be a non-negative decimal number";
   } else {
     message = std::string(httplib::status_message(response.status));
@@ -11320,6 +11368,9 @@ int main(int argc, char** argv) {
   mallopt(M_MMAP_THRESHOLD, 1 << 20);
 #endif
 #endif
+  // A failed allocation is recorded before std::bad_alloc is thrown, so the
+  // route wrapper can answer 503 (report_out_of_memory).
+  std::set_new_handler(record_allocation_failure);
   minera::set_analysis_trace_run_id(new_analysis_trace_run_id());
   int port = 8484;
   std::filesystem::path frontend_dir = "src/frontend/dist";

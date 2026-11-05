@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "minera/timestamp.hpp"
+#include "performance_arithmetic.hpp"
 
 namespace minera {
 namespace {
@@ -59,25 +60,59 @@ DurationStats summarize_durations(std::vector<double> durations) {
   return stats;
 }
 
+namespace {
+
+// summarize_durations with the reference performance-DFG arithmetic.
+DurationStats summarize_gaps(const std::vector<double>& durations,
+                             bool dataframe) {
+  DurationStats stats;
+  if (durations.empty()) return stats;
+  const auto aggregates = detail::aggregate_performance(durations, dataframe);
+  stats.count = durations.size();
+  stats.total = aggregates.sum;
+  stats.mean = aggregates.mean;
+  stats.median = aggregates.median;
+  stats.min = aggregates.minimum;
+  stats.max = aggregates.maximum;
+  return stats;
+}
+
+}  // namespace
+
 PerformanceMetrics compute_performance_metrics(
     const EventLog& log,
-    const DirectlyFollowsGraph& graph) {
+    const DirectlyFollowsGraph& graph,
+    bool dataframe_arithmetic) {
   std::unordered_map<std::uint64_t, std::vector<double>> edge_durations;
   std::map<std::size_t, std::vector<double>> service_durations;
   std::vector<double> case_durations;
-  std::vector<double> case_starts;
+  std::vector<ParsedExactTimestamp> case_starts;
+  const auto seconds_between = [&](const ParsedExactTimestamp& start,
+                                   const ParsedExactTimestamp& end) {
+    const std::int64_t nanoseconds =
+        (end.seconds - start.seconds) * 1000000000LL +
+        (static_cast<std::int64_t>(end.nanoseconds) - start.nanoseconds);
+    return detail::gap_seconds(nanoseconds, dataframe_arithmetic);
+  };
 
-  for (const auto& trace : log.traces) {
-    std::optional<double> previous;
+  for (const auto* trace_pointer :
+       detail::traces_in_aggregation_order(log, dataframe_arithmetic)) {
+    const auto& trace = *trace_pointer;
+    std::optional<ParsedExactTimestamp> previous;
     std::size_t previous_activity = 0;
-    std::optional<double> first;
-    std::optional<double> last;
+    std::optional<ParsedExactTimestamp> first;
+    std::optional<ParsedExactTimestamp> last;
     // Unmatched lifecycle starts per activity, paired first-in-first-out with
     // the activity's next complete (events are time-ordered within a trace).
-    std::unordered_map<std::size_t, std::deque<double>> pending_starts;
+    std::unordered_map<std::size_t, std::deque<ParsedExactTimestamp>> pending_starts;
 
     for (const auto& event : trace.events) {
-      const auto instant = parse_timestamp(event.timestamp);
+      // Instants beyond the int64-nanosecond gap range are treated as
+      // untimed, like unparseable ones.
+      auto instant = parse_timestamp_exact(event.timestamp);
+      if (instant && (instant->seconds > 9000000000LL ||
+                      instant->seconds < -9000000000LL))
+        instant.reset();
       const auto activity = graph.activity_id(event.activity);
 
       if (instant && activity) {
@@ -89,7 +124,8 @@ PerformanceMetrics compute_performance_metrics(
         if (previous) {
           // Like the reference performance DFG, a backwards step (the trace is
           // not sorted by time) counts as a zero-second gap, max(0, delta).
-          const double duration = std::max(0.0, *instant - *previous);
+          const double duration =
+              std::max(0.0, seconds_between(*previous, *instant));
           edge_durations[edge_key(previous_activity, *activity)].push_back(
               duration);
         }
@@ -103,7 +139,7 @@ PerformanceMetrics compute_performance_metrics(
           // contributes no service time, like an untimed event elsewhere.
           auto it = pending_starts.find(*activity);
           if (it != pending_starts.end() && !it->second.empty()) {
-            const double duration = *instant - it->second.front();
+            const double duration = seconds_between(it->second.front(), *instant);
             it->second.pop_front();
             if (duration >= 0.0) {
               service_durations[*activity].push_back(duration);
@@ -114,7 +150,7 @@ PerformanceMetrics compute_performance_metrics(
     }
 
     if (first && last) {
-      case_durations.push_back(*last - *first);
+      case_durations.push_back(seconds_between(*first, *last));
     }
     if (first) {
       case_starts.push_back(*first);
@@ -123,19 +159,24 @@ PerformanceMetrics compute_performance_metrics(
 
   PerformanceMetrics metrics;
   metrics.timed_traces = case_durations.size();
-  metrics.case_duration = summarize_durations(case_durations);
+  metrics.case_duration = summarize_gaps(case_durations, dataframe_arithmetic);
 
   // Case arrival rate: order the cases by start instant and summarize the
   // gaps between consecutive arrivals.
-  std::sort(case_starts.begin(), case_starts.end());
+  std::stable_sort(case_starts.begin(), case_starts.end(),
+                   [](const auto& lhs, const auto& rhs) {
+                     return lhs.seconds != rhs.seconds
+                                ? lhs.seconds < rhs.seconds
+                                : lhs.nanoseconds < rhs.nanoseconds;
+                   });
   std::vector<double> arrival_gaps;
   if (case_starts.size() > 1) {
     arrival_gaps.reserve(case_starts.size() - 1);
     for (std::size_t i = 1; i < case_starts.size(); ++i) {
-      arrival_gaps.push_back(case_starts[i] - case_starts[i - 1]);
+      arrival_gaps.push_back(seconds_between(case_starts[i - 1], case_starts[i]));
     }
   }
-  metrics.case_arrival = summarize_durations(std::move(arrival_gaps));
+  metrics.case_arrival = summarize_gaps(arrival_gaps, dataframe_arithmetic);
 
   // Emit edge timings in the graph's edge order so the two line up by index.
   metrics.edges.reserve(graph.edges().size());
@@ -145,7 +186,7 @@ PerformanceMetrics compute_performance_metrics(
     performance.target = edge.target;
     const auto it = edge_durations.find(edge_key(edge.source, edge.target));
     if (it != edge_durations.end()) {
-      performance.stats = summarize_durations(std::move(it->second));
+      performance.stats = summarize_gaps(it->second, dataframe_arithmetic);
     }
     metrics.edges.push_back(std::move(performance));
   }
@@ -155,7 +196,7 @@ PerformanceMetrics compute_performance_metrics(
   for (auto& [activity, durations] : service_durations) {
     ActivityPerformance performance;
     performance.activity = activity;
-    performance.stats = summarize_durations(std::move(durations));
+    performance.stats = summarize_gaps(durations, dataframe_arithmetic);
     metrics.activity_service.push_back(std::move(performance));
   }
 

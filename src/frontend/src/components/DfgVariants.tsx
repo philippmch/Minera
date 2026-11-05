@@ -9,7 +9,10 @@ import {
 const label = (value: string) => value.replaceAll("_", " ");
 const activity = (data: MineraExport, id: number) =>
   data.activities[id]?.name ?? `activity ${id}`;
-const seconds = (value: number) => `${numberFormat.format(value)}s`;
+// Performance values are seconds at microsecond resolution; the shared
+// three-digit numberFormat would print a 0.4 ms wait as "0s".
+const secondsFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 });
+const seconds = (value: number) => `${secondsFormat.format(value)}s`;
 
 function EdgeRows({
   data,
@@ -91,6 +94,7 @@ function StatisticalResult({
           <tr>
             <th>Source</th><th>Target</th><th className="num">Mean</th>
             <th className="num">Median</th><th className="num">Min–max</th>
+            <th className="num">Std dev</th><th className="num">Sum</th>
             <th className="num">Samples</th>
           </tr>
         </thead>
@@ -102,6 +106,8 @@ function StatisticalResult({
               <td className="num">{seconds(edge.summary.mean)}</td>
               <td className="num">{seconds(edge.summary.median)}</td>
               <td className="num">{seconds(edge.summary.min)}–{seconds(edge.summary.max)}</td>
+              <td className="num">{seconds(edge.summary.stdev)}</td>
+              <td className="num">{seconds(edge.summary.sum)}</td>
               <td className="num">{numberFormat.format(edge.summary.count)}</td>
             </tr>
           ))}

@@ -549,6 +549,9 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
   // whatever the change's own "ocel:type" says (observed black-box).
   if (const auto* ch = optional(root, "ocel:objectChanges")) { if (!ch->is_array()) throw std::invalid_argument("ocel:objectChanges must be array"); for (const auto& r : ch->array()) { const auto& rr = obj(r, "ocel:objectChanges"); OcelObjectChange c; c.object_id = str(required(rr, "ocel:oid"), "ocel:oid"); if (!types.count(c.object_id)) throw std::invalid_argument("object change references unknown object"); if (const auto* type = optional(rr, "ocel:type")) (void)str(*type, "ocel:type"); c.object_type = types[c.object_id]; c.timestamp = str(required(rr, "ocel:timestamp"), "ocel:timestamp"); c.field = str(required(rr, "ocel:field"), "ocel:field"); c.value = scalar(required(rr, c.field), c.field); log.object_changes.push_back(std::move(c)); } }
   for (const auto& category : {"ocel:global-log", "ocel:global-event", "ocel:global-object"}) if (const auto* g = optional(root, category)) { for (const auto& [key, value] : obj(*g, category)) { if (value.is_scalar()) log.globals[std::string(category) + "." + key] = scalar(value, key); } }
+  // read_ocel_json keeps the scopes as the file lists them, empty or not.
+  log.global_event_scope = optional(root, "ocel:global-event") != nullptr;
+  log.global_object_scope = optional(root, "ocel:global-object") != nullptr;
   for (const auto& r : log.o2o) if (!types.count(r.target_id)) throw std::invalid_argument("o2o relation references unknown object");
   return log;
 }
@@ -715,6 +718,9 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
                          qualifier == nullptr ? std::string{} : str(*qualifier, "qualifier")});
     }
   }
+  // read_ocel2_json declares every global scope, empty.
+  log.global_event_scope = true;
+  log.global_object_scope = true;
   if (const auto* globals = optional(root, "globals")) {
     for (const auto& [key, value] : obj(*globals, "globals")) {
       log.globals[key] = scalar(value, key);
@@ -944,6 +950,16 @@ void write_global_category(std::ostringstream& out, const Ocel& log,
   const std::string prefix = std::string(category) + ".";
   for (const auto& [key, value] : log.globals) {
     if (key.rfind(prefix, 0) == 0) values.emplace(key.substr(prefix.size()), &value);
+  }
+  // write_ocel_json fills an undeclared event or object scope with its
+  // defaults (an OCEL read from OCEL 2.0 XML, SQLite, CSV or OCEL 1.0 XML).
+  if (values.empty() && category == "ocel:global-event" && !log.global_event_scope) {
+    out << "{\"ocel:activity\":\"__INVALID__\"}";
+    return;
+  }
+  if (values.empty() && category == "ocel:global-object" && !log.global_object_scope) {
+    out << "{\"ocel:type\":\"__INVALID__\"}";
+    return;
   }
   out << '{';
   bool first = true;
@@ -1566,6 +1582,20 @@ std::string stored_timestamp_text(std::string_view text, std::int64_t microsecon
 
 }  // namespace
 
+bool ocel_reference_generated_global(std::string_view key, const OcelValue& value) {
+  const auto* text = std::get_if<std::string>(&value);
+  if (key == "ocel:global-event.ocel:activity" || key == "ocel:global-object.ocel:type")
+    return text != nullptr && *text == "__INVALID__";
+  if (key == "ocel:global-log.version" || key == "ocel:global-log.ocel:version")
+    return text != nullptr && *text == "1.0";
+  if (key == "ocel:global-log.ordering" || key == "ocel:global-log.ocel:ordering")
+    return text != nullptr && *text == "timestamp";
+  // The attribute-name and object-type lists (flattened by older readers).
+  return key == "ocel:global-log.attribute-names" || key == "ocel:global-log.object-types" ||
+         key == "ocel:global-log.ocel:attribute-names" ||
+         key == "ocel:global-log.ocel:object-types";
+}
+
 void drop_unrelated_ocel_entries(Ocel& log) {
   std::unordered_set<std::string> events;
   std::unordered_set<std::string> objects;
@@ -2138,10 +2168,16 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
       out << ",\"eventRelationships\":";
       write_e2e(out, log, true);
     }
-    if (!log.globals.empty()) {
+    // The reference writers' own globals (scope defaults, computed log
+    // scope) are left out: read_ocel2_json declares empty scopes, so the
+    // OCEL 1.0 writers then write them empty, as the reference does.
+    if (std::any_of(log.globals.begin(), log.globals.end(), [](const auto& global) {
+          return !ocel_reference_generated_global(global.first, global.second);
+        })) {
       out << ",\"globals\":{";
       first = true;
       for (const auto& [key, value] : log.globals) {
+        if (ocel_reference_generated_global(key, value)) continue;
         if (!first) out << ',';
         first = false;
         write_string(out, key);

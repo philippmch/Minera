@@ -383,7 +383,12 @@ int main() {
   assert(parsed.events.size() == 2 && parsed.objects.size() == 2);
   assert(parsed.relations.front().qualifier.empty());
   assert(parsed.o2o.empty() && parsed.e2e.empty() && parsed.object_changes.empty());
-  assert(parsed.globals.at("ocel:global-event.version") == minera::OcelValue(std::string("1")));
+  // The writer keeps the event global; read_ocel_xml reads no global scope
+  // (observed black-box), so the read declares none and holds no globals.
+  assert(classic.find("<global scope=\"event\">\n    <string key=\"version\" value=\"1\"/>") !=
+         std::string::npos);
+  assert(classic.find("<string key=\"ocel:type\" value=\"__INVALID__\"/>") != std::string::npos);
+  assert(parsed.globals.empty() && !parsed.global_event_scope && !parsed.global_object_scope);
   // Booleans are written as text, as the reference writes them; the integer
   // price sits in a column with a missing cell, a float column in the
   // reference frame, so it is written as the float 7.0.
@@ -442,7 +447,8 @@ int main() {
   assert(keyed.events.size() == 1 && keyed.events.front().activity == "create");
   assert(keyed.relations.size() == 1 && keyed.relations.front().qualifier == "owner");
   assert(std::get<std::int64_t>(keyed.events.front().attributes.front().value) == 7);
-  assert(std::get<std::string>(keyed.globals.at("ocel:global-log.version")) == "1.0");
+  // read_ocel_xml ignores the <global> scopes.
+  assert(keyed.globals.empty());
 
   const std::string standard_links = R"xml(
 <log>

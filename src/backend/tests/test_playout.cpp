@@ -528,9 +528,11 @@ void fitting_handles_duplicate_labels_unknowns_and_empty_logs() {
 
   const auto weights = minera::fit_stochastic_transition_weights(
       net, source_log({{"unknown", "a"}}));
+  // The token replay fires one of the two equal "a" transitions; the
+  // reference's choice follows its transition-set order (observed: t2).
   assert(weights[0] == 1.0);
-  assert(weights[1] == 1.0);
-  assert(weights[2] == 0.0);  // stable duplicate-label tie break
+  assert((weights[1] == 1.0 && weights[2] == 0.0) ||
+         (weights[1] == 0.0 && weights[2] == 1.0));
 
   const auto empty = minera::fit_stochastic_transition_weights(
       net, minera::EventLog{});
@@ -776,10 +778,11 @@ void inputless_transitions_are_always_enabled() {
     assert(!(trace.events.size() == 1 && trace.events[0].activity == "c"));
   }
   assert(f_first && exact_cf);
-  // The source-log fit replays with the same semantics: the reference's
-  // token replay fires f in "f c" (trace fit). Native fits activations over
-  // enablings along the replayed path; before, neither trace replayed and
-  // both weights stayed 1.
+  // The source-log fit is get_map_from_log_and_net's: activations over
+  // enablings along the token-replay path, where a firing that leaves the
+  // marking empty ends the trace's statistics. In "cf", c empties the
+  // marking, so f is counted enabled once and never activated; in "fc" both
+  // firings count. Reference: c 2/3, f 1/3 (native gave f 0.5 before).
   minera::EventLog source;
   for (const auto* words : {"cf", "fc"}) {
     minera::Trace trace;
@@ -793,7 +796,52 @@ void inputless_transitions_are_always_enabled() {
     source.traces.push_back(trace);
   }
   const auto weights = minera::fit_stochastic_transition_weights(net, source);
-  assert(std::abs(weights[0] - 2.0 / 3.0) < 1e-12 && weights[1] == 0.5);
+  assert(std::abs(weights[0] - 2.0 / 3.0) < 1e-12 &&
+         std::abs(weights[1] - 1.0 / 3.0) < 1e-12);
+}
+
+// Reference stochastic playout (pm4py 2.7.22, observed by distribution): in
+// the final marking "stop" is an option of weight 1.0 beside the enabled
+// transitions, and maxTraceLength counts visible events only.
+void stochastic_final_marking_stop_and_visible_cap() {
+  minera::PetriNet net;
+  const auto start = net.add_place();
+  const auto end = net.add_place();
+  net.set_source(start);
+  net.set_sink(end);
+  net.set_activities({"c", "f"});
+  net.add_transition(0, {start}, {end});
+  net.add_transition(1, {}, {});
+  minera::StochasticPlayoutOptions options;
+  options.traces = 20000;
+  options.max_steps = 1;
+  options.initial_marking = {0, 1};
+  options.final_marking = {0, 1};
+  // f weight 0.25 against stop 1.0: a case stops at once with probability 0.8.
+  options.transition_weights = {1.0, 0.25};
+  std::size_t empty = 0;
+  for (const auto& trace : minera::stochastic_playout(net, options).traces)
+    if (trace.events.empty()) ++empty;
+  assert(empty > 15700 && empty < 16300);
+  options.transition_weights = {1.0, 0.0};
+  for (const auto& trace : minera::stochastic_playout(net, options).traces)
+    assert(trace.events.empty());
+
+  // A silent self-loop does not use up the visible-event cap.
+  minera::PetriNet looped;
+  const auto lp0 = looped.add_place();
+  const auto lp1 = looped.add_place();
+  looped.set_source(lp0);
+  looped.set_sink(lp1);
+  looped.set_activities({"c"});
+  looped.add_transition(std::nullopt, {lp0}, {lp0});
+  looped.add_transition(0, {lp0}, {lp1});
+  minera::StochasticPlayoutOptions capped;
+  capped.traces = 500;
+  capped.max_steps = 1;
+  capped.transition_weights = {3.0, 1.0};
+  for (const auto& trace : minera::stochastic_playout(looped, capped).traces)
+    assert(trace.events.size() == 1 && trace.events.front().activity == "c");
 }
 
 int main() {
@@ -811,6 +859,7 @@ int main() {
   extensive_playout_accepts_explicit_markers();
   extensive_visited_preserves_silent_steps_and_occurrence_bound();
   inputless_transitions_are_always_enabled();
+  stochastic_final_marking_stop_and_visible_cap();
   sampled_variants_accept_explicit_markers();
   fitting_tracks_reachable_rates_and_silent_routing();
   fitting_handles_duplicate_labels_unknowns_and_empty_logs();

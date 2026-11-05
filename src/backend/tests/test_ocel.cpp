@@ -467,7 +467,60 @@ void naive_timestamps_read_as_utc_contract() {
   assert(aware.events[0].timestamp == "2024-01-01T08:00:00+00:00");
 }
 
+// Reference (pm4py 2.7.22, black-box): write_ocel_json and write_ocel_xml
+// fill an event or object global scope the OCEL does not declare with
+// {"ocel:activity": "__INVALID__"} / {"ocel:type": "__INVALID__"}. Only
+// read_ocel2_json (every scope, empty) and read_ocel_json (the scopes its
+// file lists) declare scopes; OCEL 2.0 XML, SQLite, CSV and OCEL 1.0 XML
+// reads declare none.
+void global_scope_defaults_contract() {
+  minera::Ocel log;
+  log.objects.push_back({"o1", "order", {}});
+  log.events.push_back({"e1", "A", "2024-01-01T00:00:00Z", {}});
+  log.relations.push_back({"e1", "o1", ""});
+  const auto classic = minera::serialize_ocel_json(log, minera::OcelJsonFormat::kClassic, false);
+  assert(classic.find(R"("ocel:global-event":{"ocel:activity":"__INVALID__"})") != std::string::npos);
+  assert(classic.find(R"("ocel:global-object":{"ocel:type":"__INVALID__"})") != std::string::npos);
+  // read_ocel_json keeps them; the OCEL 2.0 JSON writer leaves them out and
+  // its reader declares empty scopes, so they come back empty.
+  const auto classic_read = minera::parse_ocel_json(classic);
+  assert(classic_read.global_event_scope && classic_read.global_object_scope);
+  assert(classic_read.globals.at("ocel:global-event.ocel:activity") ==
+         minera::OcelValue(std::string("__INVALID__")));
+  const auto standard = minera::serialize_ocel_json(classic_read, minera::OcelJsonFormat::kStandard);
+  assert(standard.find("__INVALID__") == std::string::npos);
+  const auto standard_read = minera::parse_ocel_json(standard);
+  assert(standard_read.global_event_scope && standard_read.global_object_scope);
+  const auto empty_scopes = minera::serialize_ocel_json(standard_read, minera::OcelJsonFormat::kClassic, false);
+  assert(empty_scopes.find(R"("ocel:global-event":{},"ocel:global-object":{})") != std::string::npos);
+  // A file's declared empty scope stays empty; an absent one gets its default.
+  const auto one_scope = minera::parse_ocel_json(
+      R"({"ocel:global-event":{},"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"],"ocel:vmap":{}}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+  const auto one_written = minera::serialize_ocel_json(one_scope, minera::OcelJsonFormat::kClassic, false);
+  assert(one_written.find(R"("ocel:global-event":{},"ocel:global-object":{"ocel:type":"__INVALID__"})") !=
+         std::string::npos);
+  // The defaults and the computed log scope carry nothing a CSV loses: the
+  // CSV writer no longer refuses them without the loss allowance.
+  auto generated = classic_read;
+  generated.globals["ocel:global-log.ocel:version"] = std::string("1.0");
+  generated.globals["ocel:global-log.ocel:ordering"] = std::string("timestamp");
+  std::ostringstream csv;
+  minera::write_ocel_csv(csv, generated);
+  assert(csv.str().find("e1") != std::string::npos);
+  generated.globals["ocel:global-event.owner"] = std::string("x");
+  bool refused = false;
+  try {
+    std::ostringstream lossy;
+    minera::write_ocel_csv(lossy, generated);
+  } catch (const std::invalid_argument&) {
+    refused = true;
+  }
+  assert(refused);
+}
+
 int main() {
+  global_scope_defaults_contract();
   repeated_object_ids_contract();
   naive_timestamps_read_as_utc_contract();
   json_limits_contract();
@@ -585,12 +638,17 @@ int main() {
 
   const auto round =
       minera::parse_ocel_json(minera::serialize_ocel_json(log));
+  // The object scope is undeclared and empty: write_ocel_json fills it with
+  // its default, which the classic reader then keeps (declared).
+  auto round_globals = log.globals;
+  round_globals["ocel:global-object.ocel:type"] = std::string("__INVALID__");
   assert(round.events.size() == log.events.size() &&
          round.relations.size() == log.relations.size() &&
          round.o2o.size() == log.o2o.size() &&
          round.e2e.size() == log.e2e.size() &&
          round.object_changes.size() == log.object_changes.size() &&
-         round.globals == log.globals);
+         round.globals == round_globals &&
+         round.global_event_scope && round.global_object_scope);
   assert(round.o2o.back().qualifier == "contains");
   assert(round.e2e.front().source_id == "e1" &&
          round.e2e.front().target_id == "e2" &&

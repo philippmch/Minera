@@ -39,7 +39,10 @@ export function dfgDataframeActiveOptions(
   };
 }
 
-const seconds = (value: number) => `${numberFormat.format(value)}s`;
+// Durations are seconds at up to nanosecond resolution; the shared
+// three-digit numberFormat would print a 0.4 ms wait as "0s".
+const secondsFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 });
+const seconds = (value: number) => `${secondsFormat.format(value)}s`;
 
 function EventLabel({ event }: { event: DfgDataframeEvent }) {
   return (
@@ -70,6 +73,7 @@ function PerformanceRows({
             <tr>
               <th>Source</th><th>Target</th><th className="num">Mean</th>
               <th className="num">Median</th><th className="num">Min–max</th>
+              <th className="num">Std dev</th><th className="num">Sum</th>
               <th className="num">Samples</th>
             </tr>
           </thead>
@@ -81,6 +85,8 @@ function PerformanceRows({
                 <td className="num">{formatValue(edge.summary.mean)}</td>
                 <td className="num">{formatValue(edge.summary.median)}</td>
                 <td className="num">{formatValue(edge.summary.min)}–{formatValue(edge.summary.max)}</td>
+                <td className="num">{formatValue(edge.summary.stdev)}</td>
+                <td className="num">{formatValue(edge.summary.sum)}</td>
                 <td className="num">{numberFormat.format(edge.summary.count)}</td>
               </tr>
             ))}

@@ -182,7 +182,7 @@ void handle_active_source_mining(const httplib::Request& request,
   if (!params.dfg_statistical_variants.empty() || !params.dfg_causal_variants.empty())
     run("dfg_variants", "log", [&](bool& native_returned) {
       dfg_variants = analyze_dfg_variants(require_prepared_log(*session), params.dfg_statistical_variants,
-          params.dfg_causal_variants, params.dfg_statistics);
+          params.dfg_causal_variants, dfg_statistics_for_source(params.dfg_statistics, session->active_source.get()));
       native_returned = true;
       return "{\"representation\":\"analysis_presentation\"}";
     });
@@ -203,7 +203,7 @@ void handle_active_source_mining(const httplib::Request& request,
   std::optional<std::vector<minera::EventuallyFollowsEdge>> eventually;
   run("log_statistics_preparation", "log", [&](bool& native_returned) {
     const auto& log = require_prepared_log(*session); const auto& graph = require_graph(*session);
-    performance = minera::compute_performance_metrics(log, graph);
+    performance = minera::compute_performance_metrics(log, graph, dataframe_performance_source(session->active_source.get()));
     resources = minera::discover_resource_network(log);
     durations = minera::compute_variant_durations(log, graph);
     eventually = minera::discover_eventually_follows(log, graph, params.eventually_follows);

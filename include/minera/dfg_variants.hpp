@@ -156,6 +156,13 @@ struct DfgStatisticalOptions {
   // distinction required by dataframe and event-log compatibility layers.
   std::vector<BusinessHourSlot> business_hour_slots;
   bool business_hour_slots_explicit = false;
+  // Performance arithmetic of pm4py.discover_performance_dfg. false: the
+  // EventLog path (timedelta gaps floored to the microsecond, Python sum,
+  // statistics.mean/stdev, business time on each timestamp's own wall clock).
+  // true: the DataFrame path a CSV or XES import takes (Timedelta gaps to the
+  // nanosecond, Kahan sum, sum/count mean, Welford deviation, business time
+  // on the UTC clock).
+  bool dataframe_arithmetic = false;
   // Accepted for compatibility with table adapters. The pinned calculation
   // does not consult this opaque calendar value.
   std::any workcalendar;

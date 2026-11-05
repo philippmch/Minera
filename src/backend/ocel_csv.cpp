@@ -304,8 +304,12 @@ std::map<std::string, const OcelEvent*> validate_events(const Ocel& log) {
 void check_lossy_fields(const Ocel& log, const OcelCsvExportOptions& options,
                         bool has_object_table) {
   if (options.allow_lossy) return;
-  if (!log.o2o.empty() || !log.e2e.empty() || !log.object_changes.empty() ||
-      !log.globals.empty()) {
+  // The reference OCEL 1.0 writers' own globals (scope defaults, computed log
+  // scope) carry nothing a CSV loses.
+  const bool globals = std::any_of(log.globals.begin(), log.globals.end(), [](const auto& global) {
+    return !ocel_reference_generated_global(global.first, global.second);
+  });
+  if (!log.o2o.empty() || !log.e2e.empty() || !log.object_changes.empty() || globals) {
     throw std::invalid_argument(
         "OCEL extended CSV cannot represent O2O/E2E links, object changes, or globals");
   }

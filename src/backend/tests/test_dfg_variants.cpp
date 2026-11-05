@@ -422,11 +422,73 @@ void causal_rejects_unknown_variant() {
 
 }  // namespace
 
+// Reference values from pm4py 2.7.22 discover_performance_dfg on a
+// format_dataframe frame (DataFrame) and on an EventLog of the same events.
+void performance_arithmetic_follows_the_reference_paths() {
+  // A one-microsecond gap in 2026: exact on both paths (epoch doubles gave
+  // 9.5e-7).
+  const auto micro = log({trace("c", {event("A", "2026-01-01T00:00:00.000001+00:00"),
+                                      event("B", "2026-01-01T00:00:00.000002+00:00")})});
+  DfgStatisticalOptions options;
+  options.performance_aggregation = DfgPerformanceAggregation::kAll;
+  for (const bool dataframe : {false, true}) {
+    options.dataframe_arithmetic = dataframe;
+    const auto& summary = performance(discover_performance_dfg(micro, options), "A", "B").summary;
+    assert(summary.mean == 1e-06 && summary.sum == 1e-06 && summary.minimum == 1e-06);
+  }
+
+  // One 1000000.1 s gap and nine 0.1 s gaps.
+  std::vector<Trace> traces;
+  for (int i = 0; i < 10; ++i)
+    traces.push_back(trace("c" + std::to_string(i),
+                           {event("A", "2026-01-01T00:00:00+00:00"),
+                            event("B", i == 0 ? "2026-01-12T13:46:40.100000+00:00"
+                                              : "2026-01-01T00:00:00.100000+00:00")}));
+  const EventLog gaps{traces};
+  options.dataframe_arithmetic = false;  // Python sum, statistics.mean/stdev
+  auto summary = performance(discover_performance_dfg(gaps, options), "A", "B").summary;
+  assert(summary.mean == 100000.09999999999 && summary.sum == 1000000.9999999998);
+  assert(summary.median == 0.1 && summary.minimum == 0.1 && summary.maximum == 1000000.1);
+  assert(summary.standard_deviation == 316227.7660168379);
+  options.dataframe_arithmetic = true;  // Timedelta gaps, Kahan, Welford
+  summary = performance(discover_performance_dfg(gaps, options), "A", "B").summary;
+  assert(summary.mean == 100000.1 && summary.sum == 1000001.0);
+  assert(summary.median == 0.09999999999999999 && summary.minimum == 0.09999999999999999);
+  assert(summary.standard_deviation == 316227.76601683797);
+
+  // Business hours: a CSV offset is converted to UTC on the DataFrame path
+  // (01:00Z-04:00Z, none of it business time); an EventLog keeps each
+  // timestamp's own wall clock (06:00-09:00 local, two business hours).
+  const auto offset = log({trace("c", {event("A", "2024-01-01T06:00:00+05:00"),
+                                       event("B", "2024-01-01T09:00:00+05:00")})});
+  options.use_business_hours = true;
+  options.dataframe_arithmetic = true;
+  assert(performance(discover_performance_dfg(offset, options), "A", "B").summary.mean == 0.0);
+  options.dataframe_arithmetic = false;
+  assert(performance(discover_performance_dfg(offset, options), "A", "B").summary.mean == 7200.0);
+
+  // The DataFrame groups rows sorted by case id (an XES file need not be in
+  // that order); an EventLog keeps its trace order.
+  const auto unordered = log({trace("b", {event("A", "2026-01-01T00:00:00Z"),
+                                          event("B", "2026-01-01T00:00:02Z")}),
+                              trace("a", {event("A", "2026-01-01T00:00:00Z"),
+                                          event("B", "2026-01-01T00:00:01Z")})});
+  options.use_business_hours = false;
+  options.performance_aggregation = DfgPerformanceAggregation::kRawValues;
+  options.dataframe_arithmetic = true;
+  assert((std::get<std::vector<double>>(performance(discover_performance_dfg(unordered, options), "A", "B").value) ==
+          std::vector<double>{1.0, 2.0}));
+  options.dataframe_arithmetic = false;
+  assert((std::get<std::vector<double>>(performance(discover_performance_dfg(unordered, options), "A", "B").value) ==
+          std::vector<double>{2.0, 1.0}));
+}
+
 int main() {
   native_windows_keep_once_and_aliases();
   triples_are_consecutive_and_never_deduplicated();
   performance_aggregations_start_fallback_and_validation();
   performance_business_hours_use_weekly_slots();
+  performance_arithmetic_follows_the_reference_paths();
   custom_activity_and_timestamp_selectors_cover_all_variants();
   case_attributes_cover_ids_custom_missing_and_nodes();
   clean_preserves_boundaries_and_middle_owned_edges();

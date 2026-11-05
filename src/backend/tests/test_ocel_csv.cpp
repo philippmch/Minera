@@ -732,7 +732,13 @@ void reference_writer_shapes() {
   const auto xml1 = minera::serialize_ocel_xml(log, classic);
   assert(xml1.find("      <string key=\"foo\" value=\"w\"/>\n      <string key=\"eid.1\" value=\"e9\"/>\n"
                    "      <string key=\"oid\" value=\"zz\"/>\n      <list key=\"omap\">") != std::string::npos);
-  assert(xml1.find("ocel:") == std::string::npos && xml1.find("x1") == std::string::npos);
+  // A CSV read declares no global scope: write_ocel_xml fills the event and
+  // object scopes with its "__INVALID__" defaults, the only "ocel:" keys.
+  assert(xml1.find("<global scope=\"event\">\n    <string key=\"ocel:activity\" value=\"__INVALID__\"/>\n  </global>\n"
+                   "  <global scope=\"object\">\n    <string key=\"ocel:type\" value=\"__INVALID__\"/>\n") !=
+         std::string::npos);
+  assert(xml1.find("ocel:", xml1.find("<global scope=\"log\">")) == std::string::npos &&
+         xml1.find("x1") == std::string::npos);
   assert(xml1.find("<string key=\"attribute-name\" value=\"Unnamed: 4\"/>") != std::string::npos);
   // Declared: classic JSON, the native transport, keeps them in vmap.
   assert(minera::serialize_ocel_json(log).find("\"ocel:foo\":\"w\"") != std::string::npos);

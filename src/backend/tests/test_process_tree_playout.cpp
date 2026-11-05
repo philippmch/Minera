@@ -473,12 +473,62 @@ void process_tree_basic_distribution(const char* path) {
     assert(statistic < critical);
   }
 }
+// max_limit_num_traces on choices and loops (reference, black box): a
+// choice or loop stops collecting once it holds more than the limit of
+// words its node keeps, so it returns at most limit + 1 words; which ones
+// follows the reference's set order (declared), the count does not.
+void process_tree_playout_choice_and_loop_caps() {
+  const auto leaf = [](std::size_t i) { return ProcessTreeNode::leaf(i); };
+  const auto loop = [](ProcessTreeNode body, ProcessTreeNode redo) {
+    return ProcessTreeNode{ProcessTreeOperator::kLoop, 0, {std::move(body), std::move(redo)}};
+  };
+  const std::vector<std::string> names{"a", "b", "c", "d", "e", "f"};
+  const auto run = [&](const ProcessTreeNode& root, std::size_t limit, std::size_t max_length,
+                       std::optional<std::size_t> min_length = std::nullopt) {
+    ProcessTreePlayoutOptions options;
+    options.variant = ProcessTreePlayoutVariant::EXTENSIVE;
+    options.max_traces = limit;
+    options.max_length = max_length;
+    if (min_length) options.min_length = *min_length;
+    options.return_set_strings = true;
+    return process_tree_playout_result(ProcessTree(names, root), options);
+  };
+  // *( X(a,b), X(c,d) ), max_trace_length 5: the reference keeps 4 words
+  // with the limit 3 (all 42 without it).
+  const auto words = loop(xor_node({leaf(0), leaf(1)}), xor_node({leaf(2), leaf(3)}));
+  auto result = run(words, 3, 5);
+  assert(result.trace_strings.size() == 4 && result.truncated);
+  assert(run(words, 100000, 5).trace_strings.size() == 42 && !run(words, 100000, 5).truncated);
+  // X(a,b,c,d) with the limit 2: 3 words.
+  result = run(xor_node({leaf(0), leaf(1), leaf(2), leaf(3)}), 2, 1);
+  assert(result.trace_strings.size() == 3 && result.truncated);
+  // *( X(a..e), f ), max length 1: five words; the limit 4 keeps all five
+  // (limit + 1) and nothing is left out, so the result is not truncated.
+  const auto flower = loop(xor_node({leaf(0), leaf(1), leaf(2), leaf(3), leaf(4)}), leaf(5));
+  result = run(flower, 4, 1);
+  assert(result.trace_strings.size() == 5 && !result.truncated);
+  result = run(flower, 3, 1);
+  assert(result.trace_strings.size() == 4 && result.truncated);
+  // Only kept words count: with min_trace_length 3 the single activities
+  // still seed the rounds but are not counted, so 6 words of length 3 stay.
+  result = run(flower, 5, 3, 3);
+  assert(result.trace_strings.size() == 6 && result.truncated);
+  for (const auto& word : result.trace_strings) assert(word.size() == 3);
+  // A capped redo whose words never reach the result (no round fits
+  // max_length 2) leaves the result complete: not truncated.
+  result = run(loop(leaf(0), xor_node({leaf(1), leaf(2), leaf(3)})), 1, 2);
+  assert(result.trace_strings == std::vector<std::vector<std::string>>{{"a"}} && !result.truncated);
+  // A sequence is not capped: ->( X(a,b,c), X(c,d,e) ) keeps all 9 words.
+  result = run(seq({xor_node({leaf(0), leaf(1), leaf(2)}), xor_node({leaf(2), leaf(3), leaf(4)})}), 3, 5);
+  assert(result.trace_strings.size() == 9 && !result.truncated);
+}
 }  // namespace
 
 int main(int argc, char** argv) {
   process_tree_playout_envelopes();
   process_tree_playout_loop_bounds();
   process_tree_playout_safety_bounds();
+  process_tree_playout_choice_and_loop_caps();
   process_tree_basic_distribution(
       argc > 1 ? argv[1] : "src/backend/tests/fixtures/process_tree_basic_distribution.txt");
   process_tree_basic_variant_contract();

@@ -7343,13 +7343,25 @@ export const numberFormat = new Intl.NumberFormat("en-US");
 
 /**
  * Formats a duration in seconds as a compact human label, picking the largest
- * fitting unit: "12s", "3.4m", "2.1h", "5.0d". Non-positive or non-finite
- * inputs render as an em dash so untimed edges read as "no data".
+ * unit the rounded value fits: "420ms", "12s", "3.4m", "2.1h", "5.0d". The
+ * unit is chosen after rounding, so 59.6 s reads "1.0m" and 3599 s "1.0h"
+ * (not "60s" or "60.0m"). A measured zero reads "0s" and a nonzero wait
+ * under half a millisecond "<1ms"; a missing (undefined/null), negative or
+ * non-finite value renders as an em dash, "no data".
  */
-export function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`;
-  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
-  return `${(seconds / 86400).toFixed(1)}d`;
+export function formatDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) return "—";
+  if (seconds === 0) return "0s";
+  if (seconds < 1) {
+    const milliseconds = Math.round(seconds * 1000);
+    if (milliseconds === 0) return "<1ms";
+    if (milliseconds < 1000) return `${milliseconds}ms`;
+  }
+  const wholeSeconds = Math.round(seconds);
+  if (wholeSeconds < 60) return `${wholeSeconds}s`;
+  const minutes = Math.round(seconds / 6) / 10;
+  if (minutes < 60) return `${minutes.toFixed(1)}m`;
+  const hours = Math.round(seconds / 360) / 10;
+  if (hours < 24) return `${hours.toFixed(1)}h`;
+  return `${(Math.round(seconds / 8640) / 10).toFixed(1)}d`;
 }

@@ -444,6 +444,33 @@ void performance_spectrum_reference_tie_order_contract() {
              .observations.empty());
 }
 
+// The first CSV row carries input_order 0, a real position: with the log
+// sorted, its tie with a later row of the same time keeps file order (a
+// before b at 00:03:10), so the reference's single a->b observation is the
+// pair at 00:03:10, not the a at 00:00:00 followed by that b.
+void performance_spectrum_first_row_tie_order_contract() {
+  std::istringstream input(
+      "case_id,activity,timestamp\n"
+      "c1,a,2021-03-01 00:03:10\n"
+      "c1,b,2021-03-01 00:03:10\n"
+      "c1,a,2021-03-01 00:00:00\n"
+      "c1,c,2021-03-01 00:00:01\n");
+  minera::CsvImportOptions import_options;
+  import_options.case_id_column = "case_id";
+  import_options.activity_column = "activity";
+  import_options.timestamp_column = "timestamp";
+  import_options.require_timestamp_column = true;
+  const auto log = minera::import_csv_event_log(input, import_options);
+  constexpr double kTie = 1614556990.0;
+  const auto connected = minera::discover_performance_spectrum_log(log, {"a", "b"});
+  assert(connected.observations.size() == 1);
+  assert_close(connected.observations[0].instants[0], kTie);
+  assert_close(connected.observations[0].instants[1], kTie);
+  const auto pairs = minera::discover_performance_spectrum_log_disconnected(log, {"a", "b"});
+  assert(pairs.observations.size() == 1);
+  assert_close(pairs.observations[0].instants[0], kTie);
+}
+
 }  // namespace
 
 int main() {
@@ -461,4 +488,5 @@ int main() {
   performance_spectrum_dataframe_disconnected_variant_contract();
   performance_spectrum_lazyframe_disconnected_variant_contract();
   performance_spectrum_reference_tie_order_contract();
+  performance_spectrum_first_row_tie_order_contract();
 }

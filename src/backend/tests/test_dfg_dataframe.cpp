@@ -710,10 +710,53 @@ void polars_null_and_aggregation_contract() {
     try { (void)discover_polars_dfg(LazyEventTable::from_table(table), options); }
     catch (const std::invalid_argument&) { rejected = true; }
     assert(rejected);
-    (void)discover_pandas_dfg(table, options);
+    // pandas has raw_values but no SeriesGroupBy.stdev, as in the reference.
+    bool pandas_rejected = false;
+    try { (void)discover_pandas_dfg(table, options); }
+    catch (const std::invalid_argument&) { pandas_rejected = true; }
+    assert(pandas_rejected == (aggregation == DfgPerformanceAggregation::kStandardDeviation));
   }
   options.measure = DfgTableMeasure::kFrequency;
   (void)discover_polars_dfg(LazyEventTable::from_table(table), options);
+}
+
+// pandas get_dfg_graph(measure="performance", perf_aggregation_key="all")
+// in pm4py 2.7.22: Timedelta gaps, Kahan sum, sum / count mean, Welford
+// deviation, NaN deviation for one observation, UTC business clock.
+void pandas_performance_arithmetic_contract() {
+  std::vector<EventTable::Row> rows;
+  for (int i = 0; i < 10; ++i) {
+    const auto id = "c" + std::to_string(i);
+    rows.push_back(row({value("case:concept:name", id), value("concept:name", "A"),
+                        value("time:timestamp", "2026-01-01T00:00:00+00:00")}));
+    rows.push_back(row({value("case:concept:name", id), value("concept:name", "B"),
+                        value("time:timestamp", i == 0 ? "2026-01-12T13:46:40.100000+00:00"
+                                                       : "2026-01-01T00:00:00.100000+00:00")}));
+  }
+  rows.push_back(row({value("case:concept:name", "m"), value("concept:name", "A"),
+                      value("time:timestamp", "2026-01-01T00:00:00.000001+00:00")}));
+  rows.push_back(row({value("case:concept:name", "m"), value("concept:name", "C"),
+                      value("time:timestamp", "2026-01-01T00:00:00.000002+00:00")}));
+  const auto table = make_table({"case:concept:name", "concept:name", "time:timestamp"}, rows);
+  DfgTableOptions options;
+  options.measure = DfgTableMeasure::kPerformance;
+  options.performance_aggregation = DfgPerformanceAggregation::kAll;
+  const auto result = discover_pandas_dfg(table, options);
+  const auto& gaps = result.performance.at({"A", "B"}).summary;
+  assert(gaps.mean == 100000.1 && gaps.sum == 1000001.0);
+  assert(gaps.median == 0.09999999999999999 && gaps.maximum == 1000000.1);
+  assert(gaps.standard_deviation == 316227.76601683797);
+  const auto& micro = result.performance.at({"A", "C"}).summary;
+  assert(micro.mean == 1e-06 && std::isnan(micro.standard_deviation));
+
+  const auto offset = make_table(
+      {"case:concept:name", "concept:name", "time:timestamp"},
+      {row({value("case:concept:name", "c"), value("concept:name", "A"),
+            value("time:timestamp", "2024-01-01T06:00:00+05:00")}),
+       row({value("case:concept:name", "c"), value("concept:name", "B"),
+            value("time:timestamp", "2024-01-01T09:00:00+05:00")})});
+  options.business_hours = true;
+  assert(discover_pandas_dfg(offset, options).performance.at({"A", "B"}).summary.mean == 0.0);
 }
 
 // Regression: event_from_row once read the selected activity and timestamp
@@ -748,6 +791,7 @@ int main() {
   first_class_selector_contract();
   event_log_projection_selector_contract();
   polars_null_and_aggregation_contract();
+  pandas_performance_arithmetic_contract();
   selected_cells_outlive_row_lookup();
   return 0;
 }

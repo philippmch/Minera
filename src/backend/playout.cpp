@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "minera/random.hpp"
+#include "minera/stochastic_map.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -232,93 +233,6 @@ std::vector<std::uint32_t> stochastic_marking(
   return marking;
 }
 
-struct ReplayState {
-  std::vector<std::uint32_t> marking;
-  std::size_t event_index = 0;
-  std::vector<std::size_t> path;
-};
-
-struct ReplayResult {
-  std::vector<std::size_t> path;
-  std::vector<std::size_t> touched;
-  bool complete = false;
-};
-
-std::string replay_state_key(const ReplayState& state) {
-  std::string key = std::to_string(state.event_index) + '|';
-  for (const auto token : state.marking) {
-    key += std::to_string(token);
-    key += ',';
-  }
-  return key;
-}
-
-ReplayResult replay_trace(
-    const PetriNet& net, const Trace& trace,
-    const std::vector<std::uint32_t>& initial,
-    const std::vector<std::uint32_t>& final, std::size_t max_states) {
-  std::deque<ReplayState> queue;
-  std::unordered_set<std::string> visited;
-  std::vector<std::size_t> selected_path;
-  bool complete = false;
-  queue.push_back({initial, 0, {}});
-  visited.insert(replay_state_key(queue.front()));
-  ReplayState best = queue.front();
-  while (!queue.empty() && visited.size() <= max_states) {
-    auto state = std::move(queue.front());
-    queue.pop_front();
-    if (state.event_index > best.event_index ||
-        (state.event_index == best.event_index &&
-         state.path.size() > best.path.size())) {
-      best = state;
-    }
-    if (state.event_index == trace.events.size() && state.marking == final) {
-      selected_path = std::move(state.path);
-      complete = true;
-      break;
-    }
-    for (std::size_t transition_index = 0;
-         transition_index < net.transitions().size(); ++transition_index) {
-      const auto& transition = net.transitions()[transition_index];
-      // A transition without input places is always enabled, as in the
-      // reference's token replay (which fires and counts it).
-      if (!petri_transition_enabled(transition, state.marking)) continue;
-      ReplayState next = state;
-      if (!transition.silent()) {
-        if (state.event_index >= trace.events.size()) continue;
-        const auto activity = *transition.activity;
-        if (activity >= net.activities().size() ||
-            net.activities()[activity] != trace.events[state.event_index].activity)
-          continue;
-        ++next.event_index;
-      }
-      fire_petri_transition(transition, next.marking);
-      next.path.push_back(transition_index);
-      if (visited.insert(replay_state_key(next)).second)
-        queue.push_back(std::move(next));
-    }
-  }
-
-  // Re-run only the selected deterministic path. This deliberately excludes
-  // transitions enabled in discarded BFS branches from the fitted rates.
-  ReplayResult result;
-  result.path = complete ? std::move(selected_path) : std::move(best.path);
-  result.complete = complete;
-  std::vector<std::uint32_t> marking = initial;
-  for (const auto transition_index : result.path) {
-    for (std::size_t i = 0; i < net.transitions().size(); ++i) {
-      const auto& candidate = net.transitions()[i];
-      if (petri_transition_enabled(candidate, marking)) {
-        result.touched.push_back(i);
-      }
-    }
-    const auto& transition = net.transitions()[transition_index];
-    if (!petri_transition_enabled(transition, marking)) break;
-    fire_petri_transition(transition, marking);
-  }
-  return result;
-}
-
 }  // namespace
 
 namespace {
@@ -423,9 +337,16 @@ EventLog stochastic_playout_impl(const PetriNet& net,
       }
     }
 
-    for (std::size_t step = 0; step < options.max_steps; ++step) {
-      if (options.stop_at_final && is_final(marking)) break;
-
+    // The reference stochastic playout (observed by distribution): a case
+    // stops once it holds max_steps visible events (silent firings do not
+    // count); otherwise enabled transitions are drawn by weight (1.0 when
+    // the map lacks one, uniformly when every weight is zero), and in the
+    // final marking "stop" is one more option of weight 1.0, so a case there
+    // with one enabled transition of weight w stops with probability
+    // 1 / (1 + w); a case with nothing enabled stops.
+    std::size_t visible = 0;
+    std::size_t firings = 0;
+    while (visible < options.max_steps) {
       enabled.clear();
       for (std::size_t t = 0; t < transitions.size(); ++t) {
         const auto& transition = transitions[t];
@@ -433,29 +354,38 @@ EventLog stochastic_playout_impl(const PetriNet& net,
         if (!petri_transition_enabled(transition, marking)) continue;
         enabled.push_back(t);
       }
+      const bool can_stop = options.stop_at_final && is_final(marking);
       if (enabled.empty()) break;
 
-      std::size_t selected = 0;
-      if (options.transition_weights.empty()) {
-        selected = enabled[rng::below(engine, enabled.size())];
+      const auto weight_of = [&](std::size_t t) {
+        return options.transition_weights.empty() ? 1.0 : options.transition_weights[t];
+      };
+      double maximum = can_stop ? 1.0 : 0.0;
+      for (const auto t : enabled) maximum = std::max(maximum, weight_of(t));
+      std::size_t pick = 0;
+      if (!(maximum > 0.0)) {
+        pick = rng::below(engine, enabled.size());
       } else {
-        double maximum = 0.0;
-        for (const auto t : enabled)
-          maximum = std::max(maximum, options.transition_weights[t]);
-        if (!(maximum > 0.0)) {
-          selected = enabled[rng::below(engine, enabled.size())];
-        } else {
-          std::vector<double> weights;
-          weights.reserve(enabled.size());
-          for (const auto t : enabled)
-            weights.push_back(options.transition_weights[t] / maximum);
-          const auto index = rng::weighted_index(engine, weights);
-          selected = enabled[index];
-        }
+        // Scaled by the largest weight so huge weights cannot overflow.
+        std::vector<double> weights;
+        weights.reserve(enabled.size() + 1);
+        for (const auto t : enabled) weights.push_back(weight_of(t) / maximum);
+        if (can_stop) weights.push_back(1.0 / maximum);
+        pick = rng::weighted_index(engine, weights);
       }
+      if (pick == enabled.size()) break;  // stop in the final marking
+      const auto selected = enabled[pick];
 
       const auto& fired = transitions[selected];
       fire_petri_transition(fired, marking);
+      if (!fired.silent()) ++visible;
+      // A safety bound the reference does not have (it would spin forever
+      // on a silent livelock), as for the basic playout.
+      if (++firings >= std::max<std::size_t>(1000000, 1000 * (options.max_steps + 1)))
+        throw std::runtime_error(
+            "stochastic playout: a case fired " + std::to_string(firings) +
+            " transitions with " + std::to_string(visible) +
+            " visible events (silent livelock)");
       if (visited_result) {
         visited.push_back(
             {PlayoutVisitedElementKind::TRANSITION, {}, selected});
@@ -525,37 +455,19 @@ std::vector<double> fit_stochastic_transition_weights(
       net, options.initial_marking, net.source(), "initial");
   const auto final = stochastic_marking(
       net, options.final_marking, net.sink(), "final");
-  std::vector<std::size_t> enabled_count(net.transitions().size(), 0);
-  std::vector<std::size_t> activated_count(net.transitions().size(), 0);
-
-  for (const auto& source_trace : source_log.traces) {
-    // Logs can contain labels from a larger model. They are ignored for the
-    // native fit, while valid labels retain their original ordering.
-    Trace trace;
-    trace.case_id = source_trace.case_id;
-    trace.events.reserve(source_trace.events.size());
-    for (const auto& event : source_trace.events) {
-      if (std::find(net.activities().begin(), net.activities().end(),
-                    event.activity) != net.activities().end()) {
-        trace.events.push_back(event);
-      }
-    }
-
-    const auto replay = replay_trace(net, trace, initial, final,
-                                     options.fitting_max_states);
-    for (const auto transition : replay.touched)
-      ++enabled_count[transition];
-    for (const auto transition : replay.path)
-      ++activated_count[transition];
-  }
-
+  // The reference stochastic playout fits its map with
+  // get_map_from_log_and_net on the playout markings; the weights are that
+  // map's activation/enabling ratios (see fit_stochastic_map_with_report),
+  // and a transition the map lacks keeps weight 1.0, as the reference
+  // playout treats it.
+  StochasticMapFitOptions fit;
+  fit.fit_timing = false;
+  fit.replay.initial_marking.assign(initial.begin(), initial.end());
+  fit.replay.final_marking.assign(final.begin(), final.end());
+  const auto fitted = fit_stochastic_map_with_report(source_log, net, fit);
   std::vector<double> weights(net.transitions().size(), 1.0);
-  for (std::size_t i = 0; i < weights.size(); ++i) {
-    if (enabled_count[i] != 0) {
-      weights[i] = static_cast<double>(activated_count[i]) /
-                   static_cast<double>(enabled_count[i]);
-    }
-  }
+  for (const auto& record : fitted.map.transitions)
+    weights.at(record.transition) = record.activation_weight;
   return weights;
 }
 

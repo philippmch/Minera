@@ -530,6 +530,16 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       std::copy(options.replay.initial_marking.begin(),
                 options.replay.initial_marking.end(), marking.begin());
     }
+    // The places the marking lists, zero-token initial keys included. The
+    // reference statistics drop a place whose count falls to zero or below
+    // and stop a trace once a firing leaves no place listed (observed
+    // black-box: a transition that empties the marking is counted but its
+    // performance is not, and later firings are not counted at all).
+    std::vector<bool> listed(net.place_count(), false);
+    for (std::size_t place = 0; place < listed.size(); ++place)
+      listed[place] = marking[place] > 0 ||
+          (options.replay.initial_marking_keys.size() == listed.size() &&
+           options.replay.initial_marking_keys[place]);
     // Each token keeps its time and the index of the event that produced it.
     std::vector<std::deque<std::pair<std::optional<std::int64_t>, std::size_t>>> arrivals(
         net.place_count());
@@ -547,6 +557,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       const auto& transition = net.transitions()[transition_index];
       std::optional<std::int64_t> arrival;
       std::size_t arrival_source = 0;
+      bool first_event_input = false;
       std::vector<bool> consumed(net.place_count(), false);
       for (const auto place : transition.inputs) {
         if (!consumed[place]) {
@@ -559,6 +570,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
             std::tie(consumed_time, source) = arrivals[place].front();
             arrivals[place].pop_front();
           }
+          if (consumed_time && source == 0) first_event_input = true;
           if (consumed_time && (!arrival || *consumed_time > *arrival)) {
             arrival = consumed_time;
             arrival_source = source;
@@ -572,57 +584,77 @@ StochasticMapFitResult fit_stochastic_map_with_report(
         const auto weight = arc.signed_weight();
         auto& tokens = marking[arc.place];
         if (weight >= 0) {
-          tokens = tokens > static_cast<std::uint64_t>(weight) ? tokens - static_cast<std::uint64_t>(weight) : 0;
+          if (tokens > static_cast<std::uint64_t>(weight)) {
+            tokens -= static_cast<std::uint64_t>(weight);
+          } else {
+            tokens = 0;
+            listed[arc.place] = false;
+          }
         } else {
           if (tokens > std::numeric_limits<std::uint64_t>::max() - static_cast<std::uint64_t>(-(weight + 1)) - 1)
             throw std::overflow_error("stochastic map: marking overflow");
           tokens += static_cast<std::uint64_t>(-(weight + 1)) + 1;
+          listed[arc.place] = true;
         }
       }
       for (const auto place : transition.reset_inputs) {
         marking[place] = 0;
+        listed[place] = false;
         arrivals[place].clear();
         initial_arrivals[place] = 0;
       }
       std::optional<std::int64_t> time;
       std::size_t time_source = event_index;
+      std::optional<double> performance;
       if (!transition.activity) {
         // A hidden firing passes its latest input time on, unless that token
         // came from the first event (or the initial marking): the reference
-        // then leaves the hidden firing and its outputs untimed.
+        // then leaves the hidden firing and its outputs untimed. Its own
+        // zero performance is recorded only when no timed input token came
+        // from the first event or the initial marking (observed black-box;
+        // untimed inputs are ignored).
         if (arrival && arrival_source > 0) {
           time = arrival;
           time_source = arrival_source;
-          stats.performance.push_back(0.0);
-          stats.log_indices.push_back(trace_index);
+          if (!first_event_input) performance = 0.0;
         }
       } else if (event_index < trace.events.size()) {
         const auto& event = trace.events[event_index];
         time = selected_time(event);
-        if (time && arrival) {
-          stats.performance.push_back(static_cast<double>(*time - *arrival) / 1000000.0);
-          stats.log_indices.push_back(trace_index);
-        }
+        if (time && arrival)
+          performance = static_cast<double>(*time - *arrival) / 1000000.0;
         const auto activity = selected_activity(event);
         if (activity && *activity == net.activities()[*transition.activity])
           ++event_index;
-      }
-      std::vector<bool> produced(net.place_count(), false);
-      for (const auto place : transition.outputs) {
-        if (!produced[place]) arrivals[place].emplace_back(time, time_source);
-        produced[place] = true;
       }
       for (const auto& arc : petri_reference_arcs(transition, false)) {
         const auto weight = arc.signed_weight();
         auto& tokens = marking[arc.place];
         if (weight < 0) {
           const auto magnitude = static_cast<std::uint64_t>(-(weight + 1)) + 1;
-          tokens = tokens > magnitude ? tokens - magnitude : 0;
+          if (tokens > magnitude) {
+            tokens -= magnitude;
+          } else {
+            tokens = 0;
+            listed[arc.place] = false;
+          }
         } else {
           if (tokens > std::numeric_limits<std::uint64_t>::max() - static_cast<std::uint64_t>(weight))
             throw std::overflow_error("stochastic map: marking overflow");
           tokens += static_cast<std::uint64_t>(weight);
+          listed[arc.place] = true;
         }
+      }
+      if (std::none_of(listed.begin(), listed.end(), [](bool place) { return place; }))
+        break;
+      if (performance) {
+        stats.performance.push_back(*performance);
+        stats.log_indices.push_back(trace_index);
+      }
+      std::vector<bool> produced(net.place_count(), false);
+      for (const auto place : transition.outputs) {
+        if (!produced[place]) arrivals[place].emplace_back(time, time_source);
+        produced[place] = true;
       }
     }
   }

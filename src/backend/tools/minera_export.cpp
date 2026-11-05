@@ -1429,7 +1429,7 @@ int usage(const char* program) {
                "  --petri-playout-return-elements <bool> Extensive visited JSON\n"
                "  --petri-playout-max-marking-occ <n> Extensive marking repetition bound\n"
                "  --stochastic-traces <n>  Weighted Petri cases\n"
-               "  --stochastic-max-steps <n> Firing cap per case\n"
+               "  --stochastic-max-steps <n> Visible-event cap per case\n"
                "  --stochastic-seed <u64>  Weighted Petri random seed\n"
                "  --stochastic-transition-weights <w,...> Transition weights\n"
                "  --stochastic-fit-from-log <bool> Fit weights from input log\n"
@@ -7503,9 +7503,12 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     }
     std::optional<minera::DfgVariantsAnalysis> dfg_variants_analysis;
     if (!dfg_statistical_variants.empty() || !dfg_causal_variants.empty()) {
+      // The CLI reads CSV or XES, which pm4py discovers as a DataFrame.
+      auto dataframe_options = dfg_statistics_options;
+      dataframe_options.dataframe_arithmetic = true;
       dfg_variants_analysis =
           analyze_dfg_variants(log, dfg_statistical_variants,
-                               dfg_causal_variants, dfg_statistics_options);
+                               dfg_causal_variants, dataframe_options);
     }
     std::optional<minera::CorrelationVariantsAnalysis>
         correlation_variants_analysis;
@@ -7570,7 +7573,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         powl_options.case_id_key);
     const auto powl_graph =
         minera::discover_directly_follows_graph(powl_log);
-    const auto performance = minera::compute_performance_metrics(log, graph);
+    const auto performance = minera::compute_performance_metrics(
+        log, graph, /*dataframe_arithmetic=*/true);
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);

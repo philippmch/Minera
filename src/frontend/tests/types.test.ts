@@ -1183,12 +1183,14 @@ describe("isLabelSplittingResult", () => {
 });
 
 describe("formatDuration", () => {
-  it("renders a dash for non-positive or non-finite input", () => {
-    // Untimed edges read as "no data" rather than "0s".
-    expect(formatDuration(0)).toBe("—");
+  it("renders a dash only for missing, negative or non-finite input", () => {
+    // Untimed edges (no value) read as "no data"; a measured zero is 0s.
+    expect(formatDuration(undefined)).toBe("—");
+    expect(formatDuration(null)).toBe("—");
     expect(formatDuration(-5)).toBe("—");
     expect(formatDuration(NaN)).toBe("—");
     expect(formatDuration(Infinity)).toBe("—");
+    expect(formatDuration(0)).toBe("0s");
   });
 
   it("picks the largest fitting unit and rounds seconds", () => {
@@ -1199,11 +1201,20 @@ describe("formatDuration", () => {
     expect(formatDuration(86400)).toBe("1.0d");
   });
 
-  it("switches units exactly at the unit boundaries", () => {
+  it("shows sub-second waits in milliseconds instead of 0s", () => {
+    expect(formatDuration(0.25)).toBe("250ms");
+    expect(formatDuration(0.0004)).toBe("<1ms");
+    expect(formatDuration(0.9996)).toBe("1s");
+  });
+
+  it("chooses the unit after rounding, so boundaries never read 60s or 60.0m", () => {
     expect(formatDuration(59)).toBe("59s");
+    expect(formatDuration(59.6)).toBe("1.0m");
     expect(formatDuration(60)).toBe("1.0m");
-    expect(formatDuration(3599)).toBe("60.0m");
-    expect(formatDuration(86399)).toBe("24.0h");
+    expect(formatDuration(3599)).toBe("1.0h");
+    expect(formatDuration(3596)).toBe("59.9m");
+    expect(formatDuration(86399)).toBe("1.0d");
+    expect(formatDuration(86040)).toBe("23.9h");
   });
 });
 

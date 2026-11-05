@@ -417,7 +417,13 @@ at a time; another gets 503 with `Retry-After` and `{"family":"MINE_BUSY",
 "error":"Another log is being mined — wait or cancel it.", "canceling",
 "retry_after_seconds"}`. `canceling` is true when the running mine was
 canceled or replaced and only has to reach its next stage; the app then
-retries after `Retry-After` (for up to two minutes) instead of failing.
+retries after `Retry-After` (for up to two minutes) instead of failing. A
+request that runs out of memory anyway (any `/api` route, mining included)
+gets 503 with the error envelope instead of 400: the server installs a
+new-handler that records the failed allocation on the request's thread
+before `std::bad_alloc` is thrown, so the route wrapper recognises the
+handler's 400 carrying that exception's message under any standard library
+(`std::bad_alloc` with libstdc++ and libc++, `bad allocation` with MSVC).
 A canceled or replaced mine checks its flag between stages (after the import
 and after each discovery and conformance step) and stops with the usual
 "mining request was canceled or replaced by a newer source request" 400; a
@@ -760,6 +766,14 @@ header lists the patches. They do the following:
   after its first 5 s. A request cut off by either gets `408 Request Timeout`
   with a JSON message naming the deadlines and the minimum rate, and the
   connection is closed.
+- Body framing (RFC 9112): a Content-Length that is not a decimal number
+  (empty, negative, signed or with inner spaces) gets `400`, as does a
+  request that carries Content-Length fields that disagree or both
+  Transfer-Encoding and Content-Length, whatever its method. The connection
+  is closed after each of these. A request may repeat one Content-Length
+  value. On the client side, a response's Content-Length may be a list of
+  one repeated value (`5, 5`), as an intermediary that merged duplicate
+  fields leaves it.
 - Outgoing clients get a response-size cap. A response over the cap fails
   with its own error ("Response body exceeds the client's payload limit"), so
   the query, language-model, embedding and repository-history runtimes report

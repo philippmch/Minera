@@ -2342,6 +2342,13 @@ void decorate_model_moves_arc_weights() {
   assert(decoration.place_waits[middle].count == 2);
   assert(decoration.place_waits[middle].mean == 60.0);
 
+  // Waits are exact gaps, as token replay's timedelta seconds: one
+  // microsecond in 2024 is 1e-06, not the 9.5e-7 of two epoch doubles.
+  auto micro = log;
+  micro.traces.front().events[0].timestamp = "2024-01-01T10:00:00.000001Z";
+  micro.traces.front().events[1].timestamp = "2024-01-01T10:00:00.000002Z";
+  assert(minera::decorate_model(micro, net).place_waits[middle].min == 1e-06);
+
   // A weight whose wait samples would not fit one by one decorates too (as
   // runs of one value): two cases move 2^25 + 1 tokens each through the
   // middle place, after 60 s and 120 s.
@@ -3766,6 +3773,40 @@ void performance_clamps_backwards_steps_and_keeps_precision() {
   assert(json.find("\"max\": 5184007") != std::string::npos);
   assert(json.find("\"min\": 1641601") != std::string::npos);
   assert(json.find("\"mean\": 3412804") != std::string::npos);
+}
+
+// Process-map edge times follow pm4py.discover_performance_dfg (2.7.22):
+// exact sub-second gaps; total/mean by Python sum and statistics.mean on the
+// EventLog path, by Kahan sum and sum / count on the DataFrame path (CSV and
+// XES imports).
+void performance_edges_follow_reference_arithmetic() {
+  std::vector<std::pair<std::string, std::vector<std::pair<std::string, std::string>>>> cases;
+  for (int i = 0; i < 10; ++i)
+    cases.push_back({"c" + std::to_string(i),
+                     {{"A", "2026-01-01T00:00:00Z"},
+                      {"B", i == 0 ? "2026-01-12T13:46:40.100000Z"
+                                   : "2026-01-01T00:00:00.100000Z"}}});
+  cases.push_back({"m", {{"A", "2026-01-01T00:00:00.000001Z"},
+                         {"C", "2026-01-01T00:00:00.000002Z"}}});
+  const auto source = clock_log(cases);
+  const auto graph = minera::discover_directly_follows_graph(source);
+  const auto stats_of = [&](const minera::PerformanceMetrics& perf,
+                            const std::string& target) {
+    for (const auto& edge : perf.edges)
+      if (graph.activities()[edge.target] == target) return edge.stats;
+    assert(false);
+    return minera::DurationStats{};
+  };
+  const auto eventlog = minera::compute_performance_metrics(source, graph, false);
+  assert(stats_of(eventlog, "B").mean == 100000.09999999999);
+  assert(stats_of(eventlog, "B").total == 1000000.9999999998);
+  assert(stats_of(eventlog, "B").median == 0.1);
+  assert(stats_of(eventlog, "C").mean == 1e-06);  // epoch doubles: 9.5e-7
+  const auto dataframe = minera::compute_performance_metrics(source, graph, true);
+  assert(stats_of(dataframe, "B").mean == 100000.1);
+  assert(stats_of(dataframe, "B").total == 1000001.0);
+  assert(stats_of(dataframe, "B").median == 0.09999999999999999);
+  assert(stats_of(dataframe, "C").mean == 1e-06);
 }
 
 void export_variants_include_the_empty_variant() {
@@ -8272,6 +8313,7 @@ int main() {
   filters_keep_empty_traces_like_the_reference();
   filter_time_range_trace_modes_read_endpoints_by_position();
   performance_clamps_backwards_steps_and_keeps_precision();
+  performance_edges_follow_reference_arithmetic();
   export_variants_include_the_empty_variant();
   filter_supports_variant_percentage_and_endpoint_polarity();
   filter_selects_cases_by_succession();
