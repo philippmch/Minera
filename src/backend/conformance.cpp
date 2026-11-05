@@ -975,9 +975,12 @@ class Replayer {
   // nullopt as soon as the replay deviates (an activity the net lacks, a
   // missing token, or leftover tokens at the end), because a forced replay's
   // firing sequence would not be a real path through the model.
+  // `capped`, when given, is set when a silent-routing search on the way
+  // stopped at its bound, so a nullopt may be the bound rather than a deviation.
   [[nodiscard]] std::optional<std::vector<std::vector<std::size_t>>>
   clean_firing_sequence(
-      const std::vector<std::optional<std::size_t>>& trace) const {
+      const std::vector<std::optional<std::size_t>>& trace,
+      bool* capped = nullptr) const {
     Marking marking = initial_marking();
     std::vector<std::vector<std::size_t>> steps;
     steps.reserve(trace.size() + 1);
@@ -986,11 +989,13 @@ class Replayer {
         return std::nullopt;
       }
       const Step& result = cached_step(marking, *step);
+      if (capped && result.capped) *capped = true;
       if (result.missing != 0) return std::nullopt;
       marking = result.marking;
       steps.push_back(result.fired);
     }
     const Step& finish = cached_finish(marking);
+    if (capped && finish.capped) *capped = true;
     if (finish.missing != 0) return std::nullopt;
     marking = finish.marking;
     if (!marking_covers(marking, final_)) return std::nullopt;
@@ -1557,6 +1562,7 @@ class Replayer {
     Marking marking;
     TokenInteger missing = 0;
     std::vector<std::size_t> fired;  // transitions fired, silent routing included
+    bool capped = false;  // a silent-routing search stopped at its bound
   };
 
   struct StepKeyHash {
@@ -1577,8 +1583,10 @@ class Replayer {
       step.marking = marking;
       Counts counts;
       const auto& targets = transitions_by_activity_[activity];
+      const auto capped_before = capped_searches_;
       if (walk_through_hidden_transitions)
         route_silently(step.marking, targets, counts, &step.fired);
+      step.capped = capped_searches_ != capped_before;
       const std::size_t chosen = pick_enabled(step.marking, targets);
       fire(step.marking, chosen, counts);
       step.fired.push_back(chosen);
@@ -1595,7 +1603,9 @@ class Replayer {
       Step& step = it->second;
       step.marking = marking;
       Counts counts;
+      const auto capped_before = capped_searches_;
       route_silently_to_marking(step.marking, counts, &step.fired);
+      step.capped = capped_searches_ != capped_before;
       step.missing = counts.missing;
     }
     return it->second;
@@ -2327,6 +2337,9 @@ class Replayer {
         for (const auto place : touched) row_buffer[place] = from[place];
       }
     }
+    // Rows left unexpanded, or dropped once the frontier was full, mean the
+    // search stopped at its bound rather than exhausting the silent closure.
+    if (head < frontier.size() || frontier.size() >= kSilentSearchCap) ++capped_searches_;
     return FlatOutcome::kNone;
   }
 
@@ -2413,6 +2426,7 @@ class Replayer {
         frontier.push(arena.size() - 1);
       }
     }
+    if (!frontier.empty()) ++capped_searches_;  // stopped at the bound
     return std::nullopt;
   }
 
@@ -2564,6 +2578,9 @@ class Replayer {
   mutable std::unordered_map<std::pair<Marking, std::size_t>, Step, StepKeyHash>
       step_cache_, direct_step_cache_;
   mutable std::unordered_map<Marking, Step, MarkingHash> finish_cache_;
+  // Silent-routing searches (silent_path, flat_silent_path) that stopped at
+  // kSilentSearchCap; cached steps record whether theirs did.
+  mutable std::size_t capped_searches_ = 0;
   mutable std::optional<detail::SilentPlacePathIndex> place_path_index_;
   mutable std::vector<std::optional<ArcWeights>> arc_weights_;
   mutable std::vector<std::optional<InputChecks>> input_checks_;
@@ -4528,6 +4545,21 @@ class Aligner {
       bool& exhausted) const {
     const std::size_t tcount = net_.transitions().size();
     const std::size_t places = initial_.size();
+    // The marking equation describes firing only when every firing adds its
+    // incidence column: reset arcs clear a place, and repeated weighted input
+    // arcs on one place are each checked alone and clamp the place at zero.
+    // Otherwise no LP bound is applied (h = 0, nothing pruned), and with it
+    // no parent-plan or dual bound.
+    const bool marking_equation = [&] {
+      if (net_.has_extended_arcs()) return false;
+      for (const auto& transition : net_.transitions()) {
+        if (transition.input_weights.empty()) continue;
+        for (std::size_t i = 0; i < transition.inputs.size(); ++i)
+          for (std::size_t j = 0; j < i; ++j)
+            if (transition.inputs[i] == transition.inputs[j]) return false;
+      }
+      return true;
+    }();
     std::vector<double> c(tcount, 0.0);
     for (std::size_t t = 0; t < tcount; ++t) c[t] = net_.transitions()[t].silent() ? 0.0 : 1.0;
     // The incidence matrix as sparse rows; only b changes between markings.
@@ -4550,6 +4582,7 @@ class Aligner {
       if (plans.emplace(id, std::move(plan)).second) plan_order.push(id);
     };
     const auto bound = [&](const int* marking, std::vector<double>* dual_out, std::uint32_t id = std::numeric_limits<std::uint32_t>::max()) -> std::optional<std::uint64_t> {
+      if (!marking_equation) return 0;
       std::vector<double> b(places, 0.0);
       for (std::size_t p = 0; p < places; ++p) b[p] = double(final_[p] - marking[p]);
       const auto lp = solve_lp_sparse(a, std::move(b), c, dual_out);
@@ -5936,7 +5969,8 @@ std::vector<ActivityDeviation> summarize_alignment_moves(
 std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
 replay_firing_sequences(const PetriNet& net,
                         const std::vector<std::vector<std::string>>& variants,
-                        const std::function<bool()>& cancelled) {
+                        const std::function<bool()>& cancelled,
+                        std::vector<bool>* capped) {
   const Replayer replayer(net);
   CancellationCheck check_cancelled(cancelled, "model replay was cancelled", 8);
   // Each cached step holds two markings; a log whose variants keep reaching
@@ -5948,14 +5982,18 @@ replay_firing_sequences(const PetriNet& net,
       std::max<std::size_t>(4096, (std::size_t{256} << 20) / marking_bytes);
   std::vector<std::optional<std::vector<std::vector<std::size_t>>>> result;
   result.reserve(variants.size());
-  for (const auto& variant : variants) {
+  if (capped) capped->assign(variants.size(), false);
+  for (std::size_t v = 0; v < variants.size(); ++v) {
+    const auto& variant = variants[v];
     check_cancelled();
     std::vector<std::optional<std::size_t>> ids;
     ids.reserve(variant.size());
     for (const auto& name : variant) {
       ids.push_back(replayer.activity_id(name));
     }
-    result.push_back(replayer.clean_firing_sequence(ids));
+    bool variant_capped = false;
+    result.push_back(replayer.clean_firing_sequence(ids, &variant_capped));
+    if (capped && !result.back()) (*capped)[v] = variant_capped;
     if (replayer.cached_steps() > cache_limit) replayer.clear_step_caches();
   }
   return result;

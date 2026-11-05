@@ -1,6 +1,7 @@
 #include "minera/model_decoration.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <deque>
 #include <limits>
 #include <optional>
@@ -109,6 +110,107 @@ DurationStats summarize_wait_runs(std::vector<double> singles,
   return stats;
 }
 
+using FiringSequence = std::vector<std::vector<std::size_t>>;
+
+// Firing sequences of the reference token replay: one inner list per event
+// (its silent routing first, the event's visible transition last) plus one
+// for the routing to the final marking; nullopt for a variant that replay
+// does not fit (missing or remaining tokens, an activity the net lacks).
+// This is the replay pm4py decorates with, and its routing toward the final
+// marking follows shortest silent place paths instead of searching the
+// marking graph, so many concurrent optional branches stay cheap.
+std::vector<std::optional<FiringSequence>> token_replay_firing_sequences(
+    const PetriNet& net, const std::vector<std::vector<std::string>>& variants,
+    const std::function<bool()>& cancelled) {
+  EventLog variant_log;
+  variant_log.traces.reserve(variants.size());
+  for (std::size_t v = 0; v < variants.size(); ++v) {
+    Trace trace;
+    trace.case_id = std::to_string(v);
+    trace.events.reserve(variants[v].size());
+    for (const auto& activity : variants[v]) {
+      Event event;
+      event.case_id = trace.case_id;
+      event.case_id_state = FirstClassAttributeState::kPresent;
+      event.activity = activity;
+      event.activity_state = FirstClassAttributeState::kPresent;
+      trace.events.push_back(std::move(event));
+    }
+    variant_log.traces.push_back(std::move(trace));
+  }
+  TokenReplayOptions options;
+  options.cancelled = cancelled;
+  const auto rows = replay_token_traces(variant_log, net, options);
+  std::vector<std::optional<FiringSequence>> result(variants.size());
+  for (const auto& row : rows) {
+    if (row.trace_index >= variants.size()) continue;
+    if (!row.trace_is_fit || row.missing != 0 || row.remaining != 0 ||
+        row.replay_stopped || !row.unknown_event_indices.empty() ||
+        row.event_diagnostics.size() != variants[row.trace_index].size())
+      continue;
+    FiringSequence steps;
+    steps.reserve(row.event_diagnostics.size() + 1);
+    std::size_t used = 0;
+    bool consistent = true;
+    for (const auto& event : row.event_diagnostics) {
+      // The trace-level list is the events' lists in order, then the final
+      // routing; anything else would not be one firing sequence.
+      if (used + event.activated_transitions.size() > row.activated_transitions.size() ||
+          !std::equal(event.activated_transitions.begin(), event.activated_transitions.end(),
+                      row.activated_transitions.begin() + static_cast<std::ptrdiff_t>(used))) {
+        consistent = false;
+        break;
+      }
+      used += event.activated_transitions.size();
+      steps.push_back(event.activated_transitions);
+    }
+    if (!consistent) continue;
+    steps.emplace_back(row.activated_transitions.begin() + static_cast<std::ptrdiff_t>(used),
+                       row.activated_transitions.end());
+    result[row.trace_index] = std::move(steps);
+  }
+  return result;
+}
+
+// Nets with inhibitor or reset arcs keep the exhaustive silent-routing
+// replay (other nets use it only for variants token replay rejects). Its marking-graph search is bounded, so a variant can come back
+// empty because the search stopped, not because it deviates: those are
+// counted as capped. Once kCappedBeforeStop variants have capped without one
+// replaying, the rest are not attempted (the same structure would cap them
+// too) and are counted as capped as well.
+constexpr std::size_t kFallbackChunk = 16;
+constexpr std::size_t kSilentRoutingBound = 4096;  // conformance.cpp kSilentSearchCap
+constexpr std::uint64_t kCappedBeforeStop = 16;
+
+std::vector<std::optional<FiringSequence>> extended_arc_firing_sequences(
+    const PetriNet& net, const std::vector<std::vector<std::string>>& variants,
+    const std::function<bool()>& cancelled, std::uint64_t& capped,
+    std::uint64_t& skipped) {
+  std::vector<std::optional<FiringSequence>> result(variants.size());
+  std::uint64_t replayed = 0;
+  for (std::size_t begin = 0; begin < variants.size(); begin += kFallbackChunk) {
+    if (replayed == 0 && capped >= kCappedBeforeStop) {
+      skipped = variants.size() - begin;
+      break;
+    }
+    const auto end = std::min(variants.size(), begin + kFallbackChunk);
+    const std::vector<std::vector<std::string>> chunk(
+        variants.begin() + static_cast<std::ptrdiff_t>(begin),
+        variants.begin() + static_cast<std::ptrdiff_t>(end));
+    std::vector<bool> chunk_capped;
+    auto sequences = replay_firing_sequences(net, chunk, cancelled, &chunk_capped);
+    for (std::size_t i = 0; i < chunk.size(); ++i) {
+      if (sequences[i]) {
+        ++replayed;
+        result[begin + i] = std::move(sequences[i]);
+      } else if (chunk_capped[i]) {
+        ++capped;
+      }
+    }
+  }
+  return result;
+}
+
 }  // namespace
 
 ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
@@ -143,7 +245,32 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
     }
     variant_of[i] = it->second;
   }
-  const auto firing = replay_firing_sequences(net, variants, cancelled);
+  std::uint64_t capped = 0, skipped = 0;
+  std::vector<std::optional<FiringSequence>> firing;
+  if (net.has_extended_arcs()) {
+    firing = extended_arc_firing_sequences(net, variants, cancelled, capped, skipped);
+  } else {
+    firing = token_replay_firing_sequences(net, variants, cancelled);
+    // Token replay fires silent transitions greedily, so it can reject a
+    // variant that does have a clean path through the net. Those variants
+    // still get the bounded marking-graph search the decoration used before;
+    // a search that stops at its bound only leaves the variant undecorated,
+    // as the replay already judged it deviating.
+    std::vector<std::size_t> rejected;
+    for (std::size_t v = 0; v < firing.size(); ++v)
+      if (!firing[v]) rejected.push_back(v);
+    if (!rejected.empty()) {
+      std::vector<std::vector<std::string>> retry;
+      retry.reserve(rejected.size());
+      for (const auto v : rejected) retry.push_back(variants[v]);
+      std::uint64_t retry_capped = 0, retry_skipped = 0;
+      auto searched =
+          extended_arc_firing_sequences(net, retry, cancelled, retry_capped, retry_skipped);
+      for (std::size_t i = 0; i < rejected.size(); ++i)
+        if (searched[i]) firing[rejected[i]] = std::move(searched[i]);
+    }
+  }
+  result.capped_variants = capped + skipped;
 
   // Wait samples per place, reduced to stats at the end: one by one up to
   // kExpandedWaitSamples, then as (value, count) runs.
@@ -235,6 +362,19 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
         }
       }
     }
+  }
+
+  if (result.capped_variants != 0) {
+    result.message =
+        std::to_string(capped) + " of " + std::to_string(variants.size()) +
+        " variants were not decorated: on this net with inhibitor or reset arcs "
+        "their silent routing exceeded the replay's search bound of " +
+        std::to_string(kSilentRoutingBound) + " markings";
+    if (skipped != 0)
+      result.message += "; the other " + std::to_string(skipped) +
+                        " were skipped after every attempted variant exceeded it";
+  } else if (result.decorated_traces == 0 && result.trace_count != 0) {
+    result.message = "no trace replays cleanly on this model, so it carries no decoration";
   }
 
   result.place_waits.reserve(net.place_count());

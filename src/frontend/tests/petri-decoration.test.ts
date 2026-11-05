@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   decorationCoverage,
+  decorationNotice,
   hasTimedDecoration,
   placeTooltip,
   placeWaitLabel,
@@ -91,5 +92,14 @@ describe("decorationCoverage", () => {
     expect(
       decorationCoverage({ ...decoration, decorated_traces: 0 }),
     ).toBeNull();
+  });
+});
+
+describe("decorationNotice", () => {
+  it("surfaces the server's explanation only when it sent one", () => {
+    expect(decorationNotice(decoration)).toBeNull();
+    expect(decorationNotice(null)).toBeNull();
+    const note = "no trace replays cleanly on this model, so it carries no decoration";
+    expect(decorationNotice({ ...decoration, decorated_traces: 0, message: note })).toBe(note);
   });
 });

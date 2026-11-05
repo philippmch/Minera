@@ -63,3 +63,10 @@ export function decorationCoverage(
   }
   return `replayed ${numberFormat.format(decoration.decorated_traces)} of ${numberFormat.format(decoration.trace_count)} cases`;
 }
+
+/** The server's note on a decoration that leaves cases out; null when none. */
+export function decorationNotice(
+  decoration: PetriDecoration | null | undefined,
+): string | null {
+  return decoration?.message ? decoration.message : null;
+}

@@ -35,6 +35,18 @@ namespace {
 
 void write_attribute_detail(std::ostream& out, const EventAttribute& attribute);
 
+// Shortest round-trip form of a finite double (std::to_chars), the shared
+// writer for real numbers whose stream default of six significant digits
+// would lose precision; non-finite values become null.
+void write_round_trip_double(std::ostream& out, double value) {
+  if (!std::isfinite(value)) { out << "null"; return; }
+  char text[64];
+  const auto converted = std::to_chars(text, text + sizeof(text), value);
+  if (converted.ec != std::errc{})
+    throw std::runtime_error("cannot format JSON number");
+  out.write(text, converted.ptr - text);
+}
+
 void write_json_string(std::ostream& out, std::string_view value) {
   out << '"';
   for (const char c : value) {
@@ -302,8 +314,9 @@ void write_log_skeleton_conformance(
     }
     out << "], \"no_dev_total\": " << result.no_dev_total
         << ", \"no_constr_total\": " << result.no_constr_total
-        << ", \"dev_fitness\": " << result.dev_fitness
-        << ", \"is_fit\": " << (result.is_fit ? "true" : "false") << '}'
+        << ", \"dev_fitness\": ";
+    write_round_trip_double(out, result.dev_fitness);
+    out << ", \"is_fit\": " << (result.is_fit ? "true" : "false") << '}'
         << (i + 1 < conformance.size() ? ", " : "");
   }
   out << ']';
@@ -510,8 +523,9 @@ void write_declare_conformance(
     }
     out << "], \"no_constr_total\": " << result.no_constr_total
         << ", \"no_dev_total\": " << result.no_dev_total
-        << ", \"dev_fitness\": " << result.dev_fitness
-        << ", \"is_fit\": " << (result.is_fit ? "true" : "false") << '}';
+        << ", \"dev_fitness\": ";
+    write_round_trip_double(out, result.dev_fitness);
+    out << ", \"is_fit\": " << (result.is_fit ? "true" : "false") << '}';
   }
   out << ']';
 }
@@ -2302,13 +2316,8 @@ void write_decisions(std::ostream& out, const DecisionMiningResult& decisions) {
 // to_chars form picks the shorter of fixed and scientific, so whole seconds
 // stay integers (5184007, not 5.184007e+06).
 void write_duration_seconds(std::ostream& out, double value) {
-  if (!std::isfinite(value)) { out << "null"; return; }
   if (value == 0) value = 0;  // no "-0" for a zero-length span
-  char text[64];
-  const auto converted = std::to_chars(text, text + sizeof(text), value);
-  if (converted.ec != std::errc{})
-    throw std::runtime_error("cannot format duration JSON number");
-  out.write(text, converted.ptr - text);
+  write_round_trip_double(out, value);
 }
 
 void write_duration_stats(std::ostream& out, const DurationStats& stats) {
@@ -2330,8 +2339,15 @@ void write_duration_stats(std::ostream& out, const DurationStats& stats) {
 void write_model_decoration(std::ostream& out,
                             const ModelDecoration& decoration) {
   out << "{\"decorated_traces\": " << decoration.decorated_traces
-      << ", \"trace_count\": " << decoration.trace_count
-      << ", \"transitions\": [";
+      << ", \"trace_count\": " << decoration.trace_count;
+  // Present only when set, so a complete decoration keeps its former shape.
+  if (decoration.capped_variants != 0)
+    out << ", \"capped_variants\": " << decoration.capped_variants;
+  if (!decoration.message.empty()) {
+    out << ", \"message\": ";
+    write_json_string(out, decoration.message);
+  }
+  out << ", \"transitions\": [";
   for (std::size_t i = 0; i < decoration.transition_counts.size(); ++i) {
     out << decoration.transition_counts[i]
         << (i + 1 < decoration.transition_counts.size() ? ", " : "");
@@ -7820,8 +7836,14 @@ std::string temporal_conformance_json(
       write_json_string(out, deviation.target);
       out << ",\"elapsed_seconds\":" << std::setprecision(17)
           << deviation.elapsed_seconds
-          << ",\"standard_deviation_distance\":" << std::setprecision(17)
-          << deviation.standard_deviation_distance << '}';
+          << ",\"standard_deviation_distance\":";
+      // A zero-variance pair scores the reference's integer sys.maxsize,
+      // which the double 2**63 would round up.
+      if (deviation.zero_variance_sentinel)
+        out << "9223372036854775807";
+      else
+        out << std::setprecision(17) << deviation.standard_deviation_distance;
+      out << '}';
     }
     out << ']';
   }

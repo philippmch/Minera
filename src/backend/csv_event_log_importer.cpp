@@ -323,19 +323,27 @@ std::optional<int> reference_year(unsigned value, std::size_t digits, bool joine
 }
 
 // A recognized cell in ISO spelling. `iso_path` marks the shapes pandas reads
-// with its ISO-8601 parser (YYYY-M-D with `-`, `/` or `.`, a `T` or single
-// space before a two-digit HH:MM:SS clock, a `.` fraction, an uppercase `Z`
-// or a numeric offset): only those keep nanoseconds; every other shape goes
-// through dateutil, which truncates the fraction to microseconds.
+// with its ISO-8601 parser (YYYY-M-D with `-`, `/`, `.` or a single space, a
+// `T` or single space before a clock of an hour, HH:MM or HH:MM:SS (a
+// one-digit hour too), a `.` fraction, an uppercase `Z` or a numeric offset):
+// only those keep nanoseconds and read a spaced YYYY MM DD literally; every
+// other shape goes through dateutil, which truncates the fraction to
+// microseconds and orders three plain numbers itself.
 struct NormalizedTimestamp {
   std::string text;
   bool iso_path = false;
+  // The text keeps a fraction of more than six digits (nanosecond resolution).
+  bool nanosecond = false;
 };
 
-std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_view text) {
+// `allow_year_zero` accepts year 0 (proleptic, a leap year), which pandas'
+// ISO path holds and dateutil rejects; the caller decides by `iso_path`.
+std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_view text,
+                                                                 bool allow_year_zero = false) {
   TimestampTokens in{text};
   in.skip_spaces();
   int year = 0, month = 0, day = 0;
+  // Whether pandas' ISO-8601 parser takes the cell (see NormalizedTimestamp).
   bool iso_path = true;
   // A space-separated YYYY MM DD: pandas reads it on its ISO path, but a cell
   // that leaves that path reaches dateutil, which reads three numbers.
@@ -466,19 +474,23 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
     }
   }
   const auto valid_date = [&] {
-    return year >= 1 && month >= 1 && month <= 12 && day >= 1 &&
+    return year >= (allow_year_zero ? 0 : 1) && month >= 1 && month <= 12 && day >= 1 &&
            day <= month_days(year, month);
   };
   // A space-separated YYYY MM DD is checked once its reading is known.
   if (!spaced_numbers && !valid_date()) return std::nullopt;
-  // Trailing white space after a date alone is ignored.
+  // Trailing white space after a date alone is ignored, but after a spaced
+  // YYYY M D it leaves pandas' ISO path ("0060 3 20 " is 2060-03-20, while
+  // "0060-03-20 " and "0060 3 20 10:00 " stay year 60).
   if (const auto saved = in.pos; true) {
     in.skip_spaces();
     if (!in.done()) in.pos = saved;
+    else if (in.pos != saved && spaced_numbers) iso_path = false;
   }
 
   int hour = 0, minute = 0, second = 0;
   std::string fraction;
+  bool comma_fraction = false;
   std::string offset;
   int offset_minutes = 0;
   if (!in.done()) {
@@ -492,7 +504,13 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
     unsigned h = 0, m = 0, s = 0;
     const auto hour_digits = in.digits(h, 2);
     if (hour_digits == 0) return std::nullopt;
-    if (hour_digits != 2) iso_path = false;
+    // pandas' ISO path also takes a one-digit hour, an hour alone and HH:MM
+    // ("0047 1 8 9:36", "0047 01 08 19" are year 47; "2024-01-01
+    // 9:00:00.123456789" keeps its nanoseconds). A one-digit hour alone is
+    // no clock to either parser unless AM/PM follows ("2089-05-26 9" fails,
+    // "03/26/2089 9 PM" is 21:00).
+    const bool bare_digit_hour = hour_digits == 1 && in.peek() != ':';
+    bool meridiem_read = false;
     if (in.peek() == ':') {
       ++in.pos;
       if (in.digits(m, 2) != 2) return std::nullopt;
@@ -500,7 +518,7 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
         ++in.pos;
         if (in.digits(s, 2) != 2) return std::nullopt;
         if (in.peek() == '.' || in.peek() == ',') {
-          if (in.peek() == ',') iso_path = false;
+          if (in.peek() == ',') { iso_path = false; comma_fraction = true; }
           ++in.pos;
           while (!in.done() && std::isdigit(static_cast<unsigned char>(in.peek()))) {
             if (fraction.size() < 9) fraction.push_back(in.peek());
@@ -508,11 +526,7 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
           }
           if (fraction.empty()) return std::nullopt;
         }
-      } else {
-        iso_path = false;
       }
-    } else {
-      iso_path = false;
     }
     in.skip_spaces();
     if (in.peek() == 'a' || in.peek() == 'A' || in.peek() == 'p' ||
@@ -521,6 +535,7 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       const auto meridiem = in.word();
       if (meridiem == "am" || meridiem == "pm") {
         iso_path = false;
+        meridiem_read = true;
         if (h < 1 || h > 12) return std::nullopt;
         if (meridiem == "am" && h == 12) h = 0;
         else if (meridiem == "pm" && h != 12) h += 12;
@@ -529,6 +544,7 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       }
       in.skip_spaces();
     }
+    if (bare_digit_hour && !meridiem_read) return std::nullopt;
     if (h > 23 || m > 59 || s > 59) return std::nullopt;
     hour = static_cast<int>(h);
     minute = static_cast<int>(m);
@@ -576,10 +592,14 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
     }
   }
   if (!in.done()) return std::nullopt;
-  if (spaced_numbers && !iso_path) {
+  // A spaced YYYY MM DD that is no date on the ISO path ("0024 11 31") falls
+  // back to dateutil too, which then truncates the fraction.
+  if (spaced_numbers && (!iso_path || !valid_date())) {
     // dateutil's order for three plain numbers: year-first when the first
     // cannot be a day, day-first when it cannot be a month, else month-first;
-    // a year below 100 is two-digit ("0040 09 14T14:41:11 z" is 2040).
+    // a year below 100 is two-digit ("0040 09 14T14:41:11 z" is 2040,
+    // "0024 11 31" is 2031-11-24).
+    iso_path = false;
     const auto [a, b, c] = *spaced_numbers;
     const auto year_of = [](unsigned value) {
       return value < 100 ? expand_two_digit_year(value) : static_cast<int>(value);
@@ -625,15 +645,19 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
     if (!set_clock(utc, 0) && !set_clock(utc + minutes{nearest}, nearest))
       return std::nullopt;
   }
-  // dateutil keeps microseconds only.
-  if (!iso_path && fraction.size() > 6) fraction.resize(6);
+  // Off the ISO path pandas keeps microseconds only, unless a `.` fraction's
+  // microseconds end in three zeros: then its nanosecond digits are kept too
+  // ("2024-01-01t10:00:00.123000456" holds .123000456, ".1234567" .123456).
+  if (!iso_path && fraction.size() > 6 &&
+      (comma_fraction || fraction.compare(3, 3, "000") != 0))
+    fraction.resize(6);
 
   char buffer[40];
   std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d", year,
                 month, day, hour, minute, second);
   std::string out = buffer;
   if (!fraction.empty()) out += "." + fraction;
-  return NormalizedTimestamp{out + offset, iso_path};
+  return NormalizedTimestamp{out + offset, iso_path, fraction.size() > 6};
 }
 
 // The digits of the seconds fraction of a timestamp text: those after the
@@ -663,20 +687,28 @@ struct ReferenceTimestamp {
 std::optional<ReferenceTimestamp> reference_timestamp(const std::string& value,
                                                       bool padded = false) {
   const auto digits = timestamp_fraction_digits(value);
-  if (parse_timestamp_exact(value)) {
+  if (const auto exact = parse_timestamp_exact(value)) {
+    // Year 0 (a wall clock before 0001-01-01) is held only on pandas' ISO
+    // path; dateutil rejects it, so a lowercase `t` or `z` or an hour-only
+    // offset before white space makes the cell unconvertible.
+    constexpr std::int64_t kYearOneSeconds = -62135596800;
+    if (exact->seconds + std::int64_t{exact->offset_minutes} * 60 < kYearOneSeconds) {
+      const auto zero = normalize_reference_timestamp(padded ? value + " " : value, true);
+      if (zero && !zero->iso_path) return std::nullopt;
+    }
     if (digits <= 6) return ReferenceTimestamp{value, false};
     // A shape outside the ISO path (a lowercase `t` or `z`, an hour-only
     // offset before white space) goes through dateutil, which keeps
-    // microseconds only; the normalized spelling truncates it.
+    // microseconds only (but see the zero-microseconds rule in
+    // normalize_reference_timestamp); the normalized spelling truncates it.
     auto normalized = normalize_reference_timestamp(padded ? value + " " : value);
     if (!normalized || normalized->iso_path || !parse_timestamp_exact(normalized->text))
       return ReferenceTimestamp{value, true};
-    return ReferenceTimestamp{std::move(normalized->text), false};
+    return ReferenceTimestamp{std::move(normalized->text), normalized->nanosecond};
   }
   auto normalized = normalize_reference_timestamp(padded ? value + " " : value);
   if (normalized && parse_timestamp_exact(normalized->text))
-    return ReferenceTimestamp{std::move(normalized->text),
-                              normalized->iso_path && digits > 6};
+    return ReferenceTimestamp{std::move(normalized->text), normalized->nanosecond};
   return std::nullopt;
 }
 

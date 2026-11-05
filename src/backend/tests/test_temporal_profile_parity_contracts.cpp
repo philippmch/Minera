@@ -206,6 +206,7 @@ void temporal_profile_conformance_log_variant_contract() {
   assert(result[0].size() == 1);
   assert(result[0][0].standard_deviation_distance ==
          static_cast<double>(std::numeric_limits<std::int64_t>::max()));
+  assert(result[0][0].zero_variance_sentinel);
   assert(result[1].empty());
 
   options.zeta = std::numeric_limits<double>::infinity();
@@ -226,6 +227,8 @@ void temporal_profile_conformance_dataframe_variant_contract() {
   assert(result[0].size() == 1);
   assert(result[1].empty());
   assert(result[0][0].elapsed_seconds == 9.0);
+  // Zero variance: the reference's sys.maxsize, flagged for exact output.
+  assert(result[0][0].zero_variance_sentinel);
 }
 
 void temporal_profile_conformance_dispatch_contract() {
@@ -247,6 +250,14 @@ void temporal_profile_conformance_json_contract() {
          std::string::npos);
   assert(json.find("\"deviation_count\":1") != std::string::npos);
   assert(json.find("\"case_id\":\"c\"") != std::string::npos);
+
+  // A zero-variance pair carries the reference's integer sys.maxsize, not
+  // the double 2**63 (9.2233720368547758e+18).
+  minera::TemporalDeviation zero{"z", "A", "A", 0.5, 9223372036854775808.0, true};
+  const auto zero_json = minera::temporal_conformance_json({{zero}});
+  assert(zero_json.find("\"standard_deviation_distance\":9223372036854775807}") !=
+         std::string::npos);
+  assert(zero_json.find("e+18") == std::string::npos);
 }
 
 }  // namespace

@@ -3,6 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MINE_PROGRESS_INTERVAL_MS, fetchMineProgress, formatElapsed, mineProgressText, parseMineProgress, watchMineProgress } from "../src/mine-progress";
 import { Landing } from "../src/components/Landing";
+import app from "../src/App.tsx?raw";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
@@ -94,5 +95,20 @@ describe("mining overlay", () => {
   });
   it("says a canceled mine is stopping", () => {
     expect(render(parseMineProgress({...running, canceling: true}))).toContain("Stopping… Inductive net: reachability");
+  });
+});
+
+describe("which loads poll mine progress", () => {
+  it("polls only loads that post to /api/mine, never OCEL discovery", () => {
+    const begin = app.slice(app.indexOf("const beginSourceLoad ="), app.indexOf("\n", app.indexOf("const beginSourceLoad =")));
+    expect(begin).toContain("setMiningRequestId(null)");
+    expect(begin).not.toContain("setMiningRequestId(ticket.request_id)");
+    const ocel = app.slice(app.indexOf("const changeOcelModel ="), app.indexOf("const loadFile ="));
+    expect(ocel).not.toContain("setMiningRequestId");
+    const load = app.slice(app.indexOf("const loadFile ="), app.indexOf("const loadSample ="));
+    const filters = app.slice(app.indexOf("const applyFilters ="), app.indexOf("useEffect(", app.indexOf("const applyFilters =")));
+    for (const flow of [load, filters]) expect(flow).toContain("setMiningRequestId(ticket.request_id)");
+    // In a file load the id is set where it is sent, after the OCEL branch returned.
+    expect(load.indexOf("setMiningRequestId(ticket.request_id)")).toBeGreaterThan(load.indexOf("options.miningRequestId = ticket.request_id"));
   });
 });

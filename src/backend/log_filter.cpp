@@ -905,11 +905,6 @@ EventLog filter_end_activities(const EventLog& event_log,
 }
 
 EventLog filter_variants_top_k(const EventLog& event_log, std::size_t k) {
-  if (k == 0) {
-    EventLog result;
-    copy_event_log_context(event_log, result);
-    return result;
-  }
   LogFilterOptions options;
   options.top_variants = k;
   return filter_event_log(event_log, options);
@@ -1343,7 +1338,7 @@ EventLog filter_event_log(const EventLog& input, const LogFilterOptions& options
   }
 
   const bool by_frequency = options.min_variant_frequency > 1;
-  const bool by_rank = options.top_variants != 0;
+  const bool by_rank = options.top_variants.has_value();
   const bool by_coverage = options.variant_coverage > 0.0;
   const bool by_min_coverage = options.variant_min_coverage.has_value();
   const bool by_max_coverage = options.variant_max_coverage.has_value();
@@ -1424,7 +1419,7 @@ EventLog filter_event_log(const EventLog& input, const LogFilterOptions& options
   std::unordered_set<std::string> allowed;
   const double denominator = static_cast<double>(kept.size());
   for (std::size_t i = 0; i < order.size(); ++i) {
-    if (by_rank && i >= options.top_variants) break;
+    if (by_rank && i >= *options.top_variants) break;
     if (counts[order[i]] < options.min_variant_frequency) continue;
     if (by_coverage && covered.find(order[i]) == covered.end()) continue;
     if (by_percentage && percentage_allowed.find(order[i]) ==

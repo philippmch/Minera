@@ -1567,6 +1567,12 @@ describe("isMineraExport", () => {
       powl_petri_net_decoration: { ...decoration, places: [{ count: 1, wait: { ...wait, mean: Number.NaN } }, { count: 0, wait }] } })).toBe(false);
     expect(isMineraExport({ ...valid,
       activities: [{}], powl_petri_net_decoration: decoration })).toBe(false);
+    expect(isMineraExport({ ...base, powl_petri_net_decoration: { ...decoration,
+      decorated_traces: 0, capped_variants: 1, message: "1 of 1 variants were not decorated" } })).toBe(true);
+    expect(isMineraExport({ ...base,
+      powl_petri_net_decoration: { ...decoration, capped_variants: -1 } })).toBe(false);
+    expect(isMineraExport({ ...base,
+      powl_petri_net_decoration: { ...decoration, message: 3 } })).toBe(false);
   });
 
   it("accepts the complete footprint discovery and conformance envelope", () => {

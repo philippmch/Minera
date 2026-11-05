@@ -61,14 +61,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "288968",
+        "Content-Length": "289132",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-complete-log.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/typed-complete-log.response.json",
-        "bytes": 288968,
-        "sha256": "4bfa55b7b8119a9456e517becbed995826b913d380541a2484ffabccfae7efa0",
+        "bytes": 289132,
+        "sha256": "5211fd9701a9dd6dca6ed191884752cf7efe266967f95a1c38ee4bfc394bf259",
         "status": 200
       },
       "exports": {},
@@ -134,14 +134,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "226971",
+        "Content-Length": "227135",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-complete-stream.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/typed-complete-stream.response.json",
-        "bytes": 226971,
-        "sha256": "8361281efbb98035f5a9881e3a3e446de354899c64abfeaa317d51efff208f13",
+        "bytes": 227135,
+        "sha256": "d89606f31019c444f72d81ca31681de4db961239b7a94cd347d040c96ad2076f",
         "status": 200
       },
       "exports": {},
@@ -207,14 +207,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "227088",
+        "Content-Length": "227252",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-complete-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/typed-complete-dataframe.response.json",
-        "bytes": 227088,
-        "sha256": "2c596e095dc8af12d0ebe9d667fcfde8d4518280f68d07f155ae6c5743bee515",
+        "bytes": 227252,
+        "sha256": "be0a48f59ab68f39d70e2e2cd29f9f30617b273ed412079ca6dc94824a65e8ec",
         "status": 200
       },
       "exports": {},
@@ -280,14 +280,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "227052",
+        "Content-Length": "227216",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-complete-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/typed-complete-lazyframe.response.json",
-        "bytes": 227052,
-        "sha256": "65fe0fbfab5ea5abea93cde4a68499f4afbb4bf8caf7e67e66e974503ea6e2ad",
+        "bytes": 227216,
+        "sha256": "59fa22659495295322d6d8135ff1232a37ce28e58fef20c9397da01ecde172bc",
         "status": 200
       },
       "exports": {},
@@ -333,14 +333,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "128227",
+        "Content-Length": "128309",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "implicit-index-query-identity-and-selection.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/implicit-index-query-identity-and-selection.response.json",
-        "bytes": 128227,
-        "sha256": "196caaacb30b12d7a78b11250e42304dd5dcfda72ab82a2629b670dd1f203527",
+        "bytes": 128309,
+        "sha256": "b0431e40cd1a7f1a7a614028c2b264965e27c1de7852182456e18bffcb4df08e",
         "status": 200
       },
       "exports": {},
@@ -952,14 +952,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "216830",
+        "Content-Length": "216994",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-private-marker-collision-filter.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/native-private-marker-collision-filter.response.json",
-        "bytes": 216830,
-        "sha256": "fca5396497c2a02e500458e6857a9e8e5a89dec0aef9ce139c3f239951addabe",
+        "bytes": 216994,
+        "sha256": "b5321b7a47c387756603507167cab460bc51c85f9a9e2eea63cb7ceb76311fc8",
         "status": 200
       },
       "exports": {},
@@ -1202,14 +1202,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "86076",
+        "Content-Length": "86158",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "literal-selectors-1.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/literal-selectors-1.response.json",
-        "bytes": 86076,
-        "sha256": "07c13a71d6b208c8c4958020956f3035eae2f215f30ce94fc2c87bd6d9c1e0da",
+        "bytes": 86158,
+        "sha256": "47cfafc32119e71a6b61eb4acf120194107b58a553375fb8a66cafd90df1b9e8",
         "status": 200
       },
       "exports": {},
@@ -1265,14 +1265,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "101504",
+        "Content-Length": "101586",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "literal-selectors-2.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/literal-selectors-2.response.json",
-        "bytes": 101504,
-        "sha256": "cd4884c00bed0f745386ce18d0d72b4a9635fd2b190b4e558f6d77abb13a7964",
+        "bytes": 101586,
+        "sha256": "3550440a45b83e5f5c79bab7acd67b36700bc7c2dc084e5d8eb4a57efddc4f6a",
         "status": 200
       },
       "exports": {},
@@ -1328,14 +1328,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "45155",
+        "Content-Length": "45237",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "literal-empty-activity-selector.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/literal-empty-activity-selector.response.json",
-        "bytes": 45155,
-        "sha256": "8553c9d7bea8512f3619dd7a7f3cc23f2abc3ff6da00283d5228c97f646aa66f",
+        "bytes": 45237,
+        "sha256": "9b5777aa27ff396e0e3ff47ab8b06412e531988fd0ca0aa0dc2dd60e747a3268",
         "status": 200
       },
       "exports": {},
@@ -1403,14 +1403,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "127586",
+        "Content-Length": "127668",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "family-literal-selector-override-is-independent.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/family-literal-selector-override-is-independent.response.json",
-        "bytes": 127586,
-        "sha256": "4a65ae2006b56c0a3dd93fc9422fc2ac499b8ade1be9ecd80865fef549fe7ada",
+        "bytes": 127668,
+        "sha256": "54ded651313de4eb17df0dac934961f8324eb5ea8828a5d8f750becc35ae976b",
         "status": 200
       },
       "exports": {},
@@ -1553,14 +1553,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62101",
+        "Content-Length": "62183",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-alias-default-stream.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-alias-default-stream.response.json",
-        "bytes": 62101,
-        "sha256": "d23037e35231a287e3f515e0101fc726e6c74ddce562e4000ffd08d280d78ac5",
+        "bytes": 62183,
+        "sha256": "dae6ab639931abdd396e84124afc50915adc8cb131dcc9d82ea30994493f8777",
         "status": 200
       },
       "exports": {},
@@ -1603,14 +1603,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62230",
+        "Content-Length": "62394",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-alias-default-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-alias-default-dataframe.response.json",
-        "bytes": 62230,
-        "sha256": "1f2055ce51671bbb86efba795c776b0859934b3979854d4e557166d80460532f",
+        "bytes": 62394,
+        "sha256": "50ed9abab4fe4f8b84be287b9ee170c7d4c5bb803f815ed1c1a5a170d1079813",
         "status": 200
       },
       "exports": {},
@@ -1653,14 +1653,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62230",
+        "Content-Length": "62394",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-alias-default-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-alias-default-lazyframe.response.json",
-        "bytes": 62230,
-        "sha256": "c68b23152908efdfa400159267a1d2942ebb9873c5b77b4f00ecd379ba0df222",
+        "bytes": 62394,
+        "sha256": "23eb1b5d5924ef642ac26d82e4262eac0ddb137dafc3657716984f5af3b15ca1",
         "status": 200
       },
       "exports": {},
@@ -1853,14 +1853,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "70712",
+        "Content-Length": "70876",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-both-headers-default-exact.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-both-headers-default-exact.response.json",
-        "bytes": 70712,
-        "sha256": "06549175ba678584226df75af630df65d4239f4cf6e9cd454db89f94e3dfec0e",
+        "bytes": 70876,
+        "sha256": "89bba7bb1de3bc3f7280fdec45e71fcbe449d0bb8a4ad3f9305889ba0694d12c",
         "status": 200
       },
       "exports": {},
@@ -2085,14 +2085,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "50825",
+        "Content-Length": "50907",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-custom-exact-controls.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-custom-exact-controls.response.json",
-        "bytes": 50825,
-        "sha256": "d1e1876d6c4b08f5338cd37b2b3224919c43996f0da4a85e18dcb436d724fbd6",
+        "bytes": 50907,
+        "sha256": "466c84c5218a3b501ba4855c50180d7471182ab0026412249bdc2d3d3f1a55b9",
         "status": 200
       },
       "exports": {},
@@ -2138,14 +2138,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "70985",
+        "Content-Length": "71149",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-family-explicit-activity-independent.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-family-explicit-activity-independent.response.json",
-        "bytes": 70985,
-        "sha256": "7b8d1e5454812425f0b2239968436b9126b38cdf8f8e2c16a3040aa8bed43601",
+        "bytes": 71149,
+        "sha256": "7ca7ffd8f61618929617877bc00dcc6349790d50f0ceac5cf30e6304689488e0",
         "status": 200
       },
       "exports": {},
@@ -2240,14 +2240,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62684",
+        "Content-Length": "62848",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-case-alias-explicit-physical-control.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-case-alias-explicit-physical-control.response.json",
-        "bytes": 62684,
-        "sha256": "3428049e6decc076693d797e533eaf2f0e475bc13668e7a6843a74d16f733e06",
+        "bytes": 62848,
+        "sha256": "b4dbbdf32610969504827849e9645f390220216db18505345bddd8f56cda2661",
         "status": 200
       },
       "exports": {},
@@ -2396,14 +2396,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "69897",
+        "Content-Length": "69979",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-custom-clock-native-flat-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-dataframe.response.json",
-        "bytes": 69897,
-        "sha256": "ec947586d49c47e91c9a391b5c3a8eac49c6921beec8175a6af1bbc560f3366d",
+        "bytes": 69979,
+        "sha256": "b2b654bf2db8f53514b5c3cb8bdc79dcf34e640eb0ca769c9e579d1483d81f3e",
         "status": 200
       },
       "exports": {},
@@ -2450,14 +2450,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "69897",
+        "Content-Length": "69979",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-custom-clock-native-flat-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-lazyframe.response.json",
-        "bytes": 69897,
-        "sha256": "8cb57c38ca5262d0bc5ede3d79587011e918864600e6d7e2bf0847d736512cd7",
+        "bytes": 69979,
+        "sha256": "b00cd3291420ccc7dcfd12a50b04f2f3bcce744084745d549d81d49d31685b04",
         "status": 200
       },
       "exports": {},

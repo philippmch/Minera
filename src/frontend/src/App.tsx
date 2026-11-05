@@ -251,7 +251,7 @@ export default function App() {
   // A failed load: roll the backend back in case it published the session before the response failed to arrive,
   // or the response arrived but could not be applied (it was never acknowledged).
   const failSourceLoad = (pending: {request_id: string; posted: boolean; previousSource: string | null} | null) => {if (pending) handBackLiveSource(pending.previousSource, pending.posted ? sendCancel(pending.request_id) : Promise.resolve(undefined));};
-  const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; setMiningRequestId(ticket.request_id); setMining(true); setError(null); return {ticket, controller, cancelsSettled: cancelBarrier.current};};
+  const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; setMiningRequestId(null); setMining(true); setError(null); return {ticket, controller, cancelsSettled: cancelBarrier.current};};
   useEffect(() => () => {sourceGate.current.invalidate(); const pending = sourceRequest.current; pending?.controller.abort(); if (pending?.posted) void cancelMiningRequest(pending.request_id); ocelRequest.current?.abort();}, []);
   // A run on the imported model is stale once another model has been imported, even though its source is unchanged.
   const importedModelGuard = (miner: string | undefined) => {const generation = importedModelGeneration.current; return () => {if (miner === "imported" && generation !== importedModelGeneration.current) throw new Error("The imported model changed while this request was pending; run it again.");};};
@@ -514,6 +514,8 @@ export default function App() {
         }
       }
         options.miningRequestId = ticket.request_id;
+        // Only a load that reaches POST /api/mine has progress to poll (not OCEL discovery).
+        if (accepts()) setMiningRequestId(ticket.request_id);
         const sha256 = await miningSourceHash(file);
         await cancelsSettled;
         if (!accepts()) return;
@@ -570,6 +572,7 @@ export default function App() {
     // Only the import settings carry over; filters and miner settings come
     // entirely from this request, so Reset ({}) really clears them.
     const original = source, {ticket, controller, cancelsSettled} = beginSourceLoad(), options: MineOptions = {...sourceImportOptions(original.options), ...filters, miningRequestId: ticket.request_id};
+    setMiningRequestId(ticket.request_id);
     const accepts = () => sourceGate.current.accepts(ticket, controller.signal) && sourceRequest.current?.controller === controller;
     cancelsSettled
       .then(() => {

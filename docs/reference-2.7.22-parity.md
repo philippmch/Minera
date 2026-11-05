@@ -19091,3 +19091,115 @@ Declared:
 - **Uncovered timestamp shapes (declared).** Time-only cells (`10:00`, whose
   pandas result depends on the current day) and POSIX-inverted
   `UTC+02:00`/`GMT+2` offsets are not reproduced.
+
+## Review U2: decorations of large concurrent nets, temporal and conformance JSON, top-k variants (2026-11-05)
+
+Random logs were run through `/api/mine`, `minera_export` and
+`/api/temporal-conformance` and compared with pm4py 2.7.22 public calls.
+
+Fixes:
+
+- **Petri decorations use the token replay's firings.** `decorate_model`
+  took its firings from the clean silent-routing replay, whose routing to the
+  final marking searched the marking graph breadth-first up to 4096
+  markings. A net with k concurrent optional branches (the inductive and
+  POWL nets of a random log: a parallel of `xor(tau, loop(a, tau))`) has
+  about 3^k such markings, so from eight branches on every case came back
+  undecorated, silently, while token replay fit them all (300 cases, 8
+  activities: 0/300 decorated, reference and native token replay 300/300;
+  5,000 cases, 20 activities: 0/5000 decorated in 9.8 s). The decoration now
+  replays each variant with the forward token replay of `check_conformance`
+  (the replay pm4py's frequency and performance decorations use) and
+  decorates the variants it fits (no missing, no remaining tokens) with the
+  transitions that replay activates, per event and for the final routing:
+  300/300 and 5000/5000, the latter in about 0.4 s of replay. Transition
+  counts equal the replay's activation counts. Token replay fires silent
+  transitions greedily and can reject a variant that has a clean path (7 of
+  150 cases on one POWL net of the fast-path bank), so variants it rejects
+  still get the bounded clean replay, as before; the silent transitions it
+  fires for a fitting variant can differ from that search's shortest routing,
+  which moves silent-transition counts. Nets with inhibitor or reset
+  arcs keep the clean replay; a variant whose silent search stops at the
+  bound is counted in `capped_variants`, and after 16 such variants without
+  one decorated the rest are skipped and counted too. The decoration JSON
+  then carries `capped_variants` and a `message`; a decoration that covers
+  no case says why (`message`), and the Petri net view shows it. Both fields
+  are absent otherwise. Test: `minera_core_tests`
+  (`decorate_model_fits_parallel_optional_loops`).
+- **Zero-variance temporal distance.** `/api/temporal-conformance` printed
+  the `sys.maxsize` distance of a zero-deviation pair as the double
+  `9.2233720368547758e+18` (2**63); it now prints the reference integer
+  `9223372036854775807`, as the streaming route already did. The batch log
+  and dataframe conformance now set `zero_variance_sentinel` on such pairs
+  (they left it false), so every serializer that honours it prints the
+  integer.
+  Fresh: 0/400 random logs, dataframe and log variants. Test:
+  `minera_temporal_profile_parity_contracts_tests`.
+- **Full-precision conformance fitness.** The `/api/mine` log-skeleton and
+  Declare conformance printed `dev_fitness` with six significant digits
+  (21/22 as `0.954545`); it is now the shortest round-trip double
+  (`0.9545454545454546`). Test: `minera_core_tests`.
+- **Top-k variants of zero.** `top_variants` (`--top-variants`, `/api/mine`
+  `top_variants`, `LogFilterOptions::top_variants`) used 0 for "no limit";
+  it is now optional, and 0 keeps no variant, as
+  `pm4py.filter_variants_top_k(log, 0)` does. The frontend never sends 0.
+
+Unchanged and matched on random inputs: log skeleton (noise 0-0.5) and
+Declare discovery and conformance, temporal-profile discovery (CSV and XES);
+variant and case filters on CSV and XES; token-replay diagnostics (two
+differences where the reference depends on `PYTHONHASHSEED`); soundness and
+Woflan; OCEL flattening from OCEL 1.0 JSON, 2.0 JSON and 2.0 XML; the prefix
+tree.
+
+## Review U1: CSV timestamp paths, A* bounds on non-ordinary nets, mine progress (2026-11-05)
+
+Fixes after a review of Round T, checked against `pandas.read_csv` +
+`pm4py.format_dataframe` outputs only.
+
+- **pandas' ISO path is tracked on its own.** The importer used one flag
+  for "ISO spelling" and "pandas' ISO path". The ISO path also takes a
+  one-digit hour, an hour alone and `HH:MM`, so a spaced `YYYY M D` with
+  such a clock is literal (`0047 1 8 9:36` and `0047 01 08 19` are year
+  47) and `2024-01-01 9:00:00.123456789` keeps its nanoseconds (beside
+  1500-01-01 the column is refused, as the reference keeps it as text). A
+  one-digit hour alone is no clock unless AM/PM follows (`2089-05-26 9`
+  leaves the column text; `03/26/2089 9 PM` is 21:00). Trailing white
+  space after a spaced date alone leaves the ISO path (`0060 3 20 ` is
+  2060-03-20; `0060-03-20 ` and `0060 3 20 10:00 ` stay year 60).
+- **Spaced dates that are no ISO date.** A spaced `YYYY MM DD` that is
+  invalid read literally falls back to dateutil's order (`0024 11 31` is
+  2031-11-24, `0012 13 05` is 2005-12-13); `2024 02 30` still fails.
+- **Nanoseconds off the ISO path.** A `.` fraction whose digits 4-6 are
+  `000` keeps its nanoseconds on the dateutil path too
+  (`2024-01-01t10:00:00.12300045`, `... .123000456 UTC`), so such a column
+  needs the nanosecond range; other fractions and every `,` fraction keep
+  microseconds.
+- **Year 0 on the dateutil path.** pandas holds year 0 only on its ISO
+  path; a dateutil-shaped year-0 cell (`0000-05-26t17:01:52`,
+  `0000-05-26 17:01:52 +01 `) leaves the column text, so the importer
+  refuses it as for any unparsable cell.
+- **A* model-run bounds.** The marking-equation bounds (the LP, its dual
+  and the parent-plan bound) assume a firing adds the transition's
+  incidence column. A reset arc, an inhibitor arc, or two weighted input
+  arcs on one place (each checked on its own, so `b` with two weight-2
+  arcs fires on two tokens) break that, and the pruned model-run search
+  could prune a marking that reaches the final marking and call a fitting
+  net unreachable. On such nets the search now uses no bound; a run it
+  cannot finish within `max_states` is reported exhausted. Random nets
+  (1,500 per generator mode, ordinary, weighted, negative-weight,
+  reset/inhibitor, structured): ordinary nets' results and diagnostics are
+  unchanged; on the affected nets some results move from unreachable or
+  computed to exhausted.
+- **Mine progress.** Native-dispatch stages are named (`Alpha miner`,
+  `Inductive net: conformance`, ...); the OCEL discovery path no longer
+  polls `/api/mine-progress`.
+
+Fuzz: 10 sets of 3,000 multi-row CSV timestamp columns (seeds 202-204,
+301-302, 401-402, 601-603), new importer vs Round T vs reference: no column
+that Round T matched now differs; the remaining mismatches are the
+declared year-0 and `9999-12-31T23:59:00-23:59` shapes.
+
+Tests: `minera_core_tests`
+(`csv_timestamps_follow_pandas_resolution_and_offsets`,
+`mine_progress_names_native_families`), `minera_alignment_variants_tests`
+(reset-arc and repeated-weight nets), frontend `mine-progress.test.ts`.

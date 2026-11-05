@@ -713,16 +713,19 @@ TemporalConformanceResult conform_temporal_profile_log(
             options.use_business_hours ? &slots : nullptr);
         const double difference = std::abs(duration - entry->mean_seconds);
         double distance = 0.0;
+        bool sentinel = false;
         if (entry->standard_deviation_seconds == 0.0) {
           if (difference == 0.0) continue;
+          // The reference reports the integer sys.maxsize.
           distance = static_cast<double>(
               std::numeric_limits<std::int64_t>::max());
+          sentinel = true;
         } else {
           distance = difference / entry->standard_deviation_seconds;
         }
         if (!(distance > options.zeta)) continue;
         deviations.push_back({trace.case_id, *source_activity,
-                              *target_activity, duration, distance});
+                              *target_activity, duration, distance, sentinel});
       }
     }
     result.push_back(std::move(deviations));

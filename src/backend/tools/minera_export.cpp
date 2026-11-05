@@ -1632,6 +1632,7 @@ int usage(const char* program) {
                "                            becomes case <id>##@@<k>, k from 0\n"
                "  --min-variant-frequency <n>  Keep variants seen at least n times\n"
                "  --top-variants <n>        Keep only the n most frequent variants\n"
+               "                            (0 keeps none)\n"
                "  --variant-coverage <f>    Keep the most frequent variants\n"
                "                            that together cover this share of\n"
                "                            cases, f in (0,1]\n"

@@ -33,7 +33,7 @@ void handle_active_source_mining(const httplib::Request& request,
     // A canceled or superseded request stops before its next family.
     abort_if_mining_canceled(ticket);
     minera::throw_if_cancelled(disconnected, "mining request was cancelled: the client disconnected");
-    mine_progress_stage(family);
+    mine_progress_stage(mine_family_stage_name(family));
     std::string result = "null", error = "null";
     bool native_returned = false;
     try {result = call(native_returned);}

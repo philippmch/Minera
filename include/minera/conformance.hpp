@@ -759,11 +759,14 @@ struct AlignmentResult {
 // replay's firings would not be a real path through the model. Feeds decision
 // mining, which must know which transition consumed which place's token.
 // `cancelled` is polled between variants; once it returns true the call
-// throws OperationCancelled.
+// throws OperationCancelled. `capped`, when given, receives per variant
+// whether its nullopt came from a silent-routing search that stopped at its
+// bound (the variant may still fit) rather than from a deviation.
 [[nodiscard]] std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
 replay_firing_sequences(const PetriNet& net,
                         const std::vector<std::vector<std::string>>& variants,
-                        const std::function<bool()>& cancelled = {});
+                        const std::function<bool()>& cancelled = {},
+                        std::vector<bool>* capped = nullptr);
 
 // Per-activity tally of alignment moves across the whole log — the aggregate
 // behind the per-variant alignments: how often the activity aligned

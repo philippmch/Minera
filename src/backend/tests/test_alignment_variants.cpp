@@ -407,5 +407,39 @@ int main() {
       minera::check_alignment(log_of({"finish"}), long_chain, preflight_cap);
   assert(!preflight_result.computed && preflight_result.exhausted);
   assert(!preflight_result.time_limit_reached);
+
+  // A reset arc clears a place the marking equation cannot empty, so the
+  // pruned model-run search applies no LP bound to such a net: a silent token
+  // pump makes it run out of states (exhausted) instead of pruning the
+  // initial marking and calling a reachable final marking unreachable.
+  minera::PetriNet reset;
+  for (int place = 0; place < 4; ++place) reset.add_place();
+  reset.set_source(0); reset.set_sink(1); reset.set_activities({"a"});
+  reset.add_transition(std::nullopt, {0}, {0, 2});  // silent pump
+  reset.add_transition(std::nullopt, {0}, {3, 2});  // silent split
+  const auto reset_a = reset.add_transition(0, {3}, {1});
+  reset.add_reset_arc(reset_a, 2);  // a clears the pumped place
+  minera::AlignmentOptions reset_options;
+  reset_options.max_states = 2000;
+  const auto reset_result = minera::check_alignment(log_of({"a"}), reset, reset_options);
+  assert(!reset_result.computed && reset_result.exhausted);
+
+  // Two weight-2 input arcs on one place each need two tokens, so b fires
+  // on the two tokens a makes, which the marking equation (needing four)
+  // cannot see: with a silent pump the search runs out of states instead of
+  // calling the fitting run unreachable.
+  minera::PetriNet doubled;
+  for (int place = 0; place < 4; ++place) doubled.add_place();
+  doubled.set_source(0); doubled.set_sink(1); doubled.set_activities({"a", "b"});
+  doubled.add_transition(std::nullopt, {0}, {0, 3});  // silent pump
+  minera::PetriArcWeight one_token{}, two_tokens{};
+  one_token.magnitude = 1;
+  two_tokens.magnitude = 2;
+  const auto doubled_a = doubled.add_transition(0, {0}, {2});
+  doubled.set_ordinary_arc_weights(doubled_a, {one_token}, {two_tokens});
+  const auto doubled_b = doubled.add_transition(1, {2, 2}, {1});
+  doubled.set_ordinary_arc_weights(doubled_b, {two_tokens, two_tokens}, {one_token});
+  const auto doubled_result = minera::check_alignment(log_of({"a", "b"}), doubled, reset_options);
+  assert(!doubled_result.computed && doubled_result.exhausted);
   return 0;
 }

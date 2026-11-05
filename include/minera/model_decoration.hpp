@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -19,6 +20,11 @@ namespace minera {
 // (a forced replay's firings would not be a real path through the model), so
 // on a model that does not fit the whole log the annotations describe the
 // fitting part and `decorated_traces` says how much that is.
+//
+// A trace replays cleanly when the reference token replay (the forward
+// replay of check_conformance, routing through silent transitions to the
+// final marking as pm4py's decorations do) fits it: no missing and no
+// remaining tokens. Its firings are the ones that replay activates.
 struct ModelDecoration {
   // Per transition, in PetriNet::transitions() order: firings across all
   // cleanly replaying traces, silent routing included.
@@ -33,6 +39,15 @@ struct ModelDecoration {
   std::vector<DurationStats> place_waits;
   std::uint64_t decorated_traces = 0;  // traces whose replay was clean
   std::uint64_t trace_count = 0;
+  // Nets with inhibitor or reset arcs take their firings from the exhaustive
+  // silent-routing replay instead. Variants whose routing that search could
+  // not finish within its bound of 4096 markings (and, once the first 16
+  // attempted all failed so, the variants not attempted) are left out and
+  // counted here; ordinary nets never cap.
+  std::uint64_t capped_variants = 0;
+  // Why the decoration covers nothing, or why capped variants are missing;
+  // empty otherwise.
+  std::string message;
 };
 
 // Decorates `net` with the replay of `log`. Tokens are matched

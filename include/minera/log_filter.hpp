@@ -312,7 +312,8 @@ struct LogFilterOptions {
 
   // Variant selection. Keep only traces whose variant (its activity sequence)
   // occurs at least `min_variant_frequency` times; when `top_variants` is
-  // non-zero, only the `top_variants` most frequent variants; and when
+  // engaged, only the `top_variants` most frequent variants (an engaged zero
+  // keeps none, as pm4py.filter_variants_top_k(log, 0) does); and when
   // `variant_coverage` is non-zero, the most frequent variants that together
   // cover at least that share of the surviving cases ((0, 1]; a value outside
   // that range throws). The optional minimum/maximum coverage fields compare
@@ -323,7 +324,7 @@ struct LogFilterOptions {
   // A variant must satisfy every active constraint. All default to "keep
   // everything".
   std::uint64_t min_variant_frequency = 0;
-  std::size_t top_variants = 0;
+  std::optional<std::size_t> top_variants;
   double variant_coverage = 0.0;
   std::optional<double> variant_min_coverage;
   std::optional<double> variant_max_coverage;
@@ -381,7 +382,7 @@ struct LogFilterOptions {
            min_length != 0 || max_length != 0 || !start_activities.empty() ||
            !end_activities.empty() || max_cases.has_value() ||
            min_variant_frequency > 1 ||
-           top_variants != 0 || variant_coverage != 0.0 ||
+           top_variants.has_value() || variant_coverage != 0.0 ||
            variant_min_coverage.has_value() ||
            variant_max_coverage.has_value() || variant_percentage.has_value() ||
            !activity_split_activities.empty() ||

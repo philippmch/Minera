@@ -3,10 +3,12 @@
 // Progress of the running POST /api/mine, for GET /api/mine-progress.
 //
 // The mine that holds the /api/mine slot (mine_limits.hpp) records which
-// stage it is in. The record has its own mutex, never g_session_mutex or the
-// mine slot, so a poll from another connection answers at once while the mine
-// runs (and while another request is refused with MINE_BUSY). A poll reads
-// nothing of the log: stage names are fixed text.
+// stage it is in. The record has its own mutex, not the mine slot, so a poll
+// from another connection answers while the mine runs (and while another
+// request is refused with MINE_BUSY). A poll of a running mine also takes
+// g_session_mutex briefly, as the MINE_BUSY answer does, to read whether the
+// running ticket was canceled, so it waits for any request holding that
+// mutex. A poll reads nothing of the log: stage names are fixed text.
 //
 // mining_cancel_hook is the cancellation callback the long stages poll: a
 // client disconnect, as before, and also a cancel-mine (or a newer source
@@ -20,6 +22,9 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <utility>
+
+#include "mine_stage_names.hpp"
 
 struct MineProgressRecord {
   bool running = false;

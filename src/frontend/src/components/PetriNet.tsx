@@ -4,6 +4,7 @@ import { panViewBox, zoomViewBoxAt } from "../graph-viewport";
 import { type PetriLayout } from "../petri-layout";
 import {
   decorationCoverage,
+  decorationNotice,
   hasTimedDecoration,
   placeTooltip,
   placeWaitLabel,
@@ -116,6 +117,11 @@ export function PetriNet({ layout, title, actions, decoration, annotations,
               title="Annotations come from token replay of the cases that fit the model"
             >
               {decorationCoverage(decorated)}
+            </span>
+          )}
+          {decorationNotice(decoration) && (decorated === null || mode !== "plain") && (
+            <span className="map-stat" role="note">
+              {decorationNotice(decoration)}
             </span>
           )}
           <div className="tree-legend">

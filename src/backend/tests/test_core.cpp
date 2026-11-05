@@ -69,6 +69,8 @@
 #include <utility>
 #include <vector>
 
+#include "../tools/mine_stage_names.hpp"
+
 namespace {
 
 std::uint64_t exact_mean_bits(double value) {
@@ -2462,6 +2464,64 @@ void decorate_model_skips_deviating_and_untimed_traces() {
   }
 }
 
+void decorate_model_fits_parallel_optional_loops() {
+  // Random cases over eight activities mine to a parallel of eight
+  // xor(tau, loop(a, tau)) branches; closing them toward the sink spans
+  // about 3^8 silent markings, past the replay's 4096-marking search. The
+  // token replay fits every case, and the decoration must decorate them all
+  // with that replay's firings, as pm4py's frequency decoration does.
+  std::uint64_t state = 7;
+  const auto next = [&](std::uint64_t bound) {
+    state = state * 6364136223846793005ull + 1442695040888963407ull;
+    return (state >> 33) % bound;
+  };
+  std::vector<std::vector<std::string>> variants;
+  for (int c = 0; c < 300; ++c) {
+    std::vector<std::string> variant;
+    const auto length = 1 + next(10);
+    for (std::uint64_t i = 0; i < length; ++i)
+      variant.push_back(std::string(1, static_cast<char>('a' + next(8))));
+    variants.push_back(std::move(variant));
+  }
+  const auto log = log_from_variants(variants);
+  const auto tree = minera::discover_process_tree(log);
+  assert(tree.root().op == minera::ProcessTreeOperator::kParallel);
+  assert(tree.root().children.size() == 8);
+  const auto net = minera::to_petri_net(tree);
+  const auto replay = minera::replay_token_diagnostics(log, net);
+  assert(replay.fitting_traces == log.traces.size());
+
+  const auto decoration = minera::decorate_model(log, net);
+  assert(decoration.trace_count == log.traces.size());
+  assert(decoration.decorated_traces == log.traces.size());
+  assert(decoration.capped_variants == 0);
+  assert(decoration.message.empty());
+  assert(decoration.transition_counts.size() == replay.transition_activations.size());
+  for (std::size_t t = 0; t < decoration.transition_counts.size(); ++t)
+    assert(decoration.transition_counts[t] == replay.transition_activations[t]);
+  assert(decoration.place_counts[net.source()] == log.traces.size());
+
+  // A reset arc on a fresh place changes no behaviour but sends the net to
+  // the exhaustive extended-arc replay, whose bounded search cannot route
+  // these variants: they are reported as capped, the remaining ones are
+  // skipped after the first attempts, and the decoration says why.
+  auto extended = net;
+  extended.add_reset_arc(0, extended.add_place());
+  assert(extended.has_extended_arcs());
+  const auto capped = minera::decorate_model(log, extended);
+  assert(capped.decorated_traces == 0);
+  std::set<std::vector<std::string>> distinct(variants.begin(), variants.end());
+  assert(capped.capped_variants == distinct.size());
+  assert(capped.message.find("search bound") != std::string::npos);
+  assert(capped.message.find("skipped") != std::string::npos);
+
+  // Nothing fits: the message says so instead of an unexplained zero.
+  const auto foreign = log_from_variants({{"x"}, {"y", "z"}});
+  const auto empty = minera::decorate_model(foreign, net);
+  assert(empty.decorated_traces == 0 && empty.capped_variants == 0);
+  assert(empty.message == "no trace replays cleanly on this model, so it carries no decoration");
+}
+
 void ptml_round_trip_preserves_replay_behavior() {
   // A mined tree written as PTML and read back must accept the same language:
   // the perfectly fitting log still fits, by replay and by alignment.
@@ -3970,7 +4030,7 @@ void filter_keeps_variants_covering_a_share_of_cases() {
   options.top_variants = 1;
   assert(minera::filter_event_log(log, options).trace_count() == 5);
 
-  options.top_variants = 0;
+  options.top_variants.reset();
   options.variant_coverage = 1.5;
   assert(throws([&] { (void)minera::filter_event_log(log, options); }));
 }
@@ -6481,6 +6541,12 @@ void json_export_keeps_registered_empty_skeleton_activities() {
   assert(json.find("\"source\": 1, \"target\": " + empty_id) !=
          std::string::npos);
 
+  // Fitness keeps its full double (pm4py's 21/22), not six digits.
+  auto precise = conformance;
+  precise.front().dev_fitness = 21.0 / 22.0;
+  assert(encode(model, precise).find("\"dev_fitness\": 0.9545454545454546,") !=
+         std::string::npos);
+
   auto unknown_model = model;
   unknown_model.equivalence.push_back({"", "unregistered"});
   bool rejected = false;
@@ -6529,6 +6595,19 @@ void json_export_carries_declare_contract() {
   assert(json.find("\"declare\": {\"existence\"") != std::string::npos);
   assert(minera::analysis_json("test", log, graph).find("\"declare\"") ==
          std::string::npos);
+  {
+    auto precise = conformance;
+    precise.front().dev_fitness = 118.0 / 123.0;
+    const auto precise_json = minera::analysis_json(
+        "test", log, graph,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, &model, &precise);
+    assert(precise_json.find("\"dev_fitness\": 0.959349593495935,") !=
+           std::string::npos);
+  }
 
   const auto expect_rejected = [&](const minera::DeclareModel* invalid_model,
                                    const std::vector<minera::DeclareConformance>* invalid_conf) {
@@ -8392,10 +8471,56 @@ void csv_timestamps_follow_pandas_resolution_and_offsets() {
   assert(one("9999-12-31T20:00:00-15:00") == "9999-12-31 21:00:00-14:00");
   assert(one("0001-01-01T03:00:00+15:00") == "0001-01-01 02:00:00+14:00");
   assert(unconvertible("1,A,2024-01-01\n1,B,9999-12-31T23:59:00-23:59\n"));
+  // pandas' ISO path also takes a one-digit hour, an hour alone and HH:MM,
+  // so a spaced YYYY MM DD with such a clock is read literally.
+  assert(one("0001 9 10 09:17") == "0001-09-10 09:17:00");
+  assert(one("0047 1 8 19:36") == "0047-01-08 19:36:00");
+  assert(one("0047 01 08T19:36") == "0047-01-08 19:36:00");
+  assert(one("0047 01 08 19") == "0047-01-08 19:00:00");
+  assert(one("0047 1 8 9:36:00") == "0047-01-08 09:36:00");
+  assert(one("0088 9 27 01:05 +2300") == "0088-09-26 02:05:00+00:00");
+  // ... and keeps the nanoseconds of a one-digit hour, so a cell outside the
+  // nanosecond range leaves the column unconverted.
+  assert(one("2024-01-01 9:00:00.123456789") == "2024-01-01 09:00:00.123456789");
+  assert(refused("1,A,2024-01-01 9:00:00.123456789\n1,B,1500-01-01\n"));
+  // A spaced YYYY MM DD that is no ISO date falls back to dateutil's order.
+  assert(one("0024 11 31 15:06:18.3895401") == "2031-11-24 15:06:18.389540");
+  assert(one("0012 13 05") == "2005-12-13 00:00:00");
+  assert(unconvertible("1,A,2024-01-01\n1,B,2024 02 30\n"));
+  // Off the ISO path a `.` fraction whose microseconds end in three zeros
+  // keeps its nanoseconds (so the column needs nanosecond range); others,
+  // and `,` fractions, keep microseconds.
+  assert(one("2024-01-01t10:00:00.12300045") == "2024-01-01 10:00:00.12300045");
+  assert(one("2024-01-01t10:00:00.1234567") == "2024-01-01 10:00:00.123456");
+  assert(one("2024-01-01 10:00:00.123000456 UTC") == "2024-01-01 10:00:00.123000456+00:00");
+  assert(one("Jan 1 2024 10:00:00,123000456") == "2024-01-01 10:00:00.123000");
+  assert(refused("1,A,2024-01-01t10:00:00.123000000\n1,B,1500-01-01\n"));
+  // Year 0 is held on the ISO path only: dateutil rejects it.
+  assert(unconvertible("1,A,2024-01-01 10:00:00\n1,B,0000-05-26t17:01:52\n"));
+  assert(unconvertible("1,A,2024-01-01 10:00:00\n1,B,\"0000-05-26 17:01:52 +01 \"\n"));
+  // A one-digit hour alone is a clock only before AM/PM.
+  assert(unconvertible("1,A,2024-01-01\n1,B,2089-05-26 9\n"));
+  assert(one("03/26/2089 9 PM") == "2089-03-26 21:00:00");
+  // Trailing white space after a spaced YYYY M D alone leaves the ISO path.
+  assert(one("0060 3 20 ") == "2060-03-20 00:00:00");
+  assert(one("0060 3 20 10:00 ") == "0060-03-20 10:00:00");
+  assert(one("0060-03-20 ") == "0060-03-20");
+}
+
+// /api/mine-progress names a native-dispatch family by a readable stage name.
+void mine_progress_names_native_families() {
+  assert(mine_family_stage_name("alpha") == "Alpha miner");
+  assert(mine_family_stage_name("source_log_preparation") == "Reading the event log");
+  assert(mine_family_stage_name("inductive_conformance") == "Inductive net: conformance");
+  assert(mine_family_stage_name("heuristic_decoration") == "Heuristics net: decoration");
+  assert(mine_family_stage_name("heuristic_petri_conversion") == "Heuristics miner: Petri net");
+  assert(mine_family_stage_name("some_new_family") == "Some new family");
+  assert(mine_family_stage_name("_conformance") == " conformance");
 }
 
 int main() {
   csv_import_matches_reference_dataframe_flow();
+  mine_progress_names_native_families();
   csv_timestamps_follow_pandas_resolution_and_offsets();
   csv_header_names_follow_read_csv();
   csv_case_ids_follow_reference_dtype_inference_and_order();
@@ -8487,6 +8612,7 @@ int main() {
   decorate_model_counts_firings_and_waits();
   decorate_model_moves_arc_weights();
   decorate_model_skips_deviating_and_untimed_traces();
+  decorate_model_fits_parallel_optional_loops();
   decorate_model_treats_missing_custom_timestamps_as_untimed();
   ptml_round_trip_preserves_replay_behavior();
   parse_ptml_reads_a_foreign_tree();

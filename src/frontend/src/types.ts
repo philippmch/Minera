@@ -2909,6 +2909,13 @@ export interface PetriDecoration {
   transitions: number[];
   /** Per place id: token count and waiting time. */
   places: PetriPlaceDecoration[];
+  /**
+   * Variants left out because the silent-routing search of a net with
+   * inhibitor or reset arcs stopped at its bound; absent when none.
+   */
+  capped_variants?: number;
+  /** Why nothing (or not every variant) is decorated; absent otherwise. */
+  message?: string;
 }
 
 /** Validates replay decoration and its alignment with one serialized net. */
@@ -2928,6 +2935,10 @@ function isPetriDecoration(
       value.places.length !== net.place_count ||
       !value.transitions.every((count) =>
         Number.isSafeInteger(count) && (count as number) >= 0)) return false;
+  if (value.capped_variants !== undefined &&
+      (!Number.isSafeInteger(value.capped_variants) ||
+       (value.capped_variants as number) < 0)) return false;
+  if (value.message !== undefined && typeof value.message !== "string") return false;
 
   const validDuration = (raw: unknown): raw is DurationStats => {
     if (!isRecord(raw) || Array.isArray(raw) ||
