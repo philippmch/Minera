@@ -602,6 +602,13 @@ struct FootprintResult {
 [[nodiscard]] FootprintResult check_footprints(
     const EventLog& event_log, const PetriNet& net,
     const std::vector<int>& initial_marking);
+// The same, polling `cancelled` during the model's marking exploration: it
+// throws OperationCancelled once the callback returns true. An unset callback
+// never cancels, and the result is unchanged.
+[[nodiscard]] FootprintResult check_footprints(
+    const EventLog& event_log, const PetriNet& net,
+    const std::vector<int>& initial_marking,
+    const std::function<bool()>& cancelled);
 [[nodiscard]] FootprintResult check_footprints(const EventLog& event_log,
                                                const ProcessTree& tree);
 

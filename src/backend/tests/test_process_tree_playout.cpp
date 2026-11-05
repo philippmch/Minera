@@ -175,7 +175,8 @@ void process_tree_extensive_reference_contract() {
       {"->('a', X('a', 'b'))", 6, {}, {}, {"a a", "a b"}},
       // Rejected by the reference: one-child sequence or parallel cut
       // (IndexError), equal subtrees under different parents (KeyError),
-      // inclusive choice (KeyError) and interleaving (TypeError).
+      // inclusive choice (KeyError) and interleaving (KeyError at the root,
+      // TypeError below it).
       {"->('a')", {}, {}, {}, {"!"}},
       {"X(->('a'), 'b')", {}, {}, {}, {"!"}},
       {"->(->('a', 'b'), X('a', 'b'))", {}, {}, {}, {"!"}},
@@ -599,7 +600,8 @@ int main(int argc, char** argv) {
   ex.max_length = 4;
   ex.min_length = 4;
   ex.max_traces = 10;
-  // The reference EXTENSIVE playout has no interleaving (TypeError).
+  // The reference EXTENSIVE playout has no interleaving (KeyError on this
+  // interleaving root).
   bool extensive_interleaving = false;
   try {
     (void)process_tree_playout(interleaving, ex);

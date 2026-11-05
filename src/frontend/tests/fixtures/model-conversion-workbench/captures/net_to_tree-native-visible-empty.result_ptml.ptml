@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ptml>
+  <processTree id="tree" name="Independent model conversion" root="node0">
+    <manualTask id="node0" name="original-transition-0"/>
+  </processTree>
+</ptml>

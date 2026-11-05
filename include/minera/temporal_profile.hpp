@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -91,6 +92,13 @@ struct TemporalDeviation {
 // default; strict_attributes=false restores sparse-input skipping.
 [[nodiscard]] TemporalProfile discover_temporal_profile(
     const EventLog& log, const TemporalProfileOptions& options = {});
+// The same discovery; `cancelled`, when set, is polled about every million
+// event pairs and throws OperationCancelled (minera/cancellation.hpp) once it
+// returns true. The pairs of one trace grow with the square of its length,
+// so a single very long case can take minutes.
+[[nodiscard]] TemporalProfile discover_temporal_profile(
+    const EventLog& log, const TemporalProfileOptions& options,
+    const std::function<bool()>& cancelled);
 
 // Input-specific components retained as distinct contracts. The table path
 // groups by case_id_attribute and stable-sorts each case by completion time.

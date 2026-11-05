@@ -4,6 +4,7 @@
 #include "minera/powl.hpp"
 
 #include <cstddef>
+#include <functional>
 #include <string>
 
 namespace minera {
@@ -61,5 +62,13 @@ struct PowlDiscoveryOptions {
 
 [[nodiscard]] PowlNode discover_powl(
     const EventLog& event_log, const PowlDiscoveryOptions& options = {});
+// The same discovery; `cancelled`, when set, is polled at every recursion
+// step and fall-through candidate and throws OperationCancelled
+// (minera/cancellation.hpp) once it returns true. The fall-throughs try every
+// activity of a sublog in turn, so logs with hundreds of activities can take
+// many minutes.
+[[nodiscard]] PowlNode discover_powl(
+    const EventLog& event_log, const PowlDiscoveryOptions& options,
+    const std::function<bool()>& cancelled);
 
 }  // namespace minera

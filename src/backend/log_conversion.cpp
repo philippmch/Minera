@@ -249,6 +249,26 @@ std::vector<EventAttribute> event_fields(const Event& event) {
   track(before, event.first_class_source_positions[3]);
   const auto projections = fields.size();
   if (positions.size() != projections) positions.clear();
+  // A selected cell with nested children stays among the generic attributes
+  // (the importer records no position for it) and merges into its
+  // projection, so it takes the place that generic cell has in the document.
+  std::vector<std::uint32_t> erased;
+  for (const auto position : positions)
+    if (position != Event::kUnknownSourcePosition) erased.push_back(position);
+  std::sort(erased.begin(), erased.end());
+  for (std::size_t index = 0; index < positions.size(); ++index) {
+    if (positions[index] != Event::kUnknownSourcePosition) continue;
+    const auto generic = std::find_if(
+        event.attributes.begin(), event.attributes.end(), [&](const auto& attribute) {
+          return attribute.key == fields[index].key &&
+                 (!attribute.children.empty() || attribute.scalar_wrapper);
+        });
+    if (generic == event.attributes.end()) continue;
+    auto complete = static_cast<std::uint32_t>(generic - event.attributes.begin());
+    for (const auto position : erased)
+      if (position <= complete) ++complete;
+    positions[index] = complete;
+  }
   append_attributes(fields, event.attributes);
   restore_projection_order(fields, projections, positions);
   return fields;

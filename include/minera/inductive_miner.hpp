@@ -6,6 +6,7 @@
 #include "minera/process_tree.hpp"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -66,6 +67,12 @@ struct InductiveMinerOptions {
   // Suppress specialized fall-throughs. The empty-trace and flower cases
   // remain available so the miner still returns a process tree.
   bool disable_fallthroughs = false;
+  // When set, polled at each recursion step of event-log discovery and at
+  // each activity-concurrency fall-through candidate; once it returns true,
+  // discovery throws OperationCancelled (minera/cancellation.hpp). The
+  // fall-through tries every activity of a sublog in turn, so logs with
+  // hundreds of activities can take minutes. Never changes a result.
+  std::function<bool()> cancelled;
 };
 
 // A compact, weighted unique-variant log.  Each entry represents one distinct

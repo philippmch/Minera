@@ -1855,8 +1855,11 @@ void writer_refuses_text_xml_cannot_carry() {
 }
 
 // A CSV log keeps its column names as projection keys. Native exports write
-// them back as they are; standard_keys exports (the server downloads) use the
-// standard XES keys, without which pm4py.read_xes finds no case id.
+// them back as they are; standard_keys exports (the server's downloads of a
+// CSV-sourced log) write the case id, activity and timestamp under the
+// standard XES keys, as pm4py's read_csv, format_dataframe and write_xes do,
+// without which pm4py.read_xes finds no case id. The resource keeps its
+// column name, as format_dataframe leaves it.
 void standard_key_exports_rename_csv_projections() {
   constexpr auto npos = std::string::npos;
   const std::string csv =
@@ -1873,18 +1876,19 @@ void standard_key_exports_rename_csv_projections() {
   options.standard_keys = true;
   const auto xml = minera::serialize_xes(log, options);
   for (const auto* source : {"key=\"case_id\"", "key=\"activity\"",
-                             "key=\"timestamp\"", "key=\"resource\""})
+                             "key=\"timestamp\"", "key=\"org:resource\""})
     assert(xml.find(source) == npos);
   assert(xml.find("<trace>\n    <string key=\"concept:name\" value=\"c&amp;&lt;1&gt;\"/>") != npos);
   assert(xml.find("<string key=\"concept:name\" value=\"A &quot;x&quot;\"/>") != npos);
   assert(xml.find("<date key=\"time:timestamp\" value=\"2026-03-01T06:37:13.250") != npos);
-  assert(xml.find("<string key=\"org:resource\" value=\"R1\"/>") != npos);
+  assert(xml.find("<string key=\"resource\" value=\"R1\"/>") != npos);
   assert(xml.find("key=\"amount\" value=\"1.5\"") != npos);
   std::istringstream xes_input(xml);
   const auto back = minera::import_xes_event_log(xes_input);
   assert(back.traces.size() == 1 && back.traces[0].case_id == "c&<1>");
   assert(back.traces[0].events.size() == 2);
   assert(back.traces[0].events[0].activity == "A \"x\"");
+  // The default resource selector falls back to the resource key.
   assert(back.traces[0].events[0].resource == "R1");
   assert(minera::parse_timestamp(back.traces[0].events[0].timestamp) ==
          minera::parse_timestamp("2026-03-01T06:37:13.250Z"));
@@ -1893,7 +1897,7 @@ void standard_key_exports_rename_csv_projections() {
   options.infer_metadata = true;
   const auto inferred = minera::serialize_xes(log, options);
   assert(inferred.find("prefix=\"time\"") != npos);
-  assert(inferred.find("prefix=\"org\"") != npos);
+  assert(inferred.find("prefix=\"concept\"") != npos);
 
   // pm4py-style CSV columns: the case:concept:name column becomes the trace
   // concept:name rather than a trace attribute read as case:case:concept:name.
@@ -1909,23 +1913,91 @@ void standard_key_exports_rename_csv_projections() {
   assert(pm4py_xml.find("key=\"case:concept:name\"") == npos);
   assert(pm4py_xml.find("<trace>\n    <string key=\"concept:name\" value=\"c1\"/>") != npos);
 
-  // A generic attribute already under a standard key keeps the selected cell
-  // under its source key, so neither value is lost.
-  auto collision = log;
-  collision.traces[0].events[0].attributes.push_back(
-      {"concept:name", "generic", minera::AttributeKind::kString});
-  collision.traces[0].attributes.push_back(
-      {"concept:name", "case generic", minera::AttributeKind::kString});
-  const auto kept = minera::serialize_xes(collision, options);
-  assert(kept.find("<string key=\"activity\" value=\"A &quot;x&quot;\"/>") != npos);
-  assert(kept.find("<string key=\"concept:name\" value=\"generic\"/>") != npos);
-  assert(kept.find("<string key=\"case_id\" value=\"c&amp;&lt;1&gt;\"/>") != npos);
-  assert(kept.find("<string key=\"concept:name\" value=\"case generic\"/>") != npos);
-  assert(kept.find("<string key=\"concept:name\" value=\"B\"/>") != npos);
+  // Other columns under a standard key are overwritten, as format_dataframe
+  // overwrites them: a CSV with both activity and concept:name columns (and
+  // case_id and case:concept:name) gives pm4py the activity a and the case c1.
+  std::istringstream clash_input(
+      "case_id,activity,timestamp,concept:name,case:concept:name,resource\n"
+      "c1,a,2024-01-01T00:00:00Z,X,K1,r1\n"
+      "c1,b,2024-01-01T00:10:00Z,Y,K1,r2\n");
+  const auto clash = minera::serialize_xes(
+      minera::import_csv_event_log(clash_input), options);
+  assert(clash.find("<trace>\n    <string key=\"concept:name\" value=\"c1\"/>") != npos);
+  assert(clash.find("value=\"K1\"") == npos);
+  assert(clash.find("<string key=\"concept:name\" value=\"a\"/>") != npos);
+  assert(clash.find("<string key=\"concept:name\" value=\"b\"/>") != npos);
+  assert(clash.find("value=\"X\"") == npos && clash.find("value=\"Y\"") == npos);
+  std::istringstream clash_back_input(clash);
+  const auto clash_back = minera::import_xes_event_log(clash_back_input);
+  assert(clash_back.traces.size() == 1 && clash_back.traces[0].case_id == "c1");
+  assert(clash_back.traces[0].events[0].activity == "a" &&
+         clash_back.traces[0].events[1].activity == "b");
+
+  // A resource column named like the activity's standard key is overwritten
+  // too, so the activity is written once.
+  auto resource_clash = log;
+  for (auto& event : resource_clash.traces[0].events)
+    event.resource_source_key = "concept:name";
+  const auto once = minera::serialize_xes(resource_clash, options);
+  assert(once.find("value=\"R1\"") == npos);
+  assert(once.find("<string key=\"concept:name\" value=\"B\"/>") != npos);
+}
+
+// Fuzzed against pm4py.read_xes (iterparse): children outside <values> are a
+// dict (a repeated key keeps its place and its last value); a later list
+// under a selected key replaces the selected cell; a selected cell with
+// nested children keeps its document column position. (An entry of <values>
+// with a child element, which read_xes refuses with a TypeError, still reads
+// natively: Minera's own writer emits such lists. Declared.)
+void iterparse_nested_attribute_shapes() {
+  const auto attr = [](const minera::Event& event, std::string_view key) -> const minera::EventAttribute* {
+    for (const auto& attribute : event.attributes)
+      if (attribute.key == key) return &attribute;
+    return nullptr;
+  };
+  const auto event_xml = [](const std::string& body) {
+    return "<log><trace><string key=\"concept:name\" value=\"c\"/><event>"
+           "<string key=\"concept:name\" value=\"A\"/>" + body + "</event></trace></log>";
+  };
+  // Without a child element, a nested list in <values> reads.
+  {
+    const auto log = read_iterparse(event_xml("<list key=\"l\"><values><list key=\"in\"/></values></list>"));
+    assert(attr(log.traces[0].events[0], "l") != nullptr);
+  }
+  {
+    const auto log = read_iterparse(event_xml(
+        "<string key=\"s\" value=\"p\"><string key=\"b\" value=\"q\"/><int key=\"c\" value=\"2\"/>"
+        "<int key=\"b\" value=\"1\"/></string>"
+        "<list key=\"l\"><values><string key=\"b\" value=\"q\"/><string key=\"b\" value=\"r\"/></values></list>"));
+    const auto* s = attr(log.traces[0].events[0], "s");
+    assert(s && s->children.size() == 2 && s->children[0].key == "b" && s->children[0].value == "1" &&
+           s->children[1].key == "c");
+    const auto* l = attr(log.traces[0].events[0], "l");
+    assert(l && l->children.size() == 2);
+  }
+  {
+    const auto log = read_iterparse(event_xml(
+        "<id key=\"org:resource\" value=\"r\"/><list key=\"org:resource\"><values>"
+        "<id key=\"c\" value=\"i\"/></values></list>"));
+    const auto& event = log.traces[0].events[0];
+    assert(event.resource_state == minera::FirstClassAttributeState::kMissing);
+    const auto* resource = attr(event, "org:resource");
+    assert(resource && resource->container == minera::AttributeContainerKind::kList);
+  }
+  {
+    const auto log = read_iterparse(event_xml(
+        "<date key=\"time:timestamp\" value=\"2020-01-01T10:00:00\"/><float key=\"g\" value=\"1\"/>"
+        "<string key=\"org:resource\" value=\"p\"><string key=\"b\" value=\"q\"/></string>"
+        "<string key=\"z\" value=\"z\"/>"));
+    const std::vector<std::string> expected = {"concept:name", "time:timestamp", "g",
+                                               "org:resource", "z", "case:concept:name"};
+    assert(minera::event_log_to_table(log).columns == expected);
+  }
 }
 
 int main() {
   unsigned_integer_boundaries_match_public_variants();
+  iterparse_nested_attribute_shapes();
   {
     using namespace minera;
     const std::string xml = "<log><trace><string key=\"concept:name\" value=\"c\"/>"
@@ -2426,8 +2498,12 @@ int main() {
           assert(probe);
           const bool list = variant != XesImportVariant::kIterparse20 && shape != 2;
           assert(probe->scalar_children_list == list);
-          assert(probe->children.size() == ((shape == 2 || shape == 3 ||
+          // Direct children are a dict in the public iterparse readers: the
+          // repeated key keeps one entry ({'same': 2}, checked on 2.7.22).
+          const bool dict = shape == 2 && variant != XesImportVariant::kIterparse20;
+          assert(probe->children.size() == (dict ? 1 : (shape == 2 || shape == 3 ||
                   (shape == 1 && list)) ? 2 : 0));
+          if (dict) assert(probe->children[0].value == "2");
         }
       }
     }

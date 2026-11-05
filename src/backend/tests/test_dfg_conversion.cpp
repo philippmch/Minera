@@ -1,4 +1,5 @@
 #include "minera/dfg_conversion.hpp"
+#include "minera/pnml.hpp"
 
 #include <cassert>
 #include <stdexcept>
@@ -88,6 +89,13 @@ void boundary_activities_outside_edges() {
   single.end_activities["a"] = 1;
   const auto bare = minera::convert_dfg_to_petri_net(single);
   assert(bare.place_count() == 2 && bare.transitions().empty());
+  // The bare net survives a PNML round trip, as pm4py's write_pnml and
+  // read_pnml keep it (model exchange of the DFG of [<a>] converts it).
+  const auto document = minera::parse_pnml_document(minera::to_pnml(bare));
+  assert(document.net.place_count() == 2 && document.net.transitions().empty());
+  assert(document.initial_marking[document.net.source()] == 1);
+  assert(document.final_marking[document.net.sink()] == 1);
+  assert(document.net.source() != document.net.sink());
 
   minera::DfgCleanAnalysis dfg;
   dfg.graph[{"b", "c"}] = 0;

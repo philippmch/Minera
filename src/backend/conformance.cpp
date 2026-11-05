@@ -1108,12 +1108,61 @@ class Replayer {
     return acts;
   }
 
+  // The forward enabled-transition search's visit order and its (name,
+  // label) classes. They depend on the net and the options alone, so a caller
+  // that searches many markings with the same options builds them once.
+  struct ForwardEnabledPlan {
+    std::vector<std::int64_t> hashes;
+    std::vector<std::size_t> order;
+    std::vector<std::size_t> pair_ids;  // by transition
+    std::size_t pair_count = 0;
+    // The flat search's candidate index for markings of `flat_places` slots
+    // (see flat_forward_enabled).
+    std::size_t flat_places = std::numeric_limits<std::size_t>::max();
+    std::vector<std::vector<std::uint32_t>> flat_triggered;  // by place: order positions
+    std::vector<std::uint32_t> flat_unconditional;           // order positions
+  };
+
+  [[nodiscard]] ForwardEnabledPlan forward_enabled_plan(const TokenReplayOptions& options) const {
+    const auto names = detail::replay_transition_names(
+        options.nullable_transition_names, options.transition_names, net_);
+    detail::validate_forward_transition_name_order(names);
+    ForwardEnabledPlan plan;
+    auto& hashes = plan.hashes;
+    hashes.resize(net_.transitions().size());
+    if (options.transition_identity_hashes) hashes = *options.transition_identity_hashes;
+    else for (std::size_t t = 0; t < hashes.size(); ++t) hashes[t] = static_cast<std::int64_t>(t);
+    auto& order = plan.order;
+    order.resize(hashes.size());
+    for (std::size_t t = 0; t < order.size(); ++t) order[t] = t;
+    std::stable_sort(order.begin(), order.end(), [&](const auto left, const auto right) {
+      return std::tie(names[left], hashes[left]) < std::tie(names[right], hashes[right]);
+    });
+
+    using Pair = std::pair<std::optional<std::string>, std::optional<std::string>>;
+    std::map<Pair, std::size_t> pairs;
+    plan.pair_ids.resize(order.size());
+    for (const auto t : order) {
+      const auto& transition = net_.transitions()[t];
+      const auto label = transition.activity
+          ? std::optional<std::string>(net_.activities().at(*transition.activity)) : std::nullopt;
+      const auto [it, added] = pairs.emplace(Pair{names[t], label}, pairs.size());
+      (void)added;
+      plan.pair_ids[t] = it->second;
+    }
+    plan.pair_count = pairs.size();
+    return plan;
+  }
+
   // `budget`, when given, bounds the forward worklist's silent expansions and
   // reports exhaustion as SilentSearchBudgetExhausted (the precision root).
+  // `plan_cache`, when given, keeps the forward plan across calls that pass
+  // the same options.
   [[nodiscard]] std::vector<std::size_t> enabled_transition_ids(
       const Marking& marking,
       const TokenReplayOptions& options,
-      std::optional<std::size_t> budget = std::nullopt) const {
+      std::optional<std::size_t> budget = std::nullopt,
+      std::optional<ForwardEnabledPlan>* plan_cache = nullptr) const {
     if (net_.has_extended_arcs()) {
       std::vector<std::size_t> result;
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
@@ -1125,60 +1174,60 @@ class Replayer {
     }
 
     if (options.variant == TokenReplayVariant::kForward) {
-      const auto names = detail::replay_transition_names(
-          options.nullable_transition_names, options.transition_names, net_);
-      detail::validate_forward_transition_name_order(names);
-      std::vector<std::int64_t> hashes(net_.transitions().size());
-      if (options.transition_identity_hashes) hashes = *options.transition_identity_hashes;
-      else for (std::size_t t = 0; t < hashes.size(); ++t) hashes[t] = static_cast<std::int64_t>(t);
-      std::vector<std::size_t> order(hashes.size());
-      for (std::size_t t = 0; t < order.size(); ++t) order[t] = t;
-      std::stable_sort(order.begin(), order.end(), [&](const auto left, const auto right) {
-        return std::tie(names[left], hashes[left]) < std::tie(names[right], hashes[right]);
-      });
-
-      using Pair = std::pair<std::optional<std::string>, std::optional<std::string>>;
-      std::map<Pair, std::size_t> pairs;
-      std::vector<std::size_t> pair_ids(order.size());
-      for (const auto t : order) {
-        const auto& transition = net_.transitions()[t];
-        const auto label = transition.activity
-            ? std::optional<std::string>(net_.activities().at(*transition.activity)) : std::nullopt;
-        const auto [it, added] = pairs.emplace(Pair{names[t], label}, pairs.size());
-        (void)added;
-        pair_ids[t] = it->second;
-      }
-      std::vector<std::unordered_set<Marking, MarkingHash>> visited(pairs.size());
-      std::vector<std::optional<Marking>> latest(order.size());
-      std::queue<std::size_t> pending;
+      std::optional<ForwardEnabledPlan> local_plan;
+      auto& plan_slot = plan_cache ? *plan_cache : local_plan;
+      if (!plan_slot) plan_slot = forward_enabled_plan(options);
+      const auto& plan = *plan_slot;
+      const auto& order = plan.order;
+      const auto& pair_ids = plan.pair_ids;
       const auto transition_count = order.size();
       const auto expansion_slots = kSilentSearchCap + 1;
       const std::size_t worklist_cap = transition_count != 0 &&
               expansion_slots > std::numeric_limits<std::size_t>::max() / transition_count
           ? std::numeric_limits<std::size_t>::max() : expansion_slots * transition_count;
-      const auto discover = [&](const Marking& reached) {
-        for (const auto t : order) {
-          if (!enabled(reached, t)) continue;
-          if (pending.size() >= worklist_cap)
-            throw std::runtime_error("enabled transition diagnostic worklist exceeded limit");
-          latest[t] = reached;
-          pending.push(t);
-        }
-      };
-      discover(marking);
-      std::size_t expanded = 0;
       std::vector<std::size_t> selected;
-      while (!pending.empty()) {
-        const auto t = pending.front(); pending.pop();
-        const auto& reached = *latest[t];
-        if (!visited[pair_ids[t]].insert(reached).second) continue;
-        if (!net_.transitions()[t].silent()) { selected.push_back(t); continue; }
-        if (budget && expanded >= *budget) throw detail::SilentSearchBudgetExhausted();
-        if (expanded++ >= kSilentSearchCap && !budget)
-          throw std::runtime_error("enabled transition diagnostic search exceeded limit");
-        Marking next = reached;
-        fire_marking(next, t);
-        discover(next);
+      if (!flat_forward_enabled(marking, *plan_slot, budget, worklist_cap, selected)) {
+        // The reference's FIFO worklist over (transition, latest marking)
+        // entries. Each reached marking is interned once, so a worklist entry
+        // and a visited (name, label, marking) triple hold its id instead of a
+        // copy; ids are equal exactly when markings are, so the visit order,
+        // the expansions counted against the caps and the result are unchanged.
+        selected.clear();
+        std::unordered_map<Marking, std::uint32_t, MarkingHash> interned;
+        std::vector<const Marking*> markings;
+        const auto intern = [&](Marking&& reached) {
+          const auto [it, added] = interned.try_emplace(std::move(reached),
+                                                        static_cast<std::uint32_t>(markings.size()));
+          if (added) markings.push_back(&it->first);
+          return it->second;
+        };
+        std::unordered_set<std::uint64_t> visited;  // pair id << 32 | marking id
+        std::vector<std::uint32_t> latest(order.size(), 0);
+        std::queue<std::size_t> pending;
+        const auto discover = [&](std::uint32_t id) {
+          const Marking& reached = *markings[id];
+          for (const auto t : order) {
+            if (!enabled(reached, t)) continue;
+            if (pending.size() >= worklist_cap)
+              throw std::runtime_error("enabled transition diagnostic worklist exceeded limit");
+            latest[t] = id;
+            pending.push(t);
+          }
+        };
+        discover(intern(Marking(marking)));
+        std::size_t expanded = 0;
+        while (!pending.empty()) {
+          const auto t = pending.front(); pending.pop();
+          const auto id = latest[t];
+          if (!visited.insert((std::uint64_t(pair_ids[t]) << 32) | id).second) continue;
+          if (!net_.transitions()[t].silent()) { selected.push_back(t); continue; }
+          if (budget && expanded >= *budget) throw detail::SilentSearchBudgetExhausted();
+          if (expanded++ >= kSilentSearchCap && !budget)
+            throw std::runtime_error("enabled transition diagnostic search exceeded limit");
+          Marking next = *markings[id];
+          fire_marking(next, t);
+          discover(intern(std::move(next)));
+        }
       }
       if (!options.transition_identity_hashes) {
         // Native IDs have an established presentation order. A foreign hash
@@ -1187,7 +1236,7 @@ class Replayer {
         selected.erase(std::unique(selected.begin(), selected.end()), selected.end());
         return selected;
       }
-      return replay_identity_set_order(selected, hashes);
+      return replay_identity_set_order(selected, plan.hashes);
     }
 
     const auto transition_names = detail::replay_transition_names(
@@ -1931,6 +1980,151 @@ class Replayer {
     return true;
   }
 
+  // enabled_transition_ids' forward worklist on 32-bit place rows: the same
+  // FIFO of (transition, latest marking) entries, visited (name, label,
+  // marking) triples, caps and exceptions, in the same order, with markings
+  // interned in a flat pool. Only the transitions a marked place (or no
+  // place) can enable are checked at a marking, in `order`: each other one
+  // has a positive requirement on an empty place, so enabled() is false for
+  // it. False, with `selected` unspecified, when a transition or a count
+  // does not fit the flat form; the generic search then runs from the start
+  // and, being the same deterministic walk, reaches the same outcome.
+  [[nodiscard]] bool flat_forward_enabled(const Marking& marking, ForwardEnabledPlan& plan,
+                                          std::optional<std::size_t> budget,
+                                          std::size_t worklist_cap,
+                                          std::vector<std::size_t>& selected) const {
+    const std::size_t places = marking.size();
+    const auto& order = plan.order;
+    const std::size_t transition_count = order.size();
+    if (transition_count == 0 || transition_count != net_.transitions().size() ||
+        transition_count >= std::numeric_limits<std::uint32_t>::max())
+      return false;
+    std::vector<const FlatTransition*> flat(transition_count);
+    for (std::size_t t = 0; t < transition_count; ++t) {
+      const auto& entry = flat_transition(t, places);
+      if (!entry.usable) return false;
+      flat[t] = &entry;
+    }
+    if (plan.flat_places != places) {
+      plan.flat_places = places;
+      plan.flat_triggered.assign(places, {});
+      plan.flat_unconditional.clear();
+      for (std::size_t position = 0; position < transition_count; ++position) {
+        const auto& transition = *flat[order[position]];
+        if (transition.never) continue;
+        const auto trigger = std::find_if(transition.checks.begin(), transition.checks.end(),
+                                          [](const auto& check) { return check.second > 0; });
+        if (trigger == transition.checks.end())
+          plan.flat_unconditional.push_back(static_cast<std::uint32_t>(position));
+        else
+          plan.flat_triggered[trigger->first].push_back(static_cast<std::uint32_t>(position));
+      }
+    }
+
+    std::vector<std::int32_t> pool(places);
+    for (std::size_t place = 0; place < places; ++place) {
+      const auto& value = marking[place];
+      if (!value.is_small() || value.small_value() < std::numeric_limits<std::int32_t>::min() ||
+          value.small_value() > std::numeric_limits<std::int32_t>::max())
+        return false;
+      pool[place] = static_cast<std::int32_t>(value.small_value());
+    }
+    const std::size_t pair_words = (plan.pair_count + 63) / 64;
+    std::vector<std::uint64_t> visited;  // by marking id: a bit per (name, label) pair
+    std::vector<std::uint64_t> hashes;
+    constexpr std::uint32_t kEmpty = std::numeric_limits<std::uint32_t>::max();
+    std::vector<std::uint32_t> table(256, kEmpty);
+    const auto row_hash = [&](std::size_t id) {
+      const std::int32_t* row = pool.data() + id * places;
+      std::uint64_t h = 0x9e3779b97f4a7c15ull ^ places;
+      for (std::size_t place = 0; place < places; ++place)
+        h ^= static_cast<std::uint32_t>(row[place]) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+      h ^= h >> 33; h *= 0xff51afd7ed558ccdull; h ^= h >> 33;
+      return h;
+    };
+    // Interns the pool's last row: its id, which is an earlier row's when the
+    // marking was reached before (the last row is then dropped).
+    const auto intern_last = [&]() -> std::uint32_t {
+      const auto id = static_cast<std::uint32_t>(hashes.size());
+      const auto h = row_hash(id);
+      if ((hashes.size() + 1) * 2 > table.size()) {
+        std::vector<std::uint32_t> grown(table.size() * 2, kEmpty);
+        const std::size_t mask = grown.size() - 1;
+        for (const auto existing : table) {
+          if (existing == kEmpty) continue;
+          std::size_t slot = hashes[existing] & mask;
+          while (grown[slot] != kEmpty) slot = (slot + 1) & mask;
+          grown[slot] = existing;
+        }
+        table.swap(grown);
+      }
+      const std::size_t mask = table.size() - 1;
+      std::size_t slot = h & mask;
+      const std::int32_t* row = pool.data() + std::size_t(id) * places;
+      while (table[slot] != kEmpty) {
+        const auto other = table[slot];
+        if (hashes[other] == h &&
+            std::equal(row, row + places, pool.data() + std::size_t(other) * places)) {
+          pool.resize(pool.size() - places);
+          return other;
+        }
+        slot = (slot + 1) & mask;
+      }
+      table[slot] = id;
+      hashes.push_back(h);
+      visited.resize(visited.size() + pair_words, 0);
+      return id;
+    };
+
+    std::vector<std::uint32_t> latest(transition_count, 0);
+    std::vector<std::uint32_t> pending;  // FIFO: [head, size) is queued
+    std::size_t head = 0;
+    std::vector<std::uint64_t> candidates((transition_count + 63) / 64, 0);
+    const auto discover = [&](std::uint32_t id) {
+      const std::int32_t* row = pool.data() + std::size_t(id) * places;
+      std::fill(candidates.begin(), candidates.end(), 0);
+      for (const auto position : plan.flat_unconditional)
+        candidates[position >> 6] |= std::uint64_t{1} << (position & 63);
+      for (std::size_t place = 0; place < places; ++place) {
+        if (row[place] <= 0) continue;
+        for (const auto position : plan.flat_triggered[place])
+          candidates[position >> 6] |= std::uint64_t{1} << (position & 63);
+      }
+      for (std::size_t word = 0; word < candidates.size(); ++word) {
+        for (auto bits = candidates[word]; bits != 0; bits &= bits - 1) {
+          const auto t = order[word * 64 + static_cast<std::size_t>(std::countr_zero(bits))];
+          if (!flat_enabled(*flat[t], row)) continue;
+          if (pending.size() - head >= worklist_cap)
+            throw std::runtime_error("enabled transition diagnostic worklist exceeded limit");
+          latest[t] = id;
+          pending.push_back(static_cast<std::uint32_t>(t));
+        }
+      }
+    };
+    discover(intern_last());
+    std::size_t expanded = 0;
+    while (head < pending.size()) {
+      const std::size_t t = pending[head++];
+      const auto id = latest[t];
+      const auto pair = plan.pair_ids[t];
+      auto& word = visited[std::size_t(id) * pair_words + pair / 64];
+      const std::uint64_t bit = std::uint64_t{1} << (pair % 64);
+      if (word & bit) continue;
+      word |= bit;
+      if (!net_.transitions()[t].silent()) { selected.push_back(t); continue; }
+      if (budget && expanded >= *budget) throw detail::SilentSearchBudgetExhausted();
+      if (expanded++ >= kSilentSearchCap && !budget)
+        throw std::runtime_error("enabled transition diagnostic search exceeded limit");
+      if (hashes.size() >= kEmpty - 1) return false;
+      const std::size_t from = pool.size();
+      pool.resize(from + places);
+      std::copy_n(pool.data() + std::size_t(id) * places, places, pool.data() + from);
+      if (!flat_fire(*flat[t], pool.data() + from)) return false;
+      discover(intern_last());
+    }
+    return true;
+  }
+
   // What a flat search found: a path, proof of no path within the cap, or
   // that it declined and silent_path must decide.
   enum class FlatOutcome { kFound, kNone, kDeclined };
@@ -1973,8 +2167,13 @@ class Replayer {
       return true;
     };
 
-    std::vector<std::int32_t> pool;
-    pool.reserve(places * 64);
+    // The search's buffers are kept between calls (a capped search can
+    // discover tens of thousands of rows), and row hashes are additive over
+    // places, so a successor's hash follows from its parent's and the places
+    // the firing touched. The hash only buckets rows (equality is checked in
+    // full), so the rows visited and the path found are unchanged.
+    auto& scratch = flat_search_scratch_;
+    auto& pool = scratch.pool;
     pool.resize(places);
     for (std::size_t place = 0; place < places; ++place) {
       const auto& value = start[place];
@@ -1985,24 +2184,33 @@ class Replayer {
     }
     if (goal(pool.data())) { path.clear(); return FlatOutcome::kFound; }
 
-    const auto row_hash = [&](std::size_t id) {
-      const std::int32_t* row = pool.data() + id * places;
-      std::uint64_t h = 0x9e3779b97f4a7c15ull ^ places;
-      for (std::size_t place = 0; place < places; ++place) {
-        h ^= static_cast<std::uint32_t>(row[place]) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
-      }
-      h ^= h >> 33; h *= 0xff51afd7ed558ccdull; h ^= h >> 33;
-      return h;
+    const auto mix = [](std::size_t place, std::int32_t value) {
+      std::uint64_t x = (std::uint64_t(place) << 32) ^ static_cast<std::uint32_t>(value);
+      x += 0x9e3779b97f4a7c15ull;
+      x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
+      x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
+      return x ^ (x >> 31);
     };
     constexpr std::uint32_t kEmpty = std::numeric_limits<std::uint32_t>::max();
-    std::vector<std::uint32_t> table(1024, kEmpty);
-    std::vector<std::uint64_t> hashes;
-    std::vector<std::uint32_t> parent, via;
+    auto& table = scratch.table;
+    auto& hashes = scratch.hashes;
+    auto& parent = scratch.parent;
+    auto& via = scratch.via;
+    auto& frontier = scratch.frontier;
+    auto& row_buffer = scratch.row;
+    table.assign(1024, kEmpty);
+    hashes.clear();
+    parent.clear();
+    via.clear();
+    frontier.clear();
+    row_buffer.resize(places);
     std::size_t used = 0;
-    // Returns true when the row `id` (the pool's last) is new.
-    const auto insert = [&](std::uint32_t id, std::uint64_t h) {
+    // Adds `row` (a pool row or the row buffer) as row `hashes.size()` unless
+    // an equal row is known; true when it was new.
+    const auto insert = [&](const std::int32_t* row, std::uint64_t h) {
       if ((used + 1) * 2 > table.size()) {
-        std::vector<std::uint32_t> grown(table.size() * 2, kEmpty);
+        auto& grown = scratch.grown;
+        grown.assign(table.size() * 2, kEmpty);
         const std::size_t mask = grown.size() - 1;
         for (const auto existing : table) {
           if (existing == kEmpty) continue;
@@ -2014,7 +2222,6 @@ class Replayer {
       }
       const std::size_t mask = table.size() - 1;
       std::size_t slot = h & mask;
-      const std::int32_t* row = pool.data() + std::size_t(id) * places;
       while (table[slot] != kEmpty) {
         const auto other = table[slot];
         if (hashes[other] == h &&
@@ -2022,46 +2229,102 @@ class Replayer {
           return false;
         slot = (slot + 1) & mask;
       }
-      table[slot] = id;
+      table[slot] = static_cast<std::uint32_t>(hashes.size());
+      hashes.push_back(h);
       ++used;
       return true;
     };
-    hashes.push_back(row_hash(0));
+    {
+      std::uint64_t h = 0;
+      for (std::size_t place = 0; place < places; ++place) h += mix(place, pool[place]);
+      insert(pool.data(), h);
+    }
     parent.push_back(kEmpty);
     via.push_back(kEmpty);
-    insert(0, hashes[0]);
 
-    std::vector<std::uint32_t> frontier{0};
+    // Only the silent transitions a marked place (or no place) can enable
+    // are checked, in index order: each other one has a positive requirement
+    // on an empty place, so flat_enabled is false for it.
+    auto& index_entry = flat_silent_index_;
+    if (index_entry.places != places) {
+      index_entry.places = places;
+      index_entry.triggered.assign(places, {});
+      index_entry.unconditional.clear();
+      index_entry.touched.assign(silent.size(), {});
+      for (std::size_t k = 0; k < silent.size(); ++k) {
+        const auto& transition = *silent[k];
+        auto& touched = index_entry.touched[k];
+        for (const auto& input : transition.inputs) touched.push_back(input.first);
+        for (const auto place : transition.resets) touched.push_back(place);
+        for (const auto& output : transition.outputs) touched.push_back(output.first);
+        std::sort(touched.begin(), touched.end());
+        touched.erase(std::unique(touched.begin(), touched.end()), touched.end());
+        if (transition.never) continue;
+        const auto trigger = std::find_if(transition.checks.begin(), transition.checks.end(),
+                                          [](const auto& check) { return check.second > 0; });
+        if (trigger == transition.checks.end()) index_entry.unconditional.push_back(static_cast<std::uint32_t>(k));
+        else index_entry.triggered[trigger->first].push_back(static_cast<std::uint32_t>(k));
+      }
+    }
+    auto& candidates = scratch.candidates;
+    candidates.assign((silent.size() + 63) / 64, 0);
+    auto& enabled_silent = scratch.enabled;
+
+    frontier.push_back(0);
     std::size_t head = 0;
     std::size_t expanded = 0;
     while (head < frontier.size() && expanded++ < kSilentSearchCap) {
       const std::uint32_t index = frontier[head++];
-      for (std::size_t k = 0; k < silent.size(); ++k) {
-        const auto& transition = *silent[k];
-        if (!flat_enabled(transition, pool.data() + std::size_t(index) * places)) continue;
-        if (hashes.size() >= kEmpty) return FlatOutcome::kDeclined;
-        const auto id = static_cast<std::uint32_t>(hashes.size());
-        pool.resize(pool.size() + places);
-        std::copy_n(pool.data() + std::size_t(index) * places, places,
-                    pool.data() + std::size_t(id) * places);
-        if (!flat_fire(transition, pool.data() + std::size_t(id) * places))
-          return FlatOutcome::kDeclined;
-        hashes.push_back(row_hash(id));
-        if (!insert(id, hashes.back())) {
-          hashes.pop_back();
-          pool.resize(pool.size() - places);
-          continue;
+      {
+        const std::int32_t* row = pool.data() + std::size_t(index) * places;
+        std::fill(candidates.begin(), candidates.end(), 0);
+        for (const auto k : index_entry.unconditional) candidates[k >> 6] |= std::uint64_t{1} << (k & 63);
+        for (std::size_t place = 0; place < places; ++place) {
+          if (row[place] <= 0) continue;
+          for (const auto k : index_entry.triggered[place]) candidates[k >> 6] |= std::uint64_t{1} << (k & 63);
         }
-        parent.push_back(index);
-        via.push_back(static_cast<std::uint32_t>(k));
-        if (goal(pool.data() + std::size_t(id) * places)) {
+        enabled_silent.clear();
+        for (std::size_t word = 0; word < candidates.size(); ++word)
+          for (auto bits = candidates[word]; bits != 0; bits &= bits - 1)
+            enabled_silent.push_back(static_cast<std::uint32_t>(word * 64 + std::countr_zero(bits)));
+      }
+      // Each successor is fired in place on a copy of the expanded row and
+      // undone afterwards (a firing changes only its touched places). The
+      // goal is tested before the duplicate check: a known row already
+      // failed it when it was found, so only a new row can meet it, as when
+      // the test followed the check. A row found once the frontier holds
+      // kSilentSearchCap rows would sit past the last row the loop can
+      // expand, so beyond its goal test it changes nothing and is not kept.
+      std::copy_n(pool.data() + std::size_t(index) * places, places, row_buffer.data());
+      for (const std::size_t k : enabled_silent) {
+        const auto& transition = *silent[k];
+        if (!flat_enabled(transition, row_buffer.data())) continue;
+        if (hashes.size() >= kEmpty) return FlatOutcome::kDeclined;
+        if (!flat_fire(transition, row_buffer.data())) return FlatOutcome::kDeclined;
+        if (goal(row_buffer.data())) {
           path.clear();
-          for (std::uint32_t i = id; i != 0; i = parent[i])
+          path.push_back(silent_transitions_[k]);
+          for (std::uint32_t i = index; i != 0; i = parent[i])
             path.push_back(silent_transitions_[via[i]]);
           std::reverse(path.begin(), path.end());
           return FlatOutcome::kFound;
         }
-        frontier.push_back(id);
+        const auto& touched = index_entry.touched[k];
+        if (frontier.size() < kSilentSearchCap) {
+          const std::int32_t* from = pool.data() + std::size_t(index) * places;
+          std::uint64_t h = hashes[index];
+          for (const auto place : touched)
+            h += mix(place, row_buffer[place]) - mix(place, from[place]);
+          if (insert(row_buffer.data(), h)) {
+            const auto id = static_cast<std::uint32_t>(hashes.size() - 1);
+            pool.insert(pool.end(), row_buffer.begin(), row_buffer.end());
+            parent.push_back(index);
+            via.push_back(static_cast<std::uint32_t>(k));
+            frontier.push_back(id);
+          }
+        }
+        const std::int32_t* from = pool.data() + std::size_t(index) * places;
+        for (const auto place : touched) row_buffer[place] = from[place];
       }
     }
     return FlatOutcome::kNone;
@@ -2308,6 +2571,22 @@ class Replayer {
   std::vector<std::vector<std::size_t>> place_enables_;
   mutable std::vector<FlatTransition> flat_transitions_;
   mutable std::size_t flat_places_ = std::numeric_limits<std::size_t>::max();
+  // flat_silent_path's candidate index over silent_transitions_ (positions),
+  // by the first place each one needs a positive count on.
+  struct FlatSilentIndex {
+    std::size_t places = std::numeric_limits<std::size_t>::max();
+    std::vector<std::vector<std::uint32_t>> triggered;
+    std::vector<std::uint32_t> unconditional;
+    std::vector<std::vector<std::uint32_t>> touched;  // places each firing may change
+  };
+  mutable FlatSilentIndex flat_silent_index_;
+  // flat_silent_path's buffers, reused so a search allocates nothing new.
+  struct FlatSearchScratch {
+    std::vector<std::int32_t> pool, row;
+    std::vector<std::uint64_t> hashes, candidates;
+    std::vector<std::uint32_t> table, grown, parent, via, frontier, enabled;
+  };
+  mutable FlatSearchScratch flat_search_scratch_;
 };
 
 // Collapses the log into distinct activity-id sequences with occurrence counts,
@@ -4299,8 +4578,11 @@ Relation log_footprint(const EventLog& log) {
 // silent edges to a fixpoint, so every marking's silent closure is computed
 // once for the whole graph rather than re-searched per query — which is what
 // keeps concurrent nets (whose marking spaces are large) tractable.
+// `cancelled` is polled every 256 markings in each pass (the exploration of
+// up to kFootprintCap markings can take seconds on a concurrent net).
 Relation model_footprint(const PetriNet& net, const Marking& initial,
-                         bool& exhausted) {
+                         bool& exhausted, const std::function<bool()>& cancelled) {
+  CancellationCheck check_cancelled(cancelled, "footprint conformance was cancelled", 256);
   const auto& names = net.activities();
   const std::size_t acts = names.size();
   const std::size_t words = (acts + 63) / 64;
@@ -4340,6 +4622,7 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
       exhausted = true;
       break;
     }
+    check_cancelled();
     const std::uint32_t id = frontier.front();
     frontier.pop();
     if (was_expanded.size() < by_id.size()) was_expanded.resize(by_id.size(), 0);
@@ -4371,6 +4654,7 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
     return changed;
   };
   for (std::uint32_t id = 0; id < count; ++id) {
+    check_cancelled();
     const Marking& current = *by_id[id];
     for (const auto& transition : net.transitions()) {
       if (transition.silent() || !enabled(current, transition)) continue;
@@ -4384,6 +4668,7 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
   std::vector<char> queued(count, 1);
   for (std::uint32_t id = 0; id < count; ++id) work.push(id);
   while (!work.empty()) {
+    check_cancelled();
     const std::uint32_t id = work.front();
     work.pop();
     queued[id] = 0;
@@ -4401,6 +4686,7 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
   // once, rather than inserting a string pair for every edge and label.
   std::vector<std::uint64_t> follows(acts * words, 0);
   for (std::uint32_t id = 0; id < count; ++id) {
+    check_cancelled();
     if (!was_expanded[id]) continue;
     const Marking& current = *by_id[id];
     for (const auto& transition : net.transitions()) {
@@ -4459,9 +4745,15 @@ FootprintResult check_footprints(const EventLog& event_log,
 
 FootprintResult check_footprints(const EventLog& event_log, const PetriNet& net,
                                  const std::vector<int>& initial_marking) {
+  return check_footprints(event_log, net, initial_marking, {});
+}
+
+FootprintResult check_footprints(const EventLog& event_log, const PetriNet& net,
+                                 const std::vector<int>& initial_marking,
+                                 const std::function<bool()>& cancelled) {
   const auto initial = resolve_workflow_marking(net, initial_marking, true);
   bool exhausted = false;
-  const auto model = model_footprint(net, initial, exhausted);
+  const auto model = model_footprint(net, initial, exhausted, cancelled);
   return compare_footprints(log_footprint(event_log), model, exhausted);
 }
 
@@ -5532,6 +5824,7 @@ void detail::forward_token_prefix_walk_impl(
   // its ancestor reached matches the prefix replayed alone; a prefix whose
   // replay stopped leaves every extension at the same stopped state.
   std::unordered_map<TokenMarking, std::vector<std::size_t>, TokenMarkingHash> enabled_cache;
+  std::optional<Replayer::ForwardEnabledPlan> enabled_plan;
   auto state = replayer.start_prefix_walk();
   std::size_t current = 0;
   bool stopped = false;
@@ -5571,7 +5864,8 @@ void detail::forward_token_prefix_walk_impl(
     auto found = enabled_cache.find(state.marking);
     if (found == enabled_cache.end())
       found = enabled_cache.emplace(state.marking,
-                                    replayer.enabled_transition_ids(state.marking, options)).first;
+                                    replayer.enabled_transition_ids(state.marking, options,
+                                                                    std::nullopt, &enabled_plan)).first;
     visit(context, index, stopped ? nullptr : &found->second);
   }
   // The checks the full result performs after replay.

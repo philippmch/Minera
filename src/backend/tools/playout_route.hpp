@@ -209,16 +209,13 @@ void handle_playout_workbench(const httplib::Request& request,
           invoke("extensive_playout(net, options)", [&] {result = minera::extensive_playout(document->net, options);});
         else invoke("extensive_playout_visited(net, options)", [&] {result = minera::extensive_playout_visited(document->net, options);});
       } else if (petri_mode) {
-        // The server's stochastic bounds (see handle_playout): every firing
-        // counts, visited markings are bounded, a disconnect cancels.
+        // The server's stochastic bounds (bound_server_stochastic_playout):
+        // every firing counts, visited storage is bounded, a disconnect
+        // cancels.
         auto options = std::get<minera::StochasticPlayoutOptions>(configured);
         const bool visited_operation = operation == "petri_stochastic_visited" ||
                                        operation == "petri_stochastic_visited_from_source";
-        options.max_total_firings =
-            visited_operation ? kServerStochasticVisitedFirings : kServerStochasticFirings;
-        if (visited_operation)
-          options.max_visited_marking_entries = kServerStochasticVisitedMarkingEntries;
-        options.cancelled = connection_cancel_hook(request);
+        bound_server_stochastic_playout(options, document->net, visited_operation, request);
         if (operation == "petri_stochastic_log")
           invoke("stochastic_playout(net, options)", [&] {result = minera::stochastic_playout(document->net, options);});
         else if (operation == "petri_stochastic_visited")

@@ -10,11 +10,20 @@
       <place id="original-place-1">
         <name><text>original-place-1</text></name>
       </place>
+      <place id="original-place-mid">
+        <name><text>original-place-mid</text></name>
+      </place>
       <transition id="original-transition-0">
         <name><text>original-transition-0</text></name>
       </transition>
+      <transition id="original-transition-1">
+        <name><text>tau</text></name>
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="original-transition-1"/>
+      </transition>
       <arc id="original-in-0" source="original-place-0" target="original-transition-0"/>
-      <arc id="original-out-0" source="original-transition-0" target="original-place-1"/>
+      <arc id="original-out-0" source="original-transition-0" target="original-place-mid"/>
+      <arc id="original-in-1" source="original-place-mid" target="original-transition-1"/>
+      <arc id="original-out-1" source="original-transition-1" target="original-place-1"/>
     </page>
     <finalmarkings>
       <marking>

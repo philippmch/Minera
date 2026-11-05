@@ -838,7 +838,7 @@ ProcessTreePlayoutResult process_tree_playout_result(
     if (node_has_operator(tree.root(), ProcessTreeOperator::kInterleaving))
       throw std::invalid_argument(
           "EXTENSIVE process-tree playout does not support interleaving (the reference raises "
-          "TypeError)");
+          "KeyError on an interleaving root and TypeError on one below the root)");
     if (inclusive_choice_read(tree.root()))
       throw std::invalid_argument(
           "EXTENSIVE process-tree playout does not support inclusive choice (the reference raises "

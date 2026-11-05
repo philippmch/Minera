@@ -8488,11 +8488,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                   << powl_ptml_output << '\n';
         return 1;
       }
-      // Keep CLI semantics aligned with the server: POWL is first materialized
-      // as its workflow net, then reduced only when the structure is exactly
-      // block structured. Non-block partial orders fail instead of being
-      // silently approximated.
-      minera::write_ptml(ptml_file, minera::to_process_tree(powl_net), dataset);
+      // As the server: the POWL model converts directly, as pm4py's
+      // convert_to_process_tree(powl) does (a one-activity model is the leaf
+      // 'a', where its one-transition workflow net would raise).
+      minera::write_ptml(ptml_file, minera::to_process_tree(powl), dataset);
     }
 
     // Optionally emit the (filtered) event log as standard XES, making the

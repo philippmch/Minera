@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -62,6 +63,8 @@ struct State {
   PowlDiscoveryOptions opts;
   std::size_t depth = 0;
   bool probe_only = false;
+  // Polled at each recursion and fall-through candidate when set.
+  const std::function<bool()>* cancelled = nullptr;
 };
 
 struct BaseCaseResult {

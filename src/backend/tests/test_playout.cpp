@@ -1,5 +1,6 @@
 #include "minera/json_export.hpp"
 #include "minera/cancellation.hpp"
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/playout.hpp"
 #include "minera/pnml.hpp"
 #include "minera/timestamp.hpp"
@@ -10,6 +11,7 @@
 #include <limits>
 #include <stdexcept>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -605,6 +607,61 @@ void fitting_replay_budget_is_validated() {
   assert(rejected);
 }
 
+// Regression: the map fitter read only concept:name, so a CSV source (its
+// "activity" column) or a custom activity selector failed with KeyError
+// 'concept:name'. The reference get_map_from_log_and_net with the source's
+// activity key gives these weights (black-box, pm4py 2.7.22).
+void fitting_reads_the_source_log_activity_key() {
+  minera::PetriNet net;
+  const auto source = net.add_place();
+  const auto sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"A", "B"});
+  net.add_transition(0, {source}, {sink});
+  net.add_transition(1, {source}, {sink});
+
+  std::istringstream csv(
+      "case_id,activity,timestamp\n"
+      "a,A,2026-01-01T00:00:00Z\n"
+      "b,A,2026-01-01T00:00:01Z\n"
+      "c,A,2026-01-01T00:00:02Z\n"
+      "d,B,2026-01-01T00:00:03Z\n");
+  const auto csv_log = minera::import_csv_event_log(csv);
+  assert(csv_log.traces.front().events.front().activity_source_key == "activity");
+  const auto csv_weights = minera::fit_stochastic_transition_weights(net, csv_log);
+  assert(csv_weights.size() == 2);
+  assert(csv_weights[0] == 0.75 && csv_weights[1] == 0.25);
+  minera::StochasticPlayoutOptions options;
+  options.traces = 2;
+  options.max_steps = 8;
+  assert(minera::stochastic_playout(net, csv_log, options).trace_count() == 2);
+  assert(minera::stochastic_playout_visited(net, csv_log, options).traces.size() == 2);
+
+  // A custom selector kept as the selected attribute (the table adapter).
+  const std::string key(" task \xed\xa0\x80 \0 ", 12);
+  minera::EventLog custom;
+  for (int number = 0; number < 3; ++number) {
+    minera::Trace trace;
+    trace.case_id = "case_" + std::to_string(number);
+    for (const char* label : {"A", "B"}) {
+      minera::Event event;
+      event.case_id = trace.case_id;
+      event.activity = label;
+      event.activity_state = minera::FirstClassAttributeState::kPresent;
+      event.activity_source_key = key;
+      minera::EventAttribute selected;
+      selected.key = key;
+      selected.value = label;
+      event.activity_attribute = selected;
+      trace.events.push_back(std::move(event));
+    }
+    custom.traces.push_back(std::move(trace));
+  }
+  const auto custom_weights = minera::fit_stochastic_transition_weights(net, custom);
+  assert(custom_weights[0] == 1.0 && custom_weights[1] == 0.5);
+}
+
 // The reference BASIC_PLAYOUT process and envelope (invariant-only; the
 // reference draws from a set of transition objects).
 void basic_playout_reference_semantics() {
@@ -940,4 +997,5 @@ int main() {
   fitting_handles_duplicate_labels_unknowns_and_empty_logs();
   fitting_uses_activation_ratios_and_seeded_precedence();
   fitting_replay_budget_is_validated();
+  fitting_reads_the_source_log_activity_key();
 }

@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "powl/semantics.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -1680,6 +1681,7 @@ std::optional<PowlNode> activity_concurrent_fall_through(const UVCL& log,
   std::optional<Relations> parent;
   bool parent_tried = false;
   for (const auto& candidate : acts) {
+    if (s.cancelled) throw_if_cancelled(*s.cancelled, "POWL discovery was cancelled");
     std::set<std::string> rest(acts.begin(), acts.end());
     rest.erase(candidate);
     if (rest.empty()) continue;
@@ -2077,6 +2079,7 @@ PowlNode PowlSelectorRegistry::discover(const VariantLog& log, State& state) {
 namespace {
 
 PowlNode discover_rec(const UVCL& raw, State& s) {
+  if (s.cancelled) throw_if_cancelled(*s.cancelled, "POWL discovery was cancelled");
   if (++s.depth > 512) throw std::runtime_error("POWL recursion did not terminate");
   auto finish = [&](PowlNode n) { --s.depth; return n; };
   if (raw.empty()) return finish(powl_detail::BaseCaseFactory::empty());
@@ -2128,8 +2131,14 @@ void validate_options(const PowlDiscoveryOptions& o) {
 }  // namespace
 
 PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& options) {
+  return discover_powl(event_log, options, {});
+}
+
+PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& options,
+                       const std::function<bool()>& cancelled) {
   validate_options(options);
   State state{options, 0};
+  if (cancelled) state.cancelled = &cancelled;
   const auto normalized = normalize_powl_event_log_impl(event_log, options);
   const auto log = make_uvcl(normalized, options);
   if (options.variant == PowlDiscoveryVariant::kBruteForce &&

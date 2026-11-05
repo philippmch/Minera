@@ -52,6 +52,37 @@ describe("opened log files with pm4py extensions", () => {
     await expect(gunzipFile(new Blob(["not gzip"]), "x.csv")).rejects.toThrow("not valid gzip");
   });
 
+  it("decompresses large gzip files in folded parts", async () => {
+    const line = "case,activity,2026-01-01T00:00:00Z\n";
+    const csv = line.repeat(Math.ceil((17 << 20) / line.length));
+    const opened = await gunzipFile(await gzip(csv), "big.csv");
+    expect(opened.size).toBe(csv.length);
+    expect(await opened.slice(opened.size - line.length).text()).toBe(line);
+  });
+
+  it("stops decompressing when the load is cancelled", async () => {
+    const aborted = new AbortController();
+    aborted.abort();
+    await expect(gunzipFile(await gzip("a,b\n"), "x.csv", "text/csv", aborted.signal)).rejects.toMatchObject({ name: "AbortError" });
+    const later = new AbortController();
+    const pending = openableLogFile(new File([await gzip("a,b\n".repeat(200000))], "log.csv.gz"), later.signal);
+    later.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("tells running out of memory from a file that is not gzip", async () => {
+    const original = globalThis.DecompressionStream;
+    class FailingStream extends TransformStream<Uint8Array, Uint8Array> {
+      constructor() { super({ transform() { throw new RangeError("Array buffer allocation failed"); } }); }
+    }
+    vi.stubGlobal("DecompressionStream", FailingStream);
+    try {
+      await expect(gunzipFile(await gzip("a,b\n"), "x.csv")).rejects.toThrow("ran out of memory");
+    } finally {
+      vi.stubGlobal("DecompressionStream", original);
+    }
+  });
+
   it("imports OCEL XML and SQLite into OCEL JSON and leaves other files alone", async () => {
     const xml = await openableLogFile(new File(["<log><object-types/></log>"], "orders.xmlocel"));
     expect(xml.name).toBe("orders.xmlocel.json");

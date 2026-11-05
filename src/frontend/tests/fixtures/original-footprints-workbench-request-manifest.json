@@ -10731,7 +10731,7 @@
       "family": "original_footprints",
       "operation": "fitness",
       "coverage_tags": {
-        "expected_value": 1
+        "error_stage": "native_error"
       },
       "exports": {
         "model_json": {

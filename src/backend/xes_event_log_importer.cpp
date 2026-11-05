@@ -840,6 +840,20 @@ std::optional<EventAttribute> parse_attribute_node(
   if (list && variant != XesImportVariant::kIterparse20 &&
       variant != XesImportVariant::kRustXes)
     result.container = AttributeContainerKind::kContainer;
+  // Children outside <values> go to a dict in the public iterparse readers:
+  // a repeated key keeps its first place and takes the last value.
+  const auto add_child = [&](EventAttribute child, bool keyed) {
+    if (public_shapes && keyed) {
+      const auto existing = std::find_if(
+          result.children.begin(), result.children.end(),
+          [&](const auto& item) { return item.key == child.key; });
+      if (existing != result.children.end()) {
+        *existing = std::move(child);
+        return;
+      }
+    }
+    result.children.push_back(std::move(child));
+  };
 
   while (true) {
     const auto token = parser.next();
@@ -909,16 +923,16 @@ std::optional<EventAttribute> parse_attribute_node(
                   parse_attribute_node(parser, values_token, variant, depth + 1))
             result.children.push_back(*child);
         }
-      } else if (const auto child =
+      } else if (auto child =
                      parse_attribute_node(parser, token, variant, depth + 1)) {
-        result.children.push_back(*child);
+        add_child(std::move(*child), result.container != AttributeContainerKind::kList);
       }
-    } else if (const auto child =
+    } else if (auto child =
                    parse_attribute_node(parser, token, variant, depth + 1)) {
       // Scalar attributes are normally self-closing, but the attribute
       // representation also permits recursive metadata children. Preserve
       // those children instead of discarding the whole nested subtree.
-      result.children.push_back(*child);
+      add_child(std::move(*child), !result.scalar_children_list);
     }
   }
 }
@@ -1379,6 +1393,29 @@ static EventLog import_xes_impl(
                       current_event.lifecycle_source_key,
                       current_event.lifecycle_attribute);
       if (timestamp_rank != 0) saw_timestamp = true;
+    } else if (options.variant != XesImportVariant::kRustXes) {
+      // A later list under a selected key replaces that cell, as the
+      // reference dict keeps the last value: the selection is dropped and
+      // the list stays an ordinary attribute.
+      const auto drop_selection = [&](int& current_rank, std::string& target,
+                                      FirstClassAttributeState& state,
+                                      std::string& source_key,
+                                      std::optional<EventAttribute>& metadata) {
+        if (source_key != key) return;
+        current_rank = 0;
+        target.clear();
+        state = FirstClassAttributeState::kMissing;
+        source_key.clear();
+        metadata.reset();
+      };
+      drop_selection(activity_match_rank, current_event.activity, current_event.activity_state,
+                     current_event.activity_source_key, current_event.activity_attribute);
+      drop_selection(timestamp_match_rank, current_event.timestamp, current_event.timestamp_state,
+                     current_event.timestamp_source_key, current_event.timestamp_attribute);
+      drop_selection(resource_match_rank, current_event.resource, current_event.resource_state,
+                     current_event.resource_source_key, current_event.resource_attribute);
+      drop_selection(lifecycle_match_rank, current_event.lifecycle, current_event.lifecycle_state,
+                     current_event.lifecycle_source_key, current_event.lifecycle_attribute);
     }
     // Keep aliases and conflicting canonical keys.  The selected key is
     // removed once the complete event has been read, after selector ranking is

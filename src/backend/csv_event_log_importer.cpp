@@ -310,16 +310,28 @@ int expand_two_digit_year(unsigned year) {
   return expanded;
 }
 
-std::optional<std::string> normalize_reference_timestamp(std::string_view text) {
+// A recognized cell in ISO spelling. `iso_path` marks the shapes pandas reads
+// with its ISO-8601 parser (YYYY-M-D with `-`, `/` or `.`, a `T` or single
+// space before a two-digit HH:MM:SS clock, a `.` fraction, an uppercase `Z`
+// or a numeric offset): only those keep nanoseconds; every other shape goes
+// through dateutil, which truncates the fraction to microseconds.
+struct NormalizedTimestamp {
+  std::string text;
+  bool iso_path = false;
+};
+
+std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_view text) {
   TimestampTokens in{text};
   in.skip_spaces();
   int year = 0, month = 0, day = 0;
+  bool iso_path = true;
 
   // Optional leading weekday name ("Tue 01/02/2024", "Tuesday, Jan 2 2024").
   if (std::isalpha(static_cast<unsigned char>(in.peek()))) {
     const auto saved = in.pos;
     const auto name = in.word();
     if (is_weekday_name(name)) {
+      iso_path = false;
       if (in.peek() == ',') ++in.pos;
       in.skip_spaces();
     } else {
@@ -332,6 +344,7 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
   };
   if (std::isalpha(static_cast<unsigned char>(in.peek()))) {
     // Mon D[,] YYYY
+    iso_path = false;
     month = month_from_name(in.word());
     if (month == 0) return std::nullopt;
     if (!date_separator(in.peek())) return std::nullopt;
@@ -355,8 +368,19 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
     const char sep = in.peek();
     if (!date_separator(sep)) return std::nullopt;
     ++in.pos;
-    if (first_digits == 4) {
+    if (first_digits == 4 && std::isalpha(static_cast<unsigned char>(in.peek()))) {
+      // YYYY-Mon-D
+      iso_path = false;
+      month = month_from_name(in.word());
+      unsigned d = 0;
+      if (month == 0 || in.peek() != sep) return std::nullopt;
+      ++in.pos;
+      if (in.digits(d, 2) == 0) return std::nullopt;
+      year = static_cast<int>(first);
+      day = static_cast<int>(d);
+    } else if (first_digits == 4) {
       // YYYY-M-D in any of the separators.
+      if (sep == ' ') iso_path = false;
       unsigned m = 0, d = 0;
       if (in.digits(m, 2) == 0 || in.peek() != sep) return std::nullopt;
       ++in.pos;
@@ -366,6 +390,7 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
       day = static_cast<int>(d);
     } else if (std::isalpha(static_cast<unsigned char>(in.peek()))) {
       // D Mon YYYY / D-Mon-YYYY
+      iso_path = false;
       month = month_from_name(in.word());
       if (month == 0 || in.peek() != sep) return std::nullopt;
       ++in.pos;
@@ -377,6 +402,7 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
       day = static_cast<int>(first);
     } else {
       // A/B/YYYY: month-first unless the first number cannot be a month.
+      iso_path = false;
       unsigned second = 0, y = 0;
       if (in.digits(second, 2) == 0 || in.peek() != sep) return std::nullopt;
       ++in.pos;
@@ -396,17 +422,28 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
   if (year < 1 || month < 1 || month > 12 || day < 1 ||
       day > month_days(year, month))
     return std::nullopt;
+  // Trailing white space after a date alone is ignored.
+  if (const auto saved = in.pos; true) {
+    in.skip_spaces();
+    if (!in.done()) in.pos = saved;
+  }
 
   int hour = 0, minute = 0, second = 0;
   std::string fraction;
   std::string offset;
+  int offset_minutes = 0;
   if (!in.done()) {
     if (in.peek() != ' ' && in.peek() != 'T' && in.peek() != 't')
       return std::nullopt;
+    if (in.peek() == 't') iso_path = false;
     ++in.pos;
+    const auto clock_start = in.pos;
     in.skip_spaces();
+    if (in.pos != clock_start) iso_path = false;
     unsigned h = 0, m = 0, s = 0;
-    if (in.digits(h, 2) == 0) return std::nullopt;
+    const auto hour_digits = in.digits(h, 2);
+    if (hour_digits == 0) return std::nullopt;
+    if (hour_digits != 2) iso_path = false;
     if (in.peek() == ':') {
       ++in.pos;
       if (in.digits(m, 2) != 2) return std::nullopt;
@@ -414,6 +451,7 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
         ++in.pos;
         if (in.digits(s, 2) != 2) return std::nullopt;
         if (in.peek() == '.' || in.peek() == ',') {
+          if (in.peek() == ',') iso_path = false;
           ++in.pos;
           while (!in.done() && std::isdigit(static_cast<unsigned char>(in.peek()))) {
             if (fraction.size() < 9) fraction.push_back(in.peek());
@@ -421,7 +459,11 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
           }
           if (fraction.empty()) return std::nullopt;
         }
+      } else {
+        iso_path = false;
       }
+    } else {
+      iso_path = false;
     }
     in.skip_spaces();
     if (in.peek() == 'a' || in.peek() == 'A' || in.peek() == 'p' ||
@@ -429,6 +471,7 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
       const auto saved = in.pos;
       const auto meridiem = in.word();
       if (meridiem == "am" || meridiem == "pm") {
+        iso_path = false;
         if (h < 1 || h > 12) return std::nullopt;
         if (meridiem == "am" && h == 12) h = 0;
         else if (meridiem == "pm" && h != 12) h += 12;
@@ -444,6 +487,7 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
     if (!in.done()) {
       const char ch = in.peek();
       if (ch == 'Z' || ch == 'z') {
+        if (ch == 'z') iso_path = false;
         ++in.pos;
         offset = "+00:00";
       } else if (ch == '+' || ch == '-') {
@@ -461,13 +505,17 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
         };
         if (!two_digits(oh)) return std::nullopt;
         if (in.peek() == ':') ++in.pos;
+        // An hour-only offset followed by white space is a dateutil shape.
+        if (!in.done() && (in.peek() == ' ' || in.peek() == '\t')) iso_path = false;
         if (!in.done() && in.peek() != ' ' && in.peek() != '\t' && !two_digits(om))
           return std::nullopt;
         if (oh > 23 || om > 59) return std::nullopt;
+        offset_minutes = (ch == '-' ? -1 : 1) * static_cast<int>(oh * 60 + om);
         char buffer[8];
         std::snprintf(buffer, sizeof(buffer), "%c%02u:%02u", ch, oh, om);
         offset = buffer;
       } else {
+        iso_path = false;
         const auto zone = in.word();
         if (zone != "utc" && zone != "gmt") return std::nullopt;
         offset = "+00:00";
@@ -477,21 +525,88 @@ std::optional<std::string> normalize_reference_timestamp(std::string_view text) 
   }
   if (!in.done()) return std::nullopt;
 
+  // pandas accepts offsets up to 23:59 where the native timestamp grammar
+  // stops at 14:00; such a cell is stored as its UTC instant.
+  if (offset_minutes > 14 * 60 || offset_minutes < -14 * 60) {
+    using namespace std::chrono;
+    const auto local = sys_days{std::chrono::year{year} / month / day} + hours{hour} +
+                       minutes{minute - offset_minutes};
+    const auto date = floor<days>(local);
+    const year_month_day ymd{date};
+    const hh_mm_ss clock{local - date};
+    year = static_cast<int>(ymd.year());
+    month = static_cast<int>(static_cast<unsigned>(ymd.month()));
+    day = static_cast<int>(static_cast<unsigned>(ymd.day()));
+    hour = static_cast<int>(clock.hours().count());
+    minute = static_cast<int>(clock.minutes().count());
+    offset = "+00:00";
+    if (year < 1 || year > 9999) return std::nullopt;
+  }
+  // dateutil keeps microseconds only.
+  if (!iso_path && fraction.size() > 6) fraction.resize(6);
+
   char buffer[40];
   std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d", year,
                 month, day, hour, minute, second);
   std::string out = buffer;
   if (!fraction.empty()) out += "." + fraction;
-  return out + offset;
+  return NormalizedTimestamp{out + offset, iso_path};
 }
 
-// Returns the timestamp text to store for a present CSV cell, or nullopt when
-// the reference conversion would fail for it.
-std::optional<std::string> reference_timestamp_text(const std::string& value) {
-  if (parse_timestamp_exact(value)) return value;
+// The digits after the first '.' or ',' of a timestamp text.
+std::size_t timestamp_fraction_digits(std::string_view text) {
+  const auto dot = text.find_first_of(".,");
+  if (dot == std::string_view::npos) return 0;
+  std::size_t end = dot + 1;
+  while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) ++end;
+  return end - dot - 1;
+}
+
+// The stored text of a present CSV cell, and whether pandas needs nanosecond
+// resolution for it (an ISO-path cell with more than six fraction digits).
+struct ReferenceTimestamp {
+  std::string text;
+  bool nanosecond_fraction = false;
+};
+
+// Returns the timestamp to store for a present CSV cell, or nullopt when the
+// reference conversion would fail for it.
+// `padded` tells that the source cell ended in white space the importer
+// trimmed, which matters after an hour-only offset.
+std::optional<ReferenceTimestamp> reference_timestamp(const std::string& value,
+                                                      bool padded = false) {
+  const auto digits = timestamp_fraction_digits(value);
+  if (parse_timestamp_exact(value)) {
+    if (digits <= 6) return ReferenceTimestamp{value, false};
+    // A shape outside the ISO path (a lowercase `t` or `z`, an hour-only
+    // offset before white space) goes through dateutil, which keeps
+    // microseconds only; the normalized spelling truncates it.
+    auto normalized = normalize_reference_timestamp(padded ? value + " " : value);
+    if (!normalized || normalized->iso_path || !parse_timestamp_exact(normalized->text))
+      return ReferenceTimestamp{value, true};
+    return ReferenceTimestamp{std::move(normalized->text), false};
+  }
   auto normalized = normalize_reference_timestamp(value);
-  if (normalized && parse_timestamp_exact(*normalized)) return normalized;
+  if (normalized && parse_timestamp_exact(normalized->text))
+    return ReferenceTimestamp{std::move(normalized->text),
+                              normalized->iso_path && digits > 6};
   return std::nullopt;
+}
+
+// pandas holds nanosecond timestamps in int64: from 1677-09-21
+// 00:12:43.145224193 to 2262-04-11 23:47:16.854775807. Both the wall clock
+// and the UTC instant of a cell must fit once the column needs them.
+bool outside_nanosecond_range(const std::string& text) {
+  const auto parsed = parse_timestamp_exact(text);
+  if (!parsed) return false;
+  constexpr std::int64_t kMinSeconds = -9223372037, kMaxSeconds = 9223372036;
+  const auto outside = [](std::int64_t seconds, std::uint32_t nanoseconds) {
+    return seconds < kMinSeconds || (seconds == kMinSeconds && nanoseconds < 145224193u) ||
+           seconds > kMaxSeconds || (seconds == kMaxSeconds && nanoseconds > 854775807u);
+  };
+  return outside(parsed->seconds, parsed->nanoseconds) ||
+         outside(parsed->seconds + std::int64_t{parsed->offset_minutes} * 60,
+                 parsed->nanoseconds);
 }
 
 // --- Reference case-id typing ------------------------------------------------
@@ -982,6 +1097,8 @@ CsvEventData import_csv_event_data_impl(
     std::size_t token = 0;
     // The timestamp cell held only whitespace, which trim_fields blanked.
     bool blank_timestamp = false;
+    // The timestamp cell ended in white space that trim_fields removed.
+    bool padded_timestamp = false;
     Event event;
     std::vector<EventAttribute> case_attributes;
     EventTable::Row table_row;
@@ -1051,10 +1168,12 @@ CsvEventData import_csv_event_data_impl(
                                         std::min(index_fields, fields.size())));
     }
     bool blank_timestamp = false;
+    bool padded_timestamp = false;
     if (untrimmed_timestamp) {
       if (*timestamp_index < fields.size()) {
         const auto& cell = fields[*timestamp_index];
         blank_timestamp = !cell.empty() && cell.find_first_not_of(" \t\r\n") == std::string::npos;
+        padded_timestamp = !cell.empty() && (cell.back() == ' ' || cell.back() == '\t');
       }
       for (auto& field : fields) field = trim(std::move(field));
     }
@@ -1077,6 +1196,7 @@ CsvEventData import_csv_event_data_impl(
     row.line_number = line_number;
     row.token = token;
     row.blank_timestamp = blank_timestamp;
+    row.padded_timestamp = padded_timestamp;
     for (const auto index : case_attribute_indices) {
       // The batch import keeps blank cells too: the reference takes a case
       // attribute from one row only, which may be blank (missing).
@@ -1203,6 +1323,17 @@ CsvEventData import_csv_event_data_impl(
   };
   bool drop_untimed_rows = false;
   std::optional<std::pair<std::size_t, std::string>> first_unconverted_timestamp;
+  // to_datetime moves the whole column to nanoseconds when an ISO cell has
+  // more than six fraction digits; a date outside that range then fails the
+  // conversion and the column stays text.
+  bool nanosecond_column = false;
+  std::optional<std::pair<std::size_t, std::string>> first_outside_nanoseconds;
+  const auto note_timestamp = [&](const ReferenceTimestamp& parsed, std::size_t line,
+                                  const std::string& cell) {
+    nanosecond_column = nanosecond_column || parsed.nanosecond_fraction;
+    if (!first_outside_nanoseconds && outside_nanosecond_range(parsed.text))
+      first_outside_nanoseconds = std::make_pair(line, cell);
+  };
   if (reference_batch && timestamp_index) {
     for (const auto& row : pending) {
       const auto& timestamp = row.event.timestamp;
@@ -1218,8 +1349,10 @@ CsvEventData import_csv_event_data_impl(
       }
       // Once the column holds dates, the scan below parses the kept rows.
       if (drop_untimed_rows && case_ids[row.token] && activities[row.token]) continue;
-      if (reference_timestamp_text(timestamp)) drop_untimed_rows = true;
-      else if (!first_unconverted_timestamp)
+      if (auto parsed = reference_timestamp(timestamp, row.padded_timestamp)) {
+        drop_untimed_rows = true;
+        note_timestamp(*parsed, row.line_number, timestamp);
+      } else if (!first_unconverted_timestamp)
         first_unconverted_timestamp = std::make_pair(row.line_number, timestamp);
     }
   }
@@ -1235,8 +1368,9 @@ CsvEventData import_csv_event_data_impl(
       const auto& timestamp = row.event.timestamp;
       if (is_reference_na_token(timestamp)) {
         timestamp_texts.emplace_back(std::string{});
-      } else if (auto parsed = reference_timestamp_text(timestamp)) {
-        timestamp_texts.push_back(std::move(parsed));
+      } else if (auto parsed = reference_timestamp(timestamp, row.padded_timestamp)) {
+        note_timestamp(*parsed, row.line_number, timestamp);
+        timestamp_texts.push_back(std::move(parsed->text));
         ++parsed_timestamps;
       } else {
         timestamp_texts.emplace_back(std::nullopt);
@@ -1299,6 +1433,13 @@ CsvEventData import_csv_event_data_impl(
     if (first_unconverted_timestamp &&
         (!first_bad_timestamp || first_unconverted_timestamp->first < first_bad_timestamp->first))
       first_bad_timestamp = first_unconverted_timestamp;
+    if (reference_batch && nanosecond_column && first_outside_nanoseconds &&
+        (!first_bad_timestamp || first_outside_nanoseconds->first < first_bad_timestamp->first))
+      throw std::runtime_error(
+          "CSV row " + std::to_string(first_outside_nanoseconds->first) + " has a timestamp '" +
+          first_outside_nanoseconds->second + "' in column '" + header[*timestamp_index] +
+          "' outside the nanosecond range that a fraction of more than six digits gives the "
+          "column, so pandas leaves the column unconverted");
     if (first_bad_timestamp) {
       const auto& text = first_bad_timestamp->second;
       throw std::runtime_error(
@@ -1388,6 +1529,13 @@ std::vector<std::optional<std::string>> reference_csv_column_text(
 
 ReferenceCsvColumn reference_csv_column(const std::vector<std::string>& cells) {
   return infer_reference_column(cells);
+}
+
+std::optional<ReferenceMixedTimestamp> reference_mixed_timestamp(const std::string& cell) {
+  auto parsed = reference_timestamp(cell);
+  if (!parsed) return std::nullopt;
+  const bool outside = outside_nanosecond_range(parsed->text);
+  return ReferenceMixedTimestamp{std::move(parsed->text), parsed->nanosecond_fraction, outside};
 }
 
 std::string reference_csv_float_text(double value) {

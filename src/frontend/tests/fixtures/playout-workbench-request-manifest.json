@@ -3450,14 +3450,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "99376",
+        "Content-Length": "99380",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "fit-typed-original-metadata.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/fit-typed-original-metadata.response.json",
-        "bytes": 99376,
-        "sha256": "d3dba2c40f121c1c686dc9c36f6bcd8eb33640354273d2f7cff31e594bb32587",
+        "bytes": 99380,
+        "sha256": "1f4c2a2c35448d1aacc08290906b950612791a7c6b58f96832845705ec17e7c7",
         "status": 200
       },
       "family": "playout",
@@ -3546,14 +3546,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "100749",
+        "Content-Length": "100753",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "fit-literal-selectors-preserve-wtf-and-nul.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/fit-literal-selectors-preserve-wtf-and-nul.response.json",
-        "bytes": 100749,
-        "sha256": "da7520235ca0128840f8707e94c51480ce75dcd182ec63e784cbc7f331fb542e",
+        "bytes": 100753,
+        "sha256": "7e31df5d1d278280f7240e4dfb93b729dc62d3e259b7ac1bf7e019cfc9f449ba",
         "status": 200
       },
       "family": "playout",
@@ -6192,14 +6192,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12804",
+        "Content-Length": "12810",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "constructor-original-tree_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_result.response.json",
-        "bytes": 12804,
-        "sha256": "8fd2383a34a428d195c36df7438889874e2064549ca39e58c5135483a9ec6fa5",
+        "bytes": 12810,
+        "sha256": "4bc5d90dc478f37e21473594eb599fc4f920874a9f48373579e600f15a2c05e2",
         "status": 200
       },
       "family": "playout",
@@ -6284,14 +6284,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12962",
+        "Content-Length": "12968",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "ptml-original-tree_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_result.response.json",
-        "bytes": 12962,
-        "sha256": "30328cd7bebd097416822c6c7ec7cb5e69e4231765e8d16bacfea75598f82134",
+        "bytes": 12968,
+        "sha256": "8af2a24e936784d63dde0d408c1b5d99a94f2033d1d67bb080ca8ac39a82793e",
         "status": 200
       },
       "family": "playout",
@@ -6375,14 +6375,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12747",
+        "Content-Length": "12753",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "constructor-original-tree_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_log.response.json",
-        "bytes": 12747,
-        "sha256": "560c086efba0125e2cb5a5250725743424504f4736a52826c088de2f13276371",
+        "bytes": 12753,
+        "sha256": "8d3c10217b81ebf112e3b404df7bfda747619d90b22cfc02455b8f652d85a234",
         "status": 200
       },
       "family": "playout",
@@ -6467,14 +6467,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12905",
+        "Content-Length": "12911",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "ptml-original-tree_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_log.response.json",
-        "bytes": 12905,
-        "sha256": "cf28635eca955c900aed246037dbab0d55bd4b64dd56678213866fea2d03b10a",
+        "bytes": 12911,
+        "sha256": "87ccd741e3d12d1cefd2fb6d8b375df5311bebf3e2d65aa144c34752e0003003",
         "status": 200
       },
       "family": "playout",
@@ -7091,14 +7091,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4628",
+        "Content-Length": "4634",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-tau.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-tau.response.json",
-        "bytes": 4628,
-        "sha256": "90138704b9fe7ab2b66db4dd6aed93b85a0322a2f5e19363f984550b69b859d8",
+        "bytes": 4634,
+        "sha256": "adbdf16bda82f5fc44596aa47b2ee1f47a1a2e5d58f448c0c7d4e048b6b157ac",
         "status": 200
       },
       "family": "playout",
@@ -7180,14 +7180,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5694",
+        "Content-Length": "5700",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-activity.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-activity.response.json",
-        "bytes": 5694,
-        "sha256": "7a0d8565f50f42b35bf28654c0c420c33ab9af0a6199f26a3c6a58ded6148d5f",
+        "bytes": 5700,
+        "sha256": "e9d354c48a416792da2053efd17d4abf778fdc4dadbddb0e8c05e050b7c28db6",
         "status": 200
       },
       "family": "playout",
@@ -7269,14 +7269,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7301",
+        "Content-Length": "7307",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-sequence.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-sequence.response.json",
-        "bytes": 7301,
-        "sha256": "7cddcef930b903f92d6ef92459beafe28973ebfd857903620ada70936996b25c",
+        "bytes": 7307,
+        "sha256": "641bf4ff65f25e812b5ce313a7aff53635695fe1f63e300367a1915d363b79c6",
         "status": 200
       },
       "family": "playout",
@@ -7358,14 +7358,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7925",
+        "Content-Length": "7931",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-exclusive.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-exclusive.response.json",
-        "bytes": 7925,
-        "sha256": "583e38bd25f9ef607ba3310c601a8113f82aa039008e4ccc6bba368927d87afc",
+        "bytes": 7931,
+        "sha256": "3c80202347405a2cba140ff8cad88299045549a2373f001e547637cd9c581814",
         "status": 200
       },
       "family": "playout",
@@ -7447,14 +7447,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10110",
+        "Content-Length": "10116",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-parallel.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-parallel.response.json",
-        "bytes": 10110,
-        "sha256": "d138f09c0d403d386a4475375e343343706a8147874b804b7a1772ce8d7e345b",
+        "bytes": 10116,
+        "sha256": "8ddbe4bd0955da16a065a04998b39620bf191ed7ddf7906b71e5cbc7cf200925",
         "status": 200
       },
       "family": "playout",
@@ -7524,7 +7524,7 @@
         "bytes": 865,
         "sha256": "bb07303b8990e92d2e41207e2fc3637ecc2b2fc748539728ec353916b2c369e8"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "model_file": {
           "filename": "owned-operator-inclusive_choice.json",
@@ -7536,15 +7536,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "13573",
+        "Content-Length": "2695",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-inclusive_choice.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-inclusive_choice.response.json",
-        "bytes": 13573,
-        "sha256": "3eb8bd128c18a2770cf65829e758c7df957a52f92d27b065a8ca253b900684ea",
-        "status": 200
+        "bytes": 2695,
+        "sha256": "5ca04d1ccc4ff908c4f2509e6f15e3f28eb4c652c4346ed6fe1c0ccf092f3184",
+        "status": 400
       },
       "family": "playout",
       "operation": "tree_result",
@@ -7567,22 +7567,21 @@
           "bytes": 380,
           "sha256": "2ab5c019f86131437ba26a1db142d2ced17c7450450f48b344b7470fd740797c",
           "format": "ptml"
-        },
-        "generated_xes": {
-          "filename": "tree-native-operator-inclusive_choice.generated_xes.xes",
-          "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-inclusive_choice.generated_xes.xes",
-          "bytes": 711,
-          "sha256": "706daa74df316a9951ee92ce25c0a8fc8ee1f92c596727e733892ebd95ee0da5",
-          "format": "xes"
         }
       },
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "EXTENSIVE process-tree playout does not support inclusive choice (the reference raises KeyError)"
+      },
       "native_calls": [
         {
           "name": "process_tree_playout_result(tree, options)",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "EXTENSIVE process-tree playout does not support inclusive choice (the reference raises KeyError)"
+          }
         }
       ]
     },
@@ -7613,7 +7612,7 @@
         "bytes": 857,
         "sha256": "4391fa19442ae701a84bb3e424855d995c9d03f452f5a45c96ba9b3b1d736146"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "model_file": {
           "filename": "owned-operator-interleaving.json",
@@ -7625,15 +7624,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10131",
+        "Content-Length": "2805",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-interleaving.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-interleaving.response.json",
-        "bytes": 10131,
-        "sha256": "72f999a1d9183bcc741a247467aad0e0120ea3ace45a0303defa42c115f281b1",
-        "status": 200
+        "bytes": 2805,
+        "sha256": "382c1f6c5c711efaa08f8a0aa2b9ca135737ff309068ef4b04918d4b067a7ce4",
+        "status": 400
       },
       "family": "playout",
       "operation": "tree_result",
@@ -7656,22 +7655,21 @@
           "bytes": 390,
           "sha256": "e5ab1125f45d36fdad5ce41bb593a2f12c2660e8c3760e94bd8129bb41a3d7f2",
           "format": "ptml"
-        },
-        "generated_xes": {
-          "filename": "tree-native-operator-interleaving.generated_xes.xes",
-          "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-interleaving.generated_xes.xes",
-          "bytes": 529,
-          "sha256": "f5496e607b97c30520bc47eb49543b4a6190b8ea0c49e34cf3c873b236b18984",
-          "format": "xes"
         }
       },
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "EXTENSIVE process-tree playout does not support interleaving (the reference raises KeyError on an interleaving root and TypeError on one below the root)"
+      },
       "native_calls": [
         {
           "name": "process_tree_playout_result(tree, options)",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "EXTENSIVE process-tree playout does not support interleaving (the reference raises KeyError on an interleaving root and TypeError on one below the root)"
+          }
         }
       ]
     },
@@ -7714,14 +7712,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1943",
+        "Content-Length": "1949",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-invalid-leaf-retains-constructor.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-invalid-leaf-retains-constructor.response.json",
-        "bytes": 1943,
-        "sha256": "7465c452d4e0c524fac1ddb0f4968ff20e634551d2fd8dd5223beaabf97040a5",
+        "bytes": 1949,
+        "sha256": "9cfdcb10bde8ebfc6c66e72f40807cb5de5b25859f14c13f71f432b33ad936bb",
         "status": 400
       },
       "family": "playout",

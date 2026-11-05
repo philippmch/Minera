@@ -1043,6 +1043,14 @@ bool dataframe_performance_source(const minera::ActiveEventSource* source) {
   return source != nullptr && source->file().format != "table";
 }
 
+// The XES downloads of a CSV-sourced log write the case id, activity and
+// timestamp under pm4py's standard keys, as read_csv, format_dataframe and
+// write_xes do; an XES source keeps its own keys, as read_xes and write_xes
+// keep them.
+bool standard_keys_for_session(const MinedSession& session) {
+  return session.active_source && session.active_source->file().format == "csv";
+}
+
 minera::DfgStatisticalOptions dfg_statistics_for_source(
     minera::DfgStatisticalOptions options,
     const minera::ActiveEventSource* source) {
@@ -1100,14 +1108,34 @@ minera::CorrelationVariantsAnalysis analyze_correlation_variants(
 // A client that gave up (closed the tab, aborted the fetch) gets nothing from
 // a result. Long searches poll this callback and stop instead of finishing
 // for no one; it is empty when the transport cannot tell.
-// Server bounds of stochastic Petri playout (see handle_playout).
-constexpr std::size_t kServerStochasticFirings = 10'000'000;
-constexpr std::size_t kServerStochasticVisitedFirings = 1'000'000;
-constexpr std::size_t kServerStochasticVisitedMarkingEntries = 20'000'000;
-
 std::function<bool()> connection_cancel_hook(const httplib::Request& request) {
   if (!request.is_connection_closed) return {};
   return [&request] { return request.is_connection_closed(); };
+}
+
+// Server bounds of stochastic Petri playout (handle_playout and the playout
+// workbench). Silent firings do not count towards max_steps, so the visible
+// budget (traces * max_steps <= 1,000,000) does not bound the work: every
+// firing of a run counts, and a disconnect cancels. A visited-elements run
+// stores two elements per firing (about 96 bytes) and each marking's place
+// counts (4 bytes a place); that storage is budgeted at 512 MiB, so its
+// firing cap scales with the place count (5.1 million firings on a 2-place
+// net, 3 million on 20 places, 1 million on 100), which a run that fills the
+// visible budget on a typical net stays under.
+constexpr std::size_t kServerStochasticFirings = 10'000'000;
+constexpr std::size_t kServerStochasticVisitedBytes = std::size_t{512} << 20;
+
+void bound_server_stochastic_playout(minera::StochasticPlayoutOptions& options,
+                                     const minera::PetriNet& net, bool visited,
+                                     const httplib::Request& request) {
+  options.max_total_firings = kServerStochasticFirings;
+  if (visited) {
+    options.max_total_firings = std::min<std::size_t>(
+        kServerStochasticFirings,
+        kServerStochasticVisitedBytes / (96 + 4 * net.place_count()));
+    options.max_visited_marking_entries = kServerStochasticVisitedBytes / 4;
+  }
+  options.cancelled = connection_cancel_hook(request);
 }
 
 #include "active_source_route.hpp"
@@ -1259,8 +1287,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           graph, *correlation_variants_analysis);
     }
     checkpoint();
+    // Quadratic in the trace length: one long case can keep it busy for
+    // minutes, so a disconnect stops it.
     const auto temporal_profile =
-        minera::discover_temporal_profile(log, params.temporal_profile);
+        minera::discover_temporal_profile(log, params.temporal_profile, disconnected);
     const auto minimum_self_distances =
         discover_selected_minimum_self_distances(
             log, params.minimum_self_distance);
@@ -1286,7 +1316,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const bool inductive_is_log = prepared_log_is_identity(inductive_prepared, log);
     if (inductive_is_log) inductive_prepared = minera::EventLog{};
     const minera::EventLog& inductive_log = inductive_is_log ? log : inductive_prepared;
-    const auto tree = minera::discover_process_tree(log, params.inductive);
+    // Its activity-concurrency fall-through tries every activity of a sublog
+    // in turn (minutes on logs with hundreds of activities), so a disconnect
+    // stops it.
+    auto inductive_discovery = params.inductive;
+    inductive_discovery.cancelled = disconnected;
+    const auto tree = minera::discover_process_tree(log, inductive_discovery);
     checkpoint();
     for (const auto& activity : tree.activities()) {
       graph.ensure_activity(activity);
@@ -1306,7 +1341,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       graph.ensure_activity(activity);
     const auto heuristics = minera::discover_heuristics_net(log, params.heuristic);
     checkpoint();
-    const auto powl = minera::discover_powl(log, params.powl);
+    // Its fall-throughs try every activity of a sublog in turn (minutes on
+    // logs with hundreds of activities), so a disconnect stops it.
+    const auto powl = minera::discover_powl(log, params.powl, disconnected);
     checkpoint();
     register_powl_labels(graph, powl);
     const auto powl_log = project_powl_activity(
@@ -1420,17 +1457,14 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                                       minera::check_conformance(
                                            *conformance_log, petri,
                                            replay_options),
-                                      is_powl
-                                          ? minera::check_footprints(powl_log,
-                                                                      petri)
-                                          : is_inductive
-                                                ? minera::check_footprints(
-                                                      inductive_log, petri)
-                                                : is_alpha
-                                                      ? minera::check_footprints(
-                                                            alpha_log, petri)
-                                                : minera::check_footprints(log,
-                                                                          petri),
+                                      // The model's marking exploration can take
+                                      // seconds; a disconnect stops it.
+                                      minera::check_footprints(
+                                          is_powl ? powl_log
+                                          : is_inductive ? inductive_log
+                                          : is_alpha ? alpha_log
+                                                     : log,
+                                          petri, std::vector<int>{}, disconnected),
                                       std::nullopt};
     };
     const std::vector<minera::ModelConformance> conformance = {
@@ -4272,8 +4306,10 @@ void handle_structured_discovery(const httplib::Request& request,
   pnml = minera::to_pnml(net, family + " " + variant + " discovery");
   try { bpmn = tree ? minera::to_bpmn(*tree) : minera::to_bpmn(net); }
   catch (const std::exception& error) { bpmn_error = error.what(); }
-  // Sparse POWL orders must not be weakened into a block approximation.
-  try { ptml = minera::to_ptml(tree ? *tree : minera::to_process_tree(net), family + " " + variant + " discovery"); }
+  // POWL converts directly, as pm4py's convert_to_process_tree(powl) does
+  // (a one-activity model is the leaf 'a'; its one-transition workflow net
+  // would raise in the net conversion).
+  try { ptml = minera::to_ptml(tree ? *tree : minera::to_process_tree(*powl), family + " " + variant + " discovery"); }
   catch (const std::exception& error) { ptml_error = error.what(); }
   const auto traces = ocel_query_size(request, "discovery_playout_traces", 0);
   const auto steps = ocel_query_size(request, "discovery_playout_max_steps", 1000);
@@ -5167,7 +5203,7 @@ void handle_log_query_export(const httplib::Request& request,httplib::Response& 
   }else if(format=="xes"){
     const auto filtered=select_active_source_rows(*session,indices,mode=="cases");
     response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
-    minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");
+    minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=standard_keys_for_session(*session);response.set_content(minera::serialize_xes(filtered,options),"application/xml");
   }else throw std::invalid_argument("filter export format must be xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
@@ -5184,7 +5220,7 @@ void handle_log_cluster(const httplib::Request& request,httplib::Response& respo
   response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
   const auto format=request.has_param("format")?request.get_param_value("format"):"summary";
   if(format=="summary")response.set_content(minera::log_cluster_runtime::summary(filtered,name,request.body,indices,std::to_string(session->query_source_id)),"application/json");
-  else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
+  else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=standard_keys_for_session(*session);response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
   else if(format=="json")response.set_content(active_source_table_json_from_log_indices(*session,indices,true),"application/json");
   else throw std::invalid_argument("cluster format must be summary, xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
@@ -5359,7 +5395,8 @@ void handle_clustering_export(const httplib::Request& request,
     if (format == "xes") {
       minera::XesExportOptions options;
       options.preserve_nulls = ocel_query_bool(request, "preserve_nulls", false);
-      options.standard_keys = true;  // a download read by pm4py and reopened with default selectors
+      // A download read by pm4py and reopened with default selectors.
+      options.standard_keys = standard_keys_for_session(*analysis->source);
       response.set_content(minera::serialize_xes(selected, options), "application/xml");
     } else if (format == "json") {
       std::vector<std::size_t> event_indices;
@@ -5958,7 +5995,7 @@ std::string anonymization_release_json(std::string result_json,
                                        const MinedSession& session) {
   const auto quote = minera::embedding_runtime::detail::escape_json;
   minera::XesExportOptions options;  // nulls omitted, as pm4py writes None/NaN
-  options.standard_keys = true;  // downloaded, and reopened with default selectors
+  options.standard_keys = standard_keys_for_session(session);  // downloaded, and reopened with default selectors
   return "{\"family\":\"ANONYMIZATION_RELEASE\",\"source_id\":" +
          quote(std::to_string(session.query_source_id)) + ",\"result\":" +
          result_json + ',' +
@@ -8930,8 +8967,12 @@ void handle_ptml(const httplib::Request& request,
                            "application/json");
       return;
     }
+    // POWL converts from the model itself, as pm4py's
+    // convert_to_process_tree(powl); the other miners reduce their nets.
     response.set_content(
-        minera::to_ptml(minera::to_process_tree(it->second),
+        minera::to_ptml(miner == "powl" && session->powl
+                            ? minera::to_process_tree(*session->powl)
+                            : minera::to_process_tree(it->second),
                         session->dataset + " " + miner),
         "application/xml");
   } catch (const std::exception& error) {
@@ -9596,18 +9637,6 @@ void handle_playout(const httplib::Request& request,
                "safety limit");
         return;
       }
-      // Silent firings do not count towards max_steps (as in the reference),
-      // so the visible-event budget above does not bound the work: the server
-      // also bounds every firing of the run, visible or silent (10,000,000;
-      // 1,000,000 with visited elements, two elements per firing as before),
-      // the marking entries a visited run records (20,000,000), and stops
-      // when the client disconnects.
-      options.max_total_firings =
-          options.return_visited_elements ? kServerStochasticVisitedFirings
-                                          : kServerStochasticFirings;
-      if (options.return_visited_elements)
-        options.max_visited_marking_entries = kServerStochasticVisitedMarkingEntries;
-      options.cancelled = connection_cancel_hook(request);
       std::optional<minera::EventLog> projected_powl_log;
       const minera::EventLog* fit_log = nullptr;
       if (options.fit_from_log) fit_log = &cached_model_log(*session, selected_miner);
@@ -9620,6 +9649,8 @@ void handle_playout(const httplib::Request& request,
       if (options.return_visited_elements) {
         const auto& selected = select_cached_or_process_tree_net(
             request, *session, selected_miner, converted);
+        // The visible budget above does not bound silent firings.
+        bound_server_stochastic_playout(options, selected, true, request);
         const auto visited = options.fit_from_log
                                  ? minera::stochastic_playout_visited(
                                        selected, *fit_log, options)
@@ -9632,6 +9663,7 @@ void handle_playout(const httplib::Request& request,
       } else {
         const auto& selected = select_cached_or_process_tree_net(
             request, *session, selected_miner, converted);
+        bound_server_stochastic_playout(options, selected, false, request);
         const auto log = options.fit_from_log
                              ? minera::stochastic_playout(selected,
                                                          *fit_log, options)
@@ -10038,10 +10070,11 @@ void handle_xes(const httplib::Request& request, httplib::Response& response) {
         ocel_query_bool(request, "xes_infer_metadata", false);
     options.preserve_nulls =
         ocel_query_bool(request, "xes_preserve_nulls", false);
-    // The download is standard XES: a CSV log's case_id/activity/timestamp
+    // A CSV log's download is standard XES: its case_id/activity/timestamp
     // columns go out as concept:name/time:timestamp, the keys pm4py reads as
-    // case:concept:name, concept:name and time:timestamp.
-    options.standard_keys = true;
+    // case:concept:name, concept:name and time:timestamp. An XES source
+    // keeps its keys.
+    options.standard_keys = standard_keys_for_session(*session);
     const bool compressed = options.compress.value_or(false);
     response.set_content(minera::serialize_xes(require_prepared_log(*session), options),
                          compressed ? "application/gzip" : "application/xml");
@@ -10335,7 +10368,16 @@ void handle_model_exchange(const httplib::Request& request,
         catch (const std::exception& error) { conversion_error = error.what(); }
       }
     }
-    if (!document && !pnml.empty()) document = minera::parse_pnml_document(pnml);
+    if (!document && !pnml.empty()) {
+      // A converted DFG that the PNML reader cannot take back is a failed
+      // conversion; the response keeps the DFG data.
+      if (format == "dfg") {
+        try { document = minera::parse_pnml_document(pnml); }
+        catch (const std::exception& error) { conversion_error = error.what(); pnml.clear(); }
+      } else {
+        document = minera::parse_pnml_document(pnml);
+      }
+    }
     if (format == "bpmn") primary = minera::pnml_document_json(*document);
     if (document && document->arc_occurrences) {
       std::ostringstream data; data << '[';

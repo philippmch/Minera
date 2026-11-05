@@ -12,11 +12,20 @@ FootprintsExtensiveResult LogExtensiveVariant::apply(const Footprint& log,
 FootprintsExtensiveResult LogExtensiveVariant::compare(
     const Footprint& log, const Footprint& model,
     bool check_act_always_executed) {
+  return compare(log, model,
+                 FootprintRelationProjection::relation_configurations(model),
+                 check_act_always_executed);
+}
+
+FootprintsExtensiveResult LogExtensiveVariant::compare(
+    const Footprint& log, const Footprint& model,
+    const std::set<FootprintPair>& model_relations,
+    bool check_act_always_executed) {
   FootprintsExtensiveResult result;
-  const auto log_projection = FootprintRelationProjection::project(log);
-  const auto model_projection = FootprintRelationProjection::project(model);
-  for (const auto& pair : log_projection.relations) {
-    if (model_projection.relations.find(pair) == model_projection.relations.end()) {
+  // Only the projections' relation sets are compared.
+  const auto log_relations = FootprintRelationProjection::relation_configurations(log);
+  for (const auto& pair : log_relations) {
+    if (model_relations.find(pair) == model_relations.end()) {
       result.footprints.insert(pair);
     }
   }

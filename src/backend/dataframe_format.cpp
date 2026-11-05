@@ -16,6 +16,7 @@
 #include <string_view>
 #include <utility>
 
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/timestamp.hpp"
 #include "full_double.hpp"
 
@@ -189,13 +190,18 @@ std::optional<ExactTimestamp> parse_iso_timestamp(std::string text) {
                         static_cast<std::uint32_t>(nanoseconds)};
 }
 
-std::optional<ExactTimestamp> parse_strptime_timestamp(std::string text,
-                                                        std::string_view format) {
-  text = trim_ascii(std::move(text));
+// Matches `format` at the start of `text` and reports where the match ends
+// in `consumed`; text after it is ignored. `iso_quirks` allows the empty
+// fractions and hour-only offsets of the ISO path.
+std::optional<ExactTimestamp> parse_strptime_prefix(std::string text,
+                                                     std::string_view format,
+                                                     bool iso_quirks,
+                                                     std::size_t* consumed = nullptr) {
   // The public parser accepts empty fractions and hour-only offsets for
   // ISO-shaped formats, but requires digits/minutes for other formats.
   bool iso_shape = false;
   for (const auto separator : {"-", "/", ".", " "}) {
+    if (!iso_quirks) break;
     for (const auto clock_separator : {" ", "T"}) {
       const auto prefix = std::string("%Y") + separator + "%m" + separator +
                           "%d" + clock_separator + "%H:%M:%S";
@@ -222,12 +228,14 @@ std::optional<ExactTimestamp> parse_strptime_timestamp(std::string text,
   };
   auto standard = [&](std::string_view fragment) {
     if (fragment.empty()) return true;
-    std::istringstream stream(text.substr(position));
+    // A sentinel byte keeps get_time from accepting text that ends before
+    // the fragment does ("1" for "%d %b %Y" reads only a day otherwise).
+    std::istringstream stream(text.substr(position) + '\x01');
     stream.imbue(std::locale::classic());
     stream >> std::get_time(&calendar, std::string(fragment).c_str());
     if (stream.fail()) return false;
     if (stream.eof()) position = text.size();
-    else position += static_cast<std::size_t>(stream.tellg());
+    else position = std::min(text.size(), position + static_cast<std::size_t>(stream.tellg()));
     return true;
   };
   std::size_t segment = 0;
@@ -280,8 +288,8 @@ std::optional<ExactTimestamp> parse_strptime_timestamp(std::string text,
     }
     segment = i + 1;
   }
-  if (!standard(format.substr(segment)) ||
-      !trim_ascii(text.substr(position)).empty()) return std::nullopt;
+  if (!standard(format.substr(segment))) return std::nullopt;
+  if (consumed) *consumed = position;
   const auto year = static_cast<std::int64_t>(calendar.tm_year) + 1900;
   const auto month = static_cast<unsigned>(calendar.tm_mon + 1);
   const auto day = static_cast<unsigned>(calendar.tm_mday);
@@ -303,6 +311,25 @@ std::optional<ExactTimestamp> parse_strptime_timestamp(std::string text,
                                                        minute * 60 + second) -
                              static_cast<std::int64_t>(offset_minutes) * 60,
                          nanoseconds};
+}
+
+// format_dataframe converts with an explicit format as to_datetime(exact=False)
+// does (observed black-box): the format may match anywhere in the cell, and
+// text before and after the match is ignored ("x2013-02-18 18:53:31+02:00"
+// reads 18:53:31 UTC with "%Y-%m-%d %H:%M:%S"). The first place it matches
+// wins.
+std::optional<ExactTimestamp> parse_strptime_timestamp(const std::string& text,
+                                                        std::string_view format) {
+  // A whole-cell match first, which keeps the ISO path's quirks
+  // ("2024/01/01 01:02:03." reads with "...%S.%f"; "...03.abc" does not).
+  const auto trimmed = trim_ascii(text);
+  std::size_t consumed = 0;
+  if (auto parsed = parse_strptime_prefix(trimmed, format, true, &consumed);
+      parsed && trim_ascii(trimmed.substr(consumed)).empty())
+    return parsed;
+  for (std::size_t start = 0; start < text.size(); ++start)
+    if (auto parsed = parse_strptime_prefix(text.substr(start), format, false)) return parsed;
+  return std::nullopt;
 }
 
 std::string format_exact_timestamp(const ExactTimestamp& timestamp,
@@ -344,8 +371,13 @@ std::optional<ExactTimestamp> parse_timestamp_cell(
     return parse_iso_timestamp(date->value);
   }
   const auto text = attribute_text(cell);
-  if (!format || *format == "mixed" || *format == "ISO8601")
+  if (!format || *format == "mixed") {
+    // The mixed parser reads dateutil shapes too (month-first numeric dates,
+    // month names, 12-hour clocks, offsets to 23:59), as the CSV importer.
+    if (const auto iso = reference_mixed_timestamp(text)) return parse_iso_timestamp(iso->text);
     return parse_iso_timestamp(text);
+  }
+  if (*format == "ISO8601") return parse_iso_timestamp(text);
   return parse_strptime_timestamp(text, *format);
 }
 
@@ -439,6 +471,8 @@ bool all_date_eligible(const EventTable& table, std::size_t column,
   parsed.reserve(table.rows.size());
   const auto dtype = source_dtype(table, column);
   if (is_numeric_dtype(dtype)) return false;
+  bool nanosecond_column = false;
+  bool outside_nanoseconds = false;
   for (const auto& row : table.rows) {
     if (column >= row.size()) return false;
     if (cell_missing(row[column])) {
@@ -479,8 +513,17 @@ bool all_date_eligible(const EventTable& table, std::size_t column,
     const auto value = parse_timestamp_cell(*row[column], format);
     if (!value) return false;
     parsed.push_back(value);
+    if ((!format || *format == "mixed") &&
+        !std::holds_alternative<NativeDate>(row[column]->typed_value)) {
+      if (const auto mixed = reference_mixed_timestamp(text)) {
+        nanosecond_column = nanosecond_column || mixed->nanosecond_fraction;
+        outside_nanoseconds = outside_nanoseconds || mixed->outside_nanosecond_range;
+      }
+    }
   }
-  return true;
+  // A long ISO fraction puts the column at nanoseconds, which cannot hold a
+  // date outside 1677-2262: the conversion fails and the column stays text.
+  return !(nanosecond_column && outside_nanoseconds);
 }
 
 EventAttribute date_cell(std::string key, const std::optional<EventAttribute>& source,

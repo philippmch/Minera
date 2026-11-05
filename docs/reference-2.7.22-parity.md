@@ -992,7 +992,10 @@ local server's `mode=stochastic` route, and the frontend controls, with strict
 trace/step/event-budget limits at adapter boundaries. The supported native
 contract also provides source-log fitting with the weights of
 `get_map_from_log_and_net` (the shared stochastic-map fitter's
-activation/enabling ratios); transitions the map lacks keep weight 1.0. Explicit
+activation/enabling ratios), read under the source log's own activity and
+timestamp keys (a CSV `activity` column or a custom selector, as the
+reference fits with the source's `activity_key`; test
+`fitting_reads_the_source_log_activity_key`); transitions the map lacks keep weight 1.0. Explicit
 transition weights take precedence over fitted values in the source-log
 overload; the native replay API is wired through strict request parsing, the
 export CLI, the cached local server route, and typed frontend controls.
@@ -18616,10 +18619,16 @@ Fixed:
   do not count towards `max_steps`, the server's visible-event budget
   (traces · max_steps ≤ 1,000,000) does not bound the work: `/api/playout`
   and the playout workbench also cap every firing of a run, visible or
-  silent, at 10,000,000 (1,000,000 with visited elements, two elements per
-  firing as before), cap the marking entries of a visited run at 20,000,000,
-  and stop when the client disconnects. A run past a cap is refused with 400
-  ("the run would fire more than … transitions"). The library defaults
+  silent, at 10,000,000, and stop when the client disconnects. A
+  visited-elements run stores two elements per firing and each marking's
+  place counts; that storage is budgeted at 512 MiB (about 96 bytes a firing
+  plus 4 bytes a place per marking), so its firing cap scales with the
+  place count: 5.1 million firings on a 2-place net, 3 million on 20 places,
+  1 million on 100, enough for a run that fills the visible budget with a
+  silent firing or two per visible event on a typical discovered net (the
+  marking entries are also capped at 128 million). A run past a cap is
+  refused with 400 ("the run would fire more than … transitions"). The
+  library defaults
   (`StochasticPlayoutOptions::max_total_firings`,
   `max_visited_marking_entries`, `cancelled`) set none, as the reference.
   (A net with a weight-500 silent self-loop and traces=100 once ran the
@@ -18713,8 +18722,17 @@ Fixes:
   gap (an earlier bound on each instant dropped events after 2255 or before
   1685 from the map, waits outside 1843-2096 from decorations, and spans over
   292 years overflowed); a gap over 2**53 microseconds is divided once, as
-  Python's int / int. pandas reads such CSVs as `datetime64[us]`; checked:
-  1700 → 2250 and year 1 → 9999 give pm4py's 332894188800.0 total.
+  Python's int / int. pandas reads a CSV without sub-microsecond digits
+  outside 1677-2262 as `datetime64[us]`; checked: year 1 → 9999 gives
+  pm4py's 315537811200.0 on both sides.
+- **Calendar-range gaps at nanosecond resolution (declared).** A CSV whose
+  timestamps carry sub-microsecond digits and all lie in 1677-2262 is read
+  by pandas as `datetime64[ns]`, and a gap of more than about 292 years
+  (2**63 ns) overflows there: `1700-01-01T00:00:00.000000001` →
+  `2250-01-01T00:00:00.000000003` makes pm4py's
+  `discover_performance_dfg` raise `OverflowError: Overflow in int64
+  addition`. Minera computes the exact gap (17356291200 s, the 2 ns below a
+  double's resolution) and does not raise.
 - **CSV events order at nanoseconds.** pandas sorts a case's events on the
   datetime64 values; the CSV importer now orders them on the exact instants
   (it compared epoch doubles, which merge events a few nanoseconds apart in
@@ -18803,14 +18821,32 @@ and trace-cluster exports, the anonymization release) wrote the case id,
 activity, timestamp and resource under the CSV column names (`case_id`,
 `activity`, ...; a pm4py-style CSV even got a trace `case:concept:name`), so
 `read_xes` returned no `case:concept:name`/`concept:name`/`time:timestamp`
-and every pm4py discovery raised `KeyError`. These downloads now use the
-standard keys (`XesExportOptions::standard_keys`), as `format_dataframe` plus
-`write_xes` does; a trace or event that already has another attribute under
-the standard key keeps the source key. Native exports keep source keys.
-Test: `minera_xes_io_tests` (`standard_key_exports_rename_csv_projections`).
+and every pm4py discovery raised `KeyError`. For a CSV source these
+downloads now write the case id, activity and timestamp under the standard
+keys (`XesExportOptions::standard_keys`), as `read_csv`, `format_dataframe`
+and `write_xes` do: another column already under one of those keys is
+overwritten, as there (a CSV with `activity` and `concept:name` columns, and
+`case_id` and `case:concept:name`, gives pm4py the activities and case ids
+of the selected columns), and the resource and lifecycle columns keep their
+names (`format_dataframe` does not rename them to `org:resource` /
+`lifecycle:transition`). "Open filtered log" and "Open released log" reopen
+the download with the default selectors, so the case id, activity and
+timestamp are found. An XES source keeps its keys (a custom timestamp
+attribute such as `clock` stays `clock`, as `read_xes` plus `write_xes`
+keeps it), and native exports keep source keys. Test: `minera_xes_io_tests`
+(`standard_key_exports_rename_csv_projections`).
 
 Declared:
 
+- **CSV columns are not repeated (declared).** pm4py's `format_dataframe`
+  adds the standard columns beside the CSV's own, so its XES also writes
+  `case_id`, `activity` and `timestamp` (and the `@@index` and
+  `@@case_index` helper columns) on every event, and a `origin` log
+  attribute. Minera's CSV-sourced downloads write the selected cells once,
+  under the standard keys; a reopened download has no `activity` or
+  `case_id` event attribute, and its resource is found only when the
+  resource column was named `resource` or `org:resource` (the default
+  selector and its fallback); another resource column stays an attribute.
 - **CSV attribute columns are XES strings (declared).** Minera's CSV log
   keeps attribute cells as text, so XES downloads write `<string>` where
   pm4py's `read_csv` would infer int64/float64/bool and `write_xes` would
@@ -18890,6 +18926,25 @@ Fixes:
   does; native expanded it into `X(tau, a)` or `*(a, tau)`. Tests:
   `minera_powl_conversion_tests`. Eight model-conversion workbench captures
   were refreshed with `scripts/capture-workbench-fixtures.py`.
+- **POWL PTML downloads convert the POWL model.** POWL discovery's PTML
+  (`/api/discover-workflow?family=powl`, `/api/ptml?miner=powl`,
+  `minera_export --powl-ptml`) reduced the POWL's workflow net, which now
+  raises for the one-transition net of a one-activity log; it converts the
+  POWL itself, as `convert_to_process_tree(powl)` does (the leaf `'a'`; a
+  residual partial order is layered, `a->c, b->c, b->d` giving
+  `->(+('a','b'), +('c','d'))`, as the reference). Alpha and heuristics
+  PTML still reduce their nets and raise on a one-transition net, as the
+  reference. Tests: `minera_powl_conversion_tests`
+  (`powl_ptml_converts_the_model_directly`),
+  `minera_export_powl_ptml_one_activity_cli`.
+- **PNML with places but no transitions.** The activity-defines-place net of
+  a DFG without edges (the DFG of `[<a>]`) is a source and a sink place;
+  `write_pnml` and `read_pnml` keep it, and the PNML reader now does too
+  (it refused a net without transitions, so model exchange of such a DFG
+  failed with 400 and lost the DFG data). A PNML without any place is still
+  refused. Model exchange also reports a DFG net the reader cannot take back
+  as `conversion_error` with the DFG data. Test:
+  `minera_dfg_conversion_tests` (`boundary_activities_outside_edges`).
 
 Declared:
 
@@ -18904,3 +18959,60 @@ Declared:
   defaults to `@@start@@`/`@@end@@` and refuses an activity with the same
   name; the reference uses `▶`/`■` and merges such an activity into the
   artificial one.
+
+## Importer fuzzing: CSV timestamps, CSV parsing and XES frames (2026-11-05)
+
+Fuzzed against `pandas.read_csv` + `pm4py.format_dataframe` and
+`pm4py.read_xes` (DataFrame), 300 cases per category, seed 7 after fixes.
+CSV timestamps (16 shape categories, 4,800 cases) and `minera_format_dataframe`
+(300 with `timest_format`, 300 mixed) have no mismatch left; CSV parsing
+(9 categories, 2,700) and XES (9 categories, 2,700) differ only as declared
+below, apart from 2 XES column-dtype cases (metadata and duplicate keys)
+not yet examined.
+
+Fixed:
+
+- **Timestamp resolution.** Cells that pandas parses through its ISO path
+  keep nanoseconds; the shapes it hands to dateutil (lowercase `t`/`z`,
+  `UTC`/`GMT` words, comma fraction, extra spaces, slash or text dates,
+  AM/PM, weekday, an hour-only offset followed by whitespace) now truncate
+  to microseconds, as the reference. `YYYY-Mon-DD` is accepted, and offsets
+  beyond ±14:00 up to ±23:59 are converted to UTC.
+- **Nanosecond range.** When any ISO cell has more than six fraction digits
+  the column moves to nanoseconds, and a cell outside
+  1677-09-21 00:12:43.145224193 .. 2262-04-11 23:47:16.854775807 (wall
+  clock or UTC) leaves the column unconverted: the CSV importer refuses
+  such a column, `format_dataframe` keeps it as text.
+- **`timest_format`.** The format matches anywhere in the cell (leading and
+  trailing text ignored), ISO-shaped formats keep their whole-cell quirks,
+  and a cell shorter than the format (a case id `1` under `%d %b %Y`) no
+  longer becomes 1900-01-01.
+- **XES nested attributes.** For `iterparse` children kept in a dict, a
+  repeated key keeps the first position with the last value; a later list
+  attribute under a first-class key drops the earlier scalar selection; a
+  nested `org:resource` keeps its document column position.
+
+Tests: `minera_core_tests` (`csv_timestamps_follow_pandas_resolution_and_offsets`,
+`csv_events_order_at_nanoseconds`), `minera_dataframe_format_tests`
+(`str_timestamps_follow_public_parsing`), `minera_xes_io_tests`
+(`iterparse_nested_attribute_shapes`).
+
+Declared:
+
+- **Field trimming (declared).** `trim_fields` defaults to true; pandas keeps
+  padding in string cells.
+- **Invalid UTF-8 CSV (declared).** Latin-1 bytes are read; pandas raises
+  `UnicodeDecodeError`.
+- **Epoch and date-free timestamp columns (declared).** Kept as opaque text,
+  as already documented; pandas gives an int64 or object column.
+- **XES trace without `concept:name` (declared).** Native keeps a null
+  `case:concept:name` column; the reference omits it.
+- **XES `<values>` entry with child elements (declared).** Native reads it
+  (its own writer emits such lists); `read_xes` raises `TypeError`.
+- **Empty XES containers (declared).** An empty `<list>` is an empty
+  container natively, `None` in the reference; a scalar whose only children
+  are dropped is a plain value natively, `{'value': v, 'children': {}}` in
+  the reference.
+- **Uncovered timestamp shapes (declared).** Time-only cells (`10:00`, whose
+  pandas result depends on the current day) and POSIX-inverted
+  `UTC+02:00`/`GMT+2` offsets are not reproduced.

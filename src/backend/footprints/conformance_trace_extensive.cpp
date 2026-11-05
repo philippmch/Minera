@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 #include <stdexcept>
 
 #include "conformance_log_extensive.hpp"
@@ -20,18 +21,23 @@ std::vector<FootprintsExtensiveResult> TraceExtensiveVariant::apply(
   // sequences matches the reference's variant-level reuse while retaining the
   // original vector order and count of diagnostics.
   std::map<std::vector<std::string>, FootprintsExtensiveResult> cache;
+  // The model's relations are the same for every trace: built once (a large
+  // model has a quadratic number of them).
+  const auto model_relations = log.empty()
+      ? std::set<FootprintPair>{}
+      : FootprintRelationProjection::relation_configurations(model);
   for (const auto& trace : log) {
     if (trace.trace) {
       const auto [it, inserted] = cache.emplace(
           *trace.trace, FootprintsExtensiveResult{});
       if (inserted) {
         it->second = LogExtensiveVariant::compare(
-            trace, model, options.enable_act_always_executed);
+            trace, model, model_relations, options.enable_act_always_executed);
       }
       result.push_back(it->second);
     } else {
       result.push_back(LogExtensiveVariant::compare(
-          trace, model, options.enable_act_always_executed));
+          trace, model, model_relations, options.enable_act_always_executed));
     }
   }
   return result;

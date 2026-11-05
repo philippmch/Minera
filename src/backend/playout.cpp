@@ -441,6 +441,25 @@ EventLog stochastic_playout_impl(const PetriNet& net,
   return log;
 }
 
+// The key a log's first-class activity (or timestamp) projection was read
+// from: the first event that records one. Empty when no event does, so the
+// replay keeps its standard key.
+std::string source_log_first_class_key(const EventLog& log, bool activity) {
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events) {
+      const auto& source_key =
+          activity ? event.activity_source_key : event.timestamp_source_key;
+      if (!source_key.empty()) return source_key;
+      const auto& attribute =
+          activity ? event.activity_attribute : event.timestamp_attribute;
+      if (attribute)
+        return attribute->first_class_source_key.empty()
+                   ? attribute->key
+                   : attribute->first_class_source_key;
+    }
+  return {};
+}
+
 }  // namespace
 
 EventLog stochastic_playout(const PetriNet& net,
@@ -486,6 +505,13 @@ std::vector<double> fit_stochastic_transition_weights(
   // playout treats it.
   StochasticMapFitOptions fit;
   fit.fit_timing = false;
+  // The reference fitter reads the activity under the key it is given, and
+  // the source log's key is the one its importer or selectors recorded (a
+  // CSV "activity" column or a custom selector), not always concept:name.
+  if (auto key = source_log_first_class_key(source_log, true); !key.empty())
+    fit.replay.activity_attribute = std::move(key);
+  if (auto key = source_log_first_class_key(source_log, false); !key.empty())
+    fit.replay.timestamp_attribute = std::move(key);
   fit.replay.initial_marking.assign(initial.begin(), initial.end());
   fit.replay.final_marking.assign(final.begin(), final.end());
   const auto fitted = fit_stochastic_map_with_report(source_log, net, fit);

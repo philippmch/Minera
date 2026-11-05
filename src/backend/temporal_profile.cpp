@@ -10,8 +10,11 @@
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
+#include "minera/cancellation.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
 
@@ -470,6 +473,12 @@ const TemporalProfileEntry* TemporalProfile::find(const std::string& source,
 
 TemporalProfile discover_temporal_profile_log(
     const EventLog& log, const TemporalProfileOptions& options) {
+  return discover_temporal_profile(log, options, {});
+}
+
+TemporalProfile discover_temporal_profile(
+    const EventLog& log, const TemporalProfileOptions& options,
+    const std::function<bool()>& cancelled) {
   if (options.activity_attribute.empty()) {
     throw std::invalid_argument(
         "temporal profile: activity attribute must not be empty");
@@ -484,9 +493,62 @@ TemporalProfile discover_temporal_profile_log(
       options.target_timestamp_attribute,
       options.target_start_timestamp_attribute);
 
-  std::map<std::pair<std::string, std::string>, Aggregate> aggregates;
+  // Every ordered event pair of a trace is visited, as the definition asks,
+  // but each event's target-side values (instant, activity, local instant)
+  // are read once and remembered: they depend on the event alone, and a
+  // first read happens at the same point of the walk as before, so a strict
+  // read throws where it did. Pairs aggregate under interned activity ids;
+  // each (source, target) aggregate receives the same durations in the same
+  // order, so its floating-point statistics are unchanged.
+  std::unordered_map<std::string, std::uint32_t> activity_ids;
+  std::vector<const std::string*> activity_names;
+  const auto intern = [&](std::string activity) {
+    const auto [it, added] = activity_ids.try_emplace(
+        std::move(activity), static_cast<std::uint32_t>(activity_names.size()));
+    if (added) activity_names.push_back(&it->first);
+    return it->second;
+  };
+  // A pair's slot is 1 + its index in pair_aggregates (0: no duration yet),
+  // kept in a dense table for the first kDenseActivities activities and in a
+  // hash map beyond, so many distinct activities cannot blow the table up.
+  constexpr std::uint32_t kDenseActivities = 2048;
+  std::vector<std::vector<std::uint32_t>> dense_slot;
+  std::unordered_map<std::uint64_t, std::uint32_t> sparse_slot;
+  std::vector<std::pair<std::uint64_t, Aggregate>> pair_aggregates;
+  const auto aggregate_for = [&](std::uint32_t source, std::uint32_t target) -> Aggregate& {
+    const std::uint64_t key = (std::uint64_t{source} << 32) | target;
+    std::uint32_t* slot = nullptr;
+    if (source < kDenseActivities && target < kDenseActivities) {
+      if (dense_slot.size() <= source) dense_slot.resize(source + 1);
+      auto& row = dense_slot[source];
+      if (row.size() <= target)
+        row.resize(std::min<std::size_t>(kDenseActivities, std::max<std::size_t>(target + 1, activity_names.size())), 0);
+      slot = &row[target];
+    } else {
+      slot = &sparse_slot[key];
+    }
+    if (*slot == 0) {
+      pair_aggregates.push_back({key, Aggregate{}});
+      *slot = static_cast<std::uint32_t>(pair_aggregates.size());
+    }
+    return pair_aggregates[*slot - 1].second;
+  };
+  struct TargetSide {
+    bool instant_read = false, activity_read = false, local_read = false;
+    std::optional<double> instant, local;
+    std::optional<std::uint32_t> activity;
+  };
+  std::vector<TargetSide> targets;
+  constexpr std::size_t kPairsPerCancellationPoll = std::size_t{1} << 20;
+  std::size_t pairs_since_poll = 0;
   for (const auto& trace : log.traces) {
+    targets.assign(trace.events.size(), TargetSide{});
     for (std::size_t i = 0; i + 1 < trace.events.size(); ++i) {
+      pairs_since_poll += trace.events.size() - i;
+      if (pairs_since_poll >= kPairsPerCancellationPoll) {
+        pairs_since_poll = 0;
+        throw_if_cancelled(cancelled, "temporal profile discovery was cancelled");
+      }
       const auto source_time =
           event_instant(trace.events[i], source_attribute, "",
                         options.strict_attributes);
@@ -499,26 +561,42 @@ TemporalProfile discover_temporal_profile_log(
                                     options.strict_attributes)
               : source_time;
       if (!source_local) continue;
+      const std::uint32_t source_id = intern(*source_activity);
       for (std::size_t j = i + 1; j < trace.events.size(); ++j) {
-        const auto target_time =
-            event_instant(trace.events[j], target_attribute, "",
-                          options.strict_attributes);
+        auto& target = targets[j];
+        if (!target.instant_read) {
+          target.instant = event_instant(trace.events[j], target_attribute, "",
+                                         options.strict_attributes);
+          target.instant_read = true;
+        }
+        const auto& target_time = target.instant;
         if (!target_time || *target_time < *source_time) continue;
-        const auto target_activity = event_activity(trace.events[j], options);
-        if (!target_activity) continue;
-        const auto target_local =
-            options.use_business_hours
-                ? event_local_instant(trace.events[j], target_attribute, "",
-                                      options.strict_attributes)
-                : target_time;
+        if (!target.activity_read) {
+          const auto target_activity = event_activity(trace.events[j], options);
+          if (target_activity) target.activity = intern(*target_activity);
+          target.activity_read = true;
+        }
+        if (!target.activity) continue;
+        if (options.use_business_hours && !target.local_read) {
+          target.local = event_local_instant(trace.events[j], target_attribute, "",
+                                             options.strict_attributes);
+          target.local_read = true;
+        }
+        const auto& target_local =
+            options.use_business_hours ? target.local : target_time;
         if (!target_local) continue;
         const double duration = elapsed_between(
             *source_time, *target_time, *source_local, *target_local, options,
             options.use_business_hours ? &slots : nullptr);
-        aggregates[{*source_activity, *target_activity}].add(duration);
+        aggregate_for(source_id, *target.activity).add(duration);
       }
     }
   }
+  std::map<std::pair<std::string, std::string>, Aggregate> aggregates;
+  for (const auto& [key, aggregate] : pair_aggregates)
+    aggregates.emplace(std::make_pair(*activity_names[key >> 32],
+                                      *activity_names[key & 0xffffffffu]),
+                       aggregate);
 
   TemporalProfile profile;
   profile.entries.reserve(aggregates.size());

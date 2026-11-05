@@ -7,7 +7,7 @@ Content-Disposition: form-data; name="operation"
 
 net_to_tree
 --OwnedModelConversionFeature56
-Content-Disposition: form-data; name="model_file"; filename="owned-net-silent.pnml"
+Content-Disposition: form-data; name="model_file"; filename="owned-net-silent-chain.pnml"
 Content-Type: application/octet-stream
 
 <?xml version='1.0' encoding='utf-8'?>
@@ -35,7 +35,25 @@ Content-Type: application/octet-stream
           <text>1</text>
         </inscription>
       </arc>
-      <arc id="original-out-0" source="original-transition-0" target="original-place-1">
+      <arc id="original-out-0" source="original-transition-0" target="original-place-mid">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <place id="original-place-mid">
+        <name>
+          <text>Original original-place-mid</text>
+        </name>
+      </place>
+      <transition id="original-transition-1">
+        <toolspecific tool="ProM" version="6.4" activity="$invisible$" />
+      </transition>
+      <arc id="original-in-1" source="original-place-mid" target="original-transition-1">
+        <inscription>
+          <text>1</text>
+        </inscription>
+      </arc>
+      <arc id="original-out-1" source="original-transition-1" target="original-place-1">
         <inscription>
           <text>1</text>
         </inscription>

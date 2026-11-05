@@ -1,4 +1,5 @@
 #include "minera/inductive_miner.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1289,6 +1290,7 @@ std::optional<ProcessTreeNode> ActivityConcurrentFallThrough::apply(
   }
 
   for (const ActId candidate : candidates) {
+    throw_if_cancelled(options.cancelled, "inductive discovery was cancelled");
     auto [candidate_log, residual_log] = split_activity(log, candidate);
     if (!has_normal_cut(build_local_dfg(residual_log), options)) continue;
     return make_node(
@@ -1382,6 +1384,7 @@ FallThrough FallThroughFactory::apply(
 ProcessTreeNode mine(const Sublog& log, double f,
                      const InductiveMinerOptions& options,
                      const ActivityLabels& labels) {
+  throw_if_cancelled(options.cancelled, "inductive discovery was cancelled");
   const EmptyTraceSplitResult empty_split =
       EmptyTraceFallThrough::split(log);
   if (EmptyLogBaseCase::detects(log)) {

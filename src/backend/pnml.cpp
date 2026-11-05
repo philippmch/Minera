@@ -1165,8 +1165,10 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (token.name == "net") in_net = false;
   }
 
-  if (!nets_seen || (require_boundaries &&
-                     (places.empty() || transitions.empty()))) {
+  // A net with places but no transitions is a net: pm4py's read_pnml reads
+  // the source/sink net that convert_to_petri_net gives for a DFG without
+  // edges (activity-defines-place), and write_pnml writes it.
+  if (!nets_seen || (require_boundaries && places.empty())) {
     throw std::runtime_error("PNML input contains no net (or an empty one)");
   }
 

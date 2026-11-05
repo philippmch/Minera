@@ -729,6 +729,15 @@ if(MINERA_BUILD_TESTS)
            COMMAND minera_live_stream "${MINERA_CSV_TYPING_FIXTURES}/stream.csv")
   set_tests_properties(minera_live_stream_cli_keeps_stream_rows PROPERTIES
     PASS_REGULAR_EXPRESSION "\"events\":4")
+  # POWL PTML converts the model itself, as pm4py's
+  # convert_to_process_tree(powl): a one-activity log exports the leaf 'a'
+  # (its one-transition workflow net would raise).
+  add_test(NAME minera_export_powl_ptml_one_activity_cli
+           COMMAND minera_export "${CMAKE_CURRENT_SOURCE_DIR}/src/backend/tests/fixtures/one_activity.csv"
+                   -o "${CMAKE_CURRENT_BINARY_DIR}/one_activity_powl.json"
+                   --powl-ptml "${CMAKE_CURRENT_BINARY_DIR}/one_activity_powl.ptml")
+  set_tests_properties(minera_export_powl_ptml_one_activity_cli PROPERTIES
+    FAIL_REGULAR_EXPRESSION "error:")
   add_executable(minera_recheck_d5b33ef_tests src/backend/tests/test_recheck_d5b33ef.cpp)
   target_link_libraries(minera_recheck_d5b33ef_tests PRIVATE minera::core)
   target_compile_features(minera_recheck_d5b33ef_tests PRIVATE cxx_std_20)

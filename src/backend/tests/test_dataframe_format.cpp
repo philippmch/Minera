@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 using namespace minera;
@@ -297,6 +298,43 @@ void categorical_columns_are_not_dates() {
   }
 }
 
+// Fuzzed against pm4py.format_dataframe on str columns: the default (mixed)
+// conversion reads dateutil shapes like the CSV importer, a long ISO fraction
+// with a date outside 1677-2262 keeps the column text, and an explicit format
+// matches anywhere in a cell (to_datetime exact=False) but never a cell that
+// ends before the format does.
+void str_timestamps_follow_public_parsing() {
+  const auto times = [](std::vector<std::string> cells, std::optional<std::string> format) {
+    EventTable table;
+    table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+    table.dtypes = {"str", "str", "str"};
+    for (std::size_t i = 0; i < cells.size(); ++i)
+      table.rows.push_back({text_cell("case:concept:name", std::to_string(i + 1)),
+                            text_cell("concept:name", "a"),
+                            text_cell("time:timestamp", cells[i])});
+    DataFrameFormatOptions options;
+    options.timestamp_format = std::move(format);
+    const auto result = format_dataframe(table, options);
+    std::vector<std::string> out;
+    for (const auto& row : result.rows) out.push_back(row[2]->value + "|" + row[0]->value);
+    return out;
+  };
+  using V = std::vector<std::string>;
+  assert((times({"01/23/2028 3:17:46 AM", "27-Oct-1992", "2024-01-02t10:00:00.123456789",
+                 "01/02/2024 10:00 +15:00"}, std::nullopt) ==
+          V{"2028-01-23T03:17:46+00:00|1", "1992-10-27T00:00:00+00:00|2",
+            "2024-01-02T10:00:00.123456+00:00|3", "2024-01-01T19:00:00+00:00|4"}));
+  assert((times({"1676-08-06T22:42:56.412861583", "2000-08-23 07:25:55"}, std::nullopt) ==
+          V{"1676-08-06T22:42:56.412861583|1", "2000-08-23 07:25:55|2"}));
+  // The case ids stay text: "1" no longer reads as a day with "%d %b %Y".
+  assert((times({"21 Nov 2005 09:40", "x 21 Mar 2030 12:50 later"}, "%d %b %Y %H:%M") ==
+          V{"2005-11-21T09:40:00+00:00|1", "2030-03-21T12:50:00+00:00|2"}));
+  assert((times({"2026-09-17 03:01:40", "2013-02-18 18:53:31+02:00"}, "%Y-%m-%d %H:%M:%S") ==
+          V{"2026-09-17T03:01:40+00:00|1", "2013-02-18T18:53:31+00:00|2"}));
+  assert((times({"2024/01/01 01:02:03.abc"}, "%Y/%m/%d %H:%M:%S.%f") ==
+          V{"2024/01/01 01:02:03.abc|1"}));
+}
+
 int main() try {
   check_public_format_dataframe_reference_cases();
   exact_unsigned_identifier_projection();
@@ -309,6 +347,7 @@ int main() try {
   undeclared_native_nanosecond_dtype_is_inferred();
   native_start_timestamp_resolution_is_preserved();
   categorical_columns_are_not_dates();
+  str_timestamps_follow_public_parsing();
 } catch (const std::exception& error) {
   return (std::fputs(error.what(), stderr), 1);
 }

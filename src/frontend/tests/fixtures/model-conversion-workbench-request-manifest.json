@@ -7290,37 +7290,34 @@
       "request_body": {
         "filename": "net_to_tree-native-silent.request.bin",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-silent.request.bin",
-        "bytes": 1559,
-        "sha256": "ce4c7dad5d5afb3c8cb20c06fa2dd663c879c63dbaca9bf88a90365abe2c2fc7"
+        "bytes": 2187,
+        "sha256": "d48e0ebf216353d2ba29a2cb70155bb599db3a6518fc15bb2b38e7f111fe309b"
       },
-      "expected_status": 400,
+      "expected_status": 200,
       "model": {
-        "filename": "owned-net-silent.pnml",
-        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-silent.pnml",
-        "bytes": 1170,
-        "sha256": "26dcdd5b18dc5f082c63881d3bb4dfc7c27feec213bd4cadf2ba7a072504270b"
+        "filename": "owned-net-silent-chain.pnml",
+        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-silent-chain.pnml",
+        "bytes": 1792,
+        "sha256": "6576565dbaf69ea5d4759fd0d928383ce2e836e8ba51f461b9ab0391d1f69afe"
       },
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4740",
+        "Content-Length": "7022",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "net_to_tree-native-silent.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-silent.response.json",
-        "bytes": 4740,
-        "sha256": "387d82a87ec4f7d55788fdc142d315c42d96248c1c23925badbeef46c5ff0b16",
-        "status": 400
+        "bytes": 7022,
+        "sha256": "1542b99bee59f604cb293df357db3a6e59655d3b36c6b3722c572a3c2d1bed95",
+        "status": 200
       },
       "family": "model_conversion",
       "operation": "net_to_tree",
       "model_format": "pnml",
-      "executed": false,
-      "error": {
-        "type": "native_error",
-        "message": "workflow-net conversion: the net has a single silent transition (pm4py raises AttributeError)"
-      },
+      "executed": true,
+      "error": null,
       "coverage_tags": {
         "net_case": "silent",
         "literal": null
@@ -7329,9 +7326,16 @@
         "source_pnml": {
           "filename": "net_to_tree-native-silent.source_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-silent.source_pnml.pnml",
-          "bytes": 1079,
-          "sha256": "487bbd057a48f09ea4ec5576254fa6a05303808e402425bd77c039f9b422476b",
+          "bytes": 1581,
+          "sha256": "c878220a5a634c6c844cc606f836ae3bc1117dc7a1d337d9f459af12dac9979d",
           "format": "pnml"
+        },
+        "result_ptml": {
+          "filename": "net_to_tree-native-silent.result_ptml.ptml",
+          "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-silent.result_ptml.ptml",
+          "bytes": 186,
+          "sha256": "deb1495ed57a7c541a0c1f46b1a172a9086f443e3e32f27c5a261bacef781d8c",
+          "format": "ptml"
         }
       }
     },
@@ -7355,37 +7359,34 @@
       "request_body": {
         "filename": "net_to_tree-native-visible-empty.request.bin",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-visible-empty.request.bin",
-        "bytes": 1542,
-        "sha256": "2e61f286dd82f539686d9b12ca76443bef7fb6f1355f84037db0b6476cdcd999"
+        "bytes": 2170,
+        "sha256": "624d4b143b2aa7e104ec8993f53db40aad37f5d1fb2a5a81ee3263b0995b948b"
       },
-      "expected_status": 400,
+      "expected_status": 200,
       "model": {
-        "filename": "owned-net-visible-empty.pnml",
-        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-visible-empty.pnml",
-        "bytes": 1146,
-        "sha256": "c6bfbc636fd472bc0148d6569b9dc73ab6653f78611bcb7e529d56a1dc9c00f7"
+        "filename": "owned-net-visible-empty-chain.pnml",
+        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-visible-empty-chain.pnml",
+        "bytes": 1768,
+        "sha256": "f79324ebc28a6abff0dadbce8dddbda54bfe7670b75259510976d504ce196bcf"
       },
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4700",
+        "Content-Length": "7027",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "net_to_tree-native-visible-empty.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-visible-empty.response.json",
-        "bytes": 4700,
-        "sha256": "936ad2ebcfb75cb49e75f6ddd33c06f11dd48c7aa6a6126fca3dbcd47b18a92e",
-        "status": 400
+        "bytes": 7027,
+        "sha256": "2cebabd013cf49065f3cd69ff582f40f788285df2099a69fd441af0fc356bcfa",
+        "status": 200
       },
       "family": "model_conversion",
       "operation": "net_to_tree",
       "model_format": "pnml",
-      "executed": false,
-      "error": {
-        "type": "native_error",
-        "message": "workflow-net conversion: the net has a single visible transition (pm4py raises AssertionError)"
-      },
+      "executed": true,
+      "error": null,
       "coverage_tags": {
         "net_case": "visible-empty",
         "literal": null
@@ -7394,9 +7395,16 @@
         "source_pnml": {
           "filename": "net_to_tree-native-visible-empty.source_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-visible-empty.source_pnml.pnml",
-          "bytes": 988,
-          "sha256": "c931f4c2186f383aeb422060fb4f0d41f588d299a3b49aed5e4d560ffe1fa9af",
+          "bytes": 1490,
+          "sha256": "fcfd4387177bee14052c39ebc9a37293c606b5d72ae1bc4e9bbbf7bdd1097c8b",
           "format": "pnml"
+        },
+        "result_ptml": {
+          "filename": "net_to_tree-native-visible-empty.result_ptml.ptml",
+          "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-visible-empty.result_ptml.ptml",
+          "bytes": 204,
+          "sha256": "9bfad1458f849cf4f5dfb4f958ce3b8e2365858551a256e479c0150b66bc9a71",
+          "format": "ptml"
         }
       }
     },
@@ -7420,37 +7428,34 @@
       "request_body": {
         "filename": "net_to_tree-native-literal-label.request.bin",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-literal-label.request.bin",
-        "bytes": 1588,
-        "sha256": "9b32ef34a5e991d304bccd4cf8d6c37c79d91bec9f1f15606faa7d77c96ac019"
+        "bytes": 2216,
+        "sha256": "f662760a06bf2f7f34f0ec9ec02f903720df43e8b91738dcfa8be0f4c3720b73"
       },
-      "expected_status": 400,
+      "expected_status": 200,
       "model": {
-        "filename": "owned-net-literal-label.pnml",
-        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-literal-label.pnml",
-        "bytes": 1192,
-        "sha256": "e127f3a80f338b8048335eb34da9d925341467248e5cc5316d00408286ca0f36"
+        "filename": "owned-net-literal-label-chain.pnml",
+        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-literal-label-chain.pnml",
+        "bytes": 1814,
+        "sha256": "bf12db742553cd364de0733e6944529473c7b39af7093bbe8d65ee47a3b32bbc"
       },
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4941",
+        "Content-Length": "7324",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "net_to_tree-native-literal-label.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-literal-label.response.json",
-        "bytes": 4941,
-        "sha256": "d7a2dc8a072315845a094e18fc026216cc5ae5d2ffd4c1c3bc24f84f82940e21",
-        "status": 400
+        "bytes": 7324,
+        "sha256": "3ec2af7822e980675b4f96950e0dcc29355750539555d7686331d448405bd3b3",
+        "status": 200
       },
       "family": "model_conversion",
       "operation": "net_to_tree",
       "model_format": "pnml",
-      "executed": false,
-      "error": {
-        "type": "native_error",
-        "message": "workflow-net conversion: the net has a single visible transition (pm4py raises AssertionError)"
-      },
+      "executed": true,
+      "error": null,
       "coverage_tags": {
         "net_case": "literal-label",
         "literal": " \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "
@@ -7459,9 +7464,16 @@
         "source_pnml": {
           "filename": "net_to_tree-native-literal-label.source_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-literal-label.source_pnml.pnml",
-          "bytes": 1007,
-          "sha256": "0c38b8ff308a29a713f0bce6366c9d9fbae3019de07f805b475dc5f577354895",
+          "bytes": 1509,
+          "sha256": "3cfeb1b24f793db2db0e0a01296164dd8dda0057bd1e5036219c03ba368153d4",
           "format": "pnml"
+        },
+        "result_ptml": {
+          "filename": "net_to_tree-native-literal-label.result_ptml.ptml",
+          "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-literal-label.result_ptml.ptml",
+          "bytes": 219,
+          "sha256": "b30e9c8dea58748f9e29c2e80cf18e8e09c4db063f1066b2f88365ae54489c95",
+          "format": "ptml"
         }
       }
     },
@@ -7773,37 +7785,34 @@
       "request_body": {
         "filename": "net_to_tree-native-compact-threshold-1025.request.bin",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-compact-threshold-1025.request.bin",
-        "bytes": 1558,
-        "sha256": "6b21d8da1048a8f3e546fcb5608dc715f7fcb9edfd4f927db1f5eb0040b961fb"
+        "bytes": 2186,
+        "sha256": "ee9439b504a269a339e9a23e234ee3963525364c8157d1976955dba7b40a35fa"
       },
-      "expected_status": 400,
+      "expected_status": 200,
       "model": {
-        "filename": "owned-net-compact-threshold-1025.pnml",
-        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-compact-threshold-1025.pnml",
-        "bytes": 1153,
-        "sha256": "126fe983b39df6aa2f8741e584327708d8fd5e8331a486ba365328741990451e"
+        "filename": "owned-net-compact-threshold-1025-chain.pnml",
+        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-compact-threshold-1025-chain.pnml",
+        "bytes": 1775,
+        "sha256": "b18901279dd96baec9f85acdaacd0c4edd29d94ca2f9531a738405cffc9295f0"
       },
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4798",
+        "Content-Length": "7085",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "net_to_tree-native-compact-threshold-1025.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-compact-threshold-1025.response.json",
-        "bytes": 4798,
-        "sha256": "c7d2abb5c30e90172b06aa379fee0510882729ccf257c82f09e444a6947c5fae",
-        "status": 400
+        "bytes": 7085,
+        "sha256": "dcec50274434d1d9cc89183df81515a386d42ed5fe4d1488cef3e9a0e9cf814d",
+        "status": 200
       },
       "family": "model_conversion",
       "operation": "net_to_tree",
       "model_format": "pnml",
-      "executed": false,
-      "error": {
-        "type": "native_error",
-        "message": "workflow-net conversion: the net has a single visible transition (pm4py raises AssertionError)"
-      },
+      "executed": true,
+      "error": null,
       "coverage_tags": {
         "compact_weights": [
           1025,
@@ -7814,9 +7823,16 @@
         "source_pnml": {
           "filename": "net_to_tree-native-compact-threshold-1025.source_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-compact-threshold-1025.source_pnml.pnml",
-          "bytes": 1015,
-          "sha256": "86a7fcd053f767df16707fad04342075d5834e56c9176daaa8df1bf49eb6f958",
+          "bytes": 1517,
+          "sha256": "107a4d39ff44939643778352dcf8096619f109b252573360d41fe58cebb5a7ab",
           "format": "pnml"
+        },
+        "result_ptml": {
+          "filename": "net_to_tree-native-compact-threshold-1025.result_ptml.ptml",
+          "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-compact-threshold-1025.result_ptml.ptml",
+          "bytes": 184,
+          "sha256": "7dde4899982d20ac89dd8a89035027bc9327ce78617a09fd6cbfd4f8c5437b36",
+          "format": "ptml"
         }
       }
     },
@@ -7840,37 +7856,34 @@
       "request_body": {
         "filename": "net_to_tree-native-compact-arbitrary-integer.request.bin",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-compact-arbitrary-integer.request.bin",
-        "bytes": 1634,
-        "sha256": "6d43f1f674431486fd19d394909015f9909ba897ea439ca7f059fdf1dd6d6092"
+        "bytes": 2262,
+        "sha256": "faf7ace003c32bd5847513c97c2a43acbe872452f3c502c881f7a1877f42dced"
       },
-      "expected_status": 400,
+      "expected_status": 200,
       "model": {
-        "filename": "owned-net-compact-arbitrary-integer.pnml",
-        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-compact-arbitrary-integer.pnml",
-        "bytes": 1226,
-        "sha256": "894d197e269c59e31a5fadecd36355dac2b56790a67db7b6db81ae44a13a29c0"
+        "filename": "owned-net-compact-arbitrary-integer-chain.pnml",
+        "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-compact-arbitrary-integer-chain.pnml",
+        "bytes": 1848,
+        "sha256": "df7b1abe3080c799c07eaa2325e2ef49ac4162580443528ad2ede062b142a4c1"
       },
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5212",
+        "Content-Length": "7499",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "net_to_tree-native-compact-arbitrary-integer.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-compact-arbitrary-integer.response.json",
-        "bytes": 5212,
-        "sha256": "deb4657392ac91f166eb86a0e6565c379f1de4688d0b493355c8738e03b87d51",
-        "status": 400
+        "bytes": 7499,
+        "sha256": "30796095e13da1b38fe1bc844d84a0ca5fe8b333e465d6bdcd77fd2c0654567f",
+        "status": 200
       },
       "family": "model_conversion",
       "operation": "net_to_tree",
       "model_format": "pnml",
-      "executed": false,
-      "error": {
-        "type": "native_error",
-        "message": "workflow-net conversion: the net has a single visible transition (pm4py raises AssertionError)"
-      },
+      "executed": true,
+      "error": null,
       "coverage_tags": {
         "compact_weights": [
           340282366920938463463374607431768211456,
@@ -7881,9 +7894,16 @@
         "source_pnml": {
           "filename": "net_to_tree-native-compact-arbitrary-integer.source_pnml.pnml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-compact-arbitrary-integer.source_pnml.pnml",
-          "bytes": 1134,
-          "sha256": "08eca92914aa27447acf57ff069de5d4414e0609ef6a585e6c4a6776cddb3bac",
+          "bytes": 1636,
+          "sha256": "7a55db61ddf196f12cacb0b214b090621a96db773d977be53ef9ce032405977b",
           "format": "pnml"
+        },
+        "result_ptml": {
+          "filename": "net_to_tree-native-compact-arbitrary-integer.result_ptml.ptml",
+          "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-compact-arbitrary-integer.result_ptml.ptml",
+          "bytes": 184,
+          "sha256": "7dde4899982d20ac89dd8a89035027bc9327ce78617a09fd6cbfd4f8c5437b36",
+          "format": "ptml"
         }
       }
     },

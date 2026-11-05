@@ -3874,24 +3874,24 @@ void performance_handles_calendar_extremes() {
 // pandas sorts a CSV's datetime64 column at nanosecond resolution: two events
 // 612 ns apart (one microsecond, one epoch double) keep their true order, and
 // so do two events one microsecond apart in year 9999 (8 us per double there).
+// The two cases are separate files: one column holding both a nanosecond
+// fraction and year 9999 is one pandas cannot convert (its nanosecond range
+// ends in 2262), which the importer refuses.
 void csv_events_order_at_nanoseconds() {
-  std::istringstream input(
-      "case_id,activity,timestamp\n"
-      "c1,A,2026-03-01T00:00:00.000000724Z\n"
-      "c1,B,2026-03-01T00:00:00.000000112Z\n"
-      "c2,A,9999-01-01T00:00:00.000002Z\n"
-      "c2,B,9999-01-01T00:00:00.000001Z\n");
-  const auto log = minera::import_csv_event_log(input);
-  assert(log.traces.size() == 2);
-  for (const auto& trace : log.traces) {
-    assert(trace.events.size() == 2);
-    assert(trace.events[0].activity == "B" && trace.events[1].activity == "A");
-  }
-  const auto graph = minera::discover_directly_follows_graph(log);
-  const auto perf = minera::compute_performance_metrics(log, graph, true);
-  assert(perf.edges.size() == 1 && perf.edges.front().stats.count == 2);
-  assert(perf.edges.front().stats.min > 6.11e-7 && perf.edges.front().stats.min < 6.13e-7);
-  assert(perf.edges.front().stats.max == 1e-06);
+  const auto wait = [](const char* rows) {
+    std::istringstream input(std::string("case_id,activity,timestamp\n") + rows);
+    const auto log = minera::import_csv_event_log(input);
+    assert(log.traces.size() == 1 && log.traces[0].events.size() == 2);
+    assert(log.traces[0].events[0].activity == "B" && log.traces[0].events[1].activity == "A");
+    const auto graph = minera::discover_directly_follows_graph(log);
+    const auto perf = minera::compute_performance_metrics(log, graph, true);
+    assert(perf.edges.size() == 1 && perf.edges.front().stats.count == 1);
+    return perf.edges.front().stats.min;
+  };
+  const auto nanoseconds = wait("c1,A,2026-03-01T00:00:00.000000724Z\n"
+                                "c1,B,2026-03-01T00:00:00.000000112Z\n");
+  assert(nanoseconds > 6.11e-7 && nanoseconds < 6.13e-7);
+  assert(wait("c2,A,9999-01-01T00:00:00.000002Z\nc2,B,9999-01-01T00:00:00.000001Z\n") == 1e-06);
 }
 
 // dec1800.csv / dec2100.csv: place waits of instants far from 1970 (once
@@ -8291,8 +8291,53 @@ void csv_import_types_activities_case_attributes_and_relations_like_reference() 
   }
 }
 
+// Fuzzed against read_csv + format_dataframe (pandas 3.0.5): only ISO-path
+// cells keep nanoseconds (dateutil shapes keep microseconds), offsets run up
+// to 23:59, `YYYY-Mon-DD` reads, and a column that a long ISO fraction puts at
+// nanosecond resolution cannot hold a date outside 1677-2262.
+void csv_timestamps_follow_pandas_resolution_and_offsets() {
+  const auto import = [](const std::string& rows) {
+    std::istringstream input("case_id,activity,timestamp\n" + rows);
+    return minera::import_csv_event_data(input);
+  };
+  const auto stamps = [&](const std::string& rows) {
+    std::vector<std::string> out;
+    for (const auto& trace : import(rows).log.traces)
+      for (const auto& event : trace.events) out.push_back(event.timestamp);
+    return out;
+  };
+  using V = std::vector<std::string>;
+  assert((stamps("1,A,2024-01-02 10:00:00.123456789\n1,B,2024-01-02T10:00:01.123456789+02:00\n") ==
+          V{"2024-01-02T10:00:01.123456789+02:00", "2024-01-02 10:00:00.123456789"}));
+  assert((stamps("1,A,\"2024-01-02 10:00:00,123456789\"\n1,B,2024-01-02t10:00:01.987654321\n"
+                 "1,C,2024-01-02 10:00:02.123456789 UTC\n1,D,2024-01-02T10:00:03.1234567z\n"
+                 "1,E,01/02/2024 10:00:04.123456789\n1,F,2024-01-02 12:00:05.123456789+02 \n") ==
+          V{"2024-01-02 10:00:00.123456", "2024-01-02 10:00:01.987654",
+            "2024-01-02 10:00:02.123456+00:00", "2024-01-02 10:00:03.123456+00:00",
+            "2024-01-02 10:00:04.123456", "2024-01-02 12:00:05.123456+02:00"}));
+  assert((stamps("1,A,2004-Dec-11\n1,B,2004-Dec-12 10:11 PM\n") ==
+          V{"2004-12-11 00:00:00", "2004-12-12 22:11:00"}));
+  assert((stamps("1,A,2024-01-02T10:00:00+15:00\n1,B,2024-01-02 10:00-14:30\n") ==
+          V{"2024-01-01 19:00:00+00:00", "2024-01-03 00:30:00+00:00"}));
+  const auto refused = [&](const std::string& rows) {
+    try { (void)import(rows); }
+    catch (const std::runtime_error& error) {
+      return std::string(error.what()).find("nanosecond range") != std::string::npos;
+    }
+    return false;
+  };
+  assert(refused("1,A,2024-01-01 10:00:00.1234567\n1,B,3000-01-01\n"));
+  assert(refused("1,A,1500-01-01\n,B,2024-01-01 10:00:00.123456000\n"));
+  assert(refused("1,A,2262-04-12T00:00:00.1234567+02:00\n"));
+  // Microsecond columns hold any year 1 to 9999.
+  assert((stamps("1,A,2024-01-01t10:00:00.123456789\n1,B,3000-01-01\n") ==
+          V{"2024-01-01 10:00:00.123456", "3000-01-01"}));
+  assert((stamps("1,A,2262-04-11 23:47:16.854775807\n1,B,1677-09-21 00:12:43.145224193\n").size() == 2));
+}
+
 int main() {
   csv_import_matches_reference_dataframe_flow();
+  csv_timestamps_follow_pandas_resolution_and_offsets();
   csv_header_names_follow_read_csv();
   csv_case_ids_follow_reference_dtype_inference_and_order();
   csv_import_types_activities_case_attributes_and_relations_like_reference();

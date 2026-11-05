@@ -1,6 +1,7 @@
 #include "minera/powl_conversion.hpp"
 #include "minera/conformance.hpp"
 #include "minera/pnml.hpp"
+#include "minera/ptml.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -496,7 +497,14 @@ void workflow_net_to_process_tree_is_strict() {
   assert(rejected_extended);
 }
 
-void powl_ptml_uses_strict_workflow_semantics() {
+// Exported POWL PTML (structured discovery, /api/ptml?miner=powl and
+// minera_export --powl-ptml) converts the POWL model directly, as pm4py's
+// convert_to_process_tree(powl): a residual partial order is layered
+// (a->c, b->c, b->d gives ->(+('a','b'), +('c','d'))) and a one-activity
+// model is the leaf 'a', where the reduction of its one-transition workflow
+// net raises.
+void powl_ptml_converts_the_model_directly() {
+  using Op = minera::ProcessTreeOperator;
   const auto block = PowlNode::loop(
       PowlNode::sequence(
           {PowlNode::transition("A"), PowlNode::transition("B")}),
@@ -506,13 +514,15 @@ void powl_ptml_uses_strict_workflow_semantics() {
   assert(enumerate_language(minera::to_petri_net(direct), 6, 160).traces ==
          enumerate_language(minera::to_petri_net(strict), 6, 160).traces);
 
-  // Direct POWL conversion intentionally has a deterministic approximation
-  // for residual partial orders; exported PTML takes the strict net route.
   const auto non_block = PowlNode::strict_partial_order(
       {PowlNode::transition("A"), PowlNode::transition("B"),
        PowlNode::transition("C"), PowlNode::transition("D")},
       {{0, 2}, {1, 2}, {1, 3}});
-  (void)minera::to_process_tree(non_block);
+  const auto layered = minera::to_process_tree(non_block);
+  assert(layered.root().op == Op::kSequence);
+  assert(layered.root().children.size() == 2);
+  assert(layered.root().children[0].op == Op::kParallel);
+  assert(layered.root().children[1].op == Op::kParallel);
   bool rejected = false;
   try {
     (void)minera::to_process_tree(minera::to_petri_net(non_block));
@@ -520,6 +530,20 @@ void powl_ptml_uses_strict_workflow_semantics() {
     rejected = true;
   }
   assert(rejected);
+
+  // The POWL of a one-activity log ([<a>, <a>]).
+  const auto single = PowlNode::transition("a");
+  const auto leaf = minera::to_process_tree(single);
+  assert(leaf.root().op == Op::kActivity);
+  assert(leaf.activities().size() == 1 && leaf.activities().front() == "a");
+  assert(minera::to_ptml(leaf).find("name=\"a\"") != std::string::npos);
+  bool net_rejected = false;
+  try {
+    (void)minera::to_process_tree(minera::to_petri_net(single));
+  } catch (const std::invalid_argument&) {
+    net_rejected = true;
+  }
+  assert(net_rejected);
 }
 
 void petri_to_powl_round_trips_structured_nets() {
@@ -918,7 +942,7 @@ int main() {
   empty_partial_order_matches_reference_nets();
   frequency_bounds_follow_reference_flags();
   workflow_net_to_process_tree_is_strict();
-  powl_ptml_uses_strict_workflow_semantics();
+  powl_ptml_converts_the_model_directly();
   petri_to_powl_round_trips_structured_nets();
   workflow_boundaries_are_inferred_and_normalized();
   workflow_net_to_process_tree_matches_reference();

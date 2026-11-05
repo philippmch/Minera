@@ -79,6 +79,22 @@ struct ReferenceCsvColumn {
 // converted to str has.
 [[nodiscard]] std::string reference_csv_float_text(double value);
 
+// One text cell as pandas' to_datetime(format="mixed") reads it (the default
+// conversion of format_dataframe): the ISO spelling of its date, with the
+// fraction cut to microseconds where pandas reads the shape with dateutil, or
+// nullopt when the cell is not a date to that parser. A cell with
+// `nanosecond_fraction` (an ISO cell with more than six fraction digits)
+// puts the column at nanosecond resolution, where a cell that is
+// `outside_nanosecond_range` (before 1677-09-21 or after 2262-04-11, wall
+// clock or UTC) makes the whole conversion fail.
+struct ReferenceMixedTimestamp {
+  std::string text;
+  bool nanosecond_fraction = false;
+  bool outside_nanosecond_range = false;
+};
+[[nodiscard]] std::optional<ReferenceMixedTimestamp> reference_mixed_timestamp(
+    const std::string& cell);
+
 [[nodiscard]] CsvEventData import_csv_event_data(
     std::istream& input,
     const CsvImportOptions& options = {});

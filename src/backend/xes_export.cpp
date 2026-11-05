@@ -685,12 +685,6 @@ std::string projection_key(std::string_view source_key,
 constexpr std::array<std::string_view, 4> kStandardEventKeys{
     "concept:name", "time:timestamp", "org:resource", "lifecycle:transition"};
 
-bool has_attribute_key(const std::vector<EventAttribute>& attributes,
-                       std::string_view key) {
-  return std::any_of(attributes.begin(), attributes.end(),
-                     [&](const auto& attribute) { return attribute.key == key; });
-}
-
 // The keys the selected cells were read from (the canonical key when unknown).
 std::array<std::string, 4> event_source_keys(const Event& event) {
   return {projection_key(event.activity_source_key, kStandardEventKeys[0]),
@@ -699,30 +693,50 @@ std::array<std::string, 4> event_source_keys(const Event& event) {
           projection_key(event.lifecycle_source_key, kStandardEventKeys[3])};
 }
 
-// The keys the selected cells are written under. With standard_keys a cell
-// moves to its standard key unless another attribute or selected cell of the
-// event already uses that key.
+// The keys the selected cells are written under. With standard_keys the
+// activity and timestamp take concept:name and time:timestamp, as
+// pm4py.format_dataframe makes them (it overwrites a column already under
+// that key, see standard_key_overwrites); the resource and lifecycle keep
+// their source keys, which format_dataframe leaves alone. A resource or
+// lifecycle cell whose key the activity or timestamp now takes is dropped
+// (an empty output key), as the overwritten column is.
 std::array<std::string, 4> event_output_keys(const Event& event,
                                              bool standard_keys) {
   auto keys = event_source_keys(event);
   if (!standard_keys) return keys;
-  for (std::size_t role = 0; role < keys.size(); ++role) {
-    const auto standard = kStandardEventKeys[role];
-    if (keys[role] == standard) continue;
-    bool taken = has_attribute_key(event.attributes, standard);
-    for (std::size_t other = 0; other < keys.size() && !taken; ++other)
-      taken = other != role && keys[other] == standard;
-    if (!taken) keys[role] = std::string(standard);
-  }
+  keys[0] = std::string(kStandardEventKeys[0]);
+  keys[1] = std::string(kStandardEventKeys[1]);
+  for (std::size_t role = 2; role < keys.size(); ++role)
+    if (keys[role] == keys[0] || keys[role] == keys[1]) keys[role].clear();
   return keys;
 }
 
+// Whether a standard_keys export drops `attribute` of `event`: another
+// column under the key the activity or timestamp moved to, which
+// format_dataframe overwrites with the selected column.
+bool standard_key_overwrites(const Event& event, const EventAttribute& attribute,
+                             bool standard_keys) {
+  if (!standard_keys) return false;
+  const auto source_keys = event_source_keys(event);
+  for (std::size_t role = 0; role < 2; ++role)
+    if (attribute.key == kStandardEventKeys[role] &&
+        source_keys[role] != kStandardEventKeys[role])
+      return true;
+  return false;
+}
+
 std::string trace_output_key(const Trace& trace, bool standard_keys) {
-  auto key = projection_key(trace.case_id_source_key, "concept:name");
-  if (standard_keys && key != "concept:name" &&
-      !has_attribute_key(trace.attributes, "concept:name"))
-    key = "concept:name";
-  return key;
+  if (standard_keys) return "concept:name";
+  return projection_key(trace.case_id_source_key, "concept:name");
+}
+
+// The trace counterpart: a case:concept:name column is overwritten by the
+// selected case id column.
+bool standard_case_key_overwrites(const Trace& trace,
+                                  const EventAttribute& attribute,
+                                  bool standard_keys) {
+  return standard_keys && attribute.key == "concept:name" &&
+         projection_key(trace.case_id_source_key, "concept:name") != "concept:name";
 }
 
 void add_key_prefix(std::set<std::string>& prefixes, std::string_view key) {
@@ -753,9 +767,9 @@ void add_projection_prefixes(std::set<std::string>& prefixes,
     add_key_prefix(prefixes, keys[0]);
   if (present(event.timestamp_state, event.timestamp))
     add_key_prefix(prefixes, keys[1]);
-  if (present(event.resource_state, event.resource))
+  if (present(event.resource_state, event.resource) && !keys[2].empty())
     add_key_prefix(prefixes, keys[2]);
-  if (present(event.lifecycle_state, event.lifecycle))
+  if (present(event.lifecycle_state, event.lifecycle) && !keys[3].empty())
     add_key_prefix(prefixes, keys[3]);
 }
 
@@ -849,7 +863,7 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
       }
         break;
       case 2:
-      if (present(event.resource_state, event.resource)) {
+      if (present(event.resource_state, event.resource) && !output_keys[2].empty()) {
         const auto& key = source_keys[2];
         const auto* nested =
             first_class_metadata(event.resource_attribute, event.attributes, key);
@@ -860,7 +874,7 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
       }
         break;
       default:
-      if (present(event.lifecycle_state, event.lifecycle)) {
+      if (present(event.lifecycle_state, event.lifecycle) && !output_keys[3].empty()) {
         const auto& key = source_keys[3];
         const auto* nested = first_class_metadata(event.lifecycle_attribute,
                                                   event.attributes, key);
@@ -908,7 +922,8 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
         (event.lifecycle_attribute &&
          is_selected_copy(attribute, &*event.lifecycle_attribute,
                           source_keys[3]));
-    if (!consumed.contains(&attribute) && !selected_copy)
+    if (!consumed.contains(&attribute) && !selected_copy &&
+        !standard_key_overwrites(event, attribute, standard_keys))
       write_typed_attribute(out, "      ", attribute, variant, preserve_nulls);
   }
   flush_known(std::numeric_limits<std::size_t>::max());
@@ -1041,7 +1056,8 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
                             trace.case_id_attribute
                                 ? &*trace.case_id_attribute
                                 : nullptr,
-                            case_key))
+                            case_key) &&
+          !standard_case_key_overwrites(trace, attribute, standard_keys))
         write_typed_attribute(out, "    ", attribute, variant, preserve_nulls);
     }
     write_case();
