@@ -163,17 +163,23 @@ int main() {
     minera::AttributeStatisticsOptions o;
     o.attribute_key = "x";
     auto r = minera::discover_attribute_statistics(a1, o);
-    assert((entries(r) == std::vector<Entry>{{"1", "int", 6}, {"1", "str", 1},
-                                              {"2.5", "float", 1}, {"0", "int", 2}}));
+    // Entries follow the reference's value_counts order: descending count,
+    // equal counts in first appearance.
+    assert((entries(r) == std::vector<Entry>{{"1", "int", 6}, {"0", "int", 2},
+                                              {"1", "str", 1}, {"2.5", "float", 1}}));
     // The text map adds keys that only share a text.
     assert((r.values == std::map<std::string, std::uint64_t>{{"0", 2}, {"1", 7}, {"2.5", 1}}));
     const auto json = minera::attribute_statistics_json(r);
     assert(json.find("\"entries\":[{\"value\":\"1\",\"type\":\"int\",\"count\":6}") !=
            std::string::npos);
+    // `values` keys follow the entries, each text at its first entry.
+    assert(json.find("\"values\":{\"1\":7,\"0\":2,\"2.5\":1}") != std::string::npos);
+    // Once per case the ties follow the sorted [case id, value] groups:
+    // c0 holds 1 and '1', c1 holds 0 and 2.5.
     o.keep_once_per_case = true;
     assert((entries(minera::discover_attribute_statistics(a1, o)) ==
-            std::vector<Entry>{{"1", "int", 3}, {"1", "str", 1}, {"2.5", "float", 1},
-                               {"0", "int", 1}}));
+            std::vector<Entry>{{"1", "int", 3}, {"1", "str", 1}, {"0", "int", 1},
+                               {"2.5", "float", 1}}));
     assert((entries(minera::discover_attribute_statistics(a2, o)) ==
             std::vector<Entry>{{"true", "bool", 2}, {"0.0", "float", 1}}));
     o.keep_once_per_case = false;
@@ -185,6 +191,49 @@ int main() {
             std::vector<Entry>{{"1", "int", 10}}));
     assert((entries(minera::discover_attribute_statistics(a2, o)) ==
             std::vector<Entry>{{"true", "bool", 5}}));
+  }
+
+  // Reference value_counts order on string columns: get_event_attribute_values
+  // gives {'B': 3, 'Z': 1, 'A': 1}, once per case {'B': 2, 'Z': 1, 'A': 1},
+  // and {'B': 2, 'A': 1, 'Z': 1} once the case ids swap (the groups sort by
+  // case id text, k1 before k10, not by row order); get_trace_attribute_values
+  // counts rows: {'y': 3, 'x': 2}.
+  {
+    minera::EventLog ordered;
+    const auto add = [&](std::string id, std::string region,
+                         std::vector<std::string> activities) {
+      minera::Trace trace;
+      trace.case_id = std::move(id);
+      trace.attributes.push_back({"region", std::move(region),
+                                  minera::AttributeKind::kString});
+      for (auto& activity : activities) trace.events.push_back(make_event(activity, "r"));
+      ordered.traces.push_back(std::move(trace));
+    };
+    add("k1", "x", {"Z", "B"});
+    add("k10", "y", {"A", "B", "B"});
+    minera::AttributeStatisticsOptions o;
+    o.attribute_key = "activity";
+    const auto texts = [](const minera::AttributeStatisticsResult& r) {
+      std::vector<std::pair<std::string, std::uint64_t>> out;
+      for (const auto& e : r.entries) out.emplace_back(e.value, e.count);
+      return out;
+    };
+    using Pairs = std::vector<std::pair<std::string, std::uint64_t>>;
+    const auto events = minera::discover_attribute_statistics(ordered, o);
+    assert((texts(events) == Pairs{{"B", 3}, {"Z", 1}, {"A", 1}}));
+    assert(minera::attribute_statistics_json(events).find(
+               "\"values\":{\"B\":3,\"Z\":1,\"A\":1}") != std::string::npos);
+    o.keep_once_per_case = true;
+    assert((texts(minera::discover_attribute_statistics(ordered, o)) ==
+            Pairs{{"B", 2}, {"Z", 1}, {"A", 1}}));
+    std::swap(ordered.traces[0].case_id, ordered.traces[1].case_id);
+    assert((texts(minera::discover_attribute_statistics(ordered, o)) ==
+            Pairs{{"B", 2}, {"A", 1}, {"Z", 1}}));
+    o.keep_once_per_case = false;
+    o.scope = minera::AttributeStatisticsScope::kTraces;
+    o.attribute_key = "region";
+    assert((texts(minera::discover_attribute_statistics(ordered, o)) ==
+            Pairs{{"y", 3}, {"x", 2}}));
   }
 
   bool rejected = false;

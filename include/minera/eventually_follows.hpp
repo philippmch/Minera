@@ -39,7 +39,9 @@ struct EventuallyFollowsOptions {
   // reference raises KeyError.
   std::string start_timestamp_attribute;
   // Completion timestamp; empty, "timestamp" or "time:timestamp" read
-  // Event::timestamp.
+  // Event::timestamp. Another attribute without a start attribute selects the
+  // interval semantics with Event::timestamp as the start (the reference's
+  // default start key), so a missing value throws there too.
   std::string timestamp_attribute;
 };
 

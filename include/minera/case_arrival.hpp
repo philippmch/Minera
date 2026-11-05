@@ -15,6 +15,15 @@ struct CaseArrivalOptions {
   bool use_business_hours = false;
   // Empty selects Monday-Friday 07:00-17:00.
   std::vector<BusinessHourSlot> business_hour_slots;
+  // How the gaps are averaged. false: as pm4py's EventLog path, for a
+  // native JSON or EventLog input: each gap floored to the microsecond, then
+  // statistics.mean (the exact sum divided by the count, rounded once).
+  // true: as pm4py's DataFrame path (what pm4py.get_case_arrival_average
+  // returns for a CSV or XES read as a DataFrame): each gap is the whole
+  // seconds plus the microseconds times 1e-6 plus the nanoseconds left times
+  // 1e-9, and the mean is numpy's pairwise float64 sum divided by the count
+  // (observed black-box).
+  bool dataframe = false;
 };
 
 struct CaseArrivalResult {

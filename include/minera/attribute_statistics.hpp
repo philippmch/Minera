@@ -43,7 +43,9 @@ struct AttributeStatisticsResult {
   // a text (the string '1' and the int 1) add up here; `entries` keeps them
   // apart.
   std::map<std::string, std::uint64_t> values;
-  // Every distinct key in first-seen order.
+  // Every distinct key in the reference DataFrame's value_counts order:
+  // descending count, equal counts in first appearance over the rows (with
+  // keep_once_per_case, over the sorted [case id, value] groups).
   std::vector<AttributeValueCount> entries;
 };
 

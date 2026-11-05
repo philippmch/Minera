@@ -5048,15 +5048,11 @@ void parse_process_tree_playout_params_rejects_bad_values() {
     }
     assert(threw);
   }
+  // min_length above max_length is accepted, as by the reference.
+  const auto inverted = minera::parse_process_tree_playout_params(fields({
+      {"playout_min_length", "4"}, {"playout_max_length", "2"}}));
+  assert(inverted.min_length == 4 && inverted.max_length == 2);
   bool threw = false;
-  try {
-    (void)minera::parse_process_tree_playout_params(fields({
-        {"playout_min_length", "4"}, {"playout_max_length", "2"}}));
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  assert(threw);
-  threw = false;
   try {
     (void)minera::parse_process_tree_playout_params(
         fields({{"playout_return_set_strings", "true"}}));

@@ -804,6 +804,26 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   read_attributes(db, "object_attributes", object_attributes);
 
   TypeTableCache type_tables(db);
+  // The reference events frame takes its column order from the type table
+  // of the first event type by name: activity first when that table holds
+  // "ocel:activity" before "ocel_time" (observed black-box).
+  {
+    std::set<std::string> activities;
+    for (const auto& id : event_order) activities.insert(event_types.at(id));
+    if (!activities.empty()) {
+      const auto& first = *activities.begin();
+      const auto mapped = event_map.find(first);
+      const auto columns = table_columns(
+          db, mapped == event_map.end() ? "event_" + type_table_token(first, options)
+                                        : "event_" + mapped->second);
+      std::optional<std::size_t> activity_index, time_index;
+      for (std::size_t index = 0; index < columns.size(); ++index) {
+        if (columns[index].name == "ocel:activity" && !activity_index) activity_index = index;
+        if (columns[index].name == "ocel_time" && !time_index) time_index = index;
+      }
+      log.event_activity_first = activity_index && time_index && *activity_index < *time_index;
+    }
+  }
   // Rows in table order, then ordered by timestamp below like the reference.
   for (const auto& id : event_order) {
     const auto& activity = event_types.at(id);
@@ -1073,15 +1093,20 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
       for (const auto* event : rows) table_values.observe_row(event->attributes);
       const auto columns =
           table_columns_for(event_frame, table_values, log.event_type_attributes, activity);
-      Statement statement(db, create_table(table, {"ocel_id", "ocel_time", "ocel:activity"},
+      // The reference frame's column order (activity first after XML).
+      const bool activity_first = log.event_activity_first;
+      Statement statement(db, create_table(table,
+                                           activity_first
+                                               ? std::vector<std::string>{"ocel_id", "ocel:activity", "ocel_time"}
+                                               : std::vector<std::string>{"ocel_id", "ocel_time", "ocel:activity"},
                                            columns, {}));
       for (const auto* event : rows) {
         bind_text(statement.get(), 1, event->id);
-        bind_text(statement.get(), 2,
+        bind_text(statement.get(), activity_first ? 3 : 2,
                   event_offset ? ocel_frame::offset_timestamp_text(event->timestamp, ' ',
                                                                    event_offset, std::nullopt)
                                : pandas_time(event->timestamp));
-        bind_text(statement.get(), 3, event->activity);
+        bind_text(statement.get(), activity_first ? 2 : 3, event->activity);
         bind_type_attributes(statement.get(), 4, columns, event->attributes);
         step_done(db, statement.get());
       }

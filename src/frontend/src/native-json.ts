@@ -36,47 +36,50 @@ export function parseNativeJson(raw:string):unknown {
   };
   // Moves past a string, true, false or null token at p (its first character is c).
   const skip=(c:number)=>{if(c===34)p=stringEnd(p);else if(c===116||c===110)p+=4;else if(c===102)p+=5;else throw new Error("Invalid native JSON token.");};
-  const walk=(current:unknown):void=>{
-    const c=space();
-    if(c===123){
-      ++p;
-      const holder=current&&typeof current==="object"&&!Array.isArray(current)?current as Record<string,unknown>:undefined;
-      let kept=holder?literals.get(holder):undefined;
-      if(space()===125){++p;return;}
-      for(;;){
-        space();const keyStart=p;p=stringEnd(p);const keyEnd=p;
-        space();++p;
-        const v=space();
-        if(v===123||v===91)walk(holder?.[keyText(keyStart,keyEnd)]);
-        else if(v===45||v>=48&&v<=57){
-          const start=p;
-          if(number()){if(kept)kept.delete(keyText(keyStart,keyEnd));}
-          else if(holder){const key=keyText(keyStart,keyEnd);kept=keep(holder,kept,key,holder[key],start);}
-        }
-        else {skip(v);if(kept)kept.delete(keyText(keyStart,keyEnd));}
-        const separator=space();++p;if(separator!==44)return;
-      }
-    }
-    if(c===91){
-      ++p;
-      const holder=Array.isArray(current)?current:undefined;
-      let kept=holder?literals.get(holder):undefined;
-      if(space()===93){++p;return;}
-      for(let i=0;;++i){
-        const v=space();
-        if(v===123||v===91)walk(holder?.[i]);
-        else if(v===45||v>=48&&v<=57){
-          const start=p;
-          if(number()){if(kept)kept.delete(String(i));}
-          else if(holder)kept=keep(holder,kept,String(i),holder[i],start);
-        }
-        else {skip(v);if(kept)kept.delete(String(i));}
-        const separator=space();++p;if(separator!==44)return;
-      }
-    }
-    if(c===45||c>=48&&c<=57)number();else skip(c);
+  // The containers being scanned, innermost last: an explicit stack rather than
+  // recursion, so a deeply nested document (thousands of levels, which JSON.parse
+  // accepts) does not overflow the call stack.
+  interface Frame {array:boolean;holder:Record<string,unknown>|unknown[]|undefined;kept:Map<string,string>|undefined;index:number}
+  const stack:Frame[]=[];
+  // Moves past the opening bracket (c) of a container holding `current`'s members;
+  // false when it is empty (and already closed).
+  const open=(current:unknown,c:number):boolean=>{
+    ++p;
+    const array=c===91;
+    const holder=array?(Array.isArray(current)?current:undefined):current&&typeof current==="object"&&!Array.isArray(current)?current as Record<string,unknown>:undefined;
+    if(space()===(array?93:125)){++p;return false;}
+    stack.push({array,holder,kept:holder?literals.get(holder):undefined,index:0});
+    return true;
   };
-  walk(value);return value;
+  // The current member of the innermost container is complete: reads separators,
+  // closing every container that ends here.
+  const close=()=>{while(stack.length){const separator=space();++p;if(separator===44)return;stack.pop();}};
+  const first=space();
+  if(first!==123&&first!==91){if(first===45||first>=48&&first<=57)number();else skip(first);return value;}
+  if(!open(value,first))return value;
+  while(stack.length){
+    const frame=stack[stack.length-1];
+    let keyStart=0,keyEnd=0;
+    if(!frame.array){space();keyStart=p;p=stringEnd(p);keyEnd=p;space();++p;}
+    const index=frame.index++;
+    const v=space();
+    if(v===123||v===91){
+      const holder=frame.holder as Record<string,unknown>|undefined;
+      if(!open(frame.array?(frame.holder as unknown[]|undefined)?.[index]:holder?.[keyText(keyStart,keyEnd)],v))close();
+      continue;
+    }
+    if(v===45||v>=48&&v<=57){
+      const start=p;
+      if(number()){if(frame.kept)frame.kept.delete(frame.array?String(index):keyText(keyStart,keyEnd));}
+      else if(frame.holder){
+        const key=frame.array?String(index):keyText(keyStart,keyEnd);
+        frame.kept=keep(frame.holder,frame.kept,key,(frame.holder as Record<string,unknown>)[key],start);
+      }
+    }
+    else {skip(v);if(frame.kept)frame.kept.delete(frame.array?String(index):keyText(keyStart,keyEnd));}
+    close();
+  }
+  return value;
 }
 export function nativeCell(holder:object,key:string|number):unknown {return literals.get(holder)?.get(String(key))??(holder as Record<string,unknown>)[String(key)];}
 export function nativeJson(value:unknown,indent=0):string {

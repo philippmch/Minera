@@ -144,8 +144,11 @@ OcelValue value_node(const Node& n, bool reject_lists) {
     value = strip_xml_space(std::move(value));
   if (name == "attribute") {
     const auto type = attr_or(n, "type", "string");
-    if (type == "date" || type == "timestamp") return strip_xml_space(std::move(value));
-    if (type == "string") return value;
+    // A date keeps its text as written: read_ocel2_xml hands it to
+    // fromisoformat, which refuses surrounding white space, and then to
+    // dateutil (" 2024-02-01" is a naive midnight there, not the ISO date
+    // stamped UTC); convert_ocel_date_attributes does the same.
+    if (type == "date" || type == "timestamp" || type == "string") return value;
     Node typed = n;
     typed.name = type;
     return value_node(typed, reject_lists);
@@ -219,9 +222,13 @@ std::string keyed_value(const Node& n, std::string_view wanted) {
   return {};
 }
 
+// `dated` (when given) receives the index in `out` of each value read from a
+// <date> or <timestamp> element.
 void append_values_filtered(const Node& n, std::vector<OcelAttribute>& out,
                             bool reject_lists,
-                            const std::unordered_set<std::string>& excluded) {
+                            const std::unordered_set<std::string>& excluded,
+                            std::vector<std::size_t>* dated = nullptr,
+                            bool lists_only = false) {
   for (const auto& c : n.children) {
     const auto name = local(c.name);
     const auto key = attr_or(c, "key", attr_or(c, "name"));
@@ -233,11 +240,12 @@ void append_values_filtered(const Node& n, std::vector<OcelAttribute>& out,
         ((name == "list" || name == "array") &&
          (key == "vmap" || key == "ovmap"))) {
       append_values_filtered(c, out, reject_lists,
-                             std::unordered_set<std::string>{});
+                             std::unordered_set<std::string>{}, dated);
       continue;
     }
-    if (!is_value_node_name(name)) continue;
+    if (!is_value_node_name(name) || lists_only) continue;
     if (key.empty() || excluded.count(key)) continue;
+    if (dated != nullptr && (name == "date" || name == "timestamp")) dated->push_back(out.size());
     out.push_back({key, value_node(c, reject_lists)});
   }
 }
@@ -246,7 +254,8 @@ void append_values_filtered(const Node& n, std::vector<OcelAttribute>& out,
 // from `n`: pm4py.read_ocel_xml converts them, so they are catalogued as
 // dates (the reference frame column is datetime64).
 void collect_date_keys(const Node& n, OcelTypeSchema& schema,
-                       const std::unordered_set<std::string>& excluded) {
+                       const std::unordered_set<std::string>& excluded,
+                       bool lists_only = false) {
   for (const auto& c : n.children) {
     const auto name = local(c.name);
     const auto key = attr_or(c, "key", attr_or(c, "name"));
@@ -256,7 +265,7 @@ void collect_date_keys(const Node& n, OcelTypeSchema& schema,
       collect_date_keys(c, schema, {});
       continue;
     }
-    if ((name != "date" && name != "timestamp") || key.empty() || excluded.count(key)) continue;
+    if (lists_only || (name != "date" && name != "timestamp") || key.empty() || excluded.count(key)) continue;
     schema[key] = "date";
   }
 }
@@ -341,11 +350,20 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
       if (id.empty() || type.empty()) throw std::invalid_argument("invalid or duplicate OCEL XML object");
       if (const auto [it, added] = types.emplace(id, type); !added) throw_repeated_xml_object(id, it->second, type);
       OcelObject o{id, type, {}};
+      // In the reference shape (keyed id and type children) read_ocel_xml
+      // reads only the ovmap list: other keyed children are dropped. The
+      // former native dialect (id and type as XML attributes) keeps them.
+      const bool lists_only = attr_or(*on, "id", attr_or(*on, "object-id")).empty();
+      std::vector<std::size_t> dated;
       append_values_filtered(*on, o.attributes, reject_lists,
-                             {"id", "object-id", "type", "object-type"});
+                             {"id", "object-id", "type", "object-type"}, &dated, lists_only);
+      // read_ocel_xml converts each <date> element (a <string> under the same
+      // key stays a string); the catalog entry below is for the writers.
+      for (const auto index : dated)
+        convert_ocel_date_value(o.attributes[index].value, OcelTimestampReader::kIsoFormat);
       log.objects.push_back(std::move(o));
       collect_date_keys(*on, log.object_type_attributes[type],
-                        {"id", "object-id", "type", "object-type"});
+                        {"id", "object-id", "type", "object-type"}, lists_only);
       for (const auto* links : children(*on, "o2o"))
         for (const auto* rel : children(*links, "relation")) {
           log.o2o.push_back({id, attr_or(*rel, "target-id",
@@ -374,11 +392,16 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
               : attr_or(*en, "timestamp", attr_or(*en, "time"));
       OcelEvent e{id, activity, timestamp, {}};
       if (e.id.empty() || e.activity.empty() || e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
+      // As for objects: the reference reads only the vmap list.
+      const bool lists_only = attr_or(*en, "id", attr_or(*en, "event-id")).empty();
+      std::vector<std::size_t> dated;
       append_values_filtered(*en, e.attributes, reject_lists,
-                             {"id", "event-id", "activity", "type", "timestamp", "time"});
+                             {"id", "event-id", "activity", "type", "timestamp", "time"}, &dated, lists_only);
+      for (const auto index : dated)
+        convert_ocel_date_value(e.attributes[index].value, OcelTimestampReader::kIsoFormat);
       log.events.push_back(std::move(e));
       collect_date_keys(*en, log.event_type_attributes[log.events.back().activity],
-                        {"id", "event-id", "activity", "type", "timestamp", "time"});
+                        {"id", "event-id", "activity", "type", "timestamp", "time"}, lists_only);
       for (const auto& child_node : en->children) {
         const auto name = local(child_node.name);
         const auto key = attr_or(child_node, "key", attr_or(child_node, "name"));
@@ -403,7 +426,12 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
     for (const auto* cn : children(*changes, "change")) {
     OcelObjectChange c{attr_or(*cn, "object-id", attr_or(*cn, "objectId")), attr_or(*cn, "object-type", attr_or(*cn, "type")), attr_or(*cn, "timestamp", attr_or(*cn, "time")), attr_or(*cn, "field"), nullptr};
     if (c.object_type.empty() && types.count(c.object_id)) c.object_type = types[c.object_id];
-    for (const auto& v : cn->children) if (local(v.name) != "field") { c.value = value_node(v, reject_lists); break; }
+    for (const auto& v : cn->children) if (local(v.name) != "field") {
+      c.value = value_node(v, reject_lists);
+      if (local(v.name) == "date" || local(v.name) == "timestamp")
+        convert_ocel_date_value(c.value, OcelTimestampReader::kIsoFormat, true);
+      break;
+    }
     if (c.object_id.empty() || c.field.empty()) throw std::invalid_argument("invalid OCEL XML object change");
     log.object_changes.push_back(std::move(c));
     }
@@ -710,11 +738,19 @@ void write_standard_value(std::ostream& out, const OcelValue& v, std::string_vie
 // every other scalar as <string> with Python's str. Nulls are left out.
 // A value of an attribute the catalog declares a date (`date`) is a <date>
 // in UTC with a "Z", as the reference writes a datetime64 column.
+// In a column that mixes dates with other values (`mixed_dates`), the frame
+// column is an object column and the reference writes each date as the
+// <string> of its isoformat ("2024-02-01T08:30:00+00:00"), observed black-box.
 void write_classic_value(std::ostream& out, const OcelValue& v, std::string_view key,
                          std::string_view indent, bool float_column = false,
-                         bool date = false) {
+                         bool date = false, bool mixed_dates = false) {
   if (std::holds_alternative<std::nullptr_t>(v)) return;
   if (const auto* text = date ? ocel_frame::date_value_text(v) : nullptr) {
+    if (mixed_dates) {
+      out << indent << "<string key=\"" << esc(key) << "\" value=\""
+          << esc(ocel_frame::utc_timestamp_text(*text, 'T', "+00:00")) << "\"/>\n";
+      return;
+    }
     out << indent << "<date key=\"" << esc(key) << "\" value=\""
         << esc(classic_xml_timestamp_text(*text)) << "\"/>\n";
     return;
@@ -738,11 +774,14 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   const Node root = parse_tree(xml); Ocel log;
   const bool standard = child(root, "object-types") != nullptr || child(root, "event-types") != nullptr || attr(root, "ocelVersion") != nullptr;
   if (standard) parse_standard(root, log, options.reject_unsupported); else parse_classic(root, log, options.reject_unsupported);
+  // Both reference XML readers build the events frame activity first.
+  log.event_activity_first = true;
   validate_references(log);
   // The OCEL 2.0 XML reader reads dates leniently, the classic one as ISO.
   sort_ocel_events_by_timestamp(log, standard ? OcelTimestampReader::kDateutil : OcelTimestampReader::kIsoFormat);
-  // Both XML readers convert date values (declared in 2.0, <date> in 1.0).
-  convert_ocel_date_attributes(log, standard ? OcelTimestampReader::kDateutil : OcelTimestampReader::kIsoFormat);
+  // Both XML readers convert date values: OCEL 2.0 the declared ones here,
+  // OCEL 1.0 each <date> element as parse_classic reads it.
+  if (standard) convert_ocel_date_attributes(log, OcelTimestampReader::kDateutil);
   // Both reference XML readers drop events and objects without relations.
   drop_unrelated_ocel_entries(log);
   return log;
@@ -864,6 +903,30 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
       return real == nullptr || std::isfinite(*real);
     });
   };
+  // The keys whose frame column mixes date values with other values (one
+  // events frame and one objects frame, across activities and types).
+  const auto mixed_date_keys = [](const auto& entries, const OcelTypeCatalog& catalog,
+                                  const auto& owner_of) {
+    std::map<std::string, std::pair<bool, bool>, std::less<>> kinds;  // date, other
+    for (const auto& entry : entries)
+      for (const auto& attribute : entry.attributes) {
+        if (std::holds_alternative<std::nullptr_t>(attribute.value) || reserved_name(attribute.key))
+          continue;
+        auto& [date, other] = kinds[attribute.key];
+        (ocel_frame::declared_date(catalog, owner_of(entry), attribute.key) &&
+                 ocel_frame::date_value_text(attribute.value)
+             ? date
+             : other) = true;
+      }
+    std::set<std::string, std::less<>> mixed;
+    for (const auto& [key, kind] : kinds)
+      if (kind.first && kind.second) mixed.insert(key);
+    return mixed;
+  };
+  const auto mixed_event_dates = mixed_date_keys(
+      log.events, log.event_type_attributes, [](const OcelEvent& event) -> const std::string& { return event.activity; });
+  const auto mixed_object_dates = mixed_date_keys(
+      log.objects, log.object_type_attributes, [](const OcelObject& object) -> const std::string& { return object.type; });
   // A CSV log whose times share an offset is written in that wall clock,
   // labelled "Z" as the reference does (see shared_nonzero_offset).
   const auto event_offset = event_time_offset(log);
@@ -872,13 +935,17 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
   } else {
     out << "  <events>\n";
     for (const auto& event : log.events) {
-      // Fields in the column order of a frame read from OCEL JSON.
-      out << "    <event>\n      <string key=\"id\" value=\"" << esc(event.id)
-          << "\"/>\n      <date key=\"timestamp\" value=\""
+      // Fields in the reference frame's column order: id, timestamp,
+      // activity for a log read from JSON, activity first after XML.
+      const auto activity_line = "      <string key=\"activity\" value=\"" + esc(event.activity) + "\"/>\n";
+      out << "    <event>\n      <string key=\"id\" value=\"" << esc(event.id) << "\"/>\n";
+      if (log.event_activity_first) out << activity_line;
+      out << "      <date key=\"timestamp\" value=\""
           << esc(event_offset ? ocel_frame::offset_timestamp_text(event.timestamp, 'T',
                                                                   event_offset, "Z")
                               : classic_xml_timestamp_text(event.timestamp))
-          << "\"/>\n      <string key=\"activity\" value=\"" << esc(event.activity) << "\"/>\n";
+          << "\"/>\n";
+      if (!log.event_activity_first) out << activity_line;
       for (const auto& attribute : event.attributes)
         if (reserved_name(attribute.key))
           write_classic_value(out, attribute.value, std::string_view(attribute.key).substr(5),
@@ -897,7 +964,8 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
             write_classic_value(out, attribute.value, attribute.key, "        ",
                                 event_frame.dtype(attribute.key) == ocel_frame::Dtype::kFloat64,
                                 ocel_frame::declared_date(log.event_type_attributes,
-                                                          event.activity, attribute.key));
+                                                          event.activity, attribute.key),
+                                mixed_event_dates.contains(attribute.key));
       }, !has_value(event.attributes));
       out << "    </event>\n";
     }
@@ -916,7 +984,8 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
             write_classic_value(out, attribute.value, attribute.key, "        ",
                                 object_frame.dtype(attribute.key) == ocel_frame::Dtype::kFloat64,
                                 ocel_frame::declared_date(log.object_type_attributes,
-                                                          object.type, attribute.key));
+                                                          object.type, attribute.key),
+                                mixed_object_dates.contains(attribute.key));
       }, !has_value(object.attributes));
       out << "    </object>\n";
     }

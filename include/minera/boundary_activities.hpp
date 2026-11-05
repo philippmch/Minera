@@ -30,6 +30,11 @@ struct BoundaryActivitiesResult {
   BoundaryActivitiesVariant variant = BoundaryActivitiesVariant::kBoth;
   std::map<std::string, std::uint64_t> starts;
   std::map<std::string, std::uint64_t> ends;
+  // The keys of `starts` and `ends` in first appearance over the traces, the
+  // key order of the reference's get_start_activities/get_end_activities
+  // dicts (an EventLog and a format_dataframe frame agree).
+  std::vector<std::string> start_order;
+  std::vector<std::string> end_order;
 };
 
 using BoundaryActivityCounts = std::map<std::string, std::uint64_t>;
@@ -55,5 +60,32 @@ using SortedBoundaryActivities =
     const EventLog& log, std::string activity_key = "activity");
 [[nodiscard]] SortedBoundaryActivities get_sorted_end_activities_list(
     const EventLog& log, std::string activity_key = "activity");
+
+// pm4py.get_activity_position_summary: how many times the activity occurs at
+// each 0-based position of its case. kPandas (the DataFrame a CSV or XES
+// import gives) lists positions by descending count, equal counts in first
+// appearance; kLog (an EventLog object) lists them in first appearance.
+enum class ActivityPositionSummaryVariant { kPandas, kLog };
+
+struct ActivityPositionSummaryOptions {
+  std::string activity;
+  // Empty, "activity", and "concept:name" select Event::activity.
+  std::string activity_key = "activity";
+  ActivityPositionSummaryVariant variant = ActivityPositionSummaryVariant::kPandas;
+};
+
+struct ActivityPositionSummary {
+  std::string activity;
+  std::string activity_key;
+  ActivityPositionSummaryVariant variant = ActivityPositionSummaryVariant::kPandas;
+  // (position, count) in the reference dict's key order.
+  std::vector<std::pair<std::uint64_t, std::uint64_t>> positions;
+};
+
+[[nodiscard]] ActivityPositionSummary get_activity_position_summary(
+    const EventLog& log, const ActivityPositionSummaryOptions& options);
+
+[[nodiscard]] const char* activity_position_summary_variant_name(
+    ActivityPositionSummaryVariant variant);
 
 }  // namespace minera

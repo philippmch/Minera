@@ -1088,6 +1088,9 @@ int usage(const char* program) {
                "  --boundary-activities     Emit start/end activity counts JSON\n"
                "  --boundary-activities-variant <start|end|both> Boundary selection\n"
                "  --boundary-activities-activity-key <name> Activity attribute\n"
+               "  --activity-position-summary <a> Emit per-position counts of <a> JSON\n"
+               "  --activity-position-summary-activity-key <name> Activity attribute\n"
+               "  --activity-position-summary-variant <pandas|log> Key order\n"
                "  --variant-statistics      Emit variant counts/probabilities JSON\n"
                "  --variant-statistics-activity-key <name> Activity attribute\n"
                "  --variant-statistics-max-variants <n> Limit returned variants\n"
@@ -2071,6 +2074,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
   bool attribute_distribution_requested = false;
   bool attribute_kde_requested = false;
   bool boundary_activities_requested = false;
+  bool activity_position_summary_requested = false;
+  minera::ActivityPositionSummaryOptions activity_position_summary_options;
   bool variant_statistics_requested = false;
   bool activity_split_option_used = false;
   bool repetition_option_used = false;
@@ -3240,6 +3245,30 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       std::replace(key.begin(), key.end(), '-', '_');
       boundary_activities_fields[key] = value;
       boundary_activities_requested = true;
+      continue;
+    }
+    if (arg == "--activity-position-summary" ||
+        arg == "--activity-position-summary-activity-key" ||
+        arg == "--activity-position-summary-variant") {
+      const auto* value = next();
+      if (!value) return usage(argv[0]);
+      if (arg == "--activity-position-summary") {
+        activity_position_summary_options.activity = value;
+      } else if (arg == "--activity-position-summary-activity-key") {
+        activity_position_summary_options.activity_key = value;
+      } else if (std::string_view(value) == "pandas") {
+        activity_position_summary_options.variant =
+            minera::ActivityPositionSummaryVariant::kPandas;
+      } else if (std::string_view(value) == "log") {
+        activity_position_summary_options.variant =
+            minera::ActivityPositionSummaryVariant::kLog;
+      } else {
+        std::cerr << "error: --activity-position-summary-variant expects "
+                     "pandas or log\n";
+        return 2;
+      }
+      if (arg == "--activity-position-summary")
+        activity_position_summary_requested = true;
       continue;
     }
     if (arg == "--variant-statistics") {
@@ -6846,7 +6875,9 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto present = [&](std::string_view name) {
         return case_arrival_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_case_arrival_params(lookup, present);
+      auto params = minera::parse_case_arrival_params(lookup, present);
+      // The input is a CSV or XES file: pm4py's DataFrame path.
+      params.dataframe = true;
       const auto body = minera::case_arrival_json(
           minera::discover_case_arrival(log, params));
       if (output.empty()) {
@@ -6967,6 +6998,22 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
           minera::parse_boundary_activities_params(lookup, present);
       const auto body = minera::boundary_activities_json(
           minera::discover_boundary_activities(log, params));
+      if (output.empty()) {
+        std::cout << body << '\n';
+      } else {
+        std::ofstream file(output);
+        if (!file) {
+          std::cerr << "error: cannot open output file " << output << '\n';
+          return 1;
+        }
+        file << body << '\n';
+      }
+      return 0;
+    }
+    if (activity_position_summary_requested) {
+      const auto body = minera::activity_position_summary_json(
+          minera::get_activity_position_summary(
+              log, activity_position_summary_options));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

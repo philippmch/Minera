@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 #include <stdexcept>
+#include <vector>
 
 namespace minera {
 namespace {
@@ -21,6 +22,11 @@ std::string selected_value(const Event& event, const std::string& key,
 struct WorkingRole {
   std::set<std::string> activities;
   std::map<std::string, std::size_t> resources;
+  // The reference's originator_importance key order: a Counter built from the
+  // activity's (resource) pairs, then Counter(left) + Counter(right) on each
+  // merge, so the left role's keys come first and the right role's new keys
+  // follow in its own order.
+  std::vector<std::string> resource_order;
 };
 
 std::string activity_key(const WorkingRole& role) {
@@ -53,9 +59,12 @@ bool final_role_order(const WorkingRole& left, const WorkingRole& right) {
 }
 
 double similarity(const WorkingRole& a, const WorkingRole& b) {
-  std::set<std::string> names;
-  for (const auto& [n, c] : a.resources) { (void)c; names.insert(n); }
-  for (const auto& [n, c] : b.resources) { (void)c; names.insert(n); }
+  // The sums run over a's resources in its key order, then b's others in
+  // its order, as the reference does: the order decides the last bit, and
+  // with it which of two equally similar pairs merges first.
+  std::vector<std::string> names = a.resource_order;
+  for (const auto& n : b.resource_order)
+    if (!a.resources.contains(n)) names.push_back(n);
   double total_a = 0.0, total_b = 0.0;
   for (const auto& [n, c] : a.resources) { (void)n; total_a += c; }
   for (const auto& [n, c] : b.resources) { (void)n; total_b += c; }
@@ -85,12 +94,16 @@ RoleDiscoveryResult discover_roles(const EventLog& log,
     throw std::invalid_argument("roles_max_activities safety bound exceeded");
 
   std::map<std::string, std::map<std::string, std::size_t>> activity_resources;
+  // Per activity, its resources in first-appearance order (the EventLog
+  // variant's Counter order); the pandas variant groups by name instead.
+  std::map<std::string, std::vector<std::string>> first_seen;
   std::set<std::string> resources;
   for (const auto& trace : log.traces) for (const auto& event : trace.events) {
     const auto activity = selected_value(event, options.activity_attribute, false);
     const auto resource = selected_value(event, options.resource_attribute, true);
     if (activity.empty() || resource.empty()) continue;
-    ++activity_resources[activity][resource];
+    if (activity_resources[activity][resource]++ == 0)
+      first_seen[activity].push_back(resource);
     resources.insert(resource);
   }
   if (resources.size() > options.max_resources)
@@ -99,8 +112,18 @@ RoleDiscoveryResult discover_roles(const EventLog& log,
     throw std::invalid_argument("roles_max_activities safety bound exceeded");
 
   std::vector<WorkingRole> roles;
-  for (const auto& [activity, counts] : activity_resources)
-    roles.push_back({{activity}, counts});
+  for (const auto& [activity, counts] : activity_resources) {
+    WorkingRole role{{activity}, counts, {}};
+    if (options.variant == RoleDiscoveryVariant::kLog) {
+      role.resource_order = first_seen[activity];
+    } else {
+      for (const auto& [name, count] : counts) {
+        (void)count;
+        role.resource_order.push_back(name);
+      }
+    }
+    roles.push_back(std::move(role));
+  }
   std::sort(roles.begin(), roles.end(), final_role_order);
   while (roles.size() > 1) {
     double best = -1.0;
@@ -126,6 +149,9 @@ RoleDiscoveryResult discover_roles(const EventLog& log,
     // The reference merges with Counter(set_res1 + set_res2): the merged role
     // carries the summed event counts of both source roles, which then feed
     // the normalized similarities of later merges.
+    for (const auto& name : roles[bj].resource_order)
+      if (!roles[bi].resources.contains(name))
+        roles[bi].resource_order.push_back(name);
     for (const auto& [name, count] : roles[bj].resources)
       roles[bi].resources[name] += count;
     roles.erase(roles.begin() + static_cast<std::ptrdiff_t>(bj));
@@ -142,7 +168,8 @@ RoleDiscoveryResult discover_roles(const EventLog& log,
   for (const auto& role : roles) {
     DiscoveredRole out;
     out.activities.assign(role.activities.begin(), role.activities.end());
-    for (const auto& [name, count] : role.resources) out.resources.push_back({name, count});
+    for (const auto& name : role.resource_order)
+      out.resources.push_back({name, role.resources.at(name)});
     result.roles.push_back(std::move(out));
   }
   result.diagnostics.role_count = result.roles.size();

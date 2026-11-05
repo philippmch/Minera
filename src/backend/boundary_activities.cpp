@@ -58,12 +58,12 @@ BoundaryActivitiesResult discover_boundary_activities(
     if (include_start) {
       if (const auto* value = activity_value(trace.events.front(),
                                              options.activity_key))
-        ++result.starts[*value];
+        if (result.starts[*value]++ == 0) result.start_order.push_back(*value);
     }
     if (include_end) {
       if (const auto* value = activity_value(trace.events.back(),
                                              options.activity_key))
-        ++result.ends[*value];
+        if (result.ends[*value]++ == 0) result.end_order.push_back(*value);
     }
   }
   return result;
@@ -93,6 +93,43 @@ SortedBoundaryActivities get_sorted_start_activities_list(
 SortedBoundaryActivities get_sorted_end_activities_list(
     const EventLog& log, std::string activity_key) {
   return sorted_counts(get_end_activities(log, std::move(activity_key)));
+}
+
+const char* activity_position_summary_variant_name(
+    ActivityPositionSummaryVariant variant) {
+  switch (variant) {
+    case ActivityPositionSummaryVariant::kPandas: return "PANDAS";
+    case ActivityPositionSummaryVariant::kLog: return "LOG";
+  }
+  throw std::invalid_argument("activity position summary: unknown variant");
+}
+
+ActivityPositionSummary get_activity_position_summary(
+    const EventLog& log, const ActivityPositionSummaryOptions& options) {
+  if (options.variant != ActivityPositionSummaryVariant::kPandas &&
+      options.variant != ActivityPositionSummaryVariant::kLog)
+    throw std::invalid_argument("activity position summary: unknown variant");
+  ActivityPositionSummary result;
+  result.activity = options.activity;
+  result.activity_key = options.activity_key;
+  result.variant = options.variant;
+  // Positions count every event of the case, also those without the key.
+  std::map<std::uint64_t, std::size_t> index;
+  for (const auto& trace : log.traces) {
+    for (std::size_t position = 0; position < trace.events.size(); ++position) {
+      const auto* value = activity_value(trace.events[position], options.activity_key);
+      if (!value || *value != options.activity) continue;
+      const auto [it, inserted] = index.emplace(position, result.positions.size());
+      if (inserted) result.positions.push_back({position, 0});
+      ++result.positions[it->second].second;
+    }
+  }
+  if (options.variant == ActivityPositionSummaryVariant::kPandas)
+    std::stable_sort(result.positions.begin(), result.positions.end(),
+                     [](const auto& left, const auto& right) {
+                       return left.second > right.second;
+                     });
+  return result;
 }
 
 }  // namespace minera

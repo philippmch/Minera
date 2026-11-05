@@ -1111,8 +1111,22 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     result.relations.assign(std::make_move_iterator(kept.rbegin()),
                             std::make_move_iterator(kept.rend()));
   }
+  // A classic document Minera wrote for a log whose event times share one
+  // non-zero offset (see serialize_ocel_json) keeps those texts as written;
+  // their order is the same by wall clock and by instant.
+  std::unordered_map<std::string, std::string> offset_times;
+  if (const auto* marker = optional(r, "minera:eventTimeOffset")) {
+    if (!marker->is_bool())
+      throw std::invalid_argument("minera:eventTimeOffset must be boolean");
+    if (std::get<bool>(marker->value) && !standard)
+      for (const auto& event : result.events) offset_times.emplace(event.id, event.timestamp);
+  }
   sort_ocel_events_by_timestamp(result, standard ? OcelTimestampReader::kIsoFormat
                                                  : OcelTimestampReader::kIsoFormatOrFileOrder);
+  if (!offset_times.empty())
+    for (auto& event : result.events)
+      if (const auto found = offset_times.find(event.id); found != offset_times.end())
+        event.timestamp = found->second;
   // read_ocel2_json converts declared date values (a text it cannot read
   // stays); read_ocel_json keeps them as text.
   if (standard) convert_ocel_date_attributes(result, OcelTimestampReader::kIsoFormatOrFileOrder);
@@ -1128,6 +1142,13 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     keep_unrelated = std::get<bool>(marker->value);
   }
   if (!keep_unrelated) drop_unrelated_ocel_entries(result);
+  // A log whose reference frame is activity first (read from XML, see
+  // Ocel::event_activity_first) keeps that order between routes.
+  if (const auto* marker = optional(r, "minera:eventActivityFirst")) {
+    if (!marker->is_bool())
+      throw std::invalid_argument("minera:eventActivityFirst must be boolean");
+    result.event_activity_first = std::get<bool>(marker->value) && !standard;
+  }
   if (const auto* raw = optional(r, "minera:tableColumns")) {
     const auto& columns = obj(*raw, "minera:tableColumns");
     const auto read = [&](const char* name,
@@ -1296,9 +1317,11 @@ int month_from_word(std::string_view word) {
 // A subset of dateutil.parser.parse (default dayfirst/yearfirst) observed
 // black-box against the pinned reference: YYYY/MM/DD and MM/DD/YYYY with
 // '/', '.' or '-' (a first field above 12 reads day-first), "Jan 2 2020",
-// "2 Jan 2020" and "January 2, 2020" (month names in any case), then a clock
-// H:MM[:SS[.f]] after 'T' or spaces, then an optional Z, UTC, GMT, +HH,
-// +HHMM or +HH:MM offset. Anything else is nullopt (unknown to native).
+// "2 Jan 2020" and "January 2, 2020" (month names in any case), the basic
+// YYYYMMDD, then a clock H:MM[:SS[.f]] (HHMM[SS[.f]] after YYYYMMDD) after
+// 'T' or spaces, then an optional Z or z, UTC, GMT, +HH, +HHMM or +HH:MM
+// offset; an all-numeric date directly followed by "-HHMM" is a naive
+// clock. Anything else is nullopt (unknown to native).
 std::optional<LenientTimestamp> dateutil_subset(std::string_view text) {
   std::size_t p = 0, n = text.size();
   const auto space = [](char ch) { return std::isspace(static_cast<unsigned char>(ch)) != 0; };
@@ -1322,6 +1345,7 @@ std::optional<LenientTimestamp> dateutil_subset(std::string_view text) {
   };
   const auto skip_spaces = [&]() { while (p < n && space(text[p])) ++p; };
   int year = 0, month = 0, day = 0;
+  bool compact = false, numeric = false;
   if (p < n && alpha(text[p])) {  // Jan 2[,] 2020
     month = month_from_word(word());
     skip_spaces();
@@ -1332,11 +1356,17 @@ std::optional<LenientTimestamp> dateutil_subset(std::string_view text) {
   } else {
     const std::size_t begin = p;
     int first = 0;
-    if (!number(1, 4, first)) return std::nullopt;
+    if (!number(1, 8, first)) return std::nullopt;
     const std::size_t length = p - begin;
-    if (length == 4) {  // YYYY/MM/DD
+    if (length == 8) {  // YYYYMMDD
+      compact = numeric = true;
+      year = first / 10000;
+      month = first / 100 % 100;
+      day = first % 100;
+    } else if (length == 4) {  // YYYY/MM/DD
       if (p >= n || (text[p] != '/' && text[p] != '.' && text[p] != '-')) return std::nullopt;
       const char separator = text[p++];
+      numeric = true;
       year = first;
       if (!number(1, 2, month) || p >= n || text[p++] != separator || !number(1, 2, day))
         return std::nullopt;
@@ -1349,6 +1379,7 @@ std::optional<LenientTimestamp> dateutil_subset(std::string_view text) {
       skip_spaces();
       if (!number(4, 4, year)) return std::nullopt;
     } else if (length <= 2 && p < n && (text[p] == '/' || text[p] == '.' || text[p] == '-')) {
+      numeric = true;
       const char separator = text[p++];  // MM/DD/YYYY
       int second = 0;
       if (!number(1, 2, second) || p >= n || text[p++] != separator || !number(4, 4, year))
@@ -1362,14 +1393,34 @@ std::optional<LenientTimestamp> dateutil_subset(std::string_view text) {
   }
   int hour = 0, minute = 0, second = 0;
   std::int64_t micro = 0;
+  if (numeric && p + 5 == n && text[p] == '-' && std::all_of(text.begin() + p + 1, text.begin() + n, digit)) {
+    // An all-numeric date then "-HHMM" reads that as a naive clock HH:MM
+    // ("2024-06-25-0530" is 05:30), observed black-box.
+    hour = (text[p + 1] - '0') * 10 + (text[p + 2] - '0');
+    minute = (text[p + 3] - '0') * 10 + (text[p + 4] - '0');
+    p = n;
+  }
   if (p < n) {
     if (text[p] == 'T') ++p;
     else if (space(text[p])) skip_spaces();
     else return std::nullopt;
-    if (!number(1, 2, hour) || p >= n || text[p++] != ':' || !number(2, 2, minute)) return std::nullopt;
-    if (p < n && text[p] == ':') {
-      ++p;
-      if (!number(2, 2, second)) return std::nullopt;
+    bool seconds = false;
+    if (compact) {  // HHMM[SS[.f]]
+      int clock = 0;
+      const std::size_t begin = p;
+      if (!number(4, 6, clock) || p - begin == 5) return std::nullopt;
+      seconds = p - begin == 6;
+      if (seconds) { hour = clock / 10000; minute = clock / 100 % 100; second = clock % 100; }
+      else { hour = clock / 100; minute = clock % 100; }
+    } else {
+      if (!number(1, 2, hour) || p >= n || text[p++] != ':' || !number(2, 2, minute)) return std::nullopt;
+      if (p < n && text[p] == ':') {
+        ++p;
+        if (!number(2, 2, second)) return std::nullopt;
+        seconds = true;
+      }
+    }
+    if (seconds) {
       if (p < n && (text[p] == '.' || text[p] == ',')) {
         ++p;
         std::size_t count = 0;
@@ -1388,7 +1439,7 @@ std::optional<LenientTimestamp> dateutil_subset(std::string_view text) {
   std::int64_t offset_seconds = 0;
   if (p < n) {
     aware = true;
-    if (text[p] == 'Z') {
+    if (text[p] == 'Z' || text[p] == 'z') {
       ++p;
     } else if (text[p] == '+' || text[p] == '-') {
       const std::int64_t sign = text[p++] == '-' ? -1 : 1;
@@ -1562,6 +1613,50 @@ void drop_unrelated_ocel_entries(Ocel& log) {
   });
 }
 
+void convert_ocel_date_value(OcelValue& value, OcelTimestampReader reader, bool change) {
+  auto* text = std::get_if<std::string>(&value);
+  if (text == nullptr) return;
+  std::optional<std::int64_t> microseconds;
+  bool aware = true, lenient_route = false;
+  try {
+    microseconds = iso_wall_microseconds(*text);
+  } catch (const std::invalid_argument&) {
+    if (reader == OcelTimestampReader::kIsoFormat) throw;
+    if (reader != OcelTimestampReader::kDateutil &&
+        reader != OcelTimestampReader::kIsoFormatOrFileOrder)
+      return;
+    if (const auto lenient = dateutil_subset(*text)) {
+      microseconds = lenient->microseconds;
+      aware = lenient->aware;
+      lenient_route = true;
+    } else if (reader == OcelTimestampReader::kDateutil && certainly_not_a_date(*text)) {
+      throw std::invalid_argument("String does not contain a date: " + *text);
+    } else {
+      // A shape native does not read: kept as written. read_ocel2_json keeps
+      // any text dateutil does not read (observed black-box).
+      return;
+    }
+    // read_ocel2_json stores object-change values in a UTC column, so a
+    // naive dateutil value there is stamped UTC (its event and object values
+    // stay naive), observed black-box; read_ocel2_xml keeps it naive.
+    if (change && reader == OcelTimestampReader::kIsoFormatOrFileOrder) aware = true;
+  }
+  // A text with surrounding white space, or any text fromisoformat refuses
+  // ("... 20:40z"), is not kept as written: the reference reads it through
+  // dateutil and stores the datetime.
+  const bool padded = !text->empty() &&
+                      (std::isspace(static_cast<unsigned char>(text->front())) != 0 ||
+                       std::isspace(static_cast<unsigned char>(text->back())) != 0);
+  // A change value keeps "+00:00", an event or object value "Z", as the
+  // reference JSON writers spell them.
+  // A space-separated clock is respelled with 'T', as the reference stores
+  // a datetime ("1999-09-08 13:37Z" is written "1999-09-08T13:37:00Z").
+  const bool spaced = text->size() > 10 && (*text)[10] == ' ';
+  if (!padded && !lenient_route && !spaced && natively_stored(*text, *microseconds, aware) && !(change && text->ends_with('Z')))
+    return;
+  *text = utc_timestamp_text(*microseconds, !aware ? "" : change ? "+00:00" : "Z");
+}
+
 void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader) {
   // read_ocel2_xml converts a type naming "date" (case-sensitive: "Date",
   // "time" and "timestamp" stay text), read_ocel2_json one naming "date" or
@@ -1577,29 +1672,8 @@ void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader) {
     const auto type = lower_ascii(found->second);
     return type.find("date") != std::string::npos || type.find("time") != std::string::npos;
   };
-  const auto convert = [&](OcelValue& value, bool change) {
-    auto* text = std::get_if<std::string>(&value);
-    if (text == nullptr) return;
-    std::optional<std::int64_t> microseconds;
-    bool aware = true;
-    try {
-      microseconds = iso_wall_microseconds(*text);
-    } catch (const std::invalid_argument&) {
-      if (reader == OcelTimestampReader::kIsoFormat) throw;
-      if (reader != OcelTimestampReader::kDateutil) return;
-      if (const auto lenient = dateutil_subset(*text)) {
-        microseconds = lenient->microseconds;
-        aware = lenient->aware;
-      } else if (certainly_not_a_date(*text)) {
-        throw std::invalid_argument("String does not contain a date: " + *text);
-      } else {
-        return;  // a shape native does not read: kept as written
-      }
-    }
-    // A change value keeps "+00:00", an event or object value "Z", as the
-    // reference JSON writers spell them.
-    if (natively_stored(*text, *microseconds, aware) && !(change && text->ends_with('Z'))) return;
-    *text = utc_timestamp_text(*microseconds, !aware ? "" : change ? "+00:00" : "Z");
+  const auto convert = [reader](OcelValue& value, bool change) {
+    convert_ocel_date_value(value, reader, change);
   };
   for (auto& event : log.events)
     for (auto& attribute : event.attributes)
@@ -1872,6 +1946,22 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
                     [&](const auto& object) { return !related_objects.contains(object.id); });
     if (unrelated) out << ",\"minera:keepUnrelated\":true";
   };
+  // Marks a log whose event times all share one non-zero offset (an OCEL
+  // CSV import), so parse_ocel_json keeps those texts as written instead of
+  // the wall clock stamped UTC that read_ocel_json stores: the XML and SQLite
+  // writers print that offset as the reference does for such a log, also
+  // after the log passed between routes as this JSON.
+  const auto write_event_time_offset = [&] {
+    std::optional<std::int32_t> offset;
+    for (const auto& event : log.events) {
+      const auto parsed = parse_timestamp_exact(event.timestamp);
+      if (!parsed || !parsed->timezone_aware || parsed->offset_minutes == 0 ||
+          (offset && *offset != parsed->offset_minutes))
+        return;
+      offset = parsed->offset_minutes;
+    }
+    if (offset) out << ",\"minera:eventTimeOffset\":true";
+  };
   const auto write_table_columns = [&] {
     const auto& columns = log.table_columns;
     if (!columns.events && !columns.objects && !columns.relations) return;
@@ -2134,6 +2224,8 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
   write_global_category(out, log, "ocel:global-object");
   write_table_columns();
   write_keep_unrelated();
+  write_event_time_offset();
+  if (log.event_activity_first) out << ",\"minera:eventActivityFirst\":true";
   out << '}';
   return out.str();
 }

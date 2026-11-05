@@ -429,8 +429,8 @@ EventLog stochastic_playout_impl(const PetriNet& net,
       enabled.clear();
       for (std::size_t t = 0; t < transitions.size(); ++t) {
         const auto& transition = transitions[t];
-        if ((transition.inputs.empty() && !transition.has_extended_arcs()) ||
-            !petri_transition_enabled(transition, marking)) continue;
+        // Input-less transitions are always enabled, as in the reference.
+        if (!petri_transition_enabled(transition, marking)) continue;
         enabled.push_back(t);
       }
       if (enabled.empty()) break;
@@ -749,7 +749,8 @@ EventLog extensive_playout_impl(const PetriNet& net,
     std::vector<std::size_t> enabled;
     for (std::size_t t = 0; t < transitions.size(); ++t) {
       const auto& transition = transitions[t];
-      if (transition.inputs.empty() && !transition.has_extended_arcs()) continue;
+      // A transition without input places is always enabled, as in the
+      // reference's semantics (alpha nets have such transitions).
       if (!transition.silent() && state.events.size() >= options.max_length) {
         continue;  // would exceed the visible-length bound
       }

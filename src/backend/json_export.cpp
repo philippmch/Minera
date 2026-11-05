@@ -7431,11 +7431,31 @@ std::string attribute_statistics_json(
   out << ",\"keep_once_per_case\":"
       << (result.keep_once_per_case ? "true" : "false")
       << ",\"values\":{";
+  // `values` keys follow `entries` (the reference's value_counts order), each
+  // text at its first entry; a hand-built result whose entries do not cover
+  // exactly the map's keys keeps name order.
+  std::vector<std::string> value_order;
+  {
+    std::set<std::string> listed;
+    for (const auto& entry : result.entries)
+      if (listed.insert(entry.value).second) value_order.push_back(entry.value);
+    const bool covered =
+        listed.size() == result.values.size() &&
+        std::all_of(listed.begin(), listed.end(),
+                    [&](const std::string& key) { return result.values.contains(key); });
+    if (!covered) {
+      value_order.clear();
+      for (const auto& [value, count] : result.values) {
+        (void)count;
+        value_order.push_back(value);
+      }
+    }
+  }
   std::size_t index = 0;
-  for (const auto& [value, count] : result.values) {
+  for (const auto& value : value_order) {
     if (index++) out << ',';
     write_json_string(out, value);
-    out << ':' << count;
+    out << ':' << result.values.at(value);
   }
   out << "},\"entries\":[";
   for (std::size_t i = 0; i < result.entries.size(); ++i) {
@@ -7512,20 +7532,52 @@ std::string boundary_activities_json(const BoundaryActivitiesResult& result) {
   out << "{\"family\":\"BOUNDARY_ACTIVITIES\",\"variant\":\""
       << boundary_activities_variant_name(result.variant)
       << "\",\"starts\":{";
-  std::size_t index = 0;
-  for (const auto& [activity, count] : result.starts) {
-    if (index++) out << ',';
-    write_json_string(out, activity);
-    out << ':' << count;
-  }
+  // Keys in first appearance, as the reference dicts; a result built by hand
+  // whose order vector does not list exactly the map's keys falls back to
+  // name order.
+  const auto write_counts = [&](const std::map<std::string, std::uint64_t>& counts,
+                                const std::vector<std::string>& order) {
+    const bool ordered =
+        order.size() == counts.size() &&
+        std::set<std::string>(order.begin(), order.end()).size() == order.size() &&
+        std::all_of(order.begin(), order.end(),
+                    [&](const std::string& key) { return counts.contains(key); });
+    std::size_t index = 0;
+    const auto write = [&](const std::string& activity, std::uint64_t count) {
+      if (index++) out << ',';
+      write_json_string(out, activity);
+      out << ':' << count;
+    };
+    if (ordered) {
+      for (const auto& activity : order) write(activity, counts.at(activity));
+    } else {
+      for (const auto& [activity, count] : counts) write(activity, count);
+    }
+  };
+  write_counts(result.starts, result.start_order);
   out << "},\"ends\":{";
-  index = 0;
-  for (const auto& [activity, count] : result.ends) {
-    if (index++) out << ',';
-    write_json_string(out, activity);
-    out << ':' << count;
-  }
+  write_counts(result.ends, result.end_order);
   out << "}}";
+  return out.str();
+}
+
+std::string activity_position_summary_json(
+    const ActivityPositionSummary& result) {
+  std::ostringstream out;
+  out << "{\"family\":\"ACTIVITY_POSITION_SUMMARY\",\"variant\":\""
+      << activity_position_summary_variant_name(result.variant)
+      << "\",\"activity\":";
+  write_json_string(out, result.activity);
+  out << ",\"activity_key\":";
+  write_json_string(out, result.activity_key);
+  // [position, count] pairs: a JSON object would let readers reorder the
+  // integer-like keys.
+  out << ",\"positions\":[";
+  for (std::size_t i = 0; i < result.positions.size(); ++i) {
+    if (i) out << ',';
+    out << '[' << result.positions[i].first << ',' << result.positions[i].second << ']';
+  }
+  out << "]}";
   return out.str();
 }
 

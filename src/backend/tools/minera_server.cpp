@@ -5643,7 +5643,12 @@ void handle_case_arrival(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto options = minera::parse_case_arrival_params(lookup, present);
+    auto options = minera::parse_case_arrival_params(lookup, present);
+    // A CSV or XES upload follows pm4py's DataFrame path; a native table
+    // source follows the EventLog path.
+    options.dataframe = !session->active_source ||
+                        session->active_source->file().format == "csv" ||
+                        session->active_source->file().format == "xes";
     response.set_content(
         minera::case_arrival_json(
             minera::discover_case_arrival(require_prepared_log(*session), options)),
@@ -7796,9 +7801,11 @@ void handle_tree_generation(const httplib::Request& request,
     const auto trees = minera::generate_random_process_trees(params);
     if (with_log) {
       const auto extensive = playout_options.variant == minera::ProcessTreePlayoutVariant::kExtensive;
-      const auto length = extensive ? playout_options.max_length : playout_options.max_steps;
+      const auto length = extensive
+          ? playout_options.max_length.value_or(playout_options.max_steps)
+          : playout_options.max_steps;
       const auto cases = extensive ? playout_options.max_traces : playout_options.traces;
-      if (length > 10000 || cases > 10000 || playout_options.max_loop_occurrences > 1000 ||
+      if (length > 10000 || cases > 10000 || playout_options.max_loop_occurrences.value_or(0) > 1000 ||
           (length && cases > 1000000 / length) ||
           (length && cases && trees.size() > 1000000 / length / cases))
         throw std::invalid_argument("generated logs exceed the one-million event budget");
@@ -9586,17 +9593,13 @@ void handle_playout(const httplib::Request& request,
     try {
       auto options = minera::parse_process_tree_playout_params(lookup, present);
       if (options.traces > 10000 || options.max_steps > 10000 ||
-          options.max_loop_occurrences > 100 ||
-          (request.has_param("max_length") && options.max_length > 64)) {
+          options.max_loop_occurrences.value_or(0) > 100 ||
+          options.max_length.value_or(0) > 64) {
         reject("process-tree playout bounds exceed the server safety limits");
         return;
       }
-      // The native extensive default is intentionally generous for local
-      // callers. The server uses a bounded default when the client did not
-      // provide a cap, so an ordinary default request remains usable.
-      if (!request.has_param("max_length") &&
-          options.variant == minera::ProcessTreePlayoutVariant::kExtensive)
-        options.max_length = 64;
+      // An omitted max_length keeps the reference default (the tree's
+      // shortest word length); the native enumeration budget bounds the rest.
       if (options.variant == minera::ProcessTreePlayoutVariant::kExtensive &&
           options.max_traces > 10000) {
         if (request.has_param("max_trace_cap") ||
@@ -9605,11 +9608,6 @@ void handle_playout(const httplib::Request& request,
           return;
         }
         options.max_traces = 10000;
-      }
-      if (options.variant == minera::ProcessTreePlayoutVariant::kExtensive &&
-          options.max_length > 64) {
-        reject("max_length must not exceed 64");
-        return;
       }
       const auto result =
           minera::process_tree_playout_result(require_process_tree(*session), options);

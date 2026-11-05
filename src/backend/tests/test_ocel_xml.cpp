@@ -291,9 +291,67 @@ void reference_capture_tests() {
          reread1.events[0].attributes[3].value == minera::OcelValue(std::string("a<b&\"c\"\nd")));
 }
 
+// The reference writers follow the events frame's column order: id,
+// activity, timestamp after either XML reader (or a CSV or SQLite table in
+// that order), id, timestamp, activity after JSON. read_ocel_xml reads only
+// the vmap/ovmap lists of a reference-shaped event or object; other keyed
+// children are dropped (both observed black-box).
+void frame_order_and_unlisted_keys() {
+  const std::string xml = R"xml(<log>
+  <events>
+    <event>
+      <string key="id" value="e1"/>
+      <string key="activity" value="Create"/>
+      <date key="timestamp" value="2024-01-01T10:00:00Z"/>
+      <string key="foo" value="w"/>
+      <list key="omap"><string key="object-id" value="o1"/></list>
+      <list key="vmap"><string key="amount" value="1"/></list>
+      <date key="later" value="2024-01-05T00:00:00Z"/>
+    </event>
+  </events>
+  <objects>
+    <object>
+      <string key="id" value="o1"/>
+      <string key="type" value="order"/>
+      <string key="bar" value="z"/>
+      <list key="ovmap"><string key="status" value="open"/></list>
+      <float key="baz" value="1.5"/>
+    </object>
+  </objects>
+</log>)xml";
+  const auto log = minera::parse_ocel_xml(xml);
+  assert(log.event_activity_first);
+  assert(log.events[0].attributes.size() == 1 && log.events[0].attributes[0].key == "amount");
+  assert(log.objects[0].attributes.size() == 1 && log.objects[0].attributes[0].key == "status");
+  assert(!log.event_type_attributes.at("Create").contains("later"));
+  minera::OcelXmlExportOptions lossy;
+  lossy.allow_lossy = true;
+  const auto written = minera::serialize_ocel_xml(log, lossy);
+  const auto activity = written.find("<string key=\"activity\" value=\"Create\"/>");
+  const auto timestamp = written.find("<date key=\"timestamp\" value=\"2024-01-01T10:00:00Z\"/>");
+  assert(activity != std::string::npos && timestamp != std::string::npos && activity < timestamp);
+  assert(written.find("foo") == std::string::npos && written.find("bar") == std::string::npos);
+  // Classic JSON carries the order between routes; OCEL 2.0 JSON does not.
+  const auto classic = minera::serialize_ocel_json(log);
+  assert(classic.find("\"minera:eventActivityFirst\":true") != std::string::npos);
+  assert(minera::parse_ocel_json(classic).event_activity_first);
+  const auto standard = minera::serialize_ocel_json(log, minera::OcelJsonFormat::kStandard);
+  assert(!minera::parse_ocel_json(standard).event_activity_first);
+  const auto from_json = minera::serialize_ocel_xml(minera::parse_ocel_json(standard), lossy);
+  assert(from_json.find("<string key=\"activity\"") > from_json.find("<date key=\"timestamp\""));
+  // The former native dialect (id and type as XML attributes) keeps them.
+  const auto former = minera::parse_ocel_xml(
+      "<log><events><event id=\"e1\" activity=\"A\" timestamp=\"2024-01-01T00:00:00Z\">"
+      "<string key=\"foo\" value=\"w\"/><omap><object object-id=\"o1\"/></omap></event></events>"
+      "<objects><object id=\"o1\" type=\"order\"><string key=\"bar\" value=\"z\"/></object></objects></log>");
+  assert(former.events[0].attributes.size() == 1 && former.events[0].attributes[0].key == "foo");
+  assert(former.objects[0].attributes.size() == 1 && former.objects[0].attributes[0].key == "bar");
+}
+
 }  // namespace
 
 int main() {
+  frame_order_and_unlisted_keys();
   minera::Ocel log;
   log.objects.push_back({"o2", "Item", {{"price", std::int64_t(7)}}});
   log.objects.push_back({"o1", "Order", {}});

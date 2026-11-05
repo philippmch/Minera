@@ -4219,8 +4219,8 @@ ProcessTreePlayoutParams parse_process_tree_playout_params(
   if (supplied("playout_cap_sampled_loops"))
     params.cap_sampled_loops = parse_boolean(
         require("playout_cap_sampled_loops"), "playout_cap_sampled_loops");
-  if (params.min_length > params.max_length)
-    throw std::invalid_argument("playout_min_length must not exceed playout_max_length");
+  // A min_length above max_length is accepted, as by the reference (whose
+  // choices and silent steps keep words outside the bounds).
   if (params.return_set_strings &&
       params.variant != ProcessTreePlayoutVariant::kExtensive)
     throw std::invalid_argument(

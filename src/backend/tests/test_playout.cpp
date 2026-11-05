@@ -6,6 +6,7 @@
 #include <cassert>
 #include <limits>
 #include <stdexcept>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -734,6 +735,48 @@ void basic_playout_reference_semantics() {
 
 }  // namespace
 
+// Reference capture (pm4py 2.7.22): c consumes start, f only produces end.
+// A transition without input places is always enabled, so EXTENSIVE yields
+// {(c,f),(f,c)} at max_trace_length 2, 3 and 4, and STOCHASTIC with equal
+// weights fires f before c in some cases and stops on the exact final marking.
+void inputless_transitions_are_always_enabled() {
+  minera::PetriNet net;
+  const auto start = net.add_place();
+  const auto end = net.add_place();
+  net.set_source(start);
+  net.set_sink(end);
+  net.set_activities({"c", "f"});
+  net.add_transition(0, {start}, {});
+  net.add_transition(1, {}, {end});
+  for (const std::size_t length : {2, 3, 4}) {
+    minera::ExtensivePlayoutOptions options;
+    options.max_length = length;
+    options.initial_marking = {1, 0};
+    options.final_marking = {0, 1};
+    std::set<std::string> words;
+    for (const auto& trace : minera::extensive_playout(net, options).traces) {
+      std::string word;
+      for (const auto& event : trace.events) word += event.activity;
+      words.insert(word);
+    }
+    assert((words == std::set<std::string>{"cf", "fc"}));
+  }
+  minera::StochasticPlayoutOptions options;
+  options.traces = 200;
+  options.max_steps = 50;
+  options.seed = 3;
+  const auto log = minera::stochastic_playout(net, options);
+  bool f_first = false, exact_cf = false;
+  for (const auto& trace : log.traces) {
+    assert(!trace.events.empty());
+    f_first = f_first || trace.events.front().activity == "f";
+    exact_cf = exact_cf || (trace.events.size() == 2 && trace.events[0].activity == "c" &&
+                            trace.events[1].activity == "f");
+    assert(!(trace.events.size() == 1 && trace.events[0].activity == "c"));
+  }
+  assert(f_first && exact_cf);
+}
+
 int main() {
   deterministic_and_timestamped();
   stochastic_visited_records_silent_steps_and_preserves_default();
@@ -748,6 +791,7 @@ int main() {
   basic_playout_reference_semantics();
   extensive_playout_accepts_explicit_markers();
   extensive_visited_preserves_silent_steps_and_occurrence_bound();
+  inputless_transitions_are_always_enabled();
   sampled_variants_accept_explicit_markers();
   fitting_tracks_reachable_rates_and_silent_routing();
   fitting_handles_duplicate_labels_unknowns_and_empty_logs();

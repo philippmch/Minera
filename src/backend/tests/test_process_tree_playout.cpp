@@ -7,9 +7,11 @@
 #include <fstream>
 #include <initializer_list>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "minera/conformance.hpp"
@@ -82,6 +84,130 @@ void process_tree_extensive_variant_contract() {
   assert(labels(log.traces[1]) == std::vector<std::string>{"b"});
 }
 
+// Reads the reference's tree notation (->, X, +, *, O, <>, tau, 'label').
+class TreeText {
+ public:
+  explicit TreeText(std::string text) : text_(std::move(text)) {}
+  ProcessTree parse() {
+    auto root = node();
+    return ProcessTree(labels_, std::move(root));
+  }
+
+ private:
+  void skip() { while (pos_ < text_.size() && text_[pos_] == ' ') ++pos_; }
+  bool take(std::string_view token) {
+    skip();
+    if (text_.compare(pos_, token.size(), token) != 0) return false;
+    pos_ += token.size();
+    return true;
+  }
+  ProcessTreeNode node() {
+    skip();
+    if (take("tau")) return ProcessTreeNode::tau();
+    if (take("'")) {
+      const auto end = text_.find('\'', pos_);
+      const auto label = text_.substr(pos_, end - pos_);
+      pos_ = end + 1;
+      const auto it = std::find(labels_.begin(), labels_.end(), label);
+      if (it != labels_.end()) return ProcessTreeNode::leaf(static_cast<std::size_t>(it - labels_.begin()));
+      labels_.push_back(label);
+      return ProcessTreeNode::leaf(labels_.size() - 1);
+    }
+    ProcessTreeNode n;
+    if (take("->(")) n.op = ProcessTreeOperator::kSequence;
+    else if (take("X(")) n.op = ProcessTreeOperator::kExclusive;
+    else if (take("+(")) n.op = ProcessTreeOperator::kParallel;
+    else if (take("*(")) n.op = ProcessTreeOperator::kLoop;
+    else if (take("O(")) n.op = ProcessTreeOperator::kInclusiveChoice;
+    else if (take("<>(")) n.op = ProcessTreeOperator::kInterleaving;
+    else throw std::invalid_argument("bad tree text");
+    do n.children.push_back(node()); while (take(","));
+    if (!take(")")) throw std::invalid_argument("bad tree text");
+    return n;
+  }
+  std::string text_;
+  std::size_t pos_ = 0;
+  std::vector<std::string> labels_;
+};
+
+// Words of the reference EXTENSIVE playout (captured from pm4py 2.7.22),
+// space-separated activities per word; "!" for a tree the reference rejects.
+void process_tree_extensive_reference_contract() {
+  struct Case {
+    const char* tree;
+    std::optional<std::size_t> max_length, max_loops, min_length;
+    std::vector<std::string> words;
+  };
+  const std::vector<Case> cases = {
+      // The default max_trace_length is the shortest word length (1), so the
+      // loop gets max_trace_length / 2 = 0 redos.
+      {"*('a', tau)", {}, {}, {}, {"a"}},
+      {"*('a', tau)", 6, {}, {}, {"a", "a a", "a a a", "a a a a"}},
+      {"*('a', tau)", 6, 2, {}, {"a", "a a", "a a a"}},
+      {"*('a', tau)", 6, 3, 3, {"a a a", "a a a a"}},
+      // Only the first redo child is read.
+      {"*('x', 'y', 'z')", 5, {}, {}, {"x", "x y x", "x y x y x"}},
+      // Shortest word 0: the default bound drops every non-empty sequence.
+      {"->(X(tau, 'b'), X(tau, 'c'))", {}, {}, {}, {}},
+      {"->(X(tau, 'b'), X(tau, 'c'))", {}, {}, 0, {""}},
+      {"->(X(tau, 'b'), X(tau, 'c'))", 5, {}, {}, {"b", "c", "b c"}},
+      // A choice keeps its children's words; the bounds are relative to the
+      // root's shortest and longest words.
+      {"X('a', ->('b', 'c'))", 1, {}, 1, {"a", "b c"}},
+      {"X('a', 'b')", 2, {}, 2, {}},
+      {"X('a', ->('b', 'c'))", 2, {}, 2, {"a", "b c"}},
+      {"X('a', ->('b', 'c'))", 3, {}, 3, {}},
+      {"X(tau, 'b')", 5, {}, 2, {""}},
+      {"X('a', *(tau, tau))", {}, {}, {}, {"a"}},
+      {"X('a', ->(tau, tau))", {}, {}, {}, {"", "a"}},
+      {"X(*('a', 'b'), ->(*('c', 'd'), 'e', 'f'))", 6, {}, 3,
+       {"a", "a b a", "c e f", "a b a b a", "c d c e f", "c d c d c e f"}},
+      {"X(*('a', 'b'), *('c', ->('d', 'e')))", 6, {}, 2, {"a", "a b a", "c d e c", "a b a b a"}},
+      {"X(*('a', 'b'), *('c', ->('d', 'e')))", 6, {}, 3, {"a b a", "c d e c", "a b a b a"}},
+      {"X(*('a', 'b'), *(tau, 'd'))", 6, {}, 2, {"d", "d d", "a b a", "d d d", "a b a b a", "a b a b a b a"}},
+      {"*(*('a', 'b'), tau)", 5, {}, 3,
+       {"a a a", "a b a", "a a b a", "a b a a", "a a a b a", "a a b a a", "a b a a a", "a b a b a"}},
+      {"->('a', X('b', ->('c', 'd')))", 3, {}, 3, {"a c d"}},
+      {"+('a', X('b', ->('c', 'd')))", 3, {}, 3, {"a c d", "c a d", "c d a"}},
+      {"->(->('a', 'b'), ->('a', 'b'))", {}, {}, {}, {"a b a b"}},
+      {"->('a', X('a', 'b'))", 6, {}, {}, {"a a", "a b"}},
+      // Rejected by the reference: one-child sequence or parallel cut
+      // (IndexError), equal subtrees under different parents (KeyError),
+      // inclusive choice (KeyError) and interleaving (TypeError).
+      {"->('a')", {}, {}, {}, {"!"}},
+      {"X(->('a'), 'b')", {}, {}, {}, {"!"}},
+      {"->(->('a', 'b'), X('a', 'b'))", {}, {}, {}, {"!"}},
+      {"->(+('a', 'b'), X(+('b', 'a'), 'c'))", {}, {}, {}, {"!"}},
+      {"X(*('a', tau), *(tau, tau))", 6, {}, 2, {"!"}},
+      {"O('a', 'b')", {}, {}, {}, {"!"}},
+      {"<>('a', 'b')", {}, {}, {}, {"!"}},
+      // An inclusive choice in a loop's third child is never read.
+      {"X(*('a', 'b', O('c', 'd')), 'z')", 4, {}, {}, {"a", "z", "a b a"}},
+  };
+  for (const auto& c : cases) {
+    const auto tree = TreeText(c.tree).parse();
+    ProcessTreePlayoutOptions options;
+    options.variant = ProcessTreePlayoutVariant::kExtensive;
+    options.max_length = c.max_length;
+    options.max_loop_occurrences = c.max_loops;
+    if (c.min_length) options.min_length = *c.min_length;
+    std::vector<std::string> words;
+    try {
+      for (const auto& trace : process_tree_playout(tree, options).traces) {
+        std::string word;
+        for (const auto& event : trace.events) word += (word.empty() ? "" : " ") + event.activity;
+        words.push_back(word);
+      }
+    } catch (const std::invalid_argument&) {
+      words = {"!"};
+    }
+    if (words != c.words) {
+      std::fprintf(stderr, "extensive mismatch for %s\n", c.tree);
+      assert(false);
+    }
+  }
+}
+
 void process_tree_topbottom_variant_contract() {
   ProcessTree tree(
       {"a", "b"},
@@ -145,12 +271,12 @@ void process_tree_playout_loop_bounds() {
   std::size_t longest = 0;
   for (const auto& trace : process_tree_playout(loop, options).traces)
     longest = std::max(longest, trace.events.size());
-  assert(longest > 2 * options.max_loop_occurrences + 1);
+  assert(longest > 2 * options.max_loop_occurrences.value_or(3) + 1);
   options.cap_sampled_loops = true;
   for (const auto variant : {ProcessTreePlayoutVariant::TOPBOTTOM, ProcessTreePlayoutVariant::BASIC_PLAYOUT}) {
     options.variant = variant;
     for (const auto& trace : process_tree_playout(loop, options).traces)
-      assert(trace.events.size() <= 2 * options.max_loop_occurrences + 1);
+      assert(trace.events.size() <= 2 * options.max_loop_occurrences.value_or(3) + 1);
   }
   options.cap_sampled_loops = false;
   options.variant = ProcessTreePlayoutVariant::TOPBOTTOM;
@@ -272,6 +398,7 @@ int main(int argc, char** argv) {
       argc > 1 ? argv[1] : "src/backend/tests/fixtures/process_tree_basic_distribution.txt");
   process_tree_basic_variant_contract();
   process_tree_extensive_variant_contract();
+  process_tree_extensive_reference_contract();
   process_tree_topbottom_variant_contract();
 
   ProcessTree tree({"a", "b"}, seq({ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)}));
@@ -337,12 +464,22 @@ int main(int argc, char** argv) {
   ex.max_length = 4;
   ex.min_length = 4;
   ex.max_traces = 10;
-  const auto interleaving_log = process_tree_playout(interleaving, ex);
-  assert(interleaving_log.traces.size() == 2);
-  assert((labels(interleaving_log.traces[0]) ==
-          std::vector<std::string>{"a", "b", "c", "d"}));
-  assert((labels(interleaving_log.traces[1]) ==
-          std::vector<std::string>{"c", "d", "a", "b"}));
+  // The reference EXTENSIVE playout has no interleaving (TypeError).
+  bool extensive_interleaving = false;
+  try {
+    (void)process_tree_playout(interleaving, ex);
+  } catch (const std::invalid_argument&) {
+    extensive_interleaving = true;
+  }
+  assert(extensive_interleaving);
+  EventLog interleaving_log;
+  for (const auto& word : {std::vector<std::string>{"a", "b", "c", "d"},
+                           std::vector<std::string>{"c", "d", "a", "b"}}) {
+    Trace trace;
+    trace.case_id = std::to_string(interleaving_log.traces.size());
+    for (const auto& activity : word) trace.events.push_back({trace.case_id, activity});
+    interleaving_log.traces.push_back(std::move(trace));
+  }
   const auto interleaving_net = to_petri_net(interleaving);
   assert(check_conformance(interleaving_log, interleaving_net).fitness == 1.0);
   EventLog mixed;
@@ -372,15 +509,14 @@ int main(int argc, char** argv) {
   ex.max_length = 2;
   ex.min_length = 0;
   ex.max_traces = 10;
-  log = process_tree_playout(inclusive, ex);
-  assert(log.traces.size() == 4);
-  assert(labels(log.traces[0]) == std::vector<std::string>{"a"});
-  assert(labels(log.traces[1]) == std::vector<std::string>{"b"});
-  assert(labels(log.traces[2]) == std::vector<std::string>({"a", "b"}) ||
-         labels(log.traces[2]) == std::vector<std::string>({"b", "a"}));
-  assert(labels(log.traces[3]) == std::vector<std::string>({"a", "b"}) ||
-         labels(log.traces[3]) == std::vector<std::string>({"b", "a"}));
-  assert(labels(log.traces[2]) != labels(log.traces[3]));
+  // The reference EXTENSIVE playout has no inclusive choice (KeyError).
+  bool extensive_or = false;
+  try {
+    (void)process_tree_playout(inclusive, ex);
+  } catch (const std::invalid_argument&) {
+    extensive_or = true;
+  }
+  assert(extensive_or);
 
   // Basic sampling selects each child with probability 1/2 (possibly none,
   // as the reference does) and remains deterministic for a fixed seed.

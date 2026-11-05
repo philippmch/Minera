@@ -98,8 +98,18 @@ void exact_native_defaults_and_all_69_fields() {
   const auto tree = parse_process_tree_playout_workbench_options("{}");
   assert(tree.variant == ProcessTreePlayoutVariant::kTopBottom);
   assert(tree.traces == 1000 && tree.max_steps == 1000 && tree.seed == 1);
-  assert(tree.max_length == 1000 && tree.min_length == 1 && tree.max_traces == 100000);
-  assert(tree.max_loop_occurrences == 3 && tree.start == basic.start);
+  // Unset bounds follow the reference: EXTENSIVE uses the shortest word length
+  // and half of it for loops; the sampled variants fall back to max_steps and 3.
+  assert(!tree.max_length && tree.min_length == 1 && tree.max_traces == 100000);
+  assert(!tree.max_loop_occurrences && tree.start == basic.start);
+  {
+    const auto unset = parse_process_tree_playout_workbench_options(R"({"max_length":null,"max_loop_occurrences":null})");
+    assert(!unset.max_length && !unset.max_loop_occurrences);
+    const auto text = serialize_playout_workbench_options_json(unset);
+    assert(text.find("\"max_length\":null") != std::string::npos);
+    const auto back = parse_process_tree_playout_workbench_options(text);
+    assert(!back.max_length && !back.max_loop_occurrences);
+  }
   assert(tree.case_interval == 60 && tree.event_interval == 1 && !tree.return_set_strings);
   assert(!tree.add_envelope && parse_process_tree_playout_workbench_options(R"({"event_interval":2})").add_envelope);
 

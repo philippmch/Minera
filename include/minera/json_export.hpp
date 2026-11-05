@@ -416,6 +416,8 @@ void write_analysis_json(std::ostream& out,
 [[nodiscard]] std::string attribute_kde_json(const AttributeKdeResult& result);
 [[nodiscard]] std::string boundary_activities_json(
     const BoundaryActivitiesResult& result);
+[[nodiscard]] std::string activity_position_summary_json(
+    const ActivityPositionSummary& result);
 [[nodiscard]] std::string variant_statistics_json(
     const VariantStatisticsResult& result);
 [[nodiscard]] std::string temporal_conformance_json(

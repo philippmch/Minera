@@ -519,10 +519,10 @@ ProcessTreePlayoutOptions parse_process_tree_playout_workbench_options(
   if (const auto* item = field(object, "traces")) result.traces = native_unsigned<std::size_t>(*item);
   if (const auto* item = field(object, "max_steps")) result.max_steps = native_unsigned<std::size_t>(*item);
   if (const auto* item = field(object, "seed")) result.seed = native_unsigned<std::uint64_t>(*item);
-  if (const auto* item = field(object, "max_length")) result.max_length = native_unsigned<std::size_t>(*item);
+  if (const auto* item = field(object, "max_length")) result.max_length = item->null() ? std::nullopt : std::optional<std::size_t>{native_unsigned<std::size_t>(*item)};
   if (const auto* item = field(object, "min_length")) result.min_length = native_unsigned<std::size_t>(*item);
   if (const auto* item = field(object, "max_traces")) result.max_traces = native_unsigned<std::size_t>(*item);
-  if (const auto* item = field(object, "max_loop_occurrences")) result.max_loop_occurrences = native_unsigned<std::size_t>(*item);
+  if (const auto* item = field(object, "max_loop_occurrences")) result.max_loop_occurrences = item->null() ? std::nullopt : std::optional<std::size_t>{native_unsigned<std::size_t>(*item)};
   if (const auto* item = field(object, "start")) result.start = ieee_double(*item);
   if (const auto* item = field(object, "case_interval")) result.case_interval = ieee_double(*item);
   if (const auto* item = field(object, "event_interval")) result.event_interval = ieee_double(*item);
@@ -619,10 +619,10 @@ std::string serialize_playout_workbench_options_json(const ProcessTreePlayoutOpt
   out << ",\"traces\":"; out << options.traces;
   out << ",\"max_steps\":"; out << options.max_steps;
   out << ",\"seed\":"; out << options.seed;
-  out << ",\"max_length\":"; out << options.max_length;
+  out << ",\"max_length\":"; if (options.max_length) out << *options.max_length; else out << "null";
   out << ",\"min_length\":"; out << options.min_length;
   out << ",\"max_traces\":"; out << options.max_traces;
-  out << ",\"max_loop_occurrences\":"; out << options.max_loop_occurrences;
+  out << ",\"max_loop_occurrences\":"; if (options.max_loop_occurrences) out << *options.max_loop_occurrences; else out << "null";
   out << ",\"start\":"; number(out, options.start);
   out << ",\"case_interval\":"; number(out, options.case_interval);
   out << ",\"event_interval\":"; number(out, options.event_interval);

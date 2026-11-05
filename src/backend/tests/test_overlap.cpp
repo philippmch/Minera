@@ -105,6 +105,23 @@ void eventually_follows_timestamp_order_reference() {
   untimed.traces.push_back(Trace{"c0", {ev("A", 5), ev("B", 1)}});
   untimed.traces[0].events[1].timestamp.clear();
   assert((counts_of(untimed) == Counts{{{"A", "B"}, 1}}));
+  // pm4py.discover_eventually_follows_graph(log, timestamp_key="x") on the
+  // case A(time 01, x 03), B(02, 01), C(03, 02) (days) gives
+  // {(A,C):1, (B,C):1}: sorted by time:timestamp, a pair counts when the
+  // later event's time is at or after the earlier one's "x".
+  EventLog keyed;
+  keyed.traces.push_back(Trace{"c0", {ev("A", 1), ev("B", 2), ev("C", 3)}});
+  keyed.traces[0].events[0].attributes.push_back({"x", "2024-01-01T00:00:03Z"});
+  keyed.traces[0].events[1].attributes.push_back({"x", "2024-01-01T00:00:01Z"});
+  keyed.traces[0].events[2].attributes.push_back({"x", "2024-01-01T00:00:02Z"});
+  const auto keyed_graph = discover_directly_follows_graph(keyed);
+  EventuallyFollowsOptions keyed_options;
+  keyed_options.timestamp_attribute = "x";
+  Counts keyed_counts;
+  for (const auto& edge : discover_eventually_follows(keyed, keyed_graph, keyed_options))
+    keyed_counts[{keyed_graph.activities()[edge.source], keyed_graph.activities()[edge.target]}] =
+        edge.count;
+  assert((keyed_counts == Counts{{{"A", "C"}, 1}, {{"B", "C"}, 1}}));
 }
 
 // Reference capture (pm4py 2.7.22 statistics.overlap.interval_events,

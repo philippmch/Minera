@@ -87,6 +87,11 @@ struct Ocel {
   OcelTypeCatalog event_type_attributes;
   OcelTypeCatalog object_type_attributes;
   OcelTableColumns table_columns;
+  // The reference events frame puts ocel:activity before ocel:timestamp
+  // (read from OCEL 1.0 or 2.0 XML, or a CSV or SQLite table in that column
+  // order); its OCEL 1.0 XML, CSV and SQLite writers follow the frame order.
+  // Classic JSON carries it as "minera:eventActivityFirst".
+  bool event_activity_first = false;
 };
 
 using OCEL = Ocel;
@@ -171,6 +176,14 @@ void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);
 // change value "...+00:00" (the reference JSON writers' spellings), unless the
 // text already is that UTC value. Non-string values are kept.
 void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader);
+
+// One date value as convert_ocel_date_attributes converts it (`change`: an
+// object-change value). kIsoFormatOrFileOrder (OCEL 2.0 JSON) falls back to
+// the dateutil subset like kDateutil but keeps a text it cannot read, and
+// stamps a naive change value UTC, as read_ocel2_json does. The OCEL 1.0 XML
+// reader calls it for each <date>/<timestamp> element's value only, as
+// read_ocel_xml converts per element (a <string> under the same key stays).
+void convert_ocel_date_value(OcelValue& value, OcelTimestampReader reader, bool change = false);
 
 // Keeps only the events and objects that take part in at least one
 // event-object relation, as every reference OCEL JSON, XML and SQLite reader

@@ -148,10 +148,49 @@ std::optional<double> exact_seconds_between(std::string_view start_text, std::st
   return static_cast<double>(seconds) + static_cast<double>(nanoseconds) / 1e9;
 }
 
+// The seconds of a gap on the reference's EventLog path: the gap floored to
+// the microsecond, as an exact quotient (a nanosecond remainder is dropped).
+std::optional<double> eventlog_seconds_between(std::string_view start_text, std::string_view end_text) {
+  const auto start = parse_timestamp_exact(start_text);
+  const auto end = parse_timestamp_exact(end_text);
+  if (!start || !end) return std::nullopt;
+  const std::int64_t seconds = end->seconds - start->seconds;
+  if (seconds > 9000000000LL || seconds < -9000000000LL) return std::nullopt;
+  const std::int64_t nanoseconds =
+      seconds * 1000000000LL + (static_cast<std::int64_t>(end->nanoseconds) - start->nanoseconds);
+  const std::int64_t micro = nanoseconds / 1000 - (nanoseconds % 1000 < 0 ? 1 : 0);
+  return static_cast<double>(micro) / 1e6;
+}
+
+// The seconds of a gap as pandas' Timedelta.total_seconds gives them on the
+// reference's DataFrame path: the whole seconds, plus the microseconds
+// times 1e-6, plus the nanoseconds left times 1e-9, which can be an ulp off
+// the exact quotient (232001 us reads 0.23200099999999998).
+std::optional<double> dataframe_seconds_between(std::string_view start_text,
+                                                std::string_view end_text) {
+  const auto start = parse_timestamp_exact(start_text);
+  const auto end = parse_timestamp_exact(end_text);
+  if (!start || !end) return std::nullopt;
+  if (end->seconds - start->seconds > 9000000000LL || end->seconds - start->seconds < -9000000000LL)
+    return std::nullopt;
+  const std::int64_t nanoseconds = (end->seconds - start->seconds) * 1000000000LL +
+                                   (static_cast<std::int64_t>(end->nanoseconds) - start->nanoseconds);
+  std::int64_t whole = nanoseconds / 1000000000LL;
+  std::int64_t rest = nanoseconds % 1000000000LL;
+  if (rest < 0) {
+    rest += 1000000000LL;
+    --whole;
+  }
+  return static_cast<double>(whole) + static_cast<double>(rest / 1000) * 1e-6 +
+         static_cast<double>(rest % 1000) * 1e-9;
+}
+
 double elapsed(double start, double end, std::string_view start_text,
                 std::string_view end_text,
-                const std::vector<BusinessHourSlot>& slots) {
-  if (slots.empty()) return exact_seconds_between(start_text, end_text).value_or(end - start);
+                const std::vector<BusinessHourSlot>& slots, bool dataframe) {
+  if (slots.empty() && dataframe)
+    return dataframe_seconds_between(start_text, end_text).value_or(end - start);
+  if (slots.empty()) return eventlog_seconds_between(start_text, end_text).value_or(end - start);
   const auto local_start = local_wall_timestamp(start_text);
   const auto local_end = local_wall_timestamp(end_text);
   if (!local_start || !local_end)
@@ -159,10 +198,36 @@ double elapsed(double start, double end, std::string_view start_text,
   return business_elapsed(*local_start, *local_end, slots);
 }
 
-// The reference averages the gaps with statistics.mean: the exact sum
-// divided by the count, rounded once (a running double sum can be an ulp off).
-double average_gaps(std::vector<double> values) {
+// numpy's pairwise float64 summation of a contiguous array (np.sum and
+// np.mean): eight accumulators up to 128 values, recursive halving above.
+double numpy_pairwise_sum(const double* values, std::size_t n) {
+  if (n < 8) {
+    double sum = 0.0;
+    for (std::size_t i = 0; i < n; ++i) sum += values[i];
+    return sum;
+  }
+  if (n <= 128) {
+    double r[8];
+    for (std::size_t j = 0; j < 8; ++j) r[j] = values[j];
+    std::size_t i = 8;
+    for (; i < n - n % 8; i += 8)
+      for (std::size_t j = 0; j < 8; ++j) r[j] += values[i + j];
+    double sum = ((r[0] + r[1]) + (r[2] + r[3])) + ((r[4] + r[5]) + (r[6] + r[7]));
+    for (; i < n; ++i) sum += values[i];
+    return sum;
+  }
+  std::size_t half = n / 2;
+  half -= half % 8;
+  return numpy_pairwise_sum(values, half) + numpy_pairwise_sum(values + half, n - half);
+}
+
+// The EventLog path averages the gaps with statistics.mean: the exact sum
+// divided by the count, rounded once (a running double sum can be an ulp
+// off). The DataFrame path takes numpy's mean of the gaps in time order.
+double average_gaps(std::vector<double> values, bool dataframe) {
   if (values.empty()) return 0.0;
+  if (dataframe)
+    return numpy_pairwise_sum(values.data(), values.size()) / static_cast<double>(values.size());
   return detail::exact_mean(values);
 }
 
@@ -200,11 +265,14 @@ CaseArrivalResult discover_case_arrival(const EventLog& log,
   dispersion.reserve(ends.size() > 1 ? ends.size() - 1 : 0);
   for (std::size_t i = 1; i < starts.size(); ++i)
     arrival.push_back(elapsed(starts[i - 1].first, starts[i].first,
-                              starts[i - 1].second, starts[i].second, slots));
+                              starts[i - 1].second, starts[i].second, slots,
+                              options.dataframe));
   for (std::size_t i = 1; i < ends.size(); ++i)
     dispersion.push_back(elapsed(ends[i - 1].first, ends[i].first,
-                                 ends[i - 1].second, ends[i].second, slots));
-  return {average_gaps(std::move(arrival)), average_gaps(std::move(dispersion)),
+                                 ends[i - 1].second, ends[i].second, slots,
+                                 options.dataframe));
+  return {average_gaps(std::move(arrival), options.dataframe),
+          average_gaps(std::move(dispersion), options.dataframe),
           starts.size(), ends.size()};
 }
 

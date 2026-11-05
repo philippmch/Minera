@@ -373,8 +373,12 @@ void write_event_table(std::ostream& out, const Ocel& log,
   for (const auto& object : log.objects)
     if (known_types.insert(object.type).second) types.push_back(object.type);
 
-  Row header{options.event_id_column, options.timestamp_column,
-             options.activity_column};
+  // The reference frame's column order (activity first after an XML read).
+  const bool activity_first = log.event_activity_first;
+  Row header = activity_first ? Row{options.event_id_column, options.activity_column,
+                                    options.timestamp_column}
+                              : Row{options.event_id_column, options.timestamp_column,
+                                    options.activity_column};
   for (const auto& key : event_attributes) {
     if (key.empty() || key == options.event_id_column || key == options.activity_column ||
         key == options.timestamp_column ||
@@ -406,7 +410,8 @@ void write_event_table(std::ostream& out, const Ocel& log,
   auto timestamps = ocel_frame::pandas_timestamp_column_text(timestamp_texts);
   for (std::size_t index = 0; index < log.events.size(); ++index) {
     const auto& event = log.events[index];
-    Row row{event.id, std::move(timestamps[index]), event.activity};
+    Row row = activity_first ? Row{event.id, event.activity, std::move(timestamps[index])}
+                             : Row{event.id, std::move(timestamps[index]), event.activity};
     for (const auto& key : event_attributes) {
       const auto* attr = find_attribute(event.attributes, key);
       row.push_back(attr == nullptr ? std::string{}
@@ -534,6 +539,8 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   // Attribute cells stay text, as the reference CSV reader keeps them (it
   // types only the timestamp); empty cells are missing values.
   Ocel log;
+  // Its frame keeps the file's column order.
+  log.event_activity_first = activity < timestamp;
   std::unordered_set<std::string> event_ids;
   // Every data row in file order, and whether it became an event.
   std::vector<std::pair<const Row*, bool>> event_rows;

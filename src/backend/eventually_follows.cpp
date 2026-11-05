@@ -58,7 +58,19 @@ std::vector<EventuallyFollowsEdge> discover_eventually_follows(
   // so this stays cheap and keeps the per-pair increment branch-free.
   std::vector<std::uint64_t> counts(n * n, 0);
 
-  if (!options.start_timestamp_attribute.empty()) {
+  // A completion attribute other than the event time selects the interval
+  // semantics with the event time as the start, as the reference's default
+  // start key is the event time: pm4py.discover_eventually_follows_graph(log,
+  // timestamp_key="x") sorts each case by time:timestamp and counts a pair
+  // only when the later event starts at or after the earlier one's "x"
+  // (observed black-box).
+  const bool builtin_completion = options.timestamp_attribute.empty() ||
+                                  options.timestamp_attribute == "timestamp" ||
+                                  options.timestamp_attribute == "time:timestamp";
+  if (!options.start_timestamp_attribute.empty() || !builtin_completion) {
+    const std::string& start_attribute = options.start_timestamp_attribute.empty()
+                                             ? std::string("time:timestamp")
+                                             : options.start_timestamp_attribute;
     struct Interval {
       std::int64_t start = 0;
       std::int64_t end = 0;
@@ -71,7 +83,7 @@ std::vector<EventuallyFollowsEdge> discover_eventually_follows(
       for (const auto& event : trace.events) {
         const auto id = graph.activity_id(event.activity);
         if (!id) continue;
-        events.push_back({required_time(event, options.start_timestamp_attribute, "start"),
+        events.push_back({required_time(event, start_attribute, "start"),
                           required_time(event, options.timestamp_attribute, "completion"),
                           *id});
       }

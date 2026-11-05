@@ -1102,7 +1102,9 @@ custom keys, empty traces, and malformed counts.
 
 Variant-statistics evidence: `discover_variant_statistics` groups complete trace
 activity sequences, sorts them by descending frequency and deterministic
-sequence order, and emits normalized stochastic-language probabilities with an
+sequence order (descending activity tuple: the order of the reference's
+`get_variants_sorted_by_count`, not the first-appearance order of
+`get_variants_as_tuples`), and emits normalized stochastic-language probabilities with an
 optional result bound. The standalone CLI, `POST /api/variant-statistics`,
 strict request parser, and typed frontend API share the `VARIANT_STATISTICS`
 envelope; focused tests cover empty traces, custom keys, limits, and probability
@@ -16526,7 +16528,7 @@ values and passing controls.
 | OC5 | `--enrich` (`enrich_ocel`, `/api/ocel/enrich`) writes O2O rows as `pm4py.ocel_o2o_enrichment` does, quirks included: the interaction graph in both orientations, descendants/cobirth/codeath once in graph orientation, and `object_inheritance_graph` carrying the descendants edges (reference code reuses the descendants graph). Computed triples are deduplicated among themselves and appended after the original O2O rows, which keep their multiplicity. Native emitted cobirth/codeath both ways and the true inheritance relation; that relation stays available as `discover_ocel_object_graph` / `--graph inheritance`. Declared difference: events without relations are skipped rather than raising. Since OC7 the JSON, XML and SQLite readers drop such events as the reference readers do, so they only reach enrichment from an OCEL CSV import (whose reference reader keeps them) or a native caller. Lifecycle E2O qualifiers are unchanged and match. | `minera_ocel_transform_tests` |
 | OC6 | Event features with `--features-name-style compatibility` reproduce two reference quirks. Endpoint columns: the reference iterates each object's first (last) event id as a string, so an event scores 1 only if its whole id is one character of some endpoint id of that type; both blocks are named `@@event_start_<type>` (start block first, types sorted). New interactions: the reference never records seen pairs, so each event counts every ordered relation pair whose first object id is lexically smaller. The native style keeps the corrected values (`@@event_end_<type>`, `@@event_new_interactions`). Declared difference: objects without relations are skipped where the reference raises KeyError. Since OC7 they only arrive from an OCEL CSV import or a native caller; the other readers drop them as the reference readers do. | `minera_ocel_features_tests` |
 | OC7 | The OCEL 1.0 JSON, OCEL 2.0 JSON, both XML and the SQLite readers keep only events and objects that take part in an event-object relation, as every reference reader does: the dropped entries take their relations, O2O links, event-to-event links and object changes with them, and a log without relations reads as empty (`drop_unrelated_ocel_entries`). The OCEL CSV reader keeps them, as the reference CSV reader does. Every OCEL route reads its document through these readers, so filters, statistics and discovery no longer see objectless events (the timestamp, event-attribute and events filters returned them; object filters kept unlinked objects). Declared: the reference OCEL 2.0 XML reader raises `AttributeError: 'NoneType' object has no attribute 'index'` on a log with no relation at all; native reads it as empty, as the reference JSON readers do. Fresh comparisons: 120 random OCELs per format (1.0 JSON, 2.0 JSON, 2.0 XML) match events, objects, relations, O2O and changes, except the 9 relation-free 2.0 XML logs where the reference raises as declared; all 15 filters match on 150 random OCELs with orphans, except one declared `filter_ocel_objects` KeyError. | `minera_ocel_tests`, `minera_ocel_xml_tests`, `minera_ocel_sqlite_tests` |
-| OC8 | OCEL file I/O follows the reference writers and readers. Writers keep the log's event, object, relation and attribute order (the reference frame order) instead of sorting by id, and print floats as Python's repr. OCEL 2.0 XML writes O2O links as the reference does (`<object>…<objects><relationship object-id qualifier/></objects>`; the former `<object-relationships>` dialect still reads), declares a column `float` only when its frame column is float64 (an int or bool column, or one with a missing cell, is `string`; an int column with a missing cell prints its integers as floats), writes `True`/`False`, the epoch time for static values and pandas timestamps (`2020-01-01T00:00:01.250000+00:00`) for events and changes; its reader reads an attribute element without text as `"None"` unless it is a float (which raises), as the reference does. OCEL 1.0 XML (`.xmlocel`) is the reference writer's document byte for byte (`<log>`, global event/object/log scopes, `omap`/`vmap`/`ovmap` lists, ints and bools as strings, float columns as `<float>`); the former dialect still reads. SQLite type tables get the pandas `to_sql` column types of the frame (INTEGER for int and bool columns, REAL for float, TEXT otherwise), the reference column order (`ocel_id, ocel_time, ocel:activity, …`; objects `ocel_id, …, ocel_changed_field, ocel_time` with change rows after the base row), pandas timestamp text and no all-null columns. CSV writes the reference text: `ocel:eid, ocel:timestamp, ocel:activity`, attributes in first-appearance order, then `ocel:type:*` columns; `False`/`True`, float repr, `2020-01-01 00:00:00+00:00`, list cells as the list's repr (`['i0']`, `["i'2"]`); its reader keeps attribute cells as text and objects in object-table order, as the reference reader does. OCEL JSON reads up to 128 MiB (the server's payload limit, 32 Mi nodes) and a larger file is refused with `OCEL JSON file exceeds the 128 MiB OCEL limit` (XML likewise); the server refuses an import whose JSON would not fit the other OCEL routes, so every import it returns can be posted back. Performance: SQLite import reads each type table once (120k events 212.8 s → 2.8 s; 30k 12.7 s → 0.5 s), classic JSON indexes typedOmap qualifiers (30k 5.9 s → 1.1 s), both XML writers index events and objects (120k from XML 97.4 s / 103.0 s → 5.2 s / 4.2 s, read included). Fresh round trips in both directions (native write → reference read, reference write → native read → JSON → reference read) for OCEL 2.0 JSON, OCEL 1.0 JSON, OCEL 2.0 XML, OCEL 1.0 XML, SQLite and CSV: 0 diffs on the rich fixture (lists, quotes, newlines, mixed and missing types, O2O, changes, orphans) and on 8,000 generated events, against 374 before. Declared: native OCEL 2.0 XML also names each value's type (`type="…"` on the value element; the reference reader ignores it) so native round trips stay typed; OCEL 1.0 XML keeps fractional seconds, where the reference truncates them; OCEL 1.0 XML and CSV refuse to drop qualifiers, O2O/E2E links, object changes or globals unless loss is allowed (`--ocel-xml-allow-lossy`, `--ocel-csv-allow-lossy`, the frontend's loss allowance), where the reference drops them silently; SQLite type-table names are collision-free tokens (`event_t_create_…`) where the reference CamelCases the type (`event_Create`), which the map tables resolve for both readers; the CSV reader accepts unquoted list items (`[o1]`), which the reference skips; a native OCEL JSON that holds events or objects without relations carries `"minera:keepUnrelated": true`, so an OCEL from a CSV import (or a filter or playout result) keeps them on every later route, while files without the marker are read as the reference reads them (OC7). | `minera_ocel_tests`, `minera_ocel_xml_tests`, `minera_ocel_sqlite_tests`, `minera_ocel_csv_tests` |
+| OC8 | OCEL file I/O follows the reference writers and readers. Writers keep the log's event, object, relation and attribute order (the reference frame order) instead of sorting by id, and print floats as Python's repr. OCEL 2.0 XML writes O2O links as the reference does (`<object>…<objects><relationship object-id qualifier/></objects>`; the former `<object-relationships>` dialect still reads), declares a column `float` only when its frame column is float64 (an int or bool column, or one with a missing cell, is `string`; an int column with a missing cell prints its integers as floats), writes `True`/`False`, the epoch time for static values and pandas timestamps (`2020-01-01T00:00:01.250000+00:00`) for events and changes; its reader reads an attribute element without text as `"None"` unless it is a float (which raises), as the reference does. OCEL 1.0 XML (`.xmlocel`) is the reference writer's document byte for byte (`<log>`, global event/object/log scopes, `omap`/`vmap`/`ovmap` lists, ints and bools as strings, float columns as `<float>`); the former dialect still reads. The OCEL 1.0 XML, CSV and SQLite writers follow the reference events frame's column order: id, activity, timestamp after either XML reader, a CSV with the activity column before the time, or a SQLite file whose first event type table by name holds `ocel:activity` before `ocel_time`; id, timestamp, activity otherwise (classic JSON carries the order between routes as `"minera:eventActivityFirst": true`). The OCEL 1.0 XML reader reads only the `vmap`/`ovmap` lists of a reference-shaped event or object and drops other keyed children, as `read_ocel_xml` does (the former dialect, with `id` as an XML attribute, keeps them). Checked on 11 source files (all six formats, SQLite type tables in mixed orders, keys outside the lists): the three writers match the reference, apart from the event and object global scopes, which the reference fills with `__INVALID__` defaults after an OCEL 2.0 XML, SQLite or CSV read and native leaves empty. SQLite type tables get the pandas `to_sql` column types of the frame (INTEGER for int and bool columns, REAL for float, TEXT otherwise), the reference column order (`ocel_id, ocel_time, ocel:activity, …`; objects `ocel_id, …, ocel_changed_field, ocel_time` with change rows after the base row), pandas timestamp text and no all-null columns. CSV writes the reference text: `ocel:eid, ocel:timestamp, ocel:activity`, attributes in first-appearance order, then `ocel:type:*` columns; `False`/`True`, float repr, `2020-01-01 00:00:00+00:00`, list cells as the list's repr (`['i0']`, `["i'2"]`); its reader keeps attribute cells as text and objects in object-table order, as the reference reader does. OCEL JSON reads up to 128 MiB (the server's payload limit, 32 Mi nodes) and a larger file is refused with `OCEL JSON file exceeds the 128 MiB OCEL limit` (XML likewise); the server refuses an import whose JSON would not fit the other OCEL routes, so every import it returns can be posted back. Performance: SQLite import reads each type table once (120k events 212.8 s → 2.8 s; 30k 12.7 s → 0.5 s), classic JSON indexes typedOmap qualifiers (30k 5.9 s → 1.1 s), both XML writers index events and objects (120k from XML 97.4 s / 103.0 s → 5.2 s / 4.2 s, read included). Fresh round trips in both directions (native write → reference read, reference write → native read → JSON → reference read) for OCEL 2.0 JSON, OCEL 1.0 JSON, OCEL 2.0 XML, OCEL 1.0 XML, SQLite and CSV: 0 diffs on the rich fixture (lists, quotes, newlines, mixed and missing types, O2O, changes, orphans) and on 8,000 generated events, against 374 before. Declared: native OCEL 2.0 XML also names each value's type (`type="…"` on the value element; the reference reader ignores it) so native round trips stay typed; OCEL 1.0 XML keeps fractional seconds, where the reference truncates them; OCEL 1.0 XML and CSV refuse to drop qualifiers, O2O/E2E links, object changes or globals unless loss is allowed (`--ocel-xml-allow-lossy`, `--ocel-csv-allow-lossy`, the frontend's loss allowance), where the reference drops them silently; SQLite type-table names are collision-free tokens (`event_t_create_…`) where the reference CamelCases the type (`event_Create`), which the map tables resolve for both readers; the CSV reader accepts unquoted list items (`[o1]`), which the reference skips; a native OCEL JSON that holds events or objects without relations carries `"minera:keepUnrelated": true`, so an OCEL from a CSV import (or a filter or playout result) keeps them on every later route, while files without the marker are read as the reference reads them (OC7). | `minera_ocel_tests`, `minera_ocel_xml_tests`, `minera_ocel_sqlite_tests`, `minera_ocel_csv_tests` |
 | R1 | Token replay reads reset and inhibitor arcs as ordinary inputs of their weight, as the reference does. PNML parallel arcs stay distinct arcs: a place needs the weight of one arc to enable, firing consumes every arc, and repair walks the arcs in order, adding each arc's weight when the place is below it. Fresh comparisons of full forward per-trace results (fitness, activated and enabled transitions, reached marking, token counters) match 0/240 random nets with reset, inhibitor, weighted and parallel arcs and no silent transitions, and 225/232 with silent transitions; the 7 left are reference set-order ties (equal-length silent paths, or parallel arcs of different kinds and weights on one place), which follow memory addresses and are not claimed. The `/api/token-replay` route gives the same results on all 495 nets (the same 7 ties differ). Backwards replay uses the same arc reading (spot-checked only). | `minera_petri_extended_arcs_tests`, `minera_token_replay_diagnostics_tests` |
 | F1 | `format_dataframe` never converts a categorical column to dates: a categorical timestamp stays categorical (strings) in its source column, in `time:timestamp` and in the `start_timestamp` copy, and an all-null categorical column stays categorical. Fresh comparisons of the full formatted frame and the post-call input match 0/660 random frames mixing nullable Int64/Float64/boolean, string, object, categorical and ordered categorical, numpy int/float/bool, naive, UTC and categorical timestamps, missing values, duplicate and MultiIndex indexes, with and without a start timestamp. | `minera_dataframe_format_tests` |
 | P1 | The Polars DFG adapter (`df_statistics.get_dfg_graph`, `freq_triples`) follows the reference on nulls and aggregation keys: rows with a null case are dropped; frequency drops pairs with a null activity, while performance keeps a null source (exposed as `null_source_performance`) and drops a null target; null timestamps sort first and give their edge a null duration, which aggregations skip (an edge with only null durations is null, except `sum`, which is 0); a single observation has a null standard deviation; `stdev` and `raw_values` are rejected as the reference rejects them; triples keep a null first activity (`null_first`). Fresh comparisons of frequency, performance (every aggregation, windows 1-3, keep-once) and triples match 0/1,700 random Polars frames with null cases, activities and timestamps, categorical and integer cases, and shuffled rows. | `minera_dfg_dataframe_tests` |
@@ -17210,9 +17212,11 @@ Declarations:
   `"minera:keepUnrelated": true`, and the JSON reader keeps them when it sees
   that marker (OC8). Files without the marker are read as the reference
   reader reads them.
-- **Eventually-follows without a start attribute** counts pairs in trace
+- **Eventually-follows without a start attribute** counted pairs in trace
   order; the reference first sorts each trace by completion timestamp. This
-  only differs on XES traces whose events are not in time order.
+  only differed on XES traces whose events are not in time order. Fixed
+  since: native sorts too (see "Eventually-follows sorts each case by
+  timestamp").
 
 ## Seeded random modules: draws, envelopes and declarations (2026-11-03)
 
@@ -17406,11 +17410,12 @@ Fixes:
 - **Attribute statistics use Python dict-key equality** (the FS5 rule):
   1, 1.0 and True are one key (0, 0.0 and False too), the string '1' stays
   apart, and each key keeps its first-seen cell, in both count modes and for
-  trace attributes. The result gains `entries` (value, type, count in
-  first-seen order); `values` stays the map by first-seen text, where keys
-  that only share a text (the int 1 and the string '1') add up. Reference
-  `{1: 6, 0: 2, '1': 1, 2.5: 1}` is native `entries` 1/int 6, 1/str 1,
-  2.5/float 1, 0/int 2. Test: `minera_attribute_statistics_tests`.
+  trace attributes. The result gains `entries` (value, type, count in the
+  reference dict's order, see the fresh sweep below); `values` stays the map
+  by first-seen text, where keys that only share a text (the int 1 and the
+  string '1') add up. Reference `{1: 6, 0: 2, '1': 1, 2.5: 1}` is native
+  `entries` 1/int 6, 0/int 2, 1/str 1, 2.5/float 1. Test:
+  `minera_attribute_statistics_tests`.
 - **ALL_PREFIXES** prefix traces carry no trace attributes, properties or case
   id (see Log utilities above). Test: `minera_log_util_tests`.
 - **Server XES downloads are pm4py-readable.** The default `read_xes` fails on
@@ -18034,14 +18039,43 @@ against black-box PM4Py 2.7.22 (pandas 3.0.5) calls.
   dropped (`2024-02-01T08:30:00+02:00` is 08:30 UTC), a naive text as UTC,
   for event, static object and object-change values. `read_ocel_json`
   (even with `"date"` in `ocel:eventTypes`), `read_ocel2_sqlite` (also for
-  `TIMESTAMP` columns) and `read_ocel_csv` keep the text. On a value it cannot
-  read, the OCEL 2.0 JSON reader keeps the raw value, the OCEL 2.0 XML reader
-  falls back to dateutil and raises `String does not contain a date: X`, and
-  the OCEL 1.0 XML reader raises `Invalid isoformat string: 'X'`. Native
-  readers now do the same (`convert_ocel_date_attributes`): an event or
-  object value is stored as `YYYY-MM-DDTHH:MM:SS[.ffffff]Z`, a change value
-  as `...+00:00`, and the OCEL 1.0 XML reader catalogues `<date>` keys as
-  `date`. The writers print an attribute the catalog declares a date as the
+  `TIMESTAMP` columns) and `read_ocel_csv` keep the text. On a value
+  `fromisoformat` refuses, both OCEL 2.0 readers fall back to dateutil:
+  `read_ocel2_json` keeps a text dateutil cannot read either (`hello`,
+  `Feb 30 2024`), `read_ocel2_xml` raises `String does not contain a date: X`
+  for one without a date; the OCEL 1.0 XML reader raises `Invalid isoformat
+  string: 'X'`. A dateutil value without an offset (`Feb 1 2024`,
+  `01/02/2024 10:00`, a padded ` 2024-02-01`, which `fromisoformat` refuses)
+  stays naive for events and objects in both 2.0 readers; `read_ocel2_json`
+  stamps its change value UTC (`2024-02-01T00:00:00+00:00`), `read_ocel2_xml`
+  keeps that naive too. `read_ocel_xml` converts each `<date>` element: a
+  `<string>` under the same key stays a string (so a column can mix both).
+  Native readers now do the same (`convert_ocel_date_value`): an event or
+  object value is stored as `YYYY-MM-DDTHH:MM:SS[.ffffff]Z` (naive: no
+  suffix), a change value as `...+00:00`, the OCEL 2.0 XML reader keeps a
+  date text's surrounding white space for that reading, and the OCEL 1.0 XML
+  reader converts per element and catalogues `<date>` keys as `date` for the
+  writers. Its writer prints a date in a column that mixes dates with other
+  values as the reference prints that object column:
+  `<string key="d" value="2024-02-01T08:30:00+00:00"/>`. The native dateutil
+  subset reads `YYYY/MM/DD`, `MM/DD/YYYY` (day first above 12, `/`, `.` or
+  `-`), month-name dates, the basic `YYYYMMDD[THHMM[SS[.f]]]`, a clock after
+  `T` or spaces, and `Z`/`z`/`UTC`/`GMT`/`+HH[[:]MM]` (an all-numeric date
+  directly followed by `-HHMM` is a naive clock HH:MM, as dateutil reads it).
+  Checked on 920 generated date strings in two seeds (ISO, dateutil and other
+  shapes, padded, with and without offsets) through `read_ocel2_json`: every
+  event, object and change value matches except the values that depend on
+  the day the reference runs, declared next. Declared: dateutil fills a
+  missing date part from today (`10:00`, `2024`, `Jan 2020`, `Monday`);
+  native keeps those texts. dateutil reads `Z`/`z`/` UTC` after some shapes
+  as the machine's local zone (`tzlocal()`); native reads them as UTC, which
+  is the same instant only on a UTC machine (the check ran on one). The
+  OCEL 2.0 XML reader keeps a date text native does not read that still has
+  digits or a month word (`Feb 30 2024`: the reference raises `day is out of
+  range for month`), so it never refuses a value dateutil may read. A
+  dateutil value with an offset keeps that offset in the reference
+  (`tzoffset(None, 7200)`) where native stores its UTC instant, as for the
+  OCEL 2.0 XML reader; the change value (UTC there) matches. The writers print an attribute the catalog declares a date as the
   reference writes a datetime64 column: OCEL 2.0 XML
   `2024-02-01T08:30:00+00:00` (fractions kept), OCEL 1.0 XML
   `<date key="d" value="2024-02-01T08:30:00Z"/>`, CSV and SQLite
@@ -18069,7 +18103,12 @@ against black-box PM4Py 2.7.22 (pandas 3.0.5) calls.
   clock (CSV already did). Times that do not share an offset stay UTC.
   Declared, unchanged: the JSON writers write the stored text
   (`2024-01-01 10:00:00+02:00` where the reference writes
-  `2024-01-01T10:00:00Z`). Test: `minera_ocel_csv_tests`
+  `2024-01-01T10:00:00Z`). The classic OCEL JSON that routes pass between
+  them (`/api/ocel/io` import, then export) marks such a log
+  `"minera:eventTimeOffset": true`, and the JSON reader keeps its event times
+  as written when it sees the marker (without it, `read_ocel_json` stores the
+  wall clock stamped UTC), so a server import and XML or SQLite export
+  writes the same offset as the CLI. Test: `minera_ocel_csv_tests`
   (`writes_offset_csv_wall_clock_in_xml`), `minera_ocel_sqlite_tests`.
 - **SQLite to OCEL CSV.** `pm4py.write_ocel2_sqlite` writes an
   `ocel:activity` column into each event type table; `read_ocel2_sqlite`
@@ -18181,13 +18220,61 @@ Fixes:
   counted in trace order (8 of 150 XES logs differed). Ties keep trace order
   and timestamps compare at microseconds, as Python datetimes do. Declared:
   the reference raises KeyError on an untimed event; native keeps the trace
-  order of a trace that holds one. Test: `minera_overlap_tests`
+  order of a trace that holds one. A completion attribute without a start
+  attribute (`--eventually-follows-timestamp-attribute x`,
+  `timestamp_key="x"`) is the reference's interval reading with the event
+  time as the start: each case sorted by `time:timestamp`, a pair counted
+  when the later event's time is at or after the earlier one's `x`
+  (A(01, x 03), B(02, x 01), C(03, x 02) gives A→C, B→C); native ignored the
+  attribute. Test: `minera_overlap_tests`
   (`eventually_follows_timestamp_order_reference`).
-- **Case arrival and dispersion averages use `statistics.mean`.** The
-  reference averages the gaps exactly and rounds once; native summed in
-  doubles, an ulp off in 22 of 150 logs (four starts at 00:28:54.365,
-  03:21:57.038, 03:43:54.029 and 04:53:21.015 give 5288.883333333333, not
-  5288.883333333334). Test: `minera_case_arrival_tests`.
+- **Start/end activity, attribute value and roles key orders.**
+  `--boundary-activities` (and `/api/boundary-activities`) lists `starts` and
+  `ends` in first appearance over the cases, as `get_start_activities` and
+  `get_end_activities` do on both an EventLog and a `format_dataframe` frame
+  (native sorted by name). `--attribute-statistics` (and
+  `/api/attribute-statistics`) orders `entries`, and the `values` object
+  with them, as the DataFrame's `get_event_attribute_values` and
+  `get_trace_attribute_values`: descending count, equal counts in first
+  appearance over the rows; with `keep_once_per_case` equal counts follow the
+  sorted `[case id, value]` groups (case ids compare as text, so `k10` comes
+  before `k9`). Native kept first-seen order. Roles: each activity's
+  resources start in first appearance (EventLog, `--roles-variant log`) or
+  by name (DataFrame, `pandas`), and a merge keeps the left role's keys then
+  the right role's new ones; native listed every role by name. The
+  similarity sums run in that same key order, which settles which of two
+  equally similar pairs merges first (native merged a different pair in 2 of
+  1,200 logs, e.g. `[A,E]` instead of the reference's `[D,E]` at
+  0.7142857142857142 vs ...43). Tests: `minera_boundary_activities_tests`,
+  `minera_attribute_statistics_tests`, `minera_role_discovery_tests`.
+- **`get_activity_position_summary` entry point.** `minera_export
+  --activity-position-summary <activity>` (with
+  `--activity-position-summary-activity-key` and
+  `--activity-position-summary-variant pandas|log`) emits `ACTIVITY_POSITION_SUMMARY` with
+  `positions` as `[position, count]` pairs in the reference dict's order:
+  descending count with ties in first appearance for the DataFrame a CSV or
+  XES import gives (`pandas`, default), first appearance for an EventLog
+  object (`log`). Positions are 0-based within the case's event order (CSV
+  cases sorted as `format_dataframe` sorts them, XES events in file order);
+  an absent activity gives `[]`, as the reference's `{}`. Test:
+  `minera_boundary_activities_tests`.
+- **Case arrival and dispersion averages follow the input's path.** For a
+  CSV or XES input (`minera_export --case-arrival`, `/api/case-arrival` on a
+  CSV or XES source) the reference is the DataFrame path
+  (`pm4py.get_case_arrival_average` on a `format_dataframe` frame or on
+  `read_xes`'s DataFrame): each gap is the whole seconds plus the
+  microseconds times 1e-6 plus the nanoseconds left times 1e-9 (so 232001 us
+  is 0.23200099999999998) and the mean is numpy's pairwise sum over the
+  count. For an EventLog (a native table source, the time-analysis
+  workbench) the EventLog path floors each gap to the microsecond and
+  averages the exact quotients with `statistics.mean`. Four starts
+  at 00:28:54.365, 03:21:57.038, 03:43:54.029 and 04:53:21.015 give
+  5288.883333333334 on the DataFrame path and 5288.883333333333 on the
+  EventLog path. Checked on 320 generated CSV logs with microsecond times
+  and 320 with nanosecond times, each through both paths (the paths give
+  different averages in 560 of the 640), and 40 XES files written from
+  them: every arrival and dispersion average matches. Declared: a single-case log gives NaN on the
+  DataFrame path, native 0.0. Test: `minera_case_arrival_tests`.
 
 Matched without changes: transition systems (all views, both directions,
 windows -2 to 10, occurrence data; 1,200 CLI logs, 150 more with the
@@ -18199,6 +18286,17 @@ business hours and OCPN (im, imd, token-based-replay annotation counters,
 nets up to isomorphism; 700 OCELs); case durations, start/end activities,
 variants as counts, rework, minimum self-distances and witnesses (300 logs
 after the fixes, plus 75 CSV logs against the `format_dataframe` frame).
+
+Order follow-up (800 logs, half CSV with shuffled rows, half XES with
+shuffled trace order and 15% out-of-order events, numeric and text case ids,
+ties; 1,200 more for roles, both variants): starts and ends 800/800 in order
+(before 360/800 and 347/800); attribute `entries` 800/800 for activity and
+resource, with and without `keep_once_per_case`, and trace attributes
+800/800 (before 46-103 of 200 per cell); position summary 3,723/3,723
+activity queries for `pandas` and 2,923/2,923 for `log` against the EventLog;
+roles 1,200/1,200 exact (before 377/600 and 378/600, 2 with a different
+merge); `--variant-statistics` already matched `get_variants_sorted_by_count`
+in order (800/800).
 
 Declared:
 
@@ -18225,9 +18323,89 @@ Declared:
   it when no event has a relationship) `discover_ocdfg` and
   `discover_oc_petri_net` raise KeyError (`ocel:timestamp` or `ocel:type`);
   native returns the empty result.
-- **Orders not claimed.** `originator_importance` key order of a merged role
-  follows the reference's merge sequence (native lists resources by name;
-  roles, activities and counts match); `get_start_activities` keys keep
-  first appearance (native sorts by name); the analysis `variants` list is
-  ordered by count, not by first appearance as `get_variants_as_tuples`.
-  `get_activity_position_summary` has no native entry point.
+- **Orders not claimed.** The analysis `variants` list (UI) is ordered by
+  count with ties in first appearance, not by first appearance as
+  `get_variants_as_tuples`; `--variant-statistics` follows
+  `get_variants_sorted_by_count`. No native output claims the
+  `get_variants`/`get_variants_as_tuples` order. On a `read_xes` DataFrame
+  that order is not first appearance either (166 of 200 XES logs differ from
+  the EventLog's).
+- **EventLog `get_event_attribute_values(count_once_per_case=True)`.** The
+  key order follows Python string hashing (`2,2,F,A,E,E` gives E,A,F,2 or
+  E,2,A,F by `PYTHONHASHSEED`); native follows the DataFrame order above.
+
+## Fresh sweep: BPMN, process trees and Petri utilities (2026-11-05)
+
+Random process trees (depth 2-4, all six operators, taus, duplicate labels,
+three-child loops, one-child operators, labels with spaces, `&`, `<`, quotes
+and non-ASCII) and random nets (alpha, heuristics and inductive discoveries of
+random logs with odd activity names, plus random nets with odd place and
+transition names, arc weights 1-3, initial markings of 1-2 and optional final
+markings of 1-3) were compared with pm4py 2.7.22 public calls. Nets are
+compared as labelled multigraphs up to isomorphism (markings and arc weights
+included).
+
+| Entry point | Cases | Result |
+| --- | --- | --- |
+| `convert_to_petri_net(tree)` | 400 trees | 400 isomorphic (silent-transition names too, except 6 interleaving trees the harness wrote as its own PTML) |
+| `read_ptml(write_ptml)` of native PTML export | 236 trees | 236 equal |
+| `convert_to_bpmn(tree)` language (native BPMN read back by the reference, traces up to 6 events) | 236 trees | 227 equal, 3 reference timeouts, 6 the declared one-child-sequence flow |
+| EXTENSIVE tree playout (defaults, and max_trace_length 6 with max_loop_occ 2) | 800 runs | 800 equal after the fix below (557 languages, 243 both rejecting) |
+| `read_pnml` / `write_pnml` round trip (odd ids, weights, final markings) | 350 nets | 350 isomorphic with equal names |
+| PNML import markings and weights | 350 nets | 350 isomorphic |
+| `check_is_workflow_net` | 350 nets | 350 equal |
+| Maximal decomposition (`decomposition.decompose`) | 210 discovered nets | 210 equal (places, transitions, arcs, markings, labels) |
+| `convert_to_petri_net(read_bpmn(write_bpmn(convert_to_bpmn(net))))` vs native `parse_bpmn` | 210 nets | 210 isomorphic |
+| Petri EXTENSIVE playout, max_trace_length 3 and 5 | 350 nets x 2 lengths | 311 of 311 and 293 of 293 equal after the fix below (39 and 57 reference runs cut at 20 s); 32 and 33 differed before |
+| Seeded `generate_process_tree` (BASIC, PTANDLOGGENERATOR), fresh bank seed | 900 cases (bank seed 20261105) | 875 generator calls, 1323 trees, 5 reference errors: 0 differences (`minera_random_tree_parity_tests` on the fresh capture) |
+
+Fixes:
+
+- **EXTENSIVE process-tree playout follows the reference construction.** The
+  reference builds each node's words bottom-up (a choice unites its
+  children, a sequence concatenates, a parallel shuffles, a loop repeats
+  `do (redo do)^k` for k up to `max_loop_occ`, reading only the first redo
+  child) and keeps a node's word w only when `|w| + minlen(root) -
+  minlen(node) <= max_trace_length` and `|w| + maxlen(root) - maxlen(node)
+  >= min_trace_length`, where a loop's maximum length is unbounded (it
+  counts as one infinite unit plus its children's maxima, compared
+  lexicographically) and a choice is not filtered. Its defaults are
+  `max_trace_length` = the tree's shortest word length, `max_loop_occ` =
+  `max_trace_length // 2` and `min_trace_length` = 1, and it raises on an
+  interleaving operator anywhere, on an inclusive choice that is read (any
+  position but a loop's third or later child), on a one-child sequence or
+  parallel, and when its bottom-up walk over value-equal subtrees never
+  reaches the root (deterministic across hash seeds: 262 trees x 6 seeds).
+  Native enumerated the whole bounded language (defaults 1000 and 3), with
+  no per-node filter, and accepted the trees the reference rejects.
+  `ProcessTreePlayoutOptions::max_length` and
+  `max_loop_occurrences` are now optional (unset = the reference default;
+  the sampled variants keep `max_steps` and 3), the workbench JSON reads and
+  writes them as `null`, and a `min_length` above `max_length` is accepted
+  as by the reference. Test:
+  `minera_process_tree_playout_tests`
+  (`process_tree_extensive_reference_contract`, 34 captured cases).
+- **Input-less transitions in Petri EXTENSIVE and STOCHASTIC playout.** The
+  reference treats a transition without input places as always enabled
+  (alpha nets of logs with a one-event activity contain them). Native
+  EXTENSIVE and STOCHASTIC skipped them (basic playout already fired them):
+  `c` consuming the source and `f` only producing the sink gives
+  {(c,f),(f,c)} at max_trace_length 2, 3 and 4 in the reference, nothing in
+  native. Test: `minera_playout_tests`
+  (`inputless_transitions_are_always_enabled`).
+
+Declared:
+
+- **EXTENSIVE tree playout `max_limit_num_traces`.** The reference caps only
+  the words of a parallel node, keeping a subset that follows set iteration
+  (hash) order; native keeps the first words in its own order and reports
+  `truncated`. Output order is a set's in the reference; native sorts by
+  length, then lexicographically.
+- **Frontend tree-playout query.** `processTreePlayoutQuery` still rejects a
+  `min_length` above `max_length` before sending; the native request parser
+  and core accept it.
+- Not compared: BPMN layout coordinates (no parity claimed);
+  `reduce_petri_net_invisibles` and `reduce_petri_net_implicit_places`
+  (no native counterpart, as recorded above); `parse_process_tree` and
+  `str(tree)` (no native counterpart; PTML was round-tripped instead); basic
+  and stochastic Petri playout remain invariant checks, as before.

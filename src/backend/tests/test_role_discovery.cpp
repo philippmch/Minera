@@ -96,4 +96,23 @@ int main() {
     assert((summed_result.roles[1].activities == std::vector<std::string>{"C"}));
     assert(summed_result.roles[1].resources[0].count == 1 && summed_result.roles[1].resources[1].count == 1);
   }
+
+  // originator_importance key order. Captured from pm4py 2.7.22: the
+  // EventLog gives [A,B,C]{kim:3, amy:3} (each activity's resources in first
+  // appearance, Counter(left) + Counter(right) per merge); the DataFrame
+  // gives {amy:3, kim:3} (each activity's resources by name).
+  EventLog originator_log{{Trace{"1", {
+      Event{"1","B","","kim",0}, Event{"1","B","","amy",1}, Event{"1","A","","amy",2},
+      Event{"1","A","","kim",3}, Event{"1","C","","kim",4}, Event{"1","C","","amy",5}}}}};
+  for (const auto variant : {RoleDiscoveryVariant::kLog, RoleDiscoveryVariant::kPandas}) {
+    RoleDiscoveryOptions ordered_options; ordered_options.variant = variant;
+    const auto ordered_result = discover_roles(originator_log, ordered_options);
+    assert(ordered_result.roles.size() == 1);
+    assert((ordered_result.roles[0].activities == std::vector<std::string>{"A", "B", "C"}));
+    const auto& resources = ordered_result.roles[0].resources;
+    assert(resources.size() == 2 && resources[0].count == 3 && resources[1].count == 3);
+    const bool log = variant == RoleDiscoveryVariant::kLog;
+    assert(resources[0].name == (log ? "kim" : "amy"));
+    assert(resources[1].name == (log ? "amy" : "kim"));
+  }
 }

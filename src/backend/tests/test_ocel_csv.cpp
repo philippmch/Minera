@@ -439,7 +439,8 @@ void writes_naive_json_and_xml_timestamps_as_utc() {
       "<objects><object><string key=\"id\" value=\"o1\"/><string key=\"type\" value=\"order\"/>"
       "<list key=\"ovmap\"/></object></objects></log>",
       xml_options);
-  assert(minera::serialize_ocel_csv(xml).find("e1,2024-01-01 00:00:00+00:00,A") != std::string::npos);
+  // The frame of an XML read is activity first, so its CSV columns are too.
+  assert(minera::serialize_ocel_csv(xml).find("e1,A,2024-01-01 00:00:00+00:00") != std::string::npos);
   // pm4py.read_ocel_csv keeps naive times naive; write_ocel_xml still
   // appends "Z" and write_ocel2_xml prints the naive isoformat.
   const auto naive = minera::parse_ocel_csv(
@@ -525,7 +526,9 @@ void date_attributes_read_as_reference() {
   classic.allow_lossy = true;
   const auto xml1 = minera::serialize_ocel_xml(log, classic);
   assert(xml1.find("<date key=\"d\" value=\"2024-02-01T08:30:00Z\"/>") != std::string::npos);
-  assert(xml1.find("<date key=\"od\" value=\"2024-03-01T10:00:00Z\"/>") != std::string::npos);
+  // "od" mixes a date with "notadate": the reference writes the mixed
+  // object column's date as a string (observed black-box on this fixture).
+  assert(xml1.find("<string key=\"od\" value=\"2024-03-01T10:00:00+00:00\"/>") != std::string::npos);
   assert(xml1.find("<string key=\"s\" value=\"2024-02-01\"/>") != std::string::npos);
   minera::OcelCsvExportOptions csv_options;
   csv_options.allow_lossy = true;
@@ -585,6 +588,116 @@ void date_attributes_read_as_reference() {
       R"("ocel:vmap":{"d":"2024-02-01T08:30:00+02:00"},"ocel:omap":["o1"]}},)"
       R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}},"ocel:eventTypes":{"A":{"d":"date"}}})");
   assert(text(classic_json.events[0].attributes[0].value) == "2024-02-01T08:30:00+02:00");
+}
+
+// Round O review items (observed black-box on pm4py 2.7.22): read_ocel_xml
+// converts each <date> element, so a <string> under the same key stays a
+// string and the column mixes both (write_ocel_xml then prints the date as
+// the <string> of its isoformat); read_ocel2_json falls back to dateutil
+// (a naive value stays naive, its change value is stamped UTC, a text
+// dateutil cannot read stays); read_ocel2_xml reads a padded date text
+// through dateutil as a naive value; the classic transport keeps a shared
+// event-time offset.
+void round_o_date_and_offset_shapes() {
+  const auto text = [](const minera::OcelValue& value) { return std::get<std::string>(value); };
+  minera::OcelXmlImportOptions xml_options;
+  const std::string mixed_xml =
+      "<log><events>"
+      "<event><string key=\"id\" value=\"e1\"/><date key=\"timestamp\" value=\"2024-01-01T00:00:00Z\"/>"
+      "<string key=\"activity\" value=\"A\"/><list key=\"omap\"><string key=\"object-id\" value=\"o1\"/></list>"
+      "<list key=\"vmap\"><date key=\"d\" value=\"2024-02-01T08:30:00+02:00\"/></list></event>"
+      "<event><string key=\"id\" value=\"e2\"/><date key=\"timestamp\" value=\"2024-01-02T00:00:00Z\"/>"
+      "<string key=\"activity\" value=\"A\"/><list key=\"omap\"><string key=\"object-id\" value=\"o1\"/></list>"
+      "<list key=\"vmap\"><string key=\"d\" value=\"hello\"/></list></event>"
+      "</events><objects><object><string key=\"id\" value=\"o1\"/><string key=\"type\" value=\"order\"/>"
+      "<list key=\"ovmap\"><string key=\"s\" value=\"2024-03-01\"/></list></object></objects></log>";
+  const auto mixed = minera::parse_ocel_xml(mixed_xml, xml_options);
+  assert(text(mixed.events[0].attributes[0].value) == "2024-02-01T08:30:00Z");
+  assert(text(mixed.events[1].attributes[0].value) == "hello");
+  assert(text(mixed.objects[0].attributes[0].value) == "2024-03-01");  // a <string> stays
+  minera::OcelXmlExportOptions classic;
+  classic.allow_lossy = true;
+  const auto written = minera::serialize_ocel_xml(mixed, classic);
+  assert(written.find("<string key=\"d\" value=\"2024-02-01T08:30:00+00:00\"/>") != std::string::npos);
+  assert(written.find("<string key=\"d\" value=\"hello\"/>") != std::string::npos);
+
+  const auto json = [](const std::string& value) {
+    return R"({"objectTypes":[{"name":"order","attributes":[{"name":"d","type":"date"}]}],)"
+           R"("eventTypes":[{"name":"A","attributes":[{"name":"d","type":"date"}]}],)"
+           R"("objects":[{"id":"o1","type":"order","attributes":[{"name":"d","time":"1970-01-01T00:00:00Z","value":")" +
+           value + R"("},{"name":"d","time":"2024-03-01T00:00:00Z","value":")" + value +
+           R"("}]}],"events":[{"id":"e1","type":"A","time":"2024-01-01T10:00:00Z","attributes":[{"name":"d","value":")" +
+           value + R"("}],"relationships":[{"objectId":"o1","qualifier":""}]}]})";
+  };
+  const auto naive = minera::parse_ocel_json(json("Feb 1 2024"));
+  assert(text(naive.events[0].attributes[0].value) == "2024-02-01T00:00:00");
+  assert(text(naive.objects[0].attributes[0].value) == "2024-02-01T00:00:00");
+  assert(text(naive.object_changes[0].value) == "2024-02-01T00:00:00+00:00");
+  const auto aware = minera::parse_ocel_json(json("2024/02/01 08:30 +0200"));
+  assert(text(aware.events[0].attributes[0].value) == "2024-02-01T06:30:00Z");
+  assert(text(aware.object_changes[0].value) == "2024-02-01T06:30:00+00:00");
+  const auto padded = minera::parse_ocel_json(json(" 2024-02-01"));
+  assert(text(padded.events[0].attributes[0].value) == "2024-02-01T00:00:00");
+  assert(text(minera::parse_ocel_json(json("Feb 30 2024")).events[0].attributes[0].value) ==
+         "Feb 30 2024");
+  // Shapes from the 920-string fuzz (reference readings): basic dates and
+  // clocks, a lowercase z, a space-separated clock respelled, and an
+  // all-numeric date followed by -HHMM read as a naive clock.
+  const auto first = [&](const std::string& value) {
+    return text(minera::parse_ocel_json(json(value)).events[0].attributes[0].value);
+  };
+  // Unpadded, fromisoformat reads the basic shape: the wall clock as UTC.
+  assert(first("20231104") == "2023-11-04T00:00:00Z");
+  assert(first("20200226T0523-0530") == "2020-02-26T05:23:00Z");
+  // Padded, only dateutil reads it: naive stays naive, an offset applies.
+  assert(first(" 20231104") == "2023-11-04T00:00:00");
+  assert(first(" 20200226T0523-0530") == "2020-02-26T10:53:00Z");
+  assert(first("20230221 200601,25 GMT") == "2023-02-21T20:06:01.250000Z");
+  assert(first("1 feb 2020T21:13z") == "2020-02-01T21:13:00Z");
+  assert(first("1999-09-08 13:37Z") == "1999-09-08T13:37:00Z");
+  assert(first("25.6.2023-0530") == "2023-06-25T05:30:00");
+  assert(first("20 MAR 2024-0530") == "20 MAR 2024-0530");
+  assert(first("2023/6/24 Z") == "2023/6/24 Z");  // a zone without a clock stays text
+
+  minera::OcelXmlExportOptions standard;
+  standard.format = minera::OcelXmlFormat::kStandard;
+  standard.allow_lossy = true;
+  auto padded_xml = minera::serialize_ocel_xml(minera::parse_ocel_json(json("2024-02-01T00:00:00Z")), standard);
+  for (std::size_t at = 0; (at = padded_xml.find(">2024-02-01T00:00:00+00:00<", at)) != std::string::npos; ++at)
+    padded_xml.replace(at, 27, "> 2024-02-01<");
+  const auto padded_back = minera::parse_ocel_xml(padded_xml, xml_options);
+  assert(text(padded_back.events[0].attributes[0].value) == "2024-02-01T00:00:00");
+  assert(minera::serialize_ocel_xml(padded_back, standard).find(">2024-02-01T00:00:00</attribute>") !=
+         std::string::npos);
+
+  const auto offset = minera::parse_ocel_csv(
+      "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order\n"
+      "e1,2024-01-01 10:00:00+02:00,A,['o1']\n"
+      "e2,2024-01-01 11:30:00+02:00,B,['o1']\n");
+  const auto transport = minera::serialize_ocel_json(offset, minera::OcelJsonFormat::kClassic);
+  assert(transport.find("\"minera:eventTimeOffset\":true") != std::string::npos);
+  const auto passed = minera::parse_ocel_json(transport);
+  assert(passed.events[0].timestamp == "2024-01-01 10:00:00+02:00");
+  assert(minera::serialize_ocel_xml(passed, standard).find("time=\"2024-01-01T10:00:00+02:00\"") !=
+         std::string::npos);
+  // Without the marker the classic reader stores the wall clock stamped UTC.
+  auto unmarked = transport;
+  unmarked.erase(unmarked.find(",\"minera:eventTimeOffset\":true"), 30);
+  assert(minera::parse_ocel_json(unmarked).events[0].timestamp == "2024-01-01T10:00:00+00:00");
+
+  // The reference CSV reader keeps the file's column order, and its CSV and
+  // OCEL 1.0 XML writers follow it (observed black-box).
+  const auto activity_first = minera::parse_ocel_csv(
+      "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:order\n"
+      "e1,Create,2024-01-01 10:00:00+00:00,['o1']\n");
+  assert(activity_first.event_activity_first);
+  assert(minera::serialize_ocel_csv(activity_first).rfind(
+             "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:order\n"
+             "e1,Create,2024-01-01 10:00:00+00:00,['o1']\n", 0) == 0);
+  const auto xml1 = minera::serialize_ocel_xml(activity_first, classic);
+  assert(xml1.find("<string key=\"activity\"") < xml1.find("<date key=\"timestamp\""));
+  assert(!offset.event_activity_first);
+  assert(minera::serialize_ocel_csv(offset).rfind("ocel:eid,ocel:timestamp,ocel:activity,", 0) == 0);
 }
 
 // Round M review items (observed black-box on pm4py 2.7.22):
@@ -651,6 +764,7 @@ void reference_writer_shapes() {
 }  // namespace
 
 int main() {
+  round_o_date_and_offset_shapes();
   const std::string events =
       "ocel:eid,ocel:activity,ocel:timestamp,ocel:type:item,ocel:type:order,amount,note\n"
       "e2,Ship,2024-01-02T00:00:00Z,\"['i2','i1']\",['o1'],2.5,\"quoted, value\"\n"
@@ -734,7 +848,8 @@ int main() {
   custom_export.allow_lossy = true;
   const auto custom_events = minera::serialize_ocel_csv(custom, custom_export);
   const auto custom_objects = minera::serialize_ocel_objects_csv(custom, custom_export);
-  assert(custom_events.rfind("event_id;occurred_at;activity_name;score;ref.item\n", 0) == 0);
+  // The input lists the activity before the time, so the output does too.
+  assert(custom_events.rfind("event_id;activity_name;occurred_at;score;ref.item\n", 0) == 0);
   assert(custom_objects.rfind("object_id;object_kind;state", 0) == 0);
   const auto custom_roundtrip =
       minera::parse_ocel_csv(custom_events, custom_objects, custom_import);

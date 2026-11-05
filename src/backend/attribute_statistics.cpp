@@ -1,5 +1,6 @@
 #include "minera/attribute_statistics.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <cstdio>
@@ -90,16 +91,70 @@ std::pair<std::string, std::string> python_key(const EventAttribute* attribute,
   }
 }
 
+// Where a key sorts in a pandas groupby on [case id, attribute]: by case id
+// text, then by value (numbers numerically, other values by text).
+struct GroupPosition {
+  std::string case_id;
+  bool numeric = false;
+  double number = 0.0;
+  std::string text;
+};
+
+bool group_before(const GroupPosition& left, const GroupPosition& right) {
+  if (left.case_id != right.case_id) return left.case_id < right.case_id;
+  if (left.numeric != right.numeric) return left.numeric;
+  if (left.numeric && left.number != right.number) return left.number < right.number;
+  return left.text < right.text;
+}
+
+GroupPosition group_position(const std::string& case_id,
+                             const std::pair<std::string, std::string>& key,
+                             const std::string& text) {
+  GroupPosition position{case_id, false, 0.0, text};
+  if (key.first.starts_with("n:") || key.first.starts_with("f:")) {
+    position.numeric = true;
+    position.number = std::strtod(key.first.c_str() + 2, nullptr);
+  }
+  return position;
+}
+
 struct Tally {
   std::map<std::string, std::size_t> index;
   AttributeStatisticsResult* result = nullptr;
-  void add(const std::pair<std::string, std::string>& key,
-           const std::string& text, std::uint64_t count) {
+  // keep_once_per_case: each key's first (case id, value) group.
+  std::vector<GroupPosition> first_group;
+  std::size_t add(const std::pair<std::string, std::string>& key,
+                  const std::string& text, std::uint64_t count) {
     const auto [it, inserted] = index.emplace(key.first, result->entries.size());
     if (inserted) result->entries.push_back({text, key.second, 0});
     result->entries[it->second].count += count;
+    return it->second;
   }
+  void add_once(const std::string& case_id,
+                const std::pair<std::string, std::string>& key,
+                const std::string& text) {
+    const auto at = add(key, text, 1);
+    auto position = group_position(case_id, key, text);
+    if (at == first_group.size()) first_group.push_back(std::move(position));
+    else if (group_before(position, first_group[at])) first_group[at] = std::move(position);
+  }
+  // The reference DataFrame counts are value_counts: descending count, equal
+  // counts in first appearance (over the rows, or over the sorted
+  // [case id, attribute] groups when counting once per case).
   void finish() {
+    std::vector<std::size_t> order(result->entries.size());
+    for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+    if (first_group.size() == order.size() && !order.empty())
+      std::stable_sort(order.begin(), order.end(), [&](std::size_t l, std::size_t r) {
+        return group_before(first_group[l], first_group[r]);
+      });
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t l, std::size_t r) {
+      return result->entries[l].count > result->entries[r].count;
+    });
+    std::vector<AttributeValueCount> sorted;
+    sorted.reserve(order.size());
+    for (const auto i : order) sorted.push_back(std::move(result->entries[i]));
+    result->entries = std::move(sorted);
     for (const auto& entry : result->entries) result->values[entry.value] += entry.count;
   }
 };
@@ -163,7 +218,10 @@ AttributeStatisticsResult discover_attribute_statistics(
         if (!attribute) attribute = owner(event.case_row_attributes, value);
         if (!attribute) attribute = owner(trace.attributes, value);
         const auto key = python_key(attribute, *value, value == &event.timestamp);
-        if (options.keep_once_per_case && !seen.insert(key.first).second) continue;
+        if (options.keep_once_per_case) {
+          if (seen.insert(key.first).second) tally.add_once(trace.case_id, key, *value);
+          continue;
+        }
         tally.add(key, *value, 1);
       }
     }

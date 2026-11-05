@@ -89,4 +89,16 @@ describe("parseNativeJson fast scanner", () => {
       compare(raw);
     }
   });
+  it("scans nesting deeper than the call stack allows recursion", () => {
+    // 20,000 levels: the scan keeps its own stack, so the kept literals at the
+    // bottom survive (JSON.parse accepts this depth).
+    const depth=20000;
+    const raw='{"a":['.repeat(depth)+'1.0,{"x":2.50,"y":7}'+']}'.repeat(depth);
+    let value=parseNativeJson(raw) as Record<string,unknown>;
+    for(let i=0;i<depth-1;++i)value=(value.a as unknown[])[0] as Record<string,unknown>;
+    const bottom=value.a as unknown[];
+    expect(nativeCell(bottom,0)).toBe("1.0");
+    expect(nativeCell(bottom[1] as object,"x")).toBe("2.50");
+    expect(nativeCell(bottom[1] as object,"y")).toBe(7);
+  });
 });

@@ -456,6 +456,67 @@ int main() {
   }
   std::filesystem::remove(activity_path, ignored);
 
+  // The reference events frame takes its column order from the type table of
+  // the first event type by name, and write_ocel2_sqlite follows the frame
+  // (activity first: ocel_id, "ocel:activity", ocel_time; observed
+  // black-box). Only that first table decides.
+  for (const bool create_first : {true, false}) {
+    std::filesystem::remove(activity_path, ignored);
+    sqlite3* order_db = nullptr;
+    assert(sqlite3_open_v2(activity_path.c_str(), &order_db,
+                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) == SQLITE_OK);
+    const std::string activity_first = "(ocel_id TEXT, \"ocel:activity\" TEXT, ocel_time TIMESTAMP);";
+    const std::string time_first = "(ocel_id TEXT, ocel_time TIMESTAMP, \"ocel:activity\" TEXT);";
+    exec_sql(order_db,
+             ("CREATE TABLE event (ocel_id TEXT, ocel_type TEXT);"
+              "CREATE TABLE object (ocel_id TEXT, ocel_type TEXT);"
+              "CREATE TABLE event_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+              "CREATE TABLE object_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+              "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
+              "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);"
+              "CREATE TABLE event_Create " + (create_first ? activity_first : time_first) +
+              "CREATE TABLE event_Pay " + (create_first ? time_first : activity_first) +
+              "CREATE TABLE object_order (ocel_id TEXT);"
+              "INSERT INTO event VALUES ('e2', 'Pay'), ('e1', 'Create');"
+              "INSERT INTO object VALUES ('o1', 'order');"
+              "INSERT INTO event_map_type VALUES ('Pay', 'Pay'), ('Create', 'Create');"
+              "INSERT INTO object_map_type VALUES ('order', 'order');"
+              "INSERT INTO object_order VALUES ('o1');"
+              "INSERT INTO event_object VALUES ('e1', 'o1', ''), ('e2', 'o1', '');"
+              "INSERT INTO event_Create (ocel_id, ocel_time, \"ocel:activity\") VALUES ('e1', '2024-01-01 10:00:00', 'Create');"
+              "INSERT INTO event_Pay (ocel_id, ocel_time, \"ocel:activity\") VALUES ('e2', '2024-01-01 11:00:00', 'Pay');")
+                 .c_str());
+    assert(sqlite3_close(order_db) == SQLITE_OK);
+    const auto read = minera::import_ocel_sqlite(activity_path);
+    assert(read.event_activity_first == create_first);
+    const auto written_path = std::filesystem::temp_directory_path() / "minera_ocel_sqlite_order_out.sqlite";
+    std::filesystem::remove(written_path, ignored);
+    minera::export_ocel_sqlite(read, written_path);
+    sqlite3* written_db = nullptr;
+    assert(sqlite3_open_v2(written_path.c_str(), &written_db, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+    for (const char* type : {"Create", "Pay"}) {
+      std::string table;
+      sqlite3_stmt* statement = nullptr;
+      const std::string like = std::string("SELECT name FROM sqlite_master WHERE name LIKE 'event_t_") + type + "%'";
+      assert(sqlite3_prepare_v2(written_db, like.c_str(), -1, &statement, nullptr) == SQLITE_OK);
+      assert(sqlite3_step(statement) == SQLITE_ROW);
+      table = reinterpret_cast<const char*>(sqlite3_column_text(statement, 0));
+      sqlite3_finalize(statement);
+      std::vector<std::string> columns;
+      assert(sqlite3_prepare_v2(written_db, ("PRAGMA table_info(\"" + table + "\")").c_str(), -1, &statement,
+                                nullptr) == SQLITE_OK);
+      while (sqlite3_step(statement) == SQLITE_ROW)
+        columns.emplace_back(reinterpret_cast<const char*>(sqlite3_column_text(statement, 1)));
+      sqlite3_finalize(statement);
+      assert(columns.size() == 3 && columns[0] == "ocel_id");
+      assert(columns[1] == (create_first ? "ocel:activity" : "ocel_time"));
+    }
+    assert(sqlite3_close(written_db) == SQLITE_OK);
+    assert(minera::import_ocel_sqlite(written_path).event_activity_first == create_first);
+    std::filesystem::remove(written_path, ignored);
+  }
+  std::filesystem::remove(activity_path, ignored);
+
   // The writer prints a date-declared attribute as the reference writes a
   // datetime64 column (TIMESTAMP, "2024-02-01 08:30:00+00:00") and the
   // events of a log whose times share an offset in that offset

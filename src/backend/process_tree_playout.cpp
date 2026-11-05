@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <iterator>
+#include <limits>
+#include <map>
 #include <cmath>
 #include <optional>
 #include <numeric>
@@ -22,18 +25,57 @@ namespace {
 using Word = std::vector<std::string>;
 using Words = std::vector<Word>;
 
-// Enumeration is deliberately budgeted before the final cap is applied. A
-// parallel cut can have factorially many interleavings, so materializing the
-// entire language and truncating afterward is not a safe implementation.
-struct EnumerationBudget {
-  std::size_t remaining = 250000;
-  bool exhausted = false;
+// EXTENSIVE follows the reference (algo.simulation.playout.process_tree
+// variants.extensive of PM4Py 2.7.22) as observed from its outputs. Every
+// node's set of words is built bottom-up: a tau gives the empty word, an
+// activity its label, an exclusive choice the union of its children, a
+// sequence the concatenations, a parallel cut the interleavings and a loop
+// do, do redo do, ... with up to max_loop_occ redos (only the first redo
+// child is used). Activities, sequences, parallel cuts and loops then keep a
+// word w when
+//   |w| + (min_len(root) - min_len(node)) <= max_trace_length and
+//   |w| + (max_len(root) - max_len(node)) >= min_trace_length,
+// where min_len and max_len are the shortest and longest words of a
+// subtree (the reference's lengths: a loop's shortest word is its do
+// child's, its longest counts as a huge constant plus every child's
+// longest). A tau and an exclusive choice keep everything, so the result
+// can hold words outside the length bounds. Unset bounds default to the
+// reference's: max_trace_length is min_len(root), max_loop_occ is half of
+// max_trace_length.
+struct ExtensiveLength {
+  // Words of a loop are unbounded; the reference counts each loop as one
+  // huge constant, so lengths are (loops, finite part) pairs compared
+  // lexicographically.
+  long long loops = 0;
+  long long finite = 0;
+  friend bool operator<(const ExtensiveLength& a, const ExtensiveLength& b) {
+    return a.loops != b.loops ? a.loops < b.loops : a.finite < b.finite;
+  }
+  ExtensiveLength& operator+=(const ExtensiveLength& other) {
+    loops += other.loops;
+    finite += other.finite;
+    return *this;
+  }
 };
 
-bool contains_operator(const ProcessTreeNode& n, ProcessTreeOperator op) {
+struct ExtensiveBudget {
+  std::size_t remaining = 250000;
+  bool exhausted = false;
+  // Takes one generated word from the budget; false once it is spent.
+  bool take() {
+    if (remaining == 0) {
+      exhausted = true;
+      return false;
+    }
+    --remaining;
+    return true;
+  }
+};
+
+bool node_has_operator(const ProcessTreeNode& n, ProcessTreeOperator op) {
   if (n.op == op) return true;
   for (const auto& child : n.children)
-    if (contains_operator(child, op)) return true;
+    if (node_has_operator(child, op)) return true;
   return false;
 }
 
@@ -67,230 +109,315 @@ void validate_node(const ProcessTreeNode& n, const ProcessTree& t) {
   for (const auto& c : n.children) validate_node(c, t);
 }
 
-void append_unique(Words& out, Word word, std::size_t max_length,
-                   EnumerationBudget& budget) {
-  if (word.size() <= max_length && budget.remaining != 0) {
-    --budget.remaining;
-    out.push_back(std::move(word));
-    if (budget.remaining == 0) budget.exhausted = true;
-  } else if (budget.remaining == 0) {
-    budget.exhausted = true;
+bool has_single_child_block(const ProcessTreeNode& n) {
+  if ((n.op == ProcessTreeOperator::kSequence ||
+       n.op == ProcessTreeOperator::kParallel) &&
+      n.children.size() == 1)
+    return true;
+  for (const auto& child : n.children)
+    if (has_single_child_block(child)) return true;
+  return false;
+}
+
+// Whether an inclusive choice is read by its parent: anywhere except as the
+// third or later child of a loop, which the reference never reads.
+bool inclusive_choice_read(const ProcessTreeNode& n) {
+  if (n.op == ProcessTreeOperator::kInclusiveChoice) return true;
+  for (std::size_t i = 0; i < n.children.size(); ++i) {
+    const auto& child = n.children[i];
+    if (n.op == ProcessTreeOperator::kLoop && i >= 2) {
+      if (child.op == ProcessTreeOperator::kInclusiveChoice) continue;
+    }
+    if (inclusive_choice_read(child)) return true;
   }
+  return false;
 }
 
-Words interleave_words(const Words& prefixes, const Words& suffixes,
-                       std::size_t max_length, EnumerationBudget& budget) {
-  Words out;
-  for (const auto& prefix : prefixes) {
-    if (budget.remaining == 0) break;
-    for (const auto& suffix : suffixes) {
-      if (budget.remaining == 0) break;
-      std::function<void(std::size_t, std::size_t, Word&)> interleave;
-      Word merged;
-      interleave = [&](std::size_t i, std::size_t j, Word&) {
-        if (budget.remaining == 0) return;
-        if (i == prefix.size() && j == suffix.size()) {
-          append_unique(out, merged, max_length, budget);
-          return;
-        }
-        if (i < prefix.size()) {
-          merged.push_back(prefix[i]);
-          interleave(i + 1, j, merged);
-          merged.pop_back();
-        }
-        if (j < suffix.size() && budget.remaining != 0) {
-          merged.push_back(suffix[j]);
-          interleave(i, j + 1, merged);
-          merged.pop_back();
-        }
-      };
-      interleave(0, 0, merged);
+// The reference walks its nodes bottom-up from a set of nodes that compares
+// subtrees by value: one representative per equal subtree (the first in
+// breadth-first order) is kept, and a parent is added when one of its own
+// children is visited and every child (by value) is already present. When
+// equal subtrees sit under different parents, a parent can be skipped and
+// the root never reached (the reference then raises KeyError).
+bool reference_root_reachable(const ProcessTree& tree) {
+  struct Flat {
+    std::size_t key = 0;
+    std::optional<std::size_t> parent;
+    std::vector<std::size_t> children;
+  };
+  std::vector<Flat> nodes;
+  std::map<std::pair<std::pair<int, std::string>, std::vector<std::size_t>>, std::size_t> keys;
+  std::function<std::size_t(const ProcessTreeNode&, std::optional<std::size_t>)> flatten;
+  flatten = [&](const ProcessTreeNode& n, std::optional<std::size_t> parent) {
+    const std::size_t id = nodes.size();
+    nodes.push_back(Flat{0, parent, {}});
+    std::vector<std::size_t> child_keys;
+    for (const auto& child : n.children) {
+      const auto child_id = flatten(child, id);
+      nodes[id].children.push_back(child_id);
+      child_keys.push_back(nodes[child_id].key);
+    }
+    std::string label;
+    if (n.op == ProcessTreeOperator::kActivity) label = tree.activities().at(n.activity);
+    const auto inserted = keys.emplace(
+        std::make_pair(std::make_pair(static_cast<int>(n.op), std::move(label)),
+                       std::move(child_keys)),
+        keys.size());
+    nodes[id].key = inserted.first->second;
+    return id;
+  };
+  flatten(tree.root(), std::nullopt);
+  std::vector<std::size_t> visit;
+  std::set<std::size_t> seen;
+  std::vector<std::size_t> queue{0};
+  for (std::size_t head = 0; head < queue.size(); ++head) {
+    const auto id = queue[head];
+    if (seen.insert(nodes[id].key).second && nodes[id].children.empty())
+      visit.push_back(id);
+    for (const auto child : nodes[id].children) queue.push_back(child);
+  }
+  std::set<std::size_t> present;
+  for (const auto id : visit) present.insert(nodes[id].key);
+  for (std::size_t i = 0; i < visit.size(); ++i) {
+    const auto parent = nodes[visit[i]].parent;
+    if (!parent || present.contains(nodes[*parent].key)) continue;
+    bool ready = true;
+    for (const auto child : nodes[*parent].children)
+      if (!present.contains(nodes[child].key)) {
+        ready = false;
+        break;
+      }
+    if (ready) {
+      visit.push_back(*parent);
+      present.insert(nodes[*parent].key);
     }
   }
-  return out;
+  return present.contains(nodes[0].key);
 }
 
-Words combine_parallel(const Words& current, const Words& child,
-                       std::size_t max_length, EnumerationBudget& budget) {
-  return interleave_words(current, child, max_length, budget);
-}
-
-std::optional<Word> first_word(const ProcessTreeNode& n,
-                               const ProcessTree& tree) {
-  switch (n.op) {
-    case ProcessTreeOperator::kTau:
-      return Word{};
-    case ProcessTreeOperator::kActivity:
-      if (n.activity >= tree.activities().size()) return std::nullopt;
-      return Word{tree.activities()[n.activity]};
-    case ProcessTreeOperator::kExclusive:
-      if (n.children.empty()) return std::nullopt;
-      return first_word(n.children.front(), tree);
-    case ProcessTreeOperator::kInclusiveChoice:
-      if (n.children.empty()) return std::nullopt;
-      return first_word(n.children.front(), tree);
-    case ProcessTreeOperator::kSequence: {
-      Word result;
-      for (const auto& child : n.children) {
-        const auto word = first_word(child, tree);
-        if (!word) return std::nullopt;
-        result.insert(result.end(), word->begin(), word->end());
-      }
-      return result;
-    }
-    case ProcessTreeOperator::kParallel: {
-      Word result;
-      for (const auto& child : n.children) {
-        const auto word = first_word(child, tree);
-        if (!word) return std::nullopt;
-        result.insert(result.end(), word->begin(), word->end());
-      }
-      return result;
-    }
-    case ProcessTreeOperator::kInterleaving: {
-      Word result;
-      for (const auto& child : n.children) {
-        const auto word = first_word(child, tree);
-        if (!word) return std::nullopt;
-        result.insert(result.end(), word->begin(), word->end());
-      }
-      return result;
-    }
-    case ProcessTreeOperator::kLoop:
-      if (n.children.empty()) return std::nullopt;
-      return first_word(n.children.front(), tree);
+class ReferenceExtensive {
+ public:
+  ReferenceExtensive(const ProcessTree& tree, std::size_t min_length,
+                     std::optional<std::size_t> max_length,
+                     std::optional<std::size_t> max_loops,
+                     std::size_t max_traces, std::size_t budget)
+      : tree_(tree), min_length_(static_cast<long long>(min_length)),
+        max_traces_(max_traces), budget_{budget} {
+    root_min_ = min_len(tree.root());
+    root_max_ = max_len(tree.root());
+    max_length_ = max_length ? static_cast<long long>(*max_length) : root_min_;
+    max_loops_ = max_loops ? *max_loops : static_cast<std::size_t>(max_length_ / 2);
   }
-  return std::nullopt;
-}
 
-Words enumerate(const ProcessTreeNode& n, const ProcessTree& tree,
-                std::size_t max_length, std::size_t max_loops,
-                EnumerationBudget& budget) {
-  if (budget.remaining == 0) return {};
-  switch (n.op) {
-    case ProcessTreeOperator::kTau: {
-      Words out;
-      append_unique(out, {}, max_length, budget);
-      return out;
+  std::set<Word> run() { return play(tree_.root()); }
+  [[nodiscard]] bool truncated() const { return budget_.exhausted || capped_; }
+
+ private:
+  long long min_len(const ProcessTreeNode& n) {
+    if (const auto it = min_.find(&n); it != min_.end()) return it->second;
+    long long value = 0;
+    switch (n.op) {
+      case ProcessTreeOperator::kTau: value = 0; break;
+      case ProcessTreeOperator::kActivity: value = 1; break;
+      case ProcessTreeOperator::kExclusive:
+      case ProcessTreeOperator::kInclusiveChoice:
+        value = std::numeric_limits<long long>::max();
+        for (const auto& child : n.children) value = std::min(value, min_len(child));
+        break;
+      case ProcessTreeOperator::kSequence:
+      case ProcessTreeOperator::kParallel:
+      case ProcessTreeOperator::kInterleaving:
+        for (const auto& child : n.children) value += min_len(child);
+        break;
+      case ProcessTreeOperator::kLoop:
+        value = min_len(n.children.front());
+        for (std::size_t i = 1; i < n.children.size(); ++i) (void)min_len(n.children[i]);
+        break;
     }
-    case ProcessTreeOperator::kActivity: {
-      Words out;
-      if (n.activity < tree.activities().size() && max_length > 0)
-        append_unique(out, Word{tree.activities()[n.activity]}, max_length,
-                      budget);
-      return out;
-    }
-    case ProcessTreeOperator::kExclusive: {
-      Words out;
-      for (const auto& c : n.children) {
-        auto child = enumerate(c, tree, max_length, max_loops, budget);
-        out.insert(out.end(), std::make_move_iterator(child.begin()),
-                   std::make_move_iterator(child.end()));
-      }
-      return out;
-    }
-    case ProcessTreeOperator::kInclusiveChoice: {
-      // An inclusive choice selects every non-empty subset of its children;
-      // selected children execute concurrently, just like a parallel cut.
-      Words out;
-      std::function<void(std::size_t, Words, std::size_t)> visit;
-      visit = [&](std::size_t index, Words current, std::size_t selected) {
-        if (budget.remaining == 0) return;
-        if (index == n.children.size()) {
-          if (selected != 0)
-            out.insert(out.end(), std::make_move_iterator(current.begin()),
-                       std::make_move_iterator(current.end()));
-          return;
+    min_.emplace(&n, value);
+    return value;
+  }
+
+  ExtensiveLength max_len(const ProcessTreeNode& n) {
+    if (const auto it = max_.find(&n); it != max_.end()) return it->second;
+    ExtensiveLength value;
+    switch (n.op) {
+      case ProcessTreeOperator::kTau: break;
+      case ProcessTreeOperator::kActivity: value.finite = 1; break;
+      case ProcessTreeOperator::kExclusive:
+        for (std::size_t i = 0; i < n.children.size(); ++i) {
+          const auto child = max_len(n.children[i]);
+          if (i == 0 || value < child) value = child;
         }
-        visit(index + 1, current, selected);
-        Words child = enumerate(n.children[index], tree, max_length,
-                               max_loops, budget);
-        Words next = combine_parallel(current, child, max_length, budget);
-        visit(index + 1, std::move(next), selected + 1);
-      };
-      visit(0, Words{Word{}}, 0);
-      return out;
+        break;
+      case ProcessTreeOperator::kSequence:
+      case ProcessTreeOperator::kParallel:
+      case ProcessTreeOperator::kInclusiveChoice:
+      case ProcessTreeOperator::kInterleaving:
+        for (const auto& child : n.children) value += max_len(child);
+        break;
+      case ProcessTreeOperator::kLoop:
+        value.loops = 1;
+        for (const auto& child : n.children) value += max_len(child);
+        break;
     }
-    case ProcessTreeOperator::kSequence: {
-      Words out{Word{}};
-      for (const auto& c : n.children) {
-        Words child = enumerate(c, tree, max_length, max_loops, budget);
-        Words next;
-        for (const auto& a : out)
-          for (const auto& b : child) {
-            Word w = a;
-            w.insert(w.end(), b.begin(), b.end());
-            append_unique(next, std::move(w), max_length, budget);
-          }
-        out = std::move(next);
+    max_.emplace(&n, value);
+    return value;
+  }
+
+  // Longest word the node keeps, from the first condition.
+  long long upper(const ProcessTreeNode& n) {
+    return max_length_ - (root_min_ - min_len(n));
+  }
+
+  std::set<Word> keep(const ProcessTreeNode& n, std::set<Word> words) {
+    const long long bound = upper(n);
+    ExtensiveLength rest = root_max_;
+    const auto own = max_len(n);
+    rest.loops -= own.loops;
+    rest.finite -= own.finite;
+    for (auto it = words.begin(); it != words.end();) {
+      const auto size = static_cast<long long>(it->size());
+      const bool short_enough = size <= bound;
+      const bool long_enough = rest.loops > 0 || size + rest.finite >= min_length_;
+      if (short_enough && long_enough) ++it;
+      else it = words.erase(it);
+    }
+    return words;
+  }
+
+  void add(std::set<Word>& out, Word word) {
+    if (budget_.take()) out.insert(std::move(word));
+  }
+
+  static void interleavings(const Word& a, const Word& b, std::size_t i,
+                            std::size_t j, Word& current,
+                            const std::function<void(const Word&)>& emit) {
+    if (i == a.size() && j == b.size()) {
+      emit(current);
+      return;
+    }
+    if (i < a.size()) {
+      current.push_back(a[i]);
+      interleavings(a, b, i + 1, j, current, emit);
+      current.pop_back();
+    }
+    if (j < b.size()) {
+      current.push_back(b[j]);
+      interleavings(a, b, i, j + 1, current, emit);
+      current.pop_back();
+    }
+  }
+
+  std::set<Word> play(const ProcessTreeNode& n) {
+    switch (n.op) {
+      case ProcessTreeOperator::kTau:
+        return {Word{}};
+      case ProcessTreeOperator::kActivity:
+        return keep(n, {Word{tree_.activities().at(n.activity)}});
+      case ProcessTreeOperator::kExclusive: {
+        std::set<Word> out;
+        for (const auto& child : n.children) out.merge(play(child));
+        return out;
       }
-      return out;
-    }
-    case ProcessTreeOperator::kParallel: {
-      Words out{Word{}};
-      for (const auto& c : n.children) {
-        Words child = enumerate(c, tree, max_length, max_loops, budget);
-        out = combine_parallel(out, child, max_length, budget);
-      }
-      return out;
-    }
-    case ProcessTreeOperator::kInterleaving: {
-      std::vector<Words> children;
-      children.reserve(n.children.size());
-      for (const auto& child : n.children)
-        children.push_back(enumerate(child, tree, max_length, max_loops, budget));
-      std::vector<std::size_t> order(n.children.size());
-      std::iota(order.begin(), order.end(), 0);
-      Words out;
-      do {
-        Words current{Word{}};
-        for (const auto index : order) {
-          Words next;
-          for (const auto& prefix : current) {
-            for (const auto& suffix : children[index]) {
-              Word word = prefix;
-              word.insert(word.end(), suffix.begin(), suffix.end());
-              append_unique(next, std::move(word), max_length, budget);
+      case ProcessTreeOperator::kSequence: {
+        // Words only grow, so a prefix above the node's bound is dropped
+        // early; the result is unchanged.
+        const long long bound = upper(n);
+        std::set<Word> current{Word{}};
+        for (const auto& child : n.children) {
+          const auto words = play(child);
+          std::set<Word> next;
+          for (const auto& prefix : current)
+            for (const auto& word : words) {
+              if (static_cast<long long>(prefix.size() + word.size()) > bound) continue;
+              if (budget_.exhausted) break;
+              Word joined = prefix;
+              joined.insert(joined.end(), word.begin(), word.end());
+              add(next, std::move(joined));
             }
-          }
           current = std::move(next);
         }
-        out.insert(out.end(), std::make_move_iterator(current.begin()),
-                   std::make_move_iterator(current.end()));
-      } while (budget.remaining != 0 &&
-               std::next_permutation(order.begin(), order.end()));
-      return out;
-    }
-    case ProcessTreeOperator::kLoop: {
-      Words body = enumerate(n.children[0], tree, max_length, max_loops, budget);
-      Words out;
-      std::function<void(std::size_t, Word)> expand;
-      expand = [&](std::size_t repeats, Word prefix) {
-        append_unique(out, prefix, max_length, budget);
-        if (repeats >= max_loops) return;
-        for (std::size_t r = 1; r < n.children.size(); ++r) {
-          Words redo = enumerate(n.children[r], tree, max_length, max_loops,
-                                budget);
-          for (const auto& rw : redo) {
-            for (const auto& bw : body) {
-              Word next = prefix;
-              next.insert(next.end(), rw.begin(), rw.end());
-              next.insert(next.end(), bw.begin(), bw.end());
-              // Repeating a silent loop cannot create a new visible word and
-              // would otherwise recurse once per configured loop bound.
-              if (next == prefix) continue;
-              if (next.size() <= max_length)
-                expand(repeats + 1, std::move(next));
+        return keep(n, std::move(current));
+      }
+      case ProcessTreeOperator::kParallel: {
+        const long long bound = upper(n);
+        std::set<Word> current{Word{}};
+        for (const auto& child : n.children) {
+          const auto words = play(child);
+          std::set<Word> next;
+          for (const auto& left : current)
+            for (const auto& right : words) {
+              if (static_cast<long long>(left.size() + right.size()) > bound) continue;
+              if (budget_.exhausted) break;
+              Word scratch;
+              interleavings(left, right, 0, 0, scratch,
+                            [&](const Word& word) { add(next, word); });
             }
-          }
+          current = std::move(next);
         }
-      };
-      for (const auto& bw : body) expand(0, bw);
-      return out;
+        auto kept = keep(n, std::move(current));
+        // The reference stops a parallel cut at max_limit_num_traces words;
+        // which words it keeps follows its set order. Here the first ones
+        // in word order are kept and the result is marked truncated.
+        if (kept.size() > max_traces_) {
+          capped_ = true;
+          kept.erase(std::next(kept.begin(), static_cast<std::ptrdiff_t>(max_traces_)), kept.end());
+        }
+        return kept;
+      }
+      case ProcessTreeOperator::kLoop: {
+        const long long bound = upper(n);
+        const auto body = play(n.children[0]);
+        const auto redo = play(n.children[1]);
+        for (std::size_t i = 2; i < n.children.size(); ++i) {
+          // The reference builds every child but reads only the first two.
+          if (n.children[i].op != ProcessTreeOperator::kInclusiveChoice)
+            (void)play(n.children[i]);
+        }
+        std::set<Word> out;
+        for (const auto& word : body)
+          if (static_cast<long long>(word.size()) <= bound) add(out, word);
+        std::set<Word> current = out;
+        for (std::size_t round = 0; round < max_loops_ && !current.empty() && !budget_.exhausted; ++round) {
+          std::set<Word> next;
+          for (const auto& prefix : current)
+            for (const auto& r : redo)
+              for (const auto& d : body) {
+                if (static_cast<long long>(prefix.size() + r.size() + d.size()) > bound) continue;
+                if (budget_.exhausted) break;
+                Word joined = prefix;
+                joined.insert(joined.end(), r.begin(), r.end());
+                joined.insert(joined.end(), d.begin(), d.end());
+                add(next, std::move(joined));
+              }
+          // A round that adds no new word leaves the later rounds unchanged.
+          bool grew = false;
+          for (const auto& word : next) grew = out.insert(word).second || grew;
+          if (!grew) break;
+          current = std::move(next);
+        }
+        return keep(n, std::move(out));
+      }
+      case ProcessTreeOperator::kInclusiveChoice:
+      case ProcessTreeOperator::kInterleaving:
+        break;
     }
+    throw std::invalid_argument("process-tree EXTENSIVE playout: unsupported operator");
   }
-  return {};
-}
+
+  const ProcessTree& tree_;
+  long long min_length_ = 1;
+  long long max_length_ = 0;
+  std::size_t max_loops_ = 0;
+  std::size_t max_traces_ = 100000;
+  long long root_min_ = 0;
+  ExtensiveLength root_max_;
+  ExtensiveBudget budget_;
+  bool capped_ = false;
+  std::unordered_map<const ProcessTreeNode*, long long> min_;
+  std::unordered_map<const ProcessTreeNode*, ExtensiveLength> max_;
+};
 
 // A sampled element: an activity index, or kTauElement for a silent leaf.
 // Silent leaves are kept while a trace is built because the reference
@@ -593,11 +720,9 @@ EventLog words_to_log(const Words& words, const ProcessTreePlayoutOptions& o) {
 ProcessTreePlayoutResult process_tree_playout_result(
     const ProcessTree& tree, ProcessTreePlayoutOptions options) {
   validate_node(tree.root(), tree);
-  if (options.max_length > 10000 || options.max_loop_occurrences > 10000)
+  if (options.max_length.value_or(0) > 10000 || options.max_loop_occurrences.value_or(0) > 10000)
     throw std::invalid_argument(
         "process-tree playout length and loop bounds must not exceed 10000");
-  if (options.min_length > options.max_length)
-    throw std::invalid_argument("process-tree playout min_length exceeds max_length");
   if (options.return_set_strings &&
       options.variant != ProcessTreePlayoutVariant::kExtensive)
     throw std::invalid_argument(
@@ -606,31 +731,37 @@ ProcessTreePlayoutResult process_tree_playout_result(
       !std::isfinite(options.event_interval))
     throw std::invalid_argument("process-tree playout timestamps and intervals must be finite");
   if (options.variant == ProcessTreePlayoutVariant::kExtensive) {
-    constexpr std::size_t kEnumerationBudget = 250000;
-    std::size_t budget_limit = kEnumerationBudget;
-    if (options.max_traces < kEnumerationBudget / 64)
-      budget_limit = std::max<std::size_t>(10000, options.max_traces * 64);
-    EnumerationBudget budget{budget_limit};
-    Words words = enumerate(tree.root(), tree, options.max_length,
-                            options.max_loop_occurrences, budget);
-    const bool truncated = budget.exhausted;
-    std::set<Word> unique(words.begin(), words.end());
-    words.assign(unique.begin(), unique.end());
+    if (node_has_operator(tree.root(), ProcessTreeOperator::kInterleaving))
+      throw std::invalid_argument(
+          "EXTENSIVE process-tree playout does not support interleaving (the reference raises "
+          "TypeError)");
+    if (inclusive_choice_read(tree.root()))
+      throw std::invalid_argument(
+          "EXTENSIVE process-tree playout does not support inclusive choice (the reference raises "
+          "KeyError)");
+    if (!reference_root_reachable(tree))
+      throw std::invalid_argument(
+          "EXTENSIVE process-tree playout: equal subtrees under different parents leave the "
+          "reference's bottom-up walk short of the root (the reference raises KeyError)");
+    if (has_single_child_block(tree.root()))
+      throw std::invalid_argument(
+          "EXTENSIVE process-tree playout does not support a sequence or parallel cut with one "
+          "child (the reference raises IndexError)");
+    ReferenceExtensive engine(tree, options.min_length, options.max_length,
+                              options.max_loop_occurrences, options.max_traces, 250000);
+    const auto unique = engine.run();
+    Words words(unique.begin(), unique.end());
     std::stable_sort(words.begin(), words.end(), [](const Word& a, const Word& b) {
-      return a.size() == b.size() ? a < b : a.size() < b.size();
+      return a.size() < b.size();
     });
-    words.erase(std::remove_if(words.begin(), words.end(), [&](const Word& w) {
-      return w.size() < options.min_length;
-    }), words.end());
-    if (words.size() > options.max_traces) words.resize(options.max_traces);
     ProcessTreePlayoutResult result;
     result.log = words_to_log(words, options);
     if (options.return_set_strings) result.trace_strings = std::move(words);
-    result.truncated = truncated;
+    result.truncated = engine.truncated();
     return result;
   }
   if (options.variant == ProcessTreePlayoutVariant::kTopBottom &&
-      contains_operator(tree.root(), ProcessTreeOperator::kInclusiveChoice))
+      node_has_operator(tree.root(), ProcessTreeOperator::kInclusiveChoice))
     throw std::invalid_argument(
         "TOPBOTTOM process-tree playout does not support inclusive choice (the reference raises "
         "TypeError)");
@@ -638,8 +769,8 @@ ProcessTreePlayoutResult process_tree_playout_result(
   rng::PythonRandom random(options.seed);
   SampleBounds bounds;
   bounds.cap_loops = options.cap_sampled_loops;
-  bounds.max_loops = options.max_loop_occurrences;
-  const std::size_t limit = std::min(options.max_steps, options.max_length);
+  bounds.max_loops = options.max_loop_occurrences.value_or(3);
+  const std::size_t limit = std::min(options.max_steps, options.max_length.value_or(options.max_steps));
   words.reserve(options.traces);
   // TOPBOTTOM shuffles interleaving children in place, so it runs on a copy
   // whose child order evolves across traces as the reference's tree does.

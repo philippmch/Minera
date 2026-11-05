@@ -45,6 +45,30 @@ int main() {
   const auto exact_result = minera::discover_case_arrival(exact);
   assert(exact_result.arrival_average == 5288.883333333333);
   assert(exact_result.dispersion_average == 5288.883333333333);
+  // The DataFrame path (pm4py.get_case_arrival_average on the
+  // format_dataframe frame of the same CSV, or on read_xes's DataFrame):
+  // pandas total_seconds gaps averaged by numpy give 5288.883333333334.
+  minera::CaseArrivalOptions frame;
+  frame.dataframe = true;
+  const auto frame_result = minera::discover_case_arrival(exact, frame);
+  assert(frame_result.arrival_average == 5288.883333333334);
+  assert(frame_result.dispersion_average == 5288.883333333334);
+  // Gaps of 232001 us and 707535 us: the reference's total_seconds reads
+  // 0.23200099999999998 and 0.707535, so the DataFrame mean is
+  // 0.46976799999999996 where the exact mean is 0.469768.
+  minera::EventLog sub_second;
+  sub_second.traces = {trace("2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z"),
+                       trace("2024-01-01T00:00:00.232001Z", "2024-01-01T00:00:00.232001Z"),
+                       trace("2024-01-01T00:00:00.939536Z", "2024-01-01T00:00:00.939536Z")};
+  assert(minera::discover_case_arrival(sub_second, frame).arrival_average == 0.46976799999999996);
+  assert(minera::discover_case_arrival(sub_second).arrival_average == 0.469768);
+  // A nanosecond gap: the DataFrame path adds the nanoseconds times 1e-9,
+  // the EventLog path floors the gap to the microsecond.
+  minera::EventLog nano;
+  nano.traces = {trace("2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z"),
+                 trace("2024-01-01T00:00:01.000002999Z", "2024-01-01T00:00:01.000002999Z")};
+  assert(minera::discover_case_arrival(nano, frame).arrival_average == 1.0 + 2 * 1e-6 + 999 * 1e-9);
+  assert(minera::discover_case_arrival(nano).arrival_average == 1.000002);
 
   minera::CaseArrivalOptions options;
   options.use_business_hours = true;

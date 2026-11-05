@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -31,8 +32,14 @@ enum class ProcessTreePlayoutVariant {
 // process_tree_playout.cpp), so `traces` traces reproduce the reference log
 // for the same seed whatever the string-hash seed. BASIC_PLAYOUT follows the
 // reference's distribution (its enabled-vertex set iterates in string-hash
-// order, so no seed reproduces it); EXTENSIVE enumerates the bounded
-// language. The TOPBOTTOM and EXTENSIVE logs have the activity only (no case
+// order, so no seed reproduces it); EXTENSIVE builds the reference's
+// bottom-up word sets with its length filters (see process_tree_playout.cpp),
+// so it is not the tree's language: words outside the length bounds can stay
+// and words inside them can be dropped, a loop reads only its first redo
+// child, and the trees the reference rejects (inclusive choice,
+// interleaving, a sequence or parallel cut with one child, equal subtrees
+// that leave its bottom-up walk short of the root) are rejected. The words
+// come sorted by length, then by activities. The TOPBOTTOM and EXTENSIVE logs have the activity only (no case
 // id, no timestamp); BASIC_PLAYOUT names its cases "0", "1", ... and stamps
 // the events one second apart from epoch 10,000,000 (1970-04-26T17:46:40Z),
 // counting on across cases. A tree with an inclusive choice raises under TOPBOTTOM, as the
@@ -45,13 +52,18 @@ struct ProcessTreePlayoutOptions {
   // either reproduces the reference or fails.
   std::size_t max_steps = 1000;
   std::uint64_t seed = 1;
-  std::size_t max_length = 1000;             // extensive visible length
-  std::size_t min_length = 1;                // extensive lower bound
-  std::size_t max_traces = 100000;           // extensive case cap
-  // Loop redo bound of EXTENSIVE. The sampled variants repeat loops without
-  // a bound, as the reference does, unless cap_sampled_loops opts in (a
-  // declared extension that changes the draws).
-  std::size_t max_loop_occurrences = 3;
+  // EXTENSIVE max_trace_length; unset, the tree's shortest word length, as
+  // in the reference. The sampled variants use it as a second safety bound
+  // next to max_steps (unset: max_steps alone).
+  std::optional<std::size_t> max_length;
+  std::size_t min_length = 1;                // EXTENSIVE min_trace_length
+  // EXTENSIVE max_limit_num_traces: the cap on a parallel cut's words.
+  std::size_t max_traces = 100000;
+  // EXTENSIVE max_loop_occ; unset, half of max_trace_length (rounded down),
+  // as in the reference. The sampled variants repeat loops without a bound,
+  // as the reference does, unless cap_sampled_loops opts in (a declared
+  // extension that changes the draws; unset, three redos).
+  std::optional<std::size_t> max_loop_occurrences;
   bool cap_sampled_loops = false;
   // Declared extension: case ids case_1, case_2, ... and timestamps
   // start + i * case_interval + j * event_interval instead of the reference
