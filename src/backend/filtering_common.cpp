@@ -595,15 +595,11 @@ std::string get_kde_numeric_attribute_json(const std::vector<double>& values, st
   return json_pairs(x, kde.y);
 }
 
-FilteringDateKde get_kde_date_attribute(const std::vector<FilteringDateTime>& values, std::int64_t graph_points,
-                                        std::int64_t points_to_sample) {
-  if (values.empty()) fail("IndexError", "list index out of range");
-  std::vector<double> seconds;
-  seconds.reserve(values.size());
-  for (const auto& value : values) seconds.push_back(naive_timestamp(value));
+namespace {
+
+FilteringDateKde date_kde_from_seconds(const std::vector<double>& seconds, bool single, std::int64_t graph_points,
+                                       std::int64_t points_to_sample) {
   FilteringDateKde out;
-  bool single = true;
-  for (const auto& value : values) single = single && value == values.front();
   if (single) {
     const double s = seconds.front();
     const auto grid = linspace(s - 3600, s + 3600, graph_points);
@@ -611,7 +607,7 @@ FilteringDateKde get_kde_date_attribute(const std::vector<FilteringDateTime>& va
     for (const double v : grid) out.x_ns.push_back(seconds_to_ns(v));
     return out;
   }
-  const auto n = static_cast<std::int64_t>(values.size());
+  const auto n = static_cast<std::int64_t>(seconds.size());
   const std::int64_t k = points_to_sample;
   std::vector<std::int64_t> positions;
   if (k >= n) {
@@ -630,6 +626,27 @@ FilteringDateKde get_kde_date_attribute(const std::vector<FilteringDateTime>& va
   out.y = gaussian_kde(data, grid);
   for (const double v : grid) out.x_ns.push_back(seconds_to_ns(v));
   return out;
+}
+
+}  // namespace
+
+FilteringDateKde get_kde_date_attribute(const std::vector<FilteringDateTime>& values, std::int64_t graph_points,
+                                        std::int64_t points_to_sample) {
+  if (values.empty()) fail("IndexError", "list index out of range");
+  std::vector<double> seconds;
+  seconds.reserve(values.size());
+  for (const auto& value : values) seconds.push_back(naive_timestamp(value));
+  bool single = true;
+  for (const auto& value : values) single = single && value == values.front();
+  return date_kde_from_seconds(seconds, single, graph_points, points_to_sample);
+}
+
+FilteringDateKde get_kde_date_attribute_seconds(const std::vector<double>& seconds, std::int64_t graph_points,
+                                                std::int64_t points_to_sample) {
+  if (seconds.empty()) fail("IndexError", "list index out of range");
+  bool single = true;
+  for (const double value : seconds) single = single && value == seconds.front();
+  return date_kde_from_seconds(seconds, single, graph_points, points_to_sample);
 }
 
 std::string get_kde_date_attribute_json(const std::vector<FilteringDateTime>& values, std::int64_t graph_points,

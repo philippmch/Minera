@@ -15,6 +15,7 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <spawn.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -1431,10 +1432,159 @@ int main(int argc, char** argv) {
       r = mine_on(limits, log, {});
       check(r && r->status == 200 && contains(r, "\"source_id\":"),
             "once the slot is free a mine runs to completion: " + describe(r));
+      // The stream event ceiling is the budget at 2 KiB an event (976 here):
+      // a reader whose source holds more events is refused with 429.
+      r = limits.Get("/api/live-stream/list");
+      check(r && r->status == 200 && contains(r, "\"max_events\":976}"),
+            "the stream event ceiling follows --mine-memory-budget: " + describe(r));
+      {
+        httplib::MultipartFormDataItems source = {{"log", generated(250, 4), "big.csv", "text/csv"}};
+        r = limits.Post("/api/stream-reader/create?session_id=budget1&kind=csv_events", source);
+        check(r && r->status == 429 && contains(r, "event budget (976)"),
+              "a reader past the stream event ceiling gets 429: " + describe(r));
+        httplib::MultipartFormDataItems small = {{"log", generated(10, 4), "small.csv", "text/csv"}};
+        r = limits.Post("/api/stream-reader/create?session_id=budget2&kind=csv_events", small);
+        check(r && r->status == 200, "a reader within the stream event ceiling is created: " + describe(r));
+      }
       ::kill(limit_server, SIGTERM);
       int limit_status = 0;
       ::waitpid(limit_server, &limit_status, 0);
     }
+  }
+
+  // Robustness review: malformed or overflowing controls answer 4xx with the
+  // error envelope (never 500), and every 200 JSON body is valid JSON.
+  if (ready) {
+    httplib::MultipartFormDataItems items = {{"log", log, "log.csv", "text/csv"}};
+    auto r = client.Post("/api/mine", items);
+    check(r && r->status == 200, "robustness: mine the fixture: " + describe(r));
+    // A malformed playout marking was an escaped exception (500).
+    for (const std::string query : {"initial_marking=", "final_marking=x", "initial_marking=-1"}) {
+      r = client.Post("/api/playout?" + query, "", "text/plain");
+      check(r && r->status == 400 && contains(r, "\"error\"") && valid_json(r->body),
+            "a malformed playout marking (" + query + ") gets 400: " + describe(r));
+    }
+    // Finite costs whose totals overflow a double printed inf into the JSON.
+    r = client.Post("/api/align-decomposed?log_move_cost=1e308", "", "text/plain");
+    check(r && r->status == 400 && contains(r, "alignment costs are too large") && valid_json(r->body),
+          "decomposed alignment costs that overflow get 400: " + describe(r));
+    r = client.Post("/api/align-decomposed?log_move_cost=2", "", "text/plain");
+    check(r && r->status == 200 && valid_json(r->body),
+          "decomposed alignment with a finite cost total still answers: " + describe(r));
+    const auto pnml = client.Get("/api/pnml");
+    check(pnml && pnml->status == 200, "robustness: GET /api/pnml: " + describe(pnml));
+    if (pnml && pnml->status == 200) {
+      httplib::MultipartFormDataItems align = {{"log", log, "log.csv", "text/csv"},
+                                               {"model", pnml->body, "model.pnml", "application/xml"},
+                                               {"trace_cost", "1e308", "", ""}};
+      r = client.Post("/api/align-petri-workbench", align);
+      check(r && r->status == 400 && contains(r, "alignment costs are too large") && valid_json(r->body),
+            "Petri alignment workbench costs that overflow get 400: " + describe(r));
+      align.back().content = "2";
+      r = client.Post("/api/align-petri-workbench", align);
+      check(r && r->status == 200 && valid_json(r->body),
+            "Petri alignment workbench with a finite cost still answers: " + describe(r));
+    }
+    // Control characters in names were written raw into JSON strings.
+    for (const std::string route : {"/api/embeddings", "/api/to-embeddings"}) {
+      r = client.Post(route, "embedding_model=a%01b", "application/x-www-form-urlencoded");
+      check(r && r->status == 200 && valid_json(r->body) && contains(r, "a\\u0001b"),
+            route + " escapes a control character in the model name: " + describe(r));
+    }
+    items = {{"log", "case_id,activity,timestamp\nc1,A\x01" "B,2024-01-01T00:00:00Z\n", "ctl.csv", "text/csv"}};
+    r = client.Post("/api/mine", items);
+    check(r && r->status == 200, "robustness: mine a control-character activity: " + describe(r));
+    r = client.Get("/api/trie-to-petri");
+    check(r && r->status == 200 && valid_json(r->body) && contains(r, "A\\u0001B"),
+          "trie-to-petri escapes a control character in an activity: " + describe(r));
+    // Framing errors httplib answers itself also get the error envelope: a
+    // request line over 8 KiB (414) and a malformed or negative
+    // Content-Length (400; a negative one was 413 "larger than 128 MiB").
+    const auto long_line = raw_exchange(port, "GET", "/api/traces?source_id=" + std::string(9000, '1'));
+    check(long_line.status == 414 && valid_json(long_line.body) &&
+              long_line.body.find("request line is longer") != std::string::npos,
+          "an over-long /api request line gets 414 with the error envelope: " + describe(long_line));
+    for (const std::string length : {"-5", "12abc"}) {
+      const int fd = connect_loopback(port);
+      check(fd >= 0, "connect for the malformed Content-Length");
+      if (fd < 0) continue;
+      send_all(fd, "POST /api/mine HTTP/1.1\r\n" + host_header(port) +
+                       "Content-Type: text/csv\r\nContent-Length: " + length + "\r\n\r\n");
+      const auto bad_length = read_raw_response(fd);
+      check(bad_length.status == 400 && valid_json(bad_length.body) &&
+                bad_length.body.find("Content-Length header must be") != std::string::npos,
+            "Content-Length " + length + " gets 400 with the error envelope: " + describe(bad_length));
+    }
+  }
+
+  // Address-space limits (ulimit -v, prlimit --as). The default mining memory
+  // budget honours one: under 2 GiB it is at most 1 GiB, so a log of 110,000
+  // events (about 1.1 GB estimated) gets 413 MINE_LIMIT before it is parsed
+  // instead of running the server out of memory. With the budget raised past
+  // a 1.5 GiB limit, a mine of 400,000 events that runs out of memory gets
+  // 503 naming it (it was 400 "std::bad_alloc") and the server lives on.
+  for (const bool raised : {false, true}) {
+    const int as_port = free_port();
+    const std::string as_port_text = std::to_string(as_port);
+    std::vector<std::string> as_args = {argv[1], "--port", as_port_text, "--frontend",
+                                        "/nonexistent-minera-frontend"};
+    if (raised) as_args.insert(as_args.end(), {"--mine-memory-budget", "100G"});
+    std::vector<char*> as_raw;
+    for (auto& arg : as_args) as_raw.push_back(arg.data());
+    as_raw.push_back(nullptr);
+    const rlim_t address_space = raised ? rlim_t{1536} << 20 : rlim_t{2} << 30;
+    const pid_t as_server = ::fork();
+    if (as_server == 0) {
+      const rlimit limit{address_space, address_space};
+      ::setrlimit(RLIMIT_AS, &limit);
+      ::execv(argv[1], as_raw.data());
+      ::_exit(127);
+    }
+    check(as_server > 0, "start the address-space-limited server");
+    if (as_server <= 0) continue;
+    httplib::Client limited("127.0.0.1", as_port);
+    limited.set_read_timeout(120, 0);
+    bool as_ready = false;
+    for (int attempt = 0; attempt < 200 && !as_ready; ++attempt) {
+      if (auto r = limited.Get("/api/version"); r && r->status == 200) as_ready = true;
+      else std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    check(as_ready, "address-space-limited server answers /api/version");
+    // The stream event ceiling follows the same budget: about 2 KB an event,
+    // so at most 524,288 events under 2 GiB (it was always 2,000,000).
+    if (!raised) {
+      const auto list = limited.Get("/api/live-stream/list");
+      std::uint64_t max_events = 0;
+      if (list) {
+        const auto at = list->body.find("\"max_events\":");
+        if (at != std::string::npos) max_events = std::strtoull(list->body.c_str() + at + 13, nullptr, 10);
+      }
+      check(list && list->status == 200 && max_events > 0 && max_events <= 524288,
+            "under a 2 GiB address-space limit the stream event ceiling is at most 524288: " + describe(list));
+    }
+    std::string csv = "case_id,activity,timestamp\n";
+    for (int e = 0; e < (raised ? 400000 : 110000); ++e)
+      csv += "c" + std::to_string(e / 10) + ",A" + std::to_string(e % 10) + ",2024-01-01T00:00:00Z\n";
+    httplib::MultipartFormDataItems big = {{"log", csv, "big.csv", "text/csv"}};
+    const auto r = limited.Post("/api/mine", big);
+    if (!raised) {
+      std::uint64_t budget = 0;
+      if (r) {
+        const auto at = r->body.find("\"memory_budget_bytes\":");
+        if (at != std::string::npos) budget = std::strtoull(r->body.c_str() + at + 22, nullptr, 10);
+      }
+      check(r && r->status == 413 && contains(r, "\"family\":\"MINE_LIMIT\"") && budget > 0 &&
+                budget <= (std::uint64_t{1} << 30),
+            "under a 2 GiB address-space limit the default budget is at most 1 GiB: " + describe(r));
+    } else {
+      check(r && r->status == 503 && contains(r, "ran out of memory") && valid_json(r->body),
+            "a mine that runs out of memory gets 503 with the error envelope: " + describe(r));
+      const auto alive = limited.Get("/api/version");
+      check(alive && alive->status == 200, "the server answers after running out of memory");
+    }
+    ::kill(as_server, SIGTERM);
+    int as_status = 0;
+    ::waitpid(as_server, &as_status, 0);
   }
 
   ::kill(server, SIGTERM);

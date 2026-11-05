@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstddef>
 #include <optional>
+#include <stdexcept>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -346,6 +347,103 @@ void performance_spectrum_lazyframe_disconnected_variant_contract() {
   assert(result.observations.size() == 11);
 }
 
+// Reference captures (pm4py 2.7.22 algorithm.apply with the named variant).
+EventLog timed_log(
+    const std::vector<std::pair<std::string,
+                                std::vector<std::pair<std::string, int>>>>& traces) {
+  EventLog log;
+  for (const auto& [case_id, events] : traces) {
+    minera::Trace trace;
+    trace.case_id = case_id;
+    for (std::size_t index = 0; index < events.size(); ++index) {
+      Event event;
+      event.case_id = case_id;
+      event.activity = events[index].first;
+      const int second = events[index].second;
+      event.timestamp = std::string("2020-01-01T00:00:") + (second < 10 ? "0" : "") +
+                        std::to_string(second) + "Z";
+      event.input_order = index;
+      trace.events.push_back(std::move(event));
+    }
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+std::vector<std::string> labels(const minera::PerformanceSpectrum& spectrum) {
+  std::vector<std::string> result;
+  for (const auto& observation : spectrum.observations) {
+    std::string label;
+    for (const auto& activity : observation.activities) label += activity;
+    result.push_back(label);
+  }
+  return result;
+}
+
+void performance_spectrum_reference_tie_order_contract() {
+  constexpr double kBase = 1577836800.0;
+  // LOG_DISCONNECTED walks a Python set of (i, i + 1) positions, so equally
+  // timed pairs leave in CPython set order (here across one table growth).
+  const auto one = [](const std::string& activities) {
+    std::vector<std::pair<std::string, int>> events;
+    for (const char activity : activities) events.push_back({std::string(1, activity), 0});
+    return timed_log({{"1", events}});
+  };
+  assert(labels(minera::discover_performance_spectrum_log_disconnected(
+             one("GGGABCDEFG"), {"A", "B", "C", "D", "E", "F", "G"})) ==
+         std::vector<std::string>({"AB", "DE", "BC", "FG", "CD", "EF"}));
+  assert(labels(minera::discover_performance_spectrum_log_disconnected(
+             one("CCCABC"), {"A", "B", "C"})) ==
+         std::vector<std::string>({"BC", "AB"}));
+
+  // Both LOG variants sort the traces by their first pattern event (ties in
+  // log order) before the stable sort by first instant: case 23 starts with
+  // D at 3 s, case 5 with a non-pattern X at 1 s.
+  const auto traces = timed_log({{"11", {{"A", 10}, {"D", 10}}},
+                                 {"5", {{"X", 1}, {"A", 10}, {"D", 12}}},
+                                 {"23", {{"D", 3}, {"A", 10}, {"D", 11}}}});
+  const auto connected = minera::discover_performance_spectrum_log(traces, {"A", "D"});
+  assert(observation_case_ids(connected) ==
+         std::vector<std::string>({"23", "11", "5"}));
+  assert_close(connected.observations[0].instants[1], kBase + 11);
+  const auto pairs =
+      minera::discover_performance_spectrum_log_disconnected(traces, {"A", "D"});
+  assert(observation_case_ids(pairs) == std::vector<std::string>({"23", "11", "5"}));
+
+  // DATAFRAME_DISCONNECTED gathers the longest subpatterns of every case
+  // first, so an equally early longer observation precedes a shorter one.
+  EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  const std::vector<std::tuple<std::string, std::string, std::string>> rows{
+      {"4", "E", "18"}, {"4", "E", "22"}, {"9", "E", "18"}, {"9", "E", "18"},
+      {"9", "B", "18"}};
+  for (const auto& [case_id, activity, second] : rows) {
+    table.rows.push_back({cell("case:concept:name", case_id),
+                          cell("concept:name", activity),
+                          cell("time:timestamp", "2020-01-01T00:00:" + second + "Z")});
+  }
+  const auto longest = minera::discover_performance_spectrum_dataframe_disconnected(
+      table, {"E", "E", "B"});
+  assert(observation_case_ids(longest) == std::vector<std::string>({"9", "4"}));
+  assert(labels(longest) == std::vector<std::string>({"EEB", "EE"}));
+  assert_close(longest.observations[1].instants[1], (kBase + 22) / 1000.0);
+  // Fewer pattern rows than pattern steps: pandas refuses the shifted frame
+  // ("all arrays must be same length"); one more row is enough.
+  bool rejected = false;
+  try {
+    (void)minera::discover_performance_spectrum_dataframe_disconnected(
+        table, {"B", "C", "D"});
+  } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+  assert(minera::discover_performance_spectrum_dataframe_disconnected(table, {"B", "C"})
+             .observations.empty());
+  assert(minera::discover_performance_spectrum_dataframe_disconnected(
+             table, {"E", "C", "D", "F"})
+             .observations.empty());
+}
+
 }  // namespace
 
 int main() {
@@ -362,4 +460,5 @@ int main() {
   performance_spectrum_log_disconnected_variant_contract();
   performance_spectrum_dataframe_disconnected_variant_contract();
   performance_spectrum_lazyframe_disconnected_variant_contract();
+  performance_spectrum_reference_tie_order_contract();
 }

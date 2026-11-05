@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -16,6 +17,7 @@
 
 #include "minera/conformance.hpp"
 #include "minera/bpmn.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/json_export.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/ptml.hpp"
@@ -287,6 +289,88 @@ void process_tree_playout_loop_bounds() {
   assert(threw);
 }
 
+// Safety bounds of EXTENSIVE and the sampled variants: the interleavings
+// of two long words stop once the word budget is spent (C(32,16) shuffles
+// otherwise), output_trace_cap caps the final words, a cancellation
+// callback stops a run, and an unset max_length bounds a sampled trace at
+// 1000 visible events.
+void process_tree_playout_safety_bounds() {
+  std::vector<std::string> names;
+  ProcessTreeNode left{ProcessTreeOperator::kSequence, 0, {}};
+  ProcessTreeNode right{ProcessTreeOperator::kSequence, 0, {}};
+  for (std::size_t i = 0; i < 16; ++i) {
+    names.push_back("a" + std::to_string(i));
+    left.children.push_back(ProcessTreeNode::leaf(names.size() - 1));
+    names.push_back("b" + std::to_string(i));
+    right.children.push_back(ProcessTreeNode::leaf(names.size() - 1));
+  }
+  const ProcessTree branches(names, ProcessTreeNode{ProcessTreeOperator::kParallel, 0, {left, right}});
+  ProcessTreePlayoutOptions ex;
+  ex.variant = ProcessTreePlayoutVariant::EXTENSIVE;
+  ex.max_traces = 10000;
+  const auto bounds = resolve_process_tree_extensive_bounds(branches, ex);
+  assert(bounds.max_length == 32 && bounds.max_loop_occurrences == 16);
+  const auto started = std::chrono::steady_clock::now();
+  const auto result = process_tree_playout_result(branches, ex);
+  const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+  assert(seconds < 10.0);
+  assert(result.truncated);
+  assert(result.log.traces.size() == 10000);
+
+  // Six exclusive choices of eight: 8^6 words, cut by the budget; the cap
+  // keeps the first 500 in result order.
+  std::vector<std::string> choice_names;
+  ProcessTreeNode sequence{ProcessTreeOperator::kSequence, 0, {}};
+  for (std::size_t c = 0; c < 6; ++c) {
+    ProcessTreeNode choice{ProcessTreeOperator::kExclusive, 0, {}};
+    for (std::size_t i = 0; i < 8; ++i) {
+      choice_names.push_back(std::string(1, static_cast<char>('a' + c)) + std::to_string(i));
+      choice.children.push_back(ProcessTreeNode::leaf(choice_names.size() - 1));
+    }
+    sequence.children.push_back(std::move(choice));
+  }
+  const ProcessTree choices(choice_names, sequence);
+  ex.output_trace_cap = 500;
+  ex.return_set_strings = true;
+  const auto capped = process_tree_playout_result(choices, ex);
+  assert(capped.truncated && capped.log.traces.size() == 500 && capped.trace_strings.size() == 500);
+  ex.output_trace_cap = 0;
+  ex.return_set_strings = false;
+  const auto exact = process_tree_playout_result(ProcessTree({"a", "b"}, seq({ProcessTreeNode::leaf(0), ProcessTreeNode::leaf(1)})), ex);
+  assert(!exact.truncated && exact.log.traces.size() == 1);
+
+  std::size_t polls = 0;
+  ex.cancelled = [&] { return ++polls > 3; };
+  bool cancelled = false;
+  try { (void)process_tree_playout_result(branches, ex); }
+  catch (const OperationCancelled&) { cancelled = true; }
+  assert(cancelled);
+  ProcessTreePlayoutOptions sampled;
+  sampled.traces = 3;
+  sampled.cancelled = [] { return true; };
+  cancelled = false;
+  try { (void)process_tree_playout(branches, sampled); }
+  catch (const OperationCancelled&) { cancelled = true; }
+  assert(cancelled);
+
+  std::vector<std::string> long_names;
+  ProcessTreeNode long_sequence{ProcessTreeOperator::kSequence, 0, {}};
+  for (std::size_t i = 0; i < 1001; ++i) {
+    long_names.push_back("x" + std::to_string(i));
+    long_sequence.children.push_back(ProcessTreeNode::leaf(i));
+  }
+  const ProcessTree long_tree(long_names, long_sequence);
+  ProcessTreePlayoutOptions steps;
+  steps.traces = 1;
+  steps.max_steps = 5000;
+  bool threw = false;
+  try { (void)process_tree_playout(long_tree, steps); }
+  catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  steps.max_length = 2000;
+  assert(process_tree_playout(long_tree, steps).traces.front().events.size() == 1001);
+}
+
 // BASIC_PLAYOUT against the reference distribution
 // (scripts/capture-process-tree-basic-distribution.py): a chi-square
 // homogeneity test per tree at the 0.1% level, bins with fewer than ten
@@ -394,6 +478,7 @@ void process_tree_basic_distribution(const char* path) {
 int main(int argc, char** argv) {
   process_tree_playout_envelopes();
   process_tree_playout_loop_bounds();
+  process_tree_playout_safety_bounds();
   process_tree_basic_distribution(
       argc > 1 ? argv[1] : "src/backend/tests/fixtures/process_tree_basic_distribution.txt");
   process_tree_basic_variant_contract();

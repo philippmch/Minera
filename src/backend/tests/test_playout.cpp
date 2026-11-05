@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 #include <set>
@@ -775,6 +776,24 @@ void inputless_transitions_are_always_enabled() {
     assert(!(trace.events.size() == 1 && trace.events[0].activity == "c"));
   }
   assert(f_first && exact_cf);
+  // The source-log fit replays with the same semantics: the reference's
+  // token replay fires f in "f c" (trace fit). Native fits activations over
+  // enablings along the replayed path; before, neither trace replayed and
+  // both weights stayed 1.
+  minera::EventLog source;
+  for (const auto* words : {"cf", "fc"}) {
+    minera::Trace trace;
+    trace.case_id = words;
+    for (const char* c = words; *c; ++c) {
+      minera::Event event;
+      event.case_id = trace.case_id;
+      event.activity = std::string(1, *c);
+      trace.events.push_back(event);
+    }
+    source.traces.push_back(trace);
+  }
+  const auto weights = minera::fit_stochastic_transition_weights(net, source);
+  assert(std::abs(weights[0] - 2.0 / 3.0) < 1e-12 && weights[1] == 0.5);
 }
 
 int main() {

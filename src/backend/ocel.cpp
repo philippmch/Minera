@@ -1928,7 +1928,8 @@ Ocel parse_ocel_json_literal_names(std::string_view json, const OcelJsonLimits& 
   return parse_ocel_json_names(json,limits,true);
 }
 
-std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
+std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
+                                bool transport_markers) {
   std::ostringstream out;
   // Marks a log that holds events or objects without an event-object
   // relation, so parse_ocel_json keeps them instead of dropping them as the
@@ -2224,8 +2225,10 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format) {
   write_global_category(out, log, "ocel:global-object");
   write_table_columns();
   write_keep_unrelated();
-  write_event_time_offset();
-  if (log.event_activity_first) out << ",\"minera:eventActivityFirst\":true";
+  if (transport_markers) {
+    write_event_time_offset();
+    if (log.event_activity_first) out << ",\"minera:eventActivityFirst\":true";
+  }
   out << '}';
   return out.str();
 }

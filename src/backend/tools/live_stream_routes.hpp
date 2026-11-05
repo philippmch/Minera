@@ -11,6 +11,14 @@ struct LiveCapacityError : std::runtime_error { int status; LiveCapacityError(in
 // released. One live event costs about 2 KB once queued and delivered.
 constexpr std::size_t kStreamGlobalMaxStoredBytes = std::size_t{1} << 30;
 constexpr std::size_t kStreamGlobalMaxEvents = 2000000;
+constexpr std::size_t kStreamBytesPerEvent = 2048;
+// The event ceiling fits the memory budget mining plans with (half the
+// physical memory, or of a lower cgroup or address-space limit, unless
+// --mine-memory-budget sets it), so streams cannot outgrow the address space;
+// kStreamGlobalMaxEvents bounds it when memory allows more.
+std::size_t stream_global_max_events() {
+  return static_cast<std::size_t>(std::min<std::uint64_t>(kStreamGlobalMaxEvents, mine_memory_budget() / kStreamBytesPerEvent));
+}
 std::atomic<std::size_t> g_stream_budget_bytes{0}, g_stream_budget_events{0};
 void stream_budget_take(std::atomic<std::size_t>& counter,std::size_t limit,std::size_t amount,const char* what) {
   auto current=counter.load();
@@ -29,7 +37,7 @@ struct StreamBudgetCharge {
   ~StreamBudgetCharge() {release();}
   void reserve(std::size_t more_bytes,std::size_t more_events) {
     stream_budget_take(g_stream_budget_bytes,kStreamGlobalMaxStoredBytes,more_bytes,"byte");
-    try {stream_budget_take(g_stream_budget_events,kStreamGlobalMaxEvents,more_events,"event");}
+    try {stream_budget_take(g_stream_budget_events,stream_global_max_events(),more_events,"event");}
     catch(...) {g_stream_budget_bytes-=more_bytes;throw;}
     bytes+=more_bytes;events+=more_events;
   }
@@ -40,7 +48,7 @@ struct StreamBudgetCharge {
 // "stream_budget":{"bytes":N,"events":N,"max_bytes":N,"max_events":N}.
 std::string stream_budget_json() {
   return "\"stream_budget\":{\"bytes\":"+std::to_string(g_stream_budget_bytes.load())+",\"events\":"+std::to_string(g_stream_budget_events.load())+
-         ",\"max_bytes\":"+std::to_string(kStreamGlobalMaxStoredBytes)+",\"max_events\":"+std::to_string(kStreamGlobalMaxEvents)+"}";
+         ",\"max_bytes\":"+std::to_string(kStreamGlobalMaxStoredBytes)+",\"max_events\":"+std::to_string(stream_global_max_events())+"}";
 }
 // When a request last named a session (steady clock ticks). Sessions nobody
 // touches for the idle expiry are freed by the stream idle reaper.

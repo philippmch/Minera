@@ -280,7 +280,8 @@ ReplayResult replay_trace(
     for (std::size_t transition_index = 0;
          transition_index < net.transitions().size(); ++transition_index) {
       const auto& transition = net.transitions()[transition_index];
-      if (transition.inputs.empty() && !transition.has_extended_arcs()) continue;
+      // A transition without input places is always enabled, as in the
+      // reference's token replay (which fires and counts it).
       if (!petri_transition_enabled(transition, state.marking)) continue;
       ReplayState next = state;
       if (!transition.silent()) {
@@ -307,8 +308,7 @@ ReplayResult replay_trace(
   for (const auto transition_index : result.path) {
     for (std::size_t i = 0; i < net.transitions().size(); ++i) {
       const auto& candidate = net.transitions()[i];
-      if (!(candidate.inputs.empty() && !candidate.has_extended_arcs()) &&
-          petri_transition_enabled(candidate, marking)) {
+      if (petri_transition_enabled(candidate, marking)) {
         result.touched.push_back(i);
       }
     }

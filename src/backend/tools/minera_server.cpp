@@ -2266,9 +2266,12 @@ void handle_ocel_exchange(const httplib::Request& request,
       std::string content_type;
       std::string filename;
       if (format == "json" || format == "json_standard") {
+        // A download: without the classic transport markers, so the file
+        // reads as the reference's read_ocel_json reads it.
         payload = minera::serialize_ocel_json(
             log, format == "json_standard" ? minera::OcelJsonFormat::kStandard
-                                             : minera::OcelJsonFormat::kClassic);
+                                             : minera::OcelJsonFormat::kClassic,
+            false);
         content_type = "application/json";
         filename = "ocel.json";
       } else if (format == "xml" || format == "xml_standard") {
@@ -6213,6 +6216,32 @@ void handle_token_replay_workbench(const httplib::Request& request,
 
 #include "replay_duration_route.hpp"
 
+// Whether a serialized JSON document holds a number JSON cannot carry: an
+// ostream writes an overflowed or undefined double as inf or nan. Outside
+// strings the only letters JSON allows are true, false, null and exponents,
+// none of which is an i or an n except null.
+bool json_has_nonfinite_number(std::string_view json) {
+  for (std::size_t i = 0; i < json.size(); ++i) {
+    const char c = json[i];
+    if (c == '"') {
+      for (++i; i < json.size() && json[i] != '"'; ++i)
+        if (json[i] == '\\') ++i;
+    } else if (c == 'n' && json.substr(i, 4) == "null") {
+      i += 3;
+    } else if (c == 'i' || c == 'n' || c == 'I' || c == 'N') {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Alignment costs are finite when parsed, but their totals can overflow.
+void reject_nonfinite_alignment_costs(std::string_view json) {
+  if (json_has_nonfinite_number(json))
+    throw std::invalid_argument(
+        "alignment costs are too large: a cost total overflows a double; use smaller costs");
+}
+
 // Alignment uses independent original inputs; the cached mining session is
 // neither required nor changed. Flat CSV adapters retain the parser's rows.
 void handle_petri_alignment_workbench(const httplib::Request& request,
@@ -6400,6 +6429,7 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
     body << "],\"input_before\":" << (source_table ? minera::serialize_event_table_input_json(*source_table) : "null")
          << ",\"input_after\":" << (source_table ? minera::serialize_event_table_input_json(*source_table) : "null")
          << ",\"prepared_log\":" << minera::serialize_active_source_log_json(alignment_log) << '}';
+    reject_nonfinite_alignment_costs(body.str());
     response.set_content(active_source_safe_json(body.str()), "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -8494,7 +8524,7 @@ void handle_align_decomposed(const httplib::Request& request, httplib::Response&
         throw std::invalid_argument(
             "unknown decomposed alignment parameter: " + key);
     }
-    const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_decomposed_alignment_params(lookup,present); o.cancelled=connection_cancel_hook(request); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(require_prepared_log(*session),o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::align_decomposed(*alignment_log,it->second,o); response.set_content(minera::decomposed_alignment_json(r),"application/json"); }
+    const auto lookup=[&](std::string_view n){const auto k=std::string(n); return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; auto o=minera::parse_decomposed_alignment_params(lookup,present); o.cancelled=connection_cancel_hook(request); cached_imported_markings(request, *session, miner, o); std::optional<minera::EventLog> projected_powl_log; const minera::EventLog* alignment_log=&cached_model_log(*session,miner); if(miner=="powl"){if(!request.has_param("activity_attribute")) o.activity_attribute=session->powl_activity_key; projected_powl_log=project_powl_activity(require_prepared_log(*session),o.activity_attribute,session->powl_timestamp_key,session->powl_case_id_key); alignment_log=&*projected_powl_log;} const auto r=minera::align_decomposed(*alignment_log,it->second,o); auto body=minera::decomposed_alignment_json(r); reject_nonfinite_alignment_costs(body); response.set_content(std::move(body),"application/json"); }
   catch(const std::exception& e){response.status=400; response.set_content(error_json(e.what()),"application/json");}
 }
 
@@ -9598,19 +9628,34 @@ void handle_playout(const httplib::Request& request,
         reject("process-tree playout bounds exceed the server safety limits");
         return;
       }
-      // An omitted max_length keeps the reference default (the tree's
-      // shortest word length); the native enumeration budget bounds the rest.
-      if (options.variant == minera::ProcessTreePlayoutVariant::kExtensive &&
-          options.max_traces > 10000) {
-        if (request.has_param("max_trace_cap") ||
-            request.has_param("max_traces")) {
-          reject("max_trace_cap must not exceed 10000");
+      const auto& tree = require_process_tree(*session);
+      if (options.variant == minera::ProcessTreePlayoutVariant::kExtensive) {
+        // An omitted max_length or max_loop_occurrences takes the reference
+        // default (the tree's shortest word length, half of it); the
+        // defaults meet the same limits as explicit values and are refused
+        // the same way.
+        const auto resolved = minera::resolve_process_tree_extensive_bounds(tree, options);
+        if (resolved.max_length > 64 || resolved.max_loop_occurrences > 100) {
+          reject("process-tree playout bounds exceed the server safety limits: the default "
+                 "max_length, the tree's shortest word length, is " +
+                 std::to_string(resolved.max_length) +
+                 ", above 64, so no word fits any allowed max_length; use a sampled variant");
           return;
         }
-        options.max_traces = 10000;
+        if (options.max_traces > 10000) {
+          if (request.has_param("max_trace_cap") ||
+              request.has_param("max_traces")) {
+            reject("max_trace_cap must not exceed 10000");
+            return;
+          }
+          options.max_traces = 10000;
+        }
+        // Server bound: the result keeps at most max_traces words (the
+        // reference caps only a parallel cut's words) and says truncated.
+        options.output_trace_cap = options.max_traces;
       }
-      const auto result =
-          minera::process_tree_playout_result(require_process_tree(*session), options);
+      options.cancelled = connection_cancel_hook(request);
+      const auto result = minera::process_tree_playout_result(tree, options);
       if (options.return_set_strings) {
         response.set_content(
             minera::serialize_process_tree_playout_json(result),
@@ -9826,12 +9871,13 @@ void handle_playout(const httplib::Request& request,
         ocel_query_bool(request, "fm_leq_accepted", false);
     options.return_visited_elements =
         ocel_query_bool(request, "return_visited_elements", false);
+    // A malformed marking is the caller's error (400), not an escaped throw.
+    options.initial_marking = parse_playout_marking(request, "initial_marking");
+    options.final_marking = parse_playout_marking(request, "final_marking");
   } catch (const std::exception& error) {
     reject(error.what());
     return;
   }
-  options.initial_marking = parse_playout_marking(request, "initial_marking");
-  options.final_marking = parse_playout_marking(request, "final_marking");
   cached_imported_markings(request, *session, miner, options);
 
   minera::ExtensivePlayoutOptions extensive;
@@ -11082,13 +11128,24 @@ void repair_api_json_body(httplib::Response& response) {
   repair_api_text_body(response.body, response.get_header_value("Content-Type"));
 }
 
+// Handlers answer any std::exception with 400 and its message; running out of
+// memory is the server's condition, not a malformed request.
+void report_out_of_memory(httplib::Response& response) {
+  if (response.status != 400 || response.body != error_json("std::bad_alloc")) return;
+  response.status = 503;
+  response.set_content(
+      error_json("the server ran out of memory for this request; retry with a smaller input "
+                 "or give minera_server more memory"),
+      "application/json");
+}
+
 httplib::Server::Handler api_route_handler(std::string path,
                                            httplib::Server::Handler handler) {
   return [path = std::move(path), handler = std::move(handler)](
              const httplib::Request& request, httplib::Response& response) {
     struct RepairOnExit {
       httplib::Response& response;
-      ~RepairOnExit() { try { repair_api_json_body(response); } catch (...) {} }
+      ~RepairOnExit() { try { report_out_of_memory(response); repair_api_json_body(response); } catch (...) {} }
     } repair{response};
     if (!api_route_owns_repeated_controls(path, request)) {
       if (const auto repeated = repeated_request_control(request)) {
@@ -11151,6 +11208,7 @@ void api_post(httplib::Server& server, const std::string& path,
                                                    httplib::Response& response,
                                                    const httplib::ContentReader& reader) {
     handler(request, response, reader);
+    report_out_of_memory(response);
     repair_api_json_body(response);
   });
 }
@@ -11184,6 +11242,14 @@ httplib::Server::HandlerResponse api_error_body(const httplib::Request& request,
     message = "the upload is larger than the " + std::to_string(kMaxRequestPayloadBytes >> 20) +
               (request.path.starts_with("/api/ocel") ? " MiB server limit"
                                                       : " MiB server limit; compress an XES log as .xes.gz");
+  } else if (response.status == 414) {
+    message = "the request line is longer than the server's " +
+              std::to_string(CPPHTTPLIB_REQUEST_URI_MAX_LENGTH) +
+              "-byte limit; send long controls in the request body";
+  } else if (response.status == 400 && request.has_header("Content-Length") &&
+             request.get_header_value("Content-Length").find_first_not_of("0123456789") !=
+                 std::string::npos) {
+    message = "the Content-Length header must be a non-negative decimal number";
   } else {
     message = std::string(httplib::status_message(response.status));
     if (message.empty()) message = "HTTP " + std::to_string(response.status);
@@ -11207,7 +11273,8 @@ int usage(const char* program) {
                "                     requests default to 268435456)\n"
                "  --mine-memory-budget <bytes> Memory a single /api/mine may plan\n"
                "                     for (suffix K, M, G or T allowed; default: half of\n"
-               "                     the physical or cgroup memory); a larger log gets\n"
+               "                     the physical memory, or of a lower cgroup or\n"
+               "                     address-space limit); a larger log gets\n"
                "                     413 MINE_LIMIT before it is parsed\n"
                "  --max-mine-events <n> Most events a single /api/mine accepts\n"
                "                     (default: no limit besides the memory budget)\n"

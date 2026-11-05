@@ -4616,6 +4616,11 @@ bool read_content(Stream &strm, T &x, size_t payload_max_length, int &status,
           ret = read_content_chunked(strm, x, bounded);
         } else if (!has_header(x.headers, "Content-Length")) {
           ret = read_content_without_length(strm, bounded);
+        } else if (std::string(get_header_value(x.headers, "Content-Length", "", 0))
+                       .find_first_not_of("0123456789") != std::string::npos) {
+          // MINERA PATCH: a Content-Length that is not a decimal number (a
+          // negative one included) is malformed (400), not oversized (413).
+          ret = false;
         } else {
           auto len = get_header_value_u64(x.headers, "Content-Length", 0, 0);
           if (len > payload_max_length) {
@@ -7324,12 +7329,27 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
 
   detail::stream_line_reader line_reader(strm, buf.data(), buf.size());
 
+  // MINERA PATCH: name the method and path of an over-long request line (from
+  // its first 4 KiB) so the error handler can answer the 414 for that route.
+  const auto name_request_target = [&line_reader](Request &target) {
+    const std::string line(line_reader.ptr(),
+                           (std::min)(line_reader.size(), size_t{4096}));
+    const auto method_end = line.find(' ');
+    if (method_end == std::string::npos) { return; }
+    const auto path_end = line.find_first_of(" ?", method_end + 1);
+    target.method = line.substr(0, method_end);
+    target.path = line.substr(method_end + 1, path_end == std::string::npos
+                                                  ? std::string::npos
+                                                  : path_end - method_end - 1);
+  };
+
   // Connection has been closed on client
   if (!line_reader.getline()) {
     // MINERA PATCH: a request line cut off at CPPHTTPLIB_LINE_MAX_LENGTH still
     // gets the 414 an over-long URI below the bound gets, then the close.
     if (line_reader.size() > CPPHTTPLIB_LINE_MAX_LENGTH) {
       Request req;
+      name_request_target(req);
       Response res;
       res.version = "HTTP/1.1";
       res.headers = default_headers_;
@@ -7369,6 +7389,7 @@ Server::process_request(Stream &strm, const std::string &remote_addr,
     Headers dummy;
     detail::read_headers(strm, dummy);
     res.status = StatusCode::UriTooLong_414;
+    name_request_target(req); // MINERA PATCH
     connection_closed = true; // MINERA PATCH: the head was not fully framed.
     return write_response(strm, true, req, res);
   }

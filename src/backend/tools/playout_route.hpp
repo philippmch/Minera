@@ -232,7 +232,8 @@ void handle_playout_workbench(const httplib::Request& request,
           result = minera::dfg_playout(dfg->frequency, dfg->start_activities, dfg->end_activities, options, performance);
         });
       } else {
-        const auto& options = std::get<minera::ProcessTreePlayoutOptions>(configured);
+        auto& options = std::get<minera::ProcessTreePlayoutOptions>(configured);
+        options.cancelled = connection_cancel_hook(request);
         if (operation == "tree_result")
           invoke("process_tree_playout_result(tree, options)", [&] {result = minera::process_tree_playout_result(*tree, options);});
         else invoke("process_tree_playout(tree, options)", [&] {result = minera::process_tree_playout(*tree, options);});

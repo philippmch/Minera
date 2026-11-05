@@ -171,7 +171,13 @@ void write_json_string(std::ostringstream& out, std::string_view value) {
       case '\n': out << "\\n"; break;
       case '\r': out << "\\r"; break;
       case '\t': out << "\\t"; break;
-      default: out << c; break;
+      default:
+        // Other control characters are not valid raw inside a JSON string.
+        if (static_cast<unsigned char>(c) < 0x20)
+          out << "\\u00" << "0123456789abcdef"[(c >> 4) & 15] << "0123456789abcdef"[c & 15];
+        else
+          out << c;
+        break;
     }
   }
   out << '"';

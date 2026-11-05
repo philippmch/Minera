@@ -83,10 +83,9 @@ export function parseNativeJson(raw:string):unknown {
 }
 export function nativeCell(holder:object,key:string|number):unknown {return literals.get(holder)?.get(String(key))??(holder as Record<string,unknown>)[String(key)];}
 export function nativeJson(value:unknown,indent=0):string {
-  const encode=(current:unknown,level:number):string=>{
-    if(!current||typeof current!=="object")return JSON.stringify(current)??"null";
-    const array=Array.isArray(current),keys=array?current.map((_,i)=>String(i)):Object.keys(current).filter(key=>(current as Record<string,unknown>)[key]!==undefined);const parts=keys.map(key=>{const literal=literals.get(current)?.get(key);const encoded=literal??encode((current as Record<string,unknown>)[key],level+1);return (array?"":JSON.stringify(key)+":"+(indent?" ":""))+encoded;});const open=array?"[":"{",close=array?"]":"}";return !parts.length?open+close:indent?open+"\n"+parts.map(part=>" ".repeat((level+1)*indent)+part).join(",\n")+"\n"+" ".repeat(level*indent)+close:open+parts.join(",")+close;
-  };return encode(value,0);
+  // Built by writeNativeJson in one piece: its explicit stack keeps deeply
+  // nested values (thousands of levels) off the call stack.
+  let text="";writeNativeJson(value,indent,piece=>{text+=piece;},Infinity);return text;
 }
 // Whether parseNativeJson(nativeJson(value)) would rebuild `value` exactly:
 // plain objects and dense arrays of finite numbers (not -0), strings,
@@ -140,26 +139,42 @@ export function writeNativeJson(value:unknown,indent:number,sink:(piece:string)=
     if(sink(piece)===false)throw STOP_NATIVE_JSON;
   };
   const push=(text:string)=>{buffer+=text;flush(false);};
-  const encode=(current:unknown,level:number):void=>{
+  // The containers being written, innermost last: an explicit stack rather
+  // than recursion, so deep nesting does not overflow the call stack. A
+  // container met again inside itself is a cycle and throws, as
+  // JSON.stringify does.
+  interface Frame {current:object;array:boolean;record:Record<string,unknown>;kept:Map<string,string>|undefined;keys:string[]|undefined;length:number;close:string;level:number;index:number}
+  const stack:Frame[]=[];const open=new Set<object>();
+  const begin=(current:unknown,level:number):void=>{
     if(!current||typeof current!=="object"){push(JSON.stringify(current)??"null");return;}
+    if(open.has(current))throw new TypeError("Converting circular structure to native JSON");
     const array=Array.isArray(current),record=current as Record<string,unknown>,kept=literals.get(current);
     const keys=array?undefined:Object.keys(current).filter(key=>record[key]!==undefined);
-    const length=array?(current as unknown[]).length:keys!.length,open=array?"[":"{",close=array?"]":"}";
-    if(!length){push(open+close);return;}
-    push(indent?open+"\n":open);
-    for(let i=0;i<length;++i){
+    const length=array?(current as unknown[]).length:keys!.length,close=array?"]":"}";
+    if(!length){push((array?"[":"{")+close);return;}
+    push(indent?(array?"[":"{")+"\n":(array?"[":"{"));
+    open.add(current);stack.push({current,array,record,kept,keys,length,close,level,index:0});
+  };
+  const encode=(root:unknown):void=>{
+    begin(root,0);
+    while(stack.length){
+      const frame=stack[stack.length-1];
+      if(frame.index===frame.length){
+        push(indent?"\n"+" ".repeat(frame.level*indent)+frame.close:frame.close);
+        stack.pop();open.delete(frame.current);continue;
+      }
+      const i=frame.index++;
       if(i)push(indent?",\n":",");
       // nativeJson maps over the array, so a hole leaves an empty part.
-      if(array&&!(i in current))continue;
-      const key=array?String(i):keys![i];
-      if(indent)push(" ".repeat((level+1)*indent));
-      if(!array)push(JSON.stringify(key)+":"+(indent?" ":""));
-      const literal=kept?.get(key);
-      if(literal!==undefined)push(literal);else encode(record[key],level+1);
+      if(frame.array&&!(i in frame.current))continue;
+      const key=frame.array?String(i):frame.keys![i];
+      if(indent)push(" ".repeat((frame.level+1)*indent));
+      if(!frame.array)push(JSON.stringify(key)+":"+(indent?" ":""));
+      const literal=frame.kept?.get(key);
+      if(literal!==undefined)push(literal);else begin(frame.record[key],frame.level+1);
     }
-    push(indent?"\n"+" ".repeat(level*indent)+close:close);
   };
-  try{encode(value,0);flush(true);return true;}
+  try{encode(value);flush(true);return true;}
   catch(error){if(error===STOP_NATIVE_JSON)return false;throw error;}
 }
 /** The first `limit` characters of nativeJson(value, indent) (never ending

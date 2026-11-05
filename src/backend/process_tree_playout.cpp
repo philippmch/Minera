@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+#include "minera/cancellation.hpp"
 #include "minera/random.hpp"
 #include "minera/timestamp.hpp"
 
@@ -200,9 +201,11 @@ class ReferenceExtensive {
   ReferenceExtensive(const ProcessTree& tree, std::size_t min_length,
                      std::optional<std::size_t> max_length,
                      std::optional<std::size_t> max_loops,
-                     std::size_t max_traces, std::size_t budget)
+                     std::size_t max_traces, std::size_t budget,
+                     const std::function<bool()>& cancelled)
       : tree_(tree), min_length_(static_cast<long long>(min_length)),
-        max_traces_(max_traces), budget_{budget} {
+        max_traces_(max_traces), budget_{budget},
+        check_(cancelled, "process-tree playout was cancelled") {
     root_min_ = min_len(tree.root());
     root_max_ = max_len(tree.root());
     max_length_ = max_length ? static_cast<long long>(*max_length) : root_min_;
@@ -286,27 +289,35 @@ class ReferenceExtensive {
     return words;
   }
 
-  void add(std::set<Word>& out, Word word) {
-    if (budget_.take()) out.insert(std::move(word));
+  // Takes one word from the budget into `out`; false once the budget is
+  // spent, so the caller stops generating.
+  bool add(std::set<Word>& out, Word word) {
+    check_();
+    if (!budget_.take()) return false;
+    out.insert(std::move(word));
+    return true;
   }
 
-  static void interleavings(const Word& a, const Word& b, std::size_t i,
-                            std::size_t j, Word& current,
-                            const std::function<void(const Word&)>& emit) {
-    if (i == a.size() && j == b.size()) {
-      emit(current);
-      return;
-    }
+  // Emits every interleaving of a and b; stops (returning false) as soon as
+  // `emit` does. Without the stop, two long words have C(|a|+|b|, |a|)
+  // interleavings to walk after the budget is spent.
+  bool interleavings(const Word& a, const Word& b, std::size_t i,
+                     std::size_t j, Word& current,
+                     const std::function<bool(const Word&)>& emit) {
+    if (i == a.size() && j == b.size()) return emit(current);
     if (i < a.size()) {
       current.push_back(a[i]);
-      interleavings(a, b, i + 1, j, current, emit);
+      const bool go_on = interleavings(a, b, i + 1, j, current, emit);
       current.pop_back();
+      if (!go_on) return false;
     }
     if (j < b.size()) {
       current.push_back(b[j]);
-      interleavings(a, b, i, j + 1, current, emit);
+      const bool go_on = interleavings(a, b, i, j + 1, current, emit);
       current.pop_back();
+      if (!go_on) return false;
     }
+    return true;
   }
 
   std::set<Word> play(const ProcessTreeNode& n) {
@@ -328,14 +339,17 @@ class ReferenceExtensive {
         for (const auto& child : n.children) {
           const auto words = play(child);
           std::set<Word> next;
-          for (const auto& prefix : current)
+          for (const auto& prefix : current) {
+            if (budget_.exhausted) break;
             for (const auto& word : words) {
+              check_();
               if (static_cast<long long>(prefix.size() + word.size()) > bound) continue;
               if (budget_.exhausted) break;
               Word joined = prefix;
               joined.insert(joined.end(), word.begin(), word.end());
-              add(next, std::move(joined));
+              if (!add(next, std::move(joined))) break;
             }
+          }
           current = std::move(next);
         }
         return keep(n, std::move(current));
@@ -346,14 +360,18 @@ class ReferenceExtensive {
         for (const auto& child : n.children) {
           const auto words = play(child);
           std::set<Word> next;
-          for (const auto& left : current)
+          for (const auto& left : current) {
+            if (budget_.exhausted) break;
             for (const auto& right : words) {
+              check_();
               if (static_cast<long long>(left.size() + right.size()) > bound) continue;
               if (budget_.exhausted) break;
               Word scratch;
-              interleavings(left, right, 0, 0, scratch,
-                            [&](const Word& word) { add(next, word); });
+              if (!interleavings(left, right, 0, 0, scratch,
+                                 [&](const Word& word) { return add(next, word); }))
+                break;
             }
+          }
           current = std::move(next);
         }
         auto kept = keep(n, std::move(current));
@@ -381,16 +399,21 @@ class ReferenceExtensive {
         std::set<Word> current = out;
         for (std::size_t round = 0; round < max_loops_ && !current.empty() && !budget_.exhausted; ++round) {
           std::set<Word> next;
-          for (const auto& prefix : current)
-            for (const auto& r : redo)
+          for (const auto& prefix : current) {
+            if (budget_.exhausted) break;
+            for (const auto& r : redo) {
+              if (budget_.exhausted) break;
               for (const auto& d : body) {
+                check_();
                 if (static_cast<long long>(prefix.size() + r.size() + d.size()) > bound) continue;
                 if (budget_.exhausted) break;
                 Word joined = prefix;
                 joined.insert(joined.end(), r.begin(), r.end());
                 joined.insert(joined.end(), d.begin(), d.end());
-                add(next, std::move(joined));
+                if (!add(next, std::move(joined))) break;
               }
+            }
+          }
           // A round that adds no new word leaves the later rounds unchanged.
           bool grew = false;
           for (const auto& word : next) grew = out.insert(word).second || grew;
@@ -414,6 +437,7 @@ class ReferenceExtensive {
   long long root_min_ = 0;
   ExtensiveLength root_max_;
   ExtensiveBudget budget_;
+  CancellationCheck check_;
   bool capped_ = false;
   std::unordered_map<const ProcessTreeNode*, long long> min_;
   std::unordered_map<const ProcessTreeNode*, ExtensiveLength> max_;
@@ -434,9 +458,11 @@ struct SampleBounds {
   bool cap_loops = false;
   std::size_t max_loops = 0;
   std::size_t elements = 0;
+  CancellationCheck* check = nullptr;
 };
 
 void count_element(SampleBounds& bounds) {
+  if (bounds.check) (*bounds.check)();
   if (++bounds.elements > kElementBudget)
     throw std::invalid_argument(
         "process-tree playout: a sampled trace exceeds the ten-million element safety bound");
@@ -748,16 +774,22 @@ ProcessTreePlayoutResult process_tree_playout_result(
           "EXTENSIVE process-tree playout does not support a sequence or parallel cut with one "
           "child (the reference raises IndexError)");
     ReferenceExtensive engine(tree, options.min_length, options.max_length,
-                              options.max_loop_occurrences, options.max_traces, 250000);
+                              options.max_loop_occurrences, options.max_traces, 250000,
+                              options.cancelled);
     const auto unique = engine.run();
     Words words(unique.begin(), unique.end());
     std::stable_sort(words.begin(), words.end(), [](const Word& a, const Word& b) {
       return a.size() < b.size();
     });
     ProcessTreePlayoutResult result;
+    result.truncated = engine.truncated();
+    // Declared extension: a cap on the final words (a server bound).
+    if (options.output_trace_cap != 0 && words.size() > options.output_trace_cap) {
+      words.resize(options.output_trace_cap);
+      result.truncated = true;
+    }
     result.log = words_to_log(words, options);
     if (options.return_set_strings) result.trace_strings = std::move(words);
-    result.truncated = engine.truncated();
     return result;
   }
   if (options.variant == ProcessTreePlayoutVariant::kTopBottom &&
@@ -770,7 +802,11 @@ ProcessTreePlayoutResult process_tree_playout_result(
   SampleBounds bounds;
   bounds.cap_loops = options.cap_sampled_loops;
   bounds.max_loops = options.max_loop_occurrences.value_or(3);
-  const std::size_t limit = std::min(options.max_steps, options.max_length.value_or(options.max_steps));
+  CancellationCheck check(options.cancelled, "process-tree playout was cancelled");
+  bounds.check = &check;
+  // Unset, max_length bounds a sampled trace at 1000 visible events, as
+  // before max_length became optional.
+  const std::size_t limit = std::min(options.max_steps, options.max_length.value_or(1000));
   words.reserve(options.traces);
   // TOPBOTTOM shuffles interleaving children in place, so it runs on a copy
   // whose child order evolves across traces as the reference's tree does.
@@ -779,6 +815,7 @@ ProcessTreePlayoutResult process_tree_playout_result(
   if (options.variant == ProcessTreePlayoutVariant::kBasicPlayout)
     basic.emplace(tree.root(), random, bounds);
   for (std::size_t i = 0; i < options.traces; ++i) {
+    throw_if_cancelled(options.cancelled, "process-tree playout was cancelled");
     bounds.elements = 0;
     Elements elements;
     if (basic) {
@@ -797,6 +834,37 @@ ProcessTreePlayoutResult process_tree_playout_result(
   ProcessTreePlayoutResult result;
   result.log = words_to_log(words, options);
   return result;
+}
+
+ProcessTreeExtensiveBounds resolve_process_tree_extensive_bounds(
+    const ProcessTree& tree, const ProcessTreePlayoutOptions& options) {
+  validate_node(tree.root(), tree);
+  // The shortest word length, as ReferenceExtensive's min_len reads it.
+  const std::function<std::size_t(const ProcessTreeNode&)> shortest =
+      [&](const ProcessTreeNode& n) -> std::size_t {
+    switch (n.op) {
+      case ProcessTreeOperator::kTau: return 0;
+      case ProcessTreeOperator::kActivity: return 1;
+      case ProcessTreeOperator::kExclusive:
+      case ProcessTreeOperator::kInclusiveChoice: {
+        std::size_t value = std::numeric_limits<std::size_t>::max();
+        for (const auto& child : n.children) value = std::min(value, shortest(child));
+        return value;
+      }
+      case ProcessTreeOperator::kLoop:
+        return n.children.empty() ? 0 : shortest(n.children.front());
+      default: {
+        std::size_t value = 0;
+        for (const auto& child : n.children) value += shortest(child);
+        return value;
+      }
+    }
+  };
+  ProcessTreeExtensiveBounds bounds;
+  bounds.max_length = options.max_length ? *options.max_length : shortest(tree.root());
+  bounds.max_loop_occurrences =
+      options.max_loop_occurrences ? *options.max_loop_occurrences : bounds.max_length / 2;
+  return bounds;
 }
 
 EventLog process_tree_playout(const ProcessTree& tree,

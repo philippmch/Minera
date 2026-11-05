@@ -335,6 +335,10 @@ void frame_order_and_unlisted_keys() {
   const auto classic = minera::serialize_ocel_json(log);
   assert(classic.find("\"minera:eventActivityFirst\":true") != std::string::npos);
   assert(minera::parse_ocel_json(classic).event_activity_first);
+  // A download leaves the marker out and reads as the reference reads it.
+  const auto file = minera::serialize_ocel_json(log, minera::OcelJsonFormat::kClassic, false);
+  assert(file.find("minera:eventActivityFirst") == std::string::npos);
+  assert(!minera::parse_ocel_json(file).event_activity_first);
   const auto standard = minera::serialize_ocel_json(log, minera::OcelJsonFormat::kStandard);
   assert(!minera::parse_ocel_json(standard).event_activity_first);
   const auto from_json = minera::serialize_ocel_xml(minera::parse_ocel_json(standard), lossy);

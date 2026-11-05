@@ -1820,7 +1820,8 @@ int run_ocel(int argc, char** argv) {
       std::cout << minera::serialize_ocel_xml(log, options);
     } else {
       const auto selected = format == "standard" ? minera::OcelJsonFormat::kStandard : minera::OcelJsonFormat::kClassic;
-      std::cout << minera::serialize_ocel_json(log, selected) << '\n';
+      // A user's file: without the classic transport markers.
+      std::cout << minera::serialize_ocel_json(log, selected, false) << '\n';
     }
     return 0;
   } catch (const std::exception& error) {

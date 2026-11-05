@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "minera/filtering_common.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -185,15 +186,13 @@ std::string scalar_lexical_value(const EventAttribute& attribute) {
     if (const auto* value = std::get_if<double>(&attribute.typed_value)) {
       if (attribute.kind != AttributeKind::kFloat)
         throw std::invalid_argument("XES attribute has an incompatible float native value");
+      // Non-finite values keep the xs:double tokens every XES reader takes
+      // (the reference writes Python's nan/inf); finite values are Python's
+      // repr, as pm4py.write_xes prints them: the shortest round-trip digits,
+      // "2.0" for integral values, exponents from 1e16 and below 1e-4.
       if (std::isnan(*value)) return "NaN";
       if (std::isinf(*value)) return *value < 0 ? "-INF" : "INF";
-      char buffer[128];
-      const auto converted = std::to_chars(
-          buffer, buffer + sizeof(buffer), *value,
-          std::chars_format::general, std::numeric_limits<double>::max_digits10);
-      if (converted.ec != std::errc{})
-        throw std::invalid_argument("XES float attribute cannot be serialized");
-      return std::string(buffer, converted.ptr);
+      return filtering_float_repr(*value);
     }
     if (const auto* value = std::get_if<bool>(&attribute.typed_value)) {
       if (attribute.kind != AttributeKind::kBoolean)

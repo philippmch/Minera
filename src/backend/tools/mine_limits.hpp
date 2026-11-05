@@ -8,7 +8,8 @@
 // peak, 0.88 GB retained); the estimate uses 10 KiB per event for headroom,
 // and 2 KiB more per event for every further column. The cap
 // refuses a mine whose estimate passes the memory budget (half the physical
-// memory, or the cgroup or Windows job-object limit when lower, unless
+// memory, or the cgroup, address-space (RLIMIT_AS/RLIMIT_DATA) or Windows
+// job-object limit when lower, unless
 // --mine-memory-budget sets it) or whose event count passes --max-mine-events,
 // with 413 MINE_LIMIT, rather than letting the server run out of memory
 // part-way.
@@ -19,6 +20,7 @@
 #endif
 #include <windows.h>
 #else
+#include <sys/resource.h>
 #include <unistd.h>
 #endif
 
@@ -69,6 +71,16 @@ std::uint64_t physical_memory_bytes() {
     std::ifstream file(path);
     std::uint64_t limit = 0;
     if (file >> limit && limit > 0 && (total == 0 || limit < total)) total = limit;
+  }
+#endif
+#if !defined(_WIN32)
+  // An address-space or data-segment limit (ulimit -v, prlimit --as) caps
+  // what the process can allocate however much memory the machine has.
+  for (const int resource : {RLIMIT_AS, RLIMIT_DATA}) {
+    struct rlimit limit{};
+    if (::getrlimit(resource, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY && limit.rlim_cur > 0 &&
+        (total == 0 || static_cast<std::uint64_t>(limit.rlim_cur) < total))
+      total = static_cast<std::uint64_t>(limit.rlim_cur);
   }
 #endif
   return total;

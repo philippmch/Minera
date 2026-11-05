@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
@@ -54,7 +55,8 @@ struct ProcessTreePlayoutOptions {
   std::uint64_t seed = 1;
   // EXTENSIVE max_trace_length; unset, the tree's shortest word length, as
   // in the reference. The sampled variants use it as a second safety bound
-  // next to max_steps (unset: max_steps alone).
+  // next to max_steps (unset: 1000, so the per-trace limit is
+  // min(max_steps, 1000)).
   std::optional<std::size_t> max_length;
   std::size_t min_length = 1;                // EXTENSIVE min_trace_length
   // EXTENSIVE max_limit_num_traces: the cap on a parallel cut's words.
@@ -75,7 +77,24 @@ struct ProcessTreePlayoutOptions {
   // Extensive mode can expose the canonical activity-word set through the
   // result helper while the legacy EventLog API remains unchanged.
   bool return_set_strings = false;
+  // Declared extension (server bound): EXTENSIVE keeps at most this many
+  // words of the final result (the shortest first, in the result order) and
+  // marks it truncated. 0, the default, keeps them all, as the reference.
+  std::size_t output_trace_cap = 0;
+  // Polled while a playout runs (see minera/cancellation.hpp); returning true
+  // throws OperationCancelled. Unset never cancels.
+  std::function<bool()> cancelled;
 };
+
+// The EXTENSIVE bounds a run uses once unset options take the reference
+// defaults: max_length (unset: the tree's shortest word length) and
+// max_loop_occurrences (unset: max_length / 2). Validates the tree.
+struct ProcessTreeExtensiveBounds {
+  std::size_t max_length = 0;
+  std::size_t max_loop_occurrences = 0;
+};
+[[nodiscard]] ProcessTreeExtensiveBounds resolve_process_tree_extensive_bounds(
+    const ProcessTree& tree, const ProcessTreePlayoutOptions& options);
 
 struct ProcessTreePlayoutResult {
   EventLog log;

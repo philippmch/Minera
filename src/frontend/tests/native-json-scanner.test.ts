@@ -100,5 +100,9 @@ describe("parseNativeJson fast scanner", () => {
     expect(nativeCell(bottom,0)).toBe("1.0");
     expect(nativeCell(bottom[1] as object,"x")).toBe("2.50");
     expect(nativeCell(bottom[1] as object,"y")).toBe(7);
+    // Writing it back is iterative too, and keeps the kept literals.
+    expect(nativeJson(parseNativeJson(raw))).toBe(raw);
+    const cycle:{a:unknown[]}={a:[]};cycle.a.push(cycle);
+    expect(()=>nativeJson(cycle)).toThrow(TypeError);
   });
 });

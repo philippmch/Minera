@@ -111,6 +111,13 @@ struct FilteringDateKde {
 [[nodiscard]] FilteringDateKde get_kde_date_attribute(const std::vector<FilteringDateTime>& values,
                                                       std::int64_t graph_points = 200,
                                                       std::int64_t points_to_sample = 400);
+// The same estimate over values already resolved to POSIX seconds (aware
+// datetimes, whose timestamp() does not depend on the process time zone),
+// in the order the caller's values arrive: the reference's DataFrame
+// statistics pass the column sorted, its EventLog statistics in log order.
+[[nodiscard]] FilteringDateKde get_kde_date_attribute_seconds(const std::vector<double>& seconds,
+                                                              std::int64_t graph_points = 200,
+                                                              std::int64_t points_to_sample = 400);
 // json.dumps of [[Timestamp(x).timestamp(), y], ...].
 [[nodiscard]] std::string get_kde_date_attribute_json(const std::vector<FilteringDateTime>& values,
                                                       std::int64_t graph_points = 200,

@@ -29,7 +29,16 @@ std::string json_escape(std::string_view value) {
       case '\n': out += "\\n"; break;
       case '\r': out += "\\r"; break;
       case '\t': out += "\\t"; break;
-      default: out.push_back(static_cast<char>(c)); break;
+      default:
+        // Other control characters are not valid raw inside a JSON string.
+        if (c < 0x20) {
+          out += "\\u00";
+          out += "0123456789abcdef"[c >> 4];
+          out += "0123456789abcdef"[c & 15];
+        } else {
+          out.push_back(static_cast<char>(c));
+        }
+        break;
     }
   }
   return out;

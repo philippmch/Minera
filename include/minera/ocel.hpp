@@ -207,9 +207,15 @@ Ocel parse_ocel_json_literal_names(std::string_view json,
 // events or objects outside every event-object relation gets a
 // "minera:keepUnrelated": true member, and parse_ocel_json then keeps those
 // entries rather than dropping them like the reference file readers (which
-// ignore the member): OCELs travel between routes as this JSON.
+// ignore the member): OCELs travel between routes as this JSON. The classic
+// transport also carries "minera:eventTimeOffset" and
+// "minera:eventActivityFirst" (see Ocel::event_activity_first);
+// `transport_markers` false leaves those two out, for a file a user keeps
+// (the CLI's JSON output, the export download), which then reads as the
+// reference's read_ocel_json reads it.
 std::string serialize_ocel_json(const Ocel& log,
-                                OcelJsonFormat format = OcelJsonFormat::kClassic);
+                                OcelJsonFormat format = OcelJsonFormat::kClassic,
+                                bool transport_markers = true);
 
 struct EtotEdge {
   std::string activity;

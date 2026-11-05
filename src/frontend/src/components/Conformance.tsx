@@ -1,6 +1,7 @@
 import {OriginalBoseWorkspace} from "./OriginalBoseWorkspace";
 import { useStepFocus } from "../step-focus";
 import { downloadBlob } from "../download";
+import { SERVER_EXTENSIVE_MAX_LENGTH, extensiveTreeTooLong } from "../process-tree-playout-bounds";
 import {OriginalEditDistanceWorkspace} from "./OriginalEditDistanceWorkspace";
 import {LiteralControlsPanel} from "./LiteralControlsPanel";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -42,6 +43,7 @@ import {
   type PetriAnalysisOptions,
   type PetriAnalysisResult,
   type ProcessTreePlayoutOptions,
+  type ProcessTreeNode,
   type BasicPlayoutOptions,
   type BasicPlayoutVisitedResult,
   type ExtensivePlayoutVisitedResult,
@@ -429,7 +431,7 @@ export function Conformance({
       <PetriAnalysis key={`petri-analysis-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequest={onRequestPetriAnalysis} onInspect={(result,model)=>saveDiagnostic("petri",result,model)} />
       <ModelDiagnosticsInspection key={`model-diagnostics-${analysisId}`} entries={diagnosticHistory.analysisId===analysisId?diagnosticHistory.entries:[]} />
       <OtherAlignments key={`other-alignments-${analysisId}-${importedGeneration}`} data={data} importedAvailable={Boolean(currentImported || data.conformance?.imported)} onRequestDfg={onRequestDfg} onRequestEditDistance={onRequestEditDistance} onRequestProcessTree={onRequestProcessTree} onRequestDecomposed={onRequestDecomposed} onRequestPetriAnti={onRequestPetriAnti} onRequestPetriMulti={onRequestPetriMulti} onRequestReduction={onRequestReduction} onRequestEmd={onRequestEmd} />
-      <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} sourceId={playoutSourceId} />
+      <ProcessTreePlayoutPanel dataset={data.dataset} available={Boolean(data.process_tree)} tree={data.process_tree} sourceId={playoutSourceId} />
       <PetriPlayoutPanel key={`petri-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} sourceId={playoutSourceId} />
       <StochasticPetriPlayoutPanel key={`stochastic-playout-${analysisId}`} dataset={data.dataset} miners={petriMiners} sourceId={playoutSourceId} />
       <SimulationWorkspace key={`simulation-workspace-${analysisId}`} importedGeneration={importedGeneration} dataset={data.dataset} models={evaluationModelIds(data,Boolean(currentImported || data.conformance?.imported))} live={!!onRequestDecisions} onOpenLog={onOpenSimulation} onOpenUnderlying={onCheckModel?(file,sourceId)=>void uploadModel(file,sourceId):undefined} />
@@ -572,7 +574,7 @@ function PetriUsageComparisonPanel() {
 // page shows that session's own analysis (not a saved export opened later).
 const PLAYOUT_NEEDS_SOURCE = "Playout runs on a mined event log. Open the event log behind this analysis to play out its models.";
 
-function ProcessTreePlayoutPanel({ dataset, available, sourceId }: { dataset: string; available: boolean; sourceId?: string }) {
+function ProcessTreePlayoutPanel({ dataset, available, tree, sourceId }: { dataset: string; available: boolean; tree?: ProcessTreeNode; sourceId?: string }) {
   const [options, setOptions] = useState<ProcessTreePlayoutOptions>({ variant: "TOPBOTTOM", traces: 100, max_trace_cap: 1000 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -587,6 +589,12 @@ function ProcessTreePlayoutPanel({ dataset, available, sourceId }: { dataset: st
     finally { setBusy(false); }
   };
   const number = (name: keyof ProcessTreePlayoutOptions, value: string) => setOptions((current) => ({ ...current, [name]: value === "" ? undefined : Number(value) }));
+  // The server refuses EXTENSIVE when the tree's shortest trace is longer
+  // than its max_length limit (an omitted max_length defaults to that
+  // length), and no allowed max_length keeps a trace then: say so before the
+  // request and offer the sampled variant instead.
+  const tooLong = extensiveTreeTooLong(tree, options);
+  const useSampling = () => { setOptions((current) => ({ ...current, variant: "TOPBOTTOM", max_length: undefined })); setError(null); };
   return <section className="panel conf-panel other-alignments">
     <div className="panel-head"><h2>Process-tree playout</h2><span className="panel-meta">Synthetic XES from the cached process tree</span></div>
     {!available ? <p className="conf-inline-note">No inductive process tree is present in this analysis.</p> : <>
@@ -596,12 +604,13 @@ function ProcessTreePlayoutPanel({ dataset, available, sourceId }: { dataset: st
         <label>Max steps<input type="number" min={0} value={options.max_steps ?? ""} onChange={e => number("max_steps", e.target.value)} /></label>
         <label>Seed<input type="number" min={0} value={options.seed ?? ""} onChange={e => number("seed", e.target.value)} /></label>
         <label>Min length<input type="number" min={0} value={options.min_length ?? ""} onChange={e => number("min_length", e.target.value)} /></label>
-        <label>Max length<input type="number" min={0} value={options.max_length ?? ""} onChange={e => number("max_length", e.target.value)} /></label>
+        <label>Max length<input type="number" min={0} max={options.variant === "EXTENSIVE" ? SERVER_EXTENSIVE_MAX_LENGTH : undefined} placeholder={options.variant === "EXTENSIVE" ? "shortest trace length" : undefined} value={options.max_length ?? ""} onChange={e => number("max_length", e.target.value)} /></label>
         <label>Max loop occurrences<input type="number" min={0} value={options.max_loop_occurrences ?? ""} onChange={e => number("max_loop_occurrences", e.target.value)} /></label>
         <label>Max trace cap<input type="number" min={1} value={options.max_trace_cap ?? ""} onChange={e => number("max_trace_cap", e.target.value)} /></label>
       </div>
+      {tooLong !== null && <p className="conf-inline-note" role="status" data-testid="extensive-too-long">Every trace of this tree has at least {tooLong} activities. Extensive playout on the server allows a max length of at most {SERVER_EXTENSIVE_MAX_LENGTH} (left empty, it uses the shortest trace length, {tooLong}), so no trace fits. <button type="button" className="btn-ghost" onClick={useSampling}>Use top-bottom sampling</button></p>}
       {sourceId === undefined && <p className="conf-inline-note">{PLAYOUT_NEEDS_SOURCE}</p>}
-      <button className="button" disabled={busy || sourceId === undefined} onClick={() => void run()}>{busy ? "Generating…" : "Download process-tree playout"}</button>
+      <button className="button" disabled={busy || sourceId === undefined || (tooLong !== null && options.max_length === undefined)} onClick={() => void run()}>{busy ? "Generating…" : "Download process-tree playout"}</button>
       {error && <p className="conf-inline-note">{error}</p>}
     </>}
   </section>;

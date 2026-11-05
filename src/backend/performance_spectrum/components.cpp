@@ -1,7 +1,9 @@
 #include "components.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <optional>
@@ -594,6 +596,68 @@ std::vector<SpectrumObservation> connected_points(
   return points;
 }
 
+// The reference's LOG_DISCONNECTED collects each trace's matches as a Python
+// set of (i, i + 1) position tuples and walks the set, so equally timed pairs
+// leave in CPython's set iteration order: the tuple hash (xxHash-style lanes
+// over the two small ints), open addressing with nine linear probes and
+// perturbed jumps, and growth to four times the used slots.
+std::uint64_t python_index_pair_hash(std::size_t first) {
+  constexpr std::uint64_t kPrime1 = 11400714785074694791ULL;
+  constexpr std::uint64_t kPrime2 = 14029467366897019727ULL;
+  constexpr std::uint64_t kPrime5 = 2870177450012600261ULL;
+  std::uint64_t acc = kPrime5;
+  for (const std::uint64_t lane : {static_cast<std::uint64_t>(first),
+                                   static_cast<std::uint64_t>(first) + 1}) {
+    acc += lane * kPrime2;
+    acc = std::rotl(acc, 31);
+    acc *= kPrime1;
+  }
+  acc += 2 ^ (kPrime5 ^ 3527539ULL);
+  return acc == UINT64_MAX ? 1546275796ULL : acc;
+}
+
+std::vector<std::size_t> python_index_pair_set_order(
+    const std::vector<std::size_t>& starts) {
+  struct Entry { std::size_t start; std::uint64_t hash; };
+  const auto insert = [](const Entry& entry, std::vector<std::optional<Entry>>& table) {
+    const std::size_t mask = table.size() - 1;
+    std::size_t index = static_cast<std::size_t>(entry.hash) & mask;
+    std::uint64_t perturb = entry.hash;
+    for (;;) {
+      const std::size_t probes = index + 9 <= mask ? 9 : 0;
+      for (std::size_t offset = 0; offset <= probes; ++offset) {
+        auto& slot = table[index + offset];
+        if (!slot) {
+          slot = entry;
+          return;
+        }
+      }
+      perturb >>= 5;
+      index = (index * 5 + 1 + static_cast<std::size_t>(perturb)) & mask;
+    }
+  };
+  std::vector<std::optional<Entry>> table(8);
+  std::size_t used = 0;
+  for (const auto start : starts) {
+    insert({start, python_index_pair_hash(start)}, table);
+    ++used;
+    if (used * 5 >= (table.size() - 1) * 3) {
+      const std::size_t minimum = used > 50000 ? used * 2 : used * 4;
+      std::size_t size = 8;
+      while (size <= minimum) size *= 2;
+      auto old = std::move(table);
+      table = std::vector<std::optional<Entry>>(size);
+      for (const auto& slot : old)
+        if (slot) insert(*slot, table);
+    }
+  }
+  std::vector<std::size_t> ordered;
+  ordered.reserve(used);
+  for (const auto& slot : table)
+    if (slot) ordered.push_back(slot->start);
+  return ordered;
+}
+
 std::vector<SpectrumObservation> pair_disconnected_points(
     const Cases& cases, const std::vector<std::string>& pattern,
     double scale) {
@@ -604,9 +668,12 @@ std::vector<SpectrumObservation> pair_disconnected_points(
 
   std::vector<SpectrumObservation> points;
   for (const auto& events : cases) {
+    std::vector<std::size_t> starts;
     for (std::size_t start = 0; start + 1 < events.size(); ++start) {
-      if (!pairs.contains({events[start].activity, events[start + 1].activity}))
-        continue;
+      if (pairs.contains({events[start].activity, events[start + 1].activity}))
+        starts.push_back(start);
+    }
+    for (const auto start : python_index_pair_set_order(starts)) {
       SpectrumObservation point;
       point.case_id = events[start].case_id;
       point.activities = {events[start].activity, events[start + 1].activity};
@@ -678,10 +745,14 @@ std::vector<SpectrumObservation> full_disconnected_points(
   return points;
 }
 
-void stable_sort_points(std::vector<SpectrumObservation>& points) {
+// Stable by first instant. The reference DATAFRAME_DISCONNECTED gathers every
+// case's longest subpatterns before the shorter ones, so with
+// longer_first_on_ties an equally early longer observation leaves first.
+void stable_sort_points(std::vector<SpectrumObservation>& points,
+                        bool longer_first_on_ties = false) {
   std::stable_sort(points.begin(), points.end(),
-                   [](const SpectrumObservation& left,
-                      const SpectrumObservation& right) {
+                   [longer_first_on_ties](const SpectrumObservation& left,
+                                          const SpectrumObservation& right) {
                      const double left_instant =
                          left.instants.empty()
                              ? std::numeric_limits<double>::infinity()
@@ -690,7 +761,21 @@ void stable_sort_points(std::vector<SpectrumObservation>& points) {
                          right.instants.empty()
                              ? std::numeric_limits<double>::infinity()
                              : right.instants.front();
+                     if (longer_first_on_ties && left_instant == right_instant)
+                       return left.instants.size() > right.instants.size();
                      return left_instant < right_instant;
+                   });
+}
+
+// The reference LOG variants sort the log first: events by time within each
+// trace, and the traces by their first (pattern) event, ties in log order.
+void sort_cases_by_first_instant(Cases& cases) {
+  std::stable_sort(cases.begin(), cases.end(),
+                   [](const CaseEvents& left, const CaseEvents& right) {
+                     constexpr double kNone = std::numeric_limits<double>::infinity();
+                     const double l = left.empty() ? kNone : left.front().instant;
+                     const double r = right.empty() ? kNone : right.front().instant;
+                     return l < r;
                    });
 }
 
@@ -704,6 +789,19 @@ PerformanceSpectrum run_cases(
                            component == Component::kDataframeDisconnected ||
                            component == Component::kLazyframe ||
                            component == Component::kLazyframeDisconnected;
+  if (options.sort_log && (component == Component::kLog ||
+                           component == Component::kLogDisconnected))
+    sort_cases_by_first_instant(cases);
+  if (component == Component::kDataframeDisconnected) {
+    std::size_t rows = 0;
+    for (const auto& events : cases) rows += events.size();
+    // The reference builds one shifted column per pattern step from the
+    // pattern rows; with fewer rows than steps pandas refuses the frame.
+    if (rows + 1 < activities.size())
+      throw std::invalid_argument(
+          "performance spectrum: all arrays must be same length (fewer "
+          "pattern events than pattern steps)");
+  }
   if (pair_only_disconnected(component)) {
     points = pair_disconnected_points(cases, activities, scale);
   } else if (full_disconnected(component)) {
@@ -711,7 +809,7 @@ PerformanceSpectrum run_cases(
   } else {
     points = connected_points(cases, activities, scale, concatenate);
   }
-  stable_sort_points(points);
+  stable_sort_points(points, component == Component::kDataframeDisconnected);
   switch (sample_policy(component)) {
     case SamplePolicy::kMidpointWithExtremes:
       spectrum.observations =

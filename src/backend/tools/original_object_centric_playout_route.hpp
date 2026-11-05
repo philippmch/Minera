@@ -125,8 +125,8 @@ void handle_original_object_centric_playout_workbench(
     if(causal)artifact("model_legacy_json",[&]{std::string value;invoke("serialize_oc_causal_net_json(model)","export","OcCausalNet",[&]{value=serialize_oc_causal_net_json(*causal);});return value;});
     const Ocel* generated=result?&result->log:log?&*log:nullptr;
     if(returned&&generated){
-      artifact("ocel_classic_json",[&]{std::string value;invoke("serialize_ocel_json(log,classic)","export","Ocel",[&]{value=serialize_ocel_json(*generated,OcelJsonFormat::kClassic);});return value;});
-      artifact("ocel_standard_json",[&]{std::string value;invoke("serialize_ocel_json(log,standard)","export","Ocel",[&]{value=serialize_ocel_json(*generated,OcelJsonFormat::kStandard);});return value;});
+      artifact("ocel_classic_json",[&]{std::string value;invoke("serialize_ocel_json(log,classic)","export","Ocel",[&]{value=serialize_ocel_json(*generated,OcelJsonFormat::kClassic,false);});return value;});
+      artifact("ocel_standard_json",[&]{std::string value;invoke("serialize_ocel_json(log,standard)","export","Ocel",[&]{value=serialize_ocel_json(*generated,OcelJsonFormat::kStandard,false);});return value;});
       artifact("playout_legacy_json",[&]{
         std::string value;
         if(is_ocpn&&result)invoke("serialize_ocpn_playout_json(result,binding)","export","OcpnPlayoutResult",[&]{value=serialize_ocpn_playout_json(*result,options->event_binding);});
