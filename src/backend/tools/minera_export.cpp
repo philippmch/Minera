@@ -1660,8 +1660,12 @@ minera::DfgPlayoutResult generate_dfg_playout(
     }
   }
   std::optional<minera::DfgPerformance> performance;
-  if (options.variant == minera::DfgPlayoutVariant::kPerformance)
-    performance = minera::discover_performance_dfg(log);
+  if (options.variant == minera::DfgPlayoutVariant::kPerformance) {
+    // The CLI reads CSV or XES, which pm4py discovers as a DataFrame.
+    minera::DfgStatisticalOptions dataframe_options;
+    dataframe_options.dataframe_arithmetic = true;
+    performance = minera::discover_performance_dfg(log, dataframe_options);
+  }
   return minera::dfg_playout_result(frequency, starts, ends, options,
                                     performance ? &*performance : nullptr);
 }
@@ -7768,7 +7772,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       std::string converted_net_json;
       if (stochastic_map_params.source ==
           minera::StochasticMapSource::kPerformanceDfg) {
-        const auto performance_dfg = minera::discover_performance_dfg(log);
+        // The CLI reads CSV or XES, which pm4py discovers as a DataFrame.
+        minera::DfgStatisticalOptions dataframe_options;
+        dataframe_options.dataframe_arithmetic = true;
+        const auto performance_dfg = minera::discover_performance_dfg(log, dataframe_options);
         const auto model = minera::stochastic_map_from_performance_dfg(
             graph, performance_dfg, stochastic_map_params.performance);
         stochastic_map_net = model.net;

@@ -911,6 +911,9 @@ describe("file routing", () => {
     expect(isJsonExport("EXPORT.JSON")).toBe(true);
     expect(isJsonExport("log.csv")).toBe(false);
     expect(isJsonExport("log.tsv")).toBe(false);
+    // pm4py's OCEL JSON extension is classified like any JSON upload.
+    expect(isJsonExport("orders.jsonocel")).toBe(true);
+    expect(isJsonExport("orders.xmlocel")).toBe(false);
   });
 
   it("uses a tab delimiter only for .tsv uploads", () => {

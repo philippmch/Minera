@@ -16,6 +16,8 @@
 
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/timestamp.hpp"
 #include "minera/log_conversion.hpp"
 #include "../gzip_codec.hpp"
 #include "../root_cause_trace_key.hpp"
@@ -1852,6 +1854,76 @@ void writer_refuses_text_xml_cannot_carry() {
   }
 }
 
+// A CSV log keeps its column names as projection keys. Native exports write
+// them back as they are; standard_keys exports (the server downloads) use the
+// standard XES keys, without which pm4py.read_xes finds no case id.
+void standard_key_exports_rename_csv_projections() {
+  constexpr auto npos = std::string::npos;
+  const std::string csv =
+      "case_id,activity,timestamp,resource,amount\n"
+      "\"c&<1>\",\"A \"\"x\"\"\",2026-03-01T06:37:13.250Z,R1,1.5\n"
+      "\"c&<1>\",B,2026-03-01T07:00:00Z,R2,2\n";
+  std::istringstream csv_input(csv);
+  const auto log = minera::import_csv_event_log(csv_input);
+  const auto native = minera::to_xes(log);
+  assert(native.find("<string key=\"case_id\"") != npos);
+  assert(native.find("<string key=\"activity\"") != npos);
+
+  minera::XesExportOptions options;
+  options.standard_keys = true;
+  const auto xml = minera::serialize_xes(log, options);
+  for (const auto* source : {"key=\"case_id\"", "key=\"activity\"",
+                             "key=\"timestamp\"", "key=\"resource\""})
+    assert(xml.find(source) == npos);
+  assert(xml.find("<trace>\n    <string key=\"concept:name\" value=\"c&amp;&lt;1&gt;\"/>") != npos);
+  assert(xml.find("<string key=\"concept:name\" value=\"A &quot;x&quot;\"/>") != npos);
+  assert(xml.find("<date key=\"time:timestamp\" value=\"2026-03-01T06:37:13.250") != npos);
+  assert(xml.find("<string key=\"org:resource\" value=\"R1\"/>") != npos);
+  assert(xml.find("key=\"amount\" value=\"1.5\"") != npos);
+  std::istringstream xes_input(xml);
+  const auto back = minera::import_xes_event_log(xes_input);
+  assert(back.traces.size() == 1 && back.traces[0].case_id == "c&<1>");
+  assert(back.traces[0].events.size() == 2);
+  assert(back.traces[0].events[0].activity == "A \"x\"");
+  assert(back.traces[0].events[0].resource == "R1");
+  assert(minera::parse_timestamp(back.traces[0].events[0].timestamp) ==
+         minera::parse_timestamp("2026-03-01T06:37:13.250Z"));
+
+  // Inferred metadata declares the extensions of the standard keys.
+  options.infer_metadata = true;
+  const auto inferred = minera::serialize_xes(log, options);
+  assert(inferred.find("prefix=\"time\"") != npos);
+  assert(inferred.find("prefix=\"org\"") != npos);
+
+  // pm4py-style CSV columns: the case:concept:name column becomes the trace
+  // concept:name rather than a trace attribute read as case:case:concept:name.
+  std::istringstream pm4py_input(
+      "case:concept:name,concept:name,time:timestamp\nc1,A,2026-01-01T00:00:00Z\n");
+  minera::CsvImportOptions pm4py_columns;
+  pm4py_columns.case_id_column = "case:concept:name";
+  pm4py_columns.activity_column = "concept:name";
+  pm4py_columns.timestamp_column = "time:timestamp";
+  options.infer_metadata = false;
+  const auto pm4py_xml = minera::serialize_xes(
+      minera::import_csv_event_log(pm4py_input, pm4py_columns), options);
+  assert(pm4py_xml.find("key=\"case:concept:name\"") == npos);
+  assert(pm4py_xml.find("<trace>\n    <string key=\"concept:name\" value=\"c1\"/>") != npos);
+
+  // A generic attribute already under a standard key keeps the selected cell
+  // under its source key, so neither value is lost.
+  auto collision = log;
+  collision.traces[0].events[0].attributes.push_back(
+      {"concept:name", "generic", minera::AttributeKind::kString});
+  collision.traces[0].attributes.push_back(
+      {"concept:name", "case generic", minera::AttributeKind::kString});
+  const auto kept = minera::serialize_xes(collision, options);
+  assert(kept.find("<string key=\"activity\" value=\"A &quot;x&quot;\"/>") != npos);
+  assert(kept.find("<string key=\"concept:name\" value=\"generic\"/>") != npos);
+  assert(kept.find("<string key=\"case_id\" value=\"c&amp;&lt;1&gt;\"/>") != npos);
+  assert(kept.find("<string key=\"concept:name\" value=\"case generic\"/>") != npos);
+  assert(kept.find("<string key=\"concept:name\" value=\"B\"/>") != npos);
+}
+
 int main() {
   unsigned_integer_boundaries_match_public_variants();
   {
@@ -2527,6 +2599,7 @@ int main() {
   attribute_equality_is_an_equivalence_relation();
   deeply_nested_xes_attributes_are_rejected();
   conflicting_projection_aliases_are_retained();
+  standard_key_exports_rename_csv_projections();
   inferred_metadata_completes_empty_and_partial_globals();
   null_containers_keep_recursive_children();
   null_scalar_list_children_preserve_order_and_duplicates();

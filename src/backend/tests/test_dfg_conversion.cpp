@@ -48,12 +48,62 @@ void invisible_variant_has_one_visible_transition_per_activity() {
   assert(visible == 2 && silent == 5);
 }
 
-void empty_boundaries_are_inferred() {
+// pm4py 2.7.22 convert_to_petri_net(dfg, sa, ea) passes both maps, so an
+// empty map is not inferred (captured black box 2026-11-05).
+void empty_boundaries_are_explicit() {
   minera::DfgCleanAnalysis dfg;
   dfg.graph[{"A", "B"}] = 1;
+  dfg.graph[{"B", "B"}] = 2;
   const auto net = minera::convert_dfg_to_petri_net(dfg);
-  assert(net.activities().size() == 2);
-  assert(net.transitions().size() == 3);
+  assert(net.place_count() == 4);  // source, sink, A, B
+  assert(net.transitions().size() == 2);  // the two edges, no boundaries
+  for (const auto& transition : net.transitions()) {
+    assert(transition.activity && net.activities()[*transition.activity] == "B");
+    assert(transition.inputs.front() != net.source());
+    assert(transition.outputs.front() != net.sink());
+  }
+  minera::DfgPetriConversionOptions options;
+  options.variant = minera::DfgPetriConversionVariant::kInvisiblesNoDuplicates;
+  for (const bool empty_start : {true, false}) {
+    auto partial = dfg;
+    if (empty_start) partial.end_activities["B"] = 1;
+    else partial.start_activities["A"] = 1;
+    bool raised = false;
+    try {
+      (void)minera::convert_dfg_to_petri_net(partial, options);
+    } catch (const std::invalid_argument&) {
+      raised = true;
+    }
+    assert(raised);
+  }
+}
+
+// Activity-defines-place keeps only edge activities: pm4py drops a boundary
+// activity without edges (the DFG of the log [<a>] is a bare source and
+// sink). Zero frequencies still count as keys. Invisibles-no-duplicates
+// keeps boundary activities.
+void boundary_activities_outside_edges() {
+  minera::DfgCleanAnalysis single;
+  single.start_activities["a"] = 1;
+  single.end_activities["a"] = 1;
+  const auto bare = minera::convert_dfg_to_petri_net(single);
+  assert(bare.place_count() == 2 && bare.transitions().empty());
+
+  minera::DfgCleanAnalysis dfg;
+  dfg.graph[{"b", "c"}] = 0;
+  dfg.start_activities["a"] = 1;
+  dfg.start_activities["b"] = 0;
+  dfg.end_activities["a"] = 1;
+  dfg.end_activities["c"] = 1;
+  const auto net = minera::convert_dfg_to_petri_net(dfg);
+  // places b, c, source, sink; transitions start b, end c, edge b->c
+  assert(net.place_count() == 4 && net.transitions().size() == 3);
+  minera::DfgPetriConversionOptions options;
+  options.variant = minera::DfgPetriConversionVariant::kInvisiblesNoDuplicates;
+  const auto invisible = minera::convert_dfg_to_petri_net(dfg, options);
+  // a, b, c and both artificial activities: 10 places, 5 own transitions,
+  // 2 start, 1 edge and 2 end silent transitions.
+  assert(invisible.place_count() == 10 && invisible.transitions().size() == 10);
 }
 
 void graph_overload_and_json_are_deterministic() {
@@ -98,7 +148,8 @@ void invalid_options_are_rejected() {
 int main() {
   activity_places_variant_uses_edge_transitions();
   invisible_variant_has_one_visible_transition_per_activity();
-  empty_boundaries_are_inferred();
+  empty_boundaries_are_explicit();
+  boundary_activities_outside_edges();
   graph_overload_and_json_are_deterministic();
   invalid_options_are_rejected();
 }

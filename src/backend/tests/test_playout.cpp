@@ -1,5 +1,7 @@
 #include "minera/json_export.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/playout.hpp"
+#include "minera/pnml.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -844,7 +846,80 @@ void stochastic_final_marking_stop_and_visible_cap() {
     assert(trace.events.size() == 1 && trace.events.front().activity == "c");
 }
 
+// loop.pnml: a silent self-loop beside a visible one. With weights 1, 500,
+// 1, 0 a case of max_steps visible events fires about 500 times per visible
+// event (silent firings do not count towards max_steps), so a run that the
+// visible-event budget allows can be huge. The run-wide firing bound counts
+// every firing, the visited bound counts marking entries, and the
+// cancellation callback stops the loop; all are unset by default.
+void stochastic_run_bounds_count_silent_firings() {
+  const auto net = minera::parse_pnml(R"(<?xml version="1.0" encoding="UTF-8"?>
+<pnml><net id="n" type="http://www.pnml.org/version-2009/grammar/pnmlcoremodel"><page id="pg">
+<place id="source"><name><text>source</text></name><initialMarking><text>1</text></initialMarking></place>
+<place id="p1"><name><text>p1</text></name></place>
+<place id="sink"><name><text>sink</text></name></place>
+<transition id="ta"><name><text>A</text></name></transition>
+<transition id="tt"><name><text>tau</text></name><toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="x"/></transition>
+<transition id="tb"><name><text>B</text></name></transition>
+<transition id="te"><name><text>E</text></name></transition>
+<arc id="a1" source="source" target="ta"/><arc id="a2" source="ta" target="p1"/>
+<arc id="a3" source="p1" target="tt"/><arc id="a4" source="tt" target="p1"/>
+<arc id="a5" source="p1" target="tb"/><arc id="a6" source="tb" target="p1"/>
+<arc id="a7" source="p1" target="te"/><arc id="a8" source="te" target="sink"/>
+</page><finalmarkings><marking><place idref="sink"><text>1</text></place></marking></finalmarkings></net></pnml>)");
+  assert(net.transitions().size() == 4 && net.transitions()[1].silent());
+  minera::StochasticPlayoutOptions options;
+  options.traces = 2;
+  options.max_steps = 100;
+  options.transition_weights = {1.0, 500.0, 1.0, 0.0};
+  // Unbounded by default (reference-like): visible events stop the case.
+  const auto unbounded = minera::stochastic_playout(net, options);
+  for (const auto& trace : unbounded.traces) assert(trace.events.size() == 100);
+  const auto visited = minera::stochastic_playout_visited(net, options);
+  assert(visited.traces.front().size() > 10000);  // silent steps recorded
+
+  // The run-wide firing bound counts silent firings.
+  options.max_total_firings = 5000;
+  bool refused = false;
+  try {
+    (void)minera::stochastic_playout(net, options);
+  } catch (const std::length_error& error) {
+    refused = std::string(error.what()).find("more than 5000 transitions") != std::string::npos;
+  }
+  assert(refused);
+  // A bound the run stays within changes nothing (same seed, same log).
+  options.max_total_firings = 10000000;
+  const auto within = minera::stochastic_playout(net, options);
+  assert(within.traces.size() == unbounded.traces.size());
+  for (std::size_t i = 0; i < within.traces.size(); ++i)
+    assert(within.traces[i].events.size() == unbounded.traces[i].events.size());
+
+  // Visited marking entries are bounded (three places per marking).
+  options.max_total_firings = 0;
+  options.max_visited_marking_entries = 3000;
+  refused = false;
+  try {
+    (void)minera::stochastic_playout_visited(net, options);
+  } catch (const std::length_error&) {
+    refused = true;
+  }
+  assert(refused);
+  options.max_visited_marking_entries = 0;
+
+  // A cancellation callback stops the run (polled every 256 checks).
+  std::size_t polls = 0;
+  options.cancelled = [&polls] { return ++polls > 3; };
+  bool cancelled = false;
+  try {
+    (void)minera::stochastic_playout(net, options);
+  } catch (const minera::OperationCancelled&) {
+    cancelled = true;
+  }
+  assert(cancelled && polls == 4);
+}
+
 int main() {
+  stochastic_run_bounds_count_silent_firings();
   deterministic_and_timestamped();
   stochastic_visited_records_silent_steps_and_preserves_default();
   weighted_input_multiplicity_and_silent_steps();

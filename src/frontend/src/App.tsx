@@ -41,6 +41,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
 import { ProcessModel } from "./components/ProcessModel";
+import { openableLogFile } from "./opened-log-file";
 import { Conformance } from "./components/Conformance";
 import { Resources } from "./components/Resources";
 import { VariantList } from "./components/VariantList";
@@ -465,12 +466,16 @@ export default function App() {
       .finally(() => { if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; ocelRequest.current = null; setMining(false);} });
   }, [ocelFile]);
 
-  const loadFile = (file: File, xesActivityAttribute?: string, xesOptions?: CsvOptions, miningOptions?: MineOptions) => {
+  const loadFile = (picked: File, xesActivityAttribute?: string, xesOptions?: CsvOptions, miningOptions?: MineOptions) => {
     setTool(null);
-    setPendingSourceFile(file);
+    setPendingSourceFile(picked);
     const {ticket, controller, cancelsSettled} = beginSourceLoad();
     const accepts = () => sourceRequest.current?.controller === controller && sourceGate.current.accepts(ticket, controller.signal);
     (async () => {
+      // pm4py's OCEL XML/SQLite files become OCEL JSON and gzip CSV is
+      // decompressed first, so neither reaches the CSV/XES path.
+      const file = await openableLogFile(picked, controller.signal);
+      if (!accepts()) return;
       // Minera JSON exports open directly; object-centric JSON is discovered
       // through the local backend, and other files are mined as event logs.
       let options: MineOptions = {...xesOptions, delimiter: delimiterForFile(file.name), xesActivityAttribute, ...miningOptions};
@@ -536,7 +541,7 @@ export default function App() {
         void acknowledgeMiningRequest(ticket.request_id);
     })()
       .catch((cause: Error) => {
-        if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} else failSourceLoad(sourceRequest.current); setError(`Could not load ${file.name}: ${cause.message}`); if (/\.json$/i.test(file.name)) setTool("active-source");}
+        if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} else failSourceLoad(sourceRequest.current); setError(`Could not load ${picked.name}: ${cause.message}`); if (/\.json$/i.test(picked.name)) setTool("active-source");}
       })
       .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; ocelRequest.current = null; setMining(false);}});
   };

@@ -18429,8 +18429,10 @@ Declared:
   (the server forced 64 before max_length became optional). The server
   also caps the final EXTENSIVE words at `max_traces` (default 10000), the
   shortest first, and marks the result `truncated` (the JSON member; the XES
-  download answers with the header `X-Minera-Truncated: true`, and the
-  Conformance playout panel shows a note after the download). The reference
+  download answers with the header `X-Minera-Truncated: true`, which the
+  server lists in `Access-Control-Expose-Headers` with `X-Minera-Case-Count`
+  and `X-Minera-Event-Count` so an allowed cross-origin page can read it, and
+  the Conformance playout panel shows a note after the download). The reference
   caps the words of parallel, choice and loop nodes (see the next item) but
   not of a sequence, so a tree whose words multiply across a sequence can
   return more there. The
@@ -18610,6 +18612,18 @@ Fixed:
   option of weight 1.0 beside the enabled transitions; `max_steps` caps
   visible events only (silent firings do not count); a silent livelock raises
   after max(1,000,000, 1000 · (max_steps + 1)) firings.
+- **Server bounds of stochastic playout (declared).** Because silent firings
+  do not count towards `max_steps`, the server's visible-event budget
+  (traces · max_steps ≤ 1,000,000) does not bound the work: `/api/playout`
+  and the playout workbench also cap every firing of a run, visible or
+  silent, at 10,000,000 (1,000,000 with visited elements, two elements per
+  firing as before), cap the marking entries of a visited run at 20,000,000,
+  and stop when the client disconnects. A run past a cap is refused with 400
+  ("the run would fire more than … transitions"). The library defaults
+  (`StochasticPlayoutOptions::max_total_firings`,
+  `max_visited_marking_entries`, `cancelled`) set none, as the reference.
+  (A net with a weight-500 silent self-loop and traces=100 once ran the
+  server out of memory with visited elements; traces=1000 took 32 s.)
 - **OCEL global scopes.** An event or object scope that a read did not declare
   is written with the reference defaults (`{"ocel:activity": "__INVALID__"}`,
   `{"ocel:type": "__INVALID__"}`) by the OCEL 1.0 JSON and XML writers; the
@@ -18617,8 +18631,11 @@ Fixed:
   keeps the scopes it lists, and the OCEL 1.0 XML reader ignores `<global>`
   as `read_ocel_xml` does. Reference-generated globals (scope defaults, log
   `version`/`ordering`, `attribute-names`, `object-types`) no longer count as
-  lossy for CSV and OCEL 1.0 XML, and the OCEL 2.0 JSON writer does not
-  echo them under `globals`. Filters and splits keep the scope flags.
+  lossy for CSV and OCEL 1.0 XML, and the OCEL 2.0 JSON, OCEL 2.0 XML and
+  SQLite writers do not echo them under `globals` / `ocel_globals` (an OCEL
+  2.0 XML import exported again as OCEL 2.0 XML once gained the two
+  `__INVALID__` globals from the classic JSON the routes pass along).
+  Filters and splits keep the scope flags.
 - **OCEL attribute filters on reserved columns.** `filter_ocel_event_attribute`
   on `ocel:activity` / `ocel:eid` and `filter_ocel_object_attribute` on
   `ocel:type` / `ocel:oid` select on those columns, as the reference does
@@ -18691,13 +18708,27 @@ Fixes:
   about 1e-7 s (one microsecond in 2026 read 9.5e-7). Gaps now come from the
   exact instants: `timedelta.total_seconds()` on the EventLog path, pandas'
   `Timedelta.total_seconds()` (seconds + us*1e-6 + ns*1e-9) on the DataFrame
-  path; also in Petri decoration waits.
+  path; also in Petri decoration waits. The gap is kept as whole seconds
+  plus nanoseconds, so any two instants from year 1 to 9999 have an exact
+  gap (an earlier bound on each instant dropped events after 2255 or before
+  1685 from the map, waits outside 1843-2096 from decorations, and spans over
+  292 years overflowed); a gap over 2**53 microseconds is divided once, as
+  Python's int / int. pandas reads such CSVs as `datetime64[us]`; checked:
+  1700 → 2250 and year 1 → 9999 give pm4py's 332894188800.0 total.
+- **CSV events order at nanoseconds.** pandas sorts a case's events on the
+  datetime64 values; the CSV importer now orders them on the exact instants
+  (it compared epoch doubles, which merge events a few nanoseconds apart in
+  2026, or microseconds apart in year 9999). A CSV with 9 fractional digits
+  and sub-microsecond near-ties gave a different edge order and a 0 for a
+  2.2e-08 gap.
 - **Reference aggregation arithmetic** (`performance_arithmetic.hpp`).
   EventLog: Python `sum`, `statistics.mean`, `statistics.stdev`. DataFrame:
   Kahan sum, sum/count mean, Welford deviation, observations taken in case-id
   order (`DfgStatisticalOptions::dataframe_arithmetic`,
   `compute_performance_metrics(..., dataframe_arithmetic)`; set for CSV/XES
-  sources, the CLI and the pandas table DFG).
+  sources, the CLI and the pandas table DFG, and for the performance DFG
+  behind DFG performance playout and the stochastic map from a performance
+  DFG, on the server, the CLI and `minera_playout`).
 - **Business hours on the DataFrame path run on the UTC clock** (a CSV
   offset is converted; XES is read as wall-clock UTC), the EventLog path on
   each timestamp's own wall clock; week positions now come from integer
@@ -18752,3 +18783,124 @@ Tests: `minera_dfg_variants_tests`
 `minera_core_tests` (`performance_edges_follow_reference_arithmetic`,
 decoration microsecond wait), `minera_dfg_dataframe_tests`
 (`pandas_performance_arithmetic_contract`); frontend `types.test.ts`.
+
+## UI downloads read back with pm4py (2026-11-05)
+
+Every model and log download the frontend offers was triggered in Chromium
+against a served build (a CSV with unicode, quotes and `& < >` in case ids,
+activities and resources; an XES with int/float/boolean/date attributes and
+`+02:00` offsets; an OCEL 2.0 JSON with typed attributes and qualifiers) and
+read with pm4py 2.7.22: PNML, BPMN and PTML of every miner and of the model
+file converter, all XES playouts, the log XES (both variants, gzip, inferred
+metadata), the DFG, the filtered/cluster XES, the OCEL exports in all eight
+formats, the OCEL filter/flatten/playout outputs, and SVG/PNG/PDF views.
+Nets match the served decorations (places, transitions, labels), PTML trees
+match the shown trees, typed XES attributes and OCEL JSON/SQLite types
+survive, and names keep every character.
+
+Fixed: a CSV log's XES downloads (`/api/xes`, the query-filter, LLM-cluster
+and trace-cluster exports, the anonymization release) wrote the case id,
+activity, timestamp and resource under the CSV column names (`case_id`,
+`activity`, ...; a pm4py-style CSV even got a trace `case:concept:name`), so
+`read_xes` returned no `case:concept:name`/`concept:name`/`time:timestamp`
+and every pm4py discovery raised `KeyError`. These downloads now use the
+standard keys (`XesExportOptions::standard_keys`), as `format_dataframe` plus
+`write_xes` does; a trace or event that already has another attribute under
+the standard key keeps the source key. Native exports keep source keys.
+Test: `minera_xes_io_tests` (`standard_key_exports_rename_csv_projections`).
+
+Declared:
+
+- **CSV attribute columns are XES strings (declared).** Minera's CSV log
+  keeps attribute cells as text, so XES downloads write `<string>` where
+  pm4py's `read_csv` would infer int64/float64/bool and `write_xes` would
+  write `<int>`/`<float>`/`<boolean>`. XES and OCEL sources keep their types.
+- **Workflow discovery's "adapted discovery source" XES (declared).** It is
+  the exact discovery input and keeps the source keys, with the selectors to
+  reopen it in `source_xes_options`; pm4py needs those keys passed to its
+  functions (or the log XES download instead).
+- **Process-tree playout traces carry no `concept:name` (declared).** As in
+  pm4py's own `play_out` of a tree, so `read_xes` gives only `concept:name`.
+- **Empty OCEL 2.0 JSON (declared).** A filter that keeps nothing downloads
+  a valid empty OCEL; pm4py's `read_ocel2_json` raises `KeyError:
+  'ocel:timestamp'` on an empty event list.
+- **XES offsets.** Downloads write each timestamp's own clock and offset;
+  pm4py reads XES dates as wall-clock UTC, so it reads the download exactly
+  as it reads the source file.
+
+## Model conversion matrix (2026-11-05)
+
+Random source models (reference discoveries of random logs with odd activity
+names, random process trees, random DFGs with self-loops, empty and foreign
+boundary maps and zero counts, random POWL models with frequency leaves and
+non-series-parallel orders) were converted by both sides. Nets are compared
+up to isomorphism (labels, silent transitions, markings, arc weights); trees
+by structure with the children of exclusive choices and parallels unordered.
+"Both raise" counts as a match.
+
+| Conversion (native entry point) | Cases | Result |
+| --- | --- | --- |
+| `convert_to_petri_net(dfg, sa, ea)`, both variants (`minera_dfg --to-petri`, `/api/dfg-to-petri`, `/api/model-exchange`) | 550 DFGs x 2 | 1100/1100 after the fix (195 invisibles cases both raise); 218 of 600 differed before |
+| `convert_to_process_tree(dfg, sa, ea)` and the tree of the invisibles net (`/api/model-exchange` dfg to ptml) | 320 DFGs x 2 | 637/640; 3 declared below |
+| `convert_to_process_tree` of reference DFG nets (`--pnml-to-ptml`) | 729 nets | 729/729 |
+| `convert_to_process_tree(net)` of tree, inductive, alpha and heuristics nets (`--pnml-to-ptml`, `net_to_tree`) | 1,000 nets | 1,000/1,000 (694 trees, 306 both raise); 116 of 400 differed before, one the declared hash-order case |
+| `convert_to_petri_net(bpmn)` of `convert_to_bpmn(tree)` and `discover_bpmn_inductive` (`/api/model-exchange` bpmn to pnml) | 640 | 640 isomorphic |
+| `convert_to_process_tree(bpmn)` (`--bpmn-to-ptml`, model exchange) | 640 | 640/640 after the fix (557 trees, 83 both raise) |
+| `convert_to_process_tree(powl)` (`powl_to_tree`) | 650 | 650/650 after the fix; 20 of 100 differed before |
+| heuristics net to Petri (`--pnml-miner heuristic` against `discover_petri_net_heuristics`) | 330 logs | 330 isomorphic |
+| `convert_to_dataframe(log)` (`--log-convert to_data_frame`) | 710 logs | 710 equal (column order, cells, missing values) |
+| `convert_to_event_stream(log)` (`--log-convert to_event_stream`) | 350 logs | 350 equal (event order, key order, values) |
+
+Not exposed natively: `convert_log_to_ocel`, `convert_ocel_to_log` (the OCEL
+flattening route is `ocel_flattening`, compared earlier) and DFG discovery
+from nets. Skipped as matched in earlier rounds: tree to Petri, tree to BPMN,
+Petri to BPMN to Petri and POWL to Petri.
+
+Fixes:
+
+- **DFG to Petri net takes the boundary maps as given.** The public call
+  passes both maps, so nothing is inferred: an empty start or end map adds no
+  boundary transition in activity-defines-place and raises in
+  invisibles-no-duplicates (`KeyError` on the artificial activity; native
+  `invalid_argument`). Native inferred boundaries from the graph and fell
+  back to every activity. Activity-defines-place builds places only for
+  activities on an edge and ignores boundary activities outside them (the DFG
+  of the log `[<a>]` converts to a bare source and sink), while
+  invisibles-no-duplicates keeps them. Every key counts whatever its
+  frequency (native skipped zero counts). Test: `minera_dfg_conversion_tests`
+  (`empty_boundaries_are_explicit`, `boundary_activities_outside_edges`).
+- **Workflow net to process tree folds like the reference.** Nested
+  sequences flatten (`->('a', ->('b', 'c'))` is `->('a', 'b', 'c')`), an
+  exclusive choice keeps one tau (`X(tau, X(tau, 'a'))` is `X(tau, 'a')`),
+  sequences and parallels drop taus, a loop of taus is a tau and a one-child
+  operator is its child. A valid net with a single transition raises, as the
+  reference does (`AssertionError` for a visible, `AttributeError` for a
+  silent one); two or more transitions in a chain convert. The reference's
+  tree-to-Petri conversion already folds silent steps, so the net of
+  `->(tau, 'a')` is such a net. A loop whose do part ends in self-loops at its
+  end place (activity-defines-place nets of DFGs with an `a -> a` edge) is
+  now `->(rest, *(tau, cycles))`; the strict reducer rejected it as not
+  block-structured. The same applies to BPMN to tree and model-exchange
+  PTML. Test: `minera_powl_conversion_tests`
+  (`workflow_net_to_process_tree_shapes_match_reference`, 55 captured nets,
+  `scripts/capture-net-to-tree-shape-reference.py`).
+- **POWL to process tree keeps frequency leaves.** `convert_to_process_tree`
+  keeps a `FrequentTransition` as one leaf labelled `"<label>\n[1,<max or
+  ->]"` when it is optional or self-looping, as its Petri-net conversion
+  does; native expanded it into `X(tau, a)` or `*(a, tau)`. Tests:
+  `minera_powl_conversion_tests`. Eight model-conversion workbench captures
+  were refreshed with `scripts/capture-workbench-fixtures.py`.
+
+Declared:
+
+- **Loop shapes that follow hash order (declared).** When a loop place has a
+  self-loop and another redo path, the reference reduces either the self-loop
+  first (`*(*('c', tau), redo)`) or both redo paths as one choice
+  (`*('c', X(tau, redo))`) depending on `PYTHONHASHSEED`; native always
+  builds the choice. The languages are equal. Seen on 1 of 1,400 discovered
+  nets and 3 of 640 DFG trees; each checked case gives both shapes across
+  seeds 0 to 9.
+- **Artificial DFG activity names (declared).** invisibles-no-duplicates
+  defaults to `@@start@@`/`@@end@@` and refuses an activity with the same
+  name; the reference uses `▶`/`■` and merges such an activity into the
+  artificial one.

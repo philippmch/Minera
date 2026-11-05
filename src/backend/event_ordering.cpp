@@ -57,4 +57,32 @@ void order_events_by_time(std::vector<Event>& events) {
   events = std::move(sorted);
 }
 
+void order_events_by_exact_time(std::vector<Event>& events) {
+  std::vector<ParsedExactTimestamp> instants;
+  instants.reserve(events.size());
+  for (const auto& event : events) {
+    auto instant = parse_timestamp_exact(event.timestamp);
+    if (!instant) {
+      // Same fallback as order_events_by_time.
+      order_events_by_time(events);
+      return;
+    }
+    instants.push_back(*instant);
+  }
+  std::vector<std::size_t> order(events.size());
+  std::iota(order.begin(), order.end(), std::size_t{0});
+  std::stable_sort(order.begin(), order.end(),
+                   [&](std::size_t a, std::size_t b) {
+                     if (instants[a].seconds != instants[b].seconds)
+                       return instants[a].seconds < instants[b].seconds;
+                     if (instants[a].nanoseconds != instants[b].nanoseconds)
+                       return instants[a].nanoseconds < instants[b].nanoseconds;
+                     return events[a].input_order < events[b].input_order;
+                   });
+  std::vector<Event> sorted;
+  sorted.reserve(events.size());
+  for (const std::size_t i : order) sorted.push_back(std::move(events[i]));
+  events = std::move(sorted);
+}
+
 }  // namespace minera

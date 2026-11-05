@@ -680,6 +680,51 @@ std::string projection_key(std::string_view source_key,
                             : std::string(source_key);
 }
 
+// Standard keys of the selected activity, timestamp, resource and lifecycle
+// cells, in Event::first_class_source_positions order.
+constexpr std::array<std::string_view, 4> kStandardEventKeys{
+    "concept:name", "time:timestamp", "org:resource", "lifecycle:transition"};
+
+bool has_attribute_key(const std::vector<EventAttribute>& attributes,
+                       std::string_view key) {
+  return std::any_of(attributes.begin(), attributes.end(),
+                     [&](const auto& attribute) { return attribute.key == key; });
+}
+
+// The keys the selected cells were read from (the canonical key when unknown).
+std::array<std::string, 4> event_source_keys(const Event& event) {
+  return {projection_key(event.activity_source_key, kStandardEventKeys[0]),
+          projection_key(event.timestamp_source_key, kStandardEventKeys[1]),
+          projection_key(event.resource_source_key, kStandardEventKeys[2]),
+          projection_key(event.lifecycle_source_key, kStandardEventKeys[3])};
+}
+
+// The keys the selected cells are written under. With standard_keys a cell
+// moves to its standard key unless another attribute or selected cell of the
+// event already uses that key.
+std::array<std::string, 4> event_output_keys(const Event& event,
+                                             bool standard_keys) {
+  auto keys = event_source_keys(event);
+  if (!standard_keys) return keys;
+  for (std::size_t role = 0; role < keys.size(); ++role) {
+    const auto standard = kStandardEventKeys[role];
+    if (keys[role] == standard) continue;
+    bool taken = has_attribute_key(event.attributes, standard);
+    for (std::size_t other = 0; other < keys.size() && !taken; ++other)
+      taken = other != role && keys[other] == standard;
+    if (!taken) keys[role] = std::string(standard);
+  }
+  return keys;
+}
+
+std::string trace_output_key(const Trace& trace, bool standard_keys) {
+  auto key = projection_key(trace.case_id_source_key, "concept:name");
+  if (standard_keys && key != "concept:name" &&
+      !has_attribute_key(trace.attributes, "concept:name"))
+    key = "concept:name";
+  return key;
+}
+
 void add_key_prefix(std::set<std::string>& prefixes, std::string_view key) {
   const auto separator = key.find(':');
   if (separator != std::string_view::npos && separator != 0)
@@ -702,19 +747,16 @@ void add_attribute_prefixes(std::set<std::string>& prefixes,
 }
 
 void add_projection_prefixes(std::set<std::string>& prefixes,
-                             const Event& event) {
+                             const Event& event, bool standard_keys) {
+  const auto keys = event_output_keys(event, standard_keys);
   if (present(event.activity_state, event.activity))
-    add_key_prefix(prefixes,
-                   projection_key(event.activity_source_key, "concept:name"));
+    add_key_prefix(prefixes, keys[0]);
   if (present(event.timestamp_state, event.timestamp))
-    add_key_prefix(prefixes, projection_key(event.timestamp_source_key,
-                                             "time:timestamp"));
+    add_key_prefix(prefixes, keys[1]);
   if (present(event.resource_state, event.resource))
-    add_key_prefix(prefixes,
-                   projection_key(event.resource_source_key, "org:resource"));
+    add_key_prefix(prefixes, keys[2]);
   if (present(event.lifecycle_state, event.lifecycle))
-    add_key_prefix(prefixes, projection_key(event.lifecycle_source_key,
-                                             "lifecycle:transition"));
+    add_key_prefix(prefixes, keys[3]);
 }
 
 void write_projection(std::ostream& out, std::string_view indent,
@@ -770,17 +812,21 @@ bool is_selected_copy(const EventAttribute& attribute,
          attribute.children == selected->children;
 }
 
-void write_event_attributes(std::ostream& out, const Event& event, XesExportVariant variant, bool preserve_nulls) {
+void write_event_attributes(std::ostream& out, const Event& event, XesExportVariant variant, bool preserve_nulls,
+                            bool standard_keys) {
   std::set<const EventAttribute*> consumed;
+  // Selected cells are looked up under their source keys and written under
+  // their output keys; the two differ only for standard_keys exports.
+  const auto source_keys = event_source_keys(event);
+  const auto output_keys = event_output_keys(event, standard_keys);
   const auto write_role = [&](int role) {
     switch (role) {
       case 0:
       if (present(event.activity_state, event.activity)) {
-        const auto key =
-            projection_key(event.activity_source_key, "concept:name");
+        const auto& key = source_keys[0];
         const auto* nested =
             first_class_metadata(event.activity_attribute, event.attributes, key);
-        write_projection(out, "      ", key,
+        write_projection(out, "      ", output_keys[0],
                          event.activity,
                          AttributeKind::kString, event.activity_state, variant, preserve_nulls, nested);
         if (nested && !event.activity_attribute) consumed.insert(nested);
@@ -788,11 +834,10 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
         break;
       case 1:
       if (present(event.timestamp_state, event.timestamp)) {
-        const auto key =
-            projection_key(event.timestamp_source_key, "time:timestamp");
+        const auto& key = source_keys[1];
         const auto* nested = first_class_metadata(event.timestamp_attribute,
                                                   event.attributes, key);
-        write_projection(out, "      ", key,
+        write_projection(out, "      ", output_keys[1],
                          event.timestamp,
                          event.timestamp_state == FirstClassAttributeState::kNull ||
                                  (!event.timestamp.empty() &&
@@ -805,11 +850,10 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
         break;
       case 2:
       if (present(event.resource_state, event.resource)) {
-        const auto key =
-            projection_key(event.resource_source_key, "org:resource");
+        const auto& key = source_keys[2];
         const auto* nested =
             first_class_metadata(event.resource_attribute, event.attributes, key);
-        write_projection(out, "      ", key,
+        write_projection(out, "      ", output_keys[2],
                          event.resource,
                          AttributeKind::kString, event.resource_state, variant, preserve_nulls, nested);
         if (nested && !event.resource_attribute) consumed.insert(nested);
@@ -817,11 +861,10 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
         break;
       default:
       if (present(event.lifecycle_state, event.lifecycle)) {
-        const auto key =
-            projection_key(event.lifecycle_source_key, "lifecycle:transition");
+        const auto& key = source_keys[3];
         const auto* nested = first_class_metadata(event.lifecycle_attribute,
                                                   event.attributes, key);
-        write_projection(out, "      ", key,
+        write_projection(out, "      ", output_keys[3],
                          event.lifecycle,
                          AttributeKind::kString, event.lifecycle_state, variant, preserve_nulls, nested);
         if (nested && !event.lifecycle_attribute) consumed.insert(nested);
@@ -855,20 +898,16 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
     const auto selected_copy =
         (event.activity_attribute &&
          is_selected_copy(attribute, &*event.activity_attribute,
-                          projection_key(event.activity_source_key,
-                                         "concept:name"))) ||
+                          source_keys[0])) ||
         (event.timestamp_attribute &&
          is_selected_copy(attribute, &*event.timestamp_attribute,
-                          projection_key(event.timestamp_source_key,
-                                         "time:timestamp"))) ||
+                          source_keys[1])) ||
         (event.resource_attribute &&
          is_selected_copy(attribute, &*event.resource_attribute,
-                          projection_key(event.resource_source_key,
-                                         "org:resource"))) ||
+                          source_keys[2])) ||
         (event.lifecycle_attribute &&
          is_selected_copy(attribute, &*event.lifecycle_attribute,
-                          projection_key(event.lifecycle_source_key,
-                                         "lifecycle:transition")));
+                          source_keys[3]));
     if (!consumed.contains(&attribute) && !selected_copy)
       write_typed_attribute(out, "      ", attribute, variant, preserve_nulls);
   }
@@ -884,7 +923,8 @@ const EventAttribute* stored_log_name(const EventLog& log) {
 
 void write_xes_with_options(std::ostream& out, const EventLog& log,
                             std::string_view requested_name,
-                            bool infer_metadata, XesExportVariant variant, bool preserve_nulls) {
+                            bool infer_metadata, XesExportVariant variant, bool preserve_nulls,
+                            bool standard_keys) {
   const auto globals = effective_globals(log.metadata);
   std::set<std::string> inferred_prefixes;
   if (infer_metadata) {
@@ -900,11 +940,10 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
       add_attribute_prefixes(inferred_prefixes, trace.attributes);
       if (present(trace.case_id_state, trace.case_id))
         add_key_prefix(inferred_prefixes,
-                       projection_key(trace.case_id_source_key,
-                                      "concept:name"));
+                       trace_output_key(trace, standard_keys));
       for (const auto& event : trace.events) {
         add_attribute_prefixes(inferred_prefixes, event.attributes);
-        add_projection_prefixes(inferred_prefixes, event);
+        add_projection_prefixes(inferred_prefixes, event, standard_keys);
       }
     }
   }
@@ -977,8 +1016,10 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
 
   for (const auto& trace : log.traces) {
     out << "  <trace>\n";
+    // Looked up under its source key, written under its output key.
     const auto case_key =
         projection_key(trace.case_id_source_key, "concept:name");
+    const auto case_output_key = trace_output_key(trace, standard_keys);
     const auto* nested_case = first_class_metadata(
         trace.case_id_attribute, trace.attributes, case_key);
     // The case cell goes back to its document position when it is known.
@@ -986,7 +1027,7 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
     const auto write_case = [&] {
       if (case_written) return;
       case_written = true;
-      write_projection(out, "    ", case_key, trace.case_id,
+      write_projection(out, "    ", case_output_key, trace.case_id,
                        AttributeKind::kString, trace.case_id_state,
                        variant, preserve_nulls, nested_case);
     };
@@ -1006,7 +1047,7 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
     write_case();
     for (const auto& event : trace.events) {
       out << "    <event>\n";
-      write_event_attributes(out, event, variant, preserve_nulls);
+      write_event_attributes(out, event, variant, preserve_nulls, standard_keys);
       out << "    </event>\n";
     }
     out << "  </trace>\n";
@@ -1015,7 +1056,7 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
 }
 
 void write_xes(std::ostream& out, const EventLog& log, std::string_view name) {
-  write_xes_with_options(out, log, name, false, XesExportVariant::kLineByLine, false);
+  write_xes_with_options(out, log, name, false, XesExportVariant::kLineByLine, false, false);
 }
 
 std::string to_xes(const EventLog& log, std::string_view name) {
@@ -1028,7 +1069,8 @@ std::string serialize_xes(const EventLog& log,
                            const XesExportOptions& options) {
   (void)xes_export_variant_name(options.variant);
   std::ostringstream out;
-  write_xes_with_options(out, log, options.name, options.infer_metadata, options.variant, options.preserve_nulls);
+  write_xes_with_options(out, log, options.name, options.infer_metadata, options.variant, options.preserve_nulls,
+                         options.standard_keys);
   const auto xml = out.str();
   return options.compress.value_or(false) ? detail::gzip_compress(xml) : xml;
 }

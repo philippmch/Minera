@@ -1333,12 +1333,16 @@ CsvEventData import_csv_event_data_impl(
   if (reference_batch && !case_attribute_indices.empty()) {
     for (auto& trace : log.traces) {
       const Event* chosen = trace.events.empty() ? nullptr : &trace.events.front();
-      std::optional<double> chosen_instant;
+      std::optional<ParsedExactTimestamp> chosen_instant;
+      const auto earlier = [](const ParsedExactTimestamp& lhs, const ParsedExactTimestamp& rhs) {
+        return lhs.seconds != rhs.seconds ? lhs.seconds < rhs.seconds
+                                          : lhs.nanoseconds < rhs.nanoseconds;
+      };
       for (const auto& event : trace.events) {
         if (!timestamp_index) break;
-        const auto instant = parse_timestamp(event.timestamp);
+        const auto instant = parse_timestamp_exact(event.timestamp);
         if (!instant) continue;
-        if (!chosen_instant || *instant < *chosen_instant) {
+        if (!chosen_instant || earlier(*instant, *chosen_instant)) {
           chosen = &event;
           chosen_instant = instant;
         }
@@ -1354,8 +1358,10 @@ CsvEventData import_csv_event_data_impl(
   row_case_attributes.clear();
 
   if (timestamp_index) {
+    // format_dataframe sorts the datetime64 column, at nanosecond (or
+    // finer-than-double) resolution.
     for (auto& trace : log.traces) {
-      order_events_by_time(trace.events);
+      order_events_by_exact_time(trace.events);
     }
   }
 

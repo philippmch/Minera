@@ -328,8 +328,7 @@ DfgPerformance discover_performance_dfg(
           required_timestamp(current_start_text, "start");
       // Gaps come from the exact instants: epoch doubles would lose the
       // sub-second part (one microsecond in 2026 reads 9.5e-7).
-      const auto gap = detail::exact_gap_nanoseconds(previous_complete_text,
-                                                     current_start_text);
+      const auto gap = detail::exact_gap(previous_complete_text, current_start_text);
       double elapsed = gap ? detail::gap_seconds(*gap, dataframe)
                            : current_start - previous_complete;
       if (options.use_business_hours) {

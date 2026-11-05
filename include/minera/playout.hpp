@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -70,7 +71,8 @@ struct StochasticPlayoutOptions {
   std::size_t traces = 1000;
   // Visible-event cap per case, as the reference's maxTraceLength: silent
   // firings do not count (a silent livelock raises after
-  // max(1,000,000, 1000 * (max_steps + 1)) firings).
+  // max(1,000,000, 1000 * (max_steps + 1)) firings). max_total_firings below
+  // bounds the work of a whole run.
   std::size_t max_steps = 1000;
   // Seed for transition choices; equal options reproduce equal logs.
   std::uint64_t seed = 1;
@@ -103,6 +105,18 @@ struct StochasticPlayoutOptions {
   // stochastic_playout API continues to return an EventLog. Appended to keep
   // existing positional aggregate initialization source-compatible.
   bool return_visited_elements = false;
+  // Bound on the transition firings of the whole run, visible and silent,
+  // over all cases; 0 (the default) sets none, as the reference. A run that
+  // would exceed it throws std::length_error. A visited-elements run records
+  // two elements per firing, so this also bounds that output.
+  std::size_t max_total_firings = 0;
+  // Bound on the marking entries (one per place per recorded marking) a
+  // visited-elements run records; 0 sets none. Exceeding it throws
+  // std::length_error.
+  std::size_t max_visited_marking_entries = 0;
+  // Polled while the run fires (see minera/cancellation.hpp); returning true
+  // throws OperationCancelled. Unset never cancels.
+  std::function<bool()> cancelled;
 };
 
 // Plays out a Petri net into a synthetic event log, as the reference

@@ -1,4 +1,9 @@
 #include "minera/ocel_xml.hpp"
+#include "minera/ocel.hpp"
+#include "minera/ocel_sqlite.hpp"
+
+#include <chrono>
+#include <filesystem>
 
 #include <cassert>
 #include <cstdint>
@@ -354,8 +359,47 @@ void frame_order_and_unlisted_keys() {
 
 }  // namespace
 
+// An OCEL read from OCEL 2.0 XML declares no global scope, so the classic
+// JSON the routes pass along carries the OCEL 1.0 writers' "__INVALID__"
+// scope defaults. Writing that JSON back as OCEL 2.0 XML or SQLite leaves
+// those reference-generated globals out (as the OCEL 2.0 JSON writer does)
+// and keeps a real global.
+void standard_writers_drop_reference_generated_globals() {
+  minera::Ocel log;
+  log.objects.push_back({"o1", "order", {}});
+  log.events.push_back({"e1", "create", "2020-01-01T00:00:00Z", {}});
+  log.relations.push_back({"e1", "o1", ""});
+  minera::OcelXmlExportOptions standard;
+  standard.format = minera::OcelXmlFormat::kStandard;
+  const auto imported = minera::parse_ocel_xml(minera::serialize_ocel_xml(log, standard));
+  assert(imported.globals.empty() && !imported.global_event_scope);
+  const auto passed = minera::parse_ocel_json(minera::serialize_ocel_json(imported));
+  assert(passed.globals.at("ocel:global-event.ocel:activity") ==
+         minera::OcelValue(std::string("__INVALID__")));
+  const auto xml = minera::serialize_ocel_xml(passed, standard);
+  assert(xml.find("<globals>") == std::string::npos);
+  assert(xml.find("__INVALID__") == std::string::npos);
+  const auto path = std::filesystem::temp_directory_path() /
+                    ("minera_ocel_globals_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".sqlite");
+  std::filesystem::remove(path);
+  minera::export_ocel_sqlite(passed, path);
+  assert(minera::import_ocel_sqlite(path).globals.empty());
+  std::filesystem::remove(path);
+
+  auto custom = passed;
+  custom.globals["ocel:global-event.version"] = std::string("2");
+  const auto kept = minera::serialize_ocel_xml(custom, standard);
+  assert(kept.find("ocel:global-event.version") != std::string::npos);
+  assert(kept.find("__INVALID__") == std::string::npos);
+  minera::export_ocel_sqlite(custom, path);
+  const auto reread = minera::import_ocel_sqlite(path).globals;
+  assert(reread.size() == 1 && reread.count("ocel:global-event.version") == 1);
+  std::filesystem::remove(path);
+}
+
 int main() {
   frame_order_and_unlisted_keys();
+  standard_writers_drop_reference_generated_globals();
   minera::Ocel log;
   log.objects.push_back({"o2", "Item", {{"price", std::int64_t(7)}}});
   log.objects.push_back({"o1", "Order", {}});

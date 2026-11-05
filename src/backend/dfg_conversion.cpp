@@ -21,74 +21,49 @@ struct NormalizedDfg {
   std::map<std::pair<std::string, std::string>, std::uint64_t> edges;
 };
 
-NormalizedDfg normalize(const DfgCleanAnalysis& input) {
+// pm4py 2.7.22's convert_to_petri_net(dfg, start_activities,
+// end_activities) passes both maps explicitly, so nothing is inferred: an
+// empty start or end map adds no boundary transition (activity-defines-place)
+// or raises (invisibles-no-duplicates). Every key counts, whatever its
+// frequency. Activity-defines-place builds places only for activities that
+// occur on an edge and ignores boundary activities outside them (a DFG of
+// the single trace <a> converts to a net without transitions);
+// invisibles-no-duplicates also adds the boundary activities.
+NormalizedDfg normalize(const DfgCleanAnalysis& input,
+                        DfgPetriConversionVariant variant) {
   NormalizedDfg result;
   result.edges = input.graph;
-
   std::set<std::string> names;
   for (const auto& [edge, count] : input.graph) {
-    if (count == 0) continue;
+    (void)count;
     names.insert(edge.first);
     names.insert(edge.second);
   }
-  for (const auto& [activity, count] : input.start_activities) {
-    if (count == 0) continue;
-    names.insert(activity);
-  }
-  for (const auto& [activity, count] : input.end_activities) {
-    if (count == 0) continue;
-    names.insert(activity);
-  }
-
-  result.starts = input.start_activities;
-  result.ends = input.end_activities;
-  for (auto it = result.starts.begin(); it != result.starts.end();) {
-    if (it->second == 0) it = result.starts.erase(it);
-    else ++it;
-  }
-  for (auto it = result.ends.begin(); it != result.ends.end();) {
-    if (it->second == 0) it = result.ends.erase(it);
-    else ++it;
-  }
-
-  // A raw DFG often omits boundary maps.  Infer them from the graph in that
-  // case, matching the conversion utility's default behavior.
-  if (result.starts.empty()) {
-    std::set<std::string> targets;
-    for (const auto& [edge, count] : result.edges) {
-      if (count != 0) targets.insert(edge.second);
+  const bool edge_activities_only =
+      variant == DfgPetriConversionVariant::kActivityDefinesPlace;
+  const auto boundary = [&](const auto& source, auto& target) {
+    for (const auto& [activity, count] : source) {
+      if (edge_activities_only && !names.contains(activity)) continue;
+      target[activity] = count;
     }
-    for (const auto& [edge, count] : result.edges) {
-      if (count != 0 && !targets.contains(edge.first)) result.starts[edge.first] = 1;
+  };
+  boundary(input.start_activities, result.starts);
+  boundary(input.end_activities, result.ends);
+  if (!edge_activities_only) {
+    for (const auto& [activity, count] : result.starts) {
+      (void)count;
+      names.insert(activity);
     }
-    if (result.starts.empty()) {
-      for (const auto& name : names) result.starts[name] = 1;
+    for (const auto& [activity, count] : result.ends) {
+      (void)count;
+      names.insert(activity);
     }
-  }
-  if (result.ends.empty()) {
-    std::set<std::string> sources;
-    for (const auto& [edge, count] : result.edges) {
-      if (count != 0) sources.insert(edge.first);
-    }
-    for (const auto& [edge, count] : result.edges) {
-      if (count != 0 && !sources.contains(edge.second)) result.ends[edge.second] = 1;
-    }
-    if (result.ends.empty()) {
-      for (const auto& name : names) result.ends[name] = 1;
-    }
-  }
-
-  for (const auto& [activity, count] : result.starts) {
-    if (count != 0) names.insert(activity);
-  }
-  for (const auto& [activity, count] : result.ends) {
-    if (count != 0) names.insert(activity);
   }
   result.activities.assign(names.begin(), names.end());
   return result;
 }
 
-NormalizedDfg normalize(const DirectlyFollowsGraph& graph) {
+NormalizedDfg graph_payload(const DirectlyFollowsGraph& graph) {
   NormalizedDfg result;
   const auto& names = graph.activities();
   for (const auto& edge : graph.edges()) {
@@ -105,11 +80,7 @@ NormalizedDfg normalize(const DirectlyFollowsGraph& graph) {
     if (start != 0) result.starts[activity] = start;
     if (end != 0) result.ends[activity] = end;
   }
-  DfgCleanAnalysis payload;
-  payload.graph = result.edges;
-  payload.start_activities = result.starts;
-  payload.end_activities = result.ends;
-  return normalize(payload);
+  return result;
 }
 
 void validate_artificial_names(const NormalizedDfg& dfg,
@@ -178,7 +149,7 @@ std::string variant_name(DfgPetriConversionVariant variant) {
 PetriNet convert_dfg_to_petri_net(
     const DfgCleanAnalysis& input,
     const DfgPetriConversionOptions& options) {
-  const auto dfg = normalize(input);
+  const auto dfg = normalize(input, options.variant);
   PetriNet net;
   net.set_activities(dfg.activities);
 
@@ -196,19 +167,19 @@ PetriNet convert_dfg_to_petri_net(
     for (const auto& activity : dfg.activities) add_place_for(net, places, activity);
 
     for (const auto& [activity, count] : dfg.starts) {
-      if (count == 0) continue;
+      (void)count;
       const auto place = places.at(activity);
       const auto transition = net.add_transition(activity_ids.at(activity),
                                                   {source}, {place});
       (void)transition;
     }
     for (const auto& [activity, count] : dfg.ends) {
-      if (count == 0) continue;
+      (void)count;
       const auto place = places.at(activity);
       net.add_transition(std::nullopt, {place}, {sink});
     }
     for (const auto& [edge, count] : dfg.edges) {
-      if (count == 0) continue;
+      (void)count;
       const auto source_place = places.at(edge.first);
       const auto target_place = places.at(edge.second);
       net.add_transition(activity_ids.at(edge.second), {source_place},
@@ -221,6 +192,14 @@ PetriNet convert_dfg_to_petri_net(
     throw std::invalid_argument("DFG conversion: unknown variant");
   }
   validate_artificial_names(dfg, options);
+  if (dfg.starts.empty())
+    throw std::invalid_argument(
+        "DFG conversion: the invisibles-no-duplicates variant needs start "
+        "activities (pm4py raises KeyError on the artificial start)");
+  if (dfg.ends.empty())
+    throw std::invalid_argument(
+        "DFG conversion: the invisibles-no-duplicates variant needs end "
+        "activities (pm4py raises KeyError on the artificial end)");
 
   std::unordered_map<std::string, std::size_t> left;
   std::unordered_map<std::string, std::size_t> right;
@@ -240,23 +219,20 @@ PetriNet convert_dfg_to_petri_net(
   net.set_sink(right.at(options.artificial_end_activity));
 
   for (const auto& [activity, count] : dfg.starts) {
-    if (count != 0) {
-      net.add_transition(std::nullopt,
-                         {right.at(options.artificial_start_activity)},
-                         {left.at(activity)});
-    }
+    (void)count;
+    net.add_transition(std::nullopt,
+                       {right.at(options.artificial_start_activity)},
+                       {left.at(activity)});
   }
   for (const auto& [edge, count] : dfg.edges) {
-    if (count != 0) {
-      net.add_transition(std::nullopt, {right.at(edge.first)},
-                         {left.at(edge.second)});
-    }
+    (void)count;
+    net.add_transition(std::nullopt, {right.at(edge.first)},
+                       {left.at(edge.second)});
   }
   for (const auto& [activity, count] : dfg.ends) {
-    if (count != 0) {
-      net.add_transition(std::nullopt, {right.at(activity)},
-                         {left.at(options.artificial_end_activity)});
-    }
+    (void)count;
+    net.add_transition(std::nullopt, {right.at(activity)},
+                       {left.at(options.artificial_end_activity)});
   }
   return net;
 }
@@ -264,7 +240,7 @@ PetriNet convert_dfg_to_petri_net(
 PetriNet convert_dfg_to_petri_net(
     const DirectlyFollowsGraph& graph,
     const DfgPetriConversionOptions& options) {
-  const auto normalized = normalize(graph);
+  const auto normalized = graph_payload(graph);
   DfgCleanAnalysis payload;
   payload.graph = normalized.edges;
   payload.start_activities = normalized.starts;

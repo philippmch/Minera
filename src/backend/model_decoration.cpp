@@ -45,19 +45,23 @@ std::string_view selected_timestamp(const Event& event,
   return {};
 }
 
-// An event's exact instant; unparseable text or an instant beyond the range
-// of int64-nanosecond gaps is untimed.
+// An event's exact instant; unparseable text is untimed. Any two instants of
+// the calendar range (year 1 to 9999) have an exact gap (detail::exact_gap).
 std::optional<ParsedExactTimestamp> exact_instant(std::string_view text) {
-  auto instant = parse_timestamp_exact(text);
-  if (instant && (instant->seconds > 4000000000LL || instant->seconds < -4000000000LL))
-    instant.reset();
-  return instant;
+  return parse_timestamp_exact(text);
 }
 
-std::optional<std::int64_t> nanoseconds_between(const ParsedExactTimestamp& start,
-                                                const ParsedExactTimestamp& end) {
-  return (end.seconds - start.seconds) * 1000000000LL +
-         (static_cast<std::int64_t>(end.nanoseconds) - start.nanoseconds);
+// The wait from `start` to `end` in timedelta seconds, nullopt when negative.
+// Beyond exact_gap's bound the wait is a difference of epoch doubles.
+std::optional<double> wait_seconds(const ParsedExactTimestamp& start,
+                                   const ParsedExactTimestamp& end) {
+  if (end.seconds < start.seconds ||
+      (end.seconds == start.seconds && end.nanoseconds < start.nanoseconds))
+    return std::nullopt;
+  if (const auto gap = detail::exact_gap(start, end))
+    return detail::eventlog_gap_seconds(*gap);
+  return static_cast<double>(end.seconds) - static_cast<double>(start.seconds) +
+         (static_cast<double>(end.nanoseconds) - static_cast<double>(start.nanoseconds)) * 1e-9;
 }
 
 // Wait samples a place keeps one by one; beyond this, further samples are
@@ -205,13 +209,13 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
             const std::uint64_t taken = remaining < TokenInteger(count)
                                             ? static_cast<std::uint64_t>(remaining)
                                             : count;
-            const auto gap = produced && now ? nanoseconds_between(*produced, *now)
-                                             : std::optional<std::int64_t>{};
-            if (gap && *gap >= 0) {
+            const auto measured = produced && now ? wait_seconds(*produced, *now)
+                                                  : std::optional<double>{};
+            if (measured) {
               // One wait sample per token; samples that would not fit one by
               // one are kept as a run instead. The wait is the exact gap
               // (timedelta seconds), not a difference of epoch doubles.
-              const double wait = detail::eventlog_gap_seconds(*gap);
+              const double wait = *measured;
               if (wait_runs[place].empty() && taken <= kExpandedWaitSamples - waits[place].size())
                 waits[place].insert(waits[place].end(), taken, wait);
               else

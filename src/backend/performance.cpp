@@ -89,10 +89,12 @@ PerformanceMetrics compute_performance_metrics(
   std::vector<ParsedExactTimestamp> case_starts;
   const auto seconds_between = [&](const ParsedExactTimestamp& start,
                                    const ParsedExactTimestamp& end) {
-    const std::int64_t nanoseconds =
-        (end.seconds - start.seconds) * 1000000000LL +
-        (static_cast<std::int64_t>(end.nanoseconds) - start.nanoseconds);
-    return detail::gap_seconds(nanoseconds, dataframe_arithmetic);
+    // The gap is bounded, not each instant: any two calendar instants (year
+    // 1 to 9999) have an exact gap; beyond that, epoch doubles.
+    if (const auto gap = detail::exact_gap(start, end))
+      return detail::gap_seconds(*gap, dataframe_arithmetic);
+    return static_cast<double>(end.seconds) - static_cast<double>(start.seconds) +
+           (static_cast<double>(end.nanoseconds) - static_cast<double>(start.nanoseconds)) * 1e-9;
   };
 
   for (const auto* trace_pointer :
@@ -107,12 +109,7 @@ PerformanceMetrics compute_performance_metrics(
     std::unordered_map<std::size_t, std::deque<ParsedExactTimestamp>> pending_starts;
 
     for (const auto& event : trace.events) {
-      // Instants beyond the int64-nanosecond gap range are treated as
-      // untimed, like unparseable ones.
-      auto instant = parse_timestamp_exact(event.timestamp);
-      if (instant && (instant->seconds > 9000000000LL ||
-                      instant->seconds < -9000000000LL))
-        instant.reset();
+      const auto instant = parse_timestamp_exact(event.timestamp);
       const auto activity = graph.activity_id(event.activity);
 
       if (instant && activity) {

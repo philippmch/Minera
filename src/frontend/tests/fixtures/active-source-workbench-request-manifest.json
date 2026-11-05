@@ -2296,7 +2296,7 @@
         "filename": "xes-custom-clock-legacy-log.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-legacy-log.response.json",
         "bytes": 15388,
-        "sha256": "bfec7d51dd4aafc1495e80bbdaf6f7bbeddcfadd1f7005d77b5aa0245632487d",
+        "sha256": "7e89cf95c356ba6a469dcfffbc410f4feeb398e475a1a14f652a9bc86a1e0d2c",
         "status": 200
       },
       "exports": {},
@@ -2349,7 +2349,7 @@
         "filename": "xes-custom-clock-native-flat-stream.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-stream.response.json",
         "bytes": 69768,
-        "sha256": "6e5a07960649226df54ce43c1b30eb3c118f726e660f9f9fc1cc5f1ebee0e3fe",
+        "sha256": "aa7a41e052e7daa0241ac3c57026a1fbded1a48c912c3b34a8d167ee8648564c",
         "status": 200
       },
       "exports": {},
@@ -2403,7 +2403,7 @@
         "filename": "xes-custom-clock-native-flat-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-dataframe.response.json",
         "bytes": 69897,
-        "sha256": "7fd71c8562479c5e412a1b725a0b0512701f7d930ff017d7417f3255485cf8a7",
+        "sha256": "ec947586d49c47e91c9a391b5c3a8eac49c6921beec8175a6af1bbc560f3366d",
         "status": 200
       },
       "exports": {},
@@ -2457,7 +2457,7 @@
         "filename": "xes-custom-clock-native-flat-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-lazyframe.response.json",
         "bytes": 69897,
-        "sha256": "abb07c19ca42096271692f926a538f291210abe3f05a0d4c3dc2be924340f167",
+        "sha256": "8cb57c38ca5262d0bc5ede3d79587011e918864600e6d7e2bf0847d736512cd7",
         "status": 200
       },
       "exports": {},
@@ -4065,14 +4065,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14531",
+        "Content-Length": "14477",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "legacy-default-csv-duplicate-header.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/legacy-default-csv-duplicate-header.response.json",
-        "bytes": 14531,
-        "sha256": "dfaee4ff55775ba61f767959df137b2402f8b06f925354f076af20a4392dc165",
+        "bytes": 14477,
+        "sha256": "32483f8303875359d8c231bbe0173ef7322ed2a89baa6d8a1e84238aca98fb4a",
         "status": 200
       },
       "exports": {},

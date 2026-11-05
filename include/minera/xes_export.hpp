@@ -34,6 +34,16 @@ struct XesExportOptions {
   bool infer_metadata = false;
   // Opt into Minera null markers; reference exporters omit plain nulls.
   bool preserve_nulls = false;
+  // Write the selected case id, activity, timestamp, resource and lifecycle
+  // under the standard XES keys (trace concept:name, event concept:name,
+  // time:timestamp, org:resource, lifecycle:transition) instead of the keys
+  // they were read from, such as the CSV columns case_id or activity. This is
+  // what pm4py.format_dataframe followed by write_xes produces; read_xes
+  // otherwise yields no case:concept:name column. A trace or event that already has
+  // another attribute under the standard key keeps its source key, so no
+  // value is lost or overwritten. Off by default: native exports keep the
+  // source keys.
+  bool standard_keys = false;
 };
 
 // Serializes an event log as XES (eXtensible Event Stream, IEEE 1849-2016) —

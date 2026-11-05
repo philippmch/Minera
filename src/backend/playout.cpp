@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "minera/cancellation.hpp"
 #include "minera/random.hpp"
 #include "minera/stochastic_map.hpp"
 #include "minera/timestamp.hpp"
@@ -315,6 +316,20 @@ EventLog stochastic_playout_impl(const PetriNet& net,
   const auto is_final = [&](const std::vector<std::uint64_t>& candidate) {
     return candidate == final_marking;
   };
+  // Run-wide work bounds (unset by default): every firing counts, silent
+  // ones included, and a visited-elements run counts its marking entries.
+  std::size_t total_firings = 0;
+  std::size_t visited_entries = 0;
+  const auto count_visited_marking = [&] {
+    visited_entries += places;
+    if (options.max_visited_marking_entries != 0 &&
+        visited_entries > options.max_visited_marking_entries)
+      throw std::length_error(
+          "stochastic playout: the visited elements would hold more than " +
+          std::to_string(options.max_visited_marking_entries) +
+          " marking entries; lower stochastic_traces or stochastic_max_steps");
+  };
+  CancellationCheck check_cancelled(options.cancelled, "stochastic playout cancelled");
 
   for (std::size_t c = 0; c < options.traces; ++c) {
     Trace trace;
@@ -323,6 +338,7 @@ EventLog stochastic_playout_impl(const PetriNet& net,
     if (visited_result) {
       visited.reserve(options.max_steps * 2 + 1);
       visited.push_back({PlayoutVisitedElementKind::MARKING, {}, 0});
+      count_visited_marking();
     }
     double now = options.start + static_cast<double>(c) * options.case_interval;
     marking = initial_marking;
@@ -347,6 +363,7 @@ EventLog stochastic_playout_impl(const PetriNet& net,
     std::size_t visible = 0;
     std::size_t firings = 0;
     while (visible < options.max_steps) {
+      check_cancelled();
       enabled.clear();
       for (std::size_t t = 0; t < transitions.size(); ++t) {
         const auto& transition = transitions[t];
@@ -377,6 +394,12 @@ EventLog stochastic_playout_impl(const PetriNet& net,
       const auto selected = enabled[pick];
 
       const auto& fired = transitions[selected];
+      if (options.max_total_firings != 0 && ++total_firings > options.max_total_firings)
+        throw std::length_error(
+            "stochastic playout: the run would fire more than " +
+            std::to_string(options.max_total_firings) +
+            " transitions (silent ones included); lower stochastic_traces or "
+            "stochastic_max_steps, or check the net for silent loops");
       fire_petri_transition(fired, marking);
       if (!fired.silent()) ++visible;
       // A safety bound the reference does not have (it would spin forever
@@ -389,6 +412,7 @@ EventLog stochastic_playout_impl(const PetriNet& net,
       if (visited_result) {
         visited.push_back(
             {PlayoutVisitedElementKind::TRANSITION, {}, selected});
+        count_visited_marking();
         PlayoutVisitedElement element;
         element.kind = PlayoutVisitedElementKind::MARKING;
         element.marking.reserve(marking.size());

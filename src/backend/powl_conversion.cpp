@@ -19,6 +19,16 @@
 namespace minera {
 namespace {
 
+// The label of a reference FrequentTransition: "<label>\n[1,<max or ->]"
+// when it is optional (minimum 0) or self-looping (unbounded maximum).
+std::string reference_frequency_label(const PowlNode& node) {
+  const auto& f = node.frequency();
+  const bool skippable = f.minimum == 0;
+  const bool selfloop = !f.maximum.has_value();
+  if (!skippable && !selfloop) return node.label();
+  return node.label() + "\n[1," + (selfloop ? std::string("-") : std::to_string(*f.maximum)) + "]";
+}
+
 constexpr std::size_t kMaxInclusiveChildren = 12;
 constexpr std::size_t kMaxInterleavingChildren = 8;
 
@@ -169,28 +179,12 @@ class ProcessTreeBuilder {
     return {ProcessTreeOperator::kParallel, 0, std::move(children)};
   }
 
+  // pm4py 2.7.22 convert_to_process_tree(powl) keeps a FrequentTransition
+  // as one leaf carrying its label, "<label>\n[1,<max or ->]" when it is
+  // optional or self-looping (FrequentTransition("A", 0, "-") is the leaf
+  // 'A\n[1,-]'), as its Petri-net conversion does; it adds no choice or loop.
   ProcessTreeNode transition(const PowlNode& node) {
-    const auto leaf = ProcessTreeNode::leaf(activity_id(node.label()));
-    // Same flags as pm4py's FrequentTransition: a minimum of 0 is
-    // skippable, an unbounded maximum self-loops, and finite bounds above
-    // one change nothing else.
-    const bool skippable = node.skippable();
-    const bool self_loop = node.self_loop();
-    if (!skippable && !self_loop) return leaf;
-
-    // A silent redo allows the body to repeat without introducing an
-    // observable event.
-    if (!self_loop) {
-      return {ProcessTreeOperator::kExclusive, 0,
-              {ProcessTreeNode::tau(), leaf}};
-    }
-    ProcessTreeNode repeated{
-        ProcessTreeOperator::kLoop, 0, {leaf, ProcessTreeNode::tau()}};
-    if (skippable) {
-      return {ProcessTreeOperator::kExclusive, 0,
-              {ProcessTreeNode::tau(), std::move(repeated)}};
-    }
-    return repeated;
+    return ProcessTreeNode::leaf(activity_id(reference_frequency_label(node)));
   }
 
   ProcessTreeNode partial_order(const PowlNode& node) {
@@ -468,11 +462,7 @@ class PowlBuilder {
   std::vector<bool> removed_places_;
 
   static std::string frequency_label(const PowlNode& node) {
-    const auto& f = node.frequency();
-    const bool skippable = f.minimum == 0;
-    const bool selfloop = !f.maximum.has_value();
-    if (!skippable && !selfloop) return node.label();
-    return node.label() + "\n[1," + (selfloop ? std::string("-") : std::to_string(*f.maximum)) + "]";
+    return reference_frequency_label(node);
   }
 
   void collect(const PowlNode& node) {
@@ -1659,6 +1649,53 @@ class PetriToPowlBuilder {
     return std::make_pair(std::move(do_part), std::move(redo_part));
   }
 
+  // Cycles through a fragment's single end place that nothing else of the
+  // fragment leaves run after the rest: ->(rest, *(tau, cycles)). Cycles
+  // through a single start place that nothing else enters run before it.
+  // The reference reduces such self-loop parts this way (the activity-
+  // defines-place net of a DFG with an a -> a edge into its end activity
+  // gives ->(X('a', ->('b', 'a')), *(tau, 'a')) for the do part of a loop);
+  // the strict reducer rejected them as not block-structured. Only the tree
+  // conversion uses this; net_to_powl keeps its reference-matched cuts.
+  std::optional<PowlNode> boundary_cycles(const Fragment& fragment) const {
+    if (reference_powl_loops_ || fragment.starts.size() != 1 ||
+        fragment.ends.size() != 1 || fragment.starts == fragment.ends)
+      return std::nullopt;
+    const auto start = *fragment.starts.begin();
+    const auto end = *fragment.ends.begin();
+    for (const bool at_end : {true, false}) {
+      const auto place = at_end ? end : start;
+      const auto other = at_end ? start : end;
+      IdSet cycles;
+      IdSet rest;
+      for (const auto& part : components(fragment.transitions, IdSet{start, end})) {
+        bool consumes = false, produces = false, touches_other = false;
+        for (const auto transition : part) {
+          const auto& inputs = transition_inputs_[transition];
+          const auto& outputs = transition_outputs_[transition];
+          consumes |= inputs.contains(place);
+          produces |= outputs.contains(place);
+          touches_other |= inputs.contains(other) || outputs.contains(other);
+        }
+        auto& target = consumes && produces && !touches_other ? cycles : rest;
+        target.insert(part.begin(), part.end());
+      }
+      if (cycles.empty() || rest.empty()) continue;
+      // The rest must never leave the end place (or enter the start place),
+      // so the cycles can only run once the rest is done (or before it).
+      const bool blocked = std::any_of(rest.begin(), rest.end(), [&](std::size_t transition) {
+        return at_end ? transition_inputs_[transition].contains(place)
+                      : transition_outputs_[transition].contains(place);
+      });
+      if (blocked) continue;
+      auto body = convert(Fragment{fragment.starts, fragment.ends, std::move(rest)});
+      auto loop = convert_cycles(Fragment{IdSet{place}, IdSet{place}, std::move(cycles)});
+      return at_end ? sequence_nodes(std::move(body), std::move(loop))
+                    : sequence_nodes(std::move(loop), std::move(body));
+    }
+    return std::nullopt;
+  }
+
   PowlNode convert(Fragment fragment) const {
     do {
       normalize(fragment);
@@ -1703,6 +1740,8 @@ class PetriToPowlBuilder {
       for (const auto& part : *parts) children.push_back(convert(part));
       return PowlNode::strict_partial_order(std::move(children), {});
     }
+
+    if (auto cycles = boundary_cycles(fragment)) return std::move(*cycles);
 
     if (const auto loop = loop_cut(fragment)) {
       return PowlNode::loop(
@@ -1752,8 +1791,83 @@ ProcessTree to_process_tree(const PowlNode& node) {
   return ProcessTreeBuilder().run(node);
 }
 
+namespace {
+
+// pm4py 2.7.22's convert_to_process_tree(net) raises on a net with a single
+// transition (AssertionError for a visible one, AttributeError for a silent
+// one) instead of returning a leaf; two or more transitions in a chain
+// convert (source -> tau -> a -> sink gives 'a'). Its convert_to_petri_net
+// of a tree already folds silent steps, so the net of ->(tau, 'a') is one
+// transition and raises too.
+void reject_reference_single_transition(const PetriNet& net) {
+  if (net.transitions().size() != 1) return;
+  throw std::invalid_argument(
+      net.transitions().front().activity
+          ? "workflow-net conversion: the net has a single visible transition "
+            "(pm4py raises AssertionError)"
+          : "workflow-net conversion: the net has a single silent transition "
+            "(pm4py raises AttributeError)");
+}
+
+// The reference folds the converted tree: sequences and parallels drop tau
+// children and absorb nested children of their own operator, an exclusive
+// choice absorbs nested choices and keeps one tau, a loop of taus is a tau,
+// and an operator left with one child is that child.
+ProcessTreeNode fold_reference_tree(ProcessTreeNode node) {
+  if (node.op == ProcessTreeOperator::kActivity ||
+      node.op == ProcessTreeOperator::kTau)
+    return node;
+  std::vector<ProcessTreeNode> folded;
+  folded.reserve(node.children.size());
+  for (auto& child : node.children)
+    folded.push_back(fold_reference_tree(std::move(child)));
+  const auto op = node.op;
+  if (op == ProcessTreeOperator::kLoop) {
+    if (std::all_of(folded.begin(), folded.end(), [](const auto& child) {
+          return child.op == ProcessTreeOperator::kTau;
+        }))
+      return ProcessTreeNode::tau();
+    node.children = std::move(folded);
+    return node;
+  }
+  const bool flattens = op == ProcessTreeOperator::kSequence ||
+                        op == ProcessTreeOperator::kParallel ||
+                        op == ProcessTreeOperator::kExclusive;
+  if (!flattens) {
+    node.children = std::move(folded);
+    return node;
+  }
+  std::vector<ProcessTreeNode> children;
+  bool tau_kept = false;
+  const auto keep = [&](ProcessTreeNode child) {
+    if (child.op == ProcessTreeOperator::kTau) {
+      if (op != ProcessTreeOperator::kExclusive || tau_kept) return;
+      tau_kept = true;
+    }
+    children.push_back(std::move(child));
+  };
+  for (auto& child : folded) {
+    if (child.op == op) {
+      for (auto& grandchild : child.children) keep(std::move(grandchild));
+    } else {
+      keep(std::move(child));
+    }
+  }
+  if (children.empty()) return ProcessTreeNode::tau();
+  if (children.size() == 1) return std::move(children.front());
+  node.children = std::move(children);
+  return node;
+}
+
+}  // namespace
+
 ProcessTree to_process_tree(const PetriNet& net) {
-  return ProcessTreeBuilder(true).run(PetriToPowlBuilder(net, false).run());
+  // Invalid nets keep the reconstruction's own errors; a valid workflow net
+  // of one transition is then refused as the reference refuses it.
+  const auto powl = PetriToPowlBuilder(net, false).run();
+  reject_reference_single_transition(net);
+  auto tree = ProcessTreeBuilder(true).run(powl);
+  return ProcessTree(tree.activities(), fold_reference_tree(tree.root()));
 }
 
 PetriNet to_petri_net(const PowlNode& node) { return PowlBuilder(node).run(); }

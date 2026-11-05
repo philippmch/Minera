@@ -80,7 +80,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
             {mining ? "Mining event log…" : "Drop an event log here"}
           </span>
           <span className="landing-drop-sub">
-            or click to browse · .csv, .xes, .xes.gz, OCEL or Minera JSON
+            or click to browse · .csv, .csv.gz, .xes, .xes.gz, OCEL (.json, .jsonocel, .xmlocel, .sqlite) or Minera JSON
           </span>
         </label>
 

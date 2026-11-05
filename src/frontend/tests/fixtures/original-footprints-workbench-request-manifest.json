@@ -10694,7 +10694,7 @@
         "bytes": 1248,
         "sha256": "c779f42225809798bb8e8b63b4774ec11ca8b17e0acf86758c5e723e9c652cb9"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "model_file": {
           "filename": "owned-normative.footprint.json",
@@ -10718,15 +10718,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5997",
+        "Content-Length": "6389",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-fitness-zero-dfg.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-fitness-zero-dfg.response.json",
-        "bytes": 5997,
-        "sha256": "fb5d81e7e7232b7960f954b0d171b8f51c22c5bb0f65de55dd69685ebefc41a7",
-        "status": 200
+        "bytes": 6389,
+        "sha256": "0fc8a489ee4493962d496a39cb6c15495ade3177bc61e27e78ce947e4f862453",
+        "status": 400
       },
       "family": "original_footprints",
       "operation": "fitness",
@@ -10754,13 +10754,6 @@
           "bytes": 219,
           "sha256": "40b02e1ea474b885ce28065cb8c1a8ea5e5e4ed204bba04249ccc8d16dde18d5",
           "format": "json"
-        },
-        "result_json": {
-          "filename": "native-fitness-zero-dfg.result_json.json",
-          "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-fitness-zero-dfg.result_json.json",
-          "bytes": 1,
-          "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
-          "format": "json"
         }
       },
       "model": {
@@ -10783,15 +10776,23 @@
       },
       "source": null,
       "tree": null,
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "footprint fitness is undefined: every dfg count of the log footprint is 0 (the reference raises ZeroDivisionError: float division by zero)",
+        "exception_type": "invalid_argument"
+      },
       "native_calls": [
         {
           "name": "fp_fitness(observed, model, supplied_extensive)",
           "stage": "primary",
           "input_kind": "Footprint",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "footprint fitness is undefined: every dfg count of the log footprint is 0 (the reference raises ZeroDivisionError: float division by zero)",
+            "exception_type": "invalid_argument"
+          }
         }
       ]
     },

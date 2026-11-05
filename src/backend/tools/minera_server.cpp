@@ -1100,6 +1100,11 @@ minera::CorrelationVariantsAnalysis analyze_correlation_variants(
 // A client that gave up (closed the tab, aborted the fetch) gets nothing from
 // a result. Long searches poll this callback and stop instead of finishing
 // for no one; it is empty when the transport cannot tell.
+// Server bounds of stochastic Petri playout (see handle_playout).
+constexpr std::size_t kServerStochasticFirings = 10'000'000;
+constexpr std::size_t kServerStochasticVisitedFirings = 1'000'000;
+constexpr std::size_t kServerStochasticVisitedMarkingEntries = 20'000'000;
+
 std::function<bool()> connection_cancel_hook(const httplib::Request& request) {
   if (!request.is_connection_closed) return {};
   return [&request] { return request.is_connection_closed(); };
@@ -5042,6 +5047,12 @@ void forward_runtime_response(httplib::Response& response, const httplib::Result
   response.set_content(result->body, "application/json");
 }
 
+// Response headers a cross-origin page may read (fetch hides every header
+// outside the CORS-safelisted ones unless the server exposes it): the
+// process-tree playout truncation flag and the filtered-log counts.
+constexpr const char* kExposedResponseHeaders =
+    "X-Minera-Truncated, X-Minera-Case-Count, X-Minera-Event-Count";
+
 bool llm_origin_allowed(const httplib::Request& request, httplib::Response& response) {
   if (!request.has_header("Origin")) return true;
   const auto origin = request.get_header_value("Origin");
@@ -5051,6 +5062,7 @@ bool llm_origin_allowed(const httplib::Request& request, httplib::Response& resp
     return false;
   }
   response.set_header("Access-Control-Allow-Origin", origin);
+  response.set_header("Access-Control-Expose-Headers", kExposedResponseHeaders);
   return true;
 }
 
@@ -5155,7 +5167,7 @@ void handle_log_query_export(const httplib::Request& request,httplib::Response& 
   }else if(format=="xes"){
     const auto filtered=select_active_source_rows(*session,indices,mode=="cases");
     response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
-    minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);response.set_content(minera::serialize_xes(filtered,options),"application/xml");
+    minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");
   }else throw std::invalid_argument("filter export format must be xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
@@ -5172,7 +5184,7 @@ void handle_log_cluster(const httplib::Request& request,httplib::Response& respo
   response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
   const auto format=request.has_param("format")?request.get_param_value("format"):"summary";
   if(format=="summary")response.set_content(minera::log_cluster_runtime::summary(filtered,name,request.body,indices,std::to_string(session->query_source_id)),"application/json");
-  else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
+  else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=true;response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
   else if(format=="json")response.set_content(active_source_table_json_from_log_indices(*session,indices,true),"application/json");
   else throw std::invalid_argument("cluster format must be summary, xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
@@ -5347,6 +5359,7 @@ void handle_clustering_export(const httplib::Request& request,
     if (format == "xes") {
       minera::XesExportOptions options;
       options.preserve_nulls = ocel_query_bool(request, "preserve_nulls", false);
+      options.standard_keys = true;  // a download read by pm4py and reopened with default selectors
       response.set_content(minera::serialize_xes(selected, options), "application/xml");
     } else if (format == "json") {
       std::vector<std::size_t> event_indices;
@@ -5945,6 +5958,7 @@ std::string anonymization_release_json(std::string result_json,
                                        const MinedSession& session) {
   const auto quote = minera::embedding_runtime::detail::escape_json;
   minera::XesExportOptions options;  // nulls omitted, as pm4py writes None/NaN
+  options.standard_keys = true;  // downloaded, and reopened with default selectors
   return "{\"family\":\"ANONYMIZATION_RELEASE\",\"source_id\":" +
          quote(std::to_string(session.query_source_id)) + ",\"result\":" +
          result_json + ',' +
@@ -9380,7 +9394,9 @@ void handle_stochastic_map(const httplib::Request& request,
       skipped = report.skipped_traces;
       owned_net = it->second;
     } else {
-      const auto performance = minera::discover_performance_dfg(require_prepared_log(*session));
+      const auto performance = minera::discover_performance_dfg(
+          require_prepared_log(*session),
+          dfg_statistics_for_source({}, session->active_source.get()));
       const auto model = minera::stochastic_map_from_performance_dfg(
           require_graph(*session), performance, params.performance);
       map = model.map;
@@ -9580,6 +9596,18 @@ void handle_playout(const httplib::Request& request,
                "safety limit");
         return;
       }
+      // Silent firings do not count towards max_steps (as in the reference),
+      // so the visible-event budget above does not bound the work: the server
+      // also bounds every firing of the run, visible or silent (10,000,000;
+      // 1,000,000 with visited elements, two elements per firing as before),
+      // the marking entries a visited run records (20,000,000), and stops
+      // when the client disconnects.
+      options.max_total_firings =
+          options.return_visited_elements ? kServerStochasticVisitedFirings
+                                          : kServerStochasticFirings;
+      if (options.return_visited_elements)
+        options.max_visited_marking_entries = kServerStochasticVisitedMarkingEntries;
+      options.cancelled = connection_cancel_hook(request);
       std::optional<minera::EventLog> projected_powl_log;
       const minera::EventLog* fit_log = nullptr;
       if (options.fit_from_log) fit_log = &cached_model_log(*session, selected_miner);
@@ -9741,7 +9769,8 @@ void handle_playout(const httplib::Request& request,
       // explicit zero/unbounded setting for direct native callers.
       if (options.max_execution_time_ms == 0)
         options.max_execution_time_ms = 5000;
-      minera::DfgStatisticalOptions dfg_options;
+      // CSV and XES sources take the DataFrame performance arithmetic.
+      const auto dfg_options = dfg_statistics_for_source({}, session->active_source.get());
       const auto frequency = minera::discover_frequency_dfg(require_prepared_log(*session), dfg_options);
       minera::DfgActivityCounts starts, ends;
       // The reference's start-activity dict lists activities in first-
@@ -10009,6 +10038,10 @@ void handle_xes(const httplib::Request& request, httplib::Response& response) {
         ocel_query_bool(request, "xes_infer_metadata", false);
     options.preserve_nulls =
         ocel_query_bool(request, "xes_preserve_nulls", false);
+    // The download is standard XES: a CSV log's case_id/activity/timestamp
+    // columns go out as concept:name/time:timestamp, the keys pm4py reads as
+    // case:concept:name, concept:name and time:timestamp.
+    options.standard_keys = true;
     const bool compressed = options.compress.value_or(false);
     response.set_content(minera::serialize_xes(require_prepared_log(*session), options),
                          compressed ? "application/gzip" : "application/xml");
@@ -11090,7 +11123,7 @@ void reject_stale_imported_model(httplib::Response& response) {
   // Drop what the handler produced (body, downloads, providers) but keep the
   // CORS headers the pre-routing handler set.
   httplib::Response fresh;
-  for (const char* name : {"Access-Control-Allow-Origin", "Vary"})
+  for (const char* name : {"Access-Control-Allow-Origin", "Access-Control-Expose-Headers", "Vary"})
     if (response.has_header(name))
       fresh.set_header(name, response.get_header_value(name));
   // Response's defaulted move-assignment drops a content-provider releaser
@@ -11150,24 +11183,30 @@ void repair_api_json_body(httplib::Response& response) {
 
 // Handlers answer any std::exception with 400 and its message, so the
 // exception's type is gone by the time the route wrapper sees the response.
-// The new-handler records the failed allocation on its own thread instead
-// (operator new calls it before throwing std::bad_alloc, on every standard
-// library), and the wrapper resets the record when a handler starts.
-thread_local bool t_allocation_failed = false;
+// The new-handler (which every standard library's throwing operator new calls
+// before giving up) therefore throws a std::bad_alloc whose message carries a
+// marker, and the wrapper looks for the marker in the 400 body. A failed
+// nothrow allocation (new (std::nothrow), std::get_temporary_buffer's size
+// probes) may run the new-handler too, but its exception is caught inside
+// the allocation and never reaches a response, so it leaves no trace; no
+// per-thread state is kept.
+constexpr const char* kOutOfMemoryMarker = "std::bad_alloc (minera: out of memory)";
 
-void record_allocation_failure() {
-  t_allocation_failed = true;
-  throw std::bad_alloc();
-}
+class MarkedOutOfMemory : public std::bad_alloc {
+ public:
+  const char* what() const noexcept override { return kOutOfMemoryMarker; }
+};
 
-// A 400 that carries std::bad_alloc's message (whatever the standard library
-// calls it: "std::bad_alloc", MSVC's "bad allocation") after an allocation
-// of this request failed, or that is exactly that message.
+void record_allocation_failure() { throw MarkedOutOfMemory(); }
+
+// A 400 that carries the marked out-of-memory message, or exactly the
+// message of a std::bad_alloc thrown elsewhere ("std::bad_alloc", MSVC's
+// "bad allocation").
 bool out_of_memory_response(const httplib::Response& response) {
   if (response.status != 400) return false;
   static const std::string what = std::bad_alloc().what();
-  if (response.body == error_json(what)) return true;
-  return t_allocation_failed && response.body.find(what) != std::string::npos;
+  return response.body == error_json(what) ||
+         response.body.find(kOutOfMemoryMarker) != std::string::npos;
 }
 
 // Running out of memory is the server's condition, not a malformed request.
@@ -11184,7 +11223,6 @@ httplib::Server::Handler api_route_handler(std::string path,
                                            httplib::Server::Handler handler) {
   return [path = std::move(path), handler = std::move(handler)](
              const httplib::Request& request, httplib::Response& response) {
-    t_allocation_failed = false;
     struct RepairOnExit {
       httplib::Response& response;
       ~RepairOnExit() { try { report_out_of_memory(response); repair_api_json_body(response); } catch (...) {} }
@@ -11249,7 +11287,6 @@ void api_post(httplib::Server& server, const std::string& path,
   server.Post(path, [handler = std::move(handler)](const httplib::Request& request,
                                                    httplib::Response& response,
                                                    const httplib::ContentReader& reader) {
-    t_allocation_failed = false;
     handler(request, response, reader);
     report_out_of_memory(response);
     repair_api_json_body(response);
@@ -11368,8 +11405,8 @@ int main(int argc, char** argv) {
   mallopt(M_MMAP_THRESHOLD, 1 << 20);
 #endif
 #endif
-  // A failed allocation is recorded before std::bad_alloc is thrown, so the
-  // route wrapper can answer 503 (report_out_of_memory).
+  // A failed allocation throws a marked std::bad_alloc, so the route
+  // wrapper can answer 503 (report_out_of_memory).
   std::set_new_handler(record_allocation_failure);
   minera::set_analysis_trace_run_id(new_analysis_trace_run_id());
   int port = 8484;
@@ -11542,6 +11579,7 @@ int main(int argc, char** argv) {
     add_vary(response, "Origin");
     if (g_allowed_origins.contains(origin)) {
       response.set_header("Access-Control-Allow-Origin", origin);
+      response.set_header("Access-Control-Expose-Headers", kExposedResponseHeaders);
       return httplib::Server::HandlerResponse::Unhandled;
     }
     if (!request.path.starts_with("/api/")) return httplib::Server::HandlerResponse::Unhandled;

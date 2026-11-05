@@ -4989,14 +4989,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14535",
+        "Content-Length": "14545",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-selected-field-26.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-26.response.json",
-        "bytes": 14535,
-        "sha256": "063d34753ae3f3e7df573520106266d4a50c58bc1f0f657170d7e258384162b6",
+        "bytes": 14545,
+        "sha256": "3118486e2e39454e2658916f67ea598bfffb1393fcfec40f9818f5a3b2e5769e",
         "status": 200
       },
       "family": "original_embedding",
@@ -5038,8 +5038,8 @@
         "legacy_embeddings_json": {
           "filename": "native-selected-field-26.legacy_embeddings_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-selected-field-26.legacy_embeddings_json.json",
-          "bytes": 213,
-          "sha256": "9bd525548796a79b1c89ccbc1ab107212d8170de4ee31d65dcee9fb49905f306",
+          "bytes": 218,
+          "sha256": "16e4b7f023dfb5150e25ec7a7b419d29ede1b0e3003cfa1780d0fe6ad59cc7b9",
           "format": "json"
         }
       },
@@ -25914,14 +25914,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31019",
+        "Content-Length": "31021",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-byte-target-similarity_log-nul-crlf.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-byte-target-similarity_log-nul-crlf.response.json",
-        "bytes": 31019,
-        "sha256": "ad02b0db91c5cf9038401d567789e955b82714f87aac35d56de2d9d50594470c",
+        "bytes": 31021,
+        "sha256": "a3d086dd95a1df556df4ba47ceac1eb0e51c837e585ebd54d08825390f3048fb",
         "status": 200
       },
       "family": "original_embedding",
@@ -25977,8 +25977,8 @@
         "legacy_similarity_json": {
           "filename": "native-byte-target-similarity_log-nul-crlf.legacy_similarity_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-byte-target-similarity_log-nul-crlf.legacy_similarity_json.json",
-          "bytes": 212,
-          "sha256": "d38171d841101d0c04d1e32123adce3a647c0ac133d420cb7002c5b729fb3a65",
+          "bytes": 217,
+          "sha256": "99ea6eff9540b8efc92186cc2179800f657629f1990cddf9cac88fda3c4c5990",
           "format": "json"
         }
       },
@@ -26116,14 +26116,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7587",
+        "Content-Length": "7589",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-byte-target-similarity_result-nul-crlf.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-byte-target-similarity_result-nul-crlf.response.json",
-        "bytes": 7587,
-        "sha256": "de44ce42e1b737861ba72f495606be3b7298aba19c5ef519ccc11bf8a2981609",
+        "bytes": 7589,
+        "sha256": "38f087570afc89f69e26d7e7af2b0e0103f6101126ec25ad7ec7e82baf93e24a",
         "status": 200
       },
       "family": "original_embedding",
@@ -26165,8 +26165,8 @@
         "legacy_similarity_json": {
           "filename": "native-byte-target-similarity_result-nul-crlf.legacy_similarity_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-byte-target-similarity_result-nul-crlf.legacy_similarity_json.json",
-          "bytes": 216,
-          "sha256": "37679e02e5c69c4b529eb9bce14aeb5cc685a8d42921e2b1fe9cc843ddbb298d",
+          "bytes": 221,
+          "sha256": "4f43fcfe015a78628dc429954bdead5b571fbe0d3d809535d3c44464062e77fe",
           "format": "json"
         }
       },
@@ -28021,14 +28021,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11903",
+        "Content-Length": "11905",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-legacy-successful-invalid-json-text.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-legacy-successful-invalid-json-text.response.json",
-        "bytes": 11903,
-        "sha256": "707c4a34ecc6f3d7c12a6aa5d639f207938493c8ac49ea49d59e6a22d923b581",
+        "bytes": 11905,
+        "sha256": "73c1fbb2652aa6b6703bc3af7b8e4094e4b87025b138d725e28e11c6ff451794",
         "status": 200
       },
       "family": "original_embedding",
@@ -28069,8 +28069,8 @@
         "legacy_embeddings_json": {
           "filename": "native-legacy-successful-invalid-json-text.legacy_embeddings_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-legacy-successful-invalid-json-text.legacy_embeddings_json.json",
-          "bytes": 208,
-          "sha256": "9bfa35ac585e4262f3506087e9bdc2ce094d0155d4d3f5fa74d855e83363deda",
+          "bytes": 213,
+          "sha256": "3cd91ed482b3d625956e3aa613ccd64a06138f40b81a1c55f731278b75023f26",
           "format": "json"
         }
       },
@@ -28204,14 +28204,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "31019",
+        "Content-Length": "31021",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-legacy-target-control-text.response.json",
         "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-legacy-target-control-text.response.json",
-        "bytes": 31019,
-        "sha256": "ad02b0db91c5cf9038401d567789e955b82714f87aac35d56de2d9d50594470c",
+        "bytes": 31021,
+        "sha256": "a3d086dd95a1df556df4ba47ceac1eb0e51c837e585ebd54d08825390f3048fb",
         "status": 200
       },
       "family": "original_embedding",
@@ -28266,8 +28266,8 @@
         "legacy_similarity_json": {
           "filename": "native-legacy-target-control-text.legacy_similarity_json.json",
           "path": "src/frontend/tests/fixtures/original-embedding-workbench/captures/native-legacy-target-control-text.legacy_similarity_json.json",
-          "bytes": 212,
-          "sha256": "d38171d841101d0c04d1e32123adce3a647c0ac133d420cb7002c5b729fb3a65",
+          "bytes": 217,
+          "sha256": "99ea6eff9540b8efc92186cc2179800f657629f1990cddf9cac88fda3c4c5990",
           "format": "json"
         }
       },

@@ -2,6 +2,7 @@
 #include "minera/conformance.hpp"
 #include "minera/pnml.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <iostream>
@@ -30,6 +31,14 @@ struct ReferenceWorkflowCase {
 
 #include "workflow_net_tree_reference_cases.inc"
 #include "workflow_net_powl_reference_cases.inc"
+
+struct ReferenceTreeShapeCase {
+  std::string name;
+  std::string pnml;
+  std::string expected;  // canonical tree text, or '!' and the exception type
+};
+
+#include "net_to_tree_shape_reference_cases.inc"
 
 struct LanguageEnumeration {
   std::set<Trace> traces;
@@ -224,19 +233,16 @@ void powl_to_process_tree_preserves_blocks_and_frequencies() {
   assert(sequence_tree.root().children[0].activity == 0);
   assert(sequence_tree.root().children[1].activity == 1);
 
+  // pm4py 2.7.22 keeps a FrequentTransition as one leaf with its label.
   const auto optional = minera::to_process_tree(
       PowlNode::transition("A", {0, 1}));
-  assert(optional.root().op == Op::kExclusive);
-  assert(optional.root().children.size() == 2);
-  assert(optional.root().children[0].op == Op::kTau);
-  assert(optional.root().children[1].op == Op::kActivity);
+  assert(optional.root().op == Op::kActivity);
+  assert((optional.activities() == std::vector<std::string>{"A\n[1,1]"}));
 
   const auto repeated = minera::to_process_tree(
       PowlNode::transition("A", {1, std::nullopt}));
-  assert(repeated.root().op == Op::kLoop);
-  assert(repeated.root().children.size() == 2);
-  assert(repeated.root().children[0].op == Op::kActivity);
-  assert(repeated.root().children[1].op == Op::kTau);
+  assert(repeated.root().op == Op::kActivity);
+  assert((repeated.activities() == std::vector<std::string>{"A\n[1,-]"}));
 
   const auto diamond = PowlNode::strict_partial_order(
       {PowlNode::transition("A"), PowlNode::transition("B"),
@@ -413,9 +419,8 @@ void frequency_bounds_follow_reference_flags() {
     const auto net = minera::to_petri_net(node);
     assert(net_shape(net) == (NetShape{2, {c.label + "|s>f"}}));
     const auto tree = minera::to_process_tree(node);
-    const auto expected_op =
-        c.skippable ? Op::kExclusive : c.self_loop ? Op::kLoop : Op::kActivity;
-    assert(tree.root().op == expected_op);
+    assert(tree.root().op == Op::kActivity);
+    assert((tree.activities() == std::vector<std::string>{c.label}));
   }
   const auto nested = minera::to_petri_net(
       PowlNode::parse("X ( T(\"A\",0,3), T(\"B\",2,*) )"));
@@ -425,10 +430,6 @@ void frequency_bounds_follow_reference_flags() {
 
 void workflow_net_to_process_tree_is_strict() {
   const std::vector<PowlNode> models{
-      PowlNode::silent(),
-      PowlNode::transition("A"),
-      PowlNode::transition("A", {0, 1}),
-      PowlNode::transition("A", {1, std::nullopt}),
       PowlNode::xor_node(
           {PowlNode::transition("A"), PowlNode::transition("B")}),
       PowlNode::sequence(
@@ -448,6 +449,20 @@ void workflow_net_to_process_tree_is_strict() {
     assert(enumerate_language(recovered, 6, 160).traces ==
            enumerate_language(source, 6, 160).traces);
     assert(minera::final_marking_reachable(recovered));
+  }
+
+  // A net that is one transition once its silent chain is contracted is
+  // rejected, as the reference raises on it.
+  for (const auto& model : {PowlNode::silent(), PowlNode::transition("A"),
+                            PowlNode::transition("A", {0, 1}),
+                            PowlNode::transition("A", {1, std::nullopt})}) {
+    bool single = false;
+    try {
+      (void)minera::to_process_tree(minera::to_petri_net(model));
+    } catch (const std::invalid_argument&) {
+      single = true;
+    }
+    assert(single);
   }
 
   // The N-shaped order is not series-parallel and therefore has no exact
@@ -809,6 +824,53 @@ void workflow_net_to_powl_matches_reference() {
   }
 }
 
+std::string canonical_tree(const ProcessTree& tree, const ProcessTreeNode& node) {
+  switch (node.op) {
+    case Op::kActivity: return "'" + tree.activities().at(node.activity) + "'";
+    case Op::kTau: return "tau";
+    default: break;
+  }
+  std::vector<std::string> children;
+  for (const auto& child : node.children) children.push_back(canonical_tree(tree, child));
+  std::string symbol;
+  if (node.op == Op::kSequence) symbol = "->";
+  else if (node.op == Op::kExclusive) symbol = "X";
+  else if (node.op == Op::kParallel) symbol = "+";
+  else if (node.op == Op::kLoop) symbol = "*";
+  else symbol = "?";
+  if (node.op == Op::kExclusive || node.op == Op::kParallel)
+    std::sort(children.begin(), children.end());
+  std::string text = symbol + "(";
+  for (std::size_t index = 0; index < children.size(); ++index)
+    text += (index ? "," : "") + children[index];
+  return text + ")";
+}
+
+// convert_to_process_tree(convert_to_petri_net(tree)) of pm4py 2.7.22 (see
+// scripts/capture-net-to-tree-shape-reference.py): the reference folds the
+// tree, so nested sequences flatten, an exclusive choice keeps one tau and a
+// sequence or parallel drops taus, and it raises on a net that is a single
+// transition once its silent chain is contracted. Native used to keep nested
+// sequences and repeated taus and to return a leaf for those chains.
+void workflow_net_to_process_tree_shapes_match_reference() {
+  for (const auto& reference : kReferenceTreeShapeCases) {
+    const auto document = minera::parse_pnml_document(reference.pnml);
+    std::string actual;
+    try {
+      const auto tree = minera::to_process_tree(document.net);
+      actual = canonical_tree(tree, tree.root());
+    } catch (const std::invalid_argument&) {
+      actual = "!";
+    }
+    const auto expected = reference.expected.front() == '!' ? std::string("!") : reference.expected;
+    if (actual != expected) {
+      std::cerr << "tree shape mismatch for " << reference.name << ": " << actual
+                << " vs " << reference.expected << "\n";
+      assert(false);
+    }
+  }
+}
+
 }  // namespace
 
 // A wide partial order of loop and choice nodes chained in N shapes is not
@@ -862,5 +924,6 @@ int main() {
   workflow_net_to_process_tree_matches_reference();
   workflow_net_to_powl_matches_reference();
   workflow_net_partial_order_regions_convert_quickly();
+  workflow_net_to_process_tree_shapes_match_reference();
   std::cout << "POWL conversion tests passed\n";
 }

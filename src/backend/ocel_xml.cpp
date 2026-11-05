@@ -1102,10 +1102,15 @@ void write_ocel_xml(std::ostream& out, const Ocel& log,
           << esc(relation.qualifier) << "\"/>\n";
     out << "  </e2e>\n";
   }
-  if (!log.globals.empty()) {
+  // The reference OCEL 1.0 writers' own globals (scope defaults, computed
+  // log scope) are left out, as the OCEL 2.0 JSON writer leaves them out.
+  if (std::any_of(log.globals.begin(), log.globals.end(), [](const auto& global) {
+        return !ocel_reference_generated_global(global.first, global.second);
+      })) {
     out << "  <globals>\n";
     for (const auto& [key, value] : log.globals)
-      write_standard_value(out, value, key, "    ");
+      if (!ocel_reference_generated_global(key, value))
+        write_standard_value(out, value, key, "    ");
     out << "  </globals>\n";
   }
   out << "</log>\n";

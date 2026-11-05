@@ -4,6 +4,7 @@
 
 #include "../exact_mean.hpp"
 #include "../exact_stdev.hpp"
+#include "../performance_arithmetic.hpp"
 #include "minera/alpha_miner.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
@@ -12,6 +13,7 @@
 #include "minera/decision_mining.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/dfg_alignment.hpp"
+#include "minera/dfg_variants.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/eventually_follows.hpp"
 #include "minera/footprints.hpp"
@@ -45,6 +47,7 @@
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
 
+#include <cstdio>
 #include <algorithm>
 #include <array>
 #include <bit>
@@ -3807,6 +3810,124 @@ void performance_edges_follow_reference_arithmetic() {
   assert(stats_of(dataframe, "B").total == 1000001.0);
   assert(stats_of(dataframe, "B").median == 0.09999999999999999);
   assert(stats_of(dataframe, "C").mean == 1e-06);
+}
+
+// Gaps between any two calendar instants (year 1 to 9999) are exact: the gap
+// is bounded, not each instant (it once was, so instants after 2255 or before
+// 1685 read as untimed and spans over 292 years overflowed int64 nanoseconds).
+void performance_handles_calendar_extremes() {
+  // ext.csv: 1700 -> 2250, year 1 -> 9999, and a 2020 second plus 1 us.
+  const auto source = clock_log({
+      {"c1", {{"A", "1700-01-01T00:00:00Z"}, {"B", "2250-01-01T00:00:00Z"}}},
+      {"c2", {{"A", "0001-01-01T00:00:00Z"}, {"B", "9999-12-31T23:59:59Z"}}},
+      {"c3", {{"A", "2020-01-01T00:00:00Z"}, {"B", "2020-01-01T00:00:01.000001Z"}}}});
+  const auto graph = minera::discover_directly_follows_graph(source);
+  for (const bool dataframe : {false, true}) {
+    const auto perf = minera::compute_performance_metrics(source, graph, dataframe);
+    assert(perf.timed_traces == 3);
+    assert(perf.case_duration.count == 3);
+    assert(perf.case_duration.min == 1.000001);
+    assert(perf.case_duration.median == 17356291200.0);
+    assert(perf.case_duration.max == 315537897599.0);
+    // pm4py 2.7.22 discover_performance_dfg (DataFrame and EventLog).
+    assert(perf.case_duration.total == 332894188800.0);
+    assert(perf.case_duration.mean == 110964729600.0);
+    for (const auto& gap : {perf.case_arrival.min, perf.case_arrival.max}) assert(gap > 0.0);
+    assert(perf.edges.size() == 1 && perf.edges.front().stats.count == 3);
+    assert(perf.edges.front().stats.max == 315537897599.0);
+    assert(perf.edges.front().stats.total == 332894188800.0);
+  }
+  // Fuzz case f2_49: a 2242 -> 2277 step (pandas reads datetime64[us]).
+  const auto late = clock_log({{"c4", {{"B", "2242-08-11T05:12:56.685102Z"},
+                                       {"B", "2277-06-03T19:16:13.528567Z"}}}});
+  const auto late_graph = minera::discover_directly_follows_graph(late);
+  for (const bool dataframe : {false, true}) {
+    const auto perf = minera::compute_performance_metrics(late, late_graph, dataframe);
+    assert(perf.timed_traces == 1);
+    assert(perf.edges.size() == 1 && perf.edges.front().stats.count == 1);
+    assert(perf.edges.front().stats.mean == 1098626596.843465);
+  }
+  minera::DfgStatisticalOptions options;
+  options.dataframe_arithmetic = false;
+  const auto dfg = minera::discover_performance_dfg(source, options);
+  assert(dfg.at({"A", "B"}).summary.maximum == 315537897599.0);
+
+  // timedelta.total_seconds() beyond 2**53 microseconds rounds once, as
+  // Python's int / int (values from Python).
+  namespace detail = minera::detail;
+  assert(detail::microseconds_to_seconds(9007199254740993LL) == 9007199254.740993);
+  assert(detail::microseconds_to_seconds(9007199254740995LL) == 9007199254.740995);
+  assert(detail::microseconds_to_seconds(123456789012345678LL) == 123456789012.34567);
+  assert(detail::microseconds_to_seconds(-123456789012345679LL) == -123456789012.34567);
+  assert(detail::microseconds_to_seconds(315537897599999997LL) == 315537897600.0);
+  assert(detail::microseconds_to_seconds(9007199254740992005LL) == 9007199254740.992);
+  const auto wide = [](const char* start, const char* end) {
+    return detail::eventlog_gap_seconds(*detail::exact_gap(start, end));
+  };
+  assert(wide("0001-01-01T00:00:00.000001Z", "9999-12-31T23:59:59.999998Z") == 315537897600.0);
+  assert(wide("0001-01-01T00:00:00.000007Z", "9999-12-31T23:59:59.123457Z") == 315537897599.1235);
+  assert(detail::dataframe_gap_seconds(*detail::exact_gap("2250-01-01T00:00:00.5Z",
+                                                          "1700-01-01T00:00:00.000003Z")) ==
+         -17356291200.499996);
+}
+
+// pandas sorts a CSV's datetime64 column at nanosecond resolution: two events
+// 612 ns apart (one microsecond, one epoch double) keep their true order, and
+// so do two events one microsecond apart in year 9999 (8 us per double there).
+void csv_events_order_at_nanoseconds() {
+  std::istringstream input(
+      "case_id,activity,timestamp\n"
+      "c1,A,2026-03-01T00:00:00.000000724Z\n"
+      "c1,B,2026-03-01T00:00:00.000000112Z\n"
+      "c2,A,9999-01-01T00:00:00.000002Z\n"
+      "c2,B,9999-01-01T00:00:00.000001Z\n");
+  const auto log = minera::import_csv_event_log(input);
+  assert(log.traces.size() == 2);
+  for (const auto& trace : log.traces) {
+    assert(trace.events.size() == 2);
+    assert(trace.events[0].activity == "B" && trace.events[1].activity == "A");
+  }
+  const auto graph = minera::discover_directly_follows_graph(log);
+  const auto perf = minera::compute_performance_metrics(log, graph, true);
+  assert(perf.edges.size() == 1 && perf.edges.front().stats.count == 2);
+  assert(perf.edges.front().stats.min > 6.11e-7 && perf.edges.front().stats.min < 6.13e-7);
+  assert(perf.edges.front().stats.max == 1e-06);
+}
+
+// dec1800.csv / dec2100.csv: place waits of instants far from 1970 (once
+// dropped outside 1843-2096).
+void decorate_model_handles_distant_years() {
+  minera::PetriNet net;
+  const auto source = net.add_place(), first = net.add_place(), second = net.add_place(),
+             sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"A", "B", "C"});
+  net.add_transition(0, {source}, {first});
+  net.add_transition(1, {first}, {second});
+  net.add_transition(2, {second}, {sink});
+  for (const int year : {1800, 2100, 1, 9999}) {
+    std::vector<std::pair<std::string, std::vector<std::pair<std::string, std::string>>>> cases;
+    for (int c = 0; c < 5; ++c) {
+      char day[32];
+      std::snprintf(day, sizeof day, "%04d-01-0%d", year, c + 1);
+      cases.push_back({"c" + std::to_string(c),
+                       {{"A", std::string(day) + "T00:00:00Z"},
+                        {"B", std::string(day) + "T01:00:00Z"},
+                        {"C", std::string(day) + "T03:00:00Z"}}});
+    }
+    const auto decoration = minera::decorate_model(clock_log(cases), net);
+    assert(decoration.decorated_traces == 5);
+    assert(decoration.place_waits[first].count == 5);
+    assert(decoration.place_waits[first].mean == 3600.0);
+    assert(decoration.place_waits[second].count == 5);
+    assert(decoration.place_waits[second].mean == 7200.0);
+  }
+  // A token resting from year 1 to year 9999.
+  const auto span = clock_log({{"c", {{"A", "0001-01-01T00:00:00Z"},
+                                      {"B", "9999-12-31T23:59:59Z"},
+                                      {"C", "9999-12-31T23:59:59Z"}}}});
+  assert(minera::decorate_model(span, net).place_waits[first].max == 315537897599.0);
 }
 
 void export_variants_include_the_empty_variant() {
@@ -8314,6 +8435,9 @@ int main() {
   filter_time_range_trace_modes_read_endpoints_by_position();
   performance_clamps_backwards_steps_and_keeps_precision();
   performance_edges_follow_reference_arithmetic();
+  performance_handles_calendar_extremes();
+  decorate_model_handles_distant_years();
+  csv_events_order_at_nanoseconds();
   export_variants_include_the_empty_variant();
   filter_supports_variant_percentage_and_endpoint_polarity();
   filter_selects_cases_by_succession();

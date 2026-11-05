@@ -302,9 +302,9 @@ export function maxEdgeCount(data: MineraExport): number {
   return max;
 }
 
-/** Whether an opened file is a pre-mined JSON export rather than a raw CSV log. */
+/** Whether an opened file is JSON (a pre-mined export, OCEL or EventTable) rather than a raw CSV log. */
 export function isJsonExport(name: string): boolean {
-  return /\.json$/i.test(name);
+  return /\.(json|jsonocel)$/i.test(name);
 }
 
 /** Whether a JSON document carries either supported object-centric envelope. */

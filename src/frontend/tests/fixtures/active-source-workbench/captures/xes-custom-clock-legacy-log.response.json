@@ -43,6 +43,6 @@
   "performance": {"timed_traces": 1, "case_duration": {"count": 1, "total": -60, "mean": -60, "median": -60, "min": -60, "max": -60}, "case_arrival": {"count": 0, "total": 0, "mean": 0, "median": 0, "min": 0, "max": 0}, "edges": [{"source": 0, "target": 1, "stats": {"count": 1, "total": 0, "mean": 0, "median": 0, "min": 0, "max": 0}}], "activities": []},
   "resources": {"total_handovers": 1, "resources": [{"name": "alice", "event_count": 2}], "handovers": [{"source": 0, "target": 0, "count": 1}]},
   "eventually_follows": [
-    {"source": 0, "target": 1, "count": 1}
+    {"source": 1, "target": 0, "count": 1}
   ]
 ,"source_id":"39","active_source":{"format":"auto","detected_format":"xes","shape":"log","source_id":"39","original_dataset":"owned-xes-reversed-custom-clock.xes","original_input_bytes":543,"source_unchanged":true,"source_selectors":{"case_id_key":"case:concept:name","activity_key":"concept:name","timestamp_key":"clock","resource_key":"org:resource","lifecycle_key":"lifecycle:transition"},"input_before":null,"input_after":null,"checked_table":null,"original_log":null,"checked_log":null,"prepared_stream":null,"prepared_lazy_table":null,"detail":"summary","original_table_origin":"native_log_to_table","paired_csv_import_error":null,"checked_table_origin":"native_log_to_table","checked_log_preparation_error":null,"checked_flat_projection_error":null,"source_row_ordinals":[0,1],"representative_row_ordinals":[[0,1]],"projection_changes":[]}}

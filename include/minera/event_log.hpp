@@ -598,6 +598,13 @@ inline void set_event_activity_context(const Event& source, std::string value,
 // comparison stays a consistent strict weak ordering.
 void order_events_by_time(std::vector<Event>& events);
 
+// order_events_by_time on the exact instants (whole UTC seconds and
+// nanoseconds, parse_timestamp_exact) instead of epoch doubles, as pandas
+// sorts datetime64 values: events a few nanoseconds apart (or microseconds
+// apart far from 1970, where doubles merge them) keep their true order. Same
+// tie and fallback rules.
+void order_events_by_exact_time(std::vector<Event>& events);
+
 struct EventLog {
   std::vector<Trace> traces;
   // Scalar log-level XES attributes and derived-model projection markers.

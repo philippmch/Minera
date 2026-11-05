@@ -393,8 +393,12 @@ int main(int argc, char** argv) {
       };
       const auto dfg_options = minera::parse_dfg_playout_params(lookup);
       std::optional<minera::DfgPerformance> performance;
-      if (dfg_options.variant == minera::DfgPlayoutVariant::kPerformance)
-        performance = minera::discover_performance_dfg(source);
+      if (dfg_options.variant == minera::DfgPlayoutVariant::kPerformance) {
+        // A CSV or XES input, which pm4py discovers as a DataFrame.
+        minera::DfgStatisticalOptions dataframe_options;
+        dataframe_options.dataframe_arithmetic = true;
+        performance = minera::discover_performance_dfg(source, dataframe_options);
+      }
       const auto result = minera::dfg_playout_result(
           frequency, starts, ends, dfg_options,
           performance ? &*performance : nullptr);

@@ -1237,6 +1237,9 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
     {
       Statement statement(db, "INSERT INTO ocel_globals(attribute_name, value_type, text_value, integer_value, real_value, bool_value) VALUES(?1,?7,?2,?3,?4,?5)");
       for (const auto& [key, value] : log.globals) {
+        // The reference OCEL 1.0 writers' own globals (scope defaults,
+        // computed log scope) are left out, as the OCEL 2.0 JSON writer does.
+        if (ocel_reference_generated_global(key, value)) continue;
         bind_text(statement.get(), 1, key);
         std::string type;
         bind_value(statement.get(), 1, value, type);

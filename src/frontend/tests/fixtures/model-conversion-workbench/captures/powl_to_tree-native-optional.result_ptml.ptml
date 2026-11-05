@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ptml>
   <processTree id="tree" name="Independent model conversion" root="node0">
-    <xor id="node0" name=""/>
-    <automaticTask id="node1" name=""/>
-    <manualTask id="node2" name="A"/>
-    <parentsNode id="edge0" sourceId="node0" targetId="node1"/>
-    <parentsNode id="edge1" sourceId="node0" targetId="node2"/>
+    <manualTask id="node0" name="A
+[1,1]"/>
   </processTree>
 </ptml>

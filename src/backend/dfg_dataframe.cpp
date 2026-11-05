@@ -820,13 +820,9 @@ double flow_time(const TableRow& source, const TableRow& target,
       return polars_whole_seconds(*source.completion_exact, *target_start_exact);
     // pandas: Timedelta.total_seconds of the exact gap; epoch doubles would
     // lose the sub-second part.
-    if (source.completion_exact && target_start_exact &&
-        target_start_exact->seconds - source.completion_exact->seconds <= 9000000000LL &&
-        target_start_exact->seconds - source.completion_exact->seconds >= -9000000000LL)
-      return detail::dataframe_gap_seconds(
-          (target_start_exact->seconds - source.completion_exact->seconds) * 1000000000LL +
-          (static_cast<std::int64_t>(target_start_exact->nanoseconds) -
-           source.completion_exact->nanoseconds));
+    if (source.completion_exact && target_start_exact)
+      if (const auto gap = detail::exact_gap(*source.completion_exact, *target_start_exact))
+        return detail::dataframe_gap_seconds(*gap);
     return target_start - *source.completion;
   }
   if (!polars) {

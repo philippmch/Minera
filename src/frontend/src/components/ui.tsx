@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { readStored, removeStored, writeStored } from "../storage";
 
 /** File types the main "Open log" entry points accept. */
-export const LOG_FILE_ACCEPT = ".csv,.tsv,.xes,.xes.gz,.gz,.json,text/csv,application/xml,application/gzip";
+export const LOG_FILE_ACCEPT = ".csv,.tsv,.csv.gz,.tsv.gz,.xes,.xes.gz,.gz,.json,.jsonocel,.xmlocel,.sqlite,.sqlite3,text/csv,application/xml,application/gzip";
 
 export function BrandMark({ className }: { className?: string }) {
   return (
