@@ -338,8 +338,8 @@ struct NormalizedTimestamp {
 
 // `allow_year_zero` accepts year 0 (proleptic, a leap year), which pandas'
 // ISO path holds and dateutil rejects; the caller decides by `iso_path`.
-std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_view text,
-                                                                 bool allow_year_zero = false) {
+std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
+    std::string_view text, bool allow_year_zero = false) {
   TimestampTokens in{text};
   in.skip_spaces();
   int year = 0, month = 0, day = 0;
@@ -548,10 +548,34 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
     bool meridiem_read = false;
     if (in.peek() == ':') {
       ++in.pos;
-      if (in.digits(m, 2) != 2) return std::nullopt;
-      if (in.peek() == ':') {
+      // One-digit minutes and seconds read too, on pandas' ISO path as well
+      // ("10:3:5"; "0000-01-05 10:3" is year 0).
+      if (in.digits(m, 2) == 0) return std::nullopt;
+      if (in.peek() == '.') {
+        // A fraction of a minute (dateutil): the seconds are the whole
+        // seconds of 60 times the fraction, with no sub-second part
+        // ("10:30.5" is 10:30:30, "06:37.9" 06:37:54, "10:30." 10:30:00;
+        // review X1).
+        iso_path = false;
         ++in.pos;
-        if (in.digits(s, 2) != 2) return std::nullopt;
+        std::string minute_fraction;
+        while (!in.done() && std::isdigit(static_cast<unsigned char>(in.peek()))) {
+          if (minute_fraction.size() < 30) minute_fraction.push_back(in.peek());
+          ++in.pos;
+        }
+        const std::size_t used = minute_fraction.size();
+        // floor(60 * 0.<digits>), exactly: multiply the decimal digits by 60
+        // from the right; the carry out of the first digit is the integer part.
+        unsigned carry = 0;
+        for (auto it = minute_fraction.rbegin(); it != minute_fraction.rend(); ++it)
+          carry = (static_cast<unsigned>(*it - '0') * 60 + carry) / 10;
+        s = carry;
+        // An empty fraction right before a `Z` fails ("10:30.Z"; "10:30.5Z",
+        // "10:30. Z" and "10:30.UTC" read).
+        if (used == 0 && (in.peek() == 'Z' || in.peek() == 'z')) return std::nullopt;
+      } else if (in.peek() == ':') {
+        ++in.pos;
+        if (in.digits(s, 2) == 0) return std::nullopt;
         if (in.peek() == '.' || in.peek() == ',') {
           if (in.peek() == ',') { iso_path = false; comma_fraction = true; }
           ++in.pos;
@@ -569,22 +593,29 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
         }
       }
     }
-    in.skip_spaces();
-    if (in.peek() == 'a' || in.peek() == 'A' || in.peek() == 'p' ||
-        in.peek() == 'P') {
+    // AM/PM takes an hour of 0 to 12 ("0:30 PM" is 12:30, "0 AM" 00:00).
+    // It may also follow the offset or zone, once ("3:08+05pm", "3:08 UTC
+    // pm"; review X1).
+    const auto read_meridiem = [&]() -> bool {
+      in.skip_spaces();
+      if (meridiem_read ||
+          !(in.peek() == 'a' || in.peek() == 'A' || in.peek() == 'p' || in.peek() == 'P'))
+        return true;
       const auto saved = in.pos;
       const auto meridiem = in.word();
       if (meridiem == "am" || meridiem == "pm") {
         iso_path = false;
         meridiem_read = true;
-        if (h < 1 || h > 12) return std::nullopt;
+        if (h > 12) return false;
         if (meridiem == "am" && h == 12) h = 0;
         else if (meridiem == "pm" && h != 12) h += 12;
       } else {
         in.pos = saved;
       }
       in.skip_spaces();
-    }
+      return true;
+    };
+    if (!read_meridiem()) return std::nullopt;
     if (bare_digit_hour && !meridiem_read) return std::nullopt;
     if (h > 23 || m > 59 || s > 59) return std::nullopt;
     hour = static_cast<int>(h);
@@ -595,6 +626,8 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       if (ch == 'Z' || ch == 'z') {
         if (ch == 'z') iso_path = false;
         ++in.pos;
+        // A word right after it is no zone ("Zpm" fails, "Z pm" reads).
+        if (std::isalpha(static_cast<unsigned char>(in.peek()))) return std::nullopt;
         offset = "+00:00";
       } else if (ch == '+' || ch == '-') {
         ++in.pos;
@@ -613,7 +646,8 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
         if (in.peek() == ':') ++in.pos;
         // An hour-only offset followed by white space is a dateutil shape.
         if (!in.done() && (in.peek() == ' ' || in.peek() == '\t')) iso_path = false;
-        if (!in.done() && in.peek() != ' ' && in.peek() != '\t' && !two_digits(om))
+        if (!in.done() && in.peek() != ' ' && in.peek() != '\t' &&
+            !std::isalpha(static_cast<unsigned char>(in.peek())) && !two_digits(om))
           return std::nullopt;
         // Minutes 60-99 are dateutil's: they add to the hours ("+01:90" is
         // +02:30) while the whole offset stays below 24 hours ("+23:60"
@@ -634,7 +668,8 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
         if (zone != "UTC" && zone != "GMT") return std::nullopt;
         offset = "+00:00";
       }
-      in.skip_spaces();
+      if (!read_meridiem()) return std::nullopt;
+      hour = static_cast<int>(h);
     }
   }
   if (!in.done()) return std::nullopt;
@@ -704,6 +739,93 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
   std::string out = buffer;
   if (!fraction.empty()) out += "." + fraction;
   return NormalizedTimestamp{out + offset, iso_path, fraction.size() > 6};
+}
+
+// dateutil's reading of a leading all-numeric date of three numbers written
+// with `-`, `/` and single spaces, for the long or mixed spellings the shapes
+// above leave out ("2024-1/00015", "02 0007 2031", "2057 004 22", "07-0016
+// 24"; review X1).
+// Numbers joined by `-` or `/` are kept as text, and one of more than two
+// digits is the year (its century given); a mix of the two separators in one
+// token leaves the last number standing alone. A standalone number is read
+// by value, and one above 100 is the year. More than one year fails. The
+// order is then year-first when the first number cannot be a day or is the
+// year, day-first when it cannot be a month, else month-first; a year below
+// 100 without its century is two-digit. Returns the date spelled MM/DD/YYYY
+// followed by the rest of the text, or nullopt. Numbers of more than five
+// digits are left unparsed (a standalone one is a dateutil clock shape).
+std::optional<std::string> reference_numeric_date(std::string_view text) {
+  std::size_t at = 0;
+  while (at < text.size() && text[at] == ' ') ++at;
+  struct Component {
+    unsigned value;
+    bool year;
+  };
+  std::vector<Component> components;
+  const auto number = [&](unsigned& value, std::size_t& width) {
+    const auto begin = at;
+    value = 0;
+    while (at < text.size() && std::isdigit(static_cast<unsigned char>(text[at]))) {
+      if (at - begin >= 5) return false;
+      value = value * 10 + static_cast<unsigned>(text[at] - '0');
+      ++at;
+    }
+    width = at - begin;
+    return width > 0;
+  };
+  while (components.size() < 3) {
+    if (!components.empty()) {
+      if (at >= text.size() || text[at] != ' ') return std::nullopt;
+      ++at;
+    }
+    std::array<unsigned, 3> values{};
+    std::array<std::size_t, 3> widths{};
+    std::array<char, 2> separators{};
+    std::size_t count = 0;
+    if (!number(values[0], widths[0])) return std::nullopt;
+    count = 1;
+    while (count < 3 && at < text.size() && (text[at] == '-' || text[at] == '/')) {
+      separators[count - 1] = text[at];
+      ++at;
+      if (!number(values[count], widths[count])) return std::nullopt;
+      ++count;
+    }
+    if (components.size() + count > 3) return std::nullopt;
+    for (std::size_t i = 0; i < count; ++i) {
+      const bool standalone = count == 1 || (count == 3 && i == 2 && separators[0] != separators[1]);
+      components.push_back(
+          {values[i], standalone ? values[i] > 100 : widths[i] > 2});
+    }
+  }
+  if (at < text.size() && text[at] != ' ' && text[at] != '\t' && text[at] != 'T' &&
+      text[at] != 't')
+    return std::nullopt;
+  std::size_t years = 0, year_index = 3;
+  for (std::size_t i = 0; i < 3; ++i)
+    if (components[i].year) { ++years; year_index = i; }
+  if (years > 1) return std::nullopt;
+  const unsigned a = components[0].value, b = components[1].value, c = components[2].value;
+  unsigned y = 0, m = 0, d = 0;
+  if (a > 31 || year_index == 0) { y = a; m = b; d = c; }
+  else if (a > 12) { d = a; m = b; y = c; }
+  else { m = a; d = b; y = c; }
+  const int year = y < 100 && years == 0 ? expand_two_digit_year(y) : static_cast<int>(y);
+  if (year < 1 || year > 9999 || m < 1 || m > 12 || d < 1 ||
+      static_cast<int>(d) > month_days(year, static_cast<int>(m)))
+    return std::nullopt;
+  char buffer[32];
+  std::snprintf(buffer, sizeof(buffer), "%02u/%02u/%04d", m, d, year);
+  return std::string(buffer) + std::string(text.substr(at));
+}
+
+std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_view text,
+                                                                 bool allow_year_zero = false) {
+  if (auto shaped = normalize_reference_timestamp_shapes(text, allow_year_zero)) return shaped;
+  const auto date = reference_numeric_date(text);
+  if (!date) return std::nullopt;
+  auto shaped = normalize_reference_timestamp_shapes(*date);
+  if (shaped) shaped->iso_path = false;
+  return shaped;
 }
 
 // The digits of the seconds fraction of a timestamp text: those after the

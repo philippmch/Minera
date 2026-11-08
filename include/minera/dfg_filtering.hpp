@@ -116,6 +116,12 @@ struct DfgFilteringRequest {
   std::optional<std::string> to_activity;
   std::optional<std::string> from_activity;
   std::optional<std::string> contain_activity;
+  // Before the to, from and contain steps, give each start or end activity
+  // without an activity count one (the larger of its start and end counts).
+  // minera_dfg sets it for .dfg inputs, whose counts come from
+  // dfg_filtering_data_from_dfg and leave a one-event trace's activity out;
+  // those steps need every boundary activity counted (review X1-1).
+  bool count_boundary_activities = false;
 };
 
 // A mined log's DFG with its real activity counts, the inputs a reference

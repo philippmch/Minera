@@ -9,6 +9,9 @@
 // is the pinned reference's result on the same input, written in the .dfg
 // layout (activities sorted, then starts, ends and edges).
 //
+// Review X1 adds one-event .dfg inputs for the CLI's to/from/contain steps,
+// activities named like the reference's internal nodes, and a dense DFG.
+//
 // Usage: minera_dfg_filter_route_tests <minera_server> <minera_dfg> [port]
 
 #include <netinet/in.h>
@@ -122,6 +125,50 @@ void library_checks() {
   check(minera::to_dfg(minera::to_dfg_clean_analysis(minera::apply_dfg_filtering_request(data, {}))) ==
             minera::to_dfg(dfg),
         "an empty request leaves the DFG unchanged");
+
+  // Review X1-2: activities named like the reference's internal start and end
+  // nodes are ordinary activities (declared: the reference conflates them).
+  const auto renamed = [](minera::DfgFilteringData d, const std::string& from, const std::string& to) {
+    for (auto& [e, c] : d.dfg) {
+      if (e.first == from) e.first = to;
+      if (e.second == from) e.second = to;
+    }
+    for (auto* m : {&d.start_activities, &d.end_activities, &d.activities})
+      for (auto& [a, c] : *m)
+        if (a == from) a = to;
+    return d;
+  };
+  minera::DfgFilteringData reserved;
+  reserved.dfg = {{{"_S_START_", "b"}, 2}, {{"b", "_S_END_"}, 2}, {{"b", "b"}, 1}};
+  reserved.start_activities = {{"_S_START_", 2}};
+  reserved.end_activities = {{"_S_END_", 2}};
+  reserved.activities = {{"_S_START_", 2}, {"b", 3}, {"_S_END_", 2}};
+  const auto plain = renamed(renamed(reserved, "_S_START_", "s"), "_S_END_", "t");
+  for (const double p : {0.0, 0.5, 1.0}) {
+    const auto got = renamed(renamed(minera::filter_dfg_on_paths_percentage(reserved, p), "_S_START_", "s"), "_S_END_", "t");
+    check(got == minera::filter_dfg_on_paths_percentage(plain, p), "reserved names, paths " + std::to_string(p));
+    const auto act = renamed(renamed(minera::filter_dfg_on_activities_percentage(reserved, p), "_S_START_", "s"), "_S_END_", "t");
+    check(act == minera::filter_dfg_on_activities_percentage(plain, p), "reserved names, activities " + std::to_string(p));
+  }
+  check(minera::filter_dfg_on_paths_percentage(reserved, 1.0) == reserved, "reserved names stay at paths 1.0");
+
+  // Review X1-3: a dense DFG (120 activities, 14,400 edges) filters in one
+  // incremental pass; the earlier per-trial copies took minutes here.
+  minera::DfgFilteringData dense;
+  for (int i = 0; i < 120; ++i) {
+    const auto a = "a" + std::to_string(i);
+    dense.activities.push_back({a, 1000 - i});
+    if (i < 5) dense.start_activities.push_back({a, 7 + i});
+    if (i >= 115) dense.end_activities.push_back({a, 3 + i});
+    for (int j = 0; j < 120; ++j)
+      dense.dfg.push_back({{a, "a" + std::to_string(j)}, 1 + (i * 7919 + j * 104729) % 97});
+  }
+  const auto started = std::chrono::steady_clock::now();
+  const auto filtered_dense = minera::filter_dfg_on_paths_percentage(dense, 0.3);
+  const auto kept_dense = minera::filter_dfg_keep_connected(dense, 0.5);
+  const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+  check(!filtered_dense.dfg.empty() && !kept_dense.dfg.empty(), "dense DFG filters keep edges");
+  check(seconds < 60.0, "dense DFG filters finish (" + std::to_string(seconds) + " s)");
 }
 
 }  // namespace
@@ -203,6 +250,16 @@ int main(int argc, char** argv) {
        {"--activities-percentage", "0"}, 0, "2\na\nc\n1\n1x5\n1\n0x5\n1>0x5\n"},
       {"chained_error", "3\na\nb\nc\n1\n2x2\n2\n0x1\n1x1\n2>0x1\n2>1x1\n",
        {"--to-activity", "b", "--contain-activity", "a"}, 1, "KeyError: 'a'"},
+      // Review X1-1: log a + bcd, as GET /api/dfg writes it. The one-event
+      // trace's a is only a start and end activity; to and from count it.
+      {"one_event_to", "4\na\nb\nc\nd\n2\n0x1\n1x1\n2\n0x1\n3x1\n1>2x1\n2>3x1\n", {"--to-activity", "d"}, 0,
+       "3\nb\nc\nd\n1\n0x1\n1\n2x1\n0>1x1\n1>2x1\n"},
+      {"one_event_from", "4\na\nb\nc\nd\n2\n0x1\n1x1\n2\n0x1\n3x1\n1>2x1\n2>3x1\n", {"--from-activity", "b"}, 0,
+       "3\nb\nc\nd\n1\n0x1\n1\n2x1\n0>1x1\n1>2x1\n"},
+      {"one_event_itself", "4\na\nb\nc\nd\n2\n0x1\n1x1\n2\n0x1\n3x1\n1>2x1\n2>3x1\n", {"--to-activity", "a"}, 0,
+       "1\na\n1\n0x1\n1\n0x1\n"},
+      {"one_event_contain", "4\na\nb\nc\nd\n2\n0x1\n1x1\n2\n0x1\n3x1\n1>2x1\n2>3x1\n",
+       {"--paths-percentage", "1", "--contain-activity", "c"}, 0, "3\nb\nc\nd\n1\n0x1\n1\n2x1\n0>1x1\n1>2x1\n"},
   };
   const auto dir = std::filesystem::temp_directory_path() /
                    ("minera_dfg_filter_route_tests_" + std::to_string(::getpid()));

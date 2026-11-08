@@ -465,7 +465,9 @@ describe("classic DFG export API", () => {
     expect(() => dfgExportQuery({ paths_percentage: 1.1 })).toThrow(/\[0, 1\]/);
     expect(() => dfgExportQuery({ keep_connected: Number.NaN })).toThrow(/finite/);
     expect(() => dfgExportQuery({ keep_all_activities: true })).toThrow(/requires paths_percentage/);
-    expect(() => dfgExportQuery({ to_activity: " " })).toThrow(/must not be empty/);
+    expect(() => dfgExportQuery({ to_activity: "" })).toThrow(/must not be empty/);
+    // Labels are literal, surrounding white space included (review X1).
+    expect(dfgExportQuery({ to_activity: " a ", contain_activity: " " })).toBe("to_activity=+a+&contain_activity=+");
   });
 
   it("fetches the cached graph as text", async () => {

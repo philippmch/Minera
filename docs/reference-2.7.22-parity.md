@@ -1922,7 +1922,9 @@ decimal digits, single underscores between digits, `-0` as zero), ids index the
 label list as Python does (`-1` is the last label, so `-n` to `n-1` are valid),
 a negative section size reads no rows, zero counts are accepted (and written),
 a repeated label names the same activity, and a repeated start, end or edge row
-replaces the earlier one. A blank row, a BOM and an out-of-range id are errors,
+replaces the earlier one. Writing follows `write_dfg`: every label goes on its own
+line as given, empty and padded labels included (review X2-5); only a label
+with a line break or a NUL is refused. A blank row, a BOM and an out-of-range id are errors,
 as in the reference. Declared difference: Minera stores counts as unsigned
 64-bit integers, so a negative count (which the reference keeps, e.g. `{'A': -3}`)
 is refused with `DFG: negative counts are not supported`, and a count beyond
@@ -18462,14 +18464,18 @@ Declared:
     counts every shuffle it emits, repeated ones included, of combinations
     whose length the node keeps, and stops after the limit (`+( 'a', 'a',
     'b' )` keeps 2 words with limit 2 to 4, all 3 from 5);
-  - a choice and a loop stop collecting once they hold more than the limit of
-    distinct words their node keeps, so they return at most limit + 1 (a
-    loop's rounds go breadth first; words its length bounds drop, such as
-    words under `min_trace_length`, still seed later rounds but are not
-    counted);
+  - a loop stops collecting once it holds more than the limit of distinct
+    words it keeps, so it returns at most limit + 1 (its rounds go breadth
+    first; words its length bounds drop, such as words under
+    `min_trace_length`, still seed later rounds but are not counted);
+  - a choice unites whole children and checks the limit between them: once
+    the union holds more than the limit, the later children are left out, so
+    it can return many more than limit + 1 words (`X('e', ->(X(a,b),
+    X(c,d)))` keeps all five words with limit 1; review X2-4);
   - a sequence is not capped.
 
-  Native follows the same rules. Before this fix choices and loops were never
+  Native follows the same rules (the choice rule since review X2; it capped
+  per word before). Before this fix choices and loops were never
   capped and a parallel node kept its first `limit` distinct words, so
   `*( X('a','b'), X('c','d') )` with `max_trace_length` 5 and limit 3 gave 42
   words where the reference gives 4. Native reports `truncated` when the
@@ -19508,3 +19514,165 @@ activities by string hash.
 Tests: `minera_dfg_filter_route_tests` (server and CLI repros above, and the
 `.dfg` count rule; replaces `minera_dfg_filter_tests`, which tested the native
 filters), `minera_filtering_common_bank_parity_tests` (the reference port).
+
+## Review X2: OCEL numeric attribute filters, choice caps in tree playout, `.dfg` labels, POWL (2026-11-08)
+
+Random inputs were run through `/api/ocel/filter`, `/api/ocel/statistics`,
+`minera_export` (POWL discovery, POWL nets and PTML, XES round trips, process
+tree EXTENSIVE playout), `minera_tree_reduction` and `minera_dfg`, and compared
+with pm4py 2.7.22 public calls.
+
+Fixes:
+
+- **OCEL attribute filters compare like pandas `isin` (X2-1).**
+  `filter_ocel_event_attribute` / `filter_ocel_object_attribute` (the
+  `event_attribute` and `object_attribute` routes) matched values by type, so
+  the integer 4 the frontend sends as `i:4` never selected a cell pm4py wrote
+  as 4.0 (it does whenever some event lacks the attribute). Booleans,
+  integers and floats now meet numerically (1 == 1.0 == True), strings only
+  equal strings, and null matches nothing new. Reproducer: events e1
+  (`cost` 4.0) and e2 (no cost) on object o1 (`w` 2):
+  `event_attribute&attribute_key=cost&attribute_values=i:4` keeps e1 and
+  `object_attribute&attribute_key=w&attribute_values=d:2.0` keeps o1, as the
+  reference does (native returned nothing). Fuzz: 4,544 filter calls on 400
+  random OCELs (14 filter variants), 115 differed before, all on these two
+  filters; 0 after (the declared missing-key KeyError aside). Test:
+  `minera_ocel_filter_tests`.
+- **EXTENSIVE tree playout: a choice checks the limit between children
+  (X2-4).** The reference unites a choice child's whole word set and only
+  then compares the union with `max_limit_num_traces`; native stopped after
+  limit + 1 words. Log `a; b d; b e; c d; c e` (inductive tree
+  `X('a', ->(X('c','b'), X('d','e')))`), max length 5, limit 1: the
+  reference gives all five words under every hash seed, native gave two.
+  Loops still cap per word (probed: `*(X(a,b,c), X(d,e))` with limit 1 gives
+  `a`, `b`, which is the capped body choice). The section on
+  `max_limit_num_traces` above is corrected. Fuzz (200 inductive trees of
+  random logs, `max_trace_length` 1-8, limits 1-100000, `max_loop_occ` unset
+  or 0-3, reference under PYTHONHASHSEED 0-9): the word count now matches
+  in 198 of 200 (the other two are parallel nodes whose emitted shuffles
+  repeat, as declared above); 176 outputs equal a reference outcome and
+  the other 24 differ only in which words a capped node keeps. In 12 of them the
+  reference keeps the same words under all ten seeds (generation order:
+  `+(X(tau,*(a,tau)), ->(X(tau,b),*(c,tau)))`, max length 5, limit 1 gives
+  `c`, native `b c`), so the declared set-order difference is not purely
+  hash-driven; native keeps word order. Test:
+  `minera_process_tree_playout_tests`.
+- **`.dfg` writing keeps empty and padded labels (X2-5).** `write_dfg` writes
+  every label on its own line as given and `read_dfg` strips it again; native
+  refused empty labels and labels with surrounding whitespace ("activity
+  labels must be non-empty and single-line"), so a pm4py-written file with an
+  empty label read but could not be written back. Only a line break or NUL
+  is refused now (`DFG: activity labels must be single-line and free of
+  NUL`). The reader and the views already accepted such labels. Test:
+  `minera_dfg_io_tests`.
+
+Declared (not found in reasonable time; reproducers kept for a later round):
+
+- **POWL `BRUTE_FORCE` with a filtering weight factor (X2-2).** Traces `b`,
+  `b`, `c b`, `b a c`, `b a b` with `filtering_weight_factor` 0.3: the
+  reference gives `PO[*(b, tau), X(tau, PO[X(tau,a) --> X(tau,c)])]`, its
+  unfiltered model, while native filters the `b` sublog (`{b:4, bb:1}`) to
+  `b`. TREE, MAXIMAL and DYNAMIC_CLUSTERING filter it in both. Probes show
+  the reference filters BRUTE_FORCE children below sequence cuts,
+  concurrency cuts and ordered partial orders that order the child, but not
+  a child that is unordered in a partial order that orders its other
+  children (13 of about 62 brute-force fuzz runs at 0.3 differ; no rule that
+  explains all of them was found).
+- **POWL `DYNAMIC_CLUSTERING` repair order (X2-3).** Traces `e c b f`,
+  `f d c` (no filtering): the reference gives `X(tau,e) --> PO{c, f,
+  X(tau,b), X(tau,d)}` under every hash seed, native `PO{c, f, X(tau,b),
+  X(d,e)}`: after merging `{b,c,f}` native coarsens the never co-occurring
+  `d` and `e` into a choice, while the reference merges `d` (followed and
+  preceded by `{b,c,f}`, neither direction reaching the order ratio) into
+  that group. Merging such pairs before choices breaks `x a b, x b a, x a c`,
+  where the reference merges the choice first; about 1 in 300 random logs
+  differ.
+
+Matched without changes: OCEL filters other than the two above and OCEL
+object-type statistics (292 calls); POWL discovery (all four variants, about
+1,000 runs without filtering), POWL nets (239, isomorphic) and POWL PTML
+(400); XES import/export round trips with lists, containers, nested values,
+odd dates, globals and classifiers (400 logs; only the declared empty-list
+and `<values>` differences); TREE_TR_BASED reduction (200, every native tree
+among the reference's hash-seed outcomes); the `.dfg` reader on 400 mutated
+files (only the declared negative and oversized counts).
+
+## Review X1: `.dfg` boundary activities, reserved node names, greedy edge removal, exact XES export, CSV numeric dates (2026-11-08)
+
+Fixes after a review of Round W, checked against pm4py 2.7.22 and
+`pandas.read_csv` + `pm4py.format_dataframe` outputs only.
+
+- **X1-1 Start-only and end-only activities on a `.dfg` input.** `minera_dfg
+  --to-activity/--from-activity/--contain-activity` gives every start or end
+  activity that is on no arc an activity count (the larger of its start and
+  end counts) before those steps (`DfgFilteringRequest::count_boundary_activities`);
+  the percentage steps keep `max(in, out)` over the arcs. A one-event trace
+  `a` (`a` start and end, no arcs) now keeps `a` for `--to-activity a`,
+  `--from-activity a` and `--contain-activity a`. CLI fuzz of the three
+  steps against the reference called with those counts: 3,000 operations
+  (900 with activities named `_S_START_`/`_S_END_`), 0 differences; the
+  Round W CLI differed on 237 of 900.
+- **X1-2 Internal start and end nodes cannot collide with activities.** The
+  port's graph searches use node ids for the artificial start and end, so
+  activities named `_S_START_` or `_S_END_` are ordinary activities: every
+  filter gives the same result as with the activities renamed (declared
+  below).
+- **X1-3 Incremental greedy edge removal.** `remove_edges_greedily` keeps one
+  adjacency structure with alive flags and a hashed edge index instead of a
+  graph copy per trial; an edge on neither search tree is removed without a
+  new search (removing it cannot disconnect anything). Outputs are
+  byte-identical to Round W (4,500 random cases, the 3,944-edge and
+  20,783-edge DFGs under five option sets). `--paths-percentage 0.3`: 3,944
+  edges 3.0 s → 0.015 s (pm4py 0.38 s), 20,783 edges 110 s → 0.06 s (pm4py
+  32 s); `--keep-connected 0.5` on 20,783 edges 0.07 s.
+- **X1-4 Exact multipart XES export.** `POST /api/log-query/export` with
+  `format=xes` (the exact-query multipart route) sets `standard_keys` and
+  `utc_timestamps` for CSV sources as the plain route does (W1-2); it wrote
+  native keys and the source offset.
+- **Frontend.** `dfgExportQuery` sends `to_activity`, `from_activity` and
+  `contain_activity` untrimmed (white space is part of the label); only an
+  empty value is refused.
+- **CSV numeric dates in dateutil's reading.** A cell that none of the
+  shapes reads and that starts with three numbers joined by `-`, `/` or single
+  spaces is read as dateutil does: a number joined by `-` or `/` is text, and
+  one of more than two digits is the year with its century; in a token that
+  mixes the two separators the last number stands alone; a standalone number
+  is read by value and one above 100 is the year; more than one year fails;
+  the order is year-first when the first number is above 31 or is the year,
+  day-first when it is above 12, else month-first; a year below 100 without
+  its century is two-digit (`2024-1/00015` 2024-01-15, `02 0007 2031`
+  2031-02-07, `2057 004 22` 2057-04-22, `07-0016 24` 0024-07-16, `0012
+  01-0015` 0015-12-01, `0999 1-0015` text). Numbers of more than five digits
+  stay text. This supersedes the W1 declaration "Space-first four-digit year
+  with a three- or four-digit day": those cells now read.
+- **CSV clocks.** One-digit minutes and seconds read (also on pandas' ISO
+  path). A fraction of a minute gives the whole seconds of 60 times the
+  fraction and no sub-second part (`10:30.5` 10:30:30, `06:37.9` 06:37:54,
+  `10:30.` 10:30:00; `10:30.Z` fails, `10:30. Z` reads). AM/PM takes hour 0
+  (`0:30 PM` 12:30, `0 AM` 00:00) and may follow the offset or zone once
+  (`3:08+05pm` 15:08+05:00, `3:08 UTC pm`; `3:08 Zpm` fails).
+
+Fuzz: 12,500 random numeric-date cells (seeds 7001-7005) against pandas: 9
+mismatches, 7 year-0 cells (declared under "Year 0 and far offsets") and 2
+nanosecond-fraction cells before 1677, which pandas leaves unconverted and
+the importer refuses under the existing nanosecond-range rule (the per-cell
+harness compares before that column check); 3,357 cells that Round W read
+wrongly now agree. Separator matrix (1,872 cells): 0 mismatches
+(72 fixed). Server columns of two to five cells (750, seeds 501-503): 0
+mismatches. `/api/dfg` filter chains against the reference (2,000 requests,
+odd labels included): 0. `minera_dfg` percentage steps (3,000): 0.
+
+Tests: `minera_dfg_filter_route_tests` (reserved names, one-event `.dfg`
+cases, a 14,400-edge DFG within 60 s), `minera_server_traces_route_tests`
+(exact multipart XES), `minera_core_tests` (`csv_timestamps_review_v1_shapes`),
+`minera_filtering_common_bank_parity_tests`, frontend `api.test.ts`.
+
+Declared:
+
+- **Activities named `_S_START_` or `_S_END_` (declared).** The reference
+  uses those strings as its artificial start and end nodes, so such an
+  activity is merged with them: removing it raises `KeyError`, or the final
+  prune drops it. On 1,000 random DFGs using those names the reference's
+  activities-percentage, paths-percentage and keep-connected results differ
+  from native in 638, 589 and 567 cases; to, from and contain agree (0).
+  Native keeps them as ordinary activities.

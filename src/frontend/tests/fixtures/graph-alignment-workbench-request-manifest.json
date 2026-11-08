@@ -4259,14 +4259,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "2058",
+        "Content-Length": "2060",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-literal-unicode-nul-surrogate-labels.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/dfg-literal-unicode-nul-surrogate-labels.response.json",
-        "bytes": 2058,
-        "sha256": "c514a11374cc251439c3e003116b34cc956d8d101cea8b85ac04db4f1ec3819d",
+        "bytes": 2060,
+        "sha256": "88d9f4f3559919f4c0cbecb5a622058d7cb6730dc78560b01ae03387dcfcb322",
         "status": 200
       },
       "mode": "DFG_CLASSIC",

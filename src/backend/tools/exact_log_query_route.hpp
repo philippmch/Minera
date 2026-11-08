@@ -92,6 +92,9 @@ void handle_exact_log_query(const httplib::Request& request,httplib::Response& r
           }else{
             if(!selected_log)throw std::invalid_argument("the active source has no prepared EventLog for XES export");
             minera::XesExportOptions options;  // nulls omitted, as pm4py writes None/NaN
+            // The same XES as the plain export: standard keys and the UTC
+            // clock for a CSV source (review X1-4, as W1-2 for the plain path).
+            options.standard_keys=standard_keys_for_session(*session);options.utc_timestamps=options.standard_keys;
             const auto bytes=minera::serialize_xes(*selected_log,options);
             minera::record_exact_query_output(report,"xes","application/xml",bytes);
           }

@@ -6210,14 +6210,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6017",
+        "Content-Length": "6019",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-literal-activity-identity.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-literal-activity-identity.response.json",
-        "bytes": 6017,
-        "sha256": "7ccfe3d55cd20e09e0a9891df23b687c057e54f9c9ff35eb967e92715f701bcd",
+        "bytes": 6019,
+        "sha256": "5449aff5b1463185de5cca68dd1f2a058bdb296d803a8c1557aa3d6fcd8e2039",
         "status": 200
       },
       "family": "playout",

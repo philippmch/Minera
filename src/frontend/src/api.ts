@@ -3779,9 +3779,9 @@ export function dfgExportQuery(options: DfgExportOptions = {}): string {
   for (const name of ["to_activity", "from_activity", "contain_activity"] as const) {
     const value = options[name];
     if (value === undefined) continue;
-    const activity = value.trim();
-    if (!activity) throw new Error(`${name} must not be empty`);
-    query.set(name, activity);
+    // Activity labels are literal: surrounding white space is part of the name.
+    if (!value) throw new Error(`${name} must not be empty`);
+    query.set(name, value);
   }
   return query.toString();
 }

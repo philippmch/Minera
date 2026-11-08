@@ -294,9 +294,9 @@ class ReferenceExtensive {
     return words;
   }
 
-  // The reference's choice and loop nodes stop collecting words once they
-  // hold more than max_limit_num_traces kept words (so at most one more than
-  // the limit). Which words that leaves follows the reference's set order;
+  // The reference's loop nodes stop collecting words once they hold more
+  // than max_limit_num_traces kept words (so at most one more than the
+  // limit); choices check the same bound between whole children instead. Which words that leaves follows the reference's set order;
   // here the first ones in generation order stay. Words past the cap mark
   // the result truncated.
   class WordCap {
@@ -341,15 +341,21 @@ class ReferenceExtensive {
       case ProcessTreeOperator::kActivity:
         return keep(n, {Word{tree_.activities().at(n.activity)}});
       case ProcessTreeOperator::kExclusive: {
+        // The reference unites whole children and checks the cap between
+        // them: once the union holds more than max_limit_num_traces words,
+        // the later children are left out (X('e', ->(X(a,b), X(c,d))) keeps
+        // all five words with limit 1). Every child is still played.
         std::set<Word> out;
-        WordCap cap(max_traces_, capped_);
+        bool stopped = false;
         for (const auto& child : n.children) {
-          // Every child is played, as in the reference, even past the cap.
           auto words = play(child);
-          for (auto& word : words) {
-            if (cap.stopped()) break;
-            if (cap.admit(out, word, true)) out.insert(std::move(word));
+          if (stopped) {
+            for (const auto& word : words)
+              if (!out.contains(word)) { capped_ = true; break; }
+            continue;
           }
+          out.merge(words);
+          stopped = out.size() > max_traces_;
         }
         return out;
       }

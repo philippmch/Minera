@@ -165,7 +165,9 @@ int main(int argc, char** argv) {
 
     // The reference port (algo.filtering.dfg.dfg_filtering). A .dfg file has
     // no activity counts; dfg_filtering_data_from_dfg derives them as the
-    // reference's public DFG filter wrappers do.
+    // reference's public DFG filter wrappers do; the to, from and contain
+    // steps also count the activities that occur only as start or end
+    // activities (review X1-1).
     minera::DfgFilteringRequest filters;
     if (clean_noise) {
       filters.noise_threshold = noise_threshold;
@@ -178,6 +180,7 @@ int main(int argc, char** argv) {
     filters.to_activity = to_activity;
     filters.from_activity = from_activity;
     filters.contain_activity = contain_activity;
+    filters.count_boundary_activities = true;
     minera::DfgCleanAnalysis dfg;
     try {
       dfg = minera::to_dfg_clean_analysis(minera::apply_dfg_filtering_request(

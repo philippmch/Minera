@@ -519,6 +519,16 @@ void process_tree_playout_choice_and_loop_caps() {
   // max_length 2) leaves the result complete: not truncated.
   result = run(loop(leaf(0), xor_node({leaf(1), leaf(2), leaf(3)})), 1, 2);
   assert(result.trace_strings == std::vector<std::vector<std::string>>{{"a"}} && !result.truncated);
+  // A choice unites whole children and checks the limit between them
+  // (review X2-4): X('e', ->(X(a,b), X(c,d))) keeps all five words with the
+  // limit 1, X(->(X(a,b), X(c,d)), 'e') stops after the sequence's four.
+  const auto product = seq({xor_node({leaf(0), leaf(1)}), xor_node({leaf(2), leaf(3)})});
+  result = run(xor_node({leaf(4), product}), 1, 5);
+  assert(result.trace_strings.size() == 5 && !result.truncated);
+  result = run(xor_node({product, leaf(4)}), 1, 5);
+  assert(result.trace_strings.size() == 4 && result.truncated);
+  result = run(xor_node({product, leaf(4), leaf(5)}), 4, 5);
+  assert(result.trace_strings.size() == 5 && result.truncated);
   // A sequence is not capped: ->( X(a,b,c), X(c,d,e) ) keeps all 9 words.
   result = run(seq({xor_node({leaf(0), leaf(1), leaf(2)}), xor_node({leaf(2), leaf(3), leaf(4)})}), 3, 5);
   assert(result.trace_strings.size() == 9 && !result.truncated);

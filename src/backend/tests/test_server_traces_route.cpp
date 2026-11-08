@@ -346,6 +346,23 @@ int main(int argc, char** argv) {
     r = client.Post("/api/log-query/export?format=xes&source_id=" + offsets_id,
                     "SELECT * FROM dataframe", "text/plain");
     check(utc_only(r), "the filtered log-query XES export of a CSV source writes UTC: " + describe(r));
+    // The exact (multipart) export writes the same XES (review X1-4).
+    httplib::MultipartFormDataItems exact = {
+        {"engine", "sqlite", "", ""},
+        {"source_id", offsets_id, "", ""},
+        {"sql", "SELECT * FROM dataframe", "", ""},
+        {"query_options_json", R"({"table_name":"dataframe","max_rows":1000,"max_vm_steps":10000000,"parameters":[]})", "", ""},
+        {"format", "xes", "", ""}};
+    r = client.Post("/api/log-query/export", exact);
+    std::string exported;
+    if (r) {
+      const auto at = r->body.find("\"export_bytes\":{\"bytes\":");
+      const auto end = at == std::string::npos ? at : r->body.find("\"error\"", at);
+      if (end != std::string::npos) exported = r->body.substr(at, end - at);
+    }
+    check(r && r->status == 200 && exported.find("2024-07-15T04:30:00+00:00") != std::string::npos &&
+              exported.find("concept:name") != std::string::npos && exported.find("+02:00") == std::string::npos,
+          "the exact log-query XES export of a CSV source writes UTC and standard keys: " + describe(r));
   }
   stop_server(server);
 

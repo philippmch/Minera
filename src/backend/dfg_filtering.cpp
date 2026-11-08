@@ -109,49 +109,144 @@ Adjacency adjacency_of(const DfgFilteringEdges& dfg, const DfgFilteringCounts& s
   return adj;
 }
 
-NameSet reach(const std::string& start, const Adjacency& adjacency) {
-  NameSet visited{start};
-  std::deque<std::string> queue{start};
-  while (!queue.empty()) {
-    const auto node = queue.front();
-    queue.pop_front();
-    const auto found = adjacency.find(node);
-    if (found == adjacency.end()) key_error(node);
-    for (const auto& next : found->second)
-      if (visited.insert(next).second) queue.push_back(next);
-  }
-  return visited;
-}
+// The filters' own graph. Node 0 is the start node and node 1 the end node;
+// activities get ids from 2 on, so an activity named like the reference's
+// "_S_START_"/"_S_END_" nodes stays an ordinary activity (review X1-2). Arcs
+// are the directly-follows edges, start arcs (0 -> a) and end arcs (a -> 1).
+constexpr int kStartId = 0;
+constexpr int kEndId = 1;
 
-bool connected(const DfgFilteringEdges& dfg, const DfgFilteringCounts& sa, const DfgFilteringCounts& ea,
-               const std::vector<std::string>& required) {
-  Adjacency rev;
-  const auto adj = adjacency_of(dfg, sa, ea, &rev);
-  const auto forward = reach(kDfgFilteringStartNode, adj);
-  const auto backward = reach(kDfgFilteringEndNode, rev);
-  for (const auto& r : required)
-    if (!forward.count(r) || !backward.count(r)) return false;
-  return true;
+struct PairHash {
+  std::size_t operator()(const DfgFilteringEdge& e) const noexcept {
+    const std::hash<std::string> h;
+    return h(e.first) * 1000003u ^ h(e.second);
+  }
+};
+
+class FilterGraph {
+ public:
+  struct Arc {
+    int from;
+    int to;
+  };
+
+  explicit FilterGraph(const DfgFilteringData& data) {
+    names_ = {kDfgFilteringStartNode, kDfgFilteringEndNode};
+    for (const auto& [e, c] : data.dfg) add_arc(node(e.first), node(e.second));
+    for (const auto& [a, c] : data.start_activities) add_arc(kStartId, node(a));
+    for (const auto& [a, c] : data.end_activities) add_arc(node(a), kEndId);
+  }
+
+  [[nodiscard]] const std::vector<Arc>& arcs() const noexcept { return arcs_; }
+  [[nodiscard]] std::size_t node_count() const noexcept { return names_.size(); }
+  // The activity's node id, or -1 when it is on no arc.
+  [[nodiscard]] int find(const std::string& name) const {
+    const auto found = ids_.find(name);
+    return found == ids_.end() ? -1 : found->second;
+  }
+
+  void set_arc_alive(std::size_t arc, bool alive) { arc_alive_[arc] = alive; }
+  [[nodiscard]] bool arc_alive(std::size_t arc) const { return arc_alive_[arc]; }
+  void set_node_alive(int node, bool alive) { node_alive_[static_cast<std::size_t>(node)] = alive; }
+
+  // Breadth-first reachability from the start node (forward) and to the end
+  // node (backward) over live arcs and nodes, with the arc each node was
+  // first reached by (-1 for none).
+  struct Search {
+    std::vector<char> forward, backward;
+    std::vector<int> forward_parent, backward_parent;
+  };
+  [[nodiscard]] Search search() const {
+    Search s;
+    sweep(true, s.forward, s.forward_parent);
+    sweep(false, s.backward, s.backward_parent);
+    return s;
+  }
+
+  [[nodiscard]] bool reaches(const Search& s, const std::vector<int>& required) const {
+    for (const int r : required) {
+      if (r < 0) return false;
+      const auto i = static_cast<std::size_t>(r);
+      if (!s.forward[i] || !s.backward[i]) return false;
+    }
+    return true;
+  }
+
+ private:
+  int node(const std::string& name) {
+    const auto [it, fresh] = ids_.try_emplace(name, static_cast<int>(names_.size()));
+    if (fresh) {
+      names_.push_back(name);
+      out_.emplace_back();
+      in_.emplace_back();
+      node_alive_.push_back(1);
+    }
+    return it->second;
+  }
+
+  void add_arc(int from, int to) {
+    const auto index = static_cast<int>(arcs_.size());
+    arcs_.push_back({from, to});
+    arc_alive_.push_back(1);
+    out_[static_cast<std::size_t>(from)].push_back(index);
+    in_[static_cast<std::size_t>(to)].push_back(index);
+  }
+
+  void sweep(bool forward, std::vector<char>& seen, std::vector<int>& parent) const {
+    seen.assign(names_.size(), 0);
+    parent.assign(names_.size(), -1);
+    const int root = forward ? kStartId : kEndId;
+    seen[static_cast<std::size_t>(root)] = 1;
+    std::vector<int> queue{root};
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+      const auto n = static_cast<std::size_t>(queue[head]);
+      for (const int arc : forward ? out_[n] : in_[n]) {
+        if (!arc_alive_[static_cast<std::size_t>(arc)]) continue;
+        const auto& a = arcs_[static_cast<std::size_t>(arc)];
+        const auto m = static_cast<std::size_t>(forward ? a.to : a.from);
+        if (seen[m] || !node_alive_[m]) continue;
+        seen[m] = 1;
+        parent[m] = arc;
+        queue.push_back(static_cast<int>(m));
+      }
+    }
+  }
+
+  std::vector<std::string> names_;
+  std::unordered_map<std::string, int> ids_;
+  std::vector<Arc> arcs_;
+  std::vector<char> arc_alive_;
+  std::vector<char> node_alive_{1, 1};
+  std::vector<std::vector<int>> out_{{}, {}};
+  std::vector<std::vector<int>> in_{{}, {}};
+};
+
+std::vector<int> node_ids(const FilterGraph& graph, const std::vector<std::string>& names) {
+  std::vector<int> out;
+  out.reserve(names.size());
+  for (const auto& n : names) out.push_back(graph.find(n));
+  return out;
 }
 
 // Drops the activities that are not both reachable from the start and able to
 // reach the end, with their edges and boundary entries; then keeps only the
 // edges between remaining activities.
 DfgFilteringData prune(DfgFilteringData data) {
-  Adjacency rev;
-  const auto adj = adjacency_of(data.dfg, data.start_activities, data.end_activities, &rev);
-  const auto forward = reach(kDfgFilteringStartNode, adj);
-  const auto backward = reach(kDfgFilteringEndNode, rev);
+  const FilterGraph graph(data);
+  const auto s = graph.search();
   NameSet removed;
-  for (const auto& [a, count] : data.activities)
-    if (!forward.count(a) || !backward.count(a)) removed.insert(a);
+  for (const auto& [a, count] : data.activities) {
+    const int id = graph.find(a);
+    if (id < 0 || !s.forward[static_cast<std::size_t>(id)] || !s.backward[static_cast<std::size_t>(id)])
+      removed.insert(a);
+  }
   const auto kept = [&](const std::string& a) { return !removed.count(a); };
   data.activities = filtered(data.activities, kept);
   data.start_activities = filtered(data.start_activities, kept);
   data.end_activities = filtered(data.end_activities, kept);
-  data.dfg = filtered(data.dfg, [&](const DfgFilteringEdge& e) {
-    return contains(data.activities, e.first) && contains(data.activities, e.second);
-  });
+  NameSet present;
+  for (const auto& [a, c] : data.activities) present.insert(a);
+  data.dfg = filtered(data.dfg, [&](const DfgFilteringEdge& e) { return present.count(e.first) && present.count(e.second); });
   return data;
 }
 
@@ -172,38 +267,24 @@ std::size_t slice_end(std::int64_t k, std::size_t size) {
   return static_cast<std::size_t>(std::min(k, n));
 }
 
-DfgFilteringData drop_activity(const DfgFilteringData& data, const std::string& x) {
-  DfgFilteringData out;
-  out.dfg = filtered(data.dfg, [&](const DfgFilteringEdge& e) { return e.first != x && e.second != x; });
-  const auto other = [&](const std::string& a) { return a != x; };
-  out.start_activities = filtered(data.start_activities, other);
-  out.end_activities = filtered(data.end_activities, other);
-  out.activities = filtered(data.activities, other);
-  return out;
-}
+// One arc of the paths and keep-connected filters: its arc index in a
+// FilterGraph built from the same data, its count and its sort key (start and
+// end arcs spelled with the reference's node names).
+struct RankedArc {
+  std::size_t arc;
+  DfgFilteringEdge key;
+  std::int64_t count;
+  bool boundary;  // a start or end arc
+};
 
-void drop_edge(DfgFilteringData& data, const DfgFilteringEdge& edge) {
-  if (edge.first == kDfgFilteringStartNode) {
-    data.start_activities = filtered(data.start_activities, [&](const std::string& a) { return a != edge.second; });
-  } else if (edge.second == kDfgFilteringEndNode) {
-    data.end_activities = filtered(data.end_activities, [&](const std::string& a) { return a != edge.first; });
-  } else {
-    data.dfg = filtered(data.dfg, [&](const DfgFilteringEdge& e) { return e != edge; });
-  }
-}
-
-DfgFilteringEdges all_edges(const DfgFilteringData& data) {
-  DfgFilteringEdges out = data.dfg;
-  const auto put = [&](DfgFilteringEdge key, std::int64_t count) {
-    for (auto& [k, v] : out)
-      if (k == key) {
-        v = count;
-        return;
-      }
-    out.push_back({std::move(key), count});
-  };
-  for (const auto& [a, c] : data.start_activities) put({kDfgFilteringStartNode, a}, c);
-  for (const auto& [a, c] : data.end_activities) put({a, kDfgFilteringEndNode}, c);
+// The directly-follows edges, then the start arcs, then the end arcs, in the
+// order FilterGraph numbers them.
+std::vector<RankedArc> all_arcs(const DfgFilteringData& data) {
+  std::vector<RankedArc> out;
+  out.reserve(data.dfg.size() + data.start_activities.size() + data.end_activities.size());
+  for (const auto& [e, c] : data.dfg) out.push_back({out.size(), e, c, false});
+  for (const auto& [a, c] : data.start_activities) out.push_back({out.size(), {kDfgFilteringStartNode, a}, c, true});
+  for (const auto& [a, c] : data.end_activities) out.push_back({out.size(), {a, kDfgFilteringEndNode}, c, true});
   return out;
 }
 
@@ -216,23 +297,74 @@ std::vector<std::string> every_activity(const DfgFilteringData& data) {
   return out;
 }
 
-std::vector<std::string> endpoints(const std::vector<DfgFilteringEdge>& edges) {
+// The activities on the kept arcs, start and end nodes excluded.
+std::vector<std::string> endpoints(const DfgFilteringData& data, const std::vector<RankedArc>& kept) {
   std::vector<std::string> out;
   std::set<std::string> seen;
-  for (const auto& e : edges)
-    for (const auto* n : {&e.first, &e.second})
-      if (*n != kDfgFilteringStartNode && *n != kDfgFilteringEndNode && seen.insert(*n).second) out.push_back(*n);
+  const auto see = [&](const std::string& a) {
+    if (seen.insert(a).second) out.push_back(a);
+  };
+  const auto start_count = data.dfg.size();
+  const auto end_from = start_count + data.start_activities.size();
+  for (const auto& r : kept) {
+    if (r.arc < start_count) {
+      see(r.key.first);
+      see(r.key.second);
+    } else if (r.arc < end_from) {
+      see(r.key.second);
+    } else {
+      see(r.key.first);
+    }
+  }
   return out;
 }
 
-DfgFilteringData remove_edges_greedily(DfgFilteringData data, const std::vector<DfgFilteringEdge>& others,
-                                       const std::vector<std::string>& required) {
-  for (auto it = others.rbegin(); it != others.rend(); ++it) {
-    auto trial = data;
-    drop_edge(trial, *it);
-    if (connected(trial.dfg, trial.start_activities, trial.end_activities, required)) data = std::move(trial);
+// Tries the arcs of `others` from the last one up: an arc is removed when
+// every required activity stays reachable from the start and able to reach
+// the end. Reachability only shrinks, so an arc on neither breadth-first tree
+// is removed without a new search, and a failed trial restores the trees.
+DfgFilteringData remove_edges_greedily(DfgFilteringData data, const std::vector<RankedArc>& others,
+                                       const std::vector<std::string>& required_names) {
+  FilterGraph graph(data);
+  const auto required = node_ids(graph, required_names);
+  auto current = graph.search();
+  if (graph.reaches(current, required)) {
+    std::vector<char> on_tree(graph.arcs().size(), 0);
+    const auto mark = [&](const FilterGraph::Search& s) {
+      std::fill(on_tree.begin(), on_tree.end(), 0);
+      for (const int p : s.forward_parent)
+        if (p >= 0) on_tree[static_cast<std::size_t>(p)] = 1;
+      for (const int p : s.backward_parent)
+        if (p >= 0) on_tree[static_cast<std::size_t>(p)] = 1;
+    };
+    mark(current);
+    for (auto it = others.rbegin(); it != others.rend(); ++it) {
+      graph.set_arc_alive(it->arc, false);
+      if (!on_tree[it->arc]) continue;
+      auto trial = graph.search();
+      if (graph.reaches(trial, required)) {
+        current = std::move(trial);
+        mark(current);
+      } else {
+        graph.set_arc_alive(it->arc, true);
+      }
+    }
   }
+  const auto start_from = data.dfg.size();
+  const auto end_from = start_from + data.start_activities.size();
+  std::size_t i = 0;
+  data.dfg = filtered(data.dfg, [&](const DfgFilteringEdge&) { return graph.arc_alive(i++); });
+  i = start_from;
+  data.start_activities = filtered(data.start_activities, [&](const std::string&) { return graph.arc_alive(i++); });
+  i = end_from;
+  data.end_activities = filtered(data.end_activities, [&](const std::string&) { return graph.arc_alive(i++); });
   return prune(std::move(data));
+}
+
+void sort_ranked(std::vector<RankedArc>& arcs) {
+  std::stable_sort(arcs.begin(), arcs.end(), [](const RankedArc& a, const RankedArc& b) {
+    return a.count != b.count ? a.count > b.count : a.key > b.key;
+  });
 }
 
 NameSet follow(const std::vector<std::string>& starts, const DfgFilteringEdges& dfg, bool forward) {
@@ -309,9 +441,33 @@ DfgFilteringData filter_dfg_on_activities_percentage(const DfgFilteringData& inp
   const auto split = slice_end(k, sorted.size());
   std::vector<std::string> keep;
   for (std::size_t i = 0; i < split; ++i) keep.push_back(sorted[i].first);
-  for (std::size_t i = sorted.size(); i > split; --i) {
-    auto trial = drop_activity(data, sorted[i - 1].first);
-    if (connected(trial.dfg, trial.start_activities, trial.end_activities, keep)) data = std::move(trial);
+  // An activity is dropped when every kept activity stays reachable from the
+  // start and able to reach the end without it; reachability only shrinks, so
+  // nothing is dropped when the kept activities are not connected to begin
+  // with, and an activity on no arc is always dropped then.
+  FilterGraph graph(data);
+  const auto required = node_ids(graph, keep);
+  NameSet dropped;
+  if (graph.reaches(graph.search(), required)) {
+    for (std::size_t i = sorted.size(); i > split; --i) {
+      const auto& x = sorted[i - 1].first;
+      const int id = graph.find(x);
+      if (id >= 0) {
+        graph.set_node_alive(id, false);
+        if (!graph.reaches(graph.search(), required)) {
+          graph.set_node_alive(id, true);
+          continue;
+        }
+      }
+      dropped.insert(x);
+    }
+  }
+  if (!dropped.empty()) {
+    const auto kept = [&](const std::string& a) { return !dropped.count(a); };
+    data.dfg = filtered(data.dfg, [&](const DfgFilteringEdge& e) { return kept(e.first) && kept(e.second); });
+    data.start_activities = filtered(data.start_activities, kept);
+    data.end_activities = filtered(data.end_activities, kept);
+    data.activities = filtered(data.activities, kept);
   }
   return prune(std::move(data));
 }
@@ -320,40 +476,39 @@ DfgFilteringData filter_dfg_on_paths_percentage(const DfgFilteringData& input, d
                                                 bool keep_all_activities) {
   DfgFilteringData data = input;
   if (data.activities.size() <= 1 || data.dfg.size() <= 1) return data;
-  auto edges = all_edges(data);
-  std::stable_sort(edges.begin(), edges.end(), [](const auto& a, const auto& b) {
-    return a.second != b.second ? a.second > b.second : a.first > b.first;
-  });
-  const auto k = keep_count(static_cast<double>(edges.size() - 1) * percentage);
-  const auto split = slice_end(k, edges.size());
-  std::vector<DfgFilteringEdge> kept, others;
-  for (std::size_t i = 0; i < edges.size(); ++i) (i < split ? kept : others).push_back(edges[i].first);
-  const auto required = keep_all_activities ? every_activity(data) : endpoints(kept);
+  auto arcs = all_arcs(data);
+  sort_ranked(arcs);
+  const auto k = keep_count(static_cast<double>(arcs.size() - 1) * percentage);
+  const auto split = slice_end(k, arcs.size());
+  const std::vector<RankedArc> kept(arcs.begin(), arcs.begin() + static_cast<std::ptrdiff_t>(split));
+  const std::vector<RankedArc> others(arcs.begin() + static_cast<std::ptrdiff_t>(split), arcs.end());
+  const auto required = keep_all_activities ? every_activity(data) : endpoints(data, kept);
   return remove_edges_greedily(std::move(data), others, required);
 }
 
 DfgFilteringData filter_dfg_keep_connected(const DfgFilteringData& input, double threshold, bool keep_all_activities) {
   DfgFilteringData data = input;
   if (data.activities.size() <= 1 || data.dfg.size() <= 1) return data;
-  const auto edges = all_edges(data);
-  std::vector<std::pair<DfgFilteringEdge, double>> scored;
-  for (const auto& [edge, count] : edges) {
+  std::unordered_map<DfgFilteringEdge, std::int64_t, PairHash> counts;
+  for (const auto& [edge, count] : data.dfg) counts.try_emplace(edge, count);
+  std::vector<std::pair<RankedArc, double>> scored;
+  for (const auto& arc : all_arcs(data)) {
     double score = 1.0;
-    if (edge.first != kDfgFilteringStartNode && edge.second != kDfgFilteringEndNode) {
-      const auto* inverse = find_count(data.dfg, DfgFilteringEdge{edge.second, edge.first});
-      const std::int64_t inv = inverse ? *inverse : 0;
-      const std::int64_t denominator = count + inv + 1;
+    if (!arc.boundary) {
+      const auto inverse = counts.find(DfgFilteringEdge{arc.key.second, arc.key.first});
+      const std::int64_t inv = inverse == counts.end() ? 0 : inverse->second;
+      const std::int64_t denominator = arc.count + inv + 1;
       if (denominator == 0) fail("ZeroDivisionError", "division by zero");
-      score = static_cast<double>(count - inv) / static_cast<double>(denominator);
+      score = static_cast<double>(arc.count - inv) / static_cast<double>(denominator);
     }
-    scored.push_back({edge, score});
+    scored.push_back({arc, score});
   }
   std::stable_sort(scored.begin(), scored.end(), [](const auto& a, const auto& b) {
-    return a.second != b.second ? a.second > b.second : a.first > b.first;
+    return a.second != b.second ? a.second > b.second : a.first.key > b.first.key;
   });
-  std::vector<DfgFilteringEdge> kept, others;
-  for (const auto& [edge, score] : scored) (score < threshold ? others : kept).push_back(edge);
-  const auto required = keep_all_activities ? every_activity(data) : endpoints(kept);
+  std::vector<RankedArc> kept, others;
+  for (const auto& [arc, score] : scored) (score < threshold ? others : kept).push_back(arc);
+  const auto required = keep_all_activities ? every_activity(data) : endpoints(data, kept);
   return remove_edges_greedily(std::move(data), others, required);
 }
 
@@ -565,6 +720,22 @@ DfgFilteringData apply_dfg_filtering_request(DfgFilteringData data, const DfgFil
     data = filter_dfg_on_activities_percentage(data, *request.activities_percentage);
   if (request.paths_percentage) data = filter_dfg_on_paths_percentage(data, *request.paths_percentage, keep_all);
   if (request.keep_connected) data = filter_dfg_keep_connected(data, *request.keep_connected, keep_all);
+  if (request.count_boundary_activities &&
+      (request.to_activity || request.from_activity || request.contain_activity)) {
+    std::vector<std::pair<std::string, std::int64_t>> extra;
+    const auto add = [&](const std::string& name, std::int64_t count) {
+      if (contains(data.activities, name)) return;
+      for (auto& [n, c] : extra)
+        if (n == name) {
+          c = std::max(c, count);
+          return;
+        }
+      extra.push_back({name, count});
+    };
+    for (const auto& [name, count] : data.start_activities) add(name, count);
+    for (const auto& [name, count] : data.end_activities) add(name, count);
+    data.activities.insert(data.activities.end(), extra.begin(), extra.end());
+  }
   if (request.to_activity) data = filter_dfg_to_activity(data, *request.to_activity);
   if (request.from_activity) data = filter_dfg_from_activity(data, *request.from_activity);
   if (request.contain_activity) data = filter_dfg_contain_activity(data, *request.contain_activity);

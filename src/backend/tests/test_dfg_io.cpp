@@ -146,9 +146,42 @@ void imports_and_exports_files() {
   assert(loaded.end_activities == source.end_activities);
 }
 
+// write_dfg writes empty and padded labels as given and read_dfg strips them
+// again (review X2-5); only a line break or NUL cannot be written.
+void writes_empty_and_padded_labels() {
+  DfgCleanAnalysis source;
+  source.graph[{"", "a"}] = 1;
+  source.start_activities[""] = 1;
+  source.end_activities["a"] = 1;
+  const auto text = minera::to_dfg(source);
+  assert(text == "2\n\na\n1\n0x1\n1\n1x1\n0>1x1\n");
+  const auto reread = minera::parse_dfg(text);
+  assert(reread.graph == source.graph && reread.start_activities == source.start_activities);
+  DfgCleanAnalysis padded;
+  padded.graph[{" a", "b"}] = 1;
+  padded.start_activities[" a"] = 1;
+  padded.end_activities["b"] = 1;
+  const auto padded_text = minera::to_dfg(padded);
+  assert(padded_text == "2\n a\nb\n1\n0x1\n1\n1x1\n0>1x1\n");
+  assert(minera::parse_dfg(padded_text).graph.at({"a", "b"}) == 1);
+  const auto refused = [](const std::string& label) {
+    DfgCleanAnalysis bad;
+    bad.start_activities[label] = 1;
+    try {
+      (void)minera::to_dfg(bad);
+    } catch (const std::invalid_argument&) {
+      return true;
+    }
+    return false;
+  };
+  assert(refused("a\nb") && refused("a\rb") && refused(std::string("a\0b", 3)));
+  assert(!refused("") && !refused("  "));
+}
+
 }  // namespace
 
 int main() {
+  writes_empty_and_padded_labels();
   round_trip_is_deterministic();
   preserves_utf8_labels();
   projects_discovered_graph_without_zero_registry_entries();

@@ -36,9 +36,38 @@ IdSet ids_of_objects(const Ocel& log) {
   return ids;
 }
 
+// The reference selects with pandas isin, which compares like Python ==:
+// booleans, integers and floats meet numerically (1 == 1.0 == True), while
+// strings only equal strings and a missing cell (NaN) or None matches nothing
+// but the same kind.
+bool ocel_python_equal(const OcelValue& left, const OcelValue& right) {
+  if (left.index() == right.index()) return left == right;
+  const auto number = [](const OcelValue& value) -> std::optional<long double> {
+    if (const auto* boolean = std::get_if<bool>(&value)) return *boolean ? 1.0L : 0.0L;
+    if (const auto* integer = std::get_if<std::int64_t>(&value))
+      return static_cast<long double>(*integer);
+    if (const auto* real = std::get_if<double>(&value)) return static_cast<long double>(*real);
+    return std::nullopt;
+  };
+  const auto a = number(left), b = number(right);
+  if (!a || !b) return false;
+  // An int64 and a double are equal only when the double is that exact
+  // integer; long double holds every int64 exactly on the supported targets,
+  // and the explicit check keeps the comparison exact elsewhere too.
+  const auto* integer = std::get_if<std::int64_t>(&left);
+  const auto* real = std::get_if<double>(&right);
+  if (!integer) { integer = std::get_if<std::int64_t>(&right); real = std::get_if<double>(&left); }
+  if (integer && real)
+    return std::isfinite(*real) && *real >= -0x1p63 && *real < 0x1p63 &&
+           std::trunc(*real) == *real && *integer == static_cast<std::int64_t>(*real);
+  return *a == *b;
+}
+
 bool contains_value(const std::vector<OcelValue>& values,
                     const OcelValue& candidate) {
-  return std::find(values.begin(), values.end(), candidate) != values.end();
+  return std::any_of(values.begin(), values.end(), [&](const OcelValue& value) {
+    return ocel_python_equal(value, candidate);
+  });
 }
 
 bool has_attribute_value(const std::vector<OcelAttribute>& attributes,

@@ -55,6 +55,29 @@ int main() {
   const auto not_o1 = minera::filter_ocel_object_attribute(log, "ocel:oid", {std::string("o1")}, false);
   assert(not_o1.objects.size() == 2 && not_o1.objects[0].id == "o2");
 
+  // pandas isin compares like Python ==: an integer value selects a float
+  // cell (pm4py writes 4.0 when some event lacks the attribute), and booleans
+  // count as 0/1; strings stay strings (review X2-1).
+  {
+    auto numeric = log;
+    numeric.events[0].attributes.push_back({"cost", 4.0});
+    numeric.events[2].attributes.push_back({"cost", std::int64_t{1}});
+    numeric.objects[0].attributes.push_back({"w", std::int64_t{2}});
+    numeric.objects[1].attributes.push_back({"w", true});
+    const auto four = minera::filter_ocel_event_attribute(numeric, "cost", {std::int64_t{4}});
+    assert(four.events.size() == 1 && four.events[0].id == "e1");
+    const auto one = minera::filter_ocel_event_attribute(numeric, "cost", {true, 4.5});
+    assert(one.events.size() == 1 && one.events[0].id == "e3");
+    assert(minera::filter_ocel_event_attribute(numeric, "cost", {std::string("4")}).events.empty());
+    const auto not_four = minera::filter_ocel_event_attribute(numeric, "cost", {4.0}, false);
+    assert(not_four.events.size() == 2 && not_four.events[0].id == "e2");
+    const auto two = minera::filter_ocel_object_attribute(numeric, "w", {2.0});
+    assert(two.objects.size() == 1 && two.objects[0].id == "o1");
+    const auto truthy = minera::filter_ocel_object_attribute(numeric, "w", {std::int64_t{1}});
+    assert(truthy.objects.size() == 1 && truthy.objects[0].id == "o2");
+    assert(minera::filter_ocel_object_attribute(numeric, "w", {nullptr}).objects.empty());
+  }
+
   const auto web = minera::filter_ocel_event_attribute(
       log, "channel", {std::string("web")});
   assert(web.events.size() == 2 && web.objects.size() == 3);

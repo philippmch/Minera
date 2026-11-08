@@ -8560,6 +8560,22 @@ void csv_timestamps_review_v1_shapes() {
           V{"2023-05-12 10:00:00", "2031-12-05 00:00:00", "2045-05-12 00:00:00",
             "1999-05-12 00:00:00"}));
   assert(unconvertible("1,A,2024-01-01\n1,B,2024-12.07 10:00:00\n"));
+  // Review X1: long or mixed numeric dates in dateutil's reading (a joined
+  // number of more than two digits is the year, a standalone one above 100),
+  // fractions of a minute, hour 0 with AM/PM and AM/PM after the offset.
+  assert((stamps("1,A,2024-1/00015 10:00\n2,B,02 0007 2031\n3,C,2057 004 22\n"
+                 "4,D,07-0016 24\n5,E,0012 01-0015\n6,F,0045 1-0015\n") ==
+          V{"2024-01-15 10:00:00", "2031-02-07 00:00:00", "2057-04-22 00:00:00",
+            "0024-07-16 00:00:00", "0015-12-01 00:00:00", "0045-01-15 00:00:00"}));
+  assert((stamps("1,A,2024-01-05 10:30.5\n2,B,01/05/2024 06:37.9\n3,C,01/05/2024 0:30 PM\n"
+                 "4,D,01/05/2024 0 AM\n") ==
+          V{"2024-01-05 10:30:30", "2024-01-05 06:37:54", "2024-01-05 12:30:00",
+            "2024-01-05 00:00:00"}));
+  assert((stamps("1,A,01/05/2024 3:08+05pm\n") == V{"2024-01-05 15:08:00+05:00"}));
+  assert((stamps("1,A,2024-01-05 3:08:00 UTC pm\n") == V{"2024-01-05 15:08:00+00:00"}));
+  assert(unconvertible("1,A,2024-01-01\n1,B,01/05/2024 04:42.Z\n"));
+  assert(unconvertible("1,A,2024-01-01\n1,B,0999 1-0015\n"));
+  assert(unconvertible("1,A,2024-01-01\n1,B,01/05/2024 3:08 Zpm\n"));
 }
 
 void csv_timestamps_follow_pandas_resolution_and_offsets() {

@@ -17,17 +17,6 @@ namespace {
 
 // The reference reads every row with str.strip() and int(), so surrounding
 // whitespace (ASCII, including the \x1c-\x1f separators) is ignored.
-bool row_space(char ch) {
-  return ch == ' ' || (ch >= '\t' && ch <= '\r') || (ch >= '\x1c' && ch <= '\x1f');
-}
-
-std::string trim(std::string_view input) {
-  std::size_t first = 0;
-  while (first < input.size() && row_space(input[first])) ++first;
-  std::size_t last = input.size();
-  while (last > first && row_space(input[last - 1])) --last;
-  return std::string(input.substr(first, last - first));
-}
 
 // One code point of possibly malformed UTF-8; a malformed byte stands alone
 // and matches neither whitespace nor a digit.
@@ -182,9 +171,12 @@ std::vector<std::string> activity_names(const DfgCleanAnalysis& dfg) {
   std::vector<std::string> result;
   result.reserve(names.size());
   for (const auto& [name, _] : names) {
-    if (name.empty() || name != trim(name) || name.find('\n') != std::string::npos ||
-        name.find('\r') != std::string::npos || name.find('\0') != std::string::npos) {
-      throw std::invalid_argument("DFG: activity labels must be non-empty and single-line");
+    // write_dfg writes every label on its own line as given, empty and
+    // padded ones included (read_dfg strips them again); only a line break
+    // would split the row, and a NUL cannot be read back by this reader.
+    if (name.find('\n') != std::string::npos || name.find('\r') != std::string::npos ||
+        name.find('\0') != std::string::npos) {
+      throw std::invalid_argument("DFG: activity labels must be single-line and free of NUL");
     }
     result.push_back(name);
   }
