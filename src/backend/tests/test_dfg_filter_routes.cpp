@@ -200,6 +200,18 @@ int main(int argc, char** argv) {
       // Chained where the reference raises: to_activity=b drops a, and
       // contain_activity=a then fails with KeyError.
       {{"ca", "cb"}, "to_activity=b&contain_activity=a", 400, "KeyError: 'a'"},
+      // Review Y1: the empty label is a label (the reference raises
+      // KeyError: '' when the log has no such activity), and path labels
+      // keep their spelling apart from the separator padding.
+      {{"ab"}, "to_activity=", 400, "KeyError: ''"},
+      {{"ab", "ac", "ac", "ac", "ac", "db", "db", "db", "db"},
+       "noise_threshold=0.5&most_common_paths=a%20-%3E%20b", 200,
+       "4\na\nb\nc\nd\n2\n0x5\n3x4\n2\n1x5\n2x4\n0>1x1\n0>2x4\n3>1x4\n"},
+      // A second space before b is part of the label " b", which protects
+      // nothing (the reference keeps a -> b only for ('a', 'b')).
+      {{"ab", "ac", "ac", "ac", "ac", "db", "db", "db", "db"},
+       "noise_threshold=0.5&most_common_paths=a%20-%3E%20%20b", 200,
+       "4\na\nb\nc\nd\n2\n0x5\n3x4\n2\n1x5\n2x4\n0>2x4\n3>1x4\n"},
   };
 
   const int port = argc == 4 ? std::atoi(argv[3]) : free_port();

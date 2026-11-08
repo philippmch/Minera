@@ -336,6 +336,81 @@ struct NormalizedTimestamp {
   bool nanosecond = false;
 };
 
+// A decimal number spelled as its significant digits (no leading zeros) times
+// 10^exponent; empty digits is zero.
+struct DecimalDigits {
+  std::string digits;
+  int exponent = 0;
+};
+
+// Rounds to 28 significant digits, half to even, as Python's decimal module
+// does in its default context. `sticky` tells that nonzero digits beyond
+// `digits` were left out.
+DecimalDigits round_28_digits(DecimalDigits value, bool sticky = false) {
+  constexpr std::size_t kPrecision = 28;
+  if (value.digits.size() <= kPrecision) return value;
+  const char next = value.digits[kPrecision];
+  bool rest = sticky;
+  for (std::size_t i = kPrecision + 1; i < value.digits.size() && !rest; ++i)
+    rest = value.digits[i] != '0';
+  value.exponent += static_cast<int>(value.digits.size() - kPrecision);
+  value.digits.resize(kPrecision);
+  const bool odd = (value.digits.back() - '0') % 2 == 1;
+  if (next > '5' || (next == '5' && (rest || odd))) {
+    std::size_t i = value.digits.size();
+    while (i > 0 && value.digits[i - 1] == '9') value.digits[--i] = '0';
+    if (i == 0) {
+      // 99...9 rounds up to 10...0: one more digit, so drop a zero.
+      value.digits.insert(value.digits.begin(), '1');
+      value.digits.pop_back();
+      ++value.exponent;
+    } else {
+      ++value.digits[i - 1];
+    }
+  }
+  return value;
+}
+
+// The whole seconds dateutil gives a fraction of a minute ("10:30.5" is
+// 10:30:30): int(60 * (minutes % 1)) over decimal.Decimal, so both the
+// fraction and the product are rounded to 28 significant digits. Returns 60
+// or more when the product rounds up to a whole minute, which the reference
+// refuses (review Y1-1).
+unsigned reference_minute_fraction_seconds(std::string_view fraction_digits) {
+  std::size_t zeros = 0;
+  while (zeros < fraction_digits.size() && fraction_digits[zeros] == '0') ++zeros;
+  if (zeros == fraction_digits.size()) return 0;
+  // 29 significant digits decide the rounding; the rest only as nonzero.
+  DecimalDigits fraction;
+  fraction.digits = std::string(fraction_digits.substr(zeros, 29));
+  bool sticky = false;
+  for (std::size_t i = zeros + 29; i < fraction_digits.size() && !sticky; ++i)
+    sticky = fraction_digits[i] != '0';
+  fraction.exponent = -static_cast<int>(zeros + fraction.digits.size());
+  fraction = round_28_digits(std::move(fraction), sticky);
+  // Times 60: times 6, then one more power of ten.
+  std::string product(fraction.digits.size() + 1, '0');
+  unsigned carry = 0;
+  for (std::size_t i = fraction.digits.size(); i-- > 0;) {
+    const unsigned digit = static_cast<unsigned>(fraction.digits[i] - '0') * 6 + carry;
+    product[i + 1] = static_cast<char>('0' + digit % 10);
+    carry = digit / 10;
+  }
+  product[0] = static_cast<char>('0' + carry);
+  if (product[0] == '0') product.erase(product.begin());
+  auto rounded = round_28_digits(DecimalDigits{product, fraction.exponent + 1});
+  // The integer part (at most two digits: the value is at most 60).
+  const int integer_digits = static_cast<int>(rounded.digits.size()) + rounded.exponent;
+  if (integer_digits <= 0) return 0;
+  unsigned seconds = 0;
+  for (int i = 0; i < integer_digits; ++i) {
+    const char digit = i < static_cast<int>(rounded.digits.size()) ? rounded.digits[static_cast<std::size_t>(i)] : '0';
+    seconds = seconds * 10 + static_cast<unsigned>(digit - '0');
+    if (seconds >= 60) return 60;
+  }
+  return seconds;
+}
+
 // `allow_year_zero` accepts year 0 (proleptic, a leap year), which pandas'
 // ISO path holds and dateutil rejects; the caller decides by `iso_path`.
 std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
@@ -536,17 +611,84 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
     const auto clock_start = in.pos;
     in.skip_spaces();
     if (in.pos != clock_start) iso_path = false;
+    // A `T` may also follow white space, with or without more white space
+    // after it (dateutil: "2024-01-05 T13:38", "20240105  T11:07"; review
+    // Y1-3).
+    if ((in.pos != clock_start || in.text[clock_start - 1] == ' ') &&
+        (in.peek() == 'T' || in.peek() == 't') && in.pos + 1 < in.text.size() &&
+        (std::isdigit(static_cast<unsigned char>(in.text[in.pos + 1])) ||
+         in.text[in.pos + 1] == ' ')) {
+      iso_path = false;
+      ++in.pos;
+      in.skip_spaces();
+    }
     unsigned h = 0, m = 0, s = 0;
-    const auto hour_digits = in.digits(h, 2);
-    if (hour_digits == 0) return std::nullopt;
+    // After a `.` without digits, a lone `a`/`p` (no `.` or letter after it)
+    // fails ("3:04.P" and "09:32:02.p" fail; "3:04.pm", "3:04.p.m." and
+    // "3:04. P" read; review Y1-3).
+    const auto lone_meridiem_letter = [&in]() {
+      const char ch = in.peek();
+      if (ch != 'a' && ch != 'A' && ch != 'p' && ch != 'P') return false;
+      const char next = in.pos + 1 < in.text.size() ? in.text[in.pos + 1] : '\0';
+      return next != '.' && !std::isalpha(static_cast<unsigned char>(next));
+    };
+    // The digits of a `.` seconds fraction (`,` too when `comma` is allowed).
+    const auto read_seconds_fraction = [&](bool comma) -> bool {
+      if (in.peek() != '.' && !(comma && in.peek() == ',')) return true;
+      if (in.peek() == ',') { iso_path = false; comma_fraction = true; }
+      ++in.pos;
+      std::size_t fraction_digits = 0;
+      while (!in.done() && std::isdigit(static_cast<unsigned char>(in.peek()))) {
+        if (fraction.size() < 9) fraction.push_back(in.peek());
+        ++fraction_digits;
+        ++in.pos;
+      }
+      if (fraction_digits == 0) {
+        // A `.` with no digits is dateutil's, and adds nothing
+        // ("09:32:02." and "09:32:02.Z" read, "09:32:02.z" fails; review Y1-3).
+        if (comma_fraction || in.peek() == 'z' || lone_meridiem_letter()) return false;
+        iso_path = false;
+        return true;
+      }
+      // pandas' ISO path reads at most 18 fraction digits; a longer
+      // fraction goes through dateutil ("...56.3650503944960724188" keeps
+      // microseconds only, 18 digits keep nanoseconds).
+      if (fraction_digits > 18) iso_path = false;
+      return true;
+    };
+    // A basic clock HHMM or HHMMSS ("2024-01-05 1107", "20240105T110700.5";
+    // review Y1-3); only the six-digit one takes a fraction.
+    std::size_t run = 0;
+    while (in.pos + run < in.text.size() &&
+           std::isdigit(static_cast<unsigned char>(in.text[in.pos + run])))
+      ++run;
+    const bool basic_clock = run == 4 || run == 6;
+    std::size_t hour_digits = 0;
+    if (basic_clock) {
+      const auto pair = [&](std::size_t at) {
+        return static_cast<unsigned>((in.text[in.pos + at] - '0') * 10 +
+                                     (in.text[in.pos + at + 1] - '0'));
+      };
+      h = pair(0);
+      m = pair(2);
+      if (run == 6) s = pair(4);
+      in.pos += run;
+      hour_digits = 2;
+      if (run == 4 && in.peek() == '.') return std::nullopt;
+      if (in.peek() == ',') return std::nullopt;
+      if (run == 6 && !read_seconds_fraction(false)) return std::nullopt;
+    } else {
+      hour_digits = in.digits(h, 2);
+      if (hour_digits == 0) return std::nullopt;
+    }
     // pandas' ISO path also takes a one-digit hour, an hour alone and HH:MM
     // ("0047 1 8 9:36", "0047 01 08 19" are year 47; "2024-01-01
     // 9:00:00.123456789" keeps its nanoseconds). A one-digit hour alone is
     // no clock to either parser unless AM/PM follows ("2089-05-26 9" fails,
     // "03/26/2089 9 PM" is 21:00).
-    const bool bare_digit_hour = hour_digits == 1 && in.peek() != ':';
+    const bool bare_digit_hour = !basic_clock && hour_digits == 1 && in.peek() != ':';
     bool meridiem_read = false;
-    if (in.peek() == ':') {
+    if (!basic_clock && in.peek() == ':') {
       ++in.pos;
       // One-digit minutes and seconds read too, on pandas' ISO path as well
       // ("10:3:5"; "0000-01-05 10:3" is year 0).
@@ -558,62 +700,62 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
         // review X1).
         iso_path = false;
         ++in.pos;
-        std::string minute_fraction;
-        while (!in.done() && std::isdigit(static_cast<unsigned char>(in.peek()))) {
-          if (minute_fraction.size() < 30) minute_fraction.push_back(in.peek());
-          ++in.pos;
-        }
-        const std::size_t used = minute_fraction.size();
-        // floor(60 * 0.<digits>), exactly: multiply the decimal digits by 60
-        // from the right; the carry out of the first digit is the integer part.
-        unsigned carry = 0;
-        for (auto it = minute_fraction.rbegin(); it != minute_fraction.rend(); ++it)
-          carry = (static_cast<unsigned>(*it - '0') * 60 + carry) / 10;
-        s = carry;
+        const auto fraction_start = in.pos;
+        while (!in.done() && std::isdigit(static_cast<unsigned char>(in.peek()))) ++in.pos;
+        const std::size_t used = in.pos - fraction_start;
+        // int(60 * fraction) in 28-digit decimal arithmetic (review Y1-1:
+        // "10:07.01" + 28 sixes is 10:07:01; 29 nines round to 60 and fail).
+        s = reference_minute_fraction_seconds(in.text.substr(fraction_start, used));
+        if (s >= 60) return std::nullopt;
         // An empty fraction right before a `Z` fails ("10:30.Z"; "10:30.5Z",
         // "10:30. Z" and "10:30.UTC" read).
-        if (used == 0 && (in.peek() == 'Z' || in.peek() == 'z')) return std::nullopt;
+        if (used == 0 && (in.peek() == 'Z' || in.peek() == 'z' || lone_meridiem_letter()))
+          return std::nullopt;
       } else if (in.peek() == ':') {
         ++in.pos;
         if (in.digits(s, 2) == 0) return std::nullopt;
-        if (in.peek() == '.' || in.peek() == ',') {
-          if (in.peek() == ',') { iso_path = false; comma_fraction = true; }
-          ++in.pos;
-          std::size_t fraction_digits = 0;
-          while (!in.done() && std::isdigit(static_cast<unsigned char>(in.peek()))) {
-            if (fraction.size() < 9) fraction.push_back(in.peek());
-            ++fraction_digits;
-            ++in.pos;
-          }
-          if (fraction.empty()) return std::nullopt;
-          // pandas' ISO path reads at most 18 fraction digits; a longer
-          // fraction goes through dateutil ("...56.3650503944960724188" keeps
-          // microseconds only, 18 digits keep nanoseconds).
-          if (fraction_digits > 18) iso_path = false;
-        }
+        if (!read_seconds_fraction(true)) return std::nullopt;
       }
     }
     // AM/PM takes an hour of 0 to 12 ("0:30 PM" is 12:30, "0 AM" 00:00).
-    // It may also follow the offset or zone, once ("3:08+05pm", "3:08 UTC
-    // pm"; review X1).
+    // It may also follow the offset or zone ("3:08+05pm", "3:08 UTC pm";
+    // review X1). dateutil also reads `a`/`p` alone and dotted spellings
+    // whose `m` is lowercase ("3:08 p", "p.m.", "P.m.", "p. m.", "pm.";
+    // "P.M." fails), and applies a repeated one again, so it fails once the
+    // hour is past 12 ("12:30pm pm" is 12:30, "3:08pm pm" fails). A bare
+    // one-digit hour cannot take one after two or more blanks ("1  pm"
+    // fails, "11  pm" and "1:00  pm" read; review Y1-3).
     const auto read_meridiem = [&]() -> bool {
-      in.skip_spaces();
-      if (meridiem_read ||
-          !(in.peek() == 'a' || in.peek() == 'A' || in.peek() == 'p' || in.peek() == 'P'))
-        return true;
-      const auto saved = in.pos;
-      const auto meridiem = in.word();
-      if (meridiem == "am" || meridiem == "pm") {
+      for (;;) {
+        const auto before = in.pos;
+        in.skip_spaces();
+        const bool wide = in.pos - before >= 2;
+        if (!(in.peek() == 'a' || in.peek() == 'A' || in.peek() == 'p' || in.peek() == 'P'))
+          return true;
+        const auto saved = in.pos;
+        const auto meridiem = in.word();
+        bool pm = false;
+        if (meridiem == "pm" || meridiem == "p") pm = true;
+        else if (meridiem != "am" && meridiem != "a") {
+          in.pos = saved;
+          return true;
+        }
+        if (meridiem.size() == 1) {
+          auto j = in.pos;
+          while (j < in.text.size() && (in.text[j] == '.' || in.text[j] == ' ')) ++j;
+          if (j > in.pos && j < in.text.size() && in.text[j] == 'm' &&
+              !(j + 1 < in.text.size() &&
+                std::isalpha(static_cast<unsigned char>(in.text[j + 1]))))
+            in.pos = j + 1;
+        }
+        while (in.peek() == '.') ++in.pos;
+        if (!meridiem_read && bare_digit_hour && wide) return false;
         iso_path = false;
         meridiem_read = true;
         if (h > 12) return false;
-        if (meridiem == "am" && h == 12) h = 0;
-        else if (meridiem == "pm" && h != 12) h += 12;
-      } else {
-        in.pos = saved;
+        if (!pm && h == 12) h = 0;
+        else if (pm && h != 12) h += 12;
       }
-      in.skip_spaces();
-      return true;
     };
     if (!read_meridiem()) return std::nullopt;
     if (bare_digit_hour && !meridiem_read) return std::nullopt;
@@ -642,12 +784,26 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
           in.pos += 2;
           return true;
         };
-        if (!two_digits(oh)) return std::nullopt;
-        if (in.peek() == ':') ++in.pos;
+        // A one-digit hour, and a one-digit minute after a colon, read too
+        // ("+5" is +05:00, "+5:3" +05:03, "+0:30" +00:30; "+530" fails;
+        // review Y1-3).
+        const auto one_digit = [&in](unsigned& value) {
+          if (in.done() || !std::isdigit(static_cast<unsigned char>(in.peek()))) return false;
+          if (in.pos + 1 < in.text.size() &&
+              std::isdigit(static_cast<unsigned char>(in.text[in.pos + 1])))
+            return false;
+          value = static_cast<unsigned>(in.peek() - '0');
+          ++in.pos;
+          return true;
+        };
+        if (!two_digits(oh) && !one_digit(oh)) return std::nullopt;
+        const bool colon = in.peek() == ':';
+        if (colon) ++in.pos;
         // An hour-only offset followed by white space is a dateutil shape.
         if (!in.done() && (in.peek() == ' ' || in.peek() == '\t')) iso_path = false;
         if (!in.done() && in.peek() != ' ' && in.peek() != '\t' &&
-            !std::isalpha(static_cast<unsigned char>(in.peek())) && !two_digits(om))
+            !std::isalpha(static_cast<unsigned char>(in.peek())) && !two_digits(om) &&
+            !(colon && one_digit(om)))
           return std::nullopt;
         // Minutes 60-99 are dateutil's: they add to the hours ("+01:90" is
         // +02:30) while the whole offset stays below 24 hours ("+23:60"
@@ -753,7 +909,9 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
 // year, day-first when it cannot be a month, else month-first; a year below
 // 100 without its century is two-digit. Returns the date spelled MM/DD/YYYY
 // followed by the rest of the text, or nullopt. Numbers of more than five
-// digits are left unparsed (a standalone one is a dateutil clock shape).
+// digits are left unparsed (a standalone one is a dateutil clock shape;
+// declared, review Y1-3). Runs of spaces separate the numbers like single
+// ones ("2057  8 31"; review Y1-3).
 std::optional<std::string> reference_numeric_date(std::string_view text) {
   std::size_t at = 0;
   while (at < text.size() && text[at] == ' ') ++at;
@@ -776,7 +934,7 @@ std::optional<std::string> reference_numeric_date(std::string_view text) {
   while (components.size() < 3) {
     if (!components.empty()) {
       if (at >= text.size() || text[at] != ' ') return std::nullopt;
-      ++at;
+      while (at < text.size() && text[at] == ' ') ++at;
     }
     std::array<unsigned, 3> values{};
     std::array<std::size_t, 3> widths{};
@@ -818,9 +976,30 @@ std::optional<std::string> reference_numeric_date(std::string_view text) {
   return std::string(buffer) + std::string(text.substr(at));
 }
 
+// A basic YYYYMMDD date followed by a clock after `T`, `t` or white space
+// ("20240105 11:07:52", "20240105T1107"): pandas reads it like YYYY-MM-DD
+// with that clock, nanoseconds included, but refuses a `,` fraction
+// ("20240105 11:07:52,5") and a date alone (review Y1-3). Returns the cell
+// with the date spelled YYYY-MM-DD, or nullopt.
+std::optional<std::string> reference_basic_date(std::string_view text) {
+  if (text.size() < 10) return std::nullopt;
+  for (std::size_t i = 0; i < 8; ++i)
+    if (!std::isdigit(static_cast<unsigned char>(text[i]))) return std::nullopt;
+  if (text[8] != ' ' && text[8] != 'T' && text[8] != 't') return std::nullopt;
+  if (text.find(',') != std::string_view::npos) return std::nullopt;
+  std::string out;
+  out.reserve(text.size() + 2);
+  out.append(text.substr(0, 4)).push_back('-');
+  out.append(text.substr(4, 2)).push_back('-');
+  out.append(text.substr(6));
+  return out;
+}
+
 std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_view text,
                                                                  bool allow_year_zero = false) {
   if (auto shaped = normalize_reference_timestamp_shapes(text, allow_year_zero)) return shaped;
+  if (const auto basic = reference_basic_date(text))
+    return normalize_reference_timestamp_shapes(*basic, allow_year_zero);
   const auto date = reference_numeric_date(text);
   if (!date) return std::nullopt;
   auto shaped = normalize_reference_timestamp_shapes(*date);
@@ -1470,6 +1649,13 @@ CsvEventData import_csv_event_data_impl(
                                      : std::string{};
     auto resource = resource_index ? cell_at(fields, *resource_index)
                                    : std::string{};
+    // read_csv reads a pandas NA spelling in any column as NaN, so in the
+    // batch import resource, lifecycle and extra attribute cells holding one
+    // are missing like blank cells (stream readers keep the literal text).
+    const auto na_attribute_cell = [&](const std::string& cell) {
+      return reference_batch && is_reference_na_token(cell);
+    };
+    if (na_attribute_cell(resource)) resource.clear();
 
     const std::size_t token = case_tokens.size();
     case_tokens.push_back(case_id);
@@ -1514,6 +1700,7 @@ CsvEventData import_csv_event_data_impl(
     }
     if (lifecycle_index) {
       event.lifecycle = cell_at(fields, *lifecycle_index);
+      if (na_attribute_cell(event.lifecycle)) event.lifecycle.clear();
       event.lifecycle_state = event.lifecycle.empty()
                                   ? FirstClassAttributeState::kMissing
                                   : FirstClassAttributeState::kPresent;
@@ -1522,7 +1709,9 @@ CsvEventData import_csv_event_data_impl(
     for (const auto index : attribute_indices) {
       // A blank cell means the event simply has no such attribute; a short row
       // reads the same way rather than erroring, since these columns are extra.
-      if (index >= fields.size() || fields[index].empty()) continue;
+      if (index >= fields.size() || fields[index].empty() ||
+          na_attribute_cell(fields[index]))
+        continue;
       event.attributes.push_back(
           EventAttribute{header[index], fields[index], AttributeKind::kString});
     }
@@ -1538,6 +1727,12 @@ CsvEventData import_csv_event_data_impl(
         EventAttribute cell{header[index], fields[index],
                             is_timestamp ? AttributeKind::kDate
                                          : AttributeKind::kString};
+        const bool attribute_column =
+            (resource_index && index == *resource_index) ||
+            (lifecycle_index && index == *lifecycle_index) ||
+            std::find(attribute_indices.begin(), attribute_indices.end(),
+                      index) != attribute_indices.end();
+        if (attribute_column && na_attribute_cell(cell.value)) cell.value.clear();
         const auto set_role = [&](FirstClassAttributeRole role,
                                   FirstClassAttributeState state) {
           cell.first_class_role = role;
@@ -1556,12 +1751,12 @@ CsvEventData import_csv_event_data_impl(
                                          : FirstClassAttributeState::kPresent);
         } else if (resource_index && index == *resource_index) {
           set_role(FirstClassAttributeRole::kResource,
-                   fields[index].empty() ? FirstClassAttributeState::kMissing
-                                         : FirstClassAttributeState::kPresent);
+                   cell.value.empty() ? FirstClassAttributeState::kMissing
+                                      : FirstClassAttributeState::kPresent);
         } else if (lifecycle_index && index == *lifecycle_index) {
           set_role(FirstClassAttributeRole::kLifecycle,
-                   fields[index].empty() ? FirstClassAttributeState::kMissing
-                                         : FirstClassAttributeState::kPresent);
+                   cell.value.empty() ? FirstClassAttributeState::kMissing
+                                      : FirstClassAttributeState::kPresent);
         }
         table_row.push_back(std::move(cell));
       }

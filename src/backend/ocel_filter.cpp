@@ -70,13 +70,51 @@ bool contains_value(const std::vector<OcelValue>& values,
   });
 }
 
+// The pandas dtype of the reference frame's column for an attribute, as far
+// as it changes how a large integer compares (review Y1-2): a column of
+// integers only is int64, and isin casts it to float64 against a float
+// value (2^53 + 1 then equals 2.0^53); a missing cell (a record without the
+// key, or null) or a float makes it float64, which holds every integer
+// rounded to a double; a string or boolean makes it an object column, which
+// compares like Python ==.
+enum class OcelNumericColumn { kObject, kInteger, kFloat };
+
+template <class Records>
+OcelNumericColumn ocel_numeric_column(const Records& records, std::string_view key) {
+  bool missing = false, real = false;
+  for (const auto& record : records) {
+    const OcelValue* value = nullptr;
+    for (const auto& attribute : record.attributes)
+      if (attribute.key == key) {
+        value = &attribute.value;
+        break;
+      }
+    if (!value || std::holds_alternative<std::nullptr_t>(*value)) missing = true;
+    else if (std::holds_alternative<double>(*value)) real = true;
+    else if (!std::holds_alternative<std::int64_t>(*value)) return OcelNumericColumn::kObject;
+  }
+  return missing || real ? OcelNumericColumn::kFloat : OcelNumericColumn::kInteger;
+}
+
+bool ocel_cell_equal(const OcelValue& cell, const OcelValue& value, OcelNumericColumn column) {
+  if (const auto* integer = std::get_if<std::int64_t>(&cell)) {
+    if (column == OcelNumericColumn::kFloat)
+      return ocel_python_equal(value, OcelValue(static_cast<double>(*integer)));
+    if (column == OcelNumericColumn::kInteger)
+      if (const auto* real = std::get_if<double>(&value))
+        return static_cast<double>(*integer) == *real;
+  }
+  return ocel_python_equal(value, cell);
+}
+
 bool has_attribute_value(const std::vector<OcelAttribute>& attributes,
                          std::string_view key,
-                         const std::vector<OcelValue>& values) {
+                         const std::vector<OcelValue>& values,
+                         OcelNumericColumn column) {
   for (const auto& attribute : attributes) {
-    if (attribute.key == key && contains_value(values, attribute.value)) {
-      return true;
-    }
+    if (attribute.key != key) continue;
+    for (const auto& value : values)
+      if (ocel_cell_equal(attribute.value, value, column)) return true;
   }
   return false;
 }
@@ -399,6 +437,7 @@ Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key
     throw std::invalid_argument("OCEL event attribute key must not be empty");
   }
   Ocel filtered = log;
+  const auto column = ocel_numeric_column(log.events, attribute_key);
   filter_records(filtered.events, [&](const OcelEvent& event) {
     // The id and activity are columns of the reference events frame, so
     // filter_ocel_event_attribute selects on them (ocel:timestamp holds
@@ -406,7 +445,7 @@ Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key
     const bool matches =
         attribute_key == "ocel:eid" ? contains_value(values, OcelValue(event.id))
         : attribute_key == "ocel:activity" ? contains_value(values, OcelValue(event.activity))
-        : has_attribute_value(event.attributes, attribute_key, values);
+        : has_attribute_value(event.attributes, attribute_key, values, column);
     return positive ? matches : !matches;
   });
   return propagate_event_filter(std::move(filtered));
@@ -644,12 +683,13 @@ Ocel filter_ocel_object_attribute(const Ocel& log,
     throw std::invalid_argument("OCEL object attribute key must not be empty");
   }
   Ocel filtered = log;
+  const auto column = ocel_numeric_column(log.objects, attribute_key);
   filter_records(filtered.objects, [&](const OcelObject& object) {
     // The id and type are columns of the reference objects frame.
     const bool matches =
         attribute_key == "ocel:oid" ? contains_value(values, OcelValue(object.id))
         : attribute_key == "ocel:type" ? contains_value(values, OcelValue(object.type))
-        : has_attribute_value(object.attributes, attribute_key, values);
+        : has_attribute_value(object.attributes, attribute_key, values, column);
     return positive ? matches : !matches;
   });
   return propagate_object_filter(std::move(filtered));

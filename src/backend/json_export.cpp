@@ -135,8 +135,9 @@ void write_process_tree_alignment(std::ostream& out,
       << ", \"timed_out\": " << (result.timed_out ? "true" : "false")
       << ", \"exhausted\": " << (result.exhausted ? "true" : "false")
       << ", \"total_cost\": " << result.total_cost
-      << ", \"fitness\": " << result.fitness
-      << ", \"diagnostics\": {\"visited_states\": "
+      << ", \"fitness\": ";
+  write_round_trip_double(out, result.fitness);
+  out << ", \"diagnostics\": {\"visited_states\": "
       << result.diagnostics.visited_states
       << ", \"queued_states\": " << result.diagnostics.queued_states
       << ", \"traversed_arcs\": " << result.diagnostics.traversed_arcs
@@ -153,9 +154,9 @@ void write_process_tree_alignment(std::ostream& out,
       if (j != 0) out << ", ";
       write_json_string(out, trace.trace[j]);
     }
-    out << "], \"cost\": " << trace.cost
-        << ", \"fitness\": " << trace.fitness
-        << ", \"completed\": " << (trace.completed ? "true" : "false")
+    out << "], \"cost\": " << trace.cost << ", \"fitness\": ";
+    write_round_trip_double(out, trace.fitness);
+    out << ", \"completed\": " << (trace.completed ? "true" : "false")
         << ", \"timed_out\": " << (trace.timed_out ? "true" : "false")
         << ", \"moves\": [";
     for (std::size_t j = 0; j < trace.moves.size(); ++j) {
@@ -488,8 +489,11 @@ void write_declare_model(std::ostream& out, const DeclareModel& model,
         } else {
           out << "\"activity\": " << *graph.activity_id(rule.first);
         }
-        out << ", \"support\": " << rule.support
-            << ", \"confidence\": " << rule.confidence << '}';
+        out << ", \"support\": ";
+        write_round_trip_double(out, rule.support);
+        out << ", \"confidence\": ";
+        write_round_trip_double(out, rule.confidence);
+        out << '}';
       }
     }
     out << ']';
@@ -896,9 +900,13 @@ void write_footprints_analysis(std::ostream& out,
     }
     out << ']';
   }
-  out << "}, \"metrics\": {\"precision\": " << analysis.precision
-      << ", \"log_fitness\": " << analysis.log_fitness
-      << ", \"perc_fit_traces\": " << analysis.perc_fit_traces << '}';
+  out << "}, \"metrics\": {\"precision\": ";
+  write_round_trip_double(out, analysis.precision);
+  out << ", \"log_fitness\": ";
+  write_round_trip_double(out, analysis.log_fitness);
+  out << ", \"perc_fit_traces\": ";
+  write_round_trip_double(out, analysis.perc_fit_traces);
+  out << '}';
   if (analysis.activity_attribute != "concept:name") {
     out << ", \"activity_attribute\": ";
     write_json_string(out, analysis.activity_attribute);
@@ -1841,16 +1849,19 @@ void write_conformance(std::ostream& out,
                        const ConformanceResult& conformance,
                        const DirectlyFollowsGraph& graph,
                        bool fitness_only = false) {
-  out << "{\"fitness\": " << conformance.fitness
-      << ", \"precision\": ";
+  out << "{\"fitness\": ";
+  write_round_trip_double(out, conformance.fitness);
+  out << ", \"precision\": ";
   if (fitness_only || !conformance.precision_computed) out << "null";
-  else out << conformance.precision;
+  else write_round_trip_double(out, conformance.precision);
   if (!fitness_only && !conformance.precision_computed)
     out << ", \"precision_incomplete\": true";
   out << ", \"generalization\": ";
-  if (fitness_only) out << "null"; else out << conformance.generalization;
+  if (fitness_only) out << "null";
+  else write_round_trip_double(out, conformance.generalization);
   out << ", \"simplicity\": ";
-  if (fitness_only) out << "null"; else out << conformance.simplicity;
+  if (fitness_only) out << "null";
+  else write_round_trip_double(out, conformance.simplicity);
   out << ", \"fitting_traces\": " << conformance.fitting_traces
       << ", \"trace_count\": " << conformance.trace_count
       << ", \"produced\": " << conformance.produced
@@ -1977,8 +1988,10 @@ void write_alignments(std::ostream& out,
           << (alignments.time_limit_reached ? "true" : "false");
     out << ", \"fitness\": null, \"precision\": null";
   } else {
-    out << ", \"fitness\": " << alignments.fitness << ", \"precision\": ";
-    if (alignments.precision_computed) out << alignments.precision;
+    out << ", \"fitness\": ";
+    write_round_trip_double(out, alignments.fitness);
+    out << ", \"precision\": ";
+    if (alignments.precision_computed) write_round_trip_double(out, alignments.precision);
     else out << "null, \"precision_incomplete\": true";
   }
   out << ", \"fitting_traces\": " << alignments.fitting_traces
@@ -2014,8 +2027,9 @@ void write_alignments(std::ostream& out,
       out << (j + 1 < variant.activities.size() ? ", " : "");
     }
     out << "], \"count\": " << variant.count << ", \"cost\": " << variant.cost
-        << ", \"fitness\": " << variant.fitness
-        << ", \"diagnostics\": {\"visited_states\": "
+        << ", \"fitness\": ";
+    write_round_trip_double(out, variant.fitness);
+    out << ", \"diagnostics\": {\"visited_states\": "
         << variant.diagnostics.visited_states
         << ", \"queued_states\": " << variant.diagnostics.queued_states
         << ", \"traversed_arcs\": " << variant.diagnostics.traversed_arcs
@@ -2067,9 +2081,11 @@ void write_footprints(std::ostream& out, const FootprintResult& footprints,
     }
     out << ']';
   };
-  out << "{\"fitness\": " << footprints.fitness
-      << ", \"precision\": " << footprints.precision
-      << ", \"log_relations\": " << footprints.log_relations
+  out << "{\"fitness\": ";
+  write_round_trip_double(out, footprints.fitness);
+  out << ", \"precision\": ";
+  write_round_trip_double(out, footprints.precision);
+  out << ", \"log_relations\": " << footprints.log_relations
       << ", \"model_relations\": " << footprints.model_relations
       << ", \"shared_relations\": " << footprints.shared_relations
       << ", \"exhausted\": " << (footprints.exhausted ? "true" : "false")
@@ -2265,7 +2281,8 @@ void write_decision_node(std::ostream& out,
   out << ", \"key\": ";
   write_json_string(out, node.split.key);
   if (node.split.numeric) {
-    out << ", \"threshold\": " << node.split.threshold;
+    out << ", \"threshold\": ";
+    write_round_trip_double(out, node.split.threshold);
   } else {
     out << ", \"value\": ";
     write_json_string(out, node.split.value);
@@ -2299,9 +2316,11 @@ void write_decisions(std::ostream& out, const DecisionMiningResult& decisions) {
     const auto& root = point.nodes.front().branch_counts;
     out << "{\"place\": " << point.place
         << ", \"observations\": " << point.observations
-        << ", \"accuracy\": " << point.accuracy
-        << ", \"majority_share\": " << point.majority_share
-        << ", \"branches\": [";
+        << ", \"accuracy\": ";
+    write_round_trip_double(out, point.accuracy);
+    out << ", \"majority_share\": ";
+    write_round_trip_double(out, point.majority_share);
+    out << ", \"branches\": [";
     for (std::size_t b = 0; b < point.branches.size(); ++b) {
       out << "{\"label\": ";
       write_json_string(out, point.branches[b]);
@@ -5075,7 +5094,9 @@ std::string decomposed_alignment_json(const DecomposedAlignmentResult& result) {
   std::ostringstream out;
   out << "{\"algorithm\":\"decomposed_alignment\",\"variant\":\"recompos_maximal\",\"complete\":" << (result.complete?"true":"false")
       << ",\"timed_out\":" << (result.timed_out?"true":"false") << ",\"exhausted\":" << (result.exhausted?"true":"false")
-      << ",\"fitness\":" << result.fitness << ",\"best_worst_cost\":" << result.best_worst_cost << ",\"trace_count\":" << result.trace_count << ",\"total_cost\":" << result.total_cost
+      << ",\"fitness\":";
+  write_round_trip_double(out, result.fitness);
+  out << ",\"best_worst_cost\":" << result.best_worst_cost << ",\"trace_count\":" << result.trace_count << ",\"total_cost\":" << result.total_cost
       << ",\"diagnostics\":{\"decompositions\":" << result.diagnostics.decompositions << ",\"components\":" << result.diagnostics.components << ",\"merges\":" << result.diagnostics.merges << ",\"cache_hits\":" << result.diagnostics.cache_hits << ",\"cache_misses\":" << result.diagnostics.cache_misses << ",\"border_disagreements\":" << result.diagnostics.border_disagreements << ",\"agreement_iterations\":" << result.diagnostics.agreement_iterations << ",\"visited_states\":" << result.diagnostics.visited_states << ",\"queued_states\":" << result.diagnostics.queued_states << ",\"traversed_arcs\":" << result.diagnostics.traversed_arcs << ",\"whole_net_fallback\":" << (result.diagnostics.whole_net_fallback?"true":"false") << ",\"note\":"; write_json_string(out,result.diagnostics.note); out << "},\"traces\":[";
   for (std::size_t i=0;i<result.traces.size();++i) { if(i) out<<','; const auto& t=result.traces[i]; out<<"{\"activities\":["; for(std::size_t j=0;j<t.activities.size();++j){if(j)out<<',';write_json_string(out,t.activities[j]);} out<<"],\"count\":"<<t.count<<",\"complete\":"<<(t.complete?"true":"false")<<",\"timed_out\":"<<(t.timed_out?"true":"false")<<",\"exhausted\":"<<(t.exhausted?"true":"false")<<",\"cost\":"<<t.cost<<",\"fitness\":"<<t.fitness<<",\"best_worst_cost\":"<<t.best_worst_cost<<",\"moves\":["; for(std::size_t j=0;j<t.alignment.size();++j){if(j)out<<',';const auto&m=t.alignment[j];out<<"{\"log\":";if(m.log)write_json_string(out,*m.log);else out<<"null";out<<",\"model\":";if(m.model)write_json_string(out,*m.model);else out<<"null";out<<",\"transition\":"<<(m.transition==static_cast<std::size_t>(-1)?-1:static_cast<long long>(m.transition))<<"}";} out<<"]}"; }
   out << "]}"; return out.str();
@@ -5696,7 +5717,9 @@ std::string dfg_alignment_json(const DfgAlignmentLogResult& result,
         a.best_worst_cost < 0)
       throw std::invalid_argument("DFG alignment result has invalid numeric values");
     out << "{\"computed\": true, \"cost\": " << a.cost << ", \"internal_cost\": " << a.internal_cost
-        << ", \"fitness\": " << a.fitness << ", \"best_worst_cost\": "
+        << ", \"fitness\": ";
+    write_round_trip_double(out, a.fitness);
+    out << ", \"best_worst_cost\": "
         << a.best_worst_cost << ", \"visited_states\": " << a.visited_states
         << ", \"closed\": " << a.closed << ", \"closed_states\": " << a.closed_states
         << ", \"moves\": [";
@@ -5780,7 +5803,9 @@ std::string edit_distance_json(const std::vector<EditDistanceAlignment>& result,
     out << "], \"target_variant\": [";
     for (std::size_t j=0;j<a.target_variant.size();++j){if(j)out<<',';write_json_string(out,a.target_variant[j]);}
     out << "], \"target_index\": " << a.target_index << ", \"cost\": " << a.cost
-        << ", \"fitness\": " << a.fitness << ", \"best_worst_cost\": " << a.best_worst_cost
+        << ", \"fitness\": ";
+    write_round_trip_double(out, a.fitness);
+    out << ", \"best_worst_cost\": " << a.best_worst_cost
         << ", \"bwc\": " << a.bwc << ", \"denominator\": " << a.denominator << ", \"moves\": [";
     for (std::size_t j=0;j<a.alignment.size();++j) { const auto& m=a.alignment[j]; if(j)out<<','; out<<"{\"type\": ";
       const char* type = m.type==EditDistanceMoveType::kSynchronous?"sync":(m.type==EditDistanceMoveType::kLog?"log":"model"); write_json_string(out,type);

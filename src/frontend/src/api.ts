@@ -3745,8 +3745,9 @@ export function dfgExportQuery(options: DfgExportOptions = {}): string {
     query.set("noise_threshold", String(options.noise_threshold));
   }
   if (options.most_common_paths !== undefined) {
-    const paths = options.most_common_paths.trim();
-    if (!paths) throw new Error("most_common_paths must not be empty");
+    // Labels are literal: the text goes as typed (review Y1).
+    const paths = options.most_common_paths;
+    if (!paths.trim()) throw new Error("most_common_paths must not be empty");
     if (options.noise_threshold === undefined)
       throw new Error("most_common_paths requires noise_threshold");
     query.set("most_common_paths", paths);
@@ -3779,8 +3780,8 @@ export function dfgExportQuery(options: DfgExportOptions = {}): string {
   for (const name of ["to_activity", "from_activity", "contain_activity"] as const) {
     const value = options[name];
     if (value === undefined) continue;
-    // Activity labels are literal: surrounding white space is part of the name.
-    if (!value) throw new Error(`${name} must not be empty`);
+    // Activity labels are literal: surrounding white space is part of the
+    // name, and "" names the empty label (review Y1).
     query.set(name, value);
   }
   return query.toString();

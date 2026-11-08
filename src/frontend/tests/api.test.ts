@@ -465,7 +465,10 @@ describe("classic DFG export API", () => {
     expect(() => dfgExportQuery({ paths_percentage: 1.1 })).toThrow(/\[0, 1\]/);
     expect(() => dfgExportQuery({ keep_connected: Number.NaN })).toThrow(/finite/);
     expect(() => dfgExportQuery({ keep_all_activities: true })).toThrow(/requires paths_percentage/);
-    expect(() => dfgExportQuery({ to_activity: "" })).toThrow(/must not be empty/);
+    // The empty label is a label too, and path labels go untrimmed (review Y1).
+    expect(dfgExportQuery({ to_activity: "" })).toBe("to_activity=");
+    expect(dfgExportQuery({ noise_threshold: 0, most_common_paths: " A -> B " }))
+      .toBe("noise_threshold=0&most_common_paths=+A+-%3E+B+");
     // Labels are literal, surrounding white space included (review X1).
     expect(dfgExportQuery({ to_activity: " a ", contain_activity: " " })).toBe("to_activity=+a+&contain_activity=+");
   });

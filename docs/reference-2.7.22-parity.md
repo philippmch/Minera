@@ -3271,7 +3271,11 @@ match nothing). The case-id column (`case_id`/`case:concept:name`) is a column
 of every row for the event-level filter and the events-scope statistics too.
 Other columns, including resource and lifecycle, keep their text where
 `read_csv` would type them (declared: CSV adapters do not infer pandas column
-dtypes beyond the case-id and activity columns). Declared: the flat table
+dtypes beyond the case-id and activity columns); a resource, lifecycle or
+extra attribute cell holding a pandas default NA spelling (`NaN`, `null`,
+`None`, `NA`, `n/a`, `#N/A`, ...) is missing, like a blank cell, in the log
+and in the flat table, since `read_csv` reads it as NaN (stream readers keep
+the literal text; review Y2-2). Declared: the flat table
 keeps source row order (with the converted case-id and activity text) where
 the formatted reference frame is sorted by case id, timestamp and row index.
 Case-relation files joined with a CSV log (case-relations merge and timestamp
@@ -19676,3 +19680,143 @@ Declared:
   activities-percentage, paths-percentage and keep-connected results differ
   from native in 638, 589 and 567 cases; to, from and contain agree (0).
   Native keeps them as ordinary activities.
+
+## Review Y2: metric precision in the mine JSON, CSV NA attribute cells, DataFrame dtypes in attribute statistics (2026-11-08)
+
+A random-input sweep of areas not recently compared (OCEL object graphs,
+`discover_ocdfg`, `discover_oc_petri_net` with and without TBR diagnostics,
+footprints conformance, log prefix utilities, start/end activities and
+attribute values on CSV and XES) found three differences, all fixed:
+
+- **Y2-1 Full-precision quality metrics.** The export and `/api/mine` JSON
+  printed `footprints.metrics` (precision, log_fitness, perc_fit_traces),
+  `conformance.<miner>.footprints` fitness/precision, token-replay fitness,
+  precision, generalization and simplicity, alignment fitness, precision and
+  per-variant fitness, and the embedded process-tree, DFG, edit-distance and
+  decomposed alignment fitness, Declare rule support/confidence and decision
+  accuracy, majority share and thresholds with the stream default of six
+  significant digits (`33.3333` for pm4py's `33.333333333333336`). They are
+  now the shortest round-trip double (`write_round_trip_double`); a
+  non-finite value is `null`. Only the printed digits change. Test:
+  `minera_core_tests` (`json_export_prints_quality_metrics_at_full_precision`).
+- **Y2-2 NA spellings in CSV attribute cells.** `read_csv` reads `NaN`,
+  `null`, `None`, `NA`, `n/a`, `#N/A` and the other default NA spellings as
+  NaN in every column, and `get_event_attribute_values` does not count them.
+  The batch CSV import now leaves a resource, lifecycle or extra attribute
+  cell holding one missing (log and flat table), like a blank cell; stream
+  readers keep the literal text. Reference: resources `NaN`, `null`, `r1`,
+  `None` give `{'r1': 1}` (native counted four values). Test:
+  `minera_core_tests` (`csv_na_spellings_in_attribute_cells_are_missing`).
+- **Y2-3 DataFrame column dtypes in attribute statistics.** `read_xes`
+  builds a DataFrame, whose column is float64 when it holds ints and a
+  missing cell, or ints and floats, so the reference keys are floats:
+  an int attribute on two of three events gives `{1.0: 1, 2.0: 1}`, a trace
+  int on one of two traces `{3.0: 2}` and `2.5`/`1` gives `{2.5: 1, 1.0: 1}`;
+  complete ints stay ints and a bool or string keeps the object column with
+  every cell's type. Counting once per case groups by `[case id, value]`,
+  whose value level holds the distinct keys, so ints beside a float there
+  are floats too even in an object column whose bool merged into an int key
+  (`1`, `True`, `0.5`, `3` gives `{1.0: 1, 0.5: 1, 3.0: 1}`; with `True` seen
+  first, `{True: 1, 0.5: 1, 3: 1}`). `entries` (and the `values` map) now
+  report those ints as floats (`1.0`, type `float`) for CSV and XES sources;
+  `AttributeStatisticsOptions::dataframe_column_types = false` keeps each
+  cell's EventLog type for a native log. Counts and order were already
+  equal before; with the exact types, 0 diffs on 150 random XES logs. Test:
+  `minera_attribute_statistics_tests`.
+
+Documented (reference behaviour, no change): `footprints.metrics.log_fitness`
+and `perc_fit_traces` follow `fitness_footprints` on an EventLog, which
+averages the per-trace footprints (`fp_fitness` over the trace-by-trace
+footprints, e.g. 0.873015873015873 on a six-trace log). On a DataFrame,
+`fitness_footprints` returns one float from the whole-log footprint and its
+extensive check instead (0.8757763975155279 on the same log); native reports
+the EventLog dict.
+
+Unchanged and matched on random inputs: OCEL object graphs (300 OCELs × 5
+graph types), `discover_ocdfg` annotations and performance lists (300),
+`discover_oc_petri_net` nets, double arcs and TBR place/transition counts
+(400, nets compared up to isomorphism), footprints log_model, log_extensive
+and trace_extensive results with fp fitness/precision on the inductive tree,
+inductive net and heuristics net (150 logs), `get_prefixes_from_log`,
+`get_log_with_log_prefixes`, `get_log_traces_until_activity` and
+`get_log_traces_to_activities` (250 logs), start/end activities and
+attribute counts on CSV and XES (130 logs).
+
+## Review Y1: CSV minute fractions and dateutil clock shapes, OCEL large integers, literal DFG selectors (2026-11-08)
+
+Fixes after a review of Round X, checked against `pandas.read_csv` +
+`pm4py.format_dataframe`, pm4py 2.7.22 OCEL filters and its DFG filters
+(public API outputs only).
+
+- **Y1-1 Fractions of a minute in decimal arithmetic.** dateutil's seconds
+  for `HH:MM.f` match `int(60 * (Decimal(minutes) % 1))` in Python's default
+  28-digit decimal context (fitted on 700 probes, 0 misses): both the
+  fraction and the product are rounded half-even to 28 significant digits,
+  and a product that rounds to 60 makes the cell unreadable. The importer
+  computed floor(60 x 0.f) exactly on at most 30 digits.
+  `2024-01-05 10:07.01` + 28 sixes is 10:07:01 (was :00), `.016...67` with 31
+  digits :01 (was :00), `.983333333333333333333333333333334` :59 (was :58),
+  `10:07.` + 29 nines unconvertible (was 10:07:59).
+- **Y1-3 dateutil shapes the importer kept as text.** Now read as pandas reads
+  them: a basic `YYYYMMDD` date before a clock after `T`, `t` or white space
+  (`20240105 11:07:52.123456789` keeps nanoseconds; a `,` fraction and a date
+  alone stay text); basic clocks `HHMM` and `HHMMSS[.f]` (`2024-01-05 1107`;
+  `1107.5` fails); a `T` after white space (`2024-01-05 T13:38`, dateutil's
+  path); runs of spaces between the numbers of an all-numeric date
+  (`2057  8 31`); one-digit offset hours and, after a colon, one-digit offset
+  minutes (`+5` is +05:00, `+5:3` +05:03, `+0:30`; `+530` fails); `a`/`p`
+  alone and dotted AM/PM whose `m` is lowercase (`3:08 p`, `p.m.`, `P.m.`,
+  `p. m.`, `pm.`; `P.M.` fails); a repeated AM/PM applied again (`12:30pm pm`
+  is 12:30, `12:08pm am` 00:08, `3:08pm pm` fails); a `.` with no fraction
+  digits after the seconds (`09:32:02.`, `09:32:02.Z`; `.z` and a lone
+  `.p`/`.a` fail, as after minutes). A bare one-digit hour cannot take AM/PM
+  after two or more blanks, so `01 05 2024  1  pm  -12:00` (which Round X read
+  as 2024-01-06 01:00 UTC) and `2024-01-05 1  pm` stay text (`11  pm`,
+  `1:00  pm` read).
+- **Y1-2 OCEL attribute filters and large integers.** The event and object
+  attribute filters now follow the dtype of the reference frame's column: a
+  column of integers only (int64) is compared as float64 against a float
+  value (`9007199254740993` matches `d:9007199254740992.0`, `2^63-1` matches
+  `9.223372036854776e18`); a column with a missing cell (a record without the
+  key, or null) or a float holds every integer rounded to a double, which then
+  compares exactly with the given value (`9007199254740993` there matches
+  `i:9007199254740992` and not `i:9007199254740993`); a column holding a
+  string or boolean compares like Python `==`. Small values are unchanged.
+- **Literal DFG selectors.** `GET /api/dfg` and `minera_dfg` accept an empty
+  `to_activity`/`from_activity`/`contain_activity` (the label `""`; the
+  reference raises `KeyError: ''` when no activity has it), and the frontend
+  sends it. `most_common_paths` labels keep their white space: only one space
+  after a comma and one on each side of `->` are separator padding
+  (`a -> b, c -> d` is unchanged; `a ->  b` names ` b`), in the server,
+  `minera_dfg` (`parse_activity_pairs(text, true)`) and the frontend, which no
+  longer trims the text. The log filters' succession syntax still trims.
+
+Fuzz (single-cell columns, pandas path vs 9c6fad2 vs this tree): 14,563 random
+numeric-date and clock cells (seeds 51, 52, 71, 72), a 6,160-cell AM/PM/offset
+matrix, 3,000 value-edge numeric dates (seed 83) and 2,000 columns of two to
+five rows (seed 61): no cell that 9c6fad2 read correctly differs now, and
+every remaining mismatch is in a declared class (below or earlier: year 0,
+`.` mixes, time-only cells, `GMT+05:30`). On the 99,810-cell corpus of review
+X1 the importer's output is unchanged. OCEL: the 20 dtype cases of the review
+against `pm4py.filter_ocel_event_attribute` and 4,640 filter calls on 300
+random OCELs (review X2's fuzz), 0 differences. DFG: 1,200 `/api/dfg` calls
+against pm4py's DFG filters with unusual labels, 0 differences.
+
+Tests: `minera_core_tests` (`csv_timestamps_review_y1_shapes`,
+`parse_activity_pairs_reads_the_arrow_syntax`), `minera_ocel_filter_tests`,
+`minera_dfg_filter_route_tests`, frontend `api.test.ts`.
+
+Declared (value-dependent dateutil readings, kept as text by the importer):
+
+- **Date numbers of six or more digits (declared).** dateutil reads such a
+  number as an `HHMMSS` clock and fills the date from the rest
+  (`10 31 000001` is 0001-10-31 00:00:01, `0012  000006 14`
+  0001-12-14 00:00:06).
+- **Clock fields of three or more digits (declared).** Zero-padded fields such
+  as `011:45`, `23:022:027` or a bare `013 pm` read by value.
+- **More than one offset or zone (declared).** dateutil combines them
+  (`+05:30 +01:90`, `Z+01:90`, `+1+1`).
+- **Stray words and dots (declared).** A lone `t`, `T` or `m` word, doubled
+  dots (`11:21..`), a `.` right after a bare hour (`01/05/2024 11.`), a third
+  offset-minute digit (`+5:300` is +10:00) and `10:55.Z ` with a trailing
+  blank (read, while `10:55.Z` fails).

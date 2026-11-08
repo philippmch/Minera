@@ -236,6 +236,95 @@ int main() {
             Pairs{{"y", 3}, {"x", 2}}));
   }
 
+  // Review Y2-3: the read_xes DataFrame column dtype. An int column with a
+  // missing cell, or ints mixed with floats, is float64, so the reference
+  // counts {1.0: 1, 2.0: 1} for x and {3.0: 2} for case:kind below; ints
+  // mixed with a bool or a string stay ints (object column). With
+  // dataframe_column_types off (a native log) every cell keeps its type.
+  {
+    using Entry = std::tuple<std::string, std::string, std::uint64_t>;
+    const auto entries = [](const minera::AttributeStatisticsResult& r) {
+      std::vector<Entry> out;
+      for (const auto& e : r.entries) out.emplace_back(e.value, e.type, e.count);
+      return out;
+    };
+    const auto load = [](const std::string& text) {
+      std::istringstream input(text);
+      return minera::import_xes_event_log(input);
+    };
+    const auto event = [](const std::string& activity, const std::string& extra) {
+      return "<event><string key=\"concept:name\" value=\"" + activity +
+             "\"/><date key=\"time:timestamp\" value=\"2020-01-01T00:00:00\"/>" +
+             extra + "</event>";
+    };
+    const std::string head = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><log xes.version=\"1.0\">";
+    const auto missing = load(
+        head + "<trace><string key=\"concept:name\" value=\"c0\"/><int key=\"kind\" value=\"3\"/>" +
+        event("a", "<int key=\"x\" value=\"1\"/>") + event("b", "") + "</trace>" +
+        "<trace><string key=\"concept:name\" value=\"c1\"/>" +
+        event("a", "<int key=\"x\" value=\"2\"/>") + "</trace></log>");
+    minera::AttributeStatisticsOptions o;
+    o.attribute_key = "x";
+    assert((entries(minera::discover_attribute_statistics(missing, o)) ==
+            std::vector<Entry>{{"1.0", "float", 1}, {"2.0", "float", 1}}));
+    assert((minera::discover_attribute_statistics(missing, o).values ==
+            std::map<std::string, std::uint64_t>{{"1.0", 1}, {"2.0", 1}}));
+    o.keep_once_per_case = true;
+    assert((entries(minera::discover_attribute_statistics(missing, o)) ==
+            std::vector<Entry>{{"1.0", "float", 1}, {"2.0", "float", 1}}));
+    o.keep_once_per_case = false;
+    o.dataframe_column_types = false;
+    assert((entries(minera::discover_attribute_statistics(missing, o)) ==
+            std::vector<Entry>{{"1", "int", 1}, {"2", "int", 1}}));
+    o.dataframe_column_types = true;
+    o.scope = minera::AttributeStatisticsScope::kTraces;
+    o.attribute_key = "case:kind";
+    assert((entries(minera::discover_attribute_statistics(missing, o)) ==
+            std::vector<Entry>{{"3.0", "float", 2}}));
+    o.scope = minera::AttributeStatisticsScope::kEvents;
+    o.attribute_key = "x";
+    // Ints mixed with floats, no missing cell: {2.5: 1, 1.0: 1}.
+    const auto mixed = load(
+        head + "<trace><string key=\"concept:name\" value=\"c0\"/>" +
+        event("a", "<float key=\"x\" value=\"2.5\"/>") +
+        event("b", "<int key=\"x\" value=\"1\"/>") + "</trace></log>");
+    assert((entries(minera::discover_attribute_statistics(mixed, o)) ==
+            std::vector<Entry>{{"2.5", "float", 1}, {"1.0", "float", 1}}));
+    // Complete ints stay int64; a bool or string keeps the object column.
+    const auto complete = load(
+        head + "<trace><string key=\"concept:name\" value=\"c0\"/>" +
+        event("a", "<int key=\"x\" value=\"1\"/>") +
+        event("b", "<int key=\"x\" value=\"1\"/>") + "</trace></log>");
+    assert((entries(minera::discover_attribute_statistics(complete, o)) ==
+            std::vector<Entry>{{"1", "int", 2}}));
+    const auto object = load(
+        head + "<trace><string key=\"concept:name\" value=\"c0\"/>" +
+        event("a", "<int key=\"x\" value=\"1\"/>") + event("b", "") +
+        event("c", "<string key=\"x\" value=\"y\"/>") + "</trace></log>");
+    assert((entries(minera::discover_attribute_statistics(object, o)) ==
+            std::vector<Entry>{{"1", "int", 1}, {"y", "str", 1}}));
+    // Once per case the value level holds the distinct keys: 1 (True merged
+    // into it), 0.5 and 3 are all numbers, so {1.0: 1, 0.5: 1, 3.0: 1}; with
+    // True seen first the level keeps a bool: {True: 1, 0.5: 1, 3: 1}.
+    const auto merged = [&](const std::string& first, const std::string& second) {
+      return load(head + "<trace><string key=\"concept:name\" value=\"c0\"/>" +
+                  event("a", first) + event("b", second) +
+                  "</trace><trace><string key=\"concept:name\" value=\"c1\"/>" +
+                  event("a", "<float key=\"x\" value=\"0.5\"/>") +
+                  event("b", "<int key=\"x\" value=\"3\"/>") + "</trace></log>");
+    };
+    const std::string one = "<int key=\"x\" value=\"1\"/>";
+    const std::string yes = "<boolean key=\"x\" value=\"true\"/>";
+    assert((entries(minera::discover_attribute_statistics(merged(one, yes), o)) ==
+            std::vector<Entry>{{"1", "int", 2}, {"0.5", "float", 1}, {"3", "int", 1}}));
+    o.keep_once_per_case = true;
+    assert((entries(minera::discover_attribute_statistics(merged(one, yes), o)) ==
+            std::vector<Entry>{{"1.0", "float", 1}, {"0.5", "float", 1}, {"3.0", "float", 1}}));
+    assert((entries(minera::discover_attribute_statistics(merged(yes, one), o)) ==
+            std::vector<Entry>{{"true", "bool", 1}, {"0.5", "float", 1}, {"3", "int", 1}}));
+    o.keep_once_per_case = false;
+  }
+
   bool rejected = false;
   try {
     (void)minera::discover_attribute_statistics(log, {});

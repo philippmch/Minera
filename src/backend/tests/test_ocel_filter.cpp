@@ -1,7 +1,11 @@
 #include "minera/ocel_filter.hpp"
 
 #include <cassert>
+#include <cstdint>
+#include <limits>
+#include <optional>
 #include <stdexcept>
+#include <string>
 
 namespace {
 
@@ -76,6 +80,45 @@ int main() {
     const auto truthy = minera::filter_ocel_object_attribute(numeric, "w", {std::int64_t{1}});
     assert(truthy.objects.size() == 1 && truthy.objects[0].id == "o2");
     assert(minera::filter_ocel_object_attribute(numeric, "w", {nullptr}).objects.empty());
+  }
+
+  // Integers beyond 2^53 compare as the reference frame's dtype holds them
+  // (review Y1-2): an int64 column is cast to float64 against a float value,
+  // a column with a missing cell is float64 (integers rounded to doubles),
+  // and an object column compares exactly.
+  {
+    const std::int64_t big = 9007199254740993;  // 2^53 + 1
+    const auto events_with = [&](minera::OcelValue first, std::optional<minera::OcelValue> second) {
+      auto numeric = log;
+      numeric.events[0].attributes.push_back({"v", std::move(first)});
+      if (second) numeric.events[1].attributes.push_back({"v", std::move(*second)});
+      numeric.events[2].attributes.push_back({"v", std::int64_t{0}});
+      return numeric;
+    };
+    const auto ids = [](const minera::Ocel& filtered) {
+      std::string out;
+      for (const auto& event : filtered.events) out += event.id;
+      return out;
+    };
+    const auto integer_column = events_with(big, minera::OcelValue(big - 1));
+    assert(ids(minera::filter_ocel_event_attribute(integer_column, "v", {0x1p53})) == "e1e2");
+    assert(ids(minera::filter_ocel_event_attribute(integer_column, "v", {big - 1})) == "e2");
+    const auto top = events_with(std::numeric_limits<std::int64_t>::max(), minera::OcelValue(std::int64_t{1}));
+    assert(ids(minera::filter_ocel_event_attribute(top, "v", {0x1p63})) == "e1");
+    const auto float_column = events_with(big, std::nullopt);
+    assert(ids(minera::filter_ocel_event_attribute(float_column, "v", {big - 1})) == "e1");
+    assert(minera::filter_ocel_event_attribute(float_column, "v", {big}).events.empty());
+    assert(ids(minera::filter_ocel_event_attribute(float_column, "v", {0x1p53})) == "e1");
+    const auto object_column = events_with(big, minera::OcelValue(std::string("x")));
+    assert(minera::filter_ocel_event_attribute(object_column, "v", {0x1p53}).events.empty());
+    assert(ids(minera::filter_ocel_event_attribute(object_column, "v", {big})) == "e1");
+    // The same on objects (o3 lacks the attribute: a float64 column).
+    auto objects = log;
+    objects.objects[0].attributes.push_back({"w", big});
+    objects.objects[1].attributes.push_back({"w", std::int64_t{1}});
+    const auto picked = minera::filter_ocel_object_attribute(objects, "w", {big - 1});
+    assert(picked.objects.size() == 1 && picked.objects[0].id == "o1");
+    assert(minera::filter_ocel_object_attribute(objects, "w", {big}).objects.empty());
   }
 
   const auto web = minera::filter_ocel_event_attribute(

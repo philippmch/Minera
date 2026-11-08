@@ -153,8 +153,14 @@ struct PrefixSuffixFilterOptions {
 // activity pairs, trimming spaces around each side. An entry without "->" or
 // with an empty side throws std::invalid_argument. The shared syntax for the
 // CLI's succession flags and the server's form fields.
+//
+// With `literal_labels` the labels keep their white space (DFG most_common_paths
+// labels are literal, review Y1): only one space after a comma and one space
+// on each side of the arrow are separator padding ("A -> B, C -> D" is
+// (A, B), (C, D); " A  -> B" is (" A ", B)), and an entry that is empty
+// before that padding is skipped.
 [[nodiscard]] std::vector<ActivityPair> parse_activity_pairs(
-    std::string_view text);
+    std::string_view text, bool literal_labels = false);
 
 // Log-preprocessing options. Filters are applied in a fixed order so the result
 // is well defined when several are combined: the case-attribute filter, then

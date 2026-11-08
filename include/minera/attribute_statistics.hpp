@@ -23,6 +23,11 @@ struct AttributeStatisticsOptions {
   AttributeStatisticsScope scope = AttributeStatisticsScope::kEvents;
   std::string attribute_key;
   bool keep_once_per_case = false;
+  // CSV and XES imports reach pm4py as a DataFrame, whose column dtype turns
+  // the ints of a column with a missing cell, or of ints mixed with floats,
+  // into floats (1.0). False keeps each cell's own (EventLog) type, as for a
+  // native log.
+  bool dataframe_column_types = true;
 };
 
 // One distinct value under Python dict-key equality: 1, 1.0 and True (and

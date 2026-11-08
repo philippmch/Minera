@@ -4,6 +4,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstdio>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <utility>
@@ -47,6 +48,18 @@ std::string exact_integer(double number) {
   char buffer[400];
   std::snprintf(buffer, sizeof buffer, "%.0f", number);
   return buffer;
+}
+
+// Python's repr of a float holding an integer value: 1.0, -3.0, 1e+16.
+std::string python_float_repr(double number) {
+  char buffer[64];
+  const bool fixed = std::fabs(number) < 1e16;
+  const auto converted = std::to_chars(
+      buffer, buffer + sizeof buffer, number,
+      fixed ? std::chars_format::fixed : std::chars_format::scientific);
+  std::string text(buffer, converted.ptr);
+  if (fixed && text.find('.') == std::string::npos) text += ".0";
+  return text;
 }
 
 // A key under Python dict-key equality (bool, int and float compare as
@@ -206,29 +219,32 @@ AttributeStatisticsResult discover_attribute_statistics(
   result.scope = options.scope;
   result.attribute_key = options.attribute_key;
   result.keep_once_per_case = options.keep_once_per_case;
-  Tally tally;
-  tally.result = &result;
+  // One DataFrame row of the counted column: its case, key and cell text, or
+  // no key when the cell is missing.
+  struct Row {
+    const std::string* case_id = nullptr;
+    std::optional<std::pair<std::string, std::string>> key;
+    const std::string* text = nullptr;
+    std::uint64_t weight = 1;
+  };
+  std::vector<Row> rows;
   if (options.scope == AttributeStatisticsScope::kEvents) {
     for (const auto& trace : log.traces) {
-      std::set<std::string> seen;
       for (const auto& event : trace.events) {
         const auto* value = event_value(trace, event, options.attribute_key);
-        if (!value) continue;
+        if (!value) {
+          rows.push_back({&trace.case_id, std::nullopt, nullptr, 1});
+          continue;
+        }
         const EventAttribute* attribute = owner(event.attributes, value);
         if (!attribute) attribute = owner(event.case_row_attributes, value);
         if (!attribute) attribute = owner(trace.attributes, value);
-        const auto key = python_key(attribute, *value, value == &event.timestamp);
-        if (options.keep_once_per_case) {
-          if (seen.insert(key.first).second) tally.add_once(trace.case_id, key, *value);
-          continue;
-        }
-        tally.add(key, *value, 1);
+        rows.push_back({&trace.case_id,
+                        python_key(attribute, *value, value == &event.timestamp),
+                        value, 1});
       }
     }
-    tally.finish();
-    return result;
-  }
-  if (options.scope == AttributeStatisticsScope::kTraces) {
+  } else if (options.scope == AttributeStatisticsScope::kTraces) {
     // The reference counts the case column's rows. A CSV keeps each row's own
     // cell (blank rows are not counted); otherwise a DataFrame repeats the
     // case attribute on every event row, so a case contributes one count per
@@ -239,20 +255,89 @@ AttributeStatisticsResult discover_attribute_statistics(
           const auto cell =
               dataframe_cell::case_row_value(event, options.attribute_key);
           if (cell && *cell)
-            tally.add(python_key(owner(event.case_row_attributes, *cell), **cell, false),
-                      **cell, 1);
+            rows.push_back({&trace.case_id,
+                            python_key(owner(event.case_row_attributes, *cell), **cell, false),
+                            *cell, 1});
+          else
+            rows.push_back({&trace.case_id, std::nullopt, nullptr, 1});
         }
         continue;
       }
+      if (trace.events.empty()) continue;
       const auto* value = trace_value(trace, options.attribute_key);
-      if (value && !trace.events.empty())
-        tally.add(python_key(owner(trace.attributes, value), *value, false), *value,
-                  trace.events.size());
+      if (value)
+        rows.push_back({&trace.case_id,
+                        python_key(owner(trace.attributes, value), *value, false),
+                        value, trace.events.size()});
+      else
+        rows.push_back({&trace.case_id, std::nullopt, nullptr, trace.events.size()});
     }
-    tally.finish();
-    return result;
+  } else {
+    throw std::invalid_argument("attribute statistics: unknown scope");
   }
-  throw std::invalid_argument("attribute statistics: unknown scope");
+
+  // The DataFrame column dtype: an int column with a missing cell, or ints
+  // mixed with floats, is float64, so its ints count as floats (1.0). A bool
+  // or any other value keeps the column object-typed and every cell its type.
+  bool missing = false, ints = false, floats = false, others = false;
+  for (const auto& row : rows) {
+    if (!row.key) missing = true;
+    else if (row.key->second == "int") ints = true;
+    else if (row.key->second == "float") floats = true;
+    else others = true;
+  }
+  const bool ints_as_floats =
+      options.dataframe_column_types && ints && !others && (missing || floats);
+  std::vector<std::string> float_texts;
+  float_texts.reserve(rows.size());
+
+  Tally tally;
+  tally.result = &result;
+  std::set<std::string> seen;
+  const std::string* seen_case = nullptr;
+  for (auto& row : rows) {
+    if (!row.key) continue;
+    const std::string* text = row.text;
+    if (ints_as_floats && row.key->second == "int") {
+      row.key->second = "float";
+      float_texts.push_back(python_float_repr(
+          std::strtod(row.key->first.c_str() + 2, nullptr)));
+      text = &float_texts.back();
+    }
+    if (options.scope == AttributeStatisticsScope::kEvents &&
+        options.keep_once_per_case) {
+      if (seen_case != row.case_id) {
+        seen.clear();
+        seen_case = row.case_id;
+      }
+      if (seen.insert(row.key->first).second)
+        tally.add_once(*row.case_id, *row.key, *text);
+      continue;
+    }
+    tally.add(*row.key, *text, row.weight);
+  }
+  // Counting once per case groups by [case id, value]: the value level is
+  // built from the distinct keys (each its first-seen cell), so ints beside
+  // a float there are floats too, even in an object column whose bool was
+  // merged into an int key (True after 1).
+  if (options.dataframe_column_types && options.keep_once_per_case &&
+      options.scope == AttributeStatisticsScope::kEvents) {
+    bool level_ints = false, level_floats = false, level_others = false;
+    for (const auto& entry : result.entries) {
+      if (entry.type == "int") level_ints = true;
+      else if (entry.type == "float") level_floats = true;
+      else level_others = true;
+    }
+    if (level_ints && level_floats && !level_others) {
+      for (auto& entry : result.entries) {
+        if (entry.type != "int") continue;
+        entry.type = "float";
+        entry.value = python_float_repr(std::strtod(entry.value.c_str(), nullptr));
+      }
+    }
+  }
+  tally.finish();
+  return result;
 }
 
 }  // namespace minera

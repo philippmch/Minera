@@ -29,7 +29,7 @@ double parse_number(std::string_view text, std::string_view option) {
 
 std::vector<minera::DfgFilteringEdge> parse_paths(std::string_view text) {
   std::vector<minera::DfgFilteringEdge> result;
-  for (const auto& pair : minera::parse_activity_pairs(text))
+  for (const auto& pair : minera::parse_activity_pairs(text, true))  // literal labels
     result.emplace_back(pair.predecessor, pair.successor);
   return result;
 }
@@ -125,26 +125,19 @@ int main(int argc, char** argv) {
       } else if (argument == "--to-activity" || argument == "--to_activity") {
         if (++i >= argc)
           throw std::invalid_argument("--to-activity requires an activity");
+        // Labels are literal; "" names the empty label (review Y1).
         to_activity = std::string(argv[i]);
-        if (to_activity->empty())
-          throw std::invalid_argument("--to-activity requires a non-empty activity");
       } else if (argument == "--from-activity" ||
                  argument == "--from_activity") {
         if (++i >= argc)
           throw std::invalid_argument("--from-activity requires an activity");
         from_activity = std::string(argv[i]);
-        if (from_activity->empty())
-          throw std::invalid_argument(
-              "--from-activity requires a non-empty activity");
       } else if (argument == "--contain-activity" ||
                  argument == "--contain_activity") {
         if (++i >= argc)
           throw std::invalid_argument(
               "--contain-activity requires an activity");
         contain_activity = std::string(argv[i]);
-        if (contain_activity->empty())
-          throw std::invalid_argument(
-              "--contain-activity requires a non-empty activity");
       } else if (!argument.empty() && argument.front() == '-') {
         throw std::invalid_argument("unknown option: " + std::string(argument));
       } else {

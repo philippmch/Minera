@@ -636,20 +636,34 @@ std::optional<AttributeFilterMode> parse_attribute_filter_mode(
   return std::nullopt;
 }
 
-std::vector<ActivityPair> parse_activity_pairs(std::string_view text) {
+std::vector<ActivityPair> parse_activity_pairs(std::string_view text,
+                                               bool literal_labels) {
   const auto trim = [](std::string_view value) {
     const auto begin = value.find_first_not_of(' ');
     if (begin == std::string_view::npos) return std::string_view{};
     const auto end = value.find_last_not_of(' ');
     return value.substr(begin, end - begin + 1);
   };
+  // Literal labels: drop one padding space at the given end only.
+  const auto pad_front = [](std::string_view value) {
+    return !value.empty() && value.front() == ' ' ? value.substr(1) : value;
+  };
+  const auto pad_back = [](std::string_view value) {
+    return !value.empty() && value.back() == ' ' ? value.substr(0, value.size() - 1) : value;
+  };
 
   std::vector<ActivityPair> pairs;
   std::size_t start = 0;
   for (std::size_t i = 0; i <= text.size(); ++i) {
     if (i != text.size() && text[i] != ',') continue;
-    const auto entry = trim(text.substr(start, i - start));
+    const auto raw = text.substr(start, i - start);
+    const bool after_comma = start > 0;
     start = i + 1;
+    auto entry = literal_labels ? raw : trim(raw);
+    if (literal_labels) {
+      if (after_comma) entry = pad_front(entry);
+      if (entry.empty()) continue;  // stray comma
+    }
     if (entry.empty()) continue;  // stray comma or trailing whitespace
     const auto arrow = entry.find("->");
     if (arrow == std::string_view::npos) {
@@ -657,8 +671,10 @@ std::vector<ActivityPair> parse_activity_pairs(std::string_view text) {
           "succession filter: expected 'a -> b', got '" + std::string(entry) +
           "'");
     }
-    const auto predecessor = trim(entry.substr(0, arrow));
-    const auto successor = trim(entry.substr(arrow + 2));
+    const auto predecessor = literal_labels ? pad_back(entry.substr(0, arrow))
+                                            : trim(entry.substr(0, arrow));
+    const auto successor = literal_labels ? pad_front(entry.substr(arrow + 2))
+                                          : trim(entry.substr(arrow + 2));
     if (predecessor.empty() || successor.empty()) {
       throw std::invalid_argument(
           "succession filter: an activity is missing in '" +

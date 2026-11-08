@@ -10188,8 +10188,9 @@ void handle_dfg(const httplib::Request& request, httplib::Response& response) {
       filters.noise_threshold = ocel_query_number(request, "noise_threshold", 0.0);
       if (request.has_param("most_common_paths")) {
         std::vector<minera::DfgFilteringEdge> most_common_paths;
+        // Labels are literal (review Y1): only the separator padding goes.
         for (const auto& pair : minera::parse_activity_pairs(
-                 request.get_param_value("most_common_paths"))) {
+                 request.get_param_value("most_common_paths"), true)) {
           most_common_paths.emplace_back(pair.predecessor, pair.successor);
         }
         filters.most_common_paths = std::move(most_common_paths);
@@ -10208,12 +10209,10 @@ void handle_dfg(const httplib::Request& request, httplib::Response& response) {
     }
     filters.keep_all_activities = keep_all_activities;
 
+    // Labels are literal: an empty value names the activity "" (pm4py takes
+    // it as any other label; review Y1).
     const auto query_activity = [&](std::string_view name) {
-      const auto key = std::string(name);
-      const auto value = request.get_param_value(key);
-      if (value.empty())
-        throw std::invalid_argument(key + " must not be empty");
-      return value;
+      return request.get_param_value(std::string(name));
     };
     if (request.has_param("to_activity"))
       filters.to_activity = query_activity("to_activity");

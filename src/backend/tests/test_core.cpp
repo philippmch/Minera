@@ -6,6 +6,7 @@
 #include "../exact_stdev.hpp"
 #include "../performance_arithmetic.hpp"
 #include "minera/alpha_miner.hpp"
+#include "minera/attribute_statistics.hpp"
 #include "minera/bpmn.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
@@ -63,6 +64,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -4368,6 +4370,16 @@ void parse_activity_pairs_reads_the_arrow_syntax() {
   assert(throws([] { (void)minera::parse_activity_pairs("a, b"); }));
   assert(throws([] { (void)minera::parse_activity_pairs("a ->"); }));
   assert(throws([] { (void)minera::parse_activity_pairs("-> b"); }));
+
+  // Literal labels (DFG most_common_paths, review Y1): one space after a
+  // comma and one on each side of the arrow are padding, the rest is label.
+  const auto literal = minera::parse_activity_pairs("A -> B, C -> D", true);
+  assert(literal.size() == 2 && literal[0].predecessor == "A" && literal[0].successor == "B" &&
+         literal[1].predecessor == "C" && literal[1].successor == "D");
+  const auto padded = minera::parse_activity_pairs(" A  -> B ,a->b,", true);
+  assert(padded.size() == 2 && padded[0].predecessor == " A " && padded[0].successor == "B " &&
+         padded[1].predecessor == "a" && padded[1].successor == "b");
+  assert(throws([] { (void)minera::parse_activity_pairs("a -> ", true); }));
 }
 
 void filter_projects_activities() {
@@ -5263,6 +5275,52 @@ void csv_importer_captures_extra_columns_as_attributes() {
   assert(*events[1].attribute("amount") == "250");
   assert(events[1].attribute("resource") == nullptr);
   assert(events[1].resource == "bob");
+}
+
+void csv_na_spellings_in_attribute_cells_are_missing() {
+  // read_csv reads NaN, null, None, NA, n/a, ... in any column as NaN, so the
+  // batch import leaves resource, lifecycle and extra attribute cells holding
+  // one missing, like blank cells (review Y2-2). Stream readers keep them.
+  const std::string text =
+      "case_id,activity,timestamp,resource,lifecycle,channel\n"
+      "1,A,2026-01-01T00:00:00,NaN,null,None\n"
+      "1,B,2026-01-01T00:01:00,r1,complete,n/a\n"
+      "1,C,2026-01-01T00:02:00,null,NA,web\n"
+      "1,D,2026-01-01T00:03:00, None ,#N/A,nan\n";
+  {
+    std::istringstream input(text);
+    const auto data = minera::import_csv_event_data(input);
+    const auto& events = data.log.traces.front().events;
+    assert(events.size() == 4);
+    assert(events[0].resource.empty() && !events[0].has_resource());
+    assert(events[0].lifecycle.empty() && !events[0].has_lifecycle());
+    assert(events[0].attribute("channel") == nullptr);
+    assert(events[1].resource == "r1" && events[1].lifecycle == "complete");
+    assert(events[1].attribute("channel") == nullptr);
+    assert(events[2].resource.empty() && events[2].lifecycle.empty());
+    assert(*events[2].attribute("channel") == "web");
+    // Trimmed by default (declared), so " None " is NA as well.
+    assert(events[3].resource.empty() && events[3].lifecycle.empty());
+    assert(events[3].attribute("channel") == nullptr);
+    // The flat table holds the same missing cells.
+    const auto& row = data.table.rows.front();
+    for (std::size_t i = 3; i < 6; ++i) assert(row[i] && row[i]->value.empty());
+    assert(row[3]->first_class_state == minera::FirstClassAttributeState::kMissing);
+    minera::AttributeStatisticsOptions options;
+    options.attribute_key = "resource";
+    const auto counts = minera::discover_attribute_statistics(data.log, options);
+    assert(counts.entries.size() == 1 && counts.entries[0].value == "r1" &&
+           counts.entries[0].count == 1);
+  }
+  {
+    minera::CsvImportOptions stream;
+    stream.keep_na_first_class_values = true;
+    std::istringstream input(text);
+    const auto data = minera::import_csv_event_data(input, stream);
+    const auto& events = data.log.traces.front().events;
+    assert(events[0].resource == "NaN" && events[0].lifecycle == "null");
+    assert(*events[0].attribute("channel") == "None");
+  }
 }
 
 void xes_importer_captures_generic_event_attributes() {
@@ -6681,6 +6739,56 @@ void json_export_keeps_registered_empty_skeleton_activities() {
     rejected = true;
   }
   assert(rejected);
+}
+
+void json_export_prints_quality_metrics_at_full_precision() {
+  // Review Y2-1: footprints, token replay and alignment metrics keep their
+  // shortest round-trip double (pm4py's 33.333333333333336, 9/17), not the
+  // stream default of six significant digits.
+  const auto log = transition_test_log({{"a", "b"}, {"b"}});
+  const auto graph = minera::discover_directly_follows_graph(log);
+  minera::ModelConformance model;
+  model.miner = "inductive";
+  model.token_replay.fitness = 1.0 / 3.0;
+  model.token_replay.precision = 9.0 / 17.0;
+  model.token_replay.generalization = 1.0 / 7.0;
+  model.token_replay.simplicity = 5.0 / 7.0;
+  model.footprints.fitness = 7.0 / 9.0;
+  model.footprints.precision = 7.0 / 18.0;
+  minera::AlignmentResult alignments;
+  alignments.fitness = 29.0 / 33.0;
+  alignments.precision = 45.0 / 49.0;
+  minera::VariantAlignment variant;
+  variant.activities = {"a", "b"};
+  variant.count = 1;
+  variant.fitness = 5.0 / 7.0;
+  alignments.variants.push_back(variant);
+  model.alignments = alignments;
+  const std::vector<minera::ModelConformance> models{model};
+  minera::FootprintsAnalysis footprints;
+  footprints.precision = 9.0 / 17.0;
+  footprints.log_fitness = 55.0 / 63.0;
+  footprints.perc_fit_traces = 100.0 / 3.0;
+  const auto json = minera::analysis_json(
+      "test", log, graph, nullptr, nullptr, nullptr, &models, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, &footprints);
+  for (const char* expected :
+       {"\"metrics\": {\"precision\": 0.5294117647058824, \"log_fitness\": "
+        "0.873015873015873, \"perc_fit_traces\": 33.333333333333336}",
+        "\"token_replay\": {\"fitness\": 0.3333333333333333, \"precision\": "
+        "0.5294117647058824, \"generalization\": 0.14285714285714285, "
+        "\"simplicity\": 0.7142857142857143,",
+        "\"footprints\": {\"fitness\": 0.7777777777777778, \"precision\": "
+        "0.3888888888888889,",
+        "\"fitness\": 0.8787878787878788, \"precision\": 0.9183673469387755,",
+        "\"count\": 1, \"cost\": 0, \"fitness\": 0.7142857142857143,"}) {
+    if (json.find(expected) == std::string::npos) {
+      std::cerr << "missing: " << expected << '\n';
+      assert(false);
+    }
+  }
 }
 
 void json_export_carries_declare_contract() {
@@ -8578,6 +8686,48 @@ void csv_timestamps_review_v1_shapes() {
   assert(unconvertible("1,A,2024-01-01\n1,B,01/05/2024 3:08 Zpm\n"));
 }
 
+void csv_timestamps_review_y1_shapes() {
+  const auto import = [](const std::string& rows) {
+    std::istringstream input("case_id,activity,timestamp\n" + rows);
+    return minera::import_csv_event_data(input);
+  };
+  const auto stamp = [&](const std::string& cell) {
+    return import("1,A," + cell + "\n").log.traces.at(0).events.at(0).timestamp;
+  };
+  const auto unconvertible = [&](const std::string& cell) {
+    try { (void)import("1,A,2024-01-01\n2,B," + cell + "\n"); }
+    catch (const std::runtime_error& error) {
+      return std::string(error.what()).find("cannot be parsed") != std::string::npos;
+    }
+    return false;
+  };
+  // Y1-1: a fraction of a minute in 28-digit decimal arithmetic.
+  assert(stamp("2024-01-05 10:07.01" + std::string(28, '6')) == "2024-01-05 10:07:01");
+  assert(stamp("2024-01-05 10:07.01" + std::string(29, '6') + "7") == "2024-01-05 10:07:01");
+  assert(stamp("2024-01-05 10:07.983333333333333333333333333333334") == "2024-01-05 10:07:59");
+  assert(unconvertible("2024-01-05 10:07." + std::string(29, '9')));
+  // Y1-3: basic dates and clocks, a `T` after white space, runs of spaces,
+  // one-digit offsets, dotted and repeated AM/PM, an empty `.` fraction.
+  assert(stamp("20240105 11:07:52.123456789") == "2024-01-05 11:07:52.123456789");
+  assert(stamp("20240105T1107") == "2024-01-05 11:07:00");
+  assert(stamp("2024-01-05 110700.5") == "2024-01-05 11:07:00.5");
+  assert(stamp("2024-01-05 T13:38:54.123000456") == "2024-01-05 13:38:54.123000456");
+  assert(stamp("2057  8 31 10:00") == "2057-08-31 10:00:00");
+  assert(stamp("2024-01-05 3:08+5") == "2024-01-05 03:08:00+05:00");
+  assert(stamp("2024-01-05 3:08+5:3") == "2024-01-05 03:08:00+05:03");
+  assert(stamp("2024-01-05 3:08 p.m.") == "2024-01-05 15:08:00");
+  assert(stamp("2024-01-05 3:08 P.m.") == "2024-01-05 15:08:00");
+  assert(stamp("2024-01-05 3:08 a") == "2024-01-05 03:08:00");
+  assert(stamp("2024-01-05 12:30pm pm") == "2024-01-05 12:30:00");
+  assert(stamp("2024-01-05T09:32:02.") == "2024-01-05 09:32:02");
+  assert(unconvertible("01 05 2024  1  pm  -12:00"));
+  assert(unconvertible("2024-01-05 3:08pm pm"));
+  assert(unconvertible("2024-01-05 3:08 P.M."));
+  assert(unconvertible("\"20240105 11:07:52,5\""));
+  assert(unconvertible("2024-01-05 3:08+530"));
+  assert(unconvertible("2024-01-05 1107.5"));
+}
+
 void csv_timestamps_follow_pandas_resolution_and_offsets() {
   const auto import = [](const std::string& rows) {
     std::istringstream input("case_id,activity,timestamp\n" + rows);
@@ -8727,6 +8877,7 @@ int main() {
   mine_progress_names_native_families();
   csv_timestamps_follow_pandas_resolution_and_offsets();
   csv_timestamps_review_v1_shapes();
+  csv_timestamps_review_y1_shapes();
   csv_header_names_follow_read_csv();
   csv_case_ids_follow_reference_dtype_inference_and_order();
   csv_import_types_activities_case_attributes_and_relations_like_reference();
@@ -8900,6 +9051,7 @@ int main() {
   filter_prefix_suffix_support_strictness_and_occurrence();
   filter_event_log_follows_dataframe_cells();
   csv_importer_captures_extra_columns_as_attributes();
+  csv_na_spellings_in_attribute_cells_are_missing();
   xes_importer_captures_generic_event_attributes();
   xes_export_round_trips_generic_attributes();
   filter_attribute_events_mode_keeps_and_removes();
@@ -8941,6 +9093,7 @@ int main() {
   transition_system_empty_and_deterministic();
   transition_system_positional_options_and_invalid_enums();
   json_export_carries_declare_contract();
+  json_export_prints_quality_metrics_at_full_precision();
   json_export_carries_footprints_contract();
   json_export_carries_dfg_variants_contract();
   json_export_carries_correlation_mining_contract();
