@@ -71,4 +71,8 @@ Content-Type: application/octet-stream
     </finalmarkings>
   </net>
 </pnml>
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="export_generated_xes"
+
+true
 --OwnedOriginalModelPlayoutFeature59--

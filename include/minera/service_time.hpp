@@ -18,6 +18,10 @@ struct ServiceTimeOptions {
   DfgPerformanceAggregation aggregation = DfgPerformanceAggregation::kMean;
   bool use_business_hours = false;
   std::vector<BusinessHourSlot> business_hour_slots;
+  // Business-hour clock: false counts each timestamp's own wall clock (the
+  // EventLog path); true counts the UTC clock, as pm4py's DataFrame path does
+  // after format_dataframe converts a CSV offset.
+  bool dataframe = false;
 };
 
 struct ServiceTimeResult {

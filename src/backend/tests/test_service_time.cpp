@@ -61,5 +61,18 @@ int main() {
   try { (void)minera::discover_service_time(log, options); }
   catch (const std::invalid_argument&) { rejected = true; }
   assert(rejected);
+  // Review V2-1: one CSV row starting 06:30+02:00 and ending 08:00+02:00 on a
+  // Monday. pm4py's DataFrame service time with business hours counts the
+  // UTC clock (04:30 -> 06:00): 0; the wall clock would count 3600.
+  minera::EventLog offset;
+  minera::Trace row;
+  row.events = {event("A", "2024-01-01T06:30:00+02:00", "2024-01-01T08:00:00+02:00")};
+  offset.traces = {std::move(row)};
+  minera::ServiceTimeOptions business;
+  business.start_timestamp_key = "started_at";
+  business.use_business_hours = true;
+  assert(minera::discover_service_time(offset, business).values.at("A") == 3600.0);
+  business.dataframe = true;
+  assert(minera::discover_service_time(offset, business).values.at("A") == 0.0);
   std::cout << "Service-time tests passed\n";
 }

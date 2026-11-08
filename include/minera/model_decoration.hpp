@@ -24,7 +24,9 @@ namespace minera {
 // A trace replays cleanly when the reference token replay (the forward
 // replay of check_conformance, routing through silent transitions to the
 // final marking as pm4py's decorations do) fits it: no missing and no
-// remaining tokens. Its firings are the ones that replay activates.
+// remaining tokens (an activity outside the model is skipped, as the replay's
+// fitness skips it). Its firings are the ones that replay activates
+// (token_replay_firing_sequences).
 struct ModelDecoration {
   // Per transition, in PetriNet::transitions() order: firings across all
   // cleanly replaying traces, silent routing included.

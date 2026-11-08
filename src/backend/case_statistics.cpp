@@ -170,10 +170,13 @@ CaseStatisticsResult discover_case_statistics(
     const double end = required_timestamp(last, options.timestamp_key, "end");
     double duration = end - start;
     if (!slots.empty()) {
-      const auto local_start = local_wall_timestamp(
-          timestamp_text(first, options.timestamp_key, "start"));
-      const auto local_end = local_wall_timestamp(
-          timestamp_text(last, options.timestamp_key, "end"));
+      const auto clock = [&](std::string_view text) {
+        return options.dataframe ? parse_timestamp(text) : local_wall_timestamp(text);
+      };
+      const auto local_start =
+          clock(timestamp_text(first, options.timestamp_key, "start"));
+      const auto local_end =
+          clock(timestamp_text(last, options.timestamp_key, "end"));
       if (!local_start || !local_end)
         throw std::invalid_argument(
             "case statistics: invalid business-hours timestamp");

@@ -1,4 +1,5 @@
 #include "minera/evaluation.hpp"
+#include "minera/bpmn.hpp"
 #include "minera/json_export.hpp"
 #include "minera/precomputed_replay_json.hpp"
 #include "minera/pnml.hpp"
@@ -281,6 +282,37 @@ void cyclomatic_default_multiple_empty_preset_places() {
   auto s=evaluate_simplicity(n,SimplicityVariant::EXTENDED_CYCLOMATIC);
   assert(s.computed && s.vertices==4 && s.edges==4 && s.strongly_connected_components==4);
   assert(std::abs(s.value-4.0)<1e-12);
+}
+
+// Review V2-3: pm4py.write_bpmn of an alpha net with a disconnected part
+// (start->B->gateway without outgoing flow, gateway without incoming flow->A
+// ->end). pm4py's convert_to_petri_net gives im = source:1 and
+// simplicity_petri_net(..., "extended_cyclomatic") = 1. The server passes
+// that source marking for BPMN imports; the empty-marking default would put
+// a token on the dangling gateway's entry place too (4).
+void cyclomatic_bpmn_import_uses_conversion_source_marking() {
+  const std::string xml = R"(<?xml version="1.0" encoding="utf-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="t">
+<bpmn:process id="p" isExecutable="false">
+<bpmn:exclusiveGateway id="g1" gatewayDirection="Unspecified" name=""><bpmn:outgoing>f2</bpmn:outgoing></bpmn:exclusiveGateway>
+<bpmn:exclusiveGateway id="g2" gatewayDirection="Unspecified" name=""><bpmn:incoming>f1</bpmn:incoming></bpmn:exclusiveGateway>
+<bpmn:endEvent id="e" name="end"><bpmn:incoming>f3</bpmn:incoming></bpmn:endEvent>
+<bpmn:startEvent id="s" name="start"><bpmn:outgoing>f4</bpmn:outgoing></bpmn:startEvent>
+<bpmn:task id="ta" name="A"><bpmn:incoming>f2</bpmn:incoming><bpmn:outgoing>f3</bpmn:outgoing></bpmn:task>
+<bpmn:task id="tb" name="B"><bpmn:incoming>f4</bpmn:incoming><bpmn:outgoing>f1</bpmn:outgoing></bpmn:task>
+<bpmn:sequenceFlow id="f1" sourceRef="tb" targetRef="g2"/>
+<bpmn:sequenceFlow id="f2" sourceRef="g1" targetRef="ta"/>
+<bpmn:sequenceFlow id="f3" sourceRef="ta" targetRef="e"/>
+<bpmn:sequenceFlow id="f4" sourceRef="s" targetRef="tb"/>
+</bpmn:process></bpmn:definitions>)";
+  const auto net = minera::parse_bpmn(xml);
+  assert(net.has_source() && net.place_count() == 4 && net.transitions().size() == 2);
+  SimplicityOptions options;
+  options.initial_marking.assign(net.place_count(), 0);
+  options.initial_marking[net.source()] = 1;
+  const auto s = evaluate_simplicity(net, SimplicityVariant::EXTENDED_CYCLOMATIC, options);
+  assert(s.computed && s.vertices == 2 && s.edges == 1 && s.value == 1.0);
+  assert(evaluate_simplicity(net, SimplicityVariant::EXTENDED_CYCLOMATIC).value == 4.0);
 }
 
 void simplicity_counts_extended_arcs_and_accepts_finite_baselines() {
@@ -1072,7 +1104,7 @@ int main() {
   automaton_unions_shared_prefix_observations(); automaton_excludes_short_terminal_prefix_frequency();
   automaton_task_ids_disambiguate_duplicate_labels(); automaton_differs_from_alignment_precision_on_deviation();
   alignment_precision_excludes_unfit_prefixes();
-  cyclomatic_default_multiple_empty_preset_places(); default_variant_dispatch_follows_soundness();
+  cyclomatic_default_multiple_empty_preset_places(); cyclomatic_bpmn_import_uses_conversion_source_marking(); default_variant_dispatch_follows_soundness();
   simplicity_counts_extended_arcs_and_accepts_finite_baselines();
   precision_option_errors_preserve_variant_and_convert_trees();
   replay_fitness_excludes_unknown_activities_by_default();

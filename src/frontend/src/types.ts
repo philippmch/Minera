@@ -5048,6 +5048,11 @@ export type ModelConformance = {
   error?: string;
   /** Whether the model's final marking is reachable — the bar for alignment. */
   sound: boolean;
+  /**
+   * With sound false: the reachability search stopped at its state budget
+   * before deciding, so the model is not known to be unsound. Absent otherwise.
+   */
+  reachability_exhausted?: true;
   token_replay: Conformance;
   /** Footprint comparison; absent in older exports. */
   footprints?: Footprints;
@@ -5057,6 +5062,7 @@ export type ModelConformance = {
   computed: false;
   error: string;
   sound: null;
+  reachability_exhausted?: never;
   token_replay: null;
   footprints: null;
   alignments?: never;
@@ -5285,6 +5291,27 @@ export interface ExtensivePlayoutVisitedResult {
   trace_limit_reached: boolean;
   state_limit_reached: boolean;
   traces: PlayoutVisitedElement[][];
+}
+
+/** The server writes each transition's label once, in transition_labels,
+ * and a visited transition element carries only its index. This returns the
+ * established shape: every transition element with its activity (when its
+ * index has a label) and no transition_labels. Anything else is returned as
+ * it is. */
+export function expandPlayoutVisitedResult(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const { transition_labels: labels, ...rest } = value as Record<string, unknown>;
+  if (!Array.isArray(labels) || !Array.isArray(rest.traces)) return value;
+  return {
+    ...rest,
+    traces: rest.traces.map((trace: unknown) => !Array.isArray(trace) ? trace : trace.map((element: unknown) => {
+      if (!element || typeof element !== "object") return element;
+      const item = element as Record<string, unknown>;
+      return item.kind === "transition" && Number.isSafeInteger(item.transition) &&
+        (item.transition as number) >= 0 && (item.transition as number) < labels.length && !("activity" in item)
+        ? { ...item, activity: labels[item.transition as number] } : element;
+    })),
+  };
 }
 
 export function isBasicPlayoutVisitedResult(
@@ -6369,8 +6396,9 @@ export interface CaseArrivalOptions {
 export interface CaseArrivalResult {
   family: "CASE_ARRIVAL";
   variant: "CLASSIC";
-  arrival_average: number;
-  dispersion_average: number;
+  /** null: NaN, the DataFrame path's mean over a single case (no gaps). */
+  arrival_average: number | null;
+  dispersion_average: number | null;
   timed_starts: number;
   timed_ends: number;
 }
@@ -6378,10 +6406,10 @@ export interface CaseArrivalResult {
 export function isCaseArrivalResult(value: unknown): value is CaseArrivalResult {
   if (typeof value !== "object" || value === null) return false;
   const data = value as Partial<CaseArrivalResult>;
+  const average = (item: unknown) => item === null ||
+    (typeof item === "number" && Number.isFinite(item) && item >= 0);
   return data.family === "CASE_ARRIVAL" && data.variant === "CLASSIC" &&
-    typeof data.arrival_average === "number" && Number.isFinite(data.arrival_average) &&
-    data.arrival_average >= 0 && typeof data.dispersion_average === "number" &&
-    Number.isFinite(data.dispersion_average) && data.dispersion_average >= 0 &&
+    average(data.arrival_average) && average(data.dispersion_average) &&
     typeof data.timed_starts === "number" && Number.isInteger(data.timed_starts) &&
     data.timed_starts >= 0 && typeof data.timed_ends === "number" &&
     Number.isInteger(data.timed_ends) && data.timed_ends >= 0;

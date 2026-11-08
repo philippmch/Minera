@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatDuration, isDfgPetriConversionResult, isDfgPrecisionResult, isDfgPlayoutVariantsResult, isDfgVariantsAnalysis, isBasicPlayoutVisitedResult, isProcessTreePlayoutSetResult, isTriePetriConversionResult, isEmdResult, isMineraExport, isPowlNode, isRandomTreeResult, isTimestampInterleavingsResult, isMonteCarloResult, isModelEvaluation, isLogToFeaturesResult, isLogUtilityResult, isEmbeddingResult, isEmbeddingSimilarityResult, isLabelSplittingResult, isILPMinerResult, isGeneticMinerResult, isTraceVariantQueryResult, isOrganizationalSnaResult, isRoleDiscoveryResult, isResourceProfilesResult, isLocalDiagnosticsResult, isNetworkAnalysisResult, isClusteringResult, isProfileClusteringResult, isOcelDiscoveryResult, isOcelPlayoutResult, isOcelEnrichmentResult, isOcelObjectGraphResult, isOcelHeterogeneousGraphResult, isOcelFeatureResult, isOcelStatisticsResult, isOcelDescriptionResult, isOcelSqliteResult, isOcelExchangeResult, isProcessCubeResult, isProcessCubeTable, isStreamingDfgResult, isStreamingFootprintsResult, isStreamingTemporalResult, isStreamingTbrResult, isDataPetriNetResult, isChaoticActivitiesResult, isPassedTimeResult, isServiceTimeResult, isReworkResult, isCycleTimeResult, isCaseArrivalResult, isCaseStatisticsResult, isAttributeStatisticsResult, isAttributeDistributionResult, isAttributeKdeResult, isBoundaryActivitiesResult, isVariantStatisticsResult, isPetriAnalysisResult, isPetriAnalysisDiagnosticsFragment, isConceptDriftResult, isPetriNetReductionResult, type MineraExport } from "../src/types";
-import { isGeneticMatrixConversionResult, isStochasticMapResult } from "../src/types";
+import { expandPlayoutVisitedResult, isGeneticMatrixConversionResult, isStochasticMapResult } from "../src/types";
 import { isBrowserHistoryResult } from "../src/types";
 import { isWindowsEventsResult } from "../src/types";
 import { isTemporalConformanceResult } from "../src/types";
@@ -84,6 +84,23 @@ describe("isBasicPlayoutVisitedResult", () => {
   };
   it("accepts the discriminated visitation envelope", () => {
     expect(isBasicPlayoutVisitedResult(valid)).toBe(true);
+  });
+  it("expands transition_labels back into each transition element", () => {
+    const compact = {
+      family: "PETRI_PLAYOUT_VISITED", variant: "BASIC_PLAYOUT",
+      truncated: false, trace_limit_reached: false, state_limit_reached: false,
+      transition_labels: [null, "B"],
+      traces: [[
+        { kind: "marking", marking: [1, 0] },
+        { kind: "transition", transition: 0 },
+        { kind: "marking", marking: [0, 1] },
+      ]],
+    };
+    expect(isBasicPlayoutVisitedResult(compact)).toBe(false);
+    const expanded = expandPlayoutVisitedResult(compact);
+    expect(JSON.stringify(expanded)).toBe(JSON.stringify(valid));
+    expect(isBasicPlayoutVisitedResult(expanded)).toBe(true);
+    expect(expandPlayoutVisitedResult(valid)).toBe(valid);
   });
   it("rejects malformed elements", () => {
     expect(isBasicPlayoutVisitedResult({ ...valid, truncated: "false" })).toBe(false);
@@ -814,8 +831,11 @@ describe("isCaseArrivalResult", () => {
     timed_starts: 3, timed_ends: 3,
   };
   it("accepts the arrival envelope", () => expect(isCaseArrivalResult(valid)).toBe(true));
+  it("accepts null (NaN) averages of a single-case DataFrame source", () =>
+    expect(isCaseArrivalResult({ ...valid, arrival_average: null, dispersion_average: null, timed_starts: 1, timed_ends: 1 })).toBe(true));
   it("rejects invalid averages and counts", () => {
     expect(isCaseArrivalResult({ ...valid, arrival_average: -1 })).toBe(false);
+    expect(isCaseArrivalResult({ ...valid, dispersion_average: "NaN" })).toBe(false);
     expect(isCaseArrivalResult({ ...valid, timed_ends: 1.5 })).toBe(false);
   });
 });

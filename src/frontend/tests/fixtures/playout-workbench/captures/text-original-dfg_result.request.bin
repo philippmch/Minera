@@ -24,4 +24,8 @@ B
 1x1
 0>1x1
 
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="export_generated_xes"
+
+true
 --OwnedOriginalModelPlayoutFeature59--

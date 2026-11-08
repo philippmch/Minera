@@ -633,7 +633,9 @@ CTMC projection eliminates priority-filtered silent routing with normalized
 activation weights and exposes the projected initial probability vector.
 Basic Petri sampling can also opt into a structured visitation response: each
 trace alternates marking snapshots with fired transition indices (including
-silent transitions), with transition activity labels where available. The
+silent transitions); each transition's activity label (null when silent) is
+written once in `transition_labels`, and the typed frontend adapters put it
+back on each transition element as `activity`. The
 native serializer, CLI JSON output, generic endpoint, and typed
 `fetchBasicPlayoutVisited` adapter share the `PETRI_PLAYOUT_VISITED`/
 `BASIC_PLAYOUT` envelope.
@@ -18880,9 +18882,12 @@ Declared:
 - **Empty OCEL 2.0 JSON (declared).** A filter that keeps nothing downloads
   a valid empty OCEL; pm4py's `read_ocel2_json` raises `KeyError:
   'ocel:timestamp'` on an empty event list.
-- **XES offsets.** Downloads write each timestamp's own clock and offset;
-  pm4py reads XES dates as wall-clock UTC, so it reads the download exactly
-  as it reads the source file.
+- **XES offsets.** Downloads of an XES source write each timestamp's own
+  clock and offset; pm4py reads XES dates as wall-clock UTC, so it reads the
+  download exactly as it reads the source file. Downloads of a CSV source
+  write UTC (`+00:00`), as pandas-normalized pm4py does (`format_dataframe`
+  converts offsets to UTC), so the download reads back to the CSV's instants
+  (review V2).
 
 ## Model conversion matrix (2026-11-05)
 
@@ -19203,3 +19208,171 @@ Tests: `minera_core_tests`
 (`csv_timestamps_follow_pandas_resolution_and_offsets`,
 `mine_progress_names_native_families`), `minera_alignment_variants_tests`
 (reset-arc and repeated-weight nets), frontend `mine-progress.test.ts`.
+
+## Review V1: reachability on non-ordinary nets, decoration replay cost, CSV timestamp shapes (2026-11-08)
+
+Fixes after a review of Round U, checked against pm4py 2.7.22 and
+`pandas.read_csv` + `pm4py.format_dataframe` outputs only.
+
+- **Reachability no longer stalls on non-ordinary nets.** Since Round U the
+  pruned model-run search applied no marking-equation bound to nets with
+  reset or inhibitor arcs or repeated weighted input arcs, which made it the
+  same uniform-cost search as the first preflight. A net with an unbounded
+  cost-0 silent pump (`source → τ → p1`, `τ: p1 → p1 + q`, `a: p1 → sink`)
+  then exhausted both searches, and `final_marking_reachable` reported a
+  reachable net as unreachable ("unsound") when it had an inhibitor arc on an
+  always-empty place, a reset arc, or one dead transition with two weight-2
+  inputs. Now:
+  - inhibitor arcs keep the marking-equation bounds: they only restrict when
+    a transition is enabled, and the firing still adds its incidence column,
+    so the relaxation stays valid;
+  - on nets with reset arcs or repeated weighted inputs (where the equation
+    does not describe firing) the fallback is a breadth-first search over
+    firing counts with the same state budget, which a cost-0 pump cannot
+    stall (the four nets above are reachable);
+  - the trace-alignment LP heuristic is off on the same nets (it was off only
+    for reset and inhibitor arcs), so the state-equation A* aligns `<a, b>` on
+    a net where `b` has two weight-2 inputs instead of reporting it exhausted;
+  - the soundness check of `/api/mine`, active-source mining, the imported
+    model route and `minera_export` keeps "the search stopped at its budget"
+    apart from "unreachable" (`final_marking_reachability`); the model
+    conformance JSON then carries `"reachability_exhausted": true` next to
+    `"sound": false` (absent otherwise), and the frontend says the soundness
+    check reached its limit instead of calling the model unsound, and still
+    offers alignments (whose own state limit can be raised).
+  Tests: `minera_core_tests` (`final_marking_reachability_keeps_exhausted_apart`),
+  `minera_alignment_variants_tests`, frontend `alignment-uncomputed.test.ts`.
+- **Decoration replay cost.** The Round U decoration replayed every variant
+  through `replay_token_traces`, which also computes each row's enabled
+  transitions at the reached marking; that was about two thirds of its time
+  (50,000 random cases, 48,085 variants: Heuristics net 11.3 s, Inductive
+  8.8 s). The decoration now takes the same rows without the enabled
+  transitions (`token_replay_firing_sequences`): 4.6 s and 6.9 s (Alpha 1.6
+  s, mostly the bounded search on the variants the replay rejects). Decorations
+  are byte-identical to Round U on 56 random logs and nets (mined inductive,
+  Heuristics and Alpha nets, process trees with duplicate labels) except the
+  one trace of the next item; transition counts still equal pm4py's token
+  replay activations over fitting traces on the mined nets. Reusing the rows of the
+  `/api/mine` conformance replay was not done: that replay follows the
+  request's token-replay options and per-miner activity keys, and records no
+  per-event firings, so its rows are not the decoration's.
+- **Activities outside the model.** The decoration skipped a trace that holds
+  an activity the net lacks although the token replay (and pm4py) count it
+  fit, since the replay skips such events (`e, d, b, d, b, d, a` against a net
+  without `a`). It is now decorated with the other events' firings; the
+  skipped event fires nothing. Test: `minera_core_tests`
+  (`decorate_model_skips_activities_outside_the_model`).
+- **CSV: fractions past 18 digits.** pandas' ISO path reads at most 18
+  fraction digits; a longer fraction goes through dateutil and keeps
+  microseconds (`2024-07-16T17:50:56.3650503944960724188` is `.365050`), as
+  any dateutil fraction does, including the zero-microseconds rule
+  (`.123000456496072418801` keeps `.123000456`). The importer kept
+  nanoseconds.
+- **CSV: offset minutes 60-99.** dateutil adds them to the hours while the
+  offset stays below 24 hours (`+01:90` is +02:30, `-0099` is -01:39,
+  `+23:60` fails); the fraction is then truncated to microseconds. The
+  importer kept such a column as text.
+- **CSV: mixed date separators.** Two different separators among `-`, `/`
+  and white space read as dateutil reads them: `2024-12/07`, `2024 3/5`,
+  `25-12/2024`, `07 12-2024` (month-first unless the first number cannot be
+  a month), a leading four-digit year literal when joined (`0005-06/19` is
+  year 5) and a number after a space (`0005 06-19` is 2019-05-06); a
+  trailing year is joined by its own `-` or `/` after a space (`28 07-0057`
+  is year 57) but a plain number after another joined separator
+  (`15-04/0001` is 2001); a leading number above 31 is a literal year before
+  a space (`57 7/0001` is 0057-07-01) and two-digit otherwise (`33-01 0011`
+  is 2033-01-11). These cells are on dateutil's path (microseconds).
+  Fuzz: 13,811 fresh one- to four-row columns (seeds 9101, 7331, 5150, 4242,
+  8888, 6161-6464 and a separator matrix): every remaining mismatch is a
+  declared year-0 shape or a `.` mix below. Test: `minera_core_tests`
+  (`csv_timestamps_review_v1_shapes`).
+
+Declared:
+
+- **Date separators mixed with `.` (declared).** dateutil reads a token such
+  as `12.07` as a decimal number, so mixes with `.` follow rules of their own:
+  `07.12-2024`, `25-12.2024` and `07/12.2024` read day/month first as dates
+  alone but are text with a clock; `2024.12 07` is 2024-07-01 and
+  `2024 12.07` 2024-12-01; `2024-12.07` and `2024.12-07` are text. The
+  importer keeps every such cell as text (a column of them stays text, and
+  next to dates it is refused).
+
+## Review V2: business-hour clocks, CSV XES offsets, BPMN markings, playout size (2026-11-08)
+
+Fixes after a random-input sweep against pm4py (public API outputs only).
+
+- **V2-1 Business hours on the DataFrame clock.** Case durations
+  (`CaseStatisticsOptions`), service time (`ServiceTimeOptions`) and passed
+  time (`PassedTimeOptions`) take `dataframe`: business hours then count on
+  the UTC clock (a CSV offset converted, as `format_dataframe` converts
+  it), as the DFG already did; off, each timestamp's own wall clock (the
+  EventLog path). Passed time keeps its EventLog arithmetic
+  (`DfgStatisticalOptions::business_hours_utc_clock`). The server sets it
+  for CSV and XES sources, `minera_export` always. `06:30+02:00` to
+  `08:00+02:00` with 07:00-17:00 hours: 3600 s on the wall clock, 0 s on
+  the UTC clock (04:30-06:00), as pm4py's DataFrame functions give.
+- **V2-2 CSV sources download UTC XES.** `XesExportOptions::utc_timestamps`
+  writes each offset timestamp as its UTC instant with `+00:00` (the
+  fraction digits kept); the server sets it with `standard_keys` (CSV
+  sources). pm4py reads XES dates as wall-clock UTC, so `+02:00` read two
+  hours off; the download now reads back to the CSV's instants. XES
+  sources keep their own offsets (see "UI downloads read back with pm4py").
+- **V2-3 BPMN and PTML imports: simplicity's marking.** An imported model
+  without a PNML document now gives extended cyclomatic simplicity the
+  conversion's initial marking (one token on its source, pm4py's
+  `convert_to_petri_net` im), not one token on every input-free place,
+  which a BPMN conversion leaves in dangling gateways or disconnected parts.
+- **V2-4 BPMN-converted nets and alignment precision (declared).** Minera's
+  BPMN conversion gives a net with the same labels, places, arcs and
+  markings as `convert_to_petri_net`, but pm4py's alignment precision on
+  its own conversion depends on internal names and iteration order: on
+  `q17.bpmn` pm4py gives 0.41463414634146345 on its conversion (also after
+  a PNML round trip), 0.41975308641975306 on Minera's exported net (Minera's
+  value) and 0.4533 with transitions renamed. No black-box rule
+  reproduces it, so the difference is declared.
+- **V2-5 Single-case arrival and dispersion on the DataFrame path are
+  NaN** (pandas' mean of no gaps), written as `null` like other NaN
+  statistics; the EventLog path keeps 0.
+- **Generalization summation order (S-1).** `evaluate_generalization` sums
+  the fired transitions in the order they first fire, trace by trace, then
+  1 for each unfired transition. In net order the sum differed in its last
+  bits (repro `q76`: 0.36024727322755135 vs 0.36024727322755146). This order
+  matched pm4py on 150 of 150 random nets (net order 122, `fsum` 113).
+  The mine view's `compute_generalization` (conformance.cpp) still sums
+  in net order.
+- **Playout responses.** `/api/playout-workbench` sends generated logs as a
+  compact native_state (`serialize_active_source_log_compact_json`):
+  `legacy_view` is null, `defaults` hold the first trace's and event's
+  fields, `activity_table` each activity once, and each event writes only
+  `activity_ref` and the fields that differ. The frontend
+  (`expandPlayoutEvents`) rebuilds every complete event for the
+  generated-events table. The generated log's XES is opt-in
+  (`export_generated_xes=true`); the frontend asks again with it when the
+  XES is downloaded or opened, and refuses the XES if the repeated run's
+  result differs. `/api/playout` visited JSON writes `transition_labels`
+  once, and the typed adapters put `activity` back on each element, so
+  the shown and downloaded JSON is unchanged. 10,000 cases of a
+  5-transition sequence with 200-character names: response 97.7 MB (gzip
+  1.40 MB) to 3.86 MB (gzip 0.17 MB), 22.1 MB with the XES; server peak RSS
+  511 MB to 156 MB; time 2.1 s to 1.0 s. Recaptured fixtures: the 48
+  unchanged entries are byte-identical, the 50 changed ones differ only in
+  the encoding (checked by expanding them against the old responses), and
+  every generated XES is byte-identical.
+
+Fuzz against the new server: business-hour passed time and DFG on CSV logs with
+offsets (60 logs), business-hour service time (80): no mismatch. BPMN
+round-trip quality (60): only the declared V2-4 alignment precision. PNML
+quality (60 + 80) and XES download round trips (60): no new mismatch. The
+remaining fuzzer reports compare pm4py's in-memory net, not the PNML it
+wrote; on the read-back net pm4py and Minera agree bit for bit. A
+CSV with `+02:00` offsets downloads `+00:00` XES that `read_xes` reads back to
+`format_dataframe`'s instants.
+
+Tests: `minera_case_statistics_tests`, `minera_service_time_tests`,
+`minera_passed_time_tests`, `minera_case_arrival_tests`,
+`minera_xes_io_tests` (`csv_downloads_write_utc_timestamps`),
+`minera_evaluation_tests` (`cyclomatic_bpmn_import_uses_conversion_source_marking`),
+`minera_playout_tests`, `minera_playout_workbench_json_tests`
+(`compact_generated_log_writes_each_event_once`),
+`minera_active_event_source_tests`; frontend `types.test.ts`,
+`playout-workbench.test.ts`, `playout-workbench-fixtures.test.ts` (recaptured).

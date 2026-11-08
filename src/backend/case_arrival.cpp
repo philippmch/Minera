@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <stdexcept>
@@ -225,7 +226,10 @@ double numpy_pairwise_sum(const double* values, std::size_t n) {
 // divided by the count, rounded once (a running double sum can be an ulp
 // off). The DataFrame path takes numpy's mean of the gaps in time order.
 double average_gaps(std::vector<double> values, bool dataframe) {
-  if (values.empty()) return 0.0;
+  // pm4py's DataFrame path takes the mean of an empty gap series (one case):
+  // NaN. The EventLog path returns 0.0.
+  if (values.empty())
+    return dataframe ? std::numeric_limits<double>::quiet_NaN() : 0.0;
   if (dataframe)
     return numpy_pairwise_sum(values.data(), values.size()) / static_cast<double>(values.size());
   return detail::exact_mean(values);

@@ -2464,6 +2464,29 @@ void decorate_model_skips_deviating_and_untimed_traces() {
   }
 }
 
+void decorate_model_skips_activities_outside_the_model() {
+  // Review V1: a trace with an activity the net lacks fits the token replay
+  // (the replay skips the event, as pm4py's does) and is decorated with the
+  // other events' firings; the skipped event fires nothing.
+  minera::PetriNet net;
+  const auto source = net.add_place(), middle = net.add_place(), sink = net.add_place();
+  net.set_source(source);
+  net.set_sink(sink);
+  net.set_activities({"a", "b"});
+  net.add_transition(0, {source}, {middle});
+  net.add_transition(1, {middle}, {sink});
+  const auto log = log_from_variants({{"a", "x", "b"}, {"a", "b"}});
+  const auto replay = minera::replay_token_diagnostics(log, net);
+  assert(replay.fitting_traces == 2);
+  const auto decoration = minera::decorate_model(log, net);
+  assert(decoration.decorated_traces == 2);
+  assert((decoration.transition_counts == std::vector<std::uint64_t>{2, 2}));
+  assert(decoration.message.empty());
+  const auto sequences = minera::token_replay_firing_sequences(net, {{"a", "x", "b"}, {"a", "c"}});
+  assert(sequences[0] && sequences[0]->size() == 4 && (*sequences[0])[1].empty());
+  assert(!sequences[1]);
+}
+
 void decorate_model_fits_parallel_optional_loops() {
   // Random cases over eight activities mine to a parallel of eight
   // xor(tau, loop(a, tau)) branches; closing them toward the sink spans
@@ -2515,9 +2538,21 @@ void decorate_model_fits_parallel_optional_loops() {
   assert(capped.message.find("search bound") != std::string::npos);
   assert(capped.message.find("skipped") != std::string::npos);
 
-  // Nothing fits: the message says so instead of an unexplained zero.
+  // Activities outside the model are skipped, as the token replay skips
+  // them (Review V1): every branch can close silently, so these fit.
   const auto foreign = log_from_variants({{"x"}, {"y", "z"}});
-  const auto empty = minera::decorate_model(foreign, net);
+  const auto skipped = minera::decorate_model(foreign, net);
+  assert(skipped.decorated_traces == 2 && skipped.message.empty());
+
+  // Nothing fits: the message says so instead of an unexplained zero.
+  minera::PetriNet sequence;
+  const auto start = sequence.add_place(), middle = sequence.add_place(), end = sequence.add_place();
+  sequence.set_source(start);
+  sequence.set_sink(end);
+  sequence.set_activities({"a", "b"});
+  sequence.add_transition(0, {start}, {middle});
+  sequence.add_transition(1, {middle}, {end});
+  const auto empty = minera::decorate_model(log_from_variants({{"b"}, {"a", "a"}}), sequence);
   assert(empty.decorated_traces == 0 && empty.capped_variants == 0);
   assert(empty.message == "no trace replays cleanly on this model, so it carries no decoration");
 }
@@ -3362,6 +3397,74 @@ void json_export_carries_the_alignment_contract() {
       minera::check_alignment(unknown, tau_net, tau_options), tau_graph);
   assert(tau_json.find("\"activity\": null") != std::string::npos);
   assert(tau_json.find("\"silent\": true") != std::string::npos);
+}
+
+void final_marking_reachability_keeps_exhausted_apart() {
+  // Review V1. A silent pump p1 -> p1 + q that is never drained gives an
+  // unbounded cost-0 silent closure, so the uniform-cost run never reaches
+  // the visible `a` (one firing away). The marking-equation A* prunes the
+  // pumped markings; where that equation does not describe firing (a reset
+  // arc, two weighted input arcs on one place) a breadth-first search over
+  // firing counts finds the run. An inhibitor arc keeps the marking
+  // equation valid.
+  using minera::FinalMarkingReachability;
+  const auto pumped = [](int variant) {
+    minera::PetriNet net;
+    const auto source = net.add_place(), p1 = net.add_place(), q = net.add_place(),
+               sink = net.add_place(), empty = net.add_place();
+    net.set_activities({"a"});
+    net.add_transition(std::nullopt, {source}, {p1});
+    net.add_transition(std::nullopt, {p1}, {p1, q});
+    const auto a = net.add_transition(0, {p1}, {sink});
+    if (variant == 1) net.add_inhibitor_arc(a, empty);
+    if (variant == 2) {
+      const auto y = net.add_place();
+      const auto dead = net.add_transition(std::nullopt, {y, y}, {sink});
+      minera::PetriArcWeight two{};
+      two.magnitude = 2;
+      net.set_ordinary_arc_weights(dead, {two, two}, {});
+    }
+    if (variant == 3) net.add_reset_arc(a, net.add_place());
+    net.set_source(source);
+    net.set_sink(sink);
+    return net;
+  };
+  for (int variant = 0; variant < 4; ++variant) {
+    const auto net = pumped(variant);
+    assert(minera::final_marking_reachable(net));
+    assert(minera::final_marking_reachability(net) == FinalMarkingReachability::kReachable);
+  }
+  // No run reaches the sink: a bounded net is unreachable, the pumped one
+  // runs out of states without deciding.
+  minera::PetriNet bounded;
+  {
+    const auto source = bounded.add_place(), sink = bounded.add_place(), stuck = bounded.add_place();
+    bounded.set_activities({"a"});
+    const auto a = bounded.add_transition(0, {source}, {stuck});
+    bounded.add_reset_arc(a, sink);
+    bounded.set_source(source);
+    bounded.set_sink(sink);
+  }
+  assert(minera::final_marking_reachability(bounded) == FinalMarkingReachability::kUnreachable);
+  minera::PetriNet endless;
+  {
+    const auto source = endless.add_place(), p1 = endless.add_place(), q = endless.add_place(),
+               sink = endless.add_place();
+    endless.set_activities({"a"});
+    endless.add_transition(std::nullopt, {source}, {p1});
+    const auto pump = endless.add_transition(std::nullopt, {p1}, {p1, q});
+    endless.add_reset_arc(pump, sink);
+    endless.set_source(source);
+    endless.set_sink(sink);
+  }
+  assert(minera::final_marking_reachability(endless) == FinalMarkingReachability::kExhausted);
+  assert(!minera::final_marking_reachable(endless));
+  // The JSON says "not decided" rather than only "unsound".
+  minera::ModelConformance model;
+  minera::set_model_soundness(model, FinalMarkingReachability::kExhausted);
+  assert(!model.sound && model.reachability_exhausted);
+  minera::set_model_soundness(model, FinalMarkingReachability::kUnreachable);
+  assert(!model.sound && !model.reachability_exhausted);
 }
 
 void final_marking_reachable_distinguishes_sound_nets() {
@@ -8374,6 +8477,54 @@ void csv_import_types_activities_case_attributes_and_relations_like_reference() 
 // cells keep nanoseconds (dateutil shapes keep microseconds), offsets run up
 // to 23:59, `YYYY-Mon-DD` reads, and a column that a long ISO fraction puts at
 // nanosecond resolution cannot hold a date outside 1677-2262.
+void csv_timestamps_review_v1_shapes() {
+  const auto import = [](const std::string& rows) {
+    std::istringstream input("case_id,activity,timestamp\n" + rows);
+    return minera::import_csv_event_data(input);
+  };
+  const auto stamps = [&](const std::string& rows) {
+    std::vector<std::string> out;
+    for (const auto& trace : import(rows).log.traces)
+      for (const auto& event : trace.events) out.push_back(event.timestamp);
+    return out;
+  };
+  const auto unconvertible = [&](const std::string& rows) {
+    try { (void)import(rows); }
+    catch (const std::runtime_error& error) {
+      return std::string(error.what()).find("cannot be parsed") != std::string::npos;
+    }
+    return false;
+  };
+  using V = std::vector<std::string>;
+  // More than 18 fraction digits leave pandas' ISO path: microseconds only,
+  // unless microsecond digits 4-6 are zero; 18 digits keep nanoseconds.
+  assert((stamps("1,A,2024-07-16T17:50:56.3650503944960724188\n") ==
+          V{"2024-07-16 17:50:56.365050"}));
+  assert((stamps("1,A,2024-07-16 17:50:56.3650503944960724188+01:00\n") ==
+          V{"2024-07-16 17:50:56.365050+01:00"}));
+  assert((stamps("1,A,2024-07-16T17:50:56.123000456496072418801\n") ==
+          V{"2024-07-16 17:50:56.123000456"}));
+  assert((stamps("1,A,2024-07-16T17:50:56.365050394496072418\n") ==
+          V{"2024-07-16 17:50:56.365050394"}));
+  // Offset minutes 60-99 add to the hours below 24 hours (dateutil path).
+  assert((stamps("1,A,2024-01-01T10:00:00.123456789+0190\n2,B,2024-01-01 10:00:00-0099\n") ==
+          V{"2024-01-01 10:00:00.123456+02:30", "2024-01-01 10:00:00-01:39"}));
+  assert(unconvertible("1,A,2024-01-01\n1,B,2024-01-01T10:00:00+23:60\n"));
+  // Mixed `-`, `/` and white-space date separators read as dateutil does;
+  // a mix with `.` stays text.
+  assert((stamps("1,A,2024-12/07T10:00:00.123456789\n2,B,2024 3/5 10:00\n"
+                 "3,C,25-12/2024\n4,D,07 12-2024\n5,E,0005-06/19\n6,F,0005 06-19\n") ==
+          V{"2024-12-07 10:00:00.123456", "2024-03-05 10:00:00", "2024-12-25 00:00:00",
+            "2024-07-12 00:00:00", "0005-06-19 00:00:00", "2019-05-06 00:00:00"}));
+  // The trailing year after mixed separators: joined after a space, a plain
+  // (two-digit) number after another joined separator.
+  assert((stamps("1,A,15-04/0001\n2,B,28 07-0057\n3,C,57 7/0001\n4,D,33-01 0011\n") ==
+          V{"2001-04-15 00:00:00", "0057-07-28 00:00:00", "0057-07-01 00:00:00",
+            "2033-01-11 00:00:00"}));
+  assert(unconvertible("1,A,2024-01-01\n1,B,2024.12-07\n"));
+  assert(unconvertible("1,A,2024-01-01\n1,B,2024-12.07 10:00:00\n"));
+}
+
 void csv_timestamps_follow_pandas_resolution_and_offsets() {
   const auto import = [](const std::string& rows) {
     std::istringstream input("case_id,activity,timestamp\n" + rows);
@@ -8522,6 +8673,7 @@ int main() {
   csv_import_matches_reference_dataframe_flow();
   mine_progress_names_native_families();
   csv_timestamps_follow_pandas_resolution_and_offsets();
+  csv_timestamps_review_v1_shapes();
   csv_header_names_follow_read_csv();
   csv_case_ids_follow_reference_dtype_inference_and_order();
   csv_import_types_activities_case_attributes_and_relations_like_reference();
@@ -8613,6 +8765,7 @@ int main() {
   decorate_model_moves_arc_weights();
   decorate_model_skips_deviating_and_untimed_traces();
   decorate_model_fits_parallel_optional_loops();
+  decorate_model_skips_activities_outside_the_model();
   decorate_model_treats_missing_custom_timestamps_as_untimed();
   ptml_round_trip_preserves_replay_behavior();
   parse_ptml_reads_a_foreign_tree();
@@ -8638,6 +8791,7 @@ int main() {
   alignment_diagnoses_an_inserted_activity();
   json_export_carries_the_alignment_contract();
   final_marking_reachable_distinguishes_sound_nets();
+  final_marking_reachability_keeps_exhausted_apart();
   alignment_scores_a_sound_alpha_net();
   alignment_flags_an_unsound_net();
   alignment_prunes_an_unbounded_net_with_dead_growth();

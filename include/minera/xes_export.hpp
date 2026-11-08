@@ -46,6 +46,12 @@ struct XesExportOptions {
   // Off by default: native exports keep the source keys. The server sets it
   // for the downloads of CSV-sourced logs only.
   bool standard_keys = false;
+  // Write each selected timestamp that carries a non-zero UTC offset on the
+  // UTC clock (+00:00), as pandas normalizes a CSV timestamp column before
+  // pm4py.write_xes. pm4py reads XES dates as wall-clock UTC, so a download
+  // that kept "+02:00" would be read two hours off. The server sets it for
+  // the downloads of CSV-sourced logs; an XES source keeps its own clock.
+  bool utc_timestamps = false;
 };
 
 // Serializes an event log as XES (eXtensible Event Stream, IEEE 1849-2016) —

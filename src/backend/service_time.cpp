@@ -200,8 +200,11 @@ ServiceTimeResult discover_service_time(const EventLog& log,
         const auto finish_value = builtin_timestamp_key(options.timestamp_key)
                                       ? event.timestamp
                                       : *event.attribute(options.timestamp_key);
-        const auto local_start = local_wall_timestamp(start_value);
-        const auto local_finish = local_wall_timestamp(finish_value);
+        const auto clock = [&](std::string_view text) {
+          return options.dataframe ? parse_timestamp(text) : local_wall_timestamp(text);
+        };
+        const auto local_start = clock(start_value);
+        const auto local_finish = clock(finish_value);
         if (!local_start || !local_finish)
           throw std::invalid_argument("service time: invalid business-hours timestamp");
         duration = business_elapsed(*local_start, *local_finish, slots);

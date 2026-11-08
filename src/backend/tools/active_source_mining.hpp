@@ -266,7 +266,9 @@ void handle_active_source_mining(const httplib::Request& request,
         options = minera::tools::default_replay_input_options(log, std::move(options), params.token_replay_activity_attribute_supplied);
         options_overrides[name + "_conformance"] = active_source_token_replay_options_json(options);
         options.cancelled = cancelled;
-        conformance.push_back({name, minera::final_marking_reachable(petri, cancelled), minera::check_conformance(log, petri, options), minera::check_footprints(log, petri), std::nullopt});
+        const auto reachability = minera::final_marking_reachability(petri, cancelled);
+        conformance.push_back({name, true, minera::check_conformance(log, petri, options), minera::check_footprints(log, petri), std::nullopt});
+        minera::set_model_soundness(conformance.back(), reachability);
         native_returned = true;
         return "{\"representation\":\"analysis_presentation\"}";
       });

@@ -239,6 +239,7 @@ import {
   isMonteCarloResult,
   isDfgPlayoutVariantsResult,
   isBasicPlayoutVisitedResult,
+  expandPlayoutVisitedResult,
   isStochasticPlayoutVisitedResult,
   isExtensivePlayoutVisitedResult,
   isStochasticPetriResult,
@@ -4826,7 +4827,7 @@ export async function fetchStochasticPlayoutVisited(
       throw new Error(String((payload as { error: unknown }).error));
     throw new Error(`the Minera backend answered with status ${response.status}`);
   }
-  const payload: unknown = await response.json();
+  const payload: unknown = expandPlayoutVisitedResult(await response.json());
   if (!isStochasticPlayoutVisitedResult(payload))
     throw new Error("the Minera backend returned an invalid stochastic Petri visited playout");
   return payload;
@@ -5239,7 +5240,7 @@ export async function fetchBasicPlayoutVisited(
       "could not reach the Minera backend — is minera_server running?",
     );
   }
-  const payload: unknown = await response.json().catch(() => null);
+  const payload: unknown = expandPlayoutVisitedResult(await response.json().catch(() => null));
   if (!response.ok) {
     if (payload !== null && typeof payload === "object" && "error" in payload) {
       throw new Error(String((payload as { error: unknown }).error));
@@ -5269,7 +5270,7 @@ export async function fetchExtensivePlayoutVisited(
   } catch {
     throw new Error("could not reach the Minera backend — is minera_server running?");
   }
-  const payload: unknown = await response.json().catch(() => null);
+  const payload: unknown = expandPlayoutVisitedResult(await response.json().catch(() => null));
   if (!response.ok) {
     if (payload !== null && typeof payload === "object" && "error" in payload)
       throw new Error(String((payload as { error: unknown }).error));

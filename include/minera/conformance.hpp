@@ -762,6 +762,19 @@ struct AlignmentResult {
 // throws OperationCancelled. `capped`, when given, receives per variant
 // whether its nullopt came from a silent-routing search that stopped at its
 // bound (the variant may still fit) rather than from a deviation.
+// The firings of the reference forward token replay (replay_token_traces
+// with default options, one trace per variant), in the same shape as
+// replay_firing_sequences: per event its silent routing then its visible
+// transition (empty for an activity outside the model, which the replay
+// skips), plus the routing to the final marking. nullopt for a variant the
+// replay does not fit (missing or remaining tokens, a stopped replay). This
+// is the replay pm4py's decorations take their firings from; its silent
+// routing follows shortest place paths, so wide concurrent nets stay cheap.
+[[nodiscard]] std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
+token_replay_firing_sequences(const PetriNet& net,
+                              const std::vector<std::vector<std::string>>& variants,
+                              const std::function<bool()>& cancelled = {});
+
 [[nodiscard]] std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
 replay_firing_sequences(const PetriNet& net,
                         const std::vector<std::vector<std::string>>& variants,
@@ -804,6 +817,17 @@ struct ActivityDeviation {
     const PetriNet& net, const std::vector<int>& initial_marking,
     const std::vector<int>& final_marking);
 
+// The same search with its third outcome kept apart: kExhausted when it
+// stopped at its state budget (or time) before deciding, which the boolean
+// overloads report as unreachable. Soundness displays use it to say "not
+// decided" instead of "unsound" for a net too large to search.
+enum class FinalMarkingReachability { kReachable, kUnreachable, kExhausted };
+[[nodiscard]] FinalMarkingReachability final_marking_reachability(
+    const PetriNet& net, const std::function<bool()>& cancelled = {});
+[[nodiscard]] FinalMarkingReachability final_marking_reachability(
+    const PetriNet& net, const std::vector<int>& initial_marking,
+    const std::vector<int>& final_marking);
+
 // Computes optimal alignments of every trace variant against the model using a
 // uniform-cost search over the synchronous product, and reports cost-based
 // fitness overall and per variant. The standard cost function charges 1 for a
@@ -841,6 +865,17 @@ struct ModelConformance {
   // still be retained for independent supported evaluations and export.
   bool computed = true;
   std::string error;
+  // With `sound` false: the reachability search stopped at its budget before
+  // deciding (FinalMarkingReachability::kExhausted), so the net is not known
+  // to be unsound.
+  bool reachability_exhausted = false;
 };
+
+// `sound` and `reachability_exhausted` of a ModelConformance from a verdict.
+inline void set_model_soundness(ModelConformance& model,
+                                FinalMarkingReachability verdict) {
+  model.sound = verdict == FinalMarkingReachability::kReachable;
+  model.reachability_exhausted = verdict == FinalMarkingReachability::kExhausted;
+}
 
 }  // namespace minera

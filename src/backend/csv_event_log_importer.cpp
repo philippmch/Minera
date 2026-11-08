@@ -365,6 +365,16 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
   const auto date_separator = [](char ch) {
     return ch == '/' || ch == '-' || ch == '.' || ch == ' ';
   };
+  // The separator after the second date number: the first one again, or (on
+  // dateutil's path only) another of `-`, `/` and white space, which dateutil
+  // reads alike ("2024-12/07", "2024 3/5", "07-12/2024"). A mix with `.` is
+  // left unparsed: dateutil reads such a token as a decimal number.
+  const auto second_separator = [&](char first, char ch) {
+    if (ch == first) return true;
+    if (first == '.' || ch == '.' || !date_separator(ch)) return false;
+    iso_path = false;
+    return true;
+  };
   if (std::isalpha(static_cast<unsigned char>(in.peek()))) {
     // Mon D[,] YYYY
     iso_path = false;
@@ -423,7 +433,7 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       // YYYY-M-D in any of the separators (space-separated too on the ISO
       // path; see the dateutil reading after the clock).
       unsigned m = 0, d = 0;
-      if (in.digits(m, 2) == 0 || in.peek() != sep) return std::nullopt;
+      if (in.digits(m, 2) == 0 || !second_separator(sep, in.peek())) return std::nullopt;
       ++in.pos;
       if (in.digits(d, 2) == 0) return std::nullopt;
       year = static_cast<int>(first);
@@ -452,17 +462,29 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       // else month-first unless the first number cannot be a month.
       iso_path = false;
       unsigned second = 0, y = 0;
-      if (in.digits(second, 2) == 0 || in.peek() != sep) return std::nullopt;
+      if (in.digits(second, 2) == 0 || !second_separator(sep, in.peek())) return std::nullopt;
+      // Whether the trailing year is joined: by its own `-` or `/` after a
+      // space ("28 07-0057" is year 57), but not after a different joined
+      // separator, where it reads as a plain number ("15-04/0001" is 2001).
+      const bool mixed = in.peek() != sep;
+      const bool year_joined = sep == ' ' ? in.peek() != ' ' : !mixed;
       ++in.pos;
       const auto year_digits = in.digits(y, 4);
       if (year_digits == 0) return std::nullopt;
-      if (first > 31) {
-        if (year_digits > 2) return std::nullopt;
+      if (first > 31 && mixed && sep == ' ') {
+        // "57 7/0001" is 0057-07-01: the leading number is a literal year
+        // and the joined last one the day.
+        year = static_cast<int>(first);
+        month = static_cast<int>(second);
+        day = static_cast<int>(y);
+      } else if (first > 31) {
+        // "40-03-03" and, mixed, "33-01 0011" (2033-01-11): a two-digit year.
+        if (year_digits > 2 && !mixed) return std::nullopt;
         year = expand_two_digit_year(first);
         month = static_cast<int>(second);
         day = static_cast<int>(y);
       } else {
-        year = *reference_year(y, year_digits, joined);
+        year = *reference_year(y, year_digits, year_joined);
         if (first > 12) {
           day = static_cast<int>(first);
           month = static_cast<int>(second);
@@ -520,11 +542,17 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
         if (in.peek() == '.' || in.peek() == ',') {
           if (in.peek() == ',') { iso_path = false; comma_fraction = true; }
           ++in.pos;
+          std::size_t fraction_digits = 0;
           while (!in.done() && std::isdigit(static_cast<unsigned char>(in.peek()))) {
             if (fraction.size() < 9) fraction.push_back(in.peek());
+            ++fraction_digits;
             ++in.pos;
           }
           if (fraction.empty()) return std::nullopt;
+          // pandas' ISO path reads at most 18 fraction digits; a longer
+          // fraction goes through dateutil ("...56.3650503944960724188" keeps
+          // microseconds only, 18 digits keep nanoseconds).
+          if (fraction_digits > 18) iso_path = false;
         }
       }
     }
@@ -574,10 +602,15 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
         if (!in.done() && (in.peek() == ' ' || in.peek() == '\t')) iso_path = false;
         if (!in.done() && in.peek() != ' ' && in.peek() != '\t' && !two_digits(om))
           return std::nullopt;
-        if (oh > 23 || om > 59) return std::nullopt;
-        offset_minutes = (ch == '-' ? -1 : 1) * static_cast<int>(oh * 60 + om);
-        char buffer[8];
-        std::snprintf(buffer, sizeof(buffer), "%c%02u:%02u", ch, oh, om);
+        // Minutes 60-99 are dateutil's: they add to the hours ("+01:90" is
+        // +02:30) while the whole offset stays below 24 hours ("+23:60"
+        // fails); the ISO path refuses them, so the fraction is truncated.
+        if (om > 59) iso_path = false;
+        const unsigned total = oh * 60 + om;
+        if (oh > 23 || om > 99 || total >= 24 * 60) return std::nullopt;
+        offset_minutes = (ch == '-' ? -1 : 1) * static_cast<int>(total);
+        char buffer[16];
+        std::snprintf(buffer, sizeof(buffer), "%c%02u:%02u", ch, total / 60, total % 60);
         offset = buffer;
       } else {
         iso_path = false;

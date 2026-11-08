@@ -345,6 +345,39 @@ void every_stored_result_field_survives_snapshot() {
   contains(tree_json, R"("native_state":)");
 }
 
+void compact_generated_log_writes_each_event_once() {
+  EventLog log;
+  for (const auto& [case_id, activities] : std::vector<std::pair<std::string, std::vector<std::string>>>{
+           {"c1", {"A", "B"}}, {"c2", {"A"}}}) {
+    Trace trace;
+    trace.case_id = case_id;
+    for (const auto& activity : activities) {
+      Event event;
+      event.case_id = case_id;
+      event.activity = activity;
+      event.input_order = log.traces.size() * 10 + trace.events.size();
+      event.timestamp = "2026-01-01T00:00:0" + std::to_string(event.input_order % 10);
+      trace.events.push_back(event);
+    }
+    log.traces.push_back(trace);
+  }
+  log.traces[1].events[0].resource = "r";
+  log.traces[1].events[0].case_id = "other";
+  const auto compact = serialize_active_source_log_compact_json(log);
+  contains(compact, R"({"legacy_view":null,"native_state":{"encoding":"minera-compact-log-1","attributes":)");
+  contains(compact, R"("activity_table":["A","B"])");
+  // The first event is the default: it writes only its activity reference.
+  contains(compact, R"("traces":[{"case_id":"c1","events":[{"activity_ref":0},)");
+  contains(compact, R"({"input_order":1,"activity_ref":1,"timestamp":"2026-01-01T00:00:01"}]})");
+  contains(compact, R"({"case_id":"c2","events":[{"input_order":10,"case_id":"other","activity_ref":0,"resource":"r"}]})");
+  // The defaults are the first trace's and event's complete fields, in order.
+  const auto full = serialize_active_source_log_json(log);
+  const auto first_event = full.substr(full.find("{\"input_order\":0,"));
+  contains(compact, "\"event\":" + first_event.substr(0, first_event.find(",{\"input_order\":1,")) + "},\"activity_table\"");
+  contains(serialize_playout_workbench_result_json(DfgPlayoutResult{.log = log}, true), "\"log\":" + compact);
+  contains(serialize_playout_workbench_result_json(ProcessTreePlayoutResult{.log = log}, true), "{\"log\":" + compact);
+}
+
 }  // namespace
 
 int main() {
@@ -362,4 +395,5 @@ int main() {
   run("separate native Petri log and visited calls", actual_petri_calls_keep_separate_log_and_visited_semantics);
   run("declared DFG and original tree strategies", declared_dfg_and_original_tree_strategies_reach_native_calls);
   run("complete stored result snapshots", every_stored_result_field_survives_snapshot);
+  run("compact generated log", compact_generated_log_writes_each_event_once);
 }

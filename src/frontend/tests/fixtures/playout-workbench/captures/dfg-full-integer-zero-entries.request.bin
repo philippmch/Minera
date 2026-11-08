@@ -17,4 +17,8 @@ Content-Type: application/octet-stream
 
 {"frequency":[{"source":"A","target":"B","count":18446744073709551615},{"source":"unused","target":"zero","count":0}],"start_activities":[{"activity":"A","count":18446744073709551615},{"activity":"unused","count":0}],"end_activities":[{"activity":"B","count":18446744073709551615},{"activity":"zero","count":0}],"performance":null}
 
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="export_generated_xes"
+
+true
 --OwnedOriginalModelPlayoutFeature59--

@@ -45,10 +45,12 @@ namespace minera {
 // raw enum indexes, exact counts, and the complete active-source log carrier.
 [[nodiscard]] std::string serialize_playout_workbench_result_json(
     const PlayoutVisitedResult& result);
+// compact_log writes the generated log with
+// serialize_active_source_log_compact_json, as /api/playout-workbench does.
 [[nodiscard]] std::string serialize_playout_workbench_result_json(
-    const DfgPlayoutResult& result);
+    const DfgPlayoutResult& result, bool compact_log = false);
 [[nodiscard]] std::string serialize_playout_workbench_result_json(
-    const ProcessTreePlayoutResult& result);
+    const ProcessTreePlayoutResult& result, bool compact_log = false);
 // The exact size of serialize_playout_workbench_result_json(result)'s
 // document, counted without building it.
 [[nodiscard]] std::size_t playout_workbench_result_json_bytes(const PlayoutVisitedResult& result);

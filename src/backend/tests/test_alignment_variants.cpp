@@ -441,5 +441,23 @@ int main() {
   doubled.set_ordinary_arc_weights(doubled_b, {two_tokens, two_tokens}, {one_token});
   const auto doubled_result = minera::check_alignment(log_of({"a", "b"}), doubled, reset_options);
   assert(!doubled_result.computed && doubled_result.exhausted);
+
+  // Review V1: the trace-alignment LP heuristic is off on the same nets, so
+  // the state-equation A* aligns a fitting trace instead of pruning it (the
+  // incidence column of b removes four tokens where the firing removes two).
+  minera::PetriNet v1_net;
+  for (int place = 0; place < 3; ++place) v1_net.add_place();
+  v1_net.set_source(0); v1_net.set_sink(2); v1_net.set_activities({"a", "b"});
+  const auto v1_a = v1_net.add_transition(0, {0}, {1});
+  v1_net.set_ordinary_arc_weights(v1_a, {}, {two_tokens});
+  const auto v1_b = v1_net.add_transition(1, {1, 1}, {2});
+  v1_net.set_ordinary_arc_weights(v1_b, {two_tokens, two_tokens}, {});
+  for (const auto variant : {minera::AlignmentVariant::kStateEquationAStar,
+                             minera::AlignmentVariant::kDijkstraLessMemory}) {
+    minera::AlignmentOptions options;
+    options.variant = variant;
+    const auto result = minera::check_alignment(log_of({"a", "b"}), v1_net, options);
+    assert(result.computed && result.fitness == 1.0 && result.total_cost == 0.0);
+  }
   return 0;
 }

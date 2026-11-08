@@ -103,6 +103,7 @@ PassedTimeResult discover_passed_time(const EventLog& log,
   dfg_options.performance_aggregation = options.performance_aggregation;
   dfg_options.use_business_hours = options.use_business_hours;
   dfg_options.business_hour_slots = options.business_hour_slots;
+  dfg_options.business_hours_utc_clock = options.dataframe;
   if (!options.start_timestamp_key.empty() &&
       !builtin_timestamp_key(options.start_timestamp_key)) {
     dfg_options.start_timestamp_attribute = options.start_timestamp_key;

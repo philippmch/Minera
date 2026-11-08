@@ -115,4 +115,12 @@ describe("the app's alignment time budget", () => {
     expect(unsound).toContain("sound workflow net");
     expect(unsound).not.toContain("stops alignments after");
   });
+
+  it("does not claim the model is reachable when the search stopped first", () => {
+    // Review V1: an exhausted search may have stopped before the reachability
+    // check decided, so the notice must not say the model is reachable.
+    const markup = renderToStaticMarkup(createElement(AlignmentNotice, { minerName: "Imported", exhausted: true }));
+    expect(markup).not.toContain("model is reachable");
+    expect(markup).toContain("before confirming that its end state is reachable");
+  });
 });

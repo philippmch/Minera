@@ -31,6 +31,11 @@ struct CaseStatisticsOptions {
   std::size_t max_cases = 0;  // zero means return every case
   bool use_business_hours = false;
   std::vector<BusinessHourSlot> business_hour_slots;
+  // Which clock business hours count on. false: pm4py's EventLog path, each
+  // timestamp's own wall clock. true: pm4py's DataFrame path (a CSV or XES
+  // read as a DataFrame), the UTC clock: a CSV offset is converted, as
+  // format_dataframe converts it.
+  bool dataframe = false;
 };
 
 struct CaseStatisticsEntry {

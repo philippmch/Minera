@@ -659,10 +659,10 @@ std::size_t playout_workbench_result_json_bytes(const PlayoutVisitedResult& resu
       [&](std::ostream& out) { write_visited_result_json(out, result); }, std::locale::classic());
 }
 
-std::string serialize_playout_workbench_result_json(const DfgPlayoutResult& result) {
+std::string serialize_playout_workbench_result_json(const DfgPlayoutResult& result, bool compact_log) {
   auto out = output();
   out << "{\"variant\":"; enum_json(out, result.variant, dfg_name);
-  out << ",\"log\":" << serialize_active_source_log_json(result.log);
+  out << ",\"log\":" << (compact_log ? serialize_active_source_log_compact_json(result.log) : serialize_active_source_log_json(result.log));
   out << ",\"counts\":[";
   bool comma = false;
   for (const auto& [activities, count] : result.counts) {
@@ -678,9 +678,9 @@ std::string serialize_playout_workbench_result_json(const DfgPlayoutResult& resu
   return out.str();
 }
 
-std::string serialize_playout_workbench_result_json(const ProcessTreePlayoutResult& result) {
+std::string serialize_playout_workbench_result_json(const ProcessTreePlayoutResult& result, bool compact_log) {
   auto out = output();
-  out << "{\"log\":" << serialize_active_source_log_json(result.log);
+  out << "{\"log\":" << (compact_log ? serialize_active_source_log_compact_json(result.log) : serialize_active_source_log_json(result.log));
   out << ",\"trace_strings\":"; array_json(out, result.trace_strings, words_json);
   out << ",\"truncated\":"; boolean(out, result.truncated);
   out << '}';

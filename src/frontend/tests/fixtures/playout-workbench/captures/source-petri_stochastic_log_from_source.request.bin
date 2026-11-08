@@ -78,4 +78,8 @@ b,A,2026-01-01T00:00:01Z,r2,complete
 c,A,2026-01-01T00:00:02Z,r3,complete
 d,B,2026-01-01T00:00:03Z,r4,complete
 
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="export_generated_xes"
+
+true
 --OwnedOriginalModelPlayoutFeature59--

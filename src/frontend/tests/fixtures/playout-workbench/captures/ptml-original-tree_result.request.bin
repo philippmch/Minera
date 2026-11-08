@@ -25,4 +25,8 @@ Content-Type: application/octet-stream
     <parentsNode id="edge-node-2" sourceId="node-0" targetId="node-2" />
   </processTree>
 </ptml>
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="export_generated_xes"
+
+true
 --OwnedOriginalModelPlayoutFeature59--

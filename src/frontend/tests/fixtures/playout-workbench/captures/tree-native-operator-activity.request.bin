@@ -17,4 +17,8 @@ Content-Type: application/octet-stream
 
 {"activities":["A","B","unused","A"],"root":{"op":"ACTIVITY","op_index":0,"activity":0,"children":[]}}
 
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="export_generated_xes"
+
+true
 --OwnedOriginalModelPlayoutFeature59--

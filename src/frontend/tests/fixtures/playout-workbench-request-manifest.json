@@ -8,15 +8,20 @@
       "id": "default-operation-and-native-options",
       "method": "POST",
       "path": "/api/playout-workbench",
-      "fields": [],
+      "fields": [
+        [
+          "export_generated_xes",
+          "true"
+        ]
+      ],
       "headers": {
         "Content-Type": "multipart/form-data; boundary=OwnedOriginalModelPlayoutFeature59"
       },
       "request_body": {
         "filename": "default-operation-and-native-options.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/default-operation-and-native-options.request.bin",
-        "bytes": 1320,
-        "sha256": "d7f068b6d4c3868d43a69fa458624df1387ce5618fc6d1fe358482eb6814d1ea"
+        "bytes": 1427,
+        "sha256": "a9ba1bdc2cd404f19823742459d6771206f0340de090cdbf9c454b3a43b01bb6"
       },
       "expected_status": 200,
       "uploads": {
@@ -30,14 +35,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "196263",
+        "Content-Length": "38883",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "default-operation-and-native-options.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/default-operation-and-native-options.response.json",
-        "bytes": 196263,
-        "sha256": "ca508ff34865207e3d5496fc5d23d84ceefeacf285def1e8550e4ced9f4d1200",
+        "bytes": 38883,
+        "sha256": "55b614fc7ce7f019cf3b133ed65d4fd1aaa0d7860a1c707914c095de36f92101",
         "status": 200
       },
       "family": "playout",
@@ -95,6 +100,10 @@
         [
           "options_json",
           "{\"traces\":2,\"max_steps\":8}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -103,8 +112,8 @@
       "request_body": {
         "filename": "direct-petri_basic_log.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/direct-petri_basic_log.request.bin",
-        "bytes": 2000,
-        "sha256": "63734824f49b35ee72a58e7ca50dd3a5c4e89838f71b2d2a2bb12c39a6d9a941"
+        "bytes": 2107,
+        "sha256": "cf8677f4cd9fd254b70cea9aa000b3330d381d5e6d2c487c224d3cb5d7920b5e"
       },
       "expected_status": 200,
       "uploads": {
@@ -118,14 +127,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12447",
+        "Content-Length": "10275",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "direct-petri_basic_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/direct-petri_basic_log.response.json",
-        "bytes": 12447,
-        "sha256": "e9c7034685d1676318f8ef6e9fab5315fb1638cc4fea78854ff40c4dc1527890",
+        "bytes": 10275,
+        "sha256": "f35734a774a0ef965105946b9d49144b158ba7f5a3cca563f5d7a96bd7bbbe26",
         "status": 200
       },
       "family": "playout",
@@ -262,6 +271,10 @@
         [
           "options_json",
           "{\"traces\":2,\"max_steps\":8}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -270,8 +283,8 @@
       "request_body": {
         "filename": "direct-petri_stochastic_log.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/direct-petri_stochastic_log.request.bin",
-        "bytes": 2005,
-        "sha256": "48fd7969b0d72a6899ab03e0ebd36d0130fa45b84d28d10940933b36d5eb93e9"
+        "bytes": 2112,
+        "sha256": "86443fc7183364a454945f57d1df8eea21ff54dd786e5c6d5612cc19107ca974"
       },
       "expected_status": 200,
       "uploads": {
@@ -285,14 +298,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12585",
+        "Content-Length": "10388",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "direct-petri_stochastic_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/direct-petri_stochastic_log.response.json",
-        "bytes": 12585,
-        "sha256": "0cfeebae0277578bf9a4f4fe045167fb43efcf0ea6d28588a379785555e758fa",
+        "bytes": 10388,
+        "sha256": "61752592583671421126d39b82398f2bde931c4738ff1fe0dc30181a834f63ae",
         "status": 200
       },
       "family": "playout",
@@ -429,6 +442,10 @@
         [
           "options_json",
           "{\"max_length\":4,\"max_traces\":8,\"max_states\":100}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -437,8 +454,8 @@
       "request_body": {
         "filename": "direct-petri_extensive_log.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/direct-petri_extensive_log.request.bin",
-        "bytes": 2026,
-        "sha256": "0ca414b25c4c31c2efad627d7289e6283eab28432dc58a775e501c3d152ea6cb"
+        "bytes": 2133,
+        "sha256": "6f0ac918921c6d237962282b7fea4e66bf166e397e5f11ddb568b49bc8ab7e94"
       },
       "expected_status": 200,
       "uploads": {
@@ -452,14 +469,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10640",
+        "Content-Length": "10039",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "direct-petri_extensive_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/direct-petri_extensive_log.response.json",
-        "bytes": 10640,
-        "sha256": "f9718c80ac2bdef03f2c1e7b5daf4f2a321ac7af72c112f8973a92cacbf8e2f2",
+        "bytes": 10039,
+        "sha256": "31579283c9706fde697b874056b3f301cf33395c25f048715090fce08ee3f1ed",
         "status": 200
       },
       "family": "playout",
@@ -694,6 +711,10 @@
         [
           "options_json",
           "{\"traces\":2,\"max_steps\":8}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -702,8 +723,8 @@
       "request_body": {
         "filename": "source-petri_stochastic_log_from_source.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/source-petri_stochastic_log_from_source.request.bin",
-        "bytes": 2288,
-        "sha256": "5768d63d30a2bfe34d8d6ea52e3b5e3416035790f422f36f2b9361d11de63001"
+        "bytes": 2395,
+        "sha256": "a7e4302fccf2cfd2cf3d11e8f806bc057bab17de828ef5624fd8b7002e54e544"
       },
       "expected_status": 200,
       "uploads": {
@@ -723,14 +744,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "43178",
+        "Content-Length": "40981",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "source-petri_stochastic_log_from_source.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/source-petri_stochastic_log_from_source.response.json",
-        "bytes": 43178,
-        "sha256": "f2b00949acb5acea1906790acb53d4b5ebe5c897d91c6d8242ce254aa46f1789",
+        "bytes": 40981,
+        "sha256": "aaabc5372d24f71b39f596e39fe98e2056e7f21f7f8a78d57db66000b33b8e75",
         "status": 200
       },
       "family": "playout",
@@ -887,6 +908,10 @@
         [
           "options_json",
           "{\"traces\":2,\"max_steps\":4,\"seed\":18446744073709551615,\"start\":-1,\"case_interval\":2,\"event_interval\":3,\"initial_marking\":[1,0],\"final_marking\":[0,1],\"add_only_if_fm_is_reached\":true,\"fm_leq_accepted\":true,\"return_visited_elements\":true}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -895,8 +920,8 @@
       "request_body": {
         "filename": "all11-basic-controls.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/all11-basic-controls.request.bin",
-        "bytes": 1758,
-        "sha256": "08aa5070454615fc6f981af54ed62fa23717f8e393c2bbbb2e646ba29577289b"
+        "bytes": 1865,
+        "sha256": "89dceaaf911dc88ab1740450a576dc2d1aadda1e23691aa5677cdc10e1ce2120"
       },
       "expected_status": 200,
       "uploads": {
@@ -910,14 +935,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11031",
+        "Content-Length": "8834",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "all11-basic-controls.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/all11-basic-controls.response.json",
-        "bytes": 11031,
-        "sha256": "b543551eb069c2a6b58ed50faff3ba1653b160785fc5e4c623eb14f05c909632",
+        "bytes": 8834,
+        "sha256": "426c65dbcaeaaead70c815e12ad78901ebb73ba7d0c0a1d91d9b9e0346e5b99f",
         "status": 200
       },
       "family": "playout",
@@ -974,6 +999,10 @@
         [
           "options_json",
           "{\"traces\":2,\"max_steps\":4,\"seed\":18446744073709551615,\"start\":-1,\"case_interval\":2,\"event_interval\":3,\"transition_weights\":[1],\"stop_at_final\":true,\"initial_marking\":[1,0],\"final_marking\":[0,1],\"fit_from_log\":true,\"fitting_max_states\":100,\"return_visited_elements\":true}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -982,8 +1011,8 @@
       "request_body": {
         "filename": "all13-stochastic-controls-net-only.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/all13-stochastic-controls-net-only.request.bin",
-        "bytes": 1798,
-        "sha256": "50e7be239124497602795c85ef3a7be846ca1dbd8adb51b65c65b9a8c8034317"
+        "bytes": 1905,
+        "sha256": "500f973e0ba34278069105212e4dcf1e24cef4eff1710030d6f660fdfde1aa25"
       },
       "expected_status": 200,
       "uploads": {
@@ -997,14 +1026,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11144",
+        "Content-Length": "8947",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "all13-stochastic-controls-net-only.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/all13-stochastic-controls-net-only.response.json",
-        "bytes": 11144,
-        "sha256": "a3c3c6bf45b9cdafbb0d77f18e675062ae683765759777ba55ed959f82e299d8",
+        "bytes": 8947,
+        "sha256": "846168bef8fd859988c06ef0de20f6eebab88d1e2982fb288e433325a58d1cd2",
         "status": 200
       },
       "family": "playout",
@@ -1139,6 +1168,10 @@
         [
           "options_json",
           "{\"traces\":2,\"max_steps\":1}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -1147,8 +1180,8 @@
       "request_body": {
         "filename": "basic-partial-log-preserved.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-partial-log-preserved.request.bin",
-        "bytes": 2191,
-        "sha256": "881e8dfd6736feb5ce0a7192ec23d32ec9b40b4cb6130ca3d074e54075d75d77"
+        "bytes": 2298,
+        "sha256": "cde8f50987ada386d1d11626ed161e5a0d89538ffcacd43a50ce9e2c1805dcc6"
       },
       "expected_status": 200,
       "uploads": {
@@ -1162,14 +1195,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12831",
+        "Content-Length": "10659",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "basic-partial-log-preserved.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-partial-log-preserved.response.json",
-        "bytes": 12831,
-        "sha256": "229c68ef1e7b35cc28712e3c933d1df6acc581d13ee4a76108508004fc58e4a5",
+        "bytes": 10659,
+        "sha256": "ea8a99cf753cc254a3a99be0f25f4c98df435b22d7932030d045f85bda3a0023",
         "status": 200
       },
       "family": "playout",
@@ -1226,6 +1259,10 @@
         [
           "options_json",
           "{\"traces\":2,\"max_steps\":1,\"add_only_if_fm_is_reached\":true}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -1234,8 +1271,8 @@
       "request_body": {
         "filename": "basic-acceptance-omits-partial-cases.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-acceptance-omits-partial-cases.request.bin",
-        "bytes": 2224,
-        "sha256": "287540133ce4a43ae82d2167ffa6d65b65fdcc0b33e167d11dc37642620a17a0"
+        "bytes": 2331,
+        "sha256": "b362f36949b00d2870df0a7845613442ea8e4443f07a181368a88146a35c6234"
       },
       "expected_status": 200,
       "uploads": {
@@ -1249,14 +1286,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9083",
+        "Content-Length": "8975",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "basic-acceptance-omits-partial-cases.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-acceptance-omits-partial-cases.response.json",
-        "bytes": 9083,
-        "sha256": "edbe5124d0fba583134533762d074ca789dbf7d510b9d7642257fb0a9d84f5ac",
+        "bytes": 8975,
+        "sha256": "69420f2d68a2a4c8dd773d2ccdc3bcf70b1ef99a17a6329836ece53a17f50f19",
         "status": 200
       },
       "family": "playout",
@@ -1310,6 +1347,10 @@
         [
           "options_json",
           "{\"traces\":1,\"max_steps\":1,\"add_only_if_fm_is_reached\":true}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -1318,8 +1359,8 @@
       "request_body": {
         "filename": "basic-exact-final-rejects-extra-token.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-exact-final-rejects-extra-token.request.bin",
-        "bytes": 1578,
-        "sha256": "028ce38acaf57e4e0d46777c19bb8ad5c27c20f088740b973b90c568cea69c2e"
+        "bytes": 1685,
+        "sha256": "229ca9acef46185bbbc8adbc72c2c2956af69893f439256691e23025f844fc72"
       },
       "expected_status": 200,
       "uploads": {
@@ -1333,14 +1374,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7073",
+        "Content-Length": "6965",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "basic-exact-final-rejects-extra-token.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-exact-final-rejects-extra-token.response.json",
-        "bytes": 7073,
-        "sha256": "d76e384e7ace25a5632ab7e98a1572672e3644c8743f2fa8ab7a2ef257f23bfb",
+        "bytes": 6965,
+        "sha256": "4cae1086702eece69ea3c243c980bbadbd1dbcd6de695de6fb7d3d62479a43ca",
         "status": 200
       },
       "family": "playout",
@@ -1394,6 +1435,10 @@
         [
           "options_json",
           "{\"traces\":1,\"max_steps\":1,\"add_only_if_fm_is_reached\":true,\"fm_leq_accepted\":true}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -1402,8 +1447,8 @@
       "request_body": {
         "filename": "basic-covering-final-accepts-extra-token.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-covering-final-accepts-extra-token.request.bin",
-        "bytes": 1601,
-        "sha256": "c8f3e8883553a4711f68e13441b3def46ca7060cb8328c08934669c49d4bed5d"
+        "bytes": 1708,
+        "sha256": "5cb6c59c700feeedb300ffd29792aa5220f0ad900df7eb8278a261bd91455911"
       },
       "expected_status": 200,
       "uploads": {
@@ -1417,14 +1462,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8975",
+        "Content-Length": "8384",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "basic-covering-final-accepts-extra-token.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/basic-covering-final-accepts-extra-token.response.json",
-        "bytes": 8975,
-        "sha256": "ccd21474cca56414d8feaf82347737ac38f2245951d6692088df42647c2d9395",
+        "bytes": 8384,
+        "sha256": "b2f1212c336c2fdd7d01e1837108c2a3f601d2d4f31593663185cce8194c838d",
         "status": 200
       },
       "family": "playout",
@@ -1481,6 +1526,10 @@
         [
           "options_json",
           "{\"max_length\":4,\"max_traces\":8,\"max_states\":100}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -1489,8 +1538,8 @@
       "request_body": {
         "filename": "extensive-log-collapses-silent-routing.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/extensive-log-collapses-silent-routing.request.bin",
-        "bytes": 2459,
-        "sha256": "36b613699957efdb7479015704eef3ecb6f07a235da7191b215abc2894921a19"
+        "bytes": 2566,
+        "sha256": "b508b8302e6d47d57157cd9fa47781121bd70f57f162a2c1ca962fa00114a440"
       },
       "expected_status": 200,
       "uploads": {
@@ -1504,14 +1553,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12265",
+        "Content-Length": "11664",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "extensive-log-collapses-silent-routing.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/extensive-log-collapses-silent-routing.response.json",
-        "bytes": 12265,
-        "sha256": "c6506e62d63f72ad86bc44badfcf49d27576de317a22adbebd3cef30cbc34595",
+        "bytes": 11664,
+        "sha256": "82f656f9a818e7013e56c221c26f6b8bc390de6dac8bd1e928ad883620a27752",
         "status": 200
       },
       "family": "playout",
@@ -1724,6 +1773,10 @@
         [
           "options_json",
           "{\"max_length\":2,\"max_traces\":8,\"max_states\":100,\"max_marking_occ\":1}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -1732,8 +1785,8 @@
       "request_body": {
         "filename": "extensive-marking-occurrence-bound.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/extensive-marking-occurrence-bound.request.bin",
-        "bytes": 2005,
-        "sha256": "4d8f371bc993ba9766489e5378965098acde4848ec9d893a584c068ddc40fe5f"
+        "bytes": 2112,
+        "sha256": "8508feeca48b8593a78818dd5facabeb3b12ce82e2266deeb951a8977309a3b9"
       },
       "expected_status": 200,
       "uploads": {
@@ -1747,14 +1800,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10481",
+        "Content-Length": "9880",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "extensive-marking-occurrence-bound.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/extensive-marking-occurrence-bound.response.json",
-        "bytes": 10481,
-        "sha256": "808966f1385a5a789a072a818002434a01be10b9fa48f7b0d226b082db97c0bd",
+        "bytes": 9880,
+        "sha256": "0ae0045f7041cb2800b5a5906520b8028528a6c37433fa40083bdbbf497faf9a",
         "status": 200
       },
       "family": "playout",
@@ -1888,6 +1941,10 @@
         [
           "options_json",
           "{\"max_length\":2,\"max_traces\":8,\"max_states\":100,\"max_marking_occ\":null}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -1896,8 +1953,8 @@
       "request_body": {
         "filename": "extensive-explicit-null-occurrence.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/extensive-explicit-null-occurrence.request.bin",
-        "bytes": 2008,
-        "sha256": "ff49e4c9bf801960f698746f552db256f8208b6a0c0abec28045f74b81c7e7e6"
+        "bytes": 2115,
+        "sha256": "10071678eef0041e597f5cebbda8ed6eb8a087688debb22b1631e907835ff109"
       },
       "expected_status": 200,
       "uploads": {
@@ -1911,14 +1968,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "13624",
+        "Content-Length": "10432",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "extensive-explicit-null-occurrence.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/extensive-explicit-null-occurrence.response.json",
-        "bytes": 13624,
-        "sha256": "3e766a2dc3f864c1f38dc7d4ae554e7a123e14577e79548350db20d9277d7876",
+        "bytes": 10432,
+        "sha256": "d49423c0fc81fa63226de5ce1bd8090246262d5fc8e6f62b3b0dfe7696eb4209",
         "status": 200
       },
       "family": "playout",
@@ -1972,6 +2029,10 @@
         [
           "options_json",
           "{\"traces\":1,\"initial_marking\":[],\"final_marking\":[]}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -1980,8 +2041,8 @@
       "request_body": {
         "filename": "explicit-empty-markings-remain-native.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/explicit-empty-markings-remain-native.request.bin",
-        "bytes": 1575,
-        "sha256": "391089e0e0a4faaf38c843baa5a4df130499c6bd5c3f36d171f84b0d732d17f3"
+        "bytes": 1682,
+        "sha256": "a283bc741f8ccb58698b41613e8b5fd298b13ae192fb90fc84092010f3bddcfc"
       },
       "expected_status": 200,
       "uploads": {
@@ -1995,14 +2056,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8941",
+        "Content-Length": "8350",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "explicit-empty-markings-remain-native.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/explicit-empty-markings-remain-native.response.json",
-        "bytes": 8941,
-        "sha256": "c4a8978c64fe04db1df381d4ea9abfc93b19ccd2adde631fb235828fe86f4005",
+        "bytes": 8350,
+        "sha256": "ee242a0a126f2a2cb139ba7cfd63c70097c1be4937befb0d57ccd3686f85dec0",
         "status": 200
       },
       "family": "playout",
@@ -2059,6 +2120,10 @@
         [
           "options_json",
           "{\"traces\":4,\"max_steps\":2,\"transition_weights\":[0,1],\"fit_from_log\":false,\"fitting_max_states\":0}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -2067,8 +2132,8 @@
       "request_body": {
         "filename": "stochastic-explicit-weights-bypass-source-fitting.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/stochastic-explicit-weights-bypass-source-fitting.request.bin",
-        "bytes": 2359,
-        "sha256": "54509c59df3eac44e8714d4ab88e172ff24d6dbe12f577c0e417d161d3b6d242"
+        "bytes": 2466,
+        "sha256": "c0376c3dbe3a608e3a36be05daf952fd758cd276dee6adc4897cd844fc50ca53"
       },
       "expected_status": 200,
       "uploads": {
@@ -2088,14 +2153,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "47057",
+        "Content-Length": "41668",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "stochastic-explicit-weights-bypass-source-fitting.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/stochastic-explicit-weights-bypass-source-fitting.response.json",
-        "bytes": 47057,
-        "sha256": "905964d80e55c6bd487b56c3bc05b3f7d784e94a2c07d22608aad0aac3c84364",
+        "bytes": 41668,
+        "sha256": "8e165d86899bce729302a9b63ba162b4ef4202a8b93d6decdadfdf4a63b904bc",
         "status": 200
       },
       "family": "playout",
@@ -3702,6 +3767,10 @@
         [
           "pnml_infer_initial_marking",
           "false"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -3710,8 +3779,8 @@
       "request_body": {
         "filename": "pnml-native-control-infer_initial_marking.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-infer_initial_marking.request.bin",
-        "bytes": 1663,
-        "sha256": "8166c94058bc6ddc38692e2bf343045d1d687a0bd0759d477527e5b2abba2f2c"
+        "bytes": 1770,
+        "sha256": "b5662fe877248f1cbbba9d1c2cdfc7d8941d44a20afa9b626bdea4686b415b9c"
       },
       "expected_status": 200,
       "uploads": {
@@ -3725,14 +3794,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10800",
+        "Content-Length": "8628",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-infer_initial_marking.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-infer_initial_marking.response.json",
-        "bytes": 10800,
-        "sha256": "590282c8e84dbb85a66799325628d659416e4e090d6b9d5dcc62c792ef276099",
+        "bytes": 8628,
+        "sha256": "373680d66262ae6c94d5f1741a4711980c09df0b4e45009d19f2eb68496c3bee",
         "status": 200
       },
       "family": "playout",
@@ -3793,6 +3862,10 @@
         [
           "pnml_infer_final_marking",
           "false"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -3801,8 +3874,8 @@
       "request_body": {
         "filename": "pnml-native-control-infer_final_marking.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-infer_final_marking.request.bin",
-        "bytes": 1661,
-        "sha256": "a65f9a425c673344e08fc7424e661f914ce0b9519271596977f5d6e3beda6699"
+        "bytes": 1768,
+        "sha256": "87d8ef2fe5afc961cdfcb9d7164c65e63a9427ac8a382a4e4711209ff3890cce"
       },
       "expected_status": 200,
       "uploads": {
@@ -3816,14 +3889,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10800",
+        "Content-Length": "8628",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-infer_final_marking.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-infer_final_marking.response.json",
-        "bytes": 10800,
-        "sha256": "c779d2890911c3dc8e1b3852b6eeb0c0c26ec981eed15430b84119f0d90b7cbf",
+        "bytes": 8628,
+        "sha256": "b769247ff9da116da8a16a73530581de26ce9535dd90297ffed9c65b24b47f1e",
         "status": 200
       },
       "family": "playout",
@@ -3884,6 +3957,10 @@
         [
           "pnml_import_stochastic_map",
           "true"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -3892,8 +3969,8 @@
       "request_body": {
         "filename": "pnml-native-control-import_stochastic_map.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-import_stochastic_map.request.bin",
-        "bytes": 1662,
-        "sha256": "f7d8be03144c1e7c93e03123f53e8949ad8aa54a3520aff01ed32c3d62408a82"
+        "bytes": 1769,
+        "sha256": "ffc5ed2201d02cf58f9f1d0fb10e787a2a5de5172a7834a71c2d297d3ca745db"
       },
       "expected_status": 200,
       "uploads": {
@@ -3907,14 +3984,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10798",
+        "Content-Length": "8626",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-import_stochastic_map.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-import_stochastic_map.response.json",
-        "bytes": 10798,
-        "sha256": "1a6936fd11145644b7ec012ff9228ab15dd84049f3d2a568a1c34d38aabe64d0",
+        "bytes": 8626,
+        "sha256": "aa4fcbae19ae2644846cfc4c1f03a5dace8d27511548c22be0c0749ce2275155",
         "status": 200
       },
       "family": "playout",
@@ -3975,6 +4052,10 @@
         [
           "pnml_require_workflow_boundaries",
           "false"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -3983,8 +4064,8 @@
       "request_body": {
         "filename": "pnml-native-control-require_workflow_boundaries.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-require_workflow_boundaries.request.bin",
-        "bytes": 1669,
-        "sha256": "179dc9f9cbee0726837b4bf7eaf8750354ad59edfaf46c11ba621645abb1c546"
+        "bytes": 1776,
+        "sha256": "b83bc97e44aec212daa42f594b167dabdf81c105d794fe11eb27140f6d672cc1"
       },
       "expected_status": 200,
       "uploads": {
@@ -3998,14 +4079,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10800",
+        "Content-Length": "8628",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-require_workflow_boundaries.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-require_workflow_boundaries.response.json",
-        "bytes": 10800,
-        "sha256": "544c616b57c81cab79605abbafcdce8654f32a6f8c0aa8780ebc40d2e94a2294",
+        "bytes": 8628,
+        "sha256": "8e418911a261a6b54c42956f60506c7cb218d61d887d78e7e9d6674c213b3c50",
         "status": 200
       },
       "family": "playout",
@@ -4066,6 +4147,10 @@
         [
           "pnml_public_marking_semantics",
           "true"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -4074,8 +4159,8 @@
       "request_body": {
         "filename": "pnml-native-control-public_marking_semantics.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-public_marking_semantics.request.bin",
-        "bytes": 1665,
-        "sha256": "34411bee4c92e3764a96e3ce700f50522e97117dea370dc0d79b10477ec668ca"
+        "bytes": 1772,
+        "sha256": "90427f31fc271462a5ea485dc4ee533cbb23983305357cd3e538a0a59f5c4721"
       },
       "expected_status": 200,
       "uploads": {
@@ -4089,14 +4174,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10798",
+        "Content-Length": "8626",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-native-control-public_marking_semantics.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-native-control-public_marking_semantics.response.json",
-        "bytes": 10798,
-        "sha256": "d4b8dc88e1fafc6ff643380cf3332af3dac66e191b2efda756130f8cd66c3536",
+        "bytes": 8626,
+        "sha256": "870681a86b69d8448b83516d9c55695ac6cd6fe68c0026833654ce686688e122",
         "status": 200
       },
       "family": "playout",
@@ -4153,6 +4238,10 @@
         [
           "options_json",
           "{\"traces\":2,\"max_steps\":8}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -4161,8 +4250,8 @@
       "request_body": {
         "filename": "pnml-preserves-zero-key-membership.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-preserves-zero-key-membership.request.bin",
-        "bytes": 1715,
-        "sha256": "220b1f6e4a7dfc0f376cfc49f5dcdb5494b61e2bcb4bc2232714085cd3dab045"
+        "bytes": 1822,
+        "sha256": "ccb043cc48f563d87a3950bdf786cbb6f28ade86b43458dd5e79d0046e0742fa"
       },
       "expected_status": 200,
       "uploads": {
@@ -4176,14 +4265,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11090",
+        "Content-Length": "8918",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-preserves-zero-key-membership.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-preserves-zero-key-membership.response.json",
-        "bytes": 11090,
-        "sha256": "ba883bbab866ce983c1edea2f389cc3b70031b09c98e57fdc08a2b3c7d8229b2",
+        "bytes": 8918,
+        "sha256": "0ada9b841b41da1b58a6a9b40e4111ce8fa092c1d333168598335ff0e04cf6c9",
         "status": 200
       },
       "family": "playout",
@@ -4311,6 +4400,10 @@
         [
           "options_json",
           "{\"traces\":1,\"initial_marking\":[]}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -4319,8 +4412,8 @@
       "request_body": {
         "filename": "pnml-explicit-marking-bypasses-import-conversion.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-explicit-marking-bypasses-import-conversion.request.bin",
-        "bytes": 1586,
-        "sha256": "994367d4bd9b8049acf37552f5cee259b9771bff55e81f7c9555ccbfac964794"
+        "bytes": 1693,
+        "sha256": "e65a227e7a6cadd8e3c5ad6b65a6896aa452ef428afff9d0f1cfc40bf83a0a9f"
       },
       "expected_status": 200,
       "uploads": {
@@ -4334,14 +4427,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8992",
+        "Content-Length": "8401",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-explicit-marking-bypasses-import-conversion.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-explicit-marking-bypasses-import-conversion.response.json",
-        "bytes": 8992,
-        "sha256": "b74447e91aeb12da310ee3bf6abe2f88a218af5679a88cdca6a07794342f7427",
+        "bytes": 8401,
+        "sha256": "a5eca56ba06c69c82e6718be08d45baacd834e16a2d8d737cff595fa70ff4421",
         "status": 200
       },
       "family": "playout",
@@ -4397,6 +4490,10 @@
         [
           "options_json",
           "{\"traces\":2,\"max_steps\":8}\n"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -4405,8 +4502,8 @@
       "request_body": {
         "filename": "pnml-extended-arcs-execute-natively.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-extended-arcs-execute-natively.request.bin",
-        "bytes": 1887,
-        "sha256": "4aeb02137d31b2d4b2348055c4212c8e9b45d74aab32b4ccc12a0a7c585b1117"
+        "bytes": 1994,
+        "sha256": "fd42b53cca317c1c5109f4d9f50d41220abdd2575e8e4ddb7351036d87f4460c"
       },
       "expected_status": 200,
       "uploads": {
@@ -4420,14 +4517,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11598",
+        "Content-Length": "9426",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "pnml-extended-arcs-execute-natively.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/pnml-extended-arcs-execute-natively.response.json",
-        "bytes": 11598,
-        "sha256": "5fce5c91ae33a571ac8afe31d9a26f08d6a17bd8d21dcb2b03120d45066ebd26",
+        "bytes": 9426,
+        "sha256": "1fbeaddc240c11b50859c307038343b7c79a357941532d6923f6c96b9bc4b0df",
         "status": 200
       },
       "family": "playout",
@@ -4488,6 +4585,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -4496,8 +4597,8 @@
       "request_body": {
         "filename": "declared-original-dfg_result.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/declared-original-dfg_result.request.bin",
-        "bytes": 741,
-        "sha256": "3dacc212160f3dd4e71e0f119e585ff1c40ea1e16ab3f05eeb5e2f4d816c2eaa"
+        "bytes": 848,
+        "sha256": "34512752cf188cf5f78303715614f0213b99025bd35a3d212de7cca9714fb390"
       },
       "expected_status": 200,
       "uploads": {
@@ -4511,14 +4612,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8317",
+        "Content-Length": "6664",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "declared-original-dfg_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/declared-original-dfg_result.response.json",
-        "bytes": 8317,
-        "sha256": "3038cfd60d75dccd912e6e39f0727a62c67e97fca00bba8de67795a2906a2a49",
+        "bytes": 6664,
+        "sha256": "725fc9ce54fbbc5b3c433d3a0a8937d0cfb3f5fd57520298bef49f3cb7ba29e9",
         "status": 200
       },
       "family": "playout",
@@ -4579,6 +4680,10 @@
         [
           "model_format",
           "dfg_text"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -4587,8 +4692,8 @@
       "request_body": {
         "filename": "text-original-dfg_result.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/text-original-dfg_result.request.bin",
-        "bytes": 591,
-        "sha256": "ba7a08f68b9ba8226786d017f270968b3d2a8a6cb13bb7d96c377ab0222d65b1"
+        "bytes": 698,
+        "sha256": "95f5401448622b337e16f1de576000b01a2de08989f149692fec347a49909e86"
       },
       "expected_status": 200,
       "uploads": {
@@ -4602,14 +4707,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8143",
+        "Content-Length": "6490",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "text-original-dfg_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/text-original-dfg_result.response.json",
-        "bytes": 8143,
-        "sha256": "eabdbed434ef35dfce512650bf7ab36bf464b27bd66c14d39311d12da6c7bf86",
+        "bytes": 6490,
+        "sha256": "b4ccc2159c6803527d3b93de8d9cc79436d5e78eb78d78ebb7f32b264508b9ae",
         "status": 200
       },
       "family": "playout",
@@ -4670,6 +4775,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -4678,8 +4787,8 @@
       "request_body": {
         "filename": "declared-original-dfg_log.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/declared-original-dfg_log.request.bin",
-        "bytes": 738,
-        "sha256": "694fcc044a772e400250da2654ea89515a4249b6497f8ce453a40831cbc95e7c"
+        "bytes": 845,
+        "sha256": "6b639b6ee30b88d9e4bfbfc41e55b74d25ac7ba6278da2a93dc37b6d725c9c82"
       },
       "expected_status": 200,
       "uploads": {
@@ -4693,14 +4802,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8135",
+        "Content-Length": "6482",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "declared-original-dfg_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/declared-original-dfg_log.response.json",
-        "bytes": 8135,
-        "sha256": "7345d9e1054b1790843596b847aa3d23c7364104d8a0db373c499f5359333c72",
+        "bytes": 6482,
+        "sha256": "58da4ba1bbdf84d621b1517b43c6be82f8dbbf1d1fbf8b67ba58659e9492c42a",
         "status": 200
       },
       "family": "playout",
@@ -4761,6 +4870,10 @@
         [
           "model_format",
           "dfg_text"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -4769,8 +4882,8 @@
       "request_body": {
         "filename": "text-original-dfg_log.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/text-original-dfg_log.request.bin",
-        "bytes": 588,
-        "sha256": "a51b1f1ed693d78366a28b60829521176fd68b42db5a25b29c3d9b9340cbf353"
+        "bytes": 695,
+        "sha256": "6872e525ef32e0a24b437010a7382168b13f12a99932641ce64238849ff54bf6"
       },
       "expected_status": 200,
       "uploads": {
@@ -4784,14 +4897,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7961",
+        "Content-Length": "6308",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "text-original-dfg_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/text-original-dfg_log.response.json",
-        "bytes": 7961,
-        "sha256": "63223e5e554dcac164780139fd5dd33396288e169572ec01ee32cc426d5be51a",
+        "bytes": 6308,
+        "sha256": "5d59b4e2bdd3a0391dcad91f760c8918824342fc57a3d59f2c817e74a783c789",
         "status": 200
       },
       "family": "playout",
@@ -4945,6 +5058,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -4953,8 +5070,8 @@
       "request_body": {
         "filename": "dfg-performance-scalar.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar.request.bin",
-        "bytes": 970,
-        "sha256": "47a6a419e04cb142046c3c3d3414f7c60babe9a188a0bd5e4c67b10f70ee43da"
+        "bytes": 1077,
+        "sha256": "718f4488f4d271983e49cb909476c556fa6a6b705d090ca2611a5977e9521ef6"
       },
       "expected_status": 200,
       "uploads": {
@@ -4968,14 +5085,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11421",
+        "Content-Length": "7263",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-scalar.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar.response.json",
-        "bytes": 11421,
-        "sha256": "6bc6430544cfac7e6ea09b2666d8de2099b3a6f337b5e76d9e7faecbdf066a3f",
+        "bytes": 7263,
+        "sha256": "da6d9361e8816745696c4943ad60837668c53d503bb8c7b9ec98a97e0e3cc5cb",
         "status": 200
       },
       "family": "playout",
@@ -5038,6 +5155,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -5046,8 +5167,8 @@
       "request_body": {
         "filename": "dfg-performance-scalar-three.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar-three.request.bin",
-        "bytes": 976,
-        "sha256": "9bdb745288060d73838ce9ff0dc0847bd1a78cdd69b4d9cacbd225f862a4edf2"
+        "bytes": 1083,
+        "sha256": "0f2489fad83c7aa2f966f35a2702f6644b7f87f765a453066930cf382e8159cc"
       },
       "expected_status": 200,
       "uploads": {
@@ -5061,14 +5182,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11427",
+        "Content-Length": "7269",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-scalar-three.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar-three.response.json",
-        "bytes": 11427,
-        "sha256": "20805ca22046f1d163acca1a63126b4107bf1e3c525702d351ee3d70e625477e",
+        "bytes": 7269,
+        "sha256": "62d1e22f392d725a46ef0c443a9bcc511373947beef9d92e001f8ddf82a81a96",
         "status": 200
       },
       "family": "playout",
@@ -5131,6 +5252,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -5139,8 +5264,8 @@
       "request_body": {
         "filename": "dfg-performance-scalar-nine.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar-nine.request.bin",
-        "bytes": 975,
-        "sha256": "d19ddaf27ee595d46312b8589ad2efdb9bc3accfb97f9c8b92eb1bea32db3ce7"
+        "bytes": 1082,
+        "sha256": "4c28c0c794596add55b04691dde9acb9815babc784ed4091f60946ebae367912"
       },
       "expected_status": 200,
       "uploads": {
@@ -5154,14 +5279,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11426",
+        "Content-Length": "7268",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-scalar-nine.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-scalar-nine.response.json",
-        "bytes": 11426,
-        "sha256": "173dabdbe067f04a6e360cd01918f553bdaefbd2a71a6208cc85f602575ab336",
+        "bytes": 7268,
+        "sha256": "f161505782a2e534b7525f4b605a3cfd4b7cb94284a938d7c1db38ee8c167f21",
         "status": 200
       },
       "family": "playout",
@@ -5224,6 +5349,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -5232,8 +5361,8 @@
       "request_body": {
         "filename": "dfg-performance-vector.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-vector.request.bin",
-        "bytes": 974,
-        "sha256": "0d5825410d7651c73349e016d0ee58bc532d547a45a5acdd67cd34b0fd123ea8"
+        "bytes": 1081,
+        "sha256": "f67c0bd3c37be14434084c36afb5895efaa7171120387a223efb6fa28ca0ac5d"
       },
       "expected_status": 200,
       "uploads": {
@@ -5247,14 +5376,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11429",
+        "Content-Length": "7271",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-vector.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-vector.response.json",
-        "bytes": 11429,
-        "sha256": "34985232745cf345131b2af27ffe5ccb62cc356a57a63fcadf30792d7aa124bf",
+        "bytes": 7271,
+        "sha256": "cda434eaf7a88fc347cb13f27b2debeb750837353ee0c7ef84dfb90290fc53a6",
         "status": 200
       },
       "family": "playout",
@@ -5317,6 +5446,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -5325,8 +5458,8 @@
       "request_body": {
         "filename": "dfg-performance-empty-vector.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-empty-vector.request.bin",
-        "bytes": 977,
-        "sha256": "3bc49a915da5a7263fa31c4192340a2394d4fa10916bdcd2299e4dcd4fd27407"
+        "bytes": 1084,
+        "sha256": "af199cfeae95d76873a9c1cec9dfa7df58c400557f0425376e3578420b9b54b5"
       },
       "expected_status": 200,
       "uploads": {
@@ -5340,14 +5473,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11429",
+        "Content-Length": "7271",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-empty-vector.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-empty-vector.response.json",
-        "bytes": 11429,
-        "sha256": "9891ff59b29e95be41e72baf9babf0d0c5c877fbf1ae6bbfbf78ea273fe53f2d",
+        "bytes": 7271,
+        "sha256": "2aa3ed9a89828bcc3aad5b70ddd78367ded445b874544806c9b99d151e28b454",
         "status": 200
       },
       "family": "playout",
@@ -5410,6 +5543,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -5418,8 +5555,8 @@
       "request_body": {
         "filename": "dfg-performance-summary.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-summary.request.bin",
-        "bytes": 1095,
-        "sha256": "55abe39b7b70da81cff68b3ba03b18d7e6d1d0793200cfb278c9d2cee8e80d0f"
+        "bytes": 1202,
+        "sha256": "9e493c16b704c53b13f5cc31f1af9adf2cd93a2bb13729b28c86a7cd49fcd08f"
       },
       "expected_status": 200,
       "uploads": {
@@ -5433,14 +5570,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "11690",
+        "Content-Length": "7532",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-summary.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-summary.response.json",
-        "bytes": 11690,
-        "sha256": "7167f066e66c64bb08ee9ce18dde6a25862ed9235e5cd8800363fd62db81e556",
+        "bytes": 7532,
+        "sha256": "75d4ed58d17e3fb6d56969572c15a03b7786547a25bcfbb4d4a3b54e2f277980",
         "status": 200
       },
       "family": "playout",
@@ -5588,6 +5725,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -5596,8 +5737,8 @@
       "request_body": {
         "filename": "dfg-performance-pointer-empty.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-pointer-empty.request.bin",
-        "bytes": 745,
-        "sha256": "6142b0129ba88a14716056e8a33b245693b09309cc3acef1152cfaaada655da4"
+        "bytes": 852,
+        "sha256": "0aecc6181f67bdc6faa63d02ccf1f4988660a9f9c40a9253e73ee042854228e0"
       },
       "expected_status": 200,
       "uploads": {
@@ -5611,14 +5752,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10918",
+        "Content-Length": "6718",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-pointer-empty.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-pointer-empty.response.json",
-        "bytes": 10918,
-        "sha256": "43ca4cbe2fb85f1533212b538df5b4f541c2ce6a136180b4fa882e4ad44ef97c",
+        "bytes": 6718,
+        "sha256": "eb214f32adb1b395653d2010e98dc4ddfe9cee87b99df6bc6867485b93687ee8",
         "status": 200
       },
       "family": "playout",
@@ -5761,6 +5902,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -5769,8 +5914,8 @@
       "request_body": {
         "filename": "dfg-performance-cutoff-diagnostics.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-cutoff-diagnostics.request.bin",
-        "bytes": 722,
-        "sha256": "f652311618cb62bc6679064216c31cf775d8f4c1c7502e7ec4481fa67f5fddc3"
+        "bytes": 829,
+        "sha256": "ad63664aa5124df7872d0517396ad4ab14abbfe727862e06aa9f865aa9891ca3"
       },
       "expected_status": 200,
       "uploads": {
@@ -5784,14 +5929,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "13969",
+        "Content-Length": "7189",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-performance-cutoff-diagnostics.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-performance-cutoff-diagnostics.response.json",
-        "bytes": 13969,
-        "sha256": "0ffaa6bee1d9766654b517b47350fc45e2f0feffcf963d06128dcab2accdc343",
+        "bytes": 7189,
+        "sha256": "f66b08b62a8ba5014a1a5edbd5e9a2eee71f3e6b44ef1bbb54d5c11a2a213d24",
         "status": 200
       },
       "family": "playout",
@@ -5850,6 +5995,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -5858,8 +6007,8 @@
       "request_body": {
         "filename": "dfg-classic-complete-only-suppression.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-classic-complete-only-suppression.request.bin",
-        "bytes": 773,
-        "sha256": "5194c35fc4b14929d1a708e2db8f5bf0916963dca186c8a91db879adc193deff"
+        "bytes": 880,
+        "sha256": "a3be34a9af06492a6c7df4462c1d96c55ccb89074701df2d0a6ea0d5f48f3b69"
       },
       "expected_status": 200,
       "uploads": {
@@ -5873,14 +6022,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8420",
+        "Content-Length": "6767",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-classic-complete-only-suppression.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-classic-complete-only-suppression.response.json",
-        "bytes": 8420,
-        "sha256": "432aea2e2613a69e646713654540a13041139df8437412a58e5f76ea8cb73d40",
+        "bytes": 6767,
+        "sha256": "afc836ed1be6e8203453a57cca242ed14eb4c6af74b8d33e730363704441d3e5",
         "status": 200
       },
       "family": "playout",
@@ -5938,6 +6087,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -5946,8 +6099,8 @@
       "request_body": {
         "filename": "dfg-full-integer-zero-entries.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-full-integer-zero-entries.request.bin",
-        "bytes": 912,
-        "sha256": "37d62f0d02a09bae1e5dbb434faeeef8edd20e9f63f44eb2a4a6721580d808b4"
+        "bytes": 1019,
+        "sha256": "fd151d4c34bf3295b0d2bc7b359293ba216815981b0c5f1f50595570e5a1f88a"
       },
       "expected_status": 200,
       "uploads": {
@@ -5961,14 +6114,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "8763",
+        "Content-Length": "7110",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-full-integer-zero-entries.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-full-integer-zero-entries.response.json",
-        "bytes": 8763,
-        "sha256": "faa7cbaaa357173366358697251c3a17046199f6d7ddde1e2bb2a97a7a1a2031",
+        "bytes": 7110,
+        "sha256": "a30bb494dc0c2f874f39b76d8f8213cd762685c81007143671b9c5f805d9458b",
         "status": 200
       },
       "family": "playout",
@@ -6030,6 +6183,10 @@
         [
           "model_format",
           "dfg_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -6038,8 +6195,8 @@
       "request_body": {
         "filename": "dfg-literal-activity-identity.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-literal-activity-identity.request.bin",
-        "bytes": 826,
-        "sha256": "057e1d147dc7b315affe8d1a41cf758485baef640d632c30abd8417e5a0fa583"
+        "bytes": 933,
+        "sha256": "5e3f0979c38ae25affc47d6ad043370767e3e05010a18958e7072e2b3862c764"
       },
       "expected_status": 200,
       "uploads": {
@@ -6053,14 +6210,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10273",
+        "Content-Length": "6017",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dfg-literal-activity-identity.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/dfg-literal-activity-identity.response.json",
-        "bytes": 10273,
-        "sha256": "1c63b510104a8a3b9d6f231417dc46d8effb895991e7cf4314f26653c5513875",
+        "bytes": 6017,
+        "sha256": "7ccfe3d55cd20e09e0a9891df23b687c057e54f9c9ff35eb967e92715f701bcd",
         "status": 200
       },
       "family": "playout",
@@ -6169,6 +6326,10 @@
         [
           "model_format",
           "tree_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -6177,8 +6338,8 @@
       "request_body": {
         "filename": "constructor-original-tree_result.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_result.request.bin",
-        "bytes": 783,
-        "sha256": "dd531d02939cd5d79bd53de571b8b3df9a9719a1ed859fa95959317a341e8aa2"
+        "bytes": 890,
+        "sha256": "58484935169b4726f663cafb6d8c587c13cd433313edee0dc82b12012178d900"
       },
       "expected_status": 200,
       "uploads": {
@@ -6192,14 +6353,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12810",
+        "Content-Length": "6177",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "constructor-original-tree_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_result.response.json",
-        "bytes": 12810,
-        "sha256": "4bc5d90dc478f37e21473594eb599fc4f920874a9f48373579e600f15a2c05e2",
+        "bytes": 6177,
+        "sha256": "9af85ee8d5a89a12504f635b412614e976293e8ee038c31b259187f649ad17f6",
         "status": 200
       },
       "family": "playout",
@@ -6261,6 +6422,10 @@
         [
           "model_format",
           "ptml"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -6269,8 +6434,8 @@
       "request_body": {
         "filename": "ptml-original-tree_result.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_result.request.bin",
-        "bytes": 950,
-        "sha256": "4cef4925b3884a668c5d87d0bcba81a89f20ebe2ae1578aec3431529736eeab3"
+        "bytes": 1057,
+        "sha256": "9f6089b527d487726edebcf70670aa45948d6aeafd11aa9a78cb3c69d091281b"
       },
       "expected_status": 200,
       "uploads": {
@@ -6284,14 +6449,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12968",
+        "Content-Length": "6335",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "ptml-original-tree_result.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_result.response.json",
-        "bytes": 12968,
-        "sha256": "8af2a24e936784d63dde0d408c1b5d99a94f2033d1d67bb080ca8ac39a82793e",
+        "bytes": 6335,
+        "sha256": "89eae045cea5a56f4cbadfb2716fee8202ea10a9c3ea2124c85092168508a1b5",
         "status": 200
       },
       "family": "playout",
@@ -6352,6 +6517,10 @@
         [
           "model_format",
           "tree_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -6360,8 +6529,8 @@
       "request_body": {
         "filename": "constructor-original-tree_log.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_log.request.bin",
-        "bytes": 780,
-        "sha256": "9935ec6bd1195e8c17a580297fee364aa0e2f24a2459b8baf8f3d53cc85cf5a5"
+        "bytes": 887,
+        "sha256": "00ad75965ab8ac85902f6f5dff94bf8549b0235a9af98af6c4672bfa69352b07"
       },
       "expected_status": 200,
       "uploads": {
@@ -6375,14 +6544,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12753",
+        "Content-Length": "6120",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "constructor-original-tree_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/constructor-original-tree_log.response.json",
-        "bytes": 12753,
-        "sha256": "8d3c10217b81ebf112e3b404df7bfda747619d90b22cfc02455b8f652d85a234",
+        "bytes": 6120,
+        "sha256": "b00265f9368c6b4cc616dc0e5024399b0d749bee197141df7024fcbfe0e5ed53",
         "status": 200
       },
       "family": "playout",
@@ -6444,6 +6613,10 @@
         [
           "model_format",
           "ptml"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -6452,8 +6625,8 @@
       "request_body": {
         "filename": "ptml-original-tree_log.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_log.request.bin",
-        "bytes": 947,
-        "sha256": "16b47a2d774824b2510f96c44d1de04801ebf760445b675611c1aa2a435c4253"
+        "bytes": 1054,
+        "sha256": "2c11b49919ee977cddd5fe1c807e6791b45fc3f80dd2fa37812e307af5c7dd86"
       },
       "expected_status": 200,
       "uploads": {
@@ -6467,14 +6640,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12911",
+        "Content-Length": "6278",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "ptml-original-tree_log.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/ptml-original-tree_log.response.json",
-        "bytes": 12911,
-        "sha256": "87ccd741e3d12d1cefd2fb6d8b375df5311bebf3e2d65aa144c34752e0003003",
+        "bytes": 6278,
+        "sha256": "f95784a6054efd4185e80c87a2a93fda8516bd8684917c8e2f6825d9457c52a2",
         "status": 200
       },
       "family": "playout",
@@ -6535,6 +6708,10 @@
         [
           "model_format",
           "tree_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -6543,8 +6720,8 @@
       "request_body": {
         "filename": "all12-tree-controls.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/all12-tree-controls.request.bin",
-        "bytes": 947,
-        "sha256": "d503c09bfcf8401f19ea1058579f93fe12817af19634d6fc72bace1076c8c536"
+        "bytes": 1054,
+        "sha256": "f1e3244517421a0d75a1233394efae5bc114e500bad563faba055fe20b819590"
       },
       "expected_status": 200,
       "uploads": {
@@ -6558,14 +6735,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7669",
+        "Content-Length": "6073",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "all12-tree-controls.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/all12-tree-controls.response.json",
-        "bytes": 7669,
-        "sha256": "26835f3c6da71c1b40241fe33ea87130c77ee14a19a5f86cc9a70149a9ee1ec3",
+        "bytes": 6073,
+        "sha256": "79a653c11dacc6212f9ec5df24184cb292cb96539733b9cc90a63cb96d0f3dce",
         "status": 200
       },
       "family": "playout",
@@ -6717,6 +6894,10 @@
         [
           "model_format",
           "tree_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -6725,8 +6906,8 @@
       "request_body": {
         "filename": "tree-native-loop-extensive.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-loop-extensive.request.bin",
-        "bytes": 901,
-        "sha256": "6cfd2dc630d6a354d464faa6e8a8a4b6d60626d26e12e8bc3bd1b382a240fb44"
+        "bytes": 1008,
+        "sha256": "6cf0f46f0c03364a0259de0b6d479b5f33a6f7210960348bb1037166a092faea"
       },
       "expected_status": 200,
       "uploads": {
@@ -6740,14 +6921,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16355",
+        "Content-Length": "6788",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-loop-extensive.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-loop-extensive.response.json",
-        "bytes": 16355,
-        "sha256": "d47fc1ae64ec0e5e31b10c24fe4ef917258408ace14ea3a18787197e2883a4b6",
+        "bytes": 6788,
+        "sha256": "703e5295ce1ba19b2bc107ce7d0fa660a6de1f2b11c8680fa839901c18287c6e",
         "status": 200
       },
       "family": "playout",
@@ -7068,6 +7249,10 @@
         [
           "model_format",
           "tree_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -7076,8 +7261,8 @@
       "request_body": {
         "filename": "tree-native-operator-tau.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-tau.request.bin",
-        "bytes": 724,
-        "sha256": "4f07932c1942112178a33fd54a3b22f9907ab3670351150289f47e9865027fd8"
+        "bytes": 831,
+        "sha256": "c5c8b03e40c5b35472e6909a5547c23a13a6d27b4a3e97bfae1466e487f03052"
       },
       "expected_status": 200,
       "uploads": {
@@ -7091,14 +7276,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "4634",
+        "Content-Length": "4417",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-tau.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-tau.response.json",
-        "bytes": 4634,
-        "sha256": "adbdf16bda82f5fc44596aa47b2ee1f47a1a2e5d58f448c0c7d4e048b6b157ac",
+        "bytes": 4417,
+        "sha256": "628ac695eb9460bc370fc827ea52235fc26873e6b6445b3a71c40211293f2244",
         "status": 200
       },
       "family": "playout",
@@ -7157,6 +7342,10 @@
         [
           "model_format",
           "tree_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -7165,8 +7354,8 @@
       "request_body": {
         "filename": "tree-native-operator-activity.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-activity.request.bin",
-        "bytes": 715,
-        "sha256": "16810704fc81747cc3cce20ccbed63d54d7d6e2609d084603d95ed978147a6c0"
+        "bytes": 822,
+        "sha256": "a957de86edafdc977d1168c5e99ef2057da9793f5c698b32622e28bda903a723"
       },
       "expected_status": 200,
       "uploads": {
@@ -7180,14 +7369,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5700",
+        "Content-Length": "5135",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-activity.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-activity.response.json",
-        "bytes": 5700,
-        "sha256": "e9d354c48a416792da2053efd17d4abf778fdc4dadbddb0e8c05e050b7c28db6",
+        "bytes": 5135,
+        "sha256": "211b2b86f8b3c4b127262bdb3bd045ae50d3445e3f7405cb802da2b050848a1e",
         "status": 200
       },
       "family": "playout",
@@ -7246,6 +7435,10 @@
         [
           "model_format",
           "tree_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -7254,8 +7447,8 @@
       "request_body": {
         "filename": "tree-native-operator-sequence.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-sequence.request.bin",
-        "bytes": 849,
-        "sha256": "722175314d2ce43fc50d571d640cb7e914e2d0175d25244ec615e9720286a3a8"
+        "bytes": 956,
+        "sha256": "8b1695baf851fd827785ee1787febc30eba3b05378869537d4c1f00364616f9f"
       },
       "expected_status": 200,
       "uploads": {
@@ -7269,14 +7462,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7307",
+        "Content-Length": "5768",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-sequence.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-sequence.response.json",
-        "bytes": 7307,
-        "sha256": "641bf4ff65f25e812b5ce313a7aff53635695fe1f63e300367a1915d363b79c6",
+        "bytes": 5768,
+        "sha256": "5faebae7356c923788a5578fd7e0b3a9f9a29f7f2a7be369318aac1d50013fed",
         "status": 200
       },
       "family": "playout",
@@ -7335,6 +7528,10 @@
         [
           "model_format",
           "tree_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -7343,8 +7540,8 @@
       "request_body": {
         "filename": "tree-native-operator-exclusive.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-exclusive.request.bin",
-        "bytes": 851,
-        "sha256": "ea4c0f6a0e1bffd2d402048c2f10c0ad5951ff12da882c36239979c910a765e6"
+        "bytes": 958,
+        "sha256": "306e1d8ebadf44da75150de8e986aaae5ac223e4ee1f45ce9cda2d2fb8916c3f"
       },
       "expected_status": 200,
       "uploads": {
@@ -7358,14 +7555,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7931",
+        "Content-Length": "5801",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-exclusive.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-exclusive.response.json",
-        "bytes": 7931,
-        "sha256": "3c80202347405a2cba140ff8cad88299045549a2373f001e547637cd9c581814",
+        "bytes": 5801,
+        "sha256": "10b0702700a29fcd0abe467f2f7326c8ed4f370b5a444d559a79b2a6f1e43e9d",
         "status": 200
       },
       "family": "playout",
@@ -7424,6 +7621,10 @@
         [
           "model_format",
           "tree_json"
+        ],
+        [
+          "export_generated_xes",
+          "true"
         ]
       ],
       "headers": {
@@ -7432,8 +7633,8 @@
       "request_body": {
         "filename": "tree-native-operator-parallel.request.bin",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-parallel.request.bin",
-        "bytes": 849,
-        "sha256": "bcc80277d6b93afae6a1b4c9e222ff93325c4d4105c3b21458f8991793af167c"
+        "bytes": 956,
+        "sha256": "6a1baf6c60b915e287182b247bab514710d9169a33c04f37804a4046e4c1a129"
       },
       "expected_status": 200,
       "uploads": {
@@ -7447,14 +7648,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10116",
+        "Content-Length": "6030",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "tree-native-operator-parallel.response.json",
         "path": "src/frontend/tests/fixtures/playout-workbench/captures/tree-native-operator-parallel.response.json",
-        "bytes": 10116,
-        "sha256": "8ddbe4bd0955da16a065a04998b39620bf191ed7ddf7906b71e5cbc7cf200925",
+        "bytes": 6030,
+        "sha256": "1560968f35a26be27f564cc17d7c13caa29ba4df74c3b4d3c8da04132ab7c104",
         "status": 200
       },
       "family": "playout",

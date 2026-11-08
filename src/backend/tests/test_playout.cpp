@@ -273,10 +273,11 @@ void visited_playout_records_markings_and_transitions() {
   assert(visited[4].kind == minera::PlayoutVisitedElementKind::MARKING);
   assert(visited[4].marking == std::vector<std::uint32_t>({0, 0, 1}));
   assert(minera::serialize_playout_visited_json(net, result) ==
-         "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":\"BASIC_PLAYOUT\",\"truncated\":false,\"trace_limit_reached\":false,\"state_limit_reached\":false,\"traces\":[[{\"kind\":\"marking\",\"marking\":[1,0,0]},"
-         "{\"kind\":\"transition\",\"transition\":0,\"activity\":null},"
+         "{\"family\":\"PETRI_PLAYOUT_VISITED\",\"variant\":\"BASIC_PLAYOUT\",\"truncated\":false,\"trace_limit_reached\":false,\"state_limit_reached\":false,"
+         "\"transition_labels\":[null,\"a\"],\"traces\":[[{\"kind\":\"marking\",\"marking\":[1,0,0]},"
+         "{\"kind\":\"transition\",\"transition\":0},"
          "{\"kind\":\"marking\",\"marking\":[0,1,0]},"
-         "{\"kind\":\"transition\",\"transition\":1,\"activity\":\"a\"},"
+         "{\"kind\":\"transition\",\"transition\":1},"
          "{\"kind\":\"marking\",\"marking\":[0,0,1]}]]}");
 }
 

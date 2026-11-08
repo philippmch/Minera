@@ -80,6 +80,14 @@ int main() {
   one.traces = {trace("2024-01-01T08:00:00Z", "2024-01-01T09:00:00Z")};
   const auto single = minera::discover_case_arrival(one);
   assert(single.arrival_average == 0.0 && single.dispersion_average == 0.0);
+  // Review V2-5: pm4py.get_case_arrival_average on a one-case DataFrame
+  // (and the dispersion average) is NaN; the JSON writes it as null.
+  const auto single_frame = minera::discover_case_arrival(one, frame);
+  assert(std::isnan(single_frame.arrival_average) &&
+         std::isnan(single_frame.dispersion_average));
+  const auto single_json = minera::case_arrival_json(single_frame);
+  assert(single_json.find("\"arrival_average\":null,\"dispersion_average\":null") !=
+         std::string::npos);
 
   bool rejected = false;
   try {

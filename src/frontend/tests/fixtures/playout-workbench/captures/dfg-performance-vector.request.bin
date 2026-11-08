@@ -17,4 +17,8 @@ Content-Type: application/octet-stream
 
 {"frequency":[{"source":"A","target":"B","count":1}],"start_activities":[{"activity":"A","count":1}],"end_activities":[{"activity":"B","count":1}],"performance":[{"source":"A","target":"B","statistics":{"summary":{"count":18446744073709551615,"mean":9,"median":"NaN","minimum":"-INF","maximum":"INF","standard_deviation":-0.0,"sum":-9},"raw_values":[1,2],"value":{"index":1,"value":[2,4]}}}]}
 
+--OwnedOriginalModelPlayoutFeature59
+Content-Disposition: form-data; name="export_generated_xes"
+
+true
 --OwnedOriginalModelPlayoutFeature59--

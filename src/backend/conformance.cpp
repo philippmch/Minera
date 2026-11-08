@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <chrono>
 #include <limits>
@@ -3344,6 +3345,24 @@ class MarkingTable {
   std::vector<std::uint64_t> batch_hashes_;
 };
 
+// Whether every firing changes the marking by exactly its transition's
+// incidence column, so that the marking equation is a relaxation of firing
+// and its LP bounds stay admissible. A reset arc clears its place, and two
+// weighted input arcs on one place are each checked on their own and clamp
+// the place at zero (fire_petri_transition), so either breaks it. Inhibitor
+// arcs only restrict when a transition is enabled; the firing still adds its
+// column, so they keep the relaxation valid.
+bool marking_equation_describes_firing(const PetriNet& net) {
+  for (const auto& transition : net.transitions()) {
+    if (!transition.reset_inputs.empty()) return false;
+    if (transition.input_weights.empty()) continue;
+    for (std::size_t i = 0; i < transition.inputs.size(); ++i)
+      for (std::size_t j = 0; j < i; ++j)
+        if (transition.inputs[i] == transition.inputs[j]) return false;
+  }
+  return true;
+}
+
 class Aligner {
  public:
   explicit Aligner(
@@ -3388,6 +3407,7 @@ class Aligner {
                    std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                        std::chrono::duration<double>(limit));
     }
+    marking_equation_ = marking_equation_describes_firing(net_);
     bool preflight_exhausted = false;
     if (const auto cost = shortest_model_run(options, deadline, preflight_exhausted)) {
       reachable_ = true;
@@ -3395,9 +3415,15 @@ class Aligner {
     } else if (preflight_exhausted) {
       // Silent cycles that pump tokens (weighted arcs) make the uniform-cost
       // run unbounded; retry as A* over markings that can still reach the
-      // final marking by the marking equation.
+      // final marking by the marking equation. Where the marking equation does
+      // not describe firing (reset arcs, repeated weighted inputs) that A*
+      // would be the same uniform-cost search again, so search breadth-first
+      // by firing count instead, which a cost-0 pump cannot stall.
       preflight_exhausted = false;
-      if (const auto pruned = pruned_model_run(options, deadline, preflight_exhausted)) {
+      if (const auto pruned = marking_equation_
+                                  ? pruned_model_run(options, deadline, preflight_exhausted)
+                                  : breadth_first_model_run(options, deadline,
+                                                            preflight_exhausted)) {
         reachable_ = true;
         empty_run_cost_ = *pruned;
       }
@@ -3596,7 +3622,7 @@ class Aligner {
       bool log_free = false;  // ids[pos] absent from the model: log is exact
     };
     const auto heuristic = [&](const State& state) -> std::optional<LpBound> {
-      if (net_.has_extended_arcs()) return LpBound{};
+      if (net_.has_extended_arcs() || !marking_equation_) return LpBound{};
       const std::size_t pos = static_cast<std::size_t>(state.back());
       const auto& counts = suffix_counts[pos];
       const double constant = static_cast<double>(len - pos);
@@ -4139,7 +4165,7 @@ class Aligner {
       // The marking-equation bound is in undiscounted units and may
       // overestimate a discounted suffix.  Discounted search therefore uses
       // a zero heuristic (Dijkstra), preserving optimal goal termination.
-      if (net_.has_extended_arcs() ||
+      if (net_.has_extended_arcs() || !marking_equation_ ||
           options.variant != AlignmentVariant::kStateEquationAStar || discounted)
         return 0.0;
       const std::size_t pos = static_cast<std::size_t>(state.back());
@@ -4515,6 +4541,59 @@ class Aligner {
     return std::nullopt;  // final marking unreachable: the net is not a sound WF-net
   }
 
+  // Reachability of the final marking by a breadth-first search over firing
+  // counts, for nets whose marking equation does not describe firing (no
+  // admissible bound to prune with). A uniform-cost search stalls on an
+  // unbounded cost-0 silent pump; breadth-first order still reaches a final
+  // marking a few firings away. Returns the visible count of the first run
+  // found (not necessarily the cheapest), std::nullopt when the final marking
+  // is unreachable or the search stopped at its budget (`exhausted`).
+  [[nodiscard]] std::optional<std::uint64_t> breadth_first_model_run(
+      const AlignmentOptions& options,
+      std::chrono::steady_clock::time_point deadline,
+      bool& exhausted) const {
+    MarkingTable table(initial_.size());
+    std::vector<std::uint64_t> cost;  // by marking id: visible count on its first run
+    std::deque<std::uint32_t> frontier;
+    frontier.push_back(table.intern(initial_).first);
+    cost.push_back(0);
+    const std::size_t budget = options.max_states == 0 ? kAlignSearchCap
+                                                        : options.max_states;
+    std::size_t expanded = 0;
+    CancelPoll cancelled(options.cancelled);
+    Marking current, successor;
+    std::vector<std::size_t> fired;
+    std::vector<int> successors;
+    while (!frontier.empty() && expanded < budget) {
+      if (std::chrono::steady_clock::now() >= deadline || cancelled()) {
+        exhausted = true;
+        return std::nullopt;
+      }
+      ++expanded;
+      const auto id = frontier.front();
+      frontier.pop_front();
+      table.copy(id, current);
+      if (current == final_) return cost[id];
+      fired.clear();
+      successors.clear();
+      for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
+        if (!enabled(current, t)) continue;
+        successor = current;
+        fire_petri_transition(net_.transitions()[t], successor);
+        fired.push_back(t);
+        successors.insert(successors.end(), successor.begin(), successor.end());
+      }
+      const auto base = cost[id];
+      table.intern_batch(successors.data(), fired.size(), [&](std::size_t k, std::uint32_t next, bool added) {
+        if (!added) return;
+        cost.push_back(base + (net_.transitions()[fired[k]].silent() ? 0 : 1));
+        frontier.push_back(next);
+      });
+    }
+    exhausted = !frontier.empty();
+    return std::nullopt;
+  }
+
   // shortest_model_run as an A* whose heuristic is the marking-equation bound
   // on the visible transitions still to fire; markings from which the final
   // marking is unreachable by the marking equation are dropped.
@@ -4546,20 +4625,11 @@ class Aligner {
     const std::size_t tcount = net_.transitions().size();
     const std::size_t places = initial_.size();
     // The marking equation describes firing only when every firing adds its
-    // incidence column: reset arcs clear a place, and repeated weighted input
-    // arcs on one place are each checked alone and clamp the place at zero.
-    // Otherwise no LP bound is applied (h = 0, nothing pruned), and with it
-    // no parent-plan or dual bound.
-    const bool marking_equation = [&] {
-      if (net_.has_extended_arcs()) return false;
-      for (const auto& transition : net_.transitions()) {
-        if (transition.input_weights.empty()) continue;
-        for (std::size_t i = 0; i < transition.inputs.size(); ++i)
-          for (std::size_t j = 0; j < i; ++j)
-            if (transition.inputs[i] == transition.inputs[j]) return false;
-      }
-      return true;
-    }();
+    // incidence column (marking_equation_describes_firing). The constructor
+    // runs this search only then; the guard keeps the bound sound for any
+    // other caller: without it no LP bound is applied (h = 0, nothing
+    // pruned), and with it no parent-plan or dual bound.
+    const bool marking_equation = marking_equation_;
     std::vector<double> c(tcount, 0.0);
     for (std::size_t t = 0; t < tcount; ++t) c[t] = net_.transitions()[t].silent() ? 0.0 : 1.0;
     // The incidence matrix as sparse rows; only b changes between markings.
@@ -4781,6 +4851,8 @@ class Aligner {
   bool reachable_ = false;
   bool reachability_exhausted_ = false;
   std::uint64_t empty_run_cost_ = 0;
+  // marking_equation_describes_firing(net_): the LP bounds are admissible.
+  bool marking_equation_ = true;
   // Per-transition sparse LP column for the marking-equation heuristic:
   // produced minus consumed tokens per place.
   std::vector<std::vector<std::pair<std::size_t, double>>> incidence_;
@@ -5234,9 +5306,13 @@ void carry_unknown_activity_unfitness(
   }
 }
 
+// `enabled_transitions` false leaves each row's enabled_transitions empty:
+// computing them at the reached marking dominates the replay's cost, and
+// callers that only read the firings (token_replay_firing_sequences) skip it.
 std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
     const EventLog& event_log, const PetriNet& net, TokenReplayOptions options,
-    bool calculate_fitness, bool full_result = false) {
+    bool calculate_fitness, bool full_result = false,
+    bool enabled_transitions = true) {
   validate_token_replay_event_limit(event_log, options);
   if (!valid_token_replay_variant(options.variant))
     throw std::invalid_argument("unsupported token replay variant");
@@ -5303,8 +5379,9 @@ std::vector<TokenReplayTraceDiagnostics> replay_token_trace_rows(
     row.missing = counts.missing;
     row.remaining = counts.remaining;
     row.places = std::move(counts.places);
-    row.enabled_transitions = replayer.enabled_transition_ids(
-        row.reached_marking, options);
+    if (enabled_transitions)
+      row.enabled_transitions = replayer.enabled_transition_ids(
+          row.reached_marking, options);
     for (const auto index : row.unknown_event_indices) {
       row.unknown_activities.push_back(names[index].value_or(""));
       row.unknown_activity_is_null.push_back(!names[index]);
@@ -5967,6 +6044,66 @@ std::vector<ActivityDeviation> summarize_alignment_moves(
 }
 
 std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
+token_replay_firing_sequences(const PetriNet& net,
+                              const std::vector<std::vector<std::string>>& variants,
+                              const std::function<bool()>& cancelled) {
+  // One trace per variant, replayed exactly as replay_token_traces replays a
+  // log of them with default options (forward, final routing through hidden
+  // transitions, activities outside the model skipped).
+  EventLog variant_log;
+  variant_log.traces.reserve(variants.size());
+  for (std::size_t v = 0; v < variants.size(); ++v) {
+    Trace trace;
+    trace.case_id = std::to_string(v);
+    trace.events.reserve(variants[v].size());
+    for (const auto& activity : variants[v]) {
+      Event event;
+      event.case_id = trace.case_id;
+      event.case_id_state = FirstClassAttributeState::kPresent;
+      event.activity = activity;
+      event.activity_state = FirstClassAttributeState::kPresent;
+      trace.events.push_back(std::move(event));
+    }
+    variant_log.traces.push_back(std::move(trace));
+  }
+  TokenReplayOptions options;
+  options.cancelled = cancelled;
+  const auto rows = replay_token_trace_rows(variant_log, net, options, true, false,
+                                            /*enabled_transitions=*/false);
+  std::vector<std::optional<std::vector<std::vector<std::size_t>>>> result(variants.size());
+  for (const auto& row : rows) {
+    if (row.trace_index >= variants.size()) continue;
+    // An event outside the model is skipped (its list is empty), as the
+    // replay's fitness does; it does not make the trace deviate.
+    if (!row.trace_is_fit || row.missing != 0 || row.remaining != 0 ||
+        row.replay_stopped ||
+        row.event_diagnostics.size() != variants[row.trace_index].size())
+      continue;
+    std::vector<std::vector<std::size_t>> steps;
+    steps.reserve(row.event_diagnostics.size() + 1);
+    std::size_t used = 0;
+    bool consistent = true;
+    for (const auto& event : row.event_diagnostics) {
+      // The trace-level list is the events' lists in order, then the final
+      // routing; anything else would not be one firing sequence.
+      if (used + event.activated_transitions.size() > row.activated_transitions.size() ||
+          !std::equal(event.activated_transitions.begin(), event.activated_transitions.end(),
+                      row.activated_transitions.begin() + static_cast<std::ptrdiff_t>(used))) {
+        consistent = false;
+        break;
+      }
+      used += event.activated_transitions.size();
+      steps.push_back(event.activated_transitions);
+    }
+    if (!consistent) continue;
+    steps.emplace_back(row.activated_transitions.begin() + static_cast<std::ptrdiff_t>(used),
+                       row.activated_transitions.end());
+    result[row.trace_index] = std::move(steps);
+  }
+  return result;
+}
+
+std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
 replay_firing_sequences(const PetriNet& net,
                         const std::vector<std::vector<std::string>>& variants,
                         const std::function<bool()>& cancelled,
@@ -6138,6 +6275,29 @@ bool final_marking_reachable(const PetriNet& net, const std::function<bool()>& c
   // A cancelled search reports the final marking unreachable.
   if (!reachable) throw_if_cancelled(cancelled, "reachability search was cancelled");
   return reachable;
+}
+
+FinalMarkingReachability final_marking_reachability(
+    const PetriNet& net, const std::function<bool()>& cancelled) {
+  AlignmentOptions options;
+  options.cancelled = cancelled;
+  const Aligner aligner(net, options);
+  if (aligner.reachable()) return FinalMarkingReachability::kReachable;
+  throw_if_cancelled(cancelled, "reachability search was cancelled");
+  return aligner.reachability_exhausted() ? FinalMarkingReachability::kExhausted
+                                          : FinalMarkingReachability::kUnreachable;
+}
+
+FinalMarkingReachability final_marking_reachability(
+    const PetriNet& net, const std::vector<int>& initial_marking,
+    const std::vector<int>& final_marking) {
+  AlignmentOptions options;
+  options.initial_marking = initial_marking;
+  options.final_marking = final_marking;
+  const Aligner aligner(net, options);
+  if (aligner.reachable()) return FinalMarkingReachability::kReachable;
+  return aligner.reachability_exhausted() ? FinalMarkingReachability::kExhausted
+                                          : FinalMarkingReachability::kUnreachable;
 }
 
 bool final_marking_reachable(const PetriNet& net,

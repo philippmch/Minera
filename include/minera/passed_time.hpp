@@ -34,6 +34,10 @@ struct PassedTimeOptions {
       DfgPerformanceAggregation::kMean;
   bool use_business_hours = false;
   std::vector<BusinessHourSlot> business_hour_slots;
+  // Business-hour clock: false counts each timestamp's own wall clock (the
+  // EventLog path); true counts the UTC clock of pm4py's DataFrame path.
+  // Only the business-hour clock follows it; the arithmetic is unchanged.
+  bool dataframe = false;
 };
 
 struct PassedTimeEntry {

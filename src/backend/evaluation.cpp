@@ -1859,16 +1859,22 @@ GeneralizationResult evaluate_generalization(
                                           : options.activity_attribute;
   copy_token_markings(options, replay_options);
   const auto replay = replay_token_result(log, net, replay_options);
+  // The reference sums the fired transitions in the order they first fire
+  // (trace by trace), then 1 for each transition that never fires; in net
+  // order the double sum can differ in its last bits (review V2, S-1).
+  std::vector<std::size_t> first_fired;
   for (const auto& row : replay.traces)
     for (const auto transition : row.activated_transitions)
-      ++out.transition_frequencies.at(transition);
+      if (out.transition_frequencies.at(transition)++ == 0) first_fired.push_back(transition);
   if (out.transition_frequencies.size() < net.transitions().size())
     out.transition_frequencies.resize(net.transitions().size(), 0);
   for (const auto count : out.transition_frequencies)
     if (count) ++out.executed_transitions;
   double rarity = 0.0;
+  for (const auto transition : first_fired)
+    rarity += 1.0 / std::sqrt(double(out.transition_frequencies[transition]));
   for (const auto count : out.transition_frequencies)
-    rarity += count ? 1.0 / std::sqrt(double(count)) : 1.0;
+    if (!count) rarity += 1.0;
   out.generalization = out.transition_frequencies.empty()
                            ? 1.0
                            : 1.0 - rarity / double(out.transition_frequencies.size());

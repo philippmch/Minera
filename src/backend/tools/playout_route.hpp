@@ -39,7 +39,8 @@ void handle_playout_workbench(const httplib::Request& request,
     const auto check = [&](const std::string& key) {
       if (request.params.count(key) + request.files.count(key) != 1)
         throw std::invalid_argument("duplicate playout control: " + key);
-      if (key == "model_file" || key == "operation" || key == "model_format" || key == "options_json") return;
+      if (key == "model_file" || key == "operation" || key == "model_format" || key == "options_json" ||
+          key == "export_generated_xes") return;
       if (petri_mode && pnml_controls.contains(key)) return;
       if (log_mode && source_controls.contains(key)) return;
       throw std::invalid_argument("unknown or inapplicable playout control: " + key);
@@ -65,6 +66,11 @@ void handle_playout_workbench(const httplib::Request& request,
     const auto options_json = [](const Options& value) {
       return std::visit([](const auto& item) {return minera::serialize_playout_workbench_options_json(item);}, value);
     };
+    // The generated log's XES is opt-in: it is most of a large playout's
+    // response, and the frontend asks for it only when the XES is downloaded
+    // or opened (review V2).
+    const bool export_generated_xes = supplied("export_generated_xes") &&
+      petri_anti_multi_boolean(field("export_generated_xes"), "export_generated_xes");
     minera::PnmlImportOptions imports;
     const auto boolean_option = [&](std::string_view name, bool& value) {
       if (supplied(name)) value = petri_anti_multi_boolean(field(name), name);
@@ -287,13 +293,17 @@ void handle_playout_workbench(const httplib::Request& request,
       using T = std::decay_t<decltype(value)>;
       if constexpr (std::is_same_v<T, std::monostate>) return "null";
       else if constexpr (std::is_same_v<T, minera::EventLog>)
-        return "{\"type\":\"event_log\",\"value\":" + minera::serialize_active_source_log_json(value) + '}';
+        return "{\"type\":\"event_log\",\"value\":" + minera::serialize_active_source_log_compact_json(value) + '}';
       else if constexpr (std::is_same_v<T, std::vector<double>>)
         return "{\"type\":\"weights\",\"value\":" + fitted_json + '}';
       else {
         const char* type = std::is_same_v<T, minera::PlayoutVisitedResult> ? "visited" :
           std::is_same_v<T, minera::DfgPlayoutResult> ? "dfg_result" : "tree_result";
-        return "{\"type\":" + quote(type) + ",\"value\":" + minera::serialize_playout_workbench_result_json(value) + '}';
+        if constexpr (std::is_same_v<T, minera::PlayoutVisitedResult>)
+          return "{\"type\":" + quote(type) + ",\"value\":" + minera::serialize_playout_workbench_result_json(value) + '}';
+        // Generated logs: the compact native_state (no legacy_view, repeated
+        // fields factored out); the frontend expands its events.
+        else return "{\"type\":" + quote(type) + ",\"value\":" + minera::serialize_playout_workbench_result_json(value, true) + '}';
       }
     }, result);
     const auto* generated_log = std::get_if<minera::EventLog>(&result);
@@ -315,7 +325,8 @@ void handle_playout_workbench(const httplib::Request& request,
     }
     if (source && source->checked_log_if_available())
       export_value("source_xes", [&] {return minera::to_xes(source->checked_log(), "Original playout fitting source");});
-    if (generated_log) export_value("generated_xes", [&] {return minera::to_xes(*generated_log, "Generated playout log");});
+    if (generated_log && export_generated_xes)
+      export_value("generated_xes", [&] {return minera::to_xes(*generated_log, "Generated playout log");});
     std::string exports_json = "{", supplied_json = "[";
     const auto optional_export = [&](const std::string& key) {
       const auto found = exports.find(key);

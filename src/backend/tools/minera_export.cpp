@@ -6788,7 +6788,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto present = [&](std::string_view name) {
         return passed_time_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_passed_time_params(lookup, present);
+      auto params = minera::parse_passed_time_params(lookup, present);
+      // The input is a CSV or XES file: business hours on the DataFrame
+      // path's UTC clock.
+      params.dataframe = true;
       const auto body = minera::passed_time_json(
           minera::discover_passed_time(log, params));
       if (output.empty()) {
@@ -6811,7 +6814,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto present = [&](std::string_view name) {
         return service_time_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_service_time_params(lookup, present);
+      auto params = minera::parse_service_time_params(lookup, present);
+      // The input is a CSV or XES file: business hours on the DataFrame
+      // path's UTC clock.
+      params.dataframe = true;
       const auto body = minera::service_time_json(
           minera::discover_service_time(log, params));
       if (output.empty()) {
@@ -6905,7 +6911,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto present = [&](std::string_view name) {
         return case_statistics_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_case_statistics_params(lookup, present);
+      auto params = minera::parse_case_statistics_params(lookup, present);
+      // The input is a CSV or XES file: business hours on the DataFrame
+      // path's UTC clock.
+      params.dataframe = true;
       const auto body = minera::case_statistics_json(
           minera::discover_case_statistics(log, params));
       if (output.empty()) {
@@ -7679,10 +7688,11 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       replay_options = minera::tools::default_replay_input_options(
           *conformance_log, std::move(replay_options),
           token_replay_activity_option_used);
-      return minera::ModelConformance{
-          std::move(id), minera::final_marking_reachable(
-              petri, model_alignment_options.initial_marking,
-              model_alignment_options.final_marking),
+      const auto reachability = minera::final_marking_reachability(
+          petri, model_alignment_options.initial_marking,
+          model_alignment_options.final_marking);
+      minera::ModelConformance result{
+          std::move(id), true,
            minera::check_conformance(*conformance_log, petri, replay_options),
            is_powl ? minera::check_footprints(powl_log, petri)
            : is_inductive ? minera::check_footprints(inductive_log, petri)
@@ -7696,6 +7706,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                                          *alignment_log, petri,
                                          model_alignment_options)
                                    : minera::check_alignment(log, petri))};
+      minera::set_model_soundness(result, reachability);
+      return result;
     };
     std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),

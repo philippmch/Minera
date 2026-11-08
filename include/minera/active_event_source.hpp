@@ -48,6 +48,15 @@ struct ActiveSourceCellChange {
 // legacy_view keeps the established conversion presentation. native_state
 // retains raw stored fields, enum indexes and exact typed attribute carriers.
 [[nodiscard]] std::string serialize_active_source_log_json(const EventLog& log);
+// The same native_state for a generated (playout) log, without legacy_view
+// (null) and with the repeated parts factored out: "defaults" holds every
+// trace and event field of the first trace and event, "activity_table" each
+// distinct activity once, and each trace and event writes only the fields that
+// differ from those defaults; an event refers to its activity by
+// "activity_ref" and omits a case_id equal to its trace's. Expanding an event
+// takes the keys of defaults.event in order. See expandPlayoutEvents in the
+// frontend's playout-workbench.ts.
+[[nodiscard]] std::string serialize_active_source_log_compact_json(const EventLog& log);
 [[nodiscard]] std::string serialize_active_source_stream_json(const EventStream& stream);
 [[nodiscard]] std::string serialize_active_source_skeleton_json(
     const LogSkeletonModel& model,

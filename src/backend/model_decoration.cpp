@@ -112,66 +112,6 @@ DurationStats summarize_wait_runs(std::vector<double> singles,
 
 using FiringSequence = std::vector<std::vector<std::size_t>>;
 
-// Firing sequences of the reference token replay: one inner list per event
-// (its silent routing first, the event's visible transition last) plus one
-// for the routing to the final marking; nullopt for a variant that replay
-// does not fit (missing or remaining tokens, an activity the net lacks).
-// This is the replay pm4py decorates with, and its routing toward the final
-// marking follows shortest silent place paths instead of searching the
-// marking graph, so many concurrent optional branches stay cheap.
-std::vector<std::optional<FiringSequence>> token_replay_firing_sequences(
-    const PetriNet& net, const std::vector<std::vector<std::string>>& variants,
-    const std::function<bool()>& cancelled) {
-  EventLog variant_log;
-  variant_log.traces.reserve(variants.size());
-  for (std::size_t v = 0; v < variants.size(); ++v) {
-    Trace trace;
-    trace.case_id = std::to_string(v);
-    trace.events.reserve(variants[v].size());
-    for (const auto& activity : variants[v]) {
-      Event event;
-      event.case_id = trace.case_id;
-      event.case_id_state = FirstClassAttributeState::kPresent;
-      event.activity = activity;
-      event.activity_state = FirstClassAttributeState::kPresent;
-      trace.events.push_back(std::move(event));
-    }
-    variant_log.traces.push_back(std::move(trace));
-  }
-  TokenReplayOptions options;
-  options.cancelled = cancelled;
-  const auto rows = replay_token_traces(variant_log, net, options);
-  std::vector<std::optional<FiringSequence>> result(variants.size());
-  for (const auto& row : rows) {
-    if (row.trace_index >= variants.size()) continue;
-    if (!row.trace_is_fit || row.missing != 0 || row.remaining != 0 ||
-        row.replay_stopped || !row.unknown_event_indices.empty() ||
-        row.event_diagnostics.size() != variants[row.trace_index].size())
-      continue;
-    FiringSequence steps;
-    steps.reserve(row.event_diagnostics.size() + 1);
-    std::size_t used = 0;
-    bool consistent = true;
-    for (const auto& event : row.event_diagnostics) {
-      // The trace-level list is the events' lists in order, then the final
-      // routing; anything else would not be one firing sequence.
-      if (used + event.activated_transitions.size() > row.activated_transitions.size() ||
-          !std::equal(event.activated_transitions.begin(), event.activated_transitions.end(),
-                      row.activated_transitions.begin() + static_cast<std::ptrdiff_t>(used))) {
-        consistent = false;
-        break;
-      }
-      used += event.activated_transitions.size();
-      steps.push_back(event.activated_transitions);
-    }
-    if (!consistent) continue;
-    steps.emplace_back(row.activated_transitions.begin() + static_cast<std::ptrdiff_t>(used),
-                       row.activated_transitions.end());
-    result[row.trace_index] = std::move(steps);
-  }
-  return result;
-}
-
 // Nets with inhibitor or reset arcs keep the exhaustive silent-routing
 // replay (other nets use it only for variants token replay rejects). Its marking-graph search is bounded, so a variant can come back
 // empty because the search stopped, not because it deviates: those are

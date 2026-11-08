@@ -163,6 +163,9 @@ struct DfgStatisticalOptions {
   // nanosecond, Kahan sum, sum/count mean, Welford deviation, business time
   // on the UTC clock).
   bool dataframe_arithmetic = false;
+  // Business time on the UTC clock while keeping the EventLog arithmetic
+  // (passed time on a CSV or XES source); dataframe_arithmetic implies it.
+  bool business_hours_utc_clock = false;
   // Accepted for compatibility with table adapters. The pinned calculation
   // does not consult this opaque calendar value.
   std::any workcalendar;

@@ -335,12 +335,13 @@ DfgPerformance discover_performance_dfg(
         // The DataFrame path counts business time on the UTC clock (a CSV
         // offset is converted; an XES import already holds wall-clock UTC);
         // an EventLog uses each timestamp's own wall clock.
+        const bool utc_clock = dataframe || options.business_hours_utc_clock;
         const auto previous_wall =
-            dataframe ? parse_timestamp_microseconds(previous_complete_text)
+            utc_clock ? parse_timestamp_microseconds(previous_complete_text)
                       : detail::local_wall_timestamp_microseconds(
                             previous_complete_text);
         const auto current_wall =
-            dataframe ? parse_timestamp_microseconds(current_start_text)
+            utc_clock ? parse_timestamp_microseconds(current_start_text)
                       : detail::local_wall_timestamp_microseconds(
                             current_start_text);
         if (!previous_wall || !current_wall) {

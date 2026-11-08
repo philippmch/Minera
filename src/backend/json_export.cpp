@@ -2092,6 +2092,10 @@ void write_model_conformance(std::ostream& out, const ModelConformance& model,
     return;
   }
   out << "{\"sound\": " << (model.sound ? "true" : "false");
+  // Present only when set: the reachability search stopped at its budget, so
+  // `sound: false` means "not decided" rather than "unsound".
+  if (!model.sound && model.reachability_exhausted)
+    out << ", \"reachability_exhausted\": true";
   out << ", \"token_replay\": ";
   write_conformance(out, model.token_replay, graph);
   out << ", \"footprints\": ";
@@ -6274,7 +6278,18 @@ void write_playout_visited_json(std::ostream& out, const PetriNet& net,
       << (result.trace_limit_reached ? "true" : "false")
       << ",\"state_limit_reached\":"
       << (result.state_limit_reached ? "true" : "false")
-      << ",\"traces\":[";
+      << ",\"transition_labels\":[";
+  // Each transition's label (null when silent) once, by transition index:
+  // a visited transition element carries only its index.
+  for (std::size_t t = 0; t < net.transitions().size(); ++t) {
+    if (t) out << ',';
+    const auto& activity = net.transitions()[t].activity;
+    if (activity && *activity < net.activities().size())
+      write_json_string(out, net.activities()[*activity]);
+    else
+      out << "null";
+  }
+  out << "],\"traces\":[";
   for (std::size_t i = 0; i < result.traces.size(); ++i) {
     if (i) out << ',';
     out << '[';
@@ -6291,18 +6306,7 @@ void write_playout_visited_json(std::ostream& out, const PetriNet& net,
         out << "]}";
       } else {
         out << "{\"kind\":\"transition\",\"transition\":"
-            << element.transition_index;
-        if (element.transition_index < net.transitions().size()) {
-          const auto& transition = net.transitions()[element.transition_index];
-          out << ",\"activity\":";
-          if (transition.activity &&
-              *transition.activity < net.activities().size()) {
-            write_json_string(out, net.activities()[*transition.activity]);
-          } else {
-            out << "null";
-          }
-        }
-        out << '}';
+            << element.transition_index << '}';
       }
     }
     out << ']';
@@ -7395,9 +7399,12 @@ std::string cycle_time_json(const CycleTimeResult& result) {
 }
 
 std::string case_arrival_json(const CaseArrivalResult& result) {
-  if (!std::isfinite(result.arrival_average) ||
-      !std::isfinite(result.dispersion_average) ||
-      result.arrival_average < 0.0 || result.dispersion_average < 0.0) {
+  // NaN (the DataFrame path's mean over a single case's empty gap series) is
+  // written as null; infinities and negative averages are refused.
+  const auto valid = [](double value) {
+    return std::isnan(value) || (std::isfinite(value) && value >= 0.0);
+  };
+  if (!valid(result.arrival_average) || !valid(result.dispersion_average)) {
     throw std::invalid_argument(
         "case arrival averages must be finite and non-negative");
   }

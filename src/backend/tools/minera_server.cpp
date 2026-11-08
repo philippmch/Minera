@@ -1478,7 +1478,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                                    : is_powl ? "POWL net" : "Heuristics net";
       checkpoint(net_name + ": reachability");
       // In the order the braced initializer evaluated them.
-      const bool sound = minera::final_marking_reachable(petri, cancelled);
+      const auto reachability = minera::final_marking_reachability(petri, cancelled);
       mine_progress_stage(net_name + ": token replay");
       auto token_replay = minera::check_conformance(*conformance_log, petri, replay_options);
       mine_progress_stage(net_name + ": footprints");
@@ -1490,8 +1490,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           : is_alpha ? alpha_log
                      : log,
           petri, std::vector<int>{}, cancelled);
-      return minera::ModelConformance{std::move(id), sound, std::move(token_replay),
+      minera::ModelConformance result{std::move(id), true, std::move(token_replay),
                                       std::move(model_footprints), std::nullopt};
+      minera::set_model_soundness(result, reachability);
+      return result;
     };
     const std::vector<minera::ModelConformance> conformance = {
         model("inductive", inductive_net), model("alpha", net),
@@ -5431,6 +5433,7 @@ void handle_clustering_export(const httplib::Request& request,
       options.preserve_nulls = ocel_query_bool(request, "preserve_nulls", false);
       // A download read by pm4py and reopened with default selectors.
       options.standard_keys = standard_keys_for_session(*analysis->source);
+      options.utc_timestamps = options.standard_keys;  // pandas-normalized UTC clock
       response.set_content(minera::serialize_xes(selected, options), "application/xml");
     } else if (format == "json") {
       std::vector<std::size_t> event_indices;
@@ -5597,7 +5600,10 @@ void handle_passed_time(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto options = minera::parse_passed_time_params(lookup, present);
+    auto options = minera::parse_passed_time_params(lookup, present);
+    // A CSV or XES upload counts business hours on pm4py's DataFrame (UTC)
+    // clock; a native table source on each timestamp's own wall clock.
+    options.dataframe = dataframe_performance_source(session->active_source.get());
     response.set_content(
         minera::passed_time_json(
             minera::discover_passed_time(require_prepared_log(*session), options)),
@@ -5636,7 +5642,8 @@ void handle_service_time(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto options = minera::parse_service_time_params(lookup, present);
+    auto options = minera::parse_service_time_params(lookup, present);
+    options.dataframe = dataframe_performance_source(session->active_source.get());
     response.set_content(
         minera::service_time_json(
             minera::discover_service_time(require_prepared_log(*session), options)),
@@ -5794,7 +5801,8 @@ void handle_case_statistics(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto options = minera::parse_case_statistics_params(lookup, present);
+    auto options = minera::parse_case_statistics_params(lookup, present);
+    options.dataframe = dataframe_performance_source(session->active_source.get());
     response.set_content(
         minera::case_statistics_json(
             minera::discover_case_statistics(require_prepared_log(*session), options)),
@@ -6030,6 +6038,7 @@ std::string anonymization_release_json(std::string result_json,
   const auto quote = minera::embedding_runtime::detail::escape_json;
   minera::XesExportOptions options;  // nulls omitted, as pm4py writes None/NaN
   options.standard_keys = standard_keys_for_session(session);  // downloaded, and reopened with default selectors
+  options.utc_timestamps = options.standard_keys;  // pandas-normalized UTC clock
   return "{\"family\":\"ANONYMIZATION_RELEASE\",\"source_id\":" +
          quote(std::to_string(session.query_source_id)) + ",\"result\":" +
          result_json + ',' +
@@ -6660,16 +6669,19 @@ void handle_check_model(const httplib::Request& request,
     const auto& footprint_log = footprint_input ? *footprint_input : require_prepared_log(*session);
     const auto gated = minera::tools::pnml_conformance_gate(
         imported, document ? &*document : nullptr);
-    const minera::ModelConformance conformance = gated ? *gated : minera::ModelConformance{
-        "imported", document
-            ? minera::final_marking_reachable(imported,
-                  replay_options.initial_marking, replay_options.final_marking)
-            : minera::final_marking_reachable(imported),
+    const auto imported_reachability = gated
+        ? minera::FinalMarkingReachability::kReachable
+        : document ? minera::final_marking_reachability(imported,
+                         replay_options.initial_marking, replay_options.final_marking)
+                   : minera::final_marking_reachability(imported);
+    minera::ModelConformance conformance = gated ? *gated : minera::ModelConformance{
+        "imported", true,
         minera::check_conformance(require_prepared_log(*session), imported, replay_options),
         document ? minera::check_footprints(footprint_log, imported,
                                              replay_options.initial_marking)
                  : minera::check_footprints(footprint_log, imported),
         std::nullopt};
+    if (!gated) minera::set_model_soundness(conformance, imported_reachability);
     auto body =
         minera::imported_model_json(conformance, next_session->graph);
     const auto imported_model_id = ++g_imported_model_sequence;
@@ -8357,6 +8369,16 @@ void handle_evaluate(const httplib::Request& request,
         break;
     }
     };
+    // A BPMN or PTML import has no PNML document: its conversion's initial
+    // marking is the one token on its source (pm4py's convert_to_petri_net
+    // im), not one token on every input-free place, which a BPMN conversion
+    // can leave in dangling gateways or disconnected parts (review V2-3).
+    if (miner == "imported" && !evaluation_document && selected.has_source() &&
+        params.simplicity_options.initial_marking.empty() &&
+        selected.source() < selected.place_count()) {
+      params.simplicity_options.initial_marking.assign(selected.place_count(), 0);
+      params.simplicity_options.initial_marking[selected.source()] = 1;
+    }
     if (model_only) {
       result.simplicity = evaluation_document
           ? minera::evaluate_simplicity(*evaluation_document,params.simplicity_variant,params.simplicity_options)
@@ -10111,6 +10133,7 @@ void handle_xes(const httplib::Request& request, httplib::Response& response) {
     // case:concept:name, concept:name and time:timestamp. An XES source
     // keeps its keys.
     options.standard_keys = standard_keys_for_session(*session);
+    options.utc_timestamps = options.standard_keys;  // pandas-normalized UTC clock
     const bool compressed = options.compress.value_or(false);
     response.set_content(minera::serialize_xes(require_prepared_log(*session), options),
                          compressed ? "application/gzip" : "application/xml");

@@ -141,5 +141,23 @@ int main() {
   const auto empty = minera::discover_passed_time(singleton, pre);
   assert(empty.pre.empty() && empty.post.empty());
 
+  // Review V2-1: A at 06:30+02:00 then B at 08:00+02:00 on a Monday. pm4py's
+  // DataFrame passed time (pre of B, business hours) counts the UTC clock
+  // (04:30 -> 06:00): 0; the wall clock counts 07:00-08:00: 3600.
+  minera::EventLog offset;
+  minera::Trace pair;
+  pair.case_id = "c1";
+  pair.events = {event("A", "2024-01-01T06:30:00+02:00"),
+                 event("B", "2024-01-01T08:00:00+02:00")};
+  offset.traces = {std::move(pair)};
+  minera::PassedTimeOptions business;
+  business.activity = "B";
+  business.use_business_hours = true;
+  const auto wall = minera::discover_passed_time(offset, business);
+  assert(wall.pre.size() == 1 && wall.pre.front().performance == 3600.0);
+  business.dataframe = true;
+  const auto utc = minera::discover_passed_time(offset, business);
+  assert(utc.pre.size() == 1 && utc.pre.front().performance == 0.0);
+
   std::cout << "Passed-time tests passed\n";
 }

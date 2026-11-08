@@ -414,6 +414,7 @@ export function Conformance({
               conformance={models.token_replay}
               minerName={minerName}
               sound={models.sound}
+              reachabilityExhausted={models.reachability_exhausted === true}
             />
           )
         ) : (
@@ -1543,11 +1544,14 @@ function TokenReplay({
   conformance,
   minerName,
   sound,
+  reachabilityExhausted = false,
 }: {
   data: MineraExport;
   conformance: NonNullable<NonNullable<MineraExport["conformance"]>[string]["token_replay"]>;
   minerName: string;
   sound: boolean;
+  /** The soundness check stopped at its search limit without deciding. */
+  reachabilityExhausted?: boolean;
 }) {
   const fittingShare =
     conformance.trace_count > 0
@@ -1592,7 +1596,14 @@ function TokenReplay({
 
   return (
     <div className="conformance reveal">
-      {!sound && (
+      {!sound && reachabilityExhausted && (
+        <p className="conf-inline-note">
+          The soundness check of the {minerName} model reached its search limit
+          before deciding whether the end state is reachable, so the model may
+          or may not be a sound workflow net.
+        </p>
+      )}
+      {!sound && !reachabilityExhausted && (
         <p className="conf-inline-note">
           The {minerName} model isn't a sound workflow net, so token replay has to
           force missing tokens — read these numbers as approximate. Alignments
@@ -2067,7 +2078,10 @@ function Alignments({
       setFetched(embedded);
       return;
     }
-    if (!model.sound) return;  // unsound: nothing to fetch, the notice says why
+    // Unsound: nothing to fetch, the notice says why. A model whose soundness
+    // check stopped at its limit is still tried (the alignment search has its
+    // own, configurable, limit).
+    if (!model.sound && model.reachability_exhausted !== true) return;
     let cancelled = false;
     // Leaving the view (or changing the options) aborts the request, and the
     // backend stops a search nobody is waiting for.
@@ -2086,7 +2100,7 @@ function Alignments({
       cancelled = true;
       controller.abort();
     };
-  }, [minerId, model.sound, embedded, appliedOptions]);
+  }, [minerId, model.sound, model.reachability_exhausted, embedded, appliedOptions]);
 
   const settings = (
     <AlignmentSettings
@@ -2101,7 +2115,7 @@ function Alignments({
   );
 
   // Known up front from the mine: an unsound model can't be aligned at all.
-  if (!model.sound) {
+  if (!model.sound && model.reachability_exhausted !== true) {
     return <AlignmentNotice minerName={minerName} exhausted={false} />;
   }
   if (error) {
@@ -2289,8 +2303,9 @@ export function AlignmentNotice({
           {exhausted ? (
             <>
               <p>
-                The {minerName} model is reachable, but the alignment search{" "}
-                {stoppedBy} before finding optimal alignments. This can happen
+                The alignment search for the {minerName} model{" "}
+                {stoppedBy} before finding optimal alignments (or before
+                confirming that its end state is reachable). This can happen
                 because the model is complex or admits unbounded behavior. No
                 alignment fitness, precision or cost is available for this run.
               </p>

@@ -1854,6 +1854,35 @@ void writer_refuses_text_xml_cannot_carry() {
   }
 }
 
+// Review V2-2: a CSV-sourced download writes UTC, as pm4py.write_xes writes
+// the frame format_dataframe normalized ("06:30:00+02:00" -> "04:30:00+00:00").
+// pm4py.read_xes reads XES dates as wall-clock UTC, so keeping "+02:00" would
+// read two hours off. Naive, Z and +00:00 texts are unchanged; fractions and
+// day/year rollovers carry over.
+void csv_downloads_write_utc_timestamps() {
+  constexpr auto npos = std::string::npos;
+  std::istringstream csv_input(
+      "case_id,activity,timestamp\n"
+      "c1,A,2024-01-01T06:30:00+02:00\n"
+      "c1,B,2024-01-01T01:15:00.250+05:30\n"
+      "c1,C,2023-12-31T23:30:00-01:00\n"
+      "c1,D,2024-01-02 03:00:00\n"
+      "c1,E,2024-01-03T03:00:00Z\n");
+  const auto log = minera::import_csv_event_log(csv_input);
+  minera::XesExportOptions options;
+  options.standard_keys = true;
+  const auto kept = minera::serialize_xes(log, options);
+  assert(kept.find("value=\"2024-01-01T06:30:00+02:00\"") != npos);
+  options.utc_timestamps = true;
+  const auto xml = minera::serialize_xes(log, options);
+  assert(xml.find("<date key=\"time:timestamp\" value=\"2024-01-01T04:30:00+00:00\"/>") != npos);
+  assert(xml.find("value=\"2023-12-31T19:45:00.250000+00:00\"") != npos);
+  assert(xml.find("value=\"2024-01-01T00:30:00+00:00\"") != npos);
+  assert(xml.find("value=\"2024-01-02T03:00:00\"") != npos);
+  assert(xml.find("value=\"2024-01-03T03:00:00+00:00\"") != npos);
+  assert(xml.find("+02:00") == npos && xml.find("+05:30") == npos);
+}
+
 // A CSV log keeps its column names as projection keys. Native exports write
 // them back as they are; standard_keys exports (the server's downloads of a
 // CSV-sourced log) write the case id, activity and timestamp under the
@@ -2676,6 +2705,7 @@ int main() {
   deeply_nested_xes_attributes_are_rejected();
   conflicting_projection_aliases_are_retained();
   standard_key_exports_rename_csv_projections();
+  csv_downloads_write_utc_timestamps();
   inferred_metadata_completes_empty_and_partial_globals();
   null_containers_keep_recursive_children();
   null_scalar_list_children_preserve_order_and_duplicates();

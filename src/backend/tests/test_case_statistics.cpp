@@ -65,5 +65,19 @@ int main() {
   assert(negative.cases.front().case_duration == -3600.0);
   assert(minera::case_statistics_json(negative).find(
              "\"case_duration\":-3600") != std::string::npos);
+  // Review V2-1: a CSV case 06:30+02:00 -> 08:00+02:00 on a Monday.
+  // pm4py.get_all_case_durations(format_dataframe(csv), business_hours=True)
+  // counts the UTC clock (04:30 -> 06:00, before 07:00): 0. The EventLog path
+  // on the original offsets counts 07:00-08:00 wall clock: 3600.
+  minera::EventLog offset;
+  offset.traces = {trace("c1", "2024-01-01T06:30:00+02:00",
+                         "2024-01-01T08:00:00+02:00")};
+  minera::CaseStatisticsOptions business;
+  business.use_business_hours = true;
+  assert(minera::discover_case_statistics(offset, business)
+             .cases.front().case_duration == 3600.0);
+  business.dataframe = true;
+  assert(minera::discover_case_statistics(offset, business)
+             .cases.front().case_duration == 0.0);
   std::cout << "Case-statistics tests passed\n";
 }

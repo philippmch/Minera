@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <limits>
 #include <locale>
+#include <map>
 #include <mutex>
 #include <numeric>
 #include <set>
@@ -15,6 +16,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "minera/dataframe_format_json.hpp"
 #include "minera/graph_alignment_workbench_json.hpp"
@@ -689,6 +691,105 @@ std::string serialize_active_source_log_json(const EventLog& log) {
     result += "]}";
   }
   return result + "]}}";
+}
+
+namespace {
+
+// One event's native_state fields, in event_state_json's order and with its
+// exact values, as (key, JSON) pairs.
+std::vector<std::pair<std::string, std::string>> event_state_fields(const Event& event) {
+  std::vector<std::pair<std::string, std::string>> fields;
+  fields.reserve(20);
+  fields.emplace_back("input_order", std::to_string(event.input_order));
+  fields.emplace_back("attributes", attributes_json(event.attributes));
+  const auto field = [&](const std::string& name, const std::string& value,
+                         FirstClassAttributeState state, const std::string& source_key) {
+    fields.emplace_back(name, quote(value));
+    fields.emplace_back(name + "_state_index", std::to_string(static_cast<int>(state)));
+    fields.emplace_back(name + "_source_key", quote(source_key));
+  };
+  field("case_id", event.case_id, event.case_id_state, event.case_id_source_key);
+  field("activity", event.activity, event.activity_state, event.activity_source_key);
+  field("timestamp", event.timestamp, event.timestamp_state, event.timestamp_source_key);
+  field("resource", event.resource, event.resource_state, event.resource_source_key);
+  field("lifecycle", event.lifecycle, event.lifecycle_state, event.lifecycle_source_key);
+  fields.emplace_back("activity_attribute", optional_attribute_json(event.activity_attribute));
+  fields.emplace_back("timestamp_attribute", optional_attribute_json(event.timestamp_attribute));
+  fields.emplace_back("resource_attribute", optional_attribute_json(event.resource_attribute));
+  fields.emplace_back("lifecycle_attribute", optional_attribute_json(event.lifecycle_attribute));
+  return fields;
+}
+
+std::vector<std::pair<std::string, std::string>> trace_state_fields(const Trace& trace) {
+  return {{"case_id_state_index", std::to_string(static_cast<int>(trace.case_id_state))},
+          {"case_id_source_key", quote(trace.case_id_source_key)},
+          {"case_id_attribute", optional_attribute_json(trace.case_id_attribute)},
+          {"attributes", attributes_json(trace.attributes)},
+          {"properties", attributes_json(trace.properties)}};
+}
+
+std::string fields_object_json(const std::vector<std::pair<std::string, std::string>>& fields) {
+  std::string result = "{";
+  for (const auto& [key, value] : fields) {
+    if (result.size() > 1) result += ',';
+    result += quote(key) + ':' + value;
+  }
+  return result + '}';
+}
+
+}  // namespace
+
+std::string serialize_active_source_log_compact_json(const EventLog& log) {
+  // Defaults are the first trace's and first event's own fields: a generated
+  // log repeats them on every trace and event, so each one then writes only its
+  // case id, input order, activity reference, timestamp and what differs.
+  std::vector<std::pair<std::string, std::string>> trace_defaults, event_defaults;
+  for (const auto& trace : log.traces) {
+    if (trace_defaults.empty()) trace_defaults = trace_state_fields(trace);
+    if (!trace.events.empty()) {event_defaults = event_state_fields(trace.events.front()); break;}
+  }
+  std::string traces = "[", activities = "[";
+  std::map<std::string, std::size_t> activity_index;
+  for (std::size_t trace_index = 0; trace_index < log.traces.size(); ++trace_index) {
+    const auto& trace = log.traces[trace_index];
+    if (trace_index) traces += ',';
+    const auto trace_case = quote(trace.case_id);
+    traces += "{\"case_id\":" + trace_case;
+    const auto trace_fields = trace_state_fields(trace);
+    for (std::size_t index = 0; index < trace_fields.size(); ++index)
+      if (trace_fields[index].second != trace_defaults[index].second)
+        traces += ',' + quote(trace_fields[index].first) + ':' + trace_fields[index].second;
+    traces += ",\"events\":[";
+    for (std::size_t event_index = 0; event_index < trace.events.size(); ++event_index) {
+      const auto& event = trace.events[event_index];
+      if (event_index) traces += ',';
+      auto [found, added] = activity_index.try_emplace(event.activity, activity_index.size());
+      if (added) {
+        if (activities.size() > 1) activities += ',';
+        activities += quote(event.activity);
+      }
+      const auto fields = event_state_fields(event);
+      std::string item = "{";
+      for (std::size_t index = 0; index < fields.size(); ++index) {
+        const auto& [key, value] = fields[index];
+        if (key == "activity") {
+          if (item.size() > 1) item += ',';
+          item += "\"activity_ref\":" + std::to_string(found->second);
+          continue;
+        }
+        if (key == "case_id" ? value == trace_case : value == event_defaults[index].second) continue;
+        if (item.size() > 1) item += ',';
+        item += quote(key) + ':' + value;
+      }
+      traces += item + '}';
+    }
+    traces += "]}";
+  }
+  return "{\"legacy_view\":null,\"native_state\":{\"encoding\":\"minera-compact-log-1\",\"attributes\":" +
+      attributes_json(log.attributes) + ",\"metadata\":" + metadata_json(log.metadata) +
+      ",\"defaults\":{\"trace\":" + fields_object_json(trace_defaults) +
+      ",\"event\":" + fields_object_json(event_defaults) + "},\"activity_table\":" + activities +
+      "],\"traces\":" + traces + "]}}";
 }
 
 std::string serialize_active_source_stream_json(const EventStream& stream) {

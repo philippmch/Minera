@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdio>
 #include <cctype>
 #include <fstream>
 #include <limits>
@@ -168,6 +169,44 @@ std::string xes_date_lexical_value(std::string_view text,
     result += minutes;
   }
   return result;
+}
+
+// The UTC form of a timestamp that carries a non-zero offset, as pandas
+// normalizes a CSV column (format_dataframe) before pm4py.write_xes writes
+// it: the clock fields move to UTC and the fraction digits are kept. Other
+// text (naive, Z, +00:00 or not an instant) is returned unchanged.
+std::string utc_timestamp_text(const std::string& text) {
+  const auto exact = parse_timestamp_exact(text);
+  if (!exact || !exact->timezone_aware || exact->offset_minutes == 0) return text;
+  std::int64_t seconds = exact->seconds;
+  std::int64_t days = seconds / 86400;
+  std::int64_t rest = seconds % 86400;
+  if (rest < 0) { rest += 86400; --days; }
+  // Civil date from days since 1970-01-01 (H. Hinnant's algorithm).
+  const std::int64_t z = days + 719468;
+  const std::int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+  const std::int64_t doe = z - era * 146097;
+  const std::int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const std::int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const std::int64_t mp = (5 * doy + 2) / 153;
+  const std::int64_t day = doy - (153 * mp + 2) / 5 + 1;
+  const std::int64_t month = mp < 10 ? mp + 3 : mp - 9;
+  const std::int64_t year = yoe + era * 400 + (month <= 2 ? 1 : 0);
+  if (year < 1 || year > 9999) return text;
+  char buffer[32];
+  std::snprintf(buffer, sizeof(buffer), "%04lld-%02lld-%02lldT%02lld:%02lld:%02lld",
+                static_cast<long long>(year), static_cast<long long>(month),
+                static_cast<long long>(day), static_cast<long long>(rest / 3600),
+                static_cast<long long>(rest / 60 % 60), static_cast<long long>(rest % 60));
+  std::string result(buffer);
+  // Offsets are whole minutes: the fraction digits are those of the source.
+  const auto dot = text.find('.', 19);
+  if (dot != std::string::npos) {
+    auto end = dot + 1;
+    while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) ++end;
+    result += text.substr(dot, end - dot);
+  }
+  return result + "+00:00";
 }
 
 std::string scalar_lexical_value(const EventAttribute& attribute) {
@@ -827,7 +866,7 @@ bool is_selected_copy(const EventAttribute& attribute,
 }
 
 void write_event_attributes(std::ostream& out, const Event& event, XesExportVariant variant, bool preserve_nulls,
-                            bool standard_keys) {
+                            bool standard_keys, bool utc_timestamps) {
   std::set<const EventAttribute*> consumed;
   // Selected cells are looked up under their source keys and written under
   // their output keys; the two differ only for standard_keys exports.
@@ -852,7 +891,8 @@ void write_event_attributes(std::ostream& out, const Event& event, XesExportVari
         const auto* nested = first_class_metadata(event.timestamp_attribute,
                                                   event.attributes, key);
         write_projection(out, "      ", output_keys[1],
-                         event.timestamp,
+                         utc_timestamps ? utc_timestamp_text(event.timestamp)
+                                        : event.timestamp,
                          event.timestamp_state == FirstClassAttributeState::kNull ||
                                  (!event.timestamp.empty() &&
                                    parse_timestamp(event.timestamp))
@@ -939,7 +979,7 @@ const EventAttribute* stored_log_name(const EventLog& log) {
 void write_xes_with_options(std::ostream& out, const EventLog& log,
                             std::string_view requested_name,
                             bool infer_metadata, XesExportVariant variant, bool preserve_nulls,
-                            bool standard_keys) {
+                            bool standard_keys, bool utc_timestamps = false) {
   const auto globals = effective_globals(log.metadata);
   std::set<std::string> inferred_prefixes;
   if (infer_metadata) {
@@ -1063,7 +1103,7 @@ void write_xes_with_options(std::ostream& out, const EventLog& log,
     write_case();
     for (const auto& event : trace.events) {
       out << "    <event>\n";
-      write_event_attributes(out, event, variant, preserve_nulls, standard_keys);
+      write_event_attributes(out, event, variant, preserve_nulls, standard_keys, utc_timestamps);
       out << "    </event>\n";
     }
     out << "  </trace>\n";
@@ -1086,7 +1126,7 @@ std::string serialize_xes(const EventLog& log,
   (void)xes_export_variant_name(options.variant);
   std::ostringstream out;
   write_xes_with_options(out, log, options.name, options.infer_metadata, options.variant, options.preserve_nulls,
-                         options.standard_keys);
+                         options.standard_keys, options.utc_timestamps);
   const auto xml = out.str();
   return options.compress.value_or(false) ? detail::gzip_compress(xml) : xml;
 }
