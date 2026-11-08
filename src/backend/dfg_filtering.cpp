@@ -1,5 +1,7 @@
 #include "minera/dfg_filtering.hpp"
 
+#include "minera/directly_follows_graph.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <deque>
@@ -503,6 +505,82 @@ DfgFilteringGraph generate_nx_graph_from_dfg(const DfgFilteringData& data) {
   for (std::size_t i = 0; i < graph.nodes.size(); ++i)
     for (const auto& b : successors[i]) graph.edges.push_back({graph.nodes[i], b});
   return graph;
+}
+
+DfgFilteringData dfg_filtering_data_from_graph(const DirectlyFollowsGraph& graph) {
+  DfgFilteringData data;
+  const auto& names = graph.activities();
+  for (const auto& edge : graph.edges()) {
+    if (edge.source >= names.size() || edge.target >= names.size())
+      throw std::invalid_argument("DFG edge refers to an unknown activity");
+    if (edge.count == 0) continue;
+    data.dfg.push_back({{names[edge.source], names[edge.target]}, static_cast<std::int64_t>(edge.count)});
+  }
+  for (const auto& name : names) {
+    const auto count = graph.activity_count(name);
+    const auto starts = graph.start_activity_count(name);
+    const auto ends = graph.end_activity_count(name);
+    if (count != 0) data.activities.push_back({name, static_cast<std::int64_t>(count)});
+    if (starts != 0) data.start_activities.push_back({name, static_cast<std::int64_t>(starts)});
+    if (ends != 0) data.end_activities.push_back({name, static_cast<std::int64_t>(ends)});
+  }
+  return data;
+}
+
+DfgFilteringData dfg_filtering_data_from_dfg(const DfgCleanAnalysis& dfg) {
+  DfgFilteringData data;
+  std::vector<std::string> order;
+  std::unordered_map<std::string, std::pair<std::int64_t, std::int64_t>> sums;  // incoming, outgoing
+  const auto see = [&](const std::string& name) {
+    if (sums.try_emplace(name, 0, 0).second) order.push_back(name);
+  };
+  for (const auto& [edge, count] : dfg.graph) {
+    const auto value = static_cast<std::int64_t>(count);
+    data.dfg.push_back({edge, value});
+    see(edge.first);
+    see(edge.second);
+    sums[edge.first].second += value;
+    sums[edge.second].first += value;
+  }
+  for (const auto& name : order) {
+    const auto& [incoming, outgoing] = sums.at(name);
+    data.activities.push_back({name, std::max(incoming, outgoing)});
+  }
+  for (const auto& [name, count] : dfg.start_activities)
+    data.start_activities.push_back({name, static_cast<std::int64_t>(count)});
+  for (const auto& [name, count] : dfg.end_activities)
+    data.end_activities.push_back({name, static_cast<std::int64_t>(count)});
+  return data;
+}
+
+DfgFilteringData apply_dfg_filtering_request(DfgFilteringData data, const DfgFilteringRequest& request) {
+  if (request.noise_threshold) {
+    std::vector<std::string> activities;
+    for (const auto& [name, count] : data.activities) activities.push_back(name);
+    data.dfg = clean_dfg_based_on_noise_thresh(data.dfg, activities, *request.noise_threshold,
+                                               request.most_common_paths);
+  }
+  const bool keep_all = request.keep_all_activities;
+  if (request.activities_percentage)
+    data = filter_dfg_on_activities_percentage(data, *request.activities_percentage);
+  if (request.paths_percentage) data = filter_dfg_on_paths_percentage(data, *request.paths_percentage, keep_all);
+  if (request.keep_connected) data = filter_dfg_keep_connected(data, *request.keep_connected, keep_all);
+  if (request.to_activity) data = filter_dfg_to_activity(data, *request.to_activity);
+  if (request.from_activity) data = filter_dfg_from_activity(data, *request.from_activity);
+  if (request.contain_activity) data = filter_dfg_contain_activity(data, *request.contain_activity);
+  return data;
+}
+
+DfgCleanAnalysis to_dfg_clean_analysis(const DfgFilteringData& data) {
+  const auto unsigned_count = [](std::int64_t count) {
+    if (count < 0) throw std::invalid_argument("DFG count is negative");
+    return static_cast<std::uint64_t>(count);
+  };
+  DfgCleanAnalysis out;
+  for (const auto& [edge, count] : data.dfg) out.graph[edge] = unsigned_count(count);
+  for (const auto& [name, count] : data.start_activities) out.start_activities[name] = unsigned_count(count);
+  for (const auto& [name, count] : data.end_activities) out.end_activities[name] = unsigned_count(count);
+  return out;
 }
 
 }  // namespace minera

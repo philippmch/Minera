@@ -3459,6 +3459,28 @@ void final_marking_reachability_keeps_exhausted_apart() {
   }
   assert(minera::final_marking_reachability(endless) == FinalMarkingReachability::kExhausted);
   assert(!minera::final_marking_reachable(endless));
+  // Review W1-3. A pump onto the sink that a silent drain can always empty
+  // (source → τ → source + sink, sink → τ, a: source + sink → sink) keeps the
+  // marking equation feasible everywhere, so the pruned A* starves on its
+  // equal-f ties; the reachability search then falls back to breadth-first
+  // and finds τ, a. The alignment preflight keeps its A* outcome.
+  minera::PetriNet drained;
+  {
+    const auto source = drained.add_place(), sink = drained.add_place();
+    drained.set_activities({"a"});
+    drained.add_transition(std::nullopt, {source}, {source, sink});
+    drained.add_transition(std::nullopt, {sink}, {});
+    drained.add_transition(0, {source, sink}, {sink});
+    drained.set_source(source);
+    drained.set_sink(sink);
+  }
+  assert(minera::final_marking_reachability(drained) == FinalMarkingReachability::kReachable);
+  assert(minera::final_marking_reachable(drained));
+  assert(minera::final_marking_reachable(drained, std::function<bool()>{}));
+  assert(minera::final_marking_reachability(drained, {1, 0}, {0, 1}) ==
+         FinalMarkingReachability::kReachable);
+  const auto drained_alignment = minera::check_alignment(log_from_variants({{"a"}}), drained);
+  assert(!drained_alignment.computed && drained_alignment.exhausted);
   // The JSON says "not decided" rather than only "unsound".
   minera::ModelConformance model;
   minera::set_model_soundness(model, FinalMarkingReachability::kExhausted);
@@ -8521,7 +8543,22 @@ void csv_timestamps_review_v1_shapes() {
   assert((stamps("1,A,15-04/0001\n2,B,28 07-0057\n3,C,57 7/0001\n4,D,33-01 0011\n") ==
           V{"2001-04-15 00:00:00", "0057-07-28 00:00:00", "0057-07-01 00:00:00",
             "2033-01-11 00:00:00"}));
-  assert(unconvertible("1,A,2024-01-01\n1,B,2024.12-07\n"));
+  // A leading number above 31 before a space is a literal year only when the
+  // joined day has more than two digits; otherwise a two-digit year (W1-1).
+  assert((stamps("1,A,40 3/15\n2,B,99 05/27 07:17\n3,C,32 1-2\n4,D,57 07/01\n"
+                 "5,E,99 12-31\n6,F,57 7/001\n7,G,99 5-0027\n") ==
+          V{"2040-03-15 00:00:00", "1999-05-27 07:17:00", "2032-01-02 00:00:00",
+            "2057-07-01 00:00:00", "1999-12-31 00:00:00", "0057-07-01 00:00:00",
+            "0099-05-27 00:00:00"}));
+  // Year first, joined and then another separator: a day of up to four
+  // digits with leading zeros (W1-1).
+  assert((stamps("1,A,2024-1/0015 10:00\n2,B,2024/01 031\n3,C,0045-01/001\n") ==
+          V{"2024-01-15 10:00:00", "2024-01-31 00:00:00", "0045-01-01 00:00:00"}));
+  assert(unconvertible("1,A,2024-01-01\n1,B,2024-01/1500\n"));
+  // Separated by white space alone, too, in dateutil's order of three numbers.
+  assert((stamps("1,A,2023 05 012 10:00\n2,B,0012 05 031\n3,C,0045 05 0012\n4,D,99 05 012\n") ==
+          V{"2023-05-12 10:00:00", "2031-12-05 00:00:00", "2045-05-12 00:00:00",
+            "1999-05-12 00:00:00"}));
   assert(unconvertible("1,A,2024-01-01\n1,B,2024-12.07 10:00:00\n"));
 }
 

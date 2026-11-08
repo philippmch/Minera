@@ -3368,7 +3368,8 @@ class Aligner {
   explicit Aligner(
       const PetriNet& net, const AlignmentOptions& options = AlignmentOptions{},
       std::chrono::steady_clock::time_point deadline =
-          std::chrono::steady_clock::time_point::max())
+          std::chrono::steady_clock::time_point::max(),
+      bool reachability_only = false)
       : net_(net),
         initial_(resolve_workflow_marking(net, options.initial_marking, true)),
         final_(resolve_workflow_marking(net, options.final_marking, false)) {
@@ -3420,10 +3421,22 @@ class Aligner {
       // would be the same uniform-cost search again, so search breadth-first
       // by firing count instead, which a cost-0 pump cannot stall.
       preflight_exhausted = false;
-      if (const auto pruned = marking_equation_
-                                  ? pruned_model_run(options, deadline, preflight_exhausted)
-                                  : breadth_first_model_run(options, deadline,
-                                                            preflight_exhausted)) {
+      auto pruned = marking_equation_
+                        ? pruned_model_run(options, deadline, preflight_exhausted)
+                        : breadth_first_model_run(options, deadline, preflight_exhausted);
+      // A reachability-only search (final_marking_reachability and
+      // final_marking_reachable) whose pruned A* stopped at its budget tries
+      // breadth-first too: a cost-0 silent pump that a silent drain can always
+      // empty is not pruned by the marking equation and starves A*'s ties at
+      // equal f (source → τ → source + sink, sink → τ, a: source + sink → sink;
+      // review W1-3). Alignment preflights keep the A* outcome alone, and its
+      // search counters with it. The run found is not necessarily the
+      // cheapest, which a reachability verdict does not read.
+      if (!pruned && preflight_exhausted && marking_equation_ && reachability_only) {
+        preflight_exhausted = false;
+        pruned = breadth_first_model_run(options, deadline, preflight_exhausted);
+      }
+      if (pruned) {
         reachable_ = true;
         empty_run_cost_ = *pruned;
       }
@@ -6271,7 +6284,8 @@ bool final_marking_reachable(const PetriNet& net) {
 bool final_marking_reachable(const PetriNet& net, const std::function<bool()>& cancelled) {
   AlignmentOptions options;
   options.cancelled = cancelled;
-  const bool reachable = Aligner(net, options).reachable();
+  const bool reachable =
+      Aligner(net, options, std::chrono::steady_clock::time_point::max(), true).reachable();
   // A cancelled search reports the final marking unreachable.
   if (!reachable) throw_if_cancelled(cancelled, "reachability search was cancelled");
   return reachable;
@@ -6281,7 +6295,8 @@ FinalMarkingReachability final_marking_reachability(
     const PetriNet& net, const std::function<bool()>& cancelled) {
   AlignmentOptions options;
   options.cancelled = cancelled;
-  const Aligner aligner(net, options);
+  const Aligner aligner(net, options, std::chrono::steady_clock::time_point::max(),
+                        /*reachability_only=*/true);
   if (aligner.reachable()) return FinalMarkingReachability::kReachable;
   throw_if_cancelled(cancelled, "reachability search was cancelled");
   return aligner.reachability_exhausted() ? FinalMarkingReachability::kExhausted
@@ -6294,7 +6309,8 @@ FinalMarkingReachability final_marking_reachability(
   AlignmentOptions options;
   options.initial_marking = initial_marking;
   options.final_marking = final_marking;
-  const Aligner aligner(net, options);
+  const Aligner aligner(net, options, std::chrono::steady_clock::time_point::max(),
+                        /*reachability_only=*/true);
   if (aligner.reachable()) return FinalMarkingReachability::kReachable;
   return aligner.reachability_exhausted() ? FinalMarkingReachability::kExhausted
                                           : FinalMarkingReachability::kUnreachable;
@@ -6308,7 +6324,8 @@ bool final_marking_reachable(const PetriNet& net,
   AlignmentOptions options;
   options.initial_marking = initial_marking;
   options.final_marking = final_marking;
-  return Aligner(net, options).reachable();
+  return Aligner(net, options, std::chrono::steady_clock::time_point::max(),
+                 /*reachability_only=*/true).reachable();
 }
 
 }  // namespace minera

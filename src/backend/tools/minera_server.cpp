@@ -103,7 +103,7 @@
 #include "minera/dfg_conversion.hpp"
 #include "minera/dfg_dataframe.hpp"
 #include "minera/dfg_dataframe_json.hpp"
-#include "minera/dfg_filter.hpp"
+#include "minera/dfg_filtering.hpp"
 #include "minera/dfg_io.hpp"
 #include "minera/dfg_precision.hpp"
 #include "minera/dfg_alignment.hpp"
@@ -5239,7 +5239,7 @@ void handle_log_query_export(const httplib::Request& request,httplib::Response& 
   }else if(format=="xes"){
     const auto filtered=select_active_source_rows(*session,indices,mode=="cases");
     response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
-    minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=standard_keys_for_session(*session);response.set_content(minera::serialize_xes(filtered,options),"application/xml");
+    minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=standard_keys_for_session(*session);options.utc_timestamps=options.standard_keys;/* pandas-normalized UTC clock (W1-2) */response.set_content(minera::serialize_xes(filtered,options),"application/xml");
   }else throw std::invalid_argument("filter export format must be xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
 }
@@ -5256,7 +5256,7 @@ void handle_log_cluster(const httplib::Request& request,httplib::Response& respo
   response.set_header("X-Minera-Event-Count",std::to_string(filtered.event_count()));response.set_header("X-Minera-Case-Count",std::to_string(filtered.trace_count()));
   const auto format=request.has_param("format")?request.get_param_value("format"):"summary";
   if(format=="summary")response.set_content(minera::log_cluster_runtime::summary(filtered,name,request.body,indices,std::to_string(session->query_source_id)),"application/json");
-  else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=standard_keys_for_session(*session);response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
+  else if(format=="xes"){minera::XesExportOptions options;options.preserve_nulls=ocel_query_bool(request,"preserve_nulls",false);options.standard_keys=standard_keys_for_session(*session);options.utc_timestamps=options.standard_keys;/* pandas-normalized UTC clock (W1-2) */response.set_content(minera::serialize_xes(filtered,options),"application/xml");}
   else if(format=="json")response.set_content(active_source_table_json_from_log_indices(*session,indices,true),"application/json");
   else throw std::invalid_argument("cluster format must be summary, xes or json");
  }catch(const std::exception& error){response.status=400;response.set_content(error_json(error.what()),"application/json");}
@@ -10181,34 +10181,32 @@ void handle_dfg(const httplib::Request& request, httplib::Response& response) {
           "keep_all_activities requires paths_percentage or keep_connected");
     }
 
-    auto filtered = minera::make_dfg_filter_data(require_graph(*session));
+    // The reference port (algo.filtering.dfg.dfg_filtering) over the mined
+    // DFG with the log's real activity counts.
+    minera::DfgFilteringRequest filters;
     if (request.has_param("noise_threshold")) {
-      std::set<std::pair<std::string, std::string>> most_common_paths;
+      filters.noise_threshold = ocel_query_number(request, "noise_threshold", 0.0);
       if (request.has_param("most_common_paths")) {
+        std::vector<minera::DfgFilteringEdge> most_common_paths;
         for (const auto& pair : minera::parse_activity_pairs(
                  request.get_param_value("most_common_paths"))) {
-          most_common_paths.emplace(pair.predecessor, pair.successor);
+          most_common_paths.emplace_back(pair.predecessor, pair.successor);
         }
+        filters.most_common_paths = std::move(most_common_paths);
       }
-      filtered = minera::clean_dfg_based_on_noise_threshold(
-          filtered,
-          ocel_query_number(request, "noise_threshold", 0.0),
-          most_common_paths);
     }
     if (request.has_param("activities_percentage")) {
-      filtered = minera::filter_dfg_on_activities_percentage(
-          filtered, ocel_query_number(request, "activities_percentage", 0.0));
+      filters.activities_percentage =
+          ocel_query_number(request, "activities_percentage", 0.0);
     }
     if (has_paths_percentage) {
-      filtered = minera::filter_dfg_on_paths_percentage(
-          filtered, ocel_query_number(request, "paths_percentage", 0.0),
-          keep_all_activities);
+      filters.paths_percentage =
+          ocel_query_number(request, "paths_percentage", 0.0);
     }
     if (has_keep_connected) {
-      filtered = minera::filter_dfg_keep_connected(
-          filtered, ocel_query_number(request, "keep_connected", 0.0),
-          keep_all_activities);
+      filters.keep_connected = ocel_query_number(request, "keep_connected", 0.0);
     }
+    filters.keep_all_activities = keep_all_activities;
 
     const auto query_activity = [&](std::string_view name) {
       const auto key = std::string(name);
@@ -10217,20 +10215,20 @@ void handle_dfg(const httplib::Request& request, httplib::Response& response) {
         throw std::invalid_argument(key + " must not be empty");
       return value;
     };
-    if (request.has_param("to_activity")) {
-      filtered = minera::filter_dfg_to_activity(
-          filtered, query_activity("to_activity"));
+    if (request.has_param("to_activity"))
+      filters.to_activity = query_activity("to_activity");
+    if (request.has_param("from_activity"))
+      filters.from_activity = query_activity("from_activity");
+    if (request.has_param("contain_activity"))
+      filters.contain_activity = query_activity("contain_activity");
+    minera::DfgFilteringData filtered;
+    try {
+      filtered = minera::apply_dfg_filtering_request(
+          minera::dfg_filtering_data_from_graph(require_graph(*session)), filters);
+    } catch (const minera::FilteringCommonError& error) {
+      throw std::invalid_argument(error.type + ": " + error.message);
     }
-    if (request.has_param("from_activity")) {
-      filtered = minera::filter_dfg_from_activity(
-          filtered, query_activity("from_activity"));
-    }
-    if (request.has_param("contain_activity")) {
-      filtered = minera::filter_dfg_contain_activity(
-          filtered, query_activity("contain_activity"));
-    }
-    const auto analysis = minera::DfgCleanAnalysis{
-        filtered.edges, filtered.start_activities, filtered.end_activities};
+    const auto analysis = minera::to_dfg_clean_analysis(filtered);
     response.set_content(minera::to_dfg(analysis), "text/plain");
   } catch (const std::exception& error) {
     response.status = 400;

@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "minera/dfg_variants.hpp"
 #include "minera/filtering_common.hpp"
 
 namespace minera {
@@ -98,5 +99,43 @@ struct DfgFilteringGraph {
   std::string end_node;
 };
 [[nodiscard]] DfgFilteringGraph generate_nx_graph_from_dfg(const DfgFilteringData& data);
+
+class DirectlyFollowsGraph;
+
+// The DFG export filters of GET /api/dfg, minera_dfg and the frontend's DFG
+// export, applied in this order through the functions above: noise cleaning
+// (edges only), activities percentage, paths percentage, keep connected, to,
+// from and contain activity. Any step may raise FilteringCommonError.
+struct DfgFilteringRequest {
+  std::optional<double> noise_threshold;
+  std::optional<std::vector<DfgFilteringEdge>> most_common_paths;
+  std::optional<double> activities_percentage;
+  std::optional<double> paths_percentage;
+  std::optional<double> keep_connected;
+  bool keep_all_activities = false;
+  std::optional<std::string> to_activity;
+  std::optional<std::string> from_activity;
+  std::optional<std::string> contain_activity;
+};
+
+// A mined log's DFG with its real activity counts, the inputs a reference
+// user passes as discover_dfg(log) and get_event_attribute_values(log,
+// activity): edges, start and end activities and activities in the graph's
+// order, zero counts omitted.
+[[nodiscard]] DfgFilteringData dfg_filtering_data_from_graph(const DirectlyFollowsGraph& graph);
+
+// A DFG read from a .dfg file, which carries no activity counts. Each
+// activity that occurs on an edge counts max(sum of incoming edge counts, sum
+// of outgoing edge counts); activities occurring only as start or end
+// activities get no entry. This is the count the reference's public
+// filter_dfg_activities_percentage / filter_dfg_paths_percentage wrappers use
+// for (dfg, start, end) alone (black-box: 3,000 random DFGs). Activities are
+// ordered by first occurrence over the edges (source, then target).
+[[nodiscard]] DfgFilteringData dfg_filtering_data_from_dfg(const DfgCleanAnalysis& dfg);
+
+[[nodiscard]] DfgFilteringData apply_dfg_filtering_request(DfgFilteringData data, const DfgFilteringRequest& request);
+
+// Back to the .dfg payload (edges, start and end activities).
+[[nodiscard]] DfgCleanAnalysis to_dfg_clean_analysis(const DfgFilteringData& data);
 
 }  // namespace minera

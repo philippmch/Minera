@@ -192,7 +192,6 @@ add_library(minera_core
   src/backend/decision_table.cpp
   src/backend/dfg_playout.cpp
   src/backend/dfg_alignment.cpp
-  src/backend/dfg_filter.cpp
   src/backend/dfg_filtering.cpp
   src/backend/filtering_common.cpp
   src/backend/pandas_sequence_filters.cpp
@@ -1024,14 +1023,6 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_ocel_statistics_tests PRIVATE cxx_std_20)
   target_compile_options(minera_ocel_statistics_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_ocel_statistics_tests COMMAND minera_ocel_statistics_tests)
-
-  add_executable(minera_dfg_filter_tests
-    src/backend/tests/test_dfg_filter.cpp
-  )
-  target_link_libraries(minera_dfg_filter_tests PRIVATE minera::core)
-  target_compile_features(minera_dfg_filter_tests PRIVATE cxx_std_20)
-  target_compile_options(minera_dfg_filter_tests PRIVATE ${MINERA_TEST_OPTIONS})
-  add_test(NAME minera_dfg_filter_tests COMMAND minera_dfg_filter_tests)
 
   add_executable(minera_dfg_conversion_tests
     src/backend/tests/test_dfg_conversion.cpp
@@ -1898,6 +1889,19 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_port_exclusive_tests minera_server)
     add_test(NAME minera_server_port_exclusive_tests
              COMMAND minera_server_port_exclusive_tests $<TARGET_FILE:minera_server>)
+    # Review W2: GET /api/dfg and minera_dfg filter through the reference
+    # port (algo.filtering.dfg.dfg_filtering); expected bodies are the
+    # reference's results on the same logs and .dfg files.
+    add_executable(minera_dfg_filter_route_tests
+      src/backend/tests/test_dfg_filter_routes.cpp)
+    target_include_directories(minera_dfg_filter_route_tests PRIVATE third_party)
+    target_link_libraries(minera_dfg_filter_route_tests PRIVATE minera::core Threads::Threads)
+    target_compile_features(minera_dfg_filter_route_tests PRIVATE cxx_std_20)
+    target_compile_options(minera_dfg_filter_route_tests PRIVATE ${MINERA_TEST_OPTIONS})
+    add_dependencies(minera_dfg_filter_route_tests minera_server minera_dfg)
+    add_test(NAME minera_dfg_filter_route_tests
+             COMMAND minera_dfg_filter_route_tests $<TARGET_FILE:minera_server>
+                     $<TARGET_FILE:minera_dfg>)
   endif()
   # Recheck 61ebeee0 J2/J3: present empty resources are network nodes and
   # explicit empty profile selectors pick them (reference: edge ""->"" with

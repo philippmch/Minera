@@ -644,11 +644,21 @@ std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const Petr
   // The public log dispatcher first checks easy soundness and raises for a
   // net whose final marking is unreachable, where a single trace would get
   // None.
-  const bool easy_sound =
-      plain_net(net) && weighted_net(net)
-          ? reference_easy_sound(net, options.trace.initial_marking, options.trace.final_marking,
-                                 options.trace)
-          : final_marking_reachable(net, options.trace.initial_marking, options.trace.final_marking);
+  bool easy_sound = false;
+  if (plain_net(net) && weighted_net(net)) {
+    easy_sound = reference_easy_sound(net, options.trace.initial_marking,
+                                      options.trace.final_marking, options.trace);
+  } else {
+    const auto reachability = final_marking_reachability(
+        net, options.trace.initial_marking, options.trace.final_marking);
+    // A search that stopped at its limit has not shown the net unsound
+    // (review W1-5).
+    if (reachability == FinalMarkingReachability::kExhausted)
+      throw std::invalid_argument(
+          "easy soundness undecided: the reachability search reached its limit "
+          "before deciding whether the final marking is reachable");
+    easy_sound = reachability == FinalMarkingReachability::kReachable;
+  }
   if (!easy_sound)
     throw std::invalid_argument("trying to apply alignments on a Petri net that is not easy sound");
   const bool standard = options.activity_key == "concept:name" || options.activity_key == "activity";

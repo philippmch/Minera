@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "minera/dfg_conversion.hpp"
-#include "minera/dfg_filter.hpp"
+#include "minera/dfg_filtering.hpp"
 #include "minera/dfg_io.hpp"
 #include "minera/log_filter.hpp"
 
@@ -27,69 +27,11 @@ double parse_number(std::string_view text, std::string_view option) {
   return value;
 }
 
-std::set<std::pair<std::string, std::string>> parse_paths(
-    std::string_view text) {
-  std::set<std::pair<std::string, std::string>> result;
+std::vector<minera::DfgFilteringEdge> parse_paths(std::string_view text) {
+  std::vector<minera::DfgFilteringEdge> result;
   for (const auto& pair : minera::parse_activity_pairs(text))
-    result.emplace(pair.predecessor, pair.successor);
+    result.emplace_back(pair.predecessor, pair.successor);
   return result;
-}
-
-minera::DfgFilterData to_filter_data(const minera::DfgCleanAnalysis& input) {
-  minera::DfgFilterData result;
-  result.edges = input.graph;
-  result.start_activities = input.start_activities;
-  result.end_activities = input.end_activities;
-  for (const auto& [edge, count] : input.graph) {
-    (void)count;
-    result.activities.try_emplace(edge.first, 1);
-    result.activities.try_emplace(edge.second, 1);
-  }
-  for (const auto& [activity, count] : input.start_activities) {
-    (void)count;
-    result.activities.try_emplace(activity, 1);
-  }
-  for (const auto& [activity, count] : input.end_activities) {
-    (void)count;
-    result.activities.try_emplace(activity, 1);
-  }
-  return result;
-}
-
-minera::DfgCleanAnalysis to_clean_analysis(const minera::DfgFilterData& input) {
-  return {input.edges, input.start_activities, input.end_activities};
-}
-
-minera::DfgFilterData apply_filters(
-    minera::DfgFilterData data, const std::optional<double>& activities_percentage,
-    const std::optional<double>& paths_percentage,
-    const std::optional<double>& keep_connected, bool keep_all_activities,
-    const std::optional<std::string>& to_activity,
-    const std::optional<std::string>& from_activity,
-    const std::optional<std::string>& contain_activity) {
-  if (keep_all_activities && !paths_percentage && !keep_connected) {
-    throw std::invalid_argument(
-        "--keep-all-activities requires --paths-percentage or "
-        "--keep-connected");
-  }
-  if (activities_percentage) {
-    data = minera::filter_dfg_on_activities_percentage(
-        data, *activities_percentage);
-  }
-  if (paths_percentage) {
-    data = minera::filter_dfg_on_paths_percentage(
-        data, *paths_percentage, keep_all_activities);
-  }
-  if (keep_connected) {
-    data = minera::filter_dfg_keep_connected(
-        data, *keep_connected, keep_all_activities);
-  }
-  if (to_activity) data = minera::filter_dfg_to_activity(data, *to_activity);
-  if (from_activity)
-    data = minera::filter_dfg_from_activity(data, *from_activity);
-  if (contain_activity)
-    data = minera::filter_dfg_contain_activity(data, *contain_activity);
-  return data;
 }
 
 }  // namespace
@@ -139,7 +81,7 @@ int main(int argc, char** argv) {
 
     bool clean_noise = false;
     double noise_threshold = 0.0;
-    std::set<std::pair<std::string, std::string>> most_common_paths;
+    std::vector<minera::DfgFilteringEdge> most_common_paths;
     std::optional<double> activities_percentage;
     std::optional<double> paths_percentage;
     std::optional<double> keep_connected;
@@ -215,17 +157,36 @@ int main(int argc, char** argv) {
       throw std::invalid_argument(
           "--most-common-paths requires --clean-noise");
 
-    auto dfg = minera::import_dfg(positional.front());
-    auto filter_data = to_filter_data(dfg);
-    if (clean_noise) {
-      filter_data = minera::clean_dfg_based_on_noise_threshold(
-          filter_data, noise_threshold, most_common_paths);
+    if (keep_all_activities && !paths_percentage && !keep_connected) {
+      throw std::invalid_argument(
+          "--keep-all-activities requires --paths-percentage or "
+          "--keep-connected");
     }
-    filter_data = apply_filters(std::move(filter_data), activities_percentage,
-                                paths_percentage, keep_connected,
-                                keep_all_activities, to_activity, from_activity,
-                                contain_activity);
-    dfg = to_clean_analysis(filter_data);
+
+    // The reference port (algo.filtering.dfg.dfg_filtering). A .dfg file has
+    // no activity counts; dfg_filtering_data_from_dfg derives them as the
+    // reference's public DFG filter wrappers do.
+    minera::DfgFilteringRequest filters;
+    if (clean_noise) {
+      filters.noise_threshold = noise_threshold;
+      if (!most_common_paths.empty()) filters.most_common_paths = most_common_paths;
+    }
+    filters.activities_percentage = activities_percentage;
+    filters.paths_percentage = paths_percentage;
+    filters.keep_connected = keep_connected;
+    filters.keep_all_activities = keep_all_activities;
+    filters.to_activity = to_activity;
+    filters.from_activity = from_activity;
+    filters.contain_activity = contain_activity;
+    minera::DfgCleanAnalysis dfg;
+    try {
+      dfg = minera::to_dfg_clean_analysis(minera::apply_dfg_filtering_request(
+          minera::dfg_filtering_data_from_dfg(
+              minera::import_dfg(positional.front())),
+          filters));
+    } catch (const minera::FilteringCommonError& error) {
+      throw std::invalid_argument(error.type + ": " + error.message);
+    }
     if (positional.size() == 2) {
       minera::export_dfg(positional[1], dfg);
     } else {

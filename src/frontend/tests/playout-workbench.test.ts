@@ -1,7 +1,7 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 import {createElement} from "react";
 import {renderToStaticMarkup} from "react-dom/server";
-import {expandPlayoutEvents, playoutXesOnDemand, PLAYOUT_ARTIFACTS, PLAYOUT_DFG_MODEL_EXAMPLE, PLAYOUT_OPERATIONS, PLAYOUT_OPTION_GROUPS, PLAYOUT_PNML_CONTROLS, PLAYOUT_TREE_MODEL_EXAMPLE, PlayoutRequestGate, defaultPlayoutForm, isPlayoutDfgModel, isPlayoutDfgResult, isPlayoutNativeOptions, isPlayoutNativeResult, isPlayoutTreeResult, isPlayoutVisitedResult, isPlayoutWorkbench, playoutAllTablesCsv, playoutArtifactFile, playoutEditOption, playoutExpectedResultType, playoutFields, playoutModelFormats, playoutModelKind, playoutNeedsLog, playoutOptionGroup, playoutOptions, playoutOriginalSourceBytes, playoutReport, playoutSummary, playoutTableFileName, playoutTables, playoutXesFile, runPlayoutWorkbench, type PlayoutNativeResult, type PlayoutOperation, type PlayoutOptionGroup, type PlayoutRun, type PlayoutWorkbench} from "../src/playout-workbench";
+import {expandPlayoutEvents, playoutXesOnDemand, playoutGeneratedXesFile, playoutGeneratesLog, PLAYOUT_XES_RERUN_DIFFERS, PLAYOUT_ARTIFACTS, PLAYOUT_DFG_MODEL_EXAMPLE, PLAYOUT_OPERATIONS, PLAYOUT_OPTION_GROUPS, PLAYOUT_PNML_CONTROLS, PLAYOUT_TREE_MODEL_EXAMPLE, PlayoutRequestGate, defaultPlayoutForm, isPlayoutDfgModel, isPlayoutDfgResult, isPlayoutNativeOptions, isPlayoutNativeResult, isPlayoutTreeResult, isPlayoutVisitedResult, isPlayoutWorkbench, playoutAllTablesCsv, playoutArtifactFile, playoutEditOption, playoutExpectedResultType, playoutFields, playoutModelFormats, playoutModelKind, playoutNeedsLog, playoutOptionGroup, playoutOptions, playoutOriginalSourceBytes, playoutReport, playoutSummary, playoutTableFileName, playoutTables, playoutXesFile, runPlayoutWorkbench, type PlayoutNativeResult, type PlayoutOperation, type PlayoutOptionGroup, type PlayoutRun, type PlayoutWorkbench} from "../src/playout-workbench";
 import {nativeJson, parseNativeJson} from "../src/native-json";
 import {nativeResponseRequest} from "../src/native-response";
 import {diagnosticCsv} from "../src/model-diagnostics";
@@ -62,5 +62,22 @@ describe("independent original-model playout", () => {
     expect(playoutFields({...form, exportGeneratedXes: true}).at(-1)).toEqual(["export_generated_xes", "true"]);
     const run = saved(); run.value.exports.generated_xes = null; run.value.exports.generated_xes_error = null; expect(playoutXesOnDemand(run)).toBe(false); run.form = form; expect(playoutXesOnDemand(run)).toBe(run.value.result?.type === "event_log");
     run.form = {...form, exportGeneratedXes: true}; expect(playoutXesOnDemand(run)).toBe(false);
+  });
+  it("offers Include generated XES for log-returning operations and refuses a differing re-run (W1-4)", async () => {
+    for (const operation of PLAYOUT_OPERATIONS) expect(playoutGeneratesLog(operation)).toBe(["event_log", "dfg_result", "tree_result"].includes(playoutExpectedResultType(operation)));
+    expect(renderToStaticMarkup(createElement(PlayoutWorkspace, {}))).toContain("Include generated XES");
+    expect(PLAYOUT_XES_RERUN_DIFFERS).toContain("Include generated XES"); expect(PLAYOUT_XES_RERUN_DIFFERS).not.toMatch(/unseeded/);
+    const first = envelope("petri_basic_log"); first.exports.generated_xes = null;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(nativeJson(first))));
+    const run = await runPlayoutWorkbench(modelFile(), null, defaultPlayoutForm("petri_basic_log")); expect(playoutXesOnDemand(run)).toBe(true);
+    // The same log again: the repeated request asks for the XES and returns it.
+    const again = envelope("petri_basic_log"); again.exports.generated_xes = "<log/>";
+    const fetcher = vi.fn(async () => new Response(nativeJson(again))); vi.stubGlobal("fetch", fetcher);
+    const file = await playoutGeneratedXesFile(run); expect(await file.text()).toBe("<log/>");
+    expect(((fetcher.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData).get("export_generated_xes")).toBe("true");
+    // A different log (a wall-clock limit stopped it elsewhere): refused, pointing at the checkbox.
+    const differs = envelope("petri_basic_log"); differs.exports.generated_xes = "<log/>"; differs.result = {type: "event_log", value: {legacy_view: null, native_state: {attributes: {}, metadata: {}, traces: []}}};
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(nativeJson(differs))));
+    await expect(playoutGeneratedXesFile(run)).rejects.toThrow(PLAYOUT_XES_RERUN_DIFFERS);
   });
 });

@@ -5400,6 +5400,11 @@ pruning. Focused tests cover boundary preservation, branch pruning, dependency
 ties, noise overrides, unknown activities, invalid thresholds, transport
 validation, and deterministic output ordering.
 
+Superseded by Review W2 (2026-11-08): these native filters did not match the
+reference (`contain_activity` start activities, `paths_percentage` ties) and
+are removed. `GET /api/dfg`, `minera_dfg` and the frontend's DFG export now
+call the reference port `algo.filtering.dfg.dfg_filtering`; see "Review W2".
+
 ## LTL trace-filter evidence
 
 The native LTL filter exposes eventually-follows, contiguous A-next-B-next-C,
@@ -19376,3 +19381,130 @@ Tests: `minera_case_statistics_tests`, `minera_service_time_tests`,
 (`compact_generated_log_writes_each_event_once`),
 `minera_active_event_source_tests`; frontend `types.test.ts`,
 `playout-workbench.test.ts`, `playout-workbench-fixtures.test.ts` (recaptured).
+
+## Review W1: two-digit years after a space, filtered XES clocks, drained pumps, playout XES (2026-11-08)
+
+Fixes after a review of Round V, checked against `pandas.read_csv` +
+`pm4py.format_dataframe` and pm4py 2.7.22 outputs only.
+
+- **W1-1 Two-digit leading years.** A leading number above 31 before a space
+  followed by a joined month and day is a literal year only when the day is
+  written with more than two digits (`57 7/0001` and `57 7/001` are year 57);
+  otherwise it is a two-digit year (`40 3/15` is 2040-03-15, `99 05/27 07:17`
+  1999-05-27 07:17, `57 07/01` 2057-07-01). Round V read all of them as year
+  00NN (128 of a 1,344-cell separator matrix). A year-first date joined by
+  `-` or `/` and then another separator also takes a day of up to four digits
+  with leading zeros (`2024-1/0015 10:00` is 2024-01-15 10:00, `2024/01 031`
+  2024-01-31; `2024-01/1500` stays unconverted; 32 matrix cells were text),
+  and so does a date of three numbers separated by white space alone, read in
+  dateutil's order of three numbers (`2023 05 012` is 2023-05-12, `0012 05
+  031` 2031-12-05, `99 05 012` 1999-05-12; 532 of a 1,350-cell spaced matrix
+  were text, now 0 mismatches). Separator matrix: the 16 remaining cells are
+  the declared shape below; fresh-seed fuzz of one- to four-row columns
+  (seeds 8123, 6029, 3301, 5717, 9902): no unexplained mismatch. Test: `minera_core_tests` (`csv_timestamps_review_v1_shapes`).
+- **W1-2 Filtered XES downloads of CSV sources write UTC.**
+  `/api/log-query/export?format=xes` and `/api/log-cluster` (XES) set
+  `utc_timestamps` with `standard_keys`, as `/api/xes` does; they wrote the
+  source offset, which pm4py reads as wall-clock UTC. Test:
+  `minera_server_traces_route_tests` (`MINERA_TEST_SERVER_PORT` pins its ports).
+- **W1-3 Drained silent pumps.** `source → τ → source + sink`, `sink → τ`,
+  `a: source + sink → sink` keeps the marking equation feasible on every pumped
+  marking, so the pruned A* stops at its budget (equal-f ties go to the
+  cost-0 pump). `final_marking_reachability` and `final_marking_reachable` then
+  search breadth-first with the same budget, deadline and cancellation and
+  find `τ, a`. Alignment preflights keep the A* outcome (their search counters
+  and outputs are unchanged; 1,500 random ordinary nets byte-identical to
+  Round V). Test: `minera_core_tests`
+  (`final_marking_reachability_keeps_exhausted_apart`).
+- **W1-4 Playout "Include generated XES".** The playout workbench has a
+  checkbox for log-returning operations that requests `export_generated_xes`.
+  When a re-run for a download returns a different log (only a wall-clock
+  limit such as `max_execution_time_ms` makes that happen; seeds always
+  default), the message points at the checkbox. Test: frontend
+  `playout-workbench.test.ts`.
+- **W1-5 Undecided reachability is not "unsound".** The POWL workflow-net
+  conversion and the log alignment dispatcher (for nets outside its weighted
+  easy-soundness check) say the reachability search reached its limit
+  ("undecided") instead of "requires a reachable final marking" / "not easy
+  sound". Test: `minera_petri_analysis_tests`.
+
+Declared:
+
+- **Space-first four-digit year with a three- or four-digit day
+  (declared).** dateutil reads `YYYY M-DDD` / `YYYY M/DDDD` by value: for
+  years 0001-0031 the long trailing number is the year (`0012 01-0015` is
+  0015-12-01), for 0032-0100 it is the day (`0045 1-0015` is 0045-01-15), and
+  from about 0999 the cell fails. The importer keeps such a cell as text.
+
+## Review W2: DFG export filters, .dfg export of edgeless activities, IMf at noise 1 (2026-11-08)
+
+Fixes and declarations after a random-input sweep against pm4py (public API
+outputs only).
+
+- **W2-1 DFG export filters run the reference port.** `GET /api/dfg` (and so
+  the frontend's DFG export) and `minera_dfg` used the earlier native filters
+  (`dfg_filter.cpp`, removed), which differed from
+  `algo.filtering.dfg.dfg_filtering`: `contain_activity` kept every start
+  activity that reaches the activity (log `ab,b`, `contain_activity=a`:
+  reference starts `{a:1}`, native `{a:1, b:1}`), `paths_percentage` broke
+  count ties differently (log `abc,ac,ab` at 0.5: reference ends `{c:2}`,
+  native `{b:1, c:2}`), and a chained filter could refuse an activity the
+  reference keeps (log `aba`, `paths_percentage=0&to_activity=b`: reference
+  `{a>b:1}`, native "target activity is unknown"). Both routes now build a
+  `DfgFilteringRequest` and call `apply_dfg_filtering_request`
+  (`dfg_filtering.hpp`): noise cleaning (`clean_dfg_based_on_noise_thresh`,
+  edges only), activities percentage, paths percentage, keep connected, to,
+  from and contain activity, in that order. Reference errors keep their
+  class: the server answers 400 and the CLI exits 1 with `KeyError: 'a'`
+  (log `ca,cb`, `to_activity=b&contain_activity=a`).
+  - The server passes the mined log's DFG with its real activity counts
+    (`dfg_filtering_data_from_graph`), the `discover_dfg(log)` and
+    `get_event_attribute_values(log, activity)` a reference user passes.
+  - A `.dfg` file carries no activity counts. `dfg_filtering_data_from_dfg`
+    gives each activity on an edge max(sum of its incoming edge counts, sum
+    of its outgoing edge counts) and gives activities that occur only as
+    start or end activities no entry. This is what the reference's public
+    `pm4py.filter_dfg_activities_percentage` and
+    `pm4py.filter_dfg_paths_percentage` (which take only dfg, start and end)
+    use: across 1,500 random DFGs (3,000 wrapper calls) this rule
+    reproduced every result, and in-sum, out-sum, in+out, boundary-inclusive
+    sums, `dfg_utils.sum_activities_count` and constant counts did not. The
+    CLI uses the same counts for keep-connected and the activity filters,
+    which have no public count-free wrapper.
+- **W2-2 `.dfg` export of edgeless start/end activities (declared).** When a
+  start or end activity occurs on no directly-follows edge (a one-event
+  trace, or a filter that removed its edges), `pm4py.write_dfg` raises
+  ValueError (`'a' is not in list`; log `a` + `bc`). Minera's `.dfg` writer
+  (`minera_export --dfg`, `GET /api/dfg`, `minera_dfg`) lists every edge,
+  start and end activity and writes the file, which `pm4py.read_dfg` reads
+  back to the same three dictionaries.
+- **W2-3 IMf at `noise_threshold=1.0` depends on the hash seed (declared).**
+  At noise 1 the reference's IMf tree changes with `PYTHONHASHSEED`: log
+  `acac,c` gives `X( *( 'a', tau ), 'c' )` for 5 of 8 seeds and
+  `X( tau, *( 'c', tau ) )` for 3; `caabdf,caabdff,cccbdffe,caabdf,ffdbeab,ecf,cef`
+  gives four different trees over 10 seeds. Minera gives one deterministic
+  tree, which was among the reference's outcomes in every checked case
+  (seeds 17, 22 and 65 of the sweep, 10 hash seeds each). Below 1 (300 logs
+  at 0 to 0.8, two hash seeds) the trees match exactly.
+
+Matched in the same sweep, no change: heuristics miner to Petri net with
+dependency, AND, loop-two, minimum activity and minimum edge thresholds (360
+logs); transition systems over the three views, both directions and windows
+0-5 (400 logs, apart from the declared Counter/set behaviour); Alpha+ within
+`--alpha-plus-alternatives`, detached markings included (400); IMd from a
+DFG (250); process tree to net to PNML to `--pnml-to-ptml` against
+`convert_to_process_tree` (400 trees, exact strings); `minera_dfg
+--to-petri`, both variants (250 x 2); `/api/dfg` noise cleaning (80 logs x 6
+thresholds).
+
+Fuzz against the new server: GET /api/dfg with random chains of all seven
+filters (250 logs x 6 requests) and each filter alone (80 logs x 6 requests
+per filter) against the reference functions with `discover_dfg` and
+`get_event_attribute_values`: every response has the reference's edges,
+start and end activities, and every reference error is a 400 with its class.
+The `.dfg` byte order is not compared, because the reference writer orders
+activities by string hash.
+
+Tests: `minera_dfg_filter_route_tests` (server and CLI repros above, and the
+`.dfg` count rule; replaces `minera_dfg_filter_tests`, which tested the native
+filters), `minera_filtering_common_bank_parity_tests` (the reference port).

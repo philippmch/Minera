@@ -22,6 +22,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <cstdlib>
 #include <chrono>
 #include <iostream>
 #include <string>
@@ -49,6 +50,11 @@ std::string describe(const httplib::Result& result) {
 }
 
 int free_port() {
+  // MINERA_TEST_SERVER_PORT pins the ports (the first server on it, the next
+  // one above it) for sandboxes that allow only a fixed range.
+  static int pinned_calls = 0;
+  if (const char* pinned = std::getenv("MINERA_TEST_SERVER_PORT"); pinned && *pinned)
+    return std::atoi(pinned) + pinned_calls++;
   const int socket_fd = ::socket(AF_INET, SOCK_STREAM, 0);
   sockaddr_in address{};
   address.sin_family = AF_INET;
@@ -320,6 +326,26 @@ int main(int argc, char** argv) {
     check(counted && counted->status == 200 &&
               counted->body.find("\"timestamped_trace_count\": 0, \"has_timestamps\": false") != std::string::npos,
           "unparseable timestamps are not counted: " + describe(counted));
+
+    // Every XES download of a CSV source writes the UTC clock, as pandas
+    // normalizes the column before pm4py.write_xes: the full log and the
+    // filtered log-query export alike (review W1-2).
+    const auto offsets = mine({{"include_traces", "false"}},
+                              "case_id,activity,timestamp\nc1,A,2024-07-15T06:30:00+02:00\n"
+                              "c1,B,2024-07-15T08:00:00+02:00\n");
+    const auto offsets_id = offsets ? source_id_of(offsets->body) : "";
+    check(offsets && offsets->status == 200 && !offsets_id.empty(), "offset mine: " + describe(offsets));
+    const auto utc_only = [](const httplib::Result& result) {
+      return result && result->status == 200 &&
+             result->body.find("value=\"2024-07-15T04:30:00+00:00\"") != std::string::npos &&
+             result->body.find("value=\"2024-07-15T06:00:00+00:00\"") != std::string::npos &&
+             result->body.find("+02:00") == std::string::npos;
+    };
+    r = client.Get("/api/xes");
+    check(utc_only(r), "the XES download of a CSV source writes UTC: " + describe(r));
+    r = client.Post("/api/log-query/export?format=xes&source_id=" + offsets_id,
+                    "SELECT * FROM dataframe", "text/plain");
+    check(utc_only(r), "the filtered log-query XES export of a CSV source writes UTC: " + describe(r));
   }
   stop_server(server);
 

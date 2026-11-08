@@ -847,7 +847,14 @@ class PetriToPowlBuilder {
             "workflow-net conversion found a node outside the source-to-sink region");
       }
     }
-    if (!final_marking_reachable(copy_with_boundaries(boundary))) {
+    const auto reachability = final_marking_reachability(copy_with_boundaries(boundary));
+    if (reachability == FinalMarkingReachability::kExhausted) {
+      // Not decided: the net is not known to be unsound (review W1-5).
+      throw std::invalid_argument(
+          "workflow-net conversion undecided: the reachability search reached its "
+          "limit before deciding whether the final marking is reachable");
+    }
+    if (reachability != FinalMarkingReachability::kReachable) {
       throw std::invalid_argument(
           "workflow-net conversion requires a reachable final marking");
     }

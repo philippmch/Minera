@@ -434,8 +434,17 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       // path; see the dateutil reading after the clock).
       unsigned m = 0, d = 0;
       if (in.digits(m, 2) == 0 || !second_separator(sep, in.peek())) return std::nullopt;
+      // Joined by `-` or `/` and then another separator (dateutil's path),
+      // the day may carry leading zeros up to four digits ("2024-1/0015" is
+      // 2024-01-15, "2024/01 031" 2024-01-31; review W1-1). Separated by
+      // white space alone, so it may too, and the three numbers then take
+      // dateutil's order below ("2023 05 012" is 2023-05-12, "0012 05 012"
+      // 2012-12-05).
+      const bool long_day = joined ? in.peek() != sep : in.peek() == sep;
       ++in.pos;
-      if (in.digits(d, 2) == 0) return std::nullopt;
+      const auto day_digits = in.digits(d, long_day ? 4 : 2);
+      if (day_digits == 0) return std::nullopt;
+      if (day_digits > 2) iso_path = false;
       year = static_cast<int>(first);
       month = static_cast<int>(m);
       day = static_cast<int>(d);
@@ -471,15 +480,19 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_vie
       ++in.pos;
       const auto year_digits = in.digits(y, 4);
       if (year_digits == 0) return std::nullopt;
-      if (first > 31 && mixed && sep == ' ') {
+      if (first > 31 && mixed && sep == ' ' && year_digits > 2) {
         // "57 7/0001" is 0057-07-01: the leading number is a literal year
-        // and the joined last one the day.
+        // and the joined last one, written with more than two digits, the
+        // day. With one or two digits the leading number is a two-digit year
+        // ("40 3/15" is 2040-03-15, "99 05/27" 1999-05-27; review W1-1).
         year = static_cast<int>(first);
         month = static_cast<int>(second);
         day = static_cast<int>(y);
       } else if (first > 31) {
         // "40-03-03" and, mixed, "33-01 0011" (2033-01-11): a two-digit year.
-        if (year_digits > 2 && !mixed) return std::nullopt;
+        // Separated by white space alone, the day may carry leading zeros
+        // ("99 05 012" is 1999-05-12; review W1-1).
+        if (year_digits > 2 && !mixed && sep != ' ') return std::nullopt;
         year = expand_two_digit_year(first);
         month = static_cast<int>(second);
         day = static_cast<int>(y);

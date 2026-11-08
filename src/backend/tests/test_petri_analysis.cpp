@@ -1052,6 +1052,23 @@ void alignment_weighted_and_parallel_arcs() {
   try { (void)align_petri_log(log_of({{"a", "b"}}), parallel, options); }
   catch (const std::invalid_argument&) { refused = true; }
   assert(refused);
+  // Review W1-5: a reset net whose reachability search stops at its limit is
+  // refused as undecided, not as "not easy sound".
+  {
+    PetriNet endless;
+    endless.set_activities({"a"});
+    const auto source = endless.add_place(), p1 = endless.add_place(), q = endless.add_place(),
+               sink = endless.add_place();
+    endless.add_transition(std::nullopt, {source}, {p1});
+    const auto pump = endless.add_transition(std::nullopt, {p1}, {p1, q});
+    endless.add_reset_arc(pump, sink);
+    endless.set_source(source);
+    endless.set_sink(sink);
+    std::string message;
+    try { (void)align_petri_log(log_of({{"a"}}), endless, options); }
+    catch (const std::invalid_argument& error) { message = error.what(); }
+    assert(message.find("undecided") != std::string::npos);
+  }
   // ps -a-> pm; pm -c-> pq (x2); pq (x2) -b-> pe; pm -tau-> pe.
   const auto sync = compact_net(4, {"a", "b", "c"},
       {{0, {{0}, {}}, {{1}, {}}},
