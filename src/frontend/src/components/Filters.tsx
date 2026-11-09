@@ -621,6 +621,14 @@ export function heuristicStartTimestampOptionsFromForm(
 }
 
 /** Returns the conventional automatic selector shown for each heuristic variant. */
+/** Keeps an input's tooltip equal to its placeholder, unless the input carries a title of its own. */
+export function syncPlaceholderTitle(input: HTMLInputElement): void {
+  const copied = input.dataset.placeholderTitle;
+  if (input.title && input.title !== copied) return;
+  if (input.placeholder) { input.title = input.placeholder; input.dataset.placeholderTitle = input.placeholder; }
+  else { input.removeAttribute("title"); delete input.dataset.placeholderTitle; }
+}
+
 export function heuristicStartTimestampPlaceholder(
   variant: "classic" | "plusplus",
   completionTimestamp = "time:timestamp",
@@ -674,7 +682,9 @@ export function Filters({
   const [open, setOpen] = useState(false);
   // Long defaults ("Automatic (imported activity field)", business-hour slots) stay readable as a tooltip.
   const body = useRef<HTMLDivElement>(null);
-  useEffect(() => { body.current?.querySelectorAll<HTMLInputElement>("input[placeholder]:not([title])").forEach(input => { input.title = input.placeholder; }); });
+  // The tooltip follows the placeholder as it changes (for example the heuristic start-timestamp default); a title set
+  // by the input itself is left alone.
+  useEffect(() => { body.current?.querySelectorAll<HTMLInputElement>("input[placeholder], input[data-placeholder-title]").forEach(syncPlaceholderTitle); });
   const [topVariants, setTopVariants] = useState("");
   const [maxActivities, setMaxActivities] = useState("");
   const [topActivitiesAttributeKey, setTopActivitiesAttributeKey] = useState("");

@@ -413,13 +413,15 @@ unsigned reference_minute_fraction_seconds(std::string_view fraction_digits) {
 
 // `allow_year_zero` accepts year 0 (proleptic, a leap year), which pandas'
 // ISO path holds and dateutil rejects; the caller decides by `iso_path`.
+// `dateutil_only` reads the text as dateutil does, for a cell that pandas'
+// ISO parser has already refused (see skip_dateutil_separators).
 std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
-    std::string_view text, bool allow_year_zero = false) {
+    std::string_view text, bool allow_year_zero = false, bool dateutil_only = false) {
   TimestampTokens in{text};
   in.skip_spaces();
   int year = 0, month = 0, day = 0;
   // Whether pandas' ISO-8601 parser takes the cell (see NormalizedTimestamp).
-  bool iso_path = true;
+  bool iso_path = !dateutil_only;
   // A space-separated YYYY MM DD: pandas reads it on its ISO path, but a cell
   // that leaves that path reaches dateutil, which reads three numbers.
   std::optional<std::array<unsigned, 3>> spaced_numbers;
@@ -1016,14 +1018,121 @@ std::optional<std::string> reference_basic_date(std::string_view text) {
   return out;
 }
 
-std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_view text,
-                                                                 bool allow_year_zero = false) {
-  if (auto shaped = normalize_reference_timestamp_shapes(text, allow_year_zero)) return shaped;
+// dateutil skips `;`, `/`, `'` and `.` between its tokens like white space,
+// so a cell that carries them where pandas' ISO parser stops reads like the
+// same cell with a blank there (review AA1-5): a run of them (blanks
+// included) at the start is dropped ("; 2024-01-05 03:15", "..2024-01-05"),
+// one at the end becomes a blank ("03:15:34;", "03:15:34.p/", "03:15:34..",
+// "03:15:34Z.", "2024-01-05/", "01/05/2024 ."), and one after the clock and
+// before a word or an offset becomes a blank ("03:15:34;pm", "03:15/UTC",
+// "03:15:34..+05"), where it needs a `;`, `/` or `'`, or two `.` (a lone `.`
+// keeps the meridiem rules). A `.` right after a fraction is part of that
+// number ("03:15:34.5.." fails). Only a cell that is no timestamp as written
+// is tried this way; nullopt when nothing is skipped. Declared: a cell
+// holding a `,` (dateutil reads a `,` fraction or date by value), a run
+// after a `-` ("01/05/2024-"), and runs inside the date, between the date
+// and the clock or inside the clock ("2024-01-05;03:15:34", "03;15:34" is
+// 15:34), which keep the cell text.
+std::optional<std::string> skip_dateutil_separators(std::string_view text) {
+  if (text.find(',') != std::string_view::npos) return std::nullopt;
+  const auto skippable = [](char ch) {
+    return ch == ' ' || ch == ';' || ch == '/' || ch == '\'' || ch == '.';
+  };
+  const auto hard = [](char ch) { return ch == ';' || ch == '/' || ch == '\''; };
+  const auto alnum = [](char ch) { return std::isalnum(static_cast<unsigned char>(ch)) != 0; };
+  // Whether a run after the clock counts: a lone `.` there keeps the
+  // meridiem rules ("03:15:34.p" fails, "03:15:34.pm" reads).
+  const auto counts = [&](std::string_view run) {
+    std::size_t dots = 0;
+    bool blank = false;
+    for (const char ch : run) {
+      if (hard(ch)) return true;
+      if (ch == '.') ++dots;
+      if (ch == ' ') blank = true;
+    }
+    return dots >= 2 || (dots == 1 && blank);
+  };
+  // A `.` right after a number with a fraction joins that number, which then
+  // fails ("03:15:34.5..", "10:30.5.;+05"; "03:15:34.5;" reads).
+  // A dotted date is no such number ("05.01.2024." reads).
+  const auto after_fraction = [&](std::size_t at) {
+    if (at >= text.size() || text[at] != '.') return false;
+    const auto digits_before = [&](std::size_t k) {
+      while (k > 0 && std::isdigit(static_cast<unsigned char>(text[k - 1]))) --k;
+      return k;
+    };
+    const auto k = digits_before(at);
+    if (k == at || k == 0 || text[k - 1] != '.') return false;
+    const auto whole = digits_before(k - 1);
+    return whole == k - 1 || whole == 0 || text[whole - 1] != '.';
+  };
+  std::size_t begin = 0;
+  while (begin < text.size() && skippable(text[begin])) ++begin;
+  bool changed = false;
+  if (begin > 0 && text.substr(0, begin).find_first_not_of(' ') != std::string_view::npos)
+    changed = true;
+  else
+    begin = 0;
+  std::size_t end = text.size();
+  while (end > begin && skippable(text[end - 1])) --end;
+  const bool clock = text.find(':', begin) != std::string_view::npos;
+  std::string out;
+  out.reserve(text.size());
+  const auto clock_start = text.find(':', begin);
+  for (std::size_t i = begin; i < end;) {
+    if (!skippable(text[i]) || i == begin) {
+      out.push_back(text[i++]);
+      continue;
+    }
+    std::size_t j = i;
+    while (j < end && skippable(text[j])) ++j;
+    const auto run = text.substr(i, j - i);
+    const char before = text[i - 1], after = text[j];
+    if ((!clock || i > clock_start) && alnum(before) &&
+        (std::isalpha(static_cast<unsigned char>(after)) || after == '+' || after == '-') &&
+        counts(run) && !after_fraction(i)) {
+      out.push_back(' ');
+      changed = true;
+    } else {
+      out.append(run);
+    }
+    i = j;
+  }
+  if (end < text.size()) {
+    const auto run = text.substr(end);
+    const char before = end > begin ? text[end - 1] : '\0';
+    if (before != '-' && before != '\0' && !after_fraction(end) &&
+        run.find_first_not_of(' ') != std::string_view::npos) {
+      out.push_back(' ');
+      changed = true;
+    } else {
+      out.append(run);
+    }
+  }
+  if (!changed) return std::nullopt;
+  return out;
+}
+
+std::optional<NormalizedTimestamp> normalize_reference_timestamp_text(
+    std::string_view text, bool allow_year_zero, bool dateutil_only) {
+  if (auto shaped = normalize_reference_timestamp_shapes(text, allow_year_zero, dateutil_only))
+    return shaped;
   if (const auto basic = reference_basic_date(text))
-    return normalize_reference_timestamp_shapes(*basic, allow_year_zero);
+    return normalize_reference_timestamp_shapes(*basic, allow_year_zero, dateutil_only);
   const auto date = reference_numeric_date(text);
   if (!date) return std::nullopt;
-  auto shaped = normalize_reference_timestamp_shapes(*date);
+  auto shaped = normalize_reference_timestamp_shapes(*date, false, dateutil_only);
+  if (shaped) shaped->iso_path = false;
+  return shaped;
+}
+
+std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_view text,
+                                                                 bool allow_year_zero = false) {
+  if (auto shaped = normalize_reference_timestamp_text(text, allow_year_zero, false)) return shaped;
+  // Separators dateutil skips (review AA1-5); such a cell never takes the ISO path.
+  const auto skipped = skip_dateutil_separators(text);
+  if (!skipped) return std::nullopt;
+  auto shaped = normalize_reference_timestamp_text(*skipped, allow_year_zero, true);
   if (shaped) shaped->iso_path = false;
   return shaped;
 }

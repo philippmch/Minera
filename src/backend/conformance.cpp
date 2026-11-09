@@ -458,6 +458,7 @@ class Replayer {
     detail::ReplayMarkingKeys final_keys;
     std::vector<std::size_t> initial_order;
     std::vector<std::string> place_names;
+    std::vector<std::size_t> place_name_rank;  // by slot: rank among the distinct names
     PetriTransitionNameList transition_names;
     detail::CleaningComponents components;
   };
@@ -519,8 +520,10 @@ class Replayer {
         transitions_by_activity_[*transition.activity].push_back(t);
       }
     }
+    extended_arcs_ = net_.has_extended_arcs();
     arc_weights_.resize(net_.transitions().size());
     input_checks_.resize(net_.transitions().size());
+    fire_inputs_.resize(net_.transitions().size());
     build_place_closure();
     if (replay_options && replay_options->variant == TokenReplayVariant::kForward)
       forward_configuration_ = prepare_forward(*replay_options);
@@ -672,7 +675,7 @@ class Replayer {
     auto chosen = *std::max_element(targets.begin(), targets.end(), [&](auto left, auto right) {
       return std::tie(transition_names[left], left) < std::tie(transition_names[right], right);
     });
-    if (options.transition_identity_hashes && !net_.has_extended_arcs()) {
+    if (options.transition_identity_hashes && !extended_arcs_) {
       // The public enabled set includes every activity and silent transition.
       // Filtering matching activities before constructing that set changes
       // its iteration order when collisions or table growth are involved.
@@ -692,11 +695,11 @@ class Replayer {
       }
     }
     if (!enabled(marking, chosen) && options.walk_through_hidden_transitions) {
-      if (net_.has_extended_arcs() && !has_supplied_hidden_paths(options)) {
+      if (extended_arcs_ && !has_supplied_hidden_paths(options)) {
         const auto path = silent_path_to_enable(marking, std::vector<std::size_t>{chosen});
         if (path) for (const auto transition : *path) emit(transition, true);
       } else {
-        forward_route_hidden(marking, keys, chosen, place_names,
+        forward_route_hidden(marking, keys, chosen, place_names, &configuration.place_name_rank,
                              options,
                              [&](auto transition) { emit(transition, true); });
       }
@@ -784,13 +787,14 @@ class Replayer {
       return true;
     };
     if (options.try_to_reach_final_marking_through_hidden) {
-      if (net_.has_extended_arcs() && !has_supplied_hidden_paths(options)) {
+      if (extended_arcs_ && !has_supplied_hidden_paths(options)) {
         // Inhibitor/reset-only transitions need not be reachable from a
         // marked ordinary input. Preserve enabled-state routing for these nets.
         const auto path = silent_path_to_final(marking);
         if (path) for (const auto transition : *path) emit(transition, false);
       } else for (std::size_t pass = 0; pass < 6 && !final_present(); ++pass) {
-        const auto paths = forward_place_paths(keys, final_keys, place_names, options);
+        const auto paths = forward_place_paths(keys, final_keys, place_names, options,
+                                               &configuration.place_name_rank);
         bool fired = false;
         for (const auto& path : paths) {
           for (const auto transition : path.transitions) {
@@ -1122,11 +1126,13 @@ class Replayer {
     std::vector<std::size_t> order;
     std::vector<std::size_t> pair_ids;  // by transition
     std::size_t pair_count = 0;
-    // The flat search's candidate index for markings of `flat_places` slots
-    // (see flat_forward_enabled).
+    // The flat search's per-net tables for markings of `flat_places` slots
+    // (see flat_forward_enabled), indexed by `order` position.
     std::size_t flat_places = std::numeric_limits<std::size_t>::max();
-    std::vector<std::vector<std::uint32_t>> flat_triggered;  // by place: order positions
-    std::vector<std::uint32_t> flat_unconditional;           // order positions
+    std::vector<std::vector<std::uint32_t>> flat_readers;  // by place: positions whose enabling reads it
+    std::vector<std::vector<std::uint32_t>> flat_touched;  // by position: places its firing may change
+    std::vector<std::uint32_t> flat_pair;                  // by position: pair id
+    std::vector<char> flat_silent;                         // by position
   };
 
   [[nodiscard]] ForwardEnabledPlan forward_enabled_plan(const TokenReplayOptions& options) const {
@@ -1169,7 +1175,7 @@ class Replayer {
       const TokenReplayOptions& options,
       std::optional<std::size_t> budget = std::nullopt,
       std::optional<ForwardEnabledPlan>* plan_cache = nullptr) const {
-    if (net_.has_extended_arcs()) {
+    if (extended_arcs_) {
       std::vector<std::size_t> result;
       for (std::size_t t = 0; t < net_.transitions().size(); ++t) {
         if (!net_.transitions()[t].silent() &&
@@ -1349,6 +1355,7 @@ class Replayer {
       const auto* name = std::get_if<std::string>(&place.name.value);
       result.place_names.push_back(name ? *name : "detached:" + std::to_string(place.id));
     }
+    result.place_name_rank = detail::name_ranks(result.place_names);
     result.transition_names = detail::replay_transition_names(
         options.nullable_transition_names, options.transition_names, net_);
     detail::validate_forward_transition_name_order(result.transition_names);
@@ -1357,14 +1364,34 @@ class Replayer {
     return result;
   }
 
+  // A transition's input places in ascending order, each with its
+  // input_requirements weight, built on first use for markings of `places`
+  // slots (building throws as input_requirements does).
+  struct FireInputs {
+    std::size_t places = 0;
+    std::vector<std::pair<std::size_t, TokenInteger>> required;
+  };
+  [[nodiscard]] const FireInputs& fire_inputs(std::size_t t, std::size_t places) const {
+    auto& entry = fire_inputs_[t];
+    if (entry && entry->places == places) return *entry;
+    const auto& transition = net_.transitions()[t];
+    const auto required = input_requirements(transition, places);
+    std::vector<std::size_t> inputs(transition.inputs.begin(), transition.inputs.end());
+    std::sort(inputs.begin(), inputs.end());
+    inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
+    FireInputs built;
+    built.places = places;
+    for (const auto place : inputs) built.required.emplace_back(place, required[place]);
+    entry = std::move(built);
+    return *entry;
+  }
+
   bool forward_fire(Marking& marking, detail::ReplayMarkingKeys& keys,
                     std::size_t transition, Counts& counts,
                     std::vector<std::size_t>* order = nullptr) const {
     counts.forward_replay = true;
     const auto& fired = net_.transitions()[transition];
-    const auto required = input_requirements(fired, marking.size());
-    std::vector<bool> input_places(marking.size(), false);
-    for (const auto place : fired.inputs) input_places[place] = true;
+    const auto& inputs = fire_inputs(transition, marking.size());
     const auto repair = [&](std::size_t place, const TokenInteger& weight) {
       if (marking[place] >= weight) return;
       const auto missing = TokenInteger(weight - marking[place]);
@@ -1382,8 +1409,7 @@ class Replayer {
       for (std::size_t index = 0; index < fired.inputs.size(); ++index)
         repair(fired.inputs[index], arc_tokens(fired.input_arc_weight(index)));
     } else {
-      for (std::size_t place = 0; place < marking.size(); ++place)
-        if (input_places[place]) repair(place, required[place]);
+      for (const auto& [place, weight] : inputs.required) repair(place, weight);
     }
     // Signed input state can remain below its required weight even after the
     // public full-weight repair. Bookkeeping records the attempted transition,
@@ -1400,9 +1426,8 @@ class Replayer {
       return false;
     }
     if (order) {
-      for (std::size_t place = 0; place < marking.size(); ++place)
-        if (input_places[place] && marking[place] - required[place] == 0)
-          std::erase(*order, place);
+      for (const auto& [place, weight] : inputs.required)
+        if (marking[place] - weight == 0) std::erase(*order, place);
       for (const auto place : fired.reset_inputs) std::erase(*order, place);
       for (const auto place : fired.outputs)
         if (std::find(order->begin(), order->end(), place) == order->end())
@@ -1425,7 +1450,8 @@ class Replayer {
       const detail::ReplayMarkingKeys& source_keys,
       const detail::ReplayMarkingKeys& target_keys,
       const std::vector<std::string>& place_names,
-      const TokenReplayOptions& options) const {
+      const TokenReplayOptions& options,
+      const std::vector<std::size_t>* place_name_rank = nullptr) const {
     if (!has_supplied_hidden_paths(options)) {
       // The structural search trees are the net's, not the marking's: grow
       // them once per replayer instead of once per routing query.
@@ -1435,7 +1461,9 @@ class Replayer {
       if (!place_path_index_ ||
           !place_path_index_->matches(net_, source_keys.size(), 51, order))
         place_path_index_.emplace(net_, source_keys.size(), 51, order);
-      return place_path_index_->paths(source_keys, target_keys, place_names);
+      return place_name_rank
+                 ? place_path_index_->ranked_paths(source_keys, target_keys, *place_name_rank)
+                 : place_path_index_->paths(source_keys, target_keys, place_names);
     }
     std::vector<detail::HiddenPlacePath> result;
     const auto* matrix = std::get_if<TokenReplayHiddenPathMatrix>(
@@ -1511,17 +1539,19 @@ class Replayer {
   void forward_route_hidden(Marking& marking, detail::ReplayMarkingKeys& keys,
                             std::size_t target,
                             const std::vector<std::string>& place_names,
+                            const std::vector<std::size_t>* place_name_rank,
                             const TokenReplayOptions& options,
                             const Emit& emit) const {
+    // The input places still short of their requirement.
     const auto required = [&](std::size_t selected) {
-      auto needed = input_requirements(net_.transitions()[selected], marking.size());
-      for (std::size_t place = 0; place < needed.size(); ++place)
-        if (marking[place] >= needed[place]) needed[place] = 0;
-      return detail::resolve_replay_marking_keys({}, needed, "required");
+      detail::ReplayMarkingKeys short_places(marking.size(), false);
+      for (const auto& [place, weight] : fire_inputs(selected, marking.size()).required)
+        if (!(marking[place] >= weight) && weight != 0) short_places[place] = true;
+      return short_places;
     };
     const auto candidates = [&](std::size_t /*selected*/,
                                 const detail::ReplayMarkingKeys& required_keys) {
-      return forward_place_paths(keys, required_keys, place_names, options);
+      return forward_place_paths(keys, required_keys, place_names, options, place_name_rank);
     };
     const auto trial = [&](std::size_t selected,
                            const std::vector<detail::HiddenPlacePath>& paths,
@@ -1961,7 +1991,8 @@ class Replayer {
     return entry;
   }
 
-  static bool flat_enabled(const FlatTransition& transition, const std::int32_t* row) noexcept {
+  template <class Cell>
+  static bool flat_enabled(const FlatTransition& transition, const Cell* row) noexcept {
     if (transition.never) return false;
     for (const auto& [place, required] : transition.checks)
       if (row[place] < required) return false;
@@ -1970,14 +2001,16 @@ class Replayer {
     return true;
   }
 
-  // Applies fire_marking to `row`; false when a count leaves the 32-bit range.
-  static bool flat_fire(const FlatTransition& transition, std::int32_t* row) noexcept {
-    constexpr std::int64_t lo = std::numeric_limits<std::int32_t>::min();
-    constexpr std::int64_t hi = std::numeric_limits<std::int32_t>::max();
+  // Applies fire_marking to `row`; false when a count leaves the range of
+  // the row's cells (32-bit, or 8-bit in the forward enabled search).
+  template <class Cell>
+  static bool flat_fire(const FlatTransition& transition, Cell* row) noexcept {
+    constexpr std::int64_t lo = std::numeric_limits<Cell>::min();
+    constexpr std::int64_t hi = std::numeric_limits<Cell>::max();
     for (const auto& [place, weight] : transition.inputs) {
       const std::int64_t value = std::int64_t(row[place]) - weight;
       if (value < lo || value > hi) return false;
-      row[place] = static_cast<std::int32_t>(value);
+      row[place] = static_cast<Cell>(value);
     }
     for (const auto& input : transition.inputs)
       if (row[input.first] < 0) row[input.first] = 0;
@@ -1986,20 +2019,33 @@ class Replayer {
     for (const auto& [place, weight] : transition.outputs) {
       const std::int64_t value = std::int64_t(row[place]) + weight;
       if (value < lo || value > hi) return false;
-      row[place] = static_cast<std::int32_t>(value);
+      row[place] = static_cast<Cell>(value);
     }
     return true;
   }
 
-  // enabled_transition_ids' forward worklist on 32-bit place rows: the same
-  // FIFO of (transition, latest marking) entries, visited (name, label,
-  // marking) triples, caps and exceptions, in the same order, with markings
-  // interned in a flat pool. Only the transitions a marked place (or no
-  // place) can enable are checked at a marking, in `order`: each other one
-  // has a positive requirement on an empty place, so enabled() is false for
-  // it. False, with `selected` unspecified, when a transition or a count
-  // does not fit the flat form; the generic search then runs from the start
-  // and, being the same deterministic walk, reaches the same outcome.
+  // enabled_transition_ids' forward worklist on 32-bit place rows, with the
+  // same outcome as that FIFO of (transition, latest marking) entries: the
+  // same visited (name, label, marking) triples, expansions in the same
+  // order, the same caps and exceptions, and `selected` in the same order.
+  //
+  // The FIFO is not materialised entry by entry. Each discovery of a marking
+  // appends one batch: the marking's enabled transitions in `order`. A
+  // popped entry of t acts on latest[t], the marking of the newest batch
+  // holding t, and leaves (pair of t, latest[t]) visited whether or not it
+  // already was. So once an entry of t is popped, every later entry of t
+  // pops a visited pair, and does nothing, until a newer batch holds t
+  // again. Only the first entry of t after such a rediscovery (t "dirty")
+  // can act; those entries are processed in FIFO order (batch, then
+  // position) and the others are passed over. A batch holds t exactly when
+  // its marking enables t, so the batches holding t are found from the
+  // markings' enabled sets (a row per marking, and, for scans that run long,
+  // a cached word per complete block of 64 batches and transition). Markings
+  // are interned in a flat pool; a successor's enabled set and row hash
+  // follow from its parent's and the places the firing touched. False, with
+  // `selected` unspecified, when a transition or a count does not fit the
+  // flat form; the generic search then runs from the start and, being the
+  // same deterministic walk, reaches the same outcome.
   [[nodiscard]] bool flat_forward_enabled(const Marking& marking, ForwardEnabledPlan& plan,
                                           std::optional<std::size_t> budget,
                                           std::size_t worklist_cap,
@@ -2008,58 +2054,145 @@ class Replayer {
     const auto& order = plan.order;
     const std::size_t transition_count = order.size();
     if (transition_count == 0 || transition_count != net_.transitions().size() ||
-        transition_count >= std::numeric_limits<std::uint32_t>::max())
+        transition_count >= std::numeric_limits<std::uint32_t>::max() ||
+        places >= std::numeric_limits<std::uint32_t>::max())
       return false;
-    std::vector<const FlatTransition*> flat(transition_count);
+    auto& s = flat_enabled_scratch_;
+    s.by_transition.resize(transition_count);
     for (std::size_t t = 0; t < transition_count; ++t) {
       const auto& entry = flat_transition(t, places);
       if (!entry.usable) return false;
-      flat[t] = &entry;
+      s.by_transition[t] = &entry;
     }
+    s.flat.resize(transition_count);
+    for (std::size_t position = 0; position < transition_count; ++position)
+      s.flat[position] = s.by_transition[order[position]];
     if (plan.flat_places != places) {
       plan.flat_places = places;
-      plan.flat_triggered.assign(places, {});
-      plan.flat_unconditional.clear();
+      plan.flat_readers.assign(places, {});
+      plan.flat_touched.assign(transition_count, {});
+      plan.flat_pair.resize(transition_count);
+      plan.flat_silent.resize(transition_count);
       for (std::size_t position = 0; position < transition_count; ++position) {
-        const auto& transition = *flat[order[position]];
+        const auto& transition = *s.flat[position];
+        plan.flat_pair[position] = static_cast<std::uint32_t>(plan.pair_ids[order[position]]);
+        plan.flat_silent[position] = net_.transitions()[order[position]].silent() ? 1 : 0;
+        auto& touched = plan.flat_touched[position];
+        for (const auto& input : transition.inputs) touched.push_back(input.first);
+        for (const auto place : transition.resets) touched.push_back(place);
+        for (const auto& output : transition.outputs) touched.push_back(output.first);
+        std::sort(touched.begin(), touched.end());
+        touched.erase(std::unique(touched.begin(), touched.end()), touched.end());
+        // A transition that is never enabled reads nothing that can change it.
         if (transition.never) continue;
-        const auto trigger = std::find_if(transition.checks.begin(), transition.checks.end(),
-                                          [](const auto& check) { return check.second > 0; });
-        if (trigger == transition.checks.end())
-          plan.flat_unconditional.push_back(static_cast<std::uint32_t>(position));
-        else
-          plan.flat_triggered[trigger->first].push_back(static_cast<std::uint32_t>(position));
+        std::vector<std::uint32_t> read;
+        for (const auto& check : transition.checks) read.push_back(check.first);
+        for (const auto place : transition.inhibitors) read.push_back(place);
+        std::sort(read.begin(), read.end());
+        read.erase(std::unique(read.begin(), read.end()), read.end());
+        for (const auto place : read)
+          plan.flat_readers[place].push_back(static_cast<std::uint32_t>(position));
       }
     }
-
-    std::vector<std::int32_t> pool(places);
+    // Rows of 8-bit cells while every count fits them; a search whose counts
+    // outgrow them is repeated with 32-bit cells, from the start, as the
+    // same deterministic walk.
+    bool small = true;
     for (std::size_t place = 0; place < places; ++place) {
       const auto& value = marking[place];
       if (!value.is_small() || value.small_value() < std::numeric_limits<std::int32_t>::min() ||
           value.small_value() > std::numeric_limits<std::int32_t>::max())
         return false;
-      pool[place] = static_cast<std::int32_t>(value.small_value());
+      small = small && value.small_value() >= std::numeric_limits<std::int8_t>::min() &&
+              value.small_value() <= std::numeric_limits<std::int8_t>::max();
     }
-    const std::size_t pair_words = (plan.pair_count + 63) / 64;
-    std::vector<std::uint64_t> visited;  // by marking id: a bit per (name, label) pair
-    std::vector<std::uint64_t> hashes;
-    constexpr std::uint32_t kEmpty = std::numeric_limits<std::uint32_t>::max();
-    std::vector<std::uint32_t> table(256, kEmpty);
-    const auto row_hash = [&](std::size_t id) {
-      const std::int32_t* row = pool.data() + id * places;
-      std::uint64_t h = 0x9e3779b97f4a7c15ull ^ places;
-      for (std::size_t place = 0; place < places; ++place)
-        h ^= static_cast<std::uint32_t>(row[place]) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
-      h ^= h >> 33; h *= 0xff51afd7ed558ccdull; h ^= h >> 33;
-      return h;
+    if (small) {
+      const auto outcome = flat_forward_search<std::int8_t>(marking, plan, budget, worklist_cap, selected);
+      if (outcome != FlatSearch::kOverflow) return outcome == FlatSearch::kDone;
+      selected.clear();
+    }
+    return flat_forward_search<std::int32_t>(marking, plan, budget, worklist_cap, selected) ==
+           FlatSearch::kDone;
+  }
+
+  enum class FlatSearch { kDone, kDeclined, kOverflow };
+  // flat_forward_enabled's search on rows of `Cell` counts. kOverflow when a
+  // count leaves the range of 8-bit cells (32-bit ones decline instead).
+  template <class Cell>
+  [[nodiscard]] FlatSearch flat_forward_search(const Marking& marking, ForwardEnabledPlan& plan,
+                                               std::optional<std::size_t> budget,
+                                               std::size_t worklist_cap,
+                                               std::vector<std::size_t>& selected) const {
+    constexpr FlatSearch kOutOfRange =
+        sizeof(Cell) < sizeof(std::int32_t) ? FlatSearch::kOverflow : FlatSearch::kDeclined;
+    const std::size_t places = marking.size();
+    const auto& order = plan.order;
+    const std::size_t transition_count = order.size();
+    auto& s = flat_enabled_scratch_;
+    const auto& flat = s.flat;
+    const auto& readers = plan.flat_readers;
+    const auto& touched_places = plan.flat_touched;
+    const auto& pair_of = plan.flat_pair;
+    const auto& silent_at = plan.flat_silent;
+
+    // Buffers grow geometrically and are reused across searches; `rows`,
+    // `batches` and the logical sizes below say how much of each is in use.
+    const auto reserve = [](auto& buffer, std::size_t size) {
+      if (buffer.size() < size) buffer.resize(std::max(size, buffer.size() * 2));
     };
-    // Interns the pool's last row: its id, which is an earlier row's when the
-    // marking was reached before (the last row is then dropped).
-    const auto intern_last = [&]() -> std::uint32_t {
-      const auto id = static_cast<std::uint32_t>(hashes.size());
-      const auto h = row_hash(id);
-      if ((hashes.size() + 1) * 2 > table.size()) {
-        std::vector<std::uint32_t> grown(table.size() * 2, kEmpty);
+    auto& pool = [&]() -> std::vector<Cell>& {
+      if constexpr (sizeof(Cell) < sizeof(std::int32_t)) return s.small_pool;
+      else return s.pool;
+    }();
+    reserve(pool, places);
+    for (std::size_t place = 0; place < places; ++place) {
+      const auto& value = marking[place];
+      if (!value.is_small() || value.small_value() < std::numeric_limits<Cell>::min() ||
+          value.small_value() > std::numeric_limits<Cell>::max())
+        return kOutOfRange;
+      pool[place] = static_cast<Cell>(value.small_value());
+    }
+    const std::size_t words = (transition_count + 63) / 64;
+    const std::size_t pair_words = (plan.pair_count + 63) / 64;
+    auto& hashes = s.hashes;                // by marking id; rows are pool[id * places, ...)
+    auto& visited = s.visited;              // by marking id: a bit per (name, label) pair
+    auto& enabled_rows = s.enabled;         // by marking id: a bit per enabled position
+    auto& enabled_count = s.enabled_count;  // by marking id
+    auto& batch_marking = s.batch_marking;  // by batch: the discovered marking id
+    auto& batch_start = s.batch_start;      // by batch: FIFO entries before it
+    auto& batch_rows = s.batch_rows;        // by batch: its marking's enabled set
+    auto& live = s.live;                    // by batch: positions whose entry may act
+    auto& live_any = s.live_any;            // a bit per batch: its live row is not empty
+    auto& dirty = s.dirty;                  // positions with a live entry
+    auto& block_column = s.block_column;    // by block: offset of its columns, or none
+    auto& columns = s.columns;              // by built block: a word per position
+    constexpr std::size_t kNoColumns = std::numeric_limits<std::size_t>::max();
+    // Columns are an index only; past this many words scans read rows.
+    constexpr std::size_t kColumnWordLimit = std::size_t{1} << 21;
+    std::size_t rows = 0, batches = 0, column_words = 0;
+    block_column.clear();
+    dirty.assign(words, 0);
+    constexpr std::uint32_t kEmpty = std::numeric_limits<std::uint32_t>::max();
+    auto& table = s.table;
+    table.assign(std::max<std::size_t>(256, s.table_size), kEmpty);
+
+    // Row hashes are additive over places, so a successor's hash follows from
+    // its parent's and the places the firing touched. They only bucket rows
+    // (equality is checked in full), so which rows are equal is unchanged.
+    const auto mix = [](std::size_t place, std::int64_t value) {
+      std::uint64_t x = (std::uint64_t(place) << 32) ^ static_cast<std::uint32_t>(value);
+      x += 0x9e3779b97f4a7c15ull;
+      x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
+      x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
+      return x ^ (x >> 31);
+    };
+    // Interns the row in pool slot `rows`: its id and whether it is new (an
+    // earlier row's id when the marking was reached before).
+    const auto intern_next = [&](std::uint64_t h) -> std::pair<std::uint32_t, bool> {
+      const auto id = static_cast<std::uint32_t>(rows);
+      if ((rows + 1) * 2 > table.size()) {
+        auto& grown = s.grown;
+        grown.assign(table.size() * 2, kEmpty);
         const std::size_t mask = grown.size() - 1;
         for (const auto existing : table) {
           if (existing == kEmpty) continue;
@@ -2071,69 +2204,261 @@ class Replayer {
       }
       const std::size_t mask = table.size() - 1;
       std::size_t slot = h & mask;
-      const std::int32_t* row = pool.data() + std::size_t(id) * places;
+      const Cell* row = pool.data() + std::size_t(id) * places;
       while (table[slot] != kEmpty) {
         const auto other = table[slot];
         if (hashes[other] == h &&
-            std::equal(row, row + places, pool.data() + std::size_t(other) * places)) {
-          pool.resize(pool.size() - places);
-          return other;
-        }
+            std::equal(row, row + places, pool.data() + std::size_t(other) * places))
+          return {other, false};
         slot = (slot + 1) & mask;
       }
       table[slot] = id;
-      hashes.push_back(h);
-      visited.resize(visited.size() + pair_words, 0);
-      return id;
+      ++rows;
+      if (hashes.size() < rows) {
+        reserve(hashes, rows);
+        reserve(visited, rows * pair_words);
+        reserve(enabled_rows, rows * words);
+        reserve(enabled_count, rows);
+      }
+      hashes[id] = h;
+      std::fill_n(visited.data() + std::size_t(id) * pair_words, pair_words, 0);
+      return {id, true};
     };
 
-    std::vector<std::uint32_t> latest(transition_count, 0);
-    std::vector<std::uint32_t> pending;  // FIFO: [head, size) is queued
-    std::size_t head = 0;
-    std::vector<std::uint64_t> candidates((transition_count + 63) / 64, 0);
-    const auto discover = [&](std::uint32_t id) {
-      const std::int32_t* row = pool.data() + std::size_t(id) * places;
-      std::fill(candidates.begin(), candidates.end(), 0);
-      for (const auto position : plan.flat_unconditional)
-        candidates[position >> 6] |= std::uint64_t{1} << (position & 63);
-      for (std::size_t place = 0; place < places; ++place) {
-        if (row[place] <= 0) continue;
-        for (const auto position : plan.flat_triggered[place])
-          candidates[position >> 6] |= std::uint64_t{1} << (position & 63);
+    const auto holds = [&](std::size_t batch, std::size_t position) {
+      return (batch_rows.data()[batch * words + position / 64] >> (position % 64)) & 1;
+    };
+    // Whether the batches of complete block `block` holding `position` are
+    // known as a column word (`word`). Words are computed on first use, when
+    // a scan has already read `scanned` rows without a hit: the batches
+    // holding a transition are usually a few rows apart, and a scan that runs
+    // long tends to cross the same blocks again for the same transition.
+    const auto column_word = [&](std::size_t block, std::size_t position, std::size_t scanned,
+                                 std::uint64_t& word) {
+      if (block_column.size() <= block) block_column.resize(block + 1, kNoColumns);
+      if (block_column[block] == kNoColumns) {
+        if (scanned < 64 || column_words + transition_count + words > kColumnWordLimit) return false;
+        reserve(columns, column_words + transition_count + words);
+        std::fill_n(columns.data() + column_words, transition_count + words, 0);
+        block_column[block] = column_words;
+        column_words += transition_count + words;
       }
-      for (std::size_t word = 0; word < candidates.size(); ++word) {
-        for (auto bits = candidates[word]; bits != 0; bits &= bits - 1) {
-          const auto t = order[word * 64 + static_cast<std::size_t>(std::countr_zero(bits))];
-          if (!flat_enabled(*flat[t], row)) continue;
-          if (pending.size() - head >= worklist_cap)
+      std::uint64_t* column = columns.data() + block_column[block];
+      std::uint64_t* known = column + transition_count;
+      const std::uint64_t bit = std::uint64_t{1} << (position % 64);
+      if ((known[position / 64] & bit) == 0) {
+        if (scanned < 64) return false;
+        std::uint64_t value = 0;
+        for (std::size_t r = 0; r < 64; ++r)
+          value |= std::uint64_t(holds(block * 64 + r, position)) << r;
+        column[position] = value;
+        known[position / 64] |= bit;
+      }
+      word = column[position];
+      return true;
+    };
+    const auto has_columns = [&](std::size_t block) {
+      return block < block_column.size() && block_column[block] != kNoColumns;
+    };
+    // The first batch from `batch` on that holds `position` (one does).
+    const auto first_holding = [&](std::size_t batch, std::size_t position) {
+      const std::size_t offset = position / 64;
+      const std::uint64_t bit = std::uint64_t{1} << (position % 64);
+      for (std::size_t scanned = 0;;) {
+        // Rows first; a block's column word once the scan has run long.
+        const std::size_t block = batch / 64;
+        std::uint64_t word = 0;
+        if ((scanned >= 64 || has_columns(block)) && block * 64 + 64 <= batches &&
+            column_word(block, position, scanned, word)) {
+          word &= ~std::uint64_t{0} << (batch % 64);
+          if (word != 0) return block * 64 + static_cast<std::size_t>(std::countr_zero(word));
+          batch = block * 64 + 64;
+          continue;
+        }
+        const std::uint64_t* held = batch_rows.data() + offset;
+        const std::size_t end = std::min(block * 64 + 64, batches);
+        for (; batch < end; ++batch, ++scanned)
+          if (held[batch * words] & bit) return batch;
+      }
+    };
+    // The newest batch that holds `position` (one does).
+    const auto last_holding = [&](std::size_t position) {
+      const std::size_t offset = position / 64;
+      const std::uint64_t bit = std::uint64_t{1} << (position % 64);
+      std::size_t batch = batches;  // one past the next batch to read
+      for (std::size_t scanned = 0;;) {
+        const std::size_t block = (batch - 1) / 64;
+        std::uint64_t word = 0;
+        if ((scanned >= 64 || has_columns(block)) && block * 64 + 64 <= batches &&
+            column_word(block, position, scanned, word)) {
+          const auto last = (batch - 1) % 64;
+          word &= last == 63 ? ~std::uint64_t{0} : (std::uint64_t{1} << (last + 1)) - 1;
+          if (word != 0) return block * 64 + static_cast<std::size_t>(std::bit_width(word)) - 1;
+          batch = block * 64;
+          continue;
+        }
+        const std::uint64_t* held = batch_rows.data() + offset;
+        for (; batch > block * 64; ++scanned)
+          if (held[--batch * words] & bit) return batch;
+      }
+    };
+
+    // The FIFO head: the entry being processed, as (batch, position);
+    // position -1 before the first entry.
+    std::size_t head_batch = 0;
+    std::ptrdiff_t head_position = -1;
+    std::size_t pushed = 0;  // FIFO entries appended so far
+    // Appends the batch of marking `id`: the reference's discover().
+    const auto discover = [&](std::uint32_t id) {
+      const std::size_t count = enabled_count[id];
+      if (count != 0) {
+        // The reference checks the queued entries before each push; at most
+        // the entries from the head's batch on are queued.
+        const std::size_t before = head_position >= 0 ? batch_start[head_batch] : 0;
+        if ((pushed - before) + (count - 1) >= worklist_cap) {
+          std::size_t popped = before;
+          if (head_position >= 0) {
+            const std::uint64_t* row = enabled_rows.data() + std::size_t(batch_marking[head_batch]) * words;
+            const auto last = static_cast<std::size_t>(head_position);
+            for (std::size_t word = 0; word < last / 64; ++word) popped += std::popcount(row[word]);
+            const auto bit = last % 64;
+            popped += std::popcount(row[last / 64] &
+                                    (bit == 63 ? ~std::uint64_t{0} : (std::uint64_t{1} << (bit + 1)) - 1));
+          }
+          if ((pushed - popped) + (count - 1) >= worklist_cap)
             throw std::runtime_error("enabled transition diagnostic worklist exceeded limit");
-          latest[t] = id;
-          pending.push_back(static_cast<std::uint32_t>(t));
+        }
+      }
+      if (batch_marking.size() <= batches) {
+        reserve(batch_marking, batches + 1);
+        reserve(batch_start, batches + 1);
+        reserve(batch_rows, (batches + 1) * words);
+        reserve(live, (batches + 1) * words);
+        reserve(live_any, batches / 64 + 1);
+      }
+      batch_marking[batches] = id;
+      batch_start[batches] = pushed;
+      pushed += count;
+      ++batches;
+      std::fill_n(live.data() + (batches - 1) * words, words, 0);
+      if ((batches - 1) % 64 == 0) live_any[(batches - 1) / 64] = 0;
+      const std::uint64_t* enabled = enabled_rows.data() + std::size_t(id) * words;
+      std::copy_n(enabled, words, batch_rows.data() + (batches - 1) * words);
+      for (std::size_t word = 0; word < words; ++word) {
+        const std::uint64_t fresh = enabled[word] & ~dirty[word];
+        if (fresh == 0) continue;
+        dirty[word] |= fresh;
+        for (auto bits = fresh; bits != 0; bits &= bits - 1) {
+          const auto position = word * 64 + static_cast<std::size_t>(std::countr_zero(bits));
+          // Its first entry after the head: in a batch after the head's, or
+          // in the head's batch itself when it comes after the head there.
+          const std::size_t from =
+              static_cast<std::ptrdiff_t>(position) > head_position ? head_batch : head_batch + 1;
+          const auto batch = first_holding(from, position);
+          live[batch * words + word] |= std::uint64_t{1} << (position % 64);
+          live_any[batch / 64] |= std::uint64_t{1} << (batch % 64);
         }
       }
     };
-    discover(intern_last());
+    {
+      std::uint64_t h = 0;
+      for (std::size_t place = 0; place < places; ++place) h += mix(place, pool[place]);
+      const auto [id, added] = intern_next(h);
+      (void)added;
+      std::uint64_t* enabled = enabled_rows.data() + std::size_t(id) * words;
+      std::fill_n(enabled, words, 0);
+      std::size_t count = 0;
+      const Cell* row = pool.data();
+      for (std::size_t position = 0; position < transition_count; ++position)
+        if (flat_enabled(*flat[position], row)) {
+          enabled[position / 64] |= std::uint64_t{1} << (position % 64);
+          ++count;
+        }
+      enabled_count[id] = static_cast<std::uint32_t>(count);
+      discover(id);
+    }
+
     std::size_t expanded = 0;
-    while (head < pending.size()) {
-      const std::size_t t = pending[head++];
-      const auto id = latest[t];
-      const auto pair = plan.pair_ids[t];
+    while (true) {
+      // The next live entry in FIFO order: later in the head's batch, or the
+      // first in the next batch with a live row.
+      std::size_t position = 0;
+      {
+        std::size_t batch = head_batch;
+        const auto first_in = [&](std::size_t row_batch, std::size_t from) {
+          const std::uint64_t* row = live.data() + row_batch * words;
+          std::uint64_t mask = ~std::uint64_t{0} << (from % 64);
+          for (std::size_t word = from / 64; word < words; ++word, mask = ~std::uint64_t{0})
+            if (const std::uint64_t bits = row[word] & mask; bits != 0)
+              return word * 64 + static_cast<std::size_t>(std::countr_zero(bits));
+          return transition_count;
+        };
+        position = batch < batches ? first_in(batch, static_cast<std::size_t>(head_position + 1))
+                                   : transition_count;
+        if (position == transition_count) {
+          std::size_t next = batch + 1;
+          bool found = false;
+          for (std::size_t group = next / 64; group * 64 < batches; ++group) {
+            std::uint64_t bits = live_any[group];
+            if (group == next / 64) bits &= ~std::uint64_t{0} << (next % 64);
+            if (bits != 0) {
+              batch = group * 64 + static_cast<std::size_t>(std::countr_zero(bits));
+              found = true;
+              break;
+            }
+          }
+          if (!found) break;
+          position = first_in(batch, 0);
+        }
+        std::uint64_t* row = live.data() + batch * words;
+        row[position / 64] &= ~(std::uint64_t{1} << (position % 64));
+        if (std::all_of(row, row + words, [](std::uint64_t word) { return word == 0; }))
+          live_any[batch / 64] &= ~(std::uint64_t{1} << (batch % 64));
+        head_batch = batch;
+        head_position = static_cast<std::ptrdiff_t>(position);
+      }
+      dirty[position / 64] &= ~(std::uint64_t{1} << (position % 64));
+      const auto id = batch_marking[last_holding(position)];
+      const auto pair = pair_of[position];
       auto& word = visited[std::size_t(id) * pair_words + pair / 64];
       const std::uint64_t bit = std::uint64_t{1} << (pair % 64);
       if (word & bit) continue;
       word |= bit;
-      if (!net_.transitions()[t].silent()) { selected.push_back(t); continue; }
+      if (!silent_at[position]) { selected.push_back(order[position]); continue; }
       if (budget && expanded >= *budget) throw detail::SilentSearchBudgetExhausted();
       if (expanded++ >= kSilentSearchCap && !budget)
         throw std::runtime_error("enabled transition diagnostic search exceeded limit");
-      if (hashes.size() >= kEmpty - 1) return false;
-      const std::size_t from = pool.size();
-      pool.resize(from + places);
-      std::copy_n(pool.data() + std::size_t(id) * places, places, pool.data() + from);
-      if (!flat_fire(*flat[t], pool.data() + from)) return false;
-      discover(intern_last());
+      if (rows >= kEmpty - 1) return FlatSearch::kDeclined;
+      reserve(pool, (rows + 1) * places);
+      Cell* row = pool.data() + rows * places;
+      const Cell* parent = pool.data() + std::size_t(id) * places;
+      std::copy_n(parent, places, row);
+      if (!flat_fire(*flat[position], row)) return kOutOfRange;
+      std::uint64_t h = hashes[id];
+      for (const auto place : touched_places[position])
+        h += mix(place, row[place]) - mix(place, parent[place]);
+      const auto [reached, added] = intern_next(h);
+      if (added) {
+        // Only transitions reading a touched place can change enabledness.
+        std::uint64_t* enabled = enabled_rows.data() + std::size_t(reached) * words;
+        const std::uint64_t* inherited = enabled_rows.data() + std::size_t(id) * words;
+        for (std::size_t word = 0; word < words; ++word) enabled[word] = inherited[word];
+        std::size_t count = enabled_count[id];
+        for (const auto place : touched_places[position]) {
+          for (const auto other : readers[place]) {
+            const std::uint64_t mask = std::uint64_t{1} << (other % 64);
+            const bool was = (enabled[other / 64] & mask) != 0;
+            if (flat_enabled(*flat[other], row) == was) continue;
+            enabled[other / 64] ^= mask;
+            if (was) --count; else ++count;
+          }
+        }
+        enabled_count[reached] = static_cast<std::uint32_t>(count);
+      }
+      discover(reached);
     }
-    return true;
+    s.table_size = std::min<std::size_t>(table.size(), std::size_t{1} << 16);
+    return FlatSearch::kDone;
   }
 
   // What a flat search found: a path, proof of no path within the cap, or
@@ -2585,6 +2910,8 @@ class Replayer {
   mutable std::optional<detail::SilentPlacePathIndex> place_path_index_;
   mutable std::vector<std::optional<ArcWeights>> arc_weights_;
   mutable std::vector<std::optional<InputChecks>> input_checks_;
+  mutable std::vector<std::optional<FireInputs>> fire_inputs_;
+  bool extended_arcs_ = false;  // net_.has_extended_arcs(), which scans every transition
   bool place_closure_exact_ = false;
   std::vector<std::vector<std::size_t>> place_enables_;
   mutable std::vector<FlatTransition> flat_transitions_;
@@ -2605,6 +2932,17 @@ class Replayer {
     std::vector<std::uint32_t> table, grown, parent, via, frontier, enabled;
   };
   mutable FlatSearchScratch flat_search_scratch_;
+  // flat_forward_enabled's buffers, reused across the searches of one walk.
+  struct FlatEnabledScratch {
+    std::vector<const FlatTransition*> by_transition, flat;
+    std::vector<std::int32_t> pool;
+    std::vector<std::int8_t> small_pool;
+    std::vector<std::uint64_t> hashes, visited, enabled, batch_rows, live, live_any, dirty, columns;
+    std::vector<std::size_t> batch_start, block_column;
+    std::vector<std::uint32_t> batch_marking, enabled_count, table, grown;
+    std::size_t table_size = 0;
+  };
+  mutable FlatEnabledScratch flat_enabled_scratch_;
 };
 
 // Collapses the log into distinct activity-id sequences with occurrence counts,

@@ -133,6 +133,9 @@ describe("case rows with repeated case ids", () => {
   it("lists case ids in natural order", () => {
     const ids = ["C0", "C1", "C10", "C100", "C2", "c3"].map(case_id => ({ case_id }));
     expect(caseRowEntries(ids, "").map(row => row.trace.case_id)).toEqual(["C0", "C1", "C2", "c3", "C10", "C100"]);
+    // Plain numbers sort by value, negatives included (review AA1-4).
+    const numbers = ["-3", "10", "-10", "2", "1.5", "-0.5"].map(case_id => ({ case_id }));
+    expect(caseRowEntries(numbers, "").map(row => row.trace.case_id)).toEqual(["-10", "-3", "-0.5", "1.5", "2", "10"]);
     expect(caseRowEntries(ids, "").map(row => row.key)).toEqual([0, 1, 4, 5, 2, 3]);
   });
   it("keeps trace positions as keys while filtering", () => {
@@ -207,5 +210,30 @@ describe("unreadable mining responses", () => {
     await expect(mineActiveDataset(file)).rejects.toThrow(/larger than the 128 MiB limit of the Minera backend; compress an XES log as \.xes\.gz/);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('{"unrelated":true}', { status: 200 })));
     await expect(mineActiveDataset(file)).rejects.toThrow(/invalid analysis/);
+  });
+});
+
+describe("review AA1 input and source fixes", () => {
+  it("keeps a filter input's tooltip equal to its changing placeholder, never over its own title", async () => {
+    const { syncPlaceholderTitle } = await import("../src/components/Filters");
+    const input = (placeholder: string, title = "") => ({ placeholder, title, dataset: {} as Record<string, string>, removeAttribute(this: { title: string }) { this.title = ""; } });
+    const field = input("time:timestamp");
+    syncPlaceholderTitle(field as unknown as HTMLInputElement);
+    expect(field.title).toBe("time:timestamp");
+    field.placeholder = "start_timestamp";
+    syncPlaceholderTitle(field as unknown as HTMLInputElement);
+    expect(field.title).toBe("start_timestamp");
+    field.placeholder = "";
+    syncPlaceholderTitle(field as unknown as HTMLInputElement);
+    expect(field.title).toBe("");
+    const own = input("native default", "Own explanation");
+    syncPlaceholderTitle(own as unknown as HTMLInputElement);
+    expect(own.title).toBe("Own explanation");
+  });
+
+  it("reads gzip CSV and TSV sources as tables in Source inspector", async () => {
+    const { isXesSourceName } = await import("../src/components/ActiveMiningSource");
+    for (const name of ["log.xes", "log.xes.gz", "log.gz", "LOG.XES.GZ"]) expect(isXesSourceName(name)).toBe(true);
+    for (const name of ["log.csv.gz", "LOG.TSV.GZ", "log.csv", "log.json"]) expect(isXesSourceName(name)).toBe(false);
   });
 });

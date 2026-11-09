@@ -400,6 +400,31 @@ class SilentPlacePathIndex {
   [[nodiscard]] std::vector<HiddenPlacePath> paths(
       const ReplayMarkingKeys& source_keys, const ReplayMarkingKeys& target_keys,
       const std::vector<std::string>& place_names) const {
+    auto result = unsorted_paths(source_keys, target_keys);
+    std::sort(result.begin(), result.end(), [&](const auto& left, const auto& right) {
+      return std::tuple{left.transitions.size(), std::string_view(place_names[left.source]), std::string_view(place_names[left.target]), left.source, left.target}
+           < std::tuple{right.transitions.size(), std::string_view(place_names[right.source]), std::string_view(place_names[right.target]), right.source, right.target};
+    });
+    return result;
+  }
+
+  // The same paths, order and errors as paths(place_names), given
+  // name_rank = name_ranks(place_names): equal ranks for equal names and rank
+  // order equal to name order, so integer compares replace string compares.
+  [[nodiscard]] std::vector<HiddenPlacePath> ranked_paths(
+      const ReplayMarkingKeys& source_keys, const ReplayMarkingKeys& target_keys,
+      const std::vector<std::size_t>& name_rank) const {
+    auto result = unsorted_paths(source_keys, target_keys);
+    std::sort(result.begin(), result.end(), [&](const auto& left, const auto& right) {
+      return std::tuple{left.transitions.size(), name_rank[left.source], name_rank[left.target], left.source, left.target}
+           < std::tuple{right.transitions.size(), name_rank[right.source], name_rank[right.target], right.source, right.target};
+    });
+    return result;
+  }
+
+ private:
+  std::vector<HiddenPlacePath> unsorted_paths(const ReplayMarkingKeys& source_keys,
+                                              const ReplayMarkingKeys& target_keys) const {
     std::vector<HiddenPlacePath> result;
     std::size_t stored_steps = 0;
     // The marked targets, in ascending order, listed once for all sources.
@@ -428,14 +453,9 @@ class SilentPlacePathIndex {
         result.push_back(std::move(path));
       }
     }
-    std::sort(result.begin(), result.end(), [&](const auto& left, const auto& right) {
-      return std::tuple{left.transitions.size(), std::string_view(place_names[left.source]), std::string_view(place_names[left.target]), left.source, left.target}
-           < std::tuple{right.transitions.size(), std::string_view(place_names[right.source]), std::string_view(place_names[right.target]), right.source, right.target};
-    });
     return result;
   }
 
- private:
   static constexpr std::size_t kNone = std::numeric_limits<std::size_t>::max();
   struct Tree {
     std::vector<std::size_t> parent, via;
@@ -496,6 +516,18 @@ class SilentPlacePathIndex {
   std::vector<std::vector<std::size_t>> outgoing_;
   mutable std::vector<std::optional<Tree>> trees_;
 };
+
+// The rank of each name among the distinct names in ascending order.
+inline std::vector<std::size_t> name_ranks(const std::vector<std::string>& names) {
+  std::vector<std::string_view> sorted(names.begin(), names.end());
+  std::sort(sorted.begin(), sorted.end());
+  sorted.erase(std::unique(sorted.begin(), sorted.end()), sorted.end());
+  std::vector<std::size_t> ranks(names.size());
+  for (std::size_t i = 0; i < names.size(); ++i)
+    ranks[i] = static_cast<std::size_t>(
+        std::lower_bound(sorted.begin(), sorted.end(), std::string_view(names[i])) - sorted.begin());
+  return ranks;
+}
 
 inline std::vector<HiddenPlacePath> silent_place_paths(
     const ReplayMarkingKeys& source_keys, const ReplayMarkingKeys& target_keys, const PetriNet& net,

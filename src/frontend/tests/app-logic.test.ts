@@ -4,6 +4,7 @@ import {
   delimiterForFile,
   delimiterForHeader,
   csvHeaderLine,
+  csvDataRows,
   csvHeaderNames,
   columnNotFoundMessage,
   isDelimitedTextName,
@@ -941,6 +942,38 @@ describe("file routing", () => {
     expect(csvHeaderNames('"x ""y""";z', ";")).toEqual(['x "y"', "z"]);
     expect(isDelimitedTextName("LOG.TSV")).toBe(true);
     expect(isDelimitedTextName("log.xes")).toBe(false);
+  });
+
+  it("keeps the name's delimiter unless the header is one column or the data rows confirm another (review AA1-1)", () => {
+    // A TSV header with a tab keeps the tab, also when its names hold more commas than tabs.
+    const tsv = "case_id\tactivity\ttimestamp\tnote, a, b, c, d";
+    expect(delimiterForHeader("commahdr.tsv", tsv)).toBe("\t");
+    expect(delimiterForHeader("commahdr.tsv", tsv, ["1\tA\t2024-01-01 10:00:00\tx", "1\tB\t2024-01-02 10:00:00\ty"])).toBe("\t");
+    expect(delimiterForHeader("x.tsv", "case\tactivity, type")).toBe("\t");
+    // A CSV header with semicolons in a name stays comma; data rows decide when both split the header.
+    const csv = "case_id,activity,timestamp,codes;a;b;c";
+    expect(delimiterForHeader("a.csv", csv)).toBeUndefined();
+    expect(delimiterForHeader("a.csv", csv, ["1,A,2024-01-01,x", "2,B,2024-01-02,y"])).toBeUndefined();
+    const semicolon = "case;activity;cost, EUR;note, x";
+    expect(delimiterForHeader("a.csv", semicolon)).toBeUndefined();
+    expect(delimiterForHeader("a.csv", semicolon, ["1;A;3,5;x", "2;B;4,25;y"])).toBe(";");
+    // Rows that fit both: the delimiter giving more header fields wins, a tie keeps the default.
+    expect(delimiterForHeader("a.csv", "a;b,c", ["1;2,3"])).toBeUndefined();
+    expect(delimiterForHeader("semicomma.csv", "case;activity;timestamp;cost, EUR", ["1;A;2024-01-01 10:00:00;3,5"])).toBe(";");
+    expect(delimiterForHeader("a.csv", csv, ["1,A,2024,x;y;z;w"])).toBeUndefined();
+    // A TSV header with a tab keeps it whatever the rows hold.
+    expect(delimiterForHeader("x.tsv", "a\tb, c, d", ["1, 2, 3\t4"])).toBe("\t");
+    // A ".tsv" that is really comma separated (no tab in the header) reads as comma.
+    expect(delimiterForHeader("a.tsv", "case_id,activity,timestamp")).toBeUndefined();
+    expect(delimiterForHeader("a.tsv", "case_id;activity;timestamp")).toBe(";");
+  });
+
+  it("samples the data rows after a CSV header (review AA1-1)", () => {
+    expect(csvDataRows('\ufeffa;b\r\n1;"x\ny"\r\n\r\n2;z\n', false)).toEqual(['1;"x\ny"', "2;z"]);
+    expect(csvDataRows("a;b\n1;2\n3;4", true)).toEqual(["1;2"]);
+    expect(csvDataRows("a;b\n1;2\n3;4", false)).toEqual(["1;2", "3;4"]);
+    expect(csvDataRows("a\n1\n2\n3\n4", false, 2)).toEqual(["1", "2"]);
+    expect(csvDataRows("a;b", false)).toEqual([]);
   });
 
   it("adds the header names to a column-not-found message only", () => {

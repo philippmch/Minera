@@ -8,11 +8,12 @@ import { fetchBpmn, fetchPlayout, fetchPnml, fetchPtml, type CsvOptions } from "
 import { ConstraintDiscovery } from "./ConstraintDiscovery";
 import { GraphDiscovery } from "./GraphDiscovery";
 import { ProcessTree } from "./ProcessTree";
-import { PetriNet } from "./PetriNet";
+import { PetriNet, type NetMode } from "./PetriNet";
 import { DependencyGraph } from "./DependencyGraph";
 import { PowlModel } from "./PowlModel";
 import { NativeDiscovery } from "./NativeDiscovery";
 import { WorkflowDiscovery } from "./WorkflowDiscovery";
+import type { WorkflowVariant } from "../workflow-discovery";
 
 type Step = "miner" | "variant" | "result";
 
@@ -132,7 +133,7 @@ export function ProcessModel({
 
       {step === "result" && group && variant && (
         <ModelResult
-          key={variant.id}
+          key={group.id}
           variant={variant}
           minerId={group.id}
           groupName={group.name}
@@ -143,6 +144,7 @@ export function ProcessModel({
           mining={mining}
           onUseModel={onUseModel}
           onOpenPlayout={onOpenPlayout}
+          onVariantChange={(id) => { if (group.variants.some((v) => v.id === id)) setVariantId(id); }}
         />
       )}
     </div>
@@ -160,7 +162,16 @@ interface ModelResultProps {
   mining: boolean;
   onUseModel?: (file: File, sourceId: string, activityKey?: string) => void;
   onOpenPlayout?: (file: File,activityKey?:string,options?:CsvOptions) => void;
+  /** The workflow panel's variant dropdown changed: the breadcrumb follows it (the panel keeps its form and run). */
+  onVariantChange?: (variantId: string) => void;
 }
+
+/** The workflow-discovery variant of a miner card variant, and back (Inductive "basic" is IM's log recursion, POWL's
+ * "configured" card is Maximal). */
+export const workflowVariantOf = (minerId: string, variantId: string): string =>
+  minerId === "inductive" && variantId === "basic" ? "log" : minerId === "powl" && variantId === "configured" ? "maximal" : variantId;
+export const minerVariantOf = (minerId: string, workflowVariant: string): string =>
+  minerId === "inductive" && workflowVariant === "log" ? "basic" : minerId === "powl" && workflowVariant === "maximal" ? "configured" : workflowVariant;
 
 // Renders the mined model for the chosen variant by its artifact type. A null
 // layout means the export carries no model of that kind (an older export, or a
@@ -179,7 +190,9 @@ function ModelResult({
   mining,
   onUseModel,
   onOpenPlayout,
+  onVariantChange,
 }: ModelResultProps) {
+  const variantChanged = onVariantChange ? (workflowVariant: string) => onVariantChange(minerVariantOf(minerId, workflowVariant)) : undefined;
 
   // Every miner exports both ways: PNML from its workflow net, BPMN from the
   // inductive tree or from the net's token semantics (converted server-side),
@@ -208,9 +221,9 @@ function ModelResult({
   if (minerId === "ilp" || minerId === "genetic")
     return <NativeDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} />;
   if (minerId === "alpha" || minerId === "heuristic")
-    return <>{saved}<WorkflowDiscovery family={minerId} variant={variant.id as "classic"|"plus"|"plusplus"} savedView={savedView} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} /></>;
+    return <>{saved}<WorkflowDiscovery family={minerId} variant={variant.id as "classic"|"plus"|"plusplus"} savedView={savedView} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} onVariantChange={variantChanged} /></>;
   if (minerId === "inductive" || minerId === "powl")
-    return <>{saved}<WorkflowDiscovery family={minerId} variant={(variant.id==='basic'?'log':variant.id==='configured'?'maximal':variant.id) as "log"|"imf"|"dfg"|"tree"|"brute_force"|"dynamic_clustering"|"dynamic_clustering_plain"} savedView={savedView} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} /></>;
+    return <>{saved}<WorkflowDiscovery family={minerId} variant={workflowVariantOf(minerId, variant.id) as WorkflowVariant} savedView={savedView} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} onVariantChange={variantChanged} /></>;
   if (minerId === "declare" || minerId === "log_skeleton")
     return <ConstraintDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onOpenLog={onOpenPlayout} />;
   if (minerId === "footprints" || minerId === "transition_system")
@@ -226,17 +239,21 @@ function ModelResult({
  */
 export function AnalysisModelView({ minerId, title, data, layouts }: { minerId: ModelNet; title: string; data: MineraExport; layouts: ModelLayouts }) {
   const [asNet, setAsNet] = useState(false);
+  // The decoration mode is kept here, so a flip to the tree and back keeps Frequency or Performance.
+  const [mode, setMode] = useState<NetMode>("plain");
+  // A tree or POWL model the export lacks: its workflow net is shown, and the primary view cannot be chosen.
+  const primaryMissing = minerId === "inductive" ? layouts.tree() === null : minerId === "powl" ? !data.powl : false;
   const toggle = (primaryLabel: string) =>
     layouts.hasNet(minerId) ? (
       <div className="map-mode" role="group" aria-label="Model view">
-        <button className={asNet ? "mode-btn" : "mode-btn active"} aria-pressed={!asNet} onClick={() => setAsNet(false)}>{primaryLabel}</button>
-        <button className={asNet ? "mode-btn active" : "mode-btn"} aria-pressed={asNet} onClick={() => setAsNet(true)}>Workflow net</button>
+        <button className={asNet || primaryMissing ? "mode-btn" : "mode-btn active"} aria-pressed={!asNet && !primaryMissing} disabled={primaryMissing} title={primaryMissing ? `This export has no ${primaryLabel === "Tree" ? "process tree" : "POWL model"}` : undefined} onClick={() => setAsNet(false)}>{primaryLabel}</button>
+        <button className={asNet || primaryMissing ? "mode-btn active" : "mode-btn"} aria-pressed={asNet || primaryMissing} onClick={() => setAsNet(true)}>Workflow net</button>
       </div>
     ) : null;
   const decoration = minerId === "alpha" ? data.petri_net_decoration : minerId === "inductive" ? data.inductive_petri_net_decoration : minerId === "heuristic" ? data.heuristic_petri_net_decoration : data.powl_petri_net_decoration;
   const primary = minerId === "inductive" ? "Tree" : minerId === "heuristic" ? "Dependency graph" : minerId === "powl" ? "POWL" : null;
-  const net = minerId === "alpha" || asNet ? layouts.net(minerId) : null;
-  if (net) return <PetriNet layout={net} heading="Workflow net" title={title} actions={primary ? toggle(primary) : undefined} decoration={decoration ?? null} disconnectedDescription={minerId === "alpha" ? undefined : "transitions with no incident arcs"} />;
+  const net = minerId === "alpha" || asNet || primaryMissing ? layouts.net(minerId) : null;
+  if (net) return <PetriNet layout={net} heading="Workflow net" title={title} actions={primary ? toggle(primary) : undefined} decoration={decoration ?? null} mode={mode} onModeChange={setMode} disconnectedDescription={minerId === "alpha" ? undefined : "transitions with no incident arcs"} />;
   if (minerId === "inductive") {
     const tree = layouts.tree();
     return tree ? <ProcessTree layout={tree} title={title} actions={toggle("Tree")} /> : <Placeholder>No process tree is available in this export — re-open the CSV event log to mine one.</Placeholder>;

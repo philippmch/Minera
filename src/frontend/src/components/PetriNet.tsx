@@ -12,7 +12,7 @@ import {
 } from "../petri-decoration";
 import { type PetriDecoration } from "../types";
 
-type NetMode = "plain" | "frequency" | "performance";
+export type NetMode = "plain" | "frequency" | "performance";
 
 interface PetriNetProps {
   layout: PetriLayout;
@@ -32,6 +32,9 @@ interface PetriNetProps {
     placeColors?: ReadonlyMap<number, string>;
   };
   disconnectedDescription?: string;
+  /** The annotation mode, when the parent keeps it (so it survives the net being unmounted). */
+  mode?: NetMode;
+  onModeChange?: (mode: NetMode) => void;
 }
 
 // Renders an Alpha Miner workflow net: places as circles (source and sink
@@ -41,11 +44,13 @@ interface PetriNetProps {
 // transition with how often it fired, performance labels each place with the
 // mean time tokens rested there.
 export function PetriNet({ layout, title, actions, decoration, annotations,
-  heading = "Petri net", disconnectedDescription = "short-loop activities the Alpha Miner cannot place" }: PetriNetProps) {
+  heading = "Petri net", disconnectedDescription = "short-loop activities the Alpha Miner cannot place", mode: controlledMode, onModeChange }: PetriNetProps) {
   const arrowId = `petri-arrow-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<ViewBox>(layout.fit);
-  const [mode, setMode] = useState<NetMode>("plain");
+  const [ownMode, setOwnMode] = useState<NetMode>("plain");
+  const mode = controlledMode ?? ownMode;
+  const setMode = (next: NetMode) => { setOwnMode(next); onModeChange?.(next); };
   const decorated = decoration && decoration.decorated_traces > 0 ? decoration : null;
   const timed = hasTimedDecoration(decorated);
   const showCounts = mode === "frequency" && decorated !== null;

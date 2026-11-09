@@ -151,6 +151,7 @@ import {
   delimiterForFile,
   delimiterForHeader,
   csvHeaderLine,
+  csvDataRows,
   isDelimitedTextName,
   columnNotFoundMessage,
   hasActiveFilters,
@@ -491,9 +492,11 @@ export default function App() {
       // Minera JSON exports open directly; object-centric JSON is discovered
       // through the local backend, and other files are mined as event logs.
       // CSV and TSV uploads take their delimiter from the header line (comma, semicolon, tab or pipe).
-      csvHeader = isDelimitedTextName(file.name) ? csvHeaderLine(await file.slice(0, 1 << 16).text()) : null;
+      // The first data rows confirm a delimiter other than the name's default when the header alone is ambiguous.
+      const sample = isDelimitedTextName(file.name) ? await file.slice(0, 1 << 16).text() : null;
+      csvHeader = sample === null ? null : csvHeaderLine(sample);
       if (!accepts()) return;
-      let options: MineOptions = {...xesOptions, delimiter: csvHeader === null ? delimiterForFile(file.name) : delimiterForHeader(file.name, csvHeader), xesActivityAttribute, ...miningOptions};
+      let options: MineOptions = {...xesOptions, delimiter: sample === null || csvHeader === null ? delimiterForFile(file.name) : delimiterForHeader(file.name, csvHeader, csvDataRows(sample, file.size > 1 << 16)), xesActivityAttribute, ...miningOptions};
       usedDelimiter = options.delimiter;
       if (isJsonExport(file.name) && options.miningInputFormat !== "table") {
         const classified = classifyMiningJson(activeMiningSourceText(await file.arrayBuffer()));

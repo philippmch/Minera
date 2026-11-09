@@ -8812,6 +8812,38 @@ void csv_timestamps_review_z1_shapes() {
     assert(unconvertible(cell));
 }
 
+// Review AA1-5: dateutil skips `;`, `/`, `'` and `.` between its tokens, so
+// such a run at the start or end of a cell, or after the clock and before a
+// word or an offset, reads like a blank; runs inside the date or the clock,
+// a `.` right after a fraction and cells with a `,` keep the cell text.
+void csv_timestamps_review_aa1_skipped_separators() {
+  const auto stamp = [](const std::string& cell) {
+    std::istringstream input("case_id,activity,timestamp\n1,A," + cell + "\n");
+    return minera::import_csv_event_data(input).log.traces.at(0).events.at(0).timestamp;
+  };
+  for (const auto* cell : {"2024-01-05 03:15:34;", "2024-01-05 03:15:34/",
+                           "2024-01-05 03:15:34'", "2024-01-05 03:15:34 ;",
+                           "2024-01-05 03:15:34.a/", "2024-01-05 03:15:34;;"})
+    assert(stamp(cell) == "2024-01-05 03:15:34");
+  assert(stamp("2024-01-05 03:15:34.p;") == "2024-01-05 15:15:34");
+  assert(stamp("2024-01-05 03:15:34..pm") == "2024-01-05 15:15:34");
+  assert(stamp("2024-01-05 1000./") == "2024-01-05 10:00:00");
+  assert(stamp("2024-01-05 1000;pm") == "2024-01-05 22:00:00");
+  assert(stamp("2024-01-05 03:15:34Z.") == "2024-01-05 03:15:34+00:00");
+  assert(stamp("2024-01-05 03:15 . UTC") == "2024-01-05 03:15:00+00:00");
+  assert(stamp("2024-01-05 03:15:34;+05") == "2024-01-05 03:15:34+05:00");
+  assert(stamp("; 2024-01-05 03:15") == "2024-01-05 03:15:00");
+  assert(stamp("..2024-01-05") == "2024-01-05 00:00:00");
+  assert(stamp("2024-01-05/") == "2024-01-05 00:00:00");
+  assert(stamp("05.01.2024.") == "2024-05-01 00:00:00");
+  // Such a cell is dateutil's: microseconds only.
+  assert(stamp("2024-01-05T03:15:34.123456789;") == "2024-01-05 03:15:34.123456");
+  // A single row that is no timestamp keeps its text.
+  for (const auto* cell : {"2024-01-05 03:15:34.5..", "2024-01-05 03:15:34.5.;",
+                           "2024-01-05 03:15:34.p", "2024-01-05;03:15:34", "01/05/2024-"})
+    assert(stamp(cell) == cell);
+}
+
 void csv_timestamps_follow_pandas_resolution_and_offsets() {
   const auto import = [](const std::string& rows) {
     std::istringstream input("case_id,activity,timestamp\n" + rows);
@@ -8963,6 +8995,7 @@ int main() {
   csv_timestamps_review_v1_shapes();
   csv_timestamps_review_y1_shapes();
   csv_timestamps_review_z1_shapes();
+  csv_timestamps_review_aa1_skipped_separators();
   csv_header_names_follow_read_csv();
   csv_case_ids_follow_reference_dtype_inference_and_order();
   csv_import_types_activities_case_attributes_and_relations_like_reference();

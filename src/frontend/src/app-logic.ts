@@ -363,20 +363,50 @@ export function csvHeaderNames(line: string, delimiter: string): string[] {
 }
 
 /**
- * Field delimiter detected from a CSV header line: the candidate (comma,
- * semicolon, tab, pipe) that splits the line into the most fields outside
- * quotes, ties going to the earlier candidate. A comma maps to undefined so the
- * backend applies its default; a header with no candidate keeps the name rule
- * (tab for ".tsv").
+ * The data records of a CSV sample after its header line: split on line breaks outside double quotes, blank lines
+ * skipped, at most `limit` of them. When the sample is the start of a longer file (`truncated`), its last record may be
+ * cut short and is left out.
  */
-export function delimiterForHeader(name: string, header: string): string | undefined {
-  let best: string | undefined, bestCount = 0;
-  for (const delimiter of CSV_HEADER_DELIMITERS) {
-    const count = csvHeaderNames(header, delimiter).length - 1;
-    if (count > bestCount) { best = delimiter; bestCount = count; }
+export function csvDataRows(text: string, truncated: boolean, limit = 20): string[] {
+  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text, records: string[] = [];
+  let quoted = false, start = 0;
+  for (let i = 0; i <= body.length && records.length <= limit + 1; i += 1) {
+    const c = body[i];
+    if (c === '"') quoted = !quoted;
+    else if (i === body.length || (!quoted && (c === "\n" || c === "\r"))) {
+      if (i === body.length && truncated) break;
+      records.push(body.slice(start, i));
+      if (c === "\r" && body[i + 1] === "\n") i += 1;
+      start = i + 1;
+    }
   }
-  if (best === undefined) return delimiterForFile(name);
-  return best === "," ? undefined : best;
+  return records.slice(1).filter(record => record !== "").slice(0, limit);
+}
+
+/**
+ * Field delimiter of a CSV or TSV upload. The name gives the default (tab for ".tsv", otherwise comma, which maps to
+ * undefined so the backend applies its own default), and a ".tsv" header holding a tab always keeps the tab. Another
+ * candidate (comma, semicolon, tab, pipe) replaces the default only when the default leaves the header a single column,
+ * or when every sampled data row has the candidate's header field count and the rows either do not all have the
+ * default's or the candidate splits the header into more fields. Among replacements the most fields win, ties going to
+ * the earlier candidate; a header whose names hold a stray comma or semicolon keeps the file's delimiter.
+ */
+export function delimiterForHeader(name: string, header: string, rows: readonly string[] = []): string | undefined {
+  const fallback = delimiterForFile(name) ?? ",";
+  const fields = (line: string, delimiter: string) => csvHeaderNames(line, delimiter).length;
+  const result = (delimiter: string) => delimiter === "," ? undefined : delimiter;
+  const own = fields(header, fallback);
+  if (fallback === "\t" && own > 1) return "\t";
+  const consistent = (delimiter: string) => rows.every(row => fields(row, delimiter) === fields(header, delimiter));
+  const ownConsistent = consistent(fallback);
+  let best: string | undefined, bestCount = 1;
+  for (const delimiter of CSV_HEADER_DELIMITERS) {
+    if (delimiter === fallback) continue;
+    const count = fields(header, delimiter);
+    if (count <= bestCount) continue;
+    if (own === 1 || (rows.length > 0 && consistent(delimiter) && (!ownConsistent || count > own))) { best = delimiter; bestCount = count; }
+  }
+  return result(best ?? fallback);
 }
 
 /** A column-not-found message with the header names that were read, so a mismatch is visible. */
@@ -442,12 +472,18 @@ export const IMPORTED_MODEL_CHANGED = "The imported model changed while this run
 
 /** Case rows with stable React keys: logs may repeat a case id, so rows are keyed by trace position. */
 const caseIdCollator = new Intl.Collator("en", { numeric: true });
+const plainNumber = /^[+-]?(?:\d+\.?\d*|\.\d+)$/;
+/** Natural case-id order: two plain numbers by value (-10 before -3), anything else by numeric-aware collation. */
+export function compareCaseIds(a: string, b: string): number {
+  if (plainNumber.test(a) && plainNumber.test(b)) { const d = Number(a) - Number(b); if (d !== 0) return d < 0 ? -1 : 1; }
+  return caseIdCollator.compare(a, b);
+}
 /** The event-log case list in natural case-id order (C2 before C10); equal ids keep the log's order. Display only:
  * views that mirror a reference output keep the backend's order. */
 export function caseRowEntries<T extends { case_id: string }>(traces: readonly T[], query: string): Array<{ key: number; trace: T }> {
   const needle = query.trim().toLowerCase(), rows: Array<{ key: number; trace: T }> = [];
   traces.forEach((trace, key) => { if (!needle || trace.case_id.toLowerCase().includes(needle)) rows.push({ key, trace }); });
-  return rows.sort((a, b) => caseIdCollator.compare(a.trace.case_id, b.trace.case_id) || a.key - b.key);
+  return rows.sort((a, b) => compareCaseIds(a.trace.case_id, b.trace.case_id) || a.key - b.key);
 }
 
 /** A numeric input's value: an emptied field means "not set" rather than 0. */

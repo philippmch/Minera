@@ -19685,6 +19685,47 @@ Declared:
   from native in 638, 589 and 567 cases; to, from and contain agree (0).
   Native keeps them as ordinary activities.
 
+## Review AA1: separators dateutil skips in CSV timestamps (2026-11-09)
+
+A review of Round Z against `pandas.read_csv` + `pm4py.format_dataframe`
+(public API outputs only) found one backend gap (the other AA1 findings were
+frontend fixes):
+
+- **AA1-5 Separators dateutil skips.** dateutil skips `;`, `/`, `'` and `.`
+  between its tokens like a blank, so pandas reads `2024-01-05 03:15:34;`,
+  `…03:15:34/`, `…03:15:34'`, `…03:15:34.p;` (15:15:34), `…03:15:34..pm`,
+  `2024-01-05 1000./`, `…03:15:34Z.`, `; 2024-01-05 03:15`, `..2024-01-05`,
+  `2024-01-05/` and `05.01.2024.`, which the importer kept as text. A cell
+  that is no timestamp as written is now read once more, on dateutil's path
+  (microseconds only), with such a run dropped at the start, turned into a
+  blank at the end, and turned into a blank after the clock before a word or
+  an offset (`03:15:34;pm`, `03:15/UTC`, `03:15:34..+05`, `03:15 . UTC`).
+  After the clock the run needs a `;`, `/`, `'`, two `.` or a blank next to
+  its `.`, so a lone `.` keeps the meridiem rules (`03:15:34.p` still fails),
+  and a `.` right after a fraction joins that number (`03:15:34.5..` and
+  `10:30.5.;+05` fail, as in pandas). Cells read as written are unchanged.
+
+Declared (dateutil readings kept as text): a cell holding a `,` (dateutil
+reads a `,` fraction or date by value: `03:15:34,5;` is 0001-01-05); a `-`
+next to such a run or between the date and the clock (`01/05/2024-`,
+`2024-01-05-03:15:34`); runs inside the date, between the date and the clock
+or inside the clock (`2024-01-05;03:15:34`, `Jan 5;2024`, and `03;15:34`,
+which dateutil reads as 15:34); a lone `YYYYMMDD` after a skipped run
+(`;20240105`); a run after a clock without `:` when a later offset has one
+(`1000'+05:00 pm`); a lone `.` between an offset and a word (`-05:00.pm`);
+and two zones or offsets (as in review Z1).
+
+Fuzz (per-cell readings through `reference_mixed_timestamp`, harness linked
+against 028e35d's `libminera_core.a` with only the importer rebuilt, against
+`read_csv` + `format_dataframe` on single-value columns): 5,376 cells with
+separator runs at the start, the end, after the clock, between the date and
+the clock and inside the date (`;`, `/`, `'`, `.`, `..`, `,`, `-` and blanks
+in combinations, after 13 date, 14 clock and 16 zone/meridiem shapes): 2,954
+fixed, 0 regressions, 0 new wrong values, 877 remaining mismatches all in the
+declared classes above or in earlier declared classes. 12,000 random token
+cells: 0 regressions, 0 new readings that differ from pandas (one fixed).
+Tests: `minera_core_tests` (`csv_timestamps_review_aa1_skipped_separators`).
+
 ## Review Z1: empty fractions before a zone, rounded int keys, isin list dtypes, padded NA cells (2026-11-09)
 
 A review of Round Y against `pandas.read_csv` + `pm4py.format_dataframe`,
@@ -19891,4 +19932,5 @@ Declared (value-dependent dateutil readings, kept as text by the importer):
 - **Stray words and dots (declared).** A lone `t`, `T` or `m` word, doubled
   dots (`11:21..`), a `.` right after a bare hour (`01/05/2024 11.`), a third
   offset-minute digit (`+5:300` is +10:00). (`10:55.Z ` with a trailing
-  blank reads since review Z1.)
+  blank reads since review Z1; doubled dots at the end, `11:21..`, read since
+  review AA1.)

@@ -1613,10 +1613,45 @@ double token_etconformance_precision(const std::vector<TokenPrecisionSequence>& 
     // Forward replay is incremental: each prefix continues from the state its
     // trie parent reached, so the walk costs about one replay step per trie
     // edge instead of one per event of every materialised prefix.
+    // The walk hands out one enabled list per distinct reached marking, and
+    // the same list again for every prefix reaching that marking, so its
+    // label set is built once per list. The totals are exact integers:
+    // adding the frequency once per escaping label or adding its multiple
+    // gives the same value.
+    // Labels are compared by their index among the model's distinct names.
+    std::vector<std::string> names(net.activities().begin(), net.activities().end());
+    std::sort(names.begin(), names.end());
+    names.erase(std::unique(names.begin(), names.end()), names.end());
+    std::unordered_map<std::string_view, std::size_t> name_index;
+    for (std::size_t index = 0; index < names.size(); ++index) name_index.emplace(names[index], index);
+    std::vector<std::size_t> activity_index(net.activities().size());
+    for (std::size_t activity = 0; activity < activity_index.size(); ++activity)
+      activity_index[activity] = name_index.at(net.activities()[activity]);
+    std::unordered_map<const std::vector<std::size_t>*, std::vector<std::size_t>> label_sets;
     detail::forward_token_prefix_walk(
         net, replay_options, prefixes.trie,
         [&](std::size_t index, const std::vector<std::size_t>* enabled) {
-          if (enabled) score_enabled(prefixes.proper[index], *enabled);
+          if (!enabled) return;
+          auto [cached, added] = label_sets.try_emplace(enabled);
+          auto& labels = cached->second;
+          if (added) {
+            for (const auto transition : *enabled) {
+              const auto& node = net.transitions().at(transition);
+              if (node.activity) labels.push_back(activity_index.at(*node.activity));
+            }
+            std::sort(labels.begin(), labels.end());
+            labels.erase(std::unique(labels.begin(), labels.end()), labels.end());
+          }
+          const auto& prefix = prefixes.proper[index];
+          std::size_t observed = 0;
+          for (const auto& label : prefix.observed) {
+            const auto found = name_index.find(label);
+            if (found != name_index.end() &&
+                std::binary_search(labels.begin(), labels.end(), found->second))
+              ++observed;
+          }
+          enabled_total += TokenInteger(prefix.frequency) * labels.size();
+          escaping_total += TokenInteger(prefix.frequency) * (labels.size() - observed);
         });
   } else {
     // Backwards replay needs whole prefixes; materialise them a bounded chunk
