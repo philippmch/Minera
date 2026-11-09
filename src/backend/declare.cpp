@@ -6,7 +6,9 @@
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <iomanip>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <optional>
@@ -53,67 +55,6 @@ const std::vector<std::string>& families() {
 
 bool has(const std::set<std::string>& allowed, const char* family) {
   return allowed.find(family) != allowed.end();
-}
-
-bool in(const std::unordered_map<std::string, std::vector<int>>& idx,
-        const std::string& a) {
-  const auto it = idx.find(a);
-  return it != idx.end() && !it->second.empty();
-}
-
-bool alt_response(const std::vector<std::string>& trace,
-                  const std::unordered_map<std::string, std::vector<int>>& idx,
-                  const std::string& a, const std::string& b) {
-  const auto ia = idx.find(a);
-  if (ia == idx.end()) return true;
-  const auto ib = idx.find(b);
-  if (ib == idx.end()) return false;
-  std::size_t p = 0;
-  for (std::size_t i = 0; i < ia->second.size(); ++i) {
-    const int next = i + 1 < ia->second.size() ? ia->second[i + 1]
-                                                : static_cast<int>(trace.size());
-    while (p < ib->second.size() && ib->second[p] <= ia->second[i]) ++p;
-    if (p == ib->second.size() || ib->second[p] >= next) return false;
-  }
-  return true;
-}
-
-bool alt_precedence(const std::unordered_map<std::string, std::vector<int>>& idx,
-                    const std::string& a, const std::string& b) {
-  const auto ib = idx.find(b);
-  if (ib == idx.end()) return true;
-  const auto ia = idx.find(a);
-  if (ia == idx.end()) return false;
-  std::size_t p = 0;
-  int previous = -1;
-  for (const int bi : ib->second) {
-    while (p < ia->second.size() && ia->second[p] <= previous) ++p;
-    if (p == ia->second.size() || ia->second[p] >= bi) return false;
-    previous = bi;
-  }
-  return true;
-}
-
-bool chain_response(const std::vector<std::string>& trace,
-                    const std::unordered_map<std::string, std::vector<int>>& idx,
-                    const std::string& a, const std::string& b) {
-  const auto ia = idx.find(a);
-  if (ia == idx.end()) return true;
-  for (const int i : ia->second) {
-    if (i + 1 >= static_cast<int>(trace.size()) || trace[i + 1] != b) return false;
-  }
-  return true;
-}
-
-bool chain_precedence(const std::vector<std::string>& trace,
-                      const std::unordered_map<std::string, std::vector<int>>& idx,
-                      const std::string& a, const std::string& b) {
-  const auto ib = idx.find(b);
-  if (ib == idx.end()) return true;
-  for (const int i : ib->second) {
-    if (i == 0 || trace[i - 1] != a) return false;
-  }
-  return true;
 }
 
 // Dense Declare candidate evaluation over interned activities.
@@ -756,44 +697,149 @@ DeclareModel discover_declare(const EventDataView& data,
       event_data_log(data, options.activity_key, options.case_id_key), options);
 }
 
+namespace {
+
+// A model prepared for checking many traces: the families the check visits,
+// in its order, with each rule's labels interned (trace labels outside the
+// model get ids as they appear). Equal ids are equal labels, so each
+// template reads the same occurrences as the string-keyed check.
+class DeclareChecker {
+ public:
+  explicit DeclareChecker(const DeclareModel& model) {
+    for (const auto& [_, values] : model.rules) total_ += static_cast<int>(values.size());
+    const char* const order[] = {
+        kDeclareExistence, kDeclareExactlyOne, kDeclareInit,
+        kDeclareRespondedExistence, kDeclareCoexistence, kDeclareNonCoexistence,
+        kDeclareResponse, kDeclarePrecedence, kDeclareSuccession,
+        kDeclareAltResponse, kDeclareChainResponse, kDeclareAltPrecedence,
+        kDeclareChainPrecedence, kDeclareAltSuccession, kDeclareChainSuccession,
+        kDeclareAbsence, kDeclareNonSuccession, kDeclareNonChainSuccession};
+    for (std::size_t kind = 0; kind < std::size(order); ++kind) {
+      const auto it = model.rules.find(order[kind]);
+      if (it == model.rules.end()) continue;
+      Family family{kind, it->first, {}};
+      for (const auto& rule : it->second)
+        family.rules.push_back({id(rule.first), id(rule.second), &rule});
+      families_.push_back(std::move(family));
+    }
+  }
+
+  void intern(const std::vector<const std::string*>& trace, std::vector<std::uint32_t>& ids) {
+    ids.clear();
+    for (const auto* name : trace) ids.push_back(id(*name));
+  }
+
+  DeclareConformance check(const std::vector<std::uint32_t>& trace) {
+    if (positions_.size() < names_.size()) positions_.resize(names_.size());
+    for (const auto a : present_) positions_[a].clear();
+    present_.clear();
+    for (std::size_t i = 0; i < trace.size(); ++i) {
+      auto& list = positions_[trace[i]];
+      if (list.empty()) present_.push_back(trace[i]);
+      list.push_back(static_cast<int>(i));
+    }
+    const int length = static_cast<int>(trace.size());
+    const auto in = [&](std::uint32_t a) { return !positions_[a].empty(); };
+    const auto at = [&](std::uint32_t a) -> const std::vector<int>& { return positions_[a]; };
+    const auto chain_response = [&](std::uint32_t a, std::uint32_t b) {
+      for (const int i : at(a))
+        if (i + 1 >= length || trace[static_cast<std::size_t>(i) + 1] != b) return false;
+      return true;
+    };
+    const auto chain_precedence = [&](std::uint32_t a, std::uint32_t b) {
+      for (const int i : at(b))
+        if (i == 0 || trace[static_cast<std::size_t>(i) - 1] != a) return false;
+      return true;
+    };
+    const auto ordered = [&](std::uint32_t a, std::uint32_t b) {
+      return in(a) && in(b) && at(a).front() < at(b).front() && at(a).back() < at(b).back();
+    };
+
+    DeclareConformance result;
+    result.no_constr_total = total_;
+    for (const auto& family : families_) {
+      for (const auto& rule : family.rules) {
+        const auto a = rule.first, b = rule.second;
+        bool holds = true;
+        switch (family.kind) {
+          case 0: holds = in(a); break;
+          case 1: holds = at(a).size() == 1; break;
+          case 2: holds = !trace.empty() && trace.front() == a; break;
+          case 3: holds = !in(a) || in(b); break;
+          case 4: holds = in(a) == in(b); break;
+          case 5: holds = !(in(a) && in(b)); break;
+          case 6: holds = !in(a) || (in(b) && at(a).back() < at(b).back()); break;
+          case 7: holds = !in(b) || (in(a) && at(a).front() < at(b).front()); break;
+          case 8: holds = (!in(a) && !in(b)) || ordered(a, b); break;
+          case 9: holds = alt_response_positions(at(a), at(b), length); break;
+          case 10: holds = chain_response(a, b); break;
+          case 11: holds = alt_precedence_positions(at(a), at(b)); break;
+          case 12: holds = chain_precedence(a, b); break;
+          case 13:
+            holds = alt_response_positions(at(a), at(b), length) &&
+                    alt_precedence_positions(at(a), at(b));
+            break;
+          case 14: holds = chain_response(a, b) && chain_precedence(a, b); break;
+          case 15: holds = !in(a); break;
+          case 16: holds = (!in(a) && !in(b)) || !ordered(a, b); break;
+          default:
+            holds = !in(a) || !in(b) || !(chain_response(a, b) && chain_precedence(a, b));
+        }
+        if (!holds)
+          result.deviations.push_back(
+              {family.name, rule.constraint->first, rule.constraint->second, rule.constraint->binary});
+      }
+    }
+    result.no_dev_total = static_cast<int>(result.deviations.size());
+    result.dev_fitness = result.no_constr_total > 0 ? 1.0 - static_cast<double>(result.no_dev_total) / result.no_constr_total : 1.0;
+    result.is_fit = result.no_dev_total == 0;
+    return result;
+  }
+
+ private:
+  struct Rule {
+    std::uint32_t first, second;
+    const DeclareConstraint* constraint;
+  };
+  struct Family {
+    std::size_t kind;
+    std::string name;
+    std::vector<Rule> rules;
+  };
+
+  std::uint32_t id(const std::string& name) {
+    const auto [it, added] = ids_.try_emplace(name, static_cast<std::uint32_t>(names_.size()));
+    if (added) names_.push_back(&it->first);
+    return it->second;
+  }
+
+  int total_ = 0;
+  std::unordered_map<std::string, std::uint32_t> ids_;
+  std::vector<const std::string*> names_;
+  std::vector<Family> families_;
+  std::vector<std::vector<int>> positions_;
+  std::vector<std::uint32_t> present_;
+};
+
+struct IdSequenceHash {
+  std::size_t operator()(const std::vector<std::uint32_t>& ids) const noexcept {
+    std::uint64_t value = 1469598103934665603ull;
+    for (const auto id : ids) value = (value ^ id) * 1099511628211ull;
+    return static_cast<std::size_t>(value);
+  }
+};
+
+}  // namespace
+
 DeclareConformance check_declare_conformance(const std::vector<std::string>& trace,
                                              const DeclareModel& model) {
-  DeclareConformance result;
-  for (const auto& [_, values] : model.rules) result.no_constr_total += static_cast<int>(values.size());
-  std::unordered_map<std::string, std::vector<int>> idx;
-  for (int i = 0; i < static_cast<int>(trace.size()); ++i) idx[trace[i]].push_back(i);
-  auto add_dev = [&](const std::string& family, const DeclareConstraint& c) {
-    result.deviations.push_back({family, c.first, c.second, c.binary});
-  };
-  auto check = [&](const std::string& family, auto&& predicate) {
-    const auto it = model.rules.find(family); if (it == model.rules.end()) return;
-    for (const auto& c : it->second) if (!predicate(c)) add_dev(family, c);
-  };
-  check(kDeclareExistence, [&](const auto& c){ return in(idx,c.first); });
-  check(kDeclareExactlyOne, [&](const auto& c){
-    const auto it = idx.find(c.first);
-    return it != idx.end() && it->second.size() == 1;
-  });
-  check(kDeclareInit, [&](const auto& c){ return !trace.empty() && trace.front()==c.first; });
-  check(kDeclareRespondedExistence, [&](const auto& c){ return !in(idx,c.first)||in(idx,c.second); });
-  check(kDeclareCoexistence, [&](const auto& c){ return in(idx,c.first)==in(idx,c.second); });
-  check(kDeclareNonCoexistence, [&](const auto& c){ return !(in(idx,c.first)&&in(idx,c.second)); });
-  check(kDeclareResponse, [&](const auto& c){ return !in(idx,c.first)||(in(idx,c.second)&&idx.at(c.first).back()<idx.at(c.second).back()); });
-  check(kDeclarePrecedence, [&](const auto& c){ return !in(idx,c.second)||(in(idx,c.first)&&idx.at(c.first).front()<idx.at(c.second).front()); });
-  check(kDeclareSuccession, [&](const auto& c){ return (!in(idx,c.first)&&!in(idx,c.second)) || (in(idx,c.first)&&in(idx,c.second)&&idx.at(c.first).front()<idx.at(c.second).front()&&idx.at(c.first).back()<idx.at(c.second).back()); });
-  check(kDeclareAltResponse, [&](const auto& c){ return alt_response(trace,idx,c.first,c.second); });
-  check(kDeclareChainResponse, [&](const auto& c){ return chain_response(trace,idx,c.first,c.second); });
-  check(kDeclareAltPrecedence, [&](const auto& c){ return alt_precedence(idx,c.first,c.second); });
-  check(kDeclareChainPrecedence, [&](const auto& c){ return chain_precedence(trace,idx,c.first,c.second); });
-  check(kDeclareAltSuccession, [&](const auto& c){ return alt_response(trace,idx,c.first,c.second)&&alt_precedence(idx,c.first,c.second); });
-  check(kDeclareChainSuccession, [&](const auto& c){ return chain_response(trace,idx,c.first,c.second)&&chain_precedence(trace,idx,c.first,c.second); });
-  check(kDeclareAbsence, [&](const auto& c){ return !in(idx,c.first); });
-  check(kDeclareNonSuccession, [&](const auto& c){ return !in(idx,c.first)&&!in(idx,c.second) || !(in(idx,c.first)&&in(idx,c.second)&&idx.at(c.first).front()<idx.at(c.second).front()&&idx.at(c.first).back()<idx.at(c.second).back()); });
-  check(kDeclareNonChainSuccession, [&](const auto& c){ return !in(idx,c.first)||!in(idx,c.second)||!(chain_response(trace,idx,c.first,c.second)&&chain_precedence(trace,idx,c.first,c.second)); });
-  result.no_dev_total = static_cast<int>(result.deviations.size());
-  result.dev_fitness = result.no_constr_total > 0 ? 1.0 - static_cast<double>(result.no_dev_total) / result.no_constr_total : 1.0;
-  result.is_fit = result.no_dev_total == 0;
-  return result;
+  DeclareChecker checker(model);
+  std::vector<const std::string*> labels;
+  labels.reserve(trace.size());
+  for (const auto& activity : trace) labels.push_back(&activity);
+  std::vector<std::uint32_t> ids;
+  checker.intern(labels, ids);
+  return checker.check(ids);
 }
 
 std::vector<DeclareConformance> check_declare_conformance(const EventLog& log,
@@ -809,19 +855,28 @@ std::vector<DeclareConformance> check_declare_conformance(
   result.reserve(log.traces.size());
   // A trace's result depends only on its activity sequence, so each distinct
   // sequence (variant) is checked once.
-  std::map<std::vector<std::string>, std::size_t> checked;
+  DeclareChecker checker(model);
+  std::unordered_map<std::vector<std::uint32_t>, std::size_t, IdSequenceHash> checked;
+  std::vector<const std::string*> labels;
+  std::vector<std::uint32_t> ids;
   for (const auto& trace : log.traces) {
-    std::vector<std::string> activities;
-    activities.reserve(trace.events.size());
-    for (const auto& event : trace.events)
-      activities.push_back(selected_activity(event, options.activity_key));
-    const auto found = checked.find(activities);
+    labels.clear();
+    for (const auto& event : trace.events) {
+      const auto* value = resolve_event_field(event, options.activity_key);
+      if (!value)
+        throw std::invalid_argument(
+            "declare: event activity selector is missing or null: '" +
+            options.activity_key + "'");
+      labels.push_back(value);
+    }
+    checker.intern(labels, ids);
+    const auto found = checked.find(ids);
     if (found != checked.end()) {
       result.push_back(result[found->second]);
       continue;
     }
-    result.push_back(check_declare_conformance(activities, model));
-    checked.emplace(std::move(activities), result.size() - 1);
+    result.push_back(checker.check(ids));
+    checked.emplace(ids, result.size() - 1);
   }
   return result;
 }

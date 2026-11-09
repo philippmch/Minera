@@ -5,20 +5,20 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <iomanip>
 #include <limits>
 #include <optional>
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 
 namespace minera {
 namespace {
 
 using Activities = std::vector<std::string>;
-using CountMap = std::map<std::string, std::size_t>;
-using VariantMap = std::map<Activities, std::size_t>;
 
 void validate_activity_key(std::string_view activity_key) {
   if (activity_key.empty() ||
@@ -140,6 +140,21 @@ std::string selected_activity(const Event& event, std::string_view activity_key)
       std::string(activity_key) + "'");
 }
 
+// activities_of without copies: each event's selected label in place.
+void selected_activities(const Trace& trace, std::string_view activity_key,
+                         std::vector<const std::string*>& result) {
+  validate_activity_key(activity_key);
+  result.clear();
+  for (const auto& event : trace.events) {
+    const auto* value = resolve_event_field(event, activity_key);
+    if (!value)
+      throw std::invalid_argument(
+          "log skeleton: event activity selector is missing or null: '" +
+          std::string(activity_key) + "'");
+    result.push_back(value);
+  }
+}
+
 Activities activities_of(const Trace& trace, std::string_view activity_key) {
   validate_activity_key(activity_key);
   Activities result;
@@ -147,51 +162,6 @@ Activities activities_of(const Trace& trace, std::string_view activity_key) {
   for (const auto& event : trace.events)
     result.push_back(selected_activity(event, activity_key));
   return result;
-}
-
-CountMap frequencies(const Activities& trace) {
-  CountMap result;
-  for (const auto& activity : trace) ++result[activity];
-  return result;
-}
-
-std::set<LogSkeletonPair> relation_set(const Activities& trace,
-                                       const std::string& family) {
-  std::set<LogSkeletonPair> result;
-  const auto counts = frequencies(trace);
-  if (family == "equivalence") {
-    for (const auto& [a, ca] : counts)
-      for (const auto& [b, cb] : counts)
-        if (a != b && ca == cb) result.insert({a, b});
-  } else if (family == "always_after" || family == "always_before") {
-    // (trace[i], trace[j]) over positions i != j, j after i (always_after)
-    // or before it (always_before). A label pair (a, b) occurs in that order
-    // exactly when the first a precedes the last b (after), or the last a
-    // follows the first b (before), so the set needs only each label's first
-    // and last position: O(L + k^2) instead of O(L^2).
-    std::map<std::string, std::pair<std::size_t, std::size_t>> span;
-    for (std::size_t i = 0; i < trace.size(); ++i) {
-      const auto [it, inserted] = span.try_emplace(trace[i], i, i);
-      if (!inserted) it->second.second = i;
-    }
-    const bool after = family == "always_after";
-    for (const auto& [a, a_span] : span)
-      for (const auto& [b, b_span] : span)
-        if (after ? a_span.first < b_span.second : a_span.second > b_span.first)
-          result.insert(result.end(), {a, b});
-  } else if (family == "never_together") {
-    for (const auto& a : counts)
-      for (const auto& b : counts)
-        if (a.first != b.first) result.insert({a.first, b.first});
-  } else if (family == "directly_follows") {
-    for (std::size_t i = 1; i < trace.size(); ++i)
-      result.insert({trace[i - 1], trace[i]});
-  }
-  return result;
-}
-
-std::vector<LogSkeletonPair> sorted_pairs(const std::set<LogSkeletonPair>& pairs) {
-  return {pairs.begin(), pairs.end()};
 }
 
 int activity_selector_priority(const EventAttribute& field,
@@ -382,90 +352,215 @@ EventLog event_data_log(const EventDataView& data,
   throw std::invalid_argument("event data: invalid input kind");
 }
 
-LogSkeletonModel discover_from_variants(
-    const VariantMap& variants, const std::vector<Activities>& variant_order,
-    const LogSkeletonOptions& options) {
+// A log's distinct activity sequences over interned activities. Activity ids
+// follow the names' string order, so ordering ids orders names; variants are
+// in first-appearance order, each with its weight (number of traces).
+struct InternedVariants {
+  std::vector<std::string> names;
+  std::vector<std::vector<std::uint32_t>> variants;
+  std::vector<std::size_t> weights;
+};
+
+struct IdSequenceHash {
+  std::size_t operator()(const std::vector<std::uint32_t>& ids) const noexcept {
+    std::uint64_t value = 1469598103934665603ull;
+    for (const auto id : ids) value = (value ^ id) * 1099511628211ull;
+    return static_cast<std::size_t>(value);
+  }
+};
+
+// Collects variants from activity sequences given one at a time as name
+// pointers, then renumbers the activities into string order.
+class VariantCollector {
+ public:
+  void add(const std::vector<const std::string*>& sequence) {
+    scratch_.clear();
+    for (const auto* name : sequence) {
+      const auto [it, added] =
+          ids_.try_emplace(*name, static_cast<std::uint32_t>(names_.size()));
+      if (added) names_.push_back(&it->first);
+      scratch_.push_back(it->second);
+    }
+    const auto [it, added] = variant_ids_.try_emplace(scratch_, result_.variants.size());
+    if (added) {
+      result_.variants.push_back(scratch_);
+      result_.weights.push_back(1);
+    } else {
+      ++result_.weights[it->second];
+    }
+  }
+  InternedVariants finish() {
+    std::vector<std::uint32_t> order(names_.size());
+    for (std::uint32_t id = 0; id < order.size(); ++id) order[id] = id;
+    std::sort(order.begin(), order.end(), [&](std::uint32_t left, std::uint32_t right) {
+      return *names_[left] < *names_[right];
+    });
+    std::vector<std::uint32_t> renumber(order.size());
+    result_.names.reserve(order.size());
+    for (std::uint32_t rank = 0; rank < order.size(); ++rank) {
+      renumber[order[rank]] = rank;
+      result_.names.push_back(*names_[order[rank]]);
+    }
+    for (auto& variant : result_.variants)
+      for (auto& id : variant) id = renumber[id];
+    return std::move(result_);
+  }
+
+ private:
+  std::unordered_map<std::string, std::uint32_t> ids_;
+  std::vector<const std::string*> names_;
+  std::unordered_map<std::vector<std::uint32_t>, std::size_t, IdSequenceHash> variant_ids_;
+  std::vector<std::uint32_t> scratch_;
+  InternedVariants result_;
+};
+
+// The reference's relation counts over interned variants. Every count is an
+// integer sum, so summing per variant in any order gives the reference's
+// value; label pairs are kept in (source, target) order, the order of the
+// reference's sorted pair sets. A pair table holds A^2 cells (the reference
+// already materialises every never-together pair).
+LogSkeletonModel discover_from_variants(const InternedVariants& input,
+                                        const LogSkeletonOptions& options) {
   validate_activity_key(options.activity_key);
   LogSkeletonModel model;
-  CountMap all_activs;
-  std::set<std::string> seen_activities;
-  std::vector<std::string> activity_order;
+  const std::size_t n = input.names.size();
+  std::vector<std::size_t> all_activs(n, 0);
+  std::vector<std::uint32_t> activity_order;
+  std::vector<char> seen(n, 0);
   std::size_t events_count = 0;
-  for (const auto& trace : variant_order) {
-    const auto weight = variants.at(trace);
+  for (std::size_t v = 0; v < input.variants.size(); ++v) {
+    const auto& trace = input.variants[v];
+    const auto weight = input.weights[v];
     events_count += trace.size() * weight;
-    for (const auto& activity : trace) {
+    for (const auto activity : trace) {
       all_activs[activity] += weight;
-      if (seen_activities.insert(activity).second)
+      if (!seen[activity]) {
+        seen[activity] = 1;
         activity_order.push_back(activity);
-    }
-  }
-
-  {
-    std::map<LogSkeletonPair, std::size_t> support;
-    for (const auto& [trace, weight] : variants) {
-      const auto counts = frequencies(trace);
-      for (const auto& pair : relation_set(trace, "equivalence"))
-        support[pair] += weight * counts.at(pair.source);
-    }
-    std::set<LogSkeletonPair> kept;
-    for (const auto& [pair, count] : support)
-      if (count >= threshold(all_activs[pair.source], options.noise_threshold))
-        kept.insert(pair);
-    model.equivalence = sorted_pairs(kept);
-  }
-
-  for (const std::string family : {"always_after", "always_before"}) {
-    std::map<LogSkeletonPair, std::size_t> support;
-    for (const auto& [trace, weight] : variants)
-      for (const auto& pair : relation_set(trace, family)) support[pair] += weight;
-    std::set<LogSkeletonPair> kept;
-    for (const auto& [pair, count] : support)
-      if (count >= threshold(all_activs[pair.source], options.noise_threshold))
-        kept.insert(pair);
-    if (family == "always_after") model.always_after = sorted_pairs(kept);
-    else model.always_before = sorted_pairs(kept);
-  }
-
-  {
-    std::map<LogSkeletonPair, long long> support;
-    for (const auto& [a, _] : all_activs)
-      for (const auto& [b, __] : all_activs)
-        if (a != b) support[{a, b}] = static_cast<long long>(all_activs[a]);
-    for (const auto& [trace, weight] : variants) {
-      for (const auto& pair : relation_set(trace, "never_together")) {
-        auto it = support.find(pair);
-        if (it == support.end()) continue;
-        it->second -= static_cast<long long>(weight);
-        if (it->second <= 0) support.erase(it);
       }
     }
-    std::set<LogSkeletonPair> kept;
-    for (const auto& [pair, count] : support)
-      if (count >= threshold(all_activs[pair.source], options.noise_threshold))
-        kept.insert(pair);
-    model.never_together = sorted_pairs(kept);
+  }
+
+  // Per variant: its distinct activities, their counts, first and last
+  // positions.
+  std::vector<std::size_t> counts(n, 0), first(n, 0), last(n, 0);
+  std::vector<std::uint32_t> present;
+  const auto profile = [&](const std::vector<std::uint32_t>& trace) {
+    for (const auto a : present) counts[a] = 0;
+    present.clear();
+    for (std::size_t i = 0; i < trace.size(); ++i) {
+      const auto a = trace[i];
+      if (counts[a]++ == 0) {
+        present.push_back(a);
+        first[a] = i;
+      }
+      last[a] = i;
+    }
+  };
+  const auto kept_pairs = [&](const std::vector<std::size_t>& support,
+                              const std::vector<char>& found) {
+    std::vector<LogSkeletonPair> kept;
+    for (std::size_t a = 0; a < n; ++a)
+      for (std::size_t b = 0; b < n; ++b) {
+        const auto cell = a * n + b;
+        if (found[cell] &&
+            support[cell] >= threshold(all_activs[a], options.noise_threshold))
+          kept.push_back({input.names[a], input.names[b]});
+      }
+    return kept;
+  };
+
+  {
+    std::vector<std::size_t> support(n * n, 0);
+    std::vector<char> found(n * n, 0);
+    for (std::size_t v = 0; v < input.variants.size(); ++v) {
+      profile(input.variants[v]);
+      const auto weight = input.weights[v];
+      for (const auto a : present)
+        for (const auto b : present)
+          if (a != b && counts[a] == counts[b]) {
+            support[a * n + b] += weight * counts[a];
+            found[a * n + b] = 1;
+          }
+    }
+    model.equivalence = kept_pairs(support, found);
+  }
+
+  for (const bool after : {true, false}) {
+    std::vector<std::size_t> support(n * n, 0);
+    std::vector<char> found(n * n, 0);
+    for (std::size_t v = 0; v < input.variants.size(); ++v) {
+      profile(input.variants[v]);
+      const auto weight = input.weights[v];
+      // (trace[i], trace[j]) over positions i != j, j after i (always_after)
+      // or before it (always_before): a label pair occurs in that order
+      // exactly when the first a precedes the last b (after), or the last a
+      // follows the first b (before).
+      for (const auto a : present)
+        for (const auto b : present)
+          if (after ? first[a] < last[b] : last[a] > first[b]) {
+            support[a * n + b] += weight;
+            found[a * n + b] = 1;
+          }
+    }
+    if (after) model.always_after = kept_pairs(support, found);
+    else model.always_before = kept_pairs(support, found);
   }
 
   {
-    std::map<LogSkeletonPair, std::size_t> support;
-    for (const auto& [trace, weight] : variants)
-      for (std::size_t i = 1; i < trace.size(); ++i)
-        support[{trace[i - 1], trace[i]}] += weight;
-    std::set<LogSkeletonPair> kept;
-    for (const auto& [pair, count] : support)
-      if (count >= threshold(all_activs[pair.source], options.noise_threshold))
-        kept.insert(pair);
-    model.directly_follows = sorted_pairs(kept);
+    // Every pair of distinct activities starts at its source's count; each
+    // variant holding both takes its weight off, and a pair at or below zero
+    // is dropped for good.
+    std::vector<long long> support(n * n, 0);
+    std::vector<char> alive(n * n, 0);
+    for (std::size_t a = 0; a < n; ++a)
+      for (std::size_t b = 0; b < n; ++b)
+        if (a != b) {
+          support[a * n + b] = static_cast<long long>(all_activs[a]);
+          alive[a * n + b] = 1;
+        }
+    for (std::size_t v = 0; v < input.variants.size(); ++v) {
+      profile(input.variants[v]);
+      const auto weight = static_cast<long long>(input.weights[v]);
+      for (const auto a : present)
+        for (const auto b : present) {
+          const auto cell = a * n + b;
+          if (a == b || !alive[cell]) continue;
+          support[cell] -= weight;
+          if (support[cell] <= 0) alive[cell] = 0;
+        }
+    }
+    for (std::size_t a = 0; a < n; ++a)
+      for (std::size_t b = 0; b < n; ++b) {
+        const auto cell = a * n + b;
+        if (alive[cell] &&
+            support[cell] >= threshold(all_activs[a], options.noise_threshold))
+          model.never_together.push_back({input.names[a], input.names[b]});
+      }
   }
 
   {
-    std::map<std::string, std::vector<std::pair<std::size_t, std::size_t>>> support;
-    for (const auto& trace : variant_order) {
-      const auto weight = variants.at(trace);
-      const auto counts = frequencies(trace);
-      for (const auto& activity : activity_order) {
-        const auto frequency = counts.count(activity) ? counts.at(activity) : 0;
+    std::vector<std::size_t> support(n * n, 0);
+    std::vector<char> found(n * n, 0);
+    for (std::size_t v = 0; v < input.variants.size(); ++v) {
+      const auto& trace = input.variants[v];
+      for (std::size_t i = 1; i < trace.size(); ++i) {
+        const auto cell = std::size_t(trace[i - 1]) * n + trace[i];
+        support[cell] += input.weights[v];
+        found[cell] = 1;
+      }
+    }
+    model.directly_follows = kept_pairs(support, found);
+  }
+
+  {
+    // Histograms in first-seen frequency order, per activity in name order.
+    std::vector<std::vector<std::pair<std::size_t, std::size_t>>> support(n);
+    for (std::size_t v = 0; v < input.variants.size(); ++v) {
+      profile(input.variants[v]);
+      const auto weight = input.weights[v];
+      for (const auto activity : activity_order) {
+        const auto frequency = counts[activity];
         auto& histogram = support[activity];
         auto hit = std::find_if(histogram.begin(), histogram.end(),
                                 [&](const auto& entry) {
@@ -475,8 +570,8 @@ LogSkeletonModel discover_from_variants(
         else hit->second += weight;
       }
     }
-    for (auto& [activity, histogram] : support) {
-      auto ranked = histogram;
+    for (std::size_t activity = 0; activity < n; ++activity) {
+      auto ranked = support[activity];
       std::stable_sort(ranked.begin(), ranked.end(),
                        [](const auto& left, const auto& right) {
                          if (left.second != right.second)
@@ -493,7 +588,7 @@ LogSkeletonModel discover_from_variants(
           break;
       }
       std::sort(allowed.begin(), allowed.end());
-      model.activ_freq.emplace(activity, std::move(allowed));
+      model.activ_freq.emplace(input.names[activity], std::move(allowed));
     }
   }
   return model;
@@ -504,19 +599,13 @@ LogSkeletonModel discover_from_variants(
 LogSkeletonModel discover_log_skeleton(const EventLog& log,
                                        const LogSkeletonOptions& options) {
   validate_activity_key(options.activity_key);
-  VariantMap variants;
-  std::vector<Activities> variant_order;
+  VariantCollector variants;
+  std::vector<const std::string*> sequence;
   for (const auto& trace : log.traces) {
-    auto acts = activities_of(trace, options.activity_key);
-    auto variant_it = variants.find(acts);
-    if (variant_it == variants.end()) {
-      variants.emplace(acts, 1);
-      variant_order.push_back(acts);
-    } else {
-      ++variant_it->second;
-    }
+    selected_activities(trace, options.activity_key, sequence);
+    variants.add(sequence);
   }
-  return discover_from_variants(variants, variant_order, options);
+  return discover_from_variants(variants.finish(), options);
 }
 
 LogSkeletonModel discover_log_skeleton(
@@ -565,99 +654,210 @@ LogSkeletonModel discover_log_skeleton(const LogSkeletonVariantList& input,
   // Duplicate entries therefore retain their multiplicity through the normal
   // variant aggregation, while an empty entry remains a real empty trace.
   validate_activity_key(options.activity_key);
-  VariantMap variants;
-  std::vector<Activities> variant_order;
+  VariantCollector variants;
+  std::vector<const std::string*> sequence;
   for (const auto& [activities, _count] : input) {
-    auto [it, inserted] = variants.emplace(activities, 1);
-    if (inserted) {
-      variant_order.push_back(activities);
-    } else {
-      ++it->second;
-    }
+    sequence.clear();
+    for (const auto& activity : activities) sequence.push_back(&activity);
+    variants.add(sequence);
   }
-  return discover_from_variants(variants, variant_order, options);
+  return discover_from_variants(variants.finish(), options);
 }
+
+namespace {
+
+// A model prepared for checking many traces: labels interned (trace labels
+// outside the model get ids as they appear), each pair family's expected
+// pairs deduplicated in (source, target) order — the reference's filtered
+// set — and the activity-frequency rules by id.
+class SkeletonChecker {
+ public:
+  SkeletonChecker(const LogSkeletonModel& model, const LogSkeletonOptions& options)
+      : options_(options) {
+    const std::pair<const char*, const std::vector<LogSkeletonPair>*> families[] = {
+        {"equivalence", &model.equivalence},
+        {"always_after", &model.always_after},
+        {"always_before", &model.always_before},
+        {"never_together", &model.never_together},
+        {"directly_follows", &model.directly_follows}};
+    for (std::size_t f = 0; f < kPairFamilies; ++f) {
+      families_[f].name = families[f].first;
+      families_[f].considered = considered(options, families[f].first);
+      if (!families_[f].considered) continue;
+      const std::set<LogSkeletonPair> unique(families[f].second->begin(),
+                                             families[f].second->end());
+      for (const auto& pair : unique)
+        families_[f].pairs.push_back({id(pair.source), id(pair.target), pair});
+    }
+    activ_freq_considered_ = considered(options, "activ_freq");
+    for (const auto& [activity, allowed] : model.activ_freq)
+      activ_freq_.push_back({id(activity), &activity, &allowed});
+    rule_of_.assign(names_.size(), nullptr);
+    for (const auto& rule : activ_freq_) rule_of_[rule.activity] = rule.allowed;
+  }
+
+  // The trace's labels as ids, interning labels the model does not name.
+  void intern(const std::vector<const std::string*>& trace, std::vector<std::uint32_t>& ids) {
+    ids.clear();
+    for (const auto* name : trace) ids.push_back(id(*name));
+  }
+
+  LogSkeletonConformance check(const std::vector<std::uint32_t>& trace) {
+    const std::size_t n = names_.size();
+    if (counts_.size() < n) {
+      counts_.resize(n, 0);
+      first_.resize(n, 0);
+      last_.resize(n, 0);
+      rule_of_.resize(n, nullptr);
+    }
+    for (const auto a : present_) counts_[a] = 0;
+    present_.clear();
+    follows_.clear();
+    for (std::size_t i = 0; i < trace.size(); ++i) {
+      const auto a = trace[i];
+      if (counts_[a]++ == 0) {
+        present_.push_back(a);
+        first_[a] = i;
+      }
+      last_[a] = i;
+      if (i > 0) follows_.push_back((std::uint64_t(trace[i - 1]) << 32) | a);
+    }
+    std::sort(follows_.begin(), follows_.end());
+    const auto in = [&](std::uint32_t a) { return counts_[a] != 0; };
+
+    LogSkeletonConformance result;
+    for (std::size_t f = 0; f < kPairFamilies; ++f) {
+      const auto& family = families_[f];
+      if (!family.considered) continue;
+      for (const auto& expected : family.pairs) {
+        const auto a = expected.source, b = expected.target;
+        if (!in(a)) continue;
+        ++result.no_constr_total;
+        bool actual = false;
+        switch (f) {
+          case 0: actual = a != b && in(b) && counts_[a] == counts_[b]; break;
+          case 1: actual = in(b) && first_[a] < last_[b]; break;
+          case 2: actual = in(b) && last_[a] > first_[b]; break;
+          case 3: actual = a != b && in(b); break;
+          default:
+            actual = std::binary_search(follows_.begin(), follows_.end(),
+                                        (std::uint64_t(a) << 32) | b);
+        }
+        if (f == 3 ? actual : !actual) {
+          ++result.no_dev_total;
+          LogSkeletonDeviation deviation;
+          deviation.constraint = family.name;
+          deviation.relation = expected.pair;
+          result.deviations.push_back(std::move(deviation));
+        }
+      }
+    }
+
+    if (activ_freq_considered_) {
+      std::size_t constraints = 0;
+      // trace_skel.get_trace_info returns an activity-frequency Counter; its
+      // iteration is over distinct activities, not every event occurrence.
+      std::sort(present_.begin(), present_.end(), [&](std::uint32_t left, std::uint32_t right) {
+        return *names_[left] < *names_[right];
+      });
+      for (const auto activity : present_) {
+        const auto observed = counts_[activity];
+        ++constraints;
+        const auto* allowed = rule_of_[activity];
+        if (!allowed) {
+          ++result.no_dev_total;
+          LogSkeletonDeviation deviation;
+          deviation.constraint = "activ_freq";
+          deviation.activity = *names_[activity];
+          // An unknown activity is reported as the absent (zero) model
+          // frequency, rather than echoing its observed count.
+          deviation.observed_frequency = 0;
+          result.deviations.push_back(std::move(deviation));
+        } else if (std::find(allowed->begin(), allowed->end(), observed) == allowed->end()) {
+          ++result.no_dev_total;
+          LogSkeletonDeviation deviation;
+          deviation.constraint = "activ_freq";
+          deviation.activity = *names_[activity];
+          deviation.observed_frequency = observed;
+          deviation.allowed_frequencies = *allowed;
+          result.deviations.push_back(std::move(deviation));
+        }
+      }
+      for (const auto& rule : activ_freq_) {
+        const auto& allowed = *rule.allowed;
+        if (!allowed.empty() && allowed.front() > 0 && !in(rule.activity)) {
+          ++constraints;
+          ++result.no_dev_total;
+          LogSkeletonDeviation deviation;
+          deviation.constraint = "activ_freq";
+          deviation.activity = *rule.name;
+          deviation.allowed_frequencies = allowed;
+          result.deviations.push_back(std::move(deviation));
+        }
+      }
+      result.no_constr_total += constraints;
+    }
+    std::sort(result.deviations.begin(), result.deviations.end(), [](const auto& a, const auto& b) {
+      if (a.constraint != b.constraint) return a.constraint < b.constraint;
+      if (a.relation.source != b.relation.source) return a.relation.source < b.relation.source;
+      if (a.relation.target != b.relation.target) return a.relation.target < b.relation.target;
+      return a.activity < b.activity;
+    });
+    result.dev_fitness = result.no_constr_total == 0
+                             ? 1.0
+                             : 1.0 - static_cast<double>(result.no_dev_total) /
+                                       static_cast<double>(result.no_constr_total);
+    result.is_fit = result.deviations.empty();
+    return result;
+  }
+
+ private:
+  static constexpr std::size_t kPairFamilies = 5;
+  struct ExpectedPair {
+    std::uint32_t source, target;
+    LogSkeletonPair pair;
+  };
+  struct Family {
+    const char* name = "";
+    bool considered = false;
+    std::vector<ExpectedPair> pairs;
+  };
+  struct FrequencyRule {
+    std::uint32_t activity;
+    const std::string* name;
+    const std::vector<std::size_t>* allowed;
+  };
+
+  std::uint32_t id(const std::string& name) {
+    const auto [it, added] = ids_.try_emplace(name, static_cast<std::uint32_t>(names_.size()));
+    if (added) names_.push_back(&it->first);
+    return it->second;
+  }
+
+  const LogSkeletonOptions& options_;
+  std::unordered_map<std::string, std::uint32_t> ids_;
+  std::vector<const std::string*> names_;
+  Family families_[kPairFamilies];
+  bool activ_freq_considered_ = false;
+  std::vector<FrequencyRule> activ_freq_;
+  std::vector<const std::vector<std::size_t>*> rule_of_;
+  std::vector<std::size_t> counts_, first_, last_;
+  std::vector<std::uint32_t> present_;
+  std::vector<std::uint64_t> follows_;
+};
+
+}  // namespace
 
 LogSkeletonConformance check_log_skeleton_conformance(
     const std::vector<std::string>& trace, const LogSkeletonModel& model,
     const LogSkeletonOptions& options) {
-  LogSkeletonConformance result;
-  const auto counts = frequencies(trace);
-  auto present = std::set<std::string>(trace.begin(), trace.end());
-  auto check_pairs = [&](const std::string& family,
-                         const std::vector<LogSkeletonPair>& expected) {
-    if (!considered(options, family)) return;
-    std::set<LogSkeletonPair> actual = relation_set(trace, family);
-    std::set<LogSkeletonPair> filtered;
-    for (const auto& pair : expected)
-      if (present.count(pair.source)) filtered.insert(pair);
-    result.no_constr_total += filtered.size();
-    for (const auto& pair : filtered)
-      if (family == "never_together" ? actual.count(pair) != 0 : actual.count(pair) == 0) {
-        ++result.no_dev_total;
-        LogSkeletonDeviation deviation;
-        deviation.constraint = family;
-        deviation.relation = pair;
-        result.deviations.push_back(std::move(deviation));
-      }
-  };
-  check_pairs("equivalence", model.equivalence);
-  check_pairs("always_after", model.always_after);
-  check_pairs("always_before", model.always_before);
-  check_pairs("never_together", model.never_together);
-  check_pairs("directly_follows", model.directly_follows);
-
-  if (considered(options, "activ_freq")) {
-    std::size_t constraints = 0;
-    // trace_skel.get_trace_info returns an activity-frequency Counter; its
-    // iteration is over distinct activities, not every event occurrence.
-    for (const auto& [activity, observed] : counts) {
-      ++constraints;
-      auto it = model.activ_freq.find(activity);
-      if (it == model.activ_freq.end()) {
-        ++result.no_dev_total;
-        LogSkeletonDeviation deviation;
-        deviation.constraint = "activ_freq";
-        deviation.activity = activity;
-        // An unknown activity is reported as the absent (zero) model
-        // frequency, rather than echoing its observed count.
-        deviation.observed_frequency = 0;
-        result.deviations.push_back(std::move(deviation));
-      } else if (std::find(it->second.begin(), it->second.end(), observed) == it->second.end()) {
-        ++result.no_dev_total;
-        LogSkeletonDeviation deviation;
-        deviation.constraint = "activ_freq";
-        deviation.activity = activity;
-        deviation.observed_frequency = observed;
-        deviation.allowed_frequencies = it->second;
-        result.deviations.push_back(std::move(deviation));
-      }
-    }
-    for (const auto& [activity, allowed] : model.activ_freq) {
-      if (!allowed.empty() && allowed.front() > 0 && !present.count(activity)) {
-        ++constraints;
-        ++result.no_dev_total;
-        LogSkeletonDeviation deviation;
-        deviation.constraint = "activ_freq";
-        deviation.activity = activity;
-        deviation.allowed_frequencies = allowed;
-        result.deviations.push_back(std::move(deviation));
-      }
-    }
-    result.no_constr_total += constraints;
-  }
-  std::sort(result.deviations.begin(), result.deviations.end(), [](const auto& a, const auto& b) {
-    if (a.constraint != b.constraint) return a.constraint < b.constraint;
-    if (a.relation.source != b.relation.source) return a.relation.source < b.relation.source;
-    if (a.relation.target != b.relation.target) return a.relation.target < b.relation.target;
-    return a.activity < b.activity;
-  });
-  result.dev_fitness = result.no_constr_total == 0
-                           ? 1.0
-                           : 1.0 - static_cast<double>(result.no_dev_total) /
-                                     static_cast<double>(result.no_constr_total);
-  result.is_fit = result.deviations.empty();
-  return result;
+  SkeletonChecker checker(model, options);
+  std::vector<const std::string*> labels;
+  labels.reserve(trace.size());
+  for (const auto& activity : trace) labels.push_back(&activity);
+  std::vector<std::uint32_t> ids;
+  checker.intern(labels, ids);
+  return checker.check(ids);
 }
 
 LogSkeletonConformance check_log_skeleton_conformance(
@@ -675,16 +875,20 @@ std::vector<LogSkeletonConformance> check_log_skeleton_conformance(
   result.reserve(log.traces.size());
   // A trace's result depends only on its activity sequence, so each distinct
   // sequence (variant) is checked once.
-  std::map<Activities, std::size_t> checked;
+  SkeletonChecker checker(model, options);
+  std::unordered_map<std::vector<std::uint32_t>, std::size_t, IdSequenceHash> checked;
+  std::vector<const std::string*> labels;
+  std::vector<std::uint32_t> ids;
   for (const auto& trace : log.traces) {
-    auto activities = activities_of(trace, options.activity_key);
-    const auto found = checked.find(activities);
+    selected_activities(trace, options.activity_key, labels);
+    checker.intern(labels, ids);
+    const auto found = checked.find(ids);
     if (found != checked.end()) {
       result.push_back(result[found->second]);
       continue;
     }
-    result.push_back(check_log_skeleton_conformance(activities, model, options));
-    checked.emplace(std::move(activities), result.size() - 1);
+    result.push_back(checker.check(ids));
+    checked.emplace(ids, result.size() - 1);
   }
   return result;
 }
@@ -734,9 +938,15 @@ LogSkeletonVariantConformance check_log_skeleton_conformance(
     const LogSkeletonOptions& options) {
   validate_activity_key(options.activity_key);
   LogSkeletonVariantConformance result;
-  for (const auto& [activities, _count] : variants)
-    result[activities] =
-        check_log_skeleton_conformance(activities, model, options);
+  SkeletonChecker checker(model, options);
+  std::vector<const std::string*> labels;
+  std::vector<std::uint32_t> ids;
+  for (const auto& [activities, _count] : variants) {
+    labels.clear();
+    for (const auto& activity : activities) labels.push_back(&activity);
+    checker.intern(labels, ids);
+    result[activities] = checker.check(ids);
+  }
   return result;
 }
 

@@ -67,19 +67,22 @@ int free_port() {
 // The stage the cancel lands in: the longest stage of the mine below.
 const std::string kLongStage = "Inductive net: token replay";
 
-// 2,000 cases of 20 to 60 events over 40 activities in random order: the
+// 5,000 cases of 20 to 60 events over 40 activities in random order: the
 // inductive miner answers with a parallel of 40 optional loops, and replaying
-// 2,000 distinct traces on that net takes seconds (about 4 s, after about
-// 5 s of earlier stages, on an unloaded machine). Its reachability check is
-// instant since the net reduction of review AA2, and its footprints since
-// the packed footprint exploration of the same review (the footprints stage
-// was the long one before).
+// 5,000 distinct traces on that net takes seconds (about 3 s, after about
+// 7 s of earlier stages, on an unloaded four-core machine). Its reachability
+// check is instant since the net reduction of review AA2, and its footprints
+// since the packed footprint exploration of the same review (the footprints
+// stage was the long one before). Review AD2 spread the replay's precision
+// searches over up to four threads, which cut 2,000 cases to about 1 s, so
+// the log grew to keep this stage the longest one (a cancel that lands while
+// those threads run stops them too; that was checked by hand).
 std::string random_log() {
   std::mt19937 rng(7);
   std::uniform_int_distribution<int> activity(0, 39), length(20, 60);
   std::ostringstream csv;
   csv << "case_id,activity,timestamp\n";
-  for (int c = 0; c < 2000; ++c) {
+  for (int c = 0; c < 5000; ++c) {
     const int n = length(rng);
     for (int e = 0; e < n; ++e)
       csv << 'c' << c << ",a" << activity(rng) << ",2024-01-01T" << (e / 60 < 10 ? "0" : "") << e / 60

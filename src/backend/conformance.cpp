@@ -9,22 +9,28 @@
 #include "reference_activity_selector.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <exception>
 #include <functional>
 #include <chrono>
 #include <limits>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <queue>
 #include <set>
 #include <string>
 #include <string_view>
 #include <stdexcept>
+#include <system_error>
+#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -5416,7 +5422,9 @@ Relation generic_model_footprint(const PetriNet& net, const Marking& initial,
 //    holds more), so hashing, comparing and storing it touches a few words
 //    instead of one int per place;
 //  * the visible labels enabled at a marking are computed once, when it is
-//    met, and the explored edges are kept, so nothing is re-fired afterwards;
+//    met, and the explored edges are kept (the silent ones as edges, the
+//    visible ones as the labels entering each marking: one label row per
+//    marking, as the general path keeps), so nothing is re-fired afterwards;
 //  * only the transitions listed under a marked input place are tested at a
 //    marking (still in transition order);
 //  * the relation only grows as markings are expanded, and it can never hold
@@ -5718,9 +5726,11 @@ Relation model_footprint(const PetriNet& net, const Marking& initial, bool& exha
   }
   Table table(words);
   // seeds[m]: the activities whose visible transitions are enabled at m.
-  std::vector<std::uint64_t> seeds;
+  // entered[m]: the activities fired by an expanded marking into m.
+  std::vector<std::uint64_t> seeds, entered;
   const auto seed_new = [&](const std::uint64_t* row) {  // the marking met last
     seeds.resize(seeds.size() + lw, 0);
+    entered.resize(entered.size() + lw, 0);
     std::uint64_t* seed = seeds.data() + seeds.size() - lw;
     for (const auto index : visible) {
       const Step& step = steps[index];
@@ -5747,32 +5757,38 @@ Relation model_footprint(const PetriNet& net, const Marking& initial, bool& exha
     });
   };
 
-  // Breadth-first: the frontier is every id from `next` on. The edges of each
-  // expanded marking are kept (target, label) in firing order.
-  std::vector<std::uint32_t> edge_target, edge_label;
-  std::vector<std::size_t> edge_begin{0};
+  // Breadth-first: the frontier is every id from `next` on. Only the silent
+  // edges of each expanded marking are kept (their targets, in firing order);
+  // a visible edge m -a-> m' is kept as a in entered[m'], which is all the
+  // relation needs of it. Memory therefore stays one label row per marking
+  // whatever the number of visible transitions enabled at each marking.
+  std::vector<std::uint32_t> silent_target;
+  std::vector<std::size_t> silent_begin{0};
 
   // The relation once the first `expanded` markings are expanded, as one bit
   // row per activity: a > b for every visible edge m -a-> m' and every b
   // observable at m' after silent moves only. Observable labels are the
   // least fixpoint of the seeds closed backwards over the silent edges; a
   // marking that was not expanded has no recorded edges, so its labels are
-  // its seeds.
-  const auto relation_rows = [&](std::size_t expanded) {
-    std::vector<std::uint64_t> labels(seeds.begin(),
-                                      seeds.begin() + static_cast<std::ptrdiff_t>(expanded * lw));
+  // its seeds. `last` closes the seeds in place (they are not needed after).
+  const auto relation_rows = [&](std::size_t expanded, bool last) {
+    std::vector<std::uint64_t> labels =
+        last ? std::move(seeds)
+             : std::vector<std::uint64_t>(seeds.begin(),
+                                          seeds.begin() + static_cast<std::ptrdiff_t>(expanded * lw));
+    // The rows of the markings that were not expanded: their seeds.
+    const std::uint64_t* outside = last ? labels.data() : seeds.data();
     std::vector<std::size_t> pred_begin(expanded + 1, 0);
     for (std::size_t m = 0; m < expanded; ++m) {
       check_cancelled();
-      for (std::size_t e = edge_begin[m]; e < edge_begin[m + 1]; ++e) {
-        if (edge_label[e] != kSilent) continue;
-        const std::uint32_t target = edge_target[e];
+      for (std::size_t e = silent_begin[m]; e < silent_begin[m + 1]; ++e) {
+        const std::uint32_t target = silent_target[e];
         if (target < expanded) {
           ++pred_begin[target + 1];
           continue;
         }
         for (std::size_t w = 0; w < lw; ++w)
-          labels[m * lw + w] |= seeds[std::size_t(target) * lw + w];
+          labels[m * lw + w] |= outside[std::size_t(target) * lw + w];
       }
     }
     for (std::size_t m = 0; m < expanded; ++m) pred_begin[m + 1] += pred_begin[m];
@@ -5780,9 +5796,9 @@ Relation model_footprint(const PetriNet& net, const Marking& initial, bool& exha
     {
       std::vector<std::size_t> fill(pred_begin.begin(), pred_begin.end() - 1);
       for (std::size_t m = 0; m < expanded; ++m)
-        for (std::size_t e = edge_begin[m]; e < edge_begin[m + 1]; ++e)
-          if (edge_label[e] == kSilent && edge_target[e] < expanded)
-            preds[fill[edge_target[e]]++] = static_cast<std::uint32_t>(m);
+        for (std::size_t e = silent_begin[m]; e < silent_begin[m + 1]; ++e)
+          if (silent_target[e] < expanded)
+            preds[fill[silent_target[e]]++] = static_cast<std::uint32_t>(m);
     }
     std::vector<std::uint32_t> work(expanded);
     for (std::size_t m = 0; m < expanded; ++m)
@@ -5809,15 +5825,16 @@ Relation model_footprint(const PetriNet& net, const Marking& initial, bool& exha
       }
     }
     std::vector<std::uint64_t> follows(acts * lw, 0);
-    for (std::size_t m = 0; m < expanded; ++m) {
+    const std::size_t met = lw == 0 ? 0 : entered.size() / lw;
+    for (std::size_t m = 0; m < met; ++m) {
       check_cancelled();
-      for (std::size_t e = edge_begin[m]; e < edge_begin[m + 1]; ++e) {
-        const std::uint32_t label = edge_label[e];
-        if (label == kSilent) continue;
-        const std::uint32_t target = edge_target[e];
-        const std::uint64_t* seen = target < expanded ? labels.data() + std::size_t(target) * lw
-                                                      : seeds.data() + std::size_t(target) * lw;
-        for (std::size_t w = 0; w < lw; ++w) follows[std::size_t(label) * lw + w] |= seen[w];
+      const std::uint64_t* into = entered.data() + m * lw;
+      const std::uint64_t* seen = m < expanded ? labels.data() + m * lw : outside + m * lw;
+      for (std::size_t aw = 0; aw < lw; ++aw) {
+        for (std::uint64_t rest = into[aw]; rest != 0; rest &= rest - 1) {
+          const std::size_t label = aw * 64 + static_cast<std::size_t>(std::countr_zero(rest));
+          for (std::size_t w = 0; w < lw; ++w) follows[label * lw + w] |= seen[w];
+        }
       }
     }
     return follows;
@@ -5857,7 +5874,7 @@ Relation model_footprint(const PetriNet& net, const Marking& initial, bool& exha
         return named(direct);
       }
       if (next >= checkpoint) {
-        auto rows = relation_rows(next);
+        auto rows = relation_rows(next, false);
         if (pairs_in(rows) == full_pairs) {
           exhausted = true;
           return named(rows);
@@ -5892,9 +5909,11 @@ Relation model_footprint(const PetriNet& net, const Marking& initial, bool& exha
                        [&](std::size_t k, std::uint32_t target, bool added) {
       if (added) seed_new(successors.data() + k * words);
       const std::uint32_t label = labels_fired[k];
-      edge_target.push_back(target);
-      edge_label.push_back(label);
-      if (label == kSilent) return;
+      if (label == kSilent) {
+        silent_target.push_back(target);
+        return;
+      }
+      entered[std::size_t(target) * lw + label / 64] |= std::uint64_t{1} << (label % 64);
       const std::uint64_t* seed = seeds.data() + std::size_t(target) * lw;
       std::uint64_t* row = direct.data() + std::size_t(label) * lw;
       for (std::size_t w = 0; w < lw; ++w) {
@@ -5904,10 +5923,10 @@ Relation model_footprint(const PetriNet& net, const Marking& initial, bool& exha
         row[w] |= fresh;
       }
     });
-    edge_begin.push_back(edge_target.size());
+    silent_begin.push_back(silent_target.size());
     ++next;
   }
-  return named(relation_rows(next));
+  return named(relation_rows(next, true));
 }
 
 }  // namespace packed_footprint
@@ -7026,6 +7045,94 @@ replay_firing_sequences(const PetriNet& net,
   return result;
 }
 
+namespace {
+
+// The distinct markings a prefix walk reaches, by id in first-reached order.
+// A marking of small counts is kept as its counts' zigzag varints in one
+// byte string (a byte per place for 0/1 nets); one holding a wide count is
+// kept whole. Room for `capacity` markings is reserved up front and never
+// moves, so other threads may decode any id published to them while the
+// walk interns more.
+class PrefixMarkingPool {
+ public:
+  explicit PrefixMarkingPool(std::size_t capacity) : capacity_(capacity) {
+    slots_.reserve(capacity);
+    compact_.reserve(capacity);
+    wide_.reserve(capacity);
+  }
+  std::uint32_t intern(const TokenMarking& marking) {
+    key_.clear();
+    bool compact = true;
+    for (const auto& count : marking) {
+      if (!count.is_small()) { compact = false; break; }
+      const std::int64_t value = count.small_value();
+      std::uint64_t zigzag = (static_cast<std::uint64_t>(value) << 1) ^
+                             static_cast<std::uint64_t>(value < 0 ? -1 : 0);
+      while (zigzag >= 0x80) {
+        key_.push_back(static_cast<char>((zigzag & 0x7f) | 0x80));
+        zigzag >>= 7;
+      }
+      key_.push_back(static_cast<char>(zigzag));
+    }
+    if (compact) {
+      if (const auto found = compact_ids_.find(key_); found != compact_ids_.end())
+        return found->second;
+    } else if (const auto found = wide_ids_.find(marking); found != wide_ids_.end()) {
+      return found->second;
+    }
+    if (slots_.size() >= capacity_ || slots_.size() >= std::numeric_limits<std::uint32_t>::max())
+      throw std::logic_error("token prefix walk reached more markings than prefixes");
+    const auto id = static_cast<std::uint32_t>(slots_.size());
+    if (compact) {
+      compact_.push_back(key_);
+      compact_ids_.emplace(compact_.back(), id);
+      slots_.push_back({false, compact_.size() - 1, marking.size()});
+    } else {
+      const auto added = wide_ids_.emplace(marking, id).first;
+      wide_.push_back(&added->first);
+      slots_.push_back({true, wide_.size() - 1, marking.size()});
+    }
+    return id;
+  }
+  [[nodiscard]] std::size_t size() const noexcept { return slots_.size(); }
+  void decode(std::size_t id, TokenMarking& marking) const {
+    const auto& slot = slots_[id];
+    if (slot.wide) {
+      marking = *wide_[slot.index];
+      return;
+    }
+    const auto& key = compact_[slot.index];
+    marking.resize(slot.places);
+    std::size_t at = 0;
+    for (std::size_t place = 0; place < slot.places; ++place) {
+      std::uint64_t zigzag = 0;
+      for (unsigned shift = 0;; shift += 7) {
+        const auto byte = static_cast<unsigned char>(key[at++]);
+        zigzag |= std::uint64_t(byte & 0x7f) << shift;
+        if (byte < 0x80) break;
+      }
+      const auto magnitude = static_cast<std::int64_t>(zigzag >> 1);
+      marking[place] = TokenInteger((zigzag & 1) != 0 ? -magnitude - 1 : magnitude);
+    }
+  }
+
+ private:
+  struct Slot {
+    bool wide;
+    std::size_t index;
+    std::size_t places;
+  };
+  std::size_t capacity_;
+  std::string key_;
+  std::vector<std::string> compact_;  // reserved: elements never move
+  std::unordered_map<std::string_view, std::uint32_t> compact_ids_;
+  std::unordered_map<TokenMarking, std::uint32_t, TokenMarkingHash> wide_ids_;
+  std::vector<const TokenMarking*> wide_;
+  std::vector<Slot> slots_;
+};
+
+}  // namespace
+
 void detail::forward_token_prefix_walk_impl(
     const PetriNet& net, const TokenReplayOptions& options, const TokenPrefixTrie& trie,
     void (*visit)(void*, std::size_t, const std::vector<std::size_t>*), void* context) {
@@ -7105,51 +7212,196 @@ void detail::forward_token_prefix_walk_impl(
   // Replay is deterministic in its state, so a prefix replayed from the state
   // its ancestor reached matches the prefix replayed alone; a prefix whose
   // replay stopped leaves every extension at the same stopped state.
-  std::unordered_map<TokenMarking, std::vector<std::size_t>, TokenMarkingHash> enabled_cache;
-  std::optional<Replayer::ForwardEnabledPlan> enabled_plan;
-  auto state = replayer.start_prefix_walk();
-  std::size_t current = 0;
-  bool stopped = false;
-  std::vector<std::size_t> path;
-  CancellationCheck cancelled(options.cancelled, "token replay was cancelled", 64);
-  for (std::size_t index = 0; index < trie.scored.size(); ++index) {
-    cancelled();
-    const auto target = trie.scored[index];
-    path.clear();
-    auto node = target;
-    while (node != 0 && depth[node] > depth[current]) {
-      path.push_back(node);
-      node = trie.parent[node];
+  //
+  // The enabled list depends on the reached marking alone, so it is searched
+  // once per distinct marking. The outcome is that of one pass which searched
+  // each marking when first reached and visited each prefix in turn:
+  //  - the walk interns each prefix's reached marking and stops at the first
+  //    exception it raises (after the prefixes before it);
+  //  - the searches are independent of each other. A long walk hands them to
+  //    up to three more threads as their markings appear, each thread with
+  //    its own Replayer (whose caches are per instance); the calling thread
+  //    walks, then searches too, and alone polls for cancellation;
+  //  - the visits then run in prefix order, rethrowing a search's exception
+  //    at the prefix that first reached its marking, and the walk's own
+  //    exception last — the order the single pass raises them.
+  // Equal enabled lists are shared, so the visitor sees one list per value.
+  const std::size_t capacity = trie.scored.size();
+  PrefixMarkingPool pool(capacity);
+  std::vector<std::uint32_t> reached;  // by scored prefix: its marking id
+  std::vector<char> unfit;             // by scored prefix: replay stopped
+  reached.reserve(capacity);
+  unfit.reserve(capacity);
+  std::exception_ptr walk_error;
+
+  std::vector<std::uint32_t> list_of(capacity, 0);
+  std::vector<std::exception_ptr> failure(capacity);
+  std::deque<std::vector<std::size_t>> lists;
+  std::map<std::vector<std::size_t>, std::uint32_t> list_ids;
+  std::mutex lists_mutex;
+  std::atomic<std::size_t> published{0};  // markings interned and readable
+  std::atomic<bool> walk_done{false};
+  std::atomic<std::size_t> next_search{0};
+  std::atomic<std::size_t> first_failed{std::numeric_limits<std::size_t>::max()};
+  std::atomic<bool> stop_searches{false};
+  std::mutex wait_mutex;
+  std::condition_variable wake;
+  std::exception_ptr worker_error;
+  const auto search_all = [&](const Replayer& searcher,
+                              std::optional<Replayer::ForwardEnabledPlan>& plan,
+                              CancellationCheck* check) {
+    TokenMarking marking;
+    for (;;) {
+      if (stop_searches.load()) return;
+      const std::size_t id = next_search.fetch_add(1);
+      // Wait for the walk to reach the id's marking, or to end short of it.
+      while (id >= published.load(std::memory_order_acquire)) {
+        if (walk_done.load(std::memory_order_acquire)) {
+          if (id >= published.load(std::memory_order_acquire)) return;
+          break;
+        }
+        std::unique_lock<std::mutex> lock(wait_mutex);
+        wake.wait_for(lock, std::chrono::milliseconds(1), [&] {
+          return stop_searches.load() || walk_done.load() ||
+                 id < published.load(std::memory_order_acquire);
+        });
+        if (stop_searches.load()) return;
+      }
+      if (check) (*check)();
+      // A search past the lowest failed one is never read.
+      if (id > first_failed.load()) continue;
+      try {
+        pool.decode(id, marking);
+        auto list = searcher.enabled_transition_ids(marking, options, std::nullopt, &plan);
+        const std::lock_guard<std::mutex> lock(lists_mutex);
+        const auto [it, added] =
+            list_ids.try_emplace(std::move(list), static_cast<std::uint32_t>(lists.size()));
+        if (added) lists.push_back(it->first);
+        list_of[id] = it->second;
+      } catch (...) {
+        failure[id] = std::current_exception();
+        auto lowest = first_failed.load();
+        while (id < lowest && !first_failed.compare_exchange_weak(lowest, id)) {}
+      }
     }
-    if (node != current) {
-      path.clear();
-      for (node = target; node != 0; node = trie.parent[node]) path.push_back(node);
-      state = replayer.start_prefix_walk();
-      current = 0;
-      stopped = false;
+  };
+  {
+    // A thread joins for every kSearchesPerThread markings, up to four
+    // threads in all. Each builds its own Replayer and keeps the caller's
+    // silent-search budget.
+    constexpr std::size_t kSearchesPerThread = 2048;
+    const std::size_t hardware = std::max<std::size_t>(1, std::thread::hardware_concurrency());
+    const std::size_t max_workers = std::min<std::size_t>(3, hardware - 1);
+    const std::size_t budget = detail::enabled_search_budget();
+    std::vector<std::thread> workers;
+    struct JoinAll {
+      std::vector<std::thread>& threads;
+      std::atomic<bool>& stop;
+      std::atomic<bool>& done;
+      std::condition_variable& wake;
+      ~JoinAll() {
+        stop.store(true);
+        done.store(true);
+        wake.notify_all();
+        for (auto& thread : threads)
+          if (thread.joinable()) thread.join();
+      }
+    } join_all{workers, stop_searches, walk_done, wake};
+    bool spawn_failed = false;
+    const auto publish = [&] {
+      published.store(pool.size(), std::memory_order_release);
+      wake.notify_all();
+      while (!spawn_failed && workers.size() < max_workers &&
+             pool.size() >= (workers.size() + 1) * kSearchesPerThread) {
+        try {
+          workers.emplace_back([&] {
+            try {
+              const detail::ScopedEnabledSearchBudget scoped(budget);
+              const Replayer searcher(net, options.initial_marking, options.final_marking,
+                                      &options, true);
+              std::optional<Replayer::ForwardEnabledPlan> plan;
+              search_all(searcher, plan, nullptr);
+            } catch (...) {
+              // Not a search's own failure (those are kept per marking): a
+              // thread that stops here may leave its marking unsearched.
+              const std::lock_guard<std::mutex> lock(lists_mutex);
+              if (!worker_error) worker_error = std::current_exception();
+              stop_searches.store(true);
+            }
+          });
+        } catch (const std::system_error&) {
+          spawn_failed = true;  // fewer threads; the calling thread takes the rest
+        }
+      }
+    };
+
+    auto state = replayer.start_prefix_walk();
+    std::size_t current = 0;
+    bool stopped = false;
+    std::vector<std::size_t> path;
+    CancellationCheck cancelled(options.cancelled, "token replay was cancelled", 64);
+    for (std::size_t index = 0; index < capacity; ++index) {
+      cancelled();
+      try {
+        const auto target = trie.scored[index];
+        path.clear();
+        auto node = target;
+        while (node != 0 && depth[node] > depth[current]) {
+          path.push_back(node);
+          node = trie.parent[node];
+        }
+        if (node != current) {
+          path.clear();
+          for (node = target; node != 0; node = trie.parent[node]) path.push_back(node);
+          state = replayer.start_prefix_walk();
+          current = 0;
+          stopped = false;
+        }
+        for (auto step = path.rbegin(); step != path.rend(); ++step) {
+          if (!stopped && !replayer.advance_prefix_walk(state, ids[trie.label[*step]], options))
+            stopped = true;
+          current = *step;
+        }
+        // The full replay computes every row's fitness, which can overflow for
+        // token counts beyond floating-point range.
+        try {
+          (void)replayer.prefix_walk_fitness(state);
+        } catch (const std::overflow_error& error) {
+          if (std::string_view(error.what()) == "token integer does not fit floating-point range")
+            throw std::overflow_error("int too large to convert to float");
+          throw;
+        }
+        // The full replay lists enabled transitions for every row, fit or not.
+        const auto before = pool.size();
+        reached.push_back(pool.intern(state.marking));
+        unfit.push_back(stopped ? 1 : 0);
+        if (pool.size() != before && pool.size() % 64 == 0) publish();
+      } catch (const OperationCancelled&) {
+        throw;
+      } catch (...) {
+        walk_error = std::current_exception();
+        break;
+      }
     }
-    for (auto step = path.rbegin(); step != path.rend(); ++step) {
-      if (!stopped && !replayer.advance_prefix_walk(state, ids[trie.label[*step]], options))
-        stopped = true;
-      current = *step;
-    }
-    // The full replay computes every row's fitness, which can overflow for
-    // token counts beyond floating-point range.
-    try {
-      (void)replayer.prefix_walk_fitness(state);
-    } catch (const std::overflow_error& error) {
-      if (std::string_view(error.what()) == "token integer does not fit floating-point range")
-        throw std::overflow_error("int too large to convert to float");
-      throw;
-    }
-    // The full replay lists enabled transitions for every row, fit or not.
-    auto found = enabled_cache.find(state.marking);
-    if (found == enabled_cache.end())
-      found = enabled_cache.emplace(state.marking,
-                                    replayer.enabled_transition_ids(state.marking, options,
-                                                                    std::nullopt, &enabled_plan)).first;
-    visit(context, index, stopped ? nullptr : &found->second);
+    publish();
+    walk_done.store(true, std::memory_order_release);
+    wake.notify_all();
+    std::optional<Replayer::ForwardEnabledPlan> enabled_plan;
+    search_all(replayer, enabled_plan, &cancelled);
+    for (auto& thread : workers) thread.join();
+    if (worker_error) std::rethrow_exception(worker_error);
   }
+
+  std::size_t first_new = 0;
+  for (std::size_t index = 0; index < reached.size(); ++index) {
+    const auto id = reached[index];
+    if (id == first_new) {
+      ++first_new;
+      if (failure[id]) std::rethrow_exception(failure[id]);
+    }
+    visit(context, index, unfit[index] ? nullptr : &lists[list_of[id]]);
+  }
+  if (walk_error) std::rethrow_exception(walk_error);
   // The checks the full result performs after replay.
   (void)replay_token_result(EventLog{}, net, options);
 }

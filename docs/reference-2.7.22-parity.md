@@ -20030,6 +20030,16 @@ The result is unchanged; only the cost:
 - **Nothing recomputed.** The visible labels enabled at a marking are found
   once, when it is met, the explored edges are kept instead of re-fired, and
   only the transitions listed under a marked input place are tested.
+- **Memory.** Only the silent edges are stored as edges; a visible edge
+  m -a-> m' is kept as the bit a in a per-marking row of entering labels,
+  closed against m''s observable labels at the end (the seeds are closed in
+  place). Storing every explored edge (review AD1) needed 8 bytes per enabled
+  transition per expansion: a counter generator plus 500 visible self-loops
+  peaked at 836 MB against the general path's 65 MB, and 1,500 self-loops
+  ran out of a 2 GB address space where the general path answers. Now the
+  extra is one label row per marking, and those nets peak at 68 MB / 550 MB
+  against 65 MB / 522 MB (18 concurrent rings with 500 / 1,500 self-loops:
+  270 / 683 MB against 280 / 655 MB), with the timings above unchanged.
 - **Stopping when the answer is fixed.** The relation can only grow as more
   markings are expanded and never holds more than every pair of the live
   visible activities. Once more than 200,000 markings are known (so the
@@ -20063,3 +20073,49 @@ on the packed path 1,264 runs to the full budget and 922 early stops).
 footprints stage, which now lasts tens of milliseconds; it now mines 2,000
 cases of 20-60 events over 40 activities and cancels inside "Inductive net:
 token replay" (about 4 s).
+
+## Review AD2: faster `/api/mine` stages on a large log (2026-11-09)
+
+No output changes: every `/api/mine` response is byte-identical apart from
+`run_id`, both on a 494k-event, 40-activity CSV and on 22 smaller CSV/XES
+responses. Changes, from the largest gain down:
+
+- **Token precision searches, pipelined and threaded.** The ETConformance
+  walk interns each distinct reached marking into a compact pool (zigzag
+  varint keys, falling back to the full marking when a count is wide). Up
+  to three worker threads (one per 2,048 markings, at most hardware - 1),
+  each with its own `Replayer` and the caller's enabled-search budget, run
+  the forward enabled-transition search on markings as soon as they are
+  published. The main thread keeps walking and then helps search. Results
+  are read back in prefix order, so the first exception raised is the one a
+  single sequential pass raises. A search that fails stops later searches
+  (markings past the failing id are skipped). Cancellation is checked by the
+  walk and by the main thread's searches; the workers stop and are joined
+  before the error propagates.
+- **Log skeleton** is computed once per variant on interned activity ids
+  (ids numbered in name order, so pair order stays lexicographic), with dense
+  tables. Conformance prepares the model once. Same rules, the same error for
+  a missing activity, the same deviation order.
+- **Declare conformance** checks each variant on interned ids against the
+  rule families in the original order, with per-activity position lists.
+- **Model decorations** no longer build a wide `TokenInteger` for the
+  `uint64` bound on every arc (an inline value is compared as an integer).
+- **CSV import** reserves each case's events up front. Time ordering returns
+  early when the events are already in order (sizeof(Event) is 1.4 KB, so
+  moving every event cost time).
+
+Tried and dropped: running the four decorations in parallel (slower, 10.4 s
+against 7.3 s, because of malloc contention under the server's
+`M_ARENA_MAX=2`), splitting token-replay firing sequences into chunks (about
+1 s slower), and a deque for pending CSV rows (later stages slowed).
+
+Measurements on the 494k-event log (stage times polled from
+`/api/mine-progress`, idle four-core machine): whole request 80.8 s -> 40.9 s;
+inductive token replay 31.3 -> 8.2 s, log skeleton 11.1 -> 0.48 s, declare
+6.8 -> 1.8 s, decorations 7.0 -> 6.4 s, reading the log 4.2 -> 3.9 s. Other
+stages are unchanged.
+
+`minera_server_mine_progress_tests` now mines 5,000 cases instead of 2,000:
+the threaded searches brought "Inductive net: token replay" on 2,000 cases
+down to about 1 s, and this keeps it the longest stage (about 3 s). It passed
+5 runs in a row.

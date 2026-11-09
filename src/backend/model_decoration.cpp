@@ -110,6 +110,14 @@ DurationStats summarize_wait_runs(std::vector<double> singles,
   return stats;
 }
 
+// value > TokenInteger(bound), without building the wide form a bound past
+// the int64 range takes: an inline value is compared as an integer (a
+// negative one is below every bound), a wide one as before.
+bool exceeds(const TokenInteger& value, std::uint64_t bound) {
+  if (!value.is_small()) return value > TokenInteger(bound);
+  return value.small_value() >= 0 && static_cast<std::uint64_t>(value.small_value()) > bound;
+}
+
 using FiringSequence = std::vector<std::vector<std::size_t>>;
 
 // Nets with inhibitor or reset arcs keep the exhaustive silent-routing
@@ -266,7 +274,7 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
           if (arc.negative) continue;
           const auto place = arc.place;
           auto remaining = arc.weight;
-          result.place_counts[place] = remaining > TokenInteger(std::numeric_limits<std::uint64_t>::max() - result.place_counts[place])
+          result.place_counts[place] = exceeds(remaining, std::numeric_limits<std::uint64_t>::max() - result.place_counts[place])
               ? std::numeric_limits<std::uint64_t>::max()
               : result.place_counts[place] + static_cast<std::uint64_t>(remaining);
           // A clean replay never fires without its tokens; the guard is
@@ -295,7 +303,7 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
         }
         for (const auto& arc : petri_reference_arcs(transition, false)) {
           if (arc.negative || arc.weight == 0) continue;
-          const auto count = arc.weight > TokenInteger(std::numeric_limits<std::uint64_t>::max())
+          const auto count = exceeds(arc.weight, std::numeric_limits<std::uint64_t>::max())
                                  ? std::numeric_limits<std::uint64_t>::max()
                                  : static_cast<std::uint64_t>(arc.weight);
           tokens[arc.place].emplace_back(now, count);

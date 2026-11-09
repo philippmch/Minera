@@ -48,6 +48,10 @@ void order_events_by_time(std::vector<Event>& events) {
                      }
                      return events[a].input_order < events[b].input_order;
                    });
+  // Events already in order (the usual case) stay where they are.
+  bool ordered = true;
+  for (std::size_t i = 0; i < order.size() && ordered; ++i) ordered = order[i] == i;
+  if (ordered) return;
 
   std::vector<Event> sorted;
   sorted.reserve(events.size());
@@ -79,6 +83,10 @@ void order_events_by_exact_time(std::vector<Event>& events) {
                        return instants[a].nanoseconds < instants[b].nanoseconds;
                      return events[a].input_order < events[b].input_order;
                    });
+  // Events already in order (the usual case) stay where they are.
+  bool ordered = true;
+  for (std::size_t i = 0; i < order.size() && ordered; ++i) ordered = order[i] == i;
+  if (ordered) return;
   std::vector<Event> sorted;
   sorted.reserve(events.size());
   for (const std::size_t i : order) sorted.push_back(std::move(events[i]));

@@ -2071,13 +2071,20 @@ CsvEventData import_csv_event_data_impl(
         first_unconverted_timestamp = std::make_pair(row.line_number, timestamp);
     }
   }
+  const auto row_kept = [&](const PendingRow& row) {
+    return case_ids[row.token] && activities[row.token] &&
+           !(drop_untimed_rows && (is_reference_na_token(row.event.timestamp) ||
+                                   nat_timestamp(row.event.timestamp)));
+  };
+  // Each case's kept rows, counted first so its events are sized once rather
+  // than regrown (an Event is large to move).
+  std::unordered_map<std::string_view, std::size_t> case_rows;
+  for (const auto& row : pending)
+    if (row_kept(row)) ++case_rows[*case_ids[row.token]];
   for (auto& row : pending) {
     const auto& case_id = case_ids[row.token];
     const auto& activity = activities[row.token];
-    if (!case_id || !activity) continue;
-    if (drop_untimed_rows && (is_reference_na_token(row.event.timestamp) ||
-                              nat_timestamp(row.event.timestamp)))
-      continue;
+    if (!row_kept(row)) continue;
     if (timestamp_index) {
       // Decided per column after the scan; see apply below.
       const auto& timestamp = row.event.timestamp;
@@ -2098,6 +2105,7 @@ CsvEventData import_csv_event_data_impl(
     if (inserted) {
       log.traces.push_back(Trace{*case_id, {}, {}});
       auto& inserted_trace = log.traces.back();
+      inserted_trace.events.reserve(case_rows[*case_id]);
       inserted_trace.case_id_state = FirstClassAttributeState::kPresent;
       inserted_trace.case_id_source_key = header[case_index];
     }
