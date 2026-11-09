@@ -804,8 +804,11 @@ struct ActivityDeviation {
 
 // Whether `net`'s final marking is reachable from its initial marking — the
 // practical bar for being a sound workflow net, and the precondition for
-// alignment. Cheap: a single shortest-run search. The Alpha Miner can produce
-// nets that fail this (e.g. concurrent start/end activities overflow the sink).
+// alignment. An ordinary net is first reduced by rules that keep this exact
+// (a process-tree or POWL translation reduces to nothing left to fire, so no
+// search runs); a residue is searched with capped state budgets. The Alpha
+// Miner can produce nets that fail this (e.g. concurrent start/end activities
+// overflow the sink).
 [[nodiscard]] bool final_marking_reachable(const PetriNet& net);
 // The same search, polling `cancelled`; once it returns true the call throws
 // OperationCancelled.

@@ -976,6 +976,29 @@ describe("file routing", () => {
     expect(csvDataRows("a;b", false)).toEqual([]);
   });
 
+  it("splits CSV records as pandas' C parser does (review AB1-3, AB1-4)", () => {
+    // Blank lines (also only spaces or tabs) do not use up the sample.
+    const blanks = "case;act;ts, x\n" + "\n".repeat(30) + "  \n\t\n1;a;b\n2;c;d\n";
+    expect(csvDataRows(blanks, false)).toEqual(["1;a;b", "2;c;d"]);
+    expect(delimiterForHeader("a.csv", csvHeaderLine(blanks), csvDataRows(blanks, false))).toBe(";");
+    expect(csvDataRows("a\n\n1\n\n2\n\n3", false, 2)).toEqual(["1", "2"]);
+    // A quote inside an unquoted field is a literal character, not the start of a quoted field.
+    const inches = 'case;activity;cost (EUR, net)\n1;A 12" screen;3,50\n2;B;4,00\n';
+    expect(csvDataRows(inches, false)).toEqual(['1;A 12" screen;3,50', "2;B;4,00"]);
+    expect(delimiterForHeader("a.csv", csvHeaderLine(inches), csvDataRows(inches, false))).toBe(";");
+    expect(csvHeaderNames('a,b"c,d', ",")).toEqual(["a", 'b"c', "d"]);
+    expect(csvHeaderNames('a, "b,c"', ",")).toEqual(["a", ' "b', 'c"']);
+    expect(csvHeaderNames('"a"b,c', ",")).toEqual(["ab", "c"]);
+    // Quotes opening a field still span delimiters and line breaks, after any candidate delimiter.
+    expect(csvDataRows('a|b\n1|"x\ny|z"\n2|w', false)).toEqual(['1|"x\ny|z"', "2|w"]);
+    expect(csvDataRows('a,b\n"1\n2",x\n3,"cut', true)).toEqual(['"1\n2",x']);
+    // The header is the first line that is not blank, as pandas reads it.
+    expect(csvHeaderLine("\n\r\n  \ncase;act;ts\n1;a;b")).toBe("case;act;ts");
+    expect(csvDataRows("\n\ncase;act;ts\n1;a;b", false)).toEqual(["1;a;b"]);
+    expect(csvHeaderLine('x 5" y,b\nc,d')).toBe('x 5" y,b');
+    expect(csvHeaderLine("")).toBe("");
+  });
+
   it("adds the header names to a column-not-found message only", () => {
     expect(columnNotFoundMessage("CSV column not found: case_id", "Case ID;Activity", ";")).toBe('CSV column not found: case_id (the header has "Case ID", "Activity"). Choose the columns in Source inspector.');
     expect(columnNotFoundMessage("XML is not well-formed", "a,b", undefined)).toBe("XML is not well-formed");

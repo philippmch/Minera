@@ -3,7 +3,7 @@
 // /api/mine-progress reports the running mine's stage, stage count and
 // elapsed time while another connection mines (and while a further mine is
 // refused with MINE_BUSY), and POST /api/cancel-mine stops the mine inside a
-// long stage (the inductive net's reachability search), not only at the next
+// long stage (the inductive net's footprints), not only at the next
 // stage boundary: the server's CPU use stops within about a second while the
 // mining connection stays open, the mine answers with the cancel's error, and
 // the progress record clears. CPU time is read from /proc, so that check runs
@@ -66,7 +66,8 @@ int free_port() {
 
 // 500 cases of 5 to 35 events over 25 activities in random order: the
 // inductive miner answers with a parallel of 25 optional loops, whose
-// reachability search runs for seconds.
+// footprints (the reachability graph of that net) take seconds. Its
+// reachability check is instant since the net reduction of review AA2.
 std::string random_log() {
   std::mt19937 rng(7);
   std::uniform_int_distribution<int> activity(0, 24), length(5, 35);
@@ -196,23 +197,23 @@ int main(int argc, char** argv) {
     });
 
     // Poll from another connection until the mine is in the inductive net's
-    // reachability search.
+    // footprints.
     std::vector<Progress> seen;
     const auto started = std::chrono::steady_clock::now();
     double slowest_poll = 0.0;
-    bool in_reachability = false;
+    bool in_long_stage = false;
     while (std::chrono::steady_clock::now() - started < std::chrono::seconds(120)) {
       const auto asked = std::chrono::steady_clock::now();
       const auto progress = poll(client, id);
       slowest_poll = std::max(slowest_poll, std::chrono::duration<double>(std::chrono::steady_clock::now() - asked).count());
       if (progress && progress->running && progress->matches) {
         seen.push_back(*progress);
-        if (progress->stage == "Inductive net: reachability") { in_reachability = true; break; }
+        if (progress->stage == "Inductive net: footprints") { in_long_stage = true; break; }
       }
       if (mined) break;  // finished (or failed) before the stage was seen
       sleep_ms(50);
     }
-    check(in_reachability, "the mine reached the inductive reachability search");
+    check(in_long_stage, "the mine reached the inductive footprints stage");
     check(!seen.empty() && seen.front().total == 26, "26 stages in all");
     bool ordered = true;
     for (std::size_t i = 1; i < seen.size(); ++i)
@@ -230,7 +231,7 @@ int main(int argc, char** argv) {
     r = client.Post("/api/mine", other);
     check(r && r->status == 503 && contains(r->body, "MINE_BUSY"), "a second mine is busy: " + describe(r));
 
-    if (in_reachability) {
+    if (in_long_stage) {
       sleep_ms(200);
       const double busy_from = cpu_seconds(server);
       sleep_ms(400);
@@ -238,8 +239,8 @@ int main(int argc, char** argv) {
       r = client.Post("/api/cancel-mine?request_id=" + id, "", "text/plain");
       check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel-mine: " + describe(r));
       const auto progress = poll(client, id);
-      check(progress && progress->stage == "Inductive net: reachability",
-            "the cancel arrived inside the reachability search");
+      check(progress && progress->stage == "Inductive net: footprints",
+            "the cancel arrived inside the footprints stage");
       sleep_ms(1000);
       const double idle_from = cpu_seconds(server);
       sleep_ms(500);

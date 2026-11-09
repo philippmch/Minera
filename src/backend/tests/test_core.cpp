@@ -8,6 +8,7 @@
 #include "minera/alpha_miner.hpp"
 #include "minera/attribute_statistics.hpp"
 #include "minera/bpmn.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/conformance.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/declare.hpp"
@@ -3489,6 +3490,71 @@ void final_marking_reachability_keeps_exhausted_apart() {
   assert(!model.sound && model.reachability_exhausted);
   minera::set_model_soundness(model, FinalMarkingReachability::kUnreachable);
   assert(!model.sound && !model.reachability_exhausted);
+}
+
+void final_marking_reachability_reduces_block_structured_nets() {
+  // Review AA2. A parallel split into 24 branches, each a choice between an
+  // activity and a silent skip, has 2^24 interleavings: the capped searches
+  // stopped at their budget (a 40-activity inductive net took 17 s and over
+  // 4 GB). Structural reduction folds the branches and decides it at once.
+  using minera::FinalMarkingReachability;
+  minera::PetriNet wide;
+  {
+    const auto source = wide.add_place(), sink = wide.add_place();
+    std::vector<std::size_t> starts, ends;
+    std::vector<std::string> labels;
+    for (std::size_t i = 0; i < 24; ++i) {
+      starts.push_back(wide.add_place());
+      ends.push_back(wide.add_place());
+      labels.push_back("a" + std::to_string(i));
+    }
+    wide.set_activities(labels);
+    wide.add_transition(std::nullopt, {source}, starts);
+    for (std::size_t i = 0; i < 24; ++i) {
+      wide.add_transition(i, {starts[i]}, {ends[i]});
+      wide.add_transition(std::nullopt, {starts[i]}, {ends[i]});
+    }
+    wide.add_transition(std::nullopt, ends, {sink});
+    wide.set_source(source);
+    wide.set_sink(sink);
+  }
+  const auto started = std::chrono::steady_clock::now();
+  assert(minera::final_marking_reachability(wide) == FinalMarkingReachability::kReachable);
+  assert(minera::final_marking_reachable(wide));
+  assert(std::chrono::steady_clock::now() - started < std::chrono::seconds(5));
+  // A missing branch join token (the join also needs a place nothing marks)
+  // stays unreachable: the reduction only folds, it never adds runs.
+  minera::PetriNet blocked = wide;
+  blocked.append_transition_arcs(blocked.transitions().size() - 1, {blocked.add_place()}, {});
+  assert(minera::final_marking_reachability(blocked) == FinalMarkingReachability::kUnreachable);
+  // A residue the reduction cannot decide is still searched: the split also
+  // marks a place that only an endless silent pump touches, so the final
+  // marking (that place empty) is unreachable but the uniform-cost search
+  // runs out of states first. A cancel stops that search.
+  minera::PetriNet pumped = wide;
+  {
+    const auto stuck = pumped.add_place(), counter = pumped.add_place();
+    pumped.append_transition_arcs(0, {}, {stuck});
+    pumped.add_transition(std::nullopt, {stuck}, {stuck, counter});
+  }
+  assert(minera::final_marking_reachability(pumped) == FinalMarkingReachability::kUnreachable);
+  std::size_t polls = 0;
+  const auto cancel_after = [&polls] { return ++polls > 50; };
+  bool cancelled = false;
+  try {
+    (void)minera::final_marking_reachability(pumped, cancel_after);
+  } catch (const minera::OperationCancelled&) {
+    cancelled = true;
+  }
+  assert(cancelled);
+  polls = 0;
+  cancelled = false;
+  try {
+    (void)minera::final_marking_reachable(pumped, cancel_after);
+  } catch (const minera::OperationCancelled&) {
+    cancelled = true;
+  }
+  assert(cancelled);
 }
 
 void final_marking_reachable_distinguishes_sound_nets() {
@@ -8842,6 +8908,20 @@ void csv_timestamps_review_aa1_skipped_separators() {
   for (const auto* cell : {"2024-01-05 03:15:34.5..", "2024-01-05 03:15:34.5.;",
                            "2024-01-05 03:15:34.p", "2024-01-05;03:15:34", "01/05/2024-"})
     assert(stamp(cell) == cell);
+  // Runs dateutil does not skip (review AB1-2): pandas rejects these cells.
+  for (const auto* cell : {".20240105", "2024 12/31/", "5 12/31/", "Jan.12.34.", "Jan.5.2024.",
+                           "2024-01-05 5/am", "01/05/2024 5. pm", "2024-01-05 5 .am",
+                           "2024-01-05 5; am", "2024-01-05 3:15:34 am;+05:", "Jan-5.5/",
+                           "/Jan/5.5"})
+    assert(stamp(cell) == cell);
+  // Their neighbours still read.
+  assert(stamp("5/Jan 2024") == "2024-01-05 00:00:00");
+  assert(stamp("5..Jan 2024") == "2024-01-05 00:00:00");
+  assert(stamp("2024-01-05 05/am") == "2024-01-05 05:00:00");
+  assert(stamp("2024-01-05 5;am") == "2024-01-05 05:00:00");
+  assert(stamp("Jan.12.34;.") == "2034-01-12 00:00:00");
+  assert(stamp("2024/01/05/") == "2024-01-05 00:00:00");
+  assert(stamp(".2024-01-05") == "2024-01-05 00:00:00");
 }
 
 void csv_timestamps_follow_pandas_resolution_and_offsets() {
@@ -9114,6 +9194,7 @@ int main() {
   json_export_carries_the_alignment_contract();
   final_marking_reachable_distinguishes_sound_nets();
   final_marking_reachability_keeps_exhausted_apart();
+  final_marking_reachability_reduces_block_structured_nets();
   alignment_scores_a_sound_alpha_net();
   alignment_flags_an_unsound_net();
   alignment_prunes_an_unbounded_net_with_dead_growth();

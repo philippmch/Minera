@@ -1033,8 +1033,42 @@ std::optional<std::string> reference_basic_date(std::string_view text) {
 // after a `-` ("01/05/2024-"), and runs inside the date, between the date
 // and the clock or inside the clock ("2024-01-05;03:15:34", "03;15:34" is
 // 15:34), which keep the cell text.
+// Runs dateutil does not skip, which keep the cell text (review AB1-2): a lone
+// `.` before the only number of the cell (".20240105" is a decimal), a run
+// other than one `;` or `'` between a lone one-digit number and a meridiem
+// ("2024-01-05 5/am", "5. pm" fail), a cell ending in `:`, a decimal number
+// outside the clock ("Jan-5.5/"), a `/` at the end after a two-number slash
+// date ("2024 12/31/" fails), and a `.` at the end after a dotted date led by
+// a month name ("Jan.12.34." fails).
 std::optional<std::string> skip_dateutil_separators(std::string_view text) {
   if (text.find(',') != std::string_view::npos) return std::nullopt;
+  const auto digit = [](char ch) { return std::isdigit(static_cast<unsigned char>(ch)) != 0; };
+  if (const auto lead = text.find_first_not_of(' ');
+      lead != std::string_view::npos && text[lead] == '.' && lead + 1 < text.size() &&
+      digit(text[lead + 1])) {
+    std::size_t k = lead + 1;
+    while (k < text.size() && digit(text[k])) ++k;
+    if (text.find_first_not_of(' ', k) == std::string_view::npos) return std::nullopt;
+  }
+  // A cell ending in a `:` ("03:15 am +05:") fails in pandas; the shapes
+  // would read it once the run before it is skipped.
+  if (const auto last = text.find_last_not_of(" ;/'."); last != std::string_view::npos &&
+      text[last] == ':')
+    return std::nullopt;
+  // A decimal number outside the clock ("Jan 5.5"): the date shapes do not
+  // read it as dateutil does, so such a cell keeps its text.
+  for (std::size_t i = 0; i < text.size();) {
+    if (!digit(text[i]) && text[i] != '.' && text[i] != ':') { ++i; continue; }
+    std::size_t j = i, dots = 0, dot = 0;
+    bool colon = false;
+    for (; j < text.size() && (digit(text[j]) || text[j] == '.' || text[j] == ':'); ++j) {
+      if (text[j] == '.') { ++dots; dot = j; }
+      if (text[j] == ':') colon = true;
+    }
+    if (!colon && dots == 1 && dot > i && dot + 1 < j && digit(text[dot - 1]) && digit(text[dot + 1]))
+      return std::nullopt;
+    i = j;
+  }
   const auto skippable = [](char ch) {
     return ch == ' ' || ch == ';' || ch == '/' || ch == '\'' || ch == '.';
   };
@@ -1076,6 +1110,46 @@ std::optional<std::string> skip_dateutil_separators(std::string_view text) {
   std::size_t end = text.size();
   while (end > begin && skippable(text[end - 1])) --end;
   const bool clock = text.find(':', begin) != std::string_view::npos;
+  // Between a lone one-digit number and a meridiem only a single `;` or `'`
+  // is skipped ("5;am" reads; "5/am", "5. pm", "5; am" fail; "5/Jan 2024"
+  // reads).
+  const auto after_lone_digit = [&](std::size_t at, std::string_view run) {
+    if (!(at > begin && digit(text[at - 1]) && (at - 1 == begin || text[at - 2] == ' ') &&
+          !(run.size() == 1 && (run.front() == ';' || run.front() == '\''))))
+      return false;
+    std::size_t k = at + run.size();
+    std::string word;
+    while (k < text.size() && std::isalpha(static_cast<unsigned char>(text[k])))
+      word.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(text[k++]))));
+    return word == "a" || word == "p" || word == "am" || word == "pm";
+  };
+  // The run at the end joins the last token: a `/` after a slash date of two
+  // numbers ("12/31/"), a `.` after a dotted date led by a month name
+  // ("Jan.12.34.").
+  const auto joins_last_token = [&](std::string_view run) {
+    if (run.front() == '/') {
+      std::size_t k = end;
+      while (k > begin && digit(text[k - 1])) --k;
+      if (k == end || k <= begin + 1 || text[k - 1] != '/') return false;
+      std::size_t m = k - 1;
+      while (m > begin && digit(text[m - 1])) --m;
+      return m < k - 1 && (m == begin || text[m - 1] == ' ');
+    }
+    if (run.front() == '.') {
+      // The token before the run is letters.digits.digits ("Jan.12.34").
+      std::size_t k = end;
+      for (int part = 0; part < 2; ++part) {
+        const auto stop = k;
+        while (k > begin && digit(text[k - 1])) --k;
+        if (k == stop || k <= begin || text[k - 1] != '.') return false;
+        --k;
+      }
+      const auto stop = k;
+      while (k > begin && std::isalpha(static_cast<unsigned char>(text[k - 1]))) --k;
+      return k < stop && (k == begin || text[k - 1] == ' ');
+    }
+    return false;
+  };
   std::string out;
   out.reserve(text.size());
   const auto clock_start = text.find(':', begin);
@@ -1090,7 +1164,7 @@ std::optional<std::string> skip_dateutil_separators(std::string_view text) {
     const char before = text[i - 1], after = text[j];
     if ((!clock || i > clock_start) && alnum(before) &&
         (std::isalpha(static_cast<unsigned char>(after)) || after == '+' || after == '-') &&
-        counts(run) && !after_fraction(i)) {
+        counts(run) && !after_fraction(i) && !after_lone_digit(i, run)) {
       out.push_back(' ');
       changed = true;
     } else {
@@ -1101,7 +1175,7 @@ std::optional<std::string> skip_dateutil_separators(std::string_view text) {
   if (end < text.size()) {
     const auto run = text.substr(end);
     const char before = end > begin ? text[end - 1] : '\0';
-    if (before != '-' && before != '\0' && !after_fraction(end) &&
+    if (before != '-' && before != '\0' && !after_fraction(end) && !joins_last_token(run) &&
         run.find_first_not_of(' ') != std::string_view::npos) {
       out.push_back(' ');
       changed = true;

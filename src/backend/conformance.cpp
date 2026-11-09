@@ -2173,8 +2173,19 @@ class Replayer {
     block_column.clear();
     dirty.assign(words, 0);
     constexpr std::uint32_t kEmpty = std::numeric_limits<std::uint32_t>::max();
+    // The table is reused across searches: only the slots the last search
+    // filled are cleared (`table_used`), so a search costs its own rows, not
+    // the largest table an earlier search grew. A table past 2^16 slots is
+    // given back once.
     auto& table = s.table;
-    table.assign(std::max<std::size_t>(256, s.table_size), kEmpty);
+    auto& table_used = s.table_used;
+    if (table.size() < 256 || table.size() > (std::size_t{1} << 16)) {
+      table.assign(table.size() < 256 ? 256 : std::size_t{1} << 16, kEmpty);
+      table.shrink_to_fit();
+    } else {
+      for (const auto slot : table_used) table[slot] = kEmpty;
+    }
+    table_used.clear();
 
     // Row hashes are additive over places, so a successor's hash follows from
     // its parent's and the places the firing touched. They only bucket rows
@@ -2194,11 +2205,12 @@ class Replayer {
         auto& grown = s.grown;
         grown.assign(table.size() * 2, kEmpty);
         const std::size_t mask = grown.size() - 1;
-        for (const auto existing : table) {
-          if (existing == kEmpty) continue;
+        for (auto& used : table_used) {
+          const auto existing = table[used];
           std::size_t slot = hashes[existing] & mask;
           while (grown[slot] != kEmpty) slot = (slot + 1) & mask;
           grown[slot] = existing;
+          used = slot;
         }
         table.swap(grown);
       }
@@ -2213,6 +2225,7 @@ class Replayer {
         slot = (slot + 1) & mask;
       }
       table[slot] = id;
+      table_used.push_back(slot);
       ++rows;
       if (hashes.size() < rows) {
         reserve(hashes, rows);
@@ -2457,7 +2470,6 @@ class Replayer {
       }
       discover(reached);
     }
-    s.table_size = std::min<std::size_t>(table.size(), std::size_t{1} << 16);
     return FlatSearch::kDone;
   }
 
@@ -2940,7 +2952,7 @@ class Replayer {
     std::vector<std::uint64_t> hashes, visited, enabled, batch_rows, live, live_any, dirty, columns;
     std::vector<std::size_t> batch_start, block_column;
     std::vector<std::uint32_t> batch_marking, enabled_count, table, grown;
-    std::size_t table_size = 0;
+    std::vector<std::size_t> table_used;  // slots of `table` holding a row id
   };
   mutable FlatEnabledScratch flat_enabled_scratch_;
 };
@@ -6615,6 +6627,353 @@ void detail::forward_token_prefix_walk_impl(
   (void)replay_token_result(EventLog{}, net, options);
 }
 
+namespace {
+
+// Structural reduction of a net for final-marking reachability, applied
+// before the reachability-only searches (final_marking_reachability and
+// final_marking_reachable). Every rule keeps "the final marking is reachable
+// from the initial marking" exactly (both directions), so a reduced net whose
+// initial marking already equals its final marking proves the original net
+// reachable without searching, and a smaller residue is searched first.
+//
+// Only ordinary nets are loaded: unit arcs (repeated unweighted endpoints are
+// multiplicities), no reset or inhibitor arcs. Labels do not matter. Rules,
+// with pre/post the input/output multisets and M0/Mf the markings:
+//  - a transition with pre = post (its firing changes nothing) is removed;
+//  - of two transitions with equal pre and post, one is removed;
+//  - a transition needing more tokens from a place than the place has
+//    initially, where no transition produces into it, is dead and removed;
+//  - of two places with equal producers, consumers (with multiplicities), M0
+//    and Mf, one is removed (both always hold the same count);
+//  - a place every transition touching it only tests (consumes and produces
+//    back the same count, at most M0), with M0 = Mf, never changes and never
+//    disables anything, and is removed;
+//  - post-agglomeration: t with pre(t) = {p} (one token), t the only consumer
+//    of p, t not producing into p, Mf(p) = 0: every producer of p produces
+//    post(t) instead (k times for k tokens into p), M0(p) tokens are moved
+//    through t, and t and p are removed. Firing t right after each production
+//    into p (and first for the M0(p) tokens) disables nothing — no one else
+//    consumes p and only adds tokens elsewhere — and every token of p must be
+//    consumed by t to reach Mf(p) = 0, so runs to the final marking map both
+//    ways;
+//  - pre-agglomeration: t with post(t) = {q} (one token), t the only producer
+//    of q, t not consuming q, M0(q) = Mf(q) = 0: every consumer of q takes
+//    pre(t) instead (k times for k tokens from q), and t and q are removed.
+//    Delaying each firing of t to just before the consumer of its token keeps
+//    more tokens around in between (no inhibitor arcs), so runs map both ways.
+// A block-structured net (the process-tree and POWL translations) reduces to
+// a marking with nothing left to fire: its sequences, choices, loops and
+// parallel branches fold into single places and duplicate transitions.
+class ReachabilityReduction {
+ public:
+  enum class Outcome { kUnchanged, kTrivial, kReduced };
+
+  // Whether the net is ordinary (see above); the reduction applies only then.
+  bool load(const PetriNet& net, const Marking& initial, const Marking& final) {
+    const std::size_t places = net.place_count();
+    const std::size_t transitions = net.transitions().size();
+    if (places >= kLimit || transitions >= kLimit || initial.size() != places ||
+        final.size() != places)
+      return false;
+    pre_.assign(transitions, {});
+    post_.assign(transitions, {});
+    visible_.assign(transitions, 0);
+    transition_alive_.assign(transitions, 1);
+    consumers_.assign(places, {});
+    producers_.assign(places, {});
+    place_alive_.assign(places, 1);
+    initial_.assign(initial.begin(), initial.end());
+    final_.assign(final.begin(), final.end());
+    const auto unit = [](const std::vector<PetriArcWeight>& weights, std::size_t arcs) {
+      if (weights.empty()) return true;
+      if (weights.size() != arcs) return false;
+      return std::all_of(weights.begin(), weights.end(), [](const PetriArcWeight& weight) {
+        return !weight.negative && weight.magnitude == TokenInteger(1);
+      });
+    };
+    for (std::size_t t = 0; t < transitions; ++t) {
+      const auto& transition = net.transitions()[t];
+      if (!transition.reset_inputs.empty() || !transition.inhibitor_inputs.empty() ||
+          !unit(transition.input_weights, transition.inputs.size()) ||
+          !unit(transition.output_weights, transition.outputs.size()))
+        return false;
+      for (const auto place : transition.inputs) {
+        if (place >= places) return false;
+        // Weighted input arcs on one place are each checked on their own
+        // (fire_petri_transition), which is not a multiplicity.
+        if (!transition.input_weights.empty() && count(pre_[t], place) != 0) return false;
+        add(pre_[t], static_cast<std::uint32_t>(place), 1);
+      }
+      for (const auto place : transition.outputs) {
+        if (place >= places) return false;
+        add(post_[t], static_cast<std::uint32_t>(place), 1);
+      }
+      for (const auto& [place, k] : pre_[t]) add(consumers_[place], static_cast<std::uint32_t>(t), k);
+      for (const auto& [place, k] : post_[t]) add(producers_[place], static_cast<std::uint32_t>(t), k);
+      arcs_ += pre_[t].size() + post_[t].size();
+      visible_[t] = transition.silent() ? 0 : 1;
+    }
+    // Agglomeration may multiply arcs; past this budget it is skipped.
+    arc_budget_ = 2 * arcs_ + 4096;
+    return true;
+  }
+
+  Outcome reduce(const std::function<bool()>& cancelled) {
+    CancelPoll poll(cancelled);
+    bool changed_any = false;
+    for (bool changed = true; changed;) {
+      changed = false;
+      if (poll()) return changed_any ? Outcome::kReduced : Outcome::kUnchanged;
+      changed |= drop_transitions();
+      changed |= drop_places();
+      for (std::uint32_t t = 0; t < transition_alive_.size(); ++t) {
+        if (!transition_alive_[t]) continue;
+        if (poll()) return changed_any || changed ? Outcome::kReduced : Outcome::kUnchanged;
+        changed |= post_agglomerate(t) || pre_agglomerate(t);
+      }
+      changed_any |= changed;
+    }
+    for (std::size_t p = 0; p < place_alive_.size(); ++p)
+      if (place_alive_[p] && initial_[p] != final_[p])
+        return changed_any ? Outcome::kReduced : Outcome::kUnchanged;
+    return Outcome::kTrivial;
+  }
+
+  // Places plus transitions left.
+  [[nodiscard]] std::size_t size() const {
+    return static_cast<std::size_t>(std::count(place_alive_.begin(), place_alive_.end(), 1) +
+                                    std::count(transition_alive_.begin(), transition_alive_.end(), 1));
+  }
+
+  // The reduced net with its markings, when they fit the search's marking type.
+  bool build(PetriNet& net, Marking& initial, Marking& final) const {
+    std::vector<std::size_t> renumber(place_alive_.size(), 0);
+    initial.clear();
+    final.clear();
+    for (std::size_t p = 0; p < place_alive_.size(); ++p) {
+      if (!place_alive_[p]) continue;
+      if (initial_[p] > kTokenLimit || final_[p] > kTokenLimit) return false;
+      renumber[p] = net.add_place();
+      initial.push_back(static_cast<int>(initial_[p]));
+      final.push_back(static_cast<int>(final_[p]));
+    }
+    net.set_activities({"visible"});
+    for (std::size_t t = 0; t < transition_alive_.size(); ++t) {
+      if (!transition_alive_[t]) continue;
+      std::vector<std::size_t> inputs, outputs;
+      for (const auto& [place, k] : pre_[t]) inputs.insert(inputs.end(), std::size_t(k), renumber[place]);
+      for (const auto& [place, k] : post_[t]) outputs.insert(outputs.end(), std::size_t(k), renumber[place]);
+      net.add_transition(visible_[t] ? std::optional<std::size_t>(0) : std::nullopt,
+                         std::move(inputs), std::move(outputs));
+    }
+    return true;
+  }
+
+ private:
+  using Arcs = std::vector<std::pair<std::uint32_t, std::int64_t>>;  // sorted by id
+  static constexpr std::size_t kLimit = std::size_t{1} << 30;
+  // Agglomeration keeps arc multiplicities at most kArcLimit and the token
+  // counts it moves at most kTokenLimit, so a capped search over the reduced
+  // net stays far from int (the search's token type) as one over the
+  // original does.
+  static constexpr std::int64_t kArcLimit = 64;
+  static constexpr std::int64_t kTokenLimit = std::int64_t{1} << 20;
+
+  static std::int64_t count(const Arcs& arcs, std::uint32_t id) {
+    const auto it = std::lower_bound(arcs.begin(), arcs.end(), std::make_pair(id, std::int64_t{0}));
+    return it != arcs.end() && it->first == id ? it->second : 0;
+  }
+  static void add(Arcs& arcs, std::uint32_t id, std::int64_t k) {
+    const auto it = std::lower_bound(arcs.begin(), arcs.end(), std::make_pair(id, std::int64_t{0}));
+    if (it != arcs.end() && it->first == id) it->second += k;
+    else arcs.insert(it, {id, k});
+  }
+  static void erase(Arcs& arcs, std::uint32_t id) {
+    const auto it = std::lower_bound(arcs.begin(), arcs.end(), std::make_pair(id, std::int64_t{0}));
+    if (it != arcs.end() && it->first == id) arcs.erase(it);
+  }
+
+  void remove_transition(std::uint32_t t) {
+    for (const auto& [place, k] : pre_[t]) erase(consumers_[place], t);
+    for (const auto& [place, k] : post_[t]) erase(producers_[place], t);
+    arcs_ -= pre_[t].size() + post_[t].size();
+    pre_[t].clear();
+    post_[t].clear();
+    transition_alive_[t] = 0;
+  }
+  void remove_place(std::uint32_t p) {
+    for (const auto& [t, k] : consumers_[p]) erase(pre_[t], p);
+    for (const auto& [t, k] : producers_[p]) erase(post_[t], p);
+    arcs_ -= consumers_[p].size() + producers_[p].size();
+    consumers_[p].clear();
+    producers_[p].clear();
+    place_alive_[p] = 0;
+  }
+
+  bool drop_transitions() {
+    bool changed = false;
+    std::map<std::pair<Arcs, Arcs>, std::uint32_t> seen;
+    for (std::uint32_t t = 0; t < transition_alive_.size(); ++t) {
+      if (!transition_alive_[t]) continue;
+      bool drop = pre_[t] == post_[t];
+      for (const auto& [place, k] : pre_[t])
+        drop = drop || (producers_[place].empty() && initial_[place] < k);
+      if (!drop) {
+        const auto [it, added] = seen.emplace(std::make_pair(pre_[t], post_[t]), t);
+        drop = !added;
+      }
+      if (drop) {
+        remove_transition(t);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  bool drop_places() {
+    bool changed = false;
+    std::map<std::tuple<Arcs, Arcs, std::int64_t, std::int64_t>, std::uint32_t> seen;
+    for (std::uint32_t p = 0; p < place_alive_.size(); ++p) {
+      if (!place_alive_[p]) continue;
+      bool drop = initial_[p] == final_[p] && consumers_[p] == producers_[p] &&
+                  std::all_of(consumers_[p].begin(), consumers_[p].end(),
+                              [&](const auto& arc) { return arc.second <= initial_[p]; });
+      if (!drop) {
+        const auto [it, added] = seen.emplace(
+            std::make_tuple(producers_[p], consumers_[p], initial_[p], final_[p]), p);
+        drop = !added;
+      }
+      if (drop) {
+        remove_place(p);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  bool post_agglomerate(std::uint32_t t) {
+    if (pre_[t].size() != 1 || pre_[t][0].second != 1) return false;
+    const auto p = pre_[t][0].first;
+    if (consumers_[p].size() != 1 || final_[p] != 0 || count(post_[t], p) != 0) return false;
+    const Arcs moved = post_[t];
+    const Arcs producers = producers_[p];
+    if (initial_[p] > kTokenLimit) return false;
+    for (const auto& [r, c] : moved)
+      if (c > kArcLimit || initial_[r] > kTokenLimit ||
+          initial_[r] + initial_[p] * c > kTokenLimit)
+        return false;
+    if (arcs_ + producers.size() * moved.size() > arc_budget_) return false;
+    for (const auto& [u, k] : producers)
+      for (const auto& [r, c] : moved)
+        if (k > kArcLimit || count(post_[u], r) + k * c > kArcLimit) return false;
+    const bool visible = visible_[t] != 0;
+    const std::int64_t tokens = initial_[p];
+    remove_transition(t);
+    for (const auto& [u, k] : producers) {
+      erase(post_[u], p);
+      --arcs_;
+      for (const auto& [r, c] : moved) {
+        if (count(post_[u], r) == 0) ++arcs_;
+        add(post_[u], r, k * c);
+        add(producers_[r], u, k * c);
+      }
+      if (visible) visible_[u] = 1;
+    }
+    for (const auto& [r, c] : moved) initial_[r] += tokens * c;
+    producers_[p].clear();
+    initial_[p] = 0;
+    place_alive_[p] = 0;
+    return true;
+  }
+
+  bool pre_agglomerate(std::uint32_t t) {
+    if (post_[t].size() != 1 || post_[t][0].second != 1) return false;
+    const auto q = post_[t][0].first;
+    if (producers_[q].size() != 1 || initial_[q] != 0 || final_[q] != 0 ||
+        count(pre_[t], q) != 0)
+      return false;
+    const Arcs taken = pre_[t];
+    const Arcs consumers = consumers_[q];
+    if (arcs_ + consumers.size() * taken.size() > arc_budget_) return false;
+    for (const auto& [v, k] : consumers)
+      for (const auto& [r, c] : taken)
+        if (k > kArcLimit || c > kArcLimit || count(pre_[v], r) + k * c > kArcLimit)
+          return false;
+    const bool visible = visible_[t] != 0;
+    remove_transition(t);
+    for (const auto& [v, k] : consumers) {
+      erase(pre_[v], q);
+      --arcs_;
+      for (const auto& [r, c] : taken) {
+        if (count(pre_[v], r) == 0) ++arcs_;
+        add(pre_[v], r, k * c);
+        add(consumers_[r], v, k * c);
+      }
+      if (visible) visible_[v] = 1;
+    }
+    consumers_[q].clear();
+    place_alive_[q] = 0;
+    return true;
+  }
+
+  std::vector<Arcs> pre_, post_;             // by transition: places
+  std::vector<Arcs> consumers_, producers_;  // by place: transitions
+  std::vector<char> visible_, transition_alive_, place_alive_;
+  std::vector<std::int64_t> initial_, final_;
+  std::size_t arcs_ = 0, arc_budget_ = 0;
+};
+
+// The reachability-only search: the structural reduction first, then the
+// Aligner's capped searches on the reduced net with a quarter of the state
+// budget (only when at most two thirds of the places and transitions are
+// left), and the unreduced searches with the full budget only when those
+// stopped at it (so every verdict the unreduced searches decide is still
+// decided, and a net neither decides costs at most about a quarter more).
+FinalMarkingReachability search_final_marking_reachability(const PetriNet& net,
+                                                           const AlignmentOptions& options) {
+  // Resolved as the Aligner does (and so throwing the same errors first).
+  const auto initial = resolve_workflow_marking(net, options.initial_marking, true);
+  const auto final = resolve_workflow_marking(net, options.final_marking, false);
+  ReachabilityReduction reduction;
+  if (reduction.load(net, initial, final)) {
+    const auto outcome = reduction.reduce(options.cancelled);
+    if (outcome == ReachabilityReduction::Outcome::kTrivial)
+      return FinalMarkingReachability::kReachable;
+    PetriNet reduced;
+    AlignmentOptions reduced_options = options;
+    reduced_options.max_states =
+        std::max<std::size_t>(1, (options.max_states == 0 ? kAlignSearchCap : options.max_states) / 4);
+    // A residue keeping more than two thirds of the net would likely stop
+    // where the unreduced search does (the undecided Heuristics nets of the
+    // review AA2 fuzz kept 70-80%), so that search runs directly.
+    const bool shrank = reduction.size() * 3 <= (net.place_count() + net.transitions().size()) * 2;
+    if (outcome == ReachabilityReduction::Outcome::kReduced && shrank &&
+        reduction.build(reduced, reduced_options.initial_marking,
+                        reduced_options.final_marking)) {
+      std::optional<FinalMarkingReachability> verdict;
+      try {
+        const Aligner aligner(reduced, reduced_options,
+                              std::chrono::steady_clock::time_point::max(),
+                              /*reachability_only=*/true);
+        if (aligner.reachable()) verdict = FinalMarkingReachability::kReachable;
+        else if (!aligner.reachability_exhausted()) verdict = FinalMarkingReachability::kUnreachable;
+      } catch (const std::overflow_error&) {
+        // Left to the unreduced search, which reports its own outcome.
+      }
+      if (verdict) return *verdict;
+      // Cancelled: the callers report it.
+      if (options.cancelled && options.cancelled()) return FinalMarkingReachability::kExhausted;
+    }
+  }
+  const Aligner aligner(net, options, std::chrono::steady_clock::time_point::max(),
+                        /*reachability_only=*/true);
+  if (aligner.reachable()) return FinalMarkingReachability::kReachable;
+  return aligner.reachability_exhausted() ? FinalMarkingReachability::kExhausted
+                                          : FinalMarkingReachability::kUnreachable;
+}
+
+}  // namespace
+
 bool final_marking_reachable(const PetriNet& net) {
   return final_marking_reachable(net, {}, {});
 }
@@ -6622,8 +6981,8 @@ bool final_marking_reachable(const PetriNet& net) {
 bool final_marking_reachable(const PetriNet& net, const std::function<bool()>& cancelled) {
   AlignmentOptions options;
   options.cancelled = cancelled;
-  const bool reachable =
-      Aligner(net, options, std::chrono::steady_clock::time_point::max(), true).reachable();
+  const bool reachable = search_final_marking_reachability(net, options) ==
+                         FinalMarkingReachability::kReachable;
   // A cancelled search reports the final marking unreachable.
   if (!reachable) throw_if_cancelled(cancelled, "reachability search was cancelled");
   return reachable;
@@ -6633,12 +6992,10 @@ FinalMarkingReachability final_marking_reachability(
     const PetriNet& net, const std::function<bool()>& cancelled) {
   AlignmentOptions options;
   options.cancelled = cancelled;
-  const Aligner aligner(net, options, std::chrono::steady_clock::time_point::max(),
-                        /*reachability_only=*/true);
-  if (aligner.reachable()) return FinalMarkingReachability::kReachable;
+  const auto verdict = search_final_marking_reachability(net, options);
+  if (verdict == FinalMarkingReachability::kReachable) return verdict;
   throw_if_cancelled(cancelled, "reachability search was cancelled");
-  return aligner.reachability_exhausted() ? FinalMarkingReachability::kExhausted
-                                          : FinalMarkingReachability::kUnreachable;
+  return verdict;
 }
 
 FinalMarkingReachability final_marking_reachability(
@@ -6647,23 +7004,17 @@ FinalMarkingReachability final_marking_reachability(
   AlignmentOptions options;
   options.initial_marking = initial_marking;
   options.final_marking = final_marking;
-  const Aligner aligner(net, options, std::chrono::steady_clock::time_point::max(),
-                        /*reachability_only=*/true);
-  if (aligner.reachable()) return FinalMarkingReachability::kReachable;
-  return aligner.reachability_exhausted() ? FinalMarkingReachability::kExhausted
-                                          : FinalMarkingReachability::kUnreachable;
+  return search_final_marking_reachability(net, options);
 }
 
 bool final_marking_reachable(const PetriNet& net,
                              const std::vector<int>& initial_marking,
                              const std::vector<int>& final_marking) {
-  // The Aligner computes final-marking reachability in its constructor as the
-  // precondition for scoring, so reuse it rather than duplicate the search.
   AlignmentOptions options;
   options.initial_marking = initial_marking;
   options.final_marking = final_marking;
-  return Aligner(net, options, std::chrono::steady_clock::time_point::max(),
-                 /*reachability_only=*/true).reachable();
+  return search_final_marking_reachability(net, options) ==
+         FinalMarkingReachability::kReachable;
 }
 
 }  // namespace minera

@@ -19726,6 +19726,24 @@ declared classes above or in earlier declared classes. 12,000 random token
 cells: 0 regressions, 0 new readings that differ from pandas (one fixed).
 Tests: `minera_core_tests` (`csv_timestamps_review_aa1_skipped_separators`).
 
+**Correction (review AB1-2).** The "0 new wrong values" above did not hold:
+an independent fuzz (about 680k generated cells, compared with 813ffae^ and
+with `read_csv` + `format_dataframe`) found 12 distinct cells the skip read
+while pandas rejects them, all runs dateutil does not skip. These now keep
+their text: a lone `.` before the only number of the cell (`.20240105`, a
+decimal to dateutil); a run other than a single `;` or `'` between a lone
+one-digit number and a meridiem (`2024-01-05 5/am`, `01/05/2024 5. pm`,
+`5; am`; `5;am`, `05/am` and `5/Jan 2024` still read); a `/` at the end after
+a slash date of two numbers (`2024 12/31/`; `2024/01/05/` still reads); a `.`
+at the end after a dotted date led by a month name (`Jan.12.34.`;
+`Jan.12.34;.` still reads); a cell ending in `:` (`03:15:34 am;+05:`); and a
+cell with a decimal number outside the clock (`Jan-5.5/`, `/Jan/5.5`), whose
+date shapes are not dateutil's. Declared: such a decimal cell that pandas
+reads keeps its text (`/Jan 5.5` is 0001-01-05 to pandas). Refuzz of the same
+generators plus two fresh seeds (about 1.1M cells, 53,759 that read
+differently from 813ffae^): 0 new wrong values, and every cell the skip had
+fixed still reads. Tests: the same test, extended.
+
 ## Review Z1: empty fractions before a zone, rounded int keys, isin list dtypes, padded NA cells (2026-11-09)
 
 A review of Round Y against `pandas.read_csv` + `pm4py.format_dataframe`,
@@ -19934,3 +19952,60 @@ Declared (value-dependent dateutil readings, kept as text by the importer):
   offset-minute digit (`+5:300` is +10:00). (`10:55.Z ` with a trailing
   blank reads since review Z1; doubled dots at the end, `11:21..`, read since
   review AA1.)
+
+## Review AA2: structural reduction before the soundness reachability search (2026-11-09)
+
+The soundness check of `/api/mine` (and of active-source mining, the imported
+model route, `minera_export`, the POWL workflow-net conversion and the log
+alignment dispatcher) calls `final_marking_reachability`. On a random CSV with
+40 activities the inductive net (162 places, 202 transitions) has billions of
+interleavings: the three capped searches (uniform-cost, marking-equation A*,
+breadth-first) all stopped at their budget after 17.6 s and 4.6 GB, and the
+POWL net after 10.6 s and 1.9 GB, so both were reported as "reached its
+search limit".
+
+- **Reduction first.** On an ordinary net (unit arcs, repeated unweighted
+  endpoints as multiplicities, no reset or inhibitor arcs) the reachability
+  search now first applies reduction rules that each keep "the final marking
+  is reachable" exactly: removing transitions whose firing changes nothing,
+  duplicate transitions and dead transitions (an input place nothing produces
+  into, with too few initial tokens); removing duplicate places and places
+  that are only tested; post-agglomeration (a transition that is the only
+  consumer of its single input place, fused into that place's producers) and
+  pre-agglomeration (a transition that is the only producer of its single
+  output place, fused into that place's consumers). The proofs are in the
+  comment above `ReachabilityReduction` in `conformance.cpp`. A net whose
+  reduced initial marking equals its reduced final marking is reachable with
+  no search: every process-tree translation (both variants) and POWL
+  translation in the fuzz below reduces that way, in under 0.5 s for nets of
+  90,000 transitions. A smaller residue is searched with the same three
+  searches and a quarter of the state budget when at most two thirds of its
+  places and transitions are left; when that stops at its budget
+  the unreduced net is searched exactly as before, so no verdict the unreduced
+  search decides can change (the undecided Heuristics nets of the fuzz keep 70-80%,
+  so they skip the residue search: 10.9 s against 11.3 s before on the
+  slowest). Nets
+  with reset, inhibitor or non-unit weighted arcs skip the reduction.
+  Alignment preflights (the `Aligner` outside reachability-only use) are
+  unchanged, and cancellation is polled during the reduction and by both
+  searches.
+- **Measurements** (`/usr/bin/time -v`, the four mined nets'
+  `final_marking_reachability` after importing the log): 30k events 17.6 s
+  inductive + 10.6 s POWL, 4.63 GB peak, now 0.00 s each, 105 MB peak (the
+  process; 1.1 s with the import); 500k events 17.9 s + 10.7 s, 5.65 GB, now
+  0.00 s each, 1.68 GB (the imported log). Whole `/api/mine` (another process
+  busy on a second core): 30k 48.0 s and 4.77 GB → 17.7 s and 3.22 GB; 500k
+  117.5 s and 7.78 GB → 88.1 s and 6.21 GB. The responses are identical apart
+  from `sound` turning true and `reachability_exhausted` disappearing for the
+  inductive and POWL models.
+- **Differential fuzz** (old vs new verdicts): 19,571 nets — inductive (IM,
+  IMf, IMd; standard and transition-bordered), Alpha, Heuristics, POWL and ILP
+  nets mined from random logs, random raw nets with weighted, reset and
+  inhibitor arcs and explicit markings, and random block-structured nets with
+  arc mutations. No decided verdict changed (13,734 reachable and 5,276
+  unreachable before); 106 inductive nets went from exhausted to reachable (each confirmed by an
+  independent random-walk witness), and one Alpha net from exhausted to
+  unreachable (unbounded, confirmed by a Karp-Miller coverability graph in
+  which no marking covers the final marking).
+
+Tests: `minera_core_tests` (`final_marking_reachability_reduces_block_structured_nets`).

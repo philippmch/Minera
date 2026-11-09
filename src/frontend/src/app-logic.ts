@@ -332,55 +332,66 @@ export const CSV_HEADER_DELIMITERS = [",", ";", "\t", "|"] as const;
 /** Whether an uploaded file is mined through the CSV/TSV reader. */
 export const isDelimitedTextName = (name: string): boolean => /\.(?:csv|tsv)$/i.test(name);
 
-/** The header line of a CSV text: everything before the first line break outside double quotes (a BOM is dropped). */
-export function csvHeaderLine(text: string): string {
-  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-  let quoted = false;
-  for (let i = 0; i < body.length; i += 1) {
+/**
+ * The records of a CSV text, as pandas' C parser splits them: line breaks end a record outside double quotes, a quote
+ * opens a quoted field only at the start of a field (the record start or after a candidate delimiter; `12" screen`
+ * keeps its quote), `""` inside quotes is a literal quote, a BOM is dropped and blank lines (only spaces or tabs) are
+ * skipped. At most `limit` records; when the text is the start of a longer file (`truncated`), a last record the text
+ * may have cut short is left out.
+ */
+function csvRecords(text: string, truncated: boolean, limit: number): string[] {
+  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text, records: string[] = [];
+  const delimiters: readonly string[] = CSV_HEADER_DELIMITERS;
+  const add = (record: string) => { if (!/^[ \t]*$/.test(record)) records.push(record); };
+  let quoted = false, start = 0;
+  for (let i = 0; i <= body.length && records.length < limit; i += 1) {
     const c = body[i];
-    if (c === '"') quoted = !quoted;
-    else if (!quoted && (c === "\n" || c === "\r")) return body.slice(0, i);
+    if (quoted) {
+      if (i === body.length) { if (!truncated) add(body.slice(start, i)); break; }
+      if (c === '"') { if (body[i + 1] === '"') i += 1; else quoted = false; }
+      continue;
+    }
+    if (c === '"' && (i === start || delimiters.includes(body[i - 1]))) { quoted = true; continue; }
+    if (i === body.length || c === "\n" || c === "\r") {
+      if (i === body.length && truncated) break;
+      add(body.slice(start, i));
+      if (c === "\r" && body[i + 1] === "\n") i += 1;
+      start = i + 1;
+    }
   }
-  return body;
+  return records;
 }
 
-/** Splits a header line on `delimiter`, honoring double quotes ("" is a literal quote). */
+/** The header line of a CSV text: its first record, after any blank lines (pandas skips them), without a BOM. */
+export function csvHeaderLine(text: string): string {
+  return csvRecords(text, false, 1)[0] ?? "";
+}
+
+/** Splits a header line on `delimiter`, honoring double quotes that open a field ("" is a literal quote). */
 export function csvHeaderNames(line: string, delimiter: string): string[] {
   const names: string[] = [];
-  let current = "", quoted = false;
+  let current = "", quoted = false, fieldStart = true;
   for (let i = 0; i < line.length; i += 1) {
     const c = line[i];
     if (quoted) {
       if (c === '"' && line[i + 1] === '"') { current += '"'; i += 1; }
       else if (c === '"') quoted = false;
       else current += c;
-    } else if (c === '"') quoted = true;
-    else if (c === delimiter) { names.push(current); current = ""; }
-    else current += c;
+    } else if (c === '"' && fieldStart) { quoted = true; fieldStart = false; }
+    else if (c === delimiter) { names.push(current); current = ""; fieldStart = true; }
+    else { current += c; fieldStart = false; }
   }
   names.push(current);
   return names;
 }
 
 /**
- * The data records of a CSV sample after its header line: split on line breaks outside double quotes, blank lines
- * skipped, at most `limit` of them. When the sample is the start of a longer file (`truncated`), its last record may be
- * cut short and is left out.
+ * The data records of a CSV sample after its header line (split as csvRecords does: blank lines skipped, quotes only
+ * at field starts), at most `limit` of them. When the sample is the start of a longer file (`truncated`), its last
+ * record may be cut short and is left out.
  */
 export function csvDataRows(text: string, truncated: boolean, limit = 20): string[] {
-  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text, records: string[] = [];
-  let quoted = false, start = 0;
-  for (let i = 0; i <= body.length && records.length <= limit + 1; i += 1) {
-    const c = body[i];
-    if (c === '"') quoted = !quoted;
-    else if (i === body.length || (!quoted && (c === "\n" || c === "\r"))) {
-      if (i === body.length && truncated) break;
-      records.push(body.slice(start, i));
-      if (c === "\r" && body[i + 1] === "\n") i += 1;
-      start = i + 1;
-    }
-  }
-  return records.slice(1).filter(record => record !== "").slice(0, limit);
+  return csvRecords(text, truncated, limit + 1).slice(1);
 }
 
 /**
