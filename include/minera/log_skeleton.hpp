@@ -73,6 +73,19 @@ struct LogSkeletonModel {
     const LazyEventTable& table, const LogSkeletonOptions& options = {});
 [[nodiscard]] LogSkeletonModel discover_log_skeleton(
     const EventDataView& data, const LogSkeletonOptions& options = {});
+// The cases of `data` met in the given order (positions into the cases the
+// functions above meet: a log's traces, flat data's groups by
+// options.case_id_key), e.g. log_skeleton_case_order(data, options).
+[[nodiscard]] LogSkeletonModel discover_log_skeleton(
+    const EventDataView& data, const LogSkeletonOptions& options,
+    const std::vector<std::size_t>& trace_order);
+// The positions of the cases the log-skeleton functions meet on `data` (a
+// log's traces; flat data's groups by options.case_id_key, in first-appearance
+// order) in the stable code-point order of their case ids: the order of
+// pm4py's DataFrame log skeleton and Declare (case_id_order for a log). The
+// Declare functions group flat data the same way.
+[[nodiscard]] std::vector<std::size_t> log_skeleton_case_order(
+    const EventDataView& data, const LogSkeletonOptions& options);
 
 // A variant list is an ordered sequence of activity variants paired with the
 // source count metadata. The classic entry point materializes one trace per

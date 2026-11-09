@@ -497,6 +497,22 @@ export function caseRowEntries<T extends { case_id: string }>(traces: readonly T
   return rows.sort((a, b) => compareCaseIds(a.trace.case_id, b.trace.case_id) || a.key - b.key);
 }
 
+const PYTHON_FLOAT_DECIMAL = /^[+-]?(?:(?:\d(?:_?\d)*)?\.\d(?:_?\d)*|\d(?:_?\d)*\.?)(?:[eE][+-]?\d(?:_?\d)*)?$/;
+const PYTHON_FLOAT_SPECIAL = /^([+-]?)(?:(inf|infinity)|nan)$/i;
+/**
+ * Python's float(str) over a whole text, as the backend reads ratio controls: surrounding whitespace, an optional sign,
+ * underscores only between digits, a decimal mantissa with an optional complete exponent, or inf/infinity/nan in any
+ * case. Hexadecimal, a lone ".", an exponent without digits and trailing text are refused (null). (Python also reads
+ * non-ASCII decimal digits; this accepts ASCII digits only.)
+ */
+export function parsePythonFloat(text: string): number | null {
+  const trimmed = text.trim();
+  if (PYTHON_FLOAT_DECIMAL.test(trimmed)) return Number(trimmed.replace(/_/g, ""));
+  const special = PYTHON_FLOAT_SPECIAL.exec(trimmed);
+  if (!special) return null;
+  return special[2] ? (special[1] === "-" ? -Infinity : Infinity) : NaN;
+}
+
 /** A numeric input's value: an emptied field means "not set" rather than 0. */
 export function optionalNumber(text: string): number | undefined {
   return text.trim() === "" ? undefined : Number(text);

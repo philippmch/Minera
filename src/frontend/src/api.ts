@@ -265,6 +265,7 @@ import { nativeResponseFailure, readNativeResponse } from "./native-response";
 import { importedModelFetch, importedModelIdOf, setImportedModelId } from "./imported-model-binding";
 import {isActiveSourceMining, miningSourceFields, type ActiveDatasetResult, type MiningInputOptions} from "./active-mining-source";
 import {markLiveTraces} from "./mine-traces";
+import {waitForCanceledMine} from "./mine-progress";
 
 export interface CsvOptions {
   caseColumn?: string;
@@ -1802,6 +1803,12 @@ export interface MineResponseOptions {
    * mines without it and loads the cases on demand (GET /api/traces).
    */
   includeTraces?: boolean;
+  /**
+   * true first waits (polling GET /api/mine-progress) for a canceled mine
+   * that still holds the backend's single slot, as one this tab just
+   * canceled does while it stops, instead of posting into 503 MINE_BUSY.
+   */
+  waitForCanceledMine?: boolean;
 }
 
 /** Upload the unchanged original file and retain typed source-only outcomes. */
@@ -1827,6 +1834,7 @@ export async function mineActiveDataset(
   // mining slot until its next stage; the backend says so ("canceling"), and
   // this request retries after Retry-After instead of failing.
   const started = Date.now();
+  if (options.waitForCanceledMine) await waitForCanceledMine(signal, MINE_BUSY_WAIT_MS);
   for (;;) {
     try {
       response = await importedModelFetch("/api/mine", { method: "POST", body: form, signal });

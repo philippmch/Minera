@@ -2,6 +2,7 @@
 #include "minera/request_params.hpp"
 #include "minera/literal_controls_json.hpp"
 #include "json_utf8.hpp"
+#include "python_float_text.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -468,6 +469,17 @@ double parse_finite_double(std::string_view value, std::string_view name) {
                                 owned + "'");
   }
   return parsed;
+}
+
+// A finite number in Python's float() syntax (no hexadecimal; surrounding
+// whitespace and digit underscores as float() takes them), for the controls
+// the reference reads with float().
+double parse_python_finite_float(std::string_view value, std::string_view name) {
+  const std::string owned(value);
+  const auto parsed = minera::detail::parse_python_float_text(owned);
+  if (!parsed || !std::isfinite(*parsed))
+    throw std::invalid_argument(std::string(name) + ": expected a finite number, got '" + owned + "'");
+  return *parsed;
 }
 
 double parse_ieee_double(std::string_view value, std::string_view name) {
@@ -3369,7 +3381,7 @@ MineParams parse_mine_params(const FieldLookup& field,
     if (value.empty()) return;
     // Any finite ratio, as the reference takes it: a value outside [0, 1]
     // only changes which rules pass.
-    destination = parse_finite_double(value, field_name);
+    destination = parse_python_finite_float(value, field_name);
     has_value = true;
   };
   parse_declare_ratio("declare_min_support_ratio",
@@ -3381,7 +3393,7 @@ MineParams parse_mine_params(const FieldLookup& field,
   if (const auto value = field("declare_auto_selection_multiplier");
       !value.empty()) {
     params.declare_options.auto_selection_multiplier =
-        parse_finite_double(value, "declare_auto_selection_multiplier");
+        parse_python_finite_float(value, "declare_auto_selection_multiplier");
   }
 
   const auto parse_footprints_set =

@@ -1,4 +1,5 @@
 import {parseDiscoveryStringVector, discoveryStringVectorJson, type DiscoveryVectorMode} from "./discovery-string-vectors";
+import { parsePythonFloat } from "./app-logic";
 import { backendFetch } from "./backend-fetch";
 import { DECLARE_TEMPLATES, isMineraExport, type MineraExport } from "./types";
 import type { LogQuerySchema } from "./log-query";
@@ -19,6 +20,8 @@ export function defaultConstraintForm(family: ConstraintFamily): ConstraintForm 
   return {activity:"", conformanceActivity:"", diagnosticsCase:"", selection:"native", templates:[...(family === "declare" ? DECLARE_TEMPLATES : SKELETON_FAMILIES)],
     activitySelection:"native", activities:"", activitiesMode:"legacy", activitiesJson:"[]", support:"", confidence:"", multiplier:"", noise:"", generateLog:false, traces:"", minimum:"", maximum:"", seed:""};
 }
+/** Whether Declare discovery picks its thresholds automatically (both explicit ratios blank), so the multiplier applies. */
+export const declareAutoSelectionActive = (form: Pick<ConstraintForm, "support" | "confidence">): boolean => !form.support.trim() && !form.confidence.trim();
 export function constraintQuery(family: ConstraintFamily, form: ConstraintForm, sourceId: string): URLSearchParams {
   if (!sourceId) throw new Error("Refresh the constraint source first.");
   const q = new URLSearchParams({family, source_id:sourceId});
@@ -31,11 +34,12 @@ export function constraintQuery(family: ConstraintFamily, form: ConstraintForm, 
     q.set(family === "declare" ? "declare_allowed_templates" : "log_skeleton_constraints", form.templates.join(","));
   }
   // The noise threshold stays in [0,1] (declared); Declare ratios take any
-  // finite value, as the reference does.
+  // finite value, as the reference does. The text follows Python's float()
+  // syntax, as the backend reads it (so no hexadecimal, unlike Number()).
   const ratio = (key: string, text: string, bounded = true) => {
     if (!text.trim()) return;
-    const number = Number(text);
-    if (!Number.isFinite(number)) throw new Error("Thresholds must be finite numbers.");
+    const number = parsePythonFloat(text);
+    if (number === null || !Number.isFinite(number)) throw new Error("Thresholds must be finite decimal numbers (for example 0.8 or 1e-3).");
     if (bounded && (number < 0 || number > 1)) throw new Error("Thresholds must be finite numbers in [0,1].");
     q.set(key,text.trim());
   };
@@ -44,7 +48,10 @@ export function constraintQuery(family: ConstraintFamily, form: ConstraintForm, 
       if (form.activitiesMode === "literal_json") q.set("declare_considered_activities_json", discoveryStringVectorJson(parseDiscoveryStringVector(form.activitiesJson, "Declare considered activities"), "Declare considered activities"));
       else q.set("declare_considered_activities", form.activities.split(",").map(x=>x.trim()).filter(Boolean).join(","));
     }
-    ratio("declare_min_support_ratio",form.support,false); ratio("declare_min_confidence_ratio",form.confidence,false); ratio("declare_auto_selection_multiplier",form.multiplier,false);
+    ratio("declare_min_support_ratio",form.support,false); ratio("declare_min_confidence_ratio",form.confidence,false);
+    // The multiplier scales the automatic thresholds, which apply only when
+    // both explicit ratios are blank (an explicit one leaves the other at 0).
+    if (declareAutoSelectionActive(form)) ratio("declare_auto_selection_multiplier",form.multiplier,false);
     if (form.generateLog) {
       q.set("generate_log","true");
       for (const [key,text] of [["traces",form.traces],["min_length",form.minimum],["max_length",form.maximum],["seed",form.seed]] as const) {

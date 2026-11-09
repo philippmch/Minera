@@ -2554,7 +2554,11 @@ void parse_mine_params_rejects_invalid_declare_fields() {
            std::pair{"declare_allowed_templates", "response,unknown"},
            std::pair{"declare_min_support_ratio", "nan"},
            std::pair{"declare_min_confidence_ratio", "inf"},
-           std::pair{"declare_auto_selection_multiplier", "-inf"}}) {
+           std::pair{"declare_auto_selection_multiplier", "-inf"},
+           // Python's float() refuses hexadecimal and a bare exponent.
+           std::pair{"declare_min_support_ratio", "0x10"},
+           std::pair{"declare_min_confidence_ratio", "1e"},
+           std::pair{"declare_auto_selection_multiplier", "0X1p-2"}}) {
     bool threw = false;
     try {
       (void)minera::parse_mine_params(fields({item}));
@@ -2572,6 +2576,12 @@ void parse_mine_params_rejects_invalid_declare_fields() {
   assert(outside.declare_options.min_support_ratio == -0.1);
   assert(outside.declare_options.min_confidence_ratio == 1.1);
   assert(outside.declare_options.auto_selection_multiplier == 2.0);
+  // float()'s own spellings: surrounding whitespace and digit underscores.
+  const auto spelled = minera::parse_mine_params(fields({
+      {"declare_min_support_ratio", " 0.5 "},
+      {"declare_min_confidence_ratio", "1_0e-1"}}));
+  assert(spelled.declare_options.min_support_ratio == 0.5);
+  assert(spelled.declare_options.min_confidence_ratio == 1.0);
 }
 
 void parse_mine_params_maps_footprints_options() {

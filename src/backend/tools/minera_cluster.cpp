@@ -17,7 +17,7 @@ int run_cluster(int argc,char** argv){
    if(key=="--regex"){pattern=value;has_pattern=true;}else if(key=="--runtime-url")runtime=value;else if(key=="--name")name=value;else if(key=="--activity-attribute")activity=value;else if(key=="--filter-output")output=value;else if(key=="--table-output")table_output=value;else throw std::invalid_argument("unknown cluster option: "+key);
   }
   if(!has_pattern||runtime.empty())throw std::invalid_argument("--regex and --runtime-url are required");
-  const auto path=std::filesystem::u8path(argv[1]);const auto log=path.extension()==".xes"||path.extension()==".gz"?minera::import_xes_event_log(path):minera::import_csv_event_log(path);
+  const auto path=std::filesystem::u8path(argv[1]);const auto log=path.extension()==".xes"||path.extension()==".gz"?minera::import_xes_dataframe_log(path):minera::import_csv_event_log(path);
   const auto indices=minera::log_cluster_runtime::select(runtime,log,pattern,activity);const auto filtered=minera::filter_query_events(log,indices,true);
   if(!output.empty()){minera::XesExportOptions options;options.preserve_nulls=true;minera::export_xes_event_log(std::filesystem::u8path(output),filtered,options);}
   if(!table_output.empty()){std::ofstream file(std::filesystem::u8path(table_output),std::ios::binary);if(!file)throw std::runtime_error("could not open cluster table output");file<<minera::log_cluster_runtime::table_json(log,indices);if(!file)throw std::runtime_error("could not write cluster table output");}

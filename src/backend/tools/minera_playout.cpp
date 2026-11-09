@@ -377,7 +377,7 @@ int main(int argc, char** argv) {
                      });
       const auto source = (lower_path.ends_with(".xes") ||
                            lower_path.ends_with(".xes.gz"))
-                              ? minera::import_xes_event_log(input_file)
+                              ? minera::import_xes_dataframe_log(input_file)
                               : minera::import_csv_event_log(input_file);
       const auto frequency = minera::discover_frequency_dfg(source);
       minera::DfgActivityCounts starts, ends;

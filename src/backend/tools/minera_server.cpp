@@ -1150,33 +1150,53 @@ void check_server_stochastic_visited_peak(const minera::PlayoutVisitedResult& vi
 #include "mine_limits.hpp"
 #include "mine_progress.hpp"
 #include "active_source_options.hpp"
-#include "active_source_mining.hpp"
-#include "traces_route.hpp"
-
 // The order in which pm4py's DataFrame log skeleton and Declare meet and
 // list the cases of an XES input (read_xes keeps the file order; these group
-// the frame by case id). Null for other inputs, whose log already follows the
-// reference (a formatted CSV frame is sorted by case id; a native log keeps
-// its order).
+// the frame by case id), for the data they run on: the log's traces, or a
+// flat shape's groups by case_id_key. Null for other inputs, whose data
+// already follows the reference (a formatted CSV frame is sorted by case id;
+// a native log keeps its order), and for an event stream, which pm4py groups
+// in first-appearance order.
 std::optional<std::vector<std::size_t>> constraint_case_order(
-    const minera::ActiveEventSource& source, const minera::EventLog& log) {
-  if (source.file().format != "xes") return std::nullopt;
-  auto order = minera::case_id_order(log);
+    const minera::ActiveEventSource& source, const minera::EventDataView& data,
+    std::string_view activity_key, std::string_view case_id_key) {
+  if (source.file().format != "xes" || data.kind() == minera::EventDataKind::kEventStream)
+    return std::nullopt;
+  std::vector<std::size_t> order;
+  try {
+    minera::LogSkeletonOptions keys;
+    keys.activity_key = std::string(activity_key);
+    keys.case_id_key = std::string(case_id_key);
+    order = minera::log_skeleton_case_order(data, keys);
+  } catch (const std::exception&) {
+    return std::nullopt;  // the constraint call itself reports the selector error
+  }
   bool identity = true;
   for (std::size_t i = 0; i < order.size() && identity; ++i) identity = order[i] == i;
   if (identity) return std::nullopt;
   return order;
 }
 
+std::optional<std::vector<std::size_t>> constraint_case_order(
+    const minera::ActiveEventSource& source, const minera::EventLog& log) {
+  return constraint_case_order(source, minera::EventDataView(log), "concept:name",
+                               "case:concept:name");
+}
+
+// The results in that order (unchanged when the order is null or does not
+// list every result).
 template <class Result>
 std::vector<Result> in_constraint_order(const std::vector<Result>& results,
                                         const std::optional<std::vector<std::size_t>>& order) {
-  if (!order) return results;
+  if (!order || order->size() != results.size()) return results;
   std::vector<Result> ordered;
   ordered.reserve(results.size());
   for (const auto index : *order) ordered.push_back(results.at(index));
   return ordered;
 }
+
+#include "active_source_mining.hpp"
+#include "traces_route.hpp"
 
 void handle_mine(const httplib::Request& request, httplib::Response& response) {
   // A multipart mine reads its controls from form fields only, so a query
@@ -1253,7 +1273,23 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 
     const auto exact_heuristic_options=params.heuristic;
     std::string paired_csv_import_error;
+    // An unknown field is refused before the log is read: the controls the
+    // source preparation and the steps below consult are consulted here
+    // without effect first. (The audit after them stays.)
+    if (audit_fields) {
+      for (const char* name : {"mining_input_format", "mining_input_shape", "mining_selectors_json"}) audit_form_field(name);
+      auto probe = params;
+      overlay_active_source_selectors(probe, minera::ActiveSourceSelectors{},
+          [&](std::string_view key) {return active_source_supplied(request, key);});
+      (void)minera::exact_heuristic_options_requested([&](std::string_view key) {return active_source_supplied(request, key);});
+      if (const auto unknown = field_audit.unconsulted(request))
+        throw std::invalid_argument("unknown or inapplicable /api/mine form field: " + *unknown);
+    }
     check_mine_size_limit(request, *csv, dataset, params);
+    // A cancel-mine (or a newer source request, or a disconnect) stops the
+    // read of the upload part-way (source_read_cancel.hpp).
+    const auto read_cancelled = mining_cancel_hook(ticket, connection_cancel_hook(request));
+    const SourceReadCancelScope read_cancel(read_cancelled);
     auto active_source = std::make_shared<const minera::ActiveEventSource>(
         prepare_active_event_source(request, *csv, dataset, params, &paired_csv_import_error, true));
     // A canceled or superseded request stops between stages with the same
@@ -4251,9 +4287,12 @@ void handle_constraint_discovery(const httplib::Request& request,
     std::string diagnostics, diagnostics_error, playout_xes, playout_result, playout_error;
     // An XES source's cases in pm4py's DataFrame order (see constraint_case_order);
     // the diagnostics table keeps the frame's (file) order, as the reference's does.
-    const auto constraint_order = session->active_source && session->log_ready &&
-            session->active_source->selected_kind() == minera::EventDataKind::kEventLog
-        ? constraint_case_order(*session->active_source, require_prepared_log(*session))
+    const auto constraint_order = session->active_source && session->log_ready
+        ? (family == "declare"
+               ? constraint_case_order(*session->active_source, session->active_source->selected_view(),
+                     params.declare_conformance_options.activity_key, params.declare_conformance_options.case_id_key)
+               : constraint_case_order(*session->active_source, session->active_source->selected_view(),
+                     params.log_skeleton.activity_key, params.log_skeleton.case_id_key))
         : std::nullopt;
     if (family == "declare") {
       declare = minera::discover_declare(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.declare_options);
@@ -4289,7 +4328,7 @@ void handle_constraint_discovery(const httplib::Request& request,
       }
     } else {
       skeleton = constraint_order
-          ? minera::discover_log_skeleton(require_prepared_log(*session), params.log_skeleton, *constraint_order)
+          ? minera::discover_log_skeleton(session->active_source->selected_view(), params.log_skeleton, *constraint_order)
           : minera::discover_log_skeleton(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.log_skeleton);
       auto options = params.log_skeleton; options.activity_key = conformance_activity;
       skeleton_conformance = minera::check_log_skeleton_conformance(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *skeleton, options);
@@ -6187,6 +6226,8 @@ void handle_pripel(const httplib::Request& request,
     if (query_content.empty())
       throw std::invalid_argument("PRIPEL requires a non-empty trace-variant query log");
     std::istringstream input(query_content);
+    // PRIPEL's trace_variant_query parameter is an EventLog object (the
+    // reference reads its traces as given), so its XES keeps every trace.
     const auto query = looks_like_xes(query_name, query_content)
                            ? minera::import_xes_event_log(input)
                            : minera::import_csv_event_log(input);
@@ -6232,7 +6273,7 @@ void handle_token_replay(const httplib::Request& request,
     const auto& file = request.get_file_value("log");
     std::istringstream input(file.content);
     const auto log = looks_like_xes(file.filename, file.content)
-        ? minera::import_xes_event_log(input, params.xes)
+        ? minera::import_xes_dataframe_log(input, params.xes)
         : minera::import_csv_event_log(input, params.csv);
     auto import_options = minera::tools::pnml_model_import_options();
     import_options.import_stochastic_map = false;
@@ -6623,7 +6664,7 @@ void handle_replay_fitness(const httplib::Request& request,
     const auto& file = request.get_file_value("log");
     std::istringstream input(file.content);
     const auto log = looks_like_xes(file.filename, file.content)
-        ? minera::import_xes_event_log(input, imports.xes)
+        ? minera::import_xes_dataframe_log(input, imports.xes)
         : minera::import_csv_event_log(input, imports.csv);
     auto model_options = minera::tools::pnml_model_import_options();
     model_options.import_stochastic_map = false;
@@ -7806,6 +7847,8 @@ void handle_case_relations(const httplib::Request& request,
       if (csv_table && !explicit_timestamp)
         options.timestamp_key = minera::tools::relation_role_column(
             *csv_table, minera::FirstClassAttributeRole::kTimestamp, "timestamp");
+      // The relation merger reads the read_xes frame's rows (file order, each
+      // row's own trace cells), which the imported traces give one to one.
       auto base_table = base_is_xes
           ? minera::tools::relation_xes_table(minera::import_xes_event_log(base_input), options,
                                             explicit_case, explicit_timestamp)
@@ -7878,10 +7921,10 @@ void handle_timestamp_interleavings(const httplib::Request& request,
     std::istringstream right_input(right_file.content);
     std::istringstream relation_input(relation_file.content);
     const auto left = looks_like_xes(left_file.filename, left_file.content)
-                          ? minera::import_xes_event_log(left_input)
+                          ? minera::import_xes_dataframe_log(left_input)
                           : minera::import_csv_event_log(left_input);
     const auto right = looks_like_xes(right_file.filename, right_file.content)
-                           ? minera::import_xes_event_log(right_input)
+                           ? minera::import_xes_dataframe_log(right_input)
                            : minera::import_csv_event_log(right_input);
     const auto value = [&](std::string_view key, std::string fallback) {
       return request.has_param(std::string(key))
@@ -8171,7 +8214,7 @@ void handle_compare_petri(const httplib::Request& request,
       }
       if (!selector.empty() && selector != "concept:name")
         reference_options.activity_attribute = selector;
-      reference = minera::import_xes_event_log(input, reference_options);
+      reference = minera::import_xes_dataframe_log(input, reference_options);
     } else {
       std::istringstream input(reference_file.content);
       minera::CsvImportOptions reference_options;
@@ -8614,7 +8657,7 @@ void handle_evaluate_emd(const httplib::Request& request,
     std::istringstream input(file.content);
     const auto reference =
         minera::looks_like_xes(file.filename, file.content)
-            ? minera::import_xes_event_log(input)
+            ? minera::import_xes_dataframe_log(input)
             : minera::import_csv_event_log(input);
     const auto result = minera::evaluate_emd(
         // The reference compares trace-variant probabilities (get_language).
@@ -8754,7 +8797,7 @@ void handle_alpha_plus_result(const httplib::Request& request, httplib::Response
       const auto body = request.has_file("log") ? request.get_file_value("log").content : request.body;
       const auto filename = request.has_file("log") ? request.get_file_value("log").filename : std::string{};
       std::stringstream input(body);
-      log = minera::looks_like_xes(filename, body) ? minera::import_xes_event_log(input)
+      log = minera::looks_like_xes(filename, body) ? minera::import_xes_dataframe_log(input)
                                                  : minera::import_csv_event_log(input);
     } else {
       std::shared_ptr<const MinedSession> session;
@@ -8828,7 +8871,7 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
     if (!request.is_multipart_form_data() || !request.has_file("reference_log")) throw std::invalid_argument("missing form field: reference_log");
     const auto& file = request.get_file_value("reference_log");
     std::stringstream input(file.content);
-    const auto reference = minera::looks_like_xes(file.filename, file.content) ? minera::import_xes_event_log(input) : minera::import_csv_event_log(input);
+    const auto reference = minera::looks_like_xes(file.filename, file.content) ? minera::import_xes_dataframe_log(input) : minera::import_csv_event_log(input);
     const auto lookup = [&](std::string_view n) { const auto key=std::string(n); if (request.has_param(key)) return request.get_param_value(key); if (request.has_file(key)) return request.get_file_value(key).content; return std::string{}; };
     const auto present = [&](std::string_view n) { const auto key=std::string(n); return request.has_param(key) || request.has_file(key); };
     auto options = minera::parse_edit_distance_params(lookup, present);
@@ -11145,7 +11188,7 @@ void handle_streaming_declare(const httplib::Request& request,httplib::Response&
     const auto model=minera::parse_declare_stream_model_json(model_body);minera::DeclareStreamingConformance monitor(model);minera::CsvImportOptions csv;csv.keep_na_first_class_values=true;
     if(request.has_param("streaming_declare_case_id_column"))csv.case_id_column=request.get_param_value("streaming_declare_case_id_column");if(request.has_param("streaming_declare_activity_column"))csv.activity_column=request.get_param_value("streaming_declare_activity_column");if(request.has_param("streaming_declare_timestamp_column"))csv.timestamp_column=request.get_param_value("streaming_declare_timestamp_column");
     const auto format=request.has_param("format")?request.get_param_value("format"):"csv";std::istringstream input(log_body);minera::EventLog log;
-    if(format=="csv")log=minera::import_csv_event_log(input,csv);else if(format=="xes")log=minera::import_xes_event_log(input);else throw std::invalid_argument("Declare events require CSV or XES");
+    if(format=="csv")log=minera::import_csv_event_log(input,csv);else if(format=="xes")log=minera::import_xes_dataframe_log(input);else throw std::invalid_argument("Declare events require CSV or XES");
     const auto events=streaming_events(log,request);std::ostringstream rows;rows<<'[';for(std::size_t i=0;i<events.size();++i){if(i)rows<<',';rows<<minera::serialize_declare_stream_event_json(monitor.receive(*events[i]));}rows<<']';
     auto result=minera::serialize_declare_streaming_json(monitor.snapshot(),model);result.pop_back();result+=",\"event_results\":"+rows.str()+"}";
     response.set_content(streaming_diagnostics_json(std::move(result),request,events.size()),"application/json");

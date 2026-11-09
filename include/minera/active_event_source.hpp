@@ -92,6 +92,14 @@ class ActiveEventSource {
       EventLog log, ActiveSourceFile file,
       ActiveSourceSelectors selectors = {},
       EventDataKind selected = EventDataKind::kEventLog);
+  // An imported XES log on pm4py's DataFrame path (pm4py.read_xes): the
+  // source's log is merge_dataframe_cases of `frame`, and its table holds the
+  // frame's rows: every event in file order with its own trace's cells. A
+  // filtered source keeps projecting those rows.
+  [[nodiscard]] static ActiveEventSource from_xes_frame(
+      EventLog frame, ActiveSourceFile file,
+      ActiveSourceSelectors selectors = {},
+      EventDataKind selected = EventDataKind::kEventLog);
 
   [[nodiscard]] const ActiveSourceFile& file() const noexcept;
   [[nodiscard]] const ActiveSourceSelectors& selectors() const noexcept;

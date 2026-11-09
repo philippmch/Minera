@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -162,8 +163,10 @@ int main(int argc, char** argv) {
   }
   const int port = free_port();
   const std::string port_text = std::to_string(port);
+  // The large budget lets the 600,000-row read below start; it is canceled
+  // while reading.
   std::vector<std::string> args = {argv[1], "--port", port_text, "--frontend",
-                                   "/nonexistent-minera-frontend"};
+                                   "/nonexistent-minera-frontend", "--mine-memory-budget", "64G"};
   std::vector<char*> raw;
   for (auto& arg : args) raw.push_back(arg.data());
   raw.push_back(nullptr);
@@ -278,6 +281,82 @@ int main(int argc, char** argv) {
     check(r && r->status == 200, "a later mine succeeds: " + describe(r));
     r = client.Get("/api/mine-progress");
     check(r && field(r->body, "running") == "false", "idle again after it: " + describe(r));
+
+    // A long read: 600,000 rows take seconds to import.
+    std::string big = "case_id,activity,timestamp\n";
+    big.reserve(600000 * 36);
+    for (int row = 0; row < 600000; ++row) {
+      char line[64];
+      std::snprintf(line, sizeof line, "c%d,a%d,2024-01-01T%02d:%02d:%02dZ\n", row / 12, row % 9,
+                    (row % 12) * 2, row % 60, (row / 60) % 60);
+      big += line;
+    }
+    // An unknown field is refused before the log is read.
+    {
+      const auto asked = std::chrono::steady_clock::now();
+      httplib::MultipartFormDataItems items = {{"log", big, "big.csv", "text/csv"}, {"request_id", "x", "", ""}};
+      r = client.Post("/api/mine", items);
+      const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - asked).count();
+      check(r && r->status == 400 && contains(r->body, "unknown or inapplicable /api/mine form field: request_id"),
+            "an unknown field is refused: " + describe(r));
+      std::cout << "unknown field refused in " << took << " s\n";
+      check(took < 1.0, "an unknown field is refused before the log is read (" + std::to_string(took) + " s)");
+    }
+    // A cancel during "Reading the event log" stops the read part-way.
+    {
+      const std::string read_id = "8d1e2f30-4a5b-4c6d-9e7f-0a1b2c3d4e5f";
+      std::optional<httplib::Result> read_mined;
+      std::thread reader([&] {
+        httplib::Client mining("127.0.0.1", port);
+        mining.set_read_timeout(300, 0);
+        httplib::MultipartFormDataItems items = {{"log", big, "big.csv", "text/csv"},
+                                                 {"include_traces", "false", "", ""},
+                                                 {"mining_request_id", read_id, "", ""}};
+        read_mined = mining.Post("/api/mine", items);
+      });
+      bool reading = false;
+      for (int attempt = 0; attempt < 400 && !reading && !read_mined; ++attempt) {
+        const auto progress = poll(client, read_id);
+        reading = progress && progress->running && progress->matches && progress->stage == "Reading the event log";
+        if (!reading) sleep_ms(10);
+      }
+      check(reading, "the mine reached the reading stage");
+      sleep_ms(50);
+      const auto canceled_at = std::chrono::steady_clock::now();
+      r = client.Post("/api/cancel-mine?request_id=" + read_id, "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel-mine while reading: " + describe(r));
+      const auto still = poll(client, read_id);
+      check(still && still->stage == "Reading the event log", "the cancel arrived while reading");
+      bool stopped = false;
+      while (!stopped && std::chrono::steady_clock::now() - canceled_at < std::chrono::seconds(30)) {
+        const auto progress = poll(client, read_id);
+        stopped = progress && !progress->running;
+        if (!stopped) sleep_ms(10);
+      }
+      const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - canceled_at).count();
+      std::cout << "read stopped " << took << " s after the cancel\n";
+      check(stopped && took < 0.5, "the read stopped within half a second of the cancel (" + std::to_string(took) + " s)");
+      reader.join();
+      check(read_mined && *read_mined && (*read_mined)->status == 400 &&
+                contains((*read_mined)->body, "mining request was canceled or replaced by a newer source request"),
+            "the canceled read answers with the cancel's error: " + (read_mined ? describe(*read_mined) : std::string("none")));
+    }
+    // cancel-mine says whether it undid anything: a request whose response
+    // was acknowledged cannot be canceled; an unknown id is recorded.
+    {
+      const std::string done_id = "1b2c3d4e-5f60-4718-8a9b-0c1d2e3f4a5b";
+      httplib::MultipartFormDataItems items = {{"log", "case_id,activity,timestamp\nc1,a,2024-01-01T00:00:00Z\n", "one.csv", "text/csv"},
+                                               {"include_traces", "false", "", ""},
+                                               {"mining_request_id", done_id, "", ""}};
+      r = client.Post("/api/mine", items);
+      check(r && r->status == 200, "a tracked mine: " + describe(r));
+      r = client.Post("/api/mine-ack?request_id=" + done_id, "", "text/plain");
+      check(r && contains(r->body, "\"acknowledged\":true"), "ack: " + describe(r));
+      r = client.Post("/api/cancel-mine?request_id=" + done_id, "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":false"), "cancel after an ack: " + describe(r));
+      r = client.Post("/api/cancel-mine?request_id=2c3d4e5f-6071-4829-9bac-1d2e3f4a5b6c", "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel of a request not yet seen: " + describe(r));
+    }
   }
 
   ::kill(server, SIGTERM);

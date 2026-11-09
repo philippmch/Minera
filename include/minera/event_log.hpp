@@ -638,8 +638,18 @@ struct EventLog {
 // id are one case (its events in file order, the trace attributes of the
 // first such trace, as converting the frame to a log takes them). Cases keep
 // the order of their first trace; traces with a null or missing id are kept
-// apart.
-void merge_dataframe_cases(EventLog& log);
+// apart (pm4py refuses such a frame).
+//
+// The frame's rows keep their own trace's `case:` cells, so when the traces
+// of a case differ in their attributes, each event of that case carries its
+// trace's cells in Event::case_row_attributes (every key any of those traces
+// holds, null where its trace lacks it): row-wise DataFrame consumers (case
+// filters, attribute statistics) then read them as pm4py does. When
+// frame_rows is given, it receives for each case the frame row of each of
+// its events: the event's position among all events of the log as imported
+// (file order).
+void merge_dataframe_cases(
+    EventLog& log, std::vector<std::vector<std::size_t>>* frame_rows = nullptr);
 
 // The positions of the log's traces in the stable code-point order of their
 // case ids: the order in which pm4py's DataFrame conformance lists (log

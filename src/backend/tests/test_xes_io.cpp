@@ -15,6 +15,8 @@
 #include <vector>
 
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/attribute_statistics.hpp"
+#include "minera/log_filter.hpp"
 #include "minera/xes_export.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/timestamp.hpp"
@@ -2059,8 +2061,69 @@ void dataframe_cases_merge_shared_ids_and_order_by_code_point() {
   assert(log.traces[order.back()].case_id == "b");
 }
 
+
+// A merged case keeps each frame row's own trace cells (pm4py.read_xes holds
+// a row per event with its trace's `case:` columns): case filters and the
+// trace-attribute counts read them per row, and frame_rows maps every event to
+// its file row.
+void dataframe_cases_keep_row_case_cells() {
+  const std::string xml =
+      "<log>"
+      "<trace><string key=\"concept:name\" value=\"b\"/><string key=\"k\" value=\"first\"/>"
+      "<event><string key=\"concept:name\" value=\"X\"/></event>"
+      "<event><string key=\"concept:name\" value=\"W\"/></event></trace>"
+      "<trace><string key=\"concept:name\" value=\"B\"/>"
+      "<event><string key=\"concept:name\" value=\"Y\"/></event></trace>"
+      "<trace><string key=\"concept:name\" value=\"empty\"/></trace>"
+      "<trace><string key=\"concept:name\" value=\"b\"/><string key=\"k\" value=\"second\"/>"
+      "<string key=\"j\" value=\"x\"/>"
+      "<event><string key=\"concept:name\" value=\"Z\"/></event></trace>"
+      "</log>";
+  std::istringstream input(xml);
+  auto log = minera::import_xes_event_log(input);
+  std::vector<std::vector<std::size_t>> rows;
+  minera::merge_dataframe_cases(log, &rows);
+  assert(log.traces.size() == 2);
+  assert((rows == std::vector<std::vector<std::size_t>>{{0, 1, 3}, {2}}));
+  const auto& merged = log.traces[0];
+  assert(merged.events.size() == 3);
+  const auto cell = [&](std::size_t event, std::string_view key) -> const minera::EventAttribute* {
+    for (const auto& attribute : merged.events[event].case_row_attributes)
+      if (attribute.key == key) return &attribute;
+    return nullptr;
+  };
+  assert(cell(0, "k") && cell(0, "k")->value == "first" && cell(0, "j") && cell(0, "j")->is_null);
+  assert(cell(2, "k") && cell(2, "k")->value == "second" && cell(2, "j")->value == "x");
+  assert(log.traces[1].events[0].case_row_attributes.empty());
+  // pm4py: get_trace_attribute_values(frame, "case:k") counts rows.
+  const auto counts = minera::get_trace_attribute_values(log, "case:k");
+  assert(counts.at("first") == 2 && counts.at("second") == 1 && counts.size() == 2);
+  // filter_trace_attribute_values keeps (drops) a case when any row matches.
+  minera::LogFilterOptions keep;
+  keep.case_attribute_key = "k";
+  keep.keep_case_attribute_values = {"second"};
+  const auto kept = minera::filter_event_log(log, keep);
+  assert(kept.traces.size() == 1 && kept.traces[0].events.size() == 3);
+  minera::LogFilterOptions remove;
+  remove.case_attribute_key = "case:k";
+  remove.remove_case_attribute_values = {"second"};
+  const auto left = minera::filter_event_log(log, remove);
+  assert(left.traces.size() == 1 && left.traces[0].case_id == "B");
+  // The same attributes on every trace of a case need no row cells.
+  std::istringstream same(
+      "<log><trace><string key=\"concept:name\" value=\"c\"/><string key=\"k\" value=\"v\"/>"
+      "<event><string key=\"concept:name\" value=\"A\"/></event></trace>"
+      "<trace><string key=\"concept:name\" value=\"c\"/><string key=\"k\" value=\"v\"/>"
+      "<event><string key=\"concept:name\" value=\"B\"/></event></trace></log>");
+  const auto plain = minera::import_xes_dataframe_log(same);
+  assert(plain.traces.size() == 1 && plain.traces[0].events.size() == 2);
+  assert(plain.traces[0].events[0].case_row_attributes.empty() &&
+         plain.traces[0].events[1].case_row_attributes.empty());
+}
+
 int main() {
   dataframe_cases_merge_shared_ids_and_order_by_code_point();
+  dataframe_cases_keep_row_case_cells();
   unsigned_integer_boundaries_match_public_variants();
   iterparse_nested_attribute_shapes();
   {

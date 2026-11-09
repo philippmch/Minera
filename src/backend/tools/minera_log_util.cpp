@@ -114,7 +114,7 @@ minera::EventLog import_log(const std::string& path) {
                    return static_cast<char>(std::tolower(value));
                  });
   if (lower.ends_with(".xes") || lower.ends_with(".xes.gz"))
-    return minera::import_xes_event_log(stream);
+    return minera::import_xes_dataframe_log(stream);
   return minera::import_csv_event_log(stream);
 }
 

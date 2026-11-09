@@ -1,5 +1,7 @@
 #pragma once
 
+#include "source_read_cancel.hpp"
+
 // Included in the server implementation namespace. The source owns every
 // native view; publication is guarded independently of client cancellation.
 // Returns the allocator's free pages to the system (glibc keeps them otherwise).
@@ -230,26 +232,25 @@ minera::ActiveEventSource prepare_active_event_source(
     minera::ActiveSourceFile file{dataset, format == "table" ? "table" : xes ? "xes" : "csv", bytes};
     if (format == "table")
       return minera::ActiveEventSource::from_table(minera::parse_event_table_json(bytes), std::move(file), selectors, kind);
-    std::istringstream input(bytes);
-    if (xes) {
-      auto log = minera::import_xes_event_log(input, params.xes);
-      // An XES input follows pm4py's read_xes frame: traces that share a case
-      // id are one case and a trace without events is no case. The flat
-      // shapes group the frame's rows themselves.
-      if (kind == minera::EventDataKind::kEventLog) minera::merge_dataframe_cases(log);
-      return minera::ActiveEventSource::from_log(std::move(log), std::move(file), selectors, kind);
-    }
+    SourceReadStream input(bytes);
+    // An XES input follows pm4py's read_xes frame: its log holds the frame's
+    // cases (traces that share a case id are one case, a trace without events
+    // is no case) and its table the frame's rows in file order.
+    if (xes) return minera::ActiveEventSource::from_xes_frame(minera::import_xes_event_log(input, params.xes), std::move(file), selectors, kind);
     try {
       auto data = minera::import_csv_event_data(input, params.csv);
+      check_source_read_cancelled();
       bind_imported_csv_source_selectors(data, params.csv, literal, selectors);
       if (kind != minera::EventDataKind::kEventLog || !literal.empty())
         overlay_active_source_selectors(params, selectors,
             [&](std::string_view key) {return active_source_supplied(request, key);});
       return minera::ActiveEventSource::from_csv(std::move(data), std::move(file), selectors, kind);
+    } catch (const minera::OperationCancelled&) {
+      throw;  // a canceled read is not retried as a legacy log
     } catch (const std::exception& error) {
       if (!allow_legacy_csv_log || kind != minera::EventDataKind::kEventLog || !params.correlation_variants.empty()) throw;
       if (paired_csv_error) *paired_csv_error = error.what();
-      std::istringstream legacy(bytes);
+      SourceReadStream legacy(bytes);
       // A valid grouped-log input can have an invalid flat-table schema.
       // Preserve its actual native log instead of silently repairing headers.
       return minera::ActiveEventSource::from_log(minera::import_csv_event_log(legacy, params.csv),
@@ -833,12 +834,17 @@ void handle_cancel_mine(const httplib::Request& request, httplib::Response& resp
     // A rolled-back session is destroyed after the lock is released.
     std::shared_ptr<const MinedSession> replaced;
     std::string held;
+    // false only for a request whose response was already applied for good
+    // (acknowledged, used, or past its rollback window): nothing is undone.
+    // An unknown id is recorded, so its upload is refused when it arrives.
+    bool canceled = true;
     {
     std::lock_guard<std::mutex> lock(g_session_mutex);
     if (!g_active_mining_requests.contains(id) && g_active_mining_requests.size() >= 2048)
       throw std::invalid_argument("too many unknown mining request identities");
     auto& ticket = g_active_mining_requests[id];
     if (!ticket) {ticket = std::make_shared<ActiveMiningTicket>(); ticket->id = id;}
+    canceled = !ticket->released;
     ticket->canceled = true;
     if (ticket->published && !ticket->released && g_session == ticket->published && ticket->generation == g_active_mining_generation) {
       replaced = std::move(g_session);
@@ -852,7 +858,7 @@ void handle_cancel_mine(const httplib::Request& request, httplib::Response& resp
     held = g_session ? active_source_quote(std::to_string(g_session->query_source_id)) : std::string("null");
     }
     if (replaced) {replaced.reset(); minera_release_free_memory();}
-    response.set_content("{\"family\":\"ACTIVE_SOURCE_CANCEL\",\"request_id\":" + active_source_quote(id) + ",\"canceled\":true,\"active_source_id\":" + held + "}", "application/json");
+    response.set_content("{\"family\":\"ACTIVE_SOURCE_CANCEL\",\"request_id\":" + active_source_quote(id) + ",\"canceled\":" + (canceled ? "true" : "false") + ",\"active_source_id\":" + held + "}", "application/json");
   } catch (const std::exception& error) {response.status = 400; response.set_content(error_json(error.what()), "application/json");}
 }
 

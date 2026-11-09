@@ -130,15 +130,24 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   std::optional<minera::LogSkeletonModel> skeleton;
   std::optional<std::vector<minera::LogSkeletonConformance>> skeleton_conformance;
+  // pm4py's DataFrame log skeleton and Declare meet an XES frame's cases in
+  // case-id order and list their conformance in it (constraint_case_order).
+  const auto skeleton_order = [&] {
+    return constraint_case_order(*session->active_source, data(),
+                                 params.log_skeleton.activity_key, params.log_skeleton.case_id_key);
+  };
   run("log_skeleton", selected, [&](bool& native_returned) {
-    skeleton = minera::discover_log_skeleton(data(), params.log_skeleton);
+    const auto order = skeleton_order();
+    skeleton = order ? minera::discover_log_skeleton(data(), params.log_skeleton, *order)
+                     : minera::discover_log_skeleton(data(), params.log_skeleton);
     native_returned = true;
     return minera::serialize_active_source_skeleton_json(*skeleton);
   });
   if (skeleton) run("log_skeleton_conformance", selected, [&](bool& native_returned) {
     skeleton_conformance = minera::check_log_skeleton_conformance(data(), *skeleton, params.log_skeleton);
     native_returned = true;
-    return minera::serialize_active_source_skeleton_json(*skeleton, &*skeleton_conformance);
+    const auto ordered = in_constraint_order(*skeleton_conformance, skeleton_order());
+    return minera::serialize_active_source_skeleton_json(*skeleton, &ordered);
   });
   std::optional<std::vector<minera::DeclareConformance>> declare_conformance;
   run("declare", selected, [&](bool& native_returned) {
@@ -150,7 +159,11 @@ void handle_active_source_mining(const httplib::Request& request,
   if (session->declare_ready) run("declare_conformance", selected, [&](bool& native_returned) {
     declare_conformance = minera::check_declare_conformance(data(), session->declare, params.declare_conformance_options);
     native_returned = true;
-    return minera::serialize_active_source_declare_json(session->declare, &*declare_conformance);
+    const auto ordered = in_constraint_order(*declare_conformance,
+        constraint_case_order(*session->active_source, data(),
+                              params.declare_conformance_options.activity_key,
+                              params.declare_conformance_options.case_id_key));
+    return minera::serialize_active_source_declare_json(session->declare, &ordered);
   });
   std::optional<minera::MinimumSelfDistances> distances;
   run("minimum_self_distance", params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kLog ? "log" : params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kPandas ? "dataframe" : "lazyframe", [&](bool& native_returned) {
@@ -272,6 +285,9 @@ void handle_active_source_mining(const httplib::Request& request,
         native_returned = true;
         return "{\"representation\":\"analysis_presentation\"}";
       });
+      const auto constraint_order = skeleton_order();
+      const minera::AnalysisConstraintCaseOrder constraint_list_order(
+          constraint_order ? &*constraint_order : nullptr);
       analysis = minera::analysis_json(dataset, session_log(*session), graph,
           session->tree_ready ? &session->tree : nullptr, net("alpha"), heuristics ? &*heuristics : nullptr,
           &conformance, performance ? &*performance : nullptr, resources ? &*resources : nullptr,

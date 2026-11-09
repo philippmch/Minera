@@ -20149,8 +20149,9 @@ Fixed:
   log shape: `/api/mine`, `/api/discover-constraints`, the workbenches and
   other routes reading an imported XES source) now merges such traces and
   drops empty ones (`merge_dataframe_cases`). Traces with a null or missing
-  id stay apart. Native log JSON, table shapes of an XES upload and
-  `minera_export` reading XES are unchanged.
+  id stay apart. Native log JSON is unchanged. (Review AF1 extends this to
+  the table shapes of an XES upload, the routes and tools that import XES
+  themselves, and `minera_export`; see AF1-1 and AF1-4.)
 - **AE2-2 Case order of log-skeleton and Declare lists on XES.** pm4py's
   frame conformance (log skeleton, Declare) lists cases in the stable
   code-point order of their ids, as the CSV path already gave (its frame is
@@ -20214,3 +20215,118 @@ fixture manifests with XES inputs replay unchanged, and
 `minera_mining_fast_path_equivalence_tests` keeps its pins (it runs the
 library on native logs, and discovered models hold no response, precedence or
 succession self-pairs, so AE2-3 does not reach it).
+
+## Review AF1: one DataFrame-path model for XES inputs (2026-11-09)
+
+Review AF1 found that the AE2 merge reached only some XES consumers and broke
+the per-row case attributes. Now every XES input that follows pm4py's
+DataFrame path (`pm4py.read_xes` returns a frame) uses one helper,
+`merge_dataframe_cases` (or `import_xes_dataframe_log`, which imports and
+merges). Case-grouped algorithms see the frame's cases: traces that share
+`case:concept:name` are one case and a trace without events is no case. A
+merged case whose traces differ in their attributes keeps each event's own
+trace cells in `Event::case_row_attributes`, the slot the CSV import already
+fills, with nulls for keys its trace lacks. Row-wise consumers then read every
+row as the frame holds it. An active XES source (`ActiveEventSource::from_xes_frame`) keeps
+the merged log plus the frame's rows as its table (file order, each row's own
+cells), and a filtered source keeps projecting those rows.
+
+Compared with pm4py 2.7.22 on random XES logs with shared ids (adjacent and
+not), empty traces, attributes that differ between merged traces and unsorted
+numeric-looking ids:
+
+| Check | Logs | Undeclared diffs (HEAD 78c8dce → now) |
+|---|---|---|
+| Case counts, `/api/attribute-statistics` (case column), the log-query `dataframe` table, `keep_`/`remove_case_attribute_values` | 150 | trace count 0 → 0; statistics 91 → 0; log query 95 → 0; filters 40 → 0 |
+| Log-skeleton and Declare lists plus `activ_freq`, over 4 mine paths (log, literal selectors, dataframe, lazyframe) and `/api/discover-constraints` | 150 | 16 per path (on 60 logs) → 0 |
+| `/api/token-replay` and `/api/replay-fitness` (counts, fitness values) | 100 | 75 / 72 → 0 |
+| `minera_export` (case count, skeleton list and its case order, variants) | 120 | → 0 |
+| Other `/api/mine` sections | 200 | only "XES events out of time order" edges |
+| AE2 fuzz (XES third) | 240 | only AE2-10 (28 logs, Declare) |
+
+CSV and table-JSON responses (`/api/mine`, `/api/discover-constraints` in four
+variants, `/api/traces`, `/api/xes`; 260 logs, 3,120 pairs) are byte-identical
+to HEAD. The XES workbench fixture manifests replay unchanged.
+
+Fixed:
+
+- **AF1-1 Row cells and file row order of merged XES cases.** The frame keeps
+  each trace's `case:` cells on that trace's rows. The merge gave the whole case the
+  first trace's attributes, so these all read the merged case's values instead:
+  - `get_trace_attribute_values` / `/api/attribute-statistics` on a case
+    column (`{first: 3}` where pm4py gives `{first: 2, second: 1}`);
+  - `filter_trace_attribute_values` (`keep_`/`remove_case_attribute_values`):
+    pm4py keeps a case when any row matches and drops it when any row has a
+    removed value;
+  - the log-query `dataframe` table, which held the case-grouped merged rows.
+
+  They now read the rows' own cells (`case_row_attributes`), and the active
+  source's table is the frame's rows in file order, as `read_xes` gives them.
+- **AF1-2 Literal source selectors.** `/api/mine` with `mining_selectors_json`
+  (the native active-source dispatch) merged the XES log but gave log-skeleton
+  discovery and both conformance lists in file order. It now uses the case-id
+  order of AE2-2 (`constraint_case_order`), also in its analysis presentation.
+- **AF1-3 Flat shapes of an XES upload.** `mining_input_shape=dataframe` and
+  `lazyframe` group the frame's rows in first-appearance order. pm4py's
+  frame log skeleton and Declare list (and, for the skeleton, meet) the cases
+  in case-id order. Mine family results, `/api/discover-constraints` and the
+  workbench conformance vectors now follow that order (`log_skeleton_case_order`
+  computes it for the call's own `case_id_key` groups). The stream shape keeps
+  first-appearance order, as pm4py's event stream does.
+- **AF1-4 Routes and tools that import XES themselves.** These now read the
+  frame's cases, so case counts agree with `/api/mine`:
+  - routes: `/api/token-replay`, `/api/replay-fitness`,
+    `/api/discover-alpha-plus` (uploaded log), `/api/timestamp-interleavings`,
+    the reference logs of `/api/compare-petri`, `/api/evaluate-emd` and
+    `/api/align-edit-distance`, `/api/streaming-declare`, the uploaded logs of
+    the process-tree, graph and Petri anti/multi alignment workbenches, the
+    workflow and inductive input workbenches, the saved-DFG projection, and
+    the imported source of the original LTL filter (`source_format=import`);
+  - CLIs: `minera_cluster`, `minera_context`, `minera_playout`,
+    `minera_log_util`, `minera_streaming_declare`. `minera_query` keeps the
+    frame's rows as its table and merges a filtered export, as
+    `write_xes(filtered frame)` does.
+  - `minera_export` now merges an XES input too, and lists its log-skeleton
+    and Declare conformance in case-id order, as the server does. This
+    resolves the conflict with "Mining filters over imported logs", which
+    already put its filter flags on the DataFrame path. The headless
+    `--convert-only` round trip keeps the log as read, as
+    `write_xes(read_xes(..., return_legacy_log_object=True))` does, and so
+    does the importer contract (`--xes-return-legacy-log-object`,
+    `--xes-return-pl-lazyframe`).
+
+  These deliberately stay on the EventLog path or on the frame's rows:
+  - the log filter bank (`/api/reference-log-filter`,
+    `/api/reference-log-attributes`, and `/api/reference-ltl-filter` with
+    `engine=log`). These are `algo.filtering.log.*` module calls on an
+    EventLog object; the pandas and Polars engines filter the frame's rows.
+  - PRIPEL's `trace_variant_query`, an EventLog parameter.
+  - the importer-contract workbenches (edit distance, Bose, discovery), which
+    record `import_xes_result` itself.
+  - live-stream and stream-reader XES batches, which are event streams.
+  - the case-relation merge (server and `minera_export --merge-case-relations`), whose
+    table is the frame's rows, one per imported event.
+  - the `minera_query` exact-report path, which records the module calls on
+    the log as imported.
+
+Declared:
+
+- **AF1-5 XES traces without a case id.** pm4py's frame algorithms refuse a
+  frame with a missing `case:concept:name` cell ("the case ID column should
+  not contain any empty value"). Native keeps each such trace as a case of
+  its own and lists it with an empty id, which sorts first in the case-id
+  lists. Such files are not rejected.
+- **AF1-6 Per-case token-replay and alignment lists on XES.** pm4py's frame
+  diagnostics (`conformance_diagnostics_token_based_replay`,
+  `conformance_diagnostics_alignments` on a `read_xes` frame) list cases in
+  case-id order. Their diagnostics frames and `convert_to_event_log` keep file
+  order. Native lists these results in the log's case order, which is file
+  order for XES. The values and counts match (100 logs, compared as
+  multisets). CSV frames are sorted by case, so they agree.
+
+Tests: `minera_xes_io_tests` (`dataframe_cases_keep_row_case_cells`),
+`minera_active_event_source_tests` (`xes_frame_source_keeps_frame_rows`),
+`minera_log_skeleton_tests`, `minera_attribute_statistics_tests`,
+`minera_log_query_tests`, `minera_core_tests`,
+`minera_exact_filter_discovery_json_tests`, and
+`minera_mining_fast_path_equivalence_tests` (251 outputs, pins unchanged).

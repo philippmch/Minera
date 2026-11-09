@@ -70,7 +70,7 @@ void handle_inductive_input_discovery(const httplib::Request& request,
     } else {
       std::istringstream input(file.content);
       if (looks_like_xes(file.filename, file.content)) {
-        source_log = minera::import_xes_event_log(input, params.xes); format = "xes"; origin = "uploaded_grouped_log";
+        source_log = minera::import_xes_dataframe_log(input, params.xes); format = "xes"; origin = "uploaded_grouped_log";
       } else {
         auto imported = minera::import_csv_event_data(input, params.csv);
         source_log = std::move(imported.log); table = std::move(imported.table);

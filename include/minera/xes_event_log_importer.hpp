@@ -109,4 +109,15 @@ struct XesImportResult {
     const std::filesystem::path& path,
     const XesImportOptions& options = {});
 
+// An XES input on pm4py's DataFrame path (pm4py.read_xes returns a frame):
+// import_xes_event_log followed by merge_dataframe_cases, so traces that share
+// a case id are one case and a trace without events is no case. Routes and
+// tools whose reference reads the frame use this; the EventLog importer
+// contracts (return_legacy_log_object, the log filter bank) keep
+// import_xes_event_log.
+[[nodiscard]] EventLog import_xes_dataframe_log(
+    std::istream& input, const XesImportOptions& options = {});
+[[nodiscard]] EventLog import_xes_dataframe_log(
+    const std::filesystem::path& path, const XesImportOptions& options = {});
+
 }  // namespace minera

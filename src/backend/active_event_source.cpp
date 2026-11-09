@@ -1119,6 +1119,70 @@ ActiveEventSource ActiveEventSource::from_log(EventLog log, ActiveSourceFile fil
   return ActiveEventSource(std::move(state));
 }
 
+ActiveEventSource ActiveEventSource::from_xes_frame(EventLog frame, ActiveSourceFile file,
+                                                   ActiveSourceSelectors selectors,
+                                                   EventDataKind selected) {
+  auto original = std::make_shared<OriginalSource>();
+  original->file = std::move(file);
+  original->selectors = std::move(selectors);
+  original->options = minera::preparation_options(original->selectors);
+  original->origin = SourceOrigin::kLog;
+  original->table_origin = "native_log_to_table";
+  // The frame's rows are the imported events in file order, each with its own
+  // trace's cells; the log is the frame's cases.
+  std::optional<EventTable> rows_table;
+  std::string rows_error;
+  try {
+    auto options = original->options;
+    options.include_case_attributes = true;
+    rows_table = event_log_to_table(frame, options);
+  } catch (const std::exception& error) {
+    rows_error = error.what();
+  }
+  std::vector<std::vector<std::size_t>> frame_rows;
+  merge_dataframe_cases(frame, &frame_rows);
+  original->log = std::move(frame);
+  if (rows_table && rows_table->rows.size() != original->log->event_count()) rows_table.reset();
+  if (rows_table) {
+    for (auto& rows : frame_rows)
+      original->representatives.emplace_back(rows.begin(), rows.end());
+  } else {
+    std::size_t ordinal = 0;
+    for (const auto& trace : original->log->traces) {
+      std::vector<std::optional<std::size_t>> rows;
+      for (std::size_t event = 0; event < trace.events.size(); ++event) rows.push_back(ordinal++);
+      original->representatives.push_back(std::move(rows));
+    }
+  }
+  try {
+    if (rows_table) {
+      original->table = std::move(*rows_table);
+    } else {
+      if (!rows_error.empty()) throw std::invalid_argument(rows_error);
+      auto options = original->options;
+      options.include_case_attributes = true;
+      original->table = event_log_to_table(*original->log, options);
+    }
+    retain_native_rows(*original);
+  } catch (const std::exception& error) {
+    original->table.reset();
+    original->table_error = error.what();
+  }
+  auto state = std::make_shared<State>();
+  state->original = original;
+  state->selected = selected;
+  state->view_original();
+  state->flat_error = original->table_error;
+  state->table_origin = original->table_origin;
+  state->representatives = original->representatives;
+  if (original->table) {
+    state->ordinals.resize(original->table->rows.size());
+    std::iota(state->ordinals.begin(), state->ordinals.end(), std::size_t{0});
+  }
+  state->prepare_flat();
+  return ActiveEventSource(std::move(state));
+}
+
 const ActiveSourceFile& ActiveEventSource::file() const noexcept { return state_->original->file; }
 const ActiveSourceSelectors& ActiveEventSource::selectors() const noexcept { return state_->original->selectors; }
 EventDataKind ActiveEventSource::selected_kind() const noexcept { return state_->selected; }

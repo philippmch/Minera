@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <charconv>
 #include <filesystem>
 #include <fstream>
@@ -31,7 +32,11 @@ int run_query_legacy(int argc,char** argv){
    else throw std::invalid_argument("unknown query option: "+key);
   }
   if(engine!="sqlite"&&engine!="duckdb")throw std::invalid_argument("query engine must be sqlite or duckdb");if(mode!="cases"&&mode!="events")throw std::invalid_argument("filter mode must be cases or events");
-  const auto log=path.extension()==".xes"||path.extension()==".gz"?minera::import_xes_event_log(path):minera::import_csv_event_log(path);const auto table=minera::log_query_table(log);
+  // An XES input is pm4py's read_xes frame: the query table holds its rows
+  // (each event in file order with its own trace's cells) and a filtered
+  // export its cases (merge_dataframe_cases).
+  const bool xes=path.extension()==".xes"||path.extension()==".gz";
+  const auto log=xes?minera::import_xes_event_log(path):minera::import_csv_event_log(path);const auto table=minera::log_query_table(log);
   std::vector<std::size_t> indices;
   if(engine=="sqlite"){
    const auto result=minera::query_log_sqlite(table,sql,options);std::cout<<minera::log_query_json(result)<<'\n';
@@ -43,7 +48,17 @@ int run_query_legacy(int argc,char** argv){
    const auto result=minera::query_runtime::request(runtime,"/query",&body);if(result->status!=200)throw std::runtime_error("query runtime returned HTTP "+std::to_string(result->status));std::cout<<result->body<<'\n';
    if(!output.empty()){const auto complete="{\"sql\":"+quote(sql)+",\"max_rows\":1000000,\"data\":"+minera::log_query_table_json(table)+'}';const auto selection=minera::query_runtime::request(runtime,"/select",&complete);if(selection->status!=200)throw std::runtime_error("query selection failed");indices=minera::query_runtime::parse_indices(selection->body,log.event_count());}
   }
-  if(!output.empty()){minera::XesExportOptions export_options;export_options.preserve_nulls=true;minera::export_xes_event_log(std::filesystem::u8path(output),minera::filter_query_events(log,indices,mode=="cases"),export_options);}
+  if(!output.empty()){
+   minera::XesExportOptions export_options;export_options.preserve_nulls=true;
+   if(!xes){minera::export_xes_event_log(std::filesystem::u8path(output),minera::filter_query_events(log,indices,mode=="cases"),export_options);return 0;}
+   auto cases=log;std::vector<std::vector<std::size_t>> rows;minera::merge_dataframe_cases(cases,&rows);
+   // The selected frame rows as positions among the cases' events.
+   std::vector<std::size_t> position(table.table.rows.size(),static_cast<std::size_t>(-1));std::size_t next=0;
+   for(const auto& trace:rows)for(const auto row:trace){if(row<position.size())position[row]=next;++next;}
+   std::vector<std::size_t> selected;for(const auto index:indices)if(index<position.size()&&position[index]!=static_cast<std::size_t>(-1))selected.push_back(position[index]);
+   std::sort(selected.begin(),selected.end());
+   minera::export_xes_event_log(std::filesystem::u8path(output),minera::filter_query_events(cases,selected,mode=="cases"),export_options);
+  }
   return 0;
  }catch(const std::exception& error){std::cerr<<"error: "<<error.what()<<'\n';return 1;}
 }

@@ -87,6 +87,7 @@
 #include "minera/log_conversion.hpp"
 #include "minera/ltl_filter.hpp"
 #include "minera/log_skeleton.hpp"
+#include "minera/analysis_json_traces.hpp"
 #include "minera/log_to_target.hpp"
 #include "minera/log_to_features.hpp"
 #include "minera/label_splitting.hpp"
@@ -6383,8 +6384,16 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       }
       return 0;
     }
+    std::optional<minera::EventLog> xes_frame_rows;
     if (input_is_xes) {
       log = minera::import_xes_event_log(input, xes_options);
+      // pm4py.read_xes hands the modes a frame, so traces that share a case id
+      // are one case and a trace without events is no case, as on the server.
+      // The headless XES round trip keeps the log as read, as
+      // write_xes(read_xes(..., return_legacy_log_object=True)) does.
+      // The case-relation merger reads the frame's rows themselves.
+      if (merge_requested) xes_frame_rows = log;
+      if (!convert_only) minera::merge_dataframe_cases(log);
     } else if (!correlation_variants.empty() || merge_requested) {
       csv_data = minera::import_csv_event_data(input, options);
       log = std::move(csv_data->log);
@@ -6426,7 +6435,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     }
     if (timestamp_interleavings_requested) {
       const auto right = is_xes_path(timestamp_interleavings_right_path)
-                             ? minera::import_xes_event_log(
+                             ? minera::import_xes_dataframe_log(
                                    timestamp_interleavings_right_path)
                              : minera::import_csv_event_log(
                                    timestamp_interleavings_right_path, options);
@@ -6536,7 +6545,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
           params.timestamp_key = minera::tools::relation_role_column(
               *csv_table, minera::FirstClassAttributeRole::kTimestamp, options.timestamp_column);
         auto base_table = input_is_xes
-            ? minera::tools::relation_xes_table(log, params, merge_case_key_supplied, explicit_timestamp)
+            ? minera::tools::relation_xes_table(xes_frame_rows ? *xes_frame_rows : log, params,
+                                                merge_case_key_supplied, explicit_timestamp)
             : csv_data->table;
         auto incoming_table = incoming_is_xes
             ? minera::tools::relation_xes_table(
@@ -7395,7 +7405,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
           minera::XesImportOptions reference_options;
           if (!compare_petri_activity_attribute.empty())
             reference_options.activity_attribute = compare_petri_activity_attribute;
-          return minera::import_xes_event_log(compare_petri_reference, reference_options);
+          return minera::import_xes_dataframe_log(compare_petri_reference, reference_options);
         }
         auto reference_options = options;
         reference_options.allow_case_id_aliases = true;
@@ -7496,7 +7506,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     std::optional<minera::EventLog> edit_projected_log;
     if (!edit_reference.empty()) {
       const auto reference = is_xes_path(edit_reference)
-          ? minera::import_xes_event_log(edit_reference)
+          ? minera::import_xes_dataframe_log(edit_reference)
           : minera::import_csv_event_log(edit_reference, options);
       typed_edit_result =
           minera::align_typed_edit_distance(log, reference, edit_options);
@@ -7508,7 +7518,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     std::optional<minera::EmdResult> emd_result;
     if (!emd_reference.empty()) {
       const auto reference = is_xes_path(emd_reference)
-          ? minera::import_xes_event_log(emd_reference)
+          ? minera::import_xes_dataframe_log(emd_reference)
           : minera::import_csv_event_log(emd_reference, options);
       emd_result = minera::evaluate_emd(
           // The reference compares trace-variant probabilities (get_language).
@@ -7594,8 +7604,17 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     const auto resources = minera::discover_resource_network(log);
     const auto eventually =
         minera::discover_eventually_follows(log, graph, eventually_follows_options);
-    const auto log_skeleton =
-        minera::discover_log_skeleton(log, log_skeleton_options);
+    // pm4py's DataFrame log skeleton and Declare meet an XES frame's cases in
+    // case-id order and list their conformance in it, as on the server.
+    std::optional<std::vector<std::size_t>> constraint_order;
+    if (input_is_xes) {
+      auto order = minera::case_id_order(log);
+      for (std::size_t i = 0; i < order.size(); ++i)
+        if (order[i] != i) { constraint_order = std::move(order); break; }
+    }
+    const auto log_skeleton = constraint_order
+        ? minera::discover_log_skeleton(log, log_skeleton_options, *constraint_order)
+        : minera::discover_log_skeleton(log, log_skeleton_options);
     const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
         log, log_skeleton, log_skeleton_options);
     const auto declare = minera::discover_declare(log, declare_options);
@@ -7886,8 +7905,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
           minera::XesImportOptions reference_options;
           if (!selector.empty() && selector != "concept:name")
             reference_options.activity_attribute = selector;
-          return minera::import_xes_event_log(compare_petri_reference,
-                                              reference_options);
+          return minera::import_xes_dataframe_log(compare_petri_reference,
+                                                  reference_options);
         }
         auto reference_options = options;
         reference_options.allow_case_id_aliases = true;
@@ -8329,6 +8348,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       return 0;
     }
 
+    const minera::AnalysisConstraintCaseOrder constraint_list_order(
+        constraint_order ? &*constraint_order : nullptr);
     if (output.empty()) {
       minera::write_analysis_json(
           std::cout, dataset, log, graph, &tree, &net, &heuristics,

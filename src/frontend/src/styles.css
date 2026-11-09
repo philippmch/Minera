@@ -343,7 +343,8 @@ body {
   transition: background 0.15s ease, color 0.15s ease;
   align-self: center;
 }
-.btn-open:hover { background: var(--copper); border-color: var(--copper); }
+.btn-open:hover:not(:disabled) { background: var(--copper); border-color: var(--copper); }
+.btn-open:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-open input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
 /* ---- tabs ---- */
@@ -651,6 +652,14 @@ input[type="range"]::-moz-range-thumb {
 .export-note { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--ink-70); }
 main code { overflow-wrap: anywhere; }
 main p, main li, main summary { overflow-wrap: break-word; }
+/* The DFG export's filter fields: labelled inputs in a wrapping grid once opened. */
+.pnml-export:has(> .dfg-options[open]) { flex-basis: 100%; }
+.dfg-options[open] { flex-basis: 100%; }
+.dfg-options > summary { cursor: pointer; }
+.dfg-options-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 10px 16px; margin: 10px 0 4px; }
+.dfg-options-grid label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; color: var(--ink-70); }
+.dfg-options-grid label:has(> input[type="checkbox"]) { flex-direction: row; align-items: center; gap: 6px; align-self: end; }
+.dfg-options-grid input:not([type="checkbox"]) { width: 100%; min-width: 0; box-sizing: border-box; }
 .pnml-error {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1892,6 +1901,8 @@ main p, main li, main summary { overflow-wrap: break-word; }
   font: inherit;
 }
 .align-settings-grid label.disabled { opacity: 0.45; }
+.align-settings-grid > div > small { display: block; margin-top: 4px; font-size: 11px; color: var(--ink-70); }
+.align-settings-grid input:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .analysis-json {
   margin: 1rem 0 0;
@@ -2090,11 +2101,11 @@ main p, main li, main summary { overflow-wrap: break-word; }
   background: var(--copper);
 }
 
-.filters-status {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--copper-deep);
-}
+/* A load in progress while a log is open: what it is, the stage line and Cancel. */
+.mining-status { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0; padding: 10px 12px; border-left: 3px solid var(--copper); background: var(--paper-raised); font-size: 14px; }
+.mining-status .landing-progress { margin: 0; }
+.mine-wait { margin: 0 8px; color: var(--ink-70); }
+.stale-run-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 
 .filters-body {
   display: flex;

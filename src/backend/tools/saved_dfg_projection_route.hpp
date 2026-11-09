@@ -53,7 +53,7 @@ void handle_saved_dfg_projection_workbench(const httplib::Request& request,httpl
   if(format=="raw_log"){log=minera::parse_embedding_workbench_raw_log_json(original_input);origin="uploaded_raw_log";}
   else if(format=="table"){table=minera::parse_event_table_json(original_input);log=graph_alignment_selected_log(*table,case_selector);origin="uploaded_typed_table";}
   else{const auto imports=minera::parse_mine_params(lookup,present);std::istringstream stream(original_input);
-   if(looks_like_xes(input_name,original_input)){log=minera::import_xes_event_log(stream,imports.xes);detected="xes";}
+   if(looks_like_xes(input_name,original_input)){log=minera::import_xes_dataframe_log(stream,imports.xes);detected="xes";}
    else{auto imported=minera::import_csv_event_data(stream,imports.csv);log=std::move(imported.log);table=std::move(imported.table);detected="csv";origin="uploaded_csv_rows";if(!present("alignment_case_id_attribute")&&!selectors.contains("alignment_case_id_attribute"))case_selector=imports.csv.case_id_column;}
   }
   cases=log.trace_count();events=log.event_count();input_raw=minera::serialize_embedding_workbench_raw_log_json(log);

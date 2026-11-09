@@ -67,10 +67,13 @@ export function WorkflowDiscovery({ family, variant, data, available, mining, on
    <button className="btn-open" onClick={()=>void start()}>Discover selected workflow</button></fieldset>
    {pending&&<p role="status">Discovering… <button className="btn-ghost" onClick={()=>{request.current?.abort();request.current=null;setPending(false);}}>Cancel discovery request</button></p>}{error&&<div className="error-banner" role="alert">{error}</div>}
   </section>
+  {run&&!pending&&run.value.variant!==form.variant&&<StaleRunNotice family={family} shown={run.value.variant} selected={form.variant} canDiscover={!!schema&&!mining} onDiscover={()=>void start()}/>}
   {run&&<WorkflowInspection key={sequence.current} run={run} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout}/>}
   {!run&&!pending&&(savedView!==undefined?savedView&&<SavedNotice family={family} selected={form.variant} canDiscover={available}>{savedView}</SavedNotice>:<SavedWorkflow family={family} data={data}/>)}
  </>;
 }
+/** A run of another variant than the one now selected: says so, and offers to discover the selected one. */
+function StaleRunNotice({family,shown,selected,canDiscover,onDiscover}:{family:WorkflowFamily;shown:WorkflowVariant;selected:WorkflowVariant;canDiscover:boolean;onDiscover:()=>void}){const name=(variant:WorkflowVariant)=>WORKFLOW_VARIANTS[family].find(([value])=>value===variant)?.[1]??variant;return <p className="saved-model-notice stale-run-notice" role="status">The results below come from {name(shown)}, not the selected {name(selected)}. <button className="btn-ghost" disabled={!canDiscover} onClick={onDiscover}>Discover {name(selected)}</button></p>;}
 /** The analysis model, introduced as what it is: not a run of the variant selected above. */
 function SavedNotice({family,selected,canDiscover,children}:{family:WorkflowFamily;selected:WorkflowVariant;canDiscover:boolean;children:ReactNode}){const label=WORKFLOW_VARIANTS[family].find(([value])=>value===selected)?.[1]??selected;return <><p className="saved-model-notice" role="note">No {label} run is shown yet. Below is the model mined with this analysis (its Filters &amp; miner settings), not a {label} discovery: {canDiscover?<>press “Discover selected workflow” to mine {label}.</>:<>open a CSV or XES source to mine {label}.</>}</p>{children}</>;}
 function SavedWorkflow({family,data}:{family:WorkflowFamily;data:MineraExport}) {

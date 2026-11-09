@@ -1,7 +1,7 @@
 import {DiscoveryVectorInput} from "./DiscoveryVectorInput";
 import { useEffect, useRef, useState } from "react";
 import { DECLARE_TEMPLATES, type MineraExport } from "../types";
-import { defaultConstraintForm, runConstraintDiscovery, SKELETON_FAMILIES, type ConstraintFamily, type ConstraintForm, type ConstraintRun } from "../constraint-discovery";
+import { declareAutoSelectionActive, defaultConstraintForm, runConstraintDiscovery, SKELETON_FAMILIES, type ConstraintFamily, type ConstraintForm, type ConstraintRun } from "../constraint-discovery";
 import { downloadQueryBlob, requestLogQuerySchema, type LogQuerySchema } from "../log-query";
 import { diagnosticCsv } from "../model-diagnostics";
 import { nativeJson } from "../native-json";
@@ -34,7 +34,8 @@ export function ConstraintDiscovery({family,data,available,mining,onOpenLog}:{fa
         {family === "declare" ? <>
           <label>Declare activity selection<select value={form.activitySelection} onChange={event=>change('activitySelection',event.target.value as ConstraintForm['activitySelection'])}><option value="native">Infer from source</option><option value="selected">Explicit activities (including none)</option></select></label>
           {form.activitySelection === "selected"&&<DiscoveryVectorInput label="Declare considered activities" mode={form.activitiesMode} legacyValue={form.activities} literalValue={form.activitiesJson} onMode={value=>change('activitiesMode',value)} onLegacy={value=>change('activities',value)} onLiteral={value=>change('activitiesJson',value)}/>}
-          {([['support','Declare minimum support ratio'],['confidence','Declare minimum confidence ratio'],['multiplier','Declare automatic selection multiplier']] as const).map(([key,label])=><label key={key}>{label}<input value={form[key]} placeholder={key === 'multiplier' ? '0.8 (automatic selection)' : 'native automatic selection'} onChange={event=>change(key,event.target.value)}/></label>)}
+          {([['support','Declare minimum support ratio'],['confidence','Declare minimum confidence ratio']] as const).map(([key,label])=><label key={key}>{label}<input value={form[key]} inputMode="decimal" placeholder="native automatic selection" onChange={event=>change(key,event.target.value)}/></label>)}
+          <div><label>Declare automatic selection multiplier<input value={form.multiplier} inputMode="decimal" placeholder="0.8 (automatic selection)" disabled={!declareAutoSelectionActive(form)} aria-describedby="declare-multiplier-note" onChange={event=>change('multiplier',event.target.value)}/></label><small id="declare-multiplier-note">{declareAutoSelectionActive(form) ? "Scales the automatically chosen support and confidence thresholds." : "Not used while a minimum support or confidence ratio is set; the blank one counts as 0."}</small></div>
         </> : <label>Log Skeleton noise threshold<input value={form.noise} placeholder="0" onChange={event=>change('noise',event.target.value)}/></label>}
       </div>
       {form.selection === "selected"&&<><p>An empty selection is sent explicitly. Declare discovers no templates; Log Skeleton retains its discovered model and checks no selected families.</p><div className="align-settings-grid" role="group" aria-label="Selected constraint families">{families.map(template=><label key={template}><input type="checkbox" checked={form.templates.includes(template)} onChange={event=>change('templates',event.target.checked ? [...form.templates,template] : form.templates.filter(value=>value!==template))}/>{template}</label>)}</div></>}

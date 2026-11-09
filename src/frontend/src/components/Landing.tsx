@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EVERYDAY_TOOLS, REFERENCE_TOOLS, groupTools, searchTools, type ToolGroup, type ToolId, type ToolSpec } from "../tools";
 import { BrandMark, LOG_FILE_ACCEPT, PaletteShortcut, ThemeToggle } from "./ui";
-import { mineProgressText, type MineProgress } from "../mine-progress";
+import { mineProgressText, mineWaitText, type MineProgress } from "../mine-progress";
 
 interface LandingProps {
   onOpenFile: (file: File) => void;
@@ -18,6 +18,8 @@ interface LandingProps {
   onCancel?: () => void;
   /** The backend's progress on this load's mine (GET /api/mine-progress), while mining. */
   progress?: MineProgress | null;
+  /** A load this page canceled whose mine the backend is still stopping. */
+  stopping?: boolean;
 }
 
 const SAMPLES = [
@@ -26,7 +28,7 @@ const SAMPLES = [
   { key: "resource", title: "Resource handovers", detail: "Small log with resources", text: "Mine a sample with resource relationships" },
 ] as const;
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, onOpenTool, onOpenPalette, error, onOpenInInspector, mining, onCancel, progress }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, onOpenTool, onOpenPalette, error, onOpenInInspector, mining, onCancel, progress, stopping }: LandingProps) {
   const [query, setQuery] = useState("");
   const groups = useMemo(() => groupTools(searchTools(query, EVERYDAY_TOOLS)), [query]);
   const reference = useMemo(() => groupTools(searchTools(query, REFERENCE_TOOLS)), [query]);
@@ -91,6 +93,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
 
         {mining && onCancel
           ? <div className="landing-error landing-status" role="status">Mining the event log… <MiningProgress progress={progress} /><button className="btn-ghost landing-cancel" onClick={onCancel}>Cancel</button></div>
+          : stopping && !error ? <div className="landing-error landing-status" role="status">{STOPPING_TEXT}</div>
           : error && <div className="error-banner landing-error" role="alert">{error}{onOpenInInspector && <> <button className="btn-ghost landing-inspect" onClick={onOpenInInspector}>Open in Source inspector</button></>}</div>}
 
         <div className="landing-samples reveal" aria-label="Sample data">
@@ -168,9 +171,14 @@ function ToolGroups({ groups, onOpenTool }: { groups: { group: ToolGroup; tools:
   );
 }
 
-/** The running mine's stage, stage count and elapsed time; nothing until the backend reports this mine. */
+const STOPPING_TEXT = "Stopping the canceled mine…";
+
+/** The running mine's stage, stage count and elapsed time; nothing until the backend reports this mine (a canceled
+ * mine of this tab that still holds the backend while it stops is named instead). */
 export function MiningProgress({ progress }: { progress?: MineProgress | null }) {
   const text = mineProgressText(progress ?? null);
+  const wait = text ? null : mineWaitText(progress ?? null);
+  if (wait) return <span className="mine-wait">{wait}</span>;
   if (!text || !progress) return null;
   const total = progress.stagesTotal ?? undefined;
   return (
@@ -180,5 +188,19 @@ export function MiningProgress({ progress }: { progress?: MineProgress | null })
       )}
       <span className="landing-progress-text">{progress.canceling ? `Stopping… ${text}` : text}</span>
     </span>
+  );
+}
+
+/**
+ * The load in progress while a log is open (another file or a re-mine): what it is, the backend's stage line and a
+ * Cancel button; after a cancel, while the backend still stops that mine, a plain "stopping" line.
+ */
+export function MiningStatusBar({ label, progress, onCancel }: { label: string | null; progress?: MineProgress | null; onCancel?: () => void }) {
+  return (
+    <div className="mining-status" role="status">
+      <span className="mining-status-label">{label ?? STOPPING_TEXT}</span>
+      {label !== null && <MiningProgress progress={progress} />}
+      {onCancel && <button className="btn-ghost landing-cancel" onClick={onCancel}>Cancel</button>}
+    </div>
   );
 }

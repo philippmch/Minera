@@ -664,6 +664,22 @@ LogSkeletonModel discover_log_skeleton(const EventDataView& data,
       event_data_log(data, options.activity_key, options.case_id_key), options);
 }
 
+LogSkeletonModel discover_log_skeleton(const EventDataView& data,
+                                       const LogSkeletonOptions& options,
+                                       const std::vector<std::size_t>& trace_order) {
+  if (data.kind() == EventDataKind::kEventLog)
+    return discover_log_skeleton(*data.log(), options, trace_order);
+  return discover_log_skeleton(
+      event_data_log(data, options.activity_key, options.case_id_key), options,
+      trace_order);
+}
+
+std::vector<std::size_t> log_skeleton_case_order(const EventDataView& data,
+                                                 const LogSkeletonOptions& options) {
+  if (data.kind() == EventDataKind::kEventLog) return case_id_order(*data.log());
+  return case_id_order(event_data_log(data, options.activity_key, options.case_id_key));
+}
+
 LogSkeletonModel discover_log_skeleton(const LogSkeletonVariantList& input,
                                        const LogSkeletonOptions& options) {
   // The explicit variant-list entry point follows the source API contract:

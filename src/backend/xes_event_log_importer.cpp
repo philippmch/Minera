@@ -2209,4 +2209,17 @@ EventLog import_xes_event_log(
   return import_xes_event_log(input, options);
 }
 
+EventLog import_xes_dataframe_log(std::istream& input, const XesImportOptions& options) {
+  auto log = import_xes_event_log(input, options);
+  merge_dataframe_cases(log);
+  return log;
+}
+
+EventLog import_xes_dataframe_log(const std::filesystem::path& path,
+                                  const XesImportOptions& options) {
+  auto log = import_xes_event_log(path, options);
+  merge_dataframe_cases(log);
+  return log;
+}
+
 }  // namespace minera

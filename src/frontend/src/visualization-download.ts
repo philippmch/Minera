@@ -13,11 +13,23 @@ function reference(value:string,base:string,ids:Set<string>):string{
  return fragment;
 }
 function localSvgUrls(value:string,base:string,ids:Set<string>):string{return value.replace(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*?))\s*\)/gi,(_match,double:string|undefined,single:string|undefined,plain:string|undefined)=>`url("${reference((double??single??plain??"").trim(),base,ids)}")`);}
+/** The whole width × height canvas in viewBox units: with the default "meet" fit a viewBox of another aspect leaves
+ * margins beside or above it, which the exported background must cover too. "none" and "slice" fill the canvas with
+ * the viewBox itself. */
+export function svgCanvasBox(box:number[],width:number,height:number,preserveAspectRatio?:string):[number,number,number,number]{
+ const parts=(preserveAspectRatio??"").trim().split(/\s+/).filter(Boolean);if(parts[0]==="defer")parts.shift();
+ const align=parts[0]??"xMidYMid",mode=parts[1]??"meet";
+ if(align==="none"||mode==="slice")return[box[0],box[1],box[2],box[3]];
+ const scale=Math.min(width/box[2],height/box[3]),w=width/scale,h=height/scale;
+ const ax=align.includes("xMin")?0:align.includes("xMax")?1:0.5,ay=align.includes("YMin")?0:align.includes("YMax")?1:0.5;
+ return[box[0]-(w-box[2])*ax,box[1]-(h-box[3])*ay,w,h];
+}
 /** Export presentation data only, with styles inline and local marker/filter links. */
 export function serializeStyledSvg(root:StyledSvgNode,width:number,height:number,background:string,title:string,base:string):string{
  if(root.tag!=="svg"||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)throw new Error("The selected SVG has no visible size.");
  const ids=new Set<string>(),nodes=[root];while(nodes.length){const n=nodes.pop()!;const id=n.attributes.find(([k])=>k==="id")?.[1];if(id)ids.add(id);for(const child of n.children)if(typeof child!=="string")nodes.push(child);}
  const attrs=new Map(root.attributes),viewBox=attrs.get("viewBox")??`0 0 ${width} ${height}`,box=viewBox.trim().split(/[\s,]+/).map(Number);if(box.length!==4||box.some(n=>!Number.isFinite(n))||box[2]<=0||box[3]<=0)throw new Error("The SVG viewBox is invalid.");
+ const canvas=svgCanvasBox(box,width,height,attrs.get("preserveAspectRatio"));
  attrs.set("xmlns","http://www.w3.org/2000/svg");attrs.set("xmlns:xlink","http://www.w3.org/1999/xlink");attrs.set("width",String(width));attrs.set("height",String(height));attrs.set("viewBox",viewBox);
  const pending:Array<{node:StyledSvgNode|string;close?:boolean;isRoot?:boolean}>=[{node:{...root,attributes:[...attrs]},isRoot:true}],parts=['<?xml version="1.0" encoding="UTF-8"?>\n'];
  while(pending.length){const entry=pending.pop()!,n=entry.node;if(typeof n==="string"){parts.push(xml(n));continue;}if(entry.close){parts.push(`</${n.tag}>`);continue;}
@@ -28,7 +40,7 @@ export function serializeStyledSvg(root:StyledSvgNode,width:number,height:number
   const styles=n.styles.filter(([k])=>!k.startsWith("--")&&!/[;{}]/.test(k)).map(([name,value])=>[name,localUrls(value)] as const);
   if(entry.isRoot){for(let i=styles.length-1;i>=0;i--)if(["width","height","max-width","max-height","min-width","min-height"].includes(styles[i][0]))styles.splice(i,1);styles.push(["width",width+"px"],["height",height+"px"]);}
   if(entry.isRoot)styles.push(["animation","none"],["transition","none"]);if(styles.length)a.set("style",styles.map(([k,v])=>`${k}:${v}`).join(";"));parts.push(`<${n.tag}${[...a].map(([k,v])=>` ${k}="${xml(v)}"`).join("")}>`);pending.push({node:n,close:true});
-  for(let i=n.children.length-1;i>=0;i--)pending.push({node:n.children[i]});if(entry.isRoot)parts.push(`<title>${xml(title)}</title><desc>Displayed diagram with inline styles. Fonts are not embedded; PNG and PDF retain the rendered font appearance.</desc><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" fill="${xml(background)}"/>`);
+  for(let i=n.children.length-1;i>=0;i--)pending.push({node:n.children[i]});if(entry.isRoot)parts.push(`<title>${xml(title)}</title><desc>Displayed diagram with inline styles. Fonts are not embedded; PNG and PDF retain the rendered font appearance.</desc><rect x="${canvas[0]}" y="${canvas[1]}" width="${canvas[2]}" height="${canvas[3]}" fill="${xml(background)}"/>`);
  }
  return parts.join("");
 }

@@ -564,7 +564,9 @@ input[type="file"]::file-selector-button:hover { background: var(--ink); color: 
   .landing-tools-head { flex-direction: column; align-items: stretch; }
   .landing-tools-filter { width: 100%; }
   .landing-search { min-width: 0; }
-  .landing-search span { display: none; }
+  /* No keyboard shortcut on a phone: the button keeps its visible name. */
+  .landing-search kbd { display: none; }
+  .landing-bar .brand-tagline { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

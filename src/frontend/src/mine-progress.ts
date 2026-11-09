@@ -48,10 +48,11 @@ export function parseMineProgress(value: unknown): MineProgress | null {
   };
 }
 
-/** One poll; null when the backend cannot say (an older backend, a network failure). */
-export async function fetchMineProgress(requestId: string, signal?: AbortSignal): Promise<MineProgress | null> {
+/** One poll; null when the backend cannot say (an older backend, a network failure). A null id asks about whatever mine runs. */
+export async function fetchMineProgress(requestId: string | null, signal?: AbortSignal): Promise<MineProgress | null> {
   try {
-    const response = await backendFetch(`/api/mine-progress?request_id=${encodeURIComponent(requestId)}`, {signal, cache: "no-store"});
+    const path = requestId === null ? "/api/mine-progress" : `/api/mine-progress?request_id=${encodeURIComponent(requestId)}`;
+    const response = await backendFetch(path, {signal, cache: "no-store"});
     if (!response.ok) return null;
     return parseMineProgress(await response.json());
   } catch {
@@ -83,11 +84,45 @@ export function mineProgressText(progress: MineProgress | null): string | null {
 }
 
 /**
+ * The line for a mine this tab is waiting on: a canceled mine (this tab's
+ * earlier one) that still holds the backend's single mining slot while it
+ * stops. null otherwise.
+ */
+export function mineWaitText(progress: MineProgress | null): string | null {
+  if (!progress?.running || progress.requestMatches === true || !progress.canceling) return null;
+  return "Waiting for the canceled mine to stop…";
+}
+
+/** How often a load waiting on a canceled mine asks whether it stopped. */
+export const CANCELED_MINE_POLL_MS = 250;
+
+/**
+ * Resolves once no canceled mine holds the backend's mining slot (or after
+ * `timeoutMs`, leaving the POST to report a busy server). A mine this tab just
+ * canceled keeps the slot until it stops; waiting here, rather than posting
+ * into a 503 MINE_BUSY, keeps the console free of refused requests.
+ */
+export async function waitForCanceledMine(signal?: AbortSignal, timeoutMs = 120_000, pollMs = CANCELED_MINE_POLL_MS): Promise<void> {
+  const started = Date.now();
+  for (;;) {
+    signal?.throwIfAborted();
+    const progress = await fetchMineProgress(null, signal);
+    signal?.throwIfAborted();
+    if (!progress?.running || !progress.canceling || Date.now() - started >= timeoutMs) return;
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {signal?.removeEventListener("abort", stop); resolve();}, pollMs);
+      const stop = () => {clearTimeout(timer); reject(signal?.reason);};
+      signal?.addEventListener("abort", stop, {once: true});
+    });
+  }
+}
+
+/**
  * Polls the progress of mine `requestId` every `intervalMs` (one request at a
  * time) and hands each answer to `onProgress`. Returns the stop function,
  * which also aborts a poll in flight.
  */
-export function watchMineProgress(requestId: string, onProgress: (progress: MineProgress | null) => void,
+export function watchMineProgress(requestId: string | null, onProgress: (progress: MineProgress | null) => void,
                                   intervalMs = MINE_PROGRESS_INTERVAL_MS): () => void {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;

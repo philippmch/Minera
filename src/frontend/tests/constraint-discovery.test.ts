@@ -29,9 +29,16 @@ describe("source-bound native constraint discovery",()=>{
     expect(empty.result.log_skeleton_conformance!.every(trace=>trace.no_constr_total===0&&trace.deviations.length===0)).toBe(true);
     const form=defaultConstraintForm('log_skeleton');form.selection='selected';form.templates=[];expect(constraintQuery('log_skeleton',form,'owned').get('log_skeleton_constraints')).toBe('');
   });
+  it("sends the multiplier only for automatic selection and reads ratios with Python's float() syntax",()=>{
+    const form=defaultConstraintForm('declare');form.multiplier='0.2';
+    expect(constraintQuery('declare',form,'owned').get('declare_auto_selection_multiplier')).toBe('0.2');
+    for(const text of ['1.5','-0.5',' 2 ','1_0','.5','1e-3','5.']){form.support=text;expect(constraintQuery('declare',form,'owned').get('declare_min_support_ratio')).toBe(text.trim());}
+    for(const text of ['0x10','1e','.','1__0','inf','-Infinity','nan','1,5','abc']){form.support=text;expect(()=>constraintQuery('declare',form,'owned')).toThrow(/finite decimal/);}
+  });
   it("retains a full-width Declare seed and explicit zero thresholds",()=>{
     const form=defaultConstraintForm('declare');Object.assign(form,{generateLog:true,seed:'18446744073709551615',support:'0',confidence:'0',multiplier:'0.2'});
-    const q=constraintQuery('declare',form,'owned');expect(q.get('declare_playout_seed')).toBe('18446744073709551615');expect(q.get('declare_min_support_ratio')).toBe('0');expect(q.get('declare_min_confidence_ratio')).toBe('0');expect(q.get('declare_auto_selection_multiplier')).toBe('0.2');
+    const q=constraintQuery('declare',form,'owned');expect(q.get('declare_playout_seed')).toBe('18446744073709551615');expect(q.get('declare_min_support_ratio')).toBe('0');expect(q.get('declare_min_confidence_ratio')).toBe('0');// An explicit threshold turns automatic selection, and so the multiplier, off (as in the Filters panel).
+    expect(q.get('declare_auto_selection_multiplier')).toBeNull();
     form.seed='18446744073709551616';expect(()=>constraintQuery('declare',form,'owned')).toThrow(/64-bit/);
     form.seed='42';form.support='NaN';expect(()=>constraintQuery('declare',form,'owned')).toThrow(/finite/);
   });

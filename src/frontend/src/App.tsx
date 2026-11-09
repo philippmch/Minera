@@ -52,8 +52,8 @@ import { TimingDiscovery } from "./components/TimingDiscovery";
 import { BehaviorAnalysis } from "./components/BehaviorAnalysis";
 import { retainTraces, traceFacts, useHasTimestamps } from "./mine-traces";
 import { ActivityTable } from "./components/ActivityTable";
-import { Landing } from "./components/Landing";
-import { useMineProgress } from "./mine-progress";
+import { Landing, MiningStatusBar } from "./components/Landing";
+import { useMineProgress, watchMineProgress } from "./mine-progress";
 import { EventLogView } from "./components/EventLogView";
 import { EventuallyFollows } from "./components/EventuallyFollows";
 import { DfgVariants } from "./components/DfgVariants";
@@ -200,6 +200,11 @@ export default function App() {
   // The mining_request_id of the load in progress, whose stages the overlay polls (GET /api/mine-progress).
   const [miningRequestId, setMiningRequestId] = useState<string | null>(null);
   const miningProgress = useMineProgress(mining ? miningRequestId : null);
+  // What the running load is, for the status bar shown while a log is open: another file, or a re-mine of this one.
+  const [miningLabel, setMiningLabel] = useState("Mining the event log…");
+  // A mine this tab canceled that still holds the backend's single slot while it stops.
+  const [stoppingMine, setStoppingMine] = useState(false);
+  useEffect(() => {if (!stoppingMine || mining) return undefined; return watchMineProgress(null, progress => {if (!progress?.running || !progress.canceling) setStoppingMine(false);});}, [stoppingMine, mining]);
   const [visualizationDraft,setVisualizationDraft]=useState<{generation:number;draft:VisualizationDraft}|null>(null);
   const [discoveryModelDraft,setDiscoveryModelDraft]=useState<{generation:number;file:File;sourceId:string;activityKey?:string;inferLegacyBoundaries?:boolean}|null>(null);
   const ocelQuestions=useRef<HTMLDetailsElement|null>(null);
@@ -254,7 +259,7 @@ export default function App() {
   // That holds even once the response was written: the backend keeps the previous session until this page
   // acknowledges the applied response (acknowledgeMiningRequest), sends a request on the new source, or its
   // rollback window (60 s) ends.
-  const cancelSourceLoad = () => {const {previous, rollback} = abortSourceLoad(); handBackLiveSource(previous?.previousSource, rollback);};
+  const cancelSourceLoad = () => {const {previous, rollback} = abortSourceLoad(); handBackLiveSource(previous?.previousSource, rollback); void rollback.then(outcome => {if ((outcome as {confirmed?: boolean} | undefined)?.confirmed) setStoppingMine(true);});};
   // A failed load: roll the backend back in case it published the session before the response failed to arrive,
   // or the response arrived but could not be applied (it was never acknowledged).
   const failSourceLoad = (pending: {request_id: string; posted: boolean; previousSource: string | null} | null) => {if (pending) handBackLiveSource(pending.previousSource, pending.posted ? sendCancel(pending.request_id) : Promise.resolve(undefined));};
@@ -480,6 +485,7 @@ export default function App() {
   const loadFile = (picked: File, xesActivityAttribute?: string, xesOptions?: CsvOptions, miningOptions?: MineOptions) => {
     setTool(null);
     setPendingSourceFile(picked);
+    setMiningLabel(`Opening ${picked.name}…`);
     const {ticket, controller, cancelsSettled} = beginSourceLoad();
     const accepts = () => sourceRequest.current?.controller === controller && sourceGate.current.accepts(ticket, controller.signal);
     let csvHeader: string | null = null, usedDelimiter: string | undefined;
@@ -535,7 +541,7 @@ export default function App() {
         await cancelsSettled;
         if (!accepts()) return;
         sourceRequest.current!.posted = true;
-        const result = await mineActiveDataset(file, options, controller.signal);
+        const result = await mineActiveDataset(file, {...options, waitForCanceledMine: true}, controller.signal);
         if (!accepts()) return;
         setExactInspection(exactFilterRun(result) ?? null); setOwnedExactInspection(false); if(exactFilterRun(result))setPreviousExactSuccess(exactFilterRun(result)!);
         const descriptor = miningSourceDescriptor(file, sha256, options, result), analysis = activeDatasetAnalysis(result);
@@ -584,6 +590,7 @@ export default function App() {
   // keeping the active tab. Always mines from source.file so nothing compounds.
   const applyFilters = (filters: FilterOptions & MinerOptions) => {
     if (!source) return;
+    setMiningLabel(`Re-mining ${source.file.name} with the new settings…`);
     // Only the import settings carry over; filters and miner settings come
     // entirely from this request, so Reset ({}) really clears them.
     const original = source, {ticket, controller, cancelsSettled} = beginSourceLoad(), options: MineOptions = {...sourceImportOptions(original.options), ...filters, miningRequestId: ticket.request_id};
@@ -593,7 +600,7 @@ export default function App() {
       .then(() => {
         if (!accepts()) return null;
         sourceRequest.current!.posted = true;
-        return mineActiveDataset(original.file, options, controller.signal);
+        return mineActiveDataset(original.file, {...options, waitForCanceledMine: true}, controller.signal);
       })
       .then((result) => {
         if (result === null || !accepts()) return;
@@ -967,6 +974,7 @@ export default function App() {
           mining={mining}
           onCancel={cancelSourceLoad}
           progress={miningProgress}
+          stopping={stoppingMine}
         />
         {palette}
         {dropveil}
@@ -986,6 +994,7 @@ export default function App() {
         actions={exportable ? exportToggle : undefined}
       />
       {error && <div className="error-banner" role="alert">{error}</div>}
+      {(mining || stoppingMine) && <MiningStatusBar label={mining ? miningLabel : null} progress={mining ? miningProgress : null} onCancel={mining ? cancelSourceLoad : undefined} />}
       {data.event_count === 0 && <div className="empty-state" role="status"><strong>No events were read from {data.dataset}.</strong> Check that the file is not empty and that its header row names the case, activity and timestamp columns (for example <code>case_id</code>, <code>activity</code>, <code>timestamp</code>), then open it again.</div>}
       {exportable && exportOpen && <VisualizationExplain key={cacheGeneration.current+":"+shownTab} dataset={data.dataset} busy={mining} onUse={draft=>{setVisualizationDraft({generation:cacheGeneration.current,draft});setTab("llm");setExportOpen(false);}} />}
       {(shownTab === "log" || shownTab === "dotted" || shownTab === "dfg") && <Kpis data={data} />}

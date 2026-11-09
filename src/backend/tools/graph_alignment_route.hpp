@@ -140,7 +140,7 @@ void handle_graph_alignment_workbench(const httplib::Request& request,
     } else {
       std::istringstream input(file.content);
       if (looks_like_xes(file.filename, file.content)) {
-        source_log = minera::import_xes_event_log(input, imports.xes);
+        source_log = minera::import_xes_dataframe_log(input, imports.xes);
         detected_input = "xes"; origin = "uploaded_grouped_log";
       } else {
         auto imported = minera::import_csv_event_data(input, imports.csv);

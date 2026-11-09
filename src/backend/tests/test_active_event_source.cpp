@@ -10,6 +10,8 @@
 #include <string>
 
 #include "minera/dataframe_format_json.hpp"
+#include "minera/log_skeleton.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 namespace {
 
@@ -601,9 +603,60 @@ void complete_result_writers_preserve_extreme_stored_values() {
   assert(temporal_conformance_json.find("\"value\":\"NaN\"") != std::string::npos);
 }
 
+
+// An XES source on pm4py's DataFrame path: its log holds the frame's cases and
+// its table the frame's rows (file order, each row's own trace cells), and a
+// filtered source keeps projecting those rows in file order.
+void xes_frame_source_keeps_frame_rows() {
+  std::istringstream input(
+      "<log>"
+      "<trace><string key=\"concept:name\" value=\"9\"/><string key=\"k\" value=\"first\"/>"
+      "<event><string key=\"concept:name\" value=\"a\"/></event></trace>"
+      "<trace><string key=\"concept:name\" value=\"10\"/>"
+      "<event><string key=\"concept:name\" value=\"b\"/></event></trace>"
+      "<trace><string key=\"concept:name\" value=\"empty\"/></trace>"
+      "<trace><string key=\"concept:name\" value=\"9\"/><string key=\"k\" value=\"second\"/>"
+      "<event><string key=\"concept:name\" value=\"c\"/></event></trace>"
+      "</log>");
+  const auto source = ActiveEventSource::from_xes_frame(
+      import_xes_event_log(input), {"frame.xes", "xes", ""},
+      {"case:concept:name", "concept:name", "time:timestamp", "org:resource", "lifecycle:transition"});
+  const auto& log = source.checked_log();
+  assert(log.traces.size() == 2 && log.traces[0].case_id == "9" && log.traces[0].events.size() == 2);
+  const auto& table = source.checked_table();
+  assert(table.rows.size() == 3);
+  const auto column = [&](std::string_view name) {
+    return static_cast<std::size_t>(std::find(table.columns.begin(), table.columns.end(), name) -
+                                    table.columns.begin());
+  };
+  const auto value = [&](const EventTable& rows, std::size_t row, std::string_view name) {
+    const auto& cell = rows.rows[row][column(name)];
+    return cell && !cell->is_null ? cell->value : std::string("<null>");
+  };
+  assert(value(table, 0, "concept:name") == "a" && value(table, 1, "concept:name") == "b" &&
+         value(table, 2, "concept:name") == "c");
+  assert(value(table, 0, "case:k") == "first" && value(table, 2, "case:k") == "second");
+  assert((source.representative_row_ordinals() ==
+          ActiveEventSource::RepresentativeRows{{0, 2}, {1}}));
+  LogFilterOptions keep;
+  keep.case_attribute_key = "k";
+  keep.keep_case_attribute_values = {"second"};
+  const auto filtered = source.with_filters(keep);
+  assert(filtered.checked_log().traces.size() == 1);
+  const auto& rows = filtered.checked_table();
+  assert(rows.rows.size() == 2 && value(rows, 0, "concept:name") == "a" &&
+         value(rows, 1, "concept:name") == "c" && value(rows, 1, "case:k") == "second");
+  // The table's groups by case id meet 9 before 10; pm4py lists 10 first.
+  LogSkeletonOptions keys;
+  assert((log_skeleton_case_order(source.view(EventDataKind::kEventTable), keys) ==
+          std::vector<std::size_t>{1, 0}));
+  assert((log_skeleton_case_order(source.view(EventDataKind::kEventLog), keys) ==
+          std::vector<std::size_t>{1, 0}));
+}
 }  // namespace
 
 int main() {
+  xes_frame_source_keeps_frame_rows();
   original_and_owned_views_preserve_complete_source();
   log_preparation_failure_does_not_discard_flat_input();
   selection_preserves_original_cells_and_multi_index();

@@ -146,7 +146,7 @@ void handle_workflow_input_discovery(const httplib::Request& request,
     } else {
       const bool is_xes = looks_like_xes(file.filename, file.content);
       std::istringstream input(file.content);
-      if (is_xes) {source_log = minera::import_xes_event_log(input, params.xes); format = "xes"; origin = "uploaded_grouped_log";}
+      if (is_xes) {source_log = minera::import_xes_dataframe_log(input, params.xes); format = "xes"; origin = "uploaded_grouped_log";}
       else {
         auto imported = minera::import_csv_event_data(input, params.csv);
         source_log = std::move(imported.log); table = std::move(imported.table);

@@ -19,6 +19,7 @@ import {
   type FootprintsDiscoveryVariant,
 } from "../types";
 import { type CaseAttributeStat, type EventAttributeStat } from "../types";
+import { parsePythonFloat } from "../app-logic";
 
 export const TOKEN_REPLAY_POLICY_DEFAULTS = {
   tokenReplayConsiderRemainingInFitness: true,
@@ -1175,8 +1176,9 @@ export function Filters({
   };
   const toDeclareRatio = (value: string) => {
     if (value.trim() === "") return undefined;
-    const n = Number(value);
-    return Number.isFinite(n) ? n : undefined;
+    // Python's float() syntax, as the backend reads it; any finite value.
+    const n = parsePythonFloat(value);
+    return n !== null && Number.isFinite(n) ? n : undefined;
   };
   const toDeclareActivities = (value: string) => {
     const names = value.split(",").map((name) => name.trim()).filter(Boolean);
@@ -2171,13 +2173,13 @@ export function Filters({
       <div className="filters-bar">
         <button
           className={open ? "filters-toggle open" : "filters-toggle"}
+          aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
           <span className="filters-caret">{open ? "▾" : "▸"}</span> Filters &
           miner settings
           {active && <span className="filters-dot" aria-label="filters applied" />}
         </button>
-        {mining && <span className="filters-status">re-mining…</span>}
       </div>
 
       {open && (
@@ -2635,7 +2637,7 @@ export function Filters({
             <label className="filters-field">
               <span>Declare min support ratio</span>
               <input
-                type="number" min={0} max={1} step={0.05} placeholder="auto"
+                type="number" step="any" placeholder="auto"
                 value={declareMinSupportRatio}
                 onChange={(event) => setDeclareMinSupportRatio(event.target.value)}
               />
@@ -2643,7 +2645,7 @@ export function Filters({
             <label className="filters-field">
               <span>Declare min confidence ratio</span>
               <input
-                type="number" min={0} max={1} step={0.05} placeholder="auto"
+                type="number" step="any" placeholder="auto"
                 value={declareMinConfidenceRatio}
                 onChange={(event) => setDeclareMinConfidenceRatio(event.target.value)}
               />
@@ -2655,14 +2657,14 @@ export function Filters({
                 Declare auto-selection multiplier
               </span>
               <input
-                type="number" min={0} max={1} step={0.05} placeholder="0.8"
+                type="number" step="any" placeholder="0.8"
                 value={declareAutoSelectionMultiplier}
                 disabled={declareMinSupportRatio.trim() !== "" || declareMinConfidenceRatio.trim() !== ""}
                 title="Active only when both explicit threshold fields are blank"
                 onChange={(event) => setDeclareAutoSelectionMultiplier(event.target.value)}
               />
               {(declareMinSupportRatio.trim() !== "" || declareMinConfidenceRatio.trim() !== "") && (
-                <small>Disabled while an explicit support or confidence threshold is set.</small>
+                <small>Not used while an explicit support or confidence ratio is set; the blank one counts as 0.</small>
               )}
             </label>
           </div>

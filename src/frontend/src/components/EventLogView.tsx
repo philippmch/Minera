@@ -147,12 +147,31 @@ export function XesButton({ dataset, available = true }: { dataset: string; avai
   );
 }
 
+// The DFG filter controls as the panel labels them; an error that names a
+// control by its wire name reads with the label instead.
+const DFG_CONTROL_LABELS: ReadonlyArray<[string, string]> = [
+  ["keep_all_activities", "Keep all activities"], ["activities_percentage", "Activities percentage"],
+  ["paths_percentage", "Paths percentage"], ["most_common_paths", "Most common paths"],
+  ["noise_threshold", "Noise threshold"], ["keep_connected", "Connected threshold"],
+  ["to_activity", "To activity"], ["from_activity", "From activity"], ["contain_activity", "Contain activity"],
+];
+/** A DFG export error as the panel words it: controls by their labels, and a missing activity (the reference's
+ * KeyError, kept verbatim in parentheses) named as such. */
+export function dfgErrorText(message: string): string {
+  const missing = /^KeyError: (['"])(.*)\1$/s.exec(message);
+  if (missing) return `No activity “${missing[2]}” in this log (${message}).`;
+  let text = message;
+  for (const [wire, label] of DFG_CONTROL_LABELS) text = text.split(wire).join(`“${label}”`);
+  return text;
+}
+
 function DfgButton({ dataset, available = true }: { dataset: string; available?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [options, setOptions] = useState<DfgExportOptions>({});
 
   const setNumber = (name: keyof DfgExportOptions, value: string) => {
+    setError(null);
     setOptions((current) => ({
       ...current,
       [name]: value.trim() ? Number(value) : undefined,
@@ -160,6 +179,7 @@ function DfgButton({ dataset, available = true }: { dataset: string; available?:
   };
   const setText = (name: keyof DfgExportOptions, value: string) => {
     // An emptied text field means "not set", as it does for the numeric fields.
+    setError(null);
     setOptions((current) => ({ ...current, [name]: value === "" ? undefined : value }));
   };
 
@@ -172,7 +192,7 @@ function DfgButton({ dataset, available = true }: { dataset: string; available?:
         const base = dataset.replace(/\.[^.]+$/, "") || "log";
         downloadBlob(blob, `${base}.dfg`);
       })
-      .catch((cause: Error) => setError(cause.message))
+      .catch((cause: Error) => setError(dfgErrorText(cause.message)))
       .finally(() => setBusy(false));
   };
 
