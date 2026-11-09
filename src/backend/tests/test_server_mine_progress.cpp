@@ -3,7 +3,7 @@
 // /api/mine-progress reports the running mine's stage, stage count and
 // elapsed time while another connection mines (and while a further mine is
 // refused with MINE_BUSY), and POST /api/cancel-mine stops the mine inside a
-// long stage (the inductive net's footprints), not only at the next
+// long stage (the inductive net's token replay), not only at the next
 // stage boundary: the server's CPU use stops within about a second while the
 // mining connection stays open, the mine answers with the cancel's error, and
 // the progress record clears. CPU time is read from /proc, so that check runs
@@ -64,16 +64,22 @@ int free_port() {
   return port;
 }
 
-// 500 cases of 5 to 35 events over 25 activities in random order: the
-// inductive miner answers with a parallel of 25 optional loops, whose
-// footprints (the reachability graph of that net) take seconds. Its
-// reachability check is instant since the net reduction of review AA2.
+// The stage the cancel lands in: the longest stage of the mine below.
+const std::string kLongStage = "Inductive net: token replay";
+
+// 2,000 cases of 20 to 60 events over 40 activities in random order: the
+// inductive miner answers with a parallel of 40 optional loops, and replaying
+// 2,000 distinct traces on that net takes seconds (about 4 s, after about
+// 5 s of earlier stages, on an unloaded machine). Its reachability check is
+// instant since the net reduction of review AA2, and its footprints since
+// the packed footprint exploration of the same review (the footprints stage
+// was the long one before).
 std::string random_log() {
   std::mt19937 rng(7);
-  std::uniform_int_distribution<int> activity(0, 24), length(5, 35);
+  std::uniform_int_distribution<int> activity(0, 39), length(20, 60);
   std::ostringstream csv;
   csv << "case_id,activity,timestamp\n";
-  for (int c = 0; c < 500; ++c) {
+  for (int c = 0; c < 2000; ++c) {
     const int n = length(rng);
     for (int e = 0; e < n; ++e)
       csv << 'c' << c << ",a" << activity(rng) << ",2024-01-01T" << (e / 60 < 10 ? "0" : "") << e / 60
@@ -196,8 +202,7 @@ int main(int argc, char** argv) {
       mined = mining.Post("/api/mine", items);
     });
 
-    // Poll from another connection until the mine is in the inductive net's
-    // footprints.
+    // Poll from another connection until the mine is in the long stage.
     std::vector<Progress> seen;
     const auto started = std::chrono::steady_clock::now();
     double slowest_poll = 0.0;
@@ -208,12 +213,12 @@ int main(int argc, char** argv) {
       slowest_poll = std::max(slowest_poll, std::chrono::duration<double>(std::chrono::steady_clock::now() - asked).count());
       if (progress && progress->running && progress->matches) {
         seen.push_back(*progress);
-        if (progress->stage == "Inductive net: footprints") { in_long_stage = true; break; }
+        if (progress->stage == kLongStage) { in_long_stage = true; break; }
       }
       if (mined) break;  // finished (or failed) before the stage was seen
       sleep_ms(50);
     }
-    check(in_long_stage, "the mine reached the inductive footprints stage");
+    check(in_long_stage, "the mine reached the " + kLongStage + " stage");
     check(!seen.empty() && seen.front().total == 26, "26 stages in all");
     bool ordered = true;
     for (std::size_t i = 1; i < seen.size(); ++i)
@@ -239,8 +244,8 @@ int main(int argc, char** argv) {
       r = client.Post("/api/cancel-mine?request_id=" + id, "", "text/plain");
       check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel-mine: " + describe(r));
       const auto progress = poll(client, id);
-      check(progress && progress->stage == "Inductive net: footprints",
-            "the cancel arrived inside the footprints stage");
+      check(progress && progress->stage == kLongStage,
+            "the cancel arrived inside the " + kLongStage + " stage");
       sleep_ms(1000);
       const double idle_from = cpu_seconds(server);
       sleep_ms(500);

@@ -20009,3 +20009,57 @@ search limit".
   which no marking covers the final marking).
 
 Tests: `minera_core_tests` (`final_marking_reachability_reduces_block_structured_nets`).
+
+## Review AC2: packed model-footprint exploration (2026-11-09)
+
+The "<model> net: footprints" stages of `/api/mine` (and every other
+`check_footprints` caller) explore the net's markings breadth-first up to
+`kFootprintCap` (200,000) expansions. On a random 500-case CSV with 25
+activities in random order every miner's net is concurrent enough to hit that
+budget: 3.7 s inductive, 1.6 s Heuristics and 1.1 s POWL, with a 1.1 GB peak.
+The result is unchanged; only the cost:
+
+- **Packed markings.** On a net with unit ordinary arcs (repeated endpoints as
+  multiplicities, inhibitor arcs allowed, no reset or weighted arcs: every
+  mined net) a marking is a row of fixed-width token fields in 64-bit words,
+  one bit per place while the net stays safe and widened (2, 4, ... 32 bits,
+  re-encoding the stored rows) when a place holds more. Markings get the same
+  ids in the same breadth-first order and the same budget applies, so the
+  expanded set, `exhausted` and a token-overflow error are those of the
+  general path, which every other net still takes unchanged.
+- **Nothing recomputed.** The visible labels enabled at a marking are found
+  once, when it is met, the explored edges are kept instead of re-fired, and
+  only the transitions listed under a marked input place are tested.
+- **Stopping when the answer is fixed.** The relation can only grow as more
+  markings are expanded and never holds more than every pair of the live
+  visible activities. Once more than 200,000 markings are known (so the
+  budget will be hit and `exhausted` is true) and the relation of what is
+  expanded so far already holds every such pair (the pairs seen directly are
+  checked after each expansion, the closed relation at doubling checkpoints),
+  exploring on cannot change the answer. This stop is only taken when no
+  firing within the budget can overflow a token count.
+- The log's directly-follows relation is collected as activity numbers and
+  named once per pair.
+
+Measurements (`/api/mine` stage times polled from `/api/mine-progress`; both
+responses byte-identical apart from `run_id`): 500 cases x 25 activities,
+footprints 3.75 + 0.01 + 2.20 + 1.56 s (inductive, Alpha, Heuristics, POWL)
+= 7.5 s, now 0.06 + 0.00 + 0.16 + 0.12 = 0.34 s (whole request 8.7 s ->
+1.5 s; the four `check_footprints` calls alone 1.1 GB -> 80 MB peak); 494k
+events x 40 activities 8.98 + 0.15 + 0.35 + 3.02 = 12.5 s, now 0.15 + 0.08 +
+0.29 + 0.28 = 0.8 s. A net that does not settle still runs the full 200,000
+expansions, about 3x faster than before (the 25-activity inductive net with
+the stop disabled: 1.0 s against 3.7 s).
+
+Differential fuzz (old against new `check_footprints`, every field and every
+exception): 7,212 nets from inductive (IM, IMf, IMd; both conversions), Alpha,
+Heuristics, POWL and ILP nets on random logs, large concurrent miner nets,
+random raw nets with weighted, reset and inhibitor arcs, out-of-range inputs,
+explicit and near-`INT_MAX` markings, random block nets with arc mutations
+and wide parallel nets: all identical (2,371 exhausted, 31 overflow errors;
+on the packed path 1,264 runs to the full budget and 922 early stops).
+
+`minera_server_mine_progress_tests` cancelled a mine inside the inductive
+footprints stage, which now lasts tens of milliseconds; it now mines 2,000
+cases of 20-60 events over 40 activities and cancels inside "Inductive net:
+token replay" (about 4 s).

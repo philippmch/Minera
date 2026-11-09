@@ -5237,14 +5237,25 @@ constexpr std::size_t kFootprintCap = 200000;
 using Relation = std::set<std::pair<std::string, std::string>>;
 
 // The log's directly-follows relation: every ordered pair of adjacent
-// activities seen in some trace.
+// activities seen in some trace. The pairs are collected as activity numbers
+// and named once each.
 Relation log_footprint(const EventLog& log) {
-  Relation relation;
+  std::unordered_map<std::string_view, std::uint32_t> ids;
+  std::vector<std::string_view> names;
+  std::unordered_set<std::uint64_t> pairs;
   for (const auto& trace : log.traces) {
-    for (std::size_t i = 1; i < trace.events.size(); ++i) {
-      relation.emplace(trace.events[i - 1].activity, trace.events[i].activity);
+    std::uint32_t previous = 0;
+    for (std::size_t i = 0; i < trace.events.size(); ++i) {
+      const std::string_view activity = trace.events[i].activity;
+      const auto [found, added] = ids.try_emplace(activity, static_cast<std::uint32_t>(names.size()));
+      if (added) names.push_back(activity);
+      if (i > 0) pairs.insert(std::uint64_t{previous} << 32 | found->second);
+      previous = found->second;
     }
   }
+  Relation relation;
+  for (const std::uint64_t pair : pairs)
+    relation.emplace(std::string(names[pair >> 32]), std::string(names[pair & 0xFFFFFFFFu]));
   return relation;
 }
 
@@ -5261,8 +5272,10 @@ Relation log_footprint(const EventLog& log) {
 // keeps concurrent nets (whose marking spaces are large) tractable.
 // `cancelled` is polled every 256 markings in each pass (the exploration of
 // up to kFootprintCap markings can take seconds on a concurrent net).
-Relation model_footprint(const PetriNet& net, const Marking& initial,
-                         bool& exhausted, const std::function<bool()>& cancelled) {
+// This is the general path: packed_footprint::model_footprint below computes
+// the same relation for the ordinary nets the miners produce.
+Relation generic_model_footprint(const PetriNet& net, const Marking& initial,
+                                 bool& exhausted, const std::function<bool()>& cancelled) {
   CancellationCheck check_cancelled(cancelled, "footprint conformance was cancelled", 256);
   const auto& names = net.activities();
   const std::size_t acts = names.size();
@@ -5390,6 +5403,520 @@ Relation model_footprint(const PetriNet& net, const Marking& initial,
       if (follows[a * words + b / 64] & (std::uint64_t{1} << (b % 64)))
         relation.emplace(names[a], names[b]);
   return relation;
+}
+
+// The model footprint over packed markings, for nets whose ordinary arcs all
+// have unit weight (repeated arcs allowed) and that have no reset arcs —
+// every net the miners produce. It meets the markings in the same
+// breadth-first order, gives them the same ids and stops at the same budget
+// as generic_model_footprint, so the relation, `exhausted` and any overflow
+// error are the same; what differs is the cost:
+//  * a marking is a row of fixed-width token fields packed into 64-bit words
+//    (one bit per place while the net stays safe, widened as soon as a place
+//    holds more), so hashing, comparing and storing it touches a few words
+//    instead of one int per place;
+//  * the visible labels enabled at a marking are computed once, when it is
+//    met, and the explored edges are kept, so nothing is re-fired afterwards;
+//  * only the transitions listed under a marked input place are tested at a
+//    marking (still in transition order);
+//  * the relation only grows as markings are expanded, and it can never hold
+//    more than every pair of the live visible activities. Once more than
+//    kFootprintCap markings are known — so the budget will be hit — and the
+//    relation of what is expanded so far already holds all of those pairs
+//    (checked for the pairs seen directly, a fires and then b is enabled at
+//    once, after every expansion, and for the full relation at doubling
+//    checkpoints), the result is fixed: exploring on cannot change it. That
+//    stop is only taken when no firing within the budget can overflow a
+//    token count, so it hides no error either.
+namespace packed_footprint {
+
+constexpr std::uint32_t kSilent = std::numeric_limits<std::uint32_t>::max();
+
+struct Arc {
+  std::uint32_t place = 0;
+  std::uint32_t count = 0;  // repeated arcs between the place and the transition
+  std::uint32_t word = 0;   // the place's field in the current layout
+  std::uint32_t shift = 0;
+};
+
+// A transition's arcs are arcs[in, out) inputs, [out, inhibit) outputs and
+// [inhibit, end) inhibitors, all transitions' arcs in one array.
+struct Step {
+  bool live = true;               // every input and inhibitor place exists
+  std::uint32_t label = kSilent;  // the activity, or kSilent
+  std::uint32_t in = 0, out = 0, inhibit = 0, end = 0;
+};
+
+// Rows of `words` 64-bit words, interned under consecutive ids. Only the slot
+// layout depends on the hash.
+class Table {
+ public:
+  explicit Table(std::size_t words) : words_(words), slots_(1024, 0) {}
+  Table(const Table&) = delete;
+  Table& operator=(const Table&) = delete;
+
+  [[nodiscard]] std::size_t size() const { return count_; }
+  [[nodiscard]] const std::uint64_t* at(std::uint32_t id) const {
+    return blocks_[id / kRows].get() + std::size_t(id % kRows) * words_;
+  }
+  std::pair<std::uint32_t, bool> intern(const std::uint64_t* row) {
+    if ((count_ + 1) * 2 > slots_.size()) grow();
+    return intern(row, row_hash(row));
+  }
+  // Interns `count` rows stored back to back, in order, calling
+  // visit(k, id, added) for the k-th: the ids of interning them one at a
+  // time. The slots, and then the rows they point to, are read in passes of
+  // independent loads first, so the cache misses of a large table overlap
+  // instead of being taken one after another.
+  template <class Visit>
+  void intern_batch(const std::uint64_t* rows, std::size_t count, Visit&& visit) {
+    while ((count_ + count) * 2 > slots_.size()) grow();
+    const std::size_t mask = slots_.size() - 1;
+    hashes_.resize(count);
+    std::uint64_t touched = 0;
+    for (std::size_t k = 0; k < count; ++k) {
+      hashes_[k] = row_hash(rows + k * words_);
+      touched += slots_[hashes_[k] & mask];
+    }
+    for (std::size_t k = 0; k < count; ++k) {
+      const std::uint64_t entry = slots_[hashes_[k] & mask];
+      if (entry != 0 && (entry & kTagMask) == (hashes_[k] & kTagMask))
+        touched += *at(static_cast<std::uint32_t>((entry & ~kTagMask) - 1));
+    }
+    touch_ = touch_ + touched;
+    for (std::size_t k = 0; k < count; ++k) {
+      const auto [id, added] = intern(rows + k * words_, hashes_[k]);
+      visit(k, id, added);
+    }
+  }
+  // Rewrites every row as recode(old_row, new_row) with `words` words each;
+  // the ids stay.
+  template <class Recode>
+  void relayout(std::size_t words, Recode&& recode) {
+    std::vector<std::unique_ptr<std::uint64_t[]>> blocks;
+    for (std::size_t id = 0; id < count_; ++id) {
+      if (id % kRows == 0)
+        blocks.push_back(std::make_unique_for_overwrite<std::uint64_t[]>(kRows * words));
+      recode(at(static_cast<std::uint32_t>(id)), blocks.back().get() + (id % kRows) * words);
+      if (id % kRows == kRows - 1) blocks_[id / kRows].reset();
+    }
+    blocks_ = std::move(blocks);
+    words_ = words;
+    rehash(slots_.size());
+  }
+
+ private:
+  static constexpr std::size_t kRows = 4096;
+  static constexpr std::uint64_t kTagMask = 0xFFFFFFFF00000000ull;
+
+  // The table has room for the row.
+  std::pair<std::uint32_t, bool> intern(const std::uint64_t* row, std::uint64_t hash) {
+    const std::uint64_t tag = hash & kTagMask;
+    const std::size_t mask = slots_.size() - 1;
+    std::size_t slot = hash & mask;
+    for (; slots_[slot] != 0; slot = (slot + 1) & mask) {
+      const std::uint64_t entry = slots_[slot];
+      if ((entry & kTagMask) != tag) continue;
+      const auto id = static_cast<std::uint32_t>((entry & ~kTagMask) - 1);
+      if (std::equal(row, row + words_, at(id))) return {id, false};
+    }
+    if (count_ >= std::numeric_limits<std::uint32_t>::max() - 1)
+      throw std::length_error("model-run search marking table overflow");
+    const auto id = static_cast<std::uint32_t>(count_++);
+    if (id % kRows == 0)
+      blocks_.push_back(std::make_unique_for_overwrite<std::uint64_t[]>(kRows * words_));
+    std::copy(row, row + words_, blocks_.back().get() + std::size_t(id % kRows) * words_);
+    slots_[slot] = tag | (std::uint64_t{id} + 1);
+    return {id, true};
+  }
+  [[nodiscard]] std::uint64_t row_hash(const std::uint64_t* row) const {
+    std::uint64_t h = 0x9E3779B97F4A7C15ull;
+    for (std::size_t w = 0; w < words_; ++w) {
+      h ^= row[w];
+      h *= 0xBF58476D1CE4E5B9ull;
+      h ^= h >> 31;
+    }
+    h *= 0x94D049BB133111EBull;
+    return h ^ (h >> 29);
+  }
+  void grow() { rehash(slots_.size() * 2); }
+  void rehash(std::size_t size) {
+    slots_.assign(size, 0);
+    const std::size_t mask = size - 1;
+    for (std::size_t id = 0; id < count_; ++id) {
+      const std::uint64_t hash = row_hash(at(static_cast<std::uint32_t>(id)));
+      std::size_t slot = hash & mask;
+      while (slots_[slot] != 0) slot = (slot + 1) & mask;
+      slots_[slot] = (hash & kTagMask) | (std::uint64_t{id} + 1);
+    }
+  }
+
+  std::size_t words_;
+  std::size_t count_ = 0;
+  std::vector<std::unique_ptr<std::uint64_t[]>> blocks_;
+  std::vector<std::uint64_t> slots_;  // 0, or the hash's high half | id + 1
+  std::vector<std::uint64_t> hashes_;  // of the batch being interned
+  // Sums what the batch passes read; volatile, so the reads are not dropped.
+  volatile std::uint64_t touch_ = 0;
+};
+
+// Whether packed_model_footprint applies: unit ordinary arcs, no reset arcs,
+// every output place present and every activity index in range (otherwise the
+// general path decides).
+bool applies(const PetriNet& net, const Marking& initial) {
+  const std::size_t places = initial.size();
+  if (places >= std::numeric_limits<std::uint32_t>::max()) return false;
+  for (const auto& transition : net.transitions()) {
+    if (!transition.input_weights.empty() || !transition.output_weights.empty() ||
+        !transition.reset_inputs.empty())
+      return false;
+    for (const auto place : transition.outputs)
+      if (place >= places) return false;
+    if (transition.activity && *transition.activity >= net.activities().size()) return false;
+  }
+  return true;
+}
+
+Relation model_footprint(const PetriNet& net, const Marking& initial, bool& exhausted,
+                         const std::function<bool()>& cancelled) {
+  CancellationCheck check_cancelled(cancelled, "footprint conformance was cancelled", 256);
+  const auto& names = net.activities();
+  const std::size_t acts = names.size();
+  const std::size_t lw = (acts + 63) / 64;  // label words per marking
+  const std::size_t places = initial.size();
+
+  // The transitions as place/count arcs, in transition order.
+  std::vector<Step> steps;
+  steps.reserve(net.transitions().size());
+  std::vector<std::uint32_t> visible;  // indices of the live visible steps
+  std::vector<char> live_activity(acts, 0);
+  std::uint64_t most_produced = 0;  // tokens one firing adds, at most
+  std::vector<Arc> arcs;
+  const auto gather = [&](const std::vector<std::size_t>& list) {
+    const std::size_t first = arcs.size();
+    for (const auto place : list) {
+      const auto found = std::find_if(arcs.begin() + static_cast<std::ptrdiff_t>(first), arcs.end(),
+                                      [&](const Arc& arc) { return arc.place == place; });
+      if (found != arcs.end()) ++found->count;
+      else arcs.push_back({static_cast<std::uint32_t>(place), 1, 0, 0});
+    }
+    if (arcs.size() >= std::numeric_limits<std::uint32_t>::max())
+      throw std::length_error("model footprint arc table overflow");
+    return static_cast<std::uint32_t>(arcs.size());
+  };
+  for (const auto& transition : net.transitions()) {
+    Step step;
+    for (const auto place : transition.inputs) step.live = step.live && place < places;
+    for (const auto place : transition.inhibitor_inputs) step.live = step.live && place < places;
+    step.in = static_cast<std::uint32_t>(arcs.size());
+    step.out = step.live ? gather(transition.inputs) : step.in;
+    step.inhibit = gather(transition.outputs);
+    step.end = step.live ? gather(transition.inhibitor_inputs) : step.inhibit;
+    most_produced = std::max<std::uint64_t>(most_produced, transition.outputs.size());
+    if (!transition.silent()) {
+      step.label = static_cast<std::uint32_t>(*transition.activity);
+      if (step.live) {
+        visible.push_back(static_cast<std::uint32_t>(steps.size()));
+        live_activity[step.label] = 1;
+      }
+    }
+    steps.push_back(std::move(step));
+  }
+  std::uint64_t full_pairs = 0;  // every pair of live visible activities
+  for (const char live : live_activity) full_pairs += live != 0;
+  full_pairs *= full_pairs;
+  // No marking within the budget can reach this many tokens in a place (each
+  // is at most kFootprintCap firings from the initial one), so no firing the
+  // general path would make can overflow, and stopping early hides no error.
+  std::uint64_t most_initial = 0;
+  for (const int tokens : initial) most_initial = std::max<std::uint64_t>(most_initial, std::uint64_t(tokens));
+  const std::uint64_t int_max = std::uint64_t(std::numeric_limits<int>::max());
+  const bool may_stop_early =
+      most_initial <= int_max &&
+      most_produced <= (int_max - most_initial) / (std::uint64_t(kFootprintCap) + 1);
+
+  // The packed layout: `bits` per place, fields never straddle a word.
+  unsigned bits = 1;
+  while (bits < 32 && (std::uint64_t{1} << bits) - 1 < most_initial) bits *= 2;
+  std::uint64_t field_max = 0;
+  std::size_t words = 1;
+  const auto layout = [&] {
+    const std::size_t per_word = 64 / bits;
+    field_max = (std::uint64_t{1} << bits) - 1;
+    words = std::max<std::size_t>(1, (places + per_word - 1) / per_word);
+    for (auto& arc : arcs) {
+      arc.word = static_cast<std::uint32_t>(arc.place / per_word);
+      arc.shift = static_cast<std::uint32_t>((arc.place % per_word) * bits);
+    }
+  };
+  layout();
+  const auto field = [&](const std::uint64_t* row, const Arc& arc) {
+    return (row[arc.word] >> arc.shift) & field_max;
+  };
+  const auto enabled = [&](const std::uint64_t* row, const Step& step) {
+    if (!step.live) return false;
+    for (std::uint32_t a = step.in; a < step.out; ++a)
+      if (field(row, arcs[a]) < arcs[a].count) return false;
+    for (std::uint32_t a = step.inhibit; a < step.end; ++a)
+      if (field(row, arcs[a]) != 0) return false;
+    return true;
+  };
+  // Fires an enabled step on `row` in place. Returns 0, or the token count a
+  // place would need when it does not fit the layout (the row is then
+  // unusable); a count past int's range is the general path's overflow.
+  const auto fire = [&](std::uint64_t* row, const Step& step) -> std::uint64_t {
+    for (std::uint32_t a = step.in; a < step.out; ++a)
+      row[arcs[a].word] -= std::uint64_t{arcs[a].count} << arcs[a].shift;
+    for (std::uint32_t a = step.out; a < step.inhibit; ++a) {
+      const Arc& arc = arcs[a];
+      const std::uint64_t tokens = field(row, arc) + arc.count;
+      if (tokens > int_max) throw std::overflow_error("Petri firing exceeds supported token range");
+      if (tokens > field_max) return tokens;
+      row[arc.word] += std::uint64_t{arc.count} << arc.shift;
+    }
+    return 0;
+  };
+
+  // Each live step is listed under its first input place (or as always
+  // possible when it has none): only the steps listed under a marked place can
+  // be enabled, so an expansion tests those, still in transition order.
+  std::vector<std::uint32_t> listed_begin(places + 1, 0), listed, unconditional;
+  for (const auto& step : steps)
+    if (step.live && step.in != step.out) ++listed_begin[arcs[step.in].place + 1];
+  for (std::size_t place = 0; place < places; ++place) listed_begin[place + 1] += listed_begin[place];
+  listed.resize(listed_begin[places]);
+  {
+    std::vector<std::uint32_t> fill(listed_begin.begin(), listed_begin.end() - 1);
+    for (std::size_t index = 0; index < steps.size(); ++index) {
+      const Step& step = steps[index];
+      if (!step.live) continue;
+      if (step.in == step.out) unconditional.push_back(static_cast<std::uint32_t>(index));
+      else listed[fill[arcs[step.in].place]++] = static_cast<std::uint32_t>(index);
+    }
+  }
+  std::vector<std::uint64_t> candidates((steps.size() + 63) / 64, 0);
+  const auto find_candidates = [&](const std::uint64_t* row) {
+    std::fill(candidates.begin(), candidates.end(), 0);
+    for (const auto index : unconditional) candidates[index / 64] |= std::uint64_t{1} << (index % 64);
+    const std::size_t per_word = 64 / bits;
+    for (std::size_t w = 0; w < words; ++w) {
+      for (std::uint64_t rest = row[w]; rest != 0;) {
+        const auto field_index = static_cast<std::size_t>(std::countr_zero(rest)) / bits;
+        rest &= ~(field_max << (field_index * bits));
+        const std::size_t place = w * per_word + field_index;
+        for (std::uint32_t k = listed_begin[place]; k < listed_begin[place + 1]; ++k)
+          candidates[listed[k] / 64] |= std::uint64_t{1} << (listed[k] % 64);
+      }
+    }
+  };
+
+  std::vector<std::uint64_t> packed(words, 0);
+  {
+    const std::size_t per_word = 64 / bits;
+    for (std::size_t place = 0; place < places; ++place)
+      packed[place / per_word] |= std::uint64_t(initial[place]) << ((place % per_word) * bits);
+  }
+  Table table(words);
+  // seeds[m]: the activities whose visible transitions are enabled at m.
+  std::vector<std::uint64_t> seeds;
+  const auto seed_new = [&](const std::uint64_t* row) {  // the marking met last
+    seeds.resize(seeds.size() + lw, 0);
+    std::uint64_t* seed = seeds.data() + seeds.size() - lw;
+    for (const auto index : visible) {
+      const Step& step = steps[index];
+      if (enabled(row, step)) seed[step.label / 64] |= std::uint64_t{1} << (step.label % 64);
+    }
+  };
+  table.intern(packed.data());
+  seed_new(packed.data());
+
+  const auto widen = [&](std::uint64_t needed) {
+    const unsigned old_bits = bits;
+    const std::uint64_t old_max = field_max;
+    while ((std::uint64_t{1} << bits) - 1 < needed) bits *= 2;
+    const std::size_t old_per_word = 64 / old_bits;
+    layout();
+    const std::size_t per_word = 64 / bits;
+    table.relayout(words, [&](const std::uint64_t* from, std::uint64_t* to) {
+      std::fill(to, to + words, 0);
+      for (std::size_t place = 0; place < places; ++place) {
+        const std::uint64_t tokens =
+            (from[place / old_per_word] >> ((place % old_per_word) * old_bits)) & old_max;
+        to[place / per_word] |= tokens << ((place % per_word) * bits);
+      }
+    });
+  };
+
+  // Breadth-first: the frontier is every id from `next` on. The edges of each
+  // expanded marking are kept (target, label) in firing order.
+  std::vector<std::uint32_t> edge_target, edge_label;
+  std::vector<std::size_t> edge_begin{0};
+
+  // The relation once the first `expanded` markings are expanded, as one bit
+  // row per activity: a > b for every visible edge m -a-> m' and every b
+  // observable at m' after silent moves only. Observable labels are the
+  // least fixpoint of the seeds closed backwards over the silent edges; a
+  // marking that was not expanded has no recorded edges, so its labels are
+  // its seeds.
+  const auto relation_rows = [&](std::size_t expanded) {
+    std::vector<std::uint64_t> labels(seeds.begin(),
+                                      seeds.begin() + static_cast<std::ptrdiff_t>(expanded * lw));
+    std::vector<std::size_t> pred_begin(expanded + 1, 0);
+    for (std::size_t m = 0; m < expanded; ++m) {
+      check_cancelled();
+      for (std::size_t e = edge_begin[m]; e < edge_begin[m + 1]; ++e) {
+        if (edge_label[e] != kSilent) continue;
+        const std::uint32_t target = edge_target[e];
+        if (target < expanded) {
+          ++pred_begin[target + 1];
+          continue;
+        }
+        for (std::size_t w = 0; w < lw; ++w)
+          labels[m * lw + w] |= seeds[std::size_t(target) * lw + w];
+      }
+    }
+    for (std::size_t m = 0; m < expanded; ++m) pred_begin[m + 1] += pred_begin[m];
+    std::vector<std::uint32_t> preds(pred_begin[expanded]);
+    {
+      std::vector<std::size_t> fill(pred_begin.begin(), pred_begin.end() - 1);
+      for (std::size_t m = 0; m < expanded; ++m)
+        for (std::size_t e = edge_begin[m]; e < edge_begin[m + 1]; ++e)
+          if (edge_label[e] == kSilent && edge_target[e] < expanded)
+            preds[fill[edge_target[e]]++] = static_cast<std::uint32_t>(m);
+    }
+    std::vector<std::uint32_t> work(expanded);
+    for (std::size_t m = 0; m < expanded; ++m)
+      work[m] = static_cast<std::uint32_t>(expanded - 1 - m);
+    std::vector<char> queued(expanded, 1);
+    while (!work.empty()) {
+      check_cancelled();
+      const std::uint32_t id = work.back();
+      work.pop_back();
+      queued[id] = 0;
+      const std::uint64_t* from = labels.data() + std::size_t(id) * lw;
+      for (std::size_t k = pred_begin[id]; k < pred_begin[id + 1]; ++k) {
+        const std::uint32_t pred = preds[k];
+        std::uint64_t* into = labels.data() + std::size_t(pred) * lw;
+        bool changed = false;
+        for (std::size_t w = 0; w < lw; ++w) {
+          changed |= (from[w] & ~into[w]) != 0;
+          into[w] |= from[w];
+        }
+        if (changed && !queued[pred]) {
+          queued[pred] = 1;
+          work.push_back(pred);
+        }
+      }
+    }
+    std::vector<std::uint64_t> follows(acts * lw, 0);
+    for (std::size_t m = 0; m < expanded; ++m) {
+      check_cancelled();
+      for (std::size_t e = edge_begin[m]; e < edge_begin[m + 1]; ++e) {
+        const std::uint32_t label = edge_label[e];
+        if (label == kSilent) continue;
+        const std::uint32_t target = edge_target[e];
+        const std::uint64_t* seen = target < expanded ? labels.data() + std::size_t(target) * lw
+                                                      : seeds.data() + std::size_t(target) * lw;
+        for (std::size_t w = 0; w < lw; ++w) follows[std::size_t(label) * lw + w] |= seen[w];
+      }
+    }
+    return follows;
+  };
+  const auto pairs_in = [](const std::vector<std::uint64_t>& rows) {
+    std::uint64_t pairs = 0;
+    for (const std::uint64_t word : rows) pairs += std::uint64_t(std::popcount(word));
+    return pairs;
+  };
+  const auto named = [&](const std::vector<std::uint64_t>& rows) {
+    Relation relation;
+    for (std::size_t a = 0; a < acts; ++a)
+      for (std::size_t b = 0; b < acts; ++b)
+        if (rows[a * lw + b / 64] & (std::uint64_t{1} << (b % 64)))
+          relation.emplace(names[a], names[b]);
+    return relation;
+  };
+
+  // `direct` (a fires, then b is enabled at once) is a lower bound kept as the
+  // edges are met; the closed relation is checked as well at checkpoints
+  // (doubling, so they cost a bounded share of the final closure) once the
+  // budget is known to be hit.
+  std::vector<std::uint64_t> direct(acts * lw, 0);
+  std::uint64_t direct_pairs = 0;
+  std::size_t checkpoint = 0;
+  std::vector<std::uint64_t> current, successors;
+  std::vector<std::uint32_t> labels_fired;
+  std::size_t next = 0;
+  while (next < table.size()) {
+    if (next >= kFootprintCap) {
+      exhausted = true;
+      break;
+    }
+    if (may_stop_early && table.size() > kFootprintCap) {
+      if (direct_pairs == full_pairs) {
+        exhausted = true;
+        return named(direct);
+      }
+      if (next >= checkpoint) {
+        auto rows = relation_rows(next);
+        if (pairs_in(rows) == full_pairs) {
+          exhausted = true;
+          return named(rows);
+        }
+        checkpoint = std::max<std::size_t>(2 * next, 1024);
+      }
+    }
+    check_cancelled();
+    for (bool fits = false; !fits;) {
+      current.assign(table.at(static_cast<std::uint32_t>(next)),
+                     table.at(static_cast<std::uint32_t>(next)) + words);
+      successors.clear();
+      labels_fired.clear();
+      fits = true;
+      find_candidates(current.data());
+      for (std::size_t cw = 0; fits && cw < candidates.size(); ++cw) {
+        for (std::uint64_t rest = candidates[cw]; rest != 0; rest &= rest - 1) {
+          const Step& step = steps[cw * 64 + static_cast<std::size_t>(std::countr_zero(rest))];
+          if (!enabled(current.data(), step)) continue;
+          const std::size_t base = successors.size();
+          successors.insert(successors.end(), current.begin(), current.end());
+          if (const auto needed = fire(successors.data() + base, step)) {
+            widen(needed);
+            fits = false;
+            break;
+          }
+          labels_fired.push_back(step.label);
+        }
+      }
+    }
+    table.intern_batch(successors.data(), labels_fired.size(),
+                       [&](std::size_t k, std::uint32_t target, bool added) {
+      if (added) seed_new(successors.data() + k * words);
+      const std::uint32_t label = labels_fired[k];
+      edge_target.push_back(target);
+      edge_label.push_back(label);
+      if (label == kSilent) return;
+      const std::uint64_t* seed = seeds.data() + std::size_t(target) * lw;
+      std::uint64_t* row = direct.data() + std::size_t(label) * lw;
+      for (std::size_t w = 0; w < lw; ++w) {
+        const std::uint64_t fresh = seed[w] & ~row[w];
+        if (fresh == 0) continue;
+        direct_pairs += std::uint64_t(std::popcount(fresh));
+        row[w] |= fresh;
+      }
+    });
+    edge_begin.push_back(edge_target.size());
+    ++next;
+  }
+  return named(relation_rows(next));
+}
+
+}  // namespace packed_footprint
+
+Relation model_footprint(const PetriNet& net, const Marking& initial,
+                         bool& exhausted, const std::function<bool()>& cancelled) {
+  if (packed_footprint::applies(net, initial))
+    return packed_footprint::model_footprint(net, initial, exhausted, cancelled);
+  return generic_model_footprint(net, initial, exhausted, cancelled);
 }
 
 FootprintResult compare_footprints(const Relation& log, const Relation& model,
