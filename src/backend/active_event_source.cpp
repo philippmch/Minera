@@ -1,4 +1,5 @@
 #include "minera/active_event_source.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -171,6 +172,7 @@ EventStream selected_stream(const EventTable& table,
                             const ActiveSourceSelectors& selectors,
                             const LogConversionOptions& options) {
   auto stream = event_table_to_event_stream(table, options);
+  CancellationCheck poll(options.cancelled, "event data conversion was cancelled", 4096);
   const std::array<std::pair<FirstClassAttributeRole, const std::string*>, 5> roles{{
       {FirstClassAttributeRole::kCaseId, &selectors.case_id_key},
       {FirstClassAttributeRole::kActivity, &selectors.activity_key},
@@ -178,6 +180,7 @@ EventStream selected_stream(const EventTable& table,
       {FirstClassAttributeRole::kResource, &selectors.resource_key},
       {FirstClassAttributeRole::kLifecycle, &selectors.lifecycle_key}}};
   for (auto& record : stream.events) {
+    poll();
     for (auto& field : record.fields) {
       const auto source_role = field.first_class_role;
       const auto source_state = field.first_class_state;
@@ -222,11 +225,14 @@ EventStream canonical_stream(const EventLog& log,
   return stream;
 }
 
-std::vector<std::optional<EventRecord>> build_native_rows(const OriginalSource& source) {
+std::vector<std::optional<EventRecord>> build_native_rows(
+    const OriginalSource& source, const std::function<bool()>& cancelled = {}) {
   std::vector<std::optional<EventRecord>> native_rows;
   if (!source.log || !source.table) return native_rows;
   native_rows.resize(source.table->rows.size());
-  const auto flat = canonical_stream(*source.log, source.options);
+  auto options = source.options;
+  options.cancelled = cancelled;
+  const auto flat = canonical_stream(*source.log, options);
   std::size_t encounter = 0;
   for (const auto& rows : source.representatives) {
     for (const auto row : rows) {
@@ -240,7 +246,10 @@ std::vector<std::optional<EventRecord>> build_native_rows(const OriginalSource& 
 
 // Builds the rows once to raise any error at construction, as before, and
 // drops them; native_rows() rebuilds them (deterministically) when needed.
-void retain_native_rows(OriginalSource& source) { (void)build_native_rows(source); }
+// `cancelled` (the source build's hook) is polled while they are built.
+void retain_native_rows(OriginalSource& source, const std::function<bool()>& cancelled = {}) {
+  (void)build_native_rows(source, cancelled);
+}
 
 const std::vector<std::optional<EventRecord>>& native_rows(const OriginalSource& source) {
   std::call_once(source.native_rows_once, [&] {source.native_rows = build_native_rows(source);});
@@ -932,6 +941,9 @@ std::string serialize_active_source_temporal_conformance_json(const TemporalConf
   });
 }
 
+// The message of a source build stopped by its `cancelled` hook.
+constexpr const char* kSourceBuildCancelled = "building the event source was cancelled";
+
 struct ActiveEventSource::State {
   std::shared_ptr<const OriginalSource> original;
   EventDataKind selected = EventDataKind::kEventTable;
@@ -973,15 +985,21 @@ struct ActiveEventSource::State {
         source->attributes, source->metadata, source->rows.size(), source->dtypes,
         source->index, source->categorical_dtypes);
   }
-  void prepare_flat() {
+  // `cancelled` (the source build's hook) is polled while the check runs; a
+  // cancel propagates instead of reading as a flat-projection error.
+  void prepare_flat(const std::function<bool()>& cancelled = {}) {
     stream.reset();
     stream_available = false;
     lazy.reset();
     if (!table) return;
     try {
-      (void)selected_stream(*table, original->selectors, original->options);
+      auto options = original->options;
+      options.cancelled = cancelled;
+      (void)selected_stream(*table, original->selectors, options);
       stream_available = true;
       lazy = lazy_view(table);
+    } catch (const OperationCancelled&) {
+      throw;
     } catch (const std::exception& error) {
       flat_error = error.what();
     }
@@ -1049,7 +1067,8 @@ ActiveEventSource ActiveEventSource::from_table(EventTable table, ActiveSourceFi
 
 ActiveEventSource ActiveEventSource::from_csv(CsvEventData data, ActiveSourceFile file,
                                              ActiveSourceSelectors selectors,
-                                             EventDataKind selected) {
+                                             EventDataKind selected,
+                                             const std::function<bool()>& cancelled) {
   data.table.validate();
   auto original = std::make_shared<OriginalSource>();
   original->file = std::move(file);
@@ -1059,14 +1078,16 @@ ActiveEventSource ActiveEventSource::from_csv(CsvEventData data, ActiveSourceFil
   original->table_origin = "paired_csv_import";
   original->table = std::move(data.table);
   original->log = std::move(data.log);
+  CancellationCheck poll(cancelled, kSourceBuildCancelled, 1024);
   for (const auto& trace : original->log->traces) {
+    poll();
     std::vector<std::optional<std::size_t>> rows;
     for (const auto& event : trace.events)
       rows.push_back(event.input_order < original->table->rows.size()
                          ? std::optional<std::size_t>(event.input_order) : std::nullopt);
     original->representatives.push_back(std::move(rows));
   }
-  retain_native_rows(*original);
+  retain_native_rows(*original, cancelled);
   auto state = std::make_shared<State>();
   state->original = original;
   state->selected = selected;
@@ -1075,7 +1096,8 @@ ActiveEventSource ActiveEventSource::from_csv(CsvEventData data, ActiveSourceFil
   state->representatives = original->representatives;
   state->ordinals.resize(original->table->rows.size());
   std::iota(state->ordinals.begin(), state->ordinals.end(), std::size_t{0});
-  state->prepare_flat();
+  throw_if_cancelled(cancelled, kSourceBuildCancelled);
+  state->prepare_flat(cancelled);
   return ActiveEventSource(std::move(state));
 }
 
@@ -1121,7 +1143,8 @@ ActiveEventSource ActiveEventSource::from_log(EventLog log, ActiveSourceFile fil
 
 ActiveEventSource ActiveEventSource::from_xes_frame(EventLog frame, ActiveSourceFile file,
                                                    ActiveSourceSelectors selectors,
-                                                   EventDataKind selected) {
+                                                   EventDataKind selected,
+                                                   const std::function<bool()>& cancelled) {
   auto original = std::make_shared<OriginalSource>();
   original->file = std::move(file);
   original->selectors = std::move(selectors);
@@ -1135,12 +1158,17 @@ ActiveEventSource ActiveEventSource::from_xes_frame(EventLog frame, ActiveSource
   try {
     auto options = original->options;
     options.include_case_attributes = true;
+    options.cancelled = cancelled;
     rows_table = event_log_to_table(frame, options);
+  } catch (const OperationCancelled&) {
+    throw;
   } catch (const std::exception& error) {
     rows_error = error.what();
   }
+  throw_if_cancelled(cancelled, kSourceBuildCancelled);
   std::vector<std::vector<std::size_t>> frame_rows;
   merge_dataframe_cases(frame, &frame_rows);
+  throw_if_cancelled(cancelled, kSourceBuildCancelled);
   original->log = std::move(frame);
   if (rows_table && rows_table->rows.size() != original->log->event_count()) rows_table.reset();
   if (rows_table) {
@@ -1161,9 +1189,12 @@ ActiveEventSource ActiveEventSource::from_xes_frame(EventLog frame, ActiveSource
       if (!rows_error.empty()) throw std::invalid_argument(rows_error);
       auto options = original->options;
       options.include_case_attributes = true;
+      options.cancelled = cancelled;
       original->table = event_log_to_table(*original->log, options);
     }
-    retain_native_rows(*original);
+    retain_native_rows(*original, cancelled);
+  } catch (const OperationCancelled&) {
+    throw;
   } catch (const std::exception& error) {
     original->table.reset();
     original->table_error = error.what();
@@ -1179,7 +1210,8 @@ ActiveEventSource ActiveEventSource::from_xes_frame(EventLog frame, ActiveSource
     state->ordinals.resize(original->table->rows.size());
     std::iota(state->ordinals.begin(), state->ordinals.end(), std::size_t{0});
   }
-  state->prepare_flat();
+  throw_if_cancelled(cancelled, kSourceBuildCancelled);
+  state->prepare_flat(cancelled);
   return ActiveEventSource(std::move(state));
 }
 

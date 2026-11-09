@@ -1,5 +1,6 @@
 #include "minera/event_table_json.hpp"
 #include "minera/log_conversion.hpp"
+#include "minera/cancellation.hpp"
 #include "minera/timestamp.hpp"
 #include "minera/xes_event_log_importer.hpp"
 
@@ -1323,6 +1324,9 @@ std::string_view log_conversion_variant_name(LogConversionVariant variant) {
   throw std::invalid_argument("log conversion: invalid variant");
 }
 
+// The message of a conversion stopped by LogConversionOptions::cancelled.
+constexpr const char* kConversionCancelled = "event data conversion was cancelled";
+
 ConvertedEventStream event_log_to_event_stream(
     const EventLog& log, const LogConversionOptions& options) {
   validate_options(options);
@@ -1330,6 +1334,7 @@ ConvertedEventStream event_log_to_event_stream(
   stream.attributes = log.attributes;
   stream.metadata = log.metadata;
   stream.events.reserve(log.event_count());
+  CancellationCheck poll(options.cancelled, kConversionCancelled, 4096);
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
        ++trace_index) {
     const auto& trace = log.traces[trace_index];
@@ -1339,6 +1344,7 @@ ConvertedEventStream event_log_to_event_stream(
             ? FirstClassAttributeState::kPresent
             : trace.case_id_state;
     for (const auto& event : trace.events) {
+      poll();
       LogConversionRecord record;
       record.fields = event_fields(event);
       const auto case_source_key = trace_case_source_key(trace);
@@ -1523,7 +1529,9 @@ LogConversionTable event_stream_to_table(
   table.attributes = stream.attributes;
   table.metadata = stream.metadata;
   std::map<std::string, std::size_t> column_indexes;
+  CancellationCheck poll(options.cancelled, kConversionCancelled, 4096);
   for (const auto& record : stream.events) {
+    poll();
     for (const auto& field : record.fields) {
       if (options.remove_null_fields && field.is_null &&
           field.key != options.case_id_key)
@@ -1536,6 +1544,7 @@ LogConversionTable event_stream_to_table(
   }
   table.rows.reserve(stream.events.size());
   for (const auto& record : stream.events) {
+    poll();
     std::vector<std::optional<EventAttribute>> row(table.columns.size());
     for (const auto& field : record.fields) {
       if (!options.remove_null_fields || !field.is_null ||
@@ -1564,7 +1573,9 @@ ConvertedEventStream event_table_to_event_stream(
   });
   infer_standard_extensions(table, stream.metadata);
   stream.events.reserve(table.rows.size());
+  CancellationCheck poll(options.cancelled, kConversionCancelled, 4096);
   for (const auto& row : table.rows) {
+    poll();
     LogConversionRecord record;
     record.fields.reserve(table.columns.size());
     for (std::size_t index = 0; index < table.columns.size(); ++index) {

@@ -3,6 +3,7 @@
 // polled and changes nothing, one that fires stops the call with
 // OperationCancelled, and a callback that starts returning true at some
 // instant (a client that went away) stops a long run within a second.
+#include "minera/active_event_source.hpp"
 #include "minera/cancellation.hpp"
 #include "minera/concept_drift.hpp"
 #include "minera/conformance.hpp"
@@ -11,11 +12,16 @@
 #include "minera/dfg_variants.hpp"
 #include "minera/edit_distance_alignment.hpp"
 #include "minera/inductive_miner.hpp"
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/dataframe_format_json.hpp"
 #include "minera/json_export.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/model_decoration.hpp"
 #include "minera/monte_carlo.hpp"
 #include "minera/petri_net.hpp"
 #include "minera/process_tree_alignment.hpp"
+#include "minera/xes_event_log_importer.hpp"
+#include "minera/xes_export.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -24,6 +30,7 @@
 #include <iostream>
 #include <map>
 #include <random>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -112,9 +119,115 @@ std::map<std::string, std::uint64_t> ends_of(const minera::EventLog& log) {
   return out;
 }
 
+// A CSV upload of `rows` events (unsorted case ids, a case attribute) and
+// the same events as an XES document whose traces share ids non-adjacently.
+std::string random_csv(std::size_t rows, std::uint32_t seed) {
+  std::mt19937 rng(seed);
+  std::string out = "case_id,activity,timestamp,resource,case:region\n";
+  out.reserve(rows * 48);
+  for (std::size_t row = 0; row < rows; ++row) {
+    const auto c = (row * 7919 + rng() % 5) % (rows / 6 + 1);
+    char line[128];
+    std::snprintf(line, sizeof line, "k%zu,a%u,2024-01-%02uT%02u:%02u:00Z,r%u,g%zu\n", c,
+                  unsigned(rng() % 9), unsigned(1 + row % 28), unsigned(row % 24),
+                  unsigned(rng() % 60), unsigned(rng() % 4), c % 3);
+    out += line;
+  }
+  return out;
+}
+
+std::string random_xes(std::size_t events, std::uint32_t seed) {
+  std::mt19937 rng(seed);
+  std::string out = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<log xes.version=\"1.0\">\n";
+  out.reserve(events * 180);
+  for (std::size_t written = 0, trace = 0; written < events; ++trace) {
+    out += "<trace><string key=\"concept:name\" value=\"t" + std::to_string((trace * 31) % (events / 8 + 3)) + "\"/>";
+    const auto length = rng() % 7;
+    for (std::size_t e = 0; e < length && written < events; ++e, ++written) {
+      char event[256];
+      std::snprintf(event, sizeof event,
+                    "<event><string key=\"concept:name\" value=\"a%u\"/><string key=\"org:resource\" value=\"r%u\"/>"
+                    "<date key=\"time:timestamp\" value=\"2024-02-%02uT%02u:%02u:00.000+00:00\"/></event>",
+                    unsigned(rng() % 9), unsigned(rng() % 4), unsigned(1 + e % 28), unsigned(rng() % 24),
+                    unsigned(rng() % 60));
+      out += event;
+    }
+    out += "</trace>\n";
+  }
+  return out + "</log>\n";
+}
+
+std::string table_and_log(const minera::EventTable& table, const minera::EventLog& log) {
+  return minera::serialize_event_table_input_json(table) + minera::to_xes(log, "x");
+}
+
+std::string source_state(const minera::ActiveEventSource& source) {
+  return minera::serialize_active_source_log_json(source.checked_log()) +
+         (source.checked_table_if_available() ? minera::serialize_event_table_input_json(source.checked_table()) : "") +
+         source.checked_flat_projection_error() + std::to_string(source.checked_stream().events.size());
+}
+
 }  // namespace
 
 int main() {
+  // Loading a log: the CSV importer's typing and grouping passes, the XES
+  // parse, the log/table/stream conversions and the ActiveEventSource build
+  // poll their hooks (the server's read-cancel hook of /api/mine).
+  {
+    const auto csv = random_csv(20000, 11);
+    const auto xes = random_xes(20000, 12);
+    check_hook("CSV import", minera::CsvImportOptions{}, [&](const minera::CsvImportOptions& o) {
+      std::istringstream input(csv);
+      const auto data = minera::import_csv_event_data(input, o);
+      return table_and_log(data.table, data.log);
+    });
+    check_hook("XES import", minera::XesImportOptions{}, [&](const minera::XesImportOptions& o) {
+      std::istringstream input(xes);
+      return minera::to_xes(minera::import_xes_event_log(input, o), "x");
+    });
+    std::istringstream xes_input(xes);
+    const auto xes_log = minera::import_xes_event_log(xes_input);
+    check_hook("log to table", minera::LogConversionOptions{}, [&](const minera::LogConversionOptions& o) {
+      return minera::serialize_event_table_input_json(minera::event_log_to_table(xes_log, o));
+    });
+    const auto xes_table = minera::event_log_to_table(xes_log);
+    check_hook("table to stream", minera::LogConversionOptions{}, [&](const minera::LogConversionOptions& o) {
+      return minera::to_xes(minera::event_stream_to_event_log(minera::event_table_to_event_stream(xes_table, o)), "x");
+    });
+    std::istringstream csv_input(csv);
+    const auto csv_data = minera::import_csv_event_data(csv_input);
+    const minera::ActiveSourceSelectors csv_selectors{"case_id", "activity", "timestamp", "resource", "lifecycle"};
+    check_hook("CSV source build", CallbackOnly{}, [&](const CallbackOnly& o) {
+      return source_state(minera::ActiveEventSource::from_csv(csv_data, {"x.csv", "csv", csv}, csv_selectors,
+                                                              minera::EventDataKind::kEventLog, o.cancelled));
+    });
+    const minera::ActiveSourceSelectors xes_selectors{"case:concept:name", "concept:name", "time:timestamp",
+                                                      "org:resource", "lifecycle:transition"};
+    check_hook("XES source build", CallbackOnly{}, [&](const CallbackOnly& o) {
+      return source_state(minera::ActiveEventSource::from_xes_frame(xes_log, {"x.xes", "xes", xes}, xes_selectors,
+                                                                    minera::EventDataKind::kEventLog, o.cancelled));
+    });
+    // A late cancel stops a big load within a second: the bytes are read
+    // before the hook fires, so only the parse/grouping polls can stop it.
+    const auto big_csv = random_csv(400000, 13);
+    check_disconnect("CSV import (400,000 rows)", minera::CsvImportOptions{}, [&](const minera::CsvImportOptions& o) {
+      std::istringstream input(big_csv);
+      return minera::import_csv_event_data(input, o).log.traces.size();
+    }, std::chrono::milliseconds(800));
+    const auto big_xes = random_xes(200000, 14);
+    check_disconnect("XES import (200,000 events)", minera::XesImportOptions{}, [&](const minera::XesImportOptions& o) {
+      std::istringstream input(big_xes);
+      return minera::import_xes_event_log(input, o).traces.size();
+    }, std::chrono::milliseconds(300));
+    std::istringstream big_xes_input(big_xes);
+    const auto big_xes_log = minera::import_xes_event_log(big_xes_input);
+    check_disconnect("XES source build (200,000 events)", CallbackOnly{}, [&](const CallbackOnly& o) {
+      return minera::ActiveEventSource::from_xes_frame(big_xes_log, {"x.xes", "xes", ""}, xes_selectors,
+                                                       minera::EventDataKind::kEventLog, o.cancelled)
+          .checked_log().traces.size();
+    }, std::chrono::milliseconds(200));
+  }
+
   const auto small = random_log(40, 2, 7, 5, 7);
   const auto tree = minera::discover_process_tree(small);
   const auto net = minera::to_petri_net(tree);

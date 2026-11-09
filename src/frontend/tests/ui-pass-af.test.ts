@@ -25,6 +25,12 @@ describe("Python float() syntax for ratio controls", () => {
     expect(parsePythonFloat("nan")).toBeNaN();
     for (const text of ["0x10", "1e", ".", "", " ", "1__0", "_1", "1_", "1,5", "1.2.3", "infinit", "0b1"]) expect(parsePythonFloat(text)).toBeNull();
   });
+  it("strips and reads characters as float() does: Unicode spaces and decimal digits, not U+FEFF or U+001C", () => {
+    expect(parsePythonFloat("\u00851\u0085")).toBe(1);
+    expect(parsePythonFloat("\u3000\u0661.\u0665\u2029")).toBe(1.5);
+    expect(parsePythonFloat("\uff11_\u0967e\ud835\udfd0")).toBe(1100);
+    for (const text of ["\ufeff1", "1\ufeff", "\u001c1", "1\u001f", "1\u00852", "\u00b2", "\u22121"]) expect(parsePythonFloat(text)).toBeNull();
+  });
   it("leaves the Filters Declare ratio inputs without [0,1] bounds", () => {
     const declare = filters.slice(filters.indexOf("<span>Declare min support ratio</span>"), filters.indexOf("Declare templates"));
     expect(declare).not.toMatch(/min=\{0\}|max=\{1\}|step=\{0\.05\}/);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -53,6 +54,10 @@ struct LogConversionOptions {
   std::optional<std::size_t> max_variants_to_return;
   std::size_t max_graph_nodes = 1000000;
   std::size_t max_graph_edges = 2000000;
+  // Polled by the log/table/stream conversions every few thousand events;
+  // once it answers true they throw OperationCancelled. Unset: never
+  // cancels, and the result is unchanged.
+  std::function<bool()> cancelled;
 };
 
 // Compatibility names retained for clients of the original conversion API.

@@ -23,6 +23,16 @@ class SourceReadCancelScope {
   const std::function<bool()>* previous_;
 };
 
+// The current thread's read-cancel hook as a callback for the importers'
+// and the source build's `cancelled` options (empty without a hook). The
+// work after the last slice (the XES parse, the CSV importer's grouping and
+// typing passes, the ActiveEventSource build) polls it every few thousand
+// rows or events.
+inline std::function<bool()> source_read_cancel_hook() {
+  if (!t_source_read_cancelled) return {};
+  return [hook = t_source_read_cancelled] {return (*hook)();};
+}
+
 // Throws when the current thread's read-cancel hook answers true; the
 // importer's own work after the last slice (grouping events into cases) is
 // followed by this check before the source is built.

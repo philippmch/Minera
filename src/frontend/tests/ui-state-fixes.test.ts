@@ -36,17 +36,25 @@ describe("failed or cancelled loads hand the previous live source back", () => {
     await expect(new LiveSourceHandback().handback("7", Promise.resolve({confirmed: true, activeSourceId: null}), id => restored.push(id))).resolves.toBe(false);
     // An older backend that does not report its source: a confirmed cancel restores.
     await expect(new LiveSourceHandback().handback("9", Promise.resolve({confirmed: true}), id => restored.push(id))).resolves.toBe(true);
-    expect(restored).toEqual(["7", "9"]);
+    // A cancel that changed nothing: the failed load never left the previous source, which the backend still holds.
+    await expect(new LiveSourceHandback().handback("7", Promise.resolve({confirmed: true, canceled: false, activeSourceId: "7"}), id => restored.push(id))).resolves.toBe(true);
+    await expect(new LiveSourceHandback().handback("7", Promise.resolve({confirmed: true, canceled: false}), id => restored.push(id))).resolves.toBe(false);
+    expect(restored).toEqual(["7", "9", "7"]);
   });
 
   it("reads the cancel-mine response: confirmed only on an ok cancel, with the held source", async () => {
     const respond = (body: string, status = 200) => vi.stubGlobal("fetch", vi.fn(async () => new Response(body, {status})));
     respond('{"family":"ACTIVE_SOURCE_CANCEL","request_id":"x","canceled":true,"active_source_id":"18446744073709551615"}');
-    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true, activeSourceId: "18446744073709551615"});
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true, canceled: true, activeSourceId: "18446744073709551615"});
     respond('{"family":"ACTIVE_SOURCE_CANCEL","request_id":"x","canceled":true,"active_source_id":null}');
-    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true, activeSourceId: null});
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true, canceled: true, activeSourceId: null});
     respond('{"family":"ACTIVE_SOURCE_CANCEL","request_id":"x","canceled":true}');
-    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true});
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true, canceled: true});
+    // A cancel that changed nothing (the request had already failed or been applied) is still handled.
+    respond('{"family":"ACTIVE_SOURCE_CANCEL","request_id":"x","canceled":false,"active_source_id":"3"}');
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: true, canceled: false, activeSourceId: "3"});
+    respond('{"family":"ACTIVE_SOURCE_CANCEL","request_id":"x"}');
+    await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: false});
     respond('{"error":"cancel-mine requires a request UUID"}', 400);
     await expect(cancelMiningRequest("x")).resolves.toEqual({confirmed: false});
     respond("not json");

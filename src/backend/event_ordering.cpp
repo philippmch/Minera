@@ -100,63 +100,84 @@ void merge_dataframe_cases(EventLog& log,
                            std::vector<std::vector<std::size_t>>* frame_rows) {
   std::unordered_map<std::string, std::size_t> case_of;
   std::vector<Trace> cases;
-  // Per case: the attributes of each trace merged into it (one entry per
-  // trace that has events) and the trace each event came from.
-  std::vector<std::vector<std::vector<EventAttribute>>> trace_cells;
+  // Per case: the attributes of each further trace merged into it (the first
+  // trace's stay on the case) and, once one was merged, the trace each event
+  // came from (0 for the first, i for the i-th further one).
+  std::vector<std::vector<std::vector<EventAttribute>>> merged_cells;
   std::vector<std::vector<std::size_t>> event_trace;
   std::vector<std::vector<std::size_t>> rows;
   cases.reserve(log.traces.size());
+  const auto present = [](const Trace& trace) {
+    return trace.case_id_state == FirstClassAttributeState::kPresent ||
+           (trace.case_id_state == FirstClassAttributeState::kMissing && !trace.case_id.empty());
+  };
+  // Each case's event count, so a merged case's events are moved once into
+  // storage of their final size (no regrowth left behind as free heap).
+  std::unordered_map<std::string, std::size_t> case_events;
+  bool repeated = false;
+  for (const auto& trace : log.traces)
+    if (!trace.events.empty() && present(trace)) {
+      auto [found, added] = case_events.try_emplace(trace.case_id, 0);
+      repeated = repeated || !added;
+      found->second += trace.events.size();
+    }
   std::size_t row = 0;
   for (auto& trace : log.traces) {
     if (trace.events.empty()) continue;
-    const bool present = trace.case_id_state == FirstClassAttributeState::kPresent ||
-                         (trace.case_id_state == FirstClassAttributeState::kMissing &&
-                          !trace.case_id.empty());
-    std::size_t index = cases.size();
-    if (present) {
+    if (present(trace)) {
       const auto [found, added] = case_of.try_emplace(trace.case_id, cases.size());
-      index = found->second;
       if (!added) {
+        const auto index = found->second;
         auto& target = cases[index];
-        trace_cells[index].push_back(std::move(trace.attributes));
+        auto& origins = event_trace[index];
+        if (origins.empty()) origins.assign(target.events.size(), 0);
+        merged_cells[index].push_back(std::move(trace.attributes));
+        const auto origin = merged_cells[index].size();
         for (auto& event : trace.events) {
-          event_trace[index].push_back(trace_cells[index].size() - 1);
-          rows[index].push_back(row++);
+          origins.push_back(origin);
+          if (frame_rows) rows[index].push_back(row);
+          ++row;
           target.events.push_back(std::move(event));
         }
         continue;
       }
     }
-    trace_cells.push_back({trace.attributes});
-    event_trace.emplace_back(trace.events.size(), 0);
+    merged_cells.emplace_back();
+    event_trace.emplace_back();
     rows.emplace_back();
-    for (std::size_t event = 0; event < trace.events.size(); ++event) rows.back().push_back(row++);
+    if (frame_rows) {
+      rows.back().resize(trace.events.size());
+      std::iota(rows.back().begin(), rows.back().end(), row);
+    }
+    row += trace.events.size();
+    if (repeated && present(trace)) trace.events.reserve(case_events.at(trace.case_id));
     cases.push_back(std::move(trace));
   }
   // Appending keeps a merged case's events in the frame's row (file) order.
   // Where the merged traces' attributes differ, every row keeps its own
-  // trace's case cells, as the frame does.
+  // trace's case cells, as the frame does: one shared list per trace.
   for (std::size_t index = 0; index < cases.size(); ++index) {
-    const auto& cells = trace_cells[index];
-    if (cells.size() < 2 ||
-        std::all_of(cells.begin() + 1, cells.end(),
-                    [&](const auto& other) { return other == cells.front(); }))
+    const auto& extra = merged_cells[index];
+    const auto& first = cases[index].attributes;
+    if (extra.empty() ||
+        std::all_of(extra.begin(), extra.end(), [&](const auto& other) { return other == first; }))
       continue;
+    std::vector<const std::vector<EventAttribute>*> origins{&first};
+    for (const auto& attributes : extra) origins.push_back(&attributes);
     std::vector<std::string> keys;
-    for (const auto& attributes : cells)
-      for (const auto& attribute : attributes)
+    for (const auto* attributes : origins)
+      for (const auto& attribute : *attributes)
         if (std::find(keys.begin(), keys.end(), attribute.key) == keys.end())
           keys.push_back(attribute.key);
-    auto& events = cases[index].events;
-    for (std::size_t event = 0; event < events.size(); ++event) {
-      const auto& own = cells[event_trace[index][event]];
-      auto& row_cells = events[event].case_row_attributes;
-      row_cells.clear();
+    std::vector<CaseRowCells> shared;
+    shared.reserve(origins.size());
+    for (const auto* own : origins) {
+      std::vector<EventAttribute> row_cells;
       row_cells.reserve(keys.size());
       for (const auto& key : keys) {
-        const auto found = std::find_if(own.begin(), own.end(),
+        const auto found = std::find_if(own->begin(), own->end(),
                                         [&](const auto& attribute) { return attribute.key == key; });
-        if (found != own.end()) {
+        if (found != own->end()) {
           row_cells.push_back(*found);
         } else {
           EventAttribute missing{key, ""};
@@ -164,7 +185,11 @@ void merge_dataframe_cases(EventLog& log,
           row_cells.push_back(std::move(missing));
         }
       }
+      shared.emplace_back(std::move(row_cells));
     }
+    auto& events = cases[index].events;
+    for (std::size_t event = 0; event < events.size(); ++event)
+      events[event].case_row_attributes = shared[event_trace[index][event]];
   }
   log.traces = std::move(cases);
   if (frame_rows) *frame_rows = std::move(rows);
@@ -177,6 +202,17 @@ std::vector<std::size_t> case_id_order(const EventLog& log) {
     return log.traces[a].case_id < log.traces[b].case_id;
   });
   return order;
+}
+
+void order_cases_by_id(EventLog& log) {
+  const auto order = case_id_order(log);
+  bool ordered = true;
+  for (std::size_t i = 0; i < order.size() && ordered; ++i) ordered = order[i] == i;
+  if (ordered) return;
+  std::vector<Trace> traces;
+  traces.reserve(order.size());
+  for (const auto i : order) traces.push_back(std::move(log.traces[i]));
+  log.traces = std::move(traces);
 }
 
 }  // namespace minera

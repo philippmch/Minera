@@ -1,4 +1,5 @@
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/cancellation.hpp"
 
 #include "gzip_codec.hpp"
 #include "python_isoformat.hpp"
@@ -1480,7 +1481,11 @@ static EventLog import_xes_impl(
     in_trace = false;
   };
 
+  // The parse polls the cancel hook every few thousand XML tokens.
+  static constexpr const char* kCancelled = "XES import was cancelled";
+  CancellationCheck poll(options.cancelled, kCancelled, 4096);
   while (true) {
+    poll();
     auto token = parser.next();
     if (token.kind == detail::XmlPullParser::Kind::EndOfInput) {
       break;
@@ -1663,6 +1668,7 @@ static EventLog import_xes_impl(
       finish_trace();
     }
   }
+  throw_if_cancelled(options.cancelled, kCancelled);
 
   if (options.require_timestamp && !saw_timestamp) {
     throw std::runtime_error(
@@ -2176,6 +2182,7 @@ static EventLog import_xes_impl(
   log.metadata.compatibility_event_globals_snapshot =
       log.metadata.event_globals;
 
+  throw_if_cancelled(options.cancelled, kCancelled);
   if (options.timestamp_sort && options.variant != XesImportVariant::kChunkRegex)
     sort_log_by_timestamp(log, options.reverse_sort);
 

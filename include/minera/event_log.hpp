@@ -8,6 +8,7 @@
 #include <optional>
 #include <stdexcept>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -369,6 +370,43 @@ struct EventDataMetadata {
   }
 };
 
+// The `case:` cells of one flat row (Event::case_row_attributes): an
+// immutable list that the rows carrying the same cells share, so a log and
+// its copies hold each distinct list once. Reads like a const vector; equality
+// compares the cells.
+class CaseRowCells {
+ public:
+  CaseRowCells() = default;
+  CaseRowCells(std::vector<EventAttribute> cells)  // NOLINT: implicit by design
+      : cells_(cells.empty() ? nullptr
+                             : std::make_shared<const std::vector<EventAttribute>>(std::move(cells))) {}
+  CaseRowCells& operator=(std::vector<EventAttribute> cells) {
+    return *this = CaseRowCells(std::move(cells));
+  }
+
+  [[nodiscard]] const std::vector<EventAttribute>& cells() const noexcept {
+    static const std::vector<EventAttribute> none;
+    return cells_ ? *cells_ : none;
+  }
+  operator const std::vector<EventAttribute>&() const noexcept { return cells(); }  // NOLINT
+  [[nodiscard]] auto begin() const noexcept { return cells().begin(); }
+  [[nodiscard]] auto end() const noexcept { return cells().end(); }
+  [[nodiscard]] bool empty() const noexcept { return !cells_ || cells_->empty(); }
+  [[nodiscard]] std::size_t size() const noexcept { return cells_ ? cells_->size() : 0; }
+  [[nodiscard]] const EventAttribute& operator[](std::size_t index) const { return cells()[index]; }
+  void clear() noexcept { cells_.reset(); }
+  // Whether both name the same shared list (equal cells, without comparing).
+  [[nodiscard]] bool shares(const CaseRowCells& other) const noexcept {
+    return cells_ == other.cells_;
+  }
+  bool operator==(const CaseRowCells& other) const {
+    return cells_ == other.cells_ || cells() == other.cells();
+  }
+
+ private:
+  std::shared_ptr<const std::vector<EventAttribute>> cells_;
+};
+
 struct Event {
   std::string case_id;
   std::string activity;
@@ -418,12 +456,14 @@ struct Event {
       kUnknownSourcePosition};
 
   // The `case:` cells of the flat row this event was read from (keys without
-  // the prefix), set only by the batch CSV import. A DataFrame keeps a case
-  // column per row, so its case filters and statistics test every row; the
-  // Trace keeps one collapsed value for display and conversion. A blank or NA
-  // cell is stored as an explicit null. XES and native logs leave this empty:
-  // their case attributes live on the Trace only.
-  std::vector<EventAttribute> case_row_attributes;
+  // the prefix), set by the batch CSV import and, for a case merged from XES
+  // traces whose attributes differ, by merge_dataframe_cases. A DataFrame
+  // keeps a case column per row, so its case filters and statistics test
+  // every row; the Trace keeps one collapsed value for display and
+  // conversion. A blank or NA cell is stored as an explicit null. Other
+  // native logs leave this empty: their case attributes live on the Trace
+  // only. Rows with the same cells share one immutable list.
+  CaseRowCells case_row_attributes;
 
   [[nodiscard]] bool has_case_id() const noexcept {
     return case_id_state != FirstClassAttributeState::kMissing ||
@@ -656,6 +696,12 @@ void merge_dataframe_cases(
 // skeleton, Declare) give their cases, and in which its log-skeleton
 // discovery meets them.
 [[nodiscard]] std::vector<std::size_t> case_id_order(const EventLog& log);
+
+// Puts the log's traces in case_id_order. pm4py's token replay and alignment
+// diagnostics of a frame list the cases in that order (and its fitness sums
+// their values in it); a CSV import is already in it, an XES one keeps file
+// order (merge_dataframe_cases).
+void order_cases_by_id(EventLog& log);
 
 inline void copy_event_log_context(const EventLog& source, EventLog& target) {
   target.attributes = source.attributes;

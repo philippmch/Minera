@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <istream>
 #include <optional>
 #include <vector>
@@ -32,6 +33,10 @@ struct CsvImportOptions {
   // event stream reader (csv.DictReader) keeps every row and passes those
   // cells on as literal text, so stream adapters set this to keep them.
   bool keep_na_first_class_values = false;
+  // Polled while the import parses rows and groups them into cases (every
+  // few thousand rows); once it answers true the import throws
+  // OperationCancelled. Unset: never cancels, and the result is unchanged.
+  std::function<bool()> cancelled;
 };
 
 // The CSV adapter keeps both projections of one parse.  `log` retains the

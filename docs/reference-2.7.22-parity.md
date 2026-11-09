@@ -20316,13 +20316,8 @@ Declared:
   not contain any empty value"). Native keeps each such trace as a case of
   its own and lists it with an empty id, which sorts first in the case-id
   lists. Such files are not rejected.
-- **AF1-6 Per-case token-replay and alignment lists on XES.** pm4py's frame
-  diagnostics (`conformance_diagnostics_token_based_replay`,
-  `conformance_diagnostics_alignments` on a `read_xes` frame) list cases in
-  case-id order. Their diagnostics frames and `convert_to_event_log` keep file
-  order. Native lists these results in the log's case order, which is file
-  order for XES. The values and counts match (100 logs, compared as
-  multisets). CSV frames are sorted by case, so they agree.
+- **AF1-6 Per-case token-replay and alignment lists on XES.** Resolved by
+  Review AG2 (AG2-1): these lists now follow pm4py's case-id order on XES.
 
 Tests: `minera_xes_io_tests` (`dataframe_cases_keep_row_case_cells`),
 `minera_active_event_source_tests` (`xes_frame_source_keeps_frame_rows`),
@@ -20330,3 +20325,106 @@ Tests: `minera_xes_io_tests` (`dataframe_cases_keep_row_case_cells`),
 `minera_log_query_tests`, `minera_core_tests`,
 `minera_exact_filter_discovery_json_tests`, and
 `minera_mining_fast_path_equivalence_tests` (251 outputs, pins unchanged).
+
+## Review AG2: case-id order of per-case lists on XES, cancellable log loading (2026-11-09)
+
+Fixed:
+
+- **AG2-1 Per-case token-replay and alignment lists on XES (was AF1-6).**
+  pm4py's frame diagnostics (`conformance_diagnostics_token_based_replay`,
+  `conformance_diagnostics_alignments` with a Petri net or a process tree, on
+  a `read_xes` frame) list the cases in the stable code-point order of their
+  ids ("1" < "10" < "9"), and `fitness_token_based_replay` averages the
+  per-case values in that order. Native listed them in the log's case order,
+  file order for an XES log. They now follow the case-id order, with the
+  existing case-order machinery:
+  - `/api/token-replay`, `/api/replay-fitness` and `minera_export
+    --token-replay-model` (with `--token-replay-result` or the fitness
+    result) replay the frame's cases in that order (`order_cases_by_id`, the
+    order `case_id_order` gives). Their results carry no case ids, so the
+    list and the float sums now equal pm4py's exactly.
+  - The session lists keep their log order and are written in the case-id
+    order by `AnalysisConstraintCaseOrder` (`constraint_case_order`), every
+    entry keeping its own `trace_index` and `case_id`: the
+    `token_replay.trace_diagnostics` of every model in `/api/mine` (the log,
+    literal-selector and flat shapes, as for the log-skeleton lists) and in
+    `/api/check-model`, the `process_tree_alignment` of `minera_export`, the
+    `traces` of `/api/align-process-tree`, and `minera_export
+    --token-replay-include-trace-diagnostics`. A list of another length (the
+    results of a projected or filtered log) keeps its order.
+  - `/api/evaluate` with `evaluation_family=replay_fitness` evaluates an XES
+    session's cases in that order, so its per-trace `trace_diagnostics` and
+    the token-based `average_trace_fitness` follow pm4py.
+  An event-stream session (`mining_input_shape=stream`) keeps first-appearance
+  order, as pm4py's event stream does. CSV inputs are already sorted by case
+  and native JSON logs follow the EventLog path; both are unchanged.
+
+  These stay as they were: the workbenches' `log` adapter (an EventLog, file
+  order as `convert_to_event_log` gives it; their `dataframe` and `lazyframe`
+  adapters already gave the case-id order), the process-tree alignment
+  workbench (its trace list indexes its echoed `input_log`), and the variant
+  lists of `/api/align`, `/api/align-decomposed` and the replay results,
+  which have no pm4py counterpart. The DFG, edit-distance, anti- and
+  multi-alignment routes have no public pm4py frame function to compare with
+  and keep log order.
+
+- **AG2-2 Cancelling a mine while a big log loads.** The byte read of an
+  upload was cancellable (64 KiB slices), but the work after it was not: the
+  CSV importer's typing and grouping passes and the ActiveEventSource build
+  (about 3 s for a 21 MB CSV), and the whole XES parse and source build. The
+  read-cancel hook of `/api/mine` (`source_read_cancel_hook()` in
+  `source_read_cancel.hpp`) now reaches them through `cancelled` callbacks
+  that follow the library's convention (`CancellationCheck`, polled every
+  4,096 rows, events or XML tokens, and once between passes):
+  `CsvImportOptions::cancelled`, `XesImportOptions::cancelled`,
+  `LogConversionOptions::cancelled` (log, table and stream conversions) and a
+  `cancelled` argument of `ActiveEventSource::from_csv` and `from_xes_frame`.
+  An unset callback never cancels; outputs are unchanged (the CSV and XES
+  regressions below are byte-identical).
+
+  Cancel latency, from `/api/cancel-mine` until `/api/mine-progress` reports
+  the mine stopped, with the cancel sent 0.5 to 9 s into "Reading the event
+  log" (same machine, before → after):
+
+  | Input | Before | After |
+  |---|---|---|
+  | 500,000-event CSV (21 MB) | 0.30–2.79 s (late cancels 1.6–2.8 s) | 0.29–0.68 s |
+  | 500,000-event XES (89 MB) | 0.89–9.04 s | 0.09–1.13 s |
+
+  Polling itself answers within 0.25 s (the longest unpolled step is
+  `merge_dataframe_cases`, 0.24 s on this XES); the rest of the remaining
+  latency is releasing the partly built log on the way out (about 0.7 s for
+  the 500,000-event XES source).
+
+Compared with pm4py 2.7.22 (public API only) on 257 random XES logs with
+shared ids (adjacent and not), unsorted numeric-looking ids and empty traces:
+the order differences of `/api/token-replay`, `/api/check-model` trace
+diagnostics (log and literal-selector mines), the discovered models' trace
+diagnostics and `/api/align-process-tree` (22, 22, 22, 8 and 20 of the first
+60 logs at HEAD 8387b79) are 0 now; `minera_export --token-replay-model` 16
+of 40 → 0. Value differences of the native discovered models and process-tree
+alignment fitness against pm4py's own models are unchanged from HEAD (they
+compare different models), as is the declared "XES events out of time order"
+edge. `/api/evaluate` alignment-based `average_trace_fitness` differs from
+pm4py in the last bit on 3 of 257 logs, before and after: it sums per
+variant, not per case.
+
+CSV and table-JSON responses are byte-identical to HEAD: `/api/mine`,
+`/api/discover-constraints` (four variants), `/api/traces` and `/api/xes`
+(260 logs, 3,120 pairs), and `/api/mine` with trace diagnostics,
+`/api/check-model`, `/api/align-process-tree`, `/api/align`, both
+`/api/evaluate` fitness variants, `/api/token-replay` and
+`/api/replay-fitness` (120 logs, 1,680 pairs). The XES workbench fixture
+manifests replay unchanged, so no fixture was recaptured.
+
+Tests: `minera_xes_io_tests` (`dataframe_case_lists_follow_case_id_order`),
+`minera_cancellation_hooks_tests` (CSV and XES import, log/table/stream
+conversions and both source builds: an idle hook changes nothing, a firing
+one cancels, and a late cancel stops a 400,000-row CSV import, a
+200,000-event XES import and source build within a second),
+`minera_server_mine_progress_tests` (a cancel while a 200,000-event XES
+upload is parsed stops within 0.5 s; 2.1 s at HEAD), and, unchanged,
+`minera_server_cancellation_tests`, `minera_active_event_source_tests`,
+`minera_core_tests`, `minera_log_conversion_tests`, the token-replay and
+alignment tests, and `minera_mining_fast_path_equivalence_tests` (251
+outputs, pins unchanged).

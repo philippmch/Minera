@@ -1809,6 +1809,11 @@ export interface MineResponseOptions {
    * canceled does while it stops, instead of posting into 503 MINE_BUSY.
    */
   waitForCanceledMine?: boolean;
+  /**
+   * Called right before the upload is posted (after any wait above): from then
+   * on the backend may know the request, so a cancel must name it.
+   */
+  onPosting?: () => void;
 }
 
 /** Upload the unchanged original file and retain typed source-only outcomes. */
@@ -1835,6 +1840,8 @@ export async function mineActiveDataset(
   // this request retries after Retry-After instead of failing.
   const started = Date.now();
   if (options.waitForCanceledMine) await waitForCanceledMine(signal, MINE_BUSY_WAIT_MS);
+  signal?.throwIfAborted();
+  options.onPosting?.();
   for (;;) {
     try {
       response = await importedModelFetch("/api/mine", { method: "POST", body: form, signal });

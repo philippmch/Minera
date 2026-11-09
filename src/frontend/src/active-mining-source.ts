@@ -86,8 +86,8 @@ export function activeMiningSourceText(input: ArrayBuffer | Uint8Array): string 
 export interface MiningRequestTicket {generation: number; request_id: string;}
 export class MiningSourceRequestGate {private generation = 0; issue(): MiningRequestTicket {return {generation: ++this.generation, request_id: crypto.randomUUID()};} invalidate(): void {++this.generation;} accepts(ticket: MiningRequestTicket, signal?: AbortSignal): boolean {return ticket.generation === this.generation && !signal?.aborted;}}
 export function assertMiningSourceBinding(expected: string | null, current: string | null, generation: number, currentGeneration: number): void {if (!expected) throw new Error("No live backend log is loaded for this analysis. Open the original CSV or XES log (or wait for the current load to finish) to compute this."); if (expected !== current || generation !== currentGeneration) throw new Error("The active source changed while this request was pending.");}
-/** What a cancel-mine settled with: `confirmed` once the backend handled the cancel (and restored its previous session), with the source id it then holds (null for none) when it reported one. A cancel that failed on the network or was refused is not confirmed: the backend may still hold the newer session. */
-export interface MiningCancelOutcome {confirmed: boolean; activeSourceId?: string | null;}
+/** What a cancel-mine settled with: `confirmed` once the backend handled the cancel, with the source id it then holds (null for none) when it reported one, and `canceled`: whether the cancel stopped or undid anything (false for a request that had already failed, ended or been applied for good, whose session it therefore left as it was). A cancel that failed on the network or was refused is not confirmed: the backend may still hold the newer session. */
+export interface MiningCancelOutcome {confirmed: boolean; canceled?: boolean; activeSourceId?: string | null;}
 /** How long a cancel-mine may take before it settles as unconfirmed. */
 export const CANCEL_MINING_TIMEOUT_MS = 10_000;
 /**
@@ -102,9 +102,9 @@ export function cancelMiningRequest(requestId: string, timeoutMs = CANCEL_MINING
   const answered = backendFetch(`/api/cancel-mine?request_id=${encodeURIComponent(requestId)}`, {method: "POST", signal: controller.signal}).then(async (response): Promise<MiningCancelOutcome> => {
     if (!response.ok) return {confirmed: false};
     const value: unknown = await response.json().catch(() => undefined);
-    if (!object(value) || value.family !== "ACTIVE_SOURCE_CANCEL" || value.canceled !== true) return {confirmed: false};
+    if (!object(value) || value.family !== "ACTIVE_SOURCE_CANCEL" || typeof value.canceled !== "boolean") return {confirmed: false};
     const held = value.active_source_id;
-    return {confirmed: true, ...(held === null || typeof held === "string" ? {activeSourceId: held} : {})};
+    return {confirmed: true, canceled: value.canceled, ...(held === null || typeof held === "string" ? {activeSourceId: held} : {})};
   }, () => ({confirmed: false}));
   return Promise.race([answered, expired]).finally(() => clearTimeout(timer));
 }

@@ -6638,6 +6638,9 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       model_options.require_workflow_boundaries = false;
       model_options.public_marking_semantics = replay_fitness_result_requested;
       const auto document = minera::import_pnml_document(token_replay_model, model_options);
+      // pm4py replays an XES frame's cases in case-id order and lists the
+      // results (and sums the fitness) in it, as /api/token-replay does.
+      if (input_is_xes) minera::order_cases_by_id(log);
       const auto replay_options = minera::tools::default_replay_input_options(
           log, minera::tools::pnml_replay_options(document, token_replay_options),
           token_replay_activity_option_used);

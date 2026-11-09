@@ -84,10 +84,14 @@ class ActiveEventSource {
       EventTable table, ActiveSourceFile file,
       ActiveSourceSelectors selectors = {},
       EventDataKind selected = EventDataKind::kEventTable);
+  // `cancelled` (from_csv, from_xes_frame) is polled while the source's
+  // projections are built; once it answers true the build throws
+  // OperationCancelled. Unset: never cancels, and the source is unchanged.
   [[nodiscard]] static ActiveEventSource from_csv(
       CsvEventData data, ActiveSourceFile file,
       ActiveSourceSelectors selectors = {},
-      EventDataKind selected = EventDataKind::kEventLog);
+      EventDataKind selected = EventDataKind::kEventLog,
+      const std::function<bool()>& cancelled = {});
   [[nodiscard]] static ActiveEventSource from_log(
       EventLog log, ActiveSourceFile file,
       ActiveSourceSelectors selectors = {},
@@ -99,7 +103,8 @@ class ActiveEventSource {
   [[nodiscard]] static ActiveEventSource from_xes_frame(
       EventLog frame, ActiveSourceFile file,
       ActiveSourceSelectors selectors = {},
-      EventDataKind selected = EventDataKind::kEventLog);
+      EventDataKind selected = EventDataKind::kEventLog,
+      const std::function<bool()>& cancelled = {});
 
   [[nodiscard]] const ActiveSourceFile& file() const noexcept;
   [[nodiscard]] const ActiveSourceSelectors& selectors() const noexcept;

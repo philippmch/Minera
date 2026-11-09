@@ -204,6 +204,8 @@ export default function App() {
   const [miningLabel, setMiningLabel] = useState("Mining the event log…");
   // A mine this tab canceled that still holds the backend's single slot while it stops.
   const [stoppingMine, setStoppingMine] = useState(false);
+  // Bumped by every new load: a cancel that settles after a newer load began no longer names the mine in the way.
+  const loadEpoch = useRef(0);
   useEffect(() => {if (!stoppingMine || mining) return undefined; return watchMineProgress(null, progress => {if (!progress?.running || !progress.canceling) setStoppingMine(false);});}, [stoppingMine, mining]);
   const [visualizationDraft,setVisualizationDraft]=useState<{generation:number;draft:VisualizationDraft}|null>(null);
   const [discoveryModelDraft,setDiscoveryModelDraft]=useState<{generation:number;file:File;sourceId:string;activityKey?:string;inferLegacyBoundaries?:boolean}|null>(null);
@@ -259,11 +261,13 @@ export default function App() {
   // That holds even once the response was written: the backend keeps the previous session until this page
   // acknowledges the applied response (acknowledgeMiningRequest), sends a request on the new source, or its
   // rollback window (60 s) ends.
-  const cancelSourceLoad = () => {const {previous, rollback} = abortSourceLoad(); handBackLiveSource(previous?.previousSource, rollback); void rollback.then(outcome => {if ((outcome as {confirmed?: boolean} | undefined)?.confirmed) setStoppingMine(true);});};
+  // Only a cancel that stopped a mine the backend was running (canceled: true) leaves a mine stopping; a newer load
+  // waits for it itself (waitForCanceledMine), so a cancel that settles after one began changes nothing.
+  const cancelSourceLoad = () => {const epoch = loadEpoch.current, {previous, rollback} = abortSourceLoad(); handBackLiveSource(previous?.previousSource, rollback); void rollback.then(outcome => {if (outcome?.confirmed && outcome.canceled !== false && epoch === loadEpoch.current) setStoppingMine(true);});};
   // A failed load: roll the backend back in case it published the session before the response failed to arrive,
   // or the response arrived but could not be applied (it was never acknowledged).
   const failSourceLoad = (pending: {request_id: string; posted: boolean; previousSource: string | null} | null) => {if (pending) handBackLiveSource(pending.previousSource, pending.posted ? sendCancel(pending.request_id) : Promise.resolve(undefined));};
-  const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; setMiningRequestId(null); setMining(true); setError(null); return {ticket, controller, cancelsSettled: cancelBarrier.current};};
+  const beginSourceLoad = () => {setOwnedExactInspection(false); liveSourceHandback.current.supersede(); const previousSource = sourceRequest.current ? sourceRequest.current.previousSource : liveSource.current; abortSourceLoad(); clearSourceCaches(); liveSource.current = null; setLiveSourceId(null); const ticket = sourceGate.current.issue(), controller = new AbortController(); sourceRequest.current = {controller, request_id: ticket.request_id, posted: false, previousSource}; loadEpoch.current += 1; setStoppingMine(false); setMiningRequestId(null); setMining(true); setError(null); return {ticket, controller, cancelsSettled: cancelBarrier.current};};
   useEffect(() => () => {sourceGate.current.invalidate(); const pending = sourceRequest.current; pending?.controller.abort(); if (pending?.posted) void cancelMiningRequest(pending.request_id); ocelRequest.current?.abort();}, []);
   // A run on the imported model is stale once another model has been imported, even though its source is unchanged.
   const importedModelGuard = (miner: string | undefined) => {const generation = importedModelGeneration.current; return () => {if (miner === "imported" && generation !== importedModelGeneration.current) throw new Error("The imported model changed while this request was pending; run it again.");};};
@@ -540,8 +544,8 @@ export default function App() {
         const sha256 = await miningSourceHash(file);
         await cancelsSettled;
         if (!accepts()) return;
-        sourceRequest.current!.posted = true;
-        const result = await mineActiveDataset(file, {...options, waitForCanceledMine: true}, controller.signal);
+        // Posted (so a cancel names it) only once the upload leaves, after any wait for a canceled mine.
+        const result = await mineActiveDataset(file, {...options, waitForCanceledMine: true, onPosting: () => {if (sourceRequest.current?.controller === controller) sourceRequest.current.posted = true;}}, controller.signal);
         if (!accepts()) return;
         setExactInspection(exactFilterRun(result) ?? null); setOwnedExactInspection(false); if(exactFilterRun(result))setPreviousExactSuccess(exactFilterRun(result)!);
         const descriptor = miningSourceDescriptor(file, sha256, options, result), analysis = activeDatasetAnalysis(result);
@@ -599,8 +603,7 @@ export default function App() {
     cancelsSettled
       .then(() => {
         if (!accepts()) return null;
-        sourceRequest.current!.posted = true;
-        return mineActiveDataset(original.file, {...options, waitForCanceledMine: true}, controller.signal);
+        return mineActiveDataset(original.file, {...options, waitForCanceledMine: true, onPosting: () => {if (sourceRequest.current?.controller === controller) sourceRequest.current.posted = true;}}, controller.signal);
       })
       .then((result) => {
         if (result === null || !accepts()) return;

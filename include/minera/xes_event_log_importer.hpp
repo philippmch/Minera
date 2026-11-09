@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <istream>
 #include <limits>
 #include <optional>
@@ -84,6 +85,10 @@ struct XesImportOptions {
   bool conversion_compress = false;
   // nullopt infers standard extensions; an empty list suppresses them.
   std::optional<std::vector<LogExtension>> conversion_extensions;
+  // Polled while the document is parsed and its traces are built (every few
+  // thousand XML tokens); once it answers true the import throws
+  // OperationCancelled. Unset: never cancels, and the result is unchanged.
+  std::function<bool()> cancelled;
 };
 
 struct XesImportResult {

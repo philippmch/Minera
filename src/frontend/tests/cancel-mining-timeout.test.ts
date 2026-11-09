@@ -33,7 +33,7 @@ describe("cancel-mine timeout", () => {
   it("a prompt answer wins and clears the timer", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"family":"ACTIVE_SOURCE_CANCEL","canceled":true,"active_source_id":"4"}')));
-    await expect(cancelMiningRequest("x")).resolves.toEqual({ confirmed: true, activeSourceId: "4" });
+    await expect(cancelMiningRequest("x")).resolves.toEqual({ confirmed: true, canceled: true, activeSourceId: "4" });
     expect(vi.getTimerCount()).toBe(0);
   });
 });

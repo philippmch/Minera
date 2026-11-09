@@ -341,6 +341,64 @@ int main(int argc, char** argv) {
                 contains((*read_mined)->body, "mining request was canceled or replaced by a newer source request"),
             "the canceled read answers with the cancel's error: " + (read_mined ? describe(*read_mined) : std::string("none")));
     }
+    // A cancel while an XES upload is parsed (its bytes are read in a few
+    // milliseconds; the parse and the source build take seconds) stops the
+    // parse part-way: the importer and the source build poll the read-cancel
+    // hook (Review AG2).
+    {
+      std::string xes = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<log xes.version=\"1.0\">\n";
+      xes.reserve(200000 * 170);
+      for (int event = 0; event < 200000; ++event) {
+        char line[256];
+        if (event % 8 == 0)
+          std::snprintf(line, sizeof line, "%s<trace><string key=\"concept:name\" value=\"t%d\"/>\n",
+                        event == 0 ? "" : "</trace>\n", (event / 8 * 7919) % 30011);
+        else line[0] = '\0';
+        xes += line;
+        std::snprintf(line, sizeof line,
+                      "<event><string key=\"concept:name\" value=\"a%d\"/><date key=\"time:timestamp\" "
+                      "value=\"2024-01-01T%02d:%02d:%02d.000+00:00\"/></event>\n",
+                      event % 9, (event % 12) * 2, event % 60, (event / 60) % 60);
+        xes += line;
+      }
+      xes += "</trace>\n</log>\n";
+      const std::string xes_id = "9e2f3a41-5b6c-4d7e-8f90-a1b2c3d4e5f6";
+      std::optional<httplib::Result> xes_mined;
+      std::thread reader([&] {
+        httplib::Client mining("127.0.0.1", port);
+        mining.set_read_timeout(300, 0);
+        httplib::MultipartFormDataItems items = {{"log", xes, "big.xes", "application/xml"},
+                                                 {"include_traces", "false", "", ""},
+                                                 {"mining_request_id", xes_id, "", ""}};
+        xes_mined = mining.Post("/api/mine", items);
+      });
+      bool reading = false;
+      for (int attempt = 0; attempt < 400 && !reading && !xes_mined; ++attempt) {
+        const auto progress = poll(client, xes_id);
+        reading = progress && progress->running && progress->matches && progress->stage == "Reading the event log";
+        if (!reading) sleep_ms(10);
+      }
+      check(reading, "the XES mine reached the reading stage");
+      sleep_ms(300);
+      const auto canceled_at = std::chrono::steady_clock::now();
+      r = client.Post("/api/cancel-mine?request_id=" + xes_id, "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel-mine while parsing XES: " + describe(r));
+      const auto still = poll(client, xes_id);
+      check(still && still->stage == "Reading the event log", "the cancel arrived while the XES log was read");
+      bool stopped = false;
+      while (!stopped && std::chrono::steady_clock::now() - canceled_at < std::chrono::seconds(30)) {
+        const auto progress = poll(client, xes_id);
+        stopped = progress && !progress->running;
+        if (!stopped) sleep_ms(10);
+      }
+      const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - canceled_at).count();
+      std::cout << "XES read stopped " << took << " s after the cancel\n";
+      check(stopped && took < 0.5, "the XES read stopped within half a second of the cancel (" + std::to_string(took) + " s)");
+      reader.join();
+      check(xes_mined && *xes_mined && (*xes_mined)->status == 400 &&
+                contains((*xes_mined)->body, "mining request was canceled or replaced by a newer source request"),
+            "the canceled XES read answers with the cancel's error: " + (xes_mined ? describe(*xes_mined) : std::string("none")));
+    }
     // cancel-mine says whether it undid anything: a request whose response
     // was acknowledged cannot be canceled; an unknown id is recorded.
     {
@@ -356,6 +414,33 @@ int main(int argc, char** argv) {
       check(r && r->status == 200 && contains(r->body, "\"canceled\":false"), "cancel after an ack: " + describe(r));
       r = client.Post("/api/cancel-mine?request_id=2c3d4e5f-6071-4829-9bac-1d2e3f4a5b6c", "", "text/plain");
       check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel of a request not yet seen: " + describe(r));
+      r = client.Post("/api/cancel-mine?request_id=2c3d4e5f-6071-4829-9bac-1d2e3f4a5b6c", "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":false"), "a second cancel of that id: " + describe(r));
+      // A request that already failed: nothing to stop or undo.
+      const std::string failed_id = "3d4e5f60-7182-493a-8bcd-2e3f4a5b6c7d";
+      r = client.Post("/api/mine", httplib::MultipartFormDataItems{{"log", "a,b\n1,2\n", "bad.csv", "text/csv"},
+                                                                 {"mining_request_id", failed_id, "", ""}});
+      check(r && r->status == 400, "a failing tracked mine: " + describe(r));
+      r = client.Post("/api/cancel-mine?request_id=" + failed_id, "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":false"), "cancel after a failure: " + describe(r));
+      // A finished mine a newer one superseded keeps applied; the newer one
+      // rolls back (to the older one's session) once, then has nothing left.
+      const std::string older = "4e5f6071-8293-4a4b-9cde-3f4a5b6c7d8e", newer = "5f607182-93a4-4b5c-8def-4a5b6c7d8e9f";
+      const auto tracked = [&](const std::string& id) {
+        return client.Post("/api/mine", httplib::MultipartFormDataItems{
+            {"log", "case_id,activity,timestamp\nc1,a,2024-01-01T00:00:00Z\n", "one.csv", "text/csv"},
+            {"include_traces", "false", "", ""}, {"mining_request_id", id, "", ""}});
+      };
+      r = tracked(older);
+      check(r && r->status == 200, "older mine: " + describe(r));
+      r = tracked(newer);
+      check(r && r->status == 200, "newer mine: " + describe(r));
+      r = client.Post("/api/cancel-mine?request_id=" + older, "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":false"), "cancel of a superseded finished mine: " + describe(r));
+      r = client.Post("/api/cancel-mine?request_id=" + newer, "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel rolls the newer mine back: " + describe(r));
+      r = client.Post("/api/cancel-mine?request_id=" + newer, "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":false"), "a second cancel undoes nothing: " + describe(r));
     }
   }
 

@@ -21,6 +21,11 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/timestamp.hpp"
 #include "minera/log_conversion.hpp"
+#include "minera/analysis_json_traces.hpp"
+#include "minera/inductive_miner.hpp"
+#include "minera/json_export.hpp"
+#include "minera/petri_net.hpp"
+#include "minera/process_tree_alignment.hpp"
 #include "../gzip_codec.hpp"
 #include "../root_cause_trace_key.hpp"
 
@@ -2061,6 +2066,82 @@ void dataframe_cases_merge_shared_ids_and_order_by_code_point() {
   assert(log.traces[order.back()].case_id == "b");
 }
 
+// pm4py's token-replay and alignment diagnostics of an XES frame list its
+// cases in case-id order (code points: "1" < "10" < "9"), and its token
+// fitness sums them in it. The standalone replay routes put the frame's
+// cases in that order (order_cases_by_id); the session results keep the log
+// order and AnalysisConstraintCaseOrder lists them in it, each entry keeping
+// its own trace index and case id.
+void dataframe_case_lists_follow_case_id_order() {
+  const auto event = [](const char* activity, int second) {
+    return std::string("<event><string key=\"concept:name\" value=\"") + activity +
+           "\"/><date key=\"time:timestamp\" value=\"2020-01-01T00:00:0" + std::to_string(second) +
+           ".000+00:00\"/></event>";
+  };
+  const std::string xml =
+      "<log>"
+      "<trace><string key=\"concept:name\" value=\"9\"/>" + event("a", 1) + "</trace>"
+      "<trace><string key=\"concept:name\" value=\"10\"/>" + event("b", 2) + event("c", 3) + "</trace>"
+      "<trace><string key=\"concept:name\" value=\"2\"/></trace>"
+      "<trace><string key=\"concept:name\" value=\"1\"/>" + event("c", 4) + "</trace>"
+      "<trace><string key=\"concept:name\" value=\"9\"/>" + event("d", 5) + "</trace>"
+      "</log>";
+  std::istringstream input(xml);
+  const auto log = minera::import_xes_dataframe_log(input);
+  assert(log.traces.size() == 3 && log.traces[0].case_id == "9" && log.traces[0].events.size() == 2);
+  auto sorted = log;
+  minera::order_cases_by_id(sorted);
+  assert(sorted.traces.size() == 3);
+  assert(sorted.traces[0].case_id == "1" && sorted.traces[1].case_id == "10" && sorted.traces[2].case_id == "9");
+  assert(sorted.traces[2].events.size() == 2 && sorted.traces[2].events[1].activity == "d");
+  auto again = sorted;
+  minera::order_cases_by_id(again);
+  assert(minera::to_xes(again, "x") == minera::to_xes(sorted, "x"));
+
+  const auto tree = minera::discover_process_tree(log);
+  const auto net = minera::to_petri_net(tree);
+  minera::TokenReplayOptions replay;
+  replay.include_trace_diagnostics = true;
+  const minera::ModelConformance model{"imported", true, minera::check_conformance(log, net, replay),
+                                       minera::check_footprints(log, net), std::nullopt};
+  auto graph = minera::discover_directly_follows_graph(log);
+  for (const auto& activity : net.activities()) graph.ensure_activity(activity);
+  const auto case_ids = [](const std::string& json, const char* key) {
+    std::vector<std::string> ids;
+    const std::string needle = std::string("\"") + key + "\": ";
+    for (auto at = json.find(needle); at != std::string::npos; at = json.find(needle, at + 1)) {
+      const auto begin = at + needle.size();
+      ids.push_back(json.substr(begin, json.find_first_of(",}", begin) - begin));
+    }
+    return ids;
+  };
+  const auto file_order = minera::imported_model_json(model, graph);
+  assert((case_ids(file_order, "case_id") == std::vector<std::string>{"\"9\"", "\"10\"", "\"1\""}));
+  const auto order = minera::case_id_order(log);
+  assert((order == std::vector<std::size_t>{2, 1, 0}));
+  {
+    const minera::AnalysisConstraintCaseOrder scope(&order);
+    const auto listed = minera::imported_model_json(model, graph);
+    assert((case_ids(listed, "case_id") == std::vector<std::string>{"\"1\"", "\"10\"", "\"9\""}));
+    assert((case_ids(listed, "trace_index") == std::vector<std::string>{"2", "1", "0"}));
+  }
+  {
+    // An order made for another number of cases leaves the list as it is.
+    const std::vector<std::size_t> other{1, 0};
+    const minera::AnalysisConstraintCaseOrder scope(&other);
+    assert(minera::imported_model_json(model, graph) == file_order);
+  }
+  const auto alignment = minera::align_process_tree(log, tree);
+  const auto aligned = minera::process_tree_alignment_json(alignment);
+  assert(aligned.find("\"trace\": [\"a\", \"d\"]") < aligned.find("\"trace\": [\"c\"]"));
+  {
+    const minera::AnalysisConstraintCaseOrder scope(&order);
+    const auto listed = minera::process_tree_alignment_json(alignment);
+    assert(listed.size() == aligned.size());
+    assert(listed.find("\"trace\": [\"c\"]") < listed.find("\"trace\": [\"b\", \"c\"]"));
+    assert(listed.find("\"trace\": [\"b\", \"c\"]") < listed.find("\"trace\": [\"a\", \"d\"]"));
+  }
+}
 
 // A merged case keeps each frame row's own trace cells (pm4py.read_xes holds
 // a row per event with its trace's `case:` columns): case filters and the
@@ -2094,6 +2175,11 @@ void dataframe_cases_keep_row_case_cells() {
   };
   assert(cell(0, "k") && cell(0, "k")->value == "first" && cell(0, "j") && cell(0, "j")->is_null);
   assert(cell(2, "k") && cell(2, "k")->value == "second" && cell(2, "j")->value == "x");
+  // The rows of one trace share its cell list; a copy of the log shares it too.
+  assert(merged.events[0].case_row_attributes.shares(merged.events[1].case_row_attributes));
+  assert(!merged.events[0].case_row_attributes.shares(merged.events[2].case_row_attributes));
+  const auto copied = log;
+  assert(copied.traces[0].events[2].case_row_attributes.shares(merged.events[2].case_row_attributes));
   assert(log.traces[1].events[0].case_row_attributes.empty());
   // pm4py: get_trace_attribute_values(frame, "case:k") counts rows.
   const auto counts = minera::get_trace_attribute_values(log, "case:k");
@@ -2124,6 +2210,7 @@ void dataframe_cases_keep_row_case_cells() {
 int main() {
   dataframe_cases_merge_shared_ids_and_order_by_code_point();
   dataframe_cases_keep_row_case_cells();
+  dataframe_case_lists_follow_case_id_order();
   unsigned_integer_boundaries_match_public_variants();
   iterparse_nested_attribute_shapes();
   {

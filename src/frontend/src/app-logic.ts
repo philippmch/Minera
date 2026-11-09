@@ -442,7 +442,7 @@ export function evaluationModelIds(data: MineraExport, importedAvailable = false
 }
 
 /** How a rollback (cancel-mine) settled; undefined when nothing was posted, so the backend never left the previous source. */
-export type LiveSourceRollback = {confirmed: boolean; activeSourceId?: string | null} | undefined | void;
+export type LiveSourceRollback = {confirmed: boolean; canceled?: boolean; activeSourceId?: string | null} | undefined | void;
 
 /**
  * Hands the previous live backend source back after a load that failed or was
@@ -463,7 +463,10 @@ export class LiveSourceHandback {
     const epoch = ++this.epoch;
     const outcome: LiveSourceRollback = await rollback.catch(() => ({confirmed: false}));
     if (epoch !== this.epoch) return false;
-    if (outcome && (!outcome.confirmed || (outcome.activeSourceId !== undefined && outcome.activeSourceId !== previous))) return false;
+    // A cancel that changed nothing (the request had failed, or its result was applied for good) restores only when the
+    // backend reports still holding the previous source.
+    if (outcome && (!outcome.confirmed || (outcome.activeSourceId !== undefined && outcome.activeSourceId !== previous) ||
+                    (outcome.canceled === false && outcome.activeSourceId === undefined))) return false;
     restore(previous);
     return true;
   }
@@ -499,14 +502,28 @@ export function caseRowEntries<T extends { case_id: string }>(traces: readonly T
 
 const PYTHON_FLOAT_DECIMAL = /^[+-]?(?:(?:\d(?:_?\d)*)?\.\d(?:_?\d)*|\d(?:_?\d)*\.?)(?:[eE][+-]?\d(?:_?\d)*)?$/;
 const PYTHON_FLOAT_SPECIAL = /^([+-]?)(?:(inf|infinity)|nan)$/i;
+/** Python's (Unicode 14) whitespace beyond ASCII, which float() reads as a space. */
+const PYTHON_UNICODE_SPACES = new Set([0x85, 0xa0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000]);
+/** The zero of every non-ASCII run of decimal digits (Unicode 14, as Python and the backend parser classify them). */
+const PYTHON_UNICODE_DIGIT_ZEROS = [0x660, 0x6f0, 0x7c0, 0x966, 0x9e6, 0xa66, 0xae6, 0xb66, 0xbe6, 0xc66, 0xce6, 0xd66, 0xde6, 0xe50, 0xed0, 0xf20, 0x1040, 0x1090, 0x17e0, 0x1810, 0x1946, 0x19d0, 0x1a80, 0x1a90, 0x1b50, 0x1bb0, 0x1c40, 0x1c50, 0xa620, 0xa8d0, 0xa900, 0xa9d0, 0xa9f0, 0xaa50, 0xabf0, 0xff10, 0x104a0, 0x10d30, 0x11066, 0x110f0, 0x11136, 0x111d0, 0x112f0, 0x11450, 0x114d0, 0x11650, 0x116c0, 0x11730, 0x118e0, 0x11950, 0x11c50, 0x11d50, 0x11da0, 0x16a60, 0x16ac0, 0x16b50, 0x1d7ce, 0x1d7d8, 0x1d7e2, 0x1d7ec, 0x1d7f6, 0x1e140, 0x1e2f0, 0x1e950, 0x1fbf0];
 /**
- * Python's float(str) over a whole text, as the backend reads ratio controls: surrounding whitespace, an optional sign,
- * underscores only between digits, a decimal mantissa with an optional complete exponent, or inf/infinity/nan in any
- * case. Hexadecimal, a lone ".", an exponent without digits and trailing text are refused (null). (Python also reads
- * non-ASCII decimal digits; this accepts ASCII digits only.)
+ * Python's float(str) over a whole text, as the backend reads ratio controls: non-ASCII Unicode whitespace and decimal
+ * digits read as a space and ASCII digits first; then surrounding ASCII whitespace (space, \t, \n, \v, \f, \r), an
+ * optional sign, underscores only between digits, a decimal mantissa with an optional complete exponent, or
+ * inf/infinity/nan in any case. Hexadecimal, a lone ".", an exponent without digits, other characters (U+FEFF and the
+ * ASCII separators U+001C–U+001F included) and trailing text are refused (null).
  */
 export function parsePythonFloat(text: string): number | null {
-  const trimmed = text.trim();
+  let ascii = "";
+  for (const character of text) {
+    const code = character.codePointAt(0)!;
+    if (code < 0x80) { ascii += character; continue; }
+    if (PYTHON_UNICODE_SPACES.has(code)) { ascii += " "; continue; }
+    const zero = PYTHON_UNICODE_DIGIT_ZEROS.find(start => code >= start && code < start + 10);
+    if (zero === undefined) return null;
+    ascii += String(code - zero);
+  }
+  const trimmed = ascii.replace(/^[ \t\n\v\f\r]+|[ \t\n\v\f\r]+$/g, "");
   if (PYTHON_FLOAT_DECIMAL.test(trimmed)) return Number(trimmed.replace(/_/g, ""));
   const special = PYTHON_FLOAT_SPECIAL.exec(trimmed);
   if (!special) return null;

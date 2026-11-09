@@ -1183,6 +1183,16 @@ std::optional<std::vector<std::size_t>> constraint_case_order(
                                "case:concept:name");
 }
 
+// The order of the per-case token-replay and alignment lists of a session's
+// log (pm4py's frame diagnostics list an XES frame's cases in case-id order);
+// null for other sources and for a source mined as an event stream.
+std::optional<std::vector<std::size_t>> session_case_order(
+    const minera::ActiveEventSource* source, const minera::EventLog& log) {
+  if (source == nullptr || source->selected_kind() == minera::EventDataKind::kEventStream)
+    return std::nullopt;
+  return constraint_case_order(*source, log);
+}
+
 // The results in that order (unchanged when the order is null or does not
 // list every result).
 template <class Result>
@@ -1216,6 +1226,16 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
   // The running mine's ticket, so a stage stopped by its cancel answers as a
   // cancel between stages does.
   std::shared_ptr<ActiveMiningTicket> running_ticket;
+  // However the request ends, a later cancel-mine for it can undo only a
+  // published session (handle_cancel_mine).
+  struct TicketEnd {
+    const std::shared_ptr<ActiveMiningTicket>& ticket;
+    ~TicketEnd() {
+      if (!ticket) return;
+      std::lock_guard<std::mutex> lock(g_session_mutex);
+      ticket->ended = true;
+    }
+  } ticket_end{running_ticket};
   try {
     // include_traces=false leaves the "traces" array out of the analysis (a
     // "trace_summary" takes its place) and GET /api/traces serves it on
@@ -6252,6 +6272,12 @@ void handle_pripel(const httplib::Request& request,
   }
 }
 
+// An imported XES frame's cases in case-id order (order_cases_by_id).
+minera::EventLog xes_frame_cases_by_id(minera::EventLog log) {
+  minera::order_cases_by_id(log);
+  return log;
+}
+
 // Standalone full replay accepts exact uploaded log/model inputs. It shares the
 // CLI's tagged result carrier and does not require a discovered-model session.
 void handle_token_replay(const httplib::Request& request,
@@ -6272,8 +6298,10 @@ void handle_token_replay(const httplib::Request& request,
     const auto params = minera::parse_mine_params(lookup, present);
     const auto& file = request.get_file_value("log");
     std::istringstream input(file.content);
+    // pm4py replays a frame's cases in case-id order (a CSV import already
+    // lists them so) and lists the results in it.
     const auto log = looks_like_xes(file.filename, file.content)
-        ? minera::import_xes_dataframe_log(input, params.xes)
+        ? xes_frame_cases_by_id(minera::import_xes_dataframe_log(input, params.xes))
         : minera::import_csv_event_log(input, params.csv);
     auto import_options = minera::tools::pnml_model_import_options();
     import_options.import_stochastic_map = false;
@@ -6663,8 +6691,9 @@ void handle_replay_fitness(const httplib::Request& request,
       throw std::invalid_argument("standalone replay fitness supports token-based fitness");
     const auto& file = request.get_file_value("log");
     std::istringstream input(file.content);
+    // pm4py's token fitness of a frame sums its cases in case-id order.
     const auto log = looks_like_xes(file.filename, file.content)
-        ? minera::import_xes_dataframe_log(input, imports.xes)
+        ? xes_frame_cases_by_id(minera::import_xes_dataframe_log(input, imports.xes))
         : minera::import_csv_event_log(input, imports.csv);
     auto model_options = minera::tools::pnml_model_import_options();
     model_options.import_stochastic_map = false;
@@ -6775,6 +6804,11 @@ void handle_check_model(const httplib::Request& request,
                  : minera::check_footprints(footprint_log, imported),
         std::nullopt};
     if (!gated) minera::set_model_soundness(conformance, imported_reachability);
+    // pm4py's token replay of an XES frame lists its cases in case-id order
+    // (the trace diagnostics; see constraint_case_order).
+    const auto case_order =
+        session_case_order(session->active_source.get(), require_prepared_log(*session));
+    const minera::AnalysisConstraintCaseOrder case_list_order(case_order ? &*case_order : nullptr);
     auto body =
         minera::imported_model_json(conformance, next_session->graph);
     const auto imported_model_id = ++g_imported_model_sequence;
@@ -8384,6 +8418,15 @@ void handle_evaluate(const httplib::Request& request,
     evaluation_input = minera::tools::evaluation_input_log(
         *evaluation_log, params.replay_fitness_options.activity_attribute);
     if (evaluation_input) evaluation_log = &*evaluation_input;
+    // pm4py's replay fitness of an XES frame sums the per-case values in
+    // case-id order (see session_case_order).
+    if (params.family == minera::EvaluationFamily::kReplayFitness &&
+        session_case_order(session->active_source.get(), *evaluation_log)) {
+      auto ordered = *evaluation_log;
+      minera::order_cases_by_id(ordered);
+      evaluation_input = std::move(ordered);
+      evaluation_log = &*evaluation_input;
+    }
     }
     if (!model_only && adapter != "log") {
       overlay_cached_source_selectors(request, *session, params, true);
@@ -8712,9 +8755,13 @@ void handle_align_process_tree(const httplib::Request& request,
     };
     auto options = minera::parse_process_tree_alignment_params(lookup, present);
     options.cancelled = connection_cancel_hook(request);
-    const auto result = minera::align_process_tree(cached_model_log(*session,"inductive"),
+    const auto& alignment_log = cached_model_log(*session, "inductive");
+    const auto result = minera::align_process_tree(alignment_log,
                                                    require_process_tree(*session),
                                                    options);
+    // pm4py's alignments of an XES frame list its cases in case-id order.
+    const auto case_order = session_case_order(session->active_source.get(), alignment_log);
+    const minera::AnalysisConstraintCaseOrder case_list_order(case_order ? &*case_order : nullptr);
     response.set_content(minera::process_tree_alignment_json(result),
                          "application/json");
   } catch (const std::exception& error) {

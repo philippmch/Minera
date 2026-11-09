@@ -1,4 +1,5 @@
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1669,6 +1670,11 @@ CsvEventData import_csv_event_data_impl(
   // collected first and placed once the values are known. Stream readers
   // (keep_na_first_class_values) keep the literal cell text in file order.
   const bool reference_batch = !options.keep_na_first_class_values;
+  // Rows are parsed, typed and grouped in several passes; each polls the
+  // cancel hook every few thousand rows (and once between passes).
+  static constexpr const char* kCancelled = "CSV import was cancelled";
+  CancellationCheck poll(options.cancelled, kCancelled, 4096);
+  const auto between_passes = [&] {throw_if_cancelled(options.cancelled, kCancelled);};
 
   std::string line;
   std::size_t line_number = 1;
@@ -1805,6 +1811,7 @@ CsvEventData import_csv_event_data_impl(
 
   while (read_record()) {
     ++line_number;
+    poll();
     if (line.empty() ||
         (reference_batch && is_reference_blank_line(line, options.delimiter))) {
       skipped_blank();
@@ -1999,9 +2006,12 @@ CsvEventData import_csv_event_data_impl(
   // The activity column is typed and converted the same way.
   std::vector<std::optional<std::string>> case_ids;
   std::vector<std::optional<std::string>> activities;
+  between_passes();
   if (reference_batch) {
     case_ids = infer_reference_column(case_tokens, &case_padded_na).text;
+    between_passes();
     activities = infer_reference_column(activity_tokens, &activity_padded_na).text;
+    between_passes();
   } else {
     case_ids.assign(case_tokens.begin(), case_tokens.end());
     activities.assign(activity_tokens.begin(), activity_tokens.end());
@@ -2051,6 +2061,7 @@ CsvEventData import_csv_event_data_impl(
   };
   if (reference_batch && timestamp_index) {
     for (const auto& row : pending) {
+      poll();
       const auto& timestamp = row.event.timestamp;
       if (row.blank_timestamp) {
         if (!first_unconverted_timestamp)
@@ -2079,9 +2090,12 @@ CsvEventData import_csv_event_data_impl(
   // Each case's kept rows, counted first so its events are sized once rather
   // than regrown (an Event is large to move).
   std::unordered_map<std::string_view, std::size_t> case_rows;
-  for (const auto& row : pending)
+  for (const auto& row : pending) {
+    poll();
     if (row_kept(row)) ++case_rows[*case_ids[row.token]];
+  }
   for (auto& row : pending) {
+    poll();
     const auto& case_id = case_ids[row.token];
     const auto& activity = activities[row.token];
     if (!row_kept(row)) continue;
@@ -2114,13 +2128,18 @@ CsvEventData import_csv_event_data_impl(
     if (reference_batch) {
       // The DataFrame keeps every row's case cells: case filters and
       // statistics test them per row (a blank or NA cell is null there).
-      row.event.case_row_attributes = row.case_attributes;
-      for (auto& cell : row.event.case_row_attributes) {
+      // Rows of a case that repeat the previous row's cells share its list.
+      std::vector<EventAttribute> cells = row.case_attributes;
+      for (auto& cell : cells) {
         if (cell.value.empty() || is_reference_na_token(cell.value)) {
           cell.value.clear();
           cell.is_null = true;
         }
       }
+      if (!trace.events.empty() && trace.events.back().case_row_attributes.cells() == cells)
+        row.event.case_row_attributes = trace.events.back().case_row_attributes;
+      else
+        row.event.case_row_attributes = std::move(cells);
       row_case_attributes.push_back(std::move(row.case_attributes));
     } else {
       for (auto& attribute : row.case_attributes) {
@@ -2143,6 +2162,7 @@ CsvEventData import_csv_event_data_impl(
     }
     trace.events.push_back(std::move(row.event));
   }
+  between_passes();
   pending.clear();
   pending.shrink_to_fit();
 
@@ -2174,6 +2194,7 @@ CsvEventData import_csv_event_data_impl(
     }
     for (auto& trace : log.traces) {
       for (auto& event : trace.events) {
+        poll();
         const auto& text = *timestamp_texts[event.input_order];
         event.timestamp = text;
         if (text.empty())
@@ -2196,6 +2217,7 @@ CsvEventData import_csv_event_data_impl(
   // that row leaves the attribute missing.
   if (reference_batch && !case_attribute_indices.empty()) {
     for (auto& trace : log.traces) {
+      poll();
       const Event* chosen = trace.events.empty() ? nullptr : &trace.events.front();
       std::optional<ParsedExactTimestamp> chosen_instant;
       const auto earlier = [](const ParsedExactTimestamp& lhs, const ParsedExactTimestamp& rhs) {
@@ -2225,6 +2247,7 @@ CsvEventData import_csv_event_data_impl(
     // format_dataframe sorts the datetime64 column, at nanosecond (or
     // finer-than-double) resolution.
     for (auto& trace : log.traces) {
+      poll();
       order_events_by_exact_time(trace.events);
     }
   }
@@ -2232,6 +2255,7 @@ CsvEventData import_csv_event_data_impl(
   // format_dataframe sorts the frame by the string case id (then timestamp
   // and row index), so the converted log lists its cases in code-point order
   // of their ids. UTF-8 byte order is code-point order.
+  between_passes();
   if (reference_batch) {
     std::stable_sort(log.traces.begin(), log.traces.end(),
                      [](const Trace& left, const Trace& right) {

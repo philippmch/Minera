@@ -233,18 +233,28 @@ minera::ActiveEventSource prepare_active_event_source(
     if (format == "table")
       return minera::ActiveEventSource::from_table(minera::parse_event_table_json(bytes), std::move(file), selectors, kind);
     SourceReadStream input(bytes);
+    // The read-cancel hook also reaches the work after the last slice: the
+    // XES parse, the CSV importer's grouping and the source build poll it.
+    const auto cancelled = source_read_cancel_hook();
     // An XES input follows pm4py's read_xes frame: its log holds the frame's
     // cases (traces that share a case id are one case, a trace without events
     // is no case) and its table the frame's rows in file order.
-    if (xes) return minera::ActiveEventSource::from_xes_frame(minera::import_xes_event_log(input, params.xes), std::move(file), selectors, kind);
+    if (xes) {
+      auto xes_options = params.xes;
+      xes_options.cancelled = cancelled;
+      return minera::ActiveEventSource::from_xes_frame(minera::import_xes_event_log(input, xes_options),
+          std::move(file), selectors, kind, cancelled);
+    }
     try {
-      auto data = minera::import_csv_event_data(input, params.csv);
+      auto csv_options = params.csv;
+      csv_options.cancelled = cancelled;
+      auto data = minera::import_csv_event_data(input, csv_options);
       check_source_read_cancelled();
       bind_imported_csv_source_selectors(data, params.csv, literal, selectors);
       if (kind != minera::EventDataKind::kEventLog || !literal.empty())
         overlay_active_source_selectors(params, selectors,
             [&](std::string_view key) {return active_source_supplied(request, key);});
-      return minera::ActiveEventSource::from_csv(std::move(data), std::move(file), selectors, kind);
+      return minera::ActiveEventSource::from_csv(std::move(data), std::move(file), selectors, kind, cancelled);
     } catch (const minera::OperationCancelled&) {
       throw;  // a canceled read is not retried as a legacy log
     } catch (const std::exception& error) {
@@ -511,6 +521,10 @@ struct ActiveMiningTicket {
   // expired. Until then a cancel restores the previous session, even when the
   // response bytes already reached the socket.
   bool released = false;
+  // Set (under g_session_mutex) once POST /api/mine returned for this
+  // request, whatever its answer: a cancel then undoes only a published
+  // session it may still roll back.
+  bool ended = false;
 };
 // The mine holding the /api/mine slot (see mine_limits.hpp), for its 503.
 std::weak_ptr<ActiveMiningTicket> g_running_mine_ticket;  // under g_session_mutex
@@ -834,19 +848,27 @@ void handle_cancel_mine(const httplib::Request& request, httplib::Response& resp
     // A rolled-back session is destroyed after the lock is released.
     std::shared_ptr<const MinedSession> replaced;
     std::string held;
-    // false only for a request whose response was already applied for good
-    // (acknowledged, used, or past its rollback window): nothing is undone.
-    // An unknown id is recorded, so its upload is refused when it arrives.
-    bool canceled = true;
+    // true only when this cancel stops or undoes something: the first cancel
+    // of an id not seen yet (it is recorded, so its upload is refused when it
+    // arrives), the first cancel of a mine still running and not replaced,
+    // or a rollback of a published session. A request that already failed,
+    // ended canceled, was replaced, or was applied for good (acknowledged,
+    // used, past its rollback window, or superseded by a newer mine) answers
+    // false: nothing changed.
+    bool canceled = false;
     {
     std::lock_guard<std::mutex> lock(g_session_mutex);
     if (!g_active_mining_requests.contains(id) && g_active_mining_requests.size() >= 2048)
       throw std::invalid_argument("too many unknown mining request identities");
     auto& ticket = g_active_mining_requests[id];
     if (!ticket) {ticket = std::make_shared<ActiveMiningTicket>(); ticket->id = id;}
-    canceled = !ticket->released;
+    const bool already = ticket->canceled.load();
+    const bool current = ticket->generation == g_active_mining_generation;
+    if (ticket->generation == 0) canceled = !already;  // its POST has not arrived
+    else if (!ticket->ended && !ticket->published) canceled = !already && current;  // still running
     ticket->canceled = true;
-    if (ticket->published && !ticket->released && g_session == ticket->published && ticket->generation == g_active_mining_generation) {
+    if (ticket->published && !ticket->released && g_session == ticket->published && current) {
+      canceled = true;
       replaced = std::move(g_session);
       g_session = ticket->previous; g_clustering_analysis = ticket->previous_clustering;
       // The canceled ticket can never restore again, so it holds nothing.
