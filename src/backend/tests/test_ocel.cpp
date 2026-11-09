@@ -519,8 +519,35 @@ void global_scope_defaults_contract() {
   assert(refused);
 }
 
+// Round AI: pm4py 2.7.22 write_ocel2_json declares each attribute as its
+// frame column holds it (reference capture): integer and boolean columns
+// every object has are "string", an integer column some object lacks is
+// "float", a boolean one "string", timestamps "date"; listed per type in
+// column order. Its reader casts values to the declared type, so this is what
+// makes pm4py read the file back as it reads its own export.
+void standard_json_declares_frame_column_types_contract() {
+  const auto log = minera::parse_ocel_json(R"json({"objectTypes":[
+{"name":"Order","attributes":[{"name":"q","type":"integer"},{"name":"ok","type":"boolean"},{"name":"at","type":"time"},{"name":"n","type":"integer"}]},
+{"name":"Item","attributes":[{"name":"q","type":"integer"},{"name":"ok","type":"boolean"},{"name":"at","type":"time"},{"name":"m","type":"boolean"}]}],
+"eventTypes":[{"name":"E","attributes":[{"name":"k","type":"integer"},{"name":"s","type":"string"}]}],
+"objects":[{"id":"o1","type":"Order","attributes":[{"name":"q","time":"1970-01-01T00:00:00Z","value":1},{"name":"ok","time":"1970-01-01T00:00:00Z","value":true},{"name":"at","time":"1970-01-01T00:00:00Z","value":"2024-01-05T00:00:00Z"},{"name":"n","time":"1970-01-01T00:00:00Z","value":4},{"name":"q","time":"2024-01-02T00:00:00Z","value":2}]},
+{"id":"i1","type":"Item","attributes":[{"name":"q","time":"1970-01-01T00:00:00Z","value":3},{"name":"ok","time":"1970-01-01T00:00:00Z","value":false},{"name":"at","time":"1970-01-01T00:00:00Z","value":"2024-01-06T00:00:00Z"},{"name":"m","time":"1970-01-01T00:00:00Z","value":true}]}],
+"events":[{"id":"e1","type":"E","time":"2024-01-01T00:00:00Z","attributes":[{"name":"k","value":7},{"name":"s","value":"x"}],"relationships":[{"objectId":"o1","qualifier":""},{"objectId":"i1","qualifier":""}]},
+{"id":"e2","type":"E","time":"2024-01-02T00:00:00Z","attributes":[{"name":"k","value":8},{"name":"s","value":"y"}],"relationships":[{"objectId":"o1","qualifier":""}]}]})json");
+  const auto written = minera::serialize_ocel_json(log, minera::OcelJsonFormat::kStandard);
+  assert(written.find(R"("objectTypes":[{"name":"Item","attributes":[{"name":"q","type":"string"},{"name":"ok","type":"string"},{"name":"at","type":"date"},{"name":"m","type":"string"}]},{"name":"Order","attributes":[{"name":"q","type":"string"},{"name":"ok","type":"string"},{"name":"at","type":"date"},{"name":"n","type":"float"}]}])") != std::string::npos);
+  assert(written.find(R"("eventTypes":[{"name":"E","attributes":[{"name":"k","type":"string"},{"name":"s","type":"string"}]}])") != std::string::npos);
+  // Minera reads its own export back with the same values.
+  const auto again = minera::parse_ocel_json(written);
+  assert(again.objects.size() == 2 && again.object_changes.size() == 1);
+  assert(std::get<std::int64_t>(again.object_changes[0].value) == 2);
+  for (const auto& attribute : again.objects[0].attributes)
+    if (attribute.key == "n") assert(std::get<double>(attribute.value) == 4.0);
+}
+
 int main() {
   global_scope_defaults_contract();
+  standard_json_declares_frame_column_types_contract();
   repeated_object_ids_contract();
   naive_timestamps_read_as_utc_contract();
   json_limits_contract();
@@ -1450,8 +1477,11 @@ int main() {
   const auto catalog_round = minera::parse_ocel_json(catalog_json);
   assert(catalog_round.event_type_attributes.at("EmptyEvent").at("planned_at") ==
          "datetime");
+  // An attribute with values is declared as its frame column holds it, as
+  // write_ocel2_json does (round AI): a full integer column is "string".
   assert(catalog_round.event_type_attributes.at("Create").at("count") ==
-         "long");
+         "string");
+  assert(std::get<std::int64_t>(catalog_round.events.at(0).attributes.at(0).value) == 3);
   assert(catalog_round.object_type_attributes.at("EmptyObject").at("label") ==
          "string");
   assert(catalog_round.object_type_attributes.at("Order").at("amount") ==

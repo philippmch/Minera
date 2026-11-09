@@ -38,7 +38,12 @@ struct PetriTraceAlignment {
   // visible transition whose input places are all inputs of the silent one has
   // a label occurring in the trace, else 0; DISCOUNTED_A_STAR charges 2^-depth
   // per non-sync move. All variants except DIJKSTRA_LESS_MEMORY and its
-  // generator read every ordinary arc as weight 1, as the reference does.
+  // generator read every ordinary arc as weight 1, as the reference does. On
+  // parallel arcs, state-equation A* fires a transition once each input place
+  // holds one token per arc from it and takes one; the Dijkstra searches
+  // (no-heuristics, its generator, discounted A*) fire it on one token; the
+  // less-memory searches read parallel unit arcs as one arc. The others put
+  // one token per output arc object.
   double cost = 0.0;
   // Best-worst cost and fitness are reported by the four enum variants only.
   // fitness = 1 - floor(cost / 10000) / floor(bwc / 10000), or 0 when the
@@ -102,5 +107,31 @@ struct PetriLogAlignmentOptions {
 
 [[nodiscard]] std::vector<PetriTraceAlignment> align_petri_log(
     const EventLog& log, const PetriNet& net, const PetriLogAlignmentOptions& options = {});
+
+// The public dispatcher's easy-soundness check (the one align_petri_log runs
+// first): true when the final marking is reachable under the reference's
+// rules for the net. Throws std::invalid_argument when a plain net's
+// reachability search stops at its limit, and OperationCancelled when
+// options.cancelled says so; a net with weighted or parallel arcs whose search
+// passes max_states or max_time_seconds is refused (false).
+[[nodiscard]] bool reference_easy_sound(const PetriNet& net,
+                                        const PetriTraceAlignmentOptions& options);
+
+// True when reference_log_alignment can report `options`: one of the three
+// single-alignment variants with the default costs (either cost profile and
+// no cost overrides).
+[[nodiscard]] bool reference_log_alignment_applies(const AlignmentOptions& options);
+
+// Alignments of a log as the reference's public dispatcher reports them. The
+// bundle aligner (check_alignment) keeps the trace variants, precision and
+// bounds; when reference_log_alignment_applies, each variant's alignment,
+// cost and fitness then come from align_petri_log (with its easy-soundness
+// check; a net it refuses gives an uncomputed result, exhausted when the check
+// was undecided), and the log fitness is 1 - sum(cost) / sum(best-worst cost)
+// over raw costs, or 1 when the summed best-worst cost is zero. Costs are
+// reported in the options' profile: raw (10000 per move, 1 per silent move)
+// for kStandard, whole moves for kLegacyUnit.
+[[nodiscard]] AlignmentResult reference_log_alignment(const EventLog& log, const PetriNet& net,
+                                                      const AlignmentOptions& options);
 
 }  // namespace minera

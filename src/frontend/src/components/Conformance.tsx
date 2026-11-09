@@ -389,6 +389,7 @@ export function Conformance({
             </section>
           ) : method.artifact === "alignments" ? (
             <Alignments
+              key={minerId}
               data={viewData}
               minerId={minerId}
               minerName={minerName}
@@ -2059,8 +2060,9 @@ function Alignments({
     embedded.activity_attribute !== "concept:name"
       ? embedded.activity_attribute
       : undefined;
+  const defaults = defaultAlignmentOptionsFor(minerId);
   const initialAlignmentOptions: AlignmentOptions = {
-    ...DEFAULT_ALIGNMENT_OPTIONS,
+    ...defaults,
     ...(embeddedActivityAttribute
       ? { activity_attribute: embeddedActivityAttribute }
       : {}),
@@ -2104,6 +2106,7 @@ function Alignments({
 
   const settings = (
     <AlignmentSettings
+      defaults={defaults}
       draft={draftOptions}
       onChange={setDraftOptions}
       applied={appliedOptions}
@@ -2167,6 +2170,18 @@ const ALIGNMENT_VARIANTS: { value: AlignmentVariant; label: string }[] = [
   { value: "generator_dijkstra_less_memory", label: "Generator Dijkstra (less memory)" },
 ];
 
+/**
+ * The alignment settings a model's view starts from. A supplied model aligns
+ * with the reference's public default variant, state-equation A*, as the
+ * backend does when no variant is given; discovered models keep the legacy
+ * less-memory search their mined alignments were computed with.
+ */
+export function defaultAlignmentOptionsFor(minerId: string): Required<Pick<AlignmentOptions, "variant" | "cost_profile">> {
+  return minerId === IMPORTED
+    ? { ...DEFAULT_ALIGNMENT_OPTIONS, variant: "state_equation_a_star" }
+    : DEFAULT_ALIGNMENT_OPTIONS;
+}
+
 function isDefaultAlignmentOptions(options: AlignmentOptions): boolean {
   return options.variant === DEFAULT_ALIGNMENT_OPTIONS.variant &&
     options.cost_profile === DEFAULT_ALIGNMENT_OPTIONS.cost_profile &&
@@ -2177,17 +2192,19 @@ function isDefaultAlignmentOptions(options: AlignmentOptions): boolean {
 }
 
 function AlignmentSettings({
+  defaults,
   draft,
   applied,
   onChange,
   onApply,
 }: {
+  defaults: Required<Pick<AlignmentOptions, "variant" | "cost_profile">>;
   draft: AlignmentOptions;
   applied: AlignmentOptions;
   onChange: (options: AlignmentOptions) => void;
   onApply: (options: AlignmentOptions) => void;
 }) {
-  const variant = draft.variant ?? DEFAULT_ALIGNMENT_OPTIONS.variant;
+  const variant = draft.variant ?? defaults.variant;
   const generator = variant.startsWith("generator_");
   const discounted = variant === "discounted_a_star";
   const numeric = (key: keyof AlignmentOptions, value: string) => {
@@ -2231,7 +2248,7 @@ function AlignmentSettings({
       <div className="align-settings-actions">
         {invalid && <span className="conf-inline-note">Enter valid non-negative numbers; limits and alternatives must be whole numbers, and the discount exponent must be greater than 1.</span>}
         <button type="button" className="button" disabled={invalid || draftKey === appliedKey} onClick={() => onApply(cleanAlignmentOptions(draft))}>Apply</button>
-        <button type="button" className="button secondary" disabled={draftKey === JSON.stringify(DEFAULT_ALIGNMENT_OPTIONS)} onClick={() => { const reset = { ...DEFAULT_ALIGNMENT_OPTIONS }; onChange(reset); onApply(reset); }}>Reset</button>
+        <button type="button" className="button secondary" disabled={draftKey === JSON.stringify(defaults)} onClick={() => { const reset = { ...defaults }; onChange(reset); onApply(reset); }}>Reset</button>
       </div>
     </section>
   );

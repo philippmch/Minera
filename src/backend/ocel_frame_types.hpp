@@ -10,10 +10,12 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -96,6 +98,86 @@ class Columns {
   std::unordered_map<std::string, std::size_t> index_;
   std::size_t rows_ = 0;
 };
+
+// One owner's attribute declarations in output order, per owner.
+using TypeDeclarations =
+    std::map<std::string, std::vector<std::pair<std::string, std::string>>>;
+
+// The reference OCEL 2.0 writers (write_ocel2_xml, write_ocel2_json) declare
+// what their frame column holds: "float" for a
+// float64 column (an integer column with a missing cell is one), "date" for
+// a timestamp column (here: a catalog date or time declaration), otherwise
+// "string". Each type lists its attributes with a value in global column
+// order (changed fields after the static ones); declared-only catalog entries
+// follow with their declared type, so empty types and attributes survive.
+inline void reference_type_declarations(const Ocel& log, TypeDeclarations& object_types,
+                                        TypeDeclarations& event_types) {
+  Columns object_columns, change_columns, event_columns;
+  for (const auto& object : log.objects) object_columns.observe_row(object.attributes);
+  for (const auto& change : log.object_changes) {
+    change_columns.add_rows(1);
+    change_columns.observe(change.field, change.value);
+  }
+  for (const auto& event : log.events) event_columns.observe_row(event.attributes);
+  const auto declare = [](const OcelTypeCatalog& catalog, const std::string& owner,
+                          const std::string& key, Dtype dtype) {
+    if (const auto schema = catalog.find(owner); schema != catalog.end())
+      if (const auto found = schema->second.find(key); found != schema->second.end()) {
+        std::string lowered = found->second;
+        for (auto& ch : lowered) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        // The reference XML reader reads only "date" as a timestamp ("time",
+        // the OCEL 2.0 JSON spelling, stays text there), and both writers
+        // declare a timestamp column "date".
+        if (lowered.find("date") != std::string::npos || lowered.find("time") != std::string::npos)
+          return std::string("date");
+      }
+    return std::string(dtype == Dtype::kFloat64 ? "float" : "string");
+  };
+  using Present = std::map<std::string, std::unordered_set<std::string>>;
+  const auto build = [&](const OcelTypeCatalog& catalog, const Present& present,
+                         const std::vector<const Columns*>& order,
+                         TypeDeclarations& table) {
+    for (const auto& [owner, keys] : present) {
+      auto& declarations = table[owner];
+      std::unordered_set<std::string> written;
+      for (const auto* columns : order)
+        for (const auto& name : columns->names()) {
+          if (!keys.contains(name) || !written.insert(name).second) continue;
+          auto dtype = columns->dtype(name);
+          if (columns == &change_columns) dtype = change_columns.dtype(name);
+          else if (dtype == Dtype::kEmpty) dtype = change_columns.dtype(name);
+          declarations.emplace_back(name, declare(catalog, owner, name, dtype));
+        }
+    }
+    for (const auto& [owner, schema] : catalog) {
+      auto& declarations = table[owner];
+      for (const auto& [name, type] : schema) {
+        const bool listed = std::any_of(declarations.begin(), declarations.end(),
+                                        [&](const auto& entry) { return entry.first == name; });
+        if (!listed) declarations.emplace_back(name, type.empty() ? "string" : type);
+      }
+    }
+  };
+  Present object_present, event_present;
+  for (const auto& object : log.objects)
+    for (const auto& attribute : object.attributes)
+      if (!std::holds_alternative<std::nullptr_t>(attribute.value))
+        object_present[object.type].insert(attribute.key);
+  for (const auto& change : log.object_changes)
+    if (!std::holds_alternative<std::nullptr_t>(change.value))
+      object_present[change.object_type].insert(change.field);
+  for (const auto& event : log.events)
+    for (const auto& attribute : event.attributes)
+      if (!std::holds_alternative<std::nullptr_t>(attribute.value))
+        event_present[event.activity].insert(attribute.key);
+  build(log.object_type_attributes, object_present, {&object_columns, &change_columns}, object_types);
+  build(log.event_type_attributes, event_present, {&event_columns}, event_types);
+  for (auto* table : {&object_types, &event_types})
+    for (auto& [owner, declarations] : *table)
+      std::erase_if(declarations, [](const auto& entry) { return entry.first.starts_with("ocel:"); });
+  for (const auto& object : log.objects) object_types[object.type];
+  for (const auto& event : log.events) event_types[event.activity];
+}
 
 // pandas to_sql's column type: from the dtype, or for an object column from
 // the kinds of its non-null values in the written table.

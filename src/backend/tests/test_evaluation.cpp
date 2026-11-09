@@ -5,6 +5,7 @@
 #include "minera/pnml.hpp"
 #include "minera/log_conversion.hpp"
 #include <cassert>
+#include <cstdio>
 #include <cmath>
 #include <limits>
 
@@ -1076,8 +1077,46 @@ void literal_activity_selector_and_missing_canonical_name() {
   assert(empty_result.computed && empty_result.precision == 1.0);
 }
 
+// Round AI: alignment fitness and Align-ETConformance on nets with parallel
+// arcs follow the reference's public evaluators. s puts a token on each of
+// its `outs` parallel arcs into p1, d takes its `ins` parallel arcs from p1,
+// x drains p1. With two arcs on each side the net is easy sound and the
+// dispatcher's state-equation A* (d enabled at two tokens, taking one) gives
+// log fitness 0.8333..., average trace fitness 0.83095..., 25% fitting
+// traces and precision 0.8333...; with one output arc the reference refuses
+// the net as not easy sound for both.
+static void parallel_arc_alignment_evaluation() {
+  const auto build = [](std::size_t outs, std::size_t ins) {
+    PetriNet net;
+    net.set_activities({"s", "d", "x"});
+    const auto p0 = net.add_place(), p1 = net.add_place(), pe = net.add_place();
+    net.set_source(p0); net.set_sink(pe);
+    const auto s = net.add_transition(0, {p0}, std::vector<std::size_t>(outs, p1));
+    const auto d = net.add_transition(1, std::vector<std::size_t>(ins, p1), {pe});
+    net.add_transition(2, {p1}, {});
+    net.set_ordinary_arc_weights(s, {PetriArcWeight{}}, std::vector<PetriArcWeight>(outs));
+    net.set_ordinary_arc_weights(d, std::vector<PetriArcWeight>(ins), {PetriArcWeight{}});
+    return net;
+  };
+  const auto l = log({{"s", "d"}, {"s", "d", "x"}, {"s", "x", "d"}, {"s", "d", "x", "x"}});
+  const auto sound = build(2, 2);
+  const auto fitness = evaluate_replay_fitness(l, sound, ReplayFitnessVariant::ALIGNMENT_BASED);
+  assert(fitness.computed);
+  assert(std::abs(fitness.log_fitness - 0.8333333333333334) < 1e-12);
+  assert(std::abs(fitness.average_trace_fitness - 0.830952380952381) < 1e-12);
+  assert(fitness.percentage_fit_traces == 25.0);
+  const auto precision = evaluate_precision(l, sound, PrecisionVariant::ALIGN_ETCONFORMANCE);
+  assert(precision.computed && std::abs(precision.precision - 0.8333333333333334) < 1e-12);
+  const auto refused = build(1, 2);
+  const auto unfit = evaluate_replay_fitness(l, refused, ReplayFitnessVariant::ALIGNMENT_BASED);
+  assert(!unfit.computed && !unfit.exhausted);
+  const auto imprecise = evaluate_precision(l, refused, PrecisionVariant::ALIGN_ETCONFORMANCE);
+  assert(!imprecise.computed && !imprecise.exhausted && imprecise.error == "model is not easy sound");
+}
+
 int main() {
   literal_activity_selector_and_missing_canonical_name();
+  parallel_arc_alignment_evaluation();
   auto n=sequence_net(); auto l=log({{"A","B"},{"A"}});
   auto f=evaluate_replay_fitness(l,n,ReplayFitnessVariant::TOKEN_BASED); assert(f.trace_count==2&&f.fitness<1&&f.percentage_fit_traces==50);
   auto p=evaluate_precision(l,n,PrecisionVariant::ETCONFORMANCE_TOKEN); assert(p.computed&&p.precision>=0&&p.precision<=1);

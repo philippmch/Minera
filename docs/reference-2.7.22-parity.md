@@ -20653,3 +20653,133 @@ Tests: `minera_core_tests` (PTML and BPMN reader rules, refusals),
 `alignment_variants`, `recheck_conformance_fixture` and
 `mining_fast_path_equivalence`, plus the model-reading evaluation,
 token-replay and playout ctests.
+
+## Review AI1: weighted and parallel arcs in evaluation and every alignment variant (2026-11-09)
+
+A re-review of round AH (case-id order of per-case lists, strict model XML,
+BPMN parallel arcs, the A* default for imported models) found the case-order
+and XML changes sound. The parallel arcs that BPMN imports now keep (AH2-2)
+reached code that still read them the native way. Six root causes, all
+fixed:
+
+- **AI1-1 The UI bypassed the imported-model default.** The Conformance
+  view always sent `alignment_variant`, and for a supplied model it sent the
+  discovered models' less-memory default, so `/api/align?miner=imported`
+  never used the A* default of AH2-7 from the UI. The view now starts a
+  supplied model on state-equation A* (`defaultAlignmentOptionsFor`), and its
+  Reset returns there. Discovered models keep less-memory.
+- **AI1-2 `/api/evaluate` on weighted or parallel arcs.** Alignment-based
+  fitness ran the bundle aligner, which neither applies pm4py's
+  easy-soundness check nor its costs on such nets. It now goes through the
+  same reference path as `/api/align` (`reference_log_alignment`, moved from
+  the server tools into the core next to `align_petri_log`). Align-ETC's
+  soundness probe uses the dispatcher's check too (`reference_easy_sound`),
+  so a net pm4py refuses reports "model is not easy sound" for both.
+- **AI1-3 The Dijkstra searches fired parallel arcs like A\*.**
+  `DIJKSTRA_NO_HEURISTICS`, its generator and `DISCOUNTED_A_STAR` fire a
+  transition once each input place holds one token, take one token there and
+  put one token per output arc object (weights read as 1). Only
+  state-equation A* needs k tokens for k parallel input arcs (taking one).
+  These variants now search `set_semantics_net`.
+- **AI1-4 Less-memory per trace.** pm4py's less-memory searches (and the
+  generator) read parallel unit arcs as one arc. Only the log path collapsed
+  them; `align_petri_trace` and the Reference API section did not. The
+  collapse now happens inside the search (`less_memory_net`).
+- **AI1-5 Bundle aligner on parallel arcs.** The reference path first runs
+  the bundle aligner (variants, bounds) on the native net, where parallel
+  input arcs take two tokens. On a fuzz model with the duplicated flow
+  p2, p8, p8 → p7, p7 it stopped at 250,599 states, so `/api/align` and
+  `/api/evaluate` reported "alignment search exhausted". pm4py aligns it at
+  once: log fitness 0.35896147317788596, less-memory 0.6666238095238095. The
+  bundle now runs on the net the reference search reads, and projected
+  markings fire on that net too. Both values now match.
+- **AI1-6 Align-ETC on parallel arcs.** Parallel output arcs put one token
+  each (fuzz seed 93), and parallel input arcs from one place act as one arc
+  there. Before, they needed and took the sum of their weights. On
+  s: p0 → p1 (two arcs), d: p1 (two arcs) → pe, x: p1 → (none), with the
+  log ⟨s,d⟩, ⟨s,d,x⟩, ⟨s,x,d⟩, ⟨s,d,x,x⟩, precision was 0.9286; it is now
+  0.8333333333333334, as in pm4py.
+
+Declared:
+
+- **Weighted easy soundness.** The weighted easy-soundness model still
+  differs from pm4py on 5 of 36 small parallel-arc probe nets: two or more
+  parallel unit output arcs into a weight-2 input arc, and two unit outputs
+  into two weight-2 inputs. pm4py's verdicts there follow no rule found so
+  far.
+- **A case that could not be rerun.** One earlier fuzz case (A* log fitness
+  0.917 against pm4py's 0.740) could not be regenerated, because the
+  generator's process trees are unseeded. It did not recur in the 600 later
+  cases.
+- **A* firing a two-arc transition on one token.** Minera's state-equation
+  A* fires a transition with k parallel input arcs from a place once the
+  place holds k tokens, and takes one. pm4py usually behaves that way too,
+  but not always. On fuzz seed 188's net (a silent transition with two arcs
+  from an XOR place inside a loop), pm4py's A* fires it on a single token
+  for the trace ⟨f,h,a,d,h,f,b⟩, at cost 50014. That equals the
+  no-heuristics optimum. On the same net's ⟨b,e,a,b⟩ it refuses, costing
+  30007 against 14. On small nets with the same shape it never fires it,
+  with or without a loop that refills the place. No rule that looks only at
+  the current marking gives all of these results, so pm4py's choice depends
+  on its search. One trace of seed 188 costs 70023 in Minera and 60030 in
+  pm4py (log fitness 0.7390 against 0.7607).
+
+Verification against pm4py:
+
+| Check | Cases | Result |
+|---|---|---|
+| Per-trace costs, mutated BPMN corpus (duplicated flows), A* / no-heuristics / less-memory | 95 easy-sound models | equal on every trace |
+| BPMN evaluation fuzz (fitness and precision, both replay kinds, `/api/align` A* and less-memory; 40% mutated), final build | 319 (seeds 6–206 and 400–518) | 318 equal; seed 188 is the declared A* item |
+| Same fuzz on earlier builds of this round | 394 (seeds 6–199 and 200–399) | 0 undeclared after the AI1-5 fix (seed 60) |
+
+Tests: `minera_petri_analysis_tests` (variant costs on parallel arcs, the
+fuzz model's log alignment), `minera_evaluation_tests` (fitness 0.8333…,
+average 0.83095…, precision 0.8333…, and the refusals),
+`alignment-defaults.test.ts`.
+
+## Review AI2: OCEL 2.0 writers read back with pm4py (2026-11-09)
+
+A sweep wrote 60 generated OCEL 2.0 JSON inputs in all six formats, once
+with Minera and once with pm4py, and read every file back with pm4py's
+readers. It found two undeclared root causes, both in the OCEL 2.0 type
+declarations. Fixed:
+
+- **AI2-1 XML timestamps declared `time`.** The OCEL 2.0 XML writer kept
+  the catalog's `time`, which pm4py's XML reader leaves as text: timestamp
+  attributes came back as strings. It now declares `date`, as pm4py's writer
+  does, and Minera's readers take both.
+- **AI2-2 JSON declared types.** The OCEL 2.0 JSON writer declared catalog
+  or value types (`integer`, `boolean`, `time`). pm4py declares what its
+  frame column holds, and its reader casts to the declared type:
+  - `float` for a float64 column (an integer attribute some object or event
+    lacks is one);
+  - `date` for timestamps;
+  - `string` otherwise, including full integer and boolean columns.
+
+  So an integer change value of an attribute some object lacked came back
+  int64 from Minera's file and float64 from pm4py's (fuzz seeds 140 and
+  153). The JSON writer now uses the XML writer's declaration rule, shared
+  as `ocel_frame::reference_type_declarations`, and prints an integer in a
+  float64 column as a float (`6.0`). Types are listed in frame column order.
+  A probe with full, partial and changed integer, boolean and time
+  attributes now gives pm4py's declarations exactly.
+
+Declared (pm4py reads these files back the same way, except where noted):
+
+- Types and attributes that only the catalog declares stay in the JSON and
+  XML type tables, as the XML writer already kept them.
+- Static timestamp values keep their fractional seconds and print
+  `+00:00`; pm4py's JSON writers truncate the fraction and print `Z`.
+- Mixed-type columns (times and text, or floats and text in one column)
+  keep each value's own type. pm4py coerces them per column: SQLite text
+  with `T`, XML floats as text (4 of 60 inputs).
+- pm4py's CSV writer keeps an all-empty column for an attribute that only
+  dropped events had (events without objects), where Minera writes no
+  column (1 of 60).
+
+Verification: 60 inputs × 6 formats. The JSON category is gone; only the
+declared items remain.
+
+Tests: `minera_ocel_tests` (`standard_json_declares_frame_column_types_contract`;
+the catalog round trip now expects `string` for an integer attribute that
+has values), `minera_ocel_xml_tests`.

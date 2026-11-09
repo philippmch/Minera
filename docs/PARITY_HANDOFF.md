@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AH (2026-11-05 to 2026-11-09, cloud container)
+## Review-fix loop, rounds T–AI (2026-11-05 to 2026-11-09, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4218,29 +4218,33 @@ covered token replay and footprint speed, soundness reductions, `/api/mine`
 on large logs, the DataFrame path for XES inputs (one shared import, case
 merging, case-id order of per-case lists, typed case ids), cancellable log
 loading and `cancel-mine`, and strict BPMN/PNML/PTML reading and writing.
+Round AI took the BPMN parallel arcs of AH through evaluation and every
+alignment variant, and fixed the OCEL 2.0 type declarations that pm4py
+reads back.
 
-Next round (AI) should start by re-reviewing round AH:
+Next round (AJ) should start by re-reviewing round AI:
 
-- `include/minera/case_list_order.hpp` (`order_trace_diagnostics`,
-  `apply_case_order`) at every per-case list writer, and `case_id_order`'s
-  typed order in `src/backend/event_ordering.cpp`, including the exact
-  int/float comparison that replaced a 128-bit key;
-- `ReplayFitnessOptions::trace_order` / `AlignmentOptions::trace_order` in
-  `/api/evaluate`, and `evict_mining_ticket_locked` in `minera_server.cpp`;
-- strict model XML (`model_xml_options`, `validate_model_xml` in
-  `src/backend/xml_pull_parser.hpp`; entity limits), BPMN parallel arcs as
-  repeated unit arcs, PTML/BPMN writer escapes, and
-  `src/backend/tools/imported_alignment.hpp` (A* by default for `--check-*`
-  and `/api/align?miner=imported`).
+- `src/backend/petri_trace_alignment.cpp`: `set_semantics_net` (the
+  Dijkstra variants), `less_memory_net` (collapse inside the search),
+  `reference_search_net`, and `reference_log_alignment` /
+  `reference_easy_sound` (now in the core; the bundle aligner runs on the
+  reference search net);
+- `src/backend/evaluation.cpp`: the weighted-net branches of
+  `evaluate_replay_fitness` and the Align-ETC soundness probe, and
+  `unit_output_net` (parallel input arcs act as one);
+- `ocel_frame::reference_type_declarations` (shared by the OCEL 2.0 XML and
+  JSON writers) and `write_frame_value` in `src/backend/ocel.cpp`;
+- `defaultAlignmentOptionsFor` in `Conformance.tsx`.
 
 Areas without a recent random-input sweep that are good candidates for the
-second reviewer: concept drift, root-cause and feature extraction, OCEL
-writers read back with pm4py, and large-log performance of the routes not
-covered by AD (alignments, evaluate, OCEL discovery).
+second reviewer: concept drift, root-cause and feature extraction, and
+large-log performance of the routes not covered by AD (alignments, evaluate,
+OCEL discovery).
 
 Known open or declared: mine-view generalization sum order (2 ulp); POWL
 brute-force filtering and dynamic clustering rare cases; BPMN→net
-align-ETC ties and pm4py's hash-seed dependence on BPMN inputs; the
+align-ETC ties and pm4py's hash-seed dependence on BPMN inputs; weighted
+easy soundness on 5 of 36 parallel-arc probe nets; the
 `/api/evaluate` alignment `average_trace_fitness` last bit on 3 of 257 logs
 (pm4py sums per variant); `merge_dataframe_cases` and gzip decompression are
 not polled for cancellation.

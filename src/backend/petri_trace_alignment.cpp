@@ -415,6 +415,47 @@ PetriNet unit_weight_net(const PetriNet& net) {
   return copy;
 }
 
+// The net the reference's Dijkstra searches (no-heuristics, its generator,
+// and discounted A*) align on when arcs are weighted or parallel. They fire a
+// synchronous-product transition, as observed black-box, once each of its
+// input places holds one token, take one token there, and put one token per
+// output arc object: two parallel input arcs from a place act as one, two
+// parallel output arcs put two tokens, and a weight is read as 1. State-
+// equation A* does not reach such firings (its marking-equation heuristic
+// prunes them), so it keeps unit_weight_net.
+PetriNet set_semantics_net(const PetriNet& net) {
+  PetriNet copy;
+  for (std::size_t p = 0; p < net.place_count(); ++p) copy.add_place();
+  for (const auto& transition : net.transitions()) {
+    std::vector<std::size_t> inputs, outputs;
+    for (const auto& arc : petri_reference_arcs(transition, true))
+      if (std::find(inputs.begin(), inputs.end(), arc.place) == inputs.end())
+        inputs.push_back(arc.place);
+    for (const auto& arc : petri_reference_arcs(transition, false)) outputs.push_back(arc.place);
+    copy.add_transition(transition.activity, std::move(inputs), std::move(outputs));
+  }
+  copy.set_activities(net.activities());
+  if (net.has_source()) copy.set_source(net.source());
+  if (net.has_sink()) copy.set_sink(net.sink());
+  if (net.transition_names()) copy.set_transition_names(*net.transition_names());
+  if (net.place_names()) copy.set_place_names(*net.place_names());
+  if (net.discovery_markings()) copy.set_discovery_markings(*net.discovery_markings());
+  return copy;
+}
+
+bool set_semantics_variant(AlignmentVariant variant) {
+  return variant == AlignmentVariant::kDijkstraNoHeuristics ||
+         variant == AlignmentVariant::kGeneratorDijkstraNoHeuristics ||
+         variant == AlignmentVariant::kDiscountedAStar;
+}
+
+// The net a synchronous-product variant searches on a net with weighted or
+// parallel arcs (state-equation A*: unit_weight_net; the Dijkstra searches:
+// set_semantics_net).
+PetriNet reference_search_net(const PetriNet& net, AlignmentVariant variant) {
+  return set_semantics_variant(variant) ? set_semantics_net(net) : unit_weight_net(net);
+}
+
 bool weighted_net(const PetriNet& net) { return petri_net_has_weighted_arcs(net); }
 
 // The public log dispatcher's easy-soundness check on a net with weighted or
@@ -428,7 +469,7 @@ bool weighted_net(const PetriNet& net) { return petri_net_has_weighted_arcs(net)
 // summed weight of its output arcs. A search that passes max_states refuses
 // the net, as the reference does for the unbounded nets probed, and so does
 // one past max_time_seconds; a cancelled one throws OperationCancelled.
-bool reference_easy_sound(const PetriNet& net, const std::vector<int>& requested_initial,
+bool weighted_easy_sound(const PetriNet& net, const std::vector<int>& requested_initial,
                           const std::vector<int>& requested_final,
                           const PetriTraceAlignmentOptions& options) {
   const auto max_states = options.max_states;
@@ -491,10 +532,49 @@ bool reference_easy_sound(const PetriNet& net, const std::vector<int>& requested
   return false;
 }
 
+// The net the reference's less-memory searches (DIJKSTRA_LESS_MEMORY and its
+// generator) read when some transition has parallel unit arcs: one arc per
+// place and transition (observed black-box: per-trace costs equal on 120
+// random BPMN models with duplicated flows). Nullopt when there is nothing
+// to collapse (no compact arcs, or a compact arc that is not one plain unit
+// arc, whose collapsed weight is not determined).
+std::optional<PetriNet> less_memory_net(const PetriNet& net) {
+  const auto unit = [](const std::vector<PetriArcWeight>& weights) {
+    return std::all_of(weights.begin(), weights.end(), [](const PetriArcWeight& weight) {
+      return weight.magnitude == 1 && !weight.negative;
+    });
+  };
+  if (!net.has_compact_ordinary_arcs() || net.has_extended_arcs() ||
+      !std::all_of(net.transitions().begin(), net.transitions().end(),
+                   [&](const PetriTransition& transition) {
+                     return unit(transition.input_weights) && unit(transition.output_weights);
+                   }))
+    return std::nullopt;
+  const auto distinct = [](const std::vector<std::size_t>& places) {
+    std::vector<std::size_t> out;
+    for (const auto place : places)
+      if (std::find(out.begin(), out.end(), place) == out.end()) out.push_back(place);
+    return out;
+  };
+  PetriNet collapsed;
+  for (std::size_t p = 0; p < net.place_count(); ++p) collapsed.add_place();
+  if (net.place_names()) collapsed.set_place_names(*net.place_names());
+  for (const auto& transition : net.transitions())
+    collapsed.add_transition(transition.activity, distinct(transition.inputs),
+                             distinct(transition.outputs));
+  collapsed.set_activities(net.activities());
+  if (net.transition_names()) collapsed.set_transition_names(*net.transition_names());
+  if (net.has_source()) collapsed.set_source(net.source());
+  if (net.has_sink()) collapsed.set_sink(net.sink());
+  if (net.discovery_markings()) collapsed.set_discovery_markings(*net.discovery_markings());
+  return collapsed;
+}
+
 SearchOutcome search(const std::vector<std::string>& trace, const PetriNet& net,
                      const PetriTraceAlignmentOptions& options) {
   SearchOutcome out;
   if (less_memory_variant(options.variant) && plain_net(net)) {
+    if (const auto collapsed = less_memory_net(net)) return search(trace, *collapsed, options);
     std::vector<double> model_costs = options.model_costs;
     if (model_costs.empty()) {
       if (options.variant == AlignmentVariant::kDijkstraLessMemory) {
@@ -539,7 +619,7 @@ SearchOutcome search(const std::vector<std::string>& trace, const PetriNet& net,
   }
   const auto result =
       plain_net(net) && weighted_net(net)
-          ? check_alignment(single_trace_log(trace), unit_weight_net(net),
+          ? check_alignment(single_trace_log(trace), reference_search_net(net, options.variant),
                             search_options(trace, net, options))
           : check_alignment(single_trace_log(trace), net, search_options(trace, net, options));
   if (!result.computed) {
@@ -637,6 +717,20 @@ std::vector<PetriTraceAlignment> align_petri_trace_all(
   return run(trace, net, options);
 }
 
+bool reference_easy_sound(const PetriNet& net, const PetriTraceAlignmentOptions& options) {
+  if (plain_net(net) && weighted_net(net))
+    return weighted_easy_sound(net, options.initial_marking, options.final_marking, options);
+  const auto reachability =
+      final_marking_reachability(net, options.initial_marking, options.final_marking);
+  // A search that stopped at its limit has not shown the net unsound
+  // (review W1-5).
+  if (reachability == FinalMarkingReachability::kExhausted)
+    throw std::invalid_argument(
+        "easy soundness undecided: the reachability search reached its limit "
+        "before deciding whether the final marking is reachable");
+  return reachability == FinalMarkingReachability::kReachable;
+}
+
 std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const PetriNet& net,
                                                  const PetriLogAlignmentOptions& options) {
   if (!options.trace.trace_costs.empty())
@@ -644,22 +738,7 @@ std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const Petr
   // The public log dispatcher first checks easy soundness and raises for a
   // net whose final marking is unreachable, where a single trace would get
   // None.
-  bool easy_sound = false;
-  if (plain_net(net) && weighted_net(net)) {
-    easy_sound = reference_easy_sound(net, options.trace.initial_marking,
-                                      options.trace.final_marking, options.trace);
-  } else {
-    const auto reachability = final_marking_reachability(
-        net, options.trace.initial_marking, options.trace.final_marking);
-    // A search that stopped at its limit has not shown the net unsound
-    // (review W1-5).
-    if (reachability == FinalMarkingReachability::kExhausted)
-      throw std::invalid_argument(
-          "easy soundness undecided: the reachability search reached its limit "
-          "before deciding whether the final marking is reachable");
-    easy_sound = reachability == FinalMarkingReachability::kReachable;
-  }
-  if (!easy_sound)
+  if (!reference_easy_sound(net, options.trace))
     throw std::invalid_argument("trying to apply alignments on a Petri net that is not easy sound");
   const bool standard = options.activity_key == "concept:name" || options.activity_key == "activity";
   std::map<std::vector<std::string>, PetriTraceAlignment> variants;
@@ -690,6 +769,136 @@ std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const Petr
     out.push_back(found->second);
   }
   return out;
+}
+
+bool reference_log_alignment_applies(const AlignmentOptions& options) {
+  const bool single = options.variant == AlignmentVariant::kStateEquationAStar ||
+                      options.variant == AlignmentVariant::kDijkstraNoHeuristics ||
+                      options.variant == AlignmentVariant::kDijkstraLessMemory;
+  return single && !options.default_trace_cost && !options.default_model_cost &&
+         !options.default_sync_cost && !options.default_silent_cost &&
+         options.trace_costs.empty() && options.model_costs.empty() &&
+         options.sync_costs.empty() && options.trace_costs_by_position.empty() &&
+         options.model_costs_by_transition.empty() &&
+         options.sync_costs_by_transition.empty() && !options.trace_cost_function &&
+         !options.model_cost_function && !options.sync_cost_function;
+}
+
+AlignmentResult reference_log_alignment(const EventLog& log, const PetriNet& net,
+                                        const AlignmentOptions& options) {
+  if (!reference_log_alignment_applies(options)) return check_alignment(log, net, options);
+  // The less-memory searches read parallel arcs as one (less_memory_net).
+  const auto collapsed = options.variant == AlignmentVariant::kDijkstraLessMemory
+                             ? less_memory_net(net)
+                             : std::optional<PetriNet>{};
+  // The bundle aligner groups the variants and keeps precision and bounds.
+  // On a net with weighted or parallel arcs it aligns on the net the
+  // reference search reads (native firing sums parallel arcs, which can pump
+  // tokens through a cycle until the search runs out of states).
+  std::optional<PetriNet> searched;
+  if (!collapsed && plain_net(net) && weighted_net(net) &&
+      options.variant != AlignmentVariant::kDijkstraLessMemory)
+    searched = reference_search_net(net, options.variant);
+  const PetriNet& bundle_net = collapsed ? *collapsed : searched ? *searched : net;
+  auto result = check_alignment(log, bundle_net, options);
+  if (!result.computed || result.variants.empty()) return result;
+
+  // One synthetic trace per bundle variant, aligned by the public log
+  // dispatcher (which also applies the reference easy-soundness check).
+  EventLog variants_log;
+  variants_log.traces.reserve(result.variants.size());
+  for (const auto& variant : result.variants) {
+    Trace trace;
+    for (const auto& activity : variant.activities) {
+      Event event;
+      event.activity = activity;
+      trace.events.push_back(std::move(event));
+    }
+    variants_log.traces.push_back(std::move(trace));
+  }
+  PetriLogAlignmentOptions reference;
+  reference.trace.variant = options.variant;
+  reference.trace.initial_marking = options.initial_marking;
+  reference.trace.final_marking = options.final_marking;
+  reference.trace.max_states = options.max_states;
+  reference.trace.max_time_seconds = options.max_time_seconds;
+  reference.trace.cancelled = options.cancelled;
+  std::vector<PetriTraceAlignment> aligned;
+  try {
+    aligned = align_petri_log(variants_log, net, reference);
+  } catch (const std::invalid_argument& error) {
+    result.computed = false;
+    result.exhausted = std::string(error.what()).find("undecided") != std::string::npos;
+    result.variants.clear();
+    return result;
+  }
+
+  std::vector<int> initial = options.initial_marking;
+  if (initial.empty()) {
+    initial.assign(net.place_count(), 0);
+    initial.at(net.source()) = 1;
+  }
+  const bool raw_costs = options.cost_profile == AlignmentCostProfile::kStandard;
+  const auto reported = [raw_costs](double cost) {
+    return raw_costs ? cost : std::floor(cost / kStandardMoveCost);
+  };
+  double raw_cost = 0.0;
+  double raw_worst = 0.0;
+  result.total_cost = 0.0;
+  result.fitting_traces = 0;
+  for (std::size_t v = 0; v < result.variants.size(); ++v) {
+    auto& variant = result.variants[v];
+    const auto& entry = aligned.at(v);
+    if (!entry.computed || !entry.bwc || !entry.fitness) {
+      result.computed = false;
+      result.exhausted = entry.exhausted;
+      result.time_limit_reached = entry.time_limit_reached;
+      result.variants.clear();
+      return result;
+    }
+    std::vector<AlignmentMove> moves;
+    std::vector<ProjectedAlignmentMove> projected;
+    auto marking = initial;
+    for (const auto& move : entry.alignment) {
+      const auto transition = move.transition.value_or(static_cast<std::size_t>(-1));
+      if (move.model && *move.model == ">>") {
+        moves.push_back({AlignmentMoveType::kLog, move.log, transition});
+        continue;
+      }
+      const bool synchronous = move.log != ">>";
+      moves.push_back({synchronous ? AlignmentMoveType::kSynchronous : AlignmentMoveType::kModel,
+                       synchronous ? move.log : move.model.value_or(std::string{}),
+                       transition});
+      if (!move.transition) continue;
+      const auto before = marking;
+      // Projected markings follow the firing the alignment was searched with.
+      fire_petri_transition(bundle_net.transitions().at(*move.transition), marking);
+      if (move.model)
+        projected.push_back({*move.model, *move.transition, before, marking});
+    }
+    variant.moves = moves;
+    variant.complete_moves = moves;
+    variant.optimal_alignments = {std::move(moves)};
+    variant.projected_model_moves = std::move(projected);
+    variant.cost = reported(entry.cost);
+    variant.worst_cost = reported(*entry.bwc);
+    variant.fitness = *entry.fitness;
+    variant.diagnostics = entry.diagnostics;
+    const auto count = static_cast<double>(variant.count);
+    raw_cost += entry.cost * count;
+    raw_worst += *entry.bwc * count;
+    result.total_cost += variant.cost * count;
+    if (variant.fitness >= 1.0) result.fitting_traces += variant.count;
+  }
+  // The reference reports a log fitness of 1 when the summed best-worst cost
+  // is zero (less-memory search prices no log move), whatever the costs.
+  result.fitness = raw_worst <= 0.0 ? 1.0 : 1.0 - raw_cost / raw_worst;
+  std::stable_sort(result.variants.begin(), result.variants.end(),
+                   [](const VariantAlignment& a, const VariantAlignment& b) {
+                     if (a.fitness != b.fitness) return a.fitness < b.fitness;
+                     return a.count > b.count;
+                   });
+  return result;
 }
 
 }  // namespace minera

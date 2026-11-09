@@ -4,6 +4,7 @@
 #include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
 #include "minera/filtering_common.hpp"
+#include "ocel_frame_types.hpp"
 #include "ocpn_projection.hpp"
 #include "python_isoformat.hpp"
 #include "reference_tree_net.hpp"
@@ -747,6 +748,17 @@ void write_value(std::ostringstream& out, const OcelValue& value) {
     write_string(out, std::get<std::string>(value));
   }
 }
+// A value as write_ocel2_json prints its frame cell: an integer in a float64
+// column (one some row lacks, or one holding floats too) prints as a float.
+void write_frame_value(std::ostringstream& out, const OcelValue& value,
+                       ocel_frame::Dtype dtype) {
+  if (const auto* int_value = std::get_if<std::int64_t>(&value);
+      int_value != nullptr && dtype == ocel_frame::Dtype::kFloat64) {
+    write_value(out, OcelValue(static_cast<double>(*int_value)));
+    return;
+  }
+  write_value(out, value);
+}
 // Keys in first-appearance order with the last value of a repeated key, as a
 // Python dict built from the attributes keeps them.
 void write_attrs(std::ostringstream& out, const std::vector<OcelAttribute>& attrs) {
@@ -816,61 +828,23 @@ void write_classic_type_catalog(std::ostringstream& out,
   out << '}';
 }
 
-std::string standard_value_type(const OcelValue& value) {
-  if (std::holds_alternative<bool>(value)) return "boolean";
-  if (std::holds_alternative<std::int64_t>(value)) return "int";
-  if (std::holds_alternative<double>(value)) return "float";
-  return "string";
-}
-
-void merge_standard_type(std::string& current, const OcelValue& value) {
-  const auto next = standard_value_type(value);
-  if (current.empty() || current == next) {
-    current = next;
-  } else if ((current == "int" && next == "float") ||
-             (current == "float" && next == "int")) {
-    current = "float";
-  } else {
-    current = "string";
-  }
-}
-
-using StandardTypeTable =
-    std::map<std::string, std::map<std::string, std::string>>;
-
 // pm4py.write_ocel2_json, write_ocel2_xml and write_ocel_json (objects) drop
 // an attribute whose name starts with "ocel:" (an OCEL CSV column such as
 // "ocel:foo" or "ocel:eid.1"), which their frames take for a reserved column
 // (observed black-box).
 bool reference_drops_attribute(std::string_view key) { return key.starts_with("ocel:"); }
 
+// write_ocel2_json declares each attribute as its frame column holds it, as
+// write_ocel2_xml does: "float" for a float64 column (an integer attribute
+// some object or event lacks is one), "date" for a timestamp attribute,
+// otherwise "string" (also integer and boolean columns); its reader then casts
+// the values to the declared type (observed black-box). "ocel:"-prefixed
+// attributes are dropped (reference_drops_attribute).
+using StandardTypeTable = ocel_frame::TypeDeclarations;
+
 void collect_standard_types(const Ocel& log, StandardTypeTable& object_types,
                             StandardTypeTable& event_types) {
-  object_types = log.object_type_attributes;
-  event_types = log.event_type_attributes;
-  for (const auto& object : log.objects) {
-    auto& attributes = object_types[object.type];
-    for (const auto& attribute : object.attributes) {
-      auto& declared = attributes[attribute.key];
-      if (declared.empty()) merge_standard_type(declared, attribute.value);
-    }
-  }
-  for (const auto& change : log.object_changes) {
-    auto& declared = object_types[change.object_type][change.field];
-    if (declared.empty()) merge_standard_type(declared, change.value);
-  }
-  for (const auto& event : log.events) {
-    auto& attributes = event_types[event.activity];
-    for (const auto& attribute : event.attributes) {
-      auto& declared = attributes[attribute.key];
-      if (declared.empty()) merge_standard_type(declared, attribute.value);
-    }
-  }
-  // write_ocel2_json drops "ocel:"-prefixed attributes (see
-  // reference_drops_attribute), also from the type tables.
-  for (auto* table : {&object_types, &event_types})
-    for (auto& [type, attributes] : *table)
-      std::erase_if(attributes, [](const auto& entry) { return reference_drops_attribute(entry.first); });
+  ocel_frame::reference_type_declarations(log, object_types, event_types);
 }
 
 void write_standard_type_table(std::ostringstream& out,
@@ -2044,6 +2018,16 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
       relations = found->second;
     return relations;
   };
+  // The frames the reference prints its cells from (write_frame_value).
+  ocel_frame::Columns event_frame, object_frame, change_frame;
+  if (format == OcelJsonFormat::kStandard) {
+    for (const auto& event : log.events) event_frame.observe_row(event.attributes);
+    for (const auto& object : log.objects) object_frame.observe_row(object.attributes);
+    for (const auto& change : log.object_changes) {
+      change_frame.add_rows(1);
+      change_frame.observe(change.field, change.value);
+    }
+  }
   auto write_standard_attributes = [&](const std::vector<OcelAttribute>& attrs) {
     out << '[';
     bool first = true;
@@ -2055,7 +2039,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
       out << "{\"name\":";
       write_string(out, attribute->key);
       out << ",\"value\":";
-      write_value(out, attribute->value);
+      write_frame_value(out, attribute->value, event_frame.dtype(attribute->key));
       out << '}';
     }
     out << ']';
@@ -2134,7 +2118,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
         write_string(out, attribute->key);
         out << ",\"time\":\"1970-01-01T00:00:00Z\"";
         out << ",\"value\":";
-        write_value(out, attribute->value);
+        write_frame_value(out, attribute->value, object_frame.dtype(attribute->key));
         out << '}';
       }
       std::vector<const OcelObjectChange*> changes;
@@ -2154,7 +2138,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
         out << "{\"name\":";
         write_string(out, change->field);
         out << ",\"value\":";
-        write_value(out, change->value);
+        write_frame_value(out, change->value, change_frame.dtype(change->field));
         out << ",\"time\":";
         write_string(out, change->timestamp);
         out << '}';

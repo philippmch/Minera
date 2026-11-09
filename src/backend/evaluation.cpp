@@ -1,6 +1,8 @@
 #include "minera/evaluation.hpp"
 #include "minera/cancellation.hpp"
 #include "minera/log_conversion.hpp"
+#include "minera/petri_reference_arcs.hpp"
+#include "minera/petri_trace_alignment.hpp"
 #include "minera/pnml.hpp"
 #include "cyclomatic_unicode.hpp"
 #include "root_cause_unicode.hpp"
@@ -865,7 +867,14 @@ ReplayFitnessResult evaluate_replay_fitness(
     out.decomposed_alignment_result = std::move(decomposed);
   } else {
     alignment_options.trace_order = options.trace_order ? &*options.trace_order : nullptr;
-    out.alignment_result = check_alignment(log, net, alignment_options);
+    // A net with weighted or parallel arcs aligns as the reference's public
+    // dispatcher aligns it: its easy-soundness check refuses the net, or each
+    // variant gets the dispatcher's alignment and costs (on other nets both
+    // give the same costs).
+    out.alignment_result =
+        petri_net_has_weighted_arcs(net) && reference_log_alignment_applies(alignment_options)
+            ? reference_log_alignment(log, net, alignment_options)
+            : check_alignment(log, net, alignment_options);
     out.computed = out.alignment_result.computed;
     out.exhausted = out.alignment_result.exhausted;
     out.fitness = out.computed ? out.alignment_result.fitness : 0.0;
@@ -1408,9 +1417,11 @@ StopAlignmentResult align_to_stop_prefix(const PetriNet& net,
 }
 
 // Align-ETConformance observes prefix states in which every ordinary output
-// arc produces a single token, while input arcs keep their weights (observed on
-// the pinned public evaluator with weighted arcs). Repeated output endpoints
-// therefore also collapse to one produced token.
+// arc object produces a single token, while input arcs keep their weights
+// (observed on the pinned public evaluator with weighted arcs). The repeated
+// endpoints of one weighted arc therefore collapse to one produced token, and
+// parallel output arcs (BPMN repeated flows) put one token each, while
+// parallel input arcs from one place take one arc's weight.
 PetriNet unit_output_net(const PetriNet& net) {
   PetriNet copy = net;
   for (std::size_t index = 0; index < net.transitions().size(); ++index) {
@@ -1424,11 +1435,27 @@ PetriNet unit_output_net(const PetriNet& net) {
         outputs.push_back(weight);
         continue;
       }
-      const bool first = seen.insert(transition.outputs[arc]).second;
+      // One token per output arc object: a compact side lists one entry per
+      // arc object (parallel arcs each put a token, as the reference's
+      // synchronous product does); a repeated-unit side spells one arc of
+      // weight w as w endpoints, and that arc puts one token.
+      const bool first = !transition.output_weights.empty() ||
+                         seen.insert(transition.outputs[arc]).second;
       outputs.push_back({first ? 1 : 0, false});
       changed = changed || !first || weight.magnitude != 1;
     }
-    if (changed) copy.set_ordinary_arc_weights(index, transition.input_weights, std::move(outputs));
+    // Parallel input arcs from one place act as one arc there (enabled at,
+    // and taking, the weight of the last of them; observed black-box): the
+    // earlier ones get weight 0. A repeated-unit side is one weighted arc and
+    // keeps its weight.
+    std::vector<PetriArcWeight> inputs = transition.input_weights;
+    for (std::size_t arc = 0; arc < inputs.size(); ++arc)
+      if (std::find(transition.inputs.begin() + static_cast<std::ptrdiff_t>(arc) + 1,
+                    transition.inputs.end(), transition.inputs[arc]) != transition.inputs.end()) {
+        inputs[arc] = PetriArcWeight{0, false};
+        changed = true;
+      }
+    if (changed) copy.set_ordinary_arc_weights(index, std::move(inputs), std::move(outputs));
   }
   return copy;
 }
@@ -1511,14 +1538,37 @@ PrecisionResult evaluate_precision_impl(const EventLog& log, const PetriNet& net
   // Check model easy-soundness independently of the input log.  The legacy
   // alignment API intentionally treats an empty log as trivially computable,
   // which would otherwise mask an unreachable final marking here.
-  EventLog probe;
-  probe.traces.push_back(Trace{});
-  const auto soundness = check_alignment(probe, net, alignment_options);
-  if (!soundness.computed) {
-    out.computed = false;
-    out.exhausted = soundness.exhausted;
-    out.error = out.exhausted ? "alignment search exhausted" : "model is not easy sound";
-    return out;
+  // A net with weighted or parallel arcs is checked by the reference's own
+  // rules for them (see reference_easy_sound).
+  if (petri_net_has_weighted_arcs(net)) {
+    PetriTraceAlignmentOptions check;
+    check.initial_marking = options.initial_marking;
+    check.final_marking = options.final_marking;
+    check.cancelled = options.cancelled;
+    bool sound = false;
+    try {
+      sound = reference_easy_sound(net, check);
+    } catch (const std::invalid_argument&) {
+      out.computed = false;
+      out.exhausted = true;
+      out.error = "alignment search exhausted";
+      return out;
+    }
+    if (!sound) {
+      out.computed = false;
+      out.error = "model is not easy sound";
+      return out;
+    }
+  } else {
+    EventLog probe;
+    probe.traces.push_back(Trace{});
+    const auto soundness = check_alignment(probe, net, alignment_options);
+    if (!soundness.computed) {
+      out.computed = false;
+      out.exhausted = soundness.exhausted;
+      out.error = out.exhausted ? "alignment search exhausted" : "model is not easy sound";
+      return out;
+    }
   }
 
   if (variant == PrecisionVariant::ALIGN_ETCONFORMANCE) {

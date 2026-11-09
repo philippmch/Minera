@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <map>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -1168,10 +1169,121 @@ void alignment_weighted_and_parallel_arcs() {
   assert(!timed.computed && timed.exhausted && timed.time_limit_reached);
 }
 
+// Round AI: each synchronous-product variant fires parallel arcs its own
+// way, against the reference's single-trace results on
+// s: p0 -> p1 (two parallel arcs), d: p1 (two parallel arcs) -> pe and
+// x: p1 -> (nothing). State-equation A* fires d once p1 holds two tokens and
+// takes one; the Dijkstra searches (no-heuristics, its generator, discounted
+// A*) fire it on one token and take one; the less-memory searches read each
+// pair of parallel arcs as one arc. Every variant puts one token per arc
+// object otherwise.
+void alignment_parallel_arc_variants() {
+  const auto net = compact_net(3, {"s", "d", "x"},
+      {{0, {{0}, {1}}, {{1, 1}, {1, 1}}},
+       {1, {{1, 1}, {1, 1}}, {{2}, {1}}},
+       {2, {{1}, {1}}, {{}, {}}}});
+  const std::vector<std::vector<std::string>> traces{
+      {"s", "d"}, {"s", "d", "x"}, {"s", "x", "d"}, {"s", "d", "x", "x"}};
+  const auto costs = [&](AlignmentVariant variant) {
+    PetriTraceAlignmentOptions options;
+    options.variant = variant;
+    std::vector<double> out;
+    for (const auto& trace : traces) {
+      const auto all = align_petri_trace_all(trace, net, options);
+      assert(!all.empty() && all.front().computed);
+      for (const auto& entry : all) assert(entry.cost == all.front().cost);
+      out.push_back(all.front().cost);
+    }
+    return out;
+  };
+  assert((costs(AlignmentVariant::kStateEquationAStar) ==
+          std::vector<double>{10000, 0, 20000, 10000}));
+  assert((costs(AlignmentVariant::kDijkstraNoHeuristics) ==
+          std::vector<double>{10000, 0, 0, 10000}));
+  assert((costs(AlignmentVariant::kGeneratorDijkstraNoHeuristics) ==
+          std::vector<double>{10000, 0, 0, 10000}));
+  assert((costs(AlignmentVariant::kDijkstraLessMemory) ==
+          std::vector<double>{0, 10000, 10000, 20000}));
+  assert((costs(AlignmentVariant::kGeneratorDijkstraLessMemory) ==
+          std::vector<double>{0, 10000, 10000, 20000}));
+  assert((costs(AlignmentVariant::kDiscountedAStar) ==
+          std::vector<double>{0.25, 0, 0, 0.125}));
+  // The log dispatcher's easy-soundness check accepts the net.
+  PetriLogAlignmentOptions log_options;
+  log_options.trace.variant = AlignmentVariant::kStateEquationAStar;
+  EventLog log;
+  for (const auto& activities : traces) {
+    Trace trace;
+    for (const auto& activity : activities) {
+      Event event;
+      event.activity = activity;
+      trace.events.push_back(event);
+    }
+    log.traces.push_back(trace);
+  }
+  const auto aligned = align_petri_log(log, net, log_options);
+  assert(aligned.size() == 4 && aligned[2].computed && aligned[2].cost == 20000.0);
+}
+
+// Round AI: the public log alignment on a BPMN model whose duplicated
+// sequence flow became the parallel arcs p2, p8, p8 -> p7, p7. Firing them
+// natively (two tokens taken from p8) leaves the bundle aligner searching
+// without end; the reference search net aligns the long trace at once.
+// Reference costs and log fitness from the public dispatcher.
+void reference_log_alignment_parallel_bpmn_flows() {
+  const auto net = compact_net(15, {"a", "b", "c", "d", "e", "f", "g"},
+      {{std::nullopt, {{12, 13}, {}}, {{3}, {}}},
+       {std::nullopt, {{0}, {}}, {{7}, {}}},
+       {std::nullopt, {{2, 8, 8}, {1, 1, 1}}, {{7, 7}, {1, 1}}},
+       {std::nullopt, {{3}, {}}, {{8}, {}}},
+       {std::nullopt, {{10}, {}}, {{11, 9}, {}}},
+       {std::nullopt, {{10}, {}}, {{14}, {}}},
+       {std::nullopt, {{9}, {}}, {{2}, {}}},
+       {std::nullopt, {{11}, {}}, {{1, 4}, {}}},
+       {0, {{9}, {}}, {{2}, {}}},
+       {1, {{7}, {}}, {{10}, {}}},
+       {2, {{1}, {}}, {{13}, {}}},
+       {3, {{11}, {}}, {{6}, {}}},
+       {4, {{4}, {}}, {{12}, {}}},
+       {5, {{6}, {}}, {{5}, {}}},
+       {6, {{5}, {}}, {{3}, {}}}});
+  EventLog log;
+  for (const std::string word : {"bdfgbecbacebdfgbdfgab", "bdfgbceb", "ab", "b"}) {
+    Trace trace;
+    for (const char activity : word) {
+      Event event;
+      event.activity = std::string(1, activity);
+      trace.events.push_back(event);
+    }
+    log.traces.push_back(trace);
+  }
+  const auto check = [&](AlignmentVariant variant, double fitness,
+                         const std::map<std::string, double>& costs) {
+    AlignmentOptions options;
+    options.variant = variant;
+    options.cost_profile = AlignmentCostProfile::kStandard;
+    const auto result = reference_log_alignment(log, net, options);
+    assert(result.computed);
+    assert(std::abs(result.fitness - fitness) < 1e-12);
+    assert(result.variants.size() == costs.size());
+    for (const auto& entry : result.variants) {
+      std::string word;
+      for (const auto& activity : entry.activities) word += activity;
+      assert(costs.at(word) == entry.cost);
+    }
+  };
+  check(AlignmentVariant::kStateEquationAStar, 0.22221728406035424,
+        {{"bdfgbecbacebdfgbdfgab", 200002}, {"bdfgbceb", 70002}, {"ab", 10002}, {"b", 2}});
+  check(AlignmentVariant::kDijkstraLessMemory, 0.74985,
+        {{"bdfgbecbacebdfgbdfgab", 5}, {"bdfgbceb", 1}, {"ab", 10000}, {"b", 0}});
+}
+
 int main() {
   weighted_marking_equation_counts_arc_objects();
+  reference_log_alignment_parallel_bpmn_flows();
   woflan_weighted_and_parallel_arcs();
   alignment_weighted_and_parallel_arcs();
+  alignment_parallel_arc_variants();
   classic_equation();
   incidence_feasible_not_realizable();
   classic_equation_requires_integer_solutions();
