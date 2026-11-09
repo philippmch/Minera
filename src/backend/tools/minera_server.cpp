@@ -1153,6 +1153,31 @@ void check_server_stochastic_visited_peak(const minera::PlayoutVisitedResult& vi
 #include "active_source_mining.hpp"
 #include "traces_route.hpp"
 
+// The order in which pm4py's DataFrame log skeleton and Declare meet and
+// list the cases of an XES input (read_xes keeps the file order; these group
+// the frame by case id). Null for other inputs, whose log already follows the
+// reference (a formatted CSV frame is sorted by case id; a native log keeps
+// its order).
+std::optional<std::vector<std::size_t>> constraint_case_order(
+    const minera::ActiveEventSource& source, const minera::EventLog& log) {
+  if (source.file().format != "xes") return std::nullopt;
+  auto order = minera::case_id_order(log);
+  bool identity = true;
+  for (std::size_t i = 0; i < order.size() && identity; ++i) identity = order[i] == i;
+  if (identity) return std::nullopt;
+  return order;
+}
+
+template <class Result>
+std::vector<Result> in_constraint_order(const std::vector<Result>& results,
+                                        const std::optional<std::vector<std::size_t>>& order) {
+  if (!order) return results;
+  std::vector<Result> ordered;
+  ordered.reserve(results.size());
+  for (const auto index : *order) ordered.push_back(results.at(index));
+  return ordered;
+}
+
 void handle_mine(const httplib::Request& request, httplib::Response& response) {
   // A multipart mine reads its controls from form fields only, so a query
   // string next to the upload would be silently ignored; reject it. (The
@@ -1401,8 +1426,13 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       batch_discovery = discover_selected_batches(log, params.batch_options);
     }
     checkpoint("Log skeleton");
-    const auto log_skeleton =
-        minera::discover_log_skeleton(log, params.log_skeleton);
+    // pm4py's DataFrame log skeleton and Declare meet an XES frame's cases in
+    // case-id order and list their conformance in it (a CSV log is already
+    // in that order); the native results stay indexed by trace.
+    const auto constraint_order = constraint_case_order(*active_source, log);
+    const auto log_skeleton = constraint_order
+        ? minera::discover_log_skeleton(log, params.log_skeleton, *constraint_order)
+        : minera::discover_log_skeleton(log, params.log_skeleton);
     const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
         log, log_skeleton, params.log_skeleton);
     checkpoint("Declare constraints");
@@ -1513,6 +1543,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         powl_log, powl_net, params.powl.activity_key, params.powl.timestamp_key, cancelled);
 
     checkpoint("Writing the response");
+    const minera::AnalysisConstraintCaseOrder constraint_list_order(
+        constraint_order ? &*constraint_order : nullptr);
     std::string body = minera::analysis_json(
         dataset, log, graph, &tree, &net, &heuristics, &conformance,
         &performance, &resources, &variant_durations, &eventually,
@@ -4217,6 +4249,12 @@ void handle_constraint_discovery(const httplib::Request& request,
     std::optional<std::vector<minera::LogSkeletonConformance>> skeleton_conformance;
     auto graph = session->log_ready ? minera::discover_directly_follows_graph(require_prepared_log(*session)) : minera::DirectlyFollowsGraph{};
     std::string diagnostics, diagnostics_error, playout_xes, playout_result, playout_error;
+    // An XES source's cases in pm4py's DataFrame order (see constraint_case_order);
+    // the diagnostics table keeps the frame's (file) order, as the reference's does.
+    const auto constraint_order = session->active_source && session->log_ready &&
+            session->active_source->selected_kind() == minera::EventDataKind::kEventLog
+        ? constraint_case_order(*session->active_source, require_prepared_log(*session))
+        : std::nullopt;
     if (family == "declare") {
       declare = minera::discover_declare(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.declare_options);
       auto options = params.declare_conformance_options; options.activity_key = conformance_activity;
@@ -4250,7 +4288,9 @@ void handle_constraint_discovery(const httplib::Request& request,
         } catch (const std::exception& error) { playout_error = error.what(); }
       }
     } else {
-      skeleton = minera::discover_log_skeleton(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.log_skeleton);
+      skeleton = constraint_order
+          ? minera::discover_log_skeleton(require_prepared_log(*session), params.log_skeleton, *constraint_order)
+          : minera::discover_log_skeleton(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.log_skeleton);
       auto options = params.log_skeleton; options.activity_key = conformance_activity;
       skeleton_conformance = minera::check_log_skeleton_conformance(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *skeleton, options);
       for (const auto* relations : {&skeleton->equivalence, &skeleton->always_after, &skeleton->always_before, &skeleton->never_together, &skeleton->directly_follows})
@@ -4264,13 +4304,15 @@ void handle_constraint_discovery(const httplib::Request& request,
       catch (const std::exception& error) { diagnostics_error = error.what(); }
     }
     std::string result = "null", result_error;
-    if (session->log_ready) try { const minera::OmitAnalysisTraces omit_traces(!analysis_include_traces(request)); result = minera::analysis_json(session->dataset, require_prepared_log(*session), graph,
+    if (session->log_ready) try { const minera::OmitAnalysisTraces omit_traces(!analysis_include_traces(request)); const minera::AnalysisConstraintCaseOrder constraint_list_order(constraint_order ? &*constraint_order : nullptr); result = minera::analysis_json(session->dataset, require_prepared_log(*session), graph,
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
       skeleton ? &*skeleton : nullptr, skeleton_conformance ? &*skeleton_conformance : nullptr,
       declare ? &*declare : nullptr, declare_conformance ? &*declare_conformance : nullptr); } catch (const std::exception& error) { result_error = error.what(); }
     const auto quote = minera::embedding_runtime::detail::escape_json;
-    const auto native_result = declare ? minera::serialize_active_source_declare_json(*declare,declare_conformance ? &*declare_conformance : nullptr) : minera::serialize_active_source_skeleton_json(*skeleton,skeleton_conformance ? &*skeleton_conformance : nullptr);
+    const auto native_result = declare
+        ? [&] { const auto ordered = in_constraint_order(*declare_conformance, constraint_order); return minera::serialize_active_source_declare_json(*declare, &ordered); }()
+        : [&] { const auto ordered = in_constraint_order(*skeleton_conformance, constraint_order); return minera::serialize_active_source_skeleton_json(*skeleton, &ordered); }();
     const auto optional_json = [](const std::string& value) { return value.empty() ? std::string("null") : value; };
     const auto optional_text = [&](const std::string& value) { return value.empty() ? std::string("null") : quote(value); };
     response.set_content("{\"family\":\"CONSTRAINT_DISCOVERY\",\"method\":" + quote(family) +

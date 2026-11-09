@@ -100,6 +100,23 @@ void duplicate_traces_and_thresholds_are_weighted() {
   assert(auto_model.rules.at(kDeclareExistence).size() == 2);
 }
 
+void self_pairs_follow_reference_comparisons() {
+  // The reference compares the last (response), first (precedence) or both
+  // (succession) occurrences of A with themselves, so a case holding A
+  // satisfies the self-pair and one without A is vacuous.
+  for (const char* family : {kDeclareResponse, kDeclarePrecedence, kDeclareSuccession}) {
+    DeclareModel model;
+    model.add(family, {"A", "A", true});
+    for (const auto& trace : {std::vector<std::string>{"A"},
+                              std::vector<std::string>{"A", "B", "A"},
+                              std::vector<std::string>{"B"}}) {
+      const auto result = check_declare_conformance(trace, model);
+      assert(result.is_fit);
+      assert(result.no_dev_total == 0);
+    }
+  }
+}
+
 void conformance_checks_direction_and_order() {
   DeclareModel model;
   model.add(kDeclareExistence, {"A", {}, false});
@@ -870,6 +887,7 @@ int main() {
   all_templates_are_named_and_filterable();
   duplicate_traces_and_thresholds_are_weighted();
   conformance_checks_direction_and_order();
+  self_pairs_follow_reference_comparisons();
   vacuity_and_empty_inputs();
   every_template_family_and_prerequisite_rules();
   directional_vacuity_and_negative_conformance();

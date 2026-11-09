@@ -55,6 +55,12 @@ struct LogSkeletonModel {
 
 [[nodiscard]] LogSkeletonModel discover_log_skeleton(
     const EventLog& log, const LogSkeletonOptions& options = {});
+// The log's traces met in the given order (positions into log.traces, each
+// once), e.g. case_id_order(log) for pm4py's DataFrame path: the order only
+// decides the activity-frequency ties.
+[[nodiscard]] LogSkeletonModel discover_log_skeleton(
+    const EventLog& log, const LogSkeletonOptions& options,
+    const std::vector<std::size_t>& trace_order);
 // Retain the pre-adapter brace-call form (for example, an empty log as `{}`).
 [[nodiscard]] LogSkeletonModel discover_log_skeleton(
     std::initializer_list<Trace> traces,

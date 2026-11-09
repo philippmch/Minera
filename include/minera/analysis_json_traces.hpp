@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
+#include <vector>
 
 namespace minera {
 
@@ -20,6 +22,22 @@ class OmitAnalysisTraces {
 
  private:
   bool previous_;
+};
+
+// While an instance lives on a thread, analysis_json writes its
+// "log_skeleton_conformance" and "declare_conformance" lists in this order of
+// the log's traces (positions into log.traces, e.g. case_id_order for pm4py's
+// DataFrame path). The results passed stay indexed by trace, and every entry
+// keeps its own trace's case id (and Declare trace_index). Null: log order.
+class AnalysisConstraintCaseOrder {
+ public:
+  explicit AnalysisConstraintCaseOrder(const std::vector<std::size_t>* order);
+  ~AnalysisConstraintCaseOrder();
+  AnalysisConstraintCaseOrder(const AnalysisConstraintCaseOrder&) = delete;
+  AnalysisConstraintCaseOrder& operator=(const AnalysisConstraintCaseOrder&) = delete;
+
+ private:
+  const std::vector<std::size_t>* previous_;
 };
 
 // The "traces" array analysis_json writes inline (from "[" to "]"), byte for

@@ -693,7 +693,36 @@ void custom_flat_selectors_have_precedence_and_group_cases() {
 }
 }  // namespace
 
+void trace_order_decides_activity_frequency_ties() {
+  // pm4py's DataFrame discovery meets the cases in case-id order; the order
+  // only decides which of equally frequent counts the noise threshold keeps.
+  const auto log = make_log({{"A"}, {"A", "A"}});
+  LogSkeletonOptions options;
+  options.noise_threshold = 0.9;  // pm4py: {1} for cases [A], [A A]; {2} reversed
+  const auto forward = discover_log_skeleton(log, options, {0, 1});
+  const auto backward = discover_log_skeleton(log, options, {1, 0});
+  assert(forward.activ_freq == discover_log_skeleton(log, options).activ_freq);
+  assert(forward.activ_freq.at("A") == std::vector<std::size_t>{1});
+  assert(backward.activ_freq.at("A") == std::vector<std::size_t>{2});
+  assert(forward.always_after == backward.always_after);
+  bool threw = false;
+  try {
+    (void)discover_log_skeleton(log, options, {0});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+  threw = false;
+  try {
+    (void)discover_log_skeleton(log, options, {0, 2});
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  assert(threw);
+}
+
 int main() {
+  trace_order_decides_activity_frequency_ties();
   const auto base = discover_log_skeleton(make_log({{"A", "B", "A"}, {"A", "B"}}));
   assert(has(base.equivalence, "A", "B") == false);
   assert(!has(base.always_after, "A", "B"));

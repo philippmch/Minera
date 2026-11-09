@@ -1567,10 +1567,18 @@ describe("mineFormEntries", () => {
       ["declare_min_support_ratio", "0.2"],
       ["declare_min_confidence_ratio", "0.7"],
     ]);
+    // Any finite ratio is sent (the reference takes out-of-range ratios).
     expect(mineFormEntries({
       declareAllowedTemplates: ["unknown"],
       declareMinSupportRatio: -0.1,
       declareMinConfidenceRatio: 1.1,
+      declareAutoSelectionMultiplier: Number.NaN,
+    })).toEqual([
+      ["declare_min_support_ratio", "-0.1"],
+      ["declare_min_confidence_ratio", "1.1"],
+    ]);
+    expect(mineFormEntries({
+      declareMinSupportRatio: Number.POSITIVE_INFINITY,
       declareAutoSelectionMultiplier: Number.NaN,
     })).toEqual([]);
     expect(mineFormEntries({ declareAllowedTemplates: [] })).toEqual([

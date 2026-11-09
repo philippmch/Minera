@@ -2024,7 +2024,43 @@ void iterparse_nested_attribute_shapes() {
   }
 }
 
+void dataframe_cases_merge_shared_ids_and_order_by_code_point() {
+  // read_xes gives one row per event: traces sharing a case id are one case
+  // (events in file order, the first trace's attributes) and an empty trace
+  // has no case.
+  const std::string xml =
+      "<log>"
+      "<trace><string key=\"concept:name\" value=\"b\"/><string key=\"k\" value=\"first\"/>"
+      "<event><string key=\"concept:name\" value=\"X\"/></event></trace>"
+      "<trace><string key=\"concept:name\" value=\"empty\"/></trace>"
+      "<trace><string key=\"concept:name\" value=\"B\"/>"
+      "<event><string key=\"concept:name\" value=\"Y\"/></event></trace>"
+      "<trace><string key=\"concept:name\" value=\"b\"/><string key=\"k\" value=\"second\"/>"
+      "<event><string key=\"concept:name\" value=\"Z\"/></event></trace>"
+      "<trace><event><string key=\"concept:name\" value=\"W\"/></event></trace>"
+      "<trace><event><string key=\"concept:name\" value=\"V\"/></event></trace>"
+      "</log>";
+  std::istringstream input(xml);
+  auto log = minera::import_xes_event_log(input);
+  minera::merge_dataframe_cases(log);
+  assert(log.traces.size() == 4);
+  assert(log.traces[0].case_id == "b");
+  assert(log.traces[0].events.size() == 2);
+  assert(log.traces[0].events[0].activity == "X" && log.traces[0].events[1].activity == "Z");
+  const auto k = std::find_if(log.traces[0].attributes.begin(), log.traces[0].attributes.end(),
+                              [](const auto& attribute) { return attribute.key == "k"; });
+  assert(k != log.traces[0].attributes.end() && k->value == "first");
+  assert(log.traces[1].case_id == "B");
+  // Traces without an id stay apart.
+  assert(log.traces[2].events[0].activity == "W" && log.traces[3].events[0].activity == "V");
+  const auto order = minera::case_id_order(log);
+  assert(log.traces[order[0]].case_id <= log.traces[order[1]].case_id);
+  assert(log.traces[order[order.size() - 2]].case_id == "B");
+  assert(log.traces[order.back()].case_id == "b");
+}
+
 int main() {
+  dataframe_cases_merge_shared_ids_and_order_by_code_point();
   unsigned_integer_boundaries_match_public_variants();
   iterparse_nested_attribute_shapes();
   {

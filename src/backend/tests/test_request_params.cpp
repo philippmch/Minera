@@ -2552,11 +2552,9 @@ void parse_mine_params_rejects_blank_declarative_selectors() {
 void parse_mine_params_rejects_invalid_declare_fields() {
   for (const auto& item : {
            std::pair{"declare_allowed_templates", "response,unknown"},
-           std::pair{"declare_min_support_ratio", "-0.1"},
-           std::pair{"declare_min_support_ratio", "1.1"},
            std::pair{"declare_min_support_ratio", "nan"},
            std::pair{"declare_min_confidence_ratio", "inf"},
-           std::pair{"declare_auto_selection_multiplier", "2"}}) {
+           std::pair{"declare_auto_selection_multiplier", "-inf"}}) {
     bool threw = false;
     try {
       (void)minera::parse_mine_params(fields({item}));
@@ -2565,6 +2563,15 @@ void parse_mine_params_rejects_invalid_declare_fields() {
     }
     assert(threw);
   }
+  // pm4py accepts any finite ratio or multiplier; out-of-range values only
+  // change which rules pass.
+  const auto outside = minera::parse_mine_params(fields({
+      {"declare_min_support_ratio", "-0.1"},
+      {"declare_min_confidence_ratio", "1.1"},
+      {"declare_auto_selection_multiplier", "2"}}));
+  assert(outside.declare_options.min_support_ratio == -0.1);
+  assert(outside.declare_options.min_confidence_ratio == 1.1);
+  assert(outside.declare_options.auto_selection_multiplier == 2.0);
 }
 
 void parse_mine_params_maps_footprints_options() {

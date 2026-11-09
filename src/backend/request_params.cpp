@@ -3367,11 +3367,9 @@ MineParams parse_mine_params(const FieldLookup& field,
                                        bool& has_value) {
     const auto value = field(field_name);
     if (value.empty()) return;
+    // Any finite ratio, as the reference takes it: a value outside [0, 1]
+    // only changes which rules pass.
     destination = parse_finite_double(value, field_name);
-    if (destination < 0.0 || destination > 1.0) {
-      throw std::invalid_argument(std::string(field_name) +
-                                  ": expected 0 <= value <= 1");
-    }
     has_value = true;
   };
   parse_declare_ratio("declare_min_support_ratio",
@@ -3384,11 +3382,6 @@ MineParams parse_mine_params(const FieldLookup& field,
       !value.empty()) {
     params.declare_options.auto_selection_multiplier =
         parse_finite_double(value, "declare_auto_selection_multiplier");
-    if (params.declare_options.auto_selection_multiplier < 0.0 ||
-        params.declare_options.auto_selection_multiplier > 1.0) {
-      throw std::invalid_argument(
-          "declare_auto_selection_multiplier: expected 0 <= value <= 1");
-    }
   }
 
   const auto parse_footprints_set =

@@ -1356,10 +1356,9 @@ export function mineFormEntries(options: MineOptions): Array<[string, string]> {
       add("declare_allowed_templates", selectedDeclareTemplates.join(","));
     }
   }
+  // Any finite ratio, as the reference takes it.
   const declareRatio = (value: number | undefined) =>
-    value !== undefined && Number.isFinite(value) && value >= 0 && value <= 1
-      ? String(value)
-      : undefined;
+    value !== undefined && Number.isFinite(value) ? String(value) : undefined;
   const support = declareRatio(options.declareMinSupportRatio);
   const confidence = declareRatio(options.declareMinConfidenceRatio);
   const multiplier = declareRatio(options.declareAutoSelectionMultiplier);

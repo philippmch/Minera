@@ -231,7 +231,14 @@ minera::ActiveEventSource prepare_active_event_source(
     if (format == "table")
       return minera::ActiveEventSource::from_table(minera::parse_event_table_json(bytes), std::move(file), selectors, kind);
     std::istringstream input(bytes);
-    if (xes) return minera::ActiveEventSource::from_log(minera::import_xes_event_log(input, params.xes), std::move(file), selectors, kind);
+    if (xes) {
+      auto log = minera::import_xes_event_log(input, params.xes);
+      // An XES input follows pm4py's read_xes frame: traces that share a case
+      // id are one case and a trace without events is no case. The flat
+      // shapes group the frame's rows themselves.
+      if (kind == minera::EventDataKind::kEventLog) minera::merge_dataframe_cases(log);
+      return minera::ActiveEventSource::from_log(std::move(log), std::move(file), selectors, kind);
+    }
     try {
       auto data = minera::import_csv_event_data(input, params.csv);
       bind_imported_csv_source_selectors(data, params.csv, literal, selectors);

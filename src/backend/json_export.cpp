@@ -273,12 +273,26 @@ void write_log_skeleton_model(std::ostream& out,
   out << "}}";
 }
 
+// AnalysisConstraintCaseOrder's order for the constraint lists (null: log
+// order).
+thread_local const std::vector<std::size_t>* t_constraint_case_order = nullptr;
+
+// The trace position of the k-th constraint-list entry.
+std::size_t constraint_list_trace(std::size_t k, std::size_t count) {
+  const auto* order = t_constraint_case_order;
+  if (order == nullptr) return k;
+  if (order->size() != count)
+    throw std::invalid_argument("constraint case order does not list every result");
+  return (*order)[k];
+}
+
 void write_log_skeleton_conformance(
     std::ostream& out, const EventLog& log,
     const std::vector<LogSkeletonConformance>& conformance,
     const DirectlyFollowsGraph& graph) {
   out << '[';
-  for (std::size_t i = 0; i < conformance.size(); ++i) {
+  for (std::size_t n = 0; n < conformance.size(); ++n) {
+    const auto i = constraint_list_trace(n, conformance.size());
     const auto& result = conformance[i];
     out << "{\"case_id\": ";
     write_json_string(out, log.traces[i].case_id);
@@ -318,7 +332,7 @@ void write_log_skeleton_conformance(
         << ", \"dev_fitness\": ";
     write_round_trip_double(out, result.dev_fitness);
     out << ", \"is_fit\": " << (result.is_fit ? "true" : "false") << '}'
-        << (i + 1 < conformance.size() ? ", " : "");
+        << (n + 1 < conformance.size() ? ", " : "");
   }
   out << ']';
 }
@@ -506,9 +520,10 @@ void write_declare_conformance(
     const std::vector<DeclareConformance>& conformance,
     const DirectlyFollowsGraph& graph) {
   out << '[';
-  for (std::size_t i = 0; i < conformance.size(); ++i) {
+  for (std::size_t n = 0; n < conformance.size(); ++n) {
+    const auto i = constraint_list_trace(n, conformance.size());
     const auto& result = conformance[i];
-    if (i != 0) out << ", ";
+    if (n != 0) out << ", ";
     out << "{\"trace_index\": " << i << ", \"case_id\": ";
     write_json_string(out, log.traces[i].case_id);
     out << ", \"deviations\": [";
@@ -4370,6 +4385,16 @@ OmitAnalysisTraces::OmitAnalysisTraces(bool omit)
 
 OmitAnalysisTraces::~OmitAnalysisTraces() {
   t_omit_analysis_traces = previous_;
+}
+
+AnalysisConstraintCaseOrder::AnalysisConstraintCaseOrder(
+    const std::vector<std::size_t>* order)
+    : previous_(t_constraint_case_order) {
+  t_constraint_case_order = order;
+}
+
+AnalysisConstraintCaseOrder::~AnalysisConstraintCaseOrder() {
+  t_constraint_case_order = previous_;
 }
 
 namespace {

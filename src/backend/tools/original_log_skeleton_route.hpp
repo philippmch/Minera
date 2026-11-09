@@ -237,7 +237,11 @@ void handle_original_log_skeleton_workbench(const httplib::Request& request,
     const auto input_after = input_snapshot();
     const std::string results_after = provided_results ? minera::serialize_log_skeleton_workbench_conformance_json(*provided_results) : "null";
     const std::string result_json = scalar ? "{\"type\":\"conformance\",\"value\":" + minera::serialize_log_skeleton_workbench_conformance_json(*scalar) + '}' :
-      conformances ? "{\"type\":\"conformance_vector\",\"value\":" + minera::serialize_log_skeleton_workbench_conformance_json(*conformances) + '}' :
+      conformances ? "{\"type\":\"conformance_vector\",\"value\":" + minera::serialize_log_skeleton_workbench_conformance_json(
+          // An XES source's list in pm4py's DataFrame case order; the derived
+          // diagnostics table keeps the frame's (file) order.
+          in_constraint_order(*conformances, source && source->selected_kind() == minera::EventDataKind::kEventLog
+              ? constraint_case_order(*source, source->checked_log()) : std::nullopt)) + '}' :
       variant_conformance ? "{\"type\":\"variant_conformance\",\"value\":" + minera::serialize_log_skeleton_workbench_conformance_json(*variant_conformance) + '}' :
       primary_diagnostics ? "{\"type\":\"diagnostics\",\"value\":" + minera::serialize_event_table_input_json(*primary_diagnostics) + '}' : "null";
     const auto members_json = [&](const std::set<std::string>& members) {

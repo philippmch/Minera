@@ -7217,11 +7217,19 @@ void detail::forward_token_prefix_walk_impl(
   // once per distinct marking. The outcome is that of one pass which searched
   // each marking when first reached and visited each prefix in turn:
   //  - the walk interns each prefix's reached marking and stops at the first
-  //    exception it raises (after the prefixes before it);
-  //  - the searches are independent of each other. A long walk hands them to
-  //    up to three more threads as their markings appear, each thread with
-  //    its own Replayer (whose caches are per instance); the calling thread
-  //    walks, then searches too, and alone polls for cancellation;
+  //    exception it raises (after the prefixes before it), or once a search
+  //    has failed: nothing past the prefix that first reached the failed
+  //    marking can change which exception the pass raises;
+  //  - the searches are independent of each other. The calling thread
+  //    searches each new marking as the walk reaches it until helper threads
+  //    start: a long walk hands its later markings to up to three more
+  //    threads, each with its own Replayer (whose caches are per instance),
+  //    and the calling thread walks, then searches too, and alone polls for
+  //    cancellation;
+  //  - a helper that cannot run (its Replayer or a search runs out of memory,
+  //    or any other failure of its own) drops out and leaves the marking it
+  //    held to the calling thread, so helpers never change the outcome: only
+  //    the calling thread's searches raise, as in the single pass;
   //  - the visits then run in prefix order, rethrowing a search's exception
   //    at the prefix that first reached its marking, and the walk's own
   //    exception last — the order the single pass raises them.
@@ -7234,6 +7242,7 @@ void detail::forward_token_prefix_walk_impl(
   unfit.reserve(capacity);
   std::exception_ptr walk_error;
 
+  constexpr std::size_t kNone = std::numeric_limits<std::size_t>::max();
   std::vector<std::uint32_t> list_of(capacity, 0);
   std::vector<std::exception_ptr> failure(capacity);
   std::deque<std::vector<std::size_t>> lists;
@@ -7242,22 +7251,59 @@ void detail::forward_token_prefix_walk_impl(
   std::atomic<std::size_t> published{0};  // markings interned and readable
   std::atomic<bool> walk_done{false};
   std::atomic<std::size_t> next_search{0};
-  std::atomic<std::size_t> first_failed{std::numeric_limits<std::size_t>::max()};
+  std::atomic<std::size_t> first_failed{kNone};
   std::atomic<bool> stop_searches{false};
   std::mutex wait_mutex;
   std::condition_variable wake;
-  std::exception_ptr worker_error;
+  // Searches marking `id`, keeping its list or its failure. A helper's
+  // std::bad_alloc propagates instead (the helper drops out).
+  const auto search_one = [&](const Replayer& searcher,
+                              std::optional<Replayer::ForwardEnabledPlan>& plan,
+                              TokenMarking& marking, std::size_t id, bool helper) {
+    const auto keep_failure = [&] {
+      failure[id] = std::current_exception();
+      auto lowest = first_failed.load();
+      while (id < lowest && !first_failed.compare_exchange_weak(lowest, id)) {}
+    };
+    try {
+      pool.decode(id, marking);
+      auto list = searcher.enabled_transition_ids(marking, options, std::nullopt, &plan);
+      const std::lock_guard<std::mutex> lock(lists_mutex);
+      const auto [it, added] =
+          list_ids.try_emplace(std::move(list), static_cast<std::uint32_t>(lists.size()));
+      if (added) {
+        try {
+          lists.push_back(it->first);
+        } catch (...) {
+          list_ids.erase(it);
+          throw;
+        }
+      }
+      list_of[id] = it->second;
+    } catch (const std::bad_alloc&) {
+      if (helper) throw;
+      keep_failure();
+    } catch (...) {
+      keep_failure();
+    }
+  };
+  // Takes markings in id order until none is left. `holding`, for a helper,
+  // names the marking it has taken and not finished (kNone otherwise).
   const auto search_all = [&](const Replayer& searcher,
                               std::optional<Replayer::ForwardEnabledPlan>& plan,
-                              CancellationCheck* check) {
+                              CancellationCheck* check, std::size_t* holding) {
     TokenMarking marking;
     for (;;) {
       if (stop_searches.load()) return;
       const std::size_t id = next_search.fetch_add(1);
+      if (holding) *holding = id;
       // Wait for the walk to reach the id's marking, or to end short of it.
       while (id >= published.load(std::memory_order_acquire)) {
         if (walk_done.load(std::memory_order_acquire)) {
-          if (id >= published.load(std::memory_order_acquire)) return;
+          if (id >= published.load(std::memory_order_acquire)) {
+            if (holding) *holding = kNone;
+            return;
+          }
           break;
         }
         std::unique_lock<std::mutex> lock(wait_mutex);
@@ -7269,20 +7315,8 @@ void detail::forward_token_prefix_walk_impl(
       }
       if (check) (*check)();
       // A search past the lowest failed one is never read.
-      if (id > first_failed.load()) continue;
-      try {
-        pool.decode(id, marking);
-        auto list = searcher.enabled_transition_ids(marking, options, std::nullopt, &plan);
-        const std::lock_guard<std::mutex> lock(lists_mutex);
-        const auto [it, added] =
-            list_ids.try_emplace(std::move(list), static_cast<std::uint32_t>(lists.size()));
-        if (added) lists.push_back(it->first);
-        list_of[id] = it->second;
-      } catch (...) {
-        failure[id] = std::current_exception();
-        auto lowest = first_failed.load();
-        while (id < lowest && !first_failed.compare_exchange_weak(lowest, id)) {}
-      }
+      if (id <= first_failed.load()) search_one(searcher, plan, marking, id, holding != nullptr);
+      if (holding) *holding = kNone;
     }
   };
   {
@@ -7290,9 +7324,13 @@ void detail::forward_token_prefix_walk_impl(
     // threads in all. Each builds its own Replayer and keeps the caller's
     // silent-search budget.
     constexpr std::size_t kSearchesPerThread = 2048;
+    constexpr std::size_t kMaxWorkers = 3;
     const std::size_t hardware = std::max<std::size_t>(1, std::thread::hardware_concurrency());
-    const std::size_t max_workers = std::min<std::size_t>(3, hardware - 1);
+    const std::size_t max_workers = std::min<std::size_t>(kMaxWorkers, hardware - 1);
     const std::size_t budget = detail::enabled_search_budget();
+    // dropped[k]: the marking helper k held when it dropped out, or kNone.
+    std::atomic<std::size_t> dropped[kMaxWorkers];
+    for (auto& slot : dropped) slot.store(kNone);
     std::vector<std::thread> workers;
     struct JoinAll {
       std::vector<std::thread>& threads;
@@ -7314,33 +7352,36 @@ void detail::forward_token_prefix_walk_impl(
       while (!spawn_failed && workers.size() < max_workers &&
              pool.size() >= (workers.size() + 1) * kSearchesPerThread) {
         try {
-          workers.emplace_back([&] {
+          workers.emplace_back([&, slot = &dropped[workers.size()]] {
+            std::size_t holding = kNone;
             try {
               const detail::ScopedEnabledSearchBudget scoped(budget);
               const Replayer searcher(net, options.initial_marking, options.final_marking,
                                       &options, true);
               std::optional<Replayer::ForwardEnabledPlan> plan;
-              search_all(searcher, plan, nullptr);
+              search_all(searcher, plan, nullptr, &holding);
             } catch (...) {
-              // Not a search's own failure (those are kept per marking): a
-              // thread that stops here may leave its marking unsearched.
-              const std::lock_guard<std::mutex> lock(lists_mutex);
-              if (!worker_error) worker_error = std::current_exception();
-              stop_searches.store(true);
+              // The helper's own failure, not a search's: it drops out.
             }
+            slot->store(holding);
           });
-        } catch (const std::system_error&) {
+        } catch (...) {
           spawn_failed = true;  // fewer threads; the calling thread takes the rest
         }
       }
     };
 
+    std::optional<Replayer::ForwardEnabledPlan> enabled_plan;
+    TokenMarking searched;
     auto state = replayer.start_prefix_walk();
     std::size_t current = 0;
     bool stopped = false;
     std::vector<std::size_t> path;
     CancellationCheck cancelled(options.cancelled, "token replay was cancelled", 64);
     for (std::size_t index = 0; index < capacity; ++index) {
+      // A failed search ends the pass at the prefix that first reached its
+      // marking, which the walk has passed.
+      if (first_failed.load() != kNone) break;
       cancelled();
       try {
         const auto target = trie.scored[index];
@@ -7375,7 +7416,15 @@ void detail::forward_token_prefix_walk_impl(
         const auto before = pool.size();
         reached.push_back(pool.intern(state.marking));
         unfit.push_back(stopped ? 1 : 0);
-        if (pool.size() != before && pool.size() % 64 == 0) publish();
+        if (pool.size() != before) {
+          // Until helpers run, the calling thread searches a marking when
+          // the walk first reaches it.
+          if (workers.empty()) {
+            const std::size_t id = next_search.fetch_add(1);
+            search_one(replayer, enabled_plan, searched, id, false);
+          }
+          if (pool.size() % 64 == 0) publish();
+        }
       } catch (const OperationCancelled&) {
         throw;
       } catch (...) {
@@ -7386,10 +7435,17 @@ void detail::forward_token_prefix_walk_impl(
     publish();
     walk_done.store(true, std::memory_order_release);
     wake.notify_all();
-    std::optional<Replayer::ForwardEnabledPlan> enabled_plan;
-    search_all(replayer, enabled_plan, &cancelled);
+    search_all(replayer, enabled_plan, &cancelled, nullptr);
     for (auto& thread : workers) thread.join();
-    if (worker_error) std::rethrow_exception(worker_error);
+    // The markings helpers dropped, searched here in id order.
+    std::vector<std::size_t> left;
+    for (const auto& slot : dropped)
+      if (const auto id = slot.load(); id != kNone) left.push_back(id);
+    std::sort(left.begin(), left.end());
+    for (const auto id : left) {
+      cancelled();
+      if (id <= first_failed.load()) search_one(replayer, enabled_plan, searched, id, false);
+    }
   }
 
   std::size_t first_new = 0;

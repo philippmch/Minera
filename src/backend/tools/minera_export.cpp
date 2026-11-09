@@ -4955,9 +4955,9 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       if (!value) return usage(argv[0]);
       char* end = nullptr;
       const double parsed = std::strtod(value, &end);
-      if (end == value || *end != '\0' || !std::isfinite(parsed) ||
-          parsed < 0.0 || parsed > 1.0) {
-        std::cerr << "error: " << arg << " expects a finite value in [0,1]\n";
+      // Any finite value, as the reference takes it.
+      if (end == value || *end != '\0' || !std::isfinite(parsed)) {
+        std::cerr << "error: " << arg << " expects a finite value\n";
         return 2;
       }
       if (arg == "--declare-min-support-ratio") {

@@ -30,10 +30,13 @@ export function constraintQuery(family: ConstraintFamily, form: ConstraintForm, 
     if (form.templates.some(name => !allowed.includes(name))) throw new Error("Select a supported constraint family.");
     q.set(family === "declare" ? "declare_allowed_templates" : "log_skeleton_constraints", form.templates.join(","));
   }
-  const ratio = (key: string, text: string) => {
+  // The noise threshold stays in [0,1] (declared); Declare ratios take any
+  // finite value, as the reference does.
+  const ratio = (key: string, text: string, bounded = true) => {
     if (!text.trim()) return;
     const number = Number(text);
-    if (!Number.isFinite(number) || number < 0 || number > 1) throw new Error("Thresholds must be finite numbers in [0,1].");
+    if (!Number.isFinite(number)) throw new Error("Thresholds must be finite numbers.");
+    if (bounded && (number < 0 || number > 1)) throw new Error("Thresholds must be finite numbers in [0,1].");
     q.set(key,text.trim());
   };
   if (family === "declare") {
@@ -41,7 +44,7 @@ export function constraintQuery(family: ConstraintFamily, form: ConstraintForm, 
       if (form.activitiesMode === "literal_json") q.set("declare_considered_activities_json", discoveryStringVectorJson(parseDiscoveryStringVector(form.activitiesJson, "Declare considered activities"), "Declare considered activities"));
       else q.set("declare_considered_activities", form.activities.split(",").map(x=>x.trim()).filter(Boolean).join(","));
     }
-    ratio("declare_min_support_ratio",form.support); ratio("declare_min_confidence_ratio",form.confidence); ratio("declare_auto_selection_multiplier",form.multiplier);
+    ratio("declare_min_support_ratio",form.support,false); ratio("declare_min_confidence_ratio",form.confidence,false); ratio("declare_auto_selection_multiplier",form.multiplier,false);
     if (form.generateLog) {
       q.set("generate_log","true");
       for (const [key,text] of [["traces",form.traces],["min_length",form.minimum],["max_length",form.maximum],["seed",form.seed]] as const) {

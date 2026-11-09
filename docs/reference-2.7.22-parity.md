@@ -20119,3 +20119,98 @@ stages are unchanged.
 the threaded searches brought "Inductive net: token replay" on 2,000 cases
 down to about 1 s, and this keeps it the longest stage (about 3 s). It passed
 5 runs in a row.
+
+## Review AE2: log skeleton and Declare on XES frames, self-pairs, ratios (2026-11-09)
+
+Random logs (1-12 cases, 1-7 activities, numeric, text and odd case ids,
+padded and empty names, shuffled rows, out-of-order events, XES traces that
+share a case id and empty traces) were run through `/api/mine`,
+`/api/discover-constraints` and the original log-skeleton and Declare
+workbenches, and compared with pm4py 2.7.22 public calls on the
+`read_csv` + `format_dataframe` frame and the `read_xes` frame. Results after
+the fixes: own-model runs (600 logs, a third XES: discovery, conformance lists and
+their case order, diagnostics and their order, `/api/mine` defaults) 0
+undeclared differences; supplied models with self-pairs (450 logs) 0; Declare
+ratios and multipliers inside and outside [0, 1] (400 CSV logs) 0; the only
+remaining differences are 28 + 22 XES logs of AE2-10 (Declare only). A sample of other
+`/api/mine` sections on 300 XES logs with shared ids (case counts,
+start and end activities, variants as counts, rework, eventually-follows,
+case durations) matches `read_xes` apart from the declared "XES events out of
+time order" edges (106 logs); the tree before this change gave a different case count on 117 of them,
+and the other sections differed with it.
+
+Fixed:
+
+- **AE2-1 XES traces that share a case id are one case.** `read_xes` gives
+  one row per event, so pm4py's frame algorithms see traces that share
+  `case:concept:name` as one case (their events in file order, the first
+  trace's attributes; a key only a later trace holds is not taken) and never
+  see a trace without events. The active-source import of an XES file (the
+  log shape: `/api/mine`, `/api/discover-constraints`, the workbenches and
+  other routes reading an imported XES source) now merges such traces and
+  drops empty ones (`merge_dataframe_cases`). Traces with a null or missing
+  id stay apart. Native log JSON, table shapes of an XES upload and
+  `minera_export` reading XES are unchanged.
+- **AE2-2 Case order of log-skeleton and Declare lists on XES.** pm4py's
+  frame conformance (log skeleton, Declare) lists cases in the stable
+  code-point order of their ids, as the CSV path already gave (its frame is
+  sorted by case). On XES the `log_skeleton_conformance` and
+  `declare_conformance` lists of `/api/mine` and `/api/discover-constraints`
+  and the workbench conformance results now follow that order (each entry
+  keeps its own case id and Declare `trace_index`), and log-skeleton
+  discovery meets the cases in it, so `activ_freq` ties resolve as pm4py's.
+  Diagnostics tables stay in file order, as `return_diagnostics_dataframe`
+  gives them. Other sections keep file order.
+- **AE2-3 Self-pairs in `response`, `precedence`, `succession`.** For a
+  supplied rule (a, a), pm4py compares the last a with the last a (response),
+  the first with the first (precedence), both (succession), so a case that
+  contains a satisfies it; native needed a later (earlier) occurrence and
+  reported a deviation. Native now uses the same comparisons (`<=`) for these
+  three templates. Discovery never proposes self-pairs, on either side.
+- **AE2-4 Empty diagnostics tables.** For a log without cases pm4py's
+  diagnostics DataFrame of both conformance checks has no columns; native
+  listed the column names. Native now returns no columns there.
+- **AE2-5 Declare ratios outside [0, 1].** pm4py accepts any
+  `min_support_ratio`, `min_confidence_ratio` and `auto_selection_multiplier`
+  (a negative or above-1 value only changes which rules pass). The server
+  (`declare_min_support_ratio`, `declare_min_confidence_ratio`,
+  `declare_auto_selection_multiplier`), `minera_export` and the UI rejected
+  values outside [0, 1]; they now accept any finite value with pm4py's
+  results. The log-skeleton noise threshold keeps its declared [0, 1] range.
+
+Declared:
+
+- **AE2-6 Declare keys with an empty activity name.** pm4py's Declare
+  discovery stores a binary rule (X, '') under the plain key 'X', and its own conformance then
+  raises IndexError on that model. Native keeps the pair (X, '') in the model
+  and checks it as a binary rule. Not reproduced.
+- **AE2-7 XES without timestamps.** pm4py's frame algorithms refuse a frame
+  without a timestamp column ("the dataframe should (at least) contain a
+  column of type date"). Native mines an untimed XES log in file order, as it
+  keeps CSV files whose timestamp column holds no date (see "CSV rows without
+  a timestamp are dropped"): a deliberate extension.
+- **AE2-8 Merged cases out of time order.** A case merged from traces that
+  share an id keeps file order, as `convert_to_event_log` and pm4py's
+  start/end activities give it; pm4py's DataFrame DFG sorts the case by
+  timestamp. This is the declared "XES events out of time order" difference.
+- **AE2-9 One deviation per pair.** A log-skeleton deviation is native's one
+  entry per violated pair; pm4py groups a constraint's violated pairs in one
+  tuple. Counts and pairs compare equal after expansion.
+- **AE2-10 Shared ids on non-adjacent traces.** When the traces that share
+  an id are not adjacent in the file, pm4py's frame variants
+  (`get_variants`) and its Declare discovery and conformance read the wrong
+  rows: each case as many rows as it has events, starting at its first
+  row, so they take events of the traces that follow it (traces `14: x`,
+  `30: b`, `16: ü`, ..., `14: b b` give case 14 the variant `x, b, ü`).
+  Its log skeleton, start/end activities, DFG and `convert_to_event_log` see
+  the merged case. Native uses the merged case everywhere (AE2-1).
+
+Tests: `minera_xes_io_tests`
+(`dataframe_cases_merge_shared_ids_and_order_by_code_point`),
+`minera_log_skeleton_tests` (`trace_order_decides_activity_frequency_ties`),
+`minera_declare_tests` (`self_pairs_follow_reference_comparisons`),
+`minera_request_params_tests`, frontend `app-logic.test.ts`. The workbench
+fixture manifests with XES inputs replay unchanged, and
+`minera_mining_fast_path_equivalence_tests` keeps its pins (it runs the
+library on native logs, and discovered models hold no response, precedence or
+succession self-pairs, so AE2-3 does not reach it).

@@ -633,6 +633,20 @@ struct EventLog {
   }
 };
 
+// The cases of pm4py's read_xes frame: the frame holds one row per event, so
+// a trace without events has no case, and traces that share a present case
+// id are one case (its events in file order, the trace attributes of the
+// first such trace, as converting the frame to a log takes them). Cases keep
+// the order of their first trace; traces with a null or missing id are kept
+// apart.
+void merge_dataframe_cases(EventLog& log);
+
+// The positions of the log's traces in the stable code-point order of their
+// case ids: the order in which pm4py's DataFrame conformance lists (log
+// skeleton, Declare) give their cases, and in which its log-skeleton
+// discovery meets them.
+[[nodiscard]] std::vector<std::size_t> case_id_order(const EventLog& log);
+
 inline void copy_event_log_context(const EventLog& source, EventLog& target) {
   target.attributes = source.attributes;
   target.metadata = source.metadata;

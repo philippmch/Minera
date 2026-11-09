@@ -1176,7 +1176,7 @@ export function Filters({
   const toDeclareRatio = (value: string) => {
     if (value.trim() === "") return undefined;
     const n = Number(value);
-    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : undefined;
+    return Number.isFinite(n) ? n : undefined;
   };
   const toDeclareActivities = (value: string) => {
     const names = value.split(",").map((name) => name.trim()).filter(Boolean);

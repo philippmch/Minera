@@ -608,6 +608,23 @@ LogSkeletonModel discover_log_skeleton(const EventLog& log,
   return discover_from_variants(variants.finish(), options);
 }
 
+LogSkeletonModel discover_log_skeleton(const EventLog& log,
+                                       const LogSkeletonOptions& options,
+                                       const std::vector<std::size_t>& trace_order) {
+  validate_activity_key(options.activity_key);
+  if (trace_order.size() != log.traces.size())
+    throw std::invalid_argument("log skeleton: trace order must list every trace once");
+  VariantCollector variants;
+  std::vector<const std::string*> sequence;
+  for (const auto index : trace_order) {
+    if (index >= log.traces.size())
+      throw std::invalid_argument("log skeleton: trace order position out of range");
+    selected_activities(log.traces[index], options.activity_key, sequence);
+    variants.add(sequence);
+  }
+  return discover_from_variants(variants.finish(), options);
+}
+
 LogSkeletonModel discover_log_skeleton(
     std::initializer_list<Trace> traces, const LogSkeletonOptions& options) {
   EventLog log;
@@ -1037,8 +1054,11 @@ EventTable make_diagnostics_table(
     throw std::invalid_argument(
         "log skeleton diagnostics: result count does not match trace count");
   EventTable table;
-  table.columns = {"case_id", "no_dev_total", "no_constr_total",
-                   "dev_fitness"};
+  // The reference builds its frame from the result rows, so an empty log
+  // gives a frame without columns.
+  if (!results.empty())
+    table.columns = {"case_id", "no_dev_total", "no_constr_total",
+                     "dev_fitness"};
   table.rows.reserve(results.size());
   for (std::size_t index = 0; index < results.size(); ++index) {
     auto case_id =

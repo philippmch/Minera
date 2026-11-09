@@ -768,9 +768,14 @@ class DeclareChecker {
           case 3: holds = !in(a) || in(b); break;
           case 4: holds = in(a) == in(b); break;
           case 5: holds = !(in(a) && in(b)); break;
-          case 6: holds = !in(a) || (in(b) && at(a).back() < at(b).back()); break;
-          case 7: holds = !in(b) || (in(a) && at(a).front() < at(b).front()); break;
-          case 8: holds = (!in(a) && !in(b)) || ordered(a, b); break;
+          // A self-pair (a, a) of a supplied model always holds, as in the
+          // reference: its last (first) a is not after (before) itself.
+          case 6: holds = !in(a) || (in(b) && at(a).back() <= at(b).back()); break;
+          case 7: holds = !in(b) || (in(a) && at(a).front() <= at(b).front()); break;
+          case 8:
+            holds = (!in(a) && !in(b)) ||
+                    (in(a) && in(b) && at(a).front() <= at(b).front() && at(a).back() <= at(b).back());
+            break;
           case 9: holds = alt_response_positions(at(a), at(b), length); break;
           case 10: holds = chain_response(a, b); break;
           case 11: holds = alt_precedence_positions(at(a), at(b)); break;
@@ -1024,8 +1029,11 @@ EventTable make_diagnostics_table(
     throw std::invalid_argument(
         "declare diagnostics: result count does not match trace count");
   EventTable table;
-  table.columns = {"case_id", "no_dev_total", "no_constr_total",
-                   "dev_fitness"};
+  // The reference builds its frame from the result rows, so an empty log
+  // gives a frame without columns.
+  if (!results.empty())
+    table.columns = {"case_id", "no_dev_total", "no_constr_total",
+                     "dev_fitness"};
   table.rows.reserve(results.size());
   for (std::size_t index = 0; index < results.size(); ++index) {
     auto id = trace_case_attribute(log.traces[index], options.case_id_key);

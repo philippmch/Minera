@@ -3,7 +3,10 @@
 #include <algorithm>
 #include <cstddef>
 #include <numeric>
+#include <iterator>
 #include <optional>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "minera/timestamp.hpp"
@@ -91,6 +94,39 @@ void order_events_by_exact_time(std::vector<Event>& events) {
   sorted.reserve(events.size());
   for (const std::size_t i : order) sorted.push_back(std::move(events[i]));
   events = std::move(sorted);
+}
+
+void merge_dataframe_cases(EventLog& log) {
+  std::unordered_map<std::string, std::size_t> case_of;
+  std::vector<Trace> cases;
+  cases.reserve(log.traces.size());
+  for (auto& trace : log.traces) {
+    if (trace.events.empty()) continue;
+    const bool present = trace.case_id_state == FirstClassAttributeState::kPresent ||
+                         (trace.case_id_state == FirstClassAttributeState::kMissing &&
+                          !trace.case_id.empty());
+    if (present) {
+      const auto [found, added] = case_of.try_emplace(trace.case_id, cases.size());
+      if (!added) {
+        auto& events = cases[found->second].events;
+        events.insert(events.end(), std::make_move_iterator(trace.events.begin()),
+                      std::make_move_iterator(trace.events.end()));
+        continue;
+      }
+    }
+    cases.push_back(std::move(trace));
+  }
+  // Appending keeps a merged case's events in the frame's row (file) order.
+  log.traces = std::move(cases);
+}
+
+std::vector<std::size_t> case_id_order(const EventLog& log) {
+  std::vector<std::size_t> order(log.traces.size());
+  std::iota(order.begin(), order.end(), std::size_t{0});
+  std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+    return log.traces[a].case_id < log.traces[b].case_id;
+  });
+  return order;
 }
 
 }  // namespace minera
