@@ -41,7 +41,7 @@ export function FootprintsModel({ data, footprints, title = "Footprints" }: Prop
     <div className="model-card-header"><div><p className="eyebrow">Aggregate discovery</p><h2>{title}</h2></div></div>
     {available.length ? <>
       <div className="map-mode" role="tablist" aria-label="Footprints discovery variant">
-        {available.map((variant) => <button key={variant} role="tab" aria-selected={selected === variant} className={selected === variant ? "mode-btn active" : "mode-btn"} onClick={() => setSelected(variant)}>{variant.replaceAll("_", " ")}</button>)}
+        {available.map((variant) => <button key={variant} role="tab" aria-selected={selected === variant} className={selected === variant ? "mode-btn active" : "mode-btn"} aria-pressed={selected === variant} onClick={() => setSelected(variant)}>{variant.replaceAll("_", " ")}</button>)}
       </div>
       {selectedVariant === "trace_by_trace"
         ? <TraceDiscovery data={data} rows={traceDiscovery} />

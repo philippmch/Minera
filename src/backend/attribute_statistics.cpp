@@ -299,9 +299,12 @@ AttributeStatisticsResult discover_attribute_statistics(
     if (!row.key) continue;
     const std::string* text = row.text;
     if (ints_as_floats && row.key->second == "int") {
+      // The float64 cell holds the int rounded to a double, so ints that
+      // round alike are one key (2^53 + 1 and 2^53; review Z1-2).
+      const double number = std::strtod(row.key->first.c_str() + 2, nullptr);
+      row.key->first = "n:" + exact_integer(number);
       row.key->second = "float";
-      float_texts.push_back(python_float_repr(
-          std::strtod(row.key->first.c_str() + 2, nullptr)));
+      float_texts.push_back(python_float_repr(number));
       text = &float_texts.back();
     }
     if (options.scope == AttributeStatisticsScope::kEvents &&
@@ -329,11 +332,33 @@ AttributeStatisticsResult discover_attribute_statistics(
       else level_others = true;
     }
     if (level_ints && level_floats && !level_others) {
-      for (auto& entry : result.entries) {
-        if (entry.type != "int") continue;
-        entry.type = "float";
-        entry.value = python_float_repr(std::strtod(entry.value.c_str(), nullptr));
+      // Each int key becomes its rounded double, merging keys that round
+      // alike (counts added, the earlier first group kept; review Z1-2).
+      std::vector<std::string> keys(result.entries.size());
+      for (const auto& [key, at] : tally.index) keys[at] = key;
+      Tally merged;
+      AttributeStatisticsResult merged_result;
+      merged.result = &merged_result;
+      for (std::size_t i = 0; i < result.entries.size(); ++i) {
+        auto entry = std::move(result.entries[i]);
+        auto key = std::move(keys[i]);
+        if (entry.type == "int") {
+          const double number = std::strtod(key.c_str() + 2, nullptr);
+          key = "n:" + exact_integer(number);
+          entry.type = "float";
+          entry.value = python_float_repr(number);
+        }
+        const auto at = merged.add({key, entry.type}, entry.value, entry.count);
+        if (i < tally.first_group.size()) {
+          if (at == merged.first_group.size())
+            merged.first_group.push_back(tally.first_group[i]);
+          else if (group_before(tally.first_group[i], merged.first_group[at]))
+            merged.first_group[at] = tally.first_group[i];
+        }
       }
+      result.entries = std::move(merged_result.entries);
+      tally.index = std::move(merged.index);
+      tally.first_group = std::move(merged.first_group);
     }
   }
   tally.finish();

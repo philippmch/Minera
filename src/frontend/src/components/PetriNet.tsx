@@ -88,13 +88,13 @@ export function PetriNet({ layout, title, actions, decoration, annotations,
           {decorated && (
             <div className="map-mode" role="group" aria-label="Net annotation">
               <button
-                className={mode === "plain" ? "mode-btn active" : "mode-btn"}
+                className={mode === "plain" ? "mode-btn active" : "mode-btn"} aria-pressed={mode === "plain"}
                 onClick={() => setMode("plain")}
               >
                 Plain
               </button>
               <button
-                className={mode === "frequency" ? "mode-btn active" : "mode-btn"}
+                className={mode === "frequency" ? "mode-btn active" : "mode-btn"} aria-pressed={mode === "frequency"}
                 onClick={() => setMode("frequency")}
               >
                 Frequency
@@ -103,7 +103,7 @@ export function PetriNet({ layout, title, actions, decoration, annotations,
                 <button
                   className={
                     mode === "performance" ? "mode-btn active" : "mode-btn"
-                  }
+                  } aria-pressed={mode === "performance"}
                   onClick={() => setMode("performance")}
                 >
                   Performance

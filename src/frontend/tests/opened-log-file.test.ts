@@ -15,7 +15,7 @@ vi.mock("../src/ocel-io", async (original) => {
   };
 });
 
-import { gunzipFile, ocelXmlFormat, openableLogFile, openedFileRoute } from "../src/opened-log-file";
+import { convertedOrigin, gunzipFile, ocelXmlFormat, openableLogFile, openedFileRoute, sourceBytesLabel, sourceDisplayName } from "../src/opened-log-file";
 import { LOG_FILE_ACCEPT } from "../src/components/ui";
 import { OcelIoWorkspace } from "../src/components/OcelIoWorkspace";
 
@@ -99,6 +99,18 @@ describe("opened log files with pm4py extensions", () => {
     expect(await openableLogFile(json)).toBe(json);
     expect(await openableLogFile(csv)).toBe(csv);
     expect(ocelIo.requested).toHaveLength(3);
+  });
+
+  it("shows a converted OCEL source under its uploaded name with the original byte size", async () => {
+    const upload = new File([new Uint8Array(4096)], "orders.sqlite");
+    const opened = await openableLogFile(upload);
+    expect(opened.name).toBe("orders.sqlite.json");
+    expect(convertedOrigin(opened)).toEqual({ name: "orders.sqlite", size: 4096 });
+    expect(sourceDisplayName(opened)).toBe("orders.sqlite");
+    expect(sourceBytesLabel(opened)).toBe(`OCEL JSON converted from orders.sqlite (4,096 bytes) · ${opened.size.toLocaleString("en-US")} bytes`);
+    const plain = new File(["{}"], "orders.jsonocel");
+    expect(sourceDisplayName(plain)).toBe("orders.jsonocel");
+    expect(sourceBytesLabel(plain)).toBe("orders.jsonocel · 2 bytes");
   });
 
   it("offers the pm4py extensions in the log pickers", () => {

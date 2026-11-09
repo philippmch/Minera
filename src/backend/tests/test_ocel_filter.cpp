@@ -112,6 +112,17 @@ int main() {
     const auto object_column = events_with(big, minera::OcelValue(std::string("x")));
     assert(minera::filter_ocel_event_attribute(object_column, "v", {0x1p53}).events.empty());
     assert(ids(minera::filter_ocel_event_attribute(object_column, "v", {big})) == "e1");
+    // Review Z1-3: a list of ints and floats is float64, so against a
+    // numeric column its ints are rounded too; a list holding a bool or
+    // string is an object array, compared exactly; an object column takes
+    // every list as given.
+    const minera::OcelValue half = 1.5;
+    assert(ids(minera::filter_ocel_event_attribute(integer_column, "v", {big, half})) == "e1e2");
+    assert(ids(minera::filter_ocel_event_attribute(integer_column, "v", {big - 1, half})) == "e1e2");
+    assert(ids(minera::filter_ocel_event_attribute(integer_column, "v", {0x1p53, true})) == "e2");
+    assert(ids(minera::filter_ocel_event_attribute(float_column, "v", {big, half})) == "e1");
+    assert(minera::filter_ocel_event_attribute(object_column, "v", {big - 1, half}).events.empty());
+    assert(ids(minera::filter_ocel_event_attribute(object_column, "v", {big, half})) == "e1");
     // The same on objects (o3 lacks the attribute: a float64 column).
     auto objects = log;
     objects.objects[0].attributes.push_back({"w", big});
@@ -119,6 +130,7 @@ int main() {
     const auto picked = minera::filter_ocel_object_attribute(objects, "w", {big - 1});
     assert(picked.objects.size() == 1 && picked.objects[0].id == "o1");
     assert(minera::filter_ocel_object_attribute(objects, "w", {big}).objects.empty());
+    assert(minera::filter_ocel_object_attribute(objects, "w", {big, half}).objects.size() == 1);
   }
 
   const auto web = minera::filter_ocel_event_attribute(

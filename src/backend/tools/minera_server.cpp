@@ -1969,8 +1969,13 @@ std::vector<minera::OcelValue> parse_ocel_filter_values(
       errno = 0;
       char* end = nullptr;
       const auto parsed = std::strtoll(value.c_str(), &end, 10);
-      if (end != value.c_str() + value.size() || errno == ERANGE)
+      if (end != value.c_str() + value.size())
         throw std::invalid_argument("attribute_values has an invalid integer");
+      // Declared (review Z1-3): pm4py takes Python ints of any size.
+      if (errno == ERANGE)
+        throw std::invalid_argument(
+            "attribute_values integer " + value +
+            " is outside the signed 64-bit range this filter supports");
       result.emplace_back(static_cast<std::int64_t>(parsed));
     } else if (type == "d") {
       char* end = nullptr;
@@ -5841,8 +5846,13 @@ void handle_attribute_statistics(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto options =
+    auto options =
         minera::parse_attribute_statistics_params(lookup, present);
+    // CSV and XES uploads reach pm4py as a DataFrame (column dtypes); a typed
+    // table source already carries each cell's frame type, and its nullable
+    // integer columns keep ints (review Z1-7).
+    options.dataframe_column_types =
+        !session->active_source || session->active_source->file().format != "table";
     response.set_content(
         minera::attribute_statistics_json(
             minera::discover_attribute_statistics(require_prepared_log(*session), options)),

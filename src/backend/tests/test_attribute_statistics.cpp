@@ -323,6 +323,35 @@ int main() {
     assert((entries(minera::discover_attribute_statistics(merged(yes, one), o)) ==
             std::vector<Entry>{{"true", "bool", 1}, {"0.5", "float", 1}, {"3", "int", 1}}));
     o.keep_once_per_case = false;
+    // Review Z1-2: a float64 cell holds the int rounded to a double, so
+    // 2^53 + 1 and 2^53 are one key: {9007199254740992.0: 2}.
+    const auto rounded = load(
+        head + "<trace><string key=\"concept:name\" value=\"c0\"/>" +
+        event("a", "<int key=\"x\" value=\"9007199254740993\"/>") +
+        event("b", "<int key=\"x\" value=\"9007199254740992\"/>") + event("c", "") +
+        "</trace></log>");
+    assert((entries(minera::discover_attribute_statistics(rounded, o)) ==
+            std::vector<Entry>{{"9007199254740992.0", "float", 2}}));
+    assert((minera::discover_attribute_statistics(rounded, o).values ==
+            std::map<std::string, std::uint64_t>{{"9007199254740992.0", 2}}));
+    o.keep_once_per_case = true;
+    assert((entries(minera::discover_attribute_statistics(rounded, o)) ==
+            std::vector<Entry>{{"9007199254740992.0", "float", 1}}));
+    // In the object column of the value level (a bool merged into 1) the
+    // ints become floats and merge there: {1.0: 2, 9007199254740992.0: 2, 0.5: 1}.
+    const auto level = load(
+        head + "<trace><string key=\"concept:name\" value=\"c1\"/>" + event("a", one) +
+        event("b", yes) + event("c", "<float key=\"x\" value=\"0.5\"/>") +
+        "</trace><trace><string key=\"concept:name\" value=\"c2\"/>" +
+        event("a", "<int key=\"x\" value=\"9007199254740993\"/>") +
+        "</trace><trace><string key=\"concept:name\" value=\"c3\"/>" +
+        event("a", "<int key=\"x\" value=\"9007199254740992\"/>") + event("b", one) +
+        "</trace></log>");
+    assert((entries(minera::discover_attribute_statistics(level, o)) ==
+            std::vector<Entry>{{"1.0", "float", 2},
+                               {"9007199254740992.0", "float", 2},
+                               {"0.5", "float", 1}}));
+    o.keep_once_per_case = false;
   }
 
   bool rejected = false;

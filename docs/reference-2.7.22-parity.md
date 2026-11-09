@@ -3275,7 +3275,11 @@ dtypes beyond the case-id and activity columns); a resource, lifecycle or
 extra attribute cell holding a pandas default NA spelling (`NaN`, `null`,
 `None`, `NA`, `n/a`, `#N/A`, ...) is missing, like a blank cell, in the log
 and in the flat table, since `read_csv` reads it as NaN (stream readers keep
-the literal text; review Y2-2). Declared: the flat table
+the literal text; review Y2-2). A cell that is an NA spelling only once
+trimmed (` NA`, `None `) is a value in every column, case id and activity
+included, since `read_csv` keeps the padded text (review Z1-4); in the
+timestamp column and in `case:` attribute columns it is still NA (declared,
+with field trimming). Declared: the flat table
 keeps source row order (with the converted case-id and activity text) where
 the formatted reference frame is sorted by case id, timestamp and row index.
 Case-relation files joined with a CSV log (case-relations merge and timestamp
@@ -19681,6 +19685,74 @@ Declared:
   from native in 638, 589 and 567 cases; to, from and contain agree (0).
   Native keeps them as ordinary activities.
 
+## Review Z1: empty fractions before a zone, rounded int keys, isin list dtypes, padded NA cells (2026-11-09)
+
+A review of Round Y against `pandas.read_csv` + `pm4py.format_dataframe`,
+`get_event_attribute_values`/`get_trace_attribute_values` on `read_xes`
+frames and `filter_ocel_event_attribute` (public API outputs only) found:
+
+- **Z1-1 `.Z` after an empty fraction on dateutil's path.** An empty `.`
+  fraction followed by a closing `Z` reads only on pandas' ISO path
+  (`2024-01-05 09:32:02.Z`, `20570906 14:10:24.Z`, `2024-01-05 093202.Z`).
+  On dateutil's path it fails, and Round Y read it: `2024-01-05  09:32:02.Z`,
+  `2024-01-05 T09:32:02.Z`, `01/05/2024 09:32:02.Z`, `2024  1  5 09:32:02.Z`,
+  `20240105t09:32:02.Z` and a closing `.z` anywhere now stay text. A blank or
+  a word after it reads on both (`.Z pm`, `.z pm`, `.Z `, `. Z`, `.UTC`,
+  `.+05`).
+- **Z1-2 Rounded int keys in attribute statistics.** When a DataFrame column
+  makes ints floats (Y2-3), each int is now keyed by its rounded double, so
+  ints that round alike are one value: 2^53 + 1 and 2^53 on two of three
+  events give `{9007199254740992.0: 2}` (Round Y listed the value twice). The
+  once-per-case value level merges the same way (counts added, the earlier
+  first group kept). 500 random XES logs (2,387 calls): 18 fixed, none
+  changed for the worse; one difference remains (already in Round Y): once
+  per case in an object column, `1e16` and the int 10^16 + 1, equal as
+  doubles, sort in the opposite order of pandas' exact comparison.
+- **Z1-3 The dtype of the isin list in OCEL attribute filters.** A values list
+  of ints and floats only is float64, so against an int64 or float64 column its
+  ints are rounded to doubles: an int64 column `[2^53 + 1, 2^53]` with
+  `i:9007199254740993,d:1.5` keeps both events (Round Y: one). A list holding
+  a bool or string is an object array and compares exactly, also against an
+  int64 column (`[2^53 + 1]` with `b:false,i:0,d:9007199254740992.0` keeps
+  nothing); an object column takes every list as given. 0 differences on
+  2,809 random filter calls (25 fixed). Declared: `i:` values outside the
+  signed 64-bit range are refused with an explicit error, while pm4py takes
+  Python ints of any size.
+- **Z1-4 Padded NA spellings.** Default trimming turned ` NA` / ` None ` into
+  NA spellings, so Round Y dropped them from resource, lifecycle and extra
+  attribute cells (and the case-id and activity columns dropped the row). They
+  are now values (the padding is still trimmed, declared): resources ` NA`,
+  `r1`, `NA` give `{NA: 1, r1: 1}` like pandas' `{' NA': 1, 'r1': 1}`.
+  600 random CSVs with padded and unpadded NA spellings in the case-id,
+  activity, resource and an extra column: 0 differences.
+- **Z1-5 Empty `.` before AM/PM and after HHMM.** A lone `a`/`p` after an
+  empty `.` fails only at the end of the text or before `Z`, `z`, a digit, `:`
+  or `,` (`03:15:34.p +5`, `.p Z`, `.A Z`, `.a m`, `.p-05` and `03:15.p Z`
+  read; `.p`, `.pz`, `.p5` fail). A basic `HHMM` clock takes an empty `.`
+  (`2024-01-05 1000.`, `1000. pm`, `1000.+05`; `1000.5`, `1000.Z`, `1000.p`
+  fail). An empty minute fraction followed by a closing `Z` fails, while a
+  blank or word after it reads (`10:30.Z pm`, `10:55.Z `).
+- **Z1-6** The decomposed alignment's per-trace `fitness` prints the shortest
+  round-trip double, like its top-level fitness.
+- **Z1-7** `/api/attribute-statistics` applies the DataFrame dtype rule (Y2-3)
+  to CSV and XES sources only. A typed table source (`mining_input_format=table`)
+  keeps each cell's type: its cells already hold the frame's values, and the
+  reference keeps ints for an EventLog (`{1: 1, 2: 1}`) and for a nullable
+  `Int64` column alike.
+
+Declared (dateutil readings kept as text, in the classes of review Y1):
+`.Z+05`, `.z+05` and `.Z +05` (two zones), `1:30 pm m` (a stray `m`),
+`2024-01-05 T` and `20240105T` (a lone `T`).
+
+Fuzz after the fixes: 5,897 random timestamp columns (pandas vs 2bb12ed vs
+this tree, seeds 1-3): 0 regressions, 8 columns fixed, every remaining
+mismatch a declared text reading; the 99,810-cell corpus of review Y1 changes
+in one cell (`18 0008 0031T03:45.Z PM`, now read as pandas reads it). Tests:
+`minera_core_tests` (`csv_timestamps_review_z1_shapes`,
+`csv_na_spellings_in_attribute_cells_are_missing`,
+`json_export_prints_quality_metrics_at_full_precision`),
+`minera_attribute_statistics_tests`, `minera_ocel_filter_tests`.
+
 ## Review Y2: metric precision in the mine JSON, CSV NA attribute cells, DataFrame dtypes in attribute statistics (2026-11-08)
 
 A random-input sweep of areas not recently compared (OCEL object graphs,
@@ -19818,5 +19890,5 @@ Declared (value-dependent dateutil readings, kept as text by the importer):
   (`+05:30 +01:90`, `Z+01:90`, `+1+1`).
 - **Stray words and dots (declared).** A lone `t`, `T` or `m` word, doubled
   dots (`11:21..`), a `.` right after a bare hour (`01/05/2024 11.`), a third
-  offset-minute digit (`+5:300` is +10:00) and `10:55.Z ` with a trailing
-  blank (read, while `10:55.Z` fails).
+  offset-minute digit (`+5:300` is +10:00). (`10:55.Z ` with a trailing
+  blank reads since review Z1.)

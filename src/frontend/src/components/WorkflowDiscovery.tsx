@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { WORKFLOW_VARIANTS, defaultWorkflowForm, runWorkflowDiscovery, workflowModelFile, workflowNet, workflowReplayKey, type WorkflowFamily, type WorkflowVariant, type WorkflowForm, type WorkflowRun } from "../workflow-discovery";
 import type { MineraExport } from "../types";
 import { requestLogQuerySchema, downloadQueryBlob, type LogQuerySchema } from "../log-query";
@@ -13,14 +13,23 @@ import { computeTreeLayout } from "../tree-layout";
 import { PowlModel } from "./PowlModel";
 import type { CsvOptions } from "../api";
 
-export function WorkflowDiscovery({ family, variant, data, available, mining, onUseModel, onOpenPlayout }: {
+/** Whether the selected variant is discovered without a click: once per arming (the variant card, or a re-mined
+ * analysis), as soon as the source is known and nothing else is running. */
+export function workflowAutoStarts(state:{armed:boolean;schema:boolean;run:boolean;pending:boolean;mining:boolean;available:boolean}):boolean{return state.armed&&state.schema&&!state.run&&!state.pending&&!state.mining&&state.available;}
+export function WorkflowDiscovery({ family, variant, data, available, mining, onUseModel, onOpenPlayout, savedView }: {
  family:WorkflowFamily;variant:WorkflowVariant;data:MineraExport;available:boolean;mining:boolean;
+ /** The analysis's own model, shown (labelled as such) only while no run of the selected variant is on screen. */
+ savedView?:ReactNode;
  onUseModel?:(file:File,sourceId:string,activityKey?:string)=>void;onOpenPlayout?:(file:File,activityKey?:string,options?:CsvOptions)=>void;
 }) {
  const [form,setForm]=useState(()=>defaultWorkflowForm(variant));const [schema,setSchema]=useState<LogQuerySchema|null>(null);const [run,setRun]=useState<WorkflowRun|null>(null);const [pending,setPending]=useState(false);const [error,setError]=useState<string|null>(null);
  const request=useRef<AbortController|null>(null),source=useRef<AbortController|null>(null),sequence=useRef(0);
+ // The variant card says "Mine": the selected variant is discovered as soon as the source is known, and again after the
+ // analysis is re-mined (filters). A cancelled or failed run leaves the button for the next attempt.
+ const autoStart=useRef(true);
  const refresh=async()=>{request.current?.abort();source.current?.abort();setPending(false);setSchema(null);setRun(null);setError(null);if(!available||mining)return;const controller=new AbortController();source.current=controller;try{const next=await requestLogQuerySchema(controller.signal);if(source.current===controller&&!controller.signal.aborted)setSchema(next);}catch(cause){if(source.current===controller&&!controller.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}};
- useEffect(()=>{void refresh();return()=>{request.current?.abort();source.current?.abort();};},[available,mining]);
+ useEffect(()=>{autoStart.current=true;void refresh();return()=>{request.current?.abort();source.current?.abort();};},[available,mining]);
+ useEffect(()=>{if(workflowAutoStarts({armed:autoStart.current,schema:schema!==null,run:run!==null,pending,mining,available})){autoStart.current=false;void start();}},[schema]);
  const change=<K extends keyof WorkflowForm>(key:K,value:WorkflowForm[K])=>setForm(old=>({...old,[key]:value}));
  const start=async()=>{if(!schema||pending||mining)return;const controller=new AbortController();request.current=controller;setPending(true);setError(null);try{const next=await runWorkflowDiscovery(family,form,schema,controller.signal);if(request.current===controller&&!controller.signal.aborted){sequence.current++;setRun(next);}}catch(cause){if(request.current===controller&&!controller.signal.aborted)setError(cause instanceof Error?cause.message:String(cause));}finally{if(request.current===controller){request.current=null;setPending(false);}}};
  return <>
@@ -57,9 +66,11 @@ export function WorkflowDiscovery({ family, variant, data, available, mining, on
    {pending&&<p role="status">Discovering… <button className="btn-ghost" onClick={()=>{request.current?.abort();request.current=null;setPending(false);}}>Cancel discovery request</button></p>}{error&&<div className="error-banner" role="alert">{error}</div>}
   </section>
   {run&&<WorkflowInspection key={sequence.current} run={run} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout}/>}
-  {!run&&<SavedWorkflow family={family} data={data}/>}
+  {!run&&!pending&&(savedView!==undefined?savedView&&<SavedNotice family={family} selected={form.variant}>{savedView}</SavedNotice>:<SavedWorkflow family={family} data={data}/>)}
  </>;
 }
+/** The analysis model, introduced as what it is: not a run of the variant selected above. */
+function SavedNotice({family,selected,children}:{family:WorkflowFamily;selected:WorkflowVariant;children:ReactNode}){const label=WORKFLOW_VARIANTS[family].find(([value])=>value===selected)?.[1]??selected;return <><p className="saved-model-notice" role="note">No {label} run is shown yet. Below is the model mined with this analysis (its Filters &amp; miner settings), not a {label} discovery: press “Discover selected workflow” to mine {label}.</p>{children}</>;}
 function SavedWorkflow({family,data}:{family:WorkflowFamily;data:MineraExport}) {
  const net=family==='alpha'?data.petri_net:family==='heuristic'?data.heuristic_petri_net:family==='inductive'?data.inductive_petri_net:data.powl_petri_net;const layout=useMemo(()=>net?computePetriLayout(net,data):null,[net,data]);
  const tree=useMemo(()=>family==='inductive'&&data.process_tree?computeTreeLayout(data.process_tree,data):null,[family,data]);

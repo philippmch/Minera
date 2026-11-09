@@ -326,6 +326,66 @@ export function delimiterForFile(name: string): string | undefined {
   return /\.tsv$/i.test(name) ? "\t" : undefined;
 }
 
+/** Delimiters a CSV header line is checked for, in tie-break order. */
+export const CSV_HEADER_DELIMITERS = [",", ";", "\t", "|"] as const;
+
+/** Whether an uploaded file is mined through the CSV/TSV reader. */
+export const isDelimitedTextName = (name: string): boolean => /\.(?:csv|tsv)$/i.test(name);
+
+/** The header line of a CSV text: everything before the first line break outside double quotes (a BOM is dropped). */
+export function csvHeaderLine(text: string): string {
+  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  let quoted = false;
+  for (let i = 0; i < body.length; i += 1) {
+    const c = body[i];
+    if (c === '"') quoted = !quoted;
+    else if (!quoted && (c === "\n" || c === "\r")) return body.slice(0, i);
+  }
+  return body;
+}
+
+/** Splits a header line on `delimiter`, honoring double quotes ("" is a literal quote). */
+export function csvHeaderNames(line: string, delimiter: string): string[] {
+  const names: string[] = [];
+  let current = "", quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const c = line[i];
+    if (quoted) {
+      if (c === '"' && line[i + 1] === '"') { current += '"'; i += 1; }
+      else if (c === '"') quoted = false;
+      else current += c;
+    } else if (c === '"') quoted = true;
+    else if (c === delimiter) { names.push(current); current = ""; }
+    else current += c;
+  }
+  names.push(current);
+  return names;
+}
+
+/**
+ * Field delimiter detected from a CSV header line: the candidate (comma,
+ * semicolon, tab, pipe) that splits the line into the most fields outside
+ * quotes, ties going to the earlier candidate. A comma maps to undefined so the
+ * backend applies its default; a header with no candidate keeps the name rule
+ * (tab for ".tsv").
+ */
+export function delimiterForHeader(name: string, header: string): string | undefined {
+  let best: string | undefined, bestCount = 0;
+  for (const delimiter of CSV_HEADER_DELIMITERS) {
+    const count = csvHeaderNames(header, delimiter).length - 1;
+    if (count > bestCount) { best = delimiter; bestCount = count; }
+  }
+  if (best === undefined) return delimiterForFile(name);
+  return best === "," ? undefined : best;
+}
+
+/** A column-not-found message with the header names that were read, so a mismatch is visible. */
+export function columnNotFoundMessage(message: string, header: string | null, delimiter: string | undefined): string {
+  if (header === null || !/^CSV column not found:/.test(message)) return message;
+  const names = csvHeaderNames(header, delimiter ?? ",").map(name => JSON.stringify(name)).join(", ");
+  return `${message} (the header has ${names}). Choose the columns in Source inspector.`;
+}
+
 /** Every Petri model that the quality evaluators can address in this view. */
 export function evaluationModelIds(data: MineraExport, importedAvailable = false): string[] {
   const ids = new Set<string>([
@@ -381,10 +441,13 @@ export function importedRunStale(miner: string | null | undefined, started: numb
 export const IMPORTED_MODEL_CHANGED = "The imported model changed while this run was pending; run it again.";
 
 /** Case rows with stable React keys: logs may repeat a case id, so rows are keyed by trace position. */
+const caseIdCollator = new Intl.Collator("en", { numeric: true });
+/** The event-log case list in natural case-id order (C2 before C10); equal ids keep the log's order. Display only:
+ * views that mirror a reference output keep the backend's order. */
 export function caseRowEntries<T extends { case_id: string }>(traces: readonly T[], query: string): Array<{ key: number; trace: T }> {
   const needle = query.trim().toLowerCase(), rows: Array<{ key: number; trace: T }> = [];
   traces.forEach((trace, key) => { if (!needle || trace.case_id.toLowerCase().includes(needle)) rows.push({ key, trace }); });
-  return rows;
+  return rows.sort((a, b) => caseIdCollator.compare(a.trace.case_id, b.trace.case_id) || a.key - b.key);
 }
 
 /** A numeric input's value: an emptied field means "not set" rather than 0. */

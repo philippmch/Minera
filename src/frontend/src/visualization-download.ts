@@ -27,14 +27,39 @@ export function serializeStyledSvg(root:StyledSvgNode,width:number,height:number
   const a=new Map(n.attributes.filter(([name])=>!/^on/i.test(name)&&name!=="style"));for(const [name,value]of a){if(!/^[a-zA-Z_][\w:.-]*$/.test(name))throw new Error("Invalid SVG attribute.");a.set(name,name==="href"||name==="xlink:href"?reference(value,base,ids):localUrls(value));}
   const styles=n.styles.filter(([k])=>!k.startsWith("--")&&!/[;{}]/.test(k)).map(([name,value])=>[name,localUrls(value)] as const);
   if(entry.isRoot){for(let i=styles.length-1;i>=0;i--)if(["width","height","max-width","max-height","min-width","min-height"].includes(styles[i][0]))styles.splice(i,1);styles.push(["width",width+"px"],["height",height+"px"]);}
-  styles.push(["animation","none"],["transition","none"]);a.set("style",styles.map(([k,v])=>`${k}:${v}`).join(";"));parts.push(`<${n.tag}${[...a].map(([k,v])=>` ${k}="${xml(v)}"`).join("")}>`);pending.push({node:n,close:true});
+  if(entry.isRoot)styles.push(["animation","none"],["transition","none"]);if(styles.length)a.set("style",styles.map(([k,v])=>`${k}:${v}`).join(";"));parts.push(`<${n.tag}${[...a].map(([k,v])=>` ${k}="${xml(v)}"`).join("")}>`);pending.push({node:n,close:true});
   for(let i=n.children.length-1;i>=0;i--)pending.push({node:n.children[i]});if(entry.isRoot)parts.push(`<title>${xml(title)}</title><desc>Displayed diagram with inline styles. Fonts are not embedded; PNG and PDF retain the rendered font appearance.</desc><rect x="${box[0]}" y="${box[1]}" width="${box[2]}" height="${box[3]}" fill="${xml(background)}"/>`);
  }
  return parts.join("");
 }
+/** Inherited presentation properties: a child repeats one only where its value differs from its parent's. */
+export const SVG_INHERITED_STYLES:readonly string[]=["fill","fill-opacity","fill-rule","stroke","stroke-width","stroke-opacity","stroke-dasharray","stroke-dashoffset","stroke-linecap","stroke-linejoin","stroke-miterlimit","marker-start","marker-mid","marker-end","paint-order","clip-rule","color","color-interpolation","color-interpolation-filters","visibility","font-family","font-size","font-style","font-weight","font-variant","font-stretch","font-kerning","font-feature-settings","font-variation-settings","letter-spacing","word-spacing","text-anchor","dominant-baseline","direction","writing-mode","white-space","shape-rendering","text-rendering","image-rendering"];
+/** Non-inherited presentation properties: kept only where they differ from the element's default. */
+export const SVG_OWN_STYLES:readonly string[]=["display","opacity","transform","transform-origin","transform-box","clip-path","mask","filter","mix-blend-mode","isolation","overflow","stop-color","stop-opacity","flood-color","flood-opacity","lighting-color","vector-effect","baseline-shift","alignment-baseline","text-decoration-line","text-decoration-color","text-decoration-style","unicode-bidi"];
+/** The root's own box: its border and padding are part of the displayed size the export reproduces. */
+export const SVG_ROOT_BOX_STYLES:readonly string[]=["box-sizing","padding-top","padding-right","padding-bottom","padding-left","border-top-width","border-right-width","border-bottom-width","border-left-width","border-top-style","border-right-style","border-bottom-style","border-left-style","border-top-color","border-right-color","border-bottom-color","border-left-color","border-top-left-radius","border-top-right-radius","border-bottom-right-radius","border-bottom-left-radius","background-color"];
+/** The presentation styles one exported element needs: the root carries every inherited property (the file has no
+ * page around it); a child repeats an inherited property only where it differs from its parent and a non-inherited one
+ * only where it differs from a default element of its tag. Layout, animation and interaction properties are left out. */
+export function svgExportStyles(computed:ReadonlyMap<string,string>,parent:ReadonlyMap<string,string>|null,defaults:ReadonlyMap<string,string>):Array<[string,string]>{
+ const styles:Array<[string,string]>=[];
+ for(const name of SVG_INHERITED_STYLES){const value=computed.get(name);if(value!==undefined&&value!==""&&(parent===null||parent.get(name)!==value))styles.push([name,value]);}
+ for(const name of parent===null?[...SVG_OWN_STYLES,...SVG_ROOT_BOX_STYLES]:SVG_OWN_STYLES){const value=computed.get(name);if(value!==undefined&&value!==""&&defaults.get(name)!==value)styles.push([name,value]);}
+ return styles;
+}
 function snapshotSvg(svg:SVGSVGElement):StyledSvgNode{
- const make=(element:Element):StyledSvgNode=>{const computed=getComputedStyle(element);return{tag:element.localName,attributes:Array.from(element.attributes,a=>[a.name,a.value]),styles:Array.from(computed,name=>[name,computed.getPropertyValue(name)]),children:[]};};
- const root=make(svg),pending=[{element:svg as Element,node:root}];while(pending.length){const{element,node}=pending.pop()!;for(const child of element.childNodes){if(child.nodeType===3)node.children.push(child.textContent??"");else if(child.nodeType===1){const e=child as Element,n=make(e);node.children.push(n);pending.push({element:e,node:n});}}}return root;
+ const read=(element:Element)=>{const computed=getComputedStyle(element),values=new Map<string,string>();for(const name of SVG_INHERITED_STYLES)values.set(name,computed.getPropertyValue(name));for(const name of SVG_OWN_STYLES)values.set(name,computed.getPropertyValue(name));if(element.localName==="svg")for(const name of SVG_ROOT_BOX_STYLES)values.set(name,computed.getPropertyValue(name));return values;};
+ // Defaults come from bare elements of each tag in an empty same-origin frame, so the page's own rules (for example a
+ // global box-sizing or a tag selector) cannot hide a value that the standalone file would otherwise lose.
+ const frame=document.createElement("iframe");frame.setAttribute("aria-hidden","true");frame.tabIndex=-1;frame.style.cssText="position:absolute;width:0;height:0;border:0;left:-10000px;top:0;visibility:hidden";(document.body??document.documentElement).appendChild(frame);
+ const blank=frame.contentDocument!,sandbox=blank.createElementNS("http://www.w3.org/2000/svg","svg");(blank.body??blank.documentElement).appendChild(sandbox);
+ const defaults=new Map<string,Map<string,string>>(),defaultsFor=(tag:string)=>{let value=defaults.get(tag);if(!value){const probe=blank.createElementNS("http://www.w3.org/2000/svg",tag);sandbox.appendChild(probe);const computed=frame.contentWindow!.getComputedStyle(probe);value=new Map([...SVG_OWN_STYLES,...SVG_ROOT_BOX_STYLES].map(name=>[name,computed.getPropertyValue(name)]));probe.remove();defaults.set(tag,value);}return value;};
+ try{
+  const make=(element:Element,parent:ReadonlyMap<string,string>|null)=>{const values=read(element);return{values,node:{tag:element.localName,attributes:Array.from(element.attributes,a=>[a.name,a.value]),styles:svgExportStyles(values,parent,defaultsFor(element.localName)),children:[]} as StyledSvgNode};};
+  const top=make(svg,null),pending=[{element:svg as Element,...top}];
+  while(pending.length){const{element,node,values}=pending.pop()!;for(const child of element.childNodes){if(child.nodeType===3)node.children.push(child.textContent??"");else if(child.nodeType===1){const e=child as Element,made=make(e,values);node.children.push(made.node);pending.push({element:e,...made});}}}
+  return top.node;
+ }finally{frame.remove();}
 }
 function jpegDimensions(bytes:Uint8Array):{width:number;height:number;components:number}{
  if(bytes.length<4||bytes[0]!==255||bytes[1]!==216||bytes[bytes.length-2]!==255||bytes[bytes.length-1]!==217)throw new Error("The canvas did not produce a complete JPEG image.");let p=2;

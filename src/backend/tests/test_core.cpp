@@ -5299,9 +5299,10 @@ void csv_na_spellings_in_attribute_cells_are_missing() {
     assert(events[1].attribute("channel") == nullptr);
     assert(events[2].resource.empty() && events[2].lifecycle.empty());
     assert(*events[2].attribute("channel") == "web");
-    // Trimmed by default (declared), so " None " is NA as well.
-    assert(events[3].resource.empty() && events[3].lifecycle.empty());
-    assert(events[3].attribute("channel") == nullptr);
+    // " None " is no NA spelling to read_csv, which keeps the padded text
+    // (review Z1-4); the default trimming (declared) drops the padding.
+    assert(events[3].resource == "None" && events[3].has_resource());
+    assert(events[3].lifecycle.empty() && events[3].attribute("channel") == nullptr);
     // The flat table holds the same missing cells.
     const auto& row = data.table.rows.front();
     for (std::size_t i = 3; i < 6; ++i) assert(row[i] && row[i]->value.empty());
@@ -5309,8 +5310,28 @@ void csv_na_spellings_in_attribute_cells_are_missing() {
     minera::AttributeStatisticsOptions options;
     options.attribute_key = "resource";
     const auto counts = minera::discover_attribute_statistics(data.log, options);
-    assert(counts.entries.size() == 1 && counts.entries[0].value == "r1" &&
-           counts.entries[0].count == 1);
+    assert(counts.entries.size() == 2 && counts.entries[0].value == "r1" &&
+           counts.entries[0].count == 1 && counts.entries[1].value == "None");
+  }
+  {
+    // Review Z1-4: padded NA spellings are values in every column, the
+    // case-id and activity columns included; unpadded ones stay missing.
+    std::istringstream input(
+        "case_id,activity,timestamp,resource,cost\n"
+        " NA,A,2026-01-01T00:00:00, NA ,None \n"
+        "NA,B,2026-01-01T00:01:00,r1,NA\n"
+        "2,null ,2026-01-01T00:02:00,NA,5\n"
+        "2,null,2026-01-01T00:03:00,NA,5\n");
+    const auto data = minera::import_csv_event_data(input);
+    assert(data.log.traces.size() == 2);
+    const auto& first = data.log.traces[0].case_id == "NA" ? data.log.traces[0]
+                                                           : data.log.traces[1];
+    assert(first.case_id == "NA" && first.events.size() == 1);
+    assert(first.events[0].resource == "NA" && *first.events[0].attribute("cost") == "None");
+    const auto& second = data.log.traces[0].case_id == "2" ? data.log.traces[0]
+                                                           : data.log.traces[1];
+    assert(second.events.size() == 1 && second.events[0].activity == "null");
+    assert(second.events[0].resource.empty());
   }
   {
     minera::CsvImportOptions stream;
@@ -6789,6 +6810,16 @@ void json_export_prints_quality_metrics_at_full_precision() {
       assert(false);
     }
   }
+  // Review Z1-6: the decomposed alignment's per-trace fitness too.
+  minera::DecomposedAlignmentResult decomposed;
+  decomposed.fitness = 2.0 / 3.0;
+  minera::DecomposedAlignmentTrace trace;
+  trace.activities = {"a"};
+  trace.fitness = 5.0 / 7.0;
+  decomposed.traces.push_back(trace);
+  const auto decomposed_json = minera::decomposed_alignment_json(decomposed);
+  assert(decomposed_json.find("\"fitness\":0.6666666666666666,") != std::string::npos);
+  assert(decomposed_json.find("\"fitness\":0.7142857142857143,") != std::string::npos);
 }
 
 void json_export_carries_declare_contract() {
@@ -8728,6 +8759,59 @@ void csv_timestamps_review_y1_shapes() {
   assert(unconvertible("2024-01-05 1107.5"));
 }
 
+void csv_timestamps_review_z1_shapes() {
+  const auto import = [](const std::string& rows) {
+    std::istringstream input("case_id,activity,timestamp\n" + rows);
+    return minera::import_csv_event_data(input);
+  };
+  const auto stamp = [&](const std::string& cell) {
+    return import("1,A," + cell + "\n").log.traces.at(0).events.at(0).timestamp;
+  };
+  const auto unconvertible = [&](const std::string& cell) {
+    try { (void)import("1,A,2024-01-01\n2,B," + cell + "\n"); }
+    catch (const std::runtime_error& error) {
+      return std::string(error.what()).find("cannot be parsed") != std::string::npos;
+    }
+    return false;
+  };
+  // Z1-1: an empty `.` fraction before a closing `Z` reads only on pandas'
+  // ISO path; a blank or a word after it reads on dateutil's too.
+  assert(stamp("2024-01-05 09:32:02.Z") == "2024-01-05 09:32:02+00:00");
+  assert(stamp("20570906 14:10:24.Z") == "2057-09-06 14:10:24+00:00");
+  assert(stamp("2024-01-05 093202.Z") == "2024-01-05 09:32:02+00:00");
+  assert(stamp("2024-01-05  09:32:02.Z pm") == "2024-01-05 21:32:02+00:00");
+  assert(stamp("2024-01-05  09:32:02. Z") == "2024-01-05 09:32:02+00:00");
+  assert(stamp("2024-01-05  09:32:02.UTC") == "2024-01-05 09:32:02+00:00");
+  assert(stamp("2024-01-05  09:32:02.+05") == "2024-01-05 09:32:02+05:00");
+  assert(stamp("2024-01-05 09:32:02.z pm") == "2024-01-05 21:32:02+00:00");
+  for (const auto* cell : {"2024-01-05  09:32:02.Z", "2024-01-05 T09:32:02.Z",
+                           "01/05/2024 09:32:02.Z", "2024  1  5 09:32:02.Z",
+                           "20240105t09:32:02.Z", "20570906  14:10:24.Z",
+                           "2024-01-05  093202.Z", "2024-01-05 09:32:02.z"})
+    assert(unconvertible(cell));
+  // Z1-5: a lone a/p after an empty `.` fails only at the end or before
+  // Z, z, a digit, `:` or `,`; HHMM takes an empty `.`; a closing `Z` after
+  // an empty minute fraction fails, a blank or word after it reads.
+  assert(stamp("2024-01-05 03:15:34.p +5") == "2024-01-05 15:15:34+05:00");
+  assert(stamp("2024-01-05 03:15:34.p Z") == "2024-01-05 15:15:34+00:00");
+  assert(stamp("2024-01-05 03:15:34.A Z") == "2024-01-05 03:15:34+00:00");
+  assert(stamp("2024-01-05 03:15:34.a m") == "2024-01-05 03:15:34");
+  assert(stamp("2024-01-05 03:15:34.p-05") == "2024-01-05 15:15:34-05:00");
+  assert(stamp("2024-01-05 03:15.p Z") == "2024-01-05 15:15:00+00:00");
+  assert(stamp("2024-01-05 1000.") == "2024-01-05 10:00:00");
+  assert(stamp("2024-01-05 1000. pm") == "2024-01-05 22:00:00");
+  assert(stamp("2024-01-05 1000.+05") == "2024-01-05 10:00:00+05:00");
+  assert(stamp("20240105T1000.") == "2024-01-05 10:00:00");
+  assert(stamp("2024-01-05 10:30.Z pm") == "2024-01-05 22:30:00+00:00");
+  assert(stamp("2024-01-05 10:30.z pm") == "2024-01-05 22:30:00+00:00");
+  for (const auto* cell : {"2024-01-05 03:15:34.p", "2024-01-05 03:15:34.pz",
+                           "2024-01-05 03:15:34.p5", "2024-01-05 03:15:34.p:",
+                           "2024-01-05 1000.Z", "2024-01-05 1000.p",
+                           "2024-01-05 1000.z", "2024-01-05 1000.5",
+                           "2024-01-05 10:30.Z", "2024-01-05 10:30.z"})
+    assert(unconvertible(cell));
+}
+
 void csv_timestamps_follow_pandas_resolution_and_offsets() {
   const auto import = [](const std::string& rows) {
     std::istringstream input("case_id,activity,timestamp\n" + rows);
@@ -8878,6 +8962,7 @@ int main() {
   csv_timestamps_follow_pandas_resolution_and_offsets();
   csv_timestamps_review_v1_shapes();
   csv_timestamps_review_y1_shapes();
+  csv_timestamps_review_z1_shapes();
   csv_header_names_follow_read_csv();
   csv_case_ids_follow_reference_dtype_inference_and_order();
   csv_import_types_activities_case_attributes_and_relations_like_reference();

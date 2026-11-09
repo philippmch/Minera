@@ -447,8 +447,9 @@ body {
     grid-template-areas: "map" "variants" "activities" "dfgdiscovery" "dfgvariants" "dfgdataframe" "correlation" "efg";
   }
   .variants-panel { border-left: none; border-top: 1px solid var(--line); position: static; max-height: none; }
-  .kpis { grid-template-columns: repeat(2, 1fr); }
-  .kpi { border-left: none !important; }
+  .kpis { grid-template-columns: repeat(2, 1fr); column-gap: 20px; }
+  /* Two columns: every figure starts at its column edge, so none is indented. */
+  .kpi, .kpi + .kpi { border-left: none !important; padding-left: 0; }
 }
 
 .panel { padding: 20px 0 28px; }
@@ -1323,7 +1324,11 @@ main p, main li, main summary { overflow-wrap: break-word; }
   gap: 3px;
   align-items: center;
   flex-shrink: 0;
+  /* A long case on a narrow screen clips its strip instead of widening the page. */
+  max-width: 40%;
+  overflow: hidden;
 }
+.case-seq-dot { flex-shrink: 0; }
 
 .case-seq-dot {
   width: 7px;
@@ -2131,6 +2136,12 @@ main p, main li, main summary { overflow-wrap: break-word; }
   width: auto;
   min-width: 120px;
 }
+/* The settings panel shows full field names and defaults (time:timestamp, case:concept:name, "0 = unlimited"). */
+.filters-body .filters-field input:not([type]),
+.filters-body .filters-field input[type="text"],
+.filters-body .filters-field input[type="search"] { width: 24ch; max-width: 100%; }
+.filters-body .filters-field input[type="number"] { width: 16ch; max-width: 100%; }
+.filters-body .filters-field input { text-overflow: ellipsis; }
 .filters-field input:focus,
 .filters-field select:focus {
   outline: none;
@@ -2316,6 +2327,7 @@ main p, main li, main summary { overflow-wrap: break-word; }
 .workflow-discovery fieldset { border: 0; min-width: 0; padding: 0; }
 .workflow-discovery label, .workflow-inspection > label { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
 .workflow-discovery input:not([type=checkbox]), .workflow-discovery textarea, .workflow-discovery select, .workflow-inspection select { width: 100%; min-width: 0; }
+.saved-model-notice { margin: 16px 0 0; padding: 10px 12px; border-left: 3px solid var(--copper); background: var(--paper-raised); }
 .workflow-inspection td { max-width: 480px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .workflow-inspection pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 500px; overflow: auto; }
 .other-align-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }

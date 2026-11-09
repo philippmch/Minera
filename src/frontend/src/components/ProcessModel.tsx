@@ -11,10 +11,6 @@ import { ProcessTree } from "./ProcessTree";
 import { PetriNet } from "./PetriNet";
 import { DependencyGraph } from "./DependencyGraph";
 import { PowlModel } from "./PowlModel";
-import { LogSkeletonModel } from "./LogSkeletonModel";
-import { DeclareModel } from "./DeclareModel";
-import { FootprintsModel } from "./FootprintsModel";
-import { TransitionSystemModel } from "./TransitionSystemModel";
 import { NativeDiscovery } from "./NativeDiscovery";
 import { WorkflowDiscovery } from "./WorkflowDiscovery";
 
@@ -184,7 +180,6 @@ function ModelResult({
   onUseModel,
   onOpenPlayout,
 }: ModelResultProps) {
-  const [asNet, setAsNet] = useState(false);
 
   // Every miner exports both ways: PNML from its workflow net, BPMN from the
   // inductive tree or from the net's token semantics (converted server-side),
@@ -207,207 +202,49 @@ function ModelResult({
       <div className="query-actions">{actions}</div>
     </section>
   ) : null;
+  const savedView = savedNet || minerId === "heuristic" || minerId === "inductive" && layouts.tree() !== null || minerId === "powl" && !!data.powl
+    ? <AnalysisModelView minerId={minerId as ModelNet} title={`${groupName} · mined with this analysis (analysis settings)`} data={data} layouts={layouts} />
+    : null;
   if (minerId === "ilp" || minerId === "genetic")
     return <NativeDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} />;
   if (minerId === "alpha" || minerId === "heuristic")
-    return <>{saved}<WorkflowDiscovery family={minerId} variant={variant.id as "classic"|"plus"|"plusplus"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} /></>;
+    return <>{saved}<WorkflowDiscovery family={minerId} variant={variant.id as "classic"|"plus"|"plusplus"} savedView={savedView} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} /></>;
   if (minerId === "inductive" || minerId === "powl")
-    return <>{saved}<WorkflowDiscovery family={minerId} variant={(variant.id==='basic'?'log':variant.id==='configured'?'maximal':variant.id) as "log"|"imf"|"dfg"|"tree"|"brute_force"|"dynamic_clustering"|"dynamic_clustering_plain"} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} /></>;
+    return <>{saved}<WorkflowDiscovery family={minerId} variant={(variant.id==='basic'?'log':variant.id==='configured'?'maximal':variant.id) as "log"|"imf"|"dfg"|"tree"|"brute_force"|"dynamic_clustering"|"dynamic_clustering_plain"} savedView={savedView} data={data} available={canExportPnml} mining={mining} onUseModel={onUseModel} onOpenPlayout={onOpenPlayout} /></>;
   if (minerId === "declare" || minerId === "log_skeleton")
     return <ConstraintDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} onOpenLog={onOpenPlayout} />;
   if (minerId === "footprints" || minerId === "transition_system")
     return <GraphDiscovery family={minerId} data={data} available={canExportPnml} mining={mining} />;
 
-  // The primary-view ⇄ workflow-net flip, offered when the export carries the
-  // net (older exports lack it and simply show no toggle).
-  const netToggle = (primaryLabel: string, hasNet: boolean) =>
-    hasNet ? (
+  return null;
+}
+
+/**
+ * The model the analysis mined (with the Filters & miner settings), shown while no variant run is on screen. A tree,
+ * dependency graph or POWL model flips to the same workflow net conformance checks, and every net carries the
+ * analysis's replay decoration (Plain / Frequency / Performance) when the export has one.
+ */
+export function AnalysisModelView({ minerId, title, data, layouts }: { minerId: ModelNet; title: string; data: MineraExport; layouts: ModelLayouts }) {
+  const [asNet, setAsNet] = useState(false);
+  const toggle = (primaryLabel: string) =>
+    layouts.hasNet(minerId) ? (
       <div className="map-mode" role="group" aria-label="Model view">
-        <button
-          className={asNet ? "mode-btn" : "mode-btn active"}
-          onClick={() => setAsNet(false)}
-        >
-          {primaryLabel}
-        </button>
-        <button
-          className={asNet ? "mode-btn active" : "mode-btn"}
-          onClick={() => setAsNet(true)}
-        >
-          Workflow net
-        </button>
+        <button className={asNet ? "mode-btn" : "mode-btn active"} aria-pressed={!asNet} onClick={() => setAsNet(false)}>{primaryLabel}</button>
+        <button className={asNet ? "mode-btn active" : "mode-btn"} aria-pressed={asNet} onClick={() => setAsNet(true)}>Workflow net</button>
       </div>
     ) : null;
-
-  if (variant.artifact === "process-tree") {
-    const inductiveNet = asNet ? layouts.net("inductive") : null;
-    if (inductiveNet) {
-      return (
-        <PetriNet
-          layout={inductiveNet}
-          title={groupName}
-          actions={
-            <>
-              {netToggle("Tree", layouts.hasNet("inductive"))}
-              {actions}
-            </>
-          }
-          decoration={data.inductive_petri_net_decoration ?? null}
-        />
-      );
-    }
-    const treeLayout = layouts.tree();
-    return treeLayout ? (
-      <ProcessTree
-        layout={treeLayout}
-        title={groupName}
-        actions={
-          <>
-            {netToggle("Tree", layouts.hasNet("inductive"))}
-            {actions}
-          </>
-        }
-      />
-    ) : (
-      <Placeholder>
-        No model to display. This export predates model discovery — re-open the
-        CSV event log to mine a process tree.
-      </Placeholder>
-    );
+  const decoration = minerId === "alpha" ? data.petri_net_decoration : minerId === "inductive" ? data.inductive_petri_net_decoration : minerId === "heuristic" ? data.heuristic_petri_net_decoration : data.powl_petri_net_decoration;
+  const primary = minerId === "inductive" ? "Tree" : minerId === "heuristic" ? "Dependency graph" : minerId === "powl" ? "POWL" : null;
+  const net = minerId === "alpha" || asNet ? layouts.net(minerId) : null;
+  if (net) return <PetriNet layout={net} heading="Workflow net" title={title} actions={primary ? toggle(primary) : undefined} decoration={decoration ?? null} disconnectedDescription={minerId === "alpha" ? undefined : "transitions with no incident arcs"} />;
+  if (minerId === "inductive") {
+    const tree = layouts.tree();
+    return tree ? <ProcessTree layout={tree} title={title} actions={toggle("Tree")} /> : <Placeholder>No process tree is available in this export — re-open the CSV event log to mine one.</Placeholder>;
   }
-
-  if (variant.artifact === "dependency-graph") {
-    const heuristicNet = asNet ? layouts.net("heuristic") : null;
-    if (heuristicNet) {
-      return (
-        <PetriNet
-          layout={heuristicNet}
-          title={groupName}
-          actions={
-            <>
-              {netToggle("Dependency graph", layouts.hasNet("heuristic"))}
-              {actions}
-            </>
-          }
-          decoration={data.heuristic_petri_net_decoration ?? null}
-        />
-      );
-    }
-    // The dependency graph is derived from the directly-follows counts, which
-    // every analysis carries, so it is always available.
-    return (
-      <DependencyGraph
-        data={data}
-        title={groupName}
-        actions={
-          <>
-            {netToggle("Dependency graph", layouts.hasNet("heuristic"))}
-            {actions}
-          </>
-        }
-      />
-    );
-  }
-
-  if (variant.artifact === "powl") {
-    const powlNet = asNet ? layouts.net("powl") : null;
-    if (powlNet) {
-      return (
-        <PetriNet
-          layout={powlNet}
-          title={groupName}
-          actions={
-            <>
-              {netToggle("POWL", layouts.hasNet("powl"))}
-              {actions}
-            </>
-          }
-          decoration={data.powl_petri_net_decoration ?? null}
-        />
-      );
-    }
-    return data.powl ? (
-      <PowlModel
-        model={data.powl}
-        data={data}
-        title={groupName}
-        actions={
-          <>
-            {netToggle("POWL", layouts.hasNet("powl"))}
-            {actions}
-          </>
-        }
-      />
-    ) : (
-      <Placeholder>
-        No POWL model is available in this export — re-open the CSV event log to discover one.
-      </Placeholder>
-    );
-  }
-
-  if (variant.artifact === "log-skeleton") {
-    return data.log_skeleton ? (
-      <LogSkeletonModel
-        model={data.log_skeleton}
-        conformance={data.log_skeleton_conformance}
-        data={data}
-        title={groupName}
-      />
-    ) : (
-      <Placeholder>
-        No log-skeleton model is available in this export — re-open the CSV event
-        log to discover one.
-      </Placeholder>
-    );
-  }
-
-  if (variant.artifact === "declare") {
-    return data.declare ? (
-      <DeclareModel
-        model={data.declare}
-        conformance={data.declare_conformance}
-        data={data}
-        title={groupName}
-        actions={
-          canExportPnml ? (
-            <PlayoutButton minerId="declare" dataset={data.dataset} sourceId={playoutSourceId} />
-          ) : null
-        }
-      />
-    ) : (
-      <Placeholder>
-        No Declare model is available in this export — re-open the CSV event log to discover one.
-      </Placeholder>
-    );
-  }
-
-  if (variant.artifact === "transition-system") {
-    return data.transition_system ? <TransitionSystemModel model={data.transition_system} data={data} /> : <Placeholder>No transition system is included in this export. Open a CSV or XES log to discover one.</Placeholder>;
-  }
-
-  if (variant.artifact === "footprints") {
-    return data.footprints ? (
-      <FootprintsModel data={data} footprints={data.footprints} title={groupName} />
-    ) : (
-      <Placeholder>
-        No aggregate footprints are available in this export — re-open the CSV event log to discover them.
-      </Placeholder>
-    );
-  }
-
-  const petriLayout = layouts.net("alpha");
-  return petriLayout ? (
-    <PetriNet
-      layout={petriLayout}
-      title={groupName}
-      actions={actions}
-      decoration={data.petri_net_decoration ?? null}
-    />
-  ) : (
-    <Placeholder>
-      No model to display. This export predates {groupName} discovery — re-open
-      the CSV event log to mine a Petri net.
-    </Placeholder>
-  );
+  // The dependency graph comes from the directly-follows counts every analysis carries.
+  if (minerId === "heuristic") return <DependencyGraph data={data} title={title} actions={toggle("Dependency graph")} />;
+  if (minerId === "powl") return data.powl ? <PowlModel model={data.powl} data={data} title={title} actions={toggle("POWL")} /> : <Placeholder>No POWL model is available in this export — re-open the CSV event log to discover one.</Placeholder>;
+  return <Placeholder>No workflow net is available in this export — re-open the CSV event log to mine one.</Placeholder>;
 }
 
 // Downloads the shown model as standard PNML. Every miner is translated to a

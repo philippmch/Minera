@@ -623,14 +623,25 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
       in.skip_spaces();
     }
     unsigned h = 0, m = 0, s = 0;
-    // After a `.` without digits, a lone `a`/`p` (no `.` or letter after it)
-    // fails ("3:04.P" and "09:32:02.p" fail; "3:04.pm", "3:04.p.m." and
-    // "3:04. P" read; review Y1-3).
+    // After a `.` without digits, a lone `a`/`p` fails at the end of the
+    // text or before a `Z`, `z`, digit, `:` or `,` ("3:04.P", "09:32:02.p",
+    // ".pz" and ".p5" fail; "3:04.pm", "3:04.p.m.", "3:04. P", ".p ", ".p Z"
+    // and ".p-05" read; reviews Y1-3, Z1-5).
     const auto lone_meridiem_letter = [&in]() {
       const char ch = in.peek();
       if (ch != 'a' && ch != 'A' && ch != 'p' && ch != 'P') return false;
-      const char next = in.pos + 1 < in.text.size() ? in.text[in.pos + 1] : '\0';
-      return next != '.' && !std::isalpha(static_cast<unsigned char>(next));
+      if (in.pos + 1 >= in.text.size()) return true;
+      const char next = in.text[in.pos + 1];
+      return next == 'Z' || next == 'z' || next == ':' || next == ',' ||
+             std::isdigit(static_cast<unsigned char>(next));
+    };
+    // After a `.` without digits, a zone letter at the very end of the text
+    // fails, except `Z` on pandas' ISO path ("09:32:02.Z" reads, while
+    // "2024-01-05  09:32:02.Z", "01/05/2024 09:32:02.Z" and any ".z" fail;
+    // ".Z pm", ".z pm" and ".Z " read; review Z1-1).
+    const auto empty_fraction_zone_fails = [&in, &iso_path]() {
+      if (in.pos + 1 != in.text.size()) return false;
+      return in.peek() == 'z' || (in.peek() == 'Z' && !iso_path);
     };
     // The digits of a `.` seconds fraction (`,` too when `comma` is allowed).
     const auto read_seconds_fraction = [&](bool comma) -> bool {
@@ -645,8 +656,10 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
       }
       if (fraction_digits == 0) {
         // A `.` with no digits is dateutil's, and adds nothing
-        // ("09:32:02." and "09:32:02.Z" read, "09:32:02.z" fails; review Y1-3).
-        if (comma_fraction || in.peek() == 'z' || lone_meridiem_letter()) return false;
+        // ("09:32:02." and "09:32:02.Z" read, "09:32:02.z" fails; reviews
+        // Y1-3, Z1-1).
+        if (comma_fraction || empty_fraction_zone_fails() || lone_meridiem_letter())
+          return false;
         iso_path = false;
         return true;
       }
@@ -674,9 +687,16 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
       if (run == 6) s = pair(4);
       in.pos += run;
       hour_digits = 2;
-      if (run == 4 && in.peek() == '.') return std::nullopt;
+      // HHMM takes a `.` without digits, on dateutil's path ("1000." and
+      // "1000. pm" read, "1000.5" and "1000.Z" fail; review Z1-5).
+      if (run == 4 && in.peek() == '.') {
+        if (in.pos + 1 < in.text.size() &&
+            std::isdigit(static_cast<unsigned char>(in.text[in.pos + 1])))
+          return std::nullopt;
+        iso_path = false;
+      }
       if (in.peek() == ',') return std::nullopt;
-      if (run == 6 && !read_seconds_fraction(false)) return std::nullopt;
+      if (!read_seconds_fraction(false)) return std::nullopt;
     } else {
       hour_digits = in.digits(h, 2);
       if (hour_digits == 0) return std::nullopt;
@@ -707,9 +727,10 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
         // "10:07.01" + 28 sixes is 10:07:01; 29 nines round to 60 and fail).
         s = reference_minute_fraction_seconds(in.text.substr(fraction_start, used));
         if (s >= 60) return std::nullopt;
-        // An empty fraction right before a `Z` fails ("10:30.Z"; "10:30.5Z",
-        // "10:30. Z" and "10:30.UTC" read).
-        if (used == 0 && (in.peek() == 'Z' || in.peek() == 'z' || lone_meridiem_letter()))
+        // An empty fraction right before a closing `Z` fails ("10:30.Z";
+        // "10:30.5Z", "10:30. Z", "10:30.Z pm", "10:55.Z " and "10:30.UTC"
+        // read; review Z1-5).
+        if (used == 0 && (empty_fraction_zone_fails() || lone_meridiem_letter()))
           return std::nullopt;
       } else if (in.peek() == ':') {
         ++in.pos;
@@ -1323,12 +1344,17 @@ std::string python_float_text(double value) {
 // The text each cell of one column has after read_csv's typing and
 // format_dataframe's string conversion (used for the case-id and activity
 // columns); nullopt is a missing cell, whose row the reference drops.
+// `values`, when given, marks cells that are never NA: an NA spelling that
+// only trimming exposed (" NA"), which read_csv keeps as text (review Z1-4).
 ReferenceCsvColumn infer_reference_column(
-    const std::vector<std::string>& cells) {
+    const std::vector<std::string>& cells,
+    const std::vector<char>* values = nullptr) {
   const auto count = cells.size();
   using Column = std::vector<std::optional<std::string>>;
   using Kind = ReferenceCsvColumnKind;
-  const auto na = [&](std::size_t i) { return is_reference_na_token(cells[i]); };
+  const auto na = [&](std::size_t i) {
+    return !(values && (*values)[i] != 0) && is_reference_na_token(cells[i]);
+  };
   // Every cell's text as written, NA spellings included.
   const auto literal = [&] { return Column(cells.begin(), cells.end()); };
   // A column read as Python ints (NA cells missing), when every cell is one.
@@ -1571,6 +1597,9 @@ CsvEventData import_csv_event_data_impl(
   };
   std::vector<std::string> case_tokens;
   std::vector<std::string> activity_tokens;
+  // Per token: an NA spelling only after trimming, so a value (review Z1-4).
+  std::vector<char> case_padded_na;
+  std::vector<char> activity_padded_na;
   std::vector<PendingRow> pending;
 
   // Row shape in the batch import follows read_csv's default C parser. The
@@ -1604,8 +1633,12 @@ CsvEventData import_csv_event_data_impl(
     // before trim_fields blanks it.
     const bool untrimmed_timestamp =
         reference_batch && options.trim_fields && timestamp_index.has_value();
+    // The batch import trims after reading the row, so that a cell which is
+    // an NA spelling only once trimmed (" NA", "None ") stays a value, as the
+    // untrimmed text is for read_csv (review Z1-4).
+    const bool trim_after_read = reference_batch && options.trim_fields;
     auto fields = parse_csv_row(line, options.delimiter,
-                                options.trim_fields && !untrimmed_timestamp);
+                                options.trim_fields && !trim_after_read);
     if (reference_batch) {
       if (!expected_fields) {
         index_fields = fields.size() > header.size() ? fields.size() - header.size() : 0;
@@ -1635,14 +1668,25 @@ CsvEventData import_csv_event_data_impl(
     }
     bool blank_timestamp = false;
     bool padded_timestamp = false;
-    if (untrimmed_timestamp) {
-      if (*timestamp_index < fields.size()) {
-        const auto& cell = fields[*timestamp_index];
-        blank_timestamp = !cell.empty() && cell.find_first_not_of(" \t\r\n") == std::string::npos;
-        padded_timestamp = !cell.empty() && (cell.back() == ' ' || cell.back() == '\t');
-      }
-      for (auto& field : fields) field = trim(std::move(field));
+    if (untrimmed_timestamp && *timestamp_index < fields.size()) {
+      const auto& cell = fields[*timestamp_index];
+      blank_timestamp = !cell.empty() && cell.find_first_not_of(" \t\r\n") == std::string::npos;
+      padded_timestamp = !cell.empty() && (cell.back() == ' ' || cell.back() == '\t');
     }
+    // Fields whose text is an NA spelling only after trimming.
+    std::vector<char> padded_na;
+    if (trim_after_read) {
+      padded_na.assign(fields.size(), 0);
+      for (std::size_t i = 0; i < fields.size(); ++i) {
+        auto trimmed = trim(fields[i]);
+        padded_na[i] = trimmed.size() != fields[i].size() && !trimmed.empty() &&
+                       is_reference_na_token(trimmed);
+        fields[i] = std::move(trimmed);
+      }
+    }
+    const auto padded_na_at = [&](std::size_t index) {
+      return index < padded_na.size() && padded_na[index] != 0;
+    };
     auto case_id = cell_at(fields, case_index);
     auto activity = cell_at(fields, activity_index);
     auto timestamp = timestamp_index ? cell_at(fields, *timestamp_index)
@@ -1652,14 +1696,16 @@ CsvEventData import_csv_event_data_impl(
     // read_csv reads a pandas NA spelling in any column as NaN, so in the
     // batch import resource, lifecycle and extra attribute cells holding one
     // are missing like blank cells (stream readers keep the literal text).
-    const auto na_attribute_cell = [&](const std::string& cell) {
-      return reference_batch && is_reference_na_token(cell);
+    const auto na_attribute_cell = [&](std::size_t index, const std::string& cell) {
+      return reference_batch && !padded_na_at(index) && is_reference_na_token(cell);
     };
-    if (na_attribute_cell(resource)) resource.clear();
+    if (resource_index && na_attribute_cell(*resource_index, resource)) resource.clear();
 
     const std::size_t token = case_tokens.size();
     case_tokens.push_back(case_id);
     activity_tokens.push_back(activity);
+    case_padded_na.push_back(padded_na_at(case_index) ? 1 : 0);
+    activity_padded_na.push_back(padded_na_at(activity_index) ? 1 : 0);
     // Whether an NA case id or activity is missing (the reference drops the
     // row) depends on the inferred column type, decided below. Whitespace-only
     // text is a value there, but the default trim_fields option has already
@@ -1700,7 +1746,7 @@ CsvEventData import_csv_event_data_impl(
     }
     if (lifecycle_index) {
       event.lifecycle = cell_at(fields, *lifecycle_index);
-      if (na_attribute_cell(event.lifecycle)) event.lifecycle.clear();
+      if (na_attribute_cell(*lifecycle_index, event.lifecycle)) event.lifecycle.clear();
       event.lifecycle_state = event.lifecycle.empty()
                                   ? FirstClassAttributeState::kMissing
                                   : FirstClassAttributeState::kPresent;
@@ -1710,7 +1756,7 @@ CsvEventData import_csv_event_data_impl(
       // A blank cell means the event simply has no such attribute; a short row
       // reads the same way rather than erroring, since these columns are extra.
       if (index >= fields.size() || fields[index].empty() ||
-          na_attribute_cell(fields[index]))
+          na_attribute_cell(index, fields[index]))
         continue;
       event.attributes.push_back(
           EventAttribute{header[index], fields[index], AttributeKind::kString});
@@ -1732,7 +1778,7 @@ CsvEventData import_csv_event_data_impl(
             (lifecycle_index && index == *lifecycle_index) ||
             std::find(attribute_indices.begin(), attribute_indices.end(),
                       index) != attribute_indices.end();
-        if (attribute_column && na_attribute_cell(cell.value)) cell.value.clear();
+        if (attribute_column && na_attribute_cell(index, cell.value)) cell.value.clear();
         const auto set_role = [&](FirstClassAttributeRole role,
                                   FirstClassAttributeState state) {
           cell.first_class_role = role;
@@ -1771,8 +1817,8 @@ CsvEventData import_csv_event_data_impl(
   std::vector<std::optional<std::string>> case_ids;
   std::vector<std::optional<std::string>> activities;
   if (reference_batch) {
-    case_ids = infer_reference_column(case_tokens).text;
-    activities = infer_reference_column(activity_tokens).text;
+    case_ids = infer_reference_column(case_tokens, &case_padded_na).text;
+    activities = infer_reference_column(activity_tokens, &activity_padded_na).text;
   } else {
     case_ids.assign(case_tokens.begin(), case_tokens.end());
     activities.assign(activity_tokens.begin(), activity_tokens.end());
@@ -1781,6 +1827,10 @@ CsvEventData import_csv_event_data_impl(
   case_tokens.shrink_to_fit();
   activity_tokens.clear();
   activity_tokens.shrink_to_fit();
+  case_padded_na.clear();
+  case_padded_na.shrink_to_fit();
+  activity_padded_na.clear();
+  activity_padded_na.shrink_to_fit();
   // Batch case-attribute cells per kept row (input_order), chosen per case
   // once the events are known.
   std::vector<std::vector<EventAttribute>> row_case_attributes;

@@ -96,25 +96,53 @@ OcelNumericColumn ocel_numeric_column(const Records& records, std::string_view k
   return missing || real ? OcelNumericColumn::kFloat : OcelNumericColumn::kInteger;
 }
 
-bool ocel_cell_equal(const OcelValue& cell, const OcelValue& value, OcelNumericColumn column) {
+bool ocel_cell_equal(const OcelValue& cell, const OcelValue& value, OcelNumericColumn column,
+                     bool object_list) {
   if (const auto* integer = std::get_if<std::int64_t>(&cell)) {
     if (column == OcelNumericColumn::kFloat)
       return ocel_python_equal(value, OcelValue(static_cast<double>(*integer)));
-    if (column == OcelNumericColumn::kInteger)
+    if (column == OcelNumericColumn::kInteger && !object_list)
       if (const auto* real = std::get_if<double>(&value))
         return static_cast<double>(*integer) == *real;
   }
   return ocel_python_equal(value, cell);
 }
 
+// The values as isin holds them (review Z1-3): a list of ints and floats
+// only is float64, so against a numeric column its ints are rounded to
+// doubles (2^53 + 1 next to 1.5 is 2.0^53); a list holding a bool, string or
+// null is an object array, compared with Python == even against an int64
+// column (2^53 + 1 does not equal 2.0^53 there); an object column compares
+// every list as given.
+struct OcelIsinValues {
+  std::vector<OcelValue> values;
+  bool object_list = false;
+};
+
+OcelIsinValues isin_values(const std::vector<OcelValue>& values, OcelNumericColumn column) {
+  OcelIsinValues result{values, false};
+  bool integer = false, real = false;
+  for (const auto& value : values) {
+    if (std::holds_alternative<std::int64_t>(value)) integer = true;
+    else if (std::holds_alternative<double>(value)) real = true;
+    else result.object_list = true;
+  }
+  if (result.object_list || !integer || !real || column == OcelNumericColumn::kObject)
+    return result;
+  for (auto& value : result.values)
+    if (const auto* number = std::get_if<std::int64_t>(&value))
+      value = static_cast<double>(*number);
+  return result;
+}
+
 bool has_attribute_value(const std::vector<OcelAttribute>& attributes,
                          std::string_view key,
-                         const std::vector<OcelValue>& values,
+                         const OcelIsinValues& values,
                          OcelNumericColumn column) {
   for (const auto& attribute : attributes) {
     if (attribute.key != key) continue;
-    for (const auto& value : values)
-      if (ocel_cell_equal(attribute.value, value, column)) return true;
+    for (const auto& value : values.values)
+      if (ocel_cell_equal(attribute.value, value, column, values.object_list)) return true;
   }
   return false;
 }
@@ -438,6 +466,7 @@ Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key
   }
   Ocel filtered = log;
   const auto column = ocel_numeric_column(log.events, attribute_key);
+  const auto column_values = isin_values(values, column);
   filter_records(filtered.events, [&](const OcelEvent& event) {
     // The id and activity are columns of the reference events frame, so
     // filter_ocel_event_attribute selects on them (ocel:timestamp holds
@@ -445,7 +474,7 @@ Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key
     const bool matches =
         attribute_key == "ocel:eid" ? contains_value(values, OcelValue(event.id))
         : attribute_key == "ocel:activity" ? contains_value(values, OcelValue(event.activity))
-        : has_attribute_value(event.attributes, attribute_key, values, column);
+        : has_attribute_value(event.attributes, attribute_key, column_values, column);
     return positive ? matches : !matches;
   });
   return propagate_event_filter(std::move(filtered));
@@ -684,12 +713,13 @@ Ocel filter_ocel_object_attribute(const Ocel& log,
   }
   Ocel filtered = log;
   const auto column = ocel_numeric_column(log.objects, attribute_key);
+  const auto column_values = isin_values(values, column);
   filter_records(filtered.objects, [&](const OcelObject& object) {
     // The id and type are columns of the reference objects frame.
     const bool matches =
         attribute_key == "ocel:oid" ? contains_value(values, OcelValue(object.id))
         : attribute_key == "ocel:type" ? contains_value(values, OcelValue(object.type))
-        : has_attribute_value(object.attributes, attribute_key, values, column);
+        : has_attribute_value(object.attributes, attribute_key, column_values, column);
     return positive ? matches : !matches;
   });
   return propagate_object_filter(std::move(filtered));

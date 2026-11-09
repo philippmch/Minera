@@ -41,7 +41,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Kpis } from "./components/Kpis";
 import { ProcessMap, variantHighlight } from "./components/ProcessMap";
 import { ProcessModel } from "./components/ProcessModel";
-import { openableLogFile } from "./opened-log-file";
+import { openableLogFile, sourceDisplayName } from "./opened-log-file";
 import { Conformance } from "./components/Conformance";
 import { Resources } from "./components/Resources";
 import { VariantList } from "./components/VariantList";
@@ -149,6 +149,10 @@ import {
   LiveSourceHandback,
   type LiveSourceRollback,
   delimiterForFile,
+  delimiterForHeader,
+  csvHeaderLine,
+  isDelimitedTextName,
+  columnNotFoundMessage,
   hasActiveFilters,
   hasActiveMinerOptions,
   displayedTab,
@@ -184,6 +188,8 @@ export default function App() {
   const [ocelFile, setOcelFile] = useState<File | null>(null);
   const [ocelDataset, setOcelDataset] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** A CSV whose columns did not match: the load error offers to open it in Source inspector. */
+  const [inspectableFile, setInspectableFile] = useState<File | null>(null);
   const [fontsReady, setFontsReady] = useState(false);
   const [threshold, setThreshold] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState<number | null>(null);
@@ -475,6 +481,8 @@ export default function App() {
     setPendingSourceFile(picked);
     const {ticket, controller, cancelsSettled} = beginSourceLoad();
     const accepts = () => sourceRequest.current?.controller === controller && sourceGate.current.accepts(ticket, controller.signal);
+    let csvHeader: string | null = null, usedDelimiter: string | undefined;
+    setInspectableFile(null);
     (async () => {
       // pm4py's OCEL XML/SQLite files become OCEL JSON and gzip CSV is
       // decompressed first, so neither reaches the CSV/XES path.
@@ -482,7 +490,11 @@ export default function App() {
       if (!accepts()) return;
       // Minera JSON exports open directly; object-centric JSON is discovered
       // through the local backend, and other files are mined as event logs.
-      let options: MineOptions = {...xesOptions, delimiter: delimiterForFile(file.name), xesActivityAttribute, ...miningOptions};
+      // CSV and TSV uploads take their delimiter from the header line (comma, semicolon, tab or pipe).
+      csvHeader = isDelimitedTextName(file.name) ? csvHeaderLine(await file.slice(0, 1 << 16).text()) : null;
+      if (!accepts()) return;
+      let options: MineOptions = {...xesOptions, delimiter: csvHeader === null ? delimiterForFile(file.name) : delimiterForHeader(file.name, csvHeader), xesActivityAttribute, ...miningOptions};
+      usedDelimiter = options.delimiter;
       if (isJsonExport(file.name) && options.miningInputFormat !== "table") {
         const classified = classifyMiningJson(activeMiningSourceText(await file.arrayBuffer()));
         if (!accepts()) return;
@@ -502,7 +514,7 @@ export default function App() {
           setExactInspection(null);
           setOcelResult(result);
           setOcelFile(file);
-          setOcelDataset(file.name);
+          setOcelDataset(sourceDisplayName(file));
           setSource(null);
           setSourceOutcome(null);
           setPendingSourceFile(null);
@@ -547,7 +559,7 @@ export default function App() {
         void acknowledgeMiningRequest(ticket.request_id);
     })()
       .catch((cause: Error) => {
-        if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} else failSourceLoad(sourceRequest.current); setError(`Could not load ${picked.name}: ${cause.message}`); if (/\.json$/i.test(picked.name)) setTool("active-source");}
+        if (accepts()) {if (cause instanceof OwnedExactFilterResult) {setExactInspection(cause.run);setOwnedExactInspection(true);clearSourceCaches();} else failSourceLoad(sourceRequest.current); const message = columnNotFoundMessage(cause.message, csvHeader, usedDelimiter); setError(`Could not load ${picked.name}: ${message}`); if (message !== cause.message) setInspectableFile(picked); if (/\.json$/i.test(picked.name)) setTool("active-source");}
       })
       .finally(() => {if (sourceRequest.current?.controller === controller) {sourceRequest.current = null; ocelRequest.current = null; setMining(false);}});
   };
@@ -948,6 +960,7 @@ export default function App() {
           onOpenTool={openTool}
           onOpenPalette={() => setPaletteOpen(true)}
           error={error}
+          onOpenInInspector={inspectableFile && error?.endsWith("Choose the columns in Source inspector.") ? () => {const file = inspectableFile; setInspectableFile(null); setError(null); setPendingSourceFile(file); setTool("active-source");} : undefined}
           mining={mining}
           onCancel={cancelSourceLoad}
           progress={miningProgress}

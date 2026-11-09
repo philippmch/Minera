@@ -81,8 +81,23 @@ export async function openableLogFile(file: File, signal?: AbortSignal): Promise
   if (route === "ocel_xml" || route === "ocel_sqlite") {
     const format = route === "ocel_sqlite" ? "sqlite" : ocelXmlFormat(await file.slice(0, 1 << 16).text());
     const run = await requestOcelIo({ ...defaultOcelIo("import"), format }, file, undefined, signal);
-    // The OCEL views post their source as JSON; the name keeps the original.
-    return new File([importedOcelFile(run)], `${file.name}.json`, { type: "application/json" });
+    // The OCEL views post their source as JSON; the name keeps the original, and the views show where it came from.
+    const converted = new File([importedOcelFile(run)], `${file.name}.json`, { type: "application/json" });
+    convertedOrigins.set(converted, { name: file.name, size: file.size });
+    return converted;
   }
   return file;
+}
+
+/** The upload a converted source was made from (OCEL XML or SQLite turned into OCEL JSON). */
+export interface ConvertedOrigin { name: string; size: number; }
+const convertedOrigins = new WeakMap<File, ConvertedOrigin>();
+/** Where `file` came from when it was converted on opening; undefined for a file opened as uploaded. */
+export const convertedOrigin = (file: File): ConvertedOrigin | undefined => convertedOrigins.get(file);
+/** The name to show for an opened source: the uploaded file's own name, also for a converted one. */
+export const sourceDisplayName = (file: File): string => convertedOrigins.get(file)?.name ?? file.name;
+/** "name · N bytes", or for a converted source "OCEL JSON converted from name (N bytes) · M bytes". */
+export function sourceBytesLabel(file: File): string {
+  const origin = convertedOrigins.get(file), bytes = (n: number) => `${n.toLocaleString("en-US")} bytes`;
+  return origin ? `OCEL JSON converted from ${origin.name} (${bytes(origin.size)}) · ${bytes(file.size)}` : `${file.name} · ${bytes(file.size)}`;
 }

@@ -2,7 +2,7 @@ import {ExactLiteralInput} from "./OriginalLtlFilter";
 import {LTL_COMPLETE_EXAMPLE,HEURISTIC_COMPLETE_EXAMPLE,literalFilterEditor,filterEditorControl,exactFilterFields,type ExactFilterControls} from "../exact-filter-controls";
 import {DiscoveryVectorInput} from "./DiscoveryVectorInput";
 import {parseDiscoveryStringVector, discoveryStringVectorValidation, type DiscoveryVectorMode} from "../discovery-string-vectors";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type AttributeFilterMode,
   type FilterOptions,
@@ -672,6 +672,9 @@ export function Filters({
   onExactEdit,
 }: FiltersProps) {
   const [open, setOpen] = useState(false);
+  // Long defaults ("Automatic (imported activity field)", business-hour slots) stay readable as a tooltip.
+  const body = useRef<HTMLDivElement>(null);
+  useEffect(() => { body.current?.querySelectorAll<HTMLInputElement>("input[placeholder]:not([title])").forEach(input => { input.title = input.placeholder; }); });
   const [topVariants, setTopVariants] = useState("");
   const [maxActivities, setMaxActivities] = useState("");
   const [topActivitiesAttributeKey, setTopActivitiesAttributeKey] = useState("");
@@ -2168,7 +2171,7 @@ export function Filters({
       </div>
 
       {open && (
-        <div className="filters-body">
+        <div className="filters-body" ref={body}>
           <div className="filters-row">
             <label className="filters-field">
               <span>Top variants</span>

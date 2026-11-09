@@ -11,6 +11,8 @@ interface LandingProps {
   onOpenTool?: (tool: ToolId) => void;
   onOpenPalette?: () => void;
   error: string | null;
+  /** Offered with a column-not-found error: opens the same file in Source inspector to choose its columns. */
+  onOpenInInspector?: () => void;
   mining: boolean;
   /** Stops the load in progress; shown as a Cancel button while mining. */
   onCancel?: () => void;
@@ -24,7 +26,7 @@ const SAMPLES = [
   { key: "resource", title: "Resource handovers", detail: "Small log with resources", text: "Mine a sample with resource relationships" },
 ] as const;
 
-export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, onOpenTool, onOpenPalette, error, mining, onCancel, progress }: LandingProps) {
+export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadResourceSample, onOpenTool, onOpenPalette, error, onOpenInInspector, mining, onCancel, progress }: LandingProps) {
   const [query, setQuery] = useState("");
   const groups = useMemo(() => groupTools(searchTools(query, EVERYDAY_TOOLS)), [query]);
   const reference = useMemo(() => groupTools(searchTools(query, REFERENCE_TOOLS)), [query]);
@@ -89,7 +91,7 @@ export function Landing({ onOpenFile, onLoadSample, onLoadOcelSample, onLoadReso
 
         {mining && onCancel
           ? <div className="landing-error landing-status" role="status">Mining the event log… <MiningProgress progress={progress} /><button className="btn-ghost landing-cancel" onClick={onCancel}>Cancel</button></div>
-          : error && <div className="error-banner landing-error" role="alert">{error}</div>}
+          : error && <div className="error-banner landing-error" role="alert">{error}{onOpenInInspector && <> <button className="btn-ghost landing-inspect" onClick={onOpenInInspector}>Open in Source inspector</button></>}</div>}
 
         <div className="landing-samples reveal" aria-label="Sample data">
           <span className="section-label">Or start from a sample</span>

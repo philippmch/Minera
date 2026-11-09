@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { alignmentQuery, basicPlayoutQuery, dfgAlignmentQuery, dfgPlayoutQuery, stochasticPlayoutQuery, editDistanceFormEntries, mineFormEntries, parseDfgCostMapInput, parseMarkingInput, processTreeAlignmentQuery, processTreePlayoutQuery, decomposedAlignmentQuery, petriAntiAlignmentQuery, petriMultiAlignmentQuery, processTreeReductionQuery, evaluationQuery, emdQuery, petriAnalysisQuery, conceptDriftQuery, logToTargetQuery, requestLogToTarget, trieQuery, requestTrie, intervalTreeQuery, requestIntervalTree, caseRelationsQuery, requestCaseRelations, randomTreeQuery, requestRandomTree, xesExportQuery, type FilterOptions } from "../src/api";
 import {
   delimiterForFile,
+  delimiterForHeader,
+  csvHeaderLine,
+  csvHeaderNames,
+  columnNotFoundMessage,
+  isDelimitedTextName,
   evaluationModelIds,
   hasActiveFilters,
   hasActiveMinerOptions,
@@ -921,6 +926,27 @@ describe("file routing", () => {
     expect(delimiterForFile("LOG.TSV")).toBe("\t");
     expect(delimiterForFile("log.csv")).toBeUndefined();
     expect(delimiterForFile("log")).toBeUndefined();
+  });
+
+  it("detects a CSV delimiter from the header line and keeps the comma as the backend default", () => {
+    expect(delimiterForHeader("a.csv", "case_id,activity,timestamp")).toBeUndefined();
+    expect(delimiterForHeader("a.csv", "case_id;activity;timestamp")).toBe(";");
+    expect(delimiterForHeader("a.csv", "case_id\tactivity\ttimestamp")).toBe("\t");
+    expect(delimiterForHeader("a.csv", "case_id|activity|timestamp")).toBe("|");
+    expect(delimiterForHeader("a.csv", '"case;id",activity,timestamp')).toBeUndefined();
+    expect(delimiterForHeader("a.csv", "case_id;activity,timestamp")).toBeUndefined();
+    expect(delimiterForHeader("a.tsv", "single")).toBe("\t");
+    expect(delimiterForHeader("a.csv", "single")).toBeUndefined();
+    expect(csvHeaderLine('\ufeff"a\nb",c\r\n1,2')).toBe('"a\nb",c');
+    expect(csvHeaderNames('"x ""y""";z', ";")).toEqual(['x "y"', "z"]);
+    expect(isDelimitedTextName("LOG.TSV")).toBe(true);
+    expect(isDelimitedTextName("log.xes")).toBe(false);
+  });
+
+  it("adds the header names to a column-not-found message only", () => {
+    expect(columnNotFoundMessage("CSV column not found: case_id", "Case ID;Activity", ";")).toBe('CSV column not found: case_id (the header has "Case ID", "Activity"). Choose the columns in Source inspector.');
+    expect(columnNotFoundMessage("XML is not well-formed", "a,b", undefined)).toBe("XML is not well-formed");
+    expect(columnNotFoundMessage("CSV column not found: case_id", null, undefined)).toBe("CSV column not found: case_id");
   });
 
   it("recognizes classic and standard object-centric JSON envelopes", () => {

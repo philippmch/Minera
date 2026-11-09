@@ -130,6 +130,11 @@ describe("case rows with repeated case ids", () => {
     expect(new Set(rows.map(row => row.key)).size).toBe(traces.length);
     expect(rows[2].trace).toBe(traces[2]);
   });
+  it("lists case ids in natural order", () => {
+    const ids = ["C0", "C1", "C10", "C100", "C2", "c3"].map(case_id => ({ case_id }));
+    expect(caseRowEntries(ids, "").map(row => row.trace.case_id)).toEqual(["C0", "C1", "C2", "c3", "C10", "C100"]);
+    expect(caseRowEntries(ids, "").map(row => row.key)).toEqual([0, 1, 4, 5, 2, 3]);
+  });
   it("keeps trace positions as keys while filtering", () => {
     expect(caseRowEntries(traces, " 007 ").map(row => row.key)).toEqual([0, 2]);
     expect(caseRowEntries(traces, "7").map(row => row.key)).toEqual([0, 1, 2]);
