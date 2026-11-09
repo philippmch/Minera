@@ -3406,14 +3406,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1231",
+        "Content-Length": "1234",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "powl_to_tree-native-optional.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_tree-native-optional.response.json",
-        "bytes": 1231,
-        "sha256": "9268083b0212ff34c62862c54af666b473aebaa475177a39967dfd62ba8a8e28",
+        "bytes": 1234,
+        "sha256": "9af2c9a52054456ad6df8e7eaf451f71baf0814d01cbe3598b81ca1859e6d7c6",
         "status": 200
       },
       "family": "model_conversion",
@@ -3437,8 +3437,8 @@
         "result_ptml": {
           "filename": "powl_to_tree-native-optional.result_ptml.ptml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_tree-native-optional.result_ptml.ptml",
-          "bytes": 190,
-          "sha256": "f6c68cbacfe22e94bc62a294aa3e6d2c564f0da918933d4b52ece9281201cd01",
+          "bytes": 194,
+          "sha256": "6eaa9427a34c56b9c31f98040b06146a120a0d2c44191f783775e79c01621305",
           "format": "ptml"
         }
       }
@@ -3476,14 +3476,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1232",
+        "Content-Length": "1235",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "powl_to_tree-native-repeat.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_tree-native-repeat.response.json",
-        "bytes": 1232,
-        "sha256": "feb97de0758588a29adcb829e0f93d1f337099b3c9f7a56d0b3311224622c8bb",
+        "bytes": 1235,
+        "sha256": "88e274ab9d0638a22c48743d562885e17892f3396e2db32f8c4e12342964ccd4",
         "status": 200
       },
       "family": "model_conversion",
@@ -3507,8 +3507,8 @@
         "result_ptml": {
           "filename": "powl_to_tree-native-repeat.result_ptml.ptml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_tree-native-repeat.result_ptml.ptml",
-          "bytes": 190,
-          "sha256": "4732800d507846e42a37524a4c8f119060fcf40b446f42ead1992e142e3ba9c0",
+          "bytes": 194,
+          "sha256": "3697819912c242347aa6bc78847c2d5957377ea039419a9b826f2bb30f2ff6ba",
           "format": "ptml"
         }
       }
@@ -3546,14 +3546,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1241",
+        "Content-Length": "1244",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "powl_to_tree-native-optional-repeat.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_tree-native-optional-repeat.response.json",
-        "bytes": 1241,
-        "sha256": "918da9b75d57f21a3d5ee87541d86002c9946eb5343d86506a3ed3d57c0a760a",
+        "bytes": 1244,
+        "sha256": "7ea832a14d828cad764886e1aa444174a8532b3452452683f6dd739861f31390",
         "status": 200
       },
       "family": "model_conversion",
@@ -3577,8 +3577,8 @@
         "result_ptml": {
           "filename": "powl_to_tree-native-optional-repeat.result_ptml.ptml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_tree-native-optional-repeat.result_ptml.ptml",
-          "bytes": 190,
-          "sha256": "4732800d507846e42a37524a4c8f119060fcf40b446f42ead1992e142e3ba9c0",
+          "bytes": 194,
+          "sha256": "3697819912c242347aa6bc78847c2d5957377ea039419a9b826f2bb30f2ff6ba",
           "format": "ptml"
         }
       }
@@ -4386,14 +4386,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "1477",
+        "Content-Length": "1485",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "powl_to_tree-native-unicode-wtf8-control-label.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_tree-native-unicode-wtf8-control-label.response.json",
-        "bytes": 1477,
-        "sha256": "6087af941cc7f32f36e5c6b0e485633edeca0f434cfa90b9088213f6a22fe2d1",
+        "bytes": 1485,
+        "sha256": "0a2cdb00118413650075a5d16b16d615dd241e05ddf4ec5983c0027ca2348d58",
         "status": 200
       },
       "family": "model_conversion",
@@ -4417,8 +4417,8 @@
         "result_ptml": {
           "filename": "powl_to_tree-native-unicode-wtf8-control-label.result_ptml.ptml",
           "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/powl_to_tree-native-unicode-wtf8-control-label.result_ptml.ptml",
-          "bytes": 219,
-          "sha256": "b30e9c8dea58748f9e29c2e80cf18e8e09c4db063f1066b2f88365ae54489c95",
+          "bytes": 230,
+          "sha256": "a7f9dbb09660f3f399daebb7ec00e10de96a824b7274e5412aada6dc3a31469d",
           "format": "ptml"
         }
       }
@@ -6725,7 +6725,7 @@
         "bytes": 1588,
         "sha256": "75a2d9752c13a5615c870f74bc2c4077c305fa38b29acdc1dab81ce67a4e1eef"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "model": {
         "filename": "owned-net-literal-label.pnml",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-literal-label.pnml",
@@ -6735,41 +6735,26 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "5090",
+        "Content-Length": "95",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "net_to_powl-native-literal-label.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_powl-native-literal-label.response.json",
-        "bytes": 5090,
-        "sha256": "b6cffc702214acea47479c27d6b2d49fc7e929ace79cb06d50e33527b45ddfae",
-        "status": 200
+        "bytes": 95,
+        "sha256": "7a48f1d8e67ec4a7dbbb393675aad6c99d157c1856e0266b87fc9ff497e8515f",
+        "status": 400
       },
       "family": "model_conversion",
       "operation": "net_to_powl",
       "model_format": "pnml",
       "executed": true,
-      "error": null,
+      "error": "XML is not well-formed: character U+0000 is not allowed in XML (line 21, column 3)",
       "coverage_tags": {
         "net_case": "literal-label",
         "literal": " \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "
       },
-      "exports": {
-        "source_pnml": {
-          "filename": "net_to_powl-native-literal-label.source_pnml.pnml",
-          "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_powl-native-literal-label.source_pnml.pnml",
-          "bytes": 1007,
-          "sha256": "0c38b8ff308a29a713f0bce6366c9d9fbae3019de07f805b475dc5f577354895",
-          "format": "pnml"
-        },
-        "result_powl": {
-          "filename": "net_to_powl-native-literal-label.result_powl.powl",
-          "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_powl-native-literal-label.result_powl.powl",
-          "bytes": 46,
-          "sha256": "586d64ee385ae8bcaba1177c2b8533a3923031c847d429c402aec00b197d3745",
-          "format": "powl"
-        }
-      }
+      "exports": {}
     },
     {
       "id": "net_to_powl-native-duplicate-visible-labels",
@@ -7431,7 +7416,7 @@
         "bytes": 2216,
         "sha256": "f662760a06bf2f7f34f0ec9ec02f903720df43e8b91738dcfa8be0f4c3720b73"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "model": {
         "filename": "owned-net-literal-label-chain.pnml",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/models/owned-net-literal-label-chain.pnml",
@@ -7441,41 +7426,26 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "7324",
+        "Content-Length": "95",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "net_to_tree-native-literal-label.response.json",
         "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-literal-label.response.json",
-        "bytes": 7324,
-        "sha256": "3ec2af7822e980675b4f96950e0dcc29355750539555d7686331d448405bd3b3",
-        "status": 200
+        "bytes": 95,
+        "sha256": "7a48f1d8e67ec4a7dbbb393675aad6c99d157c1856e0266b87fc9ff497e8515f",
+        "status": 400
       },
       "family": "model_conversion",
       "operation": "net_to_tree",
       "model_format": "pnml",
       "executed": true,
-      "error": null,
+      "error": "XML is not well-formed: character U+0000 is not allowed in XML (line 21, column 3)",
       "coverage_tags": {
         "net_case": "literal-label",
         "literal": " \u6771\u4eac,;\"\\\n\r\t\u0000 \ud800 X \udfff \ud83d\ude00 "
       },
-      "exports": {
-        "source_pnml": {
-          "filename": "net_to_tree-native-literal-label.source_pnml.pnml",
-          "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-literal-label.source_pnml.pnml",
-          "bytes": 1509,
-          "sha256": "3cfeb1b24f793db2db0e0a01296164dd8dda0057bd1e5036219c03ba368153d4",
-          "format": "pnml"
-        },
-        "result_ptml": {
-          "filename": "net_to_tree-native-literal-label.result_ptml.ptml",
-          "path": "src/frontend/tests/fixtures/model-conversion-workbench/captures/net_to_tree-native-literal-label.result_ptml.ptml",
-          "bytes": 219,
-          "sha256": "b30e9c8dea58748f9e29c2e80cf18e8e09c4db063f1066b2f88365ae54489c95",
-          "format": "ptml"
-        }
-      }
+      "exports": {}
     },
     {
       "id": "net_to_tree-native-duplicate-visible-labels",

@@ -19,6 +19,18 @@ namespace minera::tools {
 [[nodiscard]] inline std::optional<ModelConformance> pnml_conformance_weight_gate(
     const PetriNet& net, std::string miner = "imported") {
   if (!net.has_compact_ordinary_arcs()) return std::nullopt;
+  // Parallel unit arcs (a BPMN import or a PNML file with two arcs between
+  // one place and one transition) replay and align as the reference does.
+  const auto unit = [](const std::vector<PetriArcWeight>& weights) {
+    return std::all_of(weights.begin(), weights.end(), [](const PetriArcWeight& weight) {
+      return weight.magnitude == 1 && !weight.negative;
+    });
+  };
+  if (std::all_of(net.transitions().begin(), net.transitions().end(),
+                  [&](const PetriTransition& transition) {
+                    return unit(transition.input_weights) && unit(transition.output_weights);
+                  }))
+    return std::nullopt;
   ModelConformance result;
   result.miner = std::move(miner);
   result.computed = false;

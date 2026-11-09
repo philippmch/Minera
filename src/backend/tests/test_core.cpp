@@ -2315,8 +2315,14 @@ void parse_bpmn_rejects_unsupported_models() {
       <sequenceFlow id="f1" sourceRef="a" targetRef="e"/>
     </process></definitions>)");
   }));
-  // No process at all.
-  assert(throws([] { (void)minera::parse_bpmn("<definitions/>"); }));
+  // No process at all: like the reference, a net of just source and sink.
+  {
+    const auto empty = minera::parse_bpmn("<definitions/>");
+    assert(empty.place_count() == 2 && empty.transitions().empty());
+  }
+  // Markup that is not well-formed, or uses an undeclared prefix, is refused.
+  assert(throws([] { (void)minera::parse_bpmn("<definitions><process id=\"p\">"); }));
+  assert(throws([] { (void)minera::parse_bpmn("<bpmn:definitions/>"); }));
 }
 
 // A weighted arc moves its weight in tokens: "a" puts two tokens on the
@@ -2646,16 +2652,54 @@ void parse_ptml_rejects_malformed_trees() {
       <parentsNode id="e0" sourceId="n0" targetId="ghost"/>
     </processTree></ptml>)");
   }));
-  // A node with two parents is not a tree.
-  assert(throws([] {
-    (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
+  // A node with two parents is shared by both, as the reference reads it.
+  {
+    const auto shared = minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
       <sequence id="n0" name=""/><xor id="n1" name=""/>
       <manualTask id="n2" name="a"/>
       <parentsNode id="e0" sourceId="n0" targetId="n1"/>
       <parentsNode id="e1" sourceId="n0" targetId="n2"/>
       <parentsNode id="e2" sourceId="n1" targetId="n2"/>
     </processTree></ptml>)");
+    assert(shared.root().children.size() == 2);
+    assert(shared.root().children[1].op == minera::ProcessTreeOperator::kActivity);
+  }
+  // A tree without its root attribute, a node without a name, an unknown or
+  // namespaced tag, and markup that is not well-formed are refused.
+  assert(throws([] {
+    (void)minera::parse_ptml(R"(<ptml><processTree id="t">
+      <manualTask id="n0" name="a"/></processTree></ptml>)");
   }));
+  assert(throws([] {
+    (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
+      <manualTask id="n0"/></processTree></ptml>)");
+  }));
+  assert(throws([] {
+    (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
+      <manualTask id="n0" name="a"/><andLoop id="n1" name=""/></processTree></ptml>)");
+  }));
+  assert(throws([] {
+    (void)minera::parse_ptml(R"(<ptml xmlns="http://x"><processTree id="t" root="n0">
+      <manualTask id="n0" name="a"/></processTree></ptml>)");
+  }));
+  assert(throws([] {
+    (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">
+      <manualTask id="n0" name="a"></processTree></ptml>)");
+  }));
+  // The last of several trees is the one read; a loop of four children is a
+  // body with three redo alternatives.
+  {
+    const auto loop = minera::parse_ptml(R"(<ptml>
+      <processTree id="t" root="n0"><manualTask id="n0" name="first"/></processTree>
+      <processTree id="u" root="l"><xorLoop id="l" name=""/>
+      <manualTask id="a" name="a"/><manualTask id="b" name="b"/>
+      <manualTask id="c" name="c"/><manualTask id="d" name="d"/>
+      <parentsNode sourceId="l" targetId="a"/><parentsNode sourceId="l" targetId="b"/>
+      <parentsNode sourceId="l" targetId="c"/><parentsNode sourceId="l" targetId="d"/>
+      </processTree></ptml>)");
+    assert(loop.root().op == minera::ProcessTreeOperator::kLoop);
+    assert(loop.root().children.size() == 4);
+  }
   // An operator with no children.
   assert(throws([] {
     (void)minera::parse_ptml(R"(<ptml><processTree id="t" root="n0">

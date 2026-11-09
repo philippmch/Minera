@@ -587,6 +587,16 @@ ReplayFitnessResult evaluate_replay_fitness(
     const EventLog& log, const PetriNet& net, ReplayFitnessVariant variant,
     const ReplayFitnessOptions& options) {
   enforce_evaluation_event_log_cap(log, options.max_rows_to_materialize);
+  if (options.trace_order) {
+    std::vector<bool> seen(log.traces.size(), false);
+    bool valid = options.trace_order->size() == log.traces.size();
+    for (const auto position : *options.trace_order) {
+      if (!valid) break;
+      valid = position < seen.size() && !seen[position];
+      if (valid) seen[position] = true;
+    }
+    if (!valid) throw std::invalid_argument("evaluation: trace order must list every trace once");
+  }
   ReplayFitnessResult out;
   out.trace_count = log.trace_count();
   switch (variant) {
@@ -766,6 +776,18 @@ ReplayFitnessResult evaluate_replay_fitness(
         throw std::domain_error("float division by zero");
       throw;
     }
+    // Rows in the requested trace order, numbered by their new positions, as
+    // a log that listed its traces so would give them.
+    const auto* trace_order = options.trace_order ? &*options.trace_order : nullptr;
+    if (trace_order) {
+      std::vector<TokenReplayTraceDiagnostics> ordered;
+      ordered.reserve(rows.size());
+      for (std::size_t k = 0; k < trace_order->size(); ++k) {
+        ordered.push_back(std::move(rows[(*trace_order)[k]]));
+        ordered.back().trace_index = k;
+      }
+      rows = std::move(ordered);
+    }
     out = evaluate_replay_fitness(rows);
     out.token_result.activity_attribute = alignment_options.activity_attribute;
     out.token_result.transition_frequencies.assign(net.transitions().size(), 0);
@@ -777,7 +799,7 @@ ReplayFitnessResult evaluate_replay_fitness(
     // typed activities which share the same display spelling.
     for (std::size_t i = 0; i < rows.size(); ++i) {
       auto& detail = out.token_result.variants[i];
-      for (const auto& event : log.traces[i].events) {
+      for (const auto& event : log.traces[trace_order ? (*trace_order)[i] : i].events) {
         const bool primary = options.activity_attribute.empty() ||
                              options.activity_attribute == "concept:name" ||
                              options.activity_attribute == "activity";
@@ -810,8 +832,15 @@ ReplayFitnessResult evaluate_replay_fitness(
         });
     return out;
   } else if (decomposed_options) {
-    const auto projected = project_evaluation_activity(
+    auto projected = project_evaluation_activity(
         log, alignment_options.activity_attribute);
+    if (options.trace_order) {
+      std::vector<Trace> ordered;
+      ordered.reserve(projected.traces.size());
+      for (const auto position : *options.trace_order)
+        ordered.push_back(std::move(projected.traces[position]));
+      projected.traces = std::move(ordered);
+    }
     auto decomposed = align_decomposed(projected, net, *decomposed_options);
     out.computed = decomposed.complete;
     out.exhausted = decomposed.exhausted || decomposed.timed_out;
@@ -835,6 +864,7 @@ ReplayFitnessResult evaluate_replay_fitness(
     }
     out.decomposed_alignment_result = std::move(decomposed);
   } else {
+    alignment_options.trace_order = options.trace_order ? &*options.trace_order : nullptr;
     out.alignment_result = check_alignment(log, net, alignment_options);
     out.computed = out.alignment_result.computed;
     out.exhausted = out.alignment_result.exhausted;

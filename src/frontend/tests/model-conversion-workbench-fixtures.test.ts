@@ -38,7 +38,12 @@ const manifestPath = captureDirectory ? resolve(captureDirectory, "request-manif
 if (!existsSync(manifestPath)) throw new Error("Complete own-server model conversion captures are required. Supply MINERA_MODEL_CONVERSION_CAPTURE_DIR or publish the portable fixture manifest.");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as CapturedManifest;
 if (manifest.complete !== true || manifest.feature !== 56 || !Array.isArray(manifest.entries) || !manifest.entries.length) throw new Error("The model conversion manifest is not a complete real native capture.");
-const entries = manifest.entries, exportDirectory = environment.MINERA_MODEL_CONVERSION_EXPORT_DIR;
+// A model file that is not well-formed XML, or a PTML tag the reference does not know, is refused by
+// the model reader before the workbench runs (Review AH2): a plain 400 error, not a workbench envelope.
+const readerRefusal = (entry: {expected_status: number; error?: unknown}) => entry.expected_status === 400 &&
+  typeof entry.error === "string" && /^(XML is not well-formed|PTML unknown tag)/.test(entry.error);
+const readerRefusals = manifest.entries.filter(readerRefusal);
+const entries = manifest.entries.filter(entry => !readerRefusal(entry)), exportDirectory = environment.MINERA_MODEL_CONVERSION_EXPORT_DIR;
 if (new Set(entries.map(entry => entry.id.toLowerCase())).size !== entries.length) throw new Error("Native request identifiers must be casefold unique.");
 const digest = (bytes: string | Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 function pathInWorkspace(path: string): string {const full = isAbsolute(path) ? resolve(path) : resolve(root, path), child = relative(root, full); if (child.startsWith("..") || isAbsolute(child)) throw new Error("Fixture and export paths must stay in the workspace."); return full;}
@@ -174,5 +179,12 @@ describe("actual own-server original-model conversion and reduction fixtures", (
     expect(proofs.map(proof => proof.id)).toEqual(entries.map(entry => entry.id)); if (!exportDirectory) return;
     const integrity = {complete: true, manifest: manifestPath, manifest_sha256: digest(readFileSync(manifestPath)), entries: proofs, verified_numeric_literals: proofs.reduce((sum, proof) => sum + proof.verified_numeric_literals, 0), csv_cells: proofs.reduce((sum, proof) => sum + proof.csv_cells, 0), selected_records: proofs.reduce((sum, proof) => sum + proof.selected_records, 0), selected_numeric_literals: proofs.reduce((sum, proof) => sum + proof.selected_numeric_literals, 0)};
     immutableWrite(pathInWorkspace(resolve(exportDirectory, "export-integrity.json")), Buffer.from(JSON.stringify(integrity, null, 2) + "\n"));
+  });
+});
+
+describe("model reader refusals", () => {
+  for (const entry of readerRefusals) it(`${entry.id} is refused by the strict model reader`, () => {
+    expect(entry.response.status).toBe(400);
+    expect(JSON.parse(responseText(entry))).toEqual({error: entry.error});
   });
 });

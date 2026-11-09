@@ -691,10 +691,16 @@ struct EventLog {
 void merge_dataframe_cases(
     EventLog& log, std::vector<std::vector<std::size_t>>* frame_rows = nullptr);
 
-// The positions of the log's traces in the stable code-point order of their
-// case ids: the order in which pm4py's DataFrame conformance lists (log
-// skeleton, Declare) give their cases, and in which its log-skeleton
-// discovery meets them.
+// The positions of the log's traces in the stable order in which pandas sorts
+// a frame's case column: the order in which pm4py's DataFrame conformance
+// lists (log skeleton, Declare, token replay, alignments) give their cases,
+// and in which its log-skeleton discovery meets them. String ids follow
+// code-point order. Typed ids (an XES int, float, boolean or date
+// case:concept:name, read from Trace::case_id_attribute) come before the
+// strings, by value: numbers (booleans as 0 and 1) numerically, dates by
+// instant, numbers before dates (pandas cannot compare those; pm4py raises).
+// A trace without an id comes first (pm4py refuses such a frame), a float
+// NaN id after the numbers.
 [[nodiscard]] std::vector<std::size_t> case_id_order(const EventLog& log);
 
 // Puts the log's traces in case_id_order. pm4py's token replay and alignment

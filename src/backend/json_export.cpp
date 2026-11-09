@@ -107,8 +107,9 @@ void write_process_tree_node(std::ostream& out,
   out << '}';
 }
 
-// AnalysisConstraintCaseOrder's order for the per-case lists (null: log
-// order).
+// AnalysisConstraintCaseOrder's order for the constraint lists (null: log
+// order). Per-case token-replay and alignment lists are put in their own
+// log's case order where they are computed (case_list_order.hpp).
 thread_local const std::vector<std::size_t>* t_constraint_case_order = nullptr;
 
 // The trace position of the k-th constraint-list entry.
@@ -120,15 +121,6 @@ std::size_t constraint_list_trace(std::size_t k, std::size_t count) {
   return (*order)[k];
 }
 
-// The same for the per-case token-replay and process-tree alignment lists,
-// which hold one entry per trace of the log the scope's order was made for.
-// A list of another length (results of a projected or filtered log) keeps
-// its own order.
-std::size_t case_list_trace(std::size_t k, std::size_t count) {
-  const auto* order = t_constraint_case_order;
-  if (order == nullptr || order->size() != count) return k;
-  return (*order)[k];
-}
 
 std::string_view process_tree_alignment_variant_name(ProcessTreeAlignmentVariant variant) {
   switch (variant) {
@@ -170,7 +162,7 @@ void write_process_tree_alignment(std::ostream& out,
   write_json_string(out, result.diagnostics.message);
   out << "}, \"traces\": [";
   for (std::size_t i = 0; i < result.traces.size(); ++i) {
-    const auto& trace = result.traces[case_list_trace(i, result.traces.size())];
+    const auto& trace = result.traces[i];
     if (i != 0) out << ", ";
     out << "{\"trace\": [";
     for (std::size_t j = 0; j < trace.trace.size(); ++j) {
@@ -1935,7 +1927,7 @@ void write_conformance(std::ostream& out,
     const auto& traces = *conformance.trace_diagnostics;
     for (std::size_t i = 0; i < traces.size(); ++i) {
       if (i) out << ", ";
-      write_token_replay_trace(out, traces[case_list_trace(i, traces.size())]);
+      write_token_replay_trace(out, traces[i]);
     }
     out << ']';
   }

@@ -1,12 +1,15 @@
 #include "minera/event_log.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <numeric>
 #include <iterator>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include "minera/timestamp.hpp"
@@ -195,11 +198,114 @@ void merge_dataframe_cases(EventLog& log,
   if (frame_rows) *frame_rows = std::move(rows);
 }
 
+namespace {
+
+// Where a case id falls in the order pandas sorts a frame's case column
+// (observed through pm4py's public frame results): ids without a value
+// first (pm4py refuses them; see case_id_order), then the typed ids that
+// are not strings, by value, then the strings in code-point order. pandas
+// cannot compare numbers with dates (pm4py raises); here numbers go first.
+struct CaseIdKey {
+  enum Rank { kNone, kNumber, kNotANumber, kDate, kText } rank = kText;
+  bool integral = false;
+  bool negative = false;      // integral ids: sign of the value
+  std::uint64_t magnitude = 0;  // integral ids: absolute value
+  double real = 0;
+  ParsedExactTimestamp instant{};
+  const std::string* text = nullptr;
+};
+
+CaseIdKey case_id_key(const Trace& trace) {
+  CaseIdKey key;
+  key.text = &trace.case_id;
+  const auto& cell = trace.case_id_attribute;
+  if (!trace.has_case_id() || trace.case_id_state == FirstClassAttributeState::kNull ||
+      (cell && cell->is_null)) {
+    key.rank = CaseIdKey::kNone;
+    return key;
+  }
+  if (!cell) return key;
+  const auto& value = static_cast<const NativeAttributeValue::Base&>(cell->typed_value);
+  if (cell->kind == AttributeKind::kInt || cell->kind == AttributeKind::kBoolean ||
+      cell->kind == AttributeKind::kFloat) {
+    if (const auto* number = std::get_if<std::int64_t>(&value)) {
+      key.rank = CaseIdKey::kNumber, key.integral = true, key.negative = *number < 0;
+      key.magnitude = *number < 0 ? static_cast<std::uint64_t>(-(*number + 1)) + 1
+                                  : static_cast<std::uint64_t>(*number);
+    } else if (const auto* number = std::get_if<std::uint64_t>(&value)) {
+      key.rank = CaseIdKey::kNumber, key.integral = true, key.magnitude = *number;
+    } else if (const auto* flag = std::get_if<bool>(&value)) {
+      key.rank = CaseIdKey::kNumber, key.integral = true, key.magnitude = *flag ? 1 : 0;
+    } else if (const auto* number = std::get_if<double>(&value)) {
+      key.rank = std::isnan(*number) ? CaseIdKey::kNotANumber : CaseIdKey::kNumber;
+      key.real = *number;
+    }
+  } else if (cell->kind == AttributeKind::kDate) {
+    const auto* date = std::get_if<NativeDate>(&value);
+    if (auto instant = parse_timestamp_exact(date ? date->value : cell->value)) {
+      key.rank = CaseIdKey::kDate, key.instant = *instant;
+    }
+  }
+  return key;
+}
+
+// Exact three-way comparison of two integers held as sign and magnitude.
+int compare_integers(bool negative_a, std::uint64_t a, bool negative_b, std::uint64_t b) {
+  negative_a = negative_a && a != 0;
+  negative_b = negative_b && b != 0;
+  if (negative_a != negative_b) return negative_a ? -1 : 1;
+  const int magnitude = a < b ? -1 : b < a ? 1 : 0;
+  return negative_a ? -magnitude : magnitude;
+}
+
+// Exact three-way comparison of an integer with a float that is not NaN,
+// as Python compares int and float (no rounding of the integer).
+int compare_integer_real(bool negative, std::uint64_t magnitude, double real) {
+  if (std::isinf(real)) return real > 0 ? -1 : 1;
+  const double whole = std::trunc(real);
+  constexpr double kTwo64 = 18446744073709551616.0;
+  if (whole >= kTwo64) return -1;
+  if (whole <= -kTwo64) return 1;
+  const bool real_negative = whole < 0;
+  const auto real_magnitude = static_cast<std::uint64_t>(std::fabs(whole));
+  const int result = compare_integers(negative, magnitude, real_negative, real_magnitude);
+  if (result != 0) return result;
+  const double fraction = real - whole;
+  return fraction > 0 ? -1 : fraction < 0 ? 1 : 0;
+}
+
+bool case_id_less(const CaseIdKey& left, const CaseIdKey& right) {
+  if (left.rank != right.rank) return left.rank < right.rank;
+  switch (left.rank) {
+    case CaseIdKey::kNumber:
+      if (left.integral && right.integral)
+        return compare_integers(left.negative, left.magnitude, right.negative, right.magnitude) < 0;
+      if (left.integral) return compare_integer_real(left.negative, left.magnitude, right.real) < 0;
+      if (right.integral) return compare_integer_real(right.negative, right.magnitude, left.real) > 0;
+      return left.real < right.real;
+    case CaseIdKey::kDate:
+      if (left.instant.seconds != right.instant.seconds)
+        return left.instant.seconds < right.instant.seconds;
+      return left.instant.nanoseconds < right.instant.nanoseconds;
+    case CaseIdKey::kText:
+      return *left.text < *right.text;
+    case CaseIdKey::kNone:
+    case CaseIdKey::kNotANumber:
+      return false;
+  }
+  return false;
+}
+
+}  // namespace
+
 std::vector<std::size_t> case_id_order(const EventLog& log) {
+  std::vector<CaseIdKey> keys;
+  keys.reserve(log.traces.size());
+  for (const auto& trace : log.traces) keys.push_back(case_id_key(trace));
   std::vector<std::size_t> order(log.traces.size());
   std::iota(order.begin(), order.end(), std::size_t{0});
   std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-    return log.traces[a].case_id < log.traces[b].case_id;
+    return case_id_less(keys[a], keys[b]);
   });
   return order;
 }

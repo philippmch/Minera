@@ -38,7 +38,12 @@ const manifestPath = captureDirectory ? resolve(captureDirectory, "request-manif
 if (!existsSync(manifestPath)) throw new Error("Complete own-server graph alignment captures are required. Supply MINERA_GRAPH_ALIGNMENT_CAPTURE_DIR or publish the portable fixture manifest.");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as CapturedManifest;
 if (manifest.complete !== true || manifest.feature !== 52 || !Array.isArray(manifest.entries) || !manifest.entries.length) throw new Error("The graph alignment request manifest is not a complete real capture.");
-const entries = manifest.entries;
+// A model file that is not well-formed XML, or a PTML tag the reference does not know, is refused by
+// the model reader before the workbench runs (Review AH2): a plain 400 error, not a workbench envelope.
+const readerRefusal = (entry: {expected_status: number; error?: unknown}) => entry.expected_status === 400 &&
+  typeof entry.error === "string" && /^(XML is not well-formed|PTML unknown tag)/.test(entry.error);
+const readerRefusals = manifest.entries.filter(readerRefusal);
+const entries = manifest.entries.filter(entry => !readerRefusal(entry));
 const exportDirectory = environment.MINERA_GRAPH_ALIGNMENT_EXPORT_DIR;
 const digest = (bytes: string | Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -234,5 +239,12 @@ describe("actual own-server independent graph alignment fixtures", () => {
     const path = pathInWorkspace(resolve(exportDirectory, "export-integrity.json")); mkdirSync(dirname(path), {recursive: true});
     writeFileSync(path, JSON.stringify({complete: true, manifest: manifestPath, manifest_sha256: digest(readFileSync(manifestPath)), entries: proofs,
       verified_numeric_literals: proofs.reduce((sum, proof) => sum + proof.verified_numeric_literals, 0), csv_cells: proofs.reduce((sum, proof) => sum + proof.csv_cells, 0), selected_records: proofs.reduce((sum, proof) => sum + proof.selected_records, 0)}, null, 2) + "\n", "utf8");
+  });
+});
+
+describe("model reader refusals", () => {
+  for (const entry of readerRefusals) it(`${entry.id} is refused by the strict model reader`, () => {
+    expect(entry.response.status).toBe(400);
+    expect(JSON.parse(responseText(entry))).toEqual({error: entry.error});
   });
 });

@@ -100,6 +100,12 @@ struct ReplayFitnessOptions {
   // Token replay's per-place silent-path tie order (see TokenReplayOptions).
   // PNML document entry points default it to the imported arc order.
   std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
+  // A grouped EventLog evaluated as if it listed its traces in this order (a
+  // permutation of the trace positions, e.g. case_id_order for pm4py's frame
+  // path), without reordering a copy of it: the per-trace token results and
+  // their trace_index, the variants and the summation order of the averages
+  // follow it. Flat adapters ignore it (they group the data first).
+  std::optional<std::vector<std::size_t>> trace_order;
 };
 
 struct PrecisionResult {

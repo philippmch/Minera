@@ -856,6 +856,7 @@ pnml_place_outgoing_transition_order(const PnmlDocument& document) {
 
 PnmlDocument parse_pnml_document(std::string_view xml,
                                  const PnmlImportOptions& options) {
+  if (xml.substr(0, 3) == "\xEF\xBB\xBF") xml.remove_prefix(3);
   // Normalize physical XML line endings before entity decoding. Character
   // references to CR retain their value and their distinct error rendering.
   std::string normalized_xml;
@@ -869,8 +870,12 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     }
     xml = normalized_xml;
   }
+  detail::validate_model_xml(xml, "PNML");
+  // lxml refuses input that is not well-formed; the strict parser does too.
   detail::XmlPullParser parser(xml, /*emit_character_data=*/true,
-                              /*coalesce_character_data=*/true);
+                              /*coalesce_character_data=*/true,
+                              detail::XmlStrictness::kStrict,
+                              detail::model_xml_options("PNML"));
 
   std::vector<ParsedPlace> places;
   std::vector<ParsedTransition> transitions;
@@ -910,9 +915,9 @@ PnmlDocument parse_pnml_document(std::string_view xml,
     if (token.name == "place" && !stack_ends_with(stack, {"marking"})) {
       const auto* id = detail::attribute(token.attributes, "id");
       if (!id) throw std::runtime_error("PNML place is missing its id");
-      if (!place_index.emplace(*id, places.size()).second) {
-        throw std::runtime_error("PNML has a duplicate place id '" + *id + "'");
-      }
+      // A repeated place id keeps both places, as the reference does; arcs and
+      // marking references then resolve to the last one.
+      place_index[*id] = places.size();
       places.push_back({*id, 0});
     } else if (token.name == "place") {
       // A <place idref=…> inside <finalmarkings><marking>.

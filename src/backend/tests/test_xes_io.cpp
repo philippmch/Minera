@@ -14,6 +14,7 @@
 #include <string_view>
 #include <vector>
 
+#include "minera/case_list_order.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/attribute_statistics.hpp"
 #include "minera/log_filter.hpp"
@@ -2120,27 +2121,82 @@ void dataframe_case_lists_follow_case_id_order() {
   const auto order = minera::case_id_order(log);
   assert((order == std::vector<std::size_t>{2, 1, 0}));
   {
+    // The constraint-list scope leaves the per-case token-replay list alone:
+    // each list takes the order of the log it was computed from.
     const minera::AnalysisConstraintCaseOrder scope(&order);
-    const auto listed = minera::imported_model_json(model, graph);
-    assert((case_ids(listed, "case_id") == std::vector<std::string>{"\"1\"", "\"10\"", "\"9\""}));
-    assert((case_ids(listed, "trace_index") == std::vector<std::string>{"2", "1", "0"}));
-  }
-  {
-    // An order made for another number of cases leaves the list as it is.
-    const std::vector<std::size_t> other{1, 0};
-    const minera::AnalysisConstraintCaseOrder scope(&other);
     assert(minera::imported_model_json(model, graph) == file_order);
   }
-  const auto alignment = minera::align_process_tree(log, tree);
+  {
+    auto ordered = model;
+    minera::order_trace_diagnostics(ordered.token_replay, order);
+    const auto listed = minera::imported_model_json(ordered, graph);
+    assert((case_ids(listed, "case_id") == std::vector<std::string>{"\"1\"", "\"10\"", "\"9\""}));
+    assert((case_ids(listed, "trace_index") == std::vector<std::string>{"2", "1", "0"}));
+    // No order, an order of another length, or a list not indexed by the
+    // log's traces stays as it is.
+    auto unchanged = model;
+    minera::order_trace_diagnostics(unchanged.token_replay, std::nullopt);
+    minera::order_trace_diagnostics(unchanged.token_replay, std::vector<std::size_t>{1, 0});
+    assert(minera::imported_model_json(unchanged, graph) == file_order);
+    minera::order_trace_diagnostics(ordered.token_replay, order);
+    assert(minera::imported_model_json(ordered, graph) == listed);
+  }
+  auto alignment = minera::align_process_tree(log, tree);
   const auto aligned = minera::process_tree_alignment_json(alignment);
   assert(aligned.find("\"trace\": [\"a\", \"d\"]") < aligned.find("\"trace\": [\"c\"]"));
-  {
-    const minera::AnalysisConstraintCaseOrder scope(&order);
-    const auto listed = minera::process_tree_alignment_json(alignment);
-    assert(listed.size() == aligned.size());
-    assert(listed.find("\"trace\": [\"c\"]") < listed.find("\"trace\": [\"b\", \"c\"]"));
-    assert(listed.find("\"trace\": [\"b\", \"c\"]") < listed.find("\"trace\": [\"a\", \"d\"]"));
-  }
+  minera::apply_case_order(alignment.traces, order);
+  const auto listed = minera::process_tree_alignment_json(alignment);
+  assert(listed.size() == aligned.size());
+  assert(listed.find("\"trace\": [\"c\"]") < listed.find("\"trace\": [\"b\", \"c\"]"));
+  assert(listed.find("\"trace\": [\"b\", \"c\"]") < listed.find("\"trace\": [\"a\", \"d\"]"));
+}
+
+// pandas sorts a frame's case column with typed ids (XES int, float,
+// boolean, date) before the strings, numbers numerically and dates by
+// instant, as pm4py's frame results list them; a trace without an id first.
+void typed_case_ids_follow_frame_order() {
+  const auto trace = [](const std::string& id) {
+    return "<trace>" + id + "<event><string key=\"concept:name\" value=\"a\"/></event></trace>";
+  };
+  const std::string xml = "<log>" + trace("<int key=\"concept:name\" value=\"10\"/>") +
+      trace("<string key=\"concept:name\" value=\"x\"/>") +
+      trace("<float key=\"concept:name\" value=\"9.5\"/>") +
+      trace("<int key=\"concept:name\" value=\"2\"/>") +
+      trace("<string key=\"concept:name\" value=\"10\"/>") +
+      trace("<boolean key=\"concept:name\" value=\"true\"/>") +
+      trace("<float key=\"concept:name\" value=\"-1\"/>") + "</log>";
+  // The log keeps int 10 and string "10" apart (a frame import merges cases
+  // by their text; declared in Review AH1).
+  std::istringstream input(xml);
+  const auto log = minera::import_xes_event_log(input);
+  assert(log.traces.size() == 7);
+  // -1.0, true (1), 2, 9.5, 10, then "10", "x".
+  assert((minera::case_id_order(log) == std::vector<std::size_t>{6, 5, 3, 2, 0, 4, 1}));
+  // Integers and floats compare exactly, as Python compares int with float:
+  // 2**53 + 1 sorts after the float 2**53, and the int64 extremes keep
+  // their places around floats just outside the int64 range.
+  const std::string wide = "<log>" + trace("<int key=\"concept:name\" value=\"9007199254740993\"/>") +
+      trace("<float key=\"concept:name\" value=\"9007199254740992.0\"/>") +
+      trace("<int key=\"concept:name\" value=\"-9223372036854775808\"/>") +
+      trace("<float key=\"concept:name\" value=\"-9.3e18\"/>") +
+      trace("<int key=\"concept:name\" value=\"9223372036854775807\"/>") +
+      trace("<float key=\"concept:name\" value=\"9.3e18\"/>") +
+      trace("<float key=\"concept:name\" value=\"0.5\"/>") +
+      trace("<int key=\"concept:name\" value=\"0\"/>") + "</log>";
+  std::istringstream wide_input(wide);
+  const auto wide_log = minera::import_xes_event_log(wide_input);
+  assert(wide_log.traces.size() == 8);
+  assert((minera::case_id_order(wide_log) == std::vector<std::size_t>{3, 2, 7, 6, 1, 0, 4, 5}));
+  const std::string dates = "<log>" + trace("<string key=\"concept:name\" value=\"0\"/>") +
+      trace("<date key=\"concept:name\" value=\"2020-05-01T01:00:00.000+02:00\"/>") +
+      trace("<date key=\"concept:name\" value=\"2020-05-01T00:00:00.000+00:00\"/>") +
+      trace("") + "</log>";
+  std::istringstream dated(dates);
+  const auto timed = minera::import_xes_event_log(dated);
+  assert(timed.traces.size() == 4);
+  // The trace without an id first, then the dates by instant (read_xes reads
+  // an XES date as wall-clock UTC: 00:00 before 01:00), then the string "0".
+  assert((minera::case_id_order(timed) == std::vector<std::size_t>{3, 2, 1, 0}));
 }
 
 // A merged case keeps each frame row's own trace cells (pm4py.read_xes holds
@@ -2211,6 +2267,7 @@ int main() {
   dataframe_cases_merge_shared_ids_and_order_by_code_point();
   dataframe_cases_keep_row_case_cells();
   dataframe_case_lists_follow_case_id_order();
+  typed_case_ids_follow_frame_order();
   unsigned_integer_boundaries_match_public_variants();
   iterparse_nested_attribute_shapes();
   {

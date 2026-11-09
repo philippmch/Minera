@@ -6034,7 +6034,7 @@
         "bytes": 1704,
         "sha256": "af210ee42f9ce4bbe7063fe14fd072678b75f5c2e166872e26a30a9ab7237bef"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "input": {
         "filename": "owned-wtf8-word.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/inputs/owned-wtf8-word.json",
@@ -6050,15 +6050,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "3708",
+        "Content-Length": "117",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "decomposed-wtf8-native-and-model-export.response.json",
         "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/decomposed-wtf8-native-and-model-export.response.json",
-        "bytes": 3708,
-        "sha256": "f1552dc3ca06414a359de27bf18d2d350c1f22149ca1c00050d28b964b26c687",
-        "status": 200
+        "bytes": 117,
+        "sha256": "4f9fac8f9ab97d00c969c6a0c866ba59549fde6d2c3ff2ab872ce8066999095f",
+        "status": 400
       },
       "mode": "RECOMPOS_MAXIMAL",
       "shape": "words",
@@ -6067,16 +6067,8 @@
       "input_format": "trace_words",
       "model_format": "auto",
       "executed": true,
-      "error": null,
-      "exports": {
-        "model": {
-          "filename": "decomposed-wtf8-native-and-model-export.model.pnml",
-          "path": "src/frontend/tests/fixtures/graph-alignment-workbench/captures/decomposed-wtf8-native-and-model-export.model.pnml",
-          "bytes": 1018,
-          "sha256": "a7391b70fe72f447777779066b65fd7a92bebce51d92d70f7465fbfb16269a63",
-          "format": "pnml"
-        }
-      }
+      "error": "XML is not well-formed: character reference &#55296; does not name an XML character (line 17, column 17)",
+      "exports": {}
     },
     {
       "id": "native-trace-index-outside-input",

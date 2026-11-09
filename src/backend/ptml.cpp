@@ -5,6 +5,7 @@
 
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -32,6 +33,11 @@ void write_xml_escaped(std::ostream& out, std::string_view value) {
       case '>': out << "&gt;"; break;
       case '"': out << "&quot;"; break;
       case '\'': out << "&apos;"; break;
+      // A reader normalises literal tabs and line breaks in attribute values
+      // to spaces; character references keep them.
+      case '\t': out << "&#9;"; break;
+      case '\n': out << "&#10;"; break;
+      case '\r': out << "&#13;"; break;
       default: out << c;
     }
   }
@@ -99,6 +105,13 @@ class PtmlWriter {
         // Several redo alternatives become one xor; a redo-less loop (which
         // discovery never produces) degrades to a loop that exits at once.
         const auto id = operator_node("xorLoop");
+        // Three or more redo alternatives are written as the reference
+        // writes them, one child each: a reader takes four or more children
+        // as body and redos (three would read as body, redo and exit).
+        if (node.children.size() >= 4) {
+          for (const auto& child : node.children) edge(id, emit(child));
+          return id;
+        }
         edge(id, node.children.empty() ? leaf("automaticTask", "")
                                        : emit(node.children.front()));
         std::string redo;
@@ -216,21 +229,26 @@ class PtmlBuilder {
       if (!parsed.children.empty()) {
         throw std::runtime_error("PTML task node '" + id + "' has children");
       }
-      // An unnamed manual task carries no observable activity: silent.
-      if (parsed.kind == "manualTask" && !parsed.name.empty()) {
+      // As in the reference, a manual task is visible even when its name is
+      // empty; only an automatic task is silent.
+      if (parsed.kind == "manualTask") {
         node = ProcessTreeNode::leaf(activity_id(parsed.name));
       } else {
         node = ProcessTreeNode::tau();
       }
     } else if (parsed.kind == "xorLoop") {
-      if (parsed.children.size() < 2 || parsed.children.size() > 3) {
+      if (parsed.children.size() < 2) {
         throw std::runtime_error(
             "PTML loop node '" + id +
-            "' needs a body and a redo child (plus an optional exit)");
+            "' needs a body and at least one redo child");
       }
       node.op = ProcessTreeOperator::kLoop;
       node.children.push_back(build(parsed.children[0]));
       node.children.push_back(build(parsed.children[1]));
+      // Four or more children read as the reference reads them: one body and
+      // several redo alternatives.
+      for (std::size_t c = 3; parsed.children.size() > 3 && c <= parsed.children.size(); ++c)
+        node.children.push_back(build(parsed.children[c - 1]));
       if (parsed.children.size() == 3) {
         // The three-child form runs its exit child once when the loop ends:
         // sequence(loop, exit). A silent exit changes nothing and is dropped.
@@ -301,116 +319,36 @@ class PtmlBuilder {
 
 }  // namespace
 
-ProcessTree parse_ptml(std::string_view xml) {
-  detail::XmlPullParser parser(xml);
+namespace {
 
+struct ParsedPtmlTree {
   std::unordered_map<std::string, ParsedPtmlNode> nodes;
   std::vector<std::string> order;  // node ids in document order
   // Edges in document order — that order is the child order. Resolved after
   // the parse, since a file may legally declare an edge before its child.
   std::vector<std::pair<std::string, std::string>> edges;
-  std::string root_id;
-  bool in_tree = false;
-  bool trees_seen = false;
+  std::optional<std::string> root_id;
+};
 
-  while (true) {
-    const auto token = parser.next();
-    if (token.kind == detail::XmlPullParser::Kind::EndOfInput) break;
-    if (token.kind == detail::XmlPullParser::Kind::CharacterData) continue;
-
-    const auto name = local_name(token.name);
-    if (token.kind == detail::XmlPullParser::Kind::EndElement) {
-      if (name == "processTree") in_tree = false;
-      continue;
-    }
-
-    if (name == "processTree") {
-      if (trees_seen) {
-        // Only the first tree is read; skip the rest wholesale.
-        if (!token.self_closing) {
-          std::size_t depth = 1;
-          while (depth > 0) {
-            const auto skipped = parser.next();
-            if (skipped.kind == detail::XmlPullParser::Kind::EndOfInput) break;
-            if (skipped.kind == detail::XmlPullParser::Kind::StartElement &&
-                !skipped.self_closing) {
-              ++depth;
-            } else if (skipped.kind ==
-                       detail::XmlPullParser::Kind::EndElement) {
-              --depth;
-            }
-          }
-        }
-        continue;
-      }
-      trees_seen = true;
-      in_tree = true;
-      if (const auto* root = detail::attribute(token.attributes, "root")) {
-        root_id = *root;
-      }
-      continue;
-    }
-    if (!in_tree) continue;
-
-    if (name == "parentsNode") {
-      const auto* source = detail::attribute(token.attributes, "sourceId");
-      const auto* target = detail::attribute(token.attributes, "targetId");
-      if (!source || !target) {
-        throw std::runtime_error(
-            "PTML edge is missing its sourceId or targetId");
-      }
-      edges.emplace_back(*source, *target);
-    } else if (is_ptml_node(name)) {
-      const auto* id = detail::attribute(token.attributes, "id");
-      if (!id) throw std::runtime_error("PTML node is missing its id");
-      ParsedPtmlNode node;
-      node.kind = std::string(name);
-      if (const auto* label = detail::attribute(token.attributes, "name")) {
-        node.name = *label;
-      }
-      if (!nodes.emplace(*id, std::move(node)).second) {
-        throw std::runtime_error("PTML has a duplicate node id '" + *id + "'");
-      }
-      order.push_back(*id);
-    } else if (name == "or" || name == "interleaving" || name == "andLoop") {
-      throw std::runtime_error(
-          "PTML node kind '" + std::string(name) +
-          "' has no equivalent here and cannot be checked");
-    }
-    // Anything else (originalLog, properties, …) is ignored.
-  }
-
-  if (nodes.empty()) {
-    throw std::runtime_error(
-        "PTML input contains no process tree (or an empty one)");
-  }
-
-  for (const auto& [source, target] : edges) {
+ProcessTree build_ptml_tree(ParsedPtmlTree& tree) {
+  auto& nodes = tree.nodes;
+  const auto& order = tree.order;
+  if (!tree.root_id)
+    throw std::runtime_error("PTML process tree is missing its root attribute");
+  const std::string root_id = *tree.root_id;
+  // A node listed as the child of two parents is shared, and the same edge
+  // twice repeats the child, as in the reference.
+  for (const auto& [source, target] : tree.edges) {
     const auto parent = nodes.find(source);
     const auto child = nodes.find(target);
     if (parent == nodes.end() || child == nodes.end()) {
       throw std::runtime_error("PTML edge '" + source + "' -> '" + target +
                                "' references an unknown node");
     }
-    if (child->second.has_parent) {
-      throw std::runtime_error("PTML node '" + target +
-                               "' has two parents; a process tree is a tree");
-    }
     child->second.has_parent = true;
     parent->second.children.push_back(target);
   }
-
-  if (root_id.empty()) {
-    // No root attribute: the unique node no edge points at.
-    for (const auto& id : order) {
-      if (nodes.at(id).has_parent) continue;
-      if (!root_id.empty()) {
-        throw std::runtime_error(
-            "PTML has no root attribute and no unique parentless node");
-      }
-      root_id = id;
-    }
-  } else if (nodes.find(root_id) == nodes.end()) {
+  if (nodes.find(root_id) == nodes.end()) {
     throw std::runtime_error("PTML root references unknown node '" + root_id +
                              "'");
   }
@@ -431,10 +369,8 @@ ProcessTree parse_ptml(std::string_view xml) {
     const auto exit = loop.children.back();
     const auto exit_node = nodes.find(exit);
     if (exit_node == nodes.end()) continue;  // reported by the builder
-    const bool silent_exit =
-        exit_node->second.children.empty() &&
-        (exit_node->second.kind == "automaticTask" ||
-         (exit_node->second.kind == "manualTask" && exit_node->second.name.empty()));
+    const bool silent_exit = exit_node->second.children.empty() &&
+                             exit_node->second.kind == "automaticTask";
     loop.children.pop_back();
     const auto parent = parent_of.find(id);
     if (silent_exit || parent == parent_of.end()) {
@@ -462,6 +398,87 @@ ProcessTree parse_ptml(std::string_view xml) {
   }
 
   return PtmlBuilder(nodes).tree(root_id);
+}
+
+}  // namespace
+
+ProcessTree parse_ptml(std::string_view xml) {
+  if (xml.substr(0, 3) == "\xEF\xBB\xBF") xml.remove_prefix(3);
+  detail::validate_model_xml(xml, "PTML");
+  // lxml refuses input that is not well-formed; the strict parser does too.
+  detail::XmlPullParser parser(xml, false, false, detail::XmlStrictness::kStrict,
+                               detail::model_xml_options("PTML"));
+
+  // The reference reads every child element of the document element as a
+  // process tree and keeps the last one; a fault in any tree is an error.
+  // Inside a tree only the direct child elements count, and their tag must be
+  // a known PTML tag without a namespace.
+  std::vector<ParsedPtmlTree> trees;
+  std::vector<std::string> default_namespace{""};  // per open element
+  while (true) {
+    const auto token = parser.next();
+    if (token.kind == detail::XmlPullParser::Kind::EndOfInput) break;
+    if (token.kind == detail::XmlPullParser::Kind::CharacterData) continue;
+    if (token.kind == detail::XmlPullParser::Kind::EndElement) {
+      if (default_namespace.size() > 1) default_namespace.pop_back();
+      continue;
+    }
+    if (token.kind != detail::XmlPullParser::Kind::StartElement) continue;
+    const std::size_t depth = default_namespace.size() - 1;
+    std::string ns = default_namespace.back();
+    if (const auto* declared = detail::attribute(token.attributes, "xmlns")) ns = *declared;
+    if (!token.self_closing) default_namespace.push_back(ns);
+
+    if (depth == 1) {
+      trees.emplace_back();
+      if (const auto* root = detail::attribute(token.attributes, "root"))
+        trees.back().root_id = *root;
+      continue;
+    }
+    if (depth != 2) continue;
+    auto& tree = trees.back();
+    const std::string_view name = token.name;
+    const bool namespaced = !ns.empty() || name.find(':') != std::string_view::npos;
+    if (!namespaced && name == "parentsNode") {
+      const auto* source = detail::attribute(token.attributes, "sourceId");
+      const auto* target = detail::attribute(token.attributes, "targetId");
+      if (!source || !target) {
+        throw std::runtime_error(
+            "PTML edge is missing its sourceId or targetId");
+      }
+      tree.edges.emplace_back(*source, *target);
+    } else if (!namespaced && is_ptml_node(name)) {
+      // A task's name is its label, and the reference refuses a task without
+      // one. It refuses an operator without a name too; Minera reads that
+      // operator, whose name carries nothing (declared).
+      const auto* label = detail::attribute(token.attributes, "name");
+      const bool task = name == "manualTask" || name == "automaticTask";
+      if (!label && task)
+        throw std::runtime_error("PTML " + std::string(name) +
+                                 " node is missing its name attribute");
+      // A node without an id is skipped; a repeated id keeps the last node.
+      const auto* id = detail::attribute(token.attributes, "id");
+      if (!id) continue;
+      ParsedPtmlNode node;
+      node.kind = std::string(name);
+      if (label) node.name = *label;
+      if (tree.nodes.insert_or_assign(*id, std::move(node)).second)
+        tree.order.push_back(*id);
+    } else {
+      const auto local = name.substr(name.find(':') == std::string_view::npos
+                                         ? 0 : name.find(':') + 1);
+      throw std::runtime_error(
+          "PTML unknown tag: " +
+          (ns.empty() ? std::string(name) : "{" + ns + "}" + std::string(local)));
+    }
+  }
+
+  if (trees.empty()) {
+    throw std::runtime_error("PTML input contains no process tree");
+  }
+  std::optional<ProcessTree> last;
+  for (auto& tree : trees) last = build_ptml_tree(tree);
+  return std::move(*last);
 }
 
 ProcessTree import_ptml(const std::filesystem::path& path) {

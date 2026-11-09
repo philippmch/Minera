@@ -442,6 +442,42 @@ int main(int argc, char** argv) {
       r = client.Post("/api/cancel-mine?request_id=" + newer, "", "text/plain");
       check(r && r->status == 200 && contains(r->body, "\"canceled\":false"), "a second cancel undoes nothing: " + describe(r));
     }
+    // The identity table holds 2048 entries; a full one forgets its oldest
+    // finished entry for a new cancel too, so cancels of uploads not yet seen
+    // keep working past 2048 identities, while a mine that can still roll
+    // back and a recent recorded cancel stay.
+    {
+      const auto uuid = [](unsigned n) {
+        char text[37];
+        std::snprintf(text, sizeof text, "%08x-0000-4000-8000-%012x", n, n);
+        return std::string(text);
+      };
+      int refused = 0;
+      for (unsigned n = 1; n <= 2100; ++n) {
+        r = client.Post("/api/cancel-mine?request_id=" + uuid(n), "", "text/plain");
+        if (!r || r->status != 200 || !contains(r->body, "\"canceled\":true")) ++refused;
+      }
+      check(refused == 0, "2100 cancels of unseen ids are all recorded (" + std::to_string(refused) + " refused)");
+      const std::string pending = "6a7b8c9d-0e1f-4a2b-9c3d-4e5f6a7b8c9d";
+      r = client.Post("/api/mine", httplib::MultipartFormDataItems{
+          {"log", "case_id,activity,timestamp\nc1,a,2024-01-01T00:00:00Z\n", "one.csv", "text/csv"},
+          {"include_traces", "false", "", ""}, {"mining_request_id", pending, "", ""}});
+      check(r && r->status == 200, "a mine left unacknowledged: " + describe(r));
+      refused = 0;
+      for (unsigned n = 3001; n <= 5100; ++n) {
+        r = client.Post("/api/cancel-mine?request_id=" + uuid(n), "", "text/plain");
+        if (!r || r->status != 200 || !contains(r->body, "\"canceled\":true")) ++refused;
+      }
+      check(refused == 0, "2100 more cancels past a full table (" + std::to_string(refused) + " refused)");
+      r = client.Post("/api/cancel-mine?request_id=" + pending, "", "text/plain");
+      check(r && r->status == 200 && contains(r->body, "\"canceled\":true"),
+            "the unacknowledged mine still rolls back: " + describe(r));
+      r = client.Post("/api/mine", httplib::MultipartFormDataItems{
+          {"log", "case_id,activity,timestamp\nc1,a,2024-01-01T00:00:00Z\n", "one.csv", "text/csv"},
+          {"include_traces", "false", "", ""}, {"mining_request_id", uuid(5100), "", ""}});
+      check(r && r->status == 400 && contains(r->body, "canceled"),
+            "a recent recorded cancel still refuses its upload: " + describe(r));
+    }
   }
 
   ::kill(server, SIGTERM);

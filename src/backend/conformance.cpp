@@ -3161,10 +3161,22 @@ template <typename Resolver>
 std::vector<Variant> collect_variants(const EventLog& log,
                                       const Resolver& resolver,
                                       std::string_view activity_attribute =
-                                          "concept:name") {
+                                          "concept:name",
+                                      const std::vector<std::size_t>* trace_order = nullptr) {
+  if (trace_order) {
+    std::vector<bool> seen(log.traces.size(), false);
+    if (trace_order->size() != log.traces.size())
+      throw std::invalid_argument("alignment trace order must list every trace once");
+    for (const auto position : *trace_order) {
+      if (position >= seen.size() || seen[position])
+        throw std::invalid_argument("alignment trace order must list every trace once");
+      seen[position] = true;
+    }
+  }
   std::vector<Variant> variants;
   std::unordered_map<std::string, std::size_t> index;
-  for (const auto& trace : log.traces) {
+  for (std::size_t k = 0; k < log.traces.size(); ++k) {
+    const auto& trace = log.traces[trace_order ? (*trace_order)[k] : k];
     std::string key;
     Variant variant;
     for (const auto& event : trace.events) {
@@ -6747,7 +6759,7 @@ AlignmentResult check_alignment(const EventLog& event_log,
     return result;
   }
   const auto variants = collect_variants(event_log, aligner,
-                                          activity_attribute);
+                                          activity_attribute, options.trace_order);
   std::vector<std::vector<Marking>> variant_markings;
   variant_markings.reserve(variants.size());
   double total_worst = 0.0;

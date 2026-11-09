@@ -20364,9 +20364,12 @@ Fixed:
   adapters already gave the case-id order), the process-tree alignment
   workbench (its trace list indexes its echoed `input_log`), and the variant
   lists of `/api/align`, `/api/align-decomposed` and the replay results,
-  which have no pm4py counterpart. The DFG, edit-distance, anti- and
-  multi-alignment routes have no public pm4py frame function to compare with
-  and keep log order.
+  which have no pm4py counterpart. The edit-distance and decomposed
+  alignments keep log order, as pm4py's `apply` on a `read_xes` frame does
+  (file order), and the anti- and multi-alignments give one result. (This
+  said the DFG alignment had no public frame function to compare with; it
+  has, `algo.conformance.alignments.dfg.algorithm.apply` on the frame lists
+  case-id order, and `/api/align-dfg` follows it since Review AH1, AH1-5.)
 
 - **AG2-2 Cancelling a mine while a big log loads.** The byte read of an
   upload was cancellable (64 KiB slices), but the work after it was not: the
@@ -20428,3 +20431,225 @@ upload is parsed stops within 0.5 s; 2.1 s at HEAD), and, unchanged,
 `minera_core_tests`, `minera_log_conversion_tests`, the token-replay and
 alignment tests, and `minera_mining_fast_path_equivalence_tests` (251
 outputs, pins unchanged).
+
+## Review AH1: per-case lists in their own log's order, typed XES case ids, cancel-mine identities (2026-11-09)
+
+Fixed:
+
+- **AH1-1 Per-case lists of a model's own log.** Review AG2 wrote the session
+  lists in the order `constraint_case_order` gave for the session log, applied
+  to any list of the same length. A model mined with its own case key
+  (`inductive_case_id_key`, `alpha_case_id_attribute`,
+  `heuristic_case_id_attribute`, `powl_case_id_key`) replays its own log
+  (`cached_model_log`, the POWL projection), so its `trace_diagnostics` were
+  put in the session's `case:concept:name` order: with `org:resource` as the
+  key, cases r1, r3, r2 came out as r2, r3, r1 instead of pm4py's r1, r2, r3.
+  Every per-case list is now ordered where it is computed, by the order of the
+  log it was computed from (`include/minera/case_list_order.hpp`:
+  `order_trace_diagnostics`, which also requires entry i to be trace i, and
+  `apply_case_order`), and the JSON writers print the lists as they get them:
+  the per-model `trace_diagnostics` of `/api/mine` (both mine paths),
+  `/api/check-model`, `/api/align-process-tree` (the Inductive log, as
+  before), `minera_export --token-replay-include-trace-diagnostics` and its
+  `process_tree_alignment`. `AnalysisConstraintCaseOrder` now orders only the
+  log-skeleton and Declare lists.
+- **AH1-2 Typed XES case ids.** `case_id_order` (and so
+  `constraint_case_order`, `order_cases_by_id`, `/api/token-replay`,
+  `/api/replay-fitness`, the fitness averages, the log-skeleton and Declare
+  lists) compared case ids as text. pandas sorts a `read_xes` frame's case
+  column by value, observed through pm4py's public results (token-replay
+  diagnostics, `fitness_token_based_replay`, `conformance_log_skeleton`): a
+  missing id first (pm4py refuses it, AF1-5), then the non-string ids (XES
+  `int`, `float` and `boolean` numerically together, `true` as 1; `date` by
+  instant, read as wall-clock UTC as `read_xes` does), then the strings in
+  code-point order; NaN after the numbers. `case_id_order` now ranks by the
+  trace's typed case-id cell the same way, comparing an int with a float
+  exactly as Python does (2**53 + 1 after the float 2**53) without 128-bit
+  integers or `long double`, so the MSVC build orders them the same. pm4py on 180 random typed logs:
+  0 differences in token-replay lists, fitness, `/api/check-model`, the
+  log-skeleton lists and the `/api/evaluate` average (HEAD: order differences
+  on most logs and last-bit differences in the average).
+- **AH1-3 No evaluation-log copy.** `/api/evaluate` with
+  `evaluation_family=replay_fitness` copied the session log in case-id order
+  (+600 MB peak on a 500,000-event XES with shuffled ids). The order now goes
+  in as `ReplayFitnessOptions::trace_order` (token-based rows,
+  alignment-based variants through `AlignmentOptions::trace_order`, and the
+  decomposed projection). Output is byte-identical to HEAD (80 logs, token,
+  alignment and decomposed, three miners; the large XES response has the
+  same md5); peak during the call 2.41 → 4.82 GB at HEAD, 2.50 → 4.27 GB now.
+- **AH1-4 cancel-mine past 2048 identities.** A cancel of an id not seen yet
+  answered 400 "too many unknown mining request identities" once the table
+  held 2048 ids. It now makes room as a new mine does
+  (`evict_mining_ticket_locked`): it forgets the oldest-recorded entry that
+  no request can still act on (a cancel whose upload never came, or a mine
+  that ended and holds no session to roll back); a running mine and a mine
+  that can still roll back stay.
+- **AH1-5 `/api/align-dfg` on XES.** pm4py's DFG alignment `apply` on the
+  frame lists case-id order; the route listed file order. Its `alignments`
+  now follow `session_case_order` (unique-variant projections unchanged), as
+  does `minera_export`'s DFG alignment. The AG2 claim that the route had no
+  public frame function is corrected above.
+
+Declared:
+
+- **AH1-6 All-typed case columns.** pm4py refuses a frame whose case column
+  holds no string ("the dataframe should contain a column of type string for
+  the case identifier"); native orders such a log by value and does not
+  refuse it. A column mixing numbers and dates makes pm4py raise
+  (`'<' not supported`); native puts the numbers first.
+- **AH1-7 Equal ids across types.** pandas groups equal values across types
+  (`False` with `0`, `2` with `2.0`) and keeps int `2` apart from the string
+  `"2"`; the native frame import merges cases by their text (`2` with `"2"`,
+  not `2` with `2.0`).
+- AF1-5 (traces without a case id) is unchanged: they still sort first.
+
+Verification: per-model case keys against pm4py on 150 random XES logs, four
+input shapes (2,219 lists, 0 differences; pm4py's frame token replay with
+`case_id_key` confirmed to list sorted key order); the AG2 XES comparisons
+unchanged from HEAD; CSV and table-JSON responses byte-identical to HEAD
+(120 logs, 1,680 pairs). The 14 workbench fixture manifests with XES inputs
+replay unchanged (2,400 entries), so no fixture was recaptured.
+
+Tests: `minera_xes_io_tests` (`dataframe_case_lists_follow_case_id_order`,
+`typed_case_ids_follow_frame_order`), `minera_server_mine_progress_tests`
+(4,200 cancels of unseen ids past a full table, an unacknowledged mine still
+rolls back, a recent recorded cancel still refuses its upload), and,
+unchanged, `minera_server_cancellation_tests`, the token-replay, evaluation
+and alignment tests, and `minera_mining_fast_path_equivalence_tests`.
+
+## Review AH2: strict model XML, BPMN parallel arcs, imported-model alignments (2026-11-09)
+
+A black-box review of model input and output (BPMN, PNML, PTML,
+model exchange, `--check-*`) against pm4py 2.7.22 found nine undeclared
+root causes. Fixed:
+
+- **AH2-1 Strict XML for the model readers.** The BPMN, PNML and PTML
+  readers had used the lenient pull parser. They now use the strict
+  parser with `model_xml_options(reader)`, and a full well-formedness pass
+  (`validate_model_xml`) runs before the reader interprets anything, so a
+  syntax error is reported ahead of any semantic error, as with lxml. On
+  top of the XES strict rules, model mode also checks:
+  - undeclared namespace prefixes and xmlns values that are not valid URIs;
+  - XML Name and QName syntax;
+  - the XML declaration's syntax and processing-instruction targets;
+  - `]]>` in content, and a `/` that does not close its tag.
+
+  A bad reference is reported at its own position, after any bad character
+  before it, so errors come in document order. Attribute values normalise
+  literal TAB/LF/CR to spaces. Internal DOCTYPE entities are expanded, up to
+  10,000 references and 1 MiB of expanded text (billion-laughs stops there).
+  External entities are never loaded; a reference to one is refused.
+  Messages read "XML is not well-formed: ... (line L, column C)" and name the
+  reader for UTF-8 errors. XES keeps its own defaults, unchanged.
+- **AH2-2 BPMN parallel arcs.** The BPMN import now keeps repeated arcs, as
+  pm4py does, rather than one weighted arc. Two start events into one
+  AND-join, for example, give two `source→t` arcs. They are stored as compact
+  unit arc weights, which token replay, alignments and the PNML conformance
+  gate already handle. `repro/par2.bpmn` on `l1.csv`: token-replay log
+  fitness 0.9125, and the alignment is refused as not easy sound, both as in
+  pm4py. BPMN→PTML on these models collapses a transition's repeated places,
+  as pm4py's `convert_to_process_tree` does (a set): 236/236 and 229/229
+  trees equal.
+- **AH2-3 Writers.** The PTML and BPMN writers escape TAB, LF and CR in
+  attributes as `&#9;`, `&#10;` and `&#13;`, so labels round-trip.
+- **AH2-4 PTML loops with 4 or more children** are read as pm4py reads them:
+  a body plus n redo children. They are written back with one child each. The
+  3-child (body, redo, exit) form is unchanged.
+- **AH2-5 BPMN names** lose CR and LF, as in pm4py.
+- **AH2-6 Apostrophes.** Net or BPMN to tree drops `'` from labels, as pm4py
+  does. Labels that then coincide are merged.
+- **AH2-7 Alignment default on imported models.** `--check-pnml`,
+  `--check-bpmn` and `--check-ptml` without `--alignment-variant` now use
+  state-equation A*, pm4py's public default. The server's `/api/align` with
+  `miner=imported` had the same issue: without `alignment_variant` it now
+  uses state-equation A* too. With the default costs and one of the three
+  single-alignment variants, each variant's alignment comes from the
+  reference engine (`align_petri_log`, with its easy-soundness check), and
+  the log fitness is pm4py's 1 − Σcost/Σbwc over raw costs, or 1 when
+  Σbwc = 0. Explicit `dijkstra_less_memory` collapses parallel arcs, as
+  pm4py's less-memory search does. On `al1.pnml` with `l7.csv`: default
+  0.9999750006249843, less-memory 0.5, both as in pm4py.
+  `minera_mining_fast_path_equivalence_tests` pins did not move.
+- **AH2-9 Malformed models**, now read as pm4py reads them:
+  - **BPMN:**
+    - a node without an id is dropped; a duplicate node id keeps the first;
+    - a flow without id, sourceRef or targetRef is dropped; a duplicate flow
+      id keeps the first flow's position with the last flow's endpoints;
+    - no process, or only empty ones, gives a source/sink-only net.
+  - **PNML:** a duplicate place id keeps both places, and references go to
+    the last one.
+  - **PTML:**
+    - the last tree of the document wins;
+    - only known tags without a namespace count; others give
+      "PTML unknown tag: X";
+    - a duplicate id: the last node wins;
+    - a node with two parents is a shared child;
+    - a missing `root` attribute and an unnamed task are refused;
+    - `manualTask name=""` is a visible `''` activity;
+    - only an `automaticTask` can be the silent exit of a 3-child loop.
+
+Declared:
+
+- **AH2-8** pm4py's `convert_to_bpmn(POWL)` returns an empty BPMN. Minera's
+  `--bpmn-miner powl` matches `convert_to_bpmn(convert_to_petri_net(powl))`.
+- **BPMN elements outside a process.** pm4py picks up BPMN-named elements
+  anywhere, for example inside `extensionElements` or outside `<process>`.
+  Minera reads only the process structure.
+- **PTML refusals Minera keeps:** empty operators, 0- or 1-child loops, and
+  tasks with children.
+- **PTML acceptances:** operators without a `name` (pm4py raises KeyError),
+  and `interleaving`, a Minera extension. A prefixed unknown tag is named by
+  its prefix, not `{uri}local`.
+- **PNML export** still refuses documents with repeated place ids.
+- **Encoding names** in the XML declaration are checked for syntax only.
+  Input is decoded as UTF-8, so a name libxml2 does not know (`U-8`) is
+  accepted.
+- **pm4py nondeterminism.** pm4py's results on BPMN-imported models depend on
+  the hash seed. Under seeds 0–5, the less-memory log fitness of fuzz case
+  508 ranges from 0.528 to 0.639, and the A* one from 0.798 to 0.845. Such
+  cases count as equal when Minera's value is one pm4py can produce.
+- **Scope of the reference path.** Non-default costs, and the discounted and
+  generator variants, still use the bundle aligner on imported models.
+  Discovered models keep the legacy less-memory default.
+- **Silent cycles and self-loops.** pm4py's KeyError on BPMN silent cycles
+  and self-loops is already declared.
+
+Fixtures recaptured:
+
+| Workbench | Entries | Reason |
+|---|---|---|
+| graph-alignment | `decomposed-wtf8-native-and-model-export` | strict refusal of `&#55296;` |
+| inductive-input | `variants-{log,imf,dfg}-literal-labels` | TAB/LF/CR escapes |
+| model-conversion | 4 × `powl_to_tree-native-*` | TAB/LF/CR escapes |
+| model-conversion | `net_to_{powl,tree}-native-literal-label` | strict refusal; the first error is now the literal NUL at line 21, column 3, as lxml reports |
+| monte-carlo | `reject-malformed-pnml` | error text |
+| petri-anti-multi | `{anti,multi}-original-model-wtf8-nul-empty-id` | strict refusal |
+| process-tree-alignment | 42 entries using the owned two-tree PTML | its last tree now wins |
+| process-tree-alignment | 4 × `*-literal-unicode-surrogate-nul` | escapes |
+| process-tree-alignment | `ptml-empty-manual-name-is-silent` | now a visible `''` activity |
+| process-tree-alignment | `ptml-document-edge-order-and-reachable-registry` | "PTML unknown tag: properties" |
+
+The four model fixture tests check reader-refusal entries in their own
+`model reader refusals` test.
+
+Verification, all against pm4py:
+
+| Fuzzer | Cases | Result |
+|---|---|---|
+| BPMN→PNML | 300 | 300 equal |
+| BPMN chaos | 200 | 190 equal; 10 are the declared pm4py KeyError |
+| BPMN→PTML | 200 | 154 equal; 46 refused by both |
+| PNML→BPMN | 150 | 149 equal; 1 pm4py timeout |
+| PTML round trip | 300 | 300 equal |
+| `--check-bpmn` default and less-memory | 520 | equal or seed-dependent, 0 undeclared |
+| XML mutations against lxml (two fuzzers) | 900 each | 0 undeclared differences; 2 encoding names, declared |
+
+All 12 model manifests replay unchanged after the recapture.
+
+Tests: `minera_core_tests` (PTML and BPMN reader rules, refusals),
+`minera_xes_io_tests`, `bpmn_reference_parity`, `petri_extended_arcs`,
+`weighted_token_replay`, `petri_net_conversion`, `powl_conversion`,
+`conformance_parity_contracts`, `petri_alignment_dispatcher_parity`,
+`alignment_variants`, `recheck_conformance_fixture` and
+`mining_fast_path_equivalence`, plus the model-reading evaluation,
+token-replay and playout ctests.

@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <unordered_map>
 #include <vector>
 
 namespace minera {
@@ -1868,7 +1869,40 @@ ProcessTreeNode fold_reference_tree(ProcessTreeNode node) {
 
 }  // namespace
 
-ProcessTree to_process_tree(const PetriNet& net) {
+ProcessTree to_process_tree(const PetriNet& input) {
+  // Parallel unit arcs (separate arcs between one place and one transition,
+  // as a BPMN import keeps them) convert as one arc each: the reference's
+  // conversion reads a transition's places as a set.
+  std::optional<PetriNet> merged;
+  if (input.has_compact_ordinary_arcs() &&
+      std::all_of(input.transitions().begin(), input.transitions().end(),
+                  [](const PetriTransition& transition) {
+                    const auto unit = [](const std::vector<PetriArcWeight>& weights) {
+                      return std::all_of(weights.begin(), weights.end(), [](const PetriArcWeight& w) {
+                        return w.magnitude == 1 && !w.negative;
+                      });
+                    };
+                    return unit(transition.input_weights) && unit(transition.output_weights);
+                  })) {
+    const auto distinct = [](const std::vector<std::size_t>& places) {
+      std::vector<std::size_t> out;
+      for (const auto place : places)
+        if (std::find(out.begin(), out.end(), place) == out.end()) out.push_back(place);
+      return out;
+    };
+    merged.emplace();
+    for (std::size_t p = 0; p < input.place_count(); ++p) merged->add_place();
+    if (input.place_names()) merged->set_place_names(*input.place_names());
+    for (const auto& transition : input.transitions())
+      merged->add_transition(transition.activity, distinct(transition.inputs),
+                             distinct(transition.outputs));
+    merged->set_activities(input.activities());
+    if (input.transition_names()) merged->set_transition_names(*input.transition_names());
+    if (input.has_source()) merged->set_source(input.source());
+    if (input.has_sink()) merged->set_sink(input.sink());
+    if (input.discovery_markings()) merged->set_discovery_markings(*input.discovery_markings());
+  }
+  const PetriNet& net = merged ? *merged : input;
   // Invalid nets keep the reconstruction's own errors; a valid workflow net
   // of one transition is then refused as the reference refuses it. A net
   // without transitions is named here, since the tree (and so its PTML
@@ -1878,7 +1912,26 @@ ProcessTree to_process_tree(const PetriNet& net) {
   const auto powl = PetriToPowlBuilder(net, false).run();
   reject_reference_single_transition(net);
   auto tree = ProcessTreeBuilder(true).run(powl);
-  return ProcessTree(tree.activities(), fold_reference_tree(tree.root()));
+  // The reference's net-to-tree conversion drops apostrophes from labels;
+  // labels that then coincide share one activity.
+  std::vector<std::string> activities;
+  std::unordered_map<std::string, std::size_t> ids;
+  std::vector<std::size_t> remap;
+  for (const auto& label : tree.activities()) {
+    std::string stripped;
+    for (const char ch : label)
+      if (ch != '\'') stripped.push_back(ch);
+    const auto [it, inserted] = ids.emplace(stripped, activities.size());
+    if (inserted) activities.push_back(std::move(stripped));
+    remap.push_back(it->second);
+  }
+  auto root = fold_reference_tree(tree.root());
+  const auto relabel = [&remap](auto& self, ProcessTreeNode& node) -> void {
+    if (node.op == ProcessTreeOperator::kActivity) node.activity = remap.at(node.activity);
+    for (auto& child : node.children) self(self, child);
+  };
+  relabel(relabel, root);
+  return ProcessTree(std::move(activities), std::move(root));
 }
 
 PetriNet to_petri_net(const PowlNode& node) { return PowlBuilder(node).run(); }

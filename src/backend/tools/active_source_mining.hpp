@@ -281,6 +281,10 @@ void handle_active_source_mining(const httplib::Request& request,
         options.cancelled = cancelled;
         const auto reachability = minera::final_marking_reachability(petri, cancelled);
         conformance.push_back({name, true, minera::check_conformance(log, petri, options), minera::check_footprints(log, petri), std::nullopt});
+        // pm4py lists the frame's cases in the case-id order of the replayed
+        // log (the model's own case key; see session_case_order).
+        minera::order_trace_diagnostics(conformance.back().token_replay,
+            session_case_order(session->active_source.get(), log));
         minera::set_model_soundness(conformance.back(), reachability);
         native_returned = true;
         return "{\"representation\":\"analysis_presentation\"}";

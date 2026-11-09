@@ -9730,14 +9730,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "57",
+        "Content-Length": "97",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "reject-malformed-pnml.response.json",
         "path": "src/frontend/tests/fixtures/monte-carlo-workbench/captures/reject-malformed-pnml.response.json",
-        "bytes": 57,
-        "sha256": "8359610d593460ea26d3e070e73af595703de96417c64a37f36821a296f6d281",
+        "bytes": 97,
+        "sha256": "d8d75274c7dd3ef4d1fd5011ce6df4a5f5c00f840aff8b055f5c2734a20d51c7",
         "status": 400
       },
       "family": "monte_carlo",

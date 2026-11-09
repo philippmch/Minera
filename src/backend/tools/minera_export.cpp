@@ -38,6 +38,7 @@
 #endif
 
 #include "pnml_model_options.hpp"
+#include "imported_alignment.hpp"
 #include "replay_input_options.hpp"
 
 #include "minera/alpha_miner.hpp"
@@ -48,6 +49,7 @@
 #include "minera/attribute_distribution.hpp"
 #include "minera/boundary_activities.hpp"
 #include "minera/browser_history.hpp"
+#include "minera/case_list_order.hpp"
 #include "minera/conformance.hpp"
 #include "minera/concept_drift.hpp"
 #include "minera/case_arrival.hpp"
@@ -2034,6 +2036,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
   bool emd_option_used = false;
   minera::AlignmentOptions alignment_options;
   bool alignment_option_used = false;
+  bool alignment_variant_used = false;
   bool alignment_activity_option_used = false;
   bool token_replay_activity_option_used = false;
   bool alignment_max_alignments_used = false;
@@ -4815,6 +4818,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       else if (v == "generator_dijkstra_less_memory") alignment_options.variant = minera::AlignmentVariant::kGeneratorDijkstraLessMemory;
       else { std::cerr << "error: --alignment-variant: unknown variant\n"; return 2; }
       alignment_option_used = true;
+      alignment_variant_used = true;
     } else if (arg == "--alignment-max-states" || arg == "--alignment-max-alignments") {
       const auto* value = next();
       if (!value) return usage(argv[0]);
@@ -6361,6 +6365,17 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     }
     // A .xes file is read as XES; everything else is treated as CSV.
     const bool input_is_xes = is_xes_path(input);
+    // pm4py's frame algorithms list an XES frame's cases in the case-id order
+    // of the data they ran on: the order of `case_log` (null for CSV input,
+    // already in it, and when the log is in that order).
+    const auto xes_case_order = [&](const minera::EventLog& case_log)
+        -> std::optional<std::vector<std::size_t>> {
+      if (!input_is_xes) return std::nullopt;
+      auto order = minera::case_id_order(case_log);
+      for (std::size_t i = 0; i < order.size(); ++i)
+        if (order[i] != i) return order;
+      return std::nullopt;
+    };
     if (xes_import_result_requested) {
       if (!input_is_xes)
         throw std::invalid_argument("XES import result requires an XES input");
@@ -7503,6 +7518,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         dfg_projected_log = minera::project_log_on_dfg(
             log, dfg, starts, ends, *dfg_alignment_result,
             dfg_alignment_options);
+      // Listed in the frame's case-id order once the projections (which read
+      // it by trace position) are made.
+      if (const auto order = xes_case_order(log))
+        minera::apply_case_order(dfg_alignment_result->alignments, *order);
     }
     std::optional<std::vector<minera::EditDistanceTypedAlignment>>
         typed_edit_result;
@@ -7584,6 +7603,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     if (align_process_tree) {
       process_tree_alignment_result =
           minera::align_process_tree(inductive_log, tree, pt_alignment_options);
+      if (const auto order = xes_case_order(inductive_log))
+        minera::apply_case_order(process_tree_alignment_result->traces, *order);
     }
     const auto net = minera::discover_petri_net(log, alpha_options);
     const auto alpha_log =
@@ -7680,6 +7701,11 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       if (is_powl && !token_replay_activity_option_used)
         replay_options.activity_attribute = powl_options.activity_key;
       auto model_alignment_options = alignment_options;
+      // A supplied model aligns with the reference's public default variant
+      // (state-equation A*) unless --alignment-variant chose another.
+      const bool is_imported = id == "imported";
+      if (is_imported && !alignment_variant_used)
+        model_alignment_options.variant = minera::AlignmentVariant::kStateEquationAStar;
       if (is_powl && !alignment_activity_option_used)
         model_alignment_options.activity_attribute = powl_options.activity_key;
       if (document) {
@@ -7722,12 +7748,17 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                       : minera::check_footprints(log, petri, replay_options.initial_marking),
            no_alignments ? std::optional<minera::AlignmentResult>{}
                          : std::optional<minera::AlignmentResult>(
-                               (is_powl || is_inductive || is_alpha ||
+                               is_imported
+                                   ? minera::tools::imported_model_alignment(
+                                         *alignment_log, petri,
+                                         model_alignment_options)
+                               : (is_powl || is_inductive || is_alpha ||
                                 alignment_option_used || document)
                                    ? minera::check_alignment(
                                          *alignment_log, petri,
                                          model_alignment_options)
                                    : minera::check_alignment(log, petri))};
+      minera::order_trace_diagnostics(result.token_replay, xes_case_order(*conformance_log));
       minera::set_model_soundness(result, reachability);
       return result;
     };

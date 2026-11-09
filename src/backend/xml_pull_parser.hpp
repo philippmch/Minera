@@ -22,6 +22,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -39,6 +40,31 @@ class XmlSyntaxError : public std::runtime_error {
 };
 
 enum class XmlStrictness { kLenient, kStrict };
+
+// Extra rules a strict parser may apply. The defaults keep the XES reader's
+// behaviour; the model readers (BPMN, PNML, PTML) name themselves in the
+// UTF-8 messages, refuse undeclared namespace prefixes as lxml does, and
+// bound internal entity expansion by reference count and total size.
+// check_namespaces also turns on the finer lxml rules the XES reader leaves
+// alone: XML names and qualified names, the XML declaration's syntax,
+// processing-instruction targets, ']]>' in content, a '/' that does not close
+// its tag, and namespace URIs.
+struct XmlStrictOptions {
+  std::string_view reader = "XES";
+  bool check_namespaces = false;
+  std::size_t max_entity_expansions = static_cast<std::size_t>(-1);
+  std::size_t max_expanded_bytes = static_cast<std::size_t>(-1);
+};
+
+// The strict options of the model readers.
+inline XmlStrictOptions model_xml_options(std::string_view reader) {
+  XmlStrictOptions options;
+  options.reader = reader;
+  options.check_namespaces = true;
+  options.max_entity_expansions = 10000;
+  options.max_expanded_bytes = 1u << 20;
+  return options;
+}
 
 // The XML 1.0 Char production.
 inline bool is_xml_char(std::uint32_t code_point) noexcept {
@@ -174,10 +200,12 @@ class XmlPullParser {
  public:
   explicit XmlPullParser(std::string_view xml, bool emit_character_data = false,
                          bool coalesce_character_data = false,
-                         XmlStrictness strictness = XmlStrictness::kLenient)
+                         XmlStrictness strictness = XmlStrictness::kLenient,
+                         XmlStrictOptions strict_options = {})
       : xml_(xml), emit_character_data_(emit_character_data),
         coalesce_character_data_(coalesce_character_data),
-        strict_(strictness == XmlStrictness::kStrict) {}
+        strict_(strictness == XmlStrictness::kStrict),
+        strict_options_(strict_options) {}
 
   static constexpr std::size_t kMaxStrictDepth = 256;
   static constexpr std::size_t kMaxStrictValueBytes = 10000000;
@@ -283,13 +311,24 @@ class XmlPullParser {
       const auto open = xml_.find('<', pos_);
       if (open != pos_) {
         const auto end = open == std::string_view::npos ? xml_.size() : open;
-        token.text += decode_entities(xml_.substr(pos_, end - pos_));
+        const auto run = xml_.substr(pos_, end - pos_);
+        if (strict_) {
+          check_strict_text(run);
+          token.text += decode_strict(run, false);
+        } else {
+          token.text += decode_entities(run);
+        }
         pos_ = end;
       }
       if (xml_.substr(pos_, 9) == "<![CDATA[") {
+        if (strict_ && open_.empty())
+          fail(root_seen_ ? "extra content at the end of the document"
+                          : "a CDATA section precedes the root element");
         const auto end = xml_.find("]]>", pos_ + 9);
-        if (end == std::string_view::npos)
+        if (end == std::string_view::npos) {
+          if (strict_) fail("the document has an unterminated markup section");
           throw std::runtime_error("XML input has an unterminated CDATA section");
+        }
         token.text.append(xml_.substr(pos_ + 9, end - pos_ - 9));
         pos_ = end + 3;
       } else if (xml_.substr(pos_, 4) == "<!--") {
@@ -351,7 +390,58 @@ class XmlPullParser {
       if (strict_) fail("a tag is missing its name");
       throw std::runtime_error("XML tag is missing a name");
     }
-    return std::string(xml_.substr(start, pos_ - start));
+    const auto name = xml_.substr(start, pos_ - start);
+    if (strict_ && strict_options_.check_namespaces) {
+      if (!valid_xml_name(name)) fail_at(start, "'" + std::string(name) + "' is not a valid XML name");
+      const auto colon = name.find(':');
+      if (colon != std::string_view::npos &&
+          (colon == 0 || colon + 1 == name.size() || name.find(':', colon + 1) != std::string_view::npos))
+        fail_at(start, "failed to parse the qualified name '" + std::string(name) + "'");
+    }
+    return std::string(name);
+  }
+
+  // The XML Name production over ASCII; bytes of a multi-byte UTF-8 sequence
+  // count as name characters (their encoding is checked separately).
+  static bool valid_xml_name(std::string_view name) {
+    const auto start_char = [](unsigned char c) {
+      return c >= 0x80 || c == ':' || c == '_' || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+    };
+    if (name.empty() || !start_char(static_cast<unsigned char>(name.front()))) return false;
+    for (const char ch : name) {
+      const auto c = static_cast<unsigned char>(ch);
+      if (!start_char(c) && c != '-' && c != '.' && !(c >= '0' && c <= '9')) return false;
+    }
+    return true;
+  }
+
+  // A namespace name must parse as a URI reference: no spaces or characters
+  // outside RFC 3986 (other than non-ASCII, which IRIs allow), and an
+  // authority's port, when present, is digits.
+  static bool valid_namespace_uri(std::string_view uri) {
+    static constexpr std::string_view kAllowed =
+        "-._~:/?#[]@!$&'()*+,;=%";
+    for (const char ch : uri) {
+      const auto c = static_cast<unsigned char>(ch);
+      if (c >= 0x80 || std::isalnum(c)) continue;
+      if (kAllowed.find(ch) == std::string_view::npos) return false;
+    }
+    const auto scheme_end = uri.find("://");
+    if (scheme_end != std::string_view::npos) {
+      const auto authority_start = scheme_end + 3;
+      auto authority_end = uri.find_first_of("/?#", authority_start);
+      if (authority_end == std::string_view::npos) authority_end = uri.size();
+      auto authority = uri.substr(authority_start, authority_end - authority_start);
+      if (const auto at = authority.rfind('@'); at != std::string_view::npos)
+        authority.remove_prefix(at + 1);
+      const auto bracket = authority.rfind(']');
+      const auto colon = authority.rfind(':');
+      if (colon != std::string_view::npos && (bracket == std::string_view::npos || colon > bracket)) {
+        for (const char ch : authority.substr(colon + 1))
+          if (!std::isdigit(static_cast<unsigned char>(ch))) return false;
+      }
+    }
+    return true;
   }
 
   Token read_end_tag() {
@@ -367,6 +457,7 @@ class XmlPullParser {
         fail("opening and ending tag mismatch: <" + open_.back() + "> and </" +
              token.name + ">");
       open_.pop_back();
+      if (strict_options_.check_namespaces && !namespaces_.empty()) namespaces_.pop_back();
       if (open_.empty()) root_closed_ = true;
       ++pos_;
       return token;
@@ -403,6 +494,8 @@ class XmlPullParser {
       if (ch == '/') {
         ++pos_;
         if (pos_ >= xml_.size() || xml_[pos_] != '>') {
+          if (strict_ && strict_options_.check_namespaces)
+            fail("'/' in <" + token.name + "> is not followed by '>'");
           throw std::runtime_error("XML self-closing tag is malformed");
         }
         ++pos_;
@@ -465,6 +558,7 @@ class XmlPullParser {
         fail("the document nests elements deeper than " +
              std::to_string(kMaxStrictDepth) + " levels");
       root_seen_ = true;
+      if (strict_options_.check_namespaces) check_namespaces(token);
       if (token.self_closing) {
         if (open_.empty()) root_closed_ = true;
       } else {
@@ -472,6 +566,44 @@ class XmlPullParser {
       }
     }
     return token;
+  }
+
+  // Namespace prefixes must be declared on the element or an ancestor, as a
+  // namespace-aware parser (lxml) requires; xml and xmlns are predefined.
+  void check_namespaces(const Token& token) {
+    std::vector<std::string> declared;
+    for (const auto& [name, value] : token.attributes) {
+      if ((name == "xmlns" || name.rfind("xmlns:", 0) == 0) && !value.empty() &&
+          !valid_namespace_uri(value))
+        fail("the namespace name '" + value + "' of " + name + " is not a valid URI");
+      if (name.rfind("xmlns:", 0) == 0) {
+        if (value.empty())
+          fail("the namespace prefix " + name.substr(6) + " is bound to an empty URI");
+        declared.push_back(name.substr(6));
+      }
+    }
+    const auto known = [&](std::string_view prefix) {
+      if (prefix == "xml" || prefix == "xmlns") return true;
+      if (std::find(declared.begin(), declared.end(), prefix) != declared.end()) return true;
+      for (const auto& frame : namespaces_)
+        if (std::find(frame.begin(), frame.end(), prefix) != frame.end()) return true;
+      return false;
+    };
+    const auto prefix_of = [](std::string_view name) {
+      const auto colon = name.find(':');
+      return colon == std::string_view::npos ? std::string_view{} : name.substr(0, colon);
+    };
+    const auto element_prefix = prefix_of(token.name);
+    if (!element_prefix.empty() && !known(element_prefix))
+      fail("namespace prefix " + std::string(element_prefix) + " on " +
+           token.name.substr(element_prefix.size() + 1) + " is not defined");
+    for (const auto& [name, value] : token.attributes) {
+      const auto prefix = prefix_of(name);
+      if (!prefix.empty() && !known(prefix))
+        fail("namespace prefix " + std::string(prefix) + " for " +
+             name.substr(prefix.size() + 1) + " on " + token.name + " is not defined");
+    }
+    if (!token.self_closing) namespaces_.push_back(std::move(declared));
   }
 
   // Line and column (1-based, in bytes) of a document offset, for messages.
@@ -514,22 +646,27 @@ class XmlPullParser {
       if (lead >= 0xC2 && lead <= 0xDF) { length = 2; code_point = lead & 0x1F; minimum = 0x80; }
       else if (lead >= 0xE0 && lead <= 0xEF) { length = 3; code_point = lead & 0x0F; minimum = 0x800; }
       else if (lead >= 0xF0 && lead <= 0xF4) { length = 4; code_point = lead & 0x07; minimum = 0x10000; }
-      else fail_at(validated_, "invalid UTF-8 byte sequence (the XES reader requires UTF-8)");
+      else fail_at(validated_, utf8_message("invalid"));
       if (validated_ + length > xml_.size())
-        fail_at(validated_, "truncated UTF-8 byte sequence (the XES reader requires UTF-8)");
+        fail_at(validated_, utf8_message("truncated"));
       for (std::size_t index = 1; index < length; ++index) {
         const auto next = static_cast<unsigned char>(xml_[validated_ + index]);
         if ((next & 0xC0) != 0x80)
-          fail_at(validated_, "invalid UTF-8 byte sequence (the XES reader requires UTF-8)");
+          fail_at(validated_, utf8_message("invalid"));
         code_point = (code_point << 6) | (next & 0x3F);
       }
       if (code_point < minimum || (code_point >= 0xD800 && code_point <= 0xDFFF) ||
           code_point > 0x10FFFF)
-        fail_at(validated_, "invalid UTF-8 byte sequence (the XES reader requires UTF-8)");
+        fail_at(validated_, utf8_message("invalid"));
       if (!is_xml_char(code_point))
         fail_at(validated_, "character U+" + hex(code_point) + " is not allowed in XML");
       validated_ += length;
     }
+  }
+
+  std::string utf8_message(std::string_view kind) const {
+    return std::string(kind) + " UTF-8 byte sequence (the " +
+           std::string(strict_options_.reader) + " reader requires UTF-8)";
   }
 
   static std::string hex(std::uint32_t value) {
@@ -552,11 +689,72 @@ class XmlPullParser {
            !std::isspace(static_cast<unsigned char>(xml_[end])))
       ++end;
     const auto target = xml_.substr(open + 2, end - open - 2);
+    if (strict_options_.check_namespaces) {
+      std::size_t name_end = open + 2;
+      while (name_end < xml_.size() && is_name_char(xml_[name_end]) && xml_[name_end] != '?') ++name_end;
+      const auto name = xml_.substr(open + 2, name_end - open - 2);
+      if (!valid_xml_name(name)) fail_at(open + 2, "a processing instruction has no valid target");
+      if (name_end < xml_.size() && xml_.substr(name_end, 2) != "?>" &&
+          !std::isspace(static_cast<unsigned char>(xml_[name_end])))
+        fail_at(name_end, "processing instruction " + std::string(name) + ": space expected");
+      if (name == "xml" && open == 0) check_xml_declaration(name_end);
+    }
     if (target.size() != 3) return;
     const auto lower = [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); };
     if (lower(target[0]) != 'x' || lower(target[1]) != 'm' || lower(target[2]) != 'l') return;
     if (target != "xml") fail_at(open, "Invalid PI name");
     if (open != 0) fail_at(open, "XML declaration allowed only at the start of the document");
+  }
+
+  // The XML declaration: version, then an optional encoding and standalone
+  // pseudo-attribute, each double- or single-quoted.
+  void check_xml_declaration(std::size_t at) const {
+    const auto space = [&] {
+      const auto before = at;
+      while (at < xml_.size() && std::isspace(static_cast<unsigned char>(xml_[at]))) ++at;
+      return at != before;
+    };
+    const auto pseudo = [&](std::string_view key) -> std::optional<std::string_view> {
+      if (xml_.substr(at, key.size()) != key) return std::nullopt;
+      at += key.size();
+      space();
+      if (at >= xml_.size() || xml_[at] != '=') fail_at(at, "the XML declaration expects '=' after " + std::string(key));
+      ++at;
+      space();
+      if (at >= xml_.size() || (xml_[at] != '"' && xml_[at] != '\'')) fail_at(at, "the XML declaration's " + std::string(key) + " is not quoted");
+      const char quote = xml_[at++];
+      const auto close = xml_.find(quote, at);
+      if (close == std::string_view::npos || xml_.substr(at, close - at).find('?') != std::string_view::npos)
+        fail_at(at, "the XML declaration's " + std::string(key) + " is not closed");
+      const auto value = xml_.substr(at, close - at);
+      at = close + 1;
+      return value;
+    };
+    if (!space()) fail_at(at, "the XML declaration expects a version");
+    const auto version = pseudo("version");
+    if (!version) fail_at(at, "the XML declaration expects a version");
+    if (version->size() < 3 || version->substr(0, 2) != "1." ||
+        !std::all_of(version->begin() + 2, version->end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)); }))
+      fail_at(at, "unsupported XML version '" + std::string(*version) + "'");
+    bool spaced = space();
+    if (spaced) {
+      if (const auto encoding = pseudo("encoding")) {
+        const bool valid = !encoding->empty() && std::isalpha(static_cast<unsigned char>(encoding->front())) &&
+            std::all_of(encoding->begin(), encoding->end(), [](char c) {
+              return std::isalnum(static_cast<unsigned char>(c)) || c == '.' || c == '_' || c == '-';
+            });
+        if (!valid) fail_at(at, "invalid encoding name '" + std::string(*encoding) + "'");
+        spaced = space();
+      }
+    }
+    if (spaced) {
+      if (const auto standalone = pseudo("standalone")) {
+        if (*standalone != "yes" && *standalone != "no")
+          fail_at(at, "standalone accepts only 'yes' or 'no'");
+        space();
+      }
+    }
+    if (xml_.substr(at, 2) != "?>") fail_at(at, "the XML declaration expects '?>'");
   }
 
   // Character data between tags: only whitespace outside the root element,
@@ -568,6 +766,9 @@ class XmlPullParser {
                         : "text precedes the root element");
       return;
     }
+    if (strict_options_.check_namespaces && run.find("]]>") != std::string_view::npos)
+      fail_at(static_cast<std::size_t>(run.data() + run.find("]]>") - xml_.data()),
+              "the sequence ']]>' is not allowed in content");
     if (run.find('&') != std::string_view::npos) (void)decode_strict(run, false);
   }
 
@@ -617,10 +818,23 @@ class XmlPullParser {
                             std::size_t depth = 0) {
     std::string out;
     out.reserve(text.size());
+    // The model readers report a bad reference at the reference itself, after
+    // any bad character before it, so errors come in document order as with
+    // lxml; the XES reader keeps its token-position messages.
+    const bool in_document = strict_options_.check_namespaces && text.data() >= xml_.data() &&
+                             text.data() + text.size() <= xml_.data() + xml_.size();
+    std::size_t mark = 0;
+    const auto fail_reference = [&](const std::string& reason) {
+      if (!in_document) fail(reason);
+      const auto at = static_cast<std::size_t>(text.data() - xml_.data()) + mark;
+      validate_characters_to(at);
+      fail_at(at, reason);
+    };
     for (std::size_t i = 0; i < text.size(); ++i) {
       const char ch = text[i];
+      mark = i;
       if (attribute_value) {
-        if (ch == '<') fail("unescaped '<' in an attribute value");
+        if (ch == '<') fail_reference("unescaped '<' in an attribute value");
         if (ch == '\r') {
           out.push_back(' ');
           if (i + 1 < text.size() && text[i + 1] == '\n') ++i;
@@ -644,7 +858,7 @@ class XmlPullParser {
             return std::isspace(static_cast<unsigned char>(c)) || c == '&' ||
                    c == '<' || c == '"' || c == '\'';
           });
-      if (!name_ok) fail("'&' does not start a valid entity or character reference");
+      if (!name_ok) fail_reference("'&' does not start a valid entity or character reference");
       i = semicolon;
       if (name == "amp") out.push_back('&');
       else if (name == "lt") out.push_back('<');
@@ -666,21 +880,27 @@ class XmlPullParser {
           else code = code * (hexadecimal ? 16u : 10u) + static_cast<std::uint32_t>(value);
         }
         if (!valid || !is_xml_char(code))
-          fail("character reference &" + std::string(name) +
+          fail_reference("character reference &" + std::string(name) +
                "; does not name an XML character");
         append_utf8(out, code);
       } else {
         const auto found = entities_.find(std::string(name));
         if (found == entities_.end())
-          fail("entity '" + std::string(name) + "' is not defined");
+          fail_reference("entity '" + std::string(name) + "' is not defined");
         if (found->second.external)
-          fail("entity '" + std::string(name) +
-               "' is external; external entities are not loaded");
+          fail_reference("entity '" + std::string(name) +
+                         "' is external; external entities are not loaded");
         if (depth >= 32) fail("entity '" + std::string(name) + "' is recursive");
+        if (++entity_expansions_ > strict_options_.max_entity_expansions)
+          fail("entity expansion exceeds the limit of " +
+               std::to_string(strict_options_.max_entity_expansions) + " references");
         auto expanded = decode_strict(found->second.value, attribute_value, depth + 1);
         expanded_bytes_ += expanded.size();
         if (expanded_bytes_ > (1u << 20) && expanded_bytes_ / 5 > xml_.size())
           fail("entity expansion exceeds the amplification limit");
+        if (expanded_bytes_ > strict_options_.max_expanded_bytes)
+          fail("entity expansion exceeds the limit of " +
+               std::to_string(strict_options_.max_expanded_bytes) + " bytes");
         out += expanded;
       }
     }
@@ -702,9 +922,22 @@ class XmlPullParser {
   bool root_closed_ = false;
   std::size_t validated_ = 0;
   std::size_t expanded_bytes_ = 0;
+  std::size_t entity_expansions_ = 0;
+  XmlStrictOptions strict_options_;
+  std::vector<std::vector<std::string>> namespaces_;
   std::vector<std::string> open_;
   std::unordered_map<std::string, DeclaredEntity> entities_;
 };
+
+// Checks a whole model document for well-formedness before a model reader
+// interprets it, so that (as with lxml, which parses the document first) a
+// syntax error is reported ahead of any semantic error further up the file.
+// Throws XmlSyntaxError.
+inline void validate_model_xml(std::string_view xml, std::string_view reader) {
+  XmlPullParser parser(xml, true, false, XmlStrictness::kStrict, model_xml_options(reader));
+  while (parser.next().kind != XmlPullParser::Kind::EndOfInput) {
+  }
+}
 
 // Returns the value of the named attribute, or nullptr when absent.
 inline const std::string* attribute(

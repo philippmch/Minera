@@ -7855,14 +7855,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9811",
+        "Content-Length": "9815",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-log-literal-labels.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-literal-labels.response.json",
-        "bytes": 9811,
-        "sha256": "c44bd5bc03cee259cde281633107b9b20c8ecbf2b4fd065d8691d0b3dc5d6c54",
+        "bytes": 9815,
+        "sha256": "cae0c86b86a051c4ed17295d2ac667eae23edb67a060438ed4baba2938757bca",
         "status": 200
       },
       "family": "inductive",
@@ -7884,15 +7884,15 @@
         "bpmn": {
           "filename": "variants-log-literal-labels.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-literal-labels.bpmn.bpmn",
-          "bytes": 3467,
-          "sha256": "b01e2fe4fa6663a552112304474da445d11304466b2bc3249c77081e13f315c5",
+          "bytes": 3470,
+          "sha256": "bddd5800973f42f38e60c211b99c8712355d55bb4f53b2f745b7389e37c3d02f",
           "format": "bpmn"
         },
         "ptml": {
           "filename": "variants-log-literal-labels.ptml.ptml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-log-literal-labels.ptml.ptml",
-          "bytes": 610,
-          "sha256": "15a87ceb3e0750dfb369784a8c6860adc7d918fd7c8b17eb83c4dd475a114626",
+          "bytes": 613,
+          "sha256": "2e5ca64745198d77e6e9c9bd465566fc93bb906b51ee26b50cdefc41b4fb3ea1",
           "format": "ptml"
         }
       }
@@ -8487,14 +8487,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9815",
+        "Content-Length": "9819",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-imf-literal-labels.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-literal-labels.response.json",
-        "bytes": 9815,
-        "sha256": "2fb341c0359276e033e580beffb6eafd5beb3119ed5b779af7ddafa3cda3377d",
+        "bytes": 9819,
+        "sha256": "ac41ccf7aa84eb8dd86a3849674b16ef37f97fe477d7872488b214c689798ba9",
         "status": 200
       },
       "family": "inductive",
@@ -8516,15 +8516,15 @@
         "bpmn": {
           "filename": "variants-imf-literal-labels.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-literal-labels.bpmn.bpmn",
-          "bytes": 3467,
-          "sha256": "b01e2fe4fa6663a552112304474da445d11304466b2bc3249c77081e13f315c5",
+          "bytes": 3470,
+          "sha256": "bddd5800973f42f38e60c211b99c8712355d55bb4f53b2f745b7389e37c3d02f",
           "format": "bpmn"
         },
         "ptml": {
           "filename": "variants-imf-literal-labels.ptml.ptml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-imf-literal-labels.ptml.ptml",
-          "bytes": 610,
-          "sha256": "15a87ceb3e0750dfb369784a8c6860adc7d918fd7c8b17eb83c4dd475a114626",
+          "bytes": 613,
+          "sha256": "2e5ca64745198d77e6e9c9bd465566fc93bb906b51ee26b50cdefc41b4fb3ea1",
           "format": "ptml"
         }
       }
@@ -9119,14 +9119,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "9815",
+        "Content-Length": "9819",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "variants-dfg-literal-labels.response.json",
         "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-literal-labels.response.json",
-        "bytes": 9815,
-        "sha256": "142343504452d506e63f96ff65e20f66416db75345fa8a8accb6562f7654834d",
+        "bytes": 9819,
+        "sha256": "bc018d733789099617b02c535e4395c549d3821a79781365f428c36891a25692",
         "status": 200
       },
       "family": "inductive",
@@ -9148,15 +9148,15 @@
         "bpmn": {
           "filename": "variants-dfg-literal-labels.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-literal-labels.bpmn.bpmn",
-          "bytes": 3467,
-          "sha256": "b01e2fe4fa6663a552112304474da445d11304466b2bc3249c77081e13f315c5",
+          "bytes": 3470,
+          "sha256": "bddd5800973f42f38e60c211b99c8712355d55bb4f53b2f745b7389e37c3d02f",
           "format": "bpmn"
         },
         "ptml": {
           "filename": "variants-dfg-literal-labels.ptml.ptml",
           "path": "src/frontend/tests/fixtures/inductive-input-workbench/captures/variants-dfg-literal-labels.ptml.ptml",
-          "bytes": 610,
-          "sha256": "15a87ceb3e0750dfb369784a8c6860adc7d918fd7c8b17eb83c4dd475a114626",
+          "bytes": 613,
+          "sha256": "2e5ca64745198d77e6e9c9bd465566fc93bb906b51ee26b50cdefc41b4fb3ea1",
           "format": "ptml"
         }
       }

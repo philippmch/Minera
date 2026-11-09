@@ -10,19 +10,11 @@
       <place id="sink">
         <name><text>sink</text></name>
       </place>
-      <place id="p_3">
-        <name><text>p_3</text></name>
-      </place>
       <transition id="00000000-0000-4000-8000-000000000000">
-        <name><text>A</text></name>
-      </transition>
-      <transition id="00000000-0000-4000-8000-000000000001">
-        <name><text>B</text></name>
+        <name><text>ignored second tree</text></name>
       </transition>
       <arc id="a0" source="source" target="00000000-0000-4000-8000-000000000000"/>
-      <arc id="a1" source="00000000-0000-4000-8000-000000000000" target="p_3"/>
-      <arc id="a2" source="p_3" target="00000000-0000-4000-8000-000000000001"/>
-      <arc id="a3" source="00000000-0000-4000-8000-000000000001" target="sink"/>
+      <arc id="a1" source="00000000-0000-4000-8000-000000000000" target="sink"/>
     </page>
     <finalmarkings>
       <marking>

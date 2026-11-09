@@ -4205,3 +4205,52 @@ value stored under its mask; set_index on an evenly stepping int64 column
 builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
+
+## Review-fix loop, rounds T–AH (2026-11-05 to 2026-11-09, cloud container)
+
+Each round runs two read-only reviewers in parallel (one re-reviews the
+previous round's fixes, one sweeps an area against the pinned reference with
+random public inputs), then the same reviewers fix what they found in the
+working tree; the main session runs the full suite and pushes one commit per
+round to `main`. Each round's findings, fixes and declared differences are in
+`docs/reference-2.7.22-parity.md` under "Review <round><n>". Rounds AA–AH
+covered token replay and footprint speed, soundness reductions, `/api/mine`
+on large logs, the DataFrame path for XES inputs (one shared import, case
+merging, case-id order of per-case lists, typed case ids), cancellable log
+loading and `cancel-mine`, and strict BPMN/PNML/PTML reading and writing.
+
+Next round (AI) should start by re-reviewing round AH:
+
+- `include/minera/case_list_order.hpp` (`order_trace_diagnostics`,
+  `apply_case_order`) at every per-case list writer, and `case_id_order`'s
+  typed order in `src/backend/event_ordering.cpp`, including the exact
+  int/float comparison that replaced a 128-bit key;
+- `ReplayFitnessOptions::trace_order` / `AlignmentOptions::trace_order` in
+  `/api/evaluate`, and `evict_mining_ticket_locked` in `minera_server.cpp`;
+- strict model XML (`model_xml_options`, `validate_model_xml` in
+  `src/backend/xml_pull_parser.hpp`; entity limits), BPMN parallel arcs as
+  repeated unit arcs, PTML/BPMN writer escapes, and
+  `src/backend/tools/imported_alignment.hpp` (A* by default for `--check-*`
+  and `/api/align?miner=imported`).
+
+Areas without a recent random-input sweep that are good candidates for the
+second reviewer: concept drift, root-cause and feature extraction, OCEL
+writers read back with pm4py, and large-log performance of the routes not
+covered by AD (alignments, evaluate, OCEL discovery).
+
+Known open or declared: mine-view generalization sum order (2 ulp); POWL
+brute-force filtering and dynamic clustering rare cases; BPMN→net
+align-ETC ties and pm4py's hash-seed dependence on BPMN inputs; the
+`/api/evaluate` alignment `average_trace_fitness` last bit on 3 of 257 logs
+(pm4py sums per variant); `merge_dataframe_cases` and gzip decompression are
+not polled for cancellation.
+
+Suite before each push (about 2 h at -j2; run it from one session only):
+touch the changed sources, `cmake --build build -j2`, `ctest --test-dir build
+-j2 --timeout 1800`, `npx tsc --noEmit -p .` and `npx vitest run
+--maxWorkers=2` in `src/frontend`, `python -m unittest discover -s
+scripts/tests`, then replay every `src/frontend/tests/fixtures/*manifest*.json`
+with `scripts/capture-workbench-fixtures.py --origin <local minera_server>`
+(no `--write`) and read the full output. `minera_portable_integers` fails on
+any `__int128` or compiler builtin in core code. GitHub Actions has not run
+since 2026-10-28 (billing), so macOS and Windows are checked by nothing else.

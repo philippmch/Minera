@@ -1,5 +1,6 @@
 #include "minera/exact_filter_discovery_json.hpp"
 #include "minera/cancellation.hpp"
+#include "minera/case_list_order.hpp"
 #include "minera/case_description_workbench_json.hpp"
 #include "minera/reference_log_filter_workbench.hpp"
 #include "minera/table_attribute_repetition_workbench.hpp"
@@ -23,6 +24,7 @@
 // CSV event logs with the native core via POST /api/mine.
 
 #include "pnml_model_options.hpp"
+#include "imported_alignment.hpp"
 #include "replay_input_options.hpp"
 
 #include <algorithm>
@@ -1567,6 +1569,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       const auto reachability = minera::final_marking_reachability(petri, cancelled);
       mine_progress_stage(net_name + ": token replay");
       auto token_replay = minera::check_conformance(*conformance_log, petri, replay_options);
+      // pm4py lists the frame's cases in the case-id order of the replayed
+      // log (its own case key; see session_case_order).
+      minera::order_trace_diagnostics(token_replay,
+          session_case_order(active_source.get(), *conformance_log));
       mine_progress_stage(net_name + ": footprints");
       // The model's marking exploration can take seconds; a disconnect (or a
       // cancel) stops it.
@@ -6805,10 +6811,10 @@ void handle_check_model(const httplib::Request& request,
         std::nullopt};
     if (!gated) minera::set_model_soundness(conformance, imported_reachability);
     // pm4py's token replay of an XES frame lists its cases in case-id order
-    // (the trace diagnostics; see constraint_case_order).
-    const auto case_order =
-        session_case_order(session->active_source.get(), require_prepared_log(*session));
-    const minera::AnalysisConstraintCaseOrder case_list_order(case_order ? &*case_order : nullptr);
+    // (the trace diagnostics of the replayed log; see session_case_order).
+    if (!gated)
+      minera::order_trace_diagnostics(conformance.token_replay,
+          session_case_order(session->active_source.get(), require_prepared_log(*session)));
     auto body =
         minera::imported_model_json(conformance, next_session->graph);
     const auto imported_model_id = ++g_imported_model_sequence;
@@ -6882,6 +6888,10 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     };
     auto options = minera::parse_alignment_params(lookup, present);
     options.cancelled = connection_cancel_hook(request);
+    // A supplied model aligns with the reference's public default variant
+    // (state-equation A*) unless alignment_variant chose another.
+    if (miner == "imported" && !present("alignment_variant"))
+      options.variant = minera::AlignmentVariant::kStateEquationAStar;
     if (miner == "imported" && !request.has_param("alignment_activity_attribute"))
       options.activity_attribute = session->imported_activity_attribute;
     if (miner == "imported" && session->imported_document) {
@@ -6904,7 +6914,9 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
       alignment_log = &*projected_powl_log;
     }
     const auto alignment =
-        minera::check_alignment(*alignment_log, selected, options);
+        miner == "imported"
+            ? minera::tools::imported_model_alignment(*alignment_log, selected, options)
+            : minera::check_alignment(*alignment_log, selected, options);
     auto graph = session->graph;
     register_activity_selector_values(graph, *alignment_log,
                                       options.activity_attribute);
@@ -8419,14 +8431,11 @@ void handle_evaluate(const httplib::Request& request,
         *evaluation_log, params.replay_fitness_options.activity_attribute);
     if (evaluation_input) evaluation_log = &*evaluation_input;
     // pm4py's replay fitness of an XES frame sums the per-case values in
-    // case-id order (see session_case_order).
-    if (params.family == minera::EvaluationFamily::kReplayFitness &&
-        session_case_order(session->active_source.get(), *evaluation_log)) {
-      auto ordered = *evaluation_log;
-      minera::order_cases_by_id(ordered);
-      evaluation_input = std::move(ordered);
-      evaluation_log = &*evaluation_input;
-    }
+    // case-id order (see session_case_order); the log is read in that order
+    // rather than copied.
+    if (params.family == minera::EvaluationFamily::kReplayFitness)
+      params.replay_fitness_options.trace_order =
+          session_case_order(session->active_source.get(), *evaluation_log);
     }
     if (!model_only && adapter != "log") {
       overlay_cached_source_selectors(request, *session, params, true);
@@ -8756,12 +8765,13 @@ void handle_align_process_tree(const httplib::Request& request,
     auto options = minera::parse_process_tree_alignment_params(lookup, present);
     options.cancelled = connection_cancel_hook(request);
     const auto& alignment_log = cached_model_log(*session, "inductive");
-    const auto result = minera::align_process_tree(alignment_log,
-                                                   require_process_tree(*session),
-                                                   options);
-    // pm4py's alignments of an XES frame list its cases in case-id order.
-    const auto case_order = session_case_order(session->active_source.get(), alignment_log);
-    const minera::AnalysisConstraintCaseOrder case_list_order(case_order ? &*case_order : nullptr);
+    auto result = minera::align_process_tree(alignment_log,
+                                             require_process_tree(*session),
+                                             options);
+    // pm4py's alignments of an XES frame list its cases in case-id order
+    // (one entry per trace of the aligned log).
+    if (const auto case_order = session_case_order(session->active_source.get(), alignment_log))
+      minera::apply_case_order(result.traces, *case_order);
     response.set_content(minera::process_tree_alignment_json(result),
                          "application/json");
   } catch (const std::exception& error) {
@@ -8894,10 +8904,18 @@ void handle_align_dfg(const httplib::Request& request, httplib::Response& respon
     if (projection != "none" && projection != "log" && projection != "metrics") throw std::invalid_argument("projection expects none, log, or metrics");
     minera::DfgStatisticalOptions dopt; dopt.window = 1; dopt.activity_attribute = options.activity_attribute; dopt.timestamp_attribute = options.timestamp_attribute; const auto dfg = minera::discover_frequency_dfg(require_prepared_log(*session), dopt);
     std::map<std::string,std::uint64_t> starts, ends; for (const auto& t:require_prepared_log(*session).traces) if(!t.events.empty()){ const auto* first = minera::dfg_event_field_value(t.events.front(), options.activity_attribute); const auto* last = minera::dfg_event_field_value(t.events.back(), options.activity_attribute); if (!first || !last) throw std::invalid_argument("DFG alignment: event is missing activity attribute '" + options.activity_attribute + "'"); ++starts[*first];++ends[*last]; }
-    const auto result = minera::align_log_on_dfg(require_prepared_log(*session), dfg, starts, ends, options);
-    if (projection == "log") { const auto projected = minera::project_log_on_dfg(require_prepared_log(*session), dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(result, nullptr, &projected), "application/json"); }
-    else if (projection == "metrics") { const auto metrics = minera::project_alignments_on_dfg(require_prepared_log(*session), dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(result, &metrics), "application/json"); }
-    else response.set_content(minera::dfg_alignment_json(result), "application/json");
+    auto result = minera::align_log_on_dfg(require_prepared_log(*session), dfg, starts, ends, options);
+    // pm4py's DFG alignment of an XES frame (algo.conformance.alignments.dfg
+    // apply on the read_xes frame) lists its cases in case-id order. The
+    // projections read the result by trace position, so they come first.
+    const auto case_order = session_case_order(session->active_source.get(), require_prepared_log(*session));
+    const auto listed = [&]() -> const minera::DfgAlignmentLogResult& {
+      if (case_order) minera::apply_case_order(result.alignments, *case_order);
+      return result;
+    };
+    if (projection == "log") { const auto projected = minera::project_log_on_dfg(require_prepared_log(*session), dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(listed(), nullptr, &projected), "application/json"); }
+    else if (projection == "metrics") { const auto metrics = minera::project_alignments_on_dfg(require_prepared_log(*session), dfg, starts, ends, result, options); response.set_content(minera::dfg_alignment_json(listed(), &metrics), "application/json"); }
+    else response.set_content(minera::dfg_alignment_json(listed()), "application/json");
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 

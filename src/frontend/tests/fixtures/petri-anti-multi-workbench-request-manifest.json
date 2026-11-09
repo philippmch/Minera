@@ -10014,7 +10014,7 @@
         "bytes": 1768,
         "sha256": "ad80af0411c71a073e93d8910ea9e6901fa1b407f16bcb6633992f2c004764b3"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "input": {
         "filename": "owned-model-literal-word.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/inputs/owned-model-literal-word.json",
@@ -10030,15 +10030,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6942",
+        "Content-Length": "117",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "anti-original-model-wtf8-nul-empty-id.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-original-model-wtf8-nul-empty-id.response.json",
-        "bytes": 6942,
-        "sha256": "10559e3ec5da1c0af53a1d153476fabb8e88cfaf6768a387e8a323ce0c3b5843",
-        "status": 200
+        "bytes": 117,
+        "sha256": "42efc1f53f97e3870c880cd16af3b8dc5623f41c924c222317b0f5b945ff17f9",
+        "status": 400
       },
       "family": "petri_anti_multi_alignment",
       "algorithm": "anti",
@@ -10048,23 +10048,8 @@
       "input_format": "trace_words",
       "model_format": "pnml",
       "executed": true,
-      "error": null,
-      "exports": {
-        "pnml": {
-          "filename": "anti-original-model-wtf8-nul-empty-id.pnml.pnml",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-original-model-wtf8-nul-empty-id.pnml.pnml",
-          "bytes": 958,
-          "sha256": "da85cc9f536ead8355bc164b4e90b30d639326d9c350551b3a251655201dd99c",
-          "format": "pnml"
-        },
-        "checked_pnml": {
-          "filename": "anti-original-model-wtf8-nul-empty-id.checked_pnml.pnml",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/anti-original-model-wtf8-nul-empty-id.checked_pnml.pnml",
-          "bytes": 1083,
-          "sha256": "a4cae8d1316d2f0492e61f04b8a3437e5ee6e757a72560a57ec58d3302d6afbb",
-          "format": "pnml"
-        }
-      }
+      "error": "XML is not well-formed: character reference &#55296; does not name an XML character (line 13, column 17)",
+      "exports": {}
     },
     {
       "id": "anti-signed-zero-big-native-arcs-terminal",
@@ -10195,7 +10180,7 @@
         "bytes": 1769,
         "sha256": "eb03f55662a320e80f68a6edc372dd1aa87d4434766645bf76fa390ed9495d38"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "input": {
         "filename": "owned-model-literal-word.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/inputs/owned-model-literal-word.json",
@@ -10211,15 +10196,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6919",
+        "Content-Length": "117",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "multi-original-model-wtf8-nul-empty-id.response.json",
         "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-original-model-wtf8-nul-empty-id.response.json",
-        "bytes": 6919,
-        "sha256": "dade8883c88d95f8b9d6305aceefa8fc98de8bf0d53f02e413eb93d6d7ce7678",
-        "status": 200
+        "bytes": 117,
+        "sha256": "42efc1f53f97e3870c880cd16af3b8dc5623f41c924c222317b0f5b945ff17f9",
+        "status": 400
       },
       "family": "petri_anti_multi_alignment",
       "algorithm": "multi",
@@ -10229,23 +10214,8 @@
       "input_format": "trace_words",
       "model_format": "pnml",
       "executed": true,
-      "error": null,
-      "exports": {
-        "pnml": {
-          "filename": "multi-original-model-wtf8-nul-empty-id.pnml.pnml",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-original-model-wtf8-nul-empty-id.pnml.pnml",
-          "bytes": 958,
-          "sha256": "da85cc9f536ead8355bc164b4e90b30d639326d9c350551b3a251655201dd99c",
-          "format": "pnml"
-        },
-        "checked_pnml": {
-          "filename": "multi-original-model-wtf8-nul-empty-id.checked_pnml.pnml",
-          "path": "src/frontend/tests/fixtures/petri-anti-multi-workbench/captures/multi-original-model-wtf8-nul-empty-id.checked_pnml.pnml",
-          "bytes": 1083,
-          "sha256": "a4cae8d1316d2f0492e61f04b8a3437e5ee6e757a72560a57ec58d3302d6afbb",
-          "format": "pnml"
-        }
-      }
+      "error": "XML is not well-formed: character reference &#55296; does not name an XML character (line 13, column 17)",
+      "exports": {}
     },
     {
       "id": "multi-signed-zero-big-native-arcs-terminal",

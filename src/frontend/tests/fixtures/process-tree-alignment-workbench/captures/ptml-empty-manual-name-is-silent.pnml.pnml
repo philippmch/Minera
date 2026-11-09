@@ -10,12 +10,11 @@
       <place id="sink">
         <name><text>sink</text></name>
       </place>
-      <transition id="skip_1">
-        <name><text>tau</text></name>
-        <toolspecific tool="ProM" version="6.4" activity="$invisible$" localNodeID="skip_1"/>
+      <transition id="00000000-0000-4000-8000-000000000000">
+        <name><text></text></name>
       </transition>
-      <arc id="a0" source="source" target="skip_1"/>
-      <arc id="a1" source="skip_1" target="sink"/>
+      <arc id="a0" source="source" target="00000000-0000-4000-8000-000000000000"/>
+      <arc id="a1" source="00000000-0000-4000-8000-000000000000" target="sink"/>
     </page>
     <finalmarkings>
       <marking>

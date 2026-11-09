@@ -32,6 +32,11 @@ std::string xml_escaped(std::string_view value) {
       case '>': out += "&gt;"; break;
       case '"': out += "&quot;"; break;
       case '\'': out += "&apos;"; break;
+      // Character references keep tabs and line breaks that a reader would
+      // otherwise normalise to spaces in attribute values.
+      case '\t': out += "&#9;"; break;
+      case '\n': out += "&#10;"; break;
+      case '\r': out += "&#13;"; break;
       default: out += c;
     }
   }
@@ -573,6 +578,7 @@ struct BpmnScope {
   std::vector<BpmnNode> nodes;
   std::vector<BpmnFlow> flows;
   std::unordered_map<std::string, std::size_t> node_index;
+  std::unordered_map<std::string, std::size_t> flow_index;
 };
 
 // The element's name with any namespace prefix removed — BPMN files routinely
@@ -1322,7 +1328,21 @@ class ReferenceBpmnNetBuilder {
       std::vector<std::size_t> outputs;
       for (const auto p : node.inputs) inputs.push_back(remap[p]);
       for (const auto p : node.outputs) outputs.push_back(remap[p]);
-      net.add_transition(activity, std::move(inputs), std::move(outputs));
+      // Parallel sequence flows (two flows between the same pair of nodes)
+      // stay separate unit arcs, as in the reference, instead of merging into
+      // one weight-2 arc.
+      const auto repeats = [](std::vector<std::size_t> places) {
+        std::sort(places.begin(), places.end());
+        return std::adjacent_find(places.begin(), places.end()) != places.end();
+      };
+      const bool parallel = repeats(inputs) || repeats(outputs);
+      const auto input_count = inputs.size();
+      const auto output_count = outputs.size();
+      const auto transition = net.add_transition(activity, std::move(inputs), std::move(outputs));
+      if (parallel)
+        net.set_ordinary_arc_weights(transition,
+                                     std::vector<PetriArcWeight>(input_count),
+                                     std::vector<PetriArcWeight>(output_count));
       transition_names.emplace_back(node.name);
     }
     net.set_activities(std::move(activities));
@@ -1342,7 +1362,12 @@ class ReferenceBpmnNetBuilder {
 }  // namespace
 
 PetriNet parse_bpmn(std::string_view xml) {
-  detail::XmlPullParser parser(xml);
+  if (xml.substr(0, 3) == "\xEF\xBB\xBF") xml.remove_prefix(3);
+  detail::validate_model_xml(xml, "BPMN");
+  // lxml refuses input that is not well-formed (undeclared prefixes, bad
+  // characters, external entities, ...); the strict parser does too.
+  detail::XmlPullParser parser(xml, false, false, detail::XmlStrictness::kStrict,
+                               detail::model_xml_options("BPMN"));
 
   std::vector<BpmnScope> scopes;
   std::vector<std::size_t> processes;    // top-level <process> scopes, in order
@@ -1370,20 +1395,21 @@ PetriNet parse_bpmn(std::string_view xml) {
     BpmnNode node;
     node.kind = kind;
     node.child_scope = child_scope;
+    // The reference skips a flow node without an id and keeps the first of
+    // several nodes sharing one id.
     const auto* id = detail::attribute(token.attributes, "id");
-    if (!id) {
-      throw std::runtime_error("BPMN flow node is missing its id");
-    }
+    if (!id) return false;
     node.id = *id;
     node.element = std::string(local_name(token.name));
     if (const auto* name = detail::attribute(token.attributes, "name")) {
-      node.name = *name;
+      // The reference drops carriage returns and line feeds from names.
+      for (const char ch : *name)
+        if (ch != '\r' && ch != '\n') node.name.push_back(ch);
     }
-    if (!scope.node_index.emplace(node.id, scope.nodes.size()).second) {
-      throw std::runtime_error("BPMN has a duplicate node id '" + node.id +
-                               "'");
-    }
+    if (!scope.node_index.emplace(node.id, scope.nodes.size()).second)
+      return false;
     scope.nodes.push_back(std::move(node));
+    return true;
   };
 
   while (true) {
@@ -1415,14 +1441,16 @@ PetriNet parse_bpmn(std::string_view xml) {
     auto& scope = scopes[scope_stack.back()];
 
     if (name == "sequenceFlow") {
+      // The reference skips a flow without an id, sourceRef or targetRef, and
+      // a repeated flow id keeps the first flow's position with the last
+      // flow's endpoints.
       const auto* source = detail::attribute(token.attributes, "sourceRef");
       const auto* target = detail::attribute(token.attributes, "targetRef");
-      if (!source || !target) {
-        throw std::runtime_error(
-            "BPMN sequence flow is missing its sourceRef or targetRef");
-      }
       const auto* flow_id = detail::attribute(token.attributes, "id");
-      scope.flows.push_back({*source, *target, flow_id ? *flow_id : std::string()});
+      if (!source || !target || !flow_id) continue;
+      const auto [it, inserted] = scope.flow_index.emplace(*flow_id, scope.flows.size());
+      if (inserted) scope.flows.push_back({*source, *target, *flow_id});
+      else scope.flows[it->second] = {*source, *target, *flow_id};
     } else if (is_task_element(name)) {
       add_node(scope, BpmnNodeKind::task, token);
     } else if (name == "startEvent") {
@@ -1460,7 +1488,7 @@ PetriNet parse_bpmn(std::string_view xml) {
       const auto* attached = detail::attribute(token.attributes, "attachedToRef");
       if (!attached)
         throw std::runtime_error("BPMN boundary event is missing attachedToRef");
-      add_node(scope, BpmnNodeKind::boundary, token);
+      if (!add_node(scope, BpmnNodeKind::boundary, token)) continue;
       scope.nodes.back().attached_to = *attached;
       const auto* cancel = detail::attribute(token.attributes, "cancelActivity");
       if (cancel && *cancel != "true" && *cancel != "false")
@@ -1482,7 +1510,9 @@ PetriNet parse_bpmn(std::string_view xml) {
       return BpmnNetBuilder(scopes).build(scope);
     }
   }
-  throw std::runtime_error("BPMN input contains no process (or an empty one)");
+  // No process, or only empty ones: the reference returns a net holding just
+  // its source and sink places.
+  return ReferenceBpmnNetBuilder(BpmnScope{}).build();
 }
 
 PetriNet import_bpmn(const std::filesystem::path& path) {

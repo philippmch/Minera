@@ -51,14 +51,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "208616",
+        "Content-Length": "210914",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-csv-log.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-csv-log.response.json",
-        "bytes": 208616,
-        "sha256": "537991ba4650ee9a5ff613e371efc81142e2be73468bbfe751c0a4893ff0c687",
+        "bytes": 210914,
+        "sha256": "2575857bf2147ade648a7dd52e0a459c2a636afb15f1d0a1688382ab26a15500",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -73,22 +73,22 @@
         "pnml": {
           "filename": "search_graph_pt-csv-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-csv-log.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-csv-log.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-csv-log.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-csv-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-csv-log.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -151,14 +151,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "146075",
+        "Content-Length": "144714",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-csv-trace.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-csv-trace.response.json",
-        "bytes": 146075,
-        "sha256": "cc23bbc11172bafadb23ffda55e0f8d9521fb040e9170934dc8855d9e5cadb8f",
+        "bytes": 144714,
+        "sha256": "721a087e903c931e732f23ea764bb52ccf30f518379ef5d63c092b1cb310541a",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -173,22 +173,22 @@
         "pnml": {
           "filename": "search_graph_pt-csv-trace.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-csv-trace.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-csv-trace.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-csv-trace.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-csv-trace.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-csv-trace.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -251,14 +251,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "156424",
+        "Content-Length": "156033",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-log.response.json",
-        "bytes": 156424,
-        "sha256": "b9d1a53cc96b778af14ed18acaaa7bd30e61a53854195e5580eadcdeacae3d70",
+        "bytes": 156033,
+        "sha256": "06e89817155e3d4ef36be9b9bcd24e2dcf55a94c5838500407e537f690ea2209",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -273,22 +273,22 @@
         "pnml": {
           "filename": "search_graph_pt-xes-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-log.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-xes-log.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-log.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-xes-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-log.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -355,14 +355,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "71569",
+        "Content-Length": "70124",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-xes-trace.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-trace.response.json",
-        "bytes": 71569,
-        "sha256": "5d7e42ef49439d31374fae86918bd7ebd2491f81741351ae8c2dec0269d0322a",
+        "bytes": 70124,
+        "sha256": "693065be9bdd068b4d3f8753be6e85b4eb561a6f8d51650a6a9024952ac1d917",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -377,22 +377,22 @@
         "pnml": {
           "filename": "search_graph_pt-xes-trace.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-trace.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-xes-trace.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-trace.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-xes-trace.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-trace.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -463,14 +463,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16932",
+        "Content-Length": "15521",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-xes-importer-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse.response.json",
-        "bytes": 16932,
-        "sha256": "c87b7ad76136cc84fd8117ec4dd9ed3ca941826f16e748adc5174e183b01e8ea",
+        "bytes": 15521,
+        "sha256": "873a2ecfbb807359d23d8f6427e34a9ea74dbfe5ff114ba967bf76e71309b0f5",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -485,22 +485,22 @@
         "pnml": {
           "filename": "search_graph_pt-xes-importer-iterparse.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-xes-importer-iterparse.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-xes-importer-iterparse.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -571,14 +571,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16932",
+        "Content-Length": "15521",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-xes-importer-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-line_by_line.response.json",
-        "bytes": 16932,
-        "sha256": "c87b7ad76136cc84fd8117ec4dd9ed3ca941826f16e748adc5174e183b01e8ea",
+        "bytes": 15521,
+        "sha256": "873a2ecfbb807359d23d8f6427e34a9ea74dbfe5ff114ba967bf76e71309b0f5",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -593,22 +593,22 @@
         "pnml": {
           "filename": "search_graph_pt-xes-importer-line_by_line.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-line_by_line.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-xes-importer-line_by_line.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-line_by_line.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-xes-importer-line_by_line.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-line_by_line.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -679,14 +679,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16932",
+        "Content-Length": "15521",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-xes-importer-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse_20.response.json",
-        "bytes": 16932,
-        "sha256": "c87b7ad76136cc84fd8117ec4dd9ed3ca941826f16e748adc5174e183b01e8ea",
+        "bytes": 15521,
+        "sha256": "873a2ecfbb807359d23d8f6427e34a9ea74dbfe5ff114ba967bf76e71309b0f5",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -701,22 +701,22 @@
         "pnml": {
           "filename": "search_graph_pt-xes-importer-iterparse_20.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse_20.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-xes-importer-iterparse_20.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse_20.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-xes-importer-iterparse_20.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse_20.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -787,14 +787,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16932",
+        "Content-Length": "15521",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-xes-importer-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse_mem_compressed.response.json",
-        "bytes": 16932,
-        "sha256": "c87b7ad76136cc84fd8117ec4dd9ed3ca941826f16e748adc5174e183b01e8ea",
+        "bytes": 15521,
+        "sha256": "873a2ecfbb807359d23d8f6427e34a9ea74dbfe5ff114ba967bf76e71309b0f5",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -809,22 +809,22 @@
         "pnml": {
           "filename": "search_graph_pt-xes-importer-iterparse_mem_compressed.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse_mem_compressed.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-xes-importer-iterparse_mem_compressed.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse_mem_compressed.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-xes-importer-iterparse_mem_compressed.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-iterparse_mem_compressed.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -895,14 +895,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17919",
+        "Content-Length": "16508",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-xes-importer-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-rustxes.response.json",
-        "bytes": 17919,
-        "sha256": "937fae7ccb69c8615a42968831203ced34fe06a6444f6d5ba21677562ef2627e",
+        "bytes": 16508,
+        "sha256": "9cf653b5d2c0d9ba63ccf2bfb5e71fa64481a8ddd608f2c356e8f7550c526a5f",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -917,22 +917,22 @@
         "pnml": {
           "filename": "search_graph_pt-xes-importer-rustxes.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-rustxes.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-xes-importer-rustxes.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-rustxes.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-xes-importer-rustxes.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-rustxes.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -1003,14 +1003,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16932",
+        "Content-Length": "15521",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-xes-importer-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-chunk_regex.response.json",
-        "bytes": 16932,
-        "sha256": "c87b7ad76136cc84fd8117ec4dd9ed3ca941826f16e748adc5174e183b01e8ea",
+        "bytes": 15521,
+        "sha256": "873a2ecfbb807359d23d8f6427e34a9ea74dbfe5ff114ba967bf76e71309b0f5",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -1025,22 +1025,22 @@
         "pnml": {
           "filename": "search_graph_pt-xes-importer-chunk_regex.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-chunk_regex.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "search_graph_pt-xes-importer-chunk_regex.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-chunk_regex.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-xes-importer-chunk_regex.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-xes-importer-chunk_regex.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -1673,14 +1673,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "208632",
+        "Content-Length": "210930",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-csv-log.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-csv-log.response.json",
-        "bytes": 208632,
-        "sha256": "e4dce55d7339acc3eba1b1943358e4b39cd3f41fca38c3c29828fc472ea6430e",
+        "bytes": 210930,
+        "sha256": "51c395eed7d36bb5f390c1247d414eccb00f279bae4f05062ee47ff3bb14035f",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -1695,22 +1695,22 @@
         "pnml": {
           "filename": "dynamic_programming-csv-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-csv-log.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-csv-log.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-csv-log.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-csv-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-csv-log.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -1773,14 +1773,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "146091",
+        "Content-Length": "144730",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-csv-trace.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-csv-trace.response.json",
-        "bytes": 146091,
-        "sha256": "cbff1be6d2ed17b3064dcdcd3d6e596699830b1fb1ccb3314de32ce3ecd35759",
+        "bytes": 144730,
+        "sha256": "ae0005f9b32d21b321bf623e8aa6414fc541c54dab197073f1a94b337b542254",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -1795,22 +1795,22 @@
         "pnml": {
           "filename": "dynamic_programming-csv-trace.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-csv-trace.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-csv-trace.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-csv-trace.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-csv-trace.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-csv-trace.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -1873,14 +1873,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "156440",
+        "Content-Length": "156049",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-log.response.json",
-        "bytes": 156440,
-        "sha256": "70a092d26b6477ee79bb1321e8f3c54729679b99f35738f86e040e3ca5cd3a9b",
+        "bytes": 156049,
+        "sha256": "6c7ee54e52677a247ac59de22cfc4e8effb3545f4cd5297cdf69534e1593b616",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -1895,22 +1895,22 @@
         "pnml": {
           "filename": "dynamic_programming-xes-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-log.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-xes-log.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-log.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-xes-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-log.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -1977,14 +1977,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "71585",
+        "Content-Length": "70140",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-xes-trace.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-trace.response.json",
-        "bytes": 71585,
-        "sha256": "d8f10d2730b9ec0dcef62ef30e8135bb6a2ded77c11415596f37de05d8bf1812",
+        "bytes": 70140,
+        "sha256": "e5c585888e970bfa885939d97db375f48e7deb23061aee10dcbfcb9669ac4fd9",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -1999,22 +1999,22 @@
         "pnml": {
           "filename": "dynamic_programming-xes-trace.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-trace.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-xes-trace.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-trace.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-xes-trace.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-trace.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -2085,14 +2085,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16948",
+        "Content-Length": "15537",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-xes-importer-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse.response.json",
-        "bytes": 16948,
-        "sha256": "aa65feb70ca6e07d8fd9f8004bcd295d3ae58e38fde77116244aab4d18d97266",
+        "bytes": 15537,
+        "sha256": "421a7aa77364ce5d9a71fd4ab4dacd5c8a8106130815e1cd26f5ec2f8d51338d",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -2107,22 +2107,22 @@
         "pnml": {
           "filename": "dynamic_programming-xes-importer-iterparse.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-xes-importer-iterparse.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-xes-importer-iterparse.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -2193,14 +2193,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16948",
+        "Content-Length": "15537",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-xes-importer-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-line_by_line.response.json",
-        "bytes": 16948,
-        "sha256": "aa65feb70ca6e07d8fd9f8004bcd295d3ae58e38fde77116244aab4d18d97266",
+        "bytes": 15537,
+        "sha256": "421a7aa77364ce5d9a71fd4ab4dacd5c8a8106130815e1cd26f5ec2f8d51338d",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -2215,22 +2215,22 @@
         "pnml": {
           "filename": "dynamic_programming-xes-importer-line_by_line.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-line_by_line.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-xes-importer-line_by_line.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-line_by_line.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-xes-importer-line_by_line.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-line_by_line.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -2301,14 +2301,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16948",
+        "Content-Length": "15537",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-xes-importer-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse_20.response.json",
-        "bytes": 16948,
-        "sha256": "aa65feb70ca6e07d8fd9f8004bcd295d3ae58e38fde77116244aab4d18d97266",
+        "bytes": 15537,
+        "sha256": "421a7aa77364ce5d9a71fd4ab4dacd5c8a8106130815e1cd26f5ec2f8d51338d",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -2323,22 +2323,22 @@
         "pnml": {
           "filename": "dynamic_programming-xes-importer-iterparse_20.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse_20.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-xes-importer-iterparse_20.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse_20.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-xes-importer-iterparse_20.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse_20.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -2409,14 +2409,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16948",
+        "Content-Length": "15537",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-xes-importer-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse_mem_compressed.response.json",
-        "bytes": 16948,
-        "sha256": "aa65feb70ca6e07d8fd9f8004bcd295d3ae58e38fde77116244aab4d18d97266",
+        "bytes": 15537,
+        "sha256": "421a7aa77364ce5d9a71fd4ab4dacd5c8a8106130815e1cd26f5ec2f8d51338d",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -2431,22 +2431,22 @@
         "pnml": {
           "filename": "dynamic_programming-xes-importer-iterparse_mem_compressed.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse_mem_compressed.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-xes-importer-iterparse_mem_compressed.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse_mem_compressed.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-xes-importer-iterparse_mem_compressed.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-iterparse_mem_compressed.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -2517,14 +2517,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17935",
+        "Content-Length": "16524",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-xes-importer-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-rustxes.response.json",
-        "bytes": 17935,
-        "sha256": "34615149c3210ab6ef44190108345bc53fc539898dc1d5aaf9c7e4234f69e811",
+        "bytes": 16524,
+        "sha256": "078aa138edf2633d1545d65e62b12f9b525ef03b30f22c851950ce934efc00db",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -2539,22 +2539,22 @@
         "pnml": {
           "filename": "dynamic_programming-xes-importer-rustxes.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-rustxes.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-xes-importer-rustxes.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-rustxes.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-xes-importer-rustxes.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-rustxes.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -2625,14 +2625,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16948",
+        "Content-Length": "15537",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-xes-importer-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-chunk_regex.response.json",
-        "bytes": 16948,
-        "sha256": "aa65feb70ca6e07d8fd9f8004bcd295d3ae58e38fde77116244aab4d18d97266",
+        "bytes": 15537,
+        "sha256": "421a7aa77364ce5d9a71fd4ab4dacd5c8a8106130815e1cd26f5ec2f8d51338d",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -2647,22 +2647,22 @@
         "pnml": {
           "filename": "dynamic_programming-xes-importer-chunk_regex.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-chunk_regex.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "dynamic_programming-xes-importer-chunk_regex.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-chunk_regex.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-xes-importer-chunk_regex.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-xes-importer-chunk_regex.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -3295,14 +3295,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "208572",
+        "Content-Length": "206966",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-csv-log.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-csv-log.response.json",
-        "bytes": 208572,
-        "sha256": "6e49171e0f1ac78957bd5af5b8558e38807bbc69c824113c2997fb752f0981c3",
+        "bytes": 206966,
+        "sha256": "cd6754c014e7b8a37a208b1625d54daed4bb0d55f489beaf58c18e9e9976fe01",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -3317,22 +3317,22 @@
         "pnml": {
           "filename": "milp-csv-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-csv-log.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-csv-log.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-csv-log.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-csv-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-csv-log.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -3395,14 +3395,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "146031",
+        "Content-Length": "144548",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-csv-trace.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-csv-trace.response.json",
-        "bytes": 146031,
-        "sha256": "1bf74b07086c806022826878a58961ad5b4fe194710d1140dc1a32fba3eff783",
+        "bytes": 144548,
+        "sha256": "ab423ca29543f977a6c93f8fd7d501f37374808bd34d3d6dd9ac981285d19246",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -3417,22 +3417,22 @@
         "pnml": {
           "filename": "milp-csv-trace.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-csv-trace.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-csv-trace.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-csv-trace.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-csv-trace.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-csv-trace.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -3495,14 +3495,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "153628",
+        "Content-Length": "152085",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-log.response.json",
-        "bytes": 153628,
-        "sha256": "4ca7625ef6c68012efec6c0daf9ef1f8dbdc9b268038543d4ac3445f7e1a02b4",
+        "bytes": 152085,
+        "sha256": "b846fc306c7f166ba25776449b80c8baa405c15f42d8db8eb11db22f7cea7d9e",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -3517,22 +3517,22 @@
         "pnml": {
           "filename": "milp-xes-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-log.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-xes-log.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-log.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-xes-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-log.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -3599,14 +3599,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "71439",
+        "Content-Length": "69958",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-xes-trace.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-trace.response.json",
-        "bytes": 71439,
-        "sha256": "ff289d91788b5ee3daf3a1caebdfdb0b35abc19a67eca3229566aec074f80b60",
+        "bytes": 69958,
+        "sha256": "37c75f12631fe26b6753dc9b4c6a2b27fa3c2c3061bee12e0dfc6c6028ffadc1",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -3621,22 +3621,22 @@
         "pnml": {
           "filename": "milp-xes-trace.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-trace.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-xes-trace.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-trace.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-xes-trace.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-trace.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -3707,14 +3707,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16716",
+        "Content-Length": "15233",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-xes-importer-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse.response.json",
-        "bytes": 16716,
-        "sha256": "cc8e1270e9bed6c6ef72644b8aeea8a15a5ca82e72f4b2aa49d5b815d9ee2af5",
+        "bytes": 15233,
+        "sha256": "5acb855df994a01b15e96c0780a37921c406c2f7e4f6ed937f87244c9fb98a69",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -3729,22 +3729,22 @@
         "pnml": {
           "filename": "milp-xes-importer-iterparse.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-xes-importer-iterparse.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-xes-importer-iterparse.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -3815,14 +3815,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16716",
+        "Content-Length": "15233",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-xes-importer-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-line_by_line.response.json",
-        "bytes": 16716,
-        "sha256": "cc8e1270e9bed6c6ef72644b8aeea8a15a5ca82e72f4b2aa49d5b815d9ee2af5",
+        "bytes": 15233,
+        "sha256": "5acb855df994a01b15e96c0780a37921c406c2f7e4f6ed937f87244c9fb98a69",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -3837,22 +3837,22 @@
         "pnml": {
           "filename": "milp-xes-importer-line_by_line.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-line_by_line.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-xes-importer-line_by_line.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-line_by_line.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-xes-importer-line_by_line.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-line_by_line.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -3923,14 +3923,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16716",
+        "Content-Length": "15233",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-xes-importer-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse_20.response.json",
-        "bytes": 16716,
-        "sha256": "cc8e1270e9bed6c6ef72644b8aeea8a15a5ca82e72f4b2aa49d5b815d9ee2af5",
+        "bytes": 15233,
+        "sha256": "5acb855df994a01b15e96c0780a37921c406c2f7e4f6ed937f87244c9fb98a69",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -3945,22 +3945,22 @@
         "pnml": {
           "filename": "milp-xes-importer-iterparse_20.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse_20.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-xes-importer-iterparse_20.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse_20.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-xes-importer-iterparse_20.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse_20.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -4031,14 +4031,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16716",
+        "Content-Length": "15233",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-xes-importer-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse_mem_compressed.response.json",
-        "bytes": 16716,
-        "sha256": "cc8e1270e9bed6c6ef72644b8aeea8a15a5ca82e72f4b2aa49d5b815d9ee2af5",
+        "bytes": 15233,
+        "sha256": "5acb855df994a01b15e96c0780a37921c406c2f7e4f6ed937f87244c9fb98a69",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -4053,22 +4053,22 @@
         "pnml": {
           "filename": "milp-xes-importer-iterparse_mem_compressed.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse_mem_compressed.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-xes-importer-iterparse_mem_compressed.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse_mem_compressed.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-xes-importer-iterparse_mem_compressed.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-iterparse_mem_compressed.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -4139,14 +4139,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17703",
+        "Content-Length": "16220",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-xes-importer-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-rustxes.response.json",
-        "bytes": 17703,
-        "sha256": "de381ac7391f28182158a4ea10dd860b8c012a161dce2378035c772850bc4642",
+        "bytes": 16220,
+        "sha256": "1861a314e303da9e7c79f3aacc9681ca7a5e75a0d3953dbc641fa974360ddf9a",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -4161,22 +4161,22 @@
         "pnml": {
           "filename": "milp-xes-importer-rustxes.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-rustxes.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-xes-importer-rustxes.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-rustxes.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-xes-importer-rustxes.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-rustxes.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -4247,14 +4247,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16716",
+        "Content-Length": "15233",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-xes-importer-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-chunk_regex.response.json",
-        "bytes": 16716,
-        "sha256": "cc8e1270e9bed6c6ef72644b8aeea8a15a5ca82e72f4b2aa49d5b815d9ee2af5",
+        "bytes": 15233,
+        "sha256": "5acb855df994a01b15e96c0780a37921c406c2f7e4f6ed937f87244c9fb98a69",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -4269,22 +4269,22 @@
         "pnml": {
           "filename": "milp-xes-importer-chunk_regex.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-chunk_regex.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "milp-xes-importer-chunk_regex.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-chunk_regex.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-xes-importer-chunk_regex.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-xes-importer-chunk_regex.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -4917,14 +4917,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "208640",
+        "Content-Length": "211450",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-csv-log.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-csv-log.response.json",
-        "bytes": 208640,
-        "sha256": "4a7babce691d68b8ae73528d3cbaa2a2552967cbb6dddc50f44120ef5e123402",
+        "bytes": 211450,
+        "sha256": "2793228df7bc2989af2e7fe89b7503485cd44174a8f526c353ddd442afdd2328",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -4939,22 +4939,22 @@
         "pnml": {
           "filename": "approximated_original-csv-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-csv-log.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-csv-log.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-csv-log.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-csv-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-csv-log.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -5017,14 +5017,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "146099",
+        "Content-Length": "144754",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-csv-trace.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-csv-trace.response.json",
-        "bytes": 146099,
-        "sha256": "8336f2dfc07a4a1ad0002e81fc9e605c9db9c9f8b700a328a21e0068ade9fdb5",
+        "bytes": 144754,
+        "sha256": "5fa62632db006e98b65eade064406226f63186ef240fa6776e63363e98619e2b",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -5039,22 +5039,22 @@
         "pnml": {
           "filename": "approximated_original-csv-trace.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-csv-trace.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-csv-trace.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-csv-trace.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-csv-trace.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-csv-trace.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -5117,14 +5117,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "156960",
+        "Content-Length": "156569",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-xes-log.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-log.response.json",
-        "bytes": 156960,
-        "sha256": "aa37ca5dcc5eda9cfcb887e8342a9bb596623959b7ec7f51359054075821fc12",
+        "bytes": 156569,
+        "sha256": "ff31524585c9109c0cbfdae7f188971ce224b16ce9a847bf864396b3308cd19e",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -5139,22 +5139,22 @@
         "pnml": {
           "filename": "approximated_original-xes-log.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-log.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-xes-log.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-log.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-xes-log.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-log.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -5221,14 +5221,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "71609",
+        "Content-Length": "70164",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-xes-trace.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-trace.response.json",
-        "bytes": 71609,
-        "sha256": "98d82fa0ba6dd851701363bf2a234cb185953ec58131700a13de65382fb12114",
+        "bytes": 70164,
+        "sha256": "a0da6812fcea2b07813775b68c881cff7a377ffe64ebed5705c9550d1b0bf880",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -5243,22 +5243,22 @@
         "pnml": {
           "filename": "approximated_original-xes-trace.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-trace.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-xes-trace.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-trace.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-xes-trace.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-trace.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -5329,14 +5329,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16988",
+        "Content-Length": "15577",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-xes-importer-iterparse.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse.response.json",
-        "bytes": 16988,
-        "sha256": "3c82f210547a506eefc836fa2e11f7a8bb9d1853df885450a1d397f53f24e4e3",
+        "bytes": 15577,
+        "sha256": "0217ef8252552c3ac4053565967dfc25564399456bd200ee68f605da5a2844d7",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -5351,22 +5351,22 @@
         "pnml": {
           "filename": "approximated_original-xes-importer-iterparse.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-xes-importer-iterparse.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-xes-importer-iterparse.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -5437,14 +5437,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16988",
+        "Content-Length": "15577",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-xes-importer-line_by_line.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-line_by_line.response.json",
-        "bytes": 16988,
-        "sha256": "3c82f210547a506eefc836fa2e11f7a8bb9d1853df885450a1d397f53f24e4e3",
+        "bytes": 15577,
+        "sha256": "0217ef8252552c3ac4053565967dfc25564399456bd200ee68f605da5a2844d7",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -5459,22 +5459,22 @@
         "pnml": {
           "filename": "approximated_original-xes-importer-line_by_line.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-line_by_line.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-xes-importer-line_by_line.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-line_by_line.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-xes-importer-line_by_line.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-line_by_line.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -5545,14 +5545,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16988",
+        "Content-Length": "15577",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-xes-importer-iterparse_20.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse_20.response.json",
-        "bytes": 16988,
-        "sha256": "3c82f210547a506eefc836fa2e11f7a8bb9d1853df885450a1d397f53f24e4e3",
+        "bytes": 15577,
+        "sha256": "0217ef8252552c3ac4053565967dfc25564399456bd200ee68f605da5a2844d7",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -5567,22 +5567,22 @@
         "pnml": {
           "filename": "approximated_original-xes-importer-iterparse_20.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse_20.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-xes-importer-iterparse_20.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse_20.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-xes-importer-iterparse_20.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse_20.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -5653,14 +5653,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16988",
+        "Content-Length": "15577",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-xes-importer-iterparse_mem_compressed.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse_mem_compressed.response.json",
-        "bytes": 16988,
-        "sha256": "3c82f210547a506eefc836fa2e11f7a8bb9d1853df885450a1d397f53f24e4e3",
+        "bytes": 15577,
+        "sha256": "0217ef8252552c3ac4053565967dfc25564399456bd200ee68f605da5a2844d7",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -5675,22 +5675,22 @@
         "pnml": {
           "filename": "approximated_original-xes-importer-iterparse_mem_compressed.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse_mem_compressed.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-xes-importer-iterparse_mem_compressed.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse_mem_compressed.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-xes-importer-iterparse_mem_compressed.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-iterparse_mem_compressed.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -5761,14 +5761,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "17975",
+        "Content-Length": "16564",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-xes-importer-rustxes.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-rustxes.response.json",
-        "bytes": 17975,
-        "sha256": "86b90aacb89cc28199f8081204e1cf84c2fc2d7b2a2fed27e2024dfb90e0fcca",
+        "bytes": 16564,
+        "sha256": "f3dcf4900b755723190415dbd8396a947066244807667bc48ae5a1d44f25efeb",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -5783,22 +5783,22 @@
         "pnml": {
           "filename": "approximated_original-xes-importer-rustxes.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-rustxes.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-xes-importer-rustxes.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-rustxes.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-xes-importer-rustxes.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-rustxes.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -5869,14 +5869,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "16988",
+        "Content-Length": "15577",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-xes-importer-chunk_regex.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-chunk_regex.response.json",
-        "bytes": 16988,
-        "sha256": "3c82f210547a506eefc836fa2e11f7a8bb9d1853df885450a1d397f53f24e4e3",
+        "bytes": 15577,
+        "sha256": "0217ef8252552c3ac4053565967dfc25564399456bd200ee68f605da5a2844d7",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -5891,22 +5891,22 @@
         "pnml": {
           "filename": "approximated_original-xes-importer-chunk_regex.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-chunk_regex.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "approximated_original-xes-importer-chunk_regex.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-chunk_regex.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-xes-importer-chunk_regex.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-xes-importer-chunk_regex.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -6563,14 +6563,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14062",
+        "Content-Length": "12701",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "custom-csv-import-selectors.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/custom-csv-import-selectors.response.json",
-        "bytes": 14062,
-        "sha256": "468e30102199a115bd921b8c3dbfae9c0c863512a719f406f440decfc216801b",
+        "bytes": 12701,
+        "sha256": "ed1ce337bf3cb56b878bf3ff8f1fa31f523ece0c3b8ee663e105599287308f71",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -6585,22 +6585,22 @@
         "pnml": {
           "filename": "custom-csv-import-selectors.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/custom-csv-import-selectors.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "custom-csv-import-selectors.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/custom-csv-import-selectors.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "custom-csv-import-selectors.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/custom-csv-import-selectors.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -6687,14 +6687,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "12473",
+        "Content-Length": "11112",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "custom-xes-import-selectors.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/custom-xes-import-selectors.response.json",
-        "bytes": 12473,
-        "sha256": "edae98ce07d43b09771cb402a2b6ced5b5d082a84b36df7fb61190f40d0d93ff",
+        "bytes": 11112,
+        "sha256": "21694db6f69cb3849955d42064cebc483f24c83f643df26cb7b9bc7c88a6444d",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -6709,22 +6709,22 @@
         "pnml": {
           "filename": "custom-xes-import-selectors.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/custom-xes-import-selectors.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "custom-xes-import-selectors.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/custom-xes-import-selectors.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "custom-xes-import-selectors.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/custom-xes-import-selectors.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         },
         "source_xes": {
@@ -6979,14 +6979,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14754",
+        "Content-Length": "14764",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "search_graph_pt-literal-unicode-surrogate-nul.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-literal-unicode-surrogate-nul.response.json",
-        "bytes": 14754,
-        "sha256": "cdd8e7283158379859839d084392a645a55512263201391c42276ab5acb6682f",
+        "bytes": 14764,
+        "sha256": "594b9500710d6f3d157999d337178525c9c499d579362966d5c8426cf9b1f406",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -7008,15 +7008,15 @@
         "ptml": {
           "filename": "search_graph_pt-literal-unicode-surrogate-nul.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-literal-unicode-surrogate-nul.ptml.ptml",
-          "bytes": 620,
-          "sha256": "0a358257dd7c684b54a4f9da811fbdf772abf9f3ed041f34b5e5465efa563498",
+          "bytes": 627,
+          "sha256": "2803b8038367327bbfdae0de2921c204685aca341521a6afeb9c50480271fc26",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "search_graph_pt-literal-unicode-surrogate-nul.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/search_graph_pt-literal-unicode-surrogate-nul.bpmn.bpmn",
-          "bytes": 3477,
-          "sha256": "17b0734e2908baaf2a68ec8d7cba76c0356f016000ce7fec9e110fefabed0fee",
+          "bytes": 3484,
+          "sha256": "48c8b8237f336aac524d7b236299146321666e1e73d6e810416c94311eed97cc",
           "format": "bpmn"
         }
       }
@@ -7449,14 +7449,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14770",
+        "Content-Length": "14780",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "dynamic_programming-literal-unicode-surrogate-nul.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-literal-unicode-surrogate-nul.response.json",
-        "bytes": 14770,
-        "sha256": "a5594badb5d01aff20868cb1617c98022bd2ff46d567856dc97c5acc2f380d0a",
+        "bytes": 14780,
+        "sha256": "1286a79c9e6ab2ac920e00a8399047e945aeff2531cab6445422ed0cfe06d0ea",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -7478,15 +7478,15 @@
         "ptml": {
           "filename": "dynamic_programming-literal-unicode-surrogate-nul.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-literal-unicode-surrogate-nul.ptml.ptml",
-          "bytes": 620,
-          "sha256": "0a358257dd7c684b54a4f9da811fbdf772abf9f3ed041f34b5e5465efa563498",
+          "bytes": 627,
+          "sha256": "2803b8038367327bbfdae0de2921c204685aca341521a6afeb9c50480271fc26",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "dynamic_programming-literal-unicode-surrogate-nul.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/dynamic_programming-literal-unicode-surrogate-nul.bpmn.bpmn",
-          "bytes": 3477,
-          "sha256": "17b0734e2908baaf2a68ec8d7cba76c0356f016000ce7fec9e110fefabed0fee",
+          "bytes": 3484,
+          "sha256": "48c8b8237f336aac524d7b236299146321666e1e73d6e810416c94311eed97cc",
           "format": "bpmn"
         }
       }
@@ -7919,14 +7919,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14710",
+        "Content-Length": "14720",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "milp-literal-unicode-surrogate-nul.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-literal-unicode-surrogate-nul.response.json",
-        "bytes": 14710,
-        "sha256": "5daaed18e4839cfe4479ddd237b3b02e56948802f9014359beaf7f196250ce29",
+        "bytes": 14720,
+        "sha256": "4e0adef611ac7c4a41318b8bd03da77ee9f90116efb213e6f825bc16a6aa92b3",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -7948,15 +7948,15 @@
         "ptml": {
           "filename": "milp-literal-unicode-surrogate-nul.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-literal-unicode-surrogate-nul.ptml.ptml",
-          "bytes": 620,
-          "sha256": "0a358257dd7c684b54a4f9da811fbdf772abf9f3ed041f34b5e5465efa563498",
+          "bytes": 627,
+          "sha256": "2803b8038367327bbfdae0de2921c204685aca341521a6afeb9c50480271fc26",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "milp-literal-unicode-surrogate-nul.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/milp-literal-unicode-surrogate-nul.bpmn.bpmn",
-          "bytes": 3477,
-          "sha256": "17b0734e2908baaf2a68ec8d7cba76c0356f016000ce7fec9e110fefabed0fee",
+          "bytes": 3484,
+          "sha256": "48c8b8237f336aac524d7b236299146321666e1e73d6e810416c94311eed97cc",
           "format": "bpmn"
         }
       }
@@ -8389,14 +8389,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "14778",
+        "Content-Length": "14788",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "approximated_original-literal-unicode-surrogate-nul.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-literal-unicode-surrogate-nul.response.json",
-        "bytes": 14778,
-        "sha256": "6122a9dc2d3159b7348df2e13840e907cdedc11a9ed28ff2429b5e8508a5626c",
+        "bytes": 14788,
+        "sha256": "69de1254602b14468e31dd052da02ef5a0560fdf056f6b3343f9e52aa565fe8c",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -8418,15 +8418,15 @@
         "ptml": {
           "filename": "approximated_original-literal-unicode-surrogate-nul.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-literal-unicode-surrogate-nul.ptml.ptml",
-          "bytes": 620,
-          "sha256": "0a358257dd7c684b54a4f9da811fbdf772abf9f3ed041f34b5e5465efa563498",
+          "bytes": 627,
+          "sha256": "2803b8038367327bbfdae0de2921c204685aca341521a6afeb9c50480271fc26",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "approximated_original-literal-unicode-surrogate-nul.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/approximated_original-literal-unicode-surrogate-nul.bpmn.bpmn",
-          "bytes": 3477,
-          "sha256": "17b0734e2908baaf2a68ec8d7cba76c0356f016000ce7fec9e110fefabed0fee",
+          "bytes": 3484,
+          "sha256": "48c8b8237f336aac524d7b236299146321666e1e73d6e810416c94311eed97cc",
           "format": "bpmn"
         }
       }
@@ -18121,14 +18121,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "6940",
+        "Content-Length": "7512",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "ptml-empty-manual-name-is-silent.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/ptml-empty-manual-name-is-silent.response.json",
-        "bytes": 6940,
-        "sha256": "4c99445f9eebae67286ee7a816594aeaf84dc539c326cc3f9c0f90e2f53a30f4",
+        "bytes": 7512,
+        "sha256": "0d2bde997f418e8f86f9827764e869d2bea4edc9708531ebc8b139091cafe2e7",
         "status": 200
       },
       "family": "process_tree_alignment",
@@ -18143,22 +18143,22 @@
         "pnml": {
           "filename": "ptml-empty-manual-name-is-silent.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/ptml-empty-manual-name-is-silent.pnml.pnml",
-          "bytes": 930,
-          "sha256": "4239464c6b3891f2030eb1c04e0029429ad636cbd9311152b9a942513419254b",
+          "bytes": 923,
+          "sha256": "5986d4a35651f5158413b4fea50bde0789b1ee41f282f88d9091e2ce77341115",
           "format": "pnml"
         },
         "ptml": {
           "filename": "ptml-empty-manual-name-is-silent.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/ptml-empty-manual-name-is-silent.ptml.ptml",
-          "bytes": 198,
-          "sha256": "47af277e65ddeb09320522ac6ca9810fbe0750f7abdcf7091b8e9b65a8bc677c",
+          "bytes": 195,
+          "sha256": "317d30bb55beb41880deb8d7d97bf18c7c6107c8305d8f55c260b63743b54d21",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "ptml-empty-manual-name-is-silent.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/ptml-empty-manual-name-is-silent.bpmn.bpmn",
-          "bytes": 1405,
-          "sha256": "dfbd2aba54ad2e4c920172d93d9035823a6ec229dbc895088f717828059226a4",
+          "bytes": 1916,
+          "sha256": "9ec5dbc84d3107e4b08ef6a3c8b1c41c8981f7cec80b0b4bd3a9afb3bee0e123",
           "format": "bpmn"
         },
         "source_xes": {
@@ -19065,7 +19065,7 @@
         "bytes": 1201,
         "sha256": "d1173a958513c44dd714ac093252b1e71107c532638487da1f38d18610096983"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "input": {
         "filename": "owned-edge-order-words.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/inputs/owned-edge-order-words.json",
@@ -19081,15 +19081,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "10097",
+        "Content-Length": "41",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "ptml-document-edge-order-and-reachable-registry.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/ptml-document-edge-order-and-reachable-registry.response.json",
-        "bytes": 10097,
-        "sha256": "f6a845dce24fd6914bb59b8c59ddb9cb71425264fa4281707f8f224935c60c9a",
-        "status": 200
+        "bytes": 41,
+        "sha256": "a28995c0e7bb60827606357313d16b210d679a07bdc95d3e0dbc98a8dc8a48c8",
+        "status": 400
       },
       "family": "process_tree_alignment",
       "variant": "SEARCH_GRAPH_PT",
@@ -19098,37 +19098,8 @@
       "input_format": "trace_words",
       "model_format": "ptml",
       "executed": true,
-      "error": null,
-      "exports": {
-        "pnml": {
-          "filename": "ptml-document-edge-order-and-reachable-registry.pnml.pnml",
-          "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/ptml-document-edge-order-and-reachable-registry.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "699dbdb8da4fb80693e2bee39b043e1dccbf978375d126ed346a457678a7b543",
-          "format": "pnml"
-        },
-        "ptml": {
-          "filename": "ptml-document-edge-order-and-reachable-registry.ptml.ptml",
-          "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/ptml-document-edge-order-and-reachable-registry.ptml.ptml",
-          "bytes": 397,
-          "sha256": "b148f54cb8f246f47ad6e11e07220d23001f6da0917f19a67a0bb96e8943b14c",
-          "format": "ptml"
-        },
-        "bpmn": {
-          "filename": "ptml-document-edge-order-and-reachable-registry.bpmn.bpmn",
-          "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/ptml-document-edge-order-and-reachable-registry.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "567900a1db46a6a12670e5fe24e253457c7592a9e4510183164a53de4ae1cfe0",
-          "format": "bpmn"
-        },
-        "source_xes": {
-          "filename": "ptml-document-edge-order-and-reachable-registry.source_xes.xes",
-          "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/ptml-document-edge-order-and-reachable-registry.source_xes.xes",
-          "bytes": 449,
-          "sha256": "1589198d1a297a4a48888ff1066dd44d50aa4017f78f455c9b410adf987b6d28",
-          "format": "xes"
-        }
-      }
+      "error": "PTML unknown tag: properties",
+      "exports": {}
     },
     {
       "id": "search_graph_pt-native-invalid-leaf-index",
@@ -21077,14 +21048,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "68192",
+        "Content-Length": "66713",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "trace-index-native-outside-input.response.json",
         "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/trace-index-native-outside-input.response.json",
-        "bytes": 68192,
-        "sha256": "af26d4071291ae71873e8f2a70e96b8741946c1cd03670ef12f98746f1e5a399",
+        "bytes": 66713,
+        "sha256": "9f657d4678277f8076e1e0addb5b69e9d8313be27bd57c64bd151cd537d6ef04",
         "status": 400
       },
       "family": "process_tree_alignment",
@@ -21102,22 +21073,22 @@
         "pnml": {
           "filename": "trace-index-native-outside-input.pnml.pnml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/trace-index-native-outside-input.pnml.pnml",
-          "bytes": 1277,
-          "sha256": "35e07bd2ee9cd322357ef0830759562ec0e78a2aea74fae750b8edfe0f72d000",
+          "bytes": 942,
+          "sha256": "905badd6982ccc625bf512d1614f31f15bb0e49f2e7ad7e91b83a4bb07f9b05d",
           "format": "pnml"
         },
         "ptml": {
           "filename": "trace-index-native-outside-input.ptml.ptml",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/trace-index-native-outside-input.ptml.ptml",
-          "bytes": 397,
-          "sha256": "bbe090247888c8c0cd1e8562a65b905eeac40815e2a49cfb86905236dc088be8",
+          "bytes": 214,
+          "sha256": "af8e3a5fccbf22881216e5faf2f5d10e75449fc42b27dae2b867ad4c70d1abc7",
           "format": "ptml"
         },
         "bpmn": {
           "filename": "trace-index-native-outside-input.bpmn.bpmn",
           "path": "src/frontend/tests/fixtures/process-tree-alignment-workbench/captures/trace-index-native-outside-input.bpmn.bpmn",
-          "bytes": 2429,
-          "sha256": "09190262eafa0cd7924937d263db162dab6b3d33fea1147fbe29cabc70099777",
+          "bytes": 1935,
+          "sha256": "d8b3acb948397ad02255f539c0c7765a697f92ec82f14ca52cf0313a3b3c991f",
           "format": "bpmn"
         }
       }

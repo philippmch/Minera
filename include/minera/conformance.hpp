@@ -679,6 +679,11 @@ struct AlignmentOptions {
   // itself uncomputed and exhausted, as a run out of time does. The server
   // sets it to notice a client that disconnected. Unset never cancels.
   std::function<bool()> cancelled;
+  // When set, check_alignment reads the log's traces in this order (a
+  // permutation of their positions, which must outlive the call), as if the
+  // log listed them so: the variants and their sums follow it. Null: log
+  // order.
+  const std::vector<std::size_t>* trace_order = nullptr;
 };
 
 struct AlignmentDiagnostics {

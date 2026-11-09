@@ -525,6 +525,9 @@ struct ActiveMiningTicket {
   // request, whatever its answer: a cancel then undoes only a published
   // session it may still roll back.
   bool ended = false;
+  // When the identity entered g_active_mining_requests (a sequence number,
+  // under g_session_mutex): a full table forgets its oldest finished entry.
+  std::uint64_t recorded = 0;
 };
 // The mine holding the /api/mine slot (see mine_limits.hpp), for its 503.
 std::weak_ptr<ActiveMiningTicket> g_running_mine_ticket;  // under g_session_mutex
@@ -535,6 +538,31 @@ std::map<std::string, std::shared_ptr<ActiveMiningTicket>> g_active_mining_reque
 // The one ticket that may still hold a rollback session (each new mining
 // request drops every older rollback).
 std::shared_ptr<ActiveMiningTicket> g_rollback_mining_ticket;
+// The last ActiveMiningTicket::recorded handed out (under g_session_mutex).
+std::uint64_t g_mining_ticket_records = 0;
+// The most identities g_active_mining_requests holds.
+constexpr std::size_t kMaxMiningRequestIdentities = 2048;
+
+// With g_session_mutex held: makes room in a full g_active_mining_requests
+// by forgetting its oldest entry (other than `keep`) that no later request
+// can still act on through its identity: a mine that ended and holds no
+// session to roll back, or a cancel recorded for an upload that never
+// arrived. A mine still running or still able to roll back stays. False
+// when no entry may go.
+bool evict_mining_ticket_locked(const std::shared_ptr<ActiveMiningTicket>& keep) {
+  auto victim = g_active_mining_requests.end();
+  for (auto it = g_active_mining_requests.begin(); it != g_active_mining_requests.end(); ++it) {
+    const auto& ticket = it->second;
+    if (ticket == keep) continue;
+    if (ticket->generation != 0 && !ticket->ended) continue;  // running
+    if (ticket->published && !ticket->released) continue;     // may still roll back
+    if (victim == g_active_mining_requests.end() || ticket->recorded < victim->second->recorded)
+      victim = it;
+  }
+  if (victim == g_active_mining_requests.end()) return false;
+  g_active_mining_requests.erase(victim);
+  return true;
+}
 
 std::shared_ptr<ActiveMiningTicket> begin_active_mining(const httplib::Request& request) {
   auto ticket = std::make_shared<ActiveMiningTicket>();
@@ -564,12 +592,10 @@ std::shared_ptr<ActiveMiningTicket> begin_active_mining(const httplib::Request& 
     g_rollback_mining_ticket->published.reset(); g_rollback_mining_ticket.reset();
   }
   if (!ticket->id.empty()) {
+    ticket->recorded = ++g_mining_ticket_records;
     g_active_mining_requests[ticket->id] = ticket;
-    while (g_active_mining_requests.size() > 2048) {
-      auto oldest = std::min_element(g_active_mining_requests.begin(), g_active_mining_requests.end(), [](const auto& a, const auto& b) {return a.second->generation < b.second->generation;});
-      if (oldest->second == ticket) break;
-      g_active_mining_requests.erase(oldest);
-    }
+    while (g_active_mining_requests.size() > kMaxMiningRequestIdentities &&
+           evict_mining_ticket_locked(ticket)) {}
   }
   return ticket;
 }
@@ -858,10 +884,17 @@ void handle_cancel_mine(const httplib::Request& request, httplib::Response& resp
     bool canceled = false;
     {
     std::lock_guard<std::mutex> lock(g_session_mutex);
-    if (!g_active_mining_requests.contains(id) && g_active_mining_requests.size() >= 2048)
+    // A full table forgets its oldest finished entry, as a new mine does.
+    if (!g_active_mining_requests.contains(id) &&
+        g_active_mining_requests.size() >= kMaxMiningRequestIdentities &&
+        !evict_mining_ticket_locked(nullptr))
       throw std::invalid_argument("too many unknown mining request identities");
     auto& ticket = g_active_mining_requests[id];
-    if (!ticket) {ticket = std::make_shared<ActiveMiningTicket>(); ticket->id = id;}
+    if (!ticket) {
+      ticket = std::make_shared<ActiveMiningTicket>();
+      ticket->id = id;
+      ticket->recorded = ++g_mining_ticket_records;
+    }
     const bool already = ticket->canceled.load();
     const bool current = ticket->generation == g_active_mining_generation;
     if (ticket->generation == 0) canceled = !already;  // its POST has not arrived

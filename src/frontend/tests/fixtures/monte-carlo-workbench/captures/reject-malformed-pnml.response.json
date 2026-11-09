@@ -1,1 +1,1 @@
-{"error": "PNML input contains no net (or an empty one)"}
+{"error": "XML is not well-formed: the document ends before <net> is closed (line 1, column 12)"}
