@@ -397,7 +397,33 @@ void standard_writers_drop_reference_generated_globals() {
   std::filesystem::remove(path);
 }
 
+// read_ocel2_xml drops a relation or object link that names an unlisted
+// object (and an event left without relations); the classic reader raises.
+void unknown_object_references() {
+  const std::string standard =
+      "<?xml version='1.0' encoding='UTF-8'?>\n<log><object-types><object-type name=\"order\"><attributes/></object-type></object-types>"
+      "<event-types><event-type name=\"a\"><attributes/></event-type><event-type name=\"b\"><attributes/></event-type></event-types>"
+      "<objects><object id=\"o1\" type=\"order\"><attributes/><objects><relationship object-id=\"zz8\" qualifier=\"x\"/></objects></object></objects>"
+      "<events><event id=\"e1\" type=\"a\" time=\"2024-01-01T00:00:00+00:00\"><attributes/><objects>"
+      "<relationship object-id=\"o1\" qualifier=\"\"/><relationship object-id=\"zz7\" qualifier=\"\"/></objects></event>"
+      "<event id=\"e2\" type=\"b\" time=\"2024-01-01T00:01:00+00:00\"><attributes/><objects>"
+      "<relationship object-id=\"zz9\" qualifier=\"\"/></objects></event></events></log>";
+  const auto log = minera::parse_ocel_xml(standard);
+  assert(log.events.size() == 1 && log.events[0].id == "e1");
+  assert(log.relations.size() == 1 && log.relations[0].object_id == "o1");
+  assert(log.o2o.empty());
+  const std::string classic =
+      "<log><events><event><string key=\"id\" value=\"e1\"/><date key=\"timestamp\" value=\"2024-01-01T00:00:00Z\"/>"
+      "<string key=\"activity\" value=\"a\"/><list key=\"omap\"><string key=\"object-id\" value=\"o1\"/>"
+      "<string key=\"object-id\" value=\"zz7\"/></list><list key=\"vmap\"/></event></events>"
+      "<objects><object><string key=\"id\" value=\"o1\"/><string key=\"type\" value=\"order\"/><list key=\"ovmap\"/></object></objects></log>";
+  bool rejected = false;
+  try { (void)minera::parse_ocel_xml(classic); } catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
 int main() {
+  unknown_object_references();
   frame_order_and_unlisted_keys();
   standard_writers_drop_reference_generated_globals();
   minera::Ocel log;

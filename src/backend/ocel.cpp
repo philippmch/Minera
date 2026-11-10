@@ -504,7 +504,10 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
     std::map<std::string,std::vector<std::size_t>> occurrences;
     for (const auto& oidj : omap->array()) {
       const auto oid = str(oidj, "ocel:omap");
-      if (!types.count(oid)) throw std::invalid_argument("relation references unknown object");
+      // The reference reader drops a relation to an object the document does
+      // not list (observed black-box, as for every OCEL 2.0 reader); the
+      // event goes too when it keeps no relation.
+      if (!types.count(oid)) continue;
       const bool first=seen.insert(oid).second;
       if(literal_names || first){occurrences[oid].push_back(log.relations.size());log.relations.push_back({id,oid,""});}
     }
@@ -514,7 +517,9 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
       for (const auto& r : typed->array()) {
         const auto& rr=obj(r,"ocel:typedOmap");
         const auto oid=str(required(rr,"ocel:oid"),"ocel:oid");
-        if(!types.count(oid)||!seen.count(oid))throw std::invalid_argument("typed relation references unknown object");
+        // A qualifier only qualifies a relation the omap lists; one for any
+        // other object is ignored, as the reference reader ignores it.
+        if(!seen.count(oid))continue;
         const auto qualifier=optional(rr,"ocel:qualifier")?str(*optional(rr,"ocel:qualifier"),"ocel:qualifier"):"";
         if(literal_names){
           const auto index=assigned[oid]++;
@@ -548,12 +553,13 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
   }
   // A change has its object's type, as the reference reader gives it
   // whatever the change's own "ocel:type" says (observed black-box).
-  if (const auto* ch = optional(root, "ocel:objectChanges")) { if (!ch->is_array()) throw std::invalid_argument("ocel:objectChanges must be array"); for (const auto& r : ch->array()) { const auto& rr = obj(r, "ocel:objectChanges"); OcelObjectChange c; c.object_id = str(required(rr, "ocel:oid"), "ocel:oid"); if (!types.count(c.object_id)) throw std::invalid_argument("object change references unknown object"); if (const auto* type = optional(rr, "ocel:type")) (void)str(*type, "ocel:type"); c.object_type = types[c.object_id]; c.timestamp = str(required(rr, "ocel:timestamp"), "ocel:timestamp"); c.field = str(required(rr, "ocel:field"), "ocel:field"); c.value = scalar(required(rr, c.field), c.field); log.object_changes.push_back(std::move(c)); } }
+  if (const auto* ch = optional(root, "ocel:objectChanges")) { if (!ch->is_array()) throw std::invalid_argument("ocel:objectChanges must be array"); for (const auto& r : ch->array()) { const auto& rr = obj(r, "ocel:objectChanges"); OcelObjectChange c; c.object_id = str(required(rr, "ocel:oid"), "ocel:oid"); if (!types.count(c.object_id)) continue; /* the reference drops it */ if (const auto* type = optional(rr, "ocel:type")) (void)str(*type, "ocel:type"); c.object_type = types[c.object_id]; c.timestamp = str(required(rr, "ocel:timestamp"), "ocel:timestamp"); c.field = str(required(rr, "ocel:field"), "ocel:field"); c.value = scalar(required(rr, c.field), c.field); log.object_changes.push_back(std::move(c)); } }
   for (const auto& category : {"ocel:global-log", "ocel:global-event", "ocel:global-object"}) if (const auto* g = optional(root, category)) { for (const auto& [key, value] : obj(*g, category)) { if (value.is_scalar()) log.globals[std::string(category) + "." + key] = scalar(value, key); } }
   // read_ocel_json keeps the scopes as the file lists them, empty or not.
   log.global_event_scope = optional(root, "ocel:global-event") != nullptr;
   log.global_object_scope = optional(root, "ocel:global-object") != nullptr;
-  for (const auto& r : log.o2o) if (!types.count(r.target_id)) throw std::invalid_argument("o2o relation references unknown object");
+  // The reference readers drop an object link to an unlisted object.
+  std::erase_if(log.o2o, [&](const OcelO2oRelation& r) { return !types.count(r.target_id); });
   return log;
 }
 
@@ -688,8 +694,9 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
       for (const auto& r : rels->array()) {
         const auto& y = obj(r, "relationship");
         const auto oid = str(required(y, "objectId"), "objectId");
-        if (!types.count(oid))
-          throw std::invalid_argument("relation references unknown object");
+        // read_ocel2_json drops a relation to an unlisted object (and the
+        // event when it keeps none), observed black-box.
+        if (!types.count(oid)) continue;
         log.relations.push_back(
             {id, oid, optional(y, "qualifier")
                          ? str(*optional(y, "qualifier"), "qualifier")
@@ -727,11 +734,23 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
       log.globals[key] = scalar(value, key);
     }
   }
-  for (const auto& r : log.o2o) if (!types.count(r.target_id)) throw std::invalid_argument("o2o relation references unknown object");
+  // The reference readers drop an object link to an unlisted object.
+  std::erase_if(log.o2o, [&](const OcelO2oRelation& r) { return !types.count(r.target_id); });
   return log;
 }
 
 void write_string(std::ostringstream& out, std::string_view s) { out << '"'; for (unsigned char c : s) { switch (c) { case '"': out << "\\\""; break; case '\\': out << "\\\\"; break; case '\b': out << "\\b"; break; case '\f': out << "\\f"; break; case '\n': out << "\\n"; break; case '\r': out << "\\r"; break; case '\t': out << "\\t"; break; default: if (c < 0x20) { out << "\\u00" << "0123456789abcdef"[(c >> 4) & 15] << "0123456789abcdef"[c & 15]; } else out << static_cast<char>(c); } } out << '"'; }
+// An OCDFG edge's key in its object type's map: "source->target". Activity
+// names may hold "->" themselves, so two edges can share that text (a ->
+// "b->c" and "a->b" -> c); a repeat gets "#2", "#3", ... so the JSON object
+// keeps every edge. Readers take the pair from the edge's own fields.
+std::string ocdfg_edge_key(std::set<std::string>& used, const std::string& source,
+                           const std::string& target) {
+  const std::string base = source + "->" + target;
+  std::string key = base;
+  for (std::size_t n = 2; !used.insert(key).second; ++n) key = base + "#" + std::to_string(n);
+  return key;
+}
 void write_value(std::ostringstream& out, const OcelValue& value) {
   if (std::holds_alternative<std::nullptr_t>(value)) {
     out << "null";
@@ -1589,6 +1608,20 @@ void drop_unrelated_ocel_entries(Ocel& log) {
                   [&](const OcelRelation& relation) {
                     return events.count(relation.event_id) &&
                            objects.count(relation.object_id);
+                  }) &&
+      std::all_of(log.o2o.begin(), log.o2o.end(),
+                  [&](const OcelO2oRelation& relation) {
+                    return objects.count(relation.source_id) &&
+                           objects.count(relation.target_id);
+                  }) &&
+      std::all_of(log.e2e.begin(), log.e2e.end(),
+                  [&](const OcelE2eRelation& relation) {
+                    return events.count(relation.source_id) &&
+                           events.count(relation.target_id);
+                  }) &&
+      std::all_of(log.object_changes.begin(), log.object_changes.end(),
+                  [&](const OcelObjectChange& change) {
+                    return objects.count(change.object_id) != 0;
                   }))
     return;
   const auto erase_if = [](auto& rows, auto predicate) {
@@ -2644,10 +2677,11 @@ std::string serialize_ocdfg_json(const OcdfgGraph& graph) {
     write_string(out, object_type_name);
     out << ":{";
     bool first_edge = true;
+    std::set<std::string> used_keys;
     for (const auto& [activity_pair, edge] : edges_for_type) {
       if (!first_edge) out << ',';
       first_edge = false;
-      write_string(out, activity_pair.first + "->" + activity_pair.second);
+      write_string(out, ocdfg_edge_key(used_keys, activity_pair.first, activity_pair.second));
       out << ":{\"source_activity\":";
       write_string(out, activity_pair.first);
       out << ",\"target_activity\":";
@@ -3109,10 +3143,11 @@ void write_ocpn_annotation_fields(std::ostringstream& out,
     write_string(out, object_type_name);
     out << ":{";
     bool first_edge = true;
+    std::set<std::string> used_keys;
     for (const auto& [activity_pair, edge] : edges_for_type) {
       if (!first_edge) out << ',';
       first_edge = false;
-      write_string(out, activity_pair.first + "->" + activity_pair.second);
+      write_string(out, ocdfg_edge_key(used_keys, activity_pair.first, activity_pair.second));
       out << ":{\"source_activity\":";
       write_string(out, activity_pair.first);
       out << ",\"target_activity\":";

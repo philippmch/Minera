@@ -530,7 +530,9 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
       for (const auto* rs : children(*en, "objects"))
         for (const auto* r : children(*rs, "relationship")) {
           const std::string oid = attr_or(*r, "object-id", attr_or(*r, "objectId"));
-          if (!types.count(oid)) throw std::invalid_argument("OCEL XML relation references unknown object");
+          // read_ocel2_xml drops a relation to an unlisted object (and the
+          // event when it keeps none), observed black-box.
+          if (!types.count(oid)) continue;
           log.relations.push_back({log.events.back().id, oid, attr_or(*r, "qualifier")});
         }
     }
@@ -706,6 +708,15 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   if (standard) parse_standard(root, log, options.reject_unsupported); else parse_classic(root, log, options.reject_unsupported);
   // Both reference XML readers build the events frame activity first.
   log.event_activity_first = true;
+  // read_ocel2_xml also drops an object link to an unlisted object (the
+  // classic reader raises on a relation to one).
+  if (standard) {
+    std::unordered_set<std::string> object_ids;
+    for (const auto& object : log.objects) object_ids.insert(object.id);
+    std::erase_if(log.o2o, [&](const OcelO2oRelation& relation) {
+      return !object_ids.count(relation.source_id) || !object_ids.count(relation.target_id);
+    });
+  }
   validate_references(log);
   // The OCEL 2.0 XML reader reads dates leniently, the classic one as ISO.
   sort_ocel_events_by_timestamp(log, standard ? OcelTimestampReader::kDateutil : OcelTimestampReader::kIsoFormat);

@@ -1,6 +1,9 @@
 #include "minera/ocel_statistics.hpp"
 
 #include <cassert>
+#include <cstdlib>
+#include <string>
+#include <vector>
 #include <stdexcept>
 
 namespace {
@@ -155,6 +158,35 @@ int main() {
          std::string::npos);
   assert(edge_json.find("\"performance_total_objects\"") !=
          std::string::npos);
+  // Durations print in full, as the reference's timedelta seconds (whole
+  // seconds, then the microsecond fraction); they printed six digits.
+  minera::Ocel long_gap;
+  long_gap.objects.push_back({"o1", "Order", {}});
+  long_gap.events.push_back({"e1", "a", "2024-01-01T00:00:00.000007Z", {}});
+  long_gap.events.push_back({"e2", "b", "2024-01-15T00:00:01.123456Z", {}});
+  long_gap.events.push_back({"e3", "a->b", "2024-01-16T00:00:00Z", {}});
+  long_gap.events.push_back({"e4", "c", "2024-01-17T00:00:00Z", {}});
+  long_gap.events.push_back({"e5", "b->c", "2024-01-18T00:00:00Z", {}});
+  long_gap.relations.push_back({"e1", "o1", ""});
+  long_gap.relations.push_back({"e2", "o1", ""});
+  long_gap.objects.push_back({"o2", "Order", {}});
+  long_gap.relations.push_back({"e3", "o2", ""});
+  long_gap.relations.push_back({"e4", "o2", ""});
+  long_gap.objects.push_back({"o3", "Order", {}});
+  long_gap.relations.push_back({"e1", "o3", ""});
+  long_gap.relations.push_back({"e5", "o3", ""});
+  const auto long_edges = minera::edge_associations(long_gap);
+  assert(long_edges.at("Order").at({"a", "b"}).performance_event_couples ==
+         std::vector<double>{1209601.123449});
+  const auto long_json = minera::serialize_ocel_statistics_json(long_edges);
+  const auto printed = long_json.find("\"performance_event_couples\":[");
+  assert(printed != std::string::npos);
+  assert(std::strtod(long_json.c_str() + printed + 29, nullptr) == 1209601.123449);
+  // "a" -> "b->c" and "a->b" -> "c" share the label "a->b->c": the second
+  // gets "#2" and each edge names its endpoints.
+  assert(long_json.find(R"("a->b->c":{"event_couples")") != std::string::npos);
+  assert(long_json.find(R"("a->b->c#2":{"event_couples")") != std::string::npos);
+  assert(long_json.find(R"("source_activity":"a->b","target_activity":"c"})") != std::string::npos);
   const auto business_json = minera::serialize_ocel_statistics_json(
       log, minera::OcelStatisticsVariant::kEdgeAssociations,
       minera::OcelEdgeAssociationOptions{.use_business_hours = true});

@@ -367,6 +367,53 @@ int main() {
          orphans.object_changes[0].object_id == "o1");
   std::filesystem::remove(orphan_path, ignored);
 
+  // Rows that name an unknown event or object are dropped by default, as
+  // read_ocel2_sqlite drops them (and then the events and objects left
+  // without relations); validate_references refuses them instead.
+  const auto dangling_path = external_path.string() + ".dangling.sqlite";
+  std::filesystem::remove(dangling_path, ignored);
+  sqlite3* dangling_db = nullptr;
+  assert(sqlite3_open_v2(dangling_path.c_str(), &dangling_db,
+                         SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) ==
+         SQLITE_OK);
+  exec_sql(dangling_db,
+           "CREATE TABLE event (ocel_id TEXT PRIMARY KEY, ocel_type TEXT NOT NULL);"
+           "CREATE TABLE object (ocel_id TEXT PRIMARY KEY, ocel_type TEXT NOT NULL);"
+           "CREATE TABLE event_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
+           "CREATE TABLE object_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
+           "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
+           "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);"
+           "CREATE TABLE event_Create (ocel_id TEXT PRIMARY KEY, ocel_time TEXT);"
+           "CREATE TABLE object_order (ocel_id TEXT, ocel_time TEXT, ocel_changed_field TEXT);"
+           "INSERT INTO event VALUES ('e1', 'Create');"
+           "INSERT INTO event VALUES ('e2', 'Create');"
+           "INSERT INTO object VALUES ('o1', 'order');"
+           "INSERT INTO object VALUES ('o2', 'order');"
+           "INSERT INTO event_map_type VALUES ('Create', 'Create');"
+           "INSERT INTO object_map_type VALUES ('order', 'order');"
+           "INSERT INTO event_Create VALUES ('e1', '2024-02-01T00:00:00Z');"
+           "INSERT INTO event_Create VALUES ('e2', '2024-02-03T00:00:00Z');"
+           "INSERT INTO object_order VALUES ('o1', NULL, NULL);"
+           "INSERT INTO object_order VALUES ('o2', NULL, NULL);"
+           "INSERT INTO event_object VALUES ('e1', 'o1', 'uses');"
+           "INSERT INTO event_object VALUES ('e2', 'o2', '');"
+           "INSERT INTO event_object VALUES ('e2', 'zz9', 'w');"
+           "INSERT INTO event_object VALUES ('e9', 'o1', 'w');"
+           "INSERT INTO object_object VALUES ('o1', 'zz8', 'w');"
+           "INSERT INTO object_object VALUES ('zz7', 'o2', 'w');"
+           "INSERT INTO object_object VALUES ('o1', 'o2', 'next');");
+  assert(sqlite3_close(dangling_db) == SQLITE_OK);
+  const auto dangling = minera::import_ocel_sqlite(dangling_path);
+  assert(dangling.events.size() == 2 && dangling.objects.size() == 2);
+  assert(dangling.relations.size() == 2);
+  for (const auto& relation : dangling.relations)
+    assert(relation.event_id != "e9" && relation.object_id != "zz9");
+  assert(dangling.o2o.size() == 1 && dangling.o2o[0].qualifier == "next");
+  minera::OcelSqliteOptions strict;
+  strict.validate_references = true;
+  throws([&] { (void)minera::import_ocel_sqlite(dangling_path, strict); });
+  std::filesystem::remove(dangling_path, ignored);
+
   // Naive times read as UTC, as pm4py.read_ocel2_sqlite stores them
   // (datetime64[us, UTC]): the event time is stamped "Z", the change time
   // "+00:00", as the reference JSON writers print them. An id listed twice in

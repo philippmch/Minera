@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AL (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AM (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4231,20 +4231,35 @@ re-reviewed AK and sped up the remaining large-log alignment routes without
 changing results: A* bounds solved when a state is popped, the bundle's
 search reused by the dispatcher pass with standard costs, and one malloc
 arena per server thread (default replay fitness on 3,000 cases 225 s to
-119 s, imported-model alignment on 1,000 cases 180 s to 110 s).
+119 s, imported-model alignment on 1,000 cases 180 s to 110 s). Round AM
+re-reviewed AL without findings and swept OCEL discovery at the route level
+against pm4py on random OCEL 1.0 and 2.0 JSON files (etot, otg, OC-DFG,
+OCPN, SAW nets, edge associations): files whose relations name an unlisted
+object are now read as pm4py reads them (the row is dropped, not the log
+refused) by the JSON, OCEL 2.0 XML and SQLite readers; OC-DFG edge keys no
+longer collide when activity names hold "->"; edge-association durations
+print in full.
 
-Next round (AM) should start by re-reviewing round AL:
+Next round (AN) should start by re-reviewing round AM:
 
-- `Aligner::align_configured` in `src/backend/conformance.cpp`: pending
-  nodes (`Node::pending`, the inherited priority and its 1e-6 margin, the
-  re-queue at pop with the old sequence number; `lazy_bounds` now also
-  requires the marking equation and no extended arcs);
-- `reference_log_alignment` in `src/backend/petri_trace_alignment.cpp`:
-  `same_search`, `bundle_searches` and `align_log`'s `precomputed`
-  argument (every option the dispatcher's search reads must equal the
-  bundle's);
-- `mallopt(M_ARENA_MAX, CPPHTTPLIB_THREAD_POOL_COUNT + 8)` in
-  `minera_server.cpp`.
+- the OCEL readers in `src/backend/ocel.cpp`: `parse_classic` (`ocel:omap`
+  and `ocel:typedOmap` skip unlisted objects, `ocel:objectChanges` and
+  `ocel:o2o` drop them), `parse_standard` (event relationships, object
+  links) and `drop_unrelated_ocel_entries` (its early return now also
+  checks object links, event links and changes);
+- `parse_ocel_xml` in `src/backend/ocel_xml.cpp` (OCEL 2.0 relations and
+  links to unlisted objects dropped, the classic reader still refuses) and
+  `OcelSqliteOptions::validate_references`, now `std::optional<bool>`
+  (import drops unless true, export refuses unless false; the server sets
+  it only when the query names it);
+- `ocdfg_edge_key` (both OC-DFG writers) and `serialize_edges` in
+  `src/backend/ocel_statistics.cpp` (repeated keys, endpoint fields,
+  full-precision durations from `ocdfg_elapsed_seconds`).
+
+Round AL's targets, re-reviewed in AM without findings: pending nodes in
+`Aligner::align_configured` (inherited priority, 1e-6 margin, re-queue
+with the old sequence number), `same_search` and `bundle_searches` in
+`reference_log_alignment`, and the arena bound in `minera_server.cpp`.
 
 Round AK's targets, re-reviewed in AL without findings: `bounds` and
 `lazy_bounds` in `align_configured`; the threaded variant loop of
@@ -4265,8 +4280,10 @@ Round AJ's own targets, re-reviewed in AK without findings:
   `Conformance.tsx`).
 
 Areas without a recent random-input sweep that are good candidates for the
-second reviewer: root-cause analysis (decision trees on features), OCEL
-discovery, and the legacy-cost imported-model alignment (the bundle's unit
+second reviewer: root-cause analysis (the token-replay diagnostics that
+`token_replay_include_root_cause_diagnostics` attaches; only each tree's
+root is deterministic in pm4py), OCPN token-replay diagnostics on larger
+logs, and the legacy-cost imported-model alignment (the bundle's unit
 costs differ from the dispatcher's, so both still search: about 110 s on
 1,000 cases). In stack samples of the A* searches on these logs the LP
 solver (`solve_lp_sparse`) was about half of the busy frames. One way to

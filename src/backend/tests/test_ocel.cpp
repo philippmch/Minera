@@ -545,7 +545,60 @@ void standard_json_declares_frame_column_types_contract() {
     if (attribute.key == "n") assert(std::get<double>(attribute.value) == 4.0);
 }
 
+// A relation, object link, qualifier or object change that names an object
+// the document does not list is dropped, as every reference JSON reader drops
+// it (observed black-box); an event left without relations goes too. The
+// readers used to refuse the whole log.
+void readers_drop_unknown_object_references_contract() {
+  const auto classic = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1","zz"],)"
+      R"("ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"q"},{"ocel:oid":"zz","ocel:qualifier":"w"},{"ocel:oid":"o2","ocel:qualifier":"v"}],"ocel:vmap":{}},)"
+      R"("e2":{"ocel:activity":"B","ocel:timestamp":"2024-01-01T00:01:00Z","ocel:omap":["o2"],"ocel:vmap":{}},)"
+      R"("e3":{"ocel:activity":"C","ocel:timestamp":"2024-01-01T00:02:00Z","ocel:omap":["zz"],"ocel:vmap":{}}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{},"ocel:o2o":[{"ocel:oid":"zz","ocel:qualifier":"x"},{"ocel:oid":"o2","ocel:qualifier":"y"}]},)"
+      R"("o2":{"ocel:type":"order","ocel:ovmap":{}}},)"
+      R"("ocel:objectChanges":[{"ocel:oid":"zz","ocel:type":"order","ocel:field":"st","st":"a","ocel:timestamp":"2024-01-02T00:00:00Z"},)"
+      R"({"ocel:oid":"o1","ocel:type":"order","ocel:field":"st","st":"b","ocel:timestamp":"2024-01-02T00:00:00Z"}]})");
+  assert(classic.events.size() == 2 && classic.events[0].id == "e1" && classic.events[1].id == "e2");
+  assert(classic.relations.size() == 2);
+  assert(classic.relations[0].event_id == "e1" && classic.relations[0].object_id == "o1" &&
+         classic.relations[0].qualifier == "q");
+  assert(classic.relations[1].event_id == "e2" && classic.relations[1].object_id == "o2" &&
+         classic.relations[1].qualifier.empty());
+  assert(classic.o2o.size() == 1 && classic.o2o[0].target_id == "o2");
+  assert(classic.object_changes.size() == 1 && classic.object_changes[0].object_id == "o1");
+
+  const auto standard = minera::parse_ocel_json(R"json({"objectTypes":[{"name":"order","attributes":[]}],"eventTypes":[{"name":"A","attributes":[]},{"name":"B","attributes":[]}],
+"objects":[{"id":"o1","type":"order","attributes":[],"relationships":[{"objectId":"zz8","qualifier":"x"}]},{"id":"o2","type":"order","attributes":[]}],
+"events":[{"id":"e1","type":"A","time":"2024-01-01T00:00:00Z","attributes":[],"relationships":[{"objectId":"o1","qualifier":""},{"objectId":"zz9","qualifier":"q"}]},
+{"id":"e2","type":"B","time":"2024-01-01T00:01:00Z","attributes":[],"relationships":[{"objectId":"zz9","qualifier":""}]}]})json");
+  assert(standard.events.size() == 1 && standard.events[0].id == "e1");
+  assert(standard.objects.size() == 1 && standard.objects[0].id == "o1");
+  assert(standard.relations.size() == 1 && standard.relations[0].object_id == "o1");
+  assert(standard.o2o.empty());
+}
+
+// OCDFG edge keys are labels: "a" -> "b->c" and "a->b" -> "c" both read
+// "a->b->c", so the second gets "#2" and the JSON object keeps both edges.
+void ocdfg_edge_keys_stay_unique_contract() {
+  const auto log = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:activity":"a","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]},)"
+      R"("e2":{"ocel:activity":"b->c","ocel:timestamp":"2024-01-01T00:01:00Z","ocel:omap":["o1"]},)"
+      R"("e3":{"ocel:activity":"a->b","ocel:timestamp":"2024-01-01T00:02:00Z","ocel:omap":["o2"]},)"
+      R"("e4":{"ocel:activity":"c","ocel:timestamp":"2024-01-01T00:03:00Z","ocel:omap":["o2"]}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order"},"o2":{"ocel:type":"order"}}})");
+  const auto graph = minera::discover_ocdfg_classic(log);
+  assert(graph.edges.at("order").size() == 2);
+  const auto json = minera::serialize_ocdfg_json(graph);
+  assert(json.find(R"("a->b->c":{"source_activity":"a","target_activity":"b->c")") != std::string::npos);
+  assert(json.find(R"("a->b->c#2":{"source_activity":"a->b","target_activity":"c")") != std::string::npos);
+  const auto reread = minera::parse_ocdfg_json(json);
+  assert(reread.edges.at("order").size() == 2);
+}
+
 int main() {
+  readers_drop_unknown_object_references_contract();
+  ocdfg_edge_keys_stay_unique_contract();
   global_scope_defaults_contract();
   standard_json_declares_frame_column_types_contract();
   repeated_object_ids_contract();
@@ -808,14 +861,12 @@ int main() {
   assert(repeated.events.size() == 2 && repeated.events[0].id == "e" && repeated.events[0].activity == "b");
   assert(repeated.relations.size() == 2);
 
-  bool bad_o2o = false;
-  try {
-    (void)minera::parse_ocel_json(
-        R"({"ocel:objects":{"o":{"ocel:type":"x","ocel:o2o":[{"ocel:oid":"missing"}]}},"ocel:events":{}})");
-  } catch (...) {
-    bad_o2o = true;
-  }
-  assert(bad_o2o);
+  // An object link to an unlisted object is dropped, as the reference
+  // reader drops it (it used to refuse the log).
+  const auto bad_o2o = minera::parse_ocel_json(
+      R"({"ocel:objects":{"o":{"ocel:type":"x","ocel:o2o":[{"ocel:oid":"missing"}]}},)"
+      R"("ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"2024-01-01","ocel:omap":["o"]}}})");
+  assert(bad_o2o.objects.size() == 1 && bad_o2o.o2o.empty());
   bool bad_e2e = false;
   try {
     (void)minera::parse_ocel_json(

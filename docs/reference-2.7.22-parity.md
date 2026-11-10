@@ -21034,3 +21034,86 @@ net of AI1, every variant of the standard-cost A* and Dijkstra results
 equals the trace's own public alignment, moves and search counters
 included). 13 pins of `minera_mining_fast_path_equivalence_tests` were
 renewed after the comparison above.
+
+## Review AM1: re-review of round AL (2026-11-10)
+
+A re-review of AL (pending A* nodes, the bundle's searches reused by the
+dispatcher pass, the malloc arena bound) found no defect. Notes:
+
+- A pending node takes its parent's bound less the move's cost. If the
+  start state's bound were infinite, that difference is NaN, `std::max(0.0,
+  NaN)` gives 0, and every successor would be queued and then dropped when
+  its own LP proves infeasible: the search still finds no alignment, only
+  the counters differ. It cannot happen in `check_alignment`: the LP's
+  feasibility does not depend on the trace (a log move satisfies every
+  trace row), so the start LP is feasible whenever the reachability
+  preflight passed.
+- `check_alignment` returns uncomputed as soon as one variant's search is
+  capped, so every outcome `reference_log_alignment` reuses was found. The
+  dispatcher's search options differ from the bundle's only in
+  `max_alignments` (read by the generator variants alone) and
+  `max_total_time_seconds` (a deadline, never a different search).
+- The arena bound is evaluated at run time from httplib's pool size and set
+  before the server starts a thread.
+
+## Review AM2: OCEL discovery at the route level (2026-11-10)
+
+A random-input sweep posted generated OCEL files to `/api/ocel/discover`
+(every variant) and `/api/ocel/statistics?variant=edge_associations` and
+compared each answer with pm4py 2.7.22 reading the same file
+(`read_ocel`/`read_ocel2_json`, then `discover_etot`, `discover_otg`,
+`discover_ocdfg`, `discover_oc_petri_net`, the SAW-net dispatcher and the
+`edge_metrics` associations with their performance). The logs had one to
+four object types (names with spaces and non-ASCII letters), up to 120
+events with timestamp ties, fractions, offsets, gaps of up to three weeks
+and shuffled event order, events without objects, repeated and unlisted
+objects, object-to-object links (OCEL 2.0) and activity names that hold
+"->". OCPN nets compare up to isomorphism (markings included), SAW nets per
+type with every arc's weight distribution, the merged SAW net by structure.
+Three differences, all fixed:
+
+- **AM2-1 Relations to unlisted objects.** A file whose event names an
+  object the file does not list was refused ("relation references unknown
+  object"), in OCEL 1.0 JSON (`ocel:omap`, `ocel:typedOmap`, `ocel:o2o`,
+  `ocel:objectChanges`), OCEL 2.0 JSON (event and object relationships),
+  OCEL 2.0 XML and SQLite (`event_object`, `object_object`, also unknown
+  event ids). Every one of these pm4py readers drops such a row, and then
+  the events and objects left without relations (observed black-box: an
+  event whose only object is unlisted disappears). Native readers now do
+  the same; a qualifier in `ocel:typedOmap` for an object the omap does not
+  list is ignored, as pm4py ignores it. The OCEL 1.0 XML reader still
+  refuses such a file: pm4py raises `KeyError` there. The SQLite option
+  `validate_references` is now unset by default (an import drops, an export
+  refuses); `validate_references=true` refuses on import as before.
+- **AM2-2 OC-DFG edge keys.** Edges are keyed `source->target` in each
+  object type's map, so `a`→`b->c` and `a->b`→`c` both wrote the key
+  `a->b->c`; the browser's `JSON.parse` keeps the last of two equal keys
+  and the graph lost an edge. A repeated key now gets `#2`, `#3`, …; the
+  readers take the pair from the edge's `source_activity` and
+  `target_activity` (OC-DFG, OCPN annotations, and the edge-association
+  statistic, whose edges now name their endpoints too).
+- **AM2-3 Edge-association durations.** The edge-association statistic
+  printed durations with the stream's default six digits (1209601.123449 s
+  as `1.2096e+06`) and took them as a difference of epoch doubles, which
+  loses microseconds at present-day magnitudes. They are now printed in full
+  and computed as the reference's timedelta seconds (whole seconds, then
+  the microsecond fraction, `ocdfg_elapsed_seconds`), equal to
+  `edge_metrics.performance_calculation_ocel_aggregation`. The AJ-era
+  statistics comparison (320 OCEL 2.0 files) used gaps short enough for six
+  digits.
+
+Verification:
+
+| Check | Logs | Result |
+|---|---|---|
+| OCEL 1.0 JSON, six outputs each (etot, otg, OC-DFG, OCPN, SAW, edge associations), fresh seeds after the fixes | 300 (100 with up to 120 events) | 0 differences (before: every file with an unlisted object refused, edge-association durations of six digits) |
+| OCEL 2.0 JSON, the same outputs | 300 (100 with up to 120 events) | 0 differences |
+| Runs while fixing (some without edge associations) | 590 more | 0 differences after the fixes |
+| Unlisted objects by reader: OCEL 1.0 JSON (6 shapes), OCEL 2.0 JSON, OCEL 2.0 XML, SQLite (event, object and link rows), OCEL 1.0 XML | 10 files | kept rows, links, changes and dropped events equal pm4py's; OCEL 1.0 XML refused by both |
+
+Tests: `minera_ocel_tests` (`readers_drop_unknown_object_references_contract`,
+`ocdfg_edge_keys_stay_unique_contract`, the classic `ocel:o2o` case now
+dropped instead of refused), `minera_ocel_xml_tests`
+(`unknown_object_references`), `minera_ocel_sqlite_tests` (unknown rows
+dropped by default, refused with `validate_references`),
+`minera_ocel_statistics_tests` (full-precision durations, repeated keys).

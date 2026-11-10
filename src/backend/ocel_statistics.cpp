@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <iomanip>
+#include <limits>
+#include <locale>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -10,6 +13,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "minera/ocdfg_edge_performance.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -322,6 +326,10 @@ std::string serialize_object_type_associations(
 
 std::string serialize_edges(const OcelEdgeAssociations& associations) {
   std::ostringstream out;
+  // Durations print in full (the stream's default six digits turned
+  // 1209601.123449 s into 1.2096e+06).
+  out.imbue(std::locale::classic());
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
   out << "{\"family\":\"OCEL_STATISTICS\",\"variant\":\"EDGE_ASSOCIATIONS\",\"edges\":{";
   bool first_type = true;
   for (const auto& [type, edges] : associations) {
@@ -330,10 +338,17 @@ std::string serialize_edges(const OcelEdgeAssociations& associations) {
     json_string(out, type);
     out << ':' << '{';
     bool first_edge = true;
+    // "source->target" keys can repeat when activity names hold "->"; a
+    // repeat gets "#2", "#3", ..., and every edge names its endpoints.
+    std::set<std::string> used_keys;
     for (const auto& [activities, metric] : edges) {
       if (!first_edge) out << ',';
       first_edge = false;
-      json_string(out, activities.first + "->" + activities.second);
+      const std::string base = activities.first + "->" + activities.second;
+      std::string key = base;
+      for (std::size_t n = 2; !used_keys.insert(key).second; ++n)
+        key = base + "#" + std::to_string(n);
+      json_string(out, key);
       out << ':';
       out << "{\"event_couples\":[";
       for (std::size_t i = 0; i < metric.event_couples.size(); ++i) {
@@ -378,7 +393,11 @@ std::string serialize_edges(const OcelEdgeAssociations& associations) {
         if (i) out << ',';
         out << metric.performance_total_objects[i];
       }
-      out << "]}";
+      out << "],\"source_activity\":";
+      json_string(out, activities.first);
+      out << ",\"target_activity\":";
+      json_string(out, activities.second);
+      out << '}';
     }
     out << '}';
   }
@@ -537,9 +556,16 @@ OcelEdgeAssociations edge_associations(
                             ? local_wall_instant(target_it->second->timestamp)
                             : parse_timestamp(target_it->second->timestamp);
         if (!from || !to) return std::nullopt;
-        return options.use_business_hours
-                   ? business_elapsed(*from, *to, business_slots)
-                   : *to - *from;
+        if (!options.use_business_hours) {
+          // As the reference's timedelta: whole seconds exact, then the
+          // microsecond fraction (an epoch double difference loses
+          // microseconds at present-day magnitudes).
+          const auto exact_from = parse_timestamp_exact(source_it->second->timestamp);
+          const auto exact_to = parse_timestamp_exact(target_it->second->timestamp);
+          if (exact_from && exact_to) return ocdfg_elapsed_seconds(*exact_from, *exact_to);
+          return *to - *from;
+        }
+        return business_elapsed(*from, *to, business_slots);
       };
       for (const auto& couple : metric.event_couples) {
         if (const auto value = duration(couple.first, couple.second))

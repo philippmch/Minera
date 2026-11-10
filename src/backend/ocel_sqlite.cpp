@@ -867,7 +867,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     log.objects.push_back(std::move(object));
     log.object_type_attributes.try_emplace(type);
   }
-  read_relations(db, log, options.validate_references);
+  read_relations(db, log, options.validate_references.value_or(false));
 
   if (table_exists(db, "object_changes")) {
     Statement statement(db, "SELECT object_id, object_type, ocel_time, "
@@ -884,7 +884,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       change.timestamp = column_string(statement.get(), 2);
       change.field = column_string(statement.get(), 3);
       change.value = read_value(statement.get(), 4, 5, 6, 7, 8);
-      if (options.validate_references && !object_types.contains(change.object_id))
+      if (options.validate_references.value_or(false) && !object_types.contains(change.object_id))
         throw std::invalid_argument("OCEL SQLite object change references an unknown id");
       log.object_changes.push_back(std::move(change));
     }
@@ -899,7 +899,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
                              : "object_" + mapped->second;
       if (visited_tables.insert(table).second && table_exists(db, table)) {
         read_type_table_changes(db, table, type, log, object_ids,
-                                options.validate_references);
+                                options.validate_references.value_or(false));
       }
     }
   }
@@ -931,7 +931,7 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
   (void)options;
   throw std::runtime_error("SQLite support is not available in this build");
 #else
-  validate_log(log, options.validate_references);
+  validate_log(log, options.validate_references.value_or(true));
   std::error_code error;
   std::filesystem::remove(path, error);
   if (error) throw std::runtime_error("cannot replace SQLite output: " + error.message());

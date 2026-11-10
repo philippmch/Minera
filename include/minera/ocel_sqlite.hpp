@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 
 #include "minera/ocel.hpp"
 
@@ -13,8 +14,11 @@ namespace minera {
 // native representation remains lossless for values outside the relational
 // column contract.
 struct OcelSqliteOptions {
-  // Validate all relation references while importing and before exporting.
-  bool validate_references = true;
+  // Refuse relations, object links and changes that name an unknown event or
+  // object. Unset: an import drops such rows, as the reference SQLite reader
+  // does (and then the events and objects left without relations, observed
+  // black-box), and an export refuses them.
+  std::optional<bool> validate_references;
   // Keep type names readable in the event_<type>/object_<type> table names.
   // Names that are not safe SQLite identifiers are encoded deterministically.
   bool readable_type_table_names = true;

@@ -2328,8 +2328,8 @@ void handle_ocel_sqlite(const httplib::Request& request,
     if (mode != "import" && mode != "export")
       throw std::invalid_argument("OCEL SQLite mode expects import or export");
     minera::OcelSqliteOptions options;
-    options.validate_references = ocel_query_bool(
-        request, "validate_references", options.validate_references);
+    if (request.has_param("validate_references"))
+      options.validate_references = ocel_query_bool(request, "validate_references", true);
     options.readable_type_table_names = ocel_query_bool(
         request, "readable_type_table_names", options.readable_type_table_names);
     const bool include_open_source = ocel_query_bool(request, "include_open_source", false);
