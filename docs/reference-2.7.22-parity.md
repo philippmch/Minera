@@ -21444,3 +21444,104 @@ the XES object column of big and negative ints, uint64 and float64 big-int
 columns), `minera_ocel_sqlite_tests` (a file without base rows: first rows
 over the object tables in type-name order, `@@cumcount` ignored, a NULL id,
 an empty changed field typed by its object).
+
+## Review AR1: re-review of round AQ, case columns and temporal features on the DataFrame path (2026-11-10)
+
+Round AQ's changes were re-read and swept again on new seeds: the frame
+view (`typed_columns`, `note_cell`, `trace_columns`, the trace branch of
+`dataframe_frame_event_log`, `utc_date_cell`, `@@index`/`@@case_index`, the
+date-kind NaT cell), the frame block of the batch CSV import,
+`log_to_features` on the frame view and its other callers, and the SQLite
+first-row rule. A new harness built CSV logs whose case column has a
+`case:` header other than `case:concept:name`, whose `case:` cells vary
+within a case, and which carry a `concept:name`, `case:concept:name` or
+`time:timestamp` column beside custom case, activity and timestamp
+columns. The second area swept the calendar TEMPORAL variant of
+`/api/log-to-features` (pm4py reads the formatted frame directly) on CSV
+and XES uploads, and the reference profile clustering on CSV uploads.
+Findings, all fixed:
+
+- **AR1-1 A case column with another `case:` header.** `format_dataframe`
+  keeps such a column (say `case:id`) beside its copy `case:concept:name`,
+  so `convert_to_event_log` puts it on the trace: every trace holds the case
+  id under the unprefixed header (`id`), typed like the column (an int
+  column of ids gives ints). The default trace-based selection takes it
+  (`trace:id`, or one-hot when the ids are strings) and an explicit
+  `str_tr_attr` of `id` encodes it. Native's frame view had no such trace
+  attribute (`trace:id@UNDEFINED`). The batch CSV import now lists it as a
+  `kCaseId` trace column and the frame view fills it from the case id.
+- **AR1-2 A case column without the prefix is no trace attribute.** pm4py's
+  trace has no attribute under an unprefixed case header (say `cid`; it is
+  an event column), so an explicit trace attribute `cid` is
+  `trace:cid@UNDEFINED`. Native read the case id through the header
+  (`trace:cid@c0`, …). With the reference keys of a CSV log
+  (`standard_keys`), `log_to_features` no longer reads the case id through
+  the trace's case header (`Trace::case_id_source_key`), and the frame view
+  drops a trace's own `concept:name`
+  from a `case:concept:name` column beside another case column is dropped:
+  pm4py's copy replaces that column, so the trace's `concept:name` is the
+  case id.
+- **AR1-3 A `concept:name` column beside another activity column.**
+  `format_dataframe`'s copy of the activity replaces it, so the events'
+  `concept:name` is the activity (event-based features gave
+  `event:concept:name@q`, … from the replaced column instead of the
+  activities). The batch CSV import leaves that column out of the frame,
+  as it already did for a `time:timestamp` column beside another timestamp
+  column.
+- **AR1-4 The calendar TEMPORAL variant reads the frame.** pm4py's
+  temporal variant (with `grouper_freq`) works on the frame itself, which
+  has the resource column under its own header only: with the default
+  resource key `org:resource` and a CSV resource column under another
+  header it raises `KeyError: 'org:resource'`. Native read the mapped
+  resource and returned a table. `log_to_features` now reads
+  `dataframe_frame_event_log` for the calendar TEMPORAL variant too, so a
+  missing key raises (400 on the route) and the UTC timestamp copies are
+  read as pm4py reads them; the windowed variant (without
+  `grouper_freq`, native) keeps the log as loaded.
+
+Declared, unchanged: the reference profile clustering
+(`KMeans(n_clusters, random_state=0)`) decides some k-means steps on exact
+distance ties of the one-hot features, which pm4py breaks by its BLAS
+kernel's rounding; Minera flags these in its diagnostics ("a decision sat on
+a distance tie") and follows the Windows runtime's kernel, so a flagged
+result may group a trace differently from this container's sklearn. All
+6 differences in the sweep below are flagged; the features of each
+were equal to pm4py's.
+
+Not changed this round (next round's candidate): pm4py's organizational
+mining (`discover_handover_of_work_network` and the other SNA networks,
+`discover_activity_based_resource_similarity`,
+`discover_organizational_roles`) also reads `org:resource` from the frame
+and raises `KeyError` on a CSV upload whose resource column has another
+header; Minera's `/api/sna`, `/api/roles` and the organizational workbench
+read the mapped resource. Following pm4py there means the frontend's
+default resource field (`org:resource`) should come from the session's
+resource header, so it is left for a round of its own.
+
+Verification:
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Features, CSV with custom headers, AQ binary (seeds 500 to 529) | 90 | 90 equal |
+| Features, CSV with custom headers, fixed binary (seeds 600 to 629) | 90 | 79 equal, 11 equal under another hash seed |
+| Features, CSV case columns and copies (seeds 0 to 22), before | 92 | 25 differed and 17 raised in pm4py only, in 17 of 23 seeds (AR1-1 to AR1-3) |
+| Features, CSV case columns and copies (seeds 0 to 29), fixed | 120 | 62 equal, 30 equal under another hash seed, 28 raise in both (a string trace attribute asked as numeric) |
+| Features, CSV case columns and copies, final binary (seeds 30 to 59) | 120 | 62 equal, 26 equal under another hash seed, 32 raise in both |
+| Features, CSV `case:` columns with blank cells (seeds 100 to 129) | 90 | 90 equal |
+| Temporal (`grouper_freq`), CSV with custom headers (seeds 0 to 29) | 90 | before: 65 equal, 25 differed (AR1-4); fixed: 65 equal, 25 raise in both |
+| Temporal (`grouper_freq`), CSV with standard headers (seeds 100 to 129) | 90 | 90 equal |
+| Temporal (`grouper_freq`), XES with odd values (seeds 0 to 29) | 90 | 90 equal |
+| Profile clustering, CSV with gaps (seeds 0 to 24) | 50 | 18 equal, 28 raise in both (NaN features), 4 flagged ties |
+| Profile clustering, CSV without gaps (seeds 100 to 124, 200 to 239) | 130 | 127 equal, 3 flagged ties |
+| Root cause, CSV with custom headers (seeds 700 to 729) | 226 trees | 224 equal, 2 raise in both |
+| Root cause, XES with odd values (seeds 700 to 729) | 191 trees | 184 equal, 7 raise in both |
+| Features, XES with odd values (seeds 700 to 729) | 90 | 73 equal, 6 equal under another hash seed, 11 declared (string or date keys with gaps that pm4py types as numbers by set order) |
+| SQLite fuzz, mutated files (seeds 3000 to 3149) | 150 | 59 equal, 16 declared (rows repeated across type tables), 75 raise in both, 0 differences |
+| Fixture replay (16 manifests) | 2,673 responses | unchanged |
+
+Tests: `minera_log_to_features_tests`
+(`csv_frame_case_and_activity_copies`: a `case:id` case column as the int
+trace attribute `id`, the replaced `concept:name` and `case:concept:name`
+columns, the calendar TEMPORAL variant raising without an `org:resource`
+column and reading the resource under its header, an unprefixed case
+column as no trace attribute).

@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AQ (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AR (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4271,9 +4271,48 @@ view too, with trace attributes from the frame (`trace_columns`: a missing
 one NaN, ints with a gap floats), NaT date cells out of the default
 selection, and `lifecycle:transition` never taken by default (1,330 feature
 comparisons and 1,053 root-cause trees on CSV and XES uploads equal to
-pm4py, apart from the declared mixed-type keys below).
+pm4py, apart from the declared mixed-type keys below). Round AR re-reviewed
+AQ and fixed the CSV frame's case and activity copies: a case column with
+another `case:` header (say `case:id`) is a trace attribute (`id`, typed
+like the column), an unprefixed case column is no trace attribute, a
+`concept:name` or `case:concept:name` column beside custom case and
+activity columns is replaced by pm4py's copy; the calendar TEMPORAL
+features (`grouper_freq`) read the frame too, so with a CSV resource column
+under another header the default `org:resource` raises as in pm4py
+(features, temporal features on CSV and XES, profile clustering and root
+cause equal to pm4py apart from declared ties and mixed-type keys).
 
-Next round (AR) should start by re-reviewing round AQ:
+Next round (AS) should start by re-reviewing round AR:
+
+- the frame block of `import_csv_event_log`
+  (`src/backend/csv_event_log_importer.cpp`): `activity_copy` (a
+  `concept:name` column left out beside another activity column) and the
+  `kCaseId` trace column for a `case:` case header other than
+  `case:concept:name` (its place among the `case:` columns, its type from
+  `case_kind`/`case_ints`);
+- the trace branch of `dataframe_frame_event_log`
+  (`src/backend/dataframe_columns.cpp`): the dropped CSV trace
+  `concept:name` and the `kCaseId` cell from `Trace::case_id`; in
+  `log_to_features`, the `case_id_source_key` cleared on the frame's traces
+  under `standard_keys` (CSV sources only);
+- `log_to_features` on the frame view for the calendar TEMPORAL variant
+  (`grouper_freq`): UTC timestamp copies with offsets, XES frames, keys that
+  name the case column under its own header.
+
+Then the organizational routes, which read the mapped resource where pm4py
+raises: `discover_handover_of_work_network` (and working together,
+subcontracting, joint activities), `discover_activity_based_resource_similarity`
+and `discover_organizational_roles` read `org:resource` from the frame and
+raise `KeyError` on a CSV upload whose resource column has another header
+(including the importer's default header `resource`); `/api/sna`,
+`/api/roles`, resource profiles, local diagnostics and the organizational
+workbench return results. Following pm4py there needs the frontend's
+resource fields (default `org:resource`, `social-network-options.ts`,
+`organizational-workbench.ts`) to default to the session's resource header,
+or the routes fail by default on such uploads; decide and document the
+contract first.
+
+Round AQ's targets, re-reviewed in AR (findings AR1-1 to AR1-4, fixed):
 
 - `src/backend/dataframe_columns.cpp`: `typed_columns` and `note_cell`
   (shared by event and trace columns), `trace_columns` for XES (traces
@@ -4402,12 +4441,19 @@ for custom headers), `featxes.py` (features on XES), `casegap.py` (`case:`
 columns with blanks), `rccsv4.py` and `rcxes3.py` (root cause), `sqfuzz2.py`,
 and `refltf.py`, which reruns the reference under other hash seeds for the
 declared mixed-type keys.
+Round AR's (`review-harness/round-ar/`): `featcase.py` (CSV case columns
+with `case:` headers, varying `case:` cells, copied columns beside custom
+ones), `tempsweep.py` and `tempxes.py` (calendar TEMPORAL features on CSV
+and XES), `profsweep.py` (reference profile clustering, `--gaps 0|1`; it
+counts k-means results Minera flags as ties apart) and `profprobe.py`
+(features and sklearn labels of one case).
 
 Areas without a recent random-input sweep that are good candidates for the
-second reviewer: other DataFrame-path consumers on CSV and XES uploads
-(clustering, decision trees and other routes whose pm4py reference converts
-the frame, now that the frame view is complete), the temporal feature
-variant on CSV logs, and the legacy-cost imported-model alignment (the bundle's unit
+second reviewer: the organizational routes on CSV uploads (above), other
+DataFrame-path consumers on CSV and XES uploads whose pm4py reference reads
+attributes (decision mining is native at the route level; profile
+clustering and temporal features were swept in AR), and the legacy-cost
+imported-model alignment (the bundle's unit
 costs differ from the dispatcher's, so both still search: about 110 s on
 1,000 cases). In stack samples of the A* searches on these logs the LP
 solver (`solve_lp_sparse`) was about half of the busy frames. One way to

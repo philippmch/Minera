@@ -308,12 +308,18 @@ EventLog dataframe_frame_event_log(const EventLog& log) {
   for (auto& trace : result.traces) {
     // A trace holds every case: column too (typed by the column, a missing
     // one NaN or NaT), in place of its own attribute of that key.
-    if (!frame.trace_columns.empty()) {
+    if (!frame.trace_columns.empty() || frame.csv_text) {
       std::vector<EventAttribute> attributes;
       std::vector<char> done(frame.trace_columns.size(), 0);
       for (const auto& attribute : trace.attributes) {
+        // A CSV trace's concept:name is the case id (format_dataframe's
+        // copy replaces a case:concept:name column beside another case
+        // column).
+        if (frame.csv_text && attribute.key == "concept:name") continue;
         const auto column = std::find_if(frame.trace_columns.begin(), frame.trace_columns.end(),
                                          [&](const auto& c) { return c.key == attribute.key; });
+        if (column != frame.trace_columns.end() && column->role == FirstClassAttributeRole::kCaseId)
+          continue;  // the case id under its own header, added below
         if (column == frame.trace_columns.end() || trace_case_id_attribute(trace, attribute)) {
           attributes.push_back(attribute);
           continue;
@@ -330,8 +336,14 @@ EventLog dataframe_frame_event_log(const EventLog& log) {
         attributes.push_back(last->is_null ? missing_cell(*column)
                                            : csv_dataframe_cell(*column, last->value));
       }
-      for (std::size_t i = 0; i < frame.trace_columns.size(); ++i)
-        if (!done[i]) attributes.push_back(missing_cell(frame.trace_columns[i]));
+      for (std::size_t i = 0; i < frame.trace_columns.size(); ++i) {
+        if (done[i]) continue;
+        const auto& column = frame.trace_columns[i];
+        attributes.push_back(column.role == FirstClassAttributeRole::kCaseId && trace.has_case_id() &&
+                                     trace.case_id_state != FirstClassAttributeState::kNull
+                                 ? csv_dataframe_cell(column, trace.case_id)
+                                 : missing_cell(column));
+      }
       trace.attributes = std::move(attributes);
     }
     for (auto& event : trace.events) {

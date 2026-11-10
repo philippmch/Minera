@@ -865,6 +865,97 @@ static void csv_frame_view_feeds_trace_and_event_features() {
   assert(sorted(log_to_features(log, options).feature_names) == event_names);
 }
 
+static void csv_frame_case_and_activity_copies() {
+  // pm4py 2.7.22, read_csv + format_dataframe(case_id="case:id",
+  // activity_key="act", timestamp_key="ts") + convert_to_event_log: the
+  // case column keeps its `case:` header, so each trace holds the case id
+  // as the int trace attribute "id"; the copies replace the concept:name and
+  // case:concept:name columns (the trace's concept:name is the case id, the
+  // events' the activity); the calendar TEMPORAL variant reads the frame,
+  // which has no org:resource column (KeyError).
+  std::istringstream csv("case:id,act,ts,concept:name,case:concept:name,case:grp,who\n"
+                         "7,a,2020-01-01 00:00:00,q,z1,g1,R\n"
+                         "7,b,2020-01-01 00:01:00,r,z2,g2,S\n"
+                         "3,a,2020-01-02 00:00:00,q,z3,g2,R\n");
+  minera::CsvImportOptions import;
+  import.case_id_column = "case:id";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  const auto log = minera::import_csv_event_log(csv, import);
+  const auto sorted = [](std::vector<std::string> names) {
+    std::sort(names.begin(), names.end());
+    return names;
+  };
+  LogToFeaturesOptions options;
+  options.standard_keys = true;
+  auto traces = log_to_features(log, options);
+  assert(sorted(traces.feature_names) == std::vector<std::string>({
+             "event:@@case_index", "event:@@index", "event:act@a", "event:act@b",
+             "event:concept:name@a", "event:concept:name@b", "event:who@R", "event:who@S",
+             "succession:concept:name@UNDEFINED", "succession:concept:name@a#b",
+             "trace:grp@g1", "trace:grp@g2", "trace:id"}));
+  const auto value = [&](std::size_t row, const std::string& name) {
+    const auto at = std::find(traces.feature_names.begin(), traces.feature_names.end(), name) -
+                    traces.feature_names.begin();
+    return std::get<double>(traces.trace_rows[row][at]);
+  };
+  assert(value(0, "trace:id") == 3.0 && value(1, "trace:id") == 7.0);
+  assert(value(1, "trace:grp@g1") == 1.0 && value(0, "trace:grp@g2") == 1.0);
+
+  options.case_string_attributes = {"id", "concept:name"};
+  options.case_numeric_attributes = {"id"};
+  options.event_string_attributes = {"concept:name"};
+  options.case_string_attributes_supplied = options.case_numeric_attributes_supplied = true;
+  options.event_string_attributes_supplied = options.event_numeric_attributes_supplied = true;
+  traces = log_to_features(log, options);
+  assert(traces.feature_names == std::vector<std::string>({
+             "trace:id@3", "trace:id@7", "trace:concept:name@3", "trace:concept:name@7",
+             "event:concept:name@a", "event:concept:name@b", "trace:id"}));
+  assert(value(1, "trace:id@7") == 1.0 && value(1, "trace:concept:name@7") == 1.0 &&
+         value(1, "event:concept:name@b") == 1.0);
+
+  LogToFeaturesOptions events;
+  events.standard_keys = true;
+  events.variant = LogToFeaturesVariant::EVENT_BASED;
+  events.event_string_attributes = {"concept:name"};
+  events.event_string_attributes_supplied = events.event_numeric_attributes_supplied = true;
+  assert(log_to_features(log, events).feature_names ==
+         std::vector<std::string>({"event:concept:name@a", "event:concept:name@b"}));
+
+  LogToFeaturesOptions temporal;
+  temporal.standard_keys = true;
+  temporal.variant = LogToFeaturesVariant::TEMPORAL;
+  temporal.grouper_freq = "D";
+  bool raised = false;
+  try {
+    (void)log_to_features(log, temporal);
+  } catch (const std::invalid_argument&) {
+    raised = true;
+  }
+  assert(raised);
+  temporal.resource_key = "who";
+  const auto daily = log_to_features(log, temporal);
+  assert(daily.temporal_rows.size() == 2 && daily.feature_names.size() == 13 &&
+         daily.feature_names[0] == "unique_resources");
+  assert(std::get<double>(daily.temporal_rows[0].values[0]) == 2.0 &&
+         std::get<double>(daily.temporal_rows[1].values[3]) == 86400.0);
+
+  // An unprefixed case column is an event column only: the trace has no
+  // attribute under its header (pm4py: trace:cid@UNDEFINED).
+  std::istringstream plain("cid,act,ts\n7,a,2020-01-01 00:00:00\n3,b,2020-01-02 00:00:00\n");
+  import.case_id_column = "cid";
+  import.resource_column = "none";
+  const auto plain_log = minera::import_csv_event_log(plain, import);
+  LogToFeaturesOptions by_header;
+  by_header.standard_keys = true;
+  by_header.case_string_attributes = {"cid"};
+  by_header.case_string_attributes_supplied = by_header.case_numeric_attributes_supplied = true;
+  by_header.event_string_attributes_supplied = by_header.event_numeric_attributes_supplied = true;
+  assert(log_to_features(plain_log, by_header).feature_names ==
+         std::vector<std::string>({"trace:cid@UNDEFINED"}));
+}
+
 static void xes_frame_trace_attributes_with_gaps() {
   // pm4py 2.7.22 on convert_to_event_log(read_xes(...)): a trace without a
   // trace attribute holds NaN (NaT for a date), an int trace attribute with
@@ -3439,6 +3530,7 @@ int main() {
   default_trace_strings_have_fixed_cardinality_limit();
   csv_case_column_is_the_reference_trace_concept_name();
   csv_frame_view_feeds_trace_and_event_features();
+  csv_frame_case_and_activity_copies();
   default_trace_selection_skips_lifecycle_transition();
   xes_frame_trace_attributes_with_gaps();
   csv_frame_trace_attributes_with_gaps();

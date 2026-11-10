@@ -1020,9 +1020,18 @@ LogToFeaturesResult log_to_features(const EventLog& source,
   // The trace- and event-based variants read an EventLog: a log read on the
   // DataFrame path is then the frame as convert_to_event_log gives it (every
   // column on every event, NaN cells, frame dtypes; observed black-box).
+  // The calendar TEMPORAL variant reads the frame itself: the same columns
+  // (a CSV resource only under its header, the UTC timestamp copies).
   std::optional<EventLog> frame;
-  if (source.dataframe_columns && options.variant != LogToFeaturesVariant::TEMPORAL)
+  if (source.dataframe_columns &&
+      (options.variant != LogToFeaturesVariant::TEMPORAL || !options.grouper_freq.empty()))
     frame = dataframe_frame_event_log(source);
+  // With the reference keys of a CSV log, the frame's trace has no attribute
+  // under the case column's header (an unprefixed case column is an event
+  // column; a `case:` one is the trace attribute under its unprefixed name),
+  // so the case id is not read through that header.
+  if (frame && options.standard_keys && source.dataframe_columns->csv_text)
+    for (auto& trace : frame->traces) trace.case_id_source_key.clear();
   const EventLog& log = frame ? *frame : source;
   const bool calendar_projection = options.variant == LogToFeaturesVariant::TEMPORAL &&
       !options.grouper_freq.empty();

@@ -2056,9 +2056,13 @@ CsvEventData import_csv_event_data_impl(
     // format_dataframe copies the timestamp into time:timestamp, replacing a
     // column of that name.
     const bool timestamp_copy = timestamp_index && header[*timestamp_index] != "time:timestamp";
+    // It copies the activity into concept:name likewise, so a concept:name
+    // column beside another activity column is replaced by the copy.
+    const bool activity_copy = header[activity_index] != "concept:name";
     const auto add_column = [&](std::size_t index, FirstClassAttributeRole role) {
-      if (role == FirstClassAttributeRole::kNone && timestamp_copy &&
-          header[index] == "time:timestamp")
+      if (role == FirstClassAttributeRole::kNone &&
+          ((timestamp_copy && header[index] == "time:timestamp") ||
+           (activity_copy && header[index] == "concept:name")))
         return;
       if (role == FirstClassAttributeRole::kCaseId || role == FirstClassAttributeRole::kTimestamp) {
         DataFrameColumn column;
@@ -2126,8 +2130,26 @@ CsvEventData import_csv_event_data_impl(
     // the case's first row of the sorted frame (a blank cell there is NaN),
     // typed by read_csv over every data row like the event columns.
     std::unordered_set<std::string> trace_keys;
+    // A case column with another `case:` header stays in the frame beside
+    // the copy case:concept:name, so the trace holds the case id under the
+    // unprefixed header too (typed like the column).
+    const bool case_trace_column =
+        header[case_index].starts_with("case:") && header[case_index] != "case:concept:name";
+    const auto add_case_trace_column = [&]() {
+      DataFrameColumn column;
+      column.key = header[case_index].substr(kCasePrefix.size());
+      column.role = FirstClassAttributeRole::kCaseId;
+      column.type = column_type(case_kind, case_ints);
+      unique = trace_keys.insert(column.key).second && unique;
+      columns->trace_columns.push_back(std::move(column));
+    };
+    bool case_trace_column_added = false;
     for (std::size_t j = 0; j < case_attribute_indices.size(); ++j) {
       const auto& name = header[case_attribute_indices[j]];
+      if (case_trace_column && !case_trace_column_added && case_index < case_attribute_indices[j]) {
+        add_case_trace_column();
+        case_trace_column_added = true;
+      }
       if (name == "case:concept:name") continue;
       std::vector<std::string> cells;
       cells.reserve(pending.size());
@@ -2144,6 +2166,7 @@ CsvEventData import_csv_event_data_impl(
       unique = trace_keys.insert(column.key).second && unique;
       columns->trace_columns.push_back(std::move(column));
     }
+    if (case_trace_column && !case_trace_column_added) add_case_trace_column();
     if (timestamp_copy) {
       DataFrameColumn copy;
       copy.key = "time:timestamp";
