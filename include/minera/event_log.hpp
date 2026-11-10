@@ -645,6 +645,8 @@ void order_events_by_time(std::vector<Event>& events);
 // tie and fallback rules.
 void order_events_by_exact_time(std::vector<Event>& events);
 
+struct DataFrameColumns;
+
 struct EventLog {
   std::vector<Trace> traces;
   // Scalar log-level XES attributes and derived-model projection markers.
@@ -652,6 +654,10 @@ struct EventLog {
   // the trace vector remain source-compatible.
   std::vector<EventAttribute> attributes;
   EventDataMetadata metadata;
+  // A log read from a CSV file on pm4py's DataFrame path: the frame's event
+  // columns and their dtypes (see dataframe_columns.hpp). Copies of the log
+  // (filters, projections) keep it, as a filtered frame keeps its dtypes.
+  std::shared_ptr<const DataFrameColumns> dataframe_columns;
 
   [[nodiscard]] const std::string* attribute(std::string_view key) const {
     for (const auto& entry : attributes) {
@@ -712,6 +718,7 @@ void order_cases_by_id(EventLog& log);
 inline void copy_event_log_context(const EventLog& source, EventLog& target) {
   target.attributes = source.attributes;
   target.metadata = source.metadata;
+  target.dataframe_columns = source.dataframe_columns;
 }
 
 }  // namespace minera

@@ -1,10 +1,12 @@
 #include "minera/conformance.hpp"
+#include "minera/dataframe_columns.hpp"
 #include "root_cause_trace_key.hpp"
 #include "token_replay_context.hpp"
 
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <unordered_map>
@@ -271,26 +273,42 @@ ReplayCohorts replay_cohorts(const EventLog& log, const PetriNet& net,
 
 }  // namespace
 
+namespace {
+// A log read on pm4py's DataFrame path is analysed as convert_to_event_log
+// gives it: every event holds every frame column, a missing cell as NaN, so
+// it overwrites the context accumulated along the trace (observed black-box).
+std::optional<EventLog> frame_view(const EventLog& log) {
+  if (!log.dataframe_columns) return std::nullopt;
+  return dataframe_frame_event_log(log);
+}
+}  // namespace
+
 std::vector<TokenReplayTransitionRootCauseDiagnostics> compute_token_replay_transition_root_cause_diagnostics(
-    const EventLog& log, const PetriNet& net,
+    const EventLog& source, const PetriNet& net,
     const std::vector<TokenReplayTraceDiagnostics>& traces,
     const TokenReplayOptions& options) {
+  const auto frame = frame_view(source);
+  const auto& log = frame ? *frame : source;
   return token_replay_transition_root_cause_diagnostics(
       log, replay_cohorts(log, net, traces, options).transitions, options.root_cause);
 }
 
 std::vector<TokenReplayUnknownRootCauseDiagnostics> compute_token_replay_unknown_root_cause_diagnostics(
-    const EventLog& log, const PetriNet& net,
+    const EventLog& source, const PetriNet& net,
     const std::vector<TokenReplayTraceDiagnostics>& traces,
     const TokenReplayOptions& options) {
+  const auto frame = frame_view(source);
+  const auto& log = frame ? *frame : source;
   return token_replay_unknown_root_cause_diagnostics(
       log, replay_cohorts(log, net, traces, options).unknown, options);
 }
 
 TokenReplayRootCauseDiagnostics compute_token_replay_root_cause_diagnostics(
-    const EventLog& log, const PetriNet& net,
+    const EventLog& source, const PetriNet& net,
     const std::vector<TokenReplayTraceDiagnostics>& traces,
     const TokenReplayOptions& options) {
+  const auto frame = frame_view(source);
+  const auto& log = frame ? *frame : source;
   auto cohorts = replay_cohorts(log, net, traces, options);
   TokenReplayRootCauseDiagnostics result;
   result.options = options.root_cause;

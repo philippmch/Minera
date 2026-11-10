@@ -594,8 +594,8 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
          sqlite3_column_type(statement.get(), cumulative_index) == SQLITE_NULL ||
          sqlite3_column_double(statement.get(), cumulative_index) == 0.0))
       continue;
+    // An empty changed field is a change too (its value then NaN).
     const auto field = column_string(statement.get(), changed_index);
-    if (field.empty()) continue;
     const auto object_id = column_string(statement.get(), id_index);
     if (validate_references && !object_ids.contains(object_id))
       throw std::invalid_argument("OCEL SQLite object change references an unknown id");
@@ -603,16 +603,19 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
         columns.begin(), columns.end(), [&](const auto& column) {
           return column.name == field;
         });
-    if (value_column == columns.end())
-      throw std::invalid_argument("OCEL SQLite object change value column is missing");
     OcelObjectChange change;
     change.object_id = object_id;
     change.object_type = std::string(object_type);
     change.timestamp = column_string(statement.get(), timestamp_index);
     change.field = field;
-    change.value = read_sqlite_cell(
-        statement.get(), static_cast<int>(value_column - columns.begin()),
-        value_column->declared_type);
+    // A field without a column in its table has no value there: the
+    // reference keeps the change with a NaN value (its writer leaves out a
+    // column that holds only NULLs; observed black-box).
+    change.value = value_column == columns.end()
+                       ? OcelValue{nullptr}
+                       : read_sqlite_cell(statement.get(),
+                                          static_cast<int>(value_column - columns.begin()),
+                                          value_column->declared_type);
     log.object_changes.push_back(std::move(change));
   }
 }
@@ -758,9 +761,12 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     throw std::invalid_argument("OCEL SQLite database requires event and object tables");
 
   Ocel log;
+  // Each id's type is its last listing; the type tables read are those of
+  // every listed type (observed black-box).
   std::map<std::string, std::string> event_types;
-  std::vector<std::string> event_order;
+  std::set<std::string> activities;
   std::map<std::string, std::string> object_types;
+  std::set<std::string> object_type_names;
   {
     Statement statement(db, "SELECT ocel_id, ocel_type FROM event ORDER BY rowid");
     while (true) {
@@ -781,9 +787,12 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         if (!options.validate_references.value_or(false)) continue;
         throw std::invalid_argument("OCEL SQLite event table contains duplicate or empty ids");
       }
-      if (!event_types.emplace(id, activity).second)
+      // The reference reader types an id listed twice by its last listing
+      // and reads it from the type tables (observed black-box).
+      const auto [listed, added] = event_types.insert_or_assign(id, activity);
+      if (!added && options.validate_references.value_or(false))
         throw std::invalid_argument("OCEL SQLite event table contains duplicate or empty ids");
-      event_order.push_back(id);
+      activities.insert(activity);
     }
   }
   {
@@ -802,15 +811,16 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         if (!options.validate_references.value_or(false)) continue;
         throw std::invalid_argument("OCEL SQLite object table contains duplicate or empty ids");
       }
-      // The reference reader keeps one object row per type-table row, all
-      // typed by the id's last "object" row, so an id listed twice is two
-      // objects of one type (observed black-box), which a native OCEL cannot
-      // hold (declared).
-      if (const auto [it, added] = object_types.emplace(id, type); !added)
+      // As for events: an id listed twice has its last listing's type. The
+      // reference keeps one object per type-table row, so an id with rows in
+      // two type tables is two objects there, which a native OCEL cannot hold
+      // (declared): the first table by type name is read.
+      if (const auto [it, added] = object_types.insert_or_assign(id, type);
+          !added && options.validate_references.value_or(false))
         throw std::invalid_argument(
             "OCEL SQLite object table contains duplicate or empty ids: " + id +
-            " is listed twice (types " + it->second + " and " + type +
-            "); pm4py keeps an object row for each, which a native OCEL cannot hold");
+            " is listed twice");
+      object_type_names.insert(type);
     }
   }
   const auto event_map = read_type_map(db, "event_map_type");
@@ -836,10 +846,6 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     return mapped == object_map.end() ? "object_" + type_table_token(type, options)
                                       : "object_" + mapped->second;
   };
-  std::set<std::string> activities;
-  for (const auto& id : event_order) activities.insert(event_types.at(id));
-  std::set<std::string> object_type_names;
-  for (const auto& [id, type] : object_types) object_type_names.insert(type);
   // The reference events frame takes its column order from the type table
   // of the first event type by name: activity first when that table holds
   // "ocel:activity" before "ocel_time" (observed black-box).
@@ -968,16 +974,19 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     std::set<std::string> visited_tables;
     std::set<std::string> object_ids;
     for (const auto& [id, type] : object_types) object_ids.insert(id);
-    for (const auto& [id, type] : object_types) {
-      const auto mapped = object_map.find(type);
-      const auto table = mapped == object_map.end()
-                             ? "object_" + type_table_token(type, options)
-                             : "object_" + mapped->second;
+    for (const auto& type : object_type_names) {
+      const auto table = object_table(type);
       if (visited_tables.insert(table).second && table_exists(db, table)) {
         read_type_table_changes(db, table, type, log, object_ids,
                                 options.validate_references.value_or(false), has_base_rows);
       }
     }
+    // A change takes its object's type (the id's last listing in the object
+    // table), not its table's: pm4py types the change rows by the object
+    // table (observed black-box).
+    for (auto& change : log.object_changes)
+      if (const auto listed = object_types.find(change.object_id); listed != object_types.end())
+        change.object_type = listed->second;
   }
   if (table_exists(db, "ocel_globals")) {
     Statement statement(db, "SELECT attribute_name, value_type, text_value, "
@@ -1009,6 +1018,12 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   }
   std::erase_if(log.events, [&](const OcelEvent& event) { return !related_events.contains(event.id); });
   std::erase_if(log.objects, [&](const OcelObject& object) { return !related_objects.contains(object.id); });
+  // With no event or no object left, the reference reader keeps neither
+  // (observed black-box).
+  if (log.events.empty() || log.objects.empty()) {
+    log.events.clear();
+    log.objects.clear();
+  }
   std::unordered_set<std::string> kept_events;
   std::unordered_set<std::string> kept_objects;
   for (const auto& event : log.events) kept_events.insert(event.id);

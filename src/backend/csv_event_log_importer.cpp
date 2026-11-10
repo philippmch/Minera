@@ -1,5 +1,6 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/cancellation.hpp"
+#include "minera/dataframe_columns.hpp"
 
 #include <algorithm>
 #include <array>
@@ -12,6 +13,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <limits>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -2020,6 +2023,72 @@ CsvEventData import_csv_event_data_impl(
   case_tokens.shrink_to_fit();
   activity_tokens.clear();
   activity_tokens.shrink_to_fit();
+  // The frame's dtype of each event column, typed by read_csv over every
+  // data row (rows dropped below included). An attribute cell is present on
+  // the event exactly when it is no NA spelling (see na_attribute_cell), so
+  // a present cell that reads as one was padded and is a value.
+  if (reference_batch) {
+    auto columns = std::make_shared<DataFrameColumns>();
+    std::unordered_set<std::string> keys;
+    bool unique = true;
+    const auto add_column = [&](std::size_t index, FirstClassAttributeRole role) {
+      std::vector<std::string> cells;
+      std::vector<char> padded;
+      cells.reserve(pending.size());
+      padded.reserve(pending.size());
+      for (const auto& row : pending) {
+        const std::string* text = nullptr;
+        const auto& event = row.event;
+        if (role == FirstClassAttributeRole::kResource) {
+          if (!event.resource.empty()) text = &event.resource;
+        } else if (role == FirstClassAttributeRole::kLifecycle) {
+          if (!event.lifecycle.empty()) text = &event.lifecycle;
+        } else {
+          for (const auto& attribute : event.attributes)
+            if (attribute.key == header[index]) {
+              text = &attribute.value;
+              break;
+            }
+        }
+        cells.push_back(text ? *text : std::string{});
+        padded.push_back(text ? 1 : 0);
+      }
+      const auto typed = infer_reference_column(cells, &padded);
+      DataFrameColumn column;
+      column.key = header[index];
+      column.role = role;
+      switch (typed.kind) {
+        case ReferenceCsvColumnKind::kInteger: column.type = DataFrameColumnType::kInt64; break;
+        case ReferenceCsvColumnKind::kFloat: column.type = DataFrameColumnType::kFloat64; break;
+        case ReferenceCsvColumnKind::kBoolean: column.type = DataFrameColumnType::kBool; break;
+        case ReferenceCsvColumnKind::kText: column.type = DataFrameColumnType::kString; break;
+        case ReferenceCsvColumnKind::kObject: {
+          // Python ints when every present cell is one, else the text.
+          bool ints = true;
+          for (std::size_t i = 0; i < cells.size() && ints; ++i)
+            if (typed.text[i] && !python_int_text(cells[i])) ints = false;
+          column.type = ints ? DataFrameColumnType::kObject : DataFrameColumnType::kString;
+          break;
+        }
+      }
+      unique = keys.insert(column.key).second && unique;
+      columns->columns.push_back(std::move(column));
+    };
+    for (std::size_t index = 0; index < header.size(); ++index) {
+      poll();
+      if (resource_index && index == *resource_index)
+        add_column(index, FirstClassAttributeRole::kResource);
+      else if (lifecycle_index && index == *lifecycle_index)
+        add_column(index, FirstClassAttributeRole::kLifecycle);
+      else if (std::find(attribute_indices.begin(), attribute_indices.end(), index) !=
+               attribute_indices.end())
+        add_column(index, FirstClassAttributeRole::kNone);
+    }
+    // Repeated column names are renamed by read_csv ("a.1"); such a frame
+    // is not modelled.
+    if (unique) log.dataframe_columns = std::move(columns);
+    between_passes();
+  }
   case_padded_na.clear();
   case_padded_na.shrink_to_fit();
   activity_padded_na.clear();
@@ -2276,6 +2345,64 @@ std::vector<std::optional<std::string>> reference_csv_column_text(
 
 ReferenceCsvColumn reference_csv_column(const std::vector<std::string>& cells) {
   return infer_reference_column(cells);
+}
+
+// One present CSV cell as the frame holds it in its column.
+EventAttribute csv_dataframe_cell(const DataFrameColumn& column, const std::string& text) {
+  const auto& key = column.key;
+  EventAttribute cell{key, text, AttributeKind::kString};
+  switch (column.type) {
+    case DataFrameColumnType::kInt64: {
+      std::int64_t value = 0;
+      if (signed_cell(text, value) == IntegerCell::kFits) {
+        cell.kind = AttributeKind::kInt;
+        cell.value = std::to_string(value);
+        cell.typed_value = value;
+        break;
+      }
+      UnsignedScan scan;
+      std::uint64_t unsigned_value = 0;
+      if (unsigned_cell(text, scan, unsigned_value) == IntegerCell::kFits) {
+        cell.kind = AttributeKind::kInt;
+        cell.value = std::to_string(unsigned_value);
+        cell.typed_value = unsigned_value;
+      }
+      break;
+    }
+    case DataFrameColumnType::kFloat64: {
+      std::optional<double> value;
+      std::int64_t integer = 0;
+      if (signed_cell(text, integer) == IntegerCell::kFits)
+        value = static_cast<double>(integer);
+      else
+        value = pandas_float_cell(text);
+      if (!value) break;
+      cell.kind = AttributeKind::kFloat;
+      cell.value = python_float_text(*value);
+      cell.typed_value = *value;
+      break;
+    }
+    case DataFrameColumnType::kBool:
+      if (equals_ascii_ignoring_case(text, "true") || equals_ascii_ignoring_case(text, "false")) {
+        const bool value = equals_ascii_ignoring_case(text, "true");
+        cell.kind = AttributeKind::kBoolean;
+        cell.value = value ? "true" : "false";
+        cell.typed_value = value;
+      }
+      break;
+    case DataFrameColumnType::kObject:
+      if (auto value = python_int_text(text)) {
+        cell.kind = AttributeKind::kInt;
+        cell.value = std::move(*value);
+        std::int64_t integer = 0;
+        if (signed_cell(cell.value, integer) == IntegerCell::kFits) cell.typed_value = integer;
+      }
+      break;
+    case DataFrameColumnType::kString:
+    case DataFrameColumnType::kDate:
+      break;
+  }
+  return cell;
 }
 
 std::optional<ReferenceMixedTimestamp> reference_mixed_timestamp(const std::string& cell) {

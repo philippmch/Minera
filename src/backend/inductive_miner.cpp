@@ -2046,6 +2046,7 @@ EventLog select_event_log_fields(const EventLog& input,
   EventLog output;
   output.attributes = input.attributes;
   output.metadata = input.metadata;
+  output.dataframe_columns = input.dataframe_columns;
   std::unordered_map<std::string, std::size_t> trace_indexes;
   std::vector<char> sortable_traces;
 

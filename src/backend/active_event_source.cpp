@@ -1,5 +1,6 @@
 #include "minera/active_event_source.hpp"
 #include "minera/cancellation.hpp"
+#include "minera/dataframe_columns.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1168,6 +1169,9 @@ ActiveEventSource ActiveEventSource::from_xes_frame(EventLog frame, ActiveSource
   throw_if_cancelled(cancelled, kSourceBuildCancelled);
   std::vector<std::vector<std::size_t>> frame_rows;
   merge_dataframe_cases(frame, &frame_rows);
+  // The frame's event columns and dtypes, for consumers that read the log as
+  // convert_to_event_log gives it (root cause).
+  frame.dataframe_columns = std::make_shared<DataFrameColumns>(xes_dataframe_columns(frame));
   throw_if_cancelled(cancelled, kSourceBuildCancelled);
   original->log = std::move(frame);
   if (rows_table && rows_table->rows.size() != original->log->event_count()) rows_table.reset();

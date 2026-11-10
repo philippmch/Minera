@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AO (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AP (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4252,9 +4252,37 @@ nothing without a row of its own, the base-row rule across all object
 tables, NaT last, NULL types and missing tables raise), the OCEL 1.0 XML
 reader relates an event to an object once, and both XML readers raise on a
 file without relations. OCPN token-replay diagnostics matched pm4py on 245
-larger logs (up to 2,472 events, IM and IMd).
+larger logs (up to 2,472 events, IM and IMd). Round AP re-reviewed AO with a
+mutating SQLite fuzzer: ids listed twice in the event or object table now
+take their last listing's type (all listed types' tables are read), change
+rows take their object's type, change rows without a value column or with an
+empty field are kept, and a file left without events or objects keeps
+neither. It also fixed root cause on the DataFrame path: CSV and XES logs
+record their frame columns (`EventLog::dataframe_columns`), and the
+root-cause diagnostics read every event with every column, a missing cell as
+NaN, ints of a float64 column as floats (920 XES and 1,448 CSV trees equal
+to pm4py).
 
-Next round (AP) should start by re-reviewing round AO:
+Next round (AQ) should start by re-reviewing round AP:
+
+- `src/backend/dataframe_columns.cpp`: `xes_dataframe_columns` (dtype
+  inference from typed values, the activity and timestamp keys left out,
+  resource and lifecycle fields when an event keeps them out of its
+  attribute list), `xes_value`, `dataframe_frame_event_log` (column order,
+  unlisted attributes after, float64 ints as floats, NaT in date columns);
+- the column block in the batch path of `import_csv_event_log`
+  (`src/backend/csv_event_log_importer.cpp`: `infer_reference_column` over
+  every pending row, the kObject-of-ints rule, unique keys) and
+  `csv_dataframe_cell`; where `dataframe_columns` travels
+  (`copy_event_log_context`, `select_event_log_fields`, `from_xes_frame`,
+  `import_xes_dataframe_log`) and whether any other consumer should read the
+  frame view (only `token_replay_root_cause.cpp` does now);
+- `import_ocel_sqlite`: the relaxed event and object loops
+  (`insert_or_assign`, `activities` and `object_type_names` from every
+  listing), the change-type fix-up, the empty-frame rule, and
+  `read_type_table_changes` (NULL value for a missing column, empty fields).
+
+Round AO's targets, re-reviewed in AP (findings AP1-1 to AP1-4, fixed):
 
 - `import_ocel_sqlite` in `src/backend/ocel_sqlite.cpp`: `TypeTableRows`
   (row positions, `TypeTableBase`, first row per id), the event and object
@@ -4311,7 +4339,7 @@ Round AJ's own targets, re-reviewed in AK without findings:
 - the drift threshold (`concept_drift.cpp`, `request_params.cpp`, CLI help,
   `Conformance.tsx`).
 
-Round AP's new area, started at the end of AO: root cause at the route
+Round AP's second area (AP1-5 and AP1-6, fixed), started at the end of AO: root cause at the route
 level (`POST /api/mine` with `token_replay_include_root_cause_diagnostics`,
 compared with `diagnose_from_trans_fitness` and
 `diagnose_from_notexisting_activities` on `pm4py.convert_to_event_log` of
@@ -4326,14 +4354,17 @@ string feature reads "@1.0". Minera drops missing CSV cells, so the
 context keeps the earlier value (or "UNDEFINED"), and a numeric attribute
 raises "missing or invalid numeric attribute". The fix belongs to the
 DataFrame-path sources (CSV and XES uploads) feeding
-`token_replay_root_cause.cpp`; XES events without the key stay absent as in
-pm4py. A numeric attribute holding strings raises in both (pm4py:
+`token_replay_root_cause.cpp`. (XES events without the key do not stay
+absent: `pm4py.read_xes` returns a frame, where they hold NaN; fixed in AP
+as AP1-6.) A numeric attribute holding strings raises in both (pm4py:
 `could not convert string to float`), so that case is consistent. Harness:
 random CSV logs per seed, `/api/mine` with random string and numeric
 attribute lists and multiplier, models rebuilt from the response's
 `*_petri_net` JSON, trees compared on feature names, data (NaN-aware),
 targets, classes and root counts. The round's scripts are kept in the
-project files under `review-harness/round-ao/` (not in git).
+project files under `review-harness/round-ao/` (not in git); round AP's
+(`rcsweep2.py`, `rcxes.py` for root cause on CSV and XES, `sqfuzz.py`
+with `--mutate` for SQLite) under `review-harness/round-ap/`.
 
 Areas without a recent random-input sweep that are good candidates for the
 second reviewer: root-cause analysis at the route level (the token-replay

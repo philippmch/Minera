@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #if defined(MINERA_HAS_SQLITE)
@@ -357,6 +358,63 @@ void reference_frame_tests() {
       "INSERT INTO event_object VALUES ('e2', 'o1', '');");
   assert((event_ids(untimed) == std::vector<std::string>{"e2", "e1"}));
   assert(untimed.events[1].timestamp.empty());
+
+  // A change naming a field without a column, and a change with an empty
+  // changed field, are kept (the reference keeps the rows; the value is NaN).
+  const std::string related =
+      "INSERT INTO event VALUES ('e1', 'a');"
+      "INSERT INTO event_map_type VALUES ('a', 'A');"
+      "CREATE TABLE event_A (ocel_id TEXT, ocel_time TIMESTAMP);"
+      "INSERT INTO event_A VALUES ('e1', '2020-01-01 00:00:00');"
+      "INSERT INTO object VALUES ('o1', 't');"
+      "INSERT INTO object_map_type VALUES ('t', 'T');"
+      "INSERT INTO event_object VALUES ('e1', 'o1', '');";
+  const auto changes = read_sql("changes", related +
+      "CREATE TABLE object_T (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT, y TEXT);"
+      "INSERT INTO object_T VALUES ('o1', NULL, NULL, 'w0');"
+      "INSERT INTO object_T VALUES ('o1', '2020-01-02 00:00:00', 'z', 'w1');"
+      "INSERT INTO object_T VALUES ('o1', '2020-01-03 00:00:00', '', 'w2');"
+      "INSERT INTO object_T VALUES ('o1', '2020-01-04 00:00:00', 'y', 'w3');");
+  assert(changes.object_changes.size() == 3);
+  assert(changes.object_changes[0].field == "z" &&
+         std::holds_alternative<std::nullptr_t>(changes.object_changes[0].value));
+  assert(changes.object_changes[1].field.empty());
+  assert(changes.object_changes[2].field == "y" &&
+         std::get<std::string>(changes.object_changes[2].value) == "w3");
+
+  // An event id listed twice takes its last listing's type; the tables of
+  // every listed type are read (e1's row sits in table A, its type is b).
+  const auto listed = read_sql("listed_twice",
+      "INSERT INTO event VALUES ('e1', 'a'); INSERT INTO event VALUES ('e1', 'b');"
+      "INSERT INTO event VALUES ('e2', 'a');"
+      "INSERT INTO event_map_type VALUES ('a', 'A'); INSERT INTO event_map_type VALUES ('b', 'B');"
+      "CREATE TABLE event_A (ocel_id TEXT, ocel_time TIMESTAMP);"
+      "CREATE TABLE event_B (ocel_id TEXT, ocel_time TIMESTAMP);"
+      "INSERT INTO event_A VALUES ('e1', '2020-01-01 00:00:00');"
+      "INSERT INTO event_A VALUES ('e2', '2020-01-02 00:00:00');"
+      "INSERT INTO object VALUES ('o1', 't');"
+      "INSERT INTO object_map_type VALUES ('t', 'T');"
+      "CREATE TABLE object_T (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT);"
+      "INSERT INTO object_T VALUES ('o1', NULL, NULL);"
+      "INSERT INTO event_object VALUES ('e1', 'o1', ''); INSERT INTO event_object VALUES ('e2', 'o1', '');");
+  assert((event_ids(listed) == std::vector<std::string>{"e1", "e2"}));
+  assert(listed.events[0].activity == "b" && listed.events[1].activity == "a");
+  assert(listed.relations.size() == 2);
+
+  // When no event (or no object) keeps a row, both frames are empty.
+  const auto no_events = read_sql("no_events",
+      "INSERT INTO event VALUES ('e1', 'a');"
+      "INSERT INTO event_map_type VALUES ('a', 'A');"
+      "CREATE TABLE event_A (ocel_id TEXT, ocel_time TIMESTAMP);"
+      "INSERT INTO object VALUES ('o1', 't');"
+      "INSERT INTO object_map_type VALUES ('t', 'T');"
+      "CREATE TABLE object_T (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT);"
+      "INSERT INTO object_T VALUES ('o1', NULL, NULL);"
+      "INSERT INTO event_object VALUES ('e1', 'o1', '');");
+  assert(no_events.events.empty() && no_events.objects.empty() && no_events.relations.empty());
+  const auto no_objects = read_sql("no_objects", related +
+      "CREATE TABLE object_T (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT);");
+  assert(no_objects.events.empty() && no_objects.objects.empty() && no_objects.relations.empty());
 }
 #endif
 
@@ -620,10 +678,12 @@ int main() {
   // Naive times read as UTC, as pm4py.read_ocel2_sqlite stores them
   // (datetime64[us, UTC]): the event time is stamped "Z", the change time
   // "+00:00", as the reference JSON writers print them. An id listed twice in
-  // the object table is refused: the reference keeps an object row per
-  // type-table row, all typed by the id's last "object" row (declared).
+  // the object table takes its last listing's type, and the type tables of
+  // every listed type are read (observed black-box): with no object_item
+  // table the file is refused (pm4py raises KeyError 'item'); with an empty
+  // object_item table o1 is an "item" holding its object_order rows.
   const auto naive_path = external_path.string() + ".naive.sqlite";
-  for (const bool repeated : {false, true}) {
+  for (const int repeated : {0, 1, 2}) {
     std::filesystem::remove(naive_path, ignored);
     sqlite3* naive_db = nullptr;
     assert(sqlite3_open_v2(naive_path.c_str(), &naive_db,
@@ -646,19 +706,33 @@ int main() {
              "INSERT INTO object_order VALUES ('o1', '2024-02-02 10:00:00.5', 'paid', 'status');"
              "INSERT INTO event_object VALUES ('e1', 'o1', 'uses');");
     if (repeated) exec_sql(naive_db, "INSERT INTO object VALUES ('o1', 'item');");
+    if (repeated == 2)
+      exec_sql(naive_db,
+               "INSERT INTO object_map_type VALUES ('item', 'item');"
+               "CREATE TABLE object_item (ocel_id TEXT, ocel_time TEXT, ocel_changed_field TEXT);");
     assert(sqlite3_close(naive_db) == SQLITE_OK);
-    if (repeated) {
+    if (repeated == 1) {
       bool refused = false;
       try {
         (void)minera::import_ocel_sqlite(naive_path);
       } catch (const std::invalid_argument& error) {
-        refused = std::string(error.what()).find("o1 is listed twice (types order and item)") !=
+        refused = std::string(error.what()).find("object type table is missing") !=
                   std::string::npos;
       }
       assert(refused);
       continue;
     }
     const auto naive = minera::import_ocel_sqlite(naive_path);
+    if (repeated == 2) {
+      assert(naive.objects.size() == 1 && naive.objects[0].id == "o1" &&
+             naive.objects[0].type == "item");
+      assert(naive.relations.size() == 1 && naive.relations[0].object_id == "o1");
+      assert(naive.object_changes.size() == 1 && naive.object_changes[0].object_type == "item" &&
+             naive.object_changes[0].field == "status");
+      assert(naive.objects[0].attributes.size() == 1 &&
+             naive.objects[0].attributes[0].key == "status");
+      continue;
+    }
     assert(naive.events.size() == 1 && naive.events[0].timestamp == "2024-02-01T00:00:00Z");
     assert(naive.object_changes.size() == 1 &&
            naive.object_changes[0].timestamp == "2024-02-02T10:00:00.500000+00:00");

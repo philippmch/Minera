@@ -21261,3 +21261,83 @@ pm4py-written file, object order, NaT last, rows in another table, events
 and objects without rows, the global base-row rule, NULL type, missing
 table, tables without a time column), `minera_ocel_xml_tests`
 (`repeated_omap_ids_and_files_without_relations`).
+
+## Review AP1: re-review of round AO, root cause on the DataFrame path (2026-11-10)
+
+Round AO's SQLite and XML changes were re-read and swept again: the AO
+reader harness on new seeds (all five formats, degenerate and clean files),
+and a new fuzzer that writes random logs with `pm4py.write_ocel2_sqlite`
+and then mutates the database (rows deleted, duplicated or moved to another
+type table, NULL ids, tables without a time or changed-field column, empty
+changed fields, `@@cumcount` columns, objects without a base row, rows of
+unlisted ids, events without a row, NULL attribute cells), comparing events
+in order with their times and attributes, objects with their attributes,
+relations, O2O relations and object changes. The NaT branch of
+`sort_ocel_events_by_timestamp`, the OCEL 1.0 XML omap dedupe and the XML
+no-relation error matched on every file. The SQLite reader still differed
+on mutated files. Findings, all fixed:
+
+- **AP1-1 SQLite ids listed twice.** An event or object id listed twice in
+  the event or object table takes its last listing's type, and the type
+  tables of every listed type are read (observed black-box: o0 listed as A
+  then B with its row in A reads as a B; with no B table pm4py raises
+  KeyError). Native refused such files.
+- **AP1-2 SQLite change types.** A change row takes its object's type (the
+  id's last listing), not its table's type.
+- **AP1-3 SQLite change rows without a value column, and empty changed
+  fields.** A change naming a field its table has no column for is kept
+  with a NaN value (pm4py's writer leaves out a column that holds only
+  NULLs), and a change with an empty changed field is kept. Native raised
+  on the first and skipped the second.
+- **AP1-4 SQLite files left without events or objects.** When the relevance
+  pass leaves no event (or no object), pm4py keeps neither; native kept the
+  other side.
+
+The second part fixed the route difference found at the end of AO:
+
+- **AP1-5 Root cause on CSV logs.** `diagnose_from_trans_fitness` and
+  `diagnose_from_notexisting_activities` read the log that
+  `pm4py.convert_to_event_log` makes of the formatted frame, where every
+  event holds every frame column and a missing cell is NaN: a string
+  feature "@nan", NaN numeric data, and the NaN overwrites the context that
+  accumulates along the trace. Column dtypes come from `read_csv` over every
+  data row, rows that `format_dataframe` drops included: integers with a
+  gap become float64 ("@1.0"), booleans with a gap objects, "007" in an
+  integer column the int 7. Native dropped missing cells, so the context
+  kept the earlier value and a numeric attribute raised "missing or invalid
+  numeric attribute". The batch CSV import now records the frame's column
+  dtypes (`EventLog::dataframe_columns`, `dataframe_columns.hpp`) and the
+  root-cause diagnostics read `dataframe_frame_event_log`.
+- **AP1-6 Root cause on XES logs.** `pm4py.read_xes` returns a frame too, so
+  an event without a key holds NaN there (AO's note that such events stay
+  absent was wrong), and pandas types each column from the values it holds:
+  ints only int64, ints with a gap or beside floats float64, bools only
+  bool, bools with a gap or any other mix object, strings str, dates
+  datetime64 (missing cells NaT, category "NaT"). The XES DataFrame import
+  (`import_xes_dataframe_log`, `ActiveEventSource::from_xes_frame`) records
+  these columns.
+
+Declared, unchanged: pm4py keeps a SQLite event or object per type-table
+row, so an id with two rows (in one table or in two) is two events or
+objects there; native reads the first row.
+
+Verification:
+
+| Check | Files | Result |
+|---|---|---|
+| Root cause, CSV, AO harness (seeds 100 to 139) | 306 trees | 304 equal, 0 differences (before: 16, and 6 logs raised in Minera only); 2 raise in both |
+| Root cause, CSV, gaps in every column kind, dropped rows, odd spellings | 1,151 trees | 1,144 equal, 0 differences; 7 raise in both |
+| Root cause, XES (seeds 0 to 119) | 925 trees | 920 equal, 0 differences (before, seeds 0 to 19: 12, and 2 raised in Minera only); 5 raise in both |
+| SQLite fuzz, pm4py-written files | 150 | 0 differences |
+| SQLite fuzz, mutated files | 300 | 242 equal, 58 declared (rows repeated across type tables), 0 other differences (before: AP1-1 to AP1-4) |
+| AO reader sweep, degenerate (five formats, seeds 500 to 699) | 1,000 | 0 differences |
+| AO reader sweep, clean with O2O (seeds 800 to 899) | 500 | 0 differences |
+| SQLite probes (repeated listings, change types, missing columns, empty frames) | 12 | equal, or both raise |
+
+Tests: `minera_ocel_sqlite_tests` (the repeated object case, now read or
+refused as pm4py does; change rows without a value column and with an
+empty field; an event listed twice; files left without events or objects),
+`minera_token_replay_root_cause_tests` (`csv_frame_cell_contracts`: CSV
+column dtypes, NaN cells, the pm4py tree for a log with gaps, a gap in a
+dropped row, NaN numeric data, and the pm4py tree for an XES log with
+gaps).

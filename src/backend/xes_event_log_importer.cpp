@@ -1,4 +1,5 @@
 #include "minera/xes_event_log_importer.hpp"
+#include "minera/dataframe_columns.hpp"
 #include "minera/cancellation.hpp"
 
 #include "gzip_codec.hpp"
@@ -2219,6 +2220,7 @@ EventLog import_xes_event_log(
 EventLog import_xes_dataframe_log(std::istream& input, const XesImportOptions& options) {
   auto log = import_xes_event_log(input, options);
   merge_dataframe_cases(log);
+  log.dataframe_columns = std::make_shared<DataFrameColumns>(xes_dataframe_columns(log));
   return log;
 }
 
@@ -2226,6 +2228,7 @@ EventLog import_xes_dataframe_log(const std::filesystem::path& path,
                                   const XesImportOptions& options) {
   auto log = import_xes_event_log(path, options);
   merge_dataframe_cases(log);
+  log.dataframe_columns = std::make_shared<DataFrameColumns>(xes_dataframe_columns(log));
   return log;
 }
 

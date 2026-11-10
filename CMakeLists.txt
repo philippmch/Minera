@@ -187,6 +187,7 @@ add_library(minera_core
   src/backend/root_cause.cpp
   src/backend/root_cause_trace_key.cpp
   src/backend/token_replay_root_cause.cpp
+  src/backend/dataframe_columns.cpp
   src/backend/token_replay_result_json.cpp
   src/backend/decision_replay.cpp
   src/backend/decision_table.cpp

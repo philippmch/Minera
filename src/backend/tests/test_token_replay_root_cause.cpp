@@ -1,9 +1,12 @@
 #include "minera/conformance.hpp"
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/dataframe_columns.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/xes_event_log_importer.hpp"
 #include "minera/xes_export.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -553,7 +556,134 @@ void set_key_contracts() {
           "trace attributes match unordered set and frozen values across cohort expansion");
 }
 
+// pm4py's convert_to_event_log of a read_csv frame (round AP): every event
+// holds every column, a missing cell NaN ("nan" category, NaN numeric data),
+// and an int column with a gap reads as floats ("@2.0"). Expected values
+// observed on pm4py 2.7.22 with this log and an a, b, c sequence net.
+void csv_frame_cell_contracts() {
+  const std::string csv =
+      "case:concept:name,concept:name,time:timestamp,org:resource,amount,cost,flag,txt\n"
+      "c1,a,2020-01-01 00:00:00,R,1,0.5,True,x\n"
+      "c1,b,2020-01-01 00:01:00,,,,False,\n"
+      "c1,c,2020-01-01 00:02:00,S,2,1.5,True,y\n"
+      "c2,a,2020-01-02 00:00:00,S,3,2.50,,x\n"
+      "c2,c,2020-01-02 00:01:00,R,4,2.0,True,z\n"
+      "c3,a,2020-01-03 00:00:00,R,1,0.5,True,x\n"
+      "c3,b,2020-01-03 00:01:00,R,,3.0,False,\n"
+      "c3,c,2020-01-03 00:02:00,,2,1.5,True,y\n";
+  CsvImportOptions import;
+  import.case_id_column = "case:concept:name";
+  import.activity_column = "concept:name";
+  import.timestamp_column = "time:timestamp";
+  import.resource_column = "org:resource";
+  std::istringstream input(csv);
+  const auto log = import_csv_event_log(input, import);
+  require(log.dataframe_columns != nullptr, "batch CSV import records the frame columns");
+  const auto& columns = log.dataframe_columns->columns;
+  require(columns.size() == 5 && columns[0].key == "org:resource" &&
+          columns[0].role == FirstClassAttributeRole::kResource &&
+          columns[0].type == DataFrameColumnType::kString &&
+          columns[1].type == DataFrameColumnType::kFloat64 &&
+          columns[2].type == DataFrameColumnType::kFloat64 &&
+          columns[3].type == DataFrameColumnType::kBool &&
+          columns[4].type == DataFrameColumnType::kString, "read_csv dtypes per column");
+  const auto frame = dataframe_frame_event_log(log);
+  const auto& b = frame.traces[0].events[1];
+  require(b.attributes.size() == 5, "every frame column on every event");
+  for (const auto& attribute : b.attributes)
+    if (attribute.key != "flag")
+      require(std::holds_alternative<double>(attribute.typed_value) &&
+              std::isnan(std::get<double>(attribute.typed_value)), "a missing cell is NaN");
+  PetriNet net;
+  net.set_activities({"a", "b", "c"});
+  const auto p0 = net.add_place(), p1 = net.add_place(), p2 = net.add_place(), p3 = net.add_place();
+  net.set_source(p0); net.set_sink(p3);
+  net.add_transition(0, {p0}, {p1});
+  net.add_transition(1, {p1}, {p2});
+  net.add_transition(2, {p2}, {p3});
+  TokenReplayOptions options;
+  options.include_root_cause_diagnostics = true;
+  options.root_cause.string_attributes = {"org:resource", "flag", "txt", "amount"};
+  options.root_cause.numeric_attributes = {"amount", "cost"};
+  const auto result = check_conformance(log, net, options);
+  const auto& rows = result.root_cause_diagnostics->transitions;
+  require(rows.size() == 1 && rows[0].transition_index == 2, "underfed c");
+  require(rows[0].feature_names == std::vector<std::string>({
+              "event:org:resource@R", "event:org:resource@S", "event:org:resource@nan",
+              "event:flag@True", "event:txt@y", "event:txt@z", "event:amount@2.0",
+              "event:amount@4.0", "event:amount", "event:cost"}), "frame feature names");
+  require(rows[0].data == std::vector<std::vector<double>>({
+              {0, 1, 0, 1, 1, 0, 1, 0, 2, 1.5}, {0, 0, 1, 1, 1, 0, 1, 0, 2, 1.5},
+              {1, 0, 0, 1, 0, 1, 0, 1, 4, 2}}), "NaN cells overwrite the context");
+  require(rows[0].target == std::vector<int>({0, 0, 1}), "frame targets");
+
+  // A gap in a row format_dataframe drops (no case id) still makes the
+  // column float: read_csv types it from every row.
+  const std::string dropped =
+      "case:concept:name,concept:name,time:timestamp,amount\n"
+      "c1,a,2020-01-01 00:00:00,1\n"
+      ",a,2020-01-01 00:00:30,\n"
+      "c1,c,2020-01-01 00:01:00,2\n";
+  std::istringstream second(dropped);
+  const auto gap = dataframe_frame_event_log(import_csv_event_log(second, import));
+  require(gap.traces.size() == 1 && gap.traces[0].events[0].attributes[0].value == "1.0",
+          "an int column with a gap in a dropped row reads as floats");
+  // A missing numeric cell is NaN data, not an error.
+  const std::string numeric =
+      "case:concept:name,concept:name,time:timestamp,amount\n"
+      "c1,a,2020-01-01 00:00:00,1\n"
+      "c1,c,2020-01-01 00:01:00,\n"
+      "c2,a,2020-01-02 00:00:00,3\n"
+      "c2,b,2020-01-02 00:01:00,4\n"
+      "c2,c,2020-01-02 00:02:00,5\n";
+  std::istringstream third(numeric);
+  options.root_cause.string_attributes.clear();
+  options.root_cause.numeric_attributes = {"amount"};
+  const auto missing = check_conformance(import_csv_event_log(third, import), net, options);
+  const auto& data = missing.root_cause_diagnostics->transitions.at(0).data;
+  require(data.size() == 2 && data[0][0] == 5 && std::isnan(data[1][0]), "missing numeric cell is NaN data");
+
+  // An XES log on the read_xes frame: every key is a column typed by pandas
+  // (ints with a gap are float64, bools with a gap objects), a missing cell
+  // NaN (pm4py 2.7.22: flag@nan, amount@2.0).
+  const std::string xes =
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<log xes.version=\"1.0\">\n"
+      "<trace><string key=\"concept:name\" value=\"c1\"/>\n"
+      " <event><string key=\"concept:name\" value=\"a\"/><date key=\"time:timestamp\" value=\"2020-01-01T00:00:00+00:00\"/><int key=\"amount\" value=\"1\"/><boolean key=\"flag\" value=\"true\"/><string key=\"txt\" value=\"x\"/></event>\n"
+      " <event><string key=\"concept:name\" value=\"b\"/><date key=\"time:timestamp\" value=\"2020-01-01T00:01:00+00:00\"/><boolean key=\"flag\" value=\"false\"/></event>\n"
+      " <event><string key=\"concept:name\" value=\"c\"/><date key=\"time:timestamp\" value=\"2020-01-01T00:02:00+00:00\"/><int key=\"amount\" value=\"2\"/><string key=\"txt\" value=\"y\"/></event>\n"
+      "</trace>\n"
+      "<trace><string key=\"concept:name\" value=\"c2\"/>\n"
+      " <event><string key=\"concept:name\" value=\"a\"/><date key=\"time:timestamp\" value=\"2020-01-02T00:00:00+00:00\"/><int key=\"amount\" value=\"3\"/><boolean key=\"flag\" value=\"true\"/><string key=\"txt\" value=\"x\"/></event>\n"
+      " <event><string key=\"concept:name\" value=\"c\"/><date key=\"time:timestamp\" value=\"2020-01-02T00:01:00+00:00\"/><int key=\"amount\" value=\"4\"/><boolean key=\"flag\" value=\"true\"/><string key=\"txt\" value=\"z\"/></event>\n"
+      "</trace>\n"
+      "<trace><string key=\"concept:name\" value=\"c3\"/>\n"
+      " <event><string key=\"concept:name\" value=\"a\"/><date key=\"time:timestamp\" value=\"2020-01-03T00:00:00+00:00\"/><int key=\"amount\" value=\"1\"/><boolean key=\"flag\" value=\"true\"/><string key=\"txt\" value=\"x\"/></event>\n"
+      " <event><string key=\"concept:name\" value=\"b\"/><date key=\"time:timestamp\" value=\"2020-01-03T00:01:00+00:00\"/><boolean key=\"flag\" value=\"false\"/></event>\n"
+      " <event><string key=\"concept:name\" value=\"c\"/><date key=\"time:timestamp\" value=\"2020-01-03T00:02:00+00:00\"/><int key=\"amount\" value=\"2\"/><boolean key=\"flag\" value=\"true\"/><string key=\"txt\" value=\"y\"/></event>\n"
+      "</trace>\n"
+      "</log>\n";
+  std::istringstream fourth(xes);
+  const auto xes_log = import_xes_dataframe_log(fourth);
+  require(xes_log.dataframe_columns != nullptr && !xes_log.dataframe_columns->csv_text,
+          "the XES frame columns");
+  options.root_cause.string_attributes = {"flag", "txt", "amount"};
+  options.root_cause.numeric_attributes = {"amount"};
+  const auto xes_result = check_conformance(xes_log, net, options);
+  const auto& xes_rows = xes_result.root_cause_diagnostics->transitions;
+  require(xes_rows.size() == 1 && xes_rows[0].transition_index == 2, "XES underfed c");
+  require(xes_rows[0].feature_names == std::vector<std::string>({
+              "event:flag@True", "event:flag@nan", "event:txt@y", "event:txt@z",
+              "event:amount@2.0", "event:amount@4.0", "event:amount"}), "XES frame feature names");
+  require(xes_rows[0].data == std::vector<std::vector<double>>({
+              {0, 1, 1, 0, 1, 0, 2}, {1, 0, 1, 0, 1, 0, 2}, {1, 0, 0, 1, 0, 1, 4}}),
+          "XES frame data");
+  require(xes_rows[0].target == std::vector<int>({0, 0, 1}), "XES frame targets");
+}
+
 int main() try {
+  csv_frame_cell_contracts();
   set_key_contracts();
   byte_key_contracts();
   tuple_key_contracts();
