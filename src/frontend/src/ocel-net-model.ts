@@ -93,7 +93,8 @@ export function ocelNetModels(result: OcelDiscoveryResult): OcelNetModels {
       });
       views.push({ key,label,net,weights,variableTransitions:new Set(),replay:null,placeTypes:types });
     };
-    if (graph.multi_saw_net !== undefined) {
+    // An OCEL without object types merges into a net without places: no view.
+    if (graph.multi_saw_net !== undefined && !(record(graph.multi_saw_net) && graph.multi_saw_net.place_count === 0)) {
       const types = new Map<number,string>();
       if (record(graph.multi_place_object_types)) for (const [id,type] of Object.entries(graph.multi_place_object_types)) {
         if (count(Number(id)) && typeof type === "string") types.set(Number(id),type);

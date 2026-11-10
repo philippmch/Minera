@@ -286,7 +286,8 @@ void append_classic_relations(const Node& omap, std::string_view event_id,
                                                     key == "object-id"
                                                         ? attr_or(rel, "value", rel.text)
                                                         : std::string{})));
-    if (oid.empty()) throw std::invalid_argument("invalid OCEL XML event relation");
+    // An empty id is an id: a relation to a listed object with an empty id
+    // goes with that object, one to no listed object raises.
     if (!types.count(oid)) throw std::invalid_argument("OCEL XML relation references unknown object");
     log.relations.push_back({std::string(event_id), oid, attr_or(rel, "qualifier")});
   }
@@ -300,20 +301,22 @@ void parse_standard_xml_type_table(
     std::string_view type_name, StandardXmlAttributeTypes& result) {
   for (const auto* container : children(root, container_name)) {
     for (const auto* descriptor : children(*container, type_name)) {
+      // read_ocel2_xml takes a type listed twice from its last listing and
+      // an attribute listed twice from its last entry; an empty type name is
+      // no error (its events or objects are dropped), observed black-box.
+      // Values under an empty attribute name are skipped, so is its entry.
       const auto name = attr_or(*descriptor, "name");
-      if (name.empty() || result.contains(name))
-        throw std::invalid_argument("invalid or duplicate OCEL XML type");
       std::map<std::string, std::string> attributes;
       if (const auto* attribute_container = child(*descriptor, "attributes")) {
         for (const auto* attribute : children(*attribute_container, "attribute")) {
           const auto attribute_name = attr_or(*attribute, "name", attr_or(*attribute, "key"));
           const auto attribute_type = attr_or(*attribute, "type", "string");
-          if (attribute_name.empty() || attribute_type.empty() ||
-              !attributes.emplace(attribute_name, attribute_type).second)
-            throw std::invalid_argument("invalid or duplicate OCEL XML attribute type");
+          if (attribute_name.empty()) continue;
+          if (attribute_type.empty()) attributes.erase(attribute_name);
+          else attributes.insert_or_assign(attribute_name, attribute_type);
         }
       }
-      result.emplace(name, std::move(attributes));
+      result.insert_or_assign(name, std::move(attributes));
     }
   }
 }
@@ -347,8 +350,10 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
                                           ? keyed_value(*on, "object-type")
                                           : keyed_value(*on, "type"))
                                    : attr_or(*on, "type", attr_or(*on, "object-type"));
-      if (id.empty() || type.empty()) throw std::invalid_argument("invalid or duplicate OCEL XML object");
-      if (const auto [it, added] = types.emplace(id, type); !added) throw_repeated_xml_object(id, it->second, type);
+      // An empty id or type is no error: drop_empty_ocel_names drops the
+      // object (observed black-box), so an empty id may repeat.
+      if (const auto [it, added] = types.emplace(id, type); !added && !id.empty())
+        throw_repeated_xml_object(id, it->second, type);
       OcelObject o{id, type, {}};
       // In the reference shape (keyed id and type children) read_ocel_xml
       // reads only the ovmap list: other keyed children are dropped. The
@@ -391,7 +396,9 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
                      : keyed_value(*en, "timestamp"))
               : attr_or(*en, "timestamp", attr_or(*en, "time"));
       OcelEvent e{id, activity, timestamp, {}};
-      if (e.id.empty() || e.activity.empty() || e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
+      // As in the OCEL 2.0 reader: no id or activity drops the event later,
+      // no timestamp raises.
+      if (e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
       // As for objects: the reference reads only the vmap list.
       const bool lists_only = attr_or(*en, "id", attr_or(*en, "event-id")).empty();
       std::vector<std::size_t> dated;
@@ -459,8 +466,10 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
   for (const auto* objects : children(root, "objects"))
     for (const auto* on : children(*objects, "object")) {
       const std::string id = attr_or(*on, "id"), type = attr_or(*on, "type");
-      if (id.empty() || type.empty()) throw std::invalid_argument("invalid or duplicate OCEL XML object");
-      if (const auto [it, added] = types.emplace(id, type); !added) throw_repeated_xml_object(id, it->second, type);
+      // An empty id or type is no error: drop_empty_ocel_names drops the
+      // object (observed black-box), so an empty id may repeat.
+      if (const auto [it, added] = types.emplace(id, type); !added && !id.empty())
+        throw_repeated_xml_object(id, it->second, type);
       OcelObject o{id, type, {}};
       if (const auto* a = child(*on, "attributes")) {
         // Grouped by name in first-appearance order, like the reference's
@@ -508,7 +517,9 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
   for (const auto* events : children(root, "events"))
     for (const auto* en : children(*events, "event")) {
       OcelEvent e{attr_or(*en, "id"), attr_or(*en, "type", attr_or(*en, "activity")), attr_or(*en, "time", attr_or(*en, "timestamp")), {}};
-      if (e.id.empty() || e.activity.empty() || e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
+      // An event without id or type is dropped later (drop_empty_ocel_names);
+      // one without time raises, as the reference's date reading does.
+      if (e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
       if (const auto* a = child(*en, "attributes")) {
         for (const auto& av : a->children) if (local(av.name) == "attribute") {
           const auto key = attr_or(av, "name", attr_or(av, "key"));
@@ -723,7 +734,10 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   // Both XML readers convert date values: OCEL 2.0 the declared ones here,
   // OCEL 1.0 each <date> element as parse_classic reads it.
   if (standard) convert_ocel_date_attributes(log, OcelTimestampReader::kDateutil);
-  // Both reference XML readers drop events and objects without relations.
+  // Both drop events without id or activity and objects without id or type
+  // (after reading every date, which can raise), then the events and objects
+  // without relations.
+  drop_empty_ocel_names(log);
   drop_unrelated_ocel_entries(log);
   return log;
 }

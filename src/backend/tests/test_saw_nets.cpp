@@ -154,6 +154,13 @@ int main() {
   }
   assert(json.find("\"multi_arc_object_types\":{") != std::string::npos);
   assert(json == minera::saw_nets_json(result));
+  // An OCEL without events has no object type: the merged net is empty, no
+  // places, as the reference's multi SAW net is.
+  const auto none = minera::discover_saw_nets(minera::Ocel{});
+  assert(none.ot_saw_nets.empty() && none.multi_saw_net.net.place_count() == 0 &&
+         none.multi_saw_net.net.transitions().empty());
+  assert(minera::saw_nets_json(none).find("\"multi_saw_net\":{\"object_type\":\"multi\",\"place_count\":0,") !=
+         std::string::npos);
 
   const auto repeated = minera::discover_saw_nets(repeated_activity_sample());
   const auto& repeated_saw = repeated.ot_saw_nets.at("order");

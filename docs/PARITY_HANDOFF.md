@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AM (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AN (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4238,23 +4238,31 @@ OCPN, SAW nets, edge associations): files whose relations name an unlisted
 object are now read as pm4py reads them (the row is dropped, not the log
 refused) by the JSON, OCEL 2.0 XML and SQLite readers; OC-DFG edge keys no
 longer collide when activity names hold "->"; edge-association durations
-print in full.
+print in full. Round AN re-reviewed AM with degenerate files per reader:
+events and objects with an empty id, activity or type are now dropped as
+pm4py drops them (OCEL 1.0/2.0 JSON, both XML readers, SQLite), repeated
+type and attribute declarations and repeated OCEL 2.0 JSON event ids read
+as their last listing, OC-DFG JSON reads its endpoint fields even when
+empty, and the merged SAW net of an empty OCEL has no place.
 
-Next round (AN) should start by re-reviewing round AM:
+Next round (AO) should start by re-reviewing round AN:
 
-- the OCEL readers in `src/backend/ocel.cpp`: `parse_classic` (`ocel:omap`
-  and `ocel:typedOmap` skip unlisted objects, `ocel:objectChanges` and
-  `ocel:o2o` drop them), `parse_standard` (event relationships, object
-  links) and `drop_unrelated_ocel_entries` (its early return now also
-  checks object links, event links and changes);
-- `parse_ocel_xml` in `src/backend/ocel_xml.cpp` (OCEL 2.0 relations and
-  links to unlisted objects dropped, the classic reader still refuses) and
-  `OcelSqliteOptions::validate_references`, now `std::optional<bool>`
-  (import drops unless true, export refuses unless false; the server sets
-  it only when the query names it);
-- `ocdfg_edge_key` (both OC-DFG writers) and `serialize_edges` in
-  `src/backend/ocel_statistics.cpp` (repeated keys, endpoint fields,
-  full-precision durations from `ocdfg_elapsed_seconds`).
+- `drop_empty_ocel_names` in `src/backend/ocel.cpp` and its call sites
+  (`parse_ocel_json_names` unless literal names, `parse_ocel_xml` after the
+  date readings, `import_ocel_sqlite`); `parse_standard` (repeated event
+  ids: first place, last content, per-event relation lists) and
+  `parse_standard_type_table` (last listing wins, empty declared types
+  skipped); the relaxed classic catalog (empty attribute names);
+- the XML readers in `src/backend/ocel_xml.cpp`: empty ids and types no
+  longer refused (an empty id may repeat), the classic relation to an empty
+  id, `parse_standard_xml_type_table`; the SQLite event and object loops
+  (rows without id or type skipped unless `validate_references` is true);
+- `parse_ocdfg_json` endpoint fields and `merge_saw_nets` without object
+  types (plus `ocel-net-model.ts`, which skips a merged net without places).
+
+Round AM's targets, re-reviewed in AN (findings AN1-1 to AN1-5, fixed): the
+OCEL readers on unlisted objects, `OcelSqliteOptions::validate_references`,
+`ocdfg_edge_key` and `serialize_edges`.
 
 Round AL's targets, re-reviewed in AM without findings: pending nodes in
 `Aligner::align_configured` (inherited priority, 1e-6 margin, re-queue
@@ -4300,7 +4308,10 @@ align-ETC ties and pm4py's hash-seed dependence on BPMN inputs; weighted
 easy soundness on 5 of 36 parallel-arc probe nets; the
 `/api/evaluate` alignment `average_trace_fitness` last bit on 3 of 257 logs
 (pm4py sums per variant); BOSE norm ties decided by the BLAS kernel
-(pm4py's results depend on the CPU; Minera models the Windows kernel); `merge_dataframe_cases` and gzip decompression are
+(pm4py's results depend on the CPU; Minera models the Windows kernel); the
+OCEL 1.0 JSON reader reads an empty timestamp in file order (pm4py raises;
+the classic format is the native transport), and repeated object ids in
+the XML and SQLite readers stay refused; `merge_dataframe_cases` and gzip decompression are
 not polled for cancellation.
 
 Suite before each push (about 2 h at -j2; run it from one session only):

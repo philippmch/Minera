@@ -42,8 +42,10 @@ void literal_name_interchange(){
   Ocel log;log.events={{"","","2026-01-01T00:00:00Z",{{"",std::int64_t{7}}}}};
   log.objects={{"","",{{"",true}}}};log.relations={{"","",""}};
   for(const auto format:{OcelJsonFormat::kClassic,OcelJsonFormat::kStandard}){
-    const auto ordinary=serialize_ocel_json(log,format);
-    bool rejected=false;try{(void)parse_ocel_json(ordinary);}catch(const std::invalid_argument&){rejected=true;}assert(rejected);
+    // The ordinary reader drops entries with empty ids, activities or types,
+    // as the reference file readers do; the exact transport keeps them.
+    const auto ordinary=parse_ocel_json(serialize_ocel_json(log,format));
+    assert(ordinary.events.empty()&&ordinary.objects.empty()&&ordinary.relations.empty());
     const auto exact=serialize_ocel_exact_filter_json(log,format);
     const auto reopened=parse_ocel_json(exact);
     assert(reopened.events.at(0).id.empty()&&reopened.events.at(0).attributes.at(0).key.empty());

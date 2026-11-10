@@ -232,11 +232,8 @@ SawNet merge_saw_nets(const std::map<std::string, SawNet>& object_nets,
       }
     }
   }
-  if (!set_source) {
-    const auto source = result.net.add_place();
-    result.net.set_source(source);
-    result.net.set_sink(source);
-  }
+  // Without object types (an OCEL without events, say) the merged net is
+  // empty, no places at all, as the reference's multi SAW net is.
   return result;
 }
 

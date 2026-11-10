@@ -422,8 +422,58 @@ void unknown_object_references() {
   assert(rejected);
 }
 
+// Both reference XML readers drop an event without id or activity and an
+// object without id or type, with their relations (observed black-box); an
+// event left without relations goes too. read_ocel2_xml takes a type listed
+// twice, or an attribute listed twice, from its last listing.
+void empty_names_and_repeated_types() {
+  const std::string standard =
+      "<?xml version='1.0' encoding='UTF-8'?>\n<log><object-types><object-type name=\"o\"><attributes/></object-type>"
+      "<object-type name=\"\"><attributes/></object-type></object-types>"
+      "<event-types><event-type name=\"a\"><attributes><attribute name=\"x\" type=\"string\"/></attributes></event-type>"
+      "<event-type name=\"a\"><attributes><attribute name=\"x\" type=\"string\"/><attribute name=\"x\" type=\"float\"/></attributes></event-type>"
+      "<event-type name=\"\"><attributes/></event-type></event-types>"
+      "<objects><object id=\"o1\" type=\"o\"><attributes/></object><object id=\"o2\" type=\"\"><attributes/></object>"
+      "<object id=\"\" type=\"o\"><attributes/></object><object type=\"o\"><attributes/></object></objects>"
+      "<events><event id=\"e1\" type=\"a\" time=\"2024-01-01T00:00:00+00:00\"><attributes><attribute name=\"x\">5</attribute></attributes>"
+      "<objects><relationship object-id=\"o1\" qualifier=\"\"/><relationship object-id=\"\" qualifier=\"\"/></objects></event>"
+      "<event id=\"e2\" type=\"\" time=\"2024-01-01T00:01:00+00:00\"><attributes/><objects><relationship object-id=\"o1\" qualifier=\"\"/></objects></event>"
+      "<event id=\"\" type=\"a\" time=\"2024-01-01T00:02:00+00:00\"><attributes/><objects><relationship object-id=\"o1\" qualifier=\"\"/></objects></event>"
+      "<event id=\"e4\" type=\"a\" time=\"2024-01-01T00:03:00+00:00\"><attributes/><objects><relationship object-id=\"o2\" qualifier=\"\"/></objects></event>"
+      "</events></log>";
+  const auto log = minera::parse_ocel_xml(standard);
+  assert(log.events.size() == 1 && log.events[0].id == "e1");
+  assert(log.objects.size() == 1 && log.objects[0].id == "o1");
+  assert(log.relations.size() == 1 && log.relations[0].object_id == "o1");
+  assert(std::get<double>(log.events[0].attributes.at(0).value) == 5.0);
+  assert(!log.event_type_attributes.contains("") && !log.object_type_attributes.contains(""));
+  const std::string classic =
+      "<log><events><event><string key=\"id\" value=\"e1\"/><date key=\"timestamp\" value=\"2024-01-01T00:00:00Z\"/>"
+      "<string key=\"activity\" value=\"\"/><list key=\"omap\"><string key=\"object-id\" value=\"o1\"/></list><list key=\"vmap\"/></event>"
+      "<event><string key=\"id\" value=\"e2\"/><date key=\"timestamp\" value=\"2024-01-01T00:01:00Z\"/>"
+      "<string key=\"activity\" value=\"b\"/><list key=\"omap\"><string key=\"object-id\" value=\"o1\"/>"
+      "<string key=\"object-id\" value=\"\"/><string key=\"object-id\" value=\"p1\"/></list><list key=\"vmap\"/></event>"
+      "<event><date key=\"timestamp\" value=\"2024-01-01T00:02:00Z\"/>"
+      "<string key=\"activity\" value=\"c\"/><list key=\"omap\"><string key=\"object-id\" value=\"o1\"/></list><list key=\"vmap\"/></event></events>"
+      "<objects><object><string key=\"id\" value=\"o1\"/><string key=\"type\" value=\"o\"/><list key=\"ovmap\"/></object>"
+      "<object><string key=\"id\" value=\"\"/><string key=\"type\" value=\"o\"/><list key=\"ovmap\"/></object>"
+      "<object><string key=\"id\" value=\"p1\"/><list key=\"ovmap\"/></object></objects></log>";
+  const auto classic_log = minera::parse_ocel_xml(classic);
+  assert(classic_log.events.size() == 1 && classic_log.events[0].id == "e2");
+  assert(classic_log.objects.size() == 1 && classic_log.relations.size() == 1);
+  // A relation to an empty id that no object has still raises, as it does
+  // for any unlisted object in the classic reader.
+  std::string unlisted = classic;
+  unlisted.replace(unlisted.find("<object><string key=\"id\" value=\"\"/>"),
+                   std::string("<object><string key=\"id\" value=\"\"/><string key=\"type\" value=\"o\"/><list key=\"ovmap\"/></object>").size(), "");
+  bool rejected = false;
+  try { (void)minera::parse_ocel_xml(unlisted); } catch (const std::invalid_argument&) { rejected = true; }
+  assert(rejected);
+}
+
 int main() {
   unknown_object_references();
+  empty_names_and_repeated_types();
   frame_order_and_unlisted_keys();
   standard_writers_drop_reference_generated_globals();
   minera::Ocel log;

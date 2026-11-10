@@ -763,6 +763,10 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         throw std::runtime_error("SQLite event query failed");
       const auto id = column_string(statement.get(), 0);
       const auto activity = column_string(statement.get(), 1);
+      // The reference reader drops an event row without id or type (observed
+      // black-box); validate_references refuses it instead.
+      if ((id.empty() || activity.empty()) && !options.validate_references.value_or(false))
+        continue;
       if (id.empty() || !event_types.emplace(id, activity).second)
         throw std::invalid_argument("OCEL SQLite event table contains duplicate or empty ids");
       event_order.push_back(id);
@@ -777,6 +781,9 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         throw std::runtime_error("SQLite object query failed");
       const auto id = column_string(statement.get(), 0);
       const auto type = column_string(statement.get(), 1);
+      // As for events: a row without id or type is dropped.
+      if ((id.empty() || type.empty()) && !options.validate_references.value_or(false))
+        continue;
       if (id.empty())
         throw std::invalid_argument("OCEL SQLite object table contains duplicate or empty ids");
       // The reference reader keeps one object row per type-table row, all
@@ -917,7 +924,9 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     }
   }
   sort_ocel_events_by_timestamp(log, true);
-  // The reference SQLite reader drops events and objects without relations.
+  // The reference SQLite reader drops what names an empty id or type, then
+  // the events and objects without relations.
+  drop_empty_ocel_names(log);
   drop_unrelated_ocel_entries(log);
   return log;
 #endif

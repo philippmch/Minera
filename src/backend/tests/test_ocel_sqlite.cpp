@@ -414,6 +414,57 @@ int main() {
   throws([&] { (void)minera::import_ocel_sqlite(dangling_path, strict); });
   std::filesystem::remove(dangling_path, ignored);
 
+  // An event row without id or type and an object row without id or type
+  // are dropped with their relations, as read_ocel2_sqlite drops them
+  // (observed black-box); an event left without relations goes too.
+  const auto empty_path = external_path.string() + ".empty.sqlite";
+  std::filesystem::remove(empty_path, ignored);
+  sqlite3* empty_db = nullptr;
+  assert(sqlite3_open_v2(empty_path.c_str(), &empty_db,
+                         SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr) ==
+         SQLITE_OK);
+  exec_sql(empty_db,
+           "CREATE TABLE event (ocel_id TEXT, ocel_type TEXT);"
+           "CREATE TABLE object (ocel_id TEXT, ocel_type TEXT);"
+           "CREATE TABLE event_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+           "CREATE TABLE object_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+           "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
+           "CREATE TABLE event_Create (ocel_id TEXT, ocel_time TEXT);"
+           "CREATE TABLE event_None (ocel_id TEXT, ocel_time TEXT);"
+           "CREATE TABLE object_order (ocel_id TEXT);"
+           "CREATE TABLE object_None (ocel_id TEXT);"
+           "INSERT INTO event VALUES ('e1', 'Create');"
+           "INSERT INTO event VALUES ('', 'Create');"
+           "INSERT INTO event VALUES ('e3', '');"
+           "INSERT INTO event VALUES ('e4', 'Create');"
+           "INSERT INTO object VALUES ('o1', 'order');"
+           "INSERT INTO object VALUES ('', 'order');"
+           "INSERT INTO object VALUES ('o3', '');"
+           "INSERT INTO event_map_type VALUES ('Create', 'Create');"
+           "INSERT INTO event_map_type VALUES ('', 'None');"
+           "INSERT INTO object_map_type VALUES ('order', 'order');"
+           "INSERT INTO object_map_type VALUES ('', 'None');"
+           "INSERT INTO event_Create VALUES ('e1', '2024-02-01T00:00:00Z');"
+           "INSERT INTO event_Create VALUES ('', '2024-02-02T00:00:00Z');"
+           "INSERT INTO event_Create VALUES ('e4', '2024-02-04T00:00:00Z');"
+           "INSERT INTO event_None VALUES ('e3', '2024-02-03T00:00:00Z');"
+           "INSERT INTO object_order VALUES ('o1');"
+           "INSERT INTO object_order VALUES ('');"
+           "INSERT INTO object_None VALUES ('o3');"
+           "INSERT INTO event_object VALUES ('e1', 'o1', '');"
+           "INSERT INTO event_object VALUES ('e1', '', '');"
+           "INSERT INTO event_object VALUES ('', 'o1', '');"
+           "INSERT INTO event_object VALUES ('e3', 'o1', '');"
+           "INSERT INTO event_object VALUES ('e4', 'o3', '');");
+  assert(sqlite3_close(empty_db) == SQLITE_OK);
+  const auto empty = minera::import_ocel_sqlite(empty_path);
+  assert(empty.events.size() == 1 && empty.events[0].id == "e1");
+  assert(empty.objects.size() == 1 && empty.objects[0].id == "o1");
+  assert(empty.relations.size() == 1 && empty.relations[0].object_id == "o1");
+  assert(!empty.event_type_attributes.contains("") && !empty.object_type_attributes.contains(""));
+  throws([&] { (void)minera::import_ocel_sqlite(empty_path, strict); });
+  std::filesystem::remove(empty_path, ignored);
+
   // Naive times read as UTC, as pm4py.read_ocel2_sqlite stores them
   // (datetime64[us, UTC]): the event time is stamped "Z", the change time
   // "+00:00", as the reference JSON writers print them. An id listed twice in

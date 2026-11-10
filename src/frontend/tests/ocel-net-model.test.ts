@@ -55,6 +55,10 @@ describe("object-centric model delivery", () => {
     expect(model.bindings.find(b => b.activity === "Variable-only")?.objectTypes).toEqual(["Item"]);
     expect(model.bindings.find(b => b.activity === "Variable-only")?.variableTypes).toEqual(["Item"]);
   });
+  it("shows no stochastic net for an OCEL without object types", () => {
+    const empty: OcelDiscoveryResult = {family:"OCEL_DISCOVERY",variant:"saw",result:{ot_saw_nets:{},multi_saw_net:{place_count:0,source:0,sink:0,activities:[],transitions:[]},multi_place_object_types:{}}};
+    expect(ocelNetModels(empty).views).toEqual([]);
+  });
   it("supports combined and per-type stochastic nets without losing weight frequencies", () => {
     const views = ocelNetModels(saw()).views;
     expect(views.map(v => v.key)).toEqual(["combined","type:Item"]);

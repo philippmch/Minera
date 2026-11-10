@@ -337,16 +337,18 @@ std::string lowercase(std::string value) {
 }
 
 void parse_standard_type_table(const Json* raw, StandardAttributeTypes& types,
-                               std::string_view field, bool literal_names) {
+                               std::string_view field) {
   if (!raw) return;
   if (!raw->is_array())
     throw std::invalid_argument("OCEL " + std::string(field) +
                                 " must be an array");
   for (const auto& entry : raw->array()) {
     const auto& descriptor = obj(entry, field);
+    // read_ocel2_json takes a type listed twice from its last listing, an
+    // attribute listed twice from its last entry, and reads a value whose
+    // declared type is empty as undeclared; an empty type name is no error
+    // (its events or objects are dropped later), observed black-box.
     const auto name = str(required(descriptor, "name"), "type name");
-    if ((!literal_names && name.empty()) || types.contains(name))
-      throw std::invalid_argument("duplicate or empty OCEL type name");
     std::map<std::string, std::string> attributes;
     if (const auto* raw_attributes = optional(descriptor, "attributes")) {
       if (!raw_attributes->is_array())
@@ -357,29 +359,27 @@ void parse_standard_type_table(const Json* raw, StandardAttributeTypes& types,
             str(required(attribute, "name"), "attribute name");
         const auto attribute_type =
             str(required(attribute, "type"), "attribute type");
-        if ((!literal_names && attribute_name.empty()) || attribute_type.empty() ||
-            !attributes.emplace(attribute_name, attribute_type).second)
-          throw std::invalid_argument("duplicate or empty OCEL attribute type");
+        if (attribute_type.empty()) attributes.erase(attribute_name);
+        else attributes.insert_or_assign(attribute_name, attribute_type);
       }
     }
-    types.emplace(name, std::move(attributes));
+    types.insert_or_assign(name, std::move(attributes));
   }
 }
 
 void parse_classic_type_catalog(const Json* raw, OcelTypeCatalog& catalog,
-                                std::string_view field, bool literal_names) {
+                                std::string_view field) {
   if (!raw) return;
   if (!raw->is_object())
     throw std::invalid_argument("OCEL " + std::string(field) +
                                 " must be an object");
+  // An empty type name is read (the reference readers ignore this catalog);
+  // drop_empty_ocel_names removes it unless names are literal.
   for (const auto& [type, raw_attributes] : raw->object()) {
-    if (!literal_names && type.empty())
-      throw std::invalid_argument("OCEL type name is empty");
     const auto& attributes = obj(raw_attributes, field);
     auto& declared = catalog[type];
+    // An empty attribute name is a name (read_ocel2_json keeps the column).
     for (const auto& [name, raw_type] : attributes) {
-      if (!literal_names && name.empty())
-        throw std::invalid_argument("OCEL attribute name is empty");
       const auto attribute_type = str(raw_type, "OCEL attribute type");
       if (attribute_type.empty())
         throw std::invalid_argument("OCEL attribute type is empty");
@@ -480,9 +480,9 @@ OcelValue standard_scalar(const Json& value, std::string_view field,
 Ocel parse_classic(const Json::Object& root, bool literal_names) {
   Ocel log; std::unordered_set<std::string> object_ids, event_ids; std::unordered_map<std::string, std::string> types;
   parse_classic_type_catalog(optional(root, "ocel:objectTypes"),
-                             log.object_type_attributes, "ocel:objectTypes",literal_names);
+                             log.object_type_attributes, "ocel:objectTypes");
   parse_classic_type_catalog(optional(root, "ocel:eventTypes"),
-                             log.event_type_attributes, "ocel:eventTypes",literal_names);
+                             log.event_type_attributes, "ocel:eventTypes");
   // Objects and events are read in document order; the stable timestamp
   // sort then keeps that order among equal instants.
   const auto& objects_json = required(root, "ocel:objects");
@@ -563,16 +563,15 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
   return log;
 }
 
-Ocel parse_standard(const Json::Object& root, bool literal_names) {
+Ocel parse_standard(const Json::Object& root) {
   Ocel log;
   std::unordered_map<std::string, std::string> types;
-  std::unordered_set<std::string> event_ids;
   StandardAttributeTypes object_attribute_types;
   StandardAttributeTypes event_attribute_types;
   parse_standard_type_table(optional(root, "objectTypes"), object_attribute_types,
-                            "objectTypes",literal_names);
+                            "objectTypes");
   parse_standard_type_table(optional(root, "eventTypes"), event_attribute_types,
-                            "eventTypes",literal_names);
+                            "eventTypes");
   log.object_type_attributes = object_attribute_types;
   log.event_type_attributes = event_attribute_types;
   const auto& object_array = required(root, "objects");
@@ -594,9 +593,8 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
   std::vector<std::vector<OcelO2oRelation>> object_o2o;
   for (const auto& raw : object_array.array()) {
     const auto& x = obj(raw, "objects[]");
+    // An empty id or type is dropped with drop_empty_ocel_names.
     const auto id = str(required(x, "id"), "id");
-    if (!literal_names && id.empty())
-      throw std::invalid_argument("empty object id");
     const auto type = str(required(x, "type"), "type");
     types.insert_or_assign(id, type);
     OcelObject object{id, type, {}};
@@ -609,9 +607,8 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
       std::unordered_map<std::string, std::size_t> group_index;
       for (const auto& ar : aa->array()) {
         const auto& a = obj(ar, "attributes[]");
+        // An empty name is a name: read_ocel2_json keeps that column.
         const auto name = str(required(a, "name"), "name");
-        if (!literal_names && name.empty())
-          throw std::invalid_argument("OCEL object attribute name is empty");
         StandardAttribute entry{name,
                                 standard_scalar(
                                     required(a, "value"), "value",
@@ -666,11 +663,14 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
   const auto& event_array = required(root, "events");
   if (!event_array.is_array())
     throw std::invalid_argument("events must be array");
+  // An id listed twice is one event, as the reference reader keeps it
+  // (observed black-box): in the place of its first listing with everything
+  // of its last one, relations included.
+  std::unordered_map<std::string, std::size_t> event_index;
+  std::vector<std::vector<OcelRelation>> event_relations;
   for (const auto& raw : event_array.array()) {
     const auto& x = obj(raw, "events[]");
     const auto id = str(required(x, "id"), "id");
-    if ((!literal_names && id.empty()) || !event_ids.insert(id).second)
-      throw std::invalid_argument("duplicate or empty event id");
     const auto activity = str(required(x, "type"), "type");
     OcelEvent event{id, activity, str(required(x, "time"), "time"), {}};
     if (const auto* aa = optional(x, "attributes")) {
@@ -686,8 +686,7 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
                                                name))});
       }
     }
-    log.events.push_back(std::move(event));
-    log.event_type_attributes.try_emplace(activity);
+    std::vector<OcelRelation> relations;
     if (const auto* rels = optional(x, "relationships")) {
       if (!rels->is_array())
         throw std::invalid_argument("event relationships must be array");
@@ -697,13 +696,24 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
         // read_ocel2_json drops a relation to an unlisted object (and the
         // event when it keeps none), observed black-box.
         if (!types.count(oid)) continue;
-        log.relations.push_back(
+        relations.push_back(
             {id, oid, optional(y, "qualifier")
                          ? str(*optional(y, "qualifier"), "qualifier")
                          : ""});
       }
     }
+    const auto [slot, added] = event_index.try_emplace(id, log.events.size());
+    if (added) {
+      log.events.push_back(std::move(event));
+      event_relations.push_back(std::move(relations));
+    } else {
+      log.events[slot->second] = std::move(event);
+      event_relations[slot->second] = std::move(relations);
+    }
   }
+  for (auto& relations : event_relations)
+    for (auto& relation : relations) log.relations.push_back(std::move(relation));
+  for (const auto& event : log.events) log.event_type_attributes.try_emplace(event.activity);
   const Json* raw_e2e = optional(root, "eventRelationships");
   if (raw_e2e == nullptr) raw_e2e = optional(root, "e2e");
   if (raw_e2e != nullptr) {
@@ -719,7 +729,7 @@ Ocel parse_standard(const Json::Object& root, bool literal_names) {
         throw std::invalid_argument("eventRelationships requires sourceEventId and targetEventId");
       const auto source_id = str(*source, "sourceEventId");
       const auto target_id = str(*target, "targetEventId");
-      if (!event_ids.count(source_id) || !event_ids.count(target_id))
+      if (!event_index.count(source_id) || !event_index.count(target_id))
         throw std::invalid_argument("eventRelationships references unknown event");
       const auto* qualifier = optional(relation, "qualifier");
       log.e2e.push_back({source_id, target_id,
@@ -1108,7 +1118,7 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     literal_names=literal_names || std::get<bool>(marker->value);
   }
   const bool standard = r.find("events") != r.end() || r.find("objects") != r.end();
-  Ocel result = standard ? parse_standard(r,literal_names) : parse_classic(r,literal_names);
+  Ocel result = standard ? parse_standard(r) : parse_classic(r,literal_names);
   // The reference OCEL 2.0 JSON reader keeps one relation per event and
   // object; the last one wins (its qualifier and its place). The classic
   // format stays lossless because native adapters use it as transport.
@@ -1150,6 +1160,10 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
       throw std::invalid_argument("minera:keepUnrelated must be boolean");
     keep_unrelated = std::get<bool>(marker->value);
   }
+  // Both reference JSON readers drop events with an empty id or activity and
+  // objects with an empty id or type (observed black-box); literal names
+  // (exact filter inputs) keep them.
+  if (!literal_names) drop_empty_ocel_names(result);
   if (!keep_unrelated) drop_unrelated_ocel_entries(result);
   // A log whose reference frame is activity first (read from XML, see
   // Ocel::event_activity_first) keeps that order between routes.
@@ -1647,6 +1661,38 @@ void drop_unrelated_ocel_entries(Ocel& log) {
   });
   erase_if(log.object_changes, [&](const OcelObjectChange& change) {
     return !related_objects.count(change.object_id);
+  });
+}
+
+void drop_empty_ocel_names(Ocel& log) {
+  std::unordered_set<std::string> dropped_events;
+  std::unordered_set<std::string> dropped_objects;
+  for (const auto& event : log.events)
+    if (event.id.empty() || event.activity.empty()) dropped_events.insert(event.id);
+  for (const auto& object : log.objects)
+    if (object.id.empty() || object.type.empty()) dropped_objects.insert(object.id);
+  log.event_type_attributes.erase("");
+  log.object_type_attributes.erase("");
+  if (dropped_events.empty() && dropped_objects.empty()) return;
+  const auto event_gone = [&](const std::string& id) {
+    return id.empty() || dropped_events.count(id) != 0;
+  };
+  const auto object_gone = [&](const std::string& id) {
+    return id.empty() || dropped_objects.count(id) != 0;
+  };
+  std::erase_if(log.events, [&](const OcelEvent& event) { return event_gone(event.id); });
+  std::erase_if(log.objects, [&](const OcelObject& object) { return object_gone(object.id); });
+  std::erase_if(log.relations, [&](const OcelRelation& relation) {
+    return event_gone(relation.event_id) || object_gone(relation.object_id);
+  });
+  std::erase_if(log.o2o, [&](const OcelO2oRelation& relation) {
+    return object_gone(relation.source_id) || object_gone(relation.target_id);
+  });
+  std::erase_if(log.e2e, [&](const OcelE2eRelation& relation) {
+    return event_gone(relation.source_id) || event_gone(relation.target_id);
+  });
+  std::erase_if(log.object_changes, [&](const OcelObjectChange& change) {
+    return object_gone(change.object_id);
   });
 }
 
@@ -2841,13 +2887,15 @@ OcdfgGraph parse_ocdfg_json(std::string_view json,
     auto& destination = result.edges[type];
     for (const auto& [key, raw_metric] : raw_map) {
       const auto& fields = obj(raw_metric, "OCDFG edge " + key);
+      // The endpoint fields name the pair (an activity may be empty or hold
+      // "->"); only a document without them splits the key.
       std::string source;
       std::string target;
-      if (const auto* value = optional(fields, "source_activity"))
-        source = str(*value, "source_activity");
-      if (const auto* value = optional(fields, "target_activity"))
-        target = str(*value, "target_activity");
-      if (source.empty() || target.empty()) {
+      const auto* source_value = optional(fields, "source_activity");
+      const auto* target_value = optional(fields, "target_activity");
+      if (source_value) source = str(*source_value, "source_activity");
+      if (target_value) target = str(*target_value, "target_activity");
+      if (!source_value || !target_value) {
         const auto separator = key.find("->");
         if (separator == std::string::npos || separator == 0 ||
             separator + 2 >= key.size())

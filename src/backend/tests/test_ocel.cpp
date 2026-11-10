@@ -578,6 +578,56 @@ void readers_drop_unknown_object_references_contract() {
   assert(standard.o2o.empty());
 }
 
+// An event with an empty id or activity and an object with an empty id or
+// type are dropped with their relations, as both reference JSON readers drop
+// them (observed black-box); an event left without relations goes too. A
+// literal-names document (exact filter input) keeps them. The OCEL 2.0 reader
+// also takes a repeated event id from its last listing, in the place of the
+// first, and reads empty attribute names and repeated declarations.
+void readers_drop_empty_names_contract() {
+  const auto classic = minera::parse_ocel_json(
+      R"({"ocel:events":{"e1":{"ocel:activity":"","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]},)"
+      R"("":{"ocel:activity":"a","ocel:timestamp":"2024-01-01T00:01:00Z","ocel:omap":["o1"]},)"
+      R"("e3":{"ocel:activity":"b","ocel:timestamp":"2024-01-01T00:02:00Z","ocel:omap":["o1","p1",""]},)"
+      R"("e4":{"ocel:activity":"c","ocel:timestamp":"2024-01-01T00:03:00Z","ocel:omap":["p1"]}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"o","ocel:o2o":[{"ocel:oid":"p1"},{"ocel:oid":""}]},"p1":{"ocel:type":""},"":{"ocel:type":"o"}}})");
+  assert(classic.events.size() == 1 && classic.events[0].id == "e3");
+  assert(classic.objects.size() == 1 && classic.objects[0].id == "o1");
+  assert(classic.relations.size() == 1 && classic.relations[0].object_id == "o1");
+  assert(classic.o2o.empty());
+  assert(!classic.event_type_attributes.contains("") && !classic.object_type_attributes.contains(""));
+  const auto literal = minera::parse_ocel_json_literal_names(
+      R"({"ocel:events":{"e1":{"ocel:activity":"","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":""}}})");
+  assert(literal.events.size() == 1 && literal.objects.size() == 1);
+
+  const auto standard = minera::parse_ocel_json(R"json({"objectTypes":[{"name":"o","attributes":[{"name":"","type":"integer"}]},{"name":"","attributes":[]}],
+"eventTypes":[{"name":"a","attributes":[{"name":"x","type":"integer"},{"name":"x","type":"string"},{"name":"y","type":""}]},{"name":"","attributes":[]}],
+"objects":[{"id":"o1","type":"o","attributes":[{"name":"","value":"7"}]},{"id":"o2","type":"","attributes":[]},{"id":"","type":"o","attributes":[]}],
+"events":[{"id":"e1","type":"a","time":"2024-01-01T00:00:00Z","attributes":[{"name":"x","value":"5"},{"name":"y","value":"6"}],"relationships":[{"objectId":"o2"}]},
+{"id":"e2","type":"","time":"2024-01-01T00:00:00Z","relationships":[{"objectId":"o1"}]},
+{"id":"e3","type":"b","time":"2024-01-01T00:00:00Z","relationships":[{"objectId":"o1"}]},
+{"id":"e1","type":"c","time":"2024-01-01T00:00:00Z","attributes":[{"name":"x","value":"5"}],"relationships":[{"objectId":"o1","qualifier":"q"},{"objectId":""}]}]})json");
+  assert(standard.events.size() == 2 && standard.events[0].id == "e1" &&
+         standard.events[0].activity == "c" && standard.events[1].id == "e3");
+  assert(standard.objects.size() == 1 && standard.objects[0].id == "o1");
+  assert(standard.objects[0].attributes.size() == 1 && standard.objects[0].attributes[0].key.empty() &&
+         std::get<std::int64_t>(standard.objects[0].attributes[0].value) == 7);
+  assert(standard.relations.size() == 2 && standard.relations[0].event_id == "e1" &&
+         standard.relations[0].qualifier == "q" && standard.relations[1].event_id == "e3");
+  assert(!standard.event_type_attributes.contains("") && !standard.object_type_attributes.contains(""));
+  assert(standard.event_type_attributes.at("a").at("x") == "string" &&
+         !standard.event_type_attributes.at("a").contains("y"));
+  const auto typed = minera::parse_ocel_json(R"json({"eventTypes":[{"name":"a","attributes":[{"name":"x","type":"integer"},{"name":"x","type":"string"},{"name":"y","type":""}]}],
+"objects":[{"id":"o1","type":"o"}],
+"events":[{"id":"e1","type":"a","time":"2024-01-01T00:00:00Z","attributes":[{"name":"x","value":"5"},{"name":"y","value":"6"}],"relationships":[{"objectId":"o1"}]}]})json");
+  assert(std::get<std::string>(typed.events[0].attributes[0].value) == "5" &&
+         std::get<std::string>(typed.events[0].attributes[1].value) == "6");
+  // The classic transport carries the empty attribute name of a catalog.
+  const auto round = minera::parse_ocel_json(minera::serialize_ocel_json(standard));
+  assert(round.object_type_attributes.at("o").contains(""));
+}
+
 // OCDFG edge keys are labels: "a" -> "b->c" and "a->b" -> "c" both read
 // "a->b->c", so the second gets "#2" and the JSON object keeps both edges.
 void ocdfg_edge_keys_stay_unique_contract() {
@@ -594,10 +644,20 @@ void ocdfg_edge_keys_stay_unique_contract() {
   assert(json.find(R"("a->b->c#2":{"source_activity":"a->b","target_activity":"c")") != std::string::npos);
   const auto reread = minera::parse_ocdfg_json(json);
   assert(reread.edges.at("order").size() == 2);
+  // An empty activity (a literal-names log) reads back from the endpoint
+  // fields; the key "->b" alone could not name it.
+  const auto literal = minera::parse_ocel_json_literal_names(
+      R"({"ocel:events":{"e1":{"ocel:activity":"","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]},)"
+      R"("e2":{"ocel:activity":"b","ocel:timestamp":"2024-01-01T00:01:00Z","ocel:omap":["o1"]}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order"}}})");
+  const auto empty_round =
+      minera::parse_ocdfg_json(minera::serialize_ocdfg_json(minera::discover_ocdfg_classic(literal)));
+  assert(empty_round.edges.at("order").count({"", "b"}) == 1);
 }
 
 int main() {
   readers_drop_unknown_object_references_contract();
+  readers_drop_empty_names_contract();
   ocdfg_edge_keys_stay_unique_contract();
   global_scope_defaults_contract();
   standard_json_declares_frame_column_types_contract();
@@ -822,14 +882,14 @@ int main() {
   }
   assert(missing_change_time);
 
-  bool duplicate_type = false;
-  try {
-    (void)minera::parse_ocel_json(
-        R"json({"objectTypes":[{"name":"Order"},{"name":"Order"}],"objects":[],"events":[]})json");
-  } catch (...) {
-    duplicate_type = true;
-  }
-  assert(duplicate_type);
+  // A type listed twice is its last listing (pm4py.read_ocel2_json types
+  // the value by it; it used to be refused).
+  const auto duplicate_type = minera::parse_ocel_json(
+      R"json({"objectTypes":[{"name":"Order","attributes":[{"name":"n","type":"integer"}]},{"name":"Order"}],)json"
+      R"json("eventTypes":[{"name":"A"}],"objects":[{"id":"o1","type":"Order","attributes":[{"name":"n","value":"5"}]}],)json"
+      R"json("events":[{"id":"e1","type":"A","time":"2024-01-01T00:00:00Z","relationships":[{"objectId":"o1"}]}]})json");
+  assert(duplicate_type.objects.size() == 1 &&
+         std::get<std::string>(duplicate_type.objects[0].attributes.at(0).value) == "5");
 
   minera::Ocel escaped;
   escaped.objects.push_back(

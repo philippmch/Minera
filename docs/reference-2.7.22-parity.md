@@ -21117,3 +21117,64 @@ dropped instead of refused), `minera_ocel_xml_tests`
 (`unknown_object_references`), `minera_ocel_sqlite_tests` (unknown rows
 dropped by default, refused with `validate_references`),
 `minera_ocel_statistics_tests` (full-precision durations, repeated keys).
+
+## Review AN1: re-review of round AM (2026-11-10)
+
+The round AM readers, the SQLite option and the OC-DFG writers were
+re-read, then probed with degenerate files: empty and missing names, NaN-like
+names, repeated ids and repeated type declarations, empty timestamps, per
+reader (OCEL 1.0 JSON, OCEL 2.0 JSON, OCEL 1.0 XML, OCEL 2.0 XML, SQLite,
+CSV) against pm4py 2.7.22. Findings, all fixed:
+
+- **AN1-1 Empty names.** Every pm4py file reader except CSV (which already
+  matched) drops an event whose id or activity is empty and an object whose
+  id or type is empty (also a missing XML attribute or a NULL SQLite cell),
+  with the relations, links and changes that name them, and then the events
+  and objects left without relations (observed black-box: an event whose
+  only object has an empty type disappears). Native readers refused such
+  files (OCEL 2.0 JSON "duplicate or empty event id", both XML readers
+  "invalid OCEL XML event/object", SQLite "duplicate or empty ids") or kept
+  the entries (OCEL 1.0 JSON throughout, SQLite activities and types), so
+  discovery saw an activity "" pm4py does not have. The new
+  `drop_empty_ocel_names` runs in each of these readers before
+  `drop_unrelated_ocel_entries`; empty type names leave the catalogs. A
+  literal-names document (an exact filter input) keeps them, and
+  `validate_references=true` still refuses them in SQLite. NaN-like texts
+  ("NaN", "NA", "null", "None") and a single space are names in both. An
+  empty timestamp still raises in both XML readers and in OCEL 2.0 JSON, as
+  in pm4py; the OCEL 1.0 JSON reader keeps reading it in file order (pm4py
+  raises; declared, the classic format is the native transport), and SQLite
+  keeps the event as pm4py keeps it with NaT.
+- **AN1-2 Repeated declarations.** `read_ocel2_json` and `read_ocel2_xml`
+  take a type listed twice in `objectTypes`/`eventTypes` from its last
+  listing, an attribute listed twice from its last entry, and read a value
+  whose declared type is empty as undeclared; an empty attribute name is a
+  column (OCEL 2.0 JSON objects). Native readers refused all of these.
+- **AN1-3 Repeated event ids (OCEL 2.0 JSON).** pm4py keeps one event per
+  id: in the place of its first listing, with the activity, time,
+  attributes and relations of its last one (the earlier relations go, so an
+  object only they named is dropped). Native refused the file. The XML and
+  SQLite readers keep their declared handling of repeated ids.
+- **AN1-4 OC-DFG endpoint fields.** `parse_ocdfg_json` fell back to
+  splitting the key when an endpoint field was empty, so an edge from or to
+  an empty activity (a literal-names log) could not be read back; it now
+  splits the key only when a field is missing, as the browser reader does.
+- **AN1-5 Merged SAW net of an empty OCEL.** With no object type (every
+  event dropped), the merged SAW net had one place; pm4py's has none. It is
+  now empty, and the browser shows no combined view for it.
+
+Verification:
+
+| Check | Logs | Result |
+|---|---|---|
+| Degenerate files by reader (empty, missing and NaN-like names, repeated ids and declarations, empty times) | 80 files | events, objects and relations equal pm4py's, or both raise; repeated object ids in XML/SQLite and repeated event ids in XML stay declared |
+| Route sweep (six outputs) with empty activities, types and ids and repeated event ids, OCEL 1.0 and 2.0 JSON | 600 | 0 differences after the fixes (before: 3 empty-log merged SAW nets; before the reader fix, every log with an empty name) |
+| Route sweep without them, fresh seeds | 200 | 0 differences |
+
+Tests: `minera_ocel_tests` (`readers_drop_empty_names_contract`, a repeated
+type now its last listing, an empty-activity OC-DFG read back),
+`minera_ocel_xml_tests` (`empty_names_and_repeated_types`),
+`minera_ocel_sqlite_tests` (rows without id or type),
+`minera_saw_nets_tests` (empty merged net), `ocel-net-model.test.ts`,
+`minera_ocel_exact_filter_controls_tests` (an ordinary read of a log with
+empty names is now empty instead of refused; the exact transport keeps it).

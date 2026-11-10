@@ -200,6 +200,12 @@ void convert_ocel_date_value(OcelValue& value, OcelTimestampReader reader, bool 
 // a log without relations ends up with no events and no objects. Order,
 // multiplicity and the type catalogs are kept.
 void drop_unrelated_ocel_entries(Ocel& log);
+// Drops the events with an empty id or activity and the objects with an empty
+// id or type, with the relations, object links, event links and changes that
+// name them, and the empty type names of both catalogs: the reference OCEL
+// 1.0/2.0 JSON, both XML and the SQLite readers drop such rows (observed
+// black-box), then drop_unrelated_ocel_entries applies as usual.
+void drop_empty_ocel_names(Ocel& log);
 
 // True for a global the reference OCEL 1.0 writers produce by themselves: the
 // "__INVALID__" defaults of the event and object scopes and the computed log
