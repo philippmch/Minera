@@ -4269,7 +4269,13 @@ second reviewer: root-cause analysis (decision trees on features), OCEL
 discovery, and the legacy-cost imported-model alignment (the bundle's unit
 costs differ from the dispatcher's, so both still search: about 110 s on
 1,000 cases). In stack samples of the A* searches on these logs the LP
-solver (`solve_lp_sparse`) was about half of the busy frames.
+solver (`solve_lp_sparse`) was about half of the busy frames. One way to
+cut it: pm4py's trusted bound. When the parent's LP solution
+(`LpResult::solution`) uses the move at least once, that solution less the
+move solves the child's LP at the parent's bound minus the move's cost,
+which consistency makes optimal, so no LP is needed. The derived value can
+differ from a solved one in the last bits, so equal-priority ties must be
+checked (fast-path pins, the BPMN fuzz comparison) before relying on it.
 
 Known open or declared: mine-view generalization sum order (2 ulp); POWL
 brute-force filtering and dynamic clustering rare cases; BPMN→net

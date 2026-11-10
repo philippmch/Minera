@@ -4485,10 +4485,10 @@ class Aligner {
       std::uint64_t seq = 0;
       std::size_t depth = 0;
       bool discounted_order = false;
+      std::size_t record = 0;  // its state is records[record].state
       // Queued with a priority inherited from its parent's bound; the
       // state's own bound is solved when the node first reaches the top.
       bool pending = false;
-      std::size_t record = 0;  // its state is records[record].state
       bool operator>(const Node& o) const {
         if (priority != o.priority) return priority > o.priority;
         if (cost != o.cost) return cost > o.cost;
