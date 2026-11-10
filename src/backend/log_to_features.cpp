@@ -10,10 +10,12 @@
 #include <deque>
 #include <limits>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <unordered_map>
 
+#include "minera/dataframe_columns.hpp"
 #include "minera/timestamp.hpp"
 #include "root_cause_trace_key.hpp"
 
@@ -305,8 +307,10 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
   }
   std::vector<std::string> result;
   for (const auto& [key, count] : occurrences)
+    // The default trace-based selection never takes lifecycle:transition
+    // (observed black-box: another header with the same cells is taken).
     if (count == trace_count && has_string.contains(key) != numeric &&
-        (numeric || string_values[key].size() <= 12))
+        (numeric || string_values[key].size() <= 12) && key != "lifecycle:transition")
       result.push_back(key);
   return result;
 }
@@ -1011,8 +1015,15 @@ void temporal_object_sort(std::vector<std::size_t>& order, const Less& less) {
 
 }  // namespace
 
-LogToFeaturesResult log_to_features(const EventLog& log,
+LogToFeaturesResult log_to_features(const EventLog& source,
                                     const LogToFeaturesOptions& options) {
+  // The trace- and event-based variants read an EventLog: a log read on the
+  // DataFrame path is then the frame as convert_to_event_log gives it (every
+  // column on every event, NaN cells, frame dtypes; observed black-box).
+  std::optional<EventLog> frame;
+  if (source.dataframe_columns && options.variant != LogToFeaturesVariant::TEMPORAL)
+    frame = dataframe_frame_event_log(source);
+  const EventLog& log = frame ? *frame : source;
   const bool calendar_projection = options.variant == LogToFeaturesVariant::TEMPORAL &&
       !options.grouper_freq.empty();
   if (options.activity_key.empty() || options.timestamp_key.empty() ||

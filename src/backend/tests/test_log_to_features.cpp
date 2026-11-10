@@ -10,8 +10,10 @@
 #include <stdexcept>
 
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/dataframe_columns.hpp"
 #include "minera/json_export.hpp"
 #include "minera/timestamp.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 using namespace minera;
 
@@ -734,7 +736,8 @@ static void csv_case_column_is_the_reference_trace_concept_name() {
   // read_csv, format_dataframe and convert_to_event_log: the case column is
   // the trace's concept:name; a case_id header also stays an event
   // attribute; the activity column is the events' concept:name and keeps its
-  // own header too (pm4py, 3 cases; names compared as sets, since the
+  // own header too; format_dataframe's "@@index" and "@@case_index" are
+  // numeric event columns (pm4py, 3 cases; names compared as sets, since the
   // reference orders TRACE_BASED columns by Python set order).
   const auto sorted = [](std::vector<std::string> names) {
     std::sort(names.begin(), names.end());
@@ -756,9 +759,11 @@ static void csv_case_column_is_the_reference_trace_concept_name() {
     const bool copied = header == "case_id";
     std::vector<std::string> trace_names{
         "trace:grp@g1", "trace:grp@g2", "event:concept:name@a", "event:concept:name@b",
-        "event:activity@a", "event:activity@b", "succession:concept:name@UNDEFINED"};
+        "event:activity@a", "event:activity@b", "succession:concept:name@UNDEFINED",
+        "event:@@index", "event:@@case_index"};
     std::vector<std::string> event_names{"event:activity@a", "event:activity@b",
-                                         "event:concept:name@a", "event:concept:name@b"};
+                                         "event:concept:name@a", "event:concept:name@b",
+                                         "event:@@index", "event:@@case_index"};
     if (copied)
       for (const char* id : {"c1", "c2", "c3"}) {
         trace_names.push_back(std::string("event:case_id@") + id);
@@ -797,6 +802,165 @@ static void csv_case_column_is_the_reference_trace_concept_name() {
         [](const std::string& name) { return name.starts_with("resource_workload@@"); });
     assert(workload == (header == "org:resource" ? 2 : 0));
   }
+}
+
+static void csv_frame_view_feeds_trace_and_event_features() {
+  // pm4py 2.7.22, read_csv + format_dataframe(case_id="cid",
+  // activity_key="act", timestamp_key="ts") + convert_to_event_log: each
+  // event keeps cid (an int) and ts beside the copies, time:timestamp and ts
+  // are UTC, format_dataframe adds the numeric @@index (place in the frame
+  // sorted by case then time) and @@case_index, and the resource column
+  // stays under its own header (no org:resource).
+  std::istringstream csv("cid,act,ts,who,amount\n"
+                         "7,a,2020-01-01 01:00:00+01:00,R,1\n"
+                         "7,b,2020-01-01 01:01:30.25+01:00,S,2\n"
+                         "3,a,2020-01-02 00:00:00+00:00,R,3\n");
+  minera::CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  const auto log = minera::import_csv_event_log(csv, import);
+  const auto frame = minera::dataframe_frame_event_log(log);
+  assert(frame.traces.size() == 2 && frame.traces[0].case_id == "3");
+  const auto cell = [](const Event& event, const std::string& key) -> const EventAttribute* {
+    for (const auto& attribute : event.attributes)
+      if (attribute.key == key) return &attribute;
+    return nullptr;
+  };
+  const auto& late = frame.traces[1].events[1];
+  assert(cell(late, "cid") && cell(late, "cid")->kind == AttributeKind::kInt &&
+         cell(late, "cid")->value == "7");
+  for (const char* key : {"ts", "time:timestamp"})
+    assert(cell(late, key) && cell(late, key)->kind == AttributeKind::kDate &&
+           cell(late, key)->value == "2020-01-01T00:01:30.250000+00:00");
+  assert(cell(late, "@@index") && cell(late, "@@index")->value == "2" &&
+         cell(late, "@@case_index") && cell(late, "@@case_index")->value == "1");
+  assert(cell(frame.traces[0].events[0], "@@index")->value == "0");
+  assert(cell(late, "who") && cell(late, "who")->value == "S" && !cell(late, "org:resource"));
+
+  const auto sorted = [](std::vector<std::string> names) {
+    std::sort(names.begin(), names.end());
+    return names;
+  };
+  LogToFeaturesOptions options;
+  options.standard_keys = true;
+  const std::vector<std::string> event_names{
+      "event:@@case_index", "event:@@index", "event:act@a", "event:act@b", "event:amount",
+      "event:cid", "event:concept:name@a", "event:concept:name@b", "event:who@R", "event:who@S"};
+  auto trace_names = event_names;
+  trace_names.push_back("succession:concept:name@UNDEFINED");
+  trace_names.push_back("succession:concept:name@a#b");
+  const auto traces = log_to_features(log, options);
+  assert(sorted(traces.feature_names) == trace_names);
+  const auto value = [&](std::size_t row, const std::string& name) {
+    const auto at = std::find(traces.feature_names.begin(), traces.feature_names.end(), name) -
+                    traces.feature_names.begin();
+    return std::get<double>(traces.trace_rows[row][at]);
+  };
+  assert(value(1, "event:@@index") == 2.0 && value(1, "event:@@case_index") == 1.0);
+  assert(value(1, "event:cid") == 7.0 && value(0, "event:cid") == 3.0);
+  assert(value(1, "event:amount") == 2.0 && value(1, "event:who@S") == 1.0);
+  options.variant = LogToFeaturesVariant::EVENT_BASED;
+  assert(sorted(log_to_features(log, options).feature_names) == event_names);
+}
+
+static void xes_frame_trace_attributes_with_gaps() {
+  // pm4py 2.7.22 on convert_to_event_log(read_xes(...)): a trace without a
+  // trace attribute holds NaN (NaT for a date), an int trace attribute with
+  // a gap is float64 ("@3.0"), and a trace without events is not in the
+  // frame, so its attributes type nothing (flag stays bool).
+  std::istringstream xes(
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<log xes.version=\"1.0\">\n"
+      "<trace><string key=\"concept:name\" value=\"c1\"/><string key=\"region\" value=\"N\"/><int key=\"size\" value=\"3\"/><boolean key=\"flag\" value=\"true\"/><date key=\"d\" value=\"2020-01-01T00:00:00+00:00\"/>\n"
+      " <event><string key=\"concept:name\" value=\"a\"/><date key=\"time:timestamp\" value=\"2020-01-01T00:00:00+00:00\"/></event>\n"
+      " <event><string key=\"concept:name\" value=\"b\"/><date key=\"time:timestamp\" value=\"2020-01-01T00:01:00+00:00\"/></event>\n"
+      "</trace>\n"
+      "<trace><string key=\"concept:name\" value=\"c2\"/><int key=\"size\" value=\"4\"/><boolean key=\"flag\" value=\"false\"/>\n"
+      " <event><string key=\"concept:name\" value=\"a\"/><date key=\"time:timestamp\" value=\"2020-01-02T00:00:00+00:00\"/></event>\n"
+      "</trace>\n"
+      "<trace><string key=\"concept:name\" value=\"c3\"/><string key=\"region\" value=\"S\"/><boolean key=\"flag\" value=\"true\"/>\n"
+      " <event><string key=\"concept:name\" value=\"b\"/><date key=\"time:timestamp\" value=\"2020-01-03T00:00:00+00:00\"/></event>\n"
+      "</trace>\n"
+      "<trace><string key=\"concept:name\" value=\"c4\"/><string key=\"region\" value=\"Z\"/><int key=\"size\" value=\"9\"/></trace>\n"
+      "</log>\n");
+  const auto log = import_xes_dataframe_log(xes);
+  LogToFeaturesOptions options;
+  options.case_string_attributes = {"region", "size", "flag", "d"};
+  options.case_numeric_attributes = {"size"};
+  options.case_string_attributes_supplied = options.case_numeric_attributes_supplied = true;
+  options.event_string_attributes_supplied = options.event_numeric_attributes_supplied = true;
+  const auto result = log_to_features(log, options);
+  assert(result.feature_names == std::vector<std::string>({
+             "trace:region@N", "trace:region@S", "trace:region@nan", "trace:size@3.0",
+             "trace:size@4.0", "trace:size@nan", "trace:flag@False", "trace:flag@True",
+             "trace:d@2020-01-01 00:00:00+00:00", "trace:d@NaT", "trace:size"}));
+  const std::vector<std::vector<double>> expected{{1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 3},
+                                                  {0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 4},
+                                                  {0, 1, 0, 0, 0, 1, 0, 1, 0, 1, NAN}};
+  assert(result.trace_rows.size() == 3);
+  for (std::size_t row = 0; row < 3; ++row)
+    for (std::size_t column = 0; column < expected[row].size(); ++column) {
+      const double value = std::get<double>(result.trace_rows[row][column]);
+      assert(std::isnan(expected[row][column]) ? std::isnan(value) : value == expected[row][column]);
+    }
+}
+
+static void csv_frame_trace_attributes_with_gaps() {
+  // pm4py 2.7.22 on convert_to_event_log(format_dataframe(read_csv(...))):
+  // the trace takes each case: column from the case's first sorted row, a
+  // blank cell there is NaN (c3's grp, though its later row has g2), and an
+  // int case column with a blank is float64.
+  std::istringstream csv("case:concept:name,concept:name,time:timestamp,case:grp,case:n\n"
+                         "c1,a,2020-01-01 00:00:00,g1,1\n"
+                         "c1,b,2020-01-01 00:01:00,g1,1\n"
+                         "c2,a,2020-01-02 00:00:00,,\n"
+                         "c3,a,2020-01-03 00:00:00,,2\n"
+                         "c3,b,2020-01-03 00:01:00,g2,2\n");
+  minera::CsvImportOptions import;
+  import.case_id_column = "case:concept:name";
+  import.activity_column = "concept:name";
+  import.timestamp_column = "time:timestamp";
+  const auto log = minera::import_csv_event_log(csv, import);
+  LogToFeaturesOptions options;
+  options.standard_keys = true;
+  options.case_string_attributes = {"grp", "n"};
+  options.case_numeric_attributes = {"n"};
+  options.case_string_attributes_supplied = options.case_numeric_attributes_supplied = true;
+  options.event_string_attributes_supplied = options.event_numeric_attributes_supplied = true;
+  const auto result = log_to_features(log, options);
+  assert(result.feature_names == std::vector<std::string>({"trace:grp@g1", "trace:grp@nan",
+             "trace:n@1.0", "trace:n@2.0", "trace:n@nan", "trace:n"}));
+  const std::vector<std::vector<double>> expected{
+      {1, 0, 1, 0, 0, 1}, {0, 1, 0, 0, 1, NAN}, {0, 1, 0, 1, 0, 2}};
+  assert(result.trace_rows.size() == 3);
+  for (std::size_t row = 0; row < 3; ++row)
+    for (std::size_t column = 0; column < expected[row].size(); ++column) {
+      const double value = std::get<double>(result.trace_rows[row][column]);
+      assert(std::isnan(expected[row][column]) ? std::isnan(value) : value == expected[row][column]);
+    }
+}
+
+static void default_trace_selection_skips_lifecycle_transition() {
+  // pm4py 2.7.22: the default TRACE_BASED selection takes "other" but never
+  // lifecycle:transition, though both hold the same cells on every event.
+  EventLog log;
+  for (const char* id : {"c0", "c1", "c2"}) {
+    Trace trace{id, {}};
+    for (const auto& [activity, state] : {std::pair{"a", "start"}, std::pair{"b", "complete"}}) {
+      Event event{id, activity};
+      event.attributes = {{"lifecycle:transition", state}, {"other", state}};
+      trace.events.push_back(event);
+    }
+    log.traces.push_back(trace);
+  }
+  LogToFeaturesOptions options;
+  options.standard_keys = true;
+  auto names = log_to_features(log, options).feature_names;
+  std::sort(names.begin(), names.end());
+  assert(names == std::vector<std::string>({"event:concept:name@a", "event:concept:name@b",
+                                            "event:other@complete", "event:other@start",
+                                            "succession:concept:name@a#b"}));
 }
 
 static void default_trace_selection_validates_all_candidate_hashability() {
@@ -3274,6 +3438,10 @@ int main() {
   default_trace_selection_validates_all_candidate_hashability();
   default_trace_strings_have_fixed_cardinality_limit();
   csv_case_column_is_the_reference_trace_concept_name();
+  csv_frame_view_feeds_trace_and_event_features();
+  default_trace_selection_skips_lifecycle_transition();
+  xes_frame_trace_attributes_with_gaps();
+  csv_frame_trace_attributes_with_gaps();
   default_trace_selection_ignores_custom_core_schema();
   trace_extra_timestamps_respect_native_values_and_presence();
   concurrency_uses_exact_comparison_and_required_accesses();

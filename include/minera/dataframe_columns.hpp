@@ -2,6 +2,7 @@
 
 #include "minera/event_log.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -24,29 +25,45 @@ enum class DataFrameColumnType {
 struct DataFrameColumn {
   std::string key;
   DataFrameColumnType type = DataFrameColumnType::kString;
-  // Which first-class field of a CSV event holds the column's cells (the
-  // resource and lifecycle columns); kNone for an ordinary attribute.
+  // Which first-class field of a CSV event holds the column's cells: the
+  // resource and lifecycle columns, the case column under its own header
+  // (kCaseId), and the timestamp column with its copy time:timestamp
+  // (kTimestamp, a UTC date); kNone for an ordinary attribute.
   FirstClassAttributeRole role = FirstClassAttributeRole::kNone;
 };
 
 // The event columns of a log's frame. For a CSV log (csv_text) the cells are
 // the CSV text, typed by read_csv over every data row (rows format_dataframe
-// then drops included); kObject is then a column of Python ints. For an XES
-// log the cells are the typed XES values, and a column's dtype follows from
-// the types it holds (pandas' inference). The activity and timestamp columns
-// (and the case-id and `case:` columns, which become trace attributes) are
-// not listed: Minera already reads them as the frame holds them. Set on
-// EventLog::dataframe_columns by the batch CSV import and by
-// import_xes_dataframe_log.
+// then drops included); kObject is then a column of Python ints. A CSV frame
+// also lists its case column when the header has no `case:` prefix (an
+// event column there) and its timestamp column with the copy time:timestamp
+// (UTC dates). For an XES log the cells are the typed XES values, and a
+// column's dtype follows from the types it holds (pandas' inference). The
+// activity column (and for XES the timestamp, and the `case:` columns, which
+// become trace attributes) are not listed: Minera already reads them as the
+// frame holds them. Set on EventLog::dataframe_columns by the batch CSV
+// import and by import_xes_dataframe_log.
 struct DataFrameColumns {
   bool csv_text = true;
   std::vector<DataFrameColumn> columns;
+  // A CSV frame's "@@index" and "@@case_index" cells, which format_dataframe
+  // adds: the row's place in the sorted frame and its case's place, by
+  // Event::input_order (filtered copies keep them, as a filtered frame keeps
+  // the column). Empty for XES frames.
+  std::vector<std::int64_t> row_index;
+  std::vector<std::int64_t> case_index;
+  // The frame's case: columns (the trace attributes other than the case
+  // id) under their unprefixed keys: for XES typed over the traces with
+  // events (read_xes has no row for a trace without events), for CSV typed
+  // by read_csv over every data row (the trace takes the case's first row);
+  // a trace without the key holds NaN (NaT for dates).
+  std::vector<DataFrameColumn> trace_columns;
 };
 
 // The event columns of an XES log's frame (read_xes): every event key other
 // than the selected activity and timestamp, typed as pandas types a column of
 // those values (ints with a gap or beside floats are floats, bools with a gap
-// objects).
+// objects), and its trace_columns likewise from the trace attributes.
 [[nodiscard]] DataFrameColumns xes_dataframe_columns(const EventLog& log);
 
 // One present cell of a CSV column (csv_text) as the frame holds it: the
@@ -57,9 +74,13 @@ struct DataFrameColumns {
 
 // The log as pm4py's convert_to_event_log of its frame gives it: each event
 // of `log` holds every listed column as an attribute, typed by the column
-// (ints of a float column as floats, bools as bools), a missing cell as NaN.
-// A log without dataframe_columns is returned unchanged. Root-cause
-// diagnostics read event contexts from this view.
+// (ints of a float column as floats, bools as bools), a missing cell as NaN,
+// and for a CSV frame "@@index" and "@@case_index" (each trace holds every
+// trace column likewise); a CSV event's resource
+// and lifecycle are then only the attributes under their headers (no
+// org:resource alias). A log without dataframe_columns is returned
+// unchanged. Root-cause diagnostics and trace- and event-based features read
+// events from this view.
 [[nodiscard]] EventLog dataframe_frame_event_log(const EventLog& log);
 
 }  // namespace minera

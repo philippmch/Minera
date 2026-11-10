@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AP (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AQ (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4261,9 +4261,39 @@ neither. It also fixed root cause on the DataFrame path: CSV and XES logs
 record their frame columns (`EventLog::dataframe_columns`), and the
 root-cause diagnostics read every event with every column, a missing cell as
 NaN, ints of a float64 column as floats (920 XES and 1,448 CSV trees equal
-to pm4py).
+to pm4py). Round AQ re-reviewed AP: SQLite files without base rows take each
+id's first row over the object tables (type-name order) as the object, an
+XES column of ints past INT64_MAX beside negative ints is objects, and the
+CSV frame now has the case column under its own header, UTC timestamp
+columns, `@@index` and `@@case_index`, and the resource only under its
+header. Trace- and event-based features (`log_to_features`) read the frame
+view too, with trace attributes from the frame (`trace_columns`: a missing
+one NaN, ints with a gap floats), NaT date cells out of the default
+selection, and `lifecycle:transition` never taken by default (1,330 feature
+comparisons and 1,053 root-cause trees on CSV and XES uploads equal to
+pm4py, apart from the declared mixed-type keys below).
 
-Next round (AQ) should start by re-reviewing round AP:
+Next round (AR) should start by re-reviewing round AQ:
+
+- `src/backend/dataframe_columns.cpp`: `typed_columns` and `note_cell`
+  (shared by event and trace columns), `trace_columns` for XES (traces
+  without events left out, `trace_case_id_attribute`), the trace branch of
+  `dataframe_frame_event_log` (attributes replaced in place, missing columns
+  appended, CSV values through `csv_dataframe_cell`), `utc_date_cell`, the
+  CSV-only `@@index`/`@@case_index` cells, the dropped `concept:name` and
+  cleared resource and lifecycle fields, and the date-kind NaT cell (its
+  category in `root_cause.cpp`);
+- the frame block of `import_csv_event_log`: the kCaseId and kTimestamp
+  columns, the `time:timestamp` copy, the `case:` trace columns (typed over
+  `row.case_attributes`), `row_index`/`case_index` after the final sort;
+- `log_to_features` reading the frame view for the trace- and event-based
+  variants (and what that changes for its other callers: clustering profile
+  features, LLE, the CLI, `original_features_workbench_json.cpp`), the
+  `lifecycle:transition` exclusion in `inferred_event_attributes`;
+- `read_type_table_changes` with `first_rows` and `TypeTableBase::kFirstRow`
+  in `src/backend/ocel_sqlite.cpp`.
+
+Round AP's targets, re-reviewed in AQ (findings AQ1-1 to AQ1-7, fixed):
 
 - `src/backend/dataframe_columns.cpp`: `xes_dataframe_columns` (dtype
   inference from typed values, the activity and timestamp keys left out,
@@ -4366,12 +4396,18 @@ project files under `review-harness/round-ao/` (not in git); round AP's
 (`rcsweep2.py`, `rcxes.py` for root cause on CSV and XES, `sqfuzz.py`
 with `--mutate` for SQLite) under `review-harness/round-ap/`.
 
+Round AQ's harness scripts are under `review-harness/round-aq/` in the
+project files (not in git): `featsweep.py` (features on CSV, `--custom 1`
+for custom headers), `featxes.py` (features on XES), `casegap.py` (`case:`
+columns with blanks), `rccsv4.py` and `rcxes3.py` (root cause), `sqfuzz2.py`,
+and `refltf.py`, which reruns the reference under other hash seeds for the
+declared mixed-type keys.
+
 Areas without a recent random-input sweep that are good candidates for the
-second reviewer: root-cause analysis at the route level (the token-replay
-diagnostics that `token_replay_include_root_cause_diagnostics` attaches, on
-CSV and XES logs whose attribute types come from the DataFrame path; only
-each tree's root is deterministic in pm4py; the core functions are bound by
-the 240-case bank), and the legacy-cost imported-model alignment (the bundle's unit
+second reviewer: other DataFrame-path consumers on CSV and XES uploads
+(clustering, decision trees and other routes whose pm4py reference converts
+the frame, now that the frame view is complete), the temporal feature
+variant on CSV logs, and the legacy-cost imported-model alignment (the bundle's unit
 costs differ from the dispatcher's, so both still search: about 110 s on
 1,000 cases). In stack samples of the A* searches on these logs the LP
 solver (`solve_lp_sparse`) was about half of the busy frames. One way to
@@ -4394,7 +4430,9 @@ the classic format is the native transport), and repeated object ids in
 the XML and SQLite readers stay refused (pm4py keeps a SQLite event or object
 per type-table row; native reads the first), a SQLite type missing from the
 map table falls back to native table names (pm4py raises); `merge_dataframe_cases` and gzip decompression are
-not polled for cancellation.
+not polled for cancellation; pm4py's default trace-based feature selection
+types a mixed-type key by the first value in Python set order (random with
+strings or NaN), Minera reads it as one-hot when any value is a string.
 
 Suite before each push (about 2 h at -j2; run it from one session only):
 touch the changed sources, `cmake --build build -j2`, `ctest --test-dir build

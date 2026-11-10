@@ -295,7 +295,8 @@ std::string scalar_category(const EventAttribute& value, bool nested) {
     return real_category(*real);
   if (const auto* date = std::get_if<NativeDate>(&value.typed_value))
     return date_category(date->value, nested);
-  if (value.kind == AttributeKind::kDate) return date_category(value.value, nested);
+  if (value.kind == AttributeKind::kDate)
+    return value.value == "NaT" ? "NaT" : date_category(value.value, nested);  // a frame's missing date
   if (value.kind == AttributeKind::kBoolean) {
     if (value.value == "true" || value.value == "1") return "True";
     if (value.value == "false" || value.value == "0") return "False";

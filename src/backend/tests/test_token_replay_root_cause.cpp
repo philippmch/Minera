@@ -580,18 +580,23 @@ void csv_frame_cell_contracts() {
   const auto log = import_csv_event_log(input, import);
   require(log.dataframe_columns != nullptr, "batch CSV import records the frame columns");
   const auto& columns = log.dataframe_columns->columns;
-  require(columns.size() == 5 && columns[0].key == "org:resource" &&
-          columns[0].role == FirstClassAttributeRole::kResource &&
-          columns[0].type == DataFrameColumnType::kString &&
-          columns[1].type == DataFrameColumnType::kFloat64 &&
+  require(columns.size() == 6 && columns[0].key == "time:timestamp" &&
+          columns[0].role == FirstClassAttributeRole::kTimestamp &&
+          columns[0].type == DataFrameColumnType::kDate &&
+          columns[1].key == "org:resource" &&
+          columns[1].role == FirstClassAttributeRole::kResource &&
+          columns[1].type == DataFrameColumnType::kString &&
           columns[2].type == DataFrameColumnType::kFloat64 &&
-          columns[3].type == DataFrameColumnType::kBool &&
-          columns[4].type == DataFrameColumnType::kString, "read_csv dtypes per column");
+          columns[3].type == DataFrameColumnType::kFloat64 &&
+          columns[4].type == DataFrameColumnType::kBool &&
+          columns[5].type == DataFrameColumnType::kString, "read_csv dtypes per column");
   const auto frame = dataframe_frame_event_log(log);
   const auto& b = frame.traces[0].events[1];
-  require(b.attributes.size() == 5, "every frame column on every event");
+  // Six columns plus format_dataframe's "@@index" and "@@case_index".
+  require(b.attributes.size() == 8, "every frame column on every event");
   for (const auto& attribute : b.attributes)
-    if (attribute.key != "flag")
+    if (attribute.key != "flag" && attribute.key != "time:timestamp" &&
+        !attribute.key.starts_with("@@"))
       require(std::holds_alternative<double>(attribute.typed_value) &&
               std::isnan(std::get<double>(attribute.typed_value)), "a missing cell is NaN");
   PetriNet net;
@@ -626,7 +631,11 @@ void csv_frame_cell_contracts() {
       "c1,c,2020-01-01 00:01:00,2\n";
   std::istringstream second(dropped);
   const auto gap = dataframe_frame_event_log(import_csv_event_log(second, import));
-  require(gap.traces.size() == 1 && gap.traces[0].events[0].attributes[0].value == "1.0",
+  const auto& gap_cells = gap.traces.at(0).events.at(0).attributes;
+  require(gap.traces.size() == 1 &&
+              std::any_of(gap_cells.begin(), gap_cells.end(), [](const auto& a) {
+                return a.key == "amount" && a.value == "1.0";
+              }),
           "an int column with a gap in a dropped row reads as floats");
   // A missing numeric cell is NaN data, not an error.
   const std::string numeric =
@@ -680,6 +689,35 @@ void csv_frame_cell_contracts() {
               {0, 1, 1, 0, 1, 0, 2}, {1, 0, 1, 0, 1, 0, 2}, {1, 0, 0, 1, 0, 1, 4}}),
           "XES frame data");
   require(xes_rows[0].target == std::vector<int>({0, 0, 1}), "XES frame targets");
+
+  // pandas types a column holding an int above INT64_MAX beside a negative
+  // int as object, gap or not: each cell keeps its int (pm4py 2.7.22 frame:
+  // amount -1, not -1.0); above INT64_MAX alone it stays an int column.
+  for (const bool gap : {false, true}) {
+    const std::string big =
+        std::string("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<log xes.version=\"1.0\">\n"
+                    "<trace><string key=\"concept:name\" value=\"c1\"/>\n"
+                    " <event><string key=\"concept:name\" value=\"a\"/><int key=\"amount\" value=\"9223372036854775808\"/><int key=\"other\" value=\"9223372036854775808\"/></event>\n"
+                    " <event><string key=\"concept:name\" value=\"b\"/><int key=\"amount\" value=\"-1\"/><int key=\"other\" value=\"1\"/></event>\n") +
+        (gap ? " <event><string key=\"concept:name\" value=\"c\"/></event>\n" : "") +
+        "</trace>\n</log>\n";
+    std::istringstream big_input(big);
+    const auto big_log = import_xes_dataframe_log(big_input);
+    const auto type_of = [&](const std::string& key) {
+      for (const auto& column : big_log.dataframe_columns->columns)
+        if (column.key == key) return column.type;
+      throw std::runtime_error("missing column " + key);
+    };
+    require(type_of("amount") == DataFrameColumnType::kObject, "big and negative ints: object");
+    require(type_of("other") == (gap ? DataFrameColumnType::kFloat64 : DataFrameColumnType::kInt64),
+            "big ints alone: an int column, floats with a gap");
+    const auto big_frame = dataframe_frame_event_log(big_log);
+    const auto& negative = big_frame.traces[0].events[1].attributes;
+    const auto amount = std::find_if(negative.begin(), negative.end(),
+                                     [](const auto& a) { return a.key == "amount"; });
+    require(amount != negative.end() && amount->kind == AttributeKind::kInt && amount->value == "-1",
+            "an object column keeps the int");
+  }
 }
 
 int main() try {

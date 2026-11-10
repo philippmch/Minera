@@ -2009,9 +2009,18 @@ CsvEventData import_csv_event_data_impl(
   // The activity column is typed and converted the same way.
   std::vector<std::optional<std::string>> case_ids;
   std::vector<std::optional<std::string>> activities;
+  ReferenceCsvColumnKind case_kind = ReferenceCsvColumnKind::kText;
+  bool case_ints = false;
   between_passes();
   if (reference_batch) {
-    case_ids = infer_reference_column(case_tokens, &case_padded_na).text;
+    auto typed_cases = infer_reference_column(case_tokens, &case_padded_na);
+    case_kind = typed_cases.kind;
+    if (case_kind == ReferenceCsvColumnKind::kObject) {
+      case_ints = true;
+      for (std::size_t i = 0; i < typed_cases.text.size() && case_ints; ++i)
+        if (typed_cases.text[i] && !python_int_text(case_tokens[i])) case_ints = false;
+    }
+    case_ids = std::move(typed_cases.text);
     between_passes();
     activities = infer_reference_column(activity_tokens, &activity_padded_na).text;
     between_passes();
@@ -2027,11 +2036,41 @@ CsvEventData import_csv_event_data_impl(
   // data row (rows dropped below included). An attribute cell is present on
   // the event exactly when it is no NA spelling (see na_attribute_cell), so
   // a present cell that reads as one was padded and is a value.
+  std::shared_ptr<DataFrameColumns> frame_columns;
   if (reference_batch) {
     auto columns = std::make_shared<DataFrameColumns>();
     std::unordered_set<std::string> keys;
     bool unique = true;
+    const auto column_type = [](ReferenceCsvColumnKind kind, bool ints) {
+      switch (kind) {
+        case ReferenceCsvColumnKind::kInteger: return DataFrameColumnType::kInt64;
+        case ReferenceCsvColumnKind::kFloat: return DataFrameColumnType::kFloat64;
+        case ReferenceCsvColumnKind::kBoolean: return DataFrameColumnType::kBool;
+        case ReferenceCsvColumnKind::kText: return DataFrameColumnType::kString;
+        case ReferenceCsvColumnKind::kObject:
+          // Python ints when every present cell is one, else the text.
+          return ints ? DataFrameColumnType::kObject : DataFrameColumnType::kString;
+      }
+      return DataFrameColumnType::kString;
+    };
+    // format_dataframe copies the timestamp into time:timestamp, replacing a
+    // column of that name.
+    const bool timestamp_copy = timestamp_index && header[*timestamp_index] != "time:timestamp";
     const auto add_column = [&](std::size_t index, FirstClassAttributeRole role) {
+      if (role == FirstClassAttributeRole::kNone && timestamp_copy &&
+          header[index] == "time:timestamp")
+        return;
+      if (role == FirstClassAttributeRole::kCaseId || role == FirstClassAttributeRole::kTimestamp) {
+        DataFrameColumn column;
+        column.key = header[index];
+        column.role = role;
+        column.type = role == FirstClassAttributeRole::kTimestamp
+                          ? DataFrameColumnType::kDate
+                          : column_type(case_kind, case_ints);
+        unique = keys.insert(column.key).second && unique;
+        columns->columns.push_back(std::move(column));
+        return;
+      }
       std::vector<std::string> cells;
       std::vector<char> padded;
       cells.reserve(pending.size());
@@ -2057,36 +2096,65 @@ CsvEventData import_csv_event_data_impl(
       DataFrameColumn column;
       column.key = header[index];
       column.role = role;
-      switch (typed.kind) {
-        case ReferenceCsvColumnKind::kInteger: column.type = DataFrameColumnType::kInt64; break;
-        case ReferenceCsvColumnKind::kFloat: column.type = DataFrameColumnType::kFloat64; break;
-        case ReferenceCsvColumnKind::kBoolean: column.type = DataFrameColumnType::kBool; break;
-        case ReferenceCsvColumnKind::kText: column.type = DataFrameColumnType::kString; break;
-        case ReferenceCsvColumnKind::kObject: {
-          // Python ints when every present cell is one, else the text.
-          bool ints = true;
-          for (std::size_t i = 0; i < cells.size() && ints; ++i)
-            if (typed.text[i] && !python_int_text(cells[i])) ints = false;
-          column.type = ints ? DataFrameColumnType::kObject : DataFrameColumnType::kString;
-          break;
-        }
-      }
+      bool ints = true;
+      if (typed.kind == ReferenceCsvColumnKind::kObject)
+        for (std::size_t i = 0; i < cells.size() && ints; ++i)
+          if (typed.text[i] && !python_int_text(cells[i])) ints = false;
+      column.type = column_type(typed.kind, ints);
       unique = keys.insert(column.key).second && unique;
       columns->columns.push_back(std::move(column));
     };
     for (std::size_t index = 0; index < header.size(); ++index) {
       poll();
-      if (resource_index && index == *resource_index)
+      // A case column without the `case:` prefix stays an event column
+      // beside the copy case:concept:name (a prefixed one becomes the trace's).
+      if (index == case_index) {
+        if (!header[index].starts_with("case:"))
+          add_column(index, FirstClassAttributeRole::kCaseId);
+      } else if (timestamp_index && index == *timestamp_index) {
+        add_column(index, FirstClassAttributeRole::kTimestamp);
+      } else if (resource_index && index == *resource_index) {
         add_column(index, FirstClassAttributeRole::kResource);
-      else if (lifecycle_index && index == *lifecycle_index)
+      } else if (lifecycle_index && index == *lifecycle_index) {
         add_column(index, FirstClassAttributeRole::kLifecycle);
-      else if (std::find(attribute_indices.begin(), attribute_indices.end(), index) !=
-               attribute_indices.end())
+      } else if (std::find(attribute_indices.begin(), attribute_indices.end(), index) !=
+                 attribute_indices.end()) {
         add_column(index, FirstClassAttributeRole::kNone);
+      }
+    }
+    // The case: columns, which convert_to_event_log puts on the trace from
+    // the case's first row of the sorted frame (a blank cell there is NaN),
+    // typed by read_csv over every data row like the event columns.
+    std::unordered_set<std::string> trace_keys;
+    for (std::size_t j = 0; j < case_attribute_indices.size(); ++j) {
+      const auto& name = header[case_attribute_indices[j]];
+      if (name == "case:concept:name") continue;
+      std::vector<std::string> cells;
+      cells.reserve(pending.size());
+      for (const auto& row : pending)
+        cells.push_back(j < row.case_attributes.size() ? row.case_attributes[j].value : std::string{});
+      const auto typed = infer_reference_column(cells);
+      DataFrameColumn column;
+      column.key = name.substr(kCasePrefix.size());
+      bool ints = true;
+      if (typed.kind == ReferenceCsvColumnKind::kObject)
+        for (std::size_t i = 0; i < cells.size() && ints; ++i)
+          if (typed.text[i] && !python_int_text(cells[i])) ints = false;
+      column.type = column_type(typed.kind, ints);
+      unique = trace_keys.insert(column.key).second && unique;
+      columns->trace_columns.push_back(std::move(column));
+    }
+    if (timestamp_copy) {
+      DataFrameColumn copy;
+      copy.key = "time:timestamp";
+      copy.role = FirstClassAttributeRole::kTimestamp;
+      copy.type = DataFrameColumnType::kDate;
+      unique = keys.insert(copy.key).second && unique;
+      columns->columns.push_back(std::move(copy));
     }
     // Repeated column names are renamed by read_csv ("a.1"); such a frame
     // is not modelled.
-    if (unique) log.dataframe_columns = std::move(columns);
+    if (unique) frame_columns = std::move(columns);
     between_passes();
   }
   case_padded_na.clear();
@@ -2330,6 +2398,22 @@ CsvEventData import_csv_event_data_impl(
                      [](const Trace& left, const Trace& right) {
                        return left.case_id < right.case_id;
                      });
+  }
+  if (frame_columns) {
+    // format_dataframe's "@@index" and "@@case_index": each kept row's place
+    // in the sorted frame and its case's place (observed black-box).
+    std::size_t rows = 0;
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events) rows = std::max(rows, event.input_order + 1);
+    frame_columns->row_index.assign(rows, 0);
+    frame_columns->case_index.assign(rows, 0);
+    std::int64_t position = 0;
+    for (std::size_t trace_index = 0; trace_index < log.traces.size(); ++trace_index)
+      for (const auto& event : log.traces[trace_index].events) {
+        frame_columns->row_index[event.input_order] = position++;
+        frame_columns->case_index[event.input_order] = static_cast<std::int64_t>(trace_index);
+      }
+    log.dataframe_columns = std::move(frame_columns);
   }
 
   if (preserve_table) table.validate();

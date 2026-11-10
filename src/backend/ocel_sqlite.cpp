@@ -433,10 +433,9 @@ OcelValue read_sqlite_cell(sqlite3_stmt* statement, int column,
 }
 
 // One pass over a type table: per ocel_id, the timestamp of its first row by
-// rowid and the attributes of its base row. The base row is the first by
-// rowid, or with object changes the first one without a changed field (then
-// the first with @@cumcount 0, then any). Reference-written tables have no
-// index on ocel_id, so per-id queries would scan the table once per id.
+// rowid and the attributes of its base row (see TypeTableBase). Reference-
+// written tables have no index on ocel_id, so per-id queries would scan the
+// table once per id.
 struct TypeTableRow {
   std::string timestamp;
   std::vector<OcelAttribute> attributes;
@@ -447,10 +446,11 @@ struct TypeTableRow {
 
 // Which rows of a type table are rows of the event or object itself. An
 // event table's rows all are. In object tables the reference reader takes
-// the rows without a changed field, or, when no object table has one, the
-// rows whose "@@cumcount" is 0 or missing; the others are changes (observed
-// black-box).
-enum class TypeTableBase { kEvents, kNullChangedField, kZeroCumcount };
+// the rows without a changed field, or, when no object table has one, each
+// id's first row over the object tables in type-name order (the later rows
+// are its changes). A "@@cumcount" column in the file plays no part: the
+// reader counts the rows itself (observed black-box).
+enum class TypeTableBase { kEvents, kNullChangedField, kFirstRow };
 
 class TypeTableRows {
  public:
@@ -458,13 +458,12 @@ class TypeTableRows {
     const auto columns = table_columns(db, table);
     if (columns.empty()) return;
     exists_ = true;
-    int id_index = -1, time_index = -1, changed_index = -1, cumulative_index = -1;
+    int id_index = -1, time_index = -1, changed_index = -1;
     for (std::size_t index = 0; index < columns.size(); ++index) {
       const auto& name = columns[index].name;
       if (name == "ocel_id") id_index = static_cast<int>(index);
       else if (name == "ocel_time") time_index = static_cast<int>(index);
       else if (name == "ocel_changed_field") changed_index = static_cast<int>(index);
-      else if (name == "@@cumcount") cumulative_index = static_cast<int>(index);
     }
     if (id_index < 0)
       throw std::runtime_error("SQLite prepare failed: no such column: ocel_id");
@@ -481,14 +480,9 @@ class TypeTableRows {
       const bool changed = changed_index >= 0 &&
                            sqlite3_column_type(row, changed_index) != SQLITE_NULL;
       if (base == TypeTableBase::kNullChangedField && changed) continue;
-      if (base == TypeTableBase::kZeroCumcount && cumulative_index >= 0) {
-        const auto cumulative_type = sqlite3_column_type(row, cumulative_index);
-        if (cumulative_type != SQLITE_NULL &&
-            sqlite3_column_double(row, cumulative_index) != 0.0)
-          continue;
-      }
-      // An id with two rows is one event or object here (the reference keeps
-      // a frame row for each; declared): the first row.
+      // An id with two rows is one event or object here: the first row. (For
+      // events and base rows the reference keeps a frame row for each,
+      // declared; for kFirstRow the later rows are changes.)
       auto [entry, inserted] = rows_.try_emplace(column_string(row, id_index));
       if (!inserted) continue;
       order_.push_back(entry->first);
@@ -549,10 +543,16 @@ bool object_tables_have_base_rows(sqlite3* db, const std::vector<std::string>& t
   return false;
 }
 
+// The change rows of one object type table. With base rows somewhere
+// (has_base_rows), every row with a changed field is a change. Without, a row
+// is a change when its id already had a row earlier in the object tables
+// (first_rows holds the ids seen so far, over the tables in the order the
+// objects are read); the first row is the object's own.
 void read_type_table_changes(sqlite3* db, std::string_view table,
                              std::string_view object_type, Ocel& log,
                              const std::set<std::string>& object_ids,
-                             bool validate_references, bool has_null_change_marker) {
+                             bool validate_references, bool has_base_rows,
+                             std::unordered_set<std::string>& first_rows) {
   const auto columns = table_columns(db, table);
   const auto changed = std::find_if(
       columns.begin(), columns.end(), [](const auto& column) {
@@ -573,27 +573,19 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
   const auto id_index = static_cast<int>(id - columns.begin());
   const auto changed_index = static_cast<int>(changed - columns.begin());
   const auto timestamp_index = static_cast<int>(timestamp - columns.begin());
-  const auto cumulative = std::find_if(
-      columns.begin(), columns.end(), [](const auto& column) {
-        return column.name == "@@cumcount";
-      });
-  const auto cumulative_index = cumulative == columns.end()
-                                    ? -1
-                                    : static_cast<int>(cumulative - columns.begin());
   while (true) {
     const auto status = sqlite3_step(statement.get());
     if (status == SQLITE_DONE) break;
     if (status != SQLITE_ROW)
       throw std::runtime_error("SQLite object-change query failed");
-    if (sqlite3_column_type(statement.get(), changed_index) == SQLITE_NULL)
-      continue;
-    // Without a base row in any object table, a row whose cumcount is 0 or
-    // missing is the object's own row, not a change.
-    if (!has_null_change_marker &&
-        (cumulative_index < 0 ||
-         sqlite3_column_type(statement.get(), cumulative_index) == SQLITE_NULL ||
-         sqlite3_column_double(statement.get(), cumulative_index) == 0.0))
-      continue;
+    if (has_base_rows) {
+      if (sqlite3_column_type(statement.get(), changed_index) == SQLITE_NULL) continue;
+    } else {
+      // No base row anywhere: an id's first row is the object, a row without
+      // an id is neither.
+      if (sqlite3_column_type(statement.get(), id_index) == SQLITE_NULL) continue;
+      if (first_rows.insert(column_string(statement.get(), id_index)).second) continue;
+    }
     // An empty changed field is a change too (its value then NaN).
     const auto field = column_string(statement.get(), changed_index);
     const auto object_id = column_string(statement.get(), id_index);
@@ -929,7 +921,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       const auto table = object_table(type);
       const TypeTableRows rows(db, table,
                                has_base_rows ? TypeTableBase::kNullChangedField
-                                             : TypeTableBase::kZeroCumcount);
+                                             : TypeTableBase::kFirstRow);
       if (!rows.exists())
         throw std::invalid_argument("OCEL SQLite object type table is missing: " + table);
       for (const auto& id : rows.ids()) {
@@ -973,12 +965,14 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   } else {
     std::set<std::string> visited_tables;
     std::set<std::string> object_ids;
+    std::unordered_set<std::string> first_rows;
     for (const auto& [id, type] : object_types) object_ids.insert(id);
     for (const auto& type : object_type_names) {
       const auto table = object_table(type);
       if (visited_tables.insert(table).second && table_exists(db, table)) {
         read_type_table_changes(db, table, type, log, object_ids,
-                                options.validate_references.value_or(false), has_base_rows);
+                                options.validate_references.value_or(false), has_base_rows,
+                                first_rows);
       }
     }
     // A change takes its object's type (the id's last listing in the object

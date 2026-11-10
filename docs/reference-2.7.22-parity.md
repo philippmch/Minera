@@ -21341,3 +21341,106 @@ empty field; an event listed twice; files left without events or objects),
 column dtypes, NaN cells, the pm4py tree for a log with gaps, a gap in a
 dropped row, NaN numeric data, and the pm4py tree for an XES log with
 gaps).
+
+## Review AQ1: re-review of round AP, features on the DataFrame path (2026-11-10)
+
+Round AP's changes were re-read and swept again: the XES dtype inference
+and the frame view (`xes_dataframe_columns`, `xes_value`,
+`dataframe_frame_event_log`), the CSV column block of the batch import with
+`csv_dataframe_cell`, where `EventLog::dataframe_columns` travels, and the
+relaxed id loops of `import_ocel_sqlite`, with the AP root-cause harnesses
+on new seeds, a root-cause harness for CSV logs with custom headers (case,
+activity, timestamp and resource columns under any name, `case:` columns,
+random column order, attribute lists naming any header), XES logs with odd
+values (ints past the 64-bit range, negative and huge ints, mixed-type
+keys, dates with offsets and gaps), and the AP SQLite fuzzer with more
+mutations (ids listed again, unmapped types, changes of other ids, files
+without relations). The re-review asked whether consumers besides root
+cause should read the frame view; trace- and event-based features read the
+same log in pm4py, so `log_to_features` was swept on CSV and XES uploads
+too. Findings, all fixed:
+
+- **AQ1-1 SQLite files without base rows.** When no object table holds a
+  row without a changed field, pm4py takes each id's first row over the
+  object tables, concatenated in type-name order, as the object and its
+  later rows as changes; the file's `@@cumcount` column plays no part, and
+  rows without an id are skipped. Native read objects by `@@cumcount`.
+- **AQ1-2 XES ints past INT64_MAX beside negative ints.** pandas keeps such
+  a column as objects (each cell its Python int), with or without gaps or
+  floats; native typed it float64 ("-1.0"). Ints past INT64_MAX that are
+  all non-negative stay an int column (uint64), floats with a gap.
+- **AQ1-3 The CSV frame was incomplete.** `format_dataframe` keeps a case
+  column without the `case:` prefix as an event column typed by
+  `read_csv` (an int column of ids stays ints), makes the timestamp column
+  and its copy `time:timestamp` UTC dates ("2020-01-01 00:00:00+00:00"),
+  adds the numeric `@@index` (the row's place in the frame sorted by case
+  id, then time) and `@@case_index`, overwrites a `concept:name` column
+  with the activity copy, and leaves the resource column under its header
+  only (no `org:resource`). Native's frame view had none of these, so root
+  cause on such logs differed in names and values.
+- **AQ1-4 Trace- and event-based features on CSV and XES uploads.** pm4py
+  extracts features from `convert_to_event_log` of the frame, so every
+  event holds every column (a missing cell NaN, "@nan" in one-hot names),
+  ints with a gap are floats ("@1.0"), and `@@index` and `@@case_index` are
+  numeric features. `log_to_features` now reads `dataframe_frame_event_log`
+  for the trace- and event-based variants (the server route, the CLI, the
+  clustering profile features and LLE all go through it); the temporal
+  variant keeps the log as loaded.
+- **AQ1-5 Trace attributes with gaps.** A trace without a trace attribute
+  holds NaN in pm4py's frame (NaT for a date), and the column is typed like
+  an event column: an int trace attribute with a gap is float64. For XES the
+  types come from the traces with events (`read_xes` has no row for a trace
+  without events); for CSV each `case:` column is typed by `read_csv` over
+  every row and the trace takes the case's first sorted row, so a blank cell
+  there is NaN even when a later row of the case has a value. Native left
+  the attribute out (a numeric trace attribute raised "trace has no numeric
+  trace attribute"). `DataFrameColumns::trace_columns` holds these columns.
+- **AQ1-6 NaT cells in the default selection.** A date column with gaps is
+  left out of the default trace-based selection (NaT is neither a string
+  nor a number); native counted its "NaT" cells as strings and one-hot
+  encoded the dates. The cell is now a date-kind "NaT" whose category stays
+  "NaT".
+- **AQ1-7 The default trace-based selection never takes
+  `lifecycle:transition`** (another key with the same cells on every event
+  is taken). Native took it.
+
+Declared, unchanged: pm4py's default trace-based selection types a key by
+the first value of the set of its values (Python set order): a string makes
+it a one-hot attribute, an int or float a numeric one (which raises "could
+not convert string to float", or a TypeError on a date, when other values
+are not numbers), a bool or date leaves it out. That order is random across
+processes when the values hold a string (hash seed) or NaN (object
+identity), so a key mixing types gets a different treatment from run to run
+(observed black-box: the same log gives all three outcomes over hash seeds).
+Native reads a key with any string value as one-hot, else as numeric when
+every trace holds a number; bools and dates alone are left out. The
+harnesses accept a run when pm4py gives native's result under one of ten
+hash seeds; the rest are keys mixing bools with NaN, or numbers with dates
+and bools, where pm4py's outcome turns on NaN identity or on where a string
+lands.
+
+Verification:
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Features, CSV with gaps (seeds 0 to 109) | 330 | 318 equal, 10 equal under another hash seed, 2 declared (bools with NaN) |
+| Features, CSV with custom headers (seeds 0 to 109) | 330 | 320 equal, 9 equal under another hash seed, 1 declared (bools with NaN) |
+| Features, CSV `case:` columns with blank cells (seeds 0 to 29) | 90 | 81 equal, 9 equal under another hash seed |
+| Features, XES with odd values (seeds 0 to 79) | 240 | 206 equal, 7 equal under another hash seed, 27 declared (a key holding ints, floats, dates, bools and strings; bools with NaN) |
+| Root cause, CSV with custom headers (seeds 0 to 69) | 546 trees | 544 equal, 0 differences, 2 raise in both |
+| Root cause, XES with odd values (seeds 0 to 79) | 507 trees | 488 equal, 0 differences, 19 raise in both |
+| SQLite fuzz, mutated files (seeds 12000 to 12199) | 200 | 73 equal, 18 declared (rows repeated across type tables), 109 raise in both, 0 differences |
+| SQLite fuzz, pm4py-written files (seeds 13000 to 13099) | 100 | 0 differences |
+| Fixture replay (16 manifests) | 2,603 responses | unchanged |
+
+Tests: `minera_log_to_features_tests` (`@@index` and `@@case_index` in the
+CSV case-column test; `csv_frame_view_feeds_trace_and_event_features`: an
+int case column under its own header, UTC timestamps with fractions,
+`@@index`, the resource header and the pm4py feature names and values;
+`xes_frame_trace_attributes_with_gaps`; `csv_frame_trace_attributes_with_gaps`;
+`default_trace_selection_skips_lifecycle_transition`),
+`minera_token_replay_root_cause_tests` (the CSV frame's timestamp column,
+the XES object column of big and negative ints, uint64 and float64 big-int
+columns), `minera_ocel_sqlite_tests` (a file without base rows: first rows
+over the object tables in type-name order, `@@cumcount` ignored, a NULL id,
+an empty changed field typed by its object).

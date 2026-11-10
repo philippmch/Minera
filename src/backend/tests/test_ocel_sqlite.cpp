@@ -7,6 +7,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -314,8 +315,9 @@ void reference_frame_tests() {
   assert(rows.relations.size() == 1 && rows.relations[0].event_id == "e2");
   assert(rows.object_changes.empty());
 
-  // Without a row lacking a changed field in any object table, the rows
-  // whose "@@cumcount" is 0 or missing are the objects' own rows.
+  // Without a row lacking a changed field in any object table, each id's
+  // first row over the tables in type-name order is the object's own row and
+  // its later rows are changes.
   const auto cumulative = read_sql("cumcount",
       "INSERT INTO event VALUES ('e1', 'a');"
       "INSERT INTO event_map_type VALUES ('a', 'A');"
@@ -331,6 +333,46 @@ void reference_frame_tests() {
       "INSERT INTO event_object VALUES ('e1', 'o1', ''); INSERT INTO event_object VALUES ('e1', 'o2', '');");
   assert((object_ids(cumulative) == std::vector<std::string>{"o2", "o1"}));
   assert(cumulative.object_changes.size() == 1 && cumulative.object_changes[0].object_id == "o2");
+
+  // The file's "@@cumcount" plays no part (1 on a first row, 0 on a later
+  // one); a row without an id is neither object nor change; the first row of
+  // o3 is in type s's table, so its row in type t's table is a change typed
+  // s; an empty changed field on a later row is a change. pm4py 2.7.22:
+  // objects o3 (v1), o1 (w1), o2 (w2); changes o1 w3, o3 w4, o3 '' (NaN).
+  const auto first_rows = read_sql("first_rows",
+      "INSERT INTO event VALUES ('e1', 'a');"
+      "INSERT INTO event_map_type VALUES ('a', 'A');"
+      "CREATE TABLE event_A (ocel_id TEXT, ocel_time TIMESTAMP);"
+      "INSERT INTO event_A VALUES ('e1', '2020-01-01 00:00:00');"
+      "INSERT INTO object VALUES ('o1', 't'); INSERT INTO object VALUES ('o2', 't');"
+      "INSERT INTO object VALUES ('o3', 's');"
+      "INSERT INTO object_map_type VALUES ('t', 'T'); INSERT INTO object_map_type VALUES ('s', 'S');"
+      "CREATE TABLE object_T (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT, y TEXT, \"@@cumcount\" INTEGER);"
+      "INSERT INTO object_T VALUES ('o1', '2020-01-03 00:00:00', 'y', 'w1', 1);"
+      "INSERT INTO object_T VALUES ('o2', '2020-01-02 00:00:00', 'y', 'w2', 1);"
+      "INSERT INTO object_T VALUES (NULL, '2020-01-02 00:00:00', 'y', 'wn', 0);"
+      "INSERT INTO object_T VALUES ('o1', '2020-01-01 00:00:00', 'y', 'w3', 0);"
+      "INSERT INTO object_T VALUES ('o3', '2020-01-05 00:00:00', 'y', 'w4', 0);"
+      "CREATE TABLE object_S (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT, y TEXT);"
+      "INSERT INTO object_S VALUES ('o3', '2020-01-04 00:00:00', 'y', 'v1');"
+      "INSERT INTO object_S VALUES ('o3', '2020-01-06 00:00:00', '', 'v2');"
+      "INSERT INTO event_object VALUES ('e1', 'o1', ''); INSERT INTO event_object VALUES ('e1', 'o2', '');"
+      "INSERT INTO event_object VALUES ('e1', 'o3', '');");
+  assert((object_ids(first_rows) == std::vector<std::string>{"o3", "o1", "o2"}));
+  assert(std::get<std::string>(first_rows.objects[0].attributes.at(0).value) == "v1");
+  assert(std::get<std::string>(first_rows.objects[1].attributes.at(0).value) == "w1");
+  {
+    std::vector<std::tuple<std::string, std::string, std::string>> changes;
+    for (const auto& change : first_rows.object_changes) {
+      const auto* text = std::get_if<std::string>(&change.value);
+      changes.emplace_back(change.object_id, change.field,
+                           text ? *text : std::holds_alternative<std::nullptr_t>(change.value) ? "NaN" : "?");
+      assert(change.object_type == (change.object_id == "o3" ? "s" : "t"));
+    }
+    std::sort(changes.begin(), changes.end());
+    assert((changes == std::vector<std::tuple<std::string, std::string, std::string>>{
+                           {"o1", "y", "w3"}, {"o3", "", "NaN"}, {"o3", "y", "w4"}}));
+  }
 
   // A NULL type raises (the reference orders the types), so does a missing
   // type table; a type table without a time column reads as NaT, unless no
