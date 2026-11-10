@@ -1,6 +1,9 @@
 #include "minera/resource_profiles.hpp"
 
 #include <cassert>
+#include <functional>
+#include <map>
+#include <sstream>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -9,6 +12,8 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+
+#include "minera/csv_event_log_importer.hpp"
 
 using namespace minera;
 
@@ -150,8 +155,103 @@ static void reference_audit_contracts() {
   assert(starts.rows.size() == 2 && starts.rows[0].value == 6.0 && starts.rows[1].value == 1.0);
 }
 
+// pm4py 2.7.22 resource_profiles on read_csv + format_dataframe(case_id="cid",
+// activity_key="act", timestamp_key="ts") of this CSV (Review AT1): keys are
+// frame columns, cells are typed ("who" int, "num" float with NaN cells,
+// "start" and "ts" dates), the resource argument is text.
+static EventLog at1_csv_log() {
+  std::istringstream csv("cid,act,ts,who,num,start,region\n"
+                         "c1,a,2020-01-01 10:00:00,1,,2020-01-01 09:00:00,N\n"
+                         "c1,b,2020-01-01 11:00:00,2,1,2020-01-01 10:30:00,N\n"
+                         "c2,a,2020-01-02 10:00:00,1,2,2020-01-02 09:00:00,N\n"
+                         "c2,c,2020-01-02 13:00:00,1,3,2020-01-02 11:00:00,N\n"
+                         "c3,a,2020-01-03 10:00:00,2,1,2020-01-03 09:30:00,M\n"
+                         "c3,c,2020-01-03 10:30:00,10,,2020-01-03 10:00:00,M\n");
+  CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  auto log = import_csv_event_log(csv, import);
+  assert(log.dataframe_columns);
+  return log;
+}
+
+static bool raises_text(const std::function<void()>& call, const std::string& text) {
+  try {
+    call();
+  } catch (const std::invalid_argument& error) {
+    if (std::string(error.what()).find(text) != std::string::npos) return true;
+    std::fprintf(stderr, "unexpected error: %s\n", error.what());
+    return false;
+  }
+  return false;
+}
+
+static void frame_path_reads_pm4py_frame() {
+  const auto log = at1_csv_log();
+  const auto profile = [&](ResourceProfileMetric metric, const std::string& resource_key,
+                           std::map<std::string, std::string> extra = {}) {
+    ResourceProfilesOptions o;
+    o.metric = metric;
+    o.resource_attribute = resource_key;
+    o.t1 = "2019-01-01 00:00:00";
+    o.t2 = "2021-01-01 00:00:00";
+    if (extra.contains("resource")) { o.resource = extra["resource"]; o.resource_given = true; }
+    if (extra.contains("activity")) { o.activity = extra["activity"]; o.activity_given = true; }
+    if (extra.contains("case")) o.case_id_attribute = extra["case"];
+    if (extra.contains("timestamp")) o.timestamp_attribute = extra["timestamp"];
+    if (extra.contains("start")) o.start_timestamp_attribute = extra["start"];
+    if (extra.contains("activity_key")) o.activity_attribute = extra["activity_key"];
+    if (extra.contains("t1")) o.t1 = extra["t1"];
+    if (extra.contains("t2")) o.t2 = extra["t2"];
+    return discover_resource_profiles(log, o);
+  };
+  const auto values = [](const ResourceProfilesResult& result) {
+    std::map<std::string, double> out;
+    for (const auto& row : result.rows) out[row.resource] = row.value;
+    return out;
+  };
+  using M = ResourceProfileMetric;
+  // No org:resource column on this frame.
+  assert(raises_text([&] { (void)profile(M::kDistinctActivities, "org:resource"); },
+                     "KeyError: \"['org:resource'] not in index\""));
+  // Int resources are named by their value; the text "1" matches no int.
+  assert((values(profile(M::kActivityCompletions, "who")) == std::map<std::string, double>{{"1", 3}, {"10", 1}, {"2", 2}}));
+  assert(only_value(profile(M::kActivityCompletions, "who", {{"resource", "1"}})) == 0.0);
+  assert((values(profile(M::kActivityCompletions, "num")) == std::map<std::string, double>{{"1.0", 2}, {"2.0", 1}, {"3.0", 1}}));
+  // average_case_duration groups the resource's cases by the case column.
+  assert((values(profile(M::kAverageCaseDuration, "who", {{"case", "region"}})) ==
+          std::map<std::string, double>{{"1", 97200}, {"10", 1800}, {"2", 2700}}));
+  assert(raises_text([&] { (void)profile(M::kAverageCaseDuration, "who", {{"start", "start"}}); }, "KeyError: 'start'"));
+  assert(raises_text([&] { (void)profile(M::kSocialPosition, "who", {{"case", "region"}}); },
+                     "KeyError: \"None of ['case:concept:name'] are in the columns\""));
+  assert((values(profile(M::kSocialPosition, "who")) == std::map<std::string, double>{{"1", 2.0 / 3}, {"10", 1.0 / 3}, {"2", 2.0 / 3}}));
+  // A timestamp column of no dates fails once rows are compared.
+  assert(raises_text([&] { (void)profile(M::kCaseCompletions, "who", {{"timestamp", "@@index"}}); },
+                     "TypeError: '>=' not supported between instances of 'int' and 'datetime.datetime'"));
+  assert(only_value(profile(M::kDistinctActivities, "who", {{"timestamp", "@@index"}, {"resource", "Q"}})) == 0.0);
+  // `==` parses text against a datetime column, isin does not.
+  assert(only_value(profile(M::kActivityCompletions, "ts", {{"resource", "2020-01-01 10:00:00"}})) == 1.0);
+  assert(only_value(profile(M::kSocialPosition, "ts", {{"resource", "2020-01-01 10:00:00"}})) == 0.0);
+  // Durations from the start column, or from the previous event of the case.
+  assert((values(profile(M::kAverageDurationActivity, "who", {{"activity", "a"}, {"start", "start"}})) ==
+          std::map<std::string, double>{{"1", 3600}, {"2", 1800}}));
+  assert((values(profile(M::kAverageDurationActivity, "who", {{"activity", "c"}})) ==
+          std::map<std::string, double>{{"1", 10800}, {"10", 1800}}));
+  // A column selected twice.
+  assert(raises_text([&] { (void)profile(M::kActivityFrequency, "who", {{"activity_key", "who"}, {"resource", "1"}, {"activity", "a"}}); },
+                     "cannot reindex on an axis with duplicate labels"));
+  // The resource on the timestamp column: both masks keep every row.
+  assert(only_value(profile(M::kActivityCompletions, "time:timestamp",
+                            {{"resource", "Q"}, {"t1", "2020-01-02 00:00:00"}, {"t2", "2020-01-02 12:00:00"}})) == 6.0);
+  // A case column with NaN cells: the groupby drops them.
+  assert(values(profile(M::kCaseCompletions, "who", {{"case", "num"}})).at("1") == 2.0);
+}
+
 int main() {
   reference_audit_contracts();
+  frame_path_reads_pm4py_frame();
   const auto log = sample();
   auto distinct = discover_resource_profiles(log, {});
   assert(distinct.rows.size() == 2);

@@ -12,7 +12,11 @@
 #include <tuple>
 #include <unordered_map>
 
+#include "frame_cells.hpp"
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
+#include "python_scalar.hpp"
 #include "reference_activity_selector.hpp"
 
 namespace minera {
@@ -196,6 +200,13 @@ ResourceProfileMetric resource_profile_metric_from_string(std::string_view name)
   throw std::invalid_argument("unknown resource profile metric");
 }
 
+namespace {
+ResourceProfilesResult frame_resource_profiles(const EventLog& input, const ResourceProfilesOptions& o,
+                                               const Bounds& b);
+ResourceProfilesResult compute_resource_profiles(const EventLog& log, const ResourceProfilesOptions& o,
+                                                 const Bounds& b, bool frame);
+}  // namespace
+
 ResourceProfilesResult discover_resource_profiles(const EventLog& log,
                                                   const ResourceProfilesOptions& o) {
   if (o.max_resources == 0 || o.max_resources > kHardResources)
@@ -210,6 +221,13 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
       ((o.resource.empty() && !o.resource_given) || (o.resource2.empty() && !o.resource2_given)))
     throw std::invalid_argument("interaction_two_resources requires resource and resource2");
   const auto b = bounds(o);
+  if (log.dataframe_columns) return frame_resource_profiles(log, o, b);
+  return compute_resource_profiles(log, o, b, false);
+}
+
+namespace {
+ResourceProfilesResult compute_resource_profiles(const EventLog& log, const ResourceProfilesOptions& o,
+                                                 const Bounds& b, bool frame) {
   ResourceProfilesResult result; result.metric = o.metric;
   result.diagnostics.trace_count = log.trace_count(); result.diagnostics.event_count = log.event_count();
   std::set<std::string> names;
@@ -245,12 +263,16 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
       const auto t = parse_timestamp(timestamp_of(e, o));
       if (t && std::isfinite(*t)) { if (!first) first = *t; last = *t; }
       if (resource) tr_resources.insert(*resource);
+      // On the frame a case is in the slot whatever its events' resources.
+      if (frame && !resource && in_slot(t, b)) slot_cases.insert(case_id);
       if (resource && in_slot(t, b)) {
         slot_cases.insert(case_id);
         slot_cases_by_resource[*resource].insert(case_id);
         ++resource_events[*resource];
         if (resource_matches(*resource, o) && activity_matches(activity, o)) {
-          ++freq[{*resource, activity}]; acts[*resource].insert(activity);
+          ++freq[{*resource, activity}];
+          // On the frame a NaN activity is no value (nunique skips it).
+          if (!frame || e.activity_state != FirstClassAttributeState::kMissing) acts[*resource].insert(activity);
         }
         // The reference activity_completions(log, t1, t2, r) has no activity
         // argument: it counts every event the resource completes in the slot.
@@ -394,6 +416,458 @@ ResourceProfilesResult discover_resource_profiles(const EventLog& log,
   result.diagnostics.computed = true; result.diagnostics.message = result.diagnostics.output_truncated ? "row safety bound applied" : (result.rows.empty()?"no matching data":"ok");
   return result;
 }
+
+// The keys a metric selects from the frame, in pm4py's `df[[...]]` order
+// (observed black-box from its KeyError lists). average_case_duration reads
+// its columns one at a time instead (see frame_resource_profiles).
+std::vector<std::string> frame_selection(const ResourceProfilesOptions& o, const std::string& r,
+                                         const std::string& a, const std::string& c,
+                                         const std::string& t, const std::string& s) {
+  const bool start = !o.start_timestamp_attribute.empty();
+  switch (o.metric) {
+    case ResourceProfileMetric::kDistinctActivities:
+    case ResourceProfileMetric::kActivityFrequency: return {a, t, r};
+    case ResourceProfileMetric::kActivityCompletions: return {t, r};
+    case ResourceProfileMetric::kCaseCompletions:
+    case ResourceProfileMetric::kFractionCaseCompletions:
+    case ResourceProfileMetric::kSocialPosition: return {t, r, c};
+    case ResourceProfileMetric::kInteractionTwoResources: return {t, r, c, a};
+    case ResourceProfileMetric::kAverageDurationActivity:
+      if (start) return {t, r, c, a, s};
+      return {t, r, c, a};
+    case ResourceProfileMetric::kAverageWorkload:
+    case ResourceProfileMetric::kMultitasking:
+      // With a start column the intervals need no case: pm4py then selects
+      // no case column.
+      if (start) return {t, r, a, s};
+      return {t, r, c, a};
+    case ResourceProfileMetric::kAverageCaseDuration: return {r, c, t};
+  }
+  return {};
+}
+
+// A frame column's cells as pm4py's timestamp arithmetic sees them: the
+// Python type of its first present cell, or nullopt for a date column.
+std::optional<std::string> non_date_type(const EventLog& frame, const std::string& key) {
+  std::optional<std::string> first;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      const auto cell = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
+      if (!cell) continue;
+      if (cell->kind == python::Scalar::Kind::kDate) return std::nullopt;
+      return python::type_name(*cell);
+    }
+  // An all-missing column is float NaN; an empty frame has no cell to fail.
+  if (frame.event_count() == 0) return std::nullopt;
+  return std::string("float");
+}
+
+std::string utc_text(const python::Scalar& date) {
+  return format_timestamp_microseconds(static_cast<double>(date.date.seconds) +
+                                       static_cast<double>(date.date.nanoseconds) / 1e9);
+}
+
+// average_case_duration on the frame: the cases (case:concept:name) with
+// an event of the resource (an isin match, so a text argument matches text
+// cells only), their rows grouped by the case column, each group running
+// from its first to its last timestamp in frame order; the groups that meet
+// the closed window [t1, t2] (an endpoint inside, or spanning it) average.
+ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const ResourceProfilesOptions& o,
+                                                   const Bounds& b, const std::string& r,
+                                                   const std::string& c, const std::string& t,
+                                                   std::map<std::string, std::string>& resource_names) {
+  struct Row {
+    std::optional<std::string> resource, case_name, group;
+    std::optional<python::Scalar> time;
+  };
+  std::vector<Row> rows;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      Row row;
+      if (const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame)) {
+        row.resource = python::identity(*cell);
+        resource_names.try_emplace(*row.resource, python::str(*cell));
+      }
+      if (const auto cell = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame))
+        row.case_name = python::identity(*cell);
+      if (const auto cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame))
+        row.group = python::identity(*cell);
+      if (auto cell = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+          cell && cell->kind == python::Scalar::Kind::kDate)
+        row.time = std::move(cell);
+      rows.push_back(std::move(row));
+    }
+  const auto seconds = [](const python::Scalar& date) {
+    return static_cast<double>(date.date.seconds) + static_cast<double>(date.date.nanoseconds) / 1e9;
+  };
+  const auto duration = [](const python::Scalar& from, const python::Scalar& to) {
+    return static_cast<double>(to.date.seconds - from.date.seconds) +
+           (static_cast<double>(to.date.nanoseconds) - static_cast<double>(from.date.nanoseconds)) / 1e9;
+  };
+  // Each case's rows and each resource's cases (first seen first), so one
+  // resource costs the rows of its cases only.
+  std::map<std::string, std::vector<std::size_t>> case_rows;
+  std::map<std::string, std::vector<std::string>> resource_cases;
+  std::set<std::pair<std::string, std::string>> resource_case_seen;
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    const auto& row = rows[i];
+    if (!row.case_name) continue;
+    case_rows[*row.case_name].push_back(i);
+    if (row.resource && resource_case_seen.emplace(*row.resource, *row.case_name).second)
+      resource_cases[*row.resource].push_back(*row.case_name);
+  }
+  const auto profile = [&](const std::string& key) -> std::optional<std::pair<double, std::uint64_t>> {
+    const auto found = resource_cases.find(key);
+    if (found == resource_cases.end()) return std::nullopt;
+    // Each group's first and last row (frame order) among the cases' rows.
+    std::map<std::string, std::pair<std::size_t, std::size_t>> spans;
+    for (const auto& case_name : found->second)
+      for (const auto i : case_rows.at(case_name)) {
+        const auto& row = rows[i];
+        if (!row.group || !row.time) continue;
+        auto [it, inserted] = spans.try_emplace(*row.group, i, i);
+        if (!inserted) {
+          it->second.first = std::min(it->second.first, i);
+          it->second.second = std::max(it->second.second, i);
+        }
+      }
+    std::vector<std::pair<const python::Scalar*, const python::Scalar*>> groups;
+    std::vector<std::pair<std::size_t, std::size_t>> ordered;
+    for (const auto& [group, span] : spans) {
+      (void)group;
+      ordered.push_back(span);
+    }
+    std::sort(ordered.begin(), ordered.end());
+    for (const auto& [first, last] : ordered) groups.emplace_back(&*rows[first].time, &*rows[last].time);
+    double sum = 0.0;
+    std::uint64_t count = 0;
+    const auto inside = [&](double x) { return (!b.lo || x >= *b.lo) && (!b.hi || x <= *b.hi); };
+    for (const auto& [first, last] : groups) {
+      const double f = seconds(*first), l = seconds(*last);
+      if (!(inside(f) || inside(l) || ((!b.lo || f <= *b.lo) && (!b.hi || l >= *b.hi)))) continue;
+      sum += duration(*first, *last);
+      ++count;
+    }
+    if (count == 0) return std::nullopt;
+    return std::make_pair(sum / static_cast<double>(count), count);
+  };
+  ResourceProfilesResult result;
+  result.metric = o.metric;
+  std::set<std::string> keys;
+  for (const auto& row : rows)
+    if (row.resource) keys.insert(*row.resource);
+  if (keys.size() > o.max_resources) throw std::invalid_argument("resource_profiles resource bound exceeded");
+  result.diagnostics.resource_count = keys.size();
+  result.diagnostics.computed = true;
+  if (!o.resource.empty() || o.resource_given) {
+    const auto value = profile(python::identity(python::text(o.resource)));
+    if (!value) throw std::invalid_argument("resource profiles: mean requires at least one data point");
+    add_row(result, {o.resource, "", "", value->first, value->second}, o.max_rows);
+    return result;
+  }
+  for (const auto& key : keys)
+    if (const auto value = profile(key)) add_row(result, {key, "", "", value->first, value->second}, o.max_rows);
+  return result;
+}
+
+// pm4py's resource_profiles functions on a DataFrame (CSV and XES uploads):
+// keys are the frame's columns (no org:resource alias, a missing column
+// raises KeyError in the metric's selection order), cells are typed (the
+// resource and activity arguments are text, so they match text cells only;
+// rows for every resource are named by str() of the typed value), dates are
+// UTC, and cases are the groups of the case column. The metrics themselves
+// are the native ones over that view.
+ResourceProfilesResult frame_resource_profiles(const EventLog& input, const ResourceProfilesOptions& o,
+                                               const Bounds& b) {
+  const auto frame = dataframe_frame_event_log(input);
+  const auto keys = frame_keys(frame, FrameKeyScope::kDataFrame);
+  const auto or_default = [](const std::string& key, const char* fallback) {
+    return key.empty() ? std::string(fallback) : key;
+  };
+  const auto r = or_default(o.resource_attribute, "org:resource");
+  const auto a = or_default(o.activity_attribute, "concept:name");
+  const auto c = or_default(o.case_id_attribute, "case:concept:name");
+  const auto t = or_default(o.timestamp_attribute, "time:timestamp");
+  const bool start = !o.start_timestamp_attribute.empty();
+  const auto s = start ? o.start_timestamp_attribute : t;
+  const auto fail = [](const std::string& message) {
+    throw std::invalid_argument("resource profiles: " + message);
+  };
+  const auto selection = frame_selection(o, r, a, c, t, s);
+  const auto metric = o.metric;
+  if (metric == ResourceProfileMetric::kAverageCaseDuration) {
+    if (!keys.contains(r)) fail("KeyError: '" + r + "'");
+    if (!keys.contains(c)) fail("KeyError: '" + c + "'");
+    if (!keys.contains(t)) fail("KeyError: 'Column not found: " + t + "'");
+    if (start && s != t) fail("KeyError: '" + s + "'");
+  } else {
+    try {
+      require_frame_columns(keys, selection);
+    } catch (const std::invalid_argument& error) {
+      fail(error.what());
+    }
+  }
+  const bool workload = metric == ResourceProfileMetric::kAverageWorkload ||
+                        metric == ResourceProfileMetric::kMultitasking;
+  // Most metrics keep the rows of the resource before they compare times,
+  // so a timestamp column of no dates fails only when the resource occurs
+  // (interaction_two_resources: in a case with the second resource).
+  const auto text_key = [](const std::string& value) { return python::identity(python::text(value)); };
+  const auto date_column = [&](const std::string& key) {
+    bool any = false;
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events)
+        if (const auto cell = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame)) {
+          if (cell->kind != python::Scalar::Kind::kDate) return false;
+          any = true;
+        }
+    return any;
+  };
+  // `column == value` on a datetime column compares the argument as a
+  // Timestamp (naive text as UTC); any other column compares it as text.
+  const auto query_key = [&](const std::string& value, bool dates) {
+    if (dates)
+      if (const auto parsed = parse_timestamp_exact(value)) {
+        python::Scalar date;
+        date.kind = python::Scalar::Kind::kDate;
+        date.date = *parsed;
+        date.date.timezone_aware = true;
+        date.date.offset_minutes = 0;
+        return python::identity(date);
+      }
+    return text_key(value);
+  };
+  // social_position, interaction_two_resources and average_case_duration
+  // match the resource with isin, which compares text as text.
+  const bool resource_dates = metric != ResourceProfileMetric::kSocialPosition &&
+                              metric != ResourceProfileMetric::kInteractionTwoResources &&
+                              metric != ResourceProfileMetric::kAverageCaseDuration && date_column(r);
+  const bool all_resources = o.resource.empty() && !o.resource_given;
+  // The rows a metric compares times on: most metrics keep the rows of the
+  // resource first (interaction_two_resources: the cases with both
+  // resources), the case metrics compare every row. A missing cell never
+  // fails a comparison.
+  const auto wanted = query_key(o.resource, resource_dates), wanted2 = query_key(o.resource2, resource_dates);
+  std::set<std::string> both_cases;
+  if (metric == ResourceProfileMetric::kInteractionTwoResources) {
+    std::map<std::string, std::pair<bool, bool>> cases;
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events) {
+        const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
+        const auto case_cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame);
+        if (!cell || !case_cell) continue;
+        const auto key = python::identity(*cell);
+        auto& seen = cases[python::identity(*case_cell)];
+        seen.first = seen.first || key == wanted;
+        seen.second = seen.second || key == wanted2;
+      }
+    for (const auto& [key, seen] : cases)
+      if (seen.first && seen.second) both_cases.insert(key);
+  }
+  const bool resource_first = metric != ResourceProfileMetric::kCaseCompletions &&
+                              metric != ResourceProfileMetric::kFractionCaseCompletions &&
+                              metric != ResourceProfileMetric::kSocialPosition;
+  const auto offending_type = [&](const std::string& key) -> std::optional<std::string> {
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events) {
+        if (resource_first) {
+          const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
+          if (!cell) continue;
+          if (metric == ResourceProfileMetric::kInteractionTwoResources) {
+            const auto case_cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame);
+            if (!case_cell || !both_cases.contains(python::identity(*case_cell))) continue;
+          } else if (!all_resources && python::identity(*cell) != wanted) {
+            continue;
+          }
+        }
+        const auto value = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
+        if (value && value->kind != python::Scalar::Kind::kDate) return python::type_name(*value);
+      }
+    return std::nullopt;
+  };
+  // The two duration averages use the column's .dt accessor, which needs a
+  // datetime column whatever the rows.
+  const bool needs_dt = metric == ResourceProfileMetric::kAverageDurationActivity ||
+                        metric == ResourceProfileMetric::kAverageCaseDuration;
+  if (const auto t_type = needs_dt ? non_date_type(frame, t) : offending_type(t)) {
+    if (workload) fail("AttributeError: 'float' object has no attribute 'timestamp'");
+    fail(std::string("TypeError: '") + (metric == ResourceProfileMetric::kAverageCaseDuration ? "<" : ">=") +
+         "' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
+  }
+  // A column named twice in the selection: pandas cannot realign the
+  // selected frame (workload with its start column on the timestamp column
+  // is the one combination that runs).
+  {
+    std::set<std::string> seen;
+    for (const auto& key : selection)
+      if (!seen.insert(key).second && metric != ResourceProfileMetric::kAverageCaseDuration &&
+          !(workload && start && s == t && key == t) &&
+          !(metric == ResourceProfileMetric::kActivityCompletions))
+        fail(metric == ResourceProfileMetric::kAverageWorkload || metric == ResourceProfileMetric::kMultitasking ||
+                     metric == ResourceProfileMetric::kAverageDurationActivity
+                 ? "ValueError: The column label '" + key + "' is not unique."
+                 : "ValueError: cannot reindex on an axis with duplicate labels");
+  }
+  if ((metric == ResourceProfileMetric::kSocialPosition ||
+       metric == ResourceProfileMetric::kInteractionTwoResources) &&
+      std::find(selection.begin(), selection.end(), "case:concept:name") == selection.end())
+    fail("KeyError: \"None of ['case:concept:name'] are in the columns\"");
+  const bool uses_start = start && (workload || metric == ResourceProfileMetric::kAverageDurationActivity);
+  if (uses_start)
+    if (const auto s_type = workload ? offending_type(s) : non_date_type(frame, s)) {
+      if (workload) fail("AttributeError: '" + *s_type + "' object has no attribute 'timestamp'");
+      fail("TypeError: unsupported operand type(s) for -: 'Timestamp' and '" + *s_type + "'");
+    }
+  // The metrics that read cases (workload and multitasking only without a
+  // start column).
+  const bool uses_case = metric == ResourceProfileMetric::kCaseCompletions ||
+                         metric == ResourceProfileMetric::kFractionCaseCompletions ||
+                         metric == ResourceProfileMetric::kSocialPosition ||
+                         metric == ResourceProfileMetric::kInteractionTwoResources ||
+                         metric == ResourceProfileMetric::kAverageDurationActivity ||
+                         metric == ResourceProfileMetric::kAverageCaseDuration || (workload && !start);
+  // The metrics that group by the case column sort its values: values of
+  // two classes (text beside numbers, dates beside numbers) raise
+  // TypeError. average_case_duration groups the cases of the resource only.
+  if (uses_case && metric != ResourceProfileMetric::kInteractionTwoResources &&
+      metric != ResourceProfileMetric::kSocialPosition) {
+    std::set<std::string> resource_cases;
+    if (metric == ResourceProfileMetric::kAverageCaseDuration)
+      for (const auto& trace : frame.traces)
+        for (const auto& event : trace.events) {
+          const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
+          const auto case_name = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+          if (cell && case_name && (all_resources || python::identity(*cell) == text_key(o.resource)))
+            resource_cases.insert(python::identity(*case_name));
+        }
+    std::vector<std::vector<python::Scalar>> case_keys;
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events) {
+        if (metric == ResourceProfileMetric::kAverageCaseDuration) {
+          const auto case_name = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+          if (!case_name || !resource_cases.contains(python::identity(*case_name))) continue;
+        }
+        if (auto cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame))
+          case_keys.push_back({std::move(*cell)});
+      }
+    try {
+      (void)python::groupby(case_keys);
+    } catch (const python::TypeError& error) {
+      fail(std::string("TypeError: ") + error.what());
+    }
+  }
+
+  // The view: one trace per case group (pandas groupby drops a NaN case),
+  // events in frame order; resources, activities and case ids keyed by
+  // their Python identity.
+  std::map<std::string, std::string> resource_names, activity_names;
+  EventLog view;
+  std::map<std::string, std::size_t> case_index;
+  const std::string start_key = "\x01start";
+  const bool intervals = workload || metric == ResourceProfileMetric::kAverageDurationActivity;
+  std::size_t row_number = 0;
+  for (const auto& trace : frame.traces) {
+    if (!uses_case) view.traces.emplace_back();
+    for (const auto& event : trace.events) {
+      ++row_number;
+      std::string case_key;
+      if (uses_case) {
+        const auto cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame);
+        if (!cell) {
+          // The interval metrics keep a row with no case, its interval
+          // starting at its own time; the other metrics' groupby drops it.
+          if (!intervals) continue;
+          case_key = "\x01row" + std::to_string(row_number);
+        } else {
+          case_key = python::identity(*cell);
+        }
+        const auto [it, inserted] = case_index.try_emplace(case_key, view.traces.size());
+        if (inserted) {
+          view.traces.emplace_back();
+          view.traces.back().case_id = case_key;
+        }
+      }
+      auto& target = uses_case ? view.traces[case_index[case_key]] : view.traces.back();
+      Event out;
+      if (const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame)) {
+        out.resource = python::identity(*cell);
+        out.resource_state = FirstClassAttributeState::kPresent;
+        resource_names.try_emplace(out.resource, python::str(*cell));
+      }
+      if (const auto cell = frame_scalar(frame, trace, event, a, FrameKeyScope::kDataFrame)) {
+        out.activity = python::identity(*cell);
+        out.activity_state = FirstClassAttributeState::kPresent;
+        activity_names.try_emplace(out.activity, python::str(*cell));
+      }
+      if (const auto cell = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+          cell && cell->kind == python::Scalar::Kind::kDate)
+        out.timestamp = utc_text(*cell);
+      if (uses_start)
+        if (const auto cell = frame_scalar(frame, trace, event, s, FrameKeyScope::kDataFrame);
+            cell && cell->kind == python::Scalar::Kind::kDate)
+          out.attributes.push_back(EventAttribute{start_key, utc_text(*cell)});
+      target.events.push_back(std::move(out));
+    }
+  }
+  ResourceProfilesOptions native = o;
+  native.resource_attribute.clear();
+  native.activity_attribute.clear();
+  native.timestamp_attribute.clear();
+  native.case_id_attribute.clear();
+  native.start_timestamp_attribute = uses_start ? start_key : std::string{};
+  if (!o.resource.empty() || o.resource_given) native.resource = query_key(o.resource, resource_dates);
+  if (!o.activity.empty() || o.activity_given) native.activity = query_key(o.activity, date_column(a));
+  if (!o.resource2.empty() || o.resource2_given) native.resource2 = query_key(o.resource2, resource_dates);
+  ResourceProfilesResult result;
+  if (metric == ResourceProfileMetric::kAverageCaseDuration) {
+    result = frame_average_case_duration(frame, o, b, r, c, t, resource_names);
+  } else {
+    result = compute_resource_profiles(view, native, b, true);
+  }
+  // activity_completions with the resource on the timestamp column selects
+  // that column twice; its masks then keep every row (len of the frame).
+  if (metric == ResourceProfileMetric::kActivityCompletions && r == t) {
+    const auto rows = static_cast<std::uint64_t>(frame.event_count());
+    result.rows.clear();
+    if (!all_resources) {
+      add_row(result, {native.resource, "", "", static_cast<double>(rows), rows}, o.max_rows);
+    } else {
+      for (const auto& [key, name] : resource_names) {
+        (void)name;
+        add_row(result, {key, "", "", static_cast<double>(rows), rows}, o.max_rows);
+      }
+    }
+  }
+  result.diagnostics.trace_count = input.trace_count();
+  result.diagnostics.event_count = input.event_count();
+  const auto rename = [](const std::map<std::string, std::string>& names, const std::string& key,
+                         const std::string& query_key, const std::string& query) {
+    if (key == query_key) return query;
+    const auto it = names.find(key);
+    return it == names.end() ? key : it->second;
+  };
+  std::vector<ResourceProfileRow> rows;
+  std::set<std::tuple<std::string, std::string, std::string>> named;
+  for (auto& row : result.rows) {
+    if (metric == ResourceProfileMetric::kActivityFrequency && row.activity.empty()) continue;
+    // average_case_duration names its one-resource row already.
+    if (metric != ResourceProfileMetric::kAverageCaseDuration || all_resources)
+      row.resource = rename(resource_names, row.resource, native.resource, o.resource);
+    row.resource2 = rename(resource_names, row.resource2, native.resource2, o.resource2);
+    if (!row.activity.empty()) row.activity = rename(activity_names, row.activity, native.activity, o.activity);
+    // Two values with one str() (the int 7 and the text "7" in one object
+    // column) keep the first row.
+    if (named.emplace(row.resource, row.activity, row.resource2).second) rows.push_back(std::move(row));
+  }
+  std::sort(rows.begin(), rows.end(), [](const auto& x, const auto& y) {
+    return std::tie(x.resource, x.activity, x.resource2) < std::tie(y.resource, y.activity, y.resource2);
+  });
+  result.rows = std::move(rows);
+  result.diagnostics.message = result.diagnostics.output_truncated ? "row safety bound applied"
+                               : (result.rows.empty() ? "no matching data" : "ok");
+  return result;
+}
+}  // namespace
 
 std::string resource_profiles_json(const ResourceProfilesResult& result) {
   std::set<std::tuple<std::string, std::string, std::string>> keys;

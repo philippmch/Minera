@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
 
 namespace minera {
 
@@ -40,24 +41,38 @@ struct FrameValue {
 // as the reference raises KeyError for a column the frame does not have.
 void require_frame_key(const std::set<std::string>& keys, const std::string& key);
 
-// The value of `key` for one event of the frame view (a key of frame_keys).
-[[nodiscard]] FrameValue frame_value(const Trace& trace, const Event& event,
-                                     const std::string& key, FrameKeyScope scope);
+// The value of `key` for one event of `frame` (dataframe_frame_event_log's
+// view; a key of frame_keys). A CSV activity column under its own header is
+// typed as read_csv typed it (DataFrameColumns::activity_type), its copy
+// concept:name is text.
+[[nodiscard]] FrameValue frame_value(const EventLog& frame, const Trace& trace,
+                                     const Event& event, const std::string& key,
+                                     FrameKeyScope scope);
+
+// Throws std::invalid_argument with pandas' KeyError text for the columns of
+// a `df[[...]]` selection the frame lacks: "['x'] not in index" when some of
+// them exist, "None of [Index([...], dtype='str')] are in the [columns]" when
+// none does.
+void require_frame_columns(const std::set<std::string>& keys,
+                           const std::vector<std::string>& selection);
 
 // A number's value (True 1, False 0).
 [[nodiscard]] double frame_number(const FrameValue& value);
 
 // The names values take as Python dict keys and the order sorted() gives
-// them: numbers equal in value are one key (True, 1 and 1.0), named by the
-// first one met; numbers order by value, text by code point.
+// them: numbers equal in value are one key (True, 1 and 1.0, compared
+// exactly, so ints past 2**53 stay apart), named by the first one met;
+// numbers order by value, text by code point.
 class FrameNames {
  public:
   std::string name(const FrameValue& value);
   [[nodiscard]] bool less(const std::string& left, const std::string& right) const;
 
  private:
-  std::map<double, std::string> numbers_;
-  std::map<std::string, double> number_of_;
+  // A number's Python identity (python_scalar.hpp) and the name it took.
+  std::map<std::string, std::string> numbers_;
+  // A name's number, as its Python literal ("7", "2.5", "True").
+  std::map<std::string, std::string> number_of_;
 };
 
 // Throws std::invalid_argument with Python's TypeError text when sorted()

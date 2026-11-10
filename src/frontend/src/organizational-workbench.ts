@@ -69,15 +69,34 @@ export const ORGANIZATIONAL_CONTROLS: Record<OrganizationalFamily, readonly Orga
 };
 export interface OrganizationalWorkbenchForm { fields: Record<string, string>; roles_source_id?: string; }
 export const defaultOrganizationalWorkbenchForm = (): OrganizationalWorkbenchForm => ({fields: {}});
-/** A roles form whose resource field starts at the session's resource key when it is not the native default
- * org:resource (a CSV resource column under another header: pm4py's frame then has no org:resource). */
-export function withSessionResourceKey(form: OrganizationalWorkbenchForm, resourceKey: string | undefined, previousKey?: string): OrganizationalWorkbenchForm {
-  const current = form.fields.roles_resource_attribute;
-  if (current !== undefined && current !== "" && current !== previousKey) return form;
+/** The resource fields of each family, which default to org:resource on the server. */
+export const ORGANIZATIONAL_RESOURCE_FIELDS: Record<OrganizationalFamily, readonly string[]> = {
+  roles: ["roles_resource_attribute"],
+  profiles: ["resource_profiles_resource_attribute"],
+  diagnostics: ["local_diagnostics_resource_attribute"],
+  network: ["network_analysis_source_node_attribute", "network_analysis_target_node_attribute"],
+};
+/** A form whose resource fields start at the session's resource key when it is not the native default
+ * org:resource (a CSV resource column under another header: pm4py's frame then has no org:resource).
+ * A field the user edited away from the previous session key stays. */
+export function withSessionResourceKey(form: OrganizationalWorkbenchForm, resourceKey: string | undefined, previousKey?: string, family: OrganizationalFamily = "roles"): OrganizationalWorkbenchForm {
+  const fields = ORGANIZATIONAL_RESOURCE_FIELDS[family].filter(field => {
+    const current = form.fields[field];
+    return current === undefined || current === "" || current === previousKey;
+  });
+  if (fields.length === 0) return form;
   const next = {...form.fields};
-  if (resourceKey === undefined || resourceKey === "org:resource") delete next.roles_resource_attribute;
-  else next.roles_resource_attribute = resourceKey;
+  for (const field of fields) {
+    if (resourceKey === undefined || resourceKey === "org:resource") delete next[field];
+    else next[field] = resourceKey;
+  }
   return {...form, fields: next};
+}
+/** Every family's form with its resource fields at the session's resource key. */
+export function withSessionResourceKeys(forms: Record<OrganizationalFamily, OrganizationalWorkbenchForm>, resourceKey: string | undefined, previousKey?: string): Record<OrganizationalFamily, OrganizationalWorkbenchForm> {
+  const next = {...forms};
+  for (const family of ORGANIZATIONAL_FAMILIES) next[family] = withSessionResourceKey(forms[family], resourceKey, previousKey, family);
+  return next;
 }
 export interface OrganizationalSource { source_id: string; dataset: string; case_count: number; event_count: number; }
 type NativeOrganizationalResult = RoleDiscoveryResult | ResourceProfilesResult | LocalDiagnosticsResult | NetworkAnalysisResult;

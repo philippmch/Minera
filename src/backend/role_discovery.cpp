@@ -1,5 +1,6 @@
 #include "minera/role_discovery.hpp"
 
+#include "frame_cells.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "minera/frame_keys.hpp"
 
@@ -34,13 +35,10 @@ struct WorkingRole {
   std::vector<std::string> resource_order;
 };
 
-std::string activity_key(const WorkingRole& role) {
-  std::string key;
-  for (const auto& activity : role.activities) {
-    if (!key.empty()) key.push_back('\x1f');
-    key += activity;
-  }
-  return key;
+// The role's sorted activity list, which the reference compares as a Python
+// list (element by element, a prefix first; an empty name is an element).
+const std::set<std::string>& activity_key(const WorkingRole& role) {
+  return role.activities;
 }
 
 std::size_t resource_cardinality(const WorkingRole& role) {
@@ -121,16 +119,19 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
     std::set<FrameValueClass> resource_classes;
     for (const auto& trace : log.traces)
       for (const auto& event : trace.events) {
-        const auto activity = frame_value(trace, event, options.activity_attribute, scope);
+        const auto activity = frame_value(log, trace, event, options.activity_attribute, scope);
         if (scope == FrameKeyScope::kDataFrame) {
-          const auto resource = frame_value(trace, event, options.resource_attribute, scope);
+          const auto resource = frame_value(log, trace, event, options.resource_attribute, scope);
           if (activity.missing() || resource.missing()) continue;
           resource_classes.insert(resource.value_class);
         }
         if (activity.value_class != FrameValueClass::kText)
           throw std::invalid_argument(
               std::string("TypeError: sequence item 0: expected str instance, ") +
-              (activity.value_class == FrameValueClass::kDate ? "Timestamp" : "float") + " found");
+              (activity.value_class == FrameValueClass::kDate ? std::string("Timestamp")
+               : activity.missing() ? std::string("float")
+                                    : python::type_name(frame_number_scalar(activity))) +
+              " found");
       }
     require_sortable_classes(resource_classes);
   }
@@ -139,7 +140,7 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
   const auto select = [&](const Trace& trace, const Event& event, const std::string& key,
                           bool resource) -> std::optional<std::string> {
     if (frame) {
-      const auto value = frame_value(trace, event, key, scope);
+      const auto value = frame_value(log, trace, event, key, scope);
       if (value.missing()) return std::nullopt;
       return (resource ? frame_names : frame_activity_names).name(value);
     }
@@ -192,13 +193,13 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
   while (roles.size() > 1) {
     double best = -1.0;
     std::size_t bi = roles.size(), bj = roles.size();
-    std::string best_left, best_right;
+    std::set<std::string> best_left, best_right;
     for (std::size_t i = 0; i < roles.size(); ++i)
       for (std::size_t j = i + 1; j < roles.size(); ++j) {
         const double score = similarity(roles[i], roles[j]);
         if (!(score > options.threshold)) continue;
-        const auto candidate_left = activity_key(roles[i]);
-        const auto candidate_right = activity_key(roles[j]);
+        const auto& candidate_left = activity_key(roles[i]);
+        const auto& candidate_right = activity_key(roles[j]);
         if (bi == roles.size() || score > best ||
             (score == best && (candidate_left < best_left ||
                                (candidate_left == best_left &&

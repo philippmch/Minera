@@ -102,6 +102,8 @@ static void flat_csv_case_column() {
   const auto log = import_csv_event_log(csv);
   for (const char* column : {"case:concept:name", "case_id"}) {
     NetworkAnalysisOptions o;
+    // The frame keeps the resource column under its own header.
+    o.source_node_attribute = o.target_node_attribute = "resource";
     o.out_relation_attribute = o.in_relation_attribute = column;
     const auto edges = discover_network_analysis(log, o).edges;
     assert(edges.size() == 2);
@@ -110,6 +112,7 @@ static void flat_csv_case_column() {
   }
   // A name the CSV does not carry is still the pandas KeyError.
   NetworkAnalysisOptions absent;
+  absent.source_node_attribute = absent.target_node_attribute = "resource";
   absent.out_relation_attribute = absent.in_relation_attribute = "case:region";
   try { (void)discover_network_analysis(log, absent); assert(false); }
   catch (const std::invalid_argument& error) {
@@ -117,8 +120,47 @@ static void flat_csv_case_column() {
   }
 }
 
+// pm4py 2.7.22 on read_csv + format_dataframe(case_id="cid", activity_key="act",
+// timestamp_key="ts") of this CSV (Review AT1): "who" and "code" are int
+// columns (past 2**53 too), "team" text with a NaN cell, no org:resource.
+static EventLog at1_csv_frame() {
+  std::istringstream csv("cid,act,ts,who,team,code\n"
+                         "c1,a,2020-01-01 10:00:00,1,g1,7\n"
+                         "c1,b,2020-01-01 11:00:00,2,g2,8\n"
+                         "c2,a,2020-01-02 10:00:00,1,g1,7\n"
+                         "c2,c,2020-01-02 13:00:00,1,,9\n"
+                         "c3,a,2020-01-03 10:00:00,2,g2,7\n"
+                         "c3,c,2020-01-03 10:30:00,9007199254740993,g1,9007199254740992\n");
+  CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  auto log = import_csv_event_log(csv, import);
+  assert(log.dataframe_columns);
+  return log;
+}
+
+// Nodes are the frame's typed cells: {(1, 1): {'a': 1}, (1, 2): {'a': 1},
+// (2, 9007199254740993): {'a': 1}}; the default org:resource is no column.
+static void frame_path_reads_pm4py_frame() {
+  const auto log = at1_csv_frame();
+  try { (void)discover_network_analysis(log, {}); assert(false); }
+  catch (const std::invalid_argument& error) {
+    assert(std::string(error.what()) == "network analysis: KeyError: \"['org:resource'] not in index\"");
+  }
+  NetworkAnalysisOptions o;
+  o.source_node_attribute = o.target_node_attribute = "who";
+  const auto edges = discover_network_analysis(log, o).edges;
+  assert(edges.size() == 3);
+  assert(edges[0].source == "1" && edges[0].target == "1" && edges[0].activity == "a" && edges[0].count == 1);
+  assert(edges[1].source == "1" && edges[1].target == "2" && edges[1].activity == "a" && edges[1].count == 1);
+  assert(edges[2].source == "2" && edges[2].target == "9007199254740993" && edges[2].count == 1);
+}
+
 int main() {
   reference_audit_contracts();
+  frame_path_reads_pm4py_frame();
   flat_csv_case_column();
   auto result = discover_network_analysis(sample());
   assert(result.variant == NetworkAnalysisVariant::kDataframe);

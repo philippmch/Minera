@@ -83,10 +83,48 @@ void frame_path_reads_pm4py_keys() {
   assert(raises([&] { (void)discover_roles(log, options); },
                 "TypeError: sequence item 0: expected str instance"));
 }
+// pm4py 2.7.22 on read_csv + format_dataframe(case_id="cid", activity_key="act",
+// timestamp_key="ts") of this CSV (Review AT1): "who" and "code" are int
+// columns (past 2**53 too), "team" text with a NaN cell, no org:resource.
+EventLog at1_csv_log() {
+  std::istringstream csv("cid,act,ts,who,team,code\n"
+                         "c1,a,2020-01-01 10:00:00,1,g1,7\n"
+                         "c1,b,2020-01-01 11:00:00,2,g2,8\n"
+                         "c2,a,2020-01-02 10:00:00,1,g1,7\n"
+                         "c2,c,2020-01-02 13:00:00,1,,9\n"
+                         "c3,a,2020-01-03 10:00:00,2,g2,7\n"
+                         "c3,c,2020-01-03 10:30:00,9007199254740993,g1,9007199254740992\n");
+  CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  auto log = import_csv_event_log(csv, import);
+  assert(log.dataframe_columns);
+  return log;
+}
+
+// Review AT1: ints past 2**53 keep their exact names, the pandas variant
+// orders roles and resources by value, an int activity column raises.
+void frame_path_typed_values() {
+  const auto log = at1_csv_log();
+  RoleDiscoveryOptions options;
+  options.variant = RoleDiscoveryVariant::kPandas;
+  options.resource_attribute = "code";
+  const Roles code{{{"c"}, {{"9", 1}, {"9007199254740992", 1}}}, {{"b"}, {{"8", 1}}}, {{"a"}, {{"7", 3}}}};
+  assert(roles_of(discover_roles(log, options)) == code);
+  options.resource_attribute = "who";
+  const Roles who{{{"c"}, {{"1", 1}, {"9007199254740993", 1}}}, {{"a"}, {{"1", 2}, {"2", 1}}}, {{"b"}, {{"2", 1}}}};
+  assert(roles_of(discover_roles(log, options)) == who);
+  options.activity_attribute = "code";
+  assert(raises([&] { (void)discover_roles(log, options); },
+                "TypeError: sequence item 0: expected str instance, int found"));
+}
 }  // namespace
 
 int main() {
   frame_path_reads_pm4py_keys();
+  frame_path_typed_values();
   EventLog log{{Trace{"c", {Event{"c","A","","r1",0}, Event{"c","A","","r1",1}, Event{"c","B","","r1",2}, Event{"c","B","","r1",3}, Event{"c","B","","r2",4}}}}};
   RoleDiscoveryOptions merge_options; merge_options.threshold = 0.49;
   auto result = discover_roles(log, merge_options);

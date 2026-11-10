@@ -21651,3 +21651,179 @@ raise `KeyError` for `org:resource` on such frames and compare the
 resource argument with the typed cells), local diagnostics (pm4py's
 `apply_from_group_attribute` on a frame is its pandas implementation, whose
 results differ from the EventLog one) and network analysis.
+
+## Review AT1: re-review of round AS, the other organizational routes on the DataFrame path (2026-11-10)
+
+Round AS's changes were re-read and swept again on new seeds (`frame_keys`
+per scope, `frame_value` typing, `FrameNames`, the frame branches of
+`discover_organizational_sna` and `discover_roles`, their CLI/workbench/LLM
+callers and the frontend default). Findings, all fixed:
+
+- **AT1-1 Role tie-break order.** Between equally similar role pairs, pm4py
+  takes the first pair in the order of the roles' sorted activity lists,
+  compared as Python lists (element by element, a prefix first). Minera
+  compared the lists joined into one string with a separator byte, which
+  orders differently when an activity is empty or holds a character below
+  the separator (XES uploads), so another pair merged first.
+- **AT1-2 Ints past 2**53.** `FrameNames` keyed numbers by their double, so
+  two int resources past 2**53 that differ by one (9007199254740993 and
+  9007199254740992) became one name. Numbers are now keyed by their exact
+  Python value (`python::identity`): `True`, `1` and `1.0` stay one key.
+- **AT1-3 The activity column under its own header is typed.** `read_csv`
+  types a CSV activity column like any other (`act` of ints is int64), and
+  only the `concept:name` copy is text. Minera read the column as text, so
+  role discovery with that activity key did not raise
+  `TypeError: sequence item 0: expected str instance, int found` and SNA
+  printed `007` instead of `7`.
+
+The second area brought the three remaining organizational routes onto the
+AS contract (keys are frame columns, cells are typed) for CSV and XES
+uploads, compared with pm4py on the formatted frame:
+
+- **AT1-4 Date text columns are dates.** `format_dataframe` converts every
+  other text column whose present cells all parse with
+  `to_datetime(format="mixed", utc=True)` to `datetime64[us, UTC]`
+  (event and `case:` columns alike; observed black-box: a start-time column
+  is a date column of the frame). Minera kept them as text, so a start
+  column could not serve as `start_timestamp_key` and such values printed
+  without their UTC offset. A column whose cells need nanoseconds beside a
+  cell outside the nanosecond range stays text.
+- **AT1-5 Local diagnostics** (`/api/local-diagnostics`): pm4py's
+  `apply_from_group_attribute` on a frame is its pandas implementation.
+  Keys are checked in the order activity, resource, group (`KeyError: 'x'`),
+  a column named twice (the group as resource or activity, or with a group
+  attribute the resource as activity) raises `KeyError` too, and the
+  groupbys over (resource, activity) and the group sort their keys, so
+  values Python cannot order raise `TypeError`. Groups and memberships
+  follow the native group-attribute contract (a member's every event counts
+  for its groups, a NaN group cell included; coverage stays on the tagged
+  events), over typed resources, activities and groups named as Python
+  prints them. `apply_from_clustering_or_roles` reads the default group key
+  as well: on an upload without an `org:group` column the explicit-groups
+  mode raises `KeyError: 'org:group'`, so the roles-to-diagnostics handoff
+  fails there as pm4py does (listed members are text and match text cells
+  only).
+- **AT1-6 Network analysis** (`/api/network-analysis`): selectors are frame
+  columns (the default `org:resource` raises `KeyError: "['org:resource'] not
+  in index"` on a CSV resource column under another header), nodes and edge
+  labels are typed cells, dates are UTC. The merge of the out and in
+  relation columns follows pandas' dtype rules (`ValueError: You are trying
+  to merge on <L> and <R> columns for key 'out'. If you wish to proceed you
+  should use pd.concat` for an int column beside a text one), a relation on
+  CSV `@@index` raises `ValueError: The column label '@@index' is not
+  unique.`, and a performance timestamp column of no dates raises as pandas
+  does (`numpy boolean subtract` for bools, `'str' and 'str'` for text with
+  links, `Can only use .dt accessor` otherwise).
+- **AT1-7 Resource profiles** (`/api/resource-profiles`): pm4py's
+  `resource_profiles` functions on the frame.
+  - A missing column raises `KeyError` in the metric's `df[[...]]` order:
+    `distinct_activities` and `activity_frequency` select activity,
+    timestamp, resource; `activity_completions` timestamp, resource; the
+    case metrics (`case_completions`, `fraction_case_completions`,
+    `social_position`) timestamp, resource, case;
+    `interaction_two_resources` adds the activity;
+    `average_duration_activity` selects timestamp, resource, case, activity
+    and the start column when one is given; `average_workload` and
+    `multitasking` select timestamp, resource, case, activity, or with a
+    start column timestamp, resource, activity, start (no case).
+    `average_case_duration` reads resource, case and timestamp one at a time
+    (`KeyError: 'Column not found: <t>'` for the timestamp), and a start
+    column other than the timestamp column raises `KeyError: '<start>'`.
+  - `social_position` and `interaction_two_resources` raise
+    `KeyError: "None of ['case:concept:name'] are in the columns"` for any
+    other case column.
+  - The resource and activity arguments are text. The `==` metrics compare
+    them with a datetime column as Timestamps (naive text as UTC); the
+    `isin` metrics (`social_position`, `interaction_two_resources`,
+    `average_case_duration`) and every non-date column match text cells
+    only, so `"1"` matches nothing in an int column. The all-resources rows
+    (Minera's extension) are named by `str()` of each typed value and hold
+    pm4py's value for that value.
+  - A timestamp column holding a non-date cell raises once a compared row
+    holds one: for most metrics the resource's rows (the interaction: the
+    cases with both resources), for the case metrics any row, and for the
+    two duration averages (`.dt`) whatever the rows. The start column of the
+    interval metrics likewise.
+  - A column selected twice raises `ValueError` (cannot reindex, or not
+    unique). Two combinations run: `activity_completions` with the resource
+    on the timestamp column counts every row of the frame (its masks keep
+    all rows), and workload/multitasking with the start column on the
+    timestamp column.
+  - The metrics that group by the case column sort it: values of two classes
+    raise `TypeError` (`average_case_duration` only over the resource's
+    cases). Cases are groups of the case column (a NaN case cell is dropped,
+    the interval metrics keep such a row as its own interval);
+    `social_position` counts every case in the slot, events without a
+    resource included.
+  - `average_case_duration` takes the cases (`case:concept:name`) with an
+    event of the resource, groups their rows by the case column, and
+    averages each group's first-to-last span (frame order) over the groups
+    that meet the closed window.
+- **AT1-8 Frontend.** The resource fields of resource profiles, local
+  diagnostics and both network node fields start at the session's resource
+  key, like the roles field (`withSessionResourceKeys`; a field edited away
+  from the previous session key stays).
+
+**Contract.** As in AS (Philipp may overrule): on CSV and XES uploads these
+routes read keys and cells as pm4py reads its frame; native table sources
+keep the alias rules.
+
+Declarations (pm4py raises or returns NaN; Minera answers):
+
+- All-resources profile requests are Minera's extension (pm4py takes one
+  resource). When pm4py would raise for some resources and not for others
+  (a text timestamp column with NaN cells on some resources' rows), Minera
+  raises for the request.
+- NaN resource cells get no row (pm4py keys each NaN cell apart, as
+  declared in AS); an XES object column holding the int `7` and the text
+  `"7"` gives one row (the first met), as SNA does.
+- The texts of the less common errors (a column selected twice, timestamp
+  dtype errors) follow pandas' wording for the common dtypes only; the
+  route answers 400 in both cases.
+- `t1`/`t2` accept ISO forms (`T`, offsets) on both paths; pm4py's own
+  parse takes `%Y-%m-%d %H:%M:%S` only.
+- `average_duration_activity` on an empty selection: pm4py returns NaN or
+  raises `AttributeError: Can only use .dt accessor` (as declared before).
+- Sort ties of numeric and datetime keys in network analysis follow numpy's
+  generic argsort; on CPUs with AVX2 or AVX-512 numpy 2.4 dispatches to
+  x86-simd-sort, whose tie order differs, so reference sweeps run with
+  `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"`.
+
+Verification (`atref.py` and `atsweep.py` in the project files under
+`review-harness/round-at/`; the reference ran with the
+`NPY_DISABLE_CPU_FEATURES` setting above):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| SNA and roles re-review, AS binary, CSV and XES (new seeds) | 660 | 244 equal, 334 raise in both, 80 NaN-declared, 2 differed (AT1-1; AT1-2 and AT1-3 came from targeted cases) |
+| SNA and roles, fixed binary, CSV (seeds 0 to 59) | 360 | 143 equal, 171 raise in both, 46 NaN-declared, 0 differences |
+| SNA and roles, fixed binary, XES (seeds 0 to 59) | 360 | 145 equal, 177 raise in both, 38 NaN-declared, 0 differences |
+| Local diagnostics, CSV / XES uploads | 240 / 150 | 93 / 44 equal, 147 / 106 raise in both, 0 differences |
+| Network analysis, CSV / XES uploads | 240 / 150 | 51 / 95 equal, 189 / 55 raise in both, 0 differences |
+| Resource profiles, AS binary, CSV (seeds 0 to 39) | 367 | 229 equal, 74 differed, 33 raise in pm4py only, 9 raise in both, 22 NaN |
+| Resource profiles, fixed binary, CSV (seeds 0 to 299) | 3,819 | 2,886 equal (567 of them zero rows), 795 raise in both, 138 NaN, 0 differences |
+| Resource profiles, fixed binary, CSV (seeds 300 to 499) | 2,562 | 2,122 equal, 290 raise in both, 147 NaN, 3 declared (`.dt` on empty selections) |
+| Resource profiles, fixed binary, XES (seeds 0 to 299) | 2,675 | 2,403 equal, 176 raise in both, 96 NaN, 0 differences |
+| Resource profiles, final binary, CSV (seeds 500 to 649) | 1,560 | 1,262 equal, 233 raise in both, 65 NaN, 0 differences |
+| Resource profiles, final binary, XES (seeds 300 to 449) | 1,265 | 1,126 equal, 81 raise in both, 58 NaN, 0 differences |
+| Average case duration, 100,000-event CSV, case column `region` (3 resources) | 3 | 3 equal (negative spans, frame order), 1.4 s for all 200 resources |
+| Features, CSV with custom headers (featsweep, seeds 900 to 929) | 90 | 90 equal |
+| Temporal (`grouper_freq`), CSV with custom headers (seeds 900 to 929) | 90 | 74 equal, 16 raise in both |
+| Temporal, CSV timestamps with offsets and `T` (seeds 950 to 979) | 90 | 60 equal, 30 raise in both |
+| Root cause, CSV (rccsv4, seeds 900 to 929) | 226 | 224 equal, 2 raise in both |
+| Profile clustering, CSV without gaps (seeds 900 to 924) | 50 | 47 equal, 3 flagged ties |
+| Fixture replay (16 manifests, a fresh server each) | 2,673 responses | unchanged |
+
+Tests: `minera_resource_profiles_tests` (`frame_path_reads_pm4py_frame`:
+KeyError for `org:resource`, int and float resource names, a text argument
+against ints, average case duration by a case column, the start column,
+social position with another case column, a timestamp column of ints,
+`==` against a datetime column versus `isin`, the previous-event and
+start-column durations, a column selected twice, the resource on the
+timestamp column, a case column with NaN cells),
+`minera_local_diagnostics_tests` and `minera_network_analysis_tests`
+(frame cases with int resources past 2**53 and a NaN group cell; the CSV
+network test now names its `resource` column), `minera_role_discovery_tests`
+(`frame_path_typed_values`), and the frontend's
+`session-resource-key.test.ts`. Full suite: 454 ctest targets, vitest
+(10,723), the Python script tests (406), `tsc` and the Vite build.

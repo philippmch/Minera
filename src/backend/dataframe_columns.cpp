@@ -98,9 +98,11 @@ EventAttribute missing_cell(const DataFrameColumn& column) {
   return float_cell(column.key, std::numeric_limits<double>::quiet_NaN());
 }
 
+}  // namespace
+
 // A CSV timestamp as format_dataframe's to_datetime(utc=True) holds it: the
 // UTC instant, printed with "+00:00" (nullopt when the text is no instant).
-std::optional<EventAttribute> utc_date_cell(const std::string& key, const std::string& text) {
+std::optional<EventAttribute> csv_utc_date_cell(const std::string& key, const std::string& text) {
   const auto exact = parse_timestamp_exact(text);
   if (!exact) return std::nullopt;
   std::int64_t days = exact->seconds / 86400;
@@ -140,6 +142,8 @@ std::optional<EventAttribute> utc_date_cell(const std::string& key, const std::s
   return cell;
 }
 
+namespace {
+
 std::optional<EventAttribute> csv_value(const Event& event, const DataFrameColumn& column,
                                         std::vector<char>& listed) {
   if (column.role == FirstClassAttributeRole::kCaseId ||
@@ -153,7 +157,7 @@ std::optional<EventAttribute> csv_value(const Event& event, const DataFrameColum
                  : std::nullopt;
     if (!event.has_timestamp() || event.timestamp_state == FirstClassAttributeState::kNull)
       return std::nullopt;
-    return utc_date_cell(column.key, event.timestamp);
+    return csv_utc_date_cell(column.key, event.timestamp);
   }
   const std::string* text = nullptr;
   if (column.role == FirstClassAttributeRole::kResource) {

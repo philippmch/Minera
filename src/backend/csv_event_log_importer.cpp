@@ -2011,6 +2011,8 @@ CsvEventData import_csv_event_data_impl(
   std::vector<std::optional<std::string>> activities;
   ReferenceCsvColumnKind case_kind = ReferenceCsvColumnKind::kText;
   bool case_ints = false;
+  ReferenceCsvColumnKind activity_kind = ReferenceCsvColumnKind::kText;
+  bool activity_ints = false;
   between_passes();
   if (reference_batch) {
     auto typed_cases = infer_reference_column(case_tokens, &case_padded_na);
@@ -2022,7 +2024,14 @@ CsvEventData import_csv_event_data_impl(
     }
     case_ids = std::move(typed_cases.text);
     between_passes();
-    activities = infer_reference_column(activity_tokens, &activity_padded_na).text;
+    auto typed_activities = infer_reference_column(activity_tokens, &activity_padded_na);
+    activity_kind = typed_activities.kind;
+    if (activity_kind == ReferenceCsvColumnKind::kObject) {
+      activity_ints = true;
+      for (std::size_t i = 0; i < typed_activities.text.size() && activity_ints; ++i)
+        if (typed_activities.text[i] && !python_int_text(activity_tokens[i])) activity_ints = false;
+    }
+    activities = std::move(typed_activities.text);
     between_passes();
   } else {
     case_ids.assign(case_tokens.begin(), case_tokens.end());
@@ -2052,6 +2061,24 @@ CsvEventData import_csv_event_data_impl(
           return ints ? DataFrameColumnType::kObject : DataFrameColumnType::kString;
       }
       return DataFrameColumnType::kString;
+    };
+    // format_dataframe also converts every other text column whose present
+    // cells all read as dates (to_datetime(format="mixed", utc=True)) to
+    // dates (observed black-box: a start-time column is a date column of
+    // the frame). A column that needs nanoseconds fails with a cell outside
+    // that range and stays text.
+    const auto date_cells = [](const std::vector<std::string>& cells,
+                               const std::vector<std::optional<std::string>>& present) {
+      bool any = false, nanoseconds = false, outside = false;
+      for (std::size_t i = 0; i < cells.size(); ++i) {
+        if (!present[i]) continue;
+        const auto parsed = reference_mixed_timestamp(cells[i]);
+        if (!parsed) return false;
+        any = true;
+        nanoseconds = nanoseconds || parsed->nanosecond_fraction;
+        outside = outside || parsed->outside_nanosecond_range;
+      }
+      return any && !(nanoseconds && outside);
     };
     // format_dataframe copies the timestamp into time:timestamp, replacing a
     // column of that name.
@@ -2105,6 +2132,8 @@ CsvEventData import_csv_event_data_impl(
         for (std::size_t i = 0; i < cells.size() && ints; ++i)
           if (typed.text[i] && !python_int_text(cells[i])) ints = false;
       column.type = column_type(typed.kind, ints);
+      if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text))
+        column.type = DataFrameColumnType::kDate;
       unique = keys.insert(column.key).second && unique;
       columns->columns.push_back(std::move(column));
     };
@@ -2163,6 +2192,8 @@ CsvEventData import_csv_event_data_impl(
         for (std::size_t i = 0; i < cells.size() && ints; ++i)
           if (typed.text[i] && !python_int_text(cells[i])) ints = false;
       column.type = column_type(typed.kind, ints);
+      if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text))
+        column.type = DataFrameColumnType::kDate;
       unique = trace_keys.insert(column.key).second && unique;
       columns->trace_columns.push_back(std::move(column));
     }
@@ -2175,6 +2206,7 @@ CsvEventData import_csv_event_data_impl(
       unique = keys.insert(copy.key).second && unique;
       columns->columns.push_back(std::move(copy));
     }
+    columns->activity_type = column_type(activity_kind, activity_ints);
     // Repeated column names are renamed by read_csv ("a.1"); such a frame
     // is not modelled.
     if (unique) frame_columns = std::move(columns);
@@ -2505,8 +2537,12 @@ EventAttribute csv_dataframe_cell(const DataFrameColumn& column, const std::stri
         if (signed_cell(cell.value, integer) == IntegerCell::kFits) cell.typed_value = integer;
       }
       break;
-    case DataFrameColumnType::kString:
     case DataFrameColumnType::kDate:
+      // A text column format_dataframe converted to dates.
+      if (const auto parsed = reference_mixed_timestamp(text))
+        if (auto date = csv_utc_date_cell(key, parsed->text)) return std::move(*date);
+      break;
+    case DataFrameColumnType::kString:
       break;
   }
   return cell;

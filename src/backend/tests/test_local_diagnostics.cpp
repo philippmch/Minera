@@ -1,13 +1,73 @@
 #include "minera/local_diagnostics.hpp"
 #include "minera/request_params.hpp"
+#include "minera/csv_event_log_importer.hpp"
 
 #include <cassert>
+#include <map>
+#include <sstream>
 #include <string>
 #include <stdexcept>
 
 using namespace minera;
 
+// pm4py 2.7.22 on read_csv + format_dataframe(case_id="cid", activity_key="act",
+// timestamp_key="ts") of this CSV (Review AT1): "who" and "code" are int
+// columns (past 2**53 too), "team" text with a NaN cell, no org:resource.
+static EventLog at1_csv_log() {
+  std::istringstream csv("cid,act,ts,who,team,code\n"
+                         "c1,a,2020-01-01 10:00:00,1,g1,7\n"
+                         "c1,b,2020-01-01 11:00:00,2,g2,8\n"
+                         "c2,a,2020-01-02 10:00:00,1,g1,7\n"
+                         "c2,c,2020-01-02 13:00:00,1,,9\n"
+                         "c3,a,2020-01-03 10:00:00,2,g2,7\n"
+                         "c3,c,2020-01-03 10:30:00,9007199254740993,g1,9007199254740992\n");
+  CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  auto log = import_csv_event_log(csv, import);
+  assert(log.dataframe_columns);
+  return log;
+}
+
+static std::string error_of(const EventLog& log, const LocalDiagnosticsOptions& options) {
+  try { (void)discover_local_diagnostics(log, options); }
+  catch (const std::invalid_argument& error) { return error.what(); }
+  return {};
+}
+
+// The pandas apply_from_group_attribute: a group's members are the resources
+// seen with it, every event of a member counts for its groups (the NaN team
+// cell too), resources keep their int names.
+static void frame_path_reads_pm4py_frame() {
+  const auto log = at1_csv_log();
+  LocalDiagnosticsOptions options;
+  assert(error_of(log, options).find("KeyError: 'org:resource'") != std::string::npos);
+  options.resource_attribute = "who";
+  options.group_attribute = "team";
+  const auto result = discover_local_diagnostics(log, options);
+  const std::map<std::string, std::map<std::string, double>> focus{
+      {"g1", {{"a", 2.0 / 3}, {"b", 0.0}, {"c", 1.0}}}, {"g2", {{"a", 1.0 / 3}, {"b", 1.0}, {"c", 0.0}}}};
+  assert(result.group_relative_focus == focus);
+  const std::map<std::string, std::map<std::string, double>> stake{
+      {"g1", {{"a", 2.0 / 3}, {"b", 0.0}, {"c", 1.0 / 3}}}, {"g2", {{"a", 0.5}, {"b", 0.5}, {"c", 0.0}}}};
+  assert(result.group_relative_stake == stake);
+  const std::map<std::string, std::map<std::string, double>> coverage{
+      {"g1", {{"1", 2.0 / 3}, {"9007199254740993", 1.0 / 3}}}, {"g2", {{"2", 1.0}}}};
+  assert(result.group_coverage == coverage);
+  assert(result.group_member_contribution.at("g1").at("1").at("a") == 2);
+  assert(result.group_member_contribution.at("g1").at("1").at("c") == 0);
+  assert(result.group_member_contribution.at("g1").at("9007199254740993").at("c") == 1);
+  // Explicit groups still read the frame's org:group column.
+  LocalDiagnosticsOptions groups;
+  groups.resource_attribute = "who";
+  groups.explicit_groups = {{"R1", {"1", "2"}}};
+  assert(error_of(log, groups).find("KeyError: 'org:group'") != std::string::npos);
+}
+
 int main() {
+  frame_path_reads_pm4py_frame();
   EventLog log;
   Trace t; t.case_id = "c";
   t.events.push_back(Event{"c", "A", "", "r1", 0, {{"org:group", "g1", AttributeKind::kString}}, {}});

@@ -6,11 +6,15 @@
 #include <cmath>
 #include <map>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
 #include <variant>
 
+#include "frame_cells.hpp"
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
 #include "numpy_object_sort.hpp"
 #include "python_scalar.hpp"
@@ -139,7 +143,7 @@ const EventAttribute* projection_cell(const Event& e, const Trace* trace, std::s
 // is typed, else the projection's typed cell, else its text (a timestamp
 // projection is a Timestamp). An empty selector is a column name like any
 // other. nullopt when the value is missing (None, NaN, pd.NA, absent).
-std::optional<python::Scalar> typed_value(const Event& e, const Trace* trace, std::string_view selector) {
+std::optional<python::Scalar> native_typed_value(const Event& e, const Trace* trace, std::string_view selector) {
   if (const auto* cell = literal_cell(e, trace, selector)) {
     auto scalar = python::from_attribute(*cell);
     if (python::is_missing(scalar)) return std::nullopt;
@@ -157,10 +161,21 @@ std::optional<python::Scalar> typed_value(const Event& e, const Trace* trace, st
   return python::text(*text);
 }
 
+// Reads a selector's typed cell: on the DataFrame path (CSV and XES uploads)
+// the frame's column of that name (frame_cells.hpp), else the native
+// selector rules above.
+struct Reader {
+  const EventLog* frame = nullptr;
+  std::optional<python::Scalar> typed(const Event& e, const Trace* trace, std::string_view selector) const {
+    if (frame) return frame_scalar(*frame, *trace, e, std::string(selector), FrameKeyScope::kDataFrame);
+    return native_typed_value(e, trace, selector);
+  }
+};
+
 // The selected value as timestamp text: a Timestamp keeps the spelling it
 // was read from.
-std::optional<std::string> value(const Event& e, const Trace* trace, std::string_view selector) {
-  const auto typed = typed_value(e, trace, selector);
+std::optional<std::string> value(const Reader& reader, const Event& e, const Trace* trace, std::string_view selector) {
+  const auto typed = reader.typed(e, trace, selector);
   if (!typed) return std::nullopt;
   if (typed->kind == python::Scalar::Kind::kDate) return typed->text;
   return python::str(*typed);
@@ -176,9 +191,9 @@ struct SortKey {
   python::Scalar value;
 };
 
-SortKey sort_key(const Event& e, const Trace* trace, std::string_view selector) {
+SortKey sort_key(const Reader& reader, const Event& e, const Trace* trace, std::string_view selector) {
   SortKey key;
-  auto typed = typed_value(e, trace, selector);
+  auto typed = reader.typed(e, trace, selector);
   if (!typed) return key;
   if (python::is_number(*typed)) key.kind = SortKey::Kind::kNumber;
   else if (typed->kind == python::Scalar::Kind::kDate) key.kind = SortKey::Kind::kDate;
@@ -187,9 +202,9 @@ SortKey sort_key(const Event& e, const Trace* trace, std::string_view selector) 
   return key;
 }
 
-std::optional<double> instant(const Event& e, const Trace* trace,
+std::optional<double> instant(const Reader& reader, const Event& e, const Trace* trace,
                               std::string_view selector) {
-  const auto v = value(e, trace, selector);
+  const auto v = value(reader, e, trace, selector);
   if (!v) return std::nullopt;
   return parse_timestamp(*v);
 }
@@ -234,13 +249,15 @@ struct Ref {
 // The relation value pandas merges on: equal keys of any numeric type join
 // (1, 1.0 and True), a number and its text do not, and null-like keys (None,
 // NaN, pd.NA or an absent value) join each other, unlike in grouping.
-std::string relation_key(const Event& e, const Trace* trace, std::string_view selector) {
-  if (const auto v = typed_value(e, trace, selector)) return python::identity(*v);
+std::string relation_key(const Reader& reader, const Event& e, const Trace* trace, std::string_view selector) {
+  if (const auto v = reader.typed(e, trace, selector)) return python::identity(*v);
   return std::string(1, '\0');
 }
 
-// df[[columns]] on the selected columns: every one must exist in some row.
-void require_columns(const EventLog& log, const NetworkAnalysisOptions& o) {
+// df[[columns]] on the selected columns: every one must exist in some row
+// (on the DataFrame path: be a column of the frame, `frame_keys`).
+void require_columns(const EventLog& log, const NetworkAnalysisOptions& o,
+                     const std::set<std::string>* frame_columns = nullptr) {
   if (log.event_count() == 0) return;
   const std::vector<std::string> selected{o.out_relation_attribute, o.in_relation_attribute,
                                           o.source_node_attribute, o.target_node_attribute,
@@ -249,11 +266,11 @@ void require_columns(const EventLog& log, const NetworkAnalysisOptions& o) {
   for (const auto& name : selected) {
     if (std::find(distinct.begin(), distinct.end(), name) != distinct.end()) continue;
     distinct.push_back(name);
-    bool found = false;
+    bool found = frame_columns && frame_columns->contains(name);
     for (const auto& tr : log.traces) {
+      if (found || frame_columns) break;
       for (const auto& e : tr.events)
         if (has_column(e, &tr, name)) { found = true; break; }
-      if (found) break;
     }
     if (!found) absent.push_back(name);
   }
@@ -271,9 +288,132 @@ void require_columns(const EventLog& log, const NetworkAnalysisOptions& o) {
   throw std::invalid_argument("network analysis: KeyError: \"" + list(absent) + " not in index\"");
 }
 
+// A frame column's pandas dtype as merge sees it: its name, its kind, and
+// for object columns lib.infer_dtype(skipna=False) of its cells.
+struct FrameDtype {
+  enum class Kind { kNumber, kBool, kText, kObject, kDate } kind = Kind::kText;
+  std::string name;
+  std::string inferred;
+};
+
+FrameDtype frame_dtype(const EventLog& frame, const std::string& key) {
+  const auto& columns = *frame.dataframe_columns;
+  const bool csv = columns.csv_text;
+  const auto of_type = [&](DataFrameColumnType type) {
+    switch (type) {
+      case DataFrameColumnType::kInt64: return FrameDtype{FrameDtype::Kind::kNumber, "int64", "integer"};
+      case DataFrameColumnType::kFloat64: return FrameDtype{FrameDtype::Kind::kNumber, "float64", "floating"};
+      case DataFrameColumnType::kBool: return FrameDtype{FrameDtype::Kind::kBool, "bool", "boolean"};
+      case DataFrameColumnType::kString: return FrameDtype{FrameDtype::Kind::kText, "str", "string"};
+      case DataFrameColumnType::kDate: return FrameDtype{FrameDtype::Kind::kDate, "datetime64[us, UTC]", "datetime64"};
+      case DataFrameColumnType::kObject: return FrameDtype{FrameDtype::Kind::kObject, "object", ""};
+    }
+    return FrameDtype{};
+  };
+  FrameDtype dtype;
+  bool found = false;
+  if (key == "concept:name" || key == "case:concept:name") {
+    dtype = {FrameDtype::Kind::kText, csv ? "string" : "str", "string"};
+    found = true;
+  } else if (key == "@@index" || key == "@@case_index") {
+    dtype = of_type(DataFrameColumnType::kInt64);
+    found = true;
+  } else if (key == "time:timestamp" && !csv) {
+    dtype = of_type(DataFrameColumnType::kDate);
+    found = true;
+  }
+  for (const auto& column : columns.columns)
+    if (!found && column.key == key) {
+      dtype = of_type(column.type);
+      found = true;
+    }
+  if (!found && key.starts_with("case:"))
+    for (const auto& column : columns.trace_columns)
+      if (!found && "case:" + column.key == key) {
+        dtype = of_type(column.type);
+        found = true;
+      }
+  if (!found && csv) dtype = of_type(columns.activity_type);  // the activity under its own header
+  else if (!found) dtype = {FrameDtype::Kind::kText, "str", "string"};
+  if (dtype.kind != FrameDtype::Kind::kObject) return dtype;
+  bool ints = false, floats = false, other = false, bools = false, texts = false, missing = false;
+  std::size_t rows = 0;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      ++rows;
+      const auto value = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
+      if (!value) missing = true;
+      else if (value->kind == python::Scalar::Kind::kInt) ints = true;
+      else if (value->kind == python::Scalar::Kind::kFloat) floats = true;
+      else if (value->kind == python::Scalar::Kind::kBool) bools = true;
+      else if (value->kind == python::Scalar::Kind::kText) texts = true;
+      else other = true;
+    }
+  if (rows == 0) dtype.inferred = "empty";
+  else if (ints) dtype.inferred = (bools || texts || other) ? "mixed-integer"
+                                  : floats ? "mixed-integer-float"
+                                  : missing ? "integer-na" : "integer";
+  else if (bools && !floats && !texts && !other && !missing) dtype.inferred = "boolean";
+  else if (texts && !floats && !bools && !other && !missing) dtype.inferred = "string";
+  else if (!bools && !texts && !other) dtype.inferred = "floating";
+  else dtype.inferred = "mixed";
+  return dtype;
+}
+
+// pandas' merge check of the relation columns (left the out column, right
+// the in column; observed black-box): datetimes merge only with datetimes,
+// numbers with numbers and bools, bools with anything else but datetimes,
+// text and objects with each other, and a number with text or an object
+// only when neither infers as string-like.
+void require_mergeable(const EventLog& frame, const std::string& out, const std::string& in) {
+  const auto left = frame_dtype(frame, out);
+  const auto right = frame_dtype(frame, in);
+  using Kind = FrameDtype::Kind;
+  const auto raise = [&] {
+    throw std::invalid_argument("network analysis: ValueError: You are trying to merge on " + left.name +
+                                " and " + right.name + " columns for key '" + out +
+                                "'. If you wish to proceed you should use pd.concat");
+  };
+  if (left.name == right.name) return;
+  const bool left_number = left.kind == Kind::kNumber || left.kind == Kind::kBool;
+  const bool right_number = right.kind == Kind::kNumber || right.kind == Kind::kBool;
+  const bool left_object = left.kind == Kind::kText || left.kind == Kind::kObject;
+  const bool right_object = right.kind == Kind::kText || right.kind == Kind::kObject;
+  if (left_number && right_number) return;
+  if ((left_object && right.kind == Kind::kBool) || (left.kind == Kind::kBool && right_object)) return;
+  if ((left_object && right_number) || (left_number && right_object)) {
+    const auto in_list = [](const std::string& inferred, std::initializer_list<const char*> list) {
+      for (const auto* item : list)
+        if (inferred == item) return true;
+      return false;
+    };
+    const auto boolish = [&](const std::string& t) { return in_list(t, {"integer", "mixed-integer", "boolean", "empty"}); };
+    const auto stringish = [&](const std::string& t) { return in_list(t, {"string", "unicode", "mixed", "bytes", "empty"}); };
+    if (boolish(left.inferred) && boolish(right.inferred)) return;
+    if (stringish(left.inferred) != stringish(right.inferred)) raise();
+    return;
+  }
+  if ((left.kind == Kind::kDate) != (right.kind == Kind::kDate)) raise();
+}
+
+// The durations pandas takes from the timestamp column whatever the
+// performance flag: a column of no dates cannot be subtracted (text, bools)
+// or has no .dt accessor (observed black-box).
+void require_timestamp_column(const EventLog& frame, const std::string& key, bool links) {
+  const auto dtype = frame_dtype(frame, key);
+  if (dtype.kind == FrameDtype::Kind::kDate) return;
+  if (dtype.kind == FrameDtype::Kind::kBool)
+    throw std::invalid_argument(
+        "network analysis: TypeError: numpy boolean subtract, the `-` operator, is not supported, use the "
+        "bitwise_xor, the `^` operator, or the logical_xor function instead.");
+  if (dtype.kind == FrameDtype::Kind::kText && links)
+    throw std::invalid_argument("network analysis: TypeError: unsupported operand type(s) for -: 'str' and 'str'");
+  throw std::invalid_argument("network analysis: AttributeError: Can only use .dt accessor with datetimelike values");
+}
+
 }  // namespace
 
-NetworkAnalysisResult discover_network_analysis(const EventLog& log, const NetworkAnalysisOptions& o) {
+NetworkAnalysisResult discover_network_analysis(const EventLog& input, const NetworkAnalysisOptions& o) {
   if (o.variant != NetworkAnalysisVariant::kDataframe)
     throw std::invalid_argument("network_analysis_variant must be dataframe");
   if (o.edge_reference != NetworkAnalysisEdgeReference::kOut &&
@@ -281,7 +421,28 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
     throw std::invalid_argument("network analysis edge_reference must be _out or _in");
   if (o.max_rows == 0 || o.max_rows > 1000000) throw std::invalid_argument("network analysis max_rows safety bound exceeded");
   if (o.max_values == 0 || o.max_values > 10000000) throw std::invalid_argument("network analysis max_values safety bound exceeded");
-  require_columns(log, o);
+  // A log read on the DataFrame path (CSV and XES uploads) is read as pm4py
+  // reads its frame: selectors are column names (no org:resource alias),
+  // cells are typed (dates in UTC), and pandas' merge and duration rules
+  // apply to the columns' dtypes.
+  std::optional<EventLog> frame_storage;
+  std::set<std::string> frame_columns;
+  Reader reader;
+  if (input.dataframe_columns) {
+    frame_storage = dataframe_frame_event_log(input);
+    reader.frame = &*frame_storage;
+    frame_columns = frame_keys(*frame_storage, FrameKeyScope::kDataFrame);
+  }
+  const EventLog& log = reader.frame ? *reader.frame : input;
+  require_columns(log, o, reader.frame ? &frame_columns : nullptr);
+  if (reader.frame && log.event_count() != 0) {
+    // format_dataframe's @@index is a second column of that name beside
+    // the one the merge adds.
+    for (const auto* relation : {&o.out_relation_attribute, &o.in_relation_attribute})
+      if (*relation == "@@index" && log.dataframe_columns->csv_text)
+        throw std::invalid_argument("network analysis: ValueError: The column label '@@index' is not unique.");
+    require_mergeable(log, o.out_relation_attribute, o.in_relation_attribute);
+  }
   const auto slots = o.business_hours ? normalized_slots(o) : std::vector<BusinessHourSlot>{};
   NetworkAnalysisResult result;
   result.variant = o.variant;
@@ -289,9 +450,9 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
   result.diagnostics.event_count = log.event_count();
   std::vector<Ref> refs;
   refs.reserve(log.event_count());
-  std::size_t input = 0;
+  std::size_t position = 0;
   for (const auto& tr : log.traces) for (const auto& e : tr.events)
-    refs.push_back({&e, &tr, input++, sort_key(e, &tr, o.sorting_attribute)});
+    refs.push_back({&e, &tr, position++, sort_key(reader, e, &tr, o.sorting_attribute)});
   // sort_values on the object column (pandas' nargsort): numpy's default
   // quicksort argsorts the non-missing values, so equal keys come out in its
   // partition order (from 17 values on, not input order), then the missing
@@ -317,10 +478,10 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
   std::vector<const Ref*> successors(refs.size(), nullptr);
   std::map<std::string, const Ref*> next_by_relation;
   for (std::size_t i = refs.size(); i-- > 0;) {
-    const auto out = relation_key(*refs[i].event, refs[i].trace, o.out_relation_attribute);
+    const auto out = relation_key(reader, *refs[i].event, refs[i].trace, o.out_relation_attribute);
     const auto target = next_by_relation.find(out);
     if (target != next_by_relation.end()) successors[i] = target->second;
-    next_by_relation[relation_key(*refs[i].event, refs[i].trace, o.in_relation_attribute)] = &refs[i];
+    next_by_relation[relation_key(reader, *refs[i].event, refs[i].trace, o.in_relation_attribute)] = &refs[i];
   }
   // Each link is a row of the joined frame; the edges are its groupby over
   // (source, target, edge), with pandas' typed key identity and labels.
@@ -331,23 +492,23 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
   std::vector<Link> links;
   for (std::size_t source_index = 0; source_index < refs.size(); ++source_index) {
     const auto& source = refs[source_index];
-    const auto source_node = typed_value(*source.event, source.trace, o.source_node_attribute);
+    const auto source_node = reader.typed(*source.event, source.trace, o.source_node_attribute);
     if (!source_node) continue;
     const Ref* target = successors[source_index];
     if (!target) continue;
-    const auto target_node = typed_value(*target->event, target->trace, o.target_node_attribute);
+    const auto target_node = reader.typed(*target->event, target->trace, o.target_node_attribute);
     const auto& edge_event = o.edge_reference == NetworkAnalysisEdgeReference::kOut ? source : *target;
-    const auto edge_value = typed_value(*edge_event.event, edge_event.trace, o.edge_attribute);
+    const auto edge_value = reader.typed(*edge_event.event, edge_event.trace, o.edge_attribute);
     if (!target_node || !edge_value) continue;
     keys.push_back({*source_node, *target_node, *edge_value});
     Link link;
     ++result.diagnostics.link_count;
     if (o.include_performance) {
-      const auto st = instant(*source.event, source.trace, o.timestamp_attribute);
-      const auto tt = instant(*target->event, target->trace, o.timestamp_attribute);
+      const auto st = instant(reader, *source.event, source.trace, o.timestamp_attribute);
+      const auto tt = instant(reader, *target->event, target->trace, o.timestamp_attribute);
       if (st && tt) {
         const double duration = o.business_hours
-            ? business_elapsed(local_wall(value(*source.event, source.trace, o.timestamp_attribute).value_or("")).value_or(*st), local_wall(value(*target->event, target->trace, o.timestamp_attribute).value_or("")).value_or(*tt), slots)
+            ? business_elapsed(local_wall(value(reader, *source.event, source.trace, o.timestamp_attribute).value_or("")).value_or(*st), local_wall(value(reader, *target->event, target->trace, o.timestamp_attribute).value_or("")).value_or(*tt), slots)
             : (*tt - *st);
         if (std::isfinite(duration) && result.diagnostics.performance_value_count < o.max_values) {
           link.duration = duration;
@@ -357,6 +518,10 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& log, const Netwo
     }
     links.push_back(link);
   }
+  if (reader.frame && log.event_count() != 0)
+    require_timestamp_column(log, o.timestamp_attribute,
+                             std::any_of(successors.begin(), successors.end(),
+                                         [](const Ref* successor) { return successor != nullptr; }));
   std::vector<python::Group> groups;
   try {
     groups = python::groupby(keys);

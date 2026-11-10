@@ -96,7 +96,7 @@ std::vector<Trace> regroup_traces(const EventLog& log,
       std::optional<std::string> case_id;
       if (frame) {
         // groupby leaves out the rows whose key is NaN.
-        const auto value = frame_value(trace, event, case_id_attribute, FrameKeyScope::kDataFrame);
+        const auto value = frame_value(log, trace, event, case_id_attribute, FrameKeyScope::kDataFrame);
         if (value.missing()) continue;
         case_id = value.text;
       } else {
@@ -167,7 +167,7 @@ OrganizationalSnaResult discover_organizational_sna(
   const Selector select = [&](const Trace& trace, const Event& event, const std::string& key,
                               bool resource) -> std::optional<std::string> {
     if (frame) {
-      const auto value = frame_value(trace, event, key, scope);
+      const auto value = frame_value(log, trace, event, key, scope);
       if (value.missing()) return std::nullopt;
       return (resource ? frame_names : frame_activity_names).name(value);
     }
@@ -186,9 +186,9 @@ OrganizationalSnaResult discover_organizational_sna(
     std::set<FrameValueClass> resource_classes, activity_classes;
     for (const auto& trace : log.traces)
       for (const auto& event : trace.events) {
-        const auto resource = frame_value(trace, event, options.resource_attribute, scope);
+        const auto resource = frame_value(log, trace, event, options.resource_attribute, scope);
         if (joint) {
-          const auto activity = frame_value(trace, event, options.activity_attribute, scope);
+          const auto activity = frame_value(log, trace, event, options.activity_attribute, scope);
           if (drop_missing && (resource.missing() || activity.missing())) continue;
           activity_classes.insert(activity.value_class);
         }

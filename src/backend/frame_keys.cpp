@@ -1,5 +1,6 @@
 #include "minera/frame_keys.hpp"
 
+#include "frame_cells.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "minera/timestamp.hpp"
@@ -144,17 +145,40 @@ void require_frame_key(const std::set<std::string>& keys, const std::string& key
   if (!keys.contains(key)) throw std::invalid_argument("KeyError: '" + key + "'");
 }
 
-FrameValue frame_value(const Trace& trace, const Event& event, const std::string& key,
-                       FrameKeyScope scope) {
-  // format_dataframe's concept:name is the activity as text; the activity
-  // column under its own header holds the same values.
+namespace {
+
+// A CSV activity column under its own header, typed as read_csv typed it.
+std::optional<EventAttribute> typed_activity_cell(const EventLog& frame, const Event& event,
+                                                  const std::string& key) {
+  if (!frame.dataframe_columns || !frame.dataframe_columns->csv_text ||
+      event.activity_source_key.empty() || key != event.activity_source_key ||
+      key == "concept:name")
+    return std::nullopt;
+  DataFrameColumn column;
+  column.key = key;
+  column.type = frame.dataframe_columns->activity_type;
+  if (!event.has_activity()) {
+    EventAttribute missing{key, "", AttributeKind::kNA};
+    missing.is_null = true;
+    return missing;
+  }
+  return csv_dataframe_cell(column, event.activity);
+}
+
+}  // namespace
+
+FrameValue frame_value(const EventLog& frame, const Trace& trace, const Event& event,
+                       const std::string& key, FrameKeyScope scope) {
+  if (const auto cell = typed_activity_cell(frame, event, key)) return attribute_value(*cell);
+  // format_dataframe's concept:name is the activity as text; an XES activity
+  // under another key holds the same values.
   if (key == "concept:name" ||
       (!event.activity_source_key.empty() && key == event.activity_source_key))
     return event.has_activity() ? text_value(event.activity) : FrameValue{};
   if (const auto* attribute = last_attribute(event.attributes, key))
     return attribute_value(*attribute);
   if (key == "time:timestamp" && event.has_timestamp())
-    return FrameValue{event.timestamp, FrameValueClass::kDate};
+    return FrameValue{python_date_text(event.timestamp), FrameValueClass::kDate};
   if (scope == FrameKeyScope::kDataFrame && key.starts_with(kCasePrefix)) {
     if (key == "case:concept:name")
       return trace.has_case_id() ? text_value(trace.case_id) : FrameValue{};
@@ -162,6 +186,68 @@ FrameValue frame_value(const Trace& trace, const Event& event, const std::string
       return attribute_value(*attribute);
   }
   return {};
+}
+
+namespace {
+
+// A frame cell as the Python object pandas holds: dates are UTC Timestamps.
+std::optional<python::Scalar> cell_scalar(const EventAttribute& attribute) {
+  if (attribute_value(attribute).missing()) return std::nullopt;
+  auto scalar = python::from_attribute(attribute);
+  if (python::is_missing(scalar)) return std::nullopt;
+  if (scalar.kind == python::Scalar::Kind::kDate) {
+    scalar.date.timezone_aware = true;
+    scalar.date.offset_minutes = 0;
+  }
+  return scalar;
+}
+
+}  // namespace
+
+std::optional<python::Scalar> frame_scalar(const EventLog& frame, const Trace& trace,
+                                           const Event& event, const std::string& key,
+                                           FrameKeyScope scope) {
+  if (const auto cell = typed_activity_cell(frame, event, key)) return cell_scalar(*cell);
+  if (key == "concept:name" ||
+      (!event.activity_source_key.empty() && key == event.activity_source_key))
+    return event.has_activity() ? std::optional(python::text(event.activity)) : std::nullopt;
+  if (const auto* attribute = last_attribute(event.attributes, key)) return cell_scalar(*attribute);
+  if (key == "time:timestamp" && event.has_timestamp()) {
+    auto date = python::date_literal(event.timestamp);
+    if (!date) return std::nullopt;
+    date->date.timezone_aware = true;
+    date->date.offset_minutes = 0;
+    return date;
+  }
+  if (scope == FrameKeyScope::kDataFrame && key.starts_with(kCasePrefix)) {
+    if (key == "case:concept:name")
+      return trace.has_case_id() ? std::optional(python::text(trace.case_id)) : std::nullopt;
+    if (const auto* attribute = last_attribute(trace.attributes, key.substr(kCasePrefix.size())))
+      return cell_scalar(*attribute);
+  }
+  return std::nullopt;
+}
+
+void require_frame_columns(const std::set<std::string>& keys,
+                           const std::vector<std::string>& selection) {
+  std::vector<std::string> absent;
+  for (const auto& key : selection)
+    if (!keys.contains(key)) absent.push_back(key);
+  if (absent.empty()) return;
+  std::string list = "[";
+  for (std::size_t i = 0; i < absent.size(); ++i) list += (i ? ", '" : "'") + absent[i] + "'";
+  list += "]";
+  if (absent.size() == selection.size())
+    throw std::invalid_argument("KeyError: \"None of [Index(" + list +
+                                ", dtype='str')] are in the [columns]\"");
+  throw std::invalid_argument("KeyError: \"" + list + " not in index\"");
+}
+
+python::Scalar frame_number_scalar(const FrameValue& value) {
+  if (value.text == "True") return python::boolean(true);
+  if (value.text == "False") return python::boolean(false);
+  if (auto integer = python::integer_literal(value.text)) return *integer;
+  return python::real(std::strtod(value.text.c_str(), nullptr));
 }
 
 double frame_number(const FrameValue& value) {
@@ -172,16 +258,18 @@ double frame_number(const FrameValue& value) {
 
 std::string FrameNames::name(const FrameValue& value) {
   if (value.value_class != FrameValueClass::kNumber) return value.text;
-  const auto number = frame_number(value);
-  const auto [it, inserted] = numbers_.try_emplace(number, value.text);
-  if (inserted) number_of_.emplace(value.text, number);
+  const auto [it, inserted] =
+      numbers_.try_emplace(python::identity(frame_number_scalar(value)), value.text);
+  if (inserted) number_of_.emplace(value.text, value.text);
   return it->second;
 }
 
 bool FrameNames::less(const std::string& left, const std::string& right) const {
   const auto l = number_of_.find(left);
   const auto r = number_of_.find(right);
-  if (l != number_of_.end() && r != number_of_.end()) return l->second < r->second;
+  if (l != number_of_.end() && r != number_of_.end())
+    return python::compare(frame_number_scalar(FrameValue{l->second, FrameValueClass::kNumber}),
+                           frame_number_scalar(FrameValue{r->second, FrameValueClass::kNumber})) < 0;
   return left < right;
 }
 

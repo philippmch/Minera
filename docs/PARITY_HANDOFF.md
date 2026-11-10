@@ -4291,8 +4291,51 @@ and the frontend's social-network and roles resource fields start at the
 session's resource key (`active_source.source_selectors.resource_key`).
 Native table sources keep the alias rules. The decision is recorded in
 `docs/reference-2.7.22-parity.md` (Review AS1) for Philipp to overrule.
+Round AT re-reviewed AS (fixed: the role tie-break compares activity lists
+as Python lists, ints past 2**53 keep their own names, a CSV activity
+column under its own header is typed) and brought the other organizational
+routes onto the same contract on CSV and XES uploads: local diagnostics
+(pm4py's pandas `apply_from_group_attribute`), network analysis (frame
+columns, typed nodes, pandas merge dtype and timestamp rules) and resource
+profiles (per-metric column selections and `KeyError` order, text
+arguments against typed cells, `==` versus `isin` matching, timestamp and
+case-column errors, `average_case_duration` grouping the resource's cases
+by the case column). CSV text columns whose cells all parse as dates are
+now date columns of the frame, as `format_dataframe` makes them. The
+frontend's resource fields of all four organizational tools start at the
+session's resource key. Reference sweeps of network analysis must run with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"` (numpy's
+SIMD argsort breaks numeric ties in another order). Details and the
+declarations: `docs/reference-2.7.22-parity.md`, Review AT1.
 
-Next round (AT) should start by re-reviewing round AS:
+Next round (AU) should start by re-reviewing round AT:
+
+- `src/backend/resource_profiles.cpp`, `frame_resource_profiles` and
+  `frame_average_case_duration` (the per-metric `frame_selection`, the
+  `offending_type` rows, `query_key` date parsing and which metrics use
+  `isin`, the duplicate-column exceptions, the case-column `groupby`
+  check, the view of one trace per case group with NaN-case rows kept as
+  their own intervals, `activity_completions` with the resource on the
+  timestamp column) and the `frame` flag in `compute_resource_profiles`
+  (NaN activities, slot cases without a resource);
+- `frame_local_diagnostics` in `src/backend/local_diagnostics.cpp` and the
+  frame branch of `discover_network_analysis` (`require_mergeable`,
+  `frame_dtype`, `require_timestamp_column`, the `@@index` relation);
+- the AT1-4 date columns of `import_csv_event_log` and `csv_dataframe_cell`:
+  every CSV route that reads typed frame columns now sees such a column as
+  dates (attribute filters and statistics on the frame, features, root
+  cause, temporal features, OCEL and LLM context): sweep CSV uploads with
+  date-text columns (with offsets, `T`, partial and time-only shapes)
+  through them;
+- the frontend `withSessionResourceKeys` and the roles to diagnostics
+  handoff (explicit groups raise `KeyError: 'org:group'` on uploads without
+  that column, as pm4py does; flagged to Philipp).
+
+Then continue in a new area. Harness: `review-harness/round-at/` (`atref.py`,
+`atsweep.py --only profiles,diagnostics,network [--xes]`; it reuses
+`orgxes.py` from `review-harness/round-as/`).
+
+Round AS's targets, re-reviewed in AT (findings AT1-1 to AT1-3, fixed):
 
 - `src/backend/frame_keys.cpp` (`frame_keys` per scope: CSV `@@index`
   columns, the activity column under its own header read as text, the XES
@@ -4312,17 +4355,10 @@ Next round (AT) should start by re-reviewing round AS:
   (`sessionResourceKey`, `withSessionResourceKey`; the roles to local
   diagnostics handoff passes the roles resource key on).
 
-Then the remaining organizational routes on CSV and XES uploads, which still
-read the mapped resource: resource profiles (`/api/resource-profiles`;
-pm4py's `resource_profiles` functions raise `KeyError` for `org:resource`
-on such frames and compare the string resource argument with the typed
-cells, so `r="1"` matches nothing in a float column), local diagnostics
-(`/api/local-diagnostics`; pm4py's `apply_from_group_attribute` on a frame
-runs its pandas implementation, whose results differ from the EventLog one,
-and `apply_from_clustering_or_roles` reads the default group key) and
-network analysis (`/api/network-analysis`, pm4py's frame-based
-`discover_network_analysis`). Harness: `review-harness/round-as/`
-(`orgref.py`, `orgsweep.py` for CSV, `orgxes.py` for XES).
+AT then moved the remaining organizational routes (resource profiles, local
+diagnostics, network analysis) onto the frame (AT1-5 to AT1-7). Harness of
+AS: `review-harness/round-as/` (`orgref.py`, `orgsweep.py` for CSV,
+`orgxes.py` for XES).
 
 Round AR's targets, re-reviewed in AS (no finding):
 
@@ -4513,10 +4549,10 @@ map table falls back to native table names (pm4py raises); `merge_dataframe_case
 not polled for cancellation; pm4py's default trace-based feature selection
 types a mixed-type key by the first value in Python set order (random with
 strings or NaN), Minera reads it as one-hot when any value is a string;
-pm4py's SNA and log-variant roles key each NaN resource cell apart (float
-identity, several unequal `nan` nodes), Minera leaves NaN cells out; the
-activity column of a CSV upload under its own header is read as text
-(pm4py types it by read_csv, so `007` there is the int 7).
+pm4py's SNA, log-variant roles and resource profiles key each NaN resource
+cell apart (float identity, several unequal `nan` nodes), Minera leaves NaN
+cells out; an all-resources profile request raises when pm4py would raise
+for any one resource.
 
 Suite before each push (about 2 h at -j2; run it from one session only):
 touch the changed sources, `cmake --build build -j2`, `ctest --test-dir build

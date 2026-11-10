@@ -3,6 +3,7 @@
 #include "minera/event_log.hpp"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -58,6 +59,10 @@ struct DataFrameColumns {
   // by read_csv over every data row (the trace takes the case's first row);
   // a trace without the key holds NaN (NaT for dates).
   std::vector<DataFrameColumn> trace_columns;
+  // The dtype read_csv gives a CSV activity column under its own header
+  // (format_dataframe only copies it to concept:name as text): ints of an
+  // int column are ints there (observed black-box).
+  DataFrameColumnType activity_type = DataFrameColumnType::kString;
 };
 
 // The event columns of an XES log's frame (read_xes): every event key other
@@ -71,6 +76,12 @@ struct DataFrameColumns {
 // column's "2.50" the float 2.5, "true" the bool True).
 [[nodiscard]] EventAttribute csv_dataframe_cell(const DataFrameColumn& column,
                                                 const std::string& text);
+
+// An ISO instant as a CSV frame's date column holds it after
+// format_dataframe's to_datetime(utc=True): the UTC instant, printed with
+// "+00:00" (nullopt when the text is no instant or outside years 1-9999).
+[[nodiscard]] std::optional<EventAttribute> csv_utc_date_cell(const std::string& key,
+                                                              const std::string& text);
 
 // The log as pm4py's convert_to_event_log of its frame gives it: each event
 // of `log` holds every listed column as an attribute, typed by the column
