@@ -6331,7 +6331,7 @@ export interface ServiceTimeResult {
   family: "SERVICE_TIME";
   variant: "CLASSIC";
   aggregation: "MEAN" | "MEDIAN" | "MIN" | "MAX" | "SUM";
-  values: Record<string, number>;
+  values: Record<string, number | null>;
 }
 
 export function isServiceTimeResult(value: unknown): value is ServiceTimeResult {
@@ -6341,8 +6341,9 @@ export function isServiceTimeResult(value: unknown): value is ServiceTimeResult 
       !["MEAN", "MEDIAN", "MIN", "MAX", "SUM"].includes(data.aggregation ?? "") ||
       typeof data.values !== "object" || data.values === null || Array.isArray(data.values))
     return false;
+  // null: an upload's activity whose durations are all missing (NaT).
   return Object.values(data.values as Record<string, unknown>)
-    .every((entry) => typeof entry === "number" && Number.isFinite(entry));
+    .every((entry) => entry === null || (typeof entry === "number" && Number.isFinite(entry)));
 }
 
 export interface ReworkOptions {
@@ -6380,8 +6381,9 @@ export function isCycleTimeResult(value: unknown): value is CycleTimeResult {
   if (typeof value !== "object" || value === null) return false;
   const data = value as Partial<CycleTimeResult>;
   return data.family === "CYCLE_TIME" && data.variant === "CLASSIC" &&
+    // Negative when a start lies after its completion, as the reference reports it.
     typeof data.cycle_time === "number" && Number.isFinite(data.cycle_time) &&
-    data.cycle_time >= 0 && typeof data.instances === "number" &&
+    typeof data.instances === "number" &&
     Number.isInteger(data.instances) && data.instances >= 0 &&
     typeof data.timed_events === "number" &&
     Number.isInteger(data.timed_events) && data.timed_events >= 0;
@@ -6428,9 +6430,11 @@ export interface CaseStatisticsOptions {
 
 export interface CaseStatisticsEntry {
   case_id: string;
-  start_time: number;
-  end_time: number;
-  case_duration: number;
+  /** null: an upload's case whose timestamp cells are all missing (NaT). */
+  start_time: number | null;
+  end_time: number | null;
+  /** Negative when the case's last timestamp precedes its first. */
+  case_duration: number | null;
 }
 
 export interface CaseStatisticsResult {
@@ -6462,11 +6466,9 @@ export function isCaseStatisticsResult(
   return data.cases.every((entry) => {
     if (typeof entry !== "object" || entry === null) return false;
     const item = entry as Partial<CaseStatisticsEntry>;
+    const time = (field: unknown) => field === null || (typeof field === "number" && Number.isFinite(field));
     return typeof item.case_id === "string" &&
-      typeof item.start_time === "number" && Number.isFinite(item.start_time) &&
-      typeof item.end_time === "number" && Number.isFinite(item.end_time) &&
-      typeof item.case_duration === "number" && Number.isFinite(item.case_duration) &&
-      item.case_duration >= 0;
+      time(item.start_time) && time(item.end_time) && time(item.case_duration);
   });
 }
 

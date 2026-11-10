@@ -10,8 +10,12 @@
 #include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include "exact_mean.hpp"
+#include "frame_times.hpp"
+#include "numpy_object_sort.hpp"
+#include "minera/dataframe_columns.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -235,6 +239,64 @@ double average_gaps(std::vector<double> values, bool dataframe) {
   return detail::exact_mean(values);
 }
 
+// Each case's first and last timestamp on an upload's frame, as pm4py's
+// DataFrame case arrival and dispersion read them: the key is a column
+// (KeyError otherwise), the first and last present cell of each case group
+// in frame order (a NaT cell is skipped, a case of NaT cells only has no
+// endpoint), and a column of no dates fails as pandas does: text in the
+// gaps' subtraction, any other dtype at the .dt accessor (observed
+// black-box).
+void frame_case_endpoints(const EventLog& log, std::string_view option_key,
+                          std::vector<std::pair<double, std::string>>& starts,
+                          std::vector<std::pair<double, std::string>>& ends) {
+  const frame_times::Frame frame(log);
+  const auto key = frame_times::timestamp_column(option_key);
+  if (!frame.has(key)) throw std::invalid_argument("KeyError: '" + key + "'");
+  const auto dtype = frame.dtype(key);
+  if (dtype != DataFrameColumnType::kDate) {
+    // The cases' first cells are sorted (an object column with Python's
+    // comparisons; an XES object column holds datetime.datetime cells),
+    // then each subtracted from the next: text fails there once two cases
+    // have a cell, anything else at the .dt accessor. The arrival average
+    // fails first, so the dispersion's last cells are never read.
+    const auto cells = frame_times::case_cells(frame, key);
+    std::vector<const python::Scalar*> values;
+    bool text = false;
+    for (const auto& cell : cells) {
+      values.push_back(&cell.first);
+      text = text || cell.first.kind == python::Scalar::Kind::kText;
+    }
+    if (dtype == DataFrameColumnType::kObject) {
+      try {
+        (void)detail::numpy_object_quick_argsort(
+            values.size(), [&](std::size_t a, std::size_t b) { return python::compare(*values[a], *values[b]); });
+      } catch (const python::TypeError& error) {
+        std::string message = error.what();
+        for (std::size_t at; (at = message.find("'Timestamp'")) != std::string::npos;)
+          message.replace(at, 11, "'datetime.datetime'");
+        throw std::invalid_argument("TypeError: " + message);
+      }
+    }
+    if (text && values.size() >= 2)
+      throw std::invalid_argument("TypeError: unsupported operand type(s) for -: 'str' and 'str'");
+    throw std::invalid_argument("AttributeError: Can only use .dt accessor with datetimelike values");
+  }
+  for (const auto& trace : frame.log().traces) {
+    std::optional<ParsedExactTimestamp> first, last;
+    for (const auto& event : trace.events)
+      if (const auto date = frame.date(trace, event, key)) {
+        if (!first) first = date;
+        last = date;
+      }
+    if (!first) continue;
+    starts.emplace_back(frame_times::epoch_seconds(*first), frame_times::utc_text(*first));
+    ends.emplace_back(frame_times::epoch_seconds(*last), frame_times::utc_text(*last));
+  }
+}
+
+// No traces: the native loop's range on the frame path.
+const std::vector<Trace> kNoTraces;
+
 }  // namespace
 
 CaseArrivalResult discover_case_arrival(const EventLog& log,
@@ -246,7 +308,9 @@ CaseArrivalResult discover_case_arrival(const EventLog& log,
   std::vector<std::pair<double, std::string>> ends;
   starts.reserve(log.traces.size());
   ends.reserve(log.traces.size());
-  for (const auto& trace : log.traces) {
+  const bool dataframe = options.dataframe || log.dataframe_columns != nullptr;
+  if (log.dataframe_columns) frame_case_endpoints(log, options.timestamp_key, starts, ends);
+  for (const auto& trace : log.dataframe_columns ? kNoTraces : log.traces) {
     if (trace.events.empty()) continue;
     const auto& first = trace.events.front();
     const auto& last = trace.events.back();
@@ -270,13 +334,13 @@ CaseArrivalResult discover_case_arrival(const EventLog& log,
   for (std::size_t i = 1; i < starts.size(); ++i)
     arrival.push_back(elapsed(starts[i - 1].first, starts[i].first,
                               starts[i - 1].second, starts[i].second, slots,
-                              options.dataframe));
+                              dataframe));
   for (std::size_t i = 1; i < ends.size(); ++i)
     dispersion.push_back(elapsed(ends[i - 1].first, ends[i].first,
                                  ends[i - 1].second, ends[i].second, slots,
-                                 options.dataframe));
-  return {average_gaps(std::move(arrival), options.dataframe),
-          average_gaps(std::move(dispersion), options.dataframe),
+                                 dataframe));
+  return {average_gaps(std::move(arrival), dataframe),
+          average_gaps(std::move(dispersion), dataframe),
           starts.size(), ends.size()};
 }
 

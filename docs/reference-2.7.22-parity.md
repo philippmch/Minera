@@ -22109,3 +22109,113 @@ one-case stdev variant cut off and printed), `minera_llm_context_tests`
 (the truncated context of that variant list) and
 `minera_local_diagnostics_tests` (`review_av_empty_role`). Full suite: 454
 ctest targets, vitest (10,723), the Python script tests (406) and `tsc`.
+
+## Review AW1: re-review of round AV, date columns in attribute filters and OCEL CSV, and the time statistics on uploads (2026-11-10)
+
+Round AV's changes were swept again (the LLM context on the frame, the
+resource-profile multitasking, window and compare-first rules, the
+local-diagnostics empty role, the temporal NaT category). The AT1-4 date
+columns went through the attribute filters on the frame and OCEL import from
+CSV, which had no differences (filters match text arguments as before; OCEL
+attribute cells keep their text). The new area was the four time statistics
+routes on CSV and XES uploads: service time, cycle time, case arrival and
+case statistics, which on an upload now read the frame as pm4py's pandas
+functions do (keys are frame columns, cells are typed, a blank date cell is
+NaT). Findings, all fixed:
+
+- **AW1-1 Network analysis durations on uploads.** pm4py subtracts the
+  frame's dates and takes `Timedelta.total_seconds` (0.376544 for a gap of
+  376,544 microseconds); Minera subtracted epoch doubles
+  (0.3765439987182617).
+- **AW1-2 Resource profiles with one column in two roles**
+  (`average_workload`, `multitasking`, `average_duration_activity`).
+  Without a start column pandas first sorts by the case and timestamp
+  columns, so a case column named twice fails with `The column label 'c' is
+  not unique.`, then the timestamp column, and a resource (or, for the
+  duration, activity) column named twice fails the row mask with `cannot
+  reindex on an axis with duplicate labels`. With a start column only the
+  mask columns fail (the resource, for the duration also the activity,
+  and its timestamp column after the comparison of the kept rows), the
+  start and timestamp cells are read row by row, so the activity on the
+  start column runs (Minera raised `not unique` for every repeat). Every
+  selected column the one column keeps all rows (the others' cells
+  missing): `'<type>' object has no attribute 'timestamp'` (NaT for a date
+  column) for the workload metrics, `'DataFrame' object has no attribute
+  'dt'` for the duration. The duration's start column on the case column
+  gives a frame: a datetime timestamp column realigns it when rows remain
+  and fails on NaT when none do; other columns have no `.dt` accessor.
+- **AW1-3 An interval that ends before it starts** (a start column after
+  the timestamp) is refused by the workload metrics' interval tree: `Start
+  must be less than end`, for the resource's intervals whatever the window
+  (Minera clamped it to zero).
+- **AW1-4 Service time on uploads.** The end, then the start, then the
+  activity column must exist; durations subtract by the start column's
+  dtype (date from date; the integer, float, bool, text and object
+  subtraction errors pandas gives); a NaT start or end is a NaN duration,
+  which the aggregation skips (an activity of only NaN durations is NaN,
+  null in JSON; its sum is 0.0); sum and mean add with Kahan's summation as
+  pandas' groupby does (59.5, not 59.50000000000001); business hours run
+  row by row and fail on NaT (`cannot convert float NaN to integer`).
+- **AW1-5 Cycle time on uploads.** Each row's start and end take
+  `.timestamp()`: a NaT cell fails with `NaTType does not support
+  timestamp`, a non-date with `'<type>' object has no attribute
+  'timestamp'`. A start after its end gives a negative cycle time, which
+  pm4py reports (Minera's JSON refused it).
+- **AW1-6 Case arrival on uploads.** The cases' first non-NaT cells are
+  sorted (an object column with Python's comparisons in numpy's quicksort
+  order; an XES object column holds `datetime.datetime`), then each is
+  subtracted from the next: text fails once two cases have a cell
+  (`unsupported operand type(s) for -: 'str' and 'str'`), anything else at
+  the `.dt` accessor, and the arrival average fails before the dispersion
+  reads the last cells.
+- **AW1-7 Case statistics on uploads.** First and last non-NaT cell per
+  case; a case of NaT cells only has no times (null), and with business
+  hours fails (`cannot convert float NaN to integer`); a `str` column fails
+  with `'str' and 'str'`, an object column subtracts case by case as Python
+  does (`'str' and 'datetime.datetime'`), with business hours after each
+  cell is made naive (`str.replace() takes no keyword arguments`, `'int'
+  object has no attribute 'replace'`); business hours count the week
+  offsets from exact microseconds (1199.6234560000012, not
+  1199.6234560012817); durations are `Timedelta.total_seconds` and negative
+  ones are reported.
+
+**Contract.** On CSV and XES uploads the time statistics read keys and
+cells as pm4py's pandas functions read the frame; native table sources keep
+their alias rules. The JSON of service time and case statistics writes NaN
+as null; cycle time and case statistics allow negative values.
+
+Declarations:
+
+- Case statistics `startTime` and `endTime`: pm4py's pandas variant divides
+  the microsecond int64 by 10**9; Minera keeps epoch seconds. A case of NaT
+  cells only: pm4py gives NaT's integer (-9223372037) and NaN; Minera null.
+- Business hours on an XES object column with a case that holds no cell of
+  the column: not modelled (pm4py fails on the case's NaN first cell).
+
+Verification (`perfdate.py`, `ocelcsvdate.py`, `mtmatrix.py`, `mtdump.py`
+and the probes in the project files under `review-harness/round-aw/`; the
+re-review reuses round AV's `atdate.py` and `llmsweep.py`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Re-review of AV: profiles, diagnostics, network with date columns, CSV (seeds 5,400 to 5,559), AV binary | 2,680 | 1,432 equal (177 of them zero rows), 986 raise in both, 81 NaN, 2 network differences (AW1-1), 1 Minera-only error (AW1-2), 1 declared (two rows, AU1) |
+| Re-review of AV: TEMPORAL features with date keys, CSV (seeds 100 to 159) | 180 | 140 equal, 40 raise in both |
+| Re-review of AV: LLM context, CSV with date columns (seeds 700 to 759) | 300 | 294 equal (27 under another hash seed), 6 raise in both, 0 differences |
+| Re-review of AV: LLM context, XES (seeds 800 to 859) | 300 | 248 equal (4 under another hash seed), 25 raise in both, 27 on the `mix` key or string keys typed by set order (declared in AQ and AV1) |
+| OCEL import from CSV with date-text and numeric-text columns (seeds 0 to 39) | 40 | 40 equal |
+| Time statistics, CSV with date-text timestamp, start and extra columns (seeds 0 to 119) | 1,440 | 1,144 equal, 292 raise in both, 4 pm4py-only errors (AW1-7, fixed) |
+| The same (seeds 300 to 399) | 1,200 | 988 equal, 211 raise in both, 1 difference (AW1-7, fixed) |
+| The same, XES round trip (seeds 200 to 299) | 1,200 | 719 equal, 478 raise in both, 2 error types (AW1-6), 1 difference (AW1-7), all fixed |
+| Duplicate-column matrix, three metrics, 5 columns in each role, start or none, 3 case columns, 2 resources | 13,500 | before: about 11,000 mismatches; final: 3,812 equal, 9,596 raise the same error, 92 declared (NaN against `mean requires at least one data point`, AT) |
+| Time statistics, CSV, final binary (seeds 400 to 519) | 1,440 | 1,137 equal, 303 raise in both, 0 differences |
+| Time statistics, XES round trip, final binary (seeds 200 to 299) | 1,200 | 720 equal, 480 raise in both, 0 differences |
+| Re-review sweep again, final binary (seeds 5,400 to 5,559) | 2,680 | 1,435 equal (177 of them zero rows), 986 raise in both (`KeyError` keys compared), 81 NaN, 0 differences, 1 declared (two rows, AU1) |
+| Local diagnostics, CSV with date columns, final binary (seeds 7,000 to 7,119; `KeyError` keys compared) | 360 | 137 equal, 222 raise the same error, 1 declared (two rows, AU1) |
+| Local diagnostics, XES, final binary (seeds 7,000 to 7,119) | 360 | 138 equal, 222 raise the same error |
+
+Tests: `minera_review_aw1_tests` (case statistics with business hours, NaT
+cases and text, case arrival on dates, text and a one-case column, service
+time with NaT starts, cycle time on NaT, network durations, multitasking
+with columns in two roles and a reversed interval) and the frontend type
+tests (null and negative values). Full suite: 455 ctest targets, vitest
+(10,726), the Python script tests (406) and `tsc`.

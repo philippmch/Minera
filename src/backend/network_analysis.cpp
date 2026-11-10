@@ -13,6 +13,7 @@
 #include <variant>
 
 #include "frame_cells.hpp"
+#include "frame_times.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
@@ -536,9 +537,16 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
       const auto st = instant(reader, *source.event, source.trace, o.timestamp_attribute);
       const auto tt = instant(reader, *target->event, target->trace, o.timestamp_attribute);
       if (st && tt) {
-        const double duration = o.business_hours
+        double duration = o.business_hours
             ? business_elapsed(local_wall(value(reader, *source.event, source.trace, o.timestamp_attribute).value_or("")).value_or(*st), local_wall(value(reader, *target->event, target->trace, o.timestamp_attribute).value_or("")).value_or(*tt), slots)
             : (*tt - *st);
+        // The frame's dates subtract exactly, as Timedelta.total_seconds.
+        if (reader.frame && !o.business_hours) {
+          const auto from = reader.typed(*source.event, source.trace, o.timestamp_attribute);
+          const auto to = reader.typed(*target->event, target->trace, o.timestamp_attribute);
+          if (from && to && from->kind == python::Scalar::Kind::kDate && to->kind == python::Scalar::Kind::kDate)
+            duration = frame_times::total_seconds(from->date, to->date);
+        }
         if (std::isfinite(duration) && result.diagnostics.performance_value_count < o.max_values) {
           link.duration = duration;
           ++result.diagnostics.performance_value_count;

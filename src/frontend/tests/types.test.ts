@@ -795,6 +795,8 @@ describe("isPassedTimeResult", () => {
 describe("isServiceTimeResult", () => {
   const valid = { family: "SERVICE_TIME", variant: "CLASSIC", aggregation: "MEAN", values: { A: 900, B: 2100 } };
   it("accepts finite activity values", () => expect(isServiceTimeResult(valid)).toBe(true));
+  it("accepts null for an upload's activity whose durations are all missing", () =>
+    expect(isServiceTimeResult({ ...valid, values: { A: null, B: -3 } })).toBe(true));
   it("rejects non-finite values and wrong variants", () => {
     expect(isServiceTimeResult({ ...valid, values: { A: Number.NaN } })).toBe(false);
     expect(isServiceTimeResult({ ...valid, variant: "OTHER" })).toBe(false);
@@ -818,8 +820,11 @@ describe("isCycleTimeResult", () => {
     cycle_time: 10, instances: 2, timed_events: 4,
   };
   it("accepts the bounded timing envelope", () => expect(isCycleTimeResult(valid)).toBe(true));
-  it("rejects negative or non-integral diagnostics", () => {
-    expect(isCycleTimeResult({ ...valid, cycle_time: -1 })).toBe(false);
+  it("accepts a negative cycle time (starts after their completions)", () =>
+    expect(isCycleTimeResult({ ...valid, cycle_time: -1.5 })).toBe(true));
+  it("rejects non-finite values and non-integral diagnostics", () => {
+    expect(isCycleTimeResult({ ...valid, cycle_time: Number.NaN })).toBe(false);
+    expect(isCycleTimeResult({ ...valid, cycle_time: null })).toBe(false);
     expect(isCycleTimeResult({ ...valid, instances: 1.5 })).toBe(false);
   });
 });
@@ -849,9 +854,14 @@ describe("isCaseStatisticsResult", () => {
     cases: [{ case_id: "c1", start_time: 1, end_time: 3, case_duration: 2 }],
   };
   it("accepts per-case timing rows", () => expect(isCaseStatisticsResult(valid)).toBe(true));
+  it("accepts negative durations and the null times of a case without timestamps", () => {
+    expect(isCaseStatisticsResult({ ...valid, cases: [{ ...valid.cases[0], case_duration: -1 }] })).toBe(true);
+    expect(isCaseStatisticsResult({ ...valid, cases: [{ case_id: "c2", start_time: null, end_time: null, case_duration: null }] })).toBe(true);
+  });
   it("rejects invalid durations and limits", () => {
     expect(isCaseStatisticsResult({ ...valid, max_cases: -1 })).toBe(false);
-    expect(isCaseStatisticsResult({ ...valid, cases: [{ ...valid.cases[0], case_duration: -1 }] })).toBe(false);
+    expect(isCaseStatisticsResult({ ...valid, cases: [{ ...valid.cases[0], case_duration: "2" }] })).toBe(false);
+    expect(isCaseStatisticsResult({ ...valid, cases: [{ ...valid.cases[0], start_time: Number.POSITIVE_INFINITY }] })).toBe(false);
   });
 });
 

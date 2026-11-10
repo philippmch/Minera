@@ -7399,12 +7399,15 @@ std::string service_time_json(const ServiceTimeResult& result) {
       << service_time_aggregation_name(result.aggregation)
       << "\",\"values\":{";
   std::size_t index = 0;
+  // NaN (an upload's activity whose durations are all NaT) is written as null.
   for (const auto& [activity, value] : result.values) {
-    if (!std::isfinite(value))
+    if (std::isinf(value))
       throw std::invalid_argument("service time values must be finite");
     if (index++) out << ',';
     write_json_string(out, activity);
-    out << ':' << std::setprecision(17) << value;
+    out << ':';
+    if (std::isnan(value)) out << "null";
+    else out << std::setprecision(17) << value;
   }
   out << "}}";
   return out.str();
@@ -7441,11 +7444,13 @@ std::string rework_json(const ReworkResult& result) {
 }
 
 std::string cycle_time_json(const CycleTimeResult& result) {
-  if (!std::isfinite(result.cycle_time) || result.cycle_time < 0.0)
-    throw std::invalid_argument("cycle time must be finite and non-negative");
+  // A start after its completion gives a negative cycle time, which the
+  // reference reports as is.
+  if (!std::isfinite(result.cycle_time))
+    throw std::invalid_argument("cycle time must be finite");
   std::ostringstream out;
   out << "{\"family\":\"CYCLE_TIME\",\"variant\":\"CLASSIC\","
-      << "\"cycle_time\":" << result.cycle_time
+      << "\"cycle_time\":" << std::setprecision(17) << result.cycle_time
       << ",\"instances\":" << result.instances
       << ",\"timed_events\":" << result.timed_events << '}';
   return out.str();
@@ -7476,11 +7481,12 @@ std::string case_arrival_json(const CaseArrivalResult& result) {
 
 std::string case_statistics_json(const CaseStatisticsResult& result) {
   (void)case_statistics_sort_name(result.options.sort_by);
+  // A trace whose last event precedes its first has a negative duration,
+  // which the reference reports as is; NaN (an upload's case whose timestamp
+  // cells are all NaT) is written as null.
   for (const auto& entry : result.cases) {
-    if (!std::isfinite(entry.start_time) || !std::isfinite(entry.end_time) ||
-        !std::isfinite(entry.case_duration)) {
-      // A trace whose last event precedes its first has a negative duration,
-      // which the reference reports as is.
+    if (std::isinf(entry.start_time) || std::isinf(entry.end_time) ||
+        std::isinf(entry.case_duration)) {
       throw std::invalid_argument("case statistics values must be finite");
     }
   }
@@ -7505,9 +7511,17 @@ std::string case_statistics_json(const CaseStatisticsResult& result) {
     const auto& entry = result.cases[i];
     out << "{\"case_id\":";
     write_json_string(out, entry.case_id);
-    out << ",\"start_time\":" << std::setprecision(17)
-        << entry.start_time << ",\"end_time\":" << entry.end_time
-        << ",\"case_duration\":" << entry.case_duration << '}';
+    const auto number = [&](double value) {
+      if (std::isnan(value)) out << "null";
+      else out << std::setprecision(17) << value;
+    };
+    out << ",\"start_time\":";
+    number(entry.start_time);
+    out << ",\"end_time\":";
+    number(entry.end_time);
+    out << ",\"case_duration\":";
+    number(entry.case_duration);
+    out << '}';
   }
   out << "]}";
   return out.str();

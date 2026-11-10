@@ -9,7 +9,11 @@
 #include <string_view>
 #include <tuple>
 
+#include "frame_times.hpp"
 #include "minera/timestamp.hpp"
+
+#include <limits>
+#include <map>
 
 namespace minera {
 namespace {
@@ -141,9 +145,32 @@ bool scalar_aggregation(DfgPerformanceAggregation aggregation) {
          aggregation == DfgPerformanceAggregation::kSum;
 }
 
+// pandas' groupby sum and mean: a Kahan-compensated sum in row order.
+double kahan_sum(const std::vector<double>& values) {
+  double sum = 0.0, compensation = 0.0;
+  for (const double value : values) {
+    const double y = value - compensation;
+    const double t = sum + y;
+    compensation = t - sum - y;
+    sum = t;
+  }
+  return sum;
+}
+
 double aggregate(std::vector<double> values,
-                 DfgPerformanceAggregation aggregation) {
+                 DfgPerformanceAggregation aggregation, bool frame = false) {
+  if (frame) {
+    // pandas skips NaN durations; a group of NaN only sums to 0 and has no
+    // other aggregate.
+    std::erase_if(values, [](double value) { return std::isnan(value); });
+    if (values.empty())
+      return aggregation == DfgPerformanceAggregation::kSum ? 0.0 : std::numeric_limits<double>::quiet_NaN();
+  }
   if (values.empty()) return 0.0;
+  // The DataFrame path aggregates with pandas' groupby (observed black-box).
+  if (frame && aggregation == DfgPerformanceAggregation::kSum) return kahan_sum(values);
+  if (frame && aggregation == DfgPerformanceAggregation::kMean)
+    return kahan_sum(values) / static_cast<double>(values.size());
   if (aggregation == DfgPerformanceAggregation::kSum)
     return std::accumulate(values.begin(), values.end(), 0.0);
   if (aggregation == DfgPerformanceAggregation::kMinimum)
@@ -159,6 +186,128 @@ double aggregate(std::vector<double> values,
   }
   return std::accumulate(values.begin(), values.end(), 0.0) /
          static_cast<double>(values.size());
+}
+
+// pm4py's DataFrame service time (service_time.pandas.get.apply) on an
+// upload's frame, observed black-box: the timestamp and the start column are
+// read (KeyError), each row's duration is the timestamp less the start as
+// pandas subtracts the two columns (its TypeError for columns that are no
+// dates, the .dt accessor's AttributeError for numbers) or, with business
+// hours, row by row (each start's and timestamp's replace(), then the
+// business seconds; a NaT cell raises ValueError there), then the rows are
+// grouped by the activity column (KeyError; a missing activity drops the
+// row; values equal in Python are one key, named by the first one met). A
+// NaT cell elsewhere gives the row a NaN duration, which the aggregation
+// skips.
+std::map<std::string, std::vector<double>> frame_service_durations(
+    const EventLog& log, const ServiceTimeOptions& options,
+    const std::vector<BusinessHourSlot>& slots) {
+  const frame_times::Frame frame(log);
+  const auto activity_key = frame_times::activity_column(options.activity_key);
+  const auto timestamp_key = frame_times::timestamp_column(options.timestamp_key);
+  const auto start_key = frame_times::timestamp_column(options.start_timestamp_key);
+  const auto fail = [](const std::string& message) { throw std::invalid_argument(message); };
+  for (const auto* key : {&timestamp_key, &start_key})
+    if (!frame.has(*key)) fail("KeyError: '" + *key + "'");
+  const auto end_type = frame.dtype(timestamp_key);
+  const auto start_type = frame.dtype(start_key);
+  const auto is = [](std::optional<DataFrameColumnType> type, DataFrameColumnType wanted) { return type == wanted; };
+  const auto numeric = [&](std::optional<DataFrameColumnType> type) {
+    return is(type, DataFrameColumnType::kInt64) || is(type, DataFrameColumnType::kFloat64) ||
+           is(type, DataFrameColumnType::kBool);
+  };
+  const auto unsupported = [&](const std::string& left, const std::string& right) {
+    fail("TypeError: unsupported operand type(s) for -: '" + left + "' and '" + right + "'");
+  };
+  const auto no_accessor = [&] { fail("AttributeError: Can only use .dt accessor with datetimelike values"); };
+  const auto& traces = frame.log().traces;
+  if (slots.empty()) {
+    const bool end_dates = is(end_type, DataFrameColumnType::kDate);
+    const bool start_dates = is(start_type, DataFrameColumnType::kDate);
+    if (end_dates && !start_dates) {
+      if (is(start_type, DataFrameColumnType::kInt64))
+        fail("TypeError: Addition/subtraction of integers and integer-arrays with DatetimeArray is no longer "
+             "supported.  Instead of adding/subtracting `n`, use `n * obj.freq`");
+      if (is(start_type, DataFrameColumnType::kFloat64) || is(start_type, DataFrameColumnType::kBool)) {
+        if (frame.log().event_count() != 0)
+          unsupported("Timestamp", is(start_type, DataFrameColumnType::kBool) ? "bool" : "float");
+        no_accessor();
+      }
+      // Text and object columns subtract cell by cell.
+      for (const auto& trace : traces)
+        for (const auto& event : trace.events) {
+          const auto start = frame.cell(trace, event, start_key);
+          if (start && start->kind == python::Scalar::Kind::kDate) continue;
+          unsupported(frame.date(trace, event, timestamp_key) ? "Timestamp" : "NaTType",
+                      frame.cell_type(trace, event, start_key));
+        }
+      no_accessor();
+    }
+    if (!end_dates && start_dates) {
+      const std::string array = numeric(end_type) ? (is(end_type, DataFrameColumnType::kInt64)     ? "int64"
+                                                     : is(end_type, DataFrameColumnType::kFloat64) ? "float64"
+                                                                                                    : "bool")
+                                                  : "object";
+      fail("TypeError: cannot subtract DatetimeArray from ndarray[" + array + "]");
+    }
+    if (!end_dates) {
+      if (is(end_type, DataFrameColumnType::kBool) && is(start_type, DataFrameColumnType::kBool))
+        fail("TypeError: numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, the `^` "
+             "operator, or the logical_xor function instead.");
+      if (!numeric(end_type) || !numeric(start_type))
+        for (const auto& trace : traces)
+          for (const auto& event : trace.events) {
+            const auto end = frame.cell(trace, event, timestamp_key);
+            const auto start = frame.cell(trace, event, start_key);
+            const bool texts = (end && end->kind == python::Scalar::Kind::kText) ||
+                               (start && start->kind == python::Scalar::Kind::kText);
+            if (texts)
+              unsupported(frame.cell_type(trace, event, timestamp_key), frame.cell_type(trace, event, start_key));
+          }
+      no_accessor();
+    }
+  }
+  struct Row {
+    const Trace* trace;
+    const Event* event;
+    double duration;
+  };
+  std::vector<Row> rows;
+  for (const auto& trace : traces)
+    for (const auto& event : trace.events) {
+      if (slots.empty()) {
+        const auto start = frame.date(trace, event, start_key);
+        const auto finish = frame.date(trace, event, timestamp_key);
+        rows.push_back({&trace, &event,
+                        start && finish ? frame_times::total_seconds(*start, *finish)
+                                        : std::numeric_limits<double>::quiet_NaN()});
+        continue;
+      }
+      std::optional<ParsedExactTimestamp> ends[2];
+      int index = 0;
+      for (const auto* key : {&start_key, &timestamp_key}) {
+        const auto cell = frame.cell(trace, event, *key);
+        if (cell && cell->kind == python::Scalar::Kind::kText) fail("TypeError: str.replace() takes no keyword arguments");
+        if (cell ? cell->kind != python::Scalar::Kind::kDate : !is(frame.dtype(*key), DataFrameColumnType::kDate))
+          fail("AttributeError: '" + frame.cell_type(trace, event, *key) + "' object has no attribute 'replace'");
+        ends[index++] = frame.date(trace, event, *key);
+      }
+      if (!ends[0] || !ends[1]) fail("ValueError: cannot convert float NaN to integer");
+      const auto local_start = parse_timestamp(frame_times::utc_text(*ends[0]));
+      const auto local_finish = parse_timestamp(frame_times::utc_text(*ends[1]));
+      if (!local_start || !local_finish) fail("service time: invalid business-hours timestamp");
+      rows.push_back({&trace, &event, business_elapsed(*local_start, *local_finish, slots)});
+    }
+  if (!frame.has(activity_key)) fail("KeyError: '" + activity_key + "'");
+  std::map<std::string, std::string> names;
+  std::map<std::string, std::vector<double>> durations;
+  for (const auto& row : rows) {
+    const auto activity = frame.cell(*row.trace, *row.event, activity_key);
+    if (!activity) continue;
+    const auto& name = names.emplace(python::identity(*activity), python::str(*activity)).first->second;
+    durations[name].push_back(row.duration);
+  }
+  return durations;
 }
 
 }  // namespace
@@ -185,37 +334,42 @@ ServiceTimeResult discover_service_time(const EventLog& log,
                          ? normalized_slots(options)
                          : std::vector<BusinessHourSlot>{};
   std::map<std::string, std::vector<double>> durations;
-  for (const auto& trace : log.traces) {
-    for (const auto& event : trace.events) {
-      const auto activity = required_activity(event, options.activity_key);
-      const double start =
-          required_timestamp(event, options.start_timestamp_key, "start");
-      const double finish =
-          required_timestamp(event, options.timestamp_key, "completion");
-      double duration = finish - start;
-      if (!slots.empty()) {
-        const auto start_value = builtin_timestamp_key(options.start_timestamp_key)
-                                     ? event.timestamp
-                                     : *event.attribute(options.start_timestamp_key);
-        const auto finish_value = builtin_timestamp_key(options.timestamp_key)
-                                      ? event.timestamp
-                                      : *event.attribute(options.timestamp_key);
-        const auto clock = [&](std::string_view text) {
-          return options.dataframe ? parse_timestamp(text) : local_wall_timestamp(text);
-        };
-        const auto local_start = clock(start_value);
-        const auto local_finish = clock(finish_value);
-        if (!local_start || !local_finish)
-          throw std::invalid_argument("service time: invalid business-hours timestamp");
-        duration = business_elapsed(*local_start, *local_finish, slots);
+  if (log.dataframe_columns) {
+    durations = frame_service_durations(log, options, slots);
+  } else {
+    for (const auto& trace : log.traces) {
+      for (const auto& event : trace.events) {
+        const auto activity = required_activity(event, options.activity_key);
+        const double start =
+            required_timestamp(event, options.start_timestamp_key, "start");
+        const double finish =
+            required_timestamp(event, options.timestamp_key, "completion");
+        double duration = finish - start;
+        if (!slots.empty()) {
+          const auto start_value = builtin_timestamp_key(options.start_timestamp_key)
+                                       ? event.timestamp
+                                       : *event.attribute(options.start_timestamp_key);
+          const auto finish_value = builtin_timestamp_key(options.timestamp_key)
+                                        ? event.timestamp
+                                        : *event.attribute(options.timestamp_key);
+          const auto clock = [&](std::string_view text) {
+            return options.dataframe ? parse_timestamp(text) : local_wall_timestamp(text);
+          };
+          const auto local_start = clock(start_value);
+          const auto local_finish = clock(finish_value);
+          if (!local_start || !local_finish)
+            throw std::invalid_argument("service time: invalid business-hours timestamp");
+          duration = business_elapsed(*local_start, *local_finish, slots);
+        }
+        durations[activity].push_back(duration);
       }
-      durations[activity].push_back(duration);
     }
   }
   ServiceTimeResult result;
   result.aggregation = options.aggregation;
   for (auto& [activity, values] : durations)
-    result.values.emplace(activity, aggregate(std::move(values), options.aggregation));
+    result.values.emplace(activity, aggregate(std::move(values), options.aggregation,
+                                              log.dataframe_columns != nullptr));
   return result;
 }
 

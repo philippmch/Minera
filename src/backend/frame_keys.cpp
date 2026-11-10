@@ -260,6 +260,27 @@ std::optional<python::Scalar> frame_row_scalar(const EventLog& frame, const Trac
   return frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
 }
 
+// The dtype of a frame column (nullopt for no such column): the CSV and XES
+// columns as typed, the case and activity copies text, the CSV activity
+// column under its own header as read_csv typed it, @@index ints, an XES
+// time:timestamp dates.
+std::optional<DataFrameColumnType> frame_column_type(const EventLog& frame, const std::string& key) {
+  const auto& columns = *frame.dataframe_columns;
+  for (const auto& column : columns.columns)
+    if (column.key == key) return column.type;
+  if (key.starts_with("case:") && key != "case:concept:name")
+    for (const auto& column : columns.trace_columns)
+      if ("case:" + column.key == key) return column.type;
+  if (key == "concept:name" || key == "case:concept:name") return DataFrameColumnType::kString;
+  if (key == "@@index" || key == "@@case_index") return DataFrameColumnType::kInt64;
+  if (key == "time:timestamp") return DataFrameColumnType::kDate;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events)
+      if (event.activity_source_key == key)
+        return columns.csv_text ? columns.activity_type : DataFrameColumnType::kString;
+  return std::nullopt;
+}
+
 void require_frame_columns(const std::set<std::string>& keys,
                            const std::vector<std::string>& selection) {
   std::vector<std::string> absent;

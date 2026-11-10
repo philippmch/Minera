@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AV (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AW (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4342,7 +4342,45 @@ descriptions, `format_dataframe`'s keys for CSV features), variants fail on
 a one-case stdev only when printed, and the truncation check survives that
 failure. Details: Review AV1.
 
-Next round (AW) should start by re-reviewing round AV:
+Round AW re-reviewed AV (fixed: network durations on uploads are the
+dates' exact `Timedelta.total_seconds`; `average_workload`, `multitasking`
+and `average_duration_activity` follow pandas' duplicate-column rules,
+checked on a 13,500-request key matrix; a reversed interval raises `Start
+must be less than end`), found no differences in the attribute filters and
+OCEL-from-CSV with the AT1-4 date columns, and took the four time
+statistics routes to the upload frame: service time (module-level pandas
+apply, NaN durations skipped, Kahan sums), cycle time (per-row
+`.timestamp()`, negative values), case arrival (first cells sorted with
+Python's comparisons, text failing once two cases have a cell) and case
+statistics (NaT cases null, exact business-hour microseconds, object
+columns case by case). The round was paused for the 2026-11-10 history
+rewrite and finished on the rewritten main. Details: Review AW1.
+
+Next round (AX) should start by re-reviewing round AW:
+
+- `src/backend/frame_times.{hpp,cpp}` (`Frame`, `case_cells`,
+  `subtraction_error` with XES `datetime.datetime` cells, `total_seconds`,
+  `epoch_seconds`) and the frame branches built on it:
+  `frame_service_durations` in `service_time.cpp`, `frame_cycle_events` in
+  `cycle_time.cpp`, `frame_case_endpoints` in `case_arrival.cpp`,
+  `frame_cases` in `case_statistics.cpp`, and the null/negative JSON in
+  `json_export.cpp` with the frontend validators in `types.ts`;
+- `src/backend/resource_profiles.cpp`: `require_timed_selection` (the
+  case, timestamp, resource and activity repeats, with and without a
+  start column, the one-column case), the start-on-case branch of the
+  duration, the reversed-interval error;
+- the exact durations in `network_analysis.cpp` (business hours still use
+  epoch doubles there: worth a sweep with fractional seconds).
+
+Candidate new areas: passed time and event distribution on frames with NaT
+cells, a non-default `case_id_key` on the time statistics frames, business
+hours on network analysis with fractional seconds. Still open from earlier
+rounds: the trace-based selection of mixed-type and bool-with-gaps keys by
+Python set order (AQ, AV1), which a "most likely set order" model could
+narrow. Harness: `review-harness/round-aw/` (README there; it reuses round
+AV's scripts and theirs).
+
+Round AV's targets, re-reviewed in AW (findings AW1-1 to AW1-3, fixed):
 
 - `src/backend/llm_abstractions.cpp`: `frame_view` (column order from
   `DataFrameColumns::order` or the XES event stream, per-column dtypes,
@@ -4358,15 +4396,6 @@ Next round (AW) should start by re-reviewing round AV:
   there, the compare-first rule before `require_unique_selection`;
 - the empty-role keys in `frame_local_diagnostics` and the NaT check in the
   temporal `missing_category` of `src/backend/log_to_features.cpp`.
-
-Not swept yet with the AT1-4 date columns: attribute filters on the frame
-and OCEL import from CSV. Also open: pm4py's trace-based selection of a
-bool column with gaps is deterministic when `False` is among the values
-(`False` hashes to slot 0, so the set's first value is a bool and the key
-is left out); Minera takes it as numeric (declared as hash-seed
-dependent in AQ). Then continue in a new area. Harness:
-`review-harness/round-av/` (README there; it reuses scripts of rounds AQ,
-AR, AS and AT).
 
 Round AU's targets, re-reviewed in AV (findings AV1-2 to AV1-5 and AV1-8,
 fixed):
