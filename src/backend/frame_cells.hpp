@@ -17,6 +17,12 @@ namespace minera {
                                                          const Event& event, const std::string& key,
                                                          FrameKeyScope scope);
 
+// The cell of `key` in one row of `frame` (DataFrame scope): the row's own
+// `case:` cell where the row carries one (CSV rows, merged XES cases), typed
+// by its column, else frame_scalar's cell.
+[[nodiscard]] std::optional<python::Scalar> frame_row_scalar(const EventLog& frame, const Trace& trace,
+                                                             const Event& event, const std::string& key);
+
 // A FrameValue of class kNumber as its Python number (bool, int or float).
 [[nodiscard]] python::Scalar frame_number_scalar(const FrameValue& value);
 

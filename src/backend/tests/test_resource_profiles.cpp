@@ -351,10 +351,65 @@ static void review_au_frame_paths() {
   assert(raises_text([&] { (void)run(mixed, M::kAverageDurationActivity, "R", {{"resource_key", "org:resource"}, {"timestamp", "x"}, {"activity", "a"}}); }, unordered));
 }
 
+// Review AV1: pm4py 2.7.22 on read_csv + format_dataframe of small CSVs.
+static void review_av_frame_paths() {
+  using M = ResourceProfileMetric;
+  const auto run = [](const EventLog& log, M metric, const std::string& resource, const std::string& t1,
+                      const std::string& t2, std::map<std::string, std::string> extra = {}) {
+    ResourceProfilesOptions o;
+    o.metric = metric;
+    o.resource_attribute = "who";
+    o.t1 = t1;
+    o.t2 = t2;
+    o.resource = resource;
+    o.resource_given = true;
+    if (extra.contains("activity")) { o.activity = extra["activity"]; o.activity_given = true; }
+    if (extra.contains("timestamp")) o.timestamp_attribute = extra["timestamp"];
+    if (extra.contains("start")) o.start_timestamp_attribute = extra["start"];
+    return discover_resource_profiles(log, o);
+  };
+  const std::string lo = "2019-01-01 00:00:00", hi = "2021-01-01 00:00:00";
+  // multitasking sums each distinct (start, end, activity) interval once,
+  // while a copy still counts as overlapping: 2/3, not 1/2.
+  const auto copies = au_csv("cid,act,ts,who,st\n"
+                             "c1,a,2020-01-01 10:00:00,R,2020-01-01 09:00:00\n"
+                             "c1,a,2020-01-01 10:00:00,R,2020-01-01 09:00:00\n"
+                             "c2,b,2020-01-01 10:30:00,R,2020-01-01 09:30:00\n"
+                             "c2,c,2020-01-01 12:00:00,R,2020-01-01 11:00:00\n");
+  assert(std::abs(only_value(run(copies, M::kMultitasking, "R", lo, hi, {{"start", "st"}})) - 2.0 / 3.0) < 1e-12);
+  // average_case_duration on a frame keeps a case only when it starts
+  // before t2 and ends after t1, both strictly.
+  const auto cases = au_csv("cid,act,ts,who,f\n"
+                            "c1,a,2020-01-01 10:00:00,R,\n"
+                            "c1,b,2020-01-01 12:00:00,R,\n"
+                            "c2,a,2020-01-02 10:00:00,R,\n"
+                            "c2,b,2020-01-02 11:00:00,R,\n"
+                            "c3,a,2020-01-03 10:00:00,R,\n");
+  assert(only_value(run(cases, M::kAverageCaseDuration, "R", lo, hi)) == 3600.0);
+  assert(only_value(run(cases, M::kAverageCaseDuration, "R", "2020-01-01 12:00:00", hi)) == 1800.0);
+  assert(only_value(run(cases, M::kAverageCaseDuration, "R", lo, "2020-01-02 10:00:00")) == 7200.0);
+  assert(raises_text([&] { (void)run(cases, M::kAverageCaseDuration, "R", "2020-01-03 10:00:00", hi); },
+                     "mean requires at least one data point"));
+  // An all-NaN float64 timestamp column compares its NaN cells.
+  assert(raises_text([&] { (void)run(cases, M::kAverageCaseDuration, "R", lo, hi, {{"timestamp", "f"}}); },
+                     "TypeError: '<' not supported between instances of 'float' and 'datetime.datetime'"));
+  // The activity column as the timestamp: distinct_activities and
+  // activity_frequency compare the resource's rows before the selection
+  // realigns, so only a resource without rows reaches the realignment.
+  for (const auto metric : {M::kActivityFrequency, M::kDistinctActivities}) {
+    const std::map<std::string, std::string> extra{{"timestamp", "concept:name"}, {"activity", "a"}};
+    assert(raises_text([&] { (void)run(cases, metric, "R", lo, hi, extra); },
+                       "TypeError: '>=' not supported between instances of 'str' and 'datetime.datetime'"));
+    assert(raises_text([&] { (void)run(cases, metric, "Q", lo, hi, extra); },
+                       "ValueError: cannot reindex on an axis with duplicate labels"));
+  }
+}
+
 int main() {
   reference_audit_contracts();
   frame_path_reads_pm4py_frame();
   review_au_frame_paths();
+  review_av_frame_paths();
   const auto log = sample();
   auto distinct = discover_resource_profiles(log, {});
   assert(distinct.rows.size() == 2);

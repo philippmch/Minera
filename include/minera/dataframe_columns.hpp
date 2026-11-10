@@ -63,6 +63,13 @@ struct DataFrameColumns {
   // (format_dataframe only copies it to concept:name as text): ints of an
   // int column are ints there (observed black-box).
   DataFrameColumnType activity_type = DataFrameColumnType::kString;
+  // A CSV frame's column names in its order: read_csv's header (`case:`
+  // columns included), then format_dataframe's copies case:concept:name,
+  // concept:name and time:timestamp that the header lacks (a column of that
+  // name is overwritten in place), then @@index and @@case_index (observed
+  // black-box). Empty for XES frames, whose order is the first appearance of
+  // each key over the converted event stream.
+  std::vector<std::string> order;
 };
 
 // The event columns of an XES log's frame (read_xes): every event key other

@@ -257,6 +257,11 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
     return true;
   };
   for (const auto& group : members) {
+    // Every group is a key of each dict, empty when nothing is counted (no
+    // activity, or no member).
+    (void)result.group_relative_focus[group.name];
+    (void)result.group_relative_stake[group.name];
+    (void)result.group_coverage[group.name];
     std::map<std::string, std::uint64_t> group_counts;
     std::uint64_t group_total = 0;
     for (const auto& a : activity_order) {

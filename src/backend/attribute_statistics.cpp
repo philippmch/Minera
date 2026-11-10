@@ -132,40 +132,6 @@ std::pair<std::string, std::string> scalar_key(const python::Scalar& value, std:
   }
 }
 
-// The frame cell of `key` in one row: the row's own `case:` cell where the
-// row carries one (CSV rows, merged XES cases), typed by its column, else
-// the frame view's cell.
-std::optional<python::Scalar> frame_row_cell(const EventLog& frame, const Trace& trace,
-                                             const Event& event, const std::string& key) {
-  if (key.starts_with("case:") && key != "case:concept:name")
-    if (const auto own = dataframe_cell::case_row_value(event, key)) {
-      if (!*own) return std::nullopt;
-      const std::string bare = key.substr(5);
-      const EventAttribute* stored = nullptr;
-      for (const auto& attribute : event.case_row_attributes)
-        if (attribute.key == bare) stored = &attribute;
-      const auto& columns = *frame.dataframe_columns;
-      const DataFrameColumn* column = nullptr;
-      for (const auto& candidate : columns.trace_columns)
-        if (candidate.key == bare) column = &candidate;
-      python::Scalar value;
-      if (columns.csv_text && column) {
-        value = python::from_attribute(csv_dataframe_cell(*column, **own));
-      } else {
-        value = stored ? python::from_attribute(*stored) : python::text(**own);
-        if (column && column->type == DataFrameColumnType::kFloat64 && value.kind == python::Scalar::Kind::kInt)
-          value = python::real(std::strtod(python::str(value).c_str(), nullptr));
-      }
-      if (python::is_missing(value)) return std::nullopt;
-      if (value.kind == python::Scalar::Kind::kDate) {
-        value.date.timezone_aware = true;
-        value.date.offset_minutes = 0;
-      }
-      return value;
-    }
-  return frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
-}
-
 std::string python_text_repr(const std::string& text) {
   std::string out = "'";
   for (const char c : text) {
@@ -337,7 +303,7 @@ AttributeStatisticsResult discover_attribute_statistics(
     std::vector<std::vector<python::Scalar>> group_keys;
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events) {
-        const auto cell = frame_row_cell(frame, trace, event, key);
+        const auto cell = frame_row_scalar(frame, trace, event, key);
         if (!cell) {
           rows.push_back({&trace.case_id, std::nullopt, nullptr, 1});
           continue;

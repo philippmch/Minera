@@ -1,5 +1,6 @@
 #include "minera/frame_keys.hpp"
 
+#include "dataframe_cell.hpp"
 #include "frame_cells.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dataframe_columns.hpp"
@@ -226,6 +227,37 @@ std::optional<python::Scalar> frame_scalar(const EventLog& frame, const Trace& t
       return cell_scalar(*attribute);
   }
   return std::nullopt;
+}
+
+std::optional<python::Scalar> frame_row_scalar(const EventLog& frame, const Trace& trace,
+                                               const Event& event, const std::string& key) {
+  if (key.starts_with("case:") && key != "case:concept:name")
+    if (const auto own = dataframe_cell::case_row_value(event, key)) {
+      if (!*own) return std::nullopt;
+      const std::string bare = key.substr(5);
+      const EventAttribute* stored = nullptr;
+      for (const auto& attribute : event.case_row_attributes)
+        if (attribute.key == bare) stored = &attribute;
+      const auto& columns = *frame.dataframe_columns;
+      const DataFrameColumn* column = nullptr;
+      for (const auto& candidate : columns.trace_columns)
+        if (candidate.key == bare) column = &candidate;
+      python::Scalar value;
+      if (columns.csv_text && column) {
+        value = python::from_attribute(csv_dataframe_cell(*column, **own));
+      } else {
+        value = stored ? python::from_attribute(*stored) : python::text(**own);
+        if (column && column->type == DataFrameColumnType::kFloat64 && value.kind == python::Scalar::Kind::kInt)
+          value = python::real(std::strtod(python::str(value).c_str(), nullptr));
+      }
+      if (python::is_missing(value)) return std::nullopt;
+      if (value.kind == python::Scalar::Kind::kDate) {
+        value.date.timezone_aware = true;
+        value.date.offset_minutes = 0;
+      }
+      return value;
+    }
+  return frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
 }
 
 void require_frame_columns(const std::set<std::string>& keys,

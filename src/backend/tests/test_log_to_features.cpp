@@ -956,6 +956,43 @@ static void csv_frame_case_and_activity_copies() {
          std::vector<std::string>({"trace:cid@UNDEFINED"}));
 }
 
+static void csv_frame_temporal_date_keys_with_gaps() {
+  // Review AV1, pm4py 2.7.22 TEMPORAL on read_csv + format_dataframe: a
+  // date-text resource or activity key with a blank cell (NaT) is a missing
+  // value, not an error.
+  std::istringstream csv("cid,act,ts,who,when\n"
+                         "c1,a,2020-01-01 00:00:00,R,2020-03-01 10:00:00\n"
+                         "c1,b,2020-01-01 00:01:00,S,\n"
+                         "c2,a,2020-01-02 00:00:00,R,2020-03-02 10:00:00\n");
+  minera::CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  const auto log = minera::import_csv_event_log(csv, import);
+  LogToFeaturesOptions temporal;
+  temporal.standard_keys = true;
+  temporal.variant = LogToFeaturesVariant::TEMPORAL;
+  temporal.grouper_freq = "D";
+  const auto values = [](const LogToFeaturesResult& result) {
+    std::vector<std::vector<double>> rows;
+    for (const auto& row : result.temporal_rows) {
+      rows.emplace_back();
+      for (const auto& value : row.values) rows.back().push_back(std::get<double>(value));
+    }
+    return rows;
+  };
+  temporal.resource_key = "when";
+  assert((values(log_to_features(log, temporal)) ==
+          std::vector<std::vector<double>>{{1, 2, 2, 0, 0, 60, 60, 0, 0, 1, 2, 1, 1},
+                                           {1, 1, 1, 86400, 86340, 0, 0, 0, 0, 1, 1, 1, 1}}));
+  temporal.resource_key = "who";
+  temporal.activity_key = "when";
+  assert((values(log_to_features(log, temporal)) ==
+          std::vector<std::vector<double>>{{2, 1, 2, 0, 0, 60, 60, 0, 1, 1, 2, 1, 2},
+                                           {1, 1, 1, 86400, 86340, 0, 0, 0, 0, 1, 1, 1, 1}}));
+}
+
 static void xes_frame_trace_attributes_with_gaps() {
   // pm4py 2.7.22 on convert_to_event_log(read_xes(...)): a trace without a
   // trace attribute holds NaN (NaT for a date), an int trace attribute with
@@ -3531,6 +3568,7 @@ int main() {
   csv_case_column_is_the_reference_trace_concept_name();
   csv_frame_view_feeds_trace_and_event_features();
   csv_frame_case_and_activity_copies();
+  csv_frame_temporal_date_keys_with_gaps();
   default_trace_selection_skips_lifecycle_transition();
   xes_frame_trace_attributes_with_gaps();
   csv_frame_trace_attributes_with_gaps();

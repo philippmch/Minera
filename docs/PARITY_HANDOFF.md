@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AU (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AV (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4322,8 +4322,49 @@ group's last timestamp), the derived-start metrics' sort by case and
 timestamp (an ordered Categorical: unorderable values raise), float64
 timestamp columns comparing NaN, and CSV `@@index` network nodes take the
 analysis's own sorted numbering. Details: Review AU1.
+Round AV re-reviewed AU with the AT1-4 date shapes on the timestamp and
+start columns (fixed: `multitasking` sums each distinct interval once,
+`average_case_duration` on uploads keeps a case only when it starts before
+t2 and ends after t1, both strictly, and compares a float64 column's NaN
+cells; `distinct_activities` and `activity_frequency` compare the
+resource's rows before a duplicated timestamp column realigns; an empty
+role keeps its keys in local diagnostics) and swept the CSV routes AU had
+not: features and root cause had no differences, TEMPORAL features failed
+on a date key with blanks (`stoi`, fixed), and the LLM context described
+the native table on uploads. `/api/llm-context` now reads the frame there
+(event stream cells and column order, dtype-driven attribute
+descriptions, `format_dataframe`'s keys for CSV features), variants fail on
+a one-case stdev only when printed, and the truncation check survives that
+failure. Details: Review AV1.
 
-Next round (AV) should start by re-reviewing round AU:
+Next round (AW) should start by re-reviewing round AV:
+
+- `src/backend/llm_abstractions.cpp`: `frame_view` (column order from
+  `DataFrameColumns::order` or the XES event stream, per-column dtypes,
+  `object_scalar` for XES object dates), `frame_columns_description` and
+  `describe_columns` (the dtype table, the all-NaN float quantiles,
+  `merge_numbers`), `frame_event_stream_description`, the lazy variant
+  performance, and `exact` in `src/backend/llm_context.cpp`;
+- `DataFrameColumns::order` in `src/backend/csv_event_log_importer.cpp`
+  (header, copies, `@@index`), and `frame_row_scalar` now shared from
+  `src/backend/frame_keys.cpp`;
+- `src/backend/resource_profiles.cpp`: the multitasking interval dedup, the
+  strict window in `frame_average_case_duration`, the float64 NaN rule
+  there, the compare-first rule before `require_unique_selection`;
+- the empty-role keys in `frame_local_diagnostics` and the NaT check in the
+  temporal `missing_category` of `src/backend/log_to_features.cpp`.
+
+Not swept yet with the AT1-4 date columns: attribute filters on the frame
+and OCEL import from CSV. Also open: pm4py's trace-based selection of a
+bool column with gaps is deterministic when `False` is among the values
+(`False` hashes to slot 0, so the set's first value is a bool and the key
+is left out); Minera takes it as numeric (declared as hash-seed
+dependent in AQ). Then continue in a new area. Harness:
+`review-harness/round-av/` (README there; it reuses scripts of rounds AQ,
+AR, AS and AT).
+
+Round AU's targets, re-reviewed in AV (findings AV1-2 to AV1-5 and AV1-8,
+fixed):
 
 - `src/backend/attribute_statistics.cpp`, the frame branch of
   `discover_attribute_statistics` (`scalar_key`, `frame_row_cell` with the
@@ -4340,9 +4381,10 @@ Next round (AV) should start by re-reviewing round AU:
   (also seen by `require_mergeable`), the own `@@index` cells;
 - AT1-4 date columns in the remaining CSV routes not swept in AU (features,
   root cause, temporal features, filters on the frame, LLM context), with
-  offsets, `T`, partial and time-only shapes.
+  offsets, `T`, partial and time-only shapes (AV1-1, AV1-6, AV1-7; filters
+  not swept).
 
-Then continue in a new area. Harness: `review-harness/round-au/`
+Harness of AU: `review-harness/round-au/`
 (`statsweep.py [--xes]`, `socmatrix.py <xes|csv> <metric> [cols]`,
 `socref.py`/`socmodel.py` for the interaction model, `adaprobe.py` and
 `adaprobe2.py` for the duration probes; `atsweep2.py` and `atref.py` from

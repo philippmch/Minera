@@ -27,6 +27,12 @@ int main(){
   minera::LlmContextOptions agg;agg.variant="dfg";agg.relative_frequency=true;agg.primary_aggregation="median";agg.secondary_aggregation="max";agg.include_header=false;
   exact.relative_frequency=true;exact.primary_performance_aggregation="median";exact.secondary_performance_aggregation="max";exact.response_header=false;exact.include_header=false;
   assert(minera::build_llm_context(log,agg).text==minera::llm_log_dfg_description(log,exact));}
+ // Review AV1: a one-case variant's stdev fails only once printed, so a
+ // bounded context that cuts it off is the reference text, truncated.
+ {std::istringstream upload("cid,act,ts\nc1,a,2020-01-01 10:00:00\nc1,b,2020-01-01 11:00:00\nc2,a,2020-01-02 10:00:00\nc2,b,2020-01-02 12:00:00\nc3,a,2020-01-03 10:00:00\n");minera::CsvImportOptions import;import.case_id_column="cid";import.activity_column="act";import.timestamp_column="ts";const auto frame=minera::import_csv_event_log(upload,import);
+  minera::LlmContextOptions o;o.variant="variants";o.primary_aggregation="stdev";o.max_len=100;const auto cut=minera::build_llm_context(frame,o);
+  assert(cut.truncated&&cut.text=="If I have a process with the following process variants:\n\n a -> b ( frequency = 2  performance = 1800.000 )\n\n\n");
+  o.max_len=110;bool raised=false;try{(void)minera::build_llm_context(frame,o);}catch(const std::invalid_argument&){raised=true;}assert(raised);}
  // Reference label (pm4py declare_to_descr): "Responded Existence".
  {minera::DeclareModel model;model.rules.clear();model.rules["responded_existence"]={{"A","B",true,0,0}};assert(minera::abstract_declare(model,false).text=="\nThese are the constraints of the model:\nResponded Existence: ('A', 'B')\n");}
  // Empty traces have no rows in the reference event table: no empty variant,

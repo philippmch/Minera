@@ -2207,6 +2207,13 @@ CsvEventData import_csv_event_data_impl(
       columns->columns.push_back(std::move(copy));
     }
     columns->activity_type = column_type(activity_kind, activity_ints);
+    columns->order = header;
+    for (const char* name : {"case:concept:name", "concept:name", "time:timestamp"}) {
+      if (std::string_view(name) == "time:timestamp" && !timestamp_index) continue;
+      if (std::find(header.begin(), header.end(), name) == header.end()) columns->order.emplace_back(name);
+    }
+    columns->order.emplace_back("@@index");
+    columns->order.emplace_back("@@case_index");
     // Repeated column names are renamed by read_csv ("a.1"); such a frame
     // is not modelled.
     if (unique) frame_columns = std::move(columns);

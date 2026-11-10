@@ -82,9 +82,36 @@ static void review_au_error_order() {
   assert(error_of(log, options).find("KeyError: 'org:resource'") != std::string::npos);
 }
 
+// Review AV1 (pm4py 2.7.22 apply_from_clustering_or_roles on the frame): a
+// role is a key of every dict even when nothing is counted.
+static void review_av_empty_role() {
+  std::istringstream csv("cid,act,ts,res,grp\n"
+                         "c0,b,2020-01-01 00:30:00,,g3\n"
+                         "c1,b,2020-01-02 05:05:00,,g1\n"
+                         "c2,a,2020-01-03 05:05:00,,\n");
+  CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  const auto log = import_csv_event_log(csv, import);
+  LocalDiagnosticsOptions options;
+  options.resource_attribute = "res";
+  options.group_attribute = "grp";
+  options.explicit_groups = {{"Role 1", {}}};
+  const auto roles = discover_local_diagnostics(log, options);
+  const std::map<std::string, std::map<std::string, double>> empty{{"Role 1", {}}};
+  assert(roles.group_relative_focus == empty && roles.group_relative_stake == empty &&
+         roles.group_coverage == empty && roles.group_member_contribution.size() == 1 &&
+         roles.group_member_contribution.at("Role 1").empty());
+  options.explicit_groups.clear();
+  const auto by_group = discover_local_diagnostics(log, options);
+  assert(by_group.group_relative_focus.empty() && by_group.group_member_contribution.empty());
+}
+
 int main() {
   frame_path_reads_pm4py_frame();
   review_au_error_order();
+  review_av_empty_role();
   EventLog log;
   Trace t; t.case_id = "c";
   t.events.push_back(Event{"c", "A", "", "r1", 0, {{"org:group", "g1", AttributeKind::kString}}, {}});

@@ -21982,3 +21982,130 @@ sparse and full text timestamps, an XES object column, CSV `@@index`
 nodes) and `minera_local_diagnostics_tests` (`review_au_error_order`).
 Full suite: 454 ctest targets, vitest (10,723), the Python script tests
 (406) and `tsc`.
+
+## Review AV1: re-review of round AU, and the AT1-4 date columns in features, root cause, temporal features and the LLM context (2026-11-10)
+
+Round AU's changes were re-read (the attribute-statistics frame branch, the
+resource-profile duration and interaction models, the network timestamp
+rules) and swept again with the AT1-4 date shapes: CSV uploads whose
+timestamp and start columns are written with offsets, `T`, `Z`, fractions,
+mixed offsets, negative offsets or as dates only, plus extra date-text
+event and `case:` columns that requests may name. The CSV routes that read
+typed frame columns and were not swept in AU were swept with the same date
+columns: trace and event features, root cause, calendar TEMPORAL features
+and the LLM context. Features and root cause had no differences; the other
+findings are below, all fixed.
+
+- **AV1-1 TEMPORAL features on a date key with blanks.** A date-text column
+  chosen as the resource or activity key holds NaT for a blank cell, which
+  pm4py treats as a missing value. Minera's category check read the NaT
+  cell as a date text and returned the C++ error `stoi`.
+- **AV1-2 `multitasking` counts each interval once.** pm4py sums the
+  duration of each distinct (start, end, activity) interval of the
+  resource once, while a copy of an interval still counts as overlapping
+  the others (two copies of 09:00 to 10:00 beside 09:30 to 10:30 give 2/3;
+  Minera summed both copies, 1/2). The pandas and EventLog variants agree.
+- **AV1-3 `average_case_duration` window on uploads.** pm4py's pandas
+  variant keeps a case only when its first timestamp lies before t2 and its
+  last after t1, both strictly: a case ending at t1, one starting at t2 and
+  a one-instant case on either bound are outside (the EventLog variant's
+  window is closed, which Minera used on uploads too).
+- **AV1-4 `average_case_duration` on a float64 timestamp column.** The
+  compared rows of an all-blank (float64) column hold NaN, which numpy
+  compares with the bound: `TypeError: '<' not supported between instances
+  of 'float' and 'datetime.datetime'` (Minera raised the `.dt` accessor
+  error).
+- **AV1-5 `distinct_activities` and `activity_frequency` with the timestamp
+  column named twice** (the activity column picked as the timestamp). Both
+  keep the rows of the resource before they compare times, so the
+  comparison of those rows fails first (`'>=' not supported between
+  instances of 'str' and 'datetime.datetime'`); only a comparison that
+  passes (no row of the resource holds a non-date) reaches the
+  `cannot reindex on an axis with duplicate labels` realignment, which
+  Minera raised first.
+- **AV1-6 The LLM context reads the frame on uploads.** pm4py's
+  `abstract_event_stream`, `abstract_log_attributes` and
+  `abstract_log_features` take the formatted frame of a CSV upload and
+  `read_xes`'s frame of an XES upload. The event stream prints each row's
+  present cells in the frame's column order (for CSV: the header, then the
+  `case:concept:name`, `concept:name` and `time:timestamp` copies the header
+  lacks, then `@@index` and `@@case_index`; for XES: first appearance over
+  the converted event stream) with the cells' Python reprs (ints, floats,
+  bools, UTC dates as `Timestamp('...+0000', tz='UTC')`); the attribute
+  description follows the dtype (float64 and date columns are described by
+  quantiles, an all-NaN float column by NaN quantiles, bool, object and
+  pandas string columns by value counts when they hold two values or more,
+  int64 and `str` columns and `case:concept:name` are left out); features
+  of a CSV upload use `format_dataframe`'s standard keys. Minera described
+  the native table (text cells, its own keys and order). A context request
+  that picks another activity or timestamp attribute still describes the
+  projected log, as before. `DataFrameColumns::order` now records the CSV
+  frame's column order.
+- **AV1-7 Variants with a one-case stdev.** The population stdev of a
+  single case is None in pm4py, which fails only when a variant's
+  performance is printed (`must be real number, not NoneType`), so a
+  `max_len` that cuts the list before such a variant gives the text. Minera
+  raised as soon as any variant had one case; the context route's
+  truncation check (the description without a bound) now treats that
+  failure as truncated.
+- **AV1-8 Local diagnostics, an empty role.** With explicit groups on an
+  upload, pm4py keys every role in each of the four dicts, an empty dict
+  when nothing is counted (no resource holds an activity); Minera left the
+  role out of focus, stake and coverage.
+
+**Contract.** Unchanged from AS to AU: on CSV and XES uploads these routes
+read keys and cells as pm4py reads its frame; native table sources keep the
+alias rules.
+
+Declarations:
+
+- A key that mixes numbers with bools or dates and holds no string
+  (XES object columns): pm4py's trace-based selection types it by the first
+  value in Python set order, so it is numeric (then fails on a date) or left
+  out; Minera takes it as numeric. With strings it stays one-hot in Minera
+  (declared in AQ, as are bools with gaps). The XES `log_features`
+  differences below are all such keys.
+- `distinct_activities` and `activity_frequency` with the resource,
+  activity and timestamp on one column: pandas masks instead of realigning
+  and pm4py answers (a number, or a Series per column); Minera raises
+  `cannot reindex on an axis with duplicate labels`.
+- A two-row upload without the resource column in local diagnostics
+  (declared in AU1).
+
+Verification (`featdate.py`, `rcdate.py`, `tempdate.py`, `atdate.py`,
+`llmsweep.py` with `llmref.py`, `acdsweep.py` and `datecols.py` in the
+project files under `review-harness/round-av/`; `atdate.py` reuses
+`atsweep2.py` and `atref.py` of round AT, `llmsweep.py` reuses `rccsv4.py`
+and `orgxes.py`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Features with date-text columns, CSV with custom headers (seeds 0 to 39) | 120 | 91 equal, 29 raise in both, 0 differences |
+| Root cause with date-text columns, CSV (seeds 0 to 39) | 173 | 152 equal, 21 raise in both, 0 differences |
+| TEMPORAL features keyed on date columns, CSV (seeds 0 to 39), before | 120 | 77 equal, 40 raise in both, 3 Minera errors (AV1-1) |
+| The same, fixed binary (seeds 0 to 59) | 180 | 124 equal, 56 raise in both, 0 differences |
+| Profiles, diagnostics, network with date-shaped timestamp and start columns, CSV (seeds 5,000 to 5,039 and 5,100 to 5,219), before | 2,908 | 1 difference (AV1-2), 1 error type (AV1-4), 7 pm4py-only errors (AV1-3) |
+| The same, AV1-2 to AV1-4 fixed, partial run (seeds 5,000 to 5,075; the harness stopped on its own sampling bug) | not counted | 2 error types (AV1-5, and the declared two rows) |
+| The same, fixed binary (seeds 5,000 to 5,159) | 2,922 | 1,928 equal (172 of them zero rows), 938 raise in both, 54 NaN, 1 difference (AV1-8, fixed after), 1 declared (two rows) |
+| The same, final binary (seeds 5,200 to 5,359) | 2,597 | 1,550 equal (167 of them zero rows), 950 raise in both, 97 NaN, 0 differences |
+| The same, final binary (seeds 5,150 to 5,179, which held the earlier findings) | 693 | 516 equal (61 of them zero rows), 168 raise in both, 9 NaN, 0 differences |
+| `average_case_duration` on window bounds, CSV, final binary | 200 | 0 differences |
+| LLM context, CSV with date columns (seeds 0 to 11), AV1-6 fixed | 36 | event stream, attributes and features equal on all 12 uploads |
+| LLM context, CSV with date columns (seeds 100 to 179) and without (300 to 339), AV1-6 fixed | 600 | 575 equal (7 under another hash seed), 25 variants failing in Minera (AV1-7; some raise in pm4py too) |
+| Variants and DFG, CSV, AV1-7 fixed (seeds 100 to 179) | 160 | 150 equal, 10 raise in both |
+| LLM context, CSV, final binary (seeds 200 to 259) | 300 | 294 equal, 6 raise in both, 0 differences |
+| LLM context, XES (seeds 500 to 559), fixed binary | 300 | 246 equal, 27 raise in both, 13 declared (`mix` features), 13 pm4py-only feature errors under every tried hash seed (declared in AQ: string keys with gaps typed as numbers by set order), 1 fixed after (AV1-7) |
+| LLM context, XES, final binary (seeds 600 to 659) | 300 | 248 equal (6 under another hash seed), 23 raise in both, 29 declared (the `mix` key, bools with gaps, string keys with gaps typed as numbers by set order) |
+| Fixture replay (16 manifests, a fresh server each) | 2,673 responses | unchanged |
+
+Tests: `minera_resource_profiles_tests` (`review_av_frame_paths`: the
+multitasking interval copies, the strict case window on uploads and its
+empty result, an all-NaN float64 timestamp column, the activity column as
+the timestamp for a resource with and without rows),
+`minera_log_to_features_tests` (`csv_frame_temporal_date_keys_with_gaps`),
+`minera_llm_abstractions_parity_tests` (`review_av_frame_descriptions`:
+the event stream and attribute description of a typed CSV upload, the
+one-case stdev variant cut off and printed), `minera_llm_context_tests`
+(the truncated context of that variant list) and
+`minera_local_diagnostics_tests` (`review_av_empty_role`). Full suite: 454
+ctest targets, vitest (10,723), the Python script tests (406) and `tsc`.

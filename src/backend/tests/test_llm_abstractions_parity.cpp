@@ -6,11 +6,13 @@
 // performance options; every text must match byte for byte, or the call must
 // raise. The skeleton relation pairs follow Python set order, which moves with
 // the hash seed, so each relation line is compared as a set of pairs.
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/event_log.hpp"
 #include "minera/llm_abstractions.hpp"
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <fstream>
 #include <map>
@@ -226,9 +228,56 @@ std::string skeleton_case(const EventLog& log, const Call& call) {
   return text_case(call, [&] { return llm_log_skeleton_description(log, options_for(call.name)); }, pair_sets);
 }
 
+// Review AV1: pm4py 2.7.22's abstract_event_stream, abstract_log_attributes
+// and abstract_variants on read_csv + format_dataframe(case_id="cid",
+// activity_key="act", timestamp_key="ts"): the frame's typed cells in its
+// column order, its dtypes deciding the column descriptions, and a one-case
+// stdev variant failing only once printed.
+void review_av_frame_descriptions() {
+  const auto upload = [](const std::string& text) {
+    std::istringstream csv(text);
+    CsvImportOptions import;
+    import.case_id_column = "cid";
+    import.activity_column = "act";
+    import.timestamp_column = "ts";
+    import.resource_column = "who";
+    return import_csv_event_log(csv, import);
+  };
+  const auto typed = upload("cid,act,ts,who,n,f,flag,when\nc1,a,2020-01-01 10:00:00,R,1,1.5,True,2020-03-01 10:00:00+02:00\nc1,b,2020-01-01 11:00:00,S,2,,False,\nc2,a,2020-01-02 10:00:00,R,3,2.5,True,2020-03-02T10:00:00Z\n");
+  LlmAbstractionOptions options;
+  if (llm_event_stream_description(typed, options) != "\n\nIf I have the following stream of events:\n\n{'cid': 'c1', 'act': 'a', 'ts': Timestamp('2020-01-01 10:00:00+0000', tz='UTC'), 'who': 'R', 'n': 1, 'f': 1.5, 'flag': True, 'when': Timestamp('2020-03-01 08:00:00+0000', tz='UTC'), 'case:concept:name': 'c1', 'concept:name': 'a', 'time:timestamp': Timestamp('2020-01-01 10:00:00+0000', tz='UTC'), '@@index': 0, '@@case_index': 0}\n{'cid': 'c1', 'act': 'b', 'ts': Timestamp('2020-01-01 11:00:00+0000', tz='UTC'), 'who': 'S', 'n': 2, 'flag': False, 'case:concept:name': 'c1', 'concept:name': 'b', 'time:timestamp': Timestamp('2020-01-01 11:00:00+0000', tz='UTC'), '@@index': 1, '@@case_index': 0}\n{'cid': 'c2', 'act': 'a', 'ts': Timestamp('2020-01-02 10:00:00+0000', tz='UTC'), 'who': 'R', 'n': 3, 'f': 2.5, 'flag': True, 'when': Timestamp('2020-03-02 10:00:00+0000', tz='UTC'), 'case:concept:name': 'c2', 'concept:name': 'a', 'time:timestamp': Timestamp('2020-01-02 10:00:00+0000', tz='UTC'), '@@index': 2, '@@case_index': 1}\n\n") {
+    std::fprintf(stderr, "AV1 stream: %s\n", llm_event_stream_description(typed, options).c_str());
+    std::exit(1);
+  }
+  if (llm_log_columns_description(typed) != "concept:name  empty: 0 values: (a; freq. 2) (b; freq. 1)\nf  empty: 1  quantiles: {0.0: 1.5, 0.25: 1.75, 0.5: 2.0, 0.75: 2.25, 1.0: 2.5}\nflag  empty: 0 values: (True; freq. 2) (False; freq. 1)\ntime:timestamp  empty: 0  quantiles: {0.0: Timestamp('2020-01-01 10:00:00+0000', tz='UTC'), 0.25: Timestamp('2020-01-01 10:30:00+0000', tz='UTC'), 0.5: Timestamp('2020-01-01 11:00:00+0000', tz='UTC'), 0.75: Timestamp('2020-01-01 22:30:00+0000', tz='UTC'), 1.0: Timestamp('2020-01-02 10:00:00+0000', tz='UTC')}\nts  empty: 0  quantiles: {0.0: Timestamp('2020-01-01 10:00:00+0000', tz='UTC'), 0.25: Timestamp('2020-01-01 10:30:00+0000', tz='UTC'), 0.5: Timestamp('2020-01-01 11:00:00+0000', tz='UTC'), 0.75: Timestamp('2020-01-01 22:30:00+0000', tz='UTC'), 1.0: Timestamp('2020-01-02 10:00:00+0000', tz='UTC')}\nwhen  empty: 1  quantiles: {0.0: Timestamp('2020-03-01 08:00:00+0000', tz='UTC'), 0.25: Timestamp('2020-03-01 14:30:00+0000', tz='UTC'), 0.5: Timestamp('2020-03-01 21:00:00+0000', tz='UTC'), 0.75: Timestamp('2020-03-02 03:30:00+0000', tz='UTC'), 1.0: Timestamp('2020-03-02 10:00:00+0000', tz='UTC')}") {
+    std::fprintf(stderr, "AV1 columns: %s\n", llm_log_columns_description(typed).c_str());
+    std::exit(1);
+  }
+  const auto variants = upload("cid,act,ts,who\nc1,a,2020-01-01 10:00:00,R\nc1,b,2020-01-01 11:00:00,S\nc2,a,2020-01-02 10:00:00,R\nc2,b,2020-01-02 12:00:00,R\nc3,a,2020-01-03 10:00:00,R\n");
+  options.primary_performance_aggregation = "stdev";
+  options.max_len = 100;
+  if (llm_log_variants_description(variants, options) != "If I have a process with the following process variants:\n\n a -> b ( frequency = 2  performance = 1800.000 )\n\n\n") {
+    std::fprintf(stderr, "AV1 variants: %s\n", llm_log_variants_description(variants, options).c_str());
+    std::exit(1);
+  }
+  options.max_len = 110;
+  bool raised = false;
+  try {
+    (void)llm_log_variants_description(variants, options);
+  } catch (const std::invalid_argument&) {
+    raised = true;
+  }
+  if (!raised) {
+    std::fprintf(stderr, "AV1 variants: a printed one-case stdev must fail\n");
+    std::exit(1);
+  }
+}
+
+
 }  // namespace
 
 int main(int argc, char** argv) {
+  review_av_frame_descriptions();
   const char* path = argc > 1 ? argv[1] : "src/backend/tests/fixtures/llm_abstractions_bank.txt";
   int failures = 0;
   std::size_t compared = 0, errors = 0;

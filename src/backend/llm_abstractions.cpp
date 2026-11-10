@@ -17,8 +17,13 @@
 #include <utility>
 #include <vector>
 
+#include "frame_cells.hpp"
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
+#include "minera/log_conversion.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_features.hpp"
+#include "python_scalar.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/timestamp.hpp"
 #include "root_cause_unicode.hpp"
@@ -581,26 +586,28 @@ std::string object_feature_description(const std::string& name) {
   return name;
 }
 
-}  // namespace
-
 // ---------------------------------------------------------------------------
 
-std::string llm_log_columns_description(const EventLog& log, std::size_t max_len) {
-  std::vector<std::string> order;
-  std::map<std::string, std::vector<Cell>> columns;
-  std::size_t rows = 0;
-  for (const auto& trace : log.traces)
-    for (const auto& event : trace.events) {
-      for (auto& [key, cell] : event_row(trace, event)) {
-        auto& column = columns[key];
-        if (column.empty() && std::find(order.begin(), order.end(), key) == order.end()) order.push_back(key);
-        column.resize(rows);
-        column.push_back(std::move(cell));
-      }
-      ++rows;
-    }
-  for (auto& [key, column] : columns) column.resize(rows);
+// One column of the event table to describe: a cell per row and, for a
+// DataFrame upload, the class its dtype gives it (kInfer: from the cells, as
+// the reference's conversion of an EventLog types them).
+enum class ColumnClass { kInfer, kSkip, kNumbers, kDates, kCounts };
 
+struct DescribedColumn {
+  std::string key;
+  std::vector<Cell> cells;
+  ColumnClass kind = ColumnClass::kInfer;
+};
+
+bool numeric_cell_kind(CellKind kind) {
+  return kind == CellKind::kInt || kind == CellKind::kFloat || kind == CellKind::kBool;
+}
+
+// The described columns, in order. With merge_numbers (a DataFrame's object
+// and bool columns) value counts key numbers by value, as Python dict keys
+// do (True, 1 and 1.0 are one key, named by the first one met).
+std::string describe_columns(const std::vector<DescribedColumn>& columns, std::size_t max_len,
+                             bool merge_numbers) {
   std::map<std::string, std::string> lines;
   std::size_t measure = 0;
   struct Piece {
@@ -610,8 +617,9 @@ std::string llm_log_columns_description(const EventLog& log, std::size_t max_len
     std::string text, head;
   };
   std::vector<Piece> pieces;
-  for (const auto& key : order) {
-    const auto& column = columns[key];
+  for (const auto& described : columns) {
+    const auto& key = described.key;
+    const auto& column = described.cells;
     std::size_t missing = 0;
     bool all_date = true, all_bool = true, all_int = true, all_number = true, all_string = true;
     std::vector<const Cell*> present;
@@ -627,8 +635,14 @@ std::string llm_log_columns_description(const EventLog& log, std::size_t max_len
       all_number &= cell.kind == CellKind::kInt || cell.kind == CellKind::kFloat;
       all_string &= cell.kind == CellKind::kString;
     }
+    auto kind = described.kind;
+    if (kind == ColumnClass::kInfer)
+      kind = all_date                              ? ColumnClass::kDates
+             : all_number && !(all_int && missing == 0) ? ColumnClass::kNumbers
+             : !all_number && !all_string        ? ColumnClass::kCounts
+                                                 : ColumnClass::kSkip;
     const auto empty = std::to_string(missing);
-    if (all_date) {
+    if (kind == ColumnClass::kDates) {
       bool aware = false;
       std::vector<double> values;
       for (const auto* cell : present) {
@@ -640,23 +654,28 @@ std::string llm_log_columns_description(const EventLog& log, std::size_t max_len
                      return timestamp_repr(static_cast<std::int64_t>(value), aware);
                    });
       measure += code_points(lines[key]);
-    } else if (all_number && !(all_int && missing == 0)) {
+    } else if (kind == ColumnClass::kNumbers) {
       std::vector<double> values;
       for (const auto* cell : present) values.push_back(cell->number);
-      lines[key] = key + "  empty: " + empty + "  quantiles: " + quantile_dict(values, py_float);
+      // A float column of NaN cells only has NaN quantiles.
+      lines[key] = key + "  empty: " + empty + "  quantiles: " +
+                   (values.empty() ? std::string("{0.0: nan, 0.25: nan, 0.5: nan, 0.75: nan, 1.0: nan}")
+                                   : quantile_dict(values, py_float));
       measure += code_points(lines[key]);
-    } else if (!all_number && !all_string) {
+    } else if (kind == ColumnClass::kCounts) {
       // Boolean and mixed columns: value counts, by count and then value.
       struct Count {
         const Cell* cell;
         std::size_t count;
       };
+      const auto same = [&](const Cell& a, const Cell& b) {
+        if (merge_numbers && numeric_cell_kind(a.kind) && numeric_cell_kind(b.kind))
+          return a.kind == CellKind::kInt && b.kind == CellKind::kInt ? a.text == b.text : a.number == b.number;
+        return a.kind == b.kind && a.text == b.text && a.number == b.number && a.micros == b.micros;
+      };
       std::vector<Count> counts;
       for (const auto* cell : present) {
-        auto found = std::find_if(counts.begin(), counts.end(), [&](const Count& entry) {
-          return entry.cell->kind == cell->kind && entry.cell->text == cell->text &&
-                 entry.cell->number == cell->number && entry.cell->micros == cell->micros;
-        });
+        auto found = std::find_if(counts.begin(), counts.end(), [&](const Count& entry) { return same(*entry.cell, *cell); });
         if (found == counts.end())
           counts.push_back({cell, 1});
         else
@@ -710,6 +729,225 @@ std::string llm_log_columns_description(const EventLog& log, std::size_t max_len
   return text;
 }
 
+// ---------------------------------------------------------------------------
+// The DataFrame of a CSV or XES upload (format_dataframe's or read_xes's
+// frame), which the reference abstractions read directly there.
+
+enum class FrameDtype { kInt64, kFloat64, kBool, kStr, kStringNA, kObject, kDate };
+
+struct FrameView {
+  std::vector<std::string> keys;
+  std::vector<FrameDtype> dtypes;
+  std::vector<std::vector<Cell>> rows;  // a cell per key
+  std::vector<std::int64_t> micros;     // each row's time:timestamp
+};
+
+FrameDtype frame_dtype(DataFrameColumnType type) {
+  switch (type) {
+    case DataFrameColumnType::kInt64: return FrameDtype::kInt64;
+    case DataFrameColumnType::kFloat64: return FrameDtype::kFloat64;
+    case DataFrameColumnType::kBool: return FrameDtype::kBool;
+    case DataFrameColumnType::kString: return FrameDtype::kStr;
+    case DataFrameColumnType::kObject: return FrameDtype::kObject;
+    case DataFrameColumnType::kDate: return FrameDtype::kDate;
+  }
+  return FrameDtype::kObject;
+}
+
+Cell scalar_cell(const python::Scalar& value) {
+  using Kind = python::Scalar::Kind;
+  Cell cell;
+  switch (value.kind) {
+    case Kind::kText:
+      return string_cell(value.text);
+    case Kind::kBool:
+      cell.kind = CellKind::kBool;
+      cell.number = value.boolean ? 1.0 : 0.0;
+      return cell;
+    case Kind::kInt:
+      cell.kind = CellKind::kInt;
+      cell.text = (value.negative ? "-" : "") + value.digits;
+      cell.number = std::strtod(cell.text.c_str(), nullptr);
+      return cell;
+    case Kind::kFloat:
+      if (std::isnan(value.real)) return {};
+      cell.kind = CellKind::kFloat;
+      cell.number = value.real;
+      return cell;
+    case Kind::kDate:
+      cell.kind = CellKind::kDate;
+      cell.micros = value.date.seconds * 1000000 + value.date.nanoseconds / 1000;
+      cell.aware = value.date.timezone_aware;
+      cell.offset_minutes = value.date.offset_minutes;
+      return cell;
+    default:
+      return {};
+  }
+}
+
+// An object column's cell as the frame holds the Python object: an XES
+// date keeps its own UTC offset (a datetime.datetime, not a Timestamp).
+std::optional<python::Scalar> object_scalar(const Trace& trace, const Event& event, const std::string& key) {
+  const EventAttribute* found = nullptr;
+  for (const auto& attribute : event.attributes)
+    if (attribute.key == key) found = &attribute;
+  if (!found && key.starts_with("case:"))
+    for (const auto& attribute : trace.attributes)
+      if (attribute.key == std::string_view(key).substr(5)) found = &attribute;
+  if (!found) return std::nullopt;
+  const auto value = python::from_attribute(*found);
+  if (python::is_missing(value)) return std::nullopt;
+  return value;
+}
+
+FrameView frame_view(const EventLog& log) {
+  const auto& columns = *log.dataframe_columns;
+  const bool csv = columns.csv_text;
+  FrameView view;
+  view.keys = columns.order;
+  if (view.keys.empty()) {
+    // read_xes's frame lists each key where the converted event stream
+    // (event attributes in document order, then the case: attributes) first
+    // has it.
+    std::set<std::string> seen;
+    for (const auto& record : event_log_to_event_stream(log).events)
+      for (const auto& field : record.fields)
+        if (seen.insert(field.key).second) view.keys.push_back(field.key);
+  }
+  std::map<std::string, FrameDtype> dtypes;
+  for (const auto& column : columns.columns) dtypes[column.key] = frame_dtype(column.type);
+  for (const auto& column : columns.trace_columns) dtypes["case:" + column.key] = frame_dtype(column.type);
+  dtypes["time:timestamp"] = FrameDtype::kDate;
+  // format_dataframe's case and activity copies are of the string dtype
+  // (pd.NA); read_xes's text columns are str.
+  dtypes["concept:name"] = csv ? FrameDtype::kStringNA : FrameDtype::kStr;
+  dtypes["case:concept:name"] = csv ? FrameDtype::kStringNA : FrameDtype::kStr;
+  if (csv) {
+    dtypes["@@index"] = dtypes["@@case_index"] = FrameDtype::kInt64;
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events)
+        if (!event.activity_source_key.empty() && event.activity_source_key != "concept:name")
+          dtypes.emplace(event.activity_source_key, frame_dtype(columns.activity_type));
+  }
+  const EventLog frame = dataframe_frame_event_log(log);
+  const auto keys = frame_keys(frame, FrameKeyScope::kDataFrame);
+  std::vector<std::string> kept;
+  for (const auto& key : view.keys)
+    if (keys.contains(key) && std::find(kept.begin(), kept.end(), key) == kept.end()) kept.push_back(key);
+  view.keys = std::move(kept);
+  for (const auto& key : view.keys) {
+    const auto found = dtypes.find(key);
+    view.dtypes.push_back(found == dtypes.end() ? FrameDtype::kObject : found->second);
+  }
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      std::vector<Cell> row;
+      row.reserve(view.keys.size());
+      std::optional<std::int64_t> micros;
+      for (std::size_t i = 0; i < view.keys.size(); ++i) {
+        const auto& key = view.keys[i];
+        const auto value = !csv && view.dtypes[i] == FrameDtype::kObject ? object_scalar(trace, event, key)
+                                                                          : frame_row_scalar(frame, trace, event, key);
+        row.push_back(value ? scalar_cell(*value) : Cell{});
+        if (key == "time:timestamp" && row.back().kind == CellKind::kDate) micros = row.back().micros;
+      }
+      if (!micros) throw std::invalid_argument("every event needs a timestamp");
+      view.rows.push_back(std::move(row));
+      view.micros.push_back(*micros);
+    }
+  return view;
+}
+
+std::string frame_columns_description(const EventLog& log, std::size_t max_len) {
+  const auto view = frame_view(log);
+  std::vector<DescribedColumn> columns;
+  for (std::size_t i = 0; i < view.keys.size(); ++i) {
+    DescribedColumn column;
+    column.key = view.keys[i];
+    // The case id column is not described.
+    if (column.key == "case:concept:name") continue;
+    switch (view.dtypes[i]) {
+      case FrameDtype::kFloat64: column.kind = ColumnClass::kNumbers; break;
+      case FrameDtype::kDate: column.kind = ColumnClass::kDates; break;
+      case FrameDtype::kBool:
+      case FrameDtype::kObject:
+      case FrameDtype::kStringNA: column.kind = ColumnClass::kCounts; break;
+      case FrameDtype::kInt64:
+      case FrameDtype::kStr: continue;
+    }
+    for (const auto& row : view.rows) column.cells.push_back(row[i]);
+    columns.push_back(std::move(column));
+  }
+  return describe_columns(columns, max_len, true);
+}
+
+struct StreamItem {
+  std::int64_t micros;
+  std::string line;
+};
+
+// Latest first, ties in log (frame row) order; each line is put in front of
+// the others while the text is at most max_len.
+std::string stream_text(std::vector<StreamItem> items, const LlmAbstractionOptions& options) {
+  std::stable_sort(items.begin(), items.end(),
+                   [](const StreamItem& left, const StreamItem& right) { return left.micros > right.micros; });
+  const std::string head =
+      std::string("\n\n") + (options.response_header ? "If I have the following stream of events:\n\n" : "");
+  std::vector<const std::string*> kept;
+  std::size_t length = code_points(head);
+  for (const auto& item : items) {
+    if (length > options.max_len) break;
+    kept.push_back(&item.line);
+    length += code_points(item.line);
+  }
+  std::string text = head;
+  for (auto line = kept.rbegin(); line != kept.rend(); ++line) text += **line;
+  return text + "\n";
+}
+
+// The frame's rows as dicts of their present cells in column order (NaN,
+// NaT and NA cells left out); a datetime column's cells are Timestamps.
+std::string frame_event_stream_description(const EventLog& log, const LlmAbstractionOptions& options) {
+  const auto view = frame_view(log);
+  std::vector<StreamItem> items;
+  items.reserve(view.rows.size());
+  for (std::size_t r = 0; r < view.rows.size(); ++r) {
+    std::string line = "{";
+    for (std::size_t i = 0; i < view.keys.size(); ++i) {
+      const auto& cell = view.rows[r][i];
+      if (cell.kind == CellKind::kMissing) continue;
+      if (line.size() > 1) line += ", ";
+      line += py_repr(view.keys[i]) + ": " +
+              (view.dtypes[i] == FrameDtype::kDate && cell.kind == CellKind::kDate ? timestamp_repr(cell.micros, true)
+                                                                                    : cell_repr(cell));
+    }
+    items.push_back({view.micros[r], line + "}\n"});
+  }
+  return stream_text(std::move(items), options);
+}
+
+}  // namespace
+
+std::string llm_log_columns_description(const EventLog& log, std::size_t max_len) {
+  if (log.dataframe_columns) return frame_columns_description(log, max_len);
+  std::vector<DescribedColumn> columns;
+  std::map<std::string, std::size_t> index;
+  std::size_t rows = 0;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events) {
+      for (auto& [key, cell] : event_row(trace, event)) {
+        auto [found, inserted] = index.emplace(key, columns.size());
+        if (inserted) columns.push_back({key, {}, ColumnClass::kInfer});
+        auto& column = columns[found->second].cells;
+        column.resize(rows);
+        column.push_back(std::move(cell));
+      }
+      ++rows;
+    }
+  for (auto& column : columns) column.cells.resize(rows);
+  return describe_columns(columns, max_len, false);
+}
+
 std::string llm_log_dfg_description(const EventLog& log, const LlmAbstractionOptions& options) {
   if (!known_aggregation(options.primary_performance_aggregation))
     throw std::invalid_argument("unknown primary performance aggregation");
@@ -761,20 +999,23 @@ std::string llm_log_variants_description(const EventLog& log, const LlmAbstracti
     }
     variants[activities].push_back(seconds_between(first, last));
   }
+  // A variant's primary aggregation can have no value (the stdev of a single
+  // case): the reference then sorts it like an equal value (None == None
+  // between variants of one case each) and fails only when it prints that
+  // variant's performance, so a line max_len cuts off never fails.
   struct Entry {
     const std::vector<std::string>* activities;
     const std::vector<double>* durations;
-    double performance;
+    std::optional<double> performance;
   };
   std::vector<Entry> order;
-  for (const auto& [activities, durations] : variants) {
-    const auto performance = aggregate(options.primary_performance_aggregation, durations, false);
-    if (!performance) throw std::invalid_argument("primary performance aggregation has no value");
-    order.push_back({&activities, &durations, *performance});
-  }
+  for (const auto& [activities, durations] : variants)
+    order.push_back({&activities, &durations, aggregate(options.primary_performance_aggregation, durations, false)});
   std::sort(order.begin(), order.end(), [](const Entry& left, const Entry& right) {
     if (left.durations->size() != right.durations->size()) return left.durations->size() > right.durations->size();
-    if (left.performance != right.performance) return left.performance > right.performance;
+    if (left.performance.has_value() != right.performance.has_value())
+      throw std::invalid_argument("primary performance aggregation has no value");
+    if (left.performance && *left.performance != *right.performance) return *left.performance > *right.performance;
     return *left.activities > *right.activities;
   });
   std::string text = options.response_header ? "If I have a process with the following process variants:\n\n" : "\n\n";
@@ -791,7 +1032,11 @@ std::string llm_log_variants_description(const EventLog& log, const LlmAbstracti
 }
 
 std::string llm_log_features_description(const EventLog& log, const LlmAbstractionOptions& options) {
-  const auto features = trace_based_log_features(log);
+  // A CSV upload reaches the reference as format_dataframe's frame, whose
+  // case, activity and timestamp copies carry the standard keys.
+  LogToFeaturesOptions feature_options;
+  feature_options.standard_keys = log.dataframe_columns && log.dataframe_columns->csv_text;
+  const auto features = trace_based_log_features(log, feature_options);
   std::vector<std::string> descriptions;
   std::vector<std::vector<double>> columns(features.feature_names.size());
   for (const auto& name : features.feature_names) descriptions.push_back(log_feature_description(name));
@@ -805,11 +1050,8 @@ std::string llm_log_features_description(const EventLog& log, const LlmAbstracti
 }
 
 std::string llm_event_stream_description(const EventLog& log, const LlmAbstractionOptions& options) {
-  struct Item {
-    std::int64_t micros;
-    std::string line;
-  };
-  std::vector<Item> items;
+  if (log.dataframe_columns) return frame_event_stream_description(log, options);
+  std::vector<StreamItem> items;
   for (const auto& trace : log.traces)
     for (const auto& event : trace.events) {
       std::string line = "{";
@@ -819,20 +1061,7 @@ std::string llm_event_stream_description(const EventLog& log, const LlmAbstracti
       }
       items.push_back({event_micros(event), line + "}\n"});
     }
-  // Latest first, ties in log order; each line is put in front of the others.
-  std::stable_sort(items.begin(), items.end(), [](const Item& left, const Item& right) { return left.micros > right.micros; });
-  const std::string head =
-      std::string("\n\n") + (options.response_header ? "If I have the following stream of events:\n\n" : "");
-  std::vector<const std::string*> kept;
-  std::size_t length = code_points(head);
-  for (const auto& item : items) {
-    if (length > options.max_len) break;
-    kept.push_back(&item.line);
-    length += code_points(item.line);
-  }
-  std::string text = head;
-  for (auto line = kept.rbegin(); line != kept.rend(); ++line) text += **line;
-  return text + "\n";
+  return stream_text(std::move(items), options);
 }
 
 std::string llm_log_skeleton_description(const EventLog& log, const LlmAbstractionOptions& options) {

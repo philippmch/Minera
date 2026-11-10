@@ -1652,6 +1652,10 @@ LogToFeaturesResult log_to_features(const EventLog& source,
     if (absent_attribute(value)) return true;
     if (value.container != AttributeContainerKind::kScalar || !value.children.empty() ||
         value.kind == AttributeKind::kBytes) return false;
+    // A frame's missing date (NaT) is missing like NaN.
+    if (value.kind == AttributeKind::kDate && value.value == "NaT" &&
+        std::holds_alternative<std::monostate>(value.typed_value))
+      return true;
     if (const auto* number = std::get_if<double>(&value.typed_value)) return std::isnan(*number);
     return value.kind == AttributeKind::kFloat &&
         std::holds_alternative<std::monostate>(value.typed_value) &&

@@ -285,8 +285,8 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
       // A case counts toward a window when either endpoint lies in the closed
       // window or the case spans all of it.
       const auto inside = [&](double t) { return (!b.lo || t >= *b.lo) && (!b.hi || t <= *b.hi); };
-      case_intersects[case_id] = inside(*first) || inside(*last) ||
-          ((!b.lo || *first <= *b.lo) && (!b.hi || *last >= *b.hi));
+      case_intersects[case_id] =
+          inside(*first) || inside(*last) || ((!b.lo || *first <= *b.lo) && (!b.hi || *last >= *b.hi));
     }
     case_resources[case_id].insert(tr_resources.begin(), tr_resources.end());
     if (last && in_slot(last, b)) {
@@ -363,9 +363,14 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
         } else {
           const auto& all = all_by[r];
           double denominator = 0.0, numerator = 0.0;
+          // The reference sums each distinct (start, end, activity) interval
+          // once, while its copies still count as overlapping it (observed
+          // black-box in both the pandas and the EventLog variant).
+          std::set<std::tuple<double, double, std::string>> summed;
           for (const auto& target : v) {
             const double d = std::max(0.0, target.end - target.start);
             if (d == 0.0) continue;
+            if (!summed.emplace(target.start, target.end, target.activity).second) continue;
             int n = 0;
             for (const auto& other : all) {
               // A tiny endpoint tolerance mirrors intervalized event
@@ -563,10 +568,13 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
     for (const auto& [first, last] : ordered) groups.emplace_back(&*rows[first].time, &*rows[last].time);
     double sum = 0.0;
     std::uint64_t count = 0;
-    const auto inside = [&](double x) { return (!b.lo || x >= *b.lo) && (!b.hi || x <= *b.hi); };
+    // pm4py's pandas variant keeps a group only when its first row lies
+    // before t2 and its last after t1, both strictly (observed black-box: a
+    // case ending at t1 or starting at t2 is outside, so is a one-instant
+    // case at either bound), unlike the closed window of the EventLog one.
     for (const auto& [first, last] : groups) {
       const double f = seconds(*first), l = seconds(*last);
-      if (!(inside(f) || inside(l) || ((!b.lo || f <= *b.lo) && (!b.hi || l >= *b.hi)))) continue;
+      if (!((!b.hi || f < *b.hi) && (!b.lo || l > *b.lo))) continue;
       sum += duration(*first, *last);
       ++count;
     }
@@ -911,6 +919,16 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
                  ? "ValueError: The column label '" + key + "' is not unique."
                  : "ValueError: cannot reindex on an axis with duplicate labels");
   };
+  // distinct_activities and activity_frequency keep the rows of the
+  // resource (named once) before they compare times, so a timestamp column
+  // named twice fails that comparison first; only a comparison that passes
+  // (no row of the resource holds a non-date) reaches the realignment.
+  if ((metric == ResourceProfileMetric::kDistinctActivities ||
+       metric == ResourceProfileMetric::kActivityFrequency) &&
+      std::count(selection.begin(), selection.end(), r) == 1 &&
+      std::count(selection.begin(), selection.end(), t) > 1)
+    if (const auto t_type = offending_type(t))
+      fail("TypeError: '>=' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
   if (!social && !interaction) require_unique_selection();
   if (!start && (workload || metric == ResourceProfileMetric::kAverageDurationActivity)) {
     // The start of each row is the previous event of its case: the frame is
@@ -963,11 +981,14 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
         if (cell && case_name && (all_resources || python::identity(*cell) == text_key(o.resource)))
           cases.insert(python::identity(*case_name));
       }
+    // A float64 column compares its NaN cells too (numpy).
+    const bool float_times = frame_column_type(frame, t) == DataFrameColumnType::kFloat64;
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events) {
         const auto case_name = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
         if (!case_name || !cases.contains(python::identity(*case_name))) continue;
-        const auto value = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+        auto value = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+        if (!value && float_times) value = python::real(NAN);
         if (value && value->kind != python::Scalar::Kind::kDate)
           fail("TypeError: '<' not supported between instances of '" + python::type_name(*value) +
                "' and 'datetime.datetime'");
