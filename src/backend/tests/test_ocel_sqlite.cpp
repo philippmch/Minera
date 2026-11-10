@@ -207,6 +207,157 @@ void reference_capture_tests() {
   assert(round.o2o.size() == 1 && round.object_changes.size() == 1);
   std::filesystem::remove(path, ignored);
 }
+
+// A database from SQL, read back; the schema of pm4py.write_ocel2_sqlite.
+minera::Ocel read_sql(const std::string& name, const std::string& sql) {
+  const auto path = std::filesystem::temp_directory_path() / ("minera_ocel_sqlite_" + name + ".sqlite");
+  std::error_code ignored;
+  std::filesystem::remove(path, ignored);
+  sqlite3* db = nullptr;
+  assert(sqlite3_open_v2(path.string().c_str(), &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+                         nullptr) == SQLITE_OK);
+  exec_sql(db, ("CREATE TABLE event (ocel_id TEXT, ocel_type TEXT);"
+                "CREATE TABLE object (ocel_id TEXT, ocel_type TEXT);"
+                "CREATE TABLE event_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+                "CREATE TABLE object_map_type (ocel_type TEXT, ocel_type_map TEXT);"
+                "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
+                "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);" +
+                sql).c_str());
+  assert(sqlite3_close(db) == SQLITE_OK);
+  struct Remove {
+    std::filesystem::path path;
+    ~Remove() { std::error_code ignored; std::filesystem::remove(path, ignored); }
+  } remove{path};
+  return minera::import_ocel_sqlite(path);
+}
+
+std::vector<std::string> event_ids(const minera::Ocel& log) {
+  std::vector<std::string> ids;
+  for (const auto& event : log.events) ids.push_back(event.id);
+  return ids;
+}
+
+std::vector<std::string> object_ids(const minera::Ocel& log) {
+  std::vector<std::string> ids;
+  for (const auto& object : log.objects) ids.push_back(object.id);
+  return ids;
+}
+
+// Reference captures (pm4py 2.7.22 read_ocel2_sqlite) of how the events and
+// objects frames are built from the type tables.
+void reference_frame_tests() {
+  const std::string tables =
+      "INSERT INTO event_map_type VALUES ('b', 'B');"
+      "INSERT INTO event_map_type VALUES ('a', 'A');"
+      "INSERT INTO object_map_type VALUES ('t', 'T');"
+      "INSERT INTO object_map_type VALUES ('s', 'S');"
+      "CREATE TABLE event_A (ocel_id TEXT, ocel_time TIMESTAMP, \"ocel:activity\" TEXT);"
+      "CREATE TABLE event_B (ocel_id TEXT, ocel_time TIMESTAMP, \"ocel:activity\" TEXT);"
+      "CREATE TABLE object_T (ocel_id TEXT, x TEXT, ocel_changed_field TEXT, ocel_time TIMESTAMP);"
+      "CREATE TABLE object_S (ocel_id TEXT, x TEXT, ocel_changed_field TEXT, ocel_time TIMESTAMP);";
+  // pm4py writes e1 and e2 into table A and e3 into table B, all at one
+  // time; it reads them back as e1, e3, e2: equal times go by the row's
+  // place in its table, then by type name. Objects come by type name, then
+  // in table order (o3, o1 of type s before o2 of type t).
+  const auto ties = read_sql("ties", tables +
+      "INSERT INTO event VALUES ('e1', 'a'); INSERT INTO event VALUES ('e2', 'a');"
+      "INSERT INTO event VALUES ('e3', 'b'); INSERT INTO event VALUES ('e4', 'b');"
+      "INSERT INTO event_A VALUES ('e1', '2020-01-01 00:00:00+00:00', 'a');"
+      "INSERT INTO event_A VALUES ('e2', '2020-01-01 00:00:00+00:00', 'a');"
+      "INSERT INTO event_B VALUES ('e4', NULL, 'b');"
+      "INSERT INTO event_B VALUES ('e3', '2020-01-01 00:00:00+00:00', 'b');"
+      "INSERT INTO object VALUES ('o2', 't'); INSERT INTO object VALUES ('o1', 's');"
+      "INSERT INTO object VALUES ('o3', 's');"
+      "INSERT INTO object_T VALUES ('o2', 'v', NULL, NULL);"
+      "INSERT INTO object_S VALUES ('o3', 'v', NULL, NULL);"
+      "INSERT INTO object_S VALUES ('o1', 'v', NULL, NULL);"
+      "INSERT INTO event_object VALUES ('e1', 'o1', ''); INSERT INTO event_object VALUES ('e2', 'o2', '');"
+      "INSERT INTO event_object VALUES ('e3', 'o3', ''); INSERT INTO event_object VALUES ('e4', 'o3', '');");
+  // e4 has no time (NaT) and goes last; e3 is the second row of table B.
+  assert((event_ids(ties) == std::vector<std::string>{"e1", "e2", "e3", "e4"}));
+  assert(ties.events[3].timestamp.empty());
+  assert((object_ids(ties) == std::vector<std::string>{"o3", "o1", "o2"}));
+  const auto written = read_sql("written", tables +
+      "INSERT INTO event VALUES ('e1', 'a'); INSERT INTO event VALUES ('e2', 'a');"
+      "INSERT INTO event VALUES ('e3', 'b');"
+      "INSERT INTO event_A VALUES ('e1', '2020-01-01 00:00:00+00:00', 'a');"
+      "INSERT INTO event_A VALUES ('e2', '2020-01-01 00:00:00+00:00', 'a');"
+      "INSERT INTO event_B VALUES ('e3', '2020-01-01 00:00:00+00:00', 'b');"
+      "INSERT INTO object VALUES ('o1', 't');"
+      "INSERT INTO object_T VALUES ('o1', 'v0', NULL, NULL);"
+      "INSERT INTO object_T VALUES ('o1', 'v1', 'x', '2020-01-02 00:00:00+00:00');"
+      "INSERT INTO event_object VALUES ('e1', 'o1', ''); INSERT INTO event_object VALUES ('e2', 'o1', '');"
+      "INSERT INTO event_object VALUES ('e3', 'o1', '');");
+  assert((event_ids(written) == std::vector<std::string>{"e1", "e3", "e2"}));
+  assert(written.object_changes.size() == 1);
+
+  // An event without a row in its type table is not read, and an object
+  // without a row of its own (one that is no change) neither; the events and
+  // objects that only they related stay, without that relation. A row in
+  // another type's table is the event of its listed type.
+  const auto rows = read_sql("rows", tables +
+      "INSERT INTO event VALUES ('e1', 'a'); INSERT INTO event VALUES ('e2', 'b');"
+      "INSERT INTO event VALUES ('e3', 'a');"
+      "INSERT INTO event_A VALUES ('e3', '2020-01-01 00:00:00+00:00', 'a');"
+      "INSERT INTO event_A VALUES ('e2', '2020-01-02 00:00:00+00:00', 'a');"
+      "INSERT INTO object VALUES ('o1', 't'); INSERT INTO object VALUES ('o2', 't');"
+      "INSERT INTO object VALUES ('o3', 's');"
+      "INSERT INTO object_T VALUES ('o1', 'v', NULL, NULL);"
+      "INSERT INTO object_T VALUES ('o2', 'v', 'x', '2020-01-02 00:00:00+00:00');"
+      "INSERT INTO object_S VALUES ('o3', 'v', NULL, NULL);"
+      "INSERT INTO event_object VALUES ('e1', 'o3', ''); INSERT INTO event_object VALUES ('e2', 'o1', '');"
+      "INSERT INTO event_object VALUES ('e3', 'o2', '');");
+  assert((event_ids(rows) == std::vector<std::string>{"e3", "e2"}));
+  assert(rows.events[1].activity == "b" && rows.events[1].timestamp.starts_with("2020-01-02"));
+  assert((object_ids(rows) == std::vector<std::string>{"o3", "o1"}));
+  assert(rows.relations.size() == 1 && rows.relations[0].event_id == "e2");
+  assert(rows.object_changes.empty());
+
+  // Without a row lacking a changed field in any object table, the rows
+  // whose "@@cumcount" is 0 or missing are the objects' own rows.
+  const auto cumulative = read_sql("cumcount",
+      "INSERT INTO event VALUES ('e1', 'a');"
+      "INSERT INTO event_map_type VALUES ('a', 'A');"
+      "CREATE TABLE event_A (ocel_id TEXT, ocel_time TIMESTAMP);"
+      "INSERT INTO event_A VALUES ('e1', '2020-01-01 00:00:00');"
+      "INSERT INTO object VALUES ('o1', 't'); INSERT INTO object VALUES ('o2', 's');"
+      "INSERT INTO object_map_type VALUES ('t', 'T'); INSERT INTO object_map_type VALUES ('s', 'S');"
+      "CREATE TABLE object_T (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT, y TEXT);"
+      "INSERT INTO object_T VALUES ('o1', NULL, 'y', 'w0');"
+      "CREATE TABLE object_S (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT, x TEXT, \"@@cumcount\" INTEGER);"
+      "INSERT INTO object_S VALUES ('o2', NULL, 'x', 'v1', 0);"
+      "INSERT INTO object_S VALUES ('o2', '2020-01-02 00:00:00', 'x', 'v2', 1);"
+      "INSERT INTO event_object VALUES ('e1', 'o1', ''); INSERT INTO event_object VALUES ('e1', 'o2', '');");
+  assert((object_ids(cumulative) == std::vector<std::string>{"o2", "o1"}));
+  assert(cumulative.object_changes.size() == 1 && cumulative.object_changes[0].object_id == "o2");
+
+  // A NULL type raises (the reference orders the types), so does a missing
+  // type table; a type table without a time column reads as NaT, unless no
+  // table has one (the reference then raises).
+  const std::string one =
+      "INSERT INTO event_map_type VALUES ('a', 'A');"
+      "INSERT INTO object_map_type VALUES ('t', 'T');"
+      "INSERT INTO object VALUES ('o1', 't');"
+      "CREATE TABLE object_T (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT);"
+      "INSERT INTO object_T VALUES ('o1', NULL, NULL);"
+      "INSERT INTO event_object VALUES ('e1', 'o1', '');";
+  throws([&] { (void)read_sql("null_type", one + "INSERT INTO event VALUES ('e1', NULL);"
+                                     "CREATE TABLE event_A (ocel_id TEXT, ocel_time TIMESTAMP);"); });
+  throws([&] { (void)read_sql("missing_table", one + "INSERT INTO event VALUES ('e1', 'a');"); });
+  throws([&] { (void)read_sql("untimed", one + "INSERT INTO event VALUES ('e1', 'a');"
+                                       "CREATE TABLE event_A (ocel_id TEXT);"
+                                       "INSERT INTO event_A VALUES ('e1');"); });
+  const auto untimed = read_sql("untimed_one", one +
+      "INSERT INTO event VALUES ('e1', 'a'); INSERT INTO event VALUES ('e2', 'b');"
+      "INSERT INTO event_map_type VALUES ('b', 'B');"
+      "CREATE TABLE event_A (ocel_id TEXT);"
+      "INSERT INTO event_A VALUES ('e1');"
+      "CREATE TABLE event_B (ocel_id TEXT, ocel_time TIMESTAMP);"
+      "INSERT INTO event_B VALUES ('e2', '2020-01-01 00:00:00');"
+      "INSERT INTO event_object VALUES ('e2', 'o1', '');");
+  assert((event_ids(untimed) == std::vector<std::string>{"e2", "e1"}));
+  assert(untimed.events[1].timestamp.empty());
+}
 #endif
 
 }  // namespace
@@ -261,6 +412,7 @@ int main() {
   assert(header == std::string("SQLite format 3", 15) + '\0');
   assert_standard_type_tables(path);
   reference_capture_tests();
+  reference_frame_tests();
 
   const auto round = minera::import_ocel_sqlite(path);
   assert(round.events.size() == 2 && round.objects.size() == 2);

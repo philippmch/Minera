@@ -21178,3 +21178,86 @@ type now its last listing, an empty-activity OC-DFG read back),
 `minera_saw_nets_tests` (empty merged net), `ocel-net-model.test.ts`,
 `minera_ocel_exact_filter_controls_tests` (an ordinary read of a log with
 empty names is now empty instead of refused; the exact transport keeps it).
+
+## Review AO1: re-review of round AN, OCPN token-replay diagnostics (2026-11-10)
+
+Round AN's readers were re-read and probed again, per format, with random
+files that combine its cases (empty ids, activities and types; repeated
+event and object ids where the empty one comes first or last; relations to
+empty, unlisted and repeated objects; time ties), against pm4py 2.7.22
+(`read_ocel2_json`, `read_ocel`, `read_ocel2_xml`, `read_ocel2_sqlite`),
+comparing events in order, objects in order, relations and times. The OCEL
+1.0 and 2.0 JSON readers matched on 400 files each (pm4py also takes a
+repeated id's last listing first and drops empty names after, as AN
+assumed), and `parse_ocdfg_json` and `merge_saw_nets` read correctly. The
+XML and SQLite readers did not, partly on cases older than AN. Findings,
+all fixed:
+
+- **AO1-1 SQLite event order at equal times.** `read_ocel2_sqlite` builds
+  its events frame from the event type tables (one per type, in type-name
+  order), each row keeping its place in its own table, and then sorts by
+  time: equal times go by that place, then by type name (observed
+  black-box on 120 events under several hash seeds). Native kept the event
+  table's order, so a file pm4py itself writes (events e1, e2 of type a, e3
+  of type b at one time) read as e1, e2, e3 where pm4py reads e1, e3, e2.
+- **AO1-2 SQLite object order.** The objects frame comes the same way: object
+  types by name, rows in table order. Native listed objects by id.
+- **AO1-3 SQLite events and objects without a type-table row.** pm4py reads
+  only what the type tables hold: an event without a row in its table is
+  not read, a row in another type's table is the event of its listed type,
+  and an object needs a row of its own (no changed field; when no object
+  table has such a row, one whose `@@cumcount` is 0 or missing), across all
+  object tables, not per table. Which events and objects stay is decided on
+  the event and object tables before that, so an event whose only object
+  has no row keeps no relation but stays. Native kept such events (without a
+  time) and objects (with a change row as their own), and decided the
+  base-row rule per table.
+- **AO1-4 SQLite events without a time.** A NULL time (NaT) sorts after
+  every dated event, as pandas sorts it; native left the whole log unsorted.
+  A type table without a time column reads as NaT, as in pm4py, unless no
+  event type table has one (pm4py raises; native raised for any such table).
+- **AO1-5 SQLite NULL types and missing type tables raise.** pm4py orders
+  the types it reads, so a NULL event or object type raises there (an empty
+  text type is dropped, as AN found), and a missing type table raises.
+  Native dropped NULL types like empty ones and read missing tables as
+  empty. `validate_references=true` now also refuses rows with an empty
+  type, as its comment said.
+- **AO1-6 OCEL 1.0 XML repeated omap ids.** `read_ocel` relates an event to
+  an object once, where its omap first lists it; native kept every listing
+  (the former native dialect's `relationship` elements, which carry
+  qualifiers, still keep them all).
+- **AO1-7 XML files without relations.** Both pm4py XML readers fail
+  (AttributeError) on a file with no event-object relation to a listed
+  object; native read an empty log. It now raises "OCEL XML file has no
+  event-object relation".
+
+Declared, unchanged: pm4py keeps a SQLite event per type-table row, so an id
+with two rows is two events (native reads the first), and an event id
+listed twice in the event table is one event typed by its last row (native
+refuses it, as it refuses repeated object ids); a type missing from the map
+table raises in pm4py, native falls back to its own table names.
+
+The second part of the round swept the token-replay diagnostics of
+object-centric Petri net discovery (`discover_oc_petri_net(...,
+diagnostics_with_tbr=True)`) on larger random logs than the bank's (process-
+like object lifecycles, shared events, extra relations, unsorted files):
+each type's net with its markings, every place's missing, remaining,
+consumed and produced counts and every transition's firing count, compared
+as labelled graphs up to isomorphism.
+
+Verification:
+
+| Check | Files | Result |
+|---|---|---|
+| Reader sweep, degenerate (five formats) | 1,000 | 0 differences after the fixes (before: 51 OCEL 1.0 XML, 62 SQLite, 9 OCEL 2.0 XML) |
+| Reader sweep, clean (five formats) | 1,000 | 0 differences (before: 145, 36, 8) |
+| SQLite and XML probes (frames, NaT, base rows, missing rows and tables, NULL cells) | 62 | equal, or both raise; 2 declared |
+| OCPN with replay diagnostics, IM, 18 to 500 events | 160 | 0 differences |
+| OCPN with replay diagnostics, IM, 446 to 2,472 events | 25 | 0 differences |
+| OCPN with replay diagnostics, IMd | 60 | 0 differences (one log raises in both) |
+
+Tests: `minera_ocel_sqlite_tests` (`reference_frame_tests`: tie order of a
+pm4py-written file, object order, NaT last, rows in another table, events
+and objects without rows, the global base-row rule, NULL type, missing
+table, tables without a time column), `minera_ocel_xml_tests`
+(`repeated_omap_ids_and_files_without_relations`).

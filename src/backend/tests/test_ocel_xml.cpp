@@ -471,9 +471,46 @@ void empty_names_and_repeated_types() {
   assert(rejected);
 }
 
+// read_ocel_xml relates an event to an object once, at its first omap
+// listing, and both reference XML readers fail on a file without an
+// event-object relation (observed black-box).
+void repeated_omap_ids_and_files_without_relations() {
+  const std::string classic =
+      "<log><events><event><string key=\"id\" value=\"e1\"/><string key=\"activity\" value=\"a\"/>"
+      "<date key=\"timestamp\" value=\"2024-01-01T00:00:00\"/><list key=\"omap\">"
+      "<string key=\"object-id\" value=\"o2\"/><string key=\"object-id\" value=\"o1\"/>"
+      "<string key=\"object-id\" value=\"o2\"/></list><list key=\"vmap\"/></event></events>"
+      "<objects><object><string key=\"id\" value=\"o1\"/><string key=\"type\" value=\"t\"/><list key=\"ovmap\"/></object>"
+      "<object><string key=\"id\" value=\"o2\"/><string key=\"type\" value=\"t\"/><list key=\"ovmap\"/></object></objects></log>";
+  const auto log = minera::parse_ocel_xml(classic);
+  assert(log.relations.size() == 2 && log.relations[0].object_id == "o2" &&
+         log.relations[1].object_id == "o1");
+  const auto fails = [](const std::string& xml) {
+    bool rejected = false;
+    try { (void)minera::parse_ocel_xml(xml); } catch (const std::invalid_argument&) { rejected = true; }
+    return rejected;
+  };
+  std::string bare = classic;
+  bare.replace(bare.find("<list key=\"omap\">"), bare.find("</list>") + 7 - bare.find("<list key=\"omap\">"),
+               "<list key=\"omap\"/>");
+  assert(fails(bare));
+  const std::string standard_head =
+      "<log><object-types><object-type name=\"t\"><attributes/></object-type></object-types>"
+      "<event-types><event-type name=\"a\"><attributes/></event-type></event-types>"
+      "<objects><object id=\"o1\" type=\"t\"><attributes/></object></objects>"
+      "<events><event id=\"e1\" type=\"a\" time=\"2024-01-01T00:00:00Z\"><attributes/><objects>";
+  // A relation to an unlisted object is dropped first, so it fails too.
+  assert(fails(standard_head + "</objects></event></events></log>"));
+  assert(fails(standard_head + "<relationship object-id=\"zz\" qualifier=\"\"/></objects></event></events></log>"));
+  assert(minera::parse_ocel_xml(standard_head +
+                                "<relationship object-id=\"o1\" qualifier=\"\"/></objects></event></events></log>")
+             .relations.size() == 1);
+}
+
 int main() {
   unknown_object_references();
   empty_names_and_repeated_types();
+  repeated_omap_ids_and_files_without_relations();
   frame_order_and_unlisted_keys();
   standard_writers_drop_reference_generated_globals();
   minera::Ocel log;

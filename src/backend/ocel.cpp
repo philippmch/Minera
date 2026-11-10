@@ -1800,9 +1800,13 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
     if (!natively_stored(text, microseconds, aware))
       rewrites.emplace_back(index, stored_timestamp_text(text, microseconds, true, aware));
   };
+  // SQLite events without a time (NaT) go after every dated event, in their
+  // order, as pandas places NaT last (observed black-box).
+  std::vector<std::size_t> undated;
   for (std::size_t index = 0; index < log.events.size(); ++index) {
     const auto& text = log.events[index].timestamp;
     if (reader == OcelTimestampReader::kInstantNanoseconds) {
+      if (text.empty()) { undated.push_back(index); continue; }
       const auto instant = parse_timestamp_exact(text);
       if (!instant) { unknown = true; continue; }
       // A naive text is the UTC instant, stamped as the reference does.
@@ -1893,6 +1897,10 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
   std::unordered_map<std::string, std::size_t> position;
   for (const auto& key : keys) {
     const auto index = std::get<2>(key);
+    position.emplace(log.events[index].id, events.size());
+    events.push_back(std::move(log.events[index]));
+  }
+  for (const auto index : undated) {
     position.emplace(log.events[index].id, events.size());
     events.push_back(std::move(log.events[index]));
   }

@@ -273,6 +273,10 @@ void collect_date_keys(const Node& n, OcelTypeSchema& schema,
 void append_classic_relations(const Node& omap, std::string_view event_id,
                               const std::unordered_map<std::string, std::string>& types,
                               Ocel& log) {
+  // read_ocel_xml relates an event to an object once, where its omap first
+  // lists it (observed black-box); the former dialect's relationship
+  // elements, which carry qualifiers, keep every listing.
+  std::unordered_set<std::string> listed;
   for (const auto& rel : omap.children) {
     const auto name = local(rel.name);
     const std::string key = attr_or(rel, "key", attr_or(rel, "name"));
@@ -289,6 +293,7 @@ void append_classic_relations(const Node& omap, std::string_view event_id,
     // An empty id is an id: a relation to a listed object with an empty id
     // goes with that object, one to no listed object raises.
     if (!types.count(oid)) throw std::invalid_argument("OCEL XML relation references unknown object");
+    if (is_value_node_name(name) && key == "object-id" && !listed.insert(oid).second) continue;
     log.relations.push_back({std::string(event_id), oid, attr_or(rel, "qualifier")});
   }
 }
@@ -729,6 +734,10 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
     });
   }
   validate_references(log);
+  // Both reference XML readers fail on a file without an event-object
+  // relation to a listed object (observed black-box: AttributeError).
+  if (log.relations.empty())
+    throw std::invalid_argument("OCEL XML file has no event-object relation");
   // The OCEL 2.0 XML reader reads dates leniently, the classic one as ISO.
   sort_ocel_events_by_timestamp(log, standard ? OcelTimestampReader::kDateutil : OcelTimestampReader::kIsoFormat);
   // Both XML readers convert date values: OCEL 2.0 the declared ones here,

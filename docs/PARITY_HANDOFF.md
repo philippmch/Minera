@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AN (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AO (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4243,9 +4243,33 @@ events and objects with an empty id, activity or type are now dropped as
 pm4py drops them (OCEL 1.0/2.0 JSON, both XML readers, SQLite), repeated
 type and attribute declarations and repeated OCEL 2.0 JSON event ids read
 as their last listing, OC-DFG JSON reads its endpoint fields even when
-empty, and the merged SAW net of an empty OCEL has no place.
+empty, and the merged SAW net of an empty OCEL has no place. Round AO
+re-reviewed AN with random files per format (events, objects and times in
+order): the JSON readers matched; the SQLite reader now builds its events
+and objects from the type tables as pm4py does (equal times by the row's
+place in its table, then type name; objects by type name, then table order;
+nothing without a row of its own, the base-row rule across all object
+tables, NaT last, NULL types and missing tables raise), the OCEL 1.0 XML
+reader relates an event to an object once, and both XML readers raise on a
+file without relations. OCPN token-replay diagnostics matched pm4py on 245
+larger logs (up to 2,472 events, IM and IMd).
 
-Next round (AO) should start by re-reviewing round AN:
+Next round (AP) should start by re-reviewing round AO:
+
+- `import_ocel_sqlite` in `src/backend/ocel_sqlite.cpp`: `TypeTableRows`
+  (row positions, `TypeTableBase`, first row per id), the event and object
+  frames built per type table in name order, `object_tables_have_base_rows`,
+  `read_type_table_changes` with the global flag, the table-level relevance
+  pass at the end (replacing `drop_unrelated_ocel_entries` there), the NULL
+  type and missing-table errors, `validate_references` on empty types;
+- the NaT branch (`undated`) of `sort_ocel_events_by_timestamp` for
+  `kInstantNanoseconds` in `src/backend/ocel.cpp`;
+- `append_classic_relations` (dedupe of reference-shaped omap entries only)
+  and the no-relation error in `parse_ocel_xml` in `src/backend/ocel_xml.cpp`,
+  including routes and fixtures that import XML (an XML upload without
+  relations is now a 400).
+
+Round AN's targets, re-reviewed in AO (findings AO1-1 to AO1-7, fixed):
 
 - `drop_empty_ocel_names` in `src/backend/ocel.cpp` and its call sites
   (`parse_ocel_json_names` unless literal names, `parse_ocel_xml` after the
@@ -4287,11 +4311,36 @@ Round AJ's own targets, re-reviewed in AK without findings:
 - the drift threshold (`concept_drift.cpp`, `request_params.cpp`, CLI help,
   `Conformance.tsx`).
 
+Round AP's new area, started at the end of AO: root cause at the route
+level (`POST /api/mine` with `token_replay_include_root_cause_diagnostics`,
+compared with `diagnose_from_trans_fitness` and
+`diagnose_from_notexisting_activities` on `pm4py.convert_to_event_log` of
+the formatted CSV). Random CSV logs without missing cells matched (120 of
+120 tree comparisons, seeds 0 to 14). With missing cells (seeds 100 to 139)
+16 of 272 differed and 6 logs raised in Minera only. The cause: pm4py's
+DataFrame-to-EventLog conversion keeps a missing cell as a NaN value on the
+event, so it overwrites the context that accumulates along the trace; a
+missing string cell becomes the category "nan", a missing numeric cell NaN
+data, and an integer column with a missing cell becomes float64, so its
+string feature reads "@1.0". Minera drops missing CSV cells, so the
+context keeps the earlier value (or "UNDEFINED"), and a numeric attribute
+raises "missing or invalid numeric attribute". The fix belongs to the
+DataFrame-path sources (CSV and XES uploads) feeding
+`token_replay_root_cause.cpp`; XES events without the key stay absent as in
+pm4py. A numeric attribute holding strings raises in both (pm4py:
+`could not convert string to float`), so that case is consistent. Harness:
+random CSV logs per seed, `/api/mine` with random string and numeric
+attribute lists and multiplier, models rebuilt from the response's
+`*_petri_net` JSON, trees compared on feature names, data (NaN-aware),
+targets, classes and root counts. The round's scripts are kept in the
+project files under `review-harness/round-ao/` (not in git).
+
 Areas without a recent random-input sweep that are good candidates for the
-second reviewer: root-cause analysis (the token-replay diagnostics that
-`token_replay_include_root_cause_diagnostics` attaches; only each tree's
-root is deterministic in pm4py), OCPN token-replay diagnostics on larger
-logs, and the legacy-cost imported-model alignment (the bundle's unit
+second reviewer: root-cause analysis at the route level (the token-replay
+diagnostics that `token_replay_include_root_cause_diagnostics` attaches, on
+CSV and XES logs whose attribute types come from the DataFrame path; only
+each tree's root is deterministic in pm4py; the core functions are bound by
+the 240-case bank), and the legacy-cost imported-model alignment (the bundle's unit
 costs differ from the dispatcher's, so both still search: about 110 s on
 1,000 cases). In stack samples of the A* searches on these logs the LP
 solver (`solve_lp_sparse`) was about half of the busy frames. One way to
@@ -4311,7 +4360,9 @@ easy soundness on 5 of 36 parallel-arc probe nets; the
 (pm4py's results depend on the CPU; Minera models the Windows kernel); the
 OCEL 1.0 JSON reader reads an empty timestamp in file order (pm4py raises;
 the classic format is the native transport), and repeated object ids in
-the XML and SQLite readers stay refused; `merge_dataframe_cases` and gzip decompression are
+the XML and SQLite readers stay refused (pm4py keeps a SQLite event or object
+per type-table row; native reads the first), a SQLite type missing from the
+map table falls back to native table names (pm4py raises); `merge_dataframe_cases` and gzip decompression are
 not polled for cancellation.
 
 Suite before each push (about 2 h at -j2; run it from one session only):
@@ -4322,7 +4373,7 @@ scripts/tests`, then replay every `src/frontend/tests/fixtures/*manifest*.json`
 with `scripts/capture-workbench-fixtures.py --origin <local minera_server>`
 (no `--write`) and read the full output. Use a freshly started server (the
 active-source manifest depends on the server's state) that no other client
-uses at the same time (routes read the latest mined session). The 17
+uses at the same time (routes read the latest mined session). The 16
 `original-*` bundle manifests and `literal-controls` are not replayable
 (the script raises KeyError on them); 16 manifests replay. The script tests
 need a Python with duckdb (`/tmp/refvenv/bin/python`). `minera_portable_integers` fails on
