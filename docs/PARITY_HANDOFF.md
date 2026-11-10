@@ -6,6 +6,11 @@ on 2026-10-26 (nothing read them); the capture scripts in `scripts/` can
 regenerate a bank when one is needed. The reference
 venv and checkout can be rebuilt in a cloud container (see the README).
 
+On 2026-11-10 the history of `main` was rewritten once more, to give every
+commit the same author identity and the AGPL licence. Commit IDs quoted below
+from before that date, including those in recheck test, fixture and script
+names, refer to the earlier history.
+
 ## Objective and authorization
 
 Reach full pinned-reference parity, prioritizing usable features, then complete
