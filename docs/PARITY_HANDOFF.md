@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AJ (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AK (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4223,9 +4223,21 @@ alignment variant, and fixed the OCEL 2.0 type declarations that pm4py
 reads back. Round AJ swept concept drift (thresholds outside [0, 1]),
 feature extraction on CSV logs (pm4py's copied case, activity and timestamp
 columns) and `/api/align` on a 50,000-case log (variant searches on four
-threads, four malloc arenas in the server: 918 s to 215 s).
+threads, four malloc arenas in the server: 918 s to 215 s). Round AK
+re-reviewed AJ and made `/api/align` with a supplied model about three
+times faster without changing results (each A* bound solved once, one
+empty-trace search per log, the dispatcher pass on four threads).
 
-Next round (AK) should start by re-reviewing round AJ:
+Next round (AL) should start by re-reviewing round AK:
+
+- `Aligner::align_configured` in `src/backend/conformance.cpp`: `bounds`
+  (one LP per state) and `lazy_bounds` (the bound is solved after the
+  best-cost check, only for state-equation A* without generator, discount
+  or less-memory pruning);
+- `align_petri_log` in `src/backend/petri_trace_alignment.cpp`: the
+  threaded variant loop, `EmptyRunCache`, the order in which errors raise.
+
+Round AJ's own targets, re-reviewed in AK without findings:
 
 - `check_alignment` in `src/backend/conformance.cpp`: the parallel variant
   loop (`parallel_variants`, `PrecomputedVariant`, `stop_at`, the locked
@@ -4241,9 +4253,9 @@ Next round (AK) should start by re-reviewing round AJ:
 
 Areas without a recent random-input sweep that are good candidates for the
 second reviewer: root-cause analysis (decision trees on features), large-log
-performance of `/api/evaluate`, imported-model alignments (the per-variant
-`align_petri_log` pass after the bundle is still sequential) and OCEL
-discovery.
+performance of `/api/evaluate`, OCEL discovery, and reusing the bundle's A*
+result in the dispatcher pass of imported-model alignments (both run the
+same search per variant; every option the search reads must agree).
 
 Known open or declared: mine-view generalization sum order (2 ulp); POWL
 brute-force filtering and dynamic clustering rare cases; BPMN→net
@@ -4260,6 +4272,11 @@ touch the changed sources, `cmake --build build -j2`, `ctest --test-dir build
 --maxWorkers=2` in `src/frontend`, `python -m unittest discover -s
 scripts/tests`, then replay every `src/frontend/tests/fixtures/*manifest*.json`
 with `scripts/capture-workbench-fixtures.py --origin <local minera_server>`
-(no `--write`) and read the full output. `minera_portable_integers` fails on
+(no `--write`) and read the full output. Use a freshly started server (the
+active-source manifest depends on the server's state) that no other client
+uses at the same time (routes read the latest mined session). The 17
+`original-*` bundle manifests and `literal-controls` are not replayable
+(the script raises KeyError on them); 16 manifests replay. The script tests
+need a Python with duckdb (`/tmp/refvenv/bin/python`). `minera_portable_integers` fails on
 any `__int128` or compiler builtin in core code. GitHub Actions has not run
 since 2026-10-28 (billing), so macOS and Windows are checked by nothing else.

@@ -4542,6 +4542,9 @@ class Aligner {
       if (options.sync_cost_function) value = options.sync_cost_function(name, t);
       return value;
     };
+    // A state's bound depends on nothing but the state (the trace and the
+    // costs are fixed for the search), so each is solved once.
+    std::unordered_map<State, double, MarkingHash> bounds;
     const auto lp_heuristic = [&](const State& state) {
       // The marking-equation bound is in undiscounted units and may
       // overestimate a discounted suffix.  Discounted search therefore uses
@@ -4549,46 +4552,56 @@ class Aligner {
       if (net_.has_extended_arcs() || !marking_equation_ ||
           options.variant != AlignmentVariant::kStateEquationAStar || discounted)
         return 0.0;
-      const std::size_t pos = static_cast<std::size_t>(state.back());
-      const std::size_t remaining = len - pos;
-      const std::size_t tcount = net_.transitions().size();
-      std::size_t sync_count = 0;
-      for (std::size_t d = pos; d < len; ++d) {
-        if (!ids[d]) continue;
-        for (std::size_t t = 0; t < tcount; ++t)
-          if (!net_.transitions()[t].silent() && *net_.transitions()[t].activity == *ids[d]) ++sync_count;
-      }
-      const std::size_t vars = tcount + remaining + sync_count;
-      const std::size_t rows = pc + remaining;
-      std::vector<std::vector<double>> a(rows, std::vector<double>(vars, 0.0));
-      std::vector<double> b(rows, 0.0), c(vars, 0.0);
-      for (std::size_t p = 0; p < pc; ++p) b[p] = double(final_[p] - state[p]);
-      for (std::size_t t = 0; t < tcount; ++t) {
-        for (const auto& [p, coef] : incidence_[t]) a[p][t] = coef;
-        c[t] = model_cost_for(t);
-      }
-      std::size_t col = tcount;
-      for (std::size_t d = pos; d < len; ++d) {
-        const std::size_t row = pc + (d - pos);
-        b[row] = 1.0;
-        a[row][col] = 1.0;
-        c[col] = trace_cost_for(d);
-        ++col;
-        if (!ids[d]) continue;
-        for (std::size_t t = 0; t < tcount; ++t) {
-          if (net_.transitions()[t].silent() || *net_.transitions()[t].activity != *ids[d]) continue;
-          for (const auto& [p, coef] : incidence_[t]) a[p][col] = coef;
-          a[row][col] = 1.0;
-          c[col] = sync_cost_for(t);
-          ++col;
+      if (const auto known = bounds.find(state); known != bounds.end()) return known->second;
+      const auto solved = [&]() -> double {
+        const std::size_t pos = static_cast<std::size_t>(state.back());
+        const std::size_t remaining = len - pos;
+        const std::size_t tcount = net_.transitions().size();
+        std::size_t sync_count = 0;
+        for (std::size_t d = pos; d < len; ++d) {
+          if (!ids[d]) continue;
+          for (std::size_t t = 0; t < tcount; ++t)
+            if (!net_.transitions()[t].silent() && *net_.transitions()[t].activity == *ids[d]) ++sync_count;
         }
-      }
-      ++lp_solved;
-      auto lp = solve_lp(std::move(a), std::move(b), c);
-      if (lp.aborted) return 0.0;
-      if (!lp.feasible) return std::numeric_limits<double>::infinity();
-      return std::max(0.0, lp.objective);
+        const std::size_t vars = tcount + remaining + sync_count;
+        const std::size_t rows = pc + remaining;
+        std::vector<std::vector<double>> a(rows, std::vector<double>(vars, 0.0));
+        std::vector<double> b(rows, 0.0), c(vars, 0.0);
+        for (std::size_t p = 0; p < pc; ++p) b[p] = double(final_[p] - state[p]);
+        for (std::size_t t = 0; t < tcount; ++t) {
+          for (const auto& [p, coef] : incidence_[t]) a[p][t] = coef;
+          c[t] = model_cost_for(t);
+        }
+        std::size_t col = tcount;
+        for (std::size_t d = pos; d < len; ++d) {
+          const std::size_t row = pc + (d - pos);
+          b[row] = 1.0;
+          a[row][col] = 1.0;
+          c[col] = trace_cost_for(d);
+          ++col;
+          if (!ids[d]) continue;
+          for (std::size_t t = 0; t < tcount; ++t) {
+            if (net_.transitions()[t].silent() || *net_.transitions()[t].activity != *ids[d]) continue;
+            for (const auto& [p, coef] : incidence_[t]) a[p][col] = coef;
+            a[row][col] = 1.0;
+            c[col] = sync_cost_for(t);
+            ++col;
+          }
+        }
+        ++lp_solved;
+        auto lp = solve_lp(std::move(a), std::move(b), c);
+        if (lp.aborted) return 0.0;
+        if (!lp.feasible) return std::numeric_limits<double>::infinity();
+        return std::max(0.0, lp.objective);
+      }();
+      bounds.emplace(state, solved);
+      return solved;
     };
+    // State-equation A* solves a successor's bound only once the arrival
+    // improves on the best known cost of its state: an arrival the best cost
+    // rules out is dropped whatever its bound, so the search is unchanged.
+    const bool lazy_bounds = options.variant == AlignmentVariant::kStateEquationAStar &&
+                             !generator && !discounted && !less_memory;
     records.push_back(PathRecord{kNoRecord, start, {}, false, false});
     frontier_push(Node{0.0, lp_heuristic(start), 0, 0, discounted, 0});
     struct GoalPath {
@@ -4707,8 +4720,10 @@ class Aligner {
         child.depth = node.depth + 1;
         child.seq = seq++;
         child.cost = node.cost + edge_cost * factor;
-        child.priority = child.cost + lp_heuristic(child_state);
-        if (!std::isfinite(child.priority)) return;
+        if (!lazy_bounds) {
+          child.priority = child.cost + lp_heuristic(child_state);
+          if (!std::isfinite(child.priority)) return;
+        }
         // Configured variants retain tau/model routing moves explicitly;
         // an empty activity denotes a silent transition.
         const bool keep_move =
@@ -4756,6 +4771,10 @@ class Aligner {
               enqueue();
               return;
             }
+          }
+          if (lazy_bounds) {
+            child.priority = child.cost + lp_heuristic(child_state);
+            if (!std::isfinite(child.priority)) return;
           }
           record_best();
         } else if (old == best.end() || child.cost < old->second - 1e-9) {

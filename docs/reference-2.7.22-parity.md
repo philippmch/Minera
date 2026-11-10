@@ -20889,3 +20889,66 @@ Tests: `minera_alignment_variants_tests` (40 variants: each equals its
 own alignment, totals and summed diagnostics; a capped variant, a
 cancellation called from every thread and the total time bound leave the
 log uncomputed).
+
+## Review AK1: re-review of round AJ (2026-11-10)
+
+A re-review of AJ (the parallel variant loop of `check_alignment`, the CSV
+feature keys and the drift threshold) found no defect. Two notes:
+
+- The case-column fallback in `numeric_cell` (an event of a CSV row answers
+  its case column's header with the case id) applies to every CSV-sourced
+  event, also without `standard_keys`. Only inference depends on
+  `standard_keys`; an explicitly selected case column now resolves in both
+  modes, as pm4py's event attribute does. XES events never match the
+  fallback: their case key is the trace's `concept:name` or carries the
+  `case:` prefix.
+- `/api/align` on one server is not safe against concurrent clients that
+  mine other logs: the route aligns the latest mined session. One transient
+  difference in the old-against-new comparison below came from a fixture
+  replay running against the same server at the time; on its own the case
+  is equal in all nine reruns.
+
+## Review AK2: alignments with a supplied model on large logs (2026-11-10)
+
+`/api/align` with an imported model runs the bundle aligner and then
+pm4py's log dispatcher pass (`align_petri_log`), both with the
+state-equation A* default. On a 1,000-case slice of the AJ2 log with its
+inductive net exported as PNML (245 variants), Minera took about 610 s;
+pm4py's A* takes 270 s on the same log and net. Three causes, all fixed
+without changing a result:
+
+- **AK2-1 One bound per state.** The A* search solved a successor's LP each
+  time the successor was generated, also for arrivals its best known cost
+  then dropped. It now solves a state's bound once and only for an arrival
+  that improves on that cost (an arrival the best cost rules out is dropped
+  whatever its bound, so the search expands the same states in the same
+  order). On the slice the bundle solves 7.2 million LPs instead of 14.6
+  million. `lp_solved` now counts the LPs actually solved.
+- **AK2-2 One empty-trace search per log.** The best-worst cost of every
+  trace repeated the empty trace's search. `align_petri_log` now shares one
+  result across the log's traces.
+- **AK2-3 Dispatcher pass on four threads.** `align_petri_log` aligns the
+  distinct variants of a log with eight or more of them on up to four
+  threads, then fills the entries in log order. A failing trace (a missing
+  activity key, cancellation, an error) raises at its position as before.
+
+The bundle and the dispatcher pass still run the same A* search for each
+variant; reusing the bundle's result would halve the remaining time, but
+needs every search option to agree and is left as a candidate.
+
+Verification:
+
+| Check | Cases | Result |
+|---|---|---|
+| `/api/align?miner=imported` JSON, new against the AJ build | 250- and 1,000-case slices (107 and 245 variants) | identical except `lp_solved` |
+| Old against new build on the BPMN fuzz models of AI1 (`/api/evaluate` alignment fitness and precision; `/api/align` with every variant and both cost profiles; discovered models with A*) | 204 models (seeds 6–209) | identical except `lp_solved` (one transient difference, see AK1) |
+| `/api/align?miner=imported` time, 250-case slice | 107 variants | 345 s → 200 s (AK2-1) → 77 s |
+| Same, 1,000-case slice | 245 variants | about 610 s → 163–225 s (pm4py 270 s) |
+
+Tests: `minera_petri_analysis_tests`
+(`log_alignment_runs_variants_on_threads`: 12 variants under four search
+variants equal their own alignments; a missing key and a cancellation
+raise). `minera_mining_fast_path_equivalence_tests` pins outputs that
+include `lp_solved`: 12 A* pins were renewed after a build that solved
+every bound eagerly reproduced all 251 old pins and the new outputs differed
+from it in `lp_solved` only.

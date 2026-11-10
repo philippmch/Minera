@@ -5,6 +5,7 @@
 #include "minera/cancellation.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <map>
 #include <cmath>
@@ -1278,7 +1279,82 @@ void reference_log_alignment_parallel_bpmn_flows() {
         {{"bdfgbecbacebdfgbdfgab", 5}, {"bdfgbceb", 1}, {"ab", 10000}, {"b", 0}});
 }
 
+// Review AK2: a log with eight or more distinct variants aligns them on
+// several threads. Every entry is the trace's own alignment, in log order,
+// with the shared empty-trace search; the first failing trace (here a
+// missing activity key, or cancellation) raises as the sequential loop did.
+void log_alignment_runs_variants_on_threads() {
+  // p0 -a-> p1; p1 -b-> p2; p1 -tau-> p2; p2 -c-> p3, a loop p2 -d-> p1.
+  PetriNet net;
+  net.set_activities({"a", "b", "c", "d"});
+  for (int i = 0; i < 4; ++i) net.add_place();
+  net.set_source(0); net.set_sink(3);
+  net.add_transition(0, {0}, {1});
+  net.add_transition(1, {1}, {2});
+  net.add_transition(std::nullopt, {1}, {2});
+  net.add_transition(2, {2}, {3});
+  net.add_transition(3, {2}, {1});
+  std::vector<std::vector<std::string>> traces;
+  for (int loops = 0; loops < 4; ++loops)
+    for (const auto* tail : {"c", "x", "cc"}) {
+      std::vector<std::string> trace{"a"};
+      for (int i = 0; i < loops; ++i) { trace.push_back("b"); trace.push_back("d"); }
+      for (const char* ch = tail; *ch; ++ch) trace.push_back(std::string(1, *ch));
+      traces.push_back(trace);
+    }
+  traces.push_back(traces[2]);  // repeated variants share one result
+  traces.push_back(traces[0]);
+  const auto log_of = [](const std::vector<std::vector<std::string>>& rows) {
+    EventLog log;
+    for (std::size_t k = 0; k < rows.size(); ++k) {
+      Trace trace;
+      trace.case_id = std::to_string(k);
+      for (const auto& activity : rows[k]) {
+        Event event;
+        event.case_id = trace.case_id;
+        event.activity = activity;
+        event.attributes.push_back({"phase", activity, AttributeKind::kString});
+        trace.events.push_back(event);
+      }
+      log.traces.push_back(trace);
+    }
+    return log;
+  };
+  const auto log = log_of(traces);
+  for (const auto variant : {AlignmentVariant::kStateEquationAStar,
+                             AlignmentVariant::kDijkstraNoHeuristics,
+                             AlignmentVariant::kDijkstraLessMemory,
+                             AlignmentVariant::kDiscountedAStar}) {
+    PetriLogAlignmentOptions options;
+    options.trace.variant = variant;
+    const auto aligned = align_petri_log(log, net, options);
+    assert(aligned.size() == traces.size());
+    for (std::size_t k = 0; k < traces.size(); ++k) {
+      const auto alone = align_petri_trace(traces[k], net, options.trace);
+      assert(aligned[k].computed == alone.computed && aligned[k].cost == alone.cost);
+      assert(aligned[k].bwc == alone.bwc && aligned[k].fitness == alone.fitness);
+      assert(aligned[k].alignment == alone.alignment);
+    }
+  }
+  PetriLogAlignmentOptions options;
+  options.trace.variant = AlignmentVariant::kStateEquationAStar;
+  options.activity_key = "phase";
+  auto missing = log;
+  missing.traces[9].events[1].attributes.clear();
+  std::string message;
+  try { (void)align_petri_log(missing, net, options); }
+  catch (const std::invalid_argument& error) { message = error.what(); }
+  assert(message.find("event without activity key 'phase'") != std::string::npos);
+  std::atomic<int> polls{0};
+  options.trace.cancelled = [&] { return ++polls > 3; };
+  bool cancelled = false;
+  try { (void)align_petri_log(log, net, options); }
+  catch (const OperationCancelled&) { cancelled = true; }
+  assert(cancelled);
+}
+
 int main() {
+  log_alignment_runs_variants_on_threads();
   weighted_marking_equation_counts_arc_objects();
   reference_log_alignment_parallel_bpmn_flows();
   woflan_weighted_and_parallel_arcs();

@@ -17,6 +17,10 @@
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
+#include <atomic>
+#include <exception>
+#include <mutex>
+#include <thread>
 
 namespace minera {
 namespace {
@@ -641,8 +645,26 @@ SearchOutcome search(const std::vector<std::string>& trace, const PetriNet& net,
   return out;
 }
 
+// The best-worst cost's empty-trace search depends only on the net and the
+// options, so the traces of one log share it: the first trace that needs it
+// runs it (a search that throws leaves it for the next).
+class EmptyRunCache {
+ public:
+  template <typename Search>
+  SearchOutcome get(Search&& search) {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    if (!value_) value_ = search();
+    return *value_;
+  }
+
+ private:
+  std::mutex mutex_;
+  std::optional<SearchOutcome> value_;
+};
+
 std::vector<PetriTraceAlignment> run(const std::vector<std::string>& trace, const PetriNet& net,
-                                     const PetriTraceAlignmentOptions& options) {
+                                     const PetriTraceAlignmentOptions& options,
+                                     EmptyRunCache* empty_cache = nullptr) {
   const auto result = search(trace, net, options);
   std::vector<PetriTraceAlignment> out;
   // A search stopped by max_states or max_time_seconds proves nothing about
@@ -673,7 +695,9 @@ std::vector<PetriTraceAlignment> run(const std::vector<std::string>& trace, cons
     const bool discounted = options.variant == AlignmentVariant::kDiscountedAStar;
     double value = 0.0;
     if (!discounted) {
-      const auto empty = search({}, net, options);
+      const auto empty = empty_cache
+                             ? empty_cache->get([&] { return search({}, net, options); })
+                             : search({}, net, options);
       if (!empty.found && empty.exhausted) return stopped(empty);
       if (!empty.found) {
         out.emplace_back();
@@ -741,32 +765,114 @@ std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const Petr
   if (!reference_easy_sound(net, options.trace))
     throw std::invalid_argument("trying to apply alignments on a Petri net that is not easy sound");
   const bool standard = options.activity_key == "concept:name" || options.activity_key == "activity";
-  std::map<std::vector<std::string>, PetriTraceAlignment> variants;
+  // Each trace's variant (its activity sequence) in log order, up to the
+  // first event without the activity key; distinct variants in first-seen
+  // order.
+  std::vector<std::size_t> trace_variant;
+  trace_variant.reserve(log.traces.size());
+  std::vector<std::vector<std::string>> distinct;
+  std::exception_ptr key_error;
+  {
+    std::map<std::vector<std::string>, std::size_t> index;
+    for (const auto& trace : log.traces) {
+      std::vector<std::string> activities;
+      activities.reserve(trace.events.size());
+      try {
+        for (const auto& event : trace.events) {
+          if (standard) {
+            activities.push_back(event.activity);
+            continue;
+          }
+          const auto* value = event.attribute(options.activity_key);
+          if (!value)
+            throw std::invalid_argument("event without activity key '" + options.activity_key + "'");
+          activities.push_back(*value);
+        }
+      } catch (...) {
+        key_error = std::current_exception();
+        break;
+      }
+      const auto [found, added] = index.try_emplace(std::move(activities), distinct.size());
+      if (added) distinct.push_back(found->first);
+      trace_variant.push_back(found->second);
+    }
+  }
+  // The variants are independent searches: a log with several runs them on
+  // up to four threads. Outcomes are read in log order below, exactly as the
+  // sequential loop produced them, and a variant that throws rethrows at its
+  // first trace (the helpers start no variant after it). The caller's
+  // cancellation callback is called under a lock.
+  struct Outcome {
+    std::optional<PetriTraceAlignment> aligned;
+    std::exception_ptr error;
+  };
+  std::vector<Outcome> outcomes(distinct.size());
+  EmptyRunCache empty_cache;
+  std::mutex cancel_mutex;
+  PetriTraceAlignmentOptions trace_options = options.trace;
+  if (options.trace.cancelled)
+    trace_options.cancelled = [&] {
+      const std::lock_guard<std::mutex> lock(cancel_mutex);
+      return options.trace.cancelled();
+    };
+  std::atomic<std::size_t> next{0};
+  std::atomic<std::size_t> first_error{distinct.size()};
+  const auto work = [&] {
+    for (;;) {
+      const std::size_t v = next.fetch_add(1);
+      if (v >= distinct.size() || v > first_error.load()) return;
+      try {
+        throw_if_cancelled(trace_options.cancelled, "alignment was cancelled");
+        auto all = run(distinct[v], net, trace_options, &empty_cache);
+        auto aligned = all.empty() ? PetriTraceAlignment{} : std::move(all.front());
+        if (!options.enable_best_worst_cost) {
+          aligned.bwc.reset();
+          aligned.fitness.reset();
+        }
+        outcomes[v].aligned = std::move(aligned);
+      } catch (...) {
+        outcomes[v].error = std::current_exception();
+        std::size_t current = first_error.load();
+        while (v < current && !first_error.compare_exchange_weak(current, v)) {}
+      }
+    }
+  };
+  constexpr std::size_t kParallelVariants = 8;
+  constexpr std::size_t kMaxHelpers = 3;
+  const std::size_t hardware = std::max<std::size_t>(1, std::thread::hardware_concurrency());
+  {
+    std::vector<std::thread> helpers;
+    struct JoinHelpers {
+      std::vector<std::thread>& threads;
+      ~JoinHelpers() {
+        for (auto& thread : threads)
+          if (thread.joinable()) thread.join();
+      }
+    } join_helpers{helpers};
+    if (distinct.size() >= kParallelVariants && hardware > 1) {
+      const std::size_t count =
+          std::min<std::size_t>({kMaxHelpers, hardware - 1, distinct.size() - 1});
+      for (std::size_t k = 0; k < count; ++k) {
+        try {
+          helpers.emplace_back(work);
+        } catch (...) {
+          break;  // fewer threads; the calling thread takes the rest
+        }
+      }
+    }
+    work();
+  }
   std::vector<PetriTraceAlignment> out;
   out.reserve(log.traces.size());
-  for (const auto& trace : log.traces) {
+  for (std::size_t i = 0; i < trace_variant.size(); ++i) {
     throw_if_cancelled(options.trace.cancelled, "alignment was cancelled");
-    std::vector<std::string> activities;
-    activities.reserve(trace.events.size());
-    for (const auto& event : trace.events) {
-      if (standard) {
-        activities.push_back(event.activity);
-        continue;
-      }
-      const auto* value = event.attribute(options.activity_key);
-      if (!value) throw std::invalid_argument("event without activity key '" + options.activity_key + "'");
-      activities.push_back(*value);
-    }
-    auto found = variants.find(activities);
-    if (found == variants.end()) {
-      auto aligned = align_petri_trace(activities, net, options.trace);
-      if (!options.enable_best_worst_cost) {
-        aligned.bwc.reset();
-        aligned.fitness.reset();
-      }
-      found = variants.emplace(std::move(activities), std::move(aligned)).first;
-    }
-    out.push_back(found->second);
+    auto& outcome = outcomes[trace_variant[i]];
+    if (outcome.error) std::rethrow_exception(outcome.error);
+    out.push_back(*outcome.aligned);
+  }
+  if (key_error) {
+    throw_if_cancelled(options.trace.cancelled, "alignment was cancelled");
+    std::rethrow_exception(key_error);
   }
   return out;
 }
