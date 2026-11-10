@@ -4485,6 +4485,9 @@ class Aligner {
       std::uint64_t seq = 0;
       std::size_t depth = 0;
       bool discounted_order = false;
+      // Queued with a priority inherited from its parent's bound; the
+      // state's own bound is solved when the node first reaches the top.
+      bool pending = false;
       std::size_t record = 0;  // its state is records[record].state
       bool operator>(const Node& o) const {
         if (priority != o.priority) return priority > o.priority;
@@ -4597,11 +4600,18 @@ class Aligner {
       bounds.emplace(state, solved);
       return solved;
     };
-    // State-equation A* solves a successor's bound only once the arrival
-    // improves on the best known cost of its state: an arrival the best cost
-    // rules out is dropped whatever its bound, so the search is unchanged.
+    // State-equation A* defers a successor's bound until the successor
+    // reaches the top of the queue.  It is queued with the bound its parent
+    // implies: the marking-equation bound is consistent (a successor's LP
+    // solution plus the move solves the parent's LP, so the parent's bound is
+    // at most the successor's bound plus the move's cost), which makes the
+    // inherited priority a lower bound of the exact one.  A pending node that
+    // reaches the top is re-queued with its exact priority and keeps its
+    // sequence number, so nodes are expanded in the order eager bounds give
+    // them, and no LP is solved for successors the search never reaches.
     const bool lazy_bounds = options.variant == AlignmentVariant::kStateEquationAStar &&
-                             !generator && !discounted && !less_memory;
+                             !generator && !discounted && !less_memory &&
+                             marking_equation_ && !net_.has_extended_arcs();
     records.push_back(PathRecord{kNoRecord, start, {}, false, false});
     frontier_push(Node{0.0, lp_heuristic(start), 0, 0, discounted, 0});
     struct GoalPath {
@@ -4672,11 +4682,20 @@ class Aligner {
     while (!frontier.empty() && expanded < budget && !timed_out() &&
            records.size() < kStoredPathEntryCap) {
       std::pop_heap(frontier.begin(), frontier.end(), std::greater<>{});
-      const Node node = frontier.back();
+      Node node = frontier.back();
       frontier.pop_back();
       node_state = records[node.record].state;
       const auto it_best = best.find(node_state);
       if (it_best == best.end() || node.cost > it_best->second + 1e-9) continue;
+      if (node.pending) {
+        const double bound = lp_heuristic(node_state);
+        if (!std::isfinite(bound)) continue;
+        // An aborted LP reports 0; the inherited bound stays valid then.
+        node.priority = std::max(node.priority, node.cost + bound);
+        node.pending = false;
+        frontier_push(node);
+        continue;
+      }
       if (discounted && !discounted_closed.insert(node_state).second) continue;
       if (!generator && node_state == goal) {
         GoalPath path = reconstruct(node);
@@ -4773,8 +4792,18 @@ class Aligner {
             }
           }
           if (lazy_bounds) {
-            child.priority = child.cost + lp_heuristic(child_state);
-            if (!std::isfinite(child.priority)) return;
+            if (const auto known = bounds.find(child_state); known != bounds.end()) {
+              if (!std::isfinite(known->second)) return;
+              child.priority = child.cost + known->second;
+            } else {
+              // The parent's bound less the edge cost, with a margin for LP
+              // rounding so the inherited priority never exceeds the exact one.
+              const double parent_bound = node.priority - node.cost;
+              const double inherited =
+                  parent_bound - edge_cost - 1e-6 * std::max(1.0, std::abs(parent_bound));
+              child.priority = child.cost + std::max(0.0, inherited);
+              child.pending = true;
+            }
           }
           record_best();
         } else if (old == best.end() || child.cost < old->second - 1e-9) {

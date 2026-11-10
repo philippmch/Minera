@@ -20952,3 +20952,85 @@ raise). `minera_mining_fast_path_equivalence_tests` pins outputs that
 include `lp_solved`: 12 A* pins were renewed after a build that solved
 every bound eagerly reproduced all 251 old pins and the new outputs differed
 from it in `lp_solved` only.
+
+## Review AL1: re-review of round AK (2026-11-10)
+
+A re-review of AK (the bound cache and lazy bounds of the A* search, the
+threaded `align_petri_log`, the shared empty-trace search) found no defect.
+Notes:
+
+- `EmptyRunCache` runs the empty trace's search under its own lock; the
+  search calls the caller's cancellation callback through the locked
+  wrapper, and nothing holding the cancellation lock waits for the cache,
+  so the two locks cannot deadlock. A search that throws leaves the cache
+  empty, and the next trace runs it again, as each trace did before.
+- A variant that fails stops the helpers from starting later variants, and
+  every trace before the failing variant's first trace belongs to an
+  earlier variant (variants are numbered in first-seen order), so the
+  entries read before the error are all present.
+- AK2's comparison table listed "both cost profiles" for `/api/align`;
+  without `cost_profile` the route uses the legacy unit costs, so both
+  columns used them. The AL2 comparison adds `cost_profile=standard`.
+
+## Review AL2: alignment bounds solved on demand (2026-11-10)
+
+A second large-log sweep timed the alignment routes AK left: `/api/evaluate`
+on a 3,000-case slice of the AJ2 log (454 variants, inductive net) took
+168 s for alignment-based replay fitness and 225 s for the default replay
+fitness (pm4py picks alignments for an easy-sound net), and `/api/align`
+with the inductive net imported as PNML took about 180 s on the 1,000-case
+slice. Three causes, fixed without changing a result:
+
+- **AL2-1 Bounds solved when a state is popped.** AK solved a successor's
+  LP when the arrival improved on its best cost. The search now queues such
+  a successor with the bound its parent implies and solves the LP only when
+  the successor reaches the top of the queue; it is then queued again with
+  its exact priority and its old sequence number. The marking-equation bound
+  is consistent (a successor's LP solution plus the move solves the
+  parent's LP), so the inherited priority never exceeds the exact one and
+  states are expanded in the order eager bounds give them. Successors the
+  search never reaches get no LP: on the 1,000-case slice the variant
+  searches report 4.8 million LPs instead of 7.2 million. `lp_solved` counts
+  fewer LPs; on nets where some successors' LPs are infeasible (unsound
+  models), `queued_states` and `closed_set_length` also count those
+  successors, which eager bounds dropped before queueing. Two edge cases
+  can still order nodes differently: an LP that aborts (its bound is taken
+  as 0, so the inherited bound is kept) and the 5 million path-record cap
+  (infeasible successors now hold records).
+- **AL2-2 The bundle's search reused.** With the standard cost profile,
+  state-equation A* and Dijkstra without heuristics, the dispatcher pass of
+  `reference_log_alignment` (imported models, and alignment fitness on nets
+  with weighted or parallel arcs) ran the very search the bundle had just
+  run for each variant: `check_alignment` with standard costs on the same
+  net, markings, state bound and variant. It now takes each variant's
+  outcome from the bundle. Other profiles and variants (the legacy unit
+  costs, less-memory and generator searches) still search again.
+- **AL2-3 One malloc arena per server thread.** The default replay fitness
+  ran the same searches as the alignment-based one but spent 47 s in the
+  kernel against 1 s: strace counted 320,000 futex calls in 30 s against
+  4,900. With four arenas and eight pool threads every arena was taken, so
+  glibc gave a new search helper an arena the request thread was using, and
+  both then queued on its lock. Which threads collide depends on the
+  server's history; here it was the default route every time. The server
+  now allows one arena per thread (the pool, main and reaper threads, and
+  the helpers of two alignments side by side: 16 on four cores); resident
+  memory after the runs was 240–260 MB against 290–360 MB with four.
+
+Verification:
+
+| Check | Cases | Result |
+|---|---|---|
+| `minera_mining_fast_path_equivalence_tests` outputs, lazy against eager bounds (a temporary switch) | 251 outputs | identical except `lp_solved` (249) and the counters above on two alpha nets |
+| Old (AK) against new server on the BPMN fuzz models of AI1, as in AK2 | 204 models | identical except the counters |
+| Same with `cost_profile=standard` on `/api/align` for the imported model (default, A*, Dijkstra, less-memory) | 204 models | identical except the counters |
+| `/api/align?miner=imported`, 250- and 1,000-case slices, legacy and standard costs | 107 and 245 variants | identical except the counters |
+| `/api/evaluate` alignment fitness, default fitness and align-ETC precision, 3,000-case slice | 454 variants | identical except the counters; AL2-3 alone byte-identical |
+| `/api/align?miner=imported` time, 1,000-case slice | legacy / standard costs | 180 s → 110 s / 183 s → 48 s (pm4py 270 s) |
+| `/api/evaluate` time, 3,000-case slice | alignment / default fitness | 168 s → 119 s / 225 s → 119 s |
+
+Tests: `minera_petri_analysis_tests`
+(`reference_log_alignment_reuses_bundle_searches`: on the parallel-arc BPMN
+net of AI1, every variant of the standard-cost A* and Dijkstra results
+equals the trace's own public alignment, moves and search counters
+included). 13 pins of `minera_mining_fast_path_equivalence_tests` were
+renewed after the comparison above.

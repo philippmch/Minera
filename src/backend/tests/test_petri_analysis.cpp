@@ -1231,8 +1231,8 @@ void alignment_parallel_arc_variants() {
 // natively (two tokens taken from p8) leaves the bundle aligner searching
 // without end; the reference search net aligns the long trace at once.
 // Reference costs and log fitness from the public dispatcher.
-void reference_log_alignment_parallel_bpmn_flows() {
-  const auto net = compact_net(15, {"a", "b", "c", "d", "e", "f", "g"},
+PetriNet parallel_bpmn_flow_net() {
+  return compact_net(15, {"a", "b", "c", "d", "e", "f", "g"},
       {{std::nullopt, {{12, 13}, {}}, {{3}, {}}},
        {std::nullopt, {{0}, {}}, {{7}, {}}},
        {std::nullopt, {{2, 8, 8}, {1, 1, 1}}, {{7, 7}, {1, 1}}},
@@ -1248,6 +1248,10 @@ void reference_log_alignment_parallel_bpmn_flows() {
        {4, {{4}, {}}, {{12}, {}}},
        {5, {{6}, {}}, {{5}, {}}},
        {6, {{5}, {}}, {{3}, {}}}});
+}
+
+void reference_log_alignment_parallel_bpmn_flows() {
+  const auto net = parallel_bpmn_flow_net();
   EventLog log;
   for (const std::string word : {"bdfgbecbacebdfgbdfgab", "bdfgbceb", "ab", "b"}) {
     Trace trace;
@@ -1277,6 +1281,56 @@ void reference_log_alignment_parallel_bpmn_flows() {
         {{"bdfgbecbacebdfgbdfgab", 200002}, {"bdfgbceb", 70002}, {"ab", 10002}, {"b", 2}});
   check(AlignmentVariant::kDijkstraLessMemory, 0.74985,
         {{"bdfgbecbacebdfgbdfgab", 5}, {"bdfgbceb", 1}, {"ab", 10000}, {"b", 0}});
+}
+
+// Review AL1: with standard costs, state-equation A* and Dijkstra take each
+// variant's dispatcher search from the bundle, which ran the same search.
+// Every variant matches the trace's own public alignment: cost, best-worst
+// fitness, moves and the search counters.
+void reference_log_alignment_reuses_bundle_searches() {
+  const auto net = parallel_bpmn_flow_net();
+  for (const auto variant :
+       {AlignmentVariant::kStateEquationAStar, AlignmentVariant::kDijkstraNoHeuristics}) {
+    // Uninformed Dijkstra runs out of states on the long trace.
+    const bool a_star = variant == AlignmentVariant::kStateEquationAStar;
+    EventLog log;
+    for (const std::string word : {"bdfgbecbacebdfgbdfgab", "bdfgbceb", "ab", "b", "bdfgb", "gfdb"}) {
+      if (!a_star && word.size() > 10) continue;
+      Trace trace;
+      for (const char activity : word) {
+        Event event;
+        event.activity = std::string(1, activity);
+        trace.events.push_back(event);
+      }
+      log.traces.push_back(trace);
+    }
+    AlignmentOptions options;
+    options.variant = variant;
+    options.cost_profile = AlignmentCostProfile::kStandard;
+    const auto result = reference_log_alignment(log, net, options);
+    assert(result.computed && result.variants.size() == log.traces.size());
+    for (const auto& entry : result.variants) {
+      PetriTraceAlignmentOptions trace_options;
+      trace_options.variant = variant;
+      const auto own = align_petri_trace(entry.activities, net, trace_options);
+      assert(own.computed && own.fitness);
+      assert(own.cost == entry.cost && *own.fitness == entry.fitness);
+      assert(own.alignment.size() == entry.moves.size());
+      for (std::size_t i = 0; i < own.alignment.size(); ++i) {
+        const auto& move = own.alignment[i];
+        const auto& native = entry.moves[i];
+        assert(move.transition.value_or(static_cast<std::size_t>(-1)) == native.transition);
+        const auto type = move.model && *move.model == ">>"   ? AlignmentMoveType::kLog
+                          : move.log != ">>"                  ? AlignmentMoveType::kSynchronous
+                                                              : AlignmentMoveType::kModel;
+        assert(type == native.type);
+      }
+      assert(own.diagnostics.visited_states == entry.diagnostics.visited_states);
+      assert(own.diagnostics.queued_states == entry.diagnostics.queued_states);
+      assert(own.diagnostics.traversed_arcs == entry.diagnostics.traversed_arcs);
+      assert(own.diagnostics.lp_solved == entry.diagnostics.lp_solved);
+    }
+  }
 }
 
 // Review AK2: a log with eight or more distinct variants aligns them on
@@ -1355,6 +1409,7 @@ void log_alignment_runs_variants_on_threads() {
 
 int main() {
   log_alignment_runs_variants_on_threads();
+  reference_log_alignment_reuses_bundle_searches();
   weighted_marking_equation_counts_arc_objects();
   reference_log_alignment_parallel_bpmn_flows();
   woflan_weighted_and_parallel_arcs();

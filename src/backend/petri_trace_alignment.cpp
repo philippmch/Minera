@@ -662,10 +662,13 @@ class EmptyRunCache {
   std::optional<SearchOutcome> value_;
 };
 
+// `precomputed`: the trace's search outcome when the caller already holds it
+// (reference_log_alignment's bundle ran the very same search).
 std::vector<PetriTraceAlignment> run(const std::vector<std::string>& trace, const PetriNet& net,
                                      const PetriTraceAlignmentOptions& options,
-                                     EmptyRunCache* empty_cache = nullptr) {
-  const auto result = search(trace, net, options);
+                                     EmptyRunCache* empty_cache = nullptr,
+                                     const SearchOutcome* precomputed = nullptr) {
+  const auto result = precomputed ? *precomputed : search(trace, net, options);
   std::vector<PetriTraceAlignment> out;
   // A search stopped by max_states or max_time_seconds proves nothing about
   // the final marking: every variant reports one uncomputed, exhausted entry.
@@ -755,8 +758,13 @@ bool reference_easy_sound(const PetriNet& net, const PetriTraceAlignmentOptions&
   return reachability == FinalMarkingReachability::kReachable;
 }
 
-std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const PetriNet& net,
-                                                 const PetriLogAlignmentOptions& options) {
+namespace {
+
+using PrecomputedSearches = std::map<std::vector<std::string>, SearchOutcome>;
+
+std::vector<PetriTraceAlignment> align_log(const EventLog& log, const PetriNet& net,
+                                           const PetriLogAlignmentOptions& options,
+                                           const PrecomputedSearches* precomputed) {
   if (!options.trace.trace_costs.empty())
     throw std::invalid_argument("per-event trace costs cannot apply to a whole log");
   // The public log dispatcher first checks easy soundness and raises for a
@@ -823,7 +831,12 @@ std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const Petr
       if (v >= distinct.size() || v > first_error.load()) return;
       try {
         throw_if_cancelled(trace_options.cancelled, "alignment was cancelled");
-        auto all = run(distinct[v], net, trace_options, &empty_cache);
+        const SearchOutcome* known = nullptr;
+        if (precomputed) {
+          const auto found = precomputed->find(distinct[v]);
+          if (found != precomputed->end()) known = &found->second;
+        }
+        auto all = run(distinct[v], net, trace_options, &empty_cache, known);
         auto aligned = all.empty() ? PetriTraceAlignment{} : std::move(all.front());
         if (!options.enable_best_worst_cost) {
           aligned.bwc.reset();
@@ -875,6 +888,13 @@ std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const Petr
     std::rethrow_exception(key_error);
   }
   return out;
+}
+
+}  // namespace
+
+std::vector<PetriTraceAlignment> align_petri_log(const EventLog& log, const PetriNet& net,
+                                                 const PetriLogAlignmentOptions& options) {
+  return align_log(log, net, options, nullptr);
 }
 
 bool reference_log_alignment_applies(const AlignmentOptions& options) {
@@ -929,9 +949,32 @@ AlignmentResult reference_log_alignment(const EventLog& log, const PetriNet& net
   reference.trace.max_states = options.max_states;
   reference.trace.max_time_seconds = options.max_time_seconds;
   reference.trace.cancelled = options.cancelled;
+  // For state-equation A* and DIJKSTRA_NO_HEURISTICS the dispatcher's trace
+  // search is the bundle's own: check_alignment with standard costs on the
+  // same net (search_options), whose Aligner reads the markings and the
+  // bounds copied above and whose search reads only those and the variant,
+  // the cost profile and synchronous_dijkstra (cost overrides are excluded
+  // by reference_log_alignment_applies). When the bundle searched with the
+  // same values, its outcome is reused instead of searching again.
+  const bool same_search =
+      (options.variant == AlignmentVariant::kStateEquationAStar ||
+       options.variant == AlignmentVariant::kDijkstraNoHeuristics) &&
+      options.cost_profile == AlignmentCostProfile::kStandard &&
+      options.synchronous_dijkstra == AlignmentOptions{}.synchronous_dijkstra;
+  PrecomputedSearches bundle_searches;
+  if (same_search) {
+    for (const auto& variant : result.variants) {
+      SearchOutcome outcome;
+      outcome.found = true;
+      outcome.cost = variant.cost;
+      outcome.alignments = {variant.moves};
+      outcome.diagnostics = variant.diagnostics;
+      bundle_searches.emplace(variant.activities, std::move(outcome));
+    }
+  }
   std::vector<PetriTraceAlignment> aligned;
   try {
-    aligned = align_petri_log(variants_log, net, reference);
+    aligned = align_log(variants_log, net, reference, same_search ? &bundle_searches : nullptr);
   } catch (const std::invalid_argument& error) {
     result.computed = false;
     result.exhausted = std::string(error.what()).find("undecided") != std::string::npos;

@@ -11657,12 +11657,15 @@ bool loopback_port_in_use(int port) {
 int main(int argc, char** argv) {
 #if defined(__GLIBC__)
   // Bound the per-thread arenas and map large buffers (logs, response bodies)
-  // directly, so memory freed after a request returns to the system. Four
-  // arenas let the alignment searches that run side by side on a large log
-  // (up to four threads, see check_alignment) allocate without queueing on
-  // one arena lock: with two, four threads ran about as fast as one.
+  // directly, so memory freed after a request returns to the system. The
+  // bound leaves one arena per server thread: the pool, the main and reaper
+  // threads, and the helpers of two alignments running side by side (three
+  // each, see check_alignment and align_petri_log). Once every arena is
+  // taken, glibc hands a new helper an arena another thread is using, and
+  // the two then queue on its lock: with four arenas, the searches of one
+  // large log spent 47 s in the kernel waiting where they otherwise spend 1 s.
 #if defined(M_ARENA_MAX)
-  mallopt(M_ARENA_MAX, 4);
+  mallopt(M_ARENA_MAX, static_cast<int>(CPPHTTPLIB_THREAD_POOL_COUNT) + 8);
 #endif
 #if defined(M_MMAP_THRESHOLD)
   mallopt(M_MMAP_THRESHOLD, 1 << 20);

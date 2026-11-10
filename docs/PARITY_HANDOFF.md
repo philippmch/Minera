@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AK (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AL (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4226,16 +4226,29 @@ columns) and `/api/align` on a 50,000-case log (variant searches on four
 threads, four malloc arenas in the server: 918 s to 215 s). Round AK
 re-reviewed AJ and made `/api/align` with a supplied model about three
 times faster without changing results (each A* bound solved once, one
-empty-trace search per log, the dispatcher pass on four threads).
+empty-trace search per log, the dispatcher pass on four threads). Round AL
+re-reviewed AK and sped up the remaining large-log alignment routes without
+changing results: A* bounds solved when a state is popped, the bundle's
+search reused by the dispatcher pass with standard costs, and one malloc
+arena per server thread (default replay fitness on 3,000 cases 225 s to
+119 s, imported-model alignment on 1,000 cases 180 s to 110 s).
 
-Next round (AL) should start by re-reviewing round AK:
+Next round (AM) should start by re-reviewing round AL:
 
-- `Aligner::align_configured` in `src/backend/conformance.cpp`: `bounds`
-  (one LP per state) and `lazy_bounds` (the bound is solved after the
-  best-cost check, only for state-equation A* without generator, discount
-  or less-memory pruning);
-- `align_petri_log` in `src/backend/petri_trace_alignment.cpp`: the
-  threaded variant loop, `EmptyRunCache`, the order in which errors raise.
+- `Aligner::align_configured` in `src/backend/conformance.cpp`: pending
+  nodes (`Node::pending`, the inherited priority and its 1e-6 margin, the
+  re-queue at pop with the old sequence number; `lazy_bounds` now also
+  requires the marking equation and no extended arcs);
+- `reference_log_alignment` in `src/backend/petri_trace_alignment.cpp`:
+  `same_search`, `bundle_searches` and `align_log`'s `precomputed`
+  argument (every option the dispatcher's search reads must equal the
+  bundle's);
+- `mallopt(M_ARENA_MAX, CPPHTTPLIB_THREAD_POOL_COUNT + 8)` in
+  `minera_server.cpp`.
+
+Round AK's targets, re-reviewed in AL without findings: `bounds` and
+`lazy_bounds` in `align_configured`; the threaded variant loop of
+`align_petri_log`, `EmptyRunCache`, the order in which errors raise.
 
 Round AJ's own targets, re-reviewed in AK without findings:
 
@@ -4252,10 +4265,11 @@ Round AJ's own targets, re-reviewed in AK without findings:
   `Conformance.tsx`).
 
 Areas without a recent random-input sweep that are good candidates for the
-second reviewer: root-cause analysis (decision trees on features), large-log
-performance of `/api/evaluate`, OCEL discovery, and reusing the bundle's A*
-result in the dispatcher pass of imported-model alignments (both run the
-same search per variant; every option the search reads must agree).
+second reviewer: root-cause analysis (decision trees on features), OCEL
+discovery, and the legacy-cost imported-model alignment (the bundle's unit
+costs differ from the dispatcher's, so both still search: about 110 s on
+1,000 cases). In stack samples of the A* searches on these logs the LP
+solver (`solve_lp_sparse`) was about half of the busy frames.
 
 Known open or declared: mine-view generalization sum order (2 ulp); POWL
 brute-force filtering and dynamic clustering rare cases; BPMN→net
