@@ -1,8 +1,13 @@
 #include "minera/role_discovery.hpp"
 
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
+
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <vector>
@@ -81,7 +86,7 @@ double similarity(const WorkingRole& a, const WorkingRole& b) {
 }
 }
 
-RoleDiscoveryResult discover_roles(const EventLog& log,
+RoleDiscoveryResult discover_roles(const EventLog& input,
                                    const RoleDiscoveryOptions& options) {
   if (options.variant != RoleDiscoveryVariant::kLog &&
       options.variant != RoleDiscoveryVariant::kPandas)
@@ -93,15 +98,67 @@ RoleDiscoveryResult discover_roles(const EventLog& log,
   if (options.max_activities == 0 || options.max_activities > 100000)
     throw std::invalid_argument("roles_max_activities safety bound exceeded");
 
+  // A log read on the DataFrame path (CSV and XES uploads) is read as pm4py
+  // reads its frame: keys are column names (no org:resource alias), a key the
+  // frame lacks raises KeyError, and cells are typed. The pandas variant's
+  // groupby drops rows with a NaN activity or resource; both variants join
+  // the activity names, so an activity that is no text raises TypeError
+  // (observed black-box). The log variant keys each NaN resource cell as its
+  // own resource (float identity), which no JSON name can tell apart: it is
+  // left out here.
+  const bool frame = input.dataframe_columns != nullptr;
+  std::optional<EventLog> frame_storage;
+  if (frame) frame_storage = dataframe_frame_event_log(input);
+  const EventLog& log = frame ? *frame_storage : input;
+  const auto scope = options.variant == RoleDiscoveryVariant::kPandas
+                         ? FrameKeyScope::kDataFrame : FrameKeyScope::kEventLog;
+  if (frame) {
+    const auto keys = frame_keys(log, scope);
+    require_frame_key(keys, options.activity_attribute);
+    require_frame_key(keys, options.resource_attribute);
+    // The pandas variant's groupby sorts the resources: text beside
+    // numbers or dates raises TypeError there.
+    std::set<FrameValueClass> resource_classes;
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events) {
+        const auto activity = frame_value(trace, event, options.activity_attribute, scope);
+        if (scope == FrameKeyScope::kDataFrame) {
+          const auto resource = frame_value(trace, event, options.resource_attribute, scope);
+          if (activity.missing() || resource.missing()) continue;
+          resource_classes.insert(resource.value_class);
+        }
+        if (activity.value_class != FrameValueClass::kText)
+          throw std::invalid_argument(
+              std::string("TypeError: sequence item 0: expected str instance, ") +
+              (activity.value_class == FrameValueClass::kDate ? "Timestamp" : "float") + " found");
+      }
+    require_sortable_classes(resource_classes);
+  }
+  // Resources and activities are separate dicts to pm4py.
+  FrameNames frame_names, frame_activity_names;
+  const auto select = [&](const Trace& trace, const Event& event, const std::string& key,
+                          bool resource) -> std::optional<std::string> {
+    if (frame) {
+      const auto value = frame_value(trace, event, key, scope);
+      if (value.missing()) return std::nullopt;
+      return (resource ? frame_names : frame_activity_names).name(value);
+    }
+    auto value = selected_value(event, key, resource);
+    if (value.empty()) return std::nullopt;
+    return value;
+  };
+
   std::map<std::string, std::map<std::string, std::size_t>> activity_resources;
   // Per activity, its resources in first-appearance order (the EventLog
   // variant's Counter order); the pandas variant groups by name instead.
   std::map<std::string, std::vector<std::string>> first_seen;
   std::set<std::string> resources;
   for (const auto& trace : log.traces) for (const auto& event : trace.events) {
-    const auto activity = selected_value(event, options.activity_attribute, false);
-    const auto resource = selected_value(event, options.resource_attribute, true);
-    if (activity.empty() || resource.empty()) continue;
+    const auto activity_value = select(trace, event, options.activity_attribute, false);
+    const auto resource_value = select(trace, event, options.resource_attribute, true);
+    if (!activity_value || !resource_value) continue;
+    const auto& activity = *activity_value;
+    const auto& resource = *resource_value;
     if (activity_resources[activity][resource]++ == 0)
       first_seen[activity].push_back(resource);
     resources.insert(resource);
@@ -121,6 +178,13 @@ RoleDiscoveryResult discover_roles(const EventLog& log,
         (void)count;
         role.resource_order.push_back(name);
       }
+      // On the DataFrame path the groupby orders a role's resources by their
+      // typed value (numbers by value, text by code point).
+      if (frame)
+        std::stable_sort(role.resource_order.begin(), role.resource_order.end(),
+                         [&](const std::string& left, const std::string& right) {
+                           return frame_names.less(left, right);
+                         });
     }
     roles.push_back(std::move(role));
   }

@@ -21545,3 +21545,109 @@ trace attribute `id`, the replaced `concept:name` and `case:concept:name`
 columns, the calendar TEMPORAL variant raising without an `org:resource`
 column and reading the resource under its header, an unprefixed case
 column as no trace attribute).
+
+## Review AS1: re-review of round AR, organizational mining on the DataFrame path (2026-11-10)
+
+Round AR's changes were re-read and swept again on new seeds (the CSV
+frame's `activity_copy` and the `kCaseId` trace column of a `case:` case
+header, the trace branch of `dataframe_frame_event_log`, the cleared
+`case_id_source_key` under `standard_keys`, the calendar TEMPORAL variant
+on the frame, now also on CSV timestamps with UTC offsets, mixed offsets
+and `T` separators). No finding.
+
+The second area swept the organizational routes on CSV and XES uploads:
+`/api/sna` (all eight variants, with `sna_beta`, `sna_n`,
+`sna_metric_normalization`, custom activity and case keys) and `/api/roles`
+(both variants, custom activity keys and thresholds), compared with
+`pm4py.algo.organizational_mining.sna.algorithm.apply` and
+`roles.algorithm.apply` on the formatted frame (the `_pandas` and PANDAS
+variants) or on `convert_to_event_log` of it (the log variants). pm4py
+reads keys as the frame's column names, so on a CSV upload whose resource
+column has another header (including the importer's default header
+`resource`) the default `org:resource` raises `KeyError`. Minera aliased
+`org:resource` and `resource` to the mapped resource and read any other key
+from the event attributes, where a CSV resource column is not listed: the
+only key pm4py accepts (the column's own header) gave an empty network.
+
+**Contract (decided this round, Philipp may overrule).** On a log read on
+the DataFrame path (CSV and XES uploads; `EventLog::dataframe_columns`),
+the organizational SNA and role discovery read keys exactly as pm4py reads
+its frame. Native table sources keep the alias rules. The frontend's
+social-network resource field and the roles resource field start at the
+session's resource key (`active_source.source_selectors.resource_key`: the
+CSV resource column's header, or the XES resource attribute), so the
+default request works on such uploads; typing `org:resource` there raises
+as pm4py does. This follows the project goal (behavioral parity with the
+pinned reference) and the AR1-4 precedent for temporal features.
+
+Findings, all fixed:
+
+- **AS1-1 Keys are frame columns.** A key the frame lacks raises
+  `KeyError` (400 on the route): `org:resource` and `resource` are only
+  columns of those names, a pandas variant's case key `case_id` or
+  `case:id` is no alias of the case column, and a `case:` column is a key of
+  the `_pandas`/PANDAS variants only (`convert_to_event_log` moves it to the
+  trace). The resource column under its own header now reads the
+  resources (Minera gave no resource for it).
+- **AS1-2 Typed cells.** Resources and activities are the frame's typed
+  values printed as Python prints them: a CSV column of ints reads `007`
+  as `7`; a column of ints with a blank is float64 (`1.0`), `2.50` is
+  `2.5`, `1e3` is `1000.0`; `true` and `FALSE` in a bool column are `True`
+  and `False`; an XES date prints as `2020-01-01 00:00:00+00:00`; numbers
+  equal in value (an XES column holding `True`, `1` and `1.0`) are one
+  dict key named by the first one met. An XES empty string is a resource
+  of its own (the role JSON no longer refuses an empty name).
+- **AS1-3 Sorting raises.** Every SNA variant but the joint-activities
+  pandas one sorts the resources, so text beside a NaN cell (a CSV resource
+  column with a blank, an XES event without `org:resource`) or beside
+  numbers raises `TypeError: '<' not supported between instances of 'str'
+  and 'float'`; the joint-activities pandas variant and the PANDAS role
+  variant drop rows with a NaN resource or activity first (the PANDAS role
+  variant's groupby still raises on text beside numbers). Role discovery
+  joins the activity names, so an activity key whose values are not text
+  raises `TypeError: sequence item 0: expected str instance, float found`.
+- **AS1-4 Typed order.** The PANDAS role variant orders a role's resources
+  by value (`2` before `10`), which also orders the merged roles' Counter
+  keys; the subcontracting pandas variant orders its resource variants by
+  their typed values.
+
+Declared: a NaN cell in the selected resource column (or in the activity
+column of the joint-activities log variant) is a value of its own to pm4py
+each time it occurs (Python float identity: no two NaN cells are one dict
+key), so its networks and log-variant roles list several nodes printed
+`nan` that compare unequal and that no JSON name can tell apart; with
+metric normalization or subcontracting windows they also change the other
+weights. Minera leaves NaN cells out (as it leaves blank resources out of
+native logs); the edges between other resources match pm4py's.
+
+Verification (`orgsweep.py` and `orgxes.py` in the project files under
+`review-harness/round-as/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| SNA and roles, CSV uploads with custom headers, AR binary (seeds 0 to 29) | 180 | 36 equal, 22 differed, 60 raise in pm4py only, 26 give no network in Minera only, 25 raise in both, 11 NaN-declared |
+| SNA and roles, CSV, fixed binary (seeds 0 to 29, 100 to 199, 300 to 399) | 1,380 | 585 equal, 637 raise in both, 158 NaN-declared, 0 differences |
+| SNA and roles, XES uploads with odd values (seeds 0 to 99) | 600 | 230 equal, 302 raise in both, 68 NaN-declared, 0 differences |
+| Features, CSV case columns and copies (featcase, seeds 900 to 929) | 120 | 66 equal, 26 equal under another hash seed, 28 raise in both |
+| Features, CSV with custom headers (seeds 900 to 929) | 90 | 90 equal |
+| Temporal (`grouper_freq`), CSV with custom headers (seeds 900 to 929) | 90 | 74 equal, 16 raise in both |
+| Temporal, CSV timestamps with offsets and `T` (seeds 950 to 979) | 90 | 60 equal, 30 raise in both |
+| Temporal, XES with odd values (seeds 900 to 929) | 90 | 90 equal |
+| Profile clustering, CSV without gaps (seeds 900 to 924) | 50 | 47 equal, 3 flagged ties |
+| Fixture replay (16 manifests) | 2,673 responses | unchanged |
+
+Tests: `minera_organizational_mining_tests` and `minera_role_discovery_tests`
+(`frame_path_reads_pm4py_keys`: KeyError for `org:resource`, `resource` and
+`case_id`, int resources, float resources with a NaN cell, text beside NaN,
+the typed role order and merge, the activity join),
+`minera_core_tests` (`organizational_sna_json_is_standalone_and_deterministic`
+now raises for `org:resource` on a CSV with a `resource` header and reads
+`resource`), and the frontend's `session-resource-key.test.ts`. Full suite:
+454 ctest targets, vitest (10,722), the Python script tests (406).
+
+Next round's candidates: the other organizational routes read the mapped
+resource too: resource profiles (pm4py's `resource_profiles` functions
+raise `KeyError` for `org:resource` on such frames and compare the
+resource argument with the typed cells), local diagnostics (pm4py's
+`apply_from_group_attribute` on a frame is its pandas implementation, whose
+results differ from the EventLog one) and network analysis.

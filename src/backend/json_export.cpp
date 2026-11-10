@@ -7820,10 +7820,11 @@ std::string role_discovery_json(const RoleDiscoveryResult& result) {
     if (role.activities.empty() || role.resources.empty())
       throw std::invalid_argument("role discovery contains an empty role");
     for (const auto& activity : role.activities)
-      if (activity.empty() || !activities.insert(activity).second)
+      // An empty name is a value of a DataFrame-path log (an XES "" cell).
+      if (!activities.insert(activity).second)
         throw std::invalid_argument("role discovery activities are invalid");
     for (const auto& resource : role.resources) {
-      if (resource.name.empty() || resource.count == 0)
+      if (resource.count == 0)
         throw std::invalid_argument("role discovery resource is invalid");
       resources.insert(resource.name);
     }

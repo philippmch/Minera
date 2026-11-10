@@ -1,14 +1,94 @@
 #include "minera/organizational_mining.hpp"
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/json_export.hpp"
 
 #include <cassert>
 #include <cmath>
+#include <functional>
+#include <map>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace {
+// pm4py 2.7.22 on read_csv + format_dataframe(case_id="cid",
+// activity_key="act", timestamp_key="ts") of this CSV (Review AS1): keys
+// are frame columns, so org:resource and resource raise KeyError; "who" is
+// an int column, "num" a float one with a NaN, "txt" text with a NaN.
+minera::EventLog as1_csv_log() {
+  std::istringstream csv("cid,act,ts,who,num,txt\n"
+                         "c1,a,2020-01-01 00:00:00,1,,x\n"
+                         "c1,b,2020-01-01 00:01:00,2,1,y\n"
+                         "c1,a,2020-01-01 00:02:00,1,2,\n"
+                         "c2,a,2020-01-02 00:00:00,2,3,x\n"
+                         "c2,b,2020-01-02 00:05:00,10,1,y\n");
+  minera::CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  auto log = minera::import_csv_event_log(csv, import);
+  assert(log.dataframe_columns);
+  return log;
+}
+
+bool raises(const std::function<void()>& call, const std::string& text) {
+  try {
+    call();
+  } catch (const std::invalid_argument& error) {
+    return std::string(error.what()).find(text) != std::string::npos;
+  }
+  return false;
+}
+
+std::map<std::pair<std::string, std::string>, double> edges_of(
+    const minera::OrganizationalSnaResult& result) {
+  std::map<std::pair<std::string, std::string>, double> edges;
+  for (const auto& edge : result.edges)
+    edges[{result.resources[edge.source], result.resources[edge.target]}] = edge.weight;
+  return edges;
+}
+
+void frame_path_reads_pm4py_keys() {
+  const auto log = as1_csv_log();
+  minera::OrganizationalSnaOptions options;
+  assert(raises([&] { (void)minera::discover_organizational_sna(log, options); },
+                "KeyError: 'org:resource'"));
+  options.resource_attribute = "resource";
+  assert(raises([&] { (void)minera::discover_organizational_sna(log, options); },
+                "KeyError: 'resource'"));
+  options.resource_attribute = "who";
+  const auto handover = minera::discover_organizational_sna(log, options);
+  const std::map<std::pair<std::string, std::string>, double> handover_edges{
+      {{"1", "2"}, 1.0 / 3.0}, {{"2", "1"}, 1.0 / 3.0}, {{"2", "10"}, 1.0 / 3.0}};
+  assert(edges_of(handover) == handover_edges);
+  options.variant = minera::OrganizationalSnaVariant::kWorkingTogetherPandas;
+  const std::map<std::pair<std::string, std::string>, double> together{
+      {{"1", "2"}, 0.2}, {{"2", "1"}, 0.2}, {{"2", "10"}, 0.2}, {{"10", "2"}, 0.2}};
+  assert(edges_of(minera::discover_organizational_sna(log, options)) == together);
+  // A case key the frame lacks raises too; case_id is no alias there.
+  options.case_id_attribute = "case_id";
+  assert(raises([&] { (void)minera::discover_organizational_sna(log, options); },
+                "KeyError: 'case_id'"));
+  // The joint-activities pandas variant drops NaN cells; floats print as
+  // Python floats.
+  options = {};
+  options.variant = minera::OrganizationalSnaVariant::kJointActivitiesPandas;
+  options.resource_attribute = "num";
+  const auto joint = edges_of(minera::discover_organizational_sna(log, options));
+  assert(joint.size() == 6 && std::abs(joint.at({"2.0", "3.0"}) - 1.0) < 1e-12 &&
+         std::abs(joint.at({"1.0", "2.0"}) + 1.0) < 1e-12);
+  options.resource_attribute = "txt";
+  const auto text = edges_of(minera::discover_organizational_sna(log, options));
+  assert(text.size() == 2 && std::abs(text.at({"x", "y"}) + 1.0) < 1e-12);
+  // Every other variant sorts the resources: text beside NaN raises.
+  options.variant = minera::OrganizationalSnaVariant::kHandover;
+  assert(raises([&] { (void)minera::discover_organizational_sna(log, options); },
+                "TypeError: '<' not supported"));
+}
+
 minera::EventLog sample() {
   minera::EventLog log;
   log.traces.push_back({"c1", {{"c1", "A", "", "alice", 0, {}, ""},
@@ -22,6 +102,7 @@ minera::EventLog sample() {
 }
 
 int main() {
+  frame_path_reads_pm4py_keys();
   minera::OrganizationalSnaOptions options;
   options.beta = 0.5;
   const auto handover = minera::discover_organizational_sna(sample(), options);

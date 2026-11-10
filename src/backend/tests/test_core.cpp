@@ -8093,6 +8093,16 @@ void organizational_sna_json_is_standalone_and_deterministic() {
   const auto log = minera::import_csv_event_log(input);
   minera::OrganizationalSnaOptions options;
   options.variant = minera::OrganizationalSnaVariant::kWorkingTogether;
+  // A CSV log is read as pm4py reads its frame: the resource column keeps
+  // its header, so the default org:resource raises KeyError (Review AS1).
+  bool raised = false;
+  try {
+    (void)minera::discover_organizational_sna(log, options);
+  } catch (const std::invalid_argument& error) {
+    raised = std::string(error.what()) == "KeyError: 'org:resource'";
+  }
+  assert(raised);
+  options.resource_attribute = "resource";
   const auto result = minera::discover_organizational_sna(log, options);
   const auto first = minera::organizational_sna_json(result);
   const auto second = minera::organizational_sna_json(result);

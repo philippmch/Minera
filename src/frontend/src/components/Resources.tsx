@@ -1,6 +1,7 @@
 import { type MineraExport, numberFormat } from "../types";
 import { SocialNetwork } from "./SocialNetwork";
 import { OrganizationalWorkspace } from "./OrganizationalWorkspace";
+import { sessionResourceKey } from "../social-network-options";
 
 // The organizational perspective: who performs the work, and how cases are
 // handed from one resource to the next (the handover-of-work social network).
@@ -8,7 +9,7 @@ export function Resources({ data, available = false, mining = false }: { data: M
   const network = data.resources;
   if (!network || network.resources.length === 0) {
     return (
-      <div className="layout-resources"><div className="organizational-workspace"><OrganizationalWorkspace data={data} available={available} mining={mining} /></div><SocialNetwork available={available} mining={mining} /><section className="panel map-panel reveal">
+      <div className="layout-resources"><div className="organizational-workspace"><OrganizationalWorkspace data={data} available={available} mining={mining} /></div><SocialNetwork available={available} mining={mining} resourceKey={sessionResourceKey(data)} /><section className="panel map-panel reveal">
         <div className="model-empty">
           No resource information in this log. Add a <code>resource</code> column
           (CSV) or an <code>org:resource</code> attribute (XES) to see who
@@ -36,7 +37,7 @@ export function Resources({ data, available = false, mining = false }: { data: M
   return (
     <div className="layout-resources">
       <div className="organizational-workspace"><OrganizationalWorkspace data={data} available={available} mining={mining} /></div>
-      <SocialNetwork available={available} mining={mining} />
+      <SocialNetwork available={available} mining={mining} resourceKey={sessionResourceKey(data)} />
       <section className="panel activities-panel reveal">
         <div className="panel-head">
           <h2>Resources</h2>

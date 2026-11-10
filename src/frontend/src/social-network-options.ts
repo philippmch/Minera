@@ -8,6 +8,14 @@ export const SOCIAL_NETWORK_VARIANTS: {id:OrganizationalSnaVariant;label:string}
 ];
 export interface SocialNetworkSettings {variant:OrganizationalSnaVariant;activity:string;resource:string;caseId:string;beta:string;gap:string;normalize:boolean;}
 export const DEFAULT_SOCIAL_NETWORK:SocialNetworkSettings = {variant:"handover",activity:"concept:name",resource:"org:resource",caseId:"case:concept:name",beta:"0",gap:"2",normalize:false};
+/** The resource key of the mined session: a CSV upload's resource column under its own header (pm4py's frame has no
+ * org:resource then, so the organizational routes raise KeyError for that key), an XES upload's resource attribute. */
+export function sessionResourceKey(data:{active_source?:{source_selectors?:Partial<Record<string,unknown>>}}|null|undefined):string|undefined {
+  const key=data?.active_source?.source_selectors?.resource_key;
+  return typeof key==="string" && key.trim()!=="" ? key : undefined;
+}
+/** Social network settings whose resource field starts at the session's resource key. */
+export function defaultSocialNetwork(resourceKey?:string):SocialNetworkSettings {return {...DEFAULT_SOCIAL_NETWORK,resource:resourceKey ?? DEFAULT_SOCIAL_NETWORK.resource};}
 export function socialNetworkOptions(settings:SocialNetworkSettings):OrganizationalSnaOptions {
   if (!settings.activity.trim() || !settings.resource.trim()) throw new Error("Enter activity and resource field names.");
   const options:OrganizationalSnaOptions = {sna_variant:settings.variant,sna_activity_attribute:settings.activity.trim(),sna_resource_attribute:settings.resource.trim(),sna_metric_normalization:settings.normalize};

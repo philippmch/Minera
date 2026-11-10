@@ -1,12 +1,14 @@
 import { useEffect,useMemo,useRef,useState } from "react";
 import { requestOrganizationalSna } from "../api";
 import { type OrganizationalSnaResult } from "../types";
-import { DEFAULT_SOCIAL_NETWORK,SOCIAL_NETWORK_VARIANTS,socialNetworkOptions,type SocialNetworkSettings } from "../social-network-options";
+import { SOCIAL_NETWORK_VARIANTS,defaultSocialNetwork,socialNetworkOptions,type SocialNetworkSettings } from "../social-network-options";
 import { socialNetworkGraph,downloadModelJson } from "../model-view-data";
 import { ModelGraph } from "./ModelGraph";
 
-export function SocialNetwork({ available,mining }: {available:boolean;mining:boolean}) {
-  const [settings,setSettings]=useState({...DEFAULT_SOCIAL_NETWORK});
+export function SocialNetwork({ available,mining,resourceKey }: {available:boolean;mining:boolean;resourceKey?:string}) {
+  const [settings,setSettings]=useState(()=>defaultSocialNetwork(resourceKey));
+  // A new session starts the resource field at its own resource key.
+  useEffect(()=>{setSettings(old=>({...old,resource:defaultSocialNetwork(resourceKey).resource}));},[resourceKey]);
   const [result,setResult]=useState<OrganizationalSnaResult|null>(null);
   const [error,setError]=useState<string|null>(null);const [pending,setPending]=useState(false);
   const [selected,setSelected]=useState<string|undefined>();const [page,setPage]=useState(0);

@@ -2,14 +2,91 @@
 
 #include <cassert>
 #include <cmath>
+#include <functional>
+#include <sstream>
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "minera/csv_event_log_importer.hpp"
 
 #include "minera/json_export.hpp"
 #include "minera/request_params.hpp"
 
 using namespace minera;
 
+namespace {
+// pm4py 2.7.22 on read_csv + format_dataframe(case_id="cid",
+// activity_key="act", timestamp_key="ts") of this CSV (Review AS1): keys
+// are frame columns, so org:resource and resource raise KeyError; "who" is
+// an int column, "num" a float one with a NaN, "txt" text with a NaN.
+EventLog as1_csv_log() {
+  std::istringstream csv("cid,act,ts,who,num,txt\n"
+                         "c1,a,2020-01-01 00:00:00,1,,x\n"
+                         "c1,b,2020-01-01 00:01:00,2,1,y\n"
+                         "c1,a,2020-01-01 00:02:00,1,2,\n"
+                         "c2,a,2020-01-02 00:00:00,2,3,x\n"
+                         "c2,b,2020-01-02 00:05:00,10,1,y\n");
+  CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  auto log = import_csv_event_log(csv, import);
+  assert(log.dataframe_columns);
+  return log;
+}
+
+bool raises(const std::function<void()>& call, const std::string& text) {
+  try {
+    call();
+  } catch (const std::invalid_argument& error) {
+    return std::string(error.what()).find(text) != std::string::npos;
+  }
+  return false;
+}
+
+using Roles = std::vector<std::pair<std::vector<std::string>, std::vector<std::pair<std::string, std::size_t>>>>;
+Roles roles_of(const RoleDiscoveryResult& result) {
+  Roles roles;
+  for (const auto& role : result.roles) {
+    std::vector<std::pair<std::string, std::size_t>> resources;
+    for (const auto& resource : role.resources) resources.emplace_back(resource.name, resource.count);
+    roles.emplace_back(role.activities, resources);
+  }
+  return roles;
+}
+
+void frame_path_reads_pm4py_keys() {
+  const auto log = as1_csv_log();
+  RoleDiscoveryOptions options;
+  assert(raises([&] { (void)discover_roles(log, options); }, "KeyError: 'org:resource'"));
+  options.resource_attribute = "who";
+  // The groupby orders a role's resources by value (2 before 10).
+  const Roles who{{{"b"}, {{"2", 1}, {"10", 1}}}, {{"a"}, {{"1", 2}, {"2", 1}}}};
+  assert(roles_of(discover_roles(log, options)) == who);
+  options.variant = RoleDiscoveryVariant::kPandas;
+  assert(roles_of(discover_roles(log, options)) == who);
+  options.threshold = 0.0;
+  const Roles merged{{{"a", "b"}, {{"2", 2}, {"10", 1}, {"1", 2}}}};
+  assert(roles_of(discover_roles(log, options)) == merged);
+  // NaN cells: the pandas groupby drops them; floats print as Python floats.
+  options.threshold = 0.65;
+  options.resource_attribute = "num";
+  const Roles num{{{"a"}, {{"2.0", 1}, {"3.0", 1}}}, {{"b"}, {{"1.0", 2}}}};
+  assert(roles_of(discover_roles(log, options)) == num);
+  // Both variants join the activity names: a float activity raises.
+  options.resource_attribute = "who";
+  options.activity_attribute = "num";
+  options.variant = RoleDiscoveryVariant::kLog;
+  assert(raises([&] { (void)discover_roles(log, options); },
+                "TypeError: sequence item 0: expected str instance"));
+}
+}  // namespace
+
 int main() {
+  frame_path_reads_pm4py_keys();
   EventLog log{{Trace{"c", {Event{"c","A","","r1",0}, Event{"c","A","","r1",1}, Event{"c","B","","r1",2}, Event{"c","B","","r1",3}, Event{"c","B","","r2",4}}}}};
   RoleDiscoveryOptions merge_options; merge_options.threshold = 0.49;
   auto result = discover_roles(log, merge_options);

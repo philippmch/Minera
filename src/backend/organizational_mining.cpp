@@ -1,7 +1,11 @@
 #include "minera/organizational_mining.hpp"
 
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
+
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <map>
 #include <numeric>
@@ -31,6 +35,11 @@ std::string selected_value(const Event& event, const std::string& key,
   return {};
 }
 
+// Reads one event's value of a key: the classic selectors above, or on the
+// DataFrame path the frame's typed cell (nullopt for a missing value).
+using Selector = std::function<std::optional<std::string>(
+    const Trace&, const Event&, const std::string&, bool)>;
+
 bool handover_variant(OrganizationalSnaVariant variant) {
   return variant == OrganizationalSnaVariant::kHandover ||
          variant == OrganizationalSnaVariant::kHandoverPandas;
@@ -48,12 +57,12 @@ bool case_id_variant(OrganizationalSnaVariant variant) {
 
 std::vector<std::size_t> resource_ids(
     const Trace& trace, const std::unordered_map<std::string, std::size_t>& ids,
-    const std::string& resource_attribute) {
+    const std::string& resource_attribute, const Selector& select) {
   std::vector<std::size_t> result;
   for (const auto& event : trace.events) {
-    const auto resource = selected_value(event, resource_attribute, true);
-    if (resource.empty()) continue;
-    const auto it = ids.find(resource);
+    const auto resource = select(trace, event, resource_attribute, true);
+    if (!resource) continue;
+    const auto it = ids.find(*resource);
     if (it != ids.end()) result.push_back(it->second);
   }
   return result;
@@ -75,13 +84,24 @@ std::optional<std::string> selected_case_id(const Trace& trace,
 }
 
 std::vector<Trace> regroup_traces(const EventLog& log,
-                                  const std::string& case_id_attribute) {
-  if (default_case_id_attribute(case_id_attribute)) return log.traces;
+                                  const std::string& case_id_attribute,
+                                  bool frame) {
+  if (frame ? case_id_attribute == "case:concept:name"
+            : default_case_id_attribute(case_id_attribute))
+    return log.traces;
   std::vector<Trace> grouped;
   std::unordered_map<std::string, std::size_t> positions;
   for (const auto& trace : log.traces) {
     for (const auto& event : trace.events) {
-      const auto case_id = selected_case_id(trace, event, case_id_attribute);
+      std::optional<std::string> case_id;
+      if (frame) {
+        // groupby leaves out the rows whose key is NaN.
+        const auto value = frame_value(trace, event, case_id_attribute, FrameKeyScope::kDataFrame);
+        if (value.missing()) continue;
+        case_id = value.text;
+      } else {
+        case_id = selected_case_id(trace, event, case_id_attribute);
+      }
       if (!case_id)
         throw std::invalid_argument(
             "organizational SNA case selector is missing: " +
@@ -112,7 +132,7 @@ void emit_edges(const std::map<Pair, double>& weights,
 }  // namespace
 
 OrganizationalSnaResult discover_organizational_sna(
-    const EventLog& log, const OrganizationalSnaOptions& options) {
+    const EventLog& input, const OrganizationalSnaOptions& options) {
   if (!std::isfinite(options.beta) || options.beta < 0.0 || options.beta > 1.0)
     throw std::invalid_argument("organizational SNA beta must be finite and in [0,1]");
   if (options.n == 0 || options.n > kHardGap)
@@ -126,6 +146,59 @@ OrganizationalSnaResult discover_organizational_sna(
     throw std::invalid_argument(
         "organizational SNA case selector requires a handover, working-together, or subcontracting pandas variant");
 
+  // A log read on the DataFrame path (CSV and XES uploads) is read as
+  // pm4py reads its frame: keys are column names (no org:resource alias), a
+  // key the frame lacks raises KeyError, cells are typed, and sorting the
+  // resources (every variant but the joint-activities pandas one, which
+  // drops NaN first) raises TypeError when text sits beside numbers or NaN
+  // (observed black-box). A NaN cell is left out: pm4py keys each NaN cell
+  // as its own resource (float identity), which no JSON name can tell apart.
+  const bool frame = input.dataframe_columns != nullptr;
+  std::optional<EventLog> frame_storage;
+  if (frame) frame_storage = dataframe_frame_event_log(input);
+  const EventLog& log = frame ? *frame_storage : input;
+  const bool pandas = options.variant == OrganizationalSnaVariant::kHandoverPandas ||
+                      options.variant == OrganizationalSnaVariant::kWorkingTogetherPandas ||
+                      options.variant == OrganizationalSnaVariant::kSubcontractingPandas ||
+                      options.variant == OrganizationalSnaVariant::kJointActivitiesPandas;
+  const auto scope = pandas ? FrameKeyScope::kDataFrame : FrameKeyScope::kEventLog;
+  // Resources and activities are separate dicts to pm4py.
+  FrameNames frame_names, frame_activity_names;
+  const Selector select = [&](const Trace& trace, const Event& event, const std::string& key,
+                              bool resource) -> std::optional<std::string> {
+    if (frame) {
+      const auto value = frame_value(trace, event, key, scope);
+      if (value.missing()) return std::nullopt;
+      return (resource ? frame_names : frame_activity_names).name(value);
+    }
+    auto value = selected_value(event, key, resource);
+    if (value.empty()) return std::nullopt;
+    return value;
+  };
+  const bool joint = options.variant == OrganizationalSnaVariant::kJointActivities ||
+                     options.variant == OrganizationalSnaVariant::kJointActivitiesPandas;
+  if (frame) {
+    const auto keys = frame_keys(log, scope);
+    require_frame_key(keys, options.resource_attribute);
+    if (joint) require_frame_key(keys, options.activity_attribute);
+    if (case_id_variant(options.variant)) require_frame_key(keys, options.case_id_attribute);
+    const bool drop_missing = options.variant == OrganizationalSnaVariant::kJointActivitiesPandas;
+    std::set<FrameValueClass> resource_classes, activity_classes;
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events) {
+        const auto resource = frame_value(trace, event, options.resource_attribute, scope);
+        if (joint) {
+          const auto activity = frame_value(trace, event, options.activity_attribute, scope);
+          if (drop_missing && (resource.missing() || activity.missing())) continue;
+          activity_classes.insert(activity.value_class);
+        }
+        if (drop_missing && resource.missing()) continue;
+        resource_classes.insert(resource.value_class);
+      }
+    require_sortable_classes(resource_classes);
+    if (joint) require_sortable_classes(activity_classes);
+  }
+
   OrganizationalSnaResult result;
   result.variant = options.variant;
   result.directed = handover_variant(options.variant) ||
@@ -135,8 +208,8 @@ OrganizationalSnaResult discover_organizational_sna(
   std::set<std::string> names;
   for (const auto& trace : log.traces)
     for (const auto& event : trace.events)
-      if (const auto resource = selected_value(event, options.resource_attribute, true);
-          !resource.empty()) names.insert(resource);
+      if (const auto resource = select(trace, event, options.resource_attribute, true))
+        names.insert(*resource);
   if (names.size() > options.max_resources)
     throw std::invalid_argument("organizational SNA resource bound exceeded");
   result.resources.assign(names.begin(), names.end());
@@ -147,16 +220,16 @@ OrganizationalSnaResult discover_organizational_sna(
 
   std::map<Pair, double> weights;
   const auto traces = case_id_variant(options.variant)
-                          ? regroup_traces(log, options.case_id_attribute)
+                          ? regroup_traces(log, options.case_id_attribute, frame)
                           : log.traces;
   switch (options.variant) {
     case OrganizationalSnaVariant::kHandover:
     case OrganizationalSnaVariant::kHandoverPandas: {
-      std::map<std::vector<std::string>, std::size_t> variants;
+      std::map<std::vector<std::optional<std::string>>, std::size_t> variants;
       for (const auto& trace : traces) {
-        std::vector<std::string> sequence;
+        std::vector<std::optional<std::string>> sequence;
         for (const auto& event : trace.events)
-          sequence.push_back(selected_value(event, options.resource_attribute, true));
+          sequence.push_back(select(trace, event, options.resource_attribute, true));
         ++variants[std::move(sequence)];
       }
       double dividend = 0.0;
@@ -168,9 +241,9 @@ OrganizationalSnaResult discover_organizational_sna(
                                       : std::pow(options.beta,
                                                  static_cast<double>(j - i - 1));
             dividend += weight * occurrence;
-            if (!sequence[i].empty() && !sequence[j].empty()) {
-              const auto source = ids.find(sequence[i]);
-              const auto target = ids.find(sequence[j]);
+            if (sequence[i] && sequence[j]) {
+              const auto source = ids.find(*sequence[i]);
+              const auto target = ids.find(*sequence[j]);
               if (source != ids.end() && target != ids.end())
                 weights[{source->second, target->second}] += weight * occurrence;
             }
@@ -193,7 +266,7 @@ OrganizationalSnaResult discover_organizational_sna(
                 : static_cast<double>(traces.size());
         const double normalizer = 1.0 / denominator;
         for (const auto& trace : traces) {
-          auto events = resource_ids(trace, ids, options.resource_attribute);
+          auto events = resource_ids(trace, ids, options.resource_attribute, select);
           std::sort(events.begin(), events.end());
           events.erase(std::unique(events.begin(), events.end()), events.end());
           for (std::size_t i = 0; i < events.size(); ++i) {
@@ -213,31 +286,41 @@ OrganizationalSnaResult discover_organizational_sna(
       // only records the intermediaries of a source resource the first time
       // that source closes an n-window anywhere in the log: later windows of
       // an already-seen source add nothing. The divisor is the case count.
-      std::vector<std::pair<std::vector<std::string>, std::size_t>> variants;
-      std::map<std::vector<std::string>, std::size_t> positions;
+      std::vector<std::pair<std::vector<std::optional<std::string>>, std::size_t>> variants;
+      std::map<std::vector<std::optional<std::string>>, std::size_t> positions;
       for (const auto& trace : traces) {
-        std::vector<std::string> sequence;
+        std::vector<std::optional<std::string>> sequence;
         for (const auto& event : trace.events)
-          sequence.push_back(selected_value(event, options.resource_attribute, true));
+          sequence.push_back(select(trace, event, options.resource_attribute, true));
         const auto [it, inserted] = positions.emplace(sequence, variants.size());
         if (inserted) variants.push_back({std::move(sequence), 0});
         ++variants[it->second].second;
       }
-      if (options.variant == OrganizationalSnaVariant::kSubcontractingPandas)
+      if (options.variant == OrganizationalSnaVariant::kSubcontractingPandas) {
+        // A frame's resources compare as their typed values (numbers by value).
+        const auto element_less = [&](const std::optional<std::string>& left,
+                                      const std::optional<std::string>& right) {
+          if (!left || !right) return !left && right.has_value();
+          return frame ? frame_names.less(*left, *right) : *left < *right;
+        };
         std::sort(variants.begin(), variants.end(),
-                  [](const auto& left, const auto& right) {
+                  [&](const auto& left, const auto& right) {
                     if (left.second != right.second) return left.second > right.second;
-                    return left.first > right.first;
+                    return std::lexicographical_compare(right.first.begin(), right.first.end(),
+                                                        left.first.begin(), left.first.end(),
+                                                        element_less);
                   });
+      }
       std::set<std::size_t> seen_sources;
       for (const auto& [events, occurrence] : variants) {
         for (std::size_t i = 0; i + options.n < events.size(); ++i) {
-          if (events[i].empty() || events[i] != events[i + options.n]) continue;
-          const auto source = ids.find(events[i]);
+          if (!events[i] || events[i] != events[i + options.n]) continue;
+          const auto source = ids.find(*events[i]);
           if (source == ids.end()) continue;
           if (!seen_sources.insert(source->second).second) continue;
           for (std::size_t j = i + 1; j < i + options.n; ++j) {
-            const auto intermediary = ids.find(events[j]);
+            if (!events[j]) continue;
+            const auto intermediary = ids.find(*events[j]);
             if (intermediary != ids.end())
               weights[{source->second, intermediary->second}] +=
                   static_cast<double>(occurrence);
@@ -253,8 +336,8 @@ OrganizationalSnaResult discover_organizational_sna(
       std::set<std::string> activity_names;
       for (const auto& trace : log.traces)
         for (const auto& event : trace.events)
-          if (const auto activity = selected_value(event, options.activity_attribute, false);
-              !activity.empty()) activity_names.insert(activity);
+          if (const auto activity = select(trace, event, options.activity_attribute, false))
+            activity_names.insert(*activity);
       std::vector<std::string> activities(activity_names.begin(), activity_names.end());
       std::unordered_map<std::string, std::size_t> activity_ids;
       for (std::size_t i = 0; i < activities.size(); ++i)
@@ -263,11 +346,11 @@ OrganizationalSnaResult discover_organizational_sna(
                                                 std::vector<double>(activities.size()));
       for (const auto& trace : log.traces)
         for (const auto& event : trace.events) {
-          const auto resource = selected_value(event, options.resource_attribute, true);
-          const auto activity = selected_value(event, options.activity_attribute, false);
-          if (resource.empty() || activity.empty()) continue;
-          const auto ri = ids.find(resource);
-          const auto ai = activity_ids.find(activity);
+          const auto resource = select(trace, event, options.resource_attribute, true);
+          const auto activity = select(trace, event, options.activity_attribute, false);
+          if (!resource || !activity) continue;
+          const auto ri = ids.find(*resource);
+          const auto ai = activity_ids.find(*activity);
           if (ri != ids.end() && ai != activity_ids.end()) vectors[ri->second][ai->second] += 1.0;
         }
       // pearsonr rejects vectors shorter than two activities.

@@ -1,0 +1,205 @@
+#include "minera/frame_keys.hpp"
+
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/dataframe_columns.hpp"
+#include "minera/timestamp.hpp"
+
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <stdexcept>
+#include <variant>
+
+namespace minera {
+namespace {
+
+constexpr std::string_view kCasePrefix = "case:";
+
+// str() of a UTC date as the frame holds it ("2020-01-01 10:00:00+00:00",
+// microseconds or nanoseconds when there is a fraction).
+std::string python_date_text(const std::string& text) {
+  const auto exact = parse_timestamp_exact(text);
+  if (!exact) return text;
+  std::int64_t days = exact->seconds / 86400;
+  std::int64_t rest = exact->seconds % 86400;
+  if (rest < 0) {
+    rest += 86400;
+    --days;
+  }
+  // Civil date from days since 1970-01-01 (H. Hinnant's algorithm).
+  const std::int64_t z = days + 719468;
+  const std::int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+  const std::int64_t doe = z - era * 146097;
+  const std::int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const std::int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const std::int64_t mp = (5 * doy + 2) / 153;
+  const std::int64_t day = doy - (153 * mp + 2) / 5 + 1;
+  const std::int64_t month = mp < 10 ? mp + 3 : mp - 9;
+  const std::int64_t year = yoe + era * 400 + (month <= 2 ? 1 : 0);
+  char buffer[64];
+  std::snprintf(buffer, sizeof(buffer), "%04lld-%02lld-%02lld %02lld:%02lld:%02lld",
+                static_cast<long long>(year), static_cast<long long>(month),
+                static_cast<long long>(day), static_cast<long long>(rest / 3600),
+                static_cast<long long>(rest / 60 % 60), static_cast<long long>(rest % 60));
+  std::string value(buffer);
+  if (exact->nanoseconds != 0) {
+    char fraction[16];
+    if (exact->nanoseconds % 1000 == 0)
+      std::snprintf(fraction, sizeof(fraction), ".%06u", exact->nanoseconds / 1000);
+    else
+      std::snprintf(fraction, sizeof(fraction), ".%09u", exact->nanoseconds);
+    value += fraction;
+  }
+  return value + "+00:00";
+}
+
+FrameValue attribute_value(const EventAttribute& attribute) {
+  FrameValue value;
+  if (attribute.is_null || attribute.kind == AttributeKind::kNA) return value;
+  if (const auto* integer = std::get_if<std::int64_t>(&attribute.typed_value)) {
+    value.text = std::to_string(*integer);
+    value.value_class = FrameValueClass::kNumber;
+    return value;
+  }
+  if (const auto* natural = std::get_if<std::uint64_t>(&attribute.typed_value)) {
+    value.text = std::to_string(*natural);
+    value.value_class = FrameValueClass::kNumber;
+    return value;
+  }
+  if (const auto* real = std::get_if<double>(&attribute.typed_value)) {
+    if (std::isnan(*real)) return value;
+    value.text = reference_csv_float_text(*real);
+    value.value_class = FrameValueClass::kNumber;
+    return value;
+  }
+  if (const auto* flag = std::get_if<bool>(&attribute.typed_value)) {
+    value.text = *flag ? "True" : "False";
+    value.value_class = FrameValueClass::kNumber;
+    return value;
+  }
+  switch (attribute.kind) {
+    case AttributeKind::kInt:
+    case AttributeKind::kFloat:
+      if (attribute.value == "nan" || attribute.value == "NaN") return value;
+      value.text = attribute.value;
+      value.value_class = FrameValueClass::kNumber;
+      return value;
+    case AttributeKind::kBoolean:
+      value.text = attribute.value;
+      value.value_class = FrameValueClass::kNumber;
+      return value;
+    case AttributeKind::kDate:
+      if (attribute.value == "NaT") return value;
+      value.text = python_date_text(attribute.value);
+      value.value_class = FrameValueClass::kDate;
+      return value;
+    default:
+      value.text = attribute.value;
+      value.value_class = FrameValueClass::kText;
+      return value;
+  }
+}
+
+const EventAttribute* last_attribute(const std::vector<EventAttribute>& attributes,
+                                     const std::string& key) {
+  const EventAttribute* found = nullptr;
+  for (const auto& attribute : attributes)
+    if (attribute.key == key) found = &attribute;
+  return found;
+}
+
+FrameValue text_value(const std::string& text) {
+  return FrameValue{text, FrameValueClass::kText};
+}
+
+}  // namespace
+
+std::set<std::string> frame_keys(const EventLog& frame, FrameKeyScope scope) {
+  std::set<std::string> keys;
+  if (!frame.dataframe_columns) return keys;
+  const auto& columns = *frame.dataframe_columns;
+  for (const auto& column : columns.columns) keys.insert(column.key);
+  keys.insert("concept:name");
+  bool timestamps = false;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      if (!event.activity_source_key.empty()) keys.insert(event.activity_source_key);
+      if (event.has_timestamp()) timestamps = true;
+    }
+  if (columns.csv_text) {
+    keys.insert("@@index");
+    keys.insert("@@case_index");
+  } else if (timestamps) {
+    keys.insert("time:timestamp");
+  }
+  if (scope == FrameKeyScope::kDataFrame) {
+    keys.insert("case:concept:name");
+    for (const auto& column : columns.trace_columns)
+      keys.insert(std::string(kCasePrefix) + column.key);
+  }
+  return keys;
+}
+
+void require_frame_key(const std::set<std::string>& keys, const std::string& key) {
+  if (!keys.contains(key)) throw std::invalid_argument("KeyError: '" + key + "'");
+}
+
+FrameValue frame_value(const Trace& trace, const Event& event, const std::string& key,
+                       FrameKeyScope scope) {
+  // format_dataframe's concept:name is the activity as text; the activity
+  // column under its own header holds the same values.
+  if (key == "concept:name" ||
+      (!event.activity_source_key.empty() && key == event.activity_source_key))
+    return event.has_activity() ? text_value(event.activity) : FrameValue{};
+  if (const auto* attribute = last_attribute(event.attributes, key))
+    return attribute_value(*attribute);
+  if (key == "time:timestamp" && event.has_timestamp())
+    return FrameValue{event.timestamp, FrameValueClass::kDate};
+  if (scope == FrameKeyScope::kDataFrame && key.starts_with(kCasePrefix)) {
+    if (key == "case:concept:name")
+      return trace.has_case_id() ? text_value(trace.case_id) : FrameValue{};
+    if (const auto* attribute = last_attribute(trace.attributes, key.substr(kCasePrefix.size())))
+      return attribute_value(*attribute);
+  }
+  return {};
+}
+
+double frame_number(const FrameValue& value) {
+  if (value.text == "True") return 1.0;
+  if (value.text == "False") return 0.0;
+  return std::strtod(value.text.c_str(), nullptr);
+}
+
+std::string FrameNames::name(const FrameValue& value) {
+  if (value.value_class != FrameValueClass::kNumber) return value.text;
+  const auto number = frame_number(value);
+  const auto [it, inserted] = numbers_.try_emplace(number, value.text);
+  if (inserted) number_of_.emplace(value.text, number);
+  return it->second;
+}
+
+bool FrameNames::less(const std::string& left, const std::string& right) const {
+  const auto l = number_of_.find(left);
+  const auto r = number_of_.find(right);
+  if (l != number_of_.end() && r != number_of_.end()) return l->second < r->second;
+  return left < right;
+}
+
+void require_sortable_classes(const std::set<FrameValueClass>& classes) {
+  const auto python_type = [](FrameValueClass value_class) {
+    switch (value_class) {
+      case FrameValueClass::kText: return "str";
+      case FrameValueClass::kDate: return "Timestamp";
+      default: return "float";
+    }
+  };
+  std::set<std::string> types;
+  for (const auto value_class : classes) types.insert(python_type(value_class));
+  if (types.size() < 2) return;
+  const auto first = *types.begin();
+  const auto second = *std::next(types.begin());
+  throw std::invalid_argument(std::string("TypeError: '<' not supported between instances of '") +
+                              first + "' and '" + second + "'");
+}
+
+}  // namespace minera

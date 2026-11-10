@@ -69,6 +69,16 @@ export const ORGANIZATIONAL_CONTROLS: Record<OrganizationalFamily, readonly Orga
 };
 export interface OrganizationalWorkbenchForm { fields: Record<string, string>; roles_source_id?: string; }
 export const defaultOrganizationalWorkbenchForm = (): OrganizationalWorkbenchForm => ({fields: {}});
+/** A roles form whose resource field starts at the session's resource key when it is not the native default
+ * org:resource (a CSV resource column under another header: pm4py's frame then has no org:resource). */
+export function withSessionResourceKey(form: OrganizationalWorkbenchForm, resourceKey: string | undefined, previousKey?: string): OrganizationalWorkbenchForm {
+  const current = form.fields.roles_resource_attribute;
+  if (current !== undefined && current !== "" && current !== previousKey) return form;
+  const next = {...form.fields};
+  if (resourceKey === undefined || resourceKey === "org:resource") delete next.roles_resource_attribute;
+  else next.roles_resource_attribute = resourceKey;
+  return {...form, fields: next};
+}
 export interface OrganizationalSource { source_id: string; dataset: string; case_count: number; event_count: number; }
 type NativeOrganizationalResult = RoleDiscoveryResult | ResourceProfilesResult | LocalDiagnosticsResult | NetworkAnalysisResult;
 export type OrganizationalWorkbenchResult = NativeOrganizationalResult & {input_context: OrganizationalSource};

@@ -5,9 +5,10 @@ import { diagnosticCsv } from "../model-diagnostics";
 import { nativeJson } from "../native-json";
 import { nativeResponseRequest } from "../native-response";
 import { DiagnosticTableView } from "./ModelDiagnosticsInspection";
+import { sessionResourceKey } from "../social-network-options";
 import {
   ORGANIZATIONAL_CONTROLS, ORGANIZATIONAL_FAMILIES, ORGANIZATIONAL_TITLES, OrganizationalRequestGate, OrganizationalSourceChangedError,
-  canHandoffOrganizationalRoles, defaultOrganizationalWorkbenchForm, organizationalAllTablesCsv,
+  canHandoffOrganizationalRoles, defaultOrganizationalWorkbenchForm, organizationalAllTablesCsv, withSessionResourceKey,
   organizationalResultSummary, organizationalRoleGroups, organizationalSourceFromSchema,
   organizationalWorkbenchReport, runOrganizationalWorkbench, sameOrganizationalSource,
   type OrganizationalControl, type OrganizationalFamily, type OrganizationalSource,
@@ -18,7 +19,15 @@ const familyMap = <T,>(create: () => T): Record<OrganizationalFamily, T> => ({ro
 interface ScopedRun {epoch: number; run: OrganizationalWorkbenchRun;}
 interface ScopedSource {epoch: number; value: OrganizationalSource;}
 export function OrganizationalWorkspace({data, available, mining}: {data: MineraExport; available: boolean; mining: boolean}) {
-  const [forms, setForms] = useState(() => familyMap(defaultOrganizationalWorkbenchForm));
+  const resourceKey = sessionResourceKey(data);
+  const [forms, setForms] = useState(() => ({...familyMap(defaultOrganizationalWorkbenchForm), roles: withSessionResourceKey(defaultOrganizationalWorkbenchForm(), resourceKey)}));
+  // A new session's resource key replaces the previous one unless it was edited.
+  const sessionKey = useRef(resourceKey);
+  useEffect(() => {
+    if (sessionKey.current === resourceKey) return;
+    const previous = sessionKey.current; sessionKey.current = resourceKey;
+    setForms(current => ({...current, roles: withSessionResourceKey(current.roles, resourceKey, previous)}));
+  }, [resourceKey]);
   const [runs, setRuns] = useState(() => familyMap<ScopedRun | null>(() => null));
   const [pending, setPending] = useState(() => familyMap(() => false));
   const [errors, setErrors] = useState(() => familyMap<string | null>(() => null));
