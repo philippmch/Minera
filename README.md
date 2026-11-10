@@ -28,6 +28,22 @@ process tree with an operator a variant does not cover), still run the earlier
 native implementations. The [handoff log](docs/PARITY_HANDOFF.md) has
 the per-package history.
 
+## The reference release
+
+The reference release is PM4Py 2.7.22, an open-source process-mining library
+for Python that Process Intelligence Solutions publishes under the GNU Affero
+General Public License 3.0. Minera is an independent project. It is not
+affiliated with, sponsored by or endorsed by Process Intelligence Solutions,
+Fraunhofer FIT or the PM4Py developers. The names of the reference, its
+modules and its functions appear in this repository only to say which
+behaviour Minera is compared against.
+
+PM4Py is not bundled with Minera and is not needed to build or run it. Only
+the parity tooling uses it: the capture scripts in `scripts/` expect a copy
+you install yourself, and the CI parity job checks out the pinned commit from
+the reference's public repository. A copy you install stays under its own
+licence.
+
 ## Build
 
 You need CMake 3.20 or newer, a C++20 compiler (GCC 12+, Clang 15+ or MSVC
@@ -157,4 +173,5 @@ node scripts/verify-reference-parity.mjs /path/to/reference-2.7.22 --require-com
 
 ## License
 
-See [LICENSE](LICENSE).
+See [LICENSE](LICENSE). Vendored third-party code and data keep their own
+licences; [NOTICE](NOTICE) lists them.

@@ -1,0 +1,55 @@
+Minera
+Copyright (C) 2026 The Minera authors
+
+Minera is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. Minera is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See LICENSE for the full licence text.
+
+
+Material from PM4Py
+-------------------
+
+Minera's behaviour is tested against PM4Py 2.7.22
+(https://github.com/process-intelligence-solutions/pm4py), which inspired this
+project. PM4Py is Copyright (C) Process Intelligence Solutions UG
+(haftungsbeschränkt) and is licensed under the GNU Affero General Public
+License, version 3 or later.
+
+So that Minera's output matches the reference, some of its files reproduce
+text from PM4Py:
+
+- language-model prompt and description templates in
+  src/backend/original_model_context.cpp, src/backend/llm_abstractions.cpp,
+  src/backend/llm_context.cpp, src/backend/llm_injection.cpp and
+  src/backend/case_description.cpp;
+- SAP and Camunda extraction queries in
+  src/backend/database_history_queries.hpp;
+- error and warning messages in the importers, filters and reference-
+  compatible implementations;
+- captured reference outputs, including documentation strings, in the test
+  fixtures under src/ and in the evidence files under docs/.
+
+PM4Py itself is not included in this repository and is not needed to build or
+run Minera. Minera is an independent project and is not affiliated with or
+endorsed by the PM4Py developers.
+
+
+Third-party code and data
+-------------------------
+
+cpp-httplib 0.18.3 (third_party/httplib.h)
+  Copyright (c) 2017 yhirose
+  MIT License, see third_party/httplib.LICENSE.
+  Locally modified; the file header lists every "MINERA PATCH" change.
+
+Howard Hinnant's date/tz library 3.0.1 (third_party/date)
+  MIT License, see third_party/date/LICENSE.txt and
+  third_party/date/README.minera.
+
+Windows event log sample (src/frontend/tests/fixtures/windows-source-evtx.json)
+  Test fixture holding events decoded from the Application.evtx sample of the
+  evtx project (https://github.com/omerbenamram/evtx), which is dual-licensed
+  under the MIT License and the Apache License 2.0.
