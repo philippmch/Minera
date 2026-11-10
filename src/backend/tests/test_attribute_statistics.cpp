@@ -354,6 +354,59 @@ int main() {
     o.keep_once_per_case = false;
   }
 
+  // Review AU1: a CSV upload reads the format_dataframe frame (pm4py 2.7.22
+  // on read_csv + format_dataframe(case_id="cid", activity_key="act",
+  // timestamp_key="ts")): an int column with a blank is float64 ({1.0: 1,
+  // 2.0: 1}), a date-text column is UTC dates ({10:00 UTC: 2, 09:30 UTC: 1}),
+  // a missing key is a KeyError, the trace scope reads a column of that name
+  // before case:<key>, and once per case cannot group case:concept:name.
+  {
+    using Entry = std::tuple<std::string, std::string, std::uint64_t>;
+    const auto entries = [](const minera::AttributeStatisticsResult& r) {
+      std::vector<Entry> out;
+      for (const auto& e : r.entries) out.emplace_back(e.value, e.type, e.count);
+      return out;
+    };
+    std::istringstream input(
+        "cid,act,ts,when,n\n"
+        "c1,a,2020-01-01 10:00:00,2020-01-01 12:00:00+02:00,1\n"
+        "c1,b,2020-01-01 11:00:00,2020-01-01T09:30:00Z,\n"
+        "c2,a,2020-01-02 10:00:00,2020-01-01 12:00:00+02:00,2\n");
+    minera::CsvImportOptions import;
+    import.case_id_column = "cid";
+    import.activity_column = "act";
+    import.timestamp_column = "ts";
+    const auto frame = minera::import_csv_event_log(input, import);
+    assert(frame.dataframe_columns);
+    minera::AttributeStatisticsOptions o;
+    o.attribute_key = "n";
+    assert((entries(minera::discover_attribute_statistics(frame, o)) ==
+            std::vector<Entry>{{"1.0", "float", 1}, {"2.0", "float", 1}}));
+    o.attribute_key = "when";
+    const auto dates = entries(minera::discover_attribute_statistics(frame, o));
+    assert(dates.size() == 2 && std::get<1>(dates[0]) == "date" && std::get<2>(dates[0]) == 2 &&
+           std::get<0>(dates[0]).starts_with("2020-01-01 10:00:00") && std::get<2>(dates[1]) == 1 &&
+           std::get<0>(dates[1]).starts_with("2020-01-01 09:30:00"));
+    const auto error_of = [&](const minera::AttributeStatisticsOptions& options) {
+      try { (void)minera::discover_attribute_statistics(frame, options); }
+      catch (const std::invalid_argument& error) { return std::string(error.what()); }
+      return std::string();
+    };
+    o.attribute_key = "zz";
+    assert(error_of(o) == "attribute statistics: KeyError: 'zz'");
+    o.attribute_key = "case:concept:name";
+    o.keep_once_per_case = true;
+    assert(error_of(o) == "attribute statistics: ValueError: cannot insert case:concept:name, already exists");
+    o.keep_once_per_case = false;
+    o.scope = minera::AttributeStatisticsScope::kTraces;
+    o.attribute_key = "cid";
+    assert((entries(minera::discover_attribute_statistics(frame, o)) ==
+            std::vector<Entry>{{"c1", "str", 2}, {"c2", "str", 1}}));
+    o.attribute_key = "concept:name";
+    assert((entries(minera::discover_attribute_statistics(frame, o)) ==
+            std::vector<Entry>{{"a", "str", 2}, {"b", "str", 1}}));
+  }
+
   bool rejected = false;
   try {
     (void)minera::discover_attribute_statistics(log, {});

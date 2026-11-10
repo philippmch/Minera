@@ -1,6 +1,7 @@
 #include "minera/local_diagnostics.hpp"
 #include "minera/request_params.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 #include <cassert>
 #include <map>
@@ -66,8 +67,24 @@ static void frame_path_reads_pm4py_frame() {
   assert(error_of(log, groups).find("KeyError: 'org:group'") != std::string::npos);
 }
 
+// Review AU1: the (resource, activity) groupby sorts its keys before the
+// group column is read, so unorderable resources fail first (pm4py 2.7.22
+// on read_xes: TypeError: '<' not supported between instances of 'float'
+// and 'datetime.datetime'; the date's type name is declared).
+static void review_au_error_order() {
+  std::istringstream xes(
+      R"XES(<?xml version="1.0" encoding="UTF-8"?><log xes.version="1.0"><trace><string key="concept:name" value="c0"/><event><string key="concept:name" value="a"/><date key="time:timestamp" value="2020-01-01T00:00:00+00:00"/><date key="who" value="2020-01-01T00:00:00+00:00"/></event><event><string key="concept:name" value="b"/><date key="time:timestamp" value="2020-01-01T01:00:00+00:00"/><float key="who" value="1.5"/></event></trace><trace><string key="concept:name" value="c1"/><event><string key="concept:name" value="a"/><date key="time:timestamp" value="2020-01-02T00:00:00+00:00"/><int key="who" value="2"/></event></trace></log>)XES");
+  const auto log = import_xes_dataframe_log(xes);
+  LocalDiagnosticsOptions options;
+  options.resource_attribute = "who";
+  assert(error_of(log, options).find("TypeError: '<' not supported between instances of 'float' and '") != std::string::npos);
+  options.resource_attribute = "org:resource";
+  assert(error_of(log, options).find("KeyError: 'org:resource'") != std::string::npos);
+}
+
 int main() {
   frame_path_reads_pm4py_frame();
+  review_au_error_order();
   EventLog log;
   Trace t; t.case_id = "c";
   t.events.push_back(Event{"c", "A", "", "r1", 0, {{"org:group", "g1", AttributeKind::kString}}, {}});

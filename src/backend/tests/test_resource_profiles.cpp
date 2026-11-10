@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/xes_event_log_importer.hpp"
 
 using namespace minera;
 
@@ -249,9 +250,111 @@ static void frame_path_reads_pm4py_frame() {
   assert(values(profile(M::kCaseCompletions, "who", {{"case", "num"}})).at("1") == 2.0);
 }
 
+// Review AU1: pm4py 2.7.22 on read_csv + format_dataframe(case_id="cid",
+// activity_key="act", timestamp_key="ts") of small CSVs, and read_xes.
+static EventLog au_csv(const std::string& text) {
+  std::istringstream csv(text);
+  CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  import.resource_column = "who";
+  auto log = import_csv_event_log(csv, import);
+  assert(log.dataframe_columns);
+  return log;
+}
+
+static void review_au_frame_paths() {
+  using M = ResourceProfileMetric;
+  const auto run = [](const EventLog& log, M metric, const std::string& resource,
+                      std::map<std::string, std::string> extra = {}) {
+    ResourceProfilesOptions o;
+    o.metric = metric;
+    o.resource_attribute = extra.contains("resource_key") ? extra["resource_key"] : "who";
+    o.t1 = "2019-01-01 00:00:00";
+    o.t2 = "2021-01-01 00:00:00";
+    o.resource = resource;
+    o.resource_given = true;
+    if (extra.contains("resource2")) { o.resource2 = extra["resource2"]; o.resource2_given = true; }
+    if (extra.contains("activity")) { o.activity = extra["activity"]; o.activity_given = true; }
+    if (extra.contains("case")) o.case_id_attribute = extra["case"];
+    if (extra.contains("timestamp")) o.timestamp_attribute = extra["timestamp"];
+    if (extra.contains("start")) o.start_timestamp_attribute = extra["start"];
+    if (extra.contains("activity_key")) o.activity_attribute = extra["activity_key"];
+    return discover_resource_profiles(log, o);
+  };
+  const std::string no_dt = "AttributeError: Can only use .dt accessor with datetimelike values";
+  // Every case one event: "n" int64, "f" float64 with NaN, "s" text with
+  // NaN, "b" bools with NaN (an object column).
+  const auto single = au_csv("cid,act,ts,who,n,f,s,b\n"
+                             "c1,a,2020-01-01 10:00:00,R,1,,x,True\n"
+                             "c2,a,2020-01-02 10:00:00,R,2,,,\n"
+                             "c3,b,2020-01-03 10:00:00,S,3,1.5,y,False\n");
+  const auto ada = [&](const std::string& resource, const std::string& activity,
+                       std::map<std::string, std::string> extra = {}) {
+    extra["activity"] = activity;
+    return [&single, resource, extra, &run] { (void)run(single, M::kAverageDurationActivity, resource, extra); };
+  };
+  // Without a start column (the previous event of the case, an object
+  // column of dates when no case has two events) one selected row works,
+  // none or two have no .dt accessor.
+  assert(only_value(run(single, M::kAverageDurationActivity, "S", {{"activity", "b"}})) == 0.0);
+  assert(raises_text(ada("R", "a"), no_dt));
+  assert(raises_text(ada("Q", "a"), no_dt));
+  // The start column's dtype decides pandas' subtraction.
+  assert(raises_text(ada("R", "a", {{"start", "n"}}),
+                     "TypeError: Addition/subtraction of integers and integer-arrays with DatetimeArray is no "
+                     "longer supported.  Instead of adding/subtracting `n`, use `n * obj.freq`"));
+  assert(raises_text(ada("R", "a", {{"start", "f"}}), "TypeError: unsupported operand type(s) for -: 'Timestamp' and 'float'"));
+  assert(raises_text(ada("Q", "a", {{"start", "f"}}), no_dt));
+  assert(raises_text(ada("R", "a", {{"start", "s"}}), "TypeError: unsupported operand type(s) for -: 'DatetimeArray' and 'str'"));
+  assert(raises_text(ada("S", "b", {{"start", "b"}}), "TypeError: unsupported operand type(s) for -: 'DatetimeArray' and 'bool'"));
+  assert(raises_text(ada("R", "a", {{"start", "b"}}), "TypeError: unsupported operand type(s) for -: 'Timestamp' and 'bool'"));
+  // The compared rows are the resource's rows of the activity.
+  assert(raises_text(ada("R", "zz", {{"timestamp", "@@index"}}), no_dt));
+  assert(raises_text([&] { (void)run(single, M::kActivityFrequency, "R", {{"activity", "zz"}, {"timestamp", "@@index"}}); },
+                     "TypeError: '>=' not supported between instances of 'int' and 'datetime.datetime'"));
+  // A float64 timestamp column compares its NaN cells too.
+  assert(raises_text([&] { (void)run(single, M::kActivityCompletions, "R", {{"timestamp", "f"}}); },
+                     "TypeError: '>=' not supported between instances of 'float' and 'datetime.datetime'"));
+  assert(only_value(run(single, M::kActivityCompletions, "Q", {{"timestamp", "f"}})) == 0.0);
+  // interaction_two_resources filters the cases (case:concept:name) with
+  // both resources, then counts the groups of the case column.
+  const auto pairs = au_csv("cid,act,ts,who,grp\n"
+                            "c1,a,2020-01-01 10:00:00,R,g1\n"
+                            "c1,b,2020-01-01 11:00:00,S,g2\n"
+                            "c2,a,2020-01-02 10:00:00,R,g1\n"
+                            "c2,b,2020-01-02 11:00:00,T,g1\n"
+                            "c3,a,2020-01-03 10:00:00,S,g2\n");
+  const auto interaction = [&](std::map<std::string, std::string> extra) {
+    if (!extra.contains("resource2")) extra["resource2"] = "S";
+    return run(pairs, M::kInteractionTwoResources, "R", extra);
+  };
+  assert(only_value(interaction({{"case", "grp"}, {"activity_key", "case:concept:name"}})) == 2.0);
+  assert(only_value(interaction({{"case", "grp"}, {"activity_key", "case:concept:name"}, {"resource2", "T"}})) == 1.0);
+  assert(raises_text([&] { (void)interaction({{"case", "grp"}}); },
+                     "KeyError: \"None of ['case:concept:name'] are in the columns\""));
+  assert(raises_text([&] { (void)interaction({{"case", "who"}}); }, "ValueError: cannot reindex on an axis with duplicate labels"));
+  assert(raises_text([&] { (void)interaction({{"case", "grp"}, {"activity_key", "case:concept:name"}, {"timestamp", "grp"}}); },
+                     "ValueError: Grouper for 'grp' not 1-dimensional"));
+  // Workload and average_duration_activity without a start column sort the
+  // frame by the case and timestamp columns: a Timestamp beside a number
+  // cannot be an ordered Categorical.
+  std::istringstream xes(
+      R"XES(<?xml version="1.0" encoding="UTF-8"?><log xes.version="1.0"><trace><string key="concept:name" value="c0"/><event><string key="concept:name" value="a"/><date key="time:timestamp" value="2020-01-01T00:00:00+00:00"/><string key="org:resource" value="R"/><date key="x" value="2020-01-01T00:00:00+00:00"/></event><event><string key="concept:name" value="b"/><date key="time:timestamp" value="2020-01-01T01:00:00+00:00"/><string key="org:resource" value="R"/><float key="x" value="1.5"/></event></trace><trace><string key="concept:name" value="c1"/><event><string key="concept:name" value="a"/><date key="time:timestamp" value="2020-01-02T00:00:00+00:00"/><string key="org:resource" value="S"/><string key="x" value="z"/></event></trace></log>)XES");
+  const auto mixed = import_xes_dataframe_log(xes);
+  const std::string unordered =
+      "TypeError: 'values' is not ordered, please explicitly specify the categories order by passing in a "
+      "categories argument.";
+  assert(raises_text([&] { (void)run(mixed, M::kAverageWorkload, "R", {{"resource_key", "org:resource"}, {"timestamp", "x"}}); }, unordered));
+  assert(raises_text([&] { (void)run(mixed, M::kAverageWorkload, "R", {{"resource_key", "org:resource"}, {"case", "x"}}); }, unordered));
+  assert(raises_text([&] { (void)run(mixed, M::kAverageDurationActivity, "R", {{"resource_key", "org:resource"}, {"timestamp", "x"}, {"activity", "a"}}); }, unordered));
+}
+
 int main() {
   reference_audit_contracts();
   frame_path_reads_pm4py_frame();
+  review_au_frame_paths();
   const auto log = sample();
   auto distinct = discover_resource_profiles(log, {});
   assert(distinct.rows.size() == 2);

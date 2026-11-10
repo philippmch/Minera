@@ -4206,7 +4206,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AS (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AU (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4307,8 +4307,48 @@ session's resource key. Reference sweeps of network analysis must run with
 `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"` (numpy's
 SIMD argsort breaks numeric ties in another order). Details and the
 declarations: `docs/reference-2.7.22-parity.md`, Review AT1.
+Round AU re-reviewed AT (fixed: a column selected twice in resource
+profiles fails before the timestamp comparison; local diagnostics sort the
+(resource, activity) keys before reading the group; network analysis
+subtracts text and object timestamp columns cell by cell where both cells
+are present) and took the AT1-4 date columns through the CSV routes that
+read typed frame columns: `/api/attribute-statistics` on CSV and XES
+uploads now counts the frame's typed cells (UTC dates, float64 ints with a
+gap, `KeyError` for a missing key). The resource-profile frame branch now
+models `average_duration_activity`'s subtraction by the start column's
+dtype and the object start of single-event cases, `interaction_two_resources`
+(cases filtered on `case:concept:name`, groups of the case column, each
+group's last timestamp), the derived-start metrics' sort by case and
+timestamp (an ordered Categorical: unorderable values raise), float64
+timestamp columns comparing NaN, and CSV `@@index` network nodes take the
+analysis's own sorted numbering. Details: Review AU1.
 
-Next round (AU) should start by re-reviewing round AT:
+Next round (AV) should start by re-reviewing round AU:
+
+- `src/backend/attribute_statistics.cpp`, the frame branch of
+  `discover_attribute_statistics` (`scalar_key`, `frame_row_cell` with the
+  per-row case cells, the trace-scope key resolution, the once-per-case
+  `groupby` and its `ValueError`/`TypeError`), and the CLI and LLM callers
+  that now take it for logs with `dataframe_columns`;
+- `src/backend/resource_profiles.cpp`: `require_duration_column` (the
+  selection, the start dtype table, the single-event-case rule),
+  `frame_interaction_count`, the `compared_rows` sort by case and
+  timestamp codes, the float64 NaN rule in `offending_type`, the
+  `cannot subtract DatetimeArray from ndarray[...]` branch;
+- `src/backend/network_analysis.cpp`: `require_timestamp_column` (pairs in
+  source order), the CSV bool-with-blank object dtype in `frame_dtype`
+  (also seen by `require_mergeable`), the own `@@index` cells;
+- AT1-4 date columns in the remaining CSV routes not swept in AU (features,
+  root cause, temporal features, filters on the frame, LLM context), with
+  offsets, `T`, partial and time-only shapes.
+
+Then continue in a new area. Harness: `review-harness/round-au/`
+(`statsweep.py [--xes]`, `socmatrix.py <xes|csv> <metric> [cols]`,
+`socref.py`/`socmodel.py` for the interaction model, `adaprobe.py` and
+`adaprobe2.py` for the duration probes; `atsweep2.py` and `atref.py` from
+`review-harness/round-at/` plus `orgxes.py` from `round-as/`).
+
+Round AT's targets, re-reviewed in AU (findings AU1-2 to AU1-10, fixed):
 
 - `src/backend/resource_profiles.cpp`, `frame_resource_profiles` and
   `frame_average_case_duration` (the per-metric `frame_selection`, the
@@ -4331,9 +4371,10 @@ Next round (AU) should start by re-reviewing round AT:
   handoff (explicit groups raise `KeyError: 'org:group'` on uploads without
   that column, as pm4py does; flagged to Philipp).
 
-Then continue in a new area. Harness: `review-harness/round-at/` (`atref.py`,
-`atsweep.py --only profiles,diagnostics,network [--xes]`; it reuses
-`orgxes.py` from `review-harness/round-as/`).
+AU then took attribute statistics onto the frame (AU1-1). Harness of AT:
+`review-harness/round-at/` (`atref.py`, `atsweep.py --only
+profiles,diagnostics,network [--xes]`; it reuses `orgxes.py` from
+`review-harness/round-as/`).
 
 Round AS's targets, re-reviewed in AT (findings AT1-1 to AT1-3, fixed):
 

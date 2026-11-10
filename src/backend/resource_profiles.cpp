@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iomanip>
 #include <map>
+#include <numeric>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -462,6 +463,27 @@ std::optional<std::string> non_date_type(const EventLog& frame, const std::strin
   return std::string("float");
 }
 
+// The dtype of a frame column (nullopt for no such column): the CSV and XES
+// columns as typed, the case and activity copies text, the CSV activity
+// column under its own header as read_csv typed it, @@index ints, an XES
+// time:timestamp dates.
+std::optional<DataFrameColumnType> frame_column_type(const EventLog& frame, const std::string& key) {
+  const auto& columns = *frame.dataframe_columns;
+  for (const auto& column : columns.columns)
+    if (column.key == key) return column.type;
+  if (key.starts_with("case:") && key != "case:concept:name")
+    for (const auto& column : columns.trace_columns)
+      if ("case:" + column.key == key) return column.type;
+  if (key == "concept:name" || key == "case:concept:name") return DataFrameColumnType::kString;
+  if (key == "@@index" || key == "@@case_index") return DataFrameColumnType::kInt64;
+  if (key == "time:timestamp") return DataFrameColumnType::kDate;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events)
+      if (event.activity_source_key == key)
+        return columns.csv_text ? columns.activity_type : DataFrameColumnType::kString;
+  return std::nullopt;
+}
+
 std::string utc_text(const python::Scalar& date) {
   return format_timestamp_microseconds(static_cast<double>(date.date.seconds) +
                                        static_cast<double>(date.date.nanoseconds) / 1e9);
@@ -570,6 +592,189 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
   return result;
 }
 
+// average_duration_activity's durations, observed black-box: the selected
+// rows (a case, the resource, the activity, the timestamp in the window)
+// subtract their start column from the timestamp column, and pandas'
+// datetime subtraction rules follow the start column's dtype. An int column
+// always fails; a float or bool column fails once a row is selected; a text
+// column subtracts its present cells (one alone fails as the whole array, more
+// fail cell by cell); an object column fails as the whole array for one row,
+// else cell by cell at the first cell that is no date. Without a start
+// column the start of a row is the previous timestamp of its case, an object
+// column of dates when no case has two rows. A subtraction that leaves no
+// datetime result (no row, or object cells) then has no .dt accessor.
+void require_duration_column(const EventLog& frame, const ResourceProfilesOptions& o, const Bounds& b,
+                             const std::string& r, const std::string& a, const std::string& c,
+                             const std::string& t, const std::string& s, bool uses_start) {
+  const auto fail = [](const std::string& message) {
+    throw std::invalid_argument("resource profiles: " + message);
+  };
+  const auto no_accessor = [&] { fail("AttributeError: Can only use .dt accessor with datetimelike values"); };
+  const auto date_column = [&](const std::string& key) {
+    bool any = false;
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events)
+        if (const auto cell = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame)) {
+          if (cell->kind != python::Scalar::Kind::kDate) return false;
+          any = true;
+        }
+    return any;
+  };
+  const auto wanted = [&](const std::string& value, bool given, bool dates) -> std::optional<std::string> {
+    if (value.empty() && !given) return std::nullopt;
+    if (dates)
+      if (const auto parsed = parse_timestamp_exact(value)) {
+        python::Scalar date;
+        date.kind = python::Scalar::Kind::kDate;
+        date.date = *parsed;
+        date.date.timezone_aware = true;
+        date.date.offset_minutes = 0;
+        return python::identity(date);
+      }
+    return python::identity(python::text(value));
+  };
+  const auto resource = wanted(o.resource, o.resource_given, date_column(r));
+  const auto activity = wanted(o.activity, o.activity_given, date_column(a));
+  std::vector<std::optional<python::Scalar>> starts;
+  std::map<std::string, std::size_t> case_rows;
+  bool repeated_case = false;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      const auto case_cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame);
+      if (!case_cell) continue;
+      repeated_case = ++case_rows[python::identity(*case_cell)] > 1 || repeated_case;
+      const auto resource_cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
+      if (!resource_cell || (resource && python::identity(*resource_cell) != *resource)) continue;
+      const auto activity_cell = frame_scalar(frame, trace, event, a, FrameKeyScope::kDataFrame);
+      if (!activity_cell || (activity && python::identity(*activity_cell) != *activity)) continue;
+      const auto time = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+      if (!time || time->kind != python::Scalar::Kind::kDate) continue;
+      if (!in_slot(static_cast<double>(time->date.seconds) + static_cast<double>(time->date.nanoseconds) / 1e9, b))
+        continue;
+      starts.push_back(uses_start ? frame_scalar(frame, trace, event, s, FrameKeyScope::kDataFrame)
+                                  : std::optional<python::Scalar>{});
+    }
+  if (!uses_start) {
+    if (!repeated_case && starts.size() != 1) no_accessor();
+    return;
+  }
+  auto dtype = frame_column_type(frame, s);
+  if (!dtype || *dtype == DataFrameColumnType::kDate) return;
+  // read_csv keeps a bool column with a missing cell as objects.
+  if (*dtype == DataFrameColumnType::kBool)
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events)
+        if (!frame_scalar(frame, trace, event, s, FrameKeyScope::kDataFrame)) dtype = DataFrameColumnType::kObject;
+  const std::string integers =
+      "TypeError: Addition/subtraction of integers and integer-arrays with ";
+  const std::string integers_tail =
+      " is no longer supported.  Instead of adding/subtracting `n`, use `n * obj.freq`";
+  const auto unsupported = [&](const std::string& left, const std::string& right) {
+    fail("TypeError: unsupported operand type(s) for -: '" + left + "' and '" + right + "'");
+  };
+  if (*dtype == DataFrameColumnType::kInt64) fail(integers + "DatetimeArray" + integers_tail);
+  if (*dtype == DataFrameColumnType::kFloat64 || *dtype == DataFrameColumnType::kBool) {
+    if (!starts.empty()) unsupported("Timestamp", *dtype == DataFrameColumnType::kBool ? "bool" : "float");
+    no_accessor();
+  }
+  if (*dtype == DataFrameColumnType::kString) {
+    const auto present = std::count_if(starts.begin(), starts.end(), [](const auto& cell) { return cell.has_value(); });
+    if (present == 1) unsupported("DatetimeArray", "str");
+    if (present > 1) unsupported("Timestamp", "str");
+    no_accessor();
+  }
+  const auto failure = [&](const std::optional<python::Scalar>& cell, const std::string& array) {
+    if (cell && cell->kind == python::Scalar::Kind::kDate) return;
+    if (cell && cell->kind == python::Scalar::Kind::kInt) fail(integers + array + integers_tail);
+    unsupported(array, cell ? python::type_name(*cell) : "float");
+  };
+  if (starts.size() == 1) {
+    failure(starts.front(), "DatetimeArray");
+    return;
+  }
+  for (const auto& cell : starts) failure(cell, "Timestamp");
+  no_accessor();
+}
+
+// interaction_two_resources on the frame, observed black-box: the selection
+// [t, r, c, a] holds the resource column once (one column named four times
+// masks instead of realigning) and needs case:concept:name; the rows of the
+// cases (case:concept:name) with an event of the first resource, then of
+// those with the second (isin: text matches text cells only), group by the
+// case column (one column; the groupby sorts its keys); each group's last
+// present timestamp is compared with t1 in group order, a timestamp column
+// named twice then cannot realign, and the groups whose last timestamp lies
+// in the window count.
+std::uint64_t frame_interaction_count(const EventLog& frame, const ResourceProfilesOptions& o, const Bounds& b,
+                                      const std::vector<std::string>& selection, const std::string& r,
+                                      const std::string& c, const std::string& t) {
+  const auto fail = [](const std::string& message) {
+    throw std::invalid_argument("resource profiles: " + message);
+  };
+  const auto named = [&](const std::string& key) {
+    return static_cast<std::size_t>(std::count(selection.begin(), selection.end(), key));
+  };
+  if (named(r) > 1 && named(r) < selection.size()) fail("ValueError: cannot reindex on an axis with duplicate labels");
+  if (named("case:concept:name") == 0) fail("KeyError: \"None of ['case:concept:name'] are in the columns\"");
+  struct Row {
+    const Trace* trace;
+    const Event* event;
+    std::string case_key;
+  };
+  std::vector<Row> rows;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      const auto cell = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+      rows.push_back({&trace, &event, cell ? python::identity(*cell) : std::string("\x01missing")});
+    }
+  const auto keep_cases_of = [&](const std::string& resource) {
+    const auto wanted = python::identity(python::text(resource));
+    std::set<std::string> cases;
+    for (const auto& row : rows)
+      if (const auto cell = frame_scalar(frame, *row.trace, *row.event, r, FrameKeyScope::kDataFrame);
+          cell && python::identity(*cell) == wanted)
+        cases.insert(row.case_key);
+    std::erase_if(rows, [&](const Row& row) { return !cases.contains(row.case_key); });
+  };
+  keep_cases_of(o.resource);
+  keep_cases_of(o.resource2);
+  if (named(c) > 1) fail("ValueError: Grouper for '" + c + "' not 1-dimensional");
+  std::vector<std::vector<python::Scalar>> keys;
+  std::vector<std::size_t> keyed;
+  for (std::size_t i = 0; i < rows.size(); ++i)
+    if (auto cell = frame_scalar(frame, *rows[i].trace, *rows[i].event, c, FrameKeyScope::kDataFrame)) {
+      keys.push_back({std::move(*cell)});
+      keyed.push_back(i);
+    }
+  std::vector<python::Group> groups;
+  try {
+    groups = python::groupby(keys);
+  } catch (const python::TypeError& error) {
+    fail(std::string("TypeError: ") + error.what());
+  }
+  std::vector<std::optional<python::Scalar>> lasts;
+  for (const auto& group : groups) {
+    std::optional<python::Scalar> last;
+    for (const auto member : group.rows)
+      if (auto cell = frame_scalar(frame, *rows[keyed[member]].trace, *rows[keyed[member]].event, t,
+                                   FrameKeyScope::kDataFrame);
+          cell && !python::is_missing(*cell))
+        last = std::move(*cell);
+    // A float64 column's group of NaN cells is NaN, which numpy compares.
+    if (!last && frame_column_type(frame, t) == DataFrameColumnType::kFloat64) last = python::real(NAN);
+    if (last && last->kind != python::Scalar::Kind::kDate)
+      fail("TypeError: '>=' not supported between instances of '" + python::type_name(*last) +
+           "' and 'datetime.datetime'");
+    lasts.push_back(std::move(last));
+  }
+  if (named(t) > 1) fail("ValueError: cannot reindex on an axis with duplicate labels");
+  std::uint64_t count = 0;
+  for (const auto& last : lasts)
+    if (last && in_slot(static_cast<double>(last->date.seconds) + static_cast<double>(last->date.nanoseconds) / 1e9, b))
+      ++count;
+  return count;
+}
+
 // pm4py's resource_profiles functions on a DataFrame (CSV and XES uploads):
 // keys are the frame's columns (no org:resource alias, a missing column
 // raises KeyError in the metric's selection order), cells are typed (the
@@ -647,57 +852,55 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
   // resource first (interaction_two_resources: the cases with both
   // resources), the case metrics compare every row. A missing cell never
   // fails a comparison.
-  const auto wanted = query_key(o.resource, resource_dates), wanted2 = query_key(o.resource2, resource_dates);
-  std::set<std::string> both_cases;
-  if (metric == ResourceProfileMetric::kInteractionTwoResources) {
-    std::map<std::string, std::pair<bool, bool>> cases;
-    for (const auto& trace : frame.traces)
-      for (const auto& event : trace.events) {
-        const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
-        const auto case_cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame);
-        if (!cell || !case_cell) continue;
-        const auto key = python::identity(*cell);
-        auto& seen = cases[python::identity(*case_cell)];
-        seen.first = seen.first || key == wanted;
-        seen.second = seen.second || key == wanted2;
-      }
-    for (const auto& [key, seen] : cases)
-      if (seen.first && seen.second) both_cases.insert(key);
-  }
+  const auto wanted = query_key(o.resource, resource_dates);
   const bool resource_first = metric != ResourceProfileMetric::kCaseCompletions &&
                               metric != ResourceProfileMetric::kFractionCaseCompletions &&
                               metric != ResourceProfileMetric::kSocialPosition;
+  const auto activity_wanted = o.activity.empty() && !o.activity_given
+                                   ? std::optional<std::string>{}
+                                   : std::optional<std::string>{query_key(o.activity, date_column(a))};
+  // The frame's rows, in the order the timestamp comparisons meet them:
+  // workload and average_duration_activity without a start column first
+  // sort the frame by the case and timestamp columns (see below).
+  std::vector<std::pair<const Trace*, const Event*>> compared_rows;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) compared_rows.emplace_back(&trace, &event);
+  // A float64 column compares NaN cells too (numpy, not the masked object
+  // comparison), so a compared row of it always fails.
   const auto offending_type = [&](const std::string& key) -> std::optional<std::string> {
-    for (const auto& trace : frame.traces)
-      for (const auto& event : trace.events) {
-        if (resource_first) {
-          const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
-          if (!cell) continue;
-          if (metric == ResourceProfileMetric::kInteractionTwoResources) {
-            const auto case_cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame);
-            if (!case_cell || !both_cases.contains(python::identity(*case_cell))) continue;
-          } else if (!all_resources && python::identity(*cell) != wanted) {
-            continue;
-          }
+    const bool floats = frame_column_type(frame, key) == DataFrameColumnType::kFloat64;
+    for (const auto& [trace, event] : compared_rows) {
+      if (resource_first) {
+        const auto cell = frame_scalar(frame, *trace, *event, r, FrameKeyScope::kDataFrame);
+        if (!cell) continue;
+        if (!all_resources && python::identity(*cell) != wanted) continue;
+        // average_duration_activity keeps the rows of the activity too.
+        if (metric == ResourceProfileMetric::kAverageDurationActivity && activity_wanted) {
+          const auto activity = frame_scalar(frame, *trace, *event, a, FrameKeyScope::kDataFrame);
+          if (!activity || python::identity(*activity) != *activity_wanted) continue;
         }
-        const auto value = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
-        if (value && value->kind != python::Scalar::Kind::kDate) return python::type_name(*value);
       }
+      const auto value = frame_scalar(frame, *trace, *event, key, FrameKeyScope::kDataFrame);
+      if (!value && floats) return std::string("float");
+      if (value && value->kind != python::Scalar::Kind::kDate) return python::type_name(*value);
+    }
     return std::nullopt;
   };
-  // The two duration averages use the column's .dt accessor, which needs a
-  // datetime column whatever the rows.
-  const bool needs_dt = metric == ResourceProfileMetric::kAverageDurationActivity ||
-                        metric == ResourceProfileMetric::kAverageCaseDuration;
-  if (const auto t_type = needs_dt ? non_date_type(frame, t) : offending_type(t)) {
-    if (workload) fail("AttributeError: 'float' object has no attribute 'timestamp'");
-    fail(std::string("TypeError: '") + (metric == ResourceProfileMetric::kAverageCaseDuration ? "<" : ">=") +
-         "' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
-  }
   // A column named twice in the selection: pandas cannot realign the
   // selected frame (workload with its start column on the timestamp column
-  // is the one combination that runs).
-  {
+  // is the one combination that runs). Most metrics fail so before they
+  // compare a timestamp; social_position and interaction_two_resources
+  // compare the timestamps first, and social_position with every selected
+  // column the same one masks instead of realigning.
+  const bool social = metric == ResourceProfileMetric::kSocialPosition;
+  const bool interaction = metric == ResourceProfileMetric::kInteractionTwoResources;
+  std::optional<std::uint64_t> interaction_count;
+  if (interaction && (!o.resource.empty() || o.resource_given) && (!o.resource2.empty() || o.resource2_given))
+    interaction_count = frame_interaction_count(frame, o, b, selection, r, c, t);
+  const auto require_unique_selection = [&] {
+    if (metric == ResourceProfileMetric::kSocialPosition &&
+        std::all_of(selection.begin(), selection.end(), [&](const auto& key) { return key == selection.front(); }))
+      return;
     std::set<std::string> seen;
     for (const auto& key : selection)
       if (!seen.insert(key).second && metric != ResourceProfileMetric::kAverageCaseDuration &&
@@ -707,17 +910,114 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
                      metric == ResourceProfileMetric::kAverageDurationActivity
                  ? "ValueError: The column label '" + key + "' is not unique."
                  : "ValueError: cannot reindex on an axis with duplicate labels");
+  };
+  if (!social && !interaction) require_unique_selection();
+  if (!start && (workload || metric == ResourceProfileMetric::kAverageDurationActivity)) {
+    // The start of each row is the previous event of its case: the frame is
+    // first sorted by the case and timestamp columns, each made an ordered
+    // Categorical (whose categories need values pandas can sort; missing
+    // cells last), so a sort that compares a Timestamp with a number fails.
+    const auto codes = [&](const std::string& key) {
+      std::vector<std::vector<python::Scalar>> keys;
+      std::vector<std::size_t> keyed;
+      for (std::size_t i = 0; i < compared_rows.size(); ++i)
+        if (auto cell = frame_scalar(frame, *compared_rows[i].first, *compared_rows[i].second, key,
+                                     FrameKeyScope::kDataFrame);
+            cell && !python::is_missing(*cell)) {
+          keys.push_back({std::move(*cell)});
+          keyed.push_back(i);
+        }
+      std::vector<python::Group> groups;
+      try {
+        groups = python::groupby(keys);
+      } catch (const python::TypeError&) {
+        fail("TypeError: 'values' is not ordered, please explicitly specify the categories order by passing in a "
+             "categories argument.");
+      }
+      std::vector<std::size_t> code(compared_rows.size(), groups.size());
+      for (std::size_t g = 0; g < groups.size(); ++g)
+        for (const auto member : groups[g].rows) code[keyed[member]] = g;
+      return code;
+    };
+    const auto case_codes = codes(c);
+    const auto time_codes = codes(t);
+    std::vector<std::size_t> order(compared_rows.size());
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t x, std::size_t y) {
+      return std::tie(case_codes[x], time_codes[x]) < std::tie(case_codes[y], time_codes[y]);
+    });
+    std::vector<std::pair<const Trace*, const Event*>> sorted;
+    for (const auto i : order) sorted.push_back(compared_rows[i]);
+    compared_rows = std::move(sorted);
   }
-  if ((metric == ResourceProfileMetric::kSocialPosition ||
-       metric == ResourceProfileMetric::kInteractionTwoResources) &&
-      std::find(selection.begin(), selection.end(), "case:concept:name") == selection.end())
-    fail("KeyError: \"None of ['case:concept:name'] are in the columns\"");
-  const bool uses_start = start && (workload || metric == ResourceProfileMetric::kAverageDurationActivity);
-  if (uses_start)
-    if (const auto s_type = workload ? offending_type(s) : non_date_type(frame, s)) {
-      if (workload) fail("AttributeError: '" + *s_type + "' object has no attribute 'timestamp'");
-      fail("TypeError: unsupported operand type(s) for -: 'Timestamp' and '" + *s_type + "'");
+  if (metric == ResourceProfileMetric::kAverageCaseDuration) {
+    // The rows of the resource's cases (case:concept:name) compare their
+    // timestamps first; the groupby of the case column then needs one
+    // column (the case column on the timestamp column is two), and the
+    // spans use the .dt accessor, which needs a datetime column.
+    std::set<std::string> cases;
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events) {
+        const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
+        const auto case_name = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+        if (cell && case_name && (all_resources || python::identity(*cell) == text_key(o.resource)))
+          cases.insert(python::identity(*case_name));
+      }
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events) {
+        const auto case_name = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+        if (!case_name || !cases.contains(python::identity(*case_name))) continue;
+        const auto value = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+        if (value && value->kind != python::Scalar::Kind::kDate)
+          fail("TypeError: '<' not supported between instances of '" + python::type_name(*value) +
+               "' and 'datetime.datetime'");
+      }
+    if (c == t) fail("ValueError: Grouper for '" + t + "' not 1-dimensional");
+    if (non_date_type(frame, t)) fail("AttributeError: Can only use .dt accessor with datetimelike values");
+  } else if (metric == ResourceProfileMetric::kActivityCompletions && r == t) {
+    // The resource on the timestamp column: the masks keep every row (a
+    // non-matching cell is NaN), and the frame's timestamp comparison then
+    // raises for a typed (numeric or bool) column of no dates, or for an
+    // object or text column at a matching cell that is no date.
+    const auto dtype = frame_column_type(frame, t);
+    if (dtype && *dtype != DataFrameColumnType::kDate && *dtype != DataFrameColumnType::kObject &&
+        *dtype != DataFrameColumnType::kString) {
+      if (const auto t_type = non_date_type(frame, t))
+        fail("TypeError: '>=' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
+    } else if (const auto t_type = offending_type(t)) {
+      fail("TypeError: '>=' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
     }
+  } else if (interaction) {
+  } else if (const auto t_type = offending_type(t)) {
+    if (workload) fail("AttributeError: 'float' object has no attribute 'timestamp'");
+    fail("TypeError: '>=' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
+  } else if (metric == ResourceProfileMetric::kAverageDurationActivity && non_date_type(frame, t)) {
+    // No compared row fails; a date start column cannot be subtracted from
+    // the column, any other durations then use the .dt accessor.
+    if (start && s != t && frame_column_type(frame, s) == DataFrameColumnType::kDate) {
+      auto dtype = frame_column_type(frame, t);
+      if (dtype == DataFrameColumnType::kBool)
+        for (const auto& trace : frame.traces)
+          for (const auto& event : trace.events)
+            if (!frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame)) dtype = DataFrameColumnType::kObject;
+      const char* name = dtype == DataFrameColumnType::kInt64     ? "int64"
+                         : dtype == DataFrameColumnType::kFloat64 ? "float64"
+                         : dtype == DataFrameColumnType::kBool    ? "bool"
+                                                                  : "object";
+      fail(std::string("TypeError: cannot subtract DatetimeArray from ndarray[") + name + "]");
+    }
+    fail("AttributeError: Can only use .dt accessor with datetimelike values");
+  }
+  if (social) {
+    require_unique_selection();
+    // Both read case:concept:name from the selection.
+    if (std::find(selection.begin(), selection.end(), "case:concept:name") == selection.end())
+      fail("KeyError: \"None of ['case:concept:name'] are in the columns\"");
+  }
+  const bool uses_start = start && (workload || metric == ResourceProfileMetric::kAverageDurationActivity);
+  if (uses_start && workload)
+    if (const auto s_type = offending_type(s)) fail("AttributeError: '" + *s_type + "' object has no attribute 'timestamp'");
+  if (metric == ResourceProfileMetric::kAverageDurationActivity) require_duration_column(frame, o, b, r, a, c, t, s, uses_start);
   // The metrics that read cases (workload and multitasking only without a
   // start column).
   const bool uses_case = metric == ResourceProfileMetric::kCaseCompletions ||
@@ -824,6 +1124,11 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
   } else {
     result = compute_resource_profiles(view, native, b, true);
   }
+  if (interaction_count)
+    for (auto& row : result.rows) {
+      row.value = static_cast<double>(*interaction_count);
+      row.count = *interaction_count;
+    }
   // activity_completions with the resource on the timestamp column selects
   // that column twice; its masks then keep every row (len of the frame).
   if (metric == ResourceProfileMetric::kActivityCompletions && r == t) {

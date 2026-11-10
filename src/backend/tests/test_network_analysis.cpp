@@ -1,5 +1,6 @@
 #include "minera/network_analysis.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/xes_event_log_importer.hpp"
 #include "minera/json_export.hpp"
 #include "minera/request_params.hpp"
 
@@ -158,9 +159,62 @@ static void frame_path_reads_pm4py_frame() {
   assert(edges[2].source == "2" && edges[2].target == "9007199254740993" && edges[2].count == 1);
 }
 
+// Review AU1: the timestamp columns subtract as pandas does (target minus
+// source, cell by cell where both are present), and the analysis numbers the
+// sorted rows in its own @@index (pm4py 2.7.22 on read_csv +
+// format_dataframe(case_id="cid", activity_key="act", timestamp_key="ts"),
+// and read_xes).
+static void review_au_frame_paths() {
+  const auto csv = [](const char* text) {
+    std::istringstream input(text);
+    CsvImportOptions import;
+    import.case_id_column = "cid";
+    import.activity_column = "act";
+    import.timestamp_column = "ts";
+    auto log = import_csv_event_log(input, import);
+    assert(log.dataframe_columns);
+    return log;
+  };
+  const auto error_of = [](const EventLog& log, const NetworkAnalysisOptions& o) {
+    try { (void)discover_network_analysis(log, o); }
+    catch (const std::invalid_argument& error) { return std::string(error.what()); }
+    return std::string();
+  };
+  NetworkAnalysisOptions o;
+  o.source_node_attribute = o.target_node_attribute = "who";
+  o.timestamp_attribute = "txt";
+  // Every link has a missing text cell: nothing is subtracted.
+  const auto sparse = csv("cid,act,ts,who,txt\n"
+                          "c1,a,2020-01-01 10:00:00,R,x\nc1,b,2020-01-01 11:00:00,S,\n"
+                          "c2,a,2020-01-02 10:00:00,R,y\nc2,b,2020-01-02 11:00:00,T,\n");
+  assert(error_of(sparse, o) == "network analysis: AttributeError: Can only use .dt accessor with datetimelike values");
+  const auto full = csv("cid,act,ts,who,txt\n"
+                        "c1,a,2020-01-01 10:00:00,R,x\nc1,b,2020-01-01 11:00:00,S,y\n");
+  assert(error_of(full, o) == "network analysis: TypeError: unsupported operand type(s) for -: 'str' and 'str'");
+  // An object column fails at its first pair Python cannot subtract.
+  std::istringstream xes(
+      R"XES(<?xml version="1.0" encoding="UTF-8"?><log xes.version="1.0"><trace><string key="concept:name" value="c0"/><event><string key="concept:name" value="a"/><date key="time:timestamp" value="2020-01-01T00:00:00+00:00"/><string key="org:resource" value="R"/><int key="x" value="1"/></event><event><string key="concept:name" value="b"/><date key="time:timestamp" value="2020-01-01T01:00:00+00:00"/><string key="org:resource" value="R"/><int key="x" value="2"/></event><event><string key="concept:name" value="c"/><date key="time:timestamp" value="2020-01-01T02:00:00+00:00"/><string key="org:resource" value="R"/><string key="x" value="z"/></event></trace></log>)XES");
+  const auto object = import_xes_dataframe_log(xes);
+  NetworkAnalysisOptions x;
+  x.timestamp_attribute = "x";
+  assert(error_of(object, x) == "network analysis: TypeError: unsupported operand type(s) for -: 'str' and 'int'");
+  // format_dataframe numbers k10 before k2; the analysis sorts by time.
+  const auto renumbered = csv("cid,act,ts,who\n"
+                              "k2,a,2020-01-01 10:00:00,R\nk2,b,2020-01-01 11:00:00,S\n"
+                              "k10,a,2020-01-02 10:00:00,T\nk10,b,2020-01-02 11:00:00,R\n");
+  NetworkAnalysisOptions n;
+  n.source_node_attribute = "@@index";
+  n.target_node_attribute = "who";
+  const auto edges = discover_network_analysis(renumbered, n).edges;
+  assert(edges.size() == 2);
+  assert(edges[0].source == "0" && edges[0].target == "S" && edges[0].activity == "a");
+  assert(edges[1].source == "2" && edges[1].target == "R" && edges[1].activity == "a");
+}
+
 int main() {
   reference_audit_contracts();
   frame_path_reads_pm4py_frame();
+  review_au_frame_paths();
   flat_csv_case_column();
   auto result = discover_network_analysis(sample());
   assert(result.variant == NetworkAnalysisVariant::kDataframe);

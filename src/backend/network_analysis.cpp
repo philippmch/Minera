@@ -335,6 +335,11 @@ FrameDtype frame_dtype(const EventLog& frame, const std::string& key) {
       }
   if (!found && csv) dtype = of_type(columns.activity_type);  // the activity under its own header
   else if (!found) dtype = {FrameDtype::Kind::kText, "str", "string"};
+  // read_csv keeps a bool column with a missing cell as objects.
+  if (dtype.kind == FrameDtype::Kind::kBool)
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events)
+        if (!frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame)) dtype = of_type(DataFrameColumnType::kObject);
   if (dtype.kind != FrameDtype::Kind::kObject) return dtype;
   bool ints = false, floats = false, other = false, bools = false, texts = false, missing = false;
   std::size_t rows = 0;
@@ -396,18 +401,35 @@ void require_mergeable(const EventLog& frame, const std::string& out, const std:
   if ((left.kind == Kind::kDate) != (right.kind == Kind::kDate)) raise();
 }
 
-// The durations pandas takes from the timestamp column whatever the
-// performance flag: a column of no dates cannot be subtracted (text, bools)
-// or has no .dt accessor (observed black-box).
-void require_timestamp_column(const EventLog& frame, const std::string& key, bool links) {
+// The durations pandas takes from the joined frame's timestamp columns
+// (target minus source) whatever the performance flag, observed black-box:
+// a bool column cannot be subtracted; a text or object column subtracts cell
+// by cell where both cells are present, so the first such pair Python cannot
+// subtract is the error; and a result of no dates has no .dt accessor.
+void require_timestamp_column(const EventLog& frame, const Reader& reader, const std::string& key,
+                              const std::vector<Ref>& refs, const std::vector<const Ref*>& successors) {
   const auto dtype = frame_dtype(frame, key);
   if (dtype.kind == FrameDtype::Kind::kDate) return;
   if (dtype.kind == FrameDtype::Kind::kBool)
     throw std::invalid_argument(
         "network analysis: TypeError: numpy boolean subtract, the `-` operator, is not supported, use the "
         "bitwise_xor, the `^` operator, or the logical_xor function instead.");
-  if (dtype.kind == FrameDtype::Kind::kText && links)
-    throw std::invalid_argument("network analysis: TypeError: unsupported operand type(s) for -: 'str' and 'str'");
+  if (dtype.kind == FrameDtype::Kind::kText || dtype.kind == FrameDtype::Kind::kObject)
+    for (std::size_t i = 0; i < refs.size(); ++i) {
+      if (!successors[i]) continue;
+      const auto source = reader.typed(*refs[i].event, refs[i].trace, key);
+      const auto target = reader.typed(*successors[i]->event, successors[i]->trace, key);
+      if (!source || !target || python::is_missing(*source) || python::is_missing(*target)) continue;
+      using Kind = python::Scalar::Kind;
+      if (python::is_number(*target) && python::is_number(*source)) continue;
+      if (target->kind == Kind::kDate && source->kind == Kind::kDate) continue;
+      if (target->kind == Kind::kDate && source->kind == Kind::kInt)
+        throw std::invalid_argument(
+            "network analysis: TypeError: Addition/subtraction of integers and integer-arrays with Timestamp is "
+            "no longer supported.  Instead of adding/subtracting `n`, use `n * obj.freq`");
+      throw std::invalid_argument("network analysis: TypeError: unsupported operand type(s) for -: '" +
+                                  python::type_name(*target) + "' and '" + python::type_name(*source) + "'");
+    }
   throw std::invalid_argument("network analysis: AttributeError: Can only use .dt accessor with datetimelike values");
 }
 
@@ -467,7 +489,7 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
       return python::compare(refs[present[a]].sort.value, refs[present[b]].sort.value);
     });
   } catch (const python::TypeError& error) {
-    throw std::invalid_argument(std::string("network analysis: ") + error.what());
+    throw std::invalid_argument(std::string("network analysis: TypeError: ") + error.what());
   }
   std::vector<Ref> sorted;
   sorted.reserve(refs.size());
@@ -490,15 +512,22 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
   };
   std::vector<std::vector<python::Scalar>> keys;
   std::vector<Link> links;
+  // The analysis numbers the sorted rows in its own @@index column, which on
+  // a CSV upload replaces format_dataframe's (observed black-box).
+  const bool own_index = reader.frame && log.dataframe_columns->csv_text;
+  const auto typed = [&](const Ref& ref, const std::string& selector) -> std::optional<python::Scalar> {
+    if (own_index && selector == "@@index") return python::integer(static_cast<std::int64_t>(ref.index));
+    return reader.typed(*ref.event, ref.trace, selector);
+  };
   for (std::size_t source_index = 0; source_index < refs.size(); ++source_index) {
     const auto& source = refs[source_index];
-    const auto source_node = reader.typed(*source.event, source.trace, o.source_node_attribute);
+    const auto source_node = typed(source, o.source_node_attribute);
     if (!source_node) continue;
     const Ref* target = successors[source_index];
     if (!target) continue;
-    const auto target_node = reader.typed(*target->event, target->trace, o.target_node_attribute);
+    const auto target_node = typed(*target, o.target_node_attribute);
     const auto& edge_event = o.edge_reference == NetworkAnalysisEdgeReference::kOut ? source : *target;
-    const auto edge_value = reader.typed(*edge_event.event, edge_event.trace, o.edge_attribute);
+    const auto edge_value = typed(edge_event, o.edge_attribute);
     if (!target_node || !edge_value) continue;
     keys.push_back({*source_node, *target_node, *edge_value});
     Link link;
@@ -519,14 +548,12 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
     links.push_back(link);
   }
   if (reader.frame && log.event_count() != 0)
-    require_timestamp_column(log, o.timestamp_attribute,
-                             std::any_of(successors.begin(), successors.end(),
-                                         [](const Ref* successor) { return successor != nullptr; }));
+    require_timestamp_column(log, reader, o.timestamp_attribute, refs, successors);
   std::vector<python::Group> groups;
   try {
     groups = python::groupby(keys);
   } catch (const python::TypeError& error) {
-    throw std::invalid_argument(std::string("network analysis: ") + error.what());
+    throw std::invalid_argument(std::string("network analysis: TypeError: ") + error.what());
   }
   for (const auto& group : groups) {
     if (result.edges.size() >= o.max_rows) { result.diagnostics.output_truncated = true; break; }

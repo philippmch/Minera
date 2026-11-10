@@ -3271,7 +3271,9 @@ match nothing). The case-id column (`case_id`/`case:concept:name`) is a column
 of every row for the event-level filter and the events-scope statistics too.
 Other columns, including resource and lifecycle, keep their text where
 `read_csv` would type them (declared: CSV adapters do not infer pandas column
-dtypes beyond the case-id and activity columns); a resource, lifecycle or
+dtypes beyond the case-id and activity columns; the organizational routes
+since reviews AS1 and AT1, and attribute statistics since review AU1, read
+the typed columns of the formatted frame instead); a resource, lifecycle or
 extra attribute cell holding a pandas default NA spelling (`NaN`, `null`,
 `None`, `NA`, `n/a`, `#N/A`, ...) is missing, like a blank cell, in the log
 and in the flat table, since `read_csv` reads it as NaN (stream readers keep
@@ -21827,3 +21829,156 @@ network test now names its `resource` column), `minera_role_discovery_tests`
 (`frame_path_typed_values`), and the frontend's
 `session-resource-key.test.ts`. Full suite: 454 ctest targets, vitest
 (10,723), the Python script tests (406), `tsc` and the Vite build.
+
+## Review AU1: re-review of round AT, attribute statistics and the organizational routes on the DataFrame path (2026-11-10)
+
+Round AT's changes were re-read and swept again on new seeds (frame resource
+profiles and average case duration, frame local diagnostics, the network
+analysis frame branch, the AT1-4 date-text columns, the frontend's
+`withSessionResourceKeys`). The frontend change and the date-column import
+read correctly; the sweeps found error-order differences in the three
+organizational routes, all fixed. The AT1-4 follow-up then took the CSV
+routes that read typed frame columns: attribute statistics did not.
+
+- **AU1-1 Attribute statistics read the frame** (`/api/attribute-statistics`
+  on CSV and XES uploads). pm4py's `get_event_attribute_values` and
+  `get_trace_attribute_values` count the formatted frame's typed cells:
+  CSV columns as `read_csv` types them (an int column with a blank is
+  float64, `1.0`), date-text columns as UTC dates (AT1-4), the XES frame's
+  dtypes. Keys are frame columns: a missing one raises `KeyError: '<key>'`,
+  the trace scope reads a column of that name before `case:<key>`, and once
+  per case on `case:concept:name` raises
+  `ValueError: cannot insert case:concept:name, already exists`. Once per
+  case groups `[case, value]` with pandas' sort, so values Python cannot
+  order raise `TypeError`. Minera counted CSV cells as text (dates by their
+  spelling) and read XES typed resources as text.
+- **AU1-2 Resource profiles, a column selected twice.** The duplicate
+  selection fails before the timestamps are compared (it raised the
+  comparison's `TypeError` instead); `average_case_duration` with the case
+  column on the timestamp column raises
+  `ValueError: Grouper for '<t>' not 1-dimensional`;
+  `activity_completions` with the resource on a typed (non-object) timestamp
+  column of no dates raises the `>=` `TypeError`; a duration average over a
+  timestamp column of no dates raises `.dt` even on an empty selection.
+- **AU1-3 Local diagnostics order.** The (resource, activity) groupby, which
+  sorts its keys, runs before the group column is read, so unorderable
+  resources raise `TypeError` before a missing group raises `KeyError`.
+- **AU1-4 Network analysis, timestamp columns of no dates.** pandas
+  subtracts the joined frame's timestamps (target minus source) cell by cell
+  where both cells are present (object and text columns), so the first pair
+  Python cannot subtract is the error (`'str' and 'int'`, `Timestamp` beside
+  an int gives pandas' integer-arrays message), and links whose cells are
+  all missing leave nothing to subtract (`.dt` `AttributeError`, where
+  Minera raised `'str' and 'str'` for any text column with links). A CSV
+  bool column with a blank is an object column (`read_csv`), for the merge
+  and the subtraction alike. The error texts now carry `TypeError:`.
+- **AU1-5 Network analysis, CSV `@@index` nodes.** The analysis numbers the
+  rows it sorted by the sorting column in its own `@@index`, which on a CSV
+  upload replaces `format_dataframe`'s (sorted by case id, so `k10` before
+  `k2`); source, target and edge cells on `@@index` take that number.
+- **AU1-6 `average_duration_activity` durations.** The selected rows (a
+  case, the resource, the activity, the timestamp in the window) subtract
+  the start column from the timestamp column with pandas' datetime rules,
+  observed black-box: an int start column raises
+  `Addition/subtraction of integers and integer-arrays with DatetimeArray is
+  no longer supported.  Instead of adding/subtracting `n`, use
+  `n * obj.freq`` always; a float or bool column raises
+  `unsupported operand type(s) for -: 'Timestamp' and 'float'` (`'bool'`)
+  once a row is selected; a text column fails as the whole array for one
+  present cell (`'DatetimeArray' and 'str'`) and cell by cell for more
+  (`'Timestamp' and 'str'`); an object column (bools with a blank) fails as
+  the whole array for one row and cell by cell otherwise (a NaN cell is
+  `'float'`); a result that is no datetime (no row, or object cells) has no
+  `.dt` accessor. Without a start column the start of a row is the previous
+  timestamp of its case: when no case has two rows that is an object column
+  of dates, so one selected row gives 0.0 and none or more raise `.dt`. A
+  timestamp column of no dates beside a date start column raises
+  `cannot subtract DatetimeArray from ndarray[<dtype>]`. The compared rows
+  (the `>=` `TypeError`) are the resource's rows of the activity.
+- **AU1-7 `interaction_two_resources` on the frame.** pm4py keeps the cases
+  (by `case:concept:name`, whatever the case column) with an event of the
+  first resource, then of the second (text matches text cells only), groups
+  their rows by the case column and counts the groups whose last present
+  timestamp lies in the window. The selection `[t, r, c, a]` raises
+  `cannot reindex on an axis with duplicate labels` for the resource named
+  twice (four times the same column masks instead), then
+  `KeyError: "None of ['case:concept:name'] are in the columns"`, then
+  `Grouper for '<c>' not 1-dimensional` for the case column named twice, the
+  groupby's sort `TypeError`, each group's last timestamp compared with t1
+  in group order (`>=` `TypeError`), and the timestamp column named twice
+  (`cannot reindex`). Minera grouped by the case column for the filter, so
+  counts differed whenever the case column was not `case:concept:name`.
+- **AU1-8 The derived-start sort.** `average_workload`, `multitasking` and
+  `average_duration_activity` without a start column first sort the frame by
+  the case and timestamp columns, each as an ordered Categorical: values
+  pandas cannot sort (a Timestamp beside a number) raise
+  `TypeError: 'values' is not ordered, please explicitly specify the
+  categories order by passing in a categories argument.` whatever the
+  resource, and the timestamp comparisons then meet the rows in that sorted
+  order (a text cell after a float in its case).
+- **AU1-9 Float64 timestamp columns compare NaN.** numpy compares a float64
+  column's NaN cells with the window bound too, so a compared row of such a
+  column raises `'>=' not supported between instances of 'float' and
+  'datetime.datetime'` even when its cell is NaN (object and text columns
+  skip missing cells).
+- **AU1-10 `activity_completions` with the resource on a text timestamp
+  column.** The masks set the non-matching cells to NaN, which a text column
+  (pandas' string dtype) skips like an object column, so only matching
+  cells are compared (an absent resource counts every row of the frame);
+  numeric and bool columns still raise.
+
+**Contract.** As in AS and AT (Philipp may overrule): on CSV and XES uploads
+these routes read keys and cells as pm4py reads its frame; native table
+sources keep the alias rules and the cell types they hold (Z1-7).
+
+Declarations (pm4py raises or returns NaN; Minera answers):
+
+- A two-row frame: pandas reads a groupby key list as long as the frame as
+  one key per row, so local diagnostics without the resource column run in
+  pm4py (and may divide by zero); Minera raises the `KeyError`.
+- Dates in XES object columns are `datetime.datetime` in pm4py's messages
+  and `Timestamp` in Minera's (as declared before).
+- `average_duration_activity` on an empty selection with a datetime start:
+  pm4py returns NaN, Minera answers `mean requires at least one data point`
+  (as declared before).
+- `format_dataframe` also converts partial dates (`2020-01`) and time-only
+  text (today's date) to dates; Minera keeps those columns as text
+  (declared in AT1-4).
+- Filters on typed CSV columns keep matching text (a pm4py `isin` with text
+  matches no int cell).
+
+Verification (`statsweep.py`, `atsweep2.py`, `socmatrix.py`, `socref.py`,
+`socmodel.py`, `adaprobe.py` in the project files under
+`review-harness/round-au/`; reference sweeps with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Attribute statistics, fixed binary, CSV (seeds 0 to 84) | 2,718 | 2,292 equal, 426 raise in both, 0 differences |
+| Attribute statistics, fixed binary, XES (seeds 100 to 159) | 2,016 | 1,721 equal, 295 raise in both, 0 differences |
+| Attribute statistics, final binary, CSV (seeds 300 to 359) / XES (400 to 439) | 1,926 / 1,350 | 1,618 / 1,152 equal, 308 / 198 raise in both, 0 differences |
+| AT re-review, AT binary: profiles, diagnostics, network, CSV and XES (seeds 2,000 to 2,059, 3,000 to 3,059) | 5,207 | 8 differed in error type (AU1-2 to AU1-4), 1 declared (two rows) |
+| Profiles, diagnostics, network, AU binary, CSV (seeds 2,000 to 2,059, 3,000 to 3,059, 4,000 to 4,079, 5,000 to 5,059) | 4,383 | 2,637 equal (320 of them zero rows), 1,549 raise in both, 194 NaN, 2 declared (two rows), 1 fixed after (AU1-6) |
+| The same, XES (same seeds) | 4,104 | 3,040 equal, 972 raise in both, 92 NaN, 0 differences |
+| Final binary: profiles CSV (seeds 6,000 to 6,079 and 7,000 to 7,079), all three routes CSV (seeds 8,000 to 8,079) | 3,240 | 2,411 equal (391 of them zero rows), 722 raise in both, 107 NaN, 0 differences |
+| The same, XES | 2,664 | 2,168 equal, 400 raise in both, 96 NaN, 0 differences |
+| `interaction_two_resources` column matrix, XES (5 columns per role, `Q` and observed resource pairs) | 6,250 reference cells | before: 468 of 1,250 compared combinations differed; after: 0 bar 5 declared type names |
+| `interaction_two_resources` column matrix, CSV (5 columns) | 1,250 | 0 differences |
+| `social_position` and `activity_completions` column matrices, XES and CSV | 686 + 250 + 432 | 0 differences |
+| `average_duration_activity` probes (start dtypes, single-event cases, NaN cases) | 45 | 0 differences |
+| Fixture replay (16 manifests, a fresh server each) | 2,673 responses | unchanged |
+
+Tests: `minera_attribute_statistics_tests` (Review AU1: a CSV upload's int
+column with a blank counts as floats, date-text values in UTC, KeyError for
+an absent key, `count_once_per_case` on `case:concept:name` raises
+ValueError, trace scope by the case column), `minera_resource_profiles_tests`
+(`review_au_frame_paths`: average duration by start dtype and on
+single-event cases, the activity filter on `@@index`, `activity_completions`
+on a float column with NaN, `interaction_two_resources` with another case
+column, without `case:concept:name`, with a duplicated column and with a
+non-1-dimensional Grouper, the unordered Categorical message on an XES
+mixed column), `minera_network_analysis_tests` (`review_au_frame_paths`:
+sparse and full text timestamps, an XES object column, CSV `@@index`
+nodes) and `minera_local_diagnostics_tests` (`review_au_error_order`).
+Full suite: 454 ctest targets, vitest (10,723), the Python script tests
+(406) and `tsc`.

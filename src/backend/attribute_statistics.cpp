@@ -4,6 +4,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstdio>
+#include <deque>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -11,6 +12,10 @@
 #include <variant>
 
 #include "dataframe_cell.hpp"
+#include "frame_cells.hpp"
+#include "minera/csv_event_log_importer.hpp"
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
 
 namespace minera {
 namespace {
@@ -102,6 +107,72 @@ std::pair<std::string, std::string> python_key(const EventAttribute* attribute,
     default:
       return {"s:" + text, "str"};
   }
+}
+
+// A frame cell (CSV and XES uploads) as a statistics key under Python
+// dict-key equality, in python_key's spelling, and str() of the value as
+// pm4py's dict holds it: dates are UTC Timestamps, so two spellings of one
+// instant are one key.
+std::pair<std::string, std::string> scalar_key(const python::Scalar& value, std::string& text) {
+  using Kind = python::Scalar::Kind;
+  text = python::str(value);
+  switch (value.kind) {
+    case Kind::kBool: return {value.boolean ? "n:1" : "n:0", "bool"};
+    case Kind::kInt: return {"n:" + text, "int"};
+    case Kind::kFloat: {
+      if (std::isfinite(value.real) && std::trunc(value.real) == value.real)
+        return {"n:" + exact_integer(value.real), "float"};
+      char buffer[64];
+      std::snprintf(buffer, sizeof buffer, "%.17g", value.real);
+      return {std::string("f:") + buffer, "float"};
+    }
+    case Kind::kDate:
+      return {"d:" + std::to_string(value.date.seconds) + ":" + std::to_string(value.date.nanoseconds), "date"};
+    default: return {"s:" + text, "str"};
+  }
+}
+
+// The frame cell of `key` in one row: the row's own `case:` cell where the
+// row carries one (CSV rows, merged XES cases), typed by its column, else
+// the frame view's cell.
+std::optional<python::Scalar> frame_row_cell(const EventLog& frame, const Trace& trace,
+                                             const Event& event, const std::string& key) {
+  if (key.starts_with("case:") && key != "case:concept:name")
+    if (const auto own = dataframe_cell::case_row_value(event, key)) {
+      if (!*own) return std::nullopt;
+      const std::string bare = key.substr(5);
+      const EventAttribute* stored = nullptr;
+      for (const auto& attribute : event.case_row_attributes)
+        if (attribute.key == bare) stored = &attribute;
+      const auto& columns = *frame.dataframe_columns;
+      const DataFrameColumn* column = nullptr;
+      for (const auto& candidate : columns.trace_columns)
+        if (candidate.key == bare) column = &candidate;
+      python::Scalar value;
+      if (columns.csv_text && column) {
+        value = python::from_attribute(csv_dataframe_cell(*column, **own));
+      } else {
+        value = stored ? python::from_attribute(*stored) : python::text(**own);
+        if (column && column->type == DataFrameColumnType::kFloat64 && value.kind == python::Scalar::Kind::kInt)
+          value = python::real(std::strtod(python::str(value).c_str(), nullptr));
+      }
+      if (python::is_missing(value)) return std::nullopt;
+      if (value.kind == python::Scalar::Kind::kDate) {
+        value.date.timezone_aware = true;
+        value.date.offset_minutes = 0;
+      }
+      return value;
+    }
+  return frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
+}
+
+std::string python_text_repr(const std::string& text) {
+  std::string out = "'";
+  for (const char c : text) {
+    if (c == '\\' || c == '\'') out += '\\';
+    out += c;
+  }
+  return out + "'";
 }
 
 // Where a key sorts in a pandas groupby on [case id, attribute]: by case id
@@ -228,7 +299,65 @@ AttributeStatisticsResult discover_attribute_statistics(
     std::uint64_t weight = 1;
   };
   std::vector<Row> rows;
-  if (options.scope == AttributeStatisticsScope::kEvents) {
+  // CSV and XES uploads reach pm4py as a DataFrame: the key names a column
+  // of format_dataframe's or read_xes's frame (KeyError otherwise; the short
+  // aliases still name the first-class columns), and the cells are its typed
+  // values (CSV columns typed as read_csv and format_dataframe type them).
+  // get_trace_attribute_values counts the rows of the column itself, or of
+  // case:<key> when the frame has no column <key>.
+  const bool frame_path = options.dataframe_column_types && log.dataframe_columns != nullptr;
+  std::optional<EventLog> frame_storage;
+  std::deque<std::string> frame_texts;
+  if (frame_path) {
+    frame_storage = dataframe_frame_event_log(log);
+    const auto& frame = *frame_storage;
+    const auto keys = frame_keys(frame, FrameKeyScope::kDataFrame);
+    std::string key = options.attribute_key;
+    const auto alias = [](const std::string& name) -> std::string {
+      if (name == "activity") return "concept:name";
+      if (name == "timestamp") return "time:timestamp";
+      if (name == "resource") return "org:resource";
+      if (name == "lifecycle") return "lifecycle:transition";
+      if (name == "case_id") return "case:concept:name";
+      return name;
+    };
+    if (!keys.contains(key)) {
+      if (options.scope == AttributeStatisticsScope::kTraces && keys.contains("case:" + key))
+        key = "case:" + key;
+      else if (keys.contains(alias(key)))
+        key = alias(key);
+      else
+        throw std::invalid_argument("attribute statistics: KeyError: " + python_text_repr(options.attribute_key));
+    }
+    const bool once = options.scope == AttributeStatisticsScope::kEvents && options.keep_once_per_case;
+    // groupby([case:concept:name, key]).reset_index cannot insert the case
+    // column twice.
+    if (once && key == "case:concept:name")
+      throw std::invalid_argument("attribute statistics: ValueError: cannot insert case:concept:name, already exists");
+    std::vector<std::vector<python::Scalar>> group_keys;
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events) {
+        const auto cell = frame_row_cell(frame, trace, event, key);
+        if (!cell) {
+          rows.push_back({&trace.case_id, std::nullopt, nullptr, 1});
+          continue;
+        }
+        if (once) group_keys.push_back({python::text(trace.case_id), *cell});
+        std::string text;
+        auto value_key = scalar_key(*cell, text);
+        frame_texts.push_back(std::move(text));
+        rows.push_back({&trace.case_id, std::move(value_key), &frame_texts.back(), 1});
+      }
+    // The groupby sorts the [case id, value] pairs: values Python cannot
+    // order raise TypeError.
+    if (once) {
+      try {
+        (void)python::groupby(group_keys);
+      } catch (const python::TypeError& error) {
+        throw std::invalid_argument(std::string("attribute statistics: TypeError: ") + error.what());
+      }
+    }
+  } else if (options.scope == AttributeStatisticsScope::kEvents) {
     for (const auto& trace : log.traces) {
       for (const auto& event : trace.events) {
         const auto* value = event_value(trace, event, options.attribute_key);
@@ -286,8 +415,9 @@ AttributeStatisticsResult discover_attribute_statistics(
     else if (row.key->second == "float") floats = true;
     else others = true;
   }
+  // (The frame view holds its columns' typed cells already.)
   const bool ints_as_floats =
-      options.dataframe_column_types && ints && !others && (missing || floats);
+      !frame_path && options.dataframe_column_types && ints && !others && (missing || floats);
   std::vector<std::string> float_texts;
   float_texts.reserve(rows.size());
 

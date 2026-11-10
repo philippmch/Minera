@@ -105,14 +105,10 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
   const std::string resource_key = o.resource_attribute.empty() ? "org:resource" : o.resource_attribute;
   const std::string activity_key = o.activity_attribute.empty() ? "concept:name" : o.activity_attribute;
   const std::string& group_key = o.group_attribute;
-  for (const auto* key : {&activity_key, &resource_key, &group_key})
+  // The activity and resource columns are read first, and their groupby
+  // sorts before the group column is read.
+  for (const auto* key : {&activity_key, &resource_key})
     if (!keys.contains(*key)) throw std::invalid_argument("KeyError: " + python_repr(*key));
-  // A column named twice (the group as resource or activity, or with a group
-  // attribute the resource as activity) is no single column to pandas there.
-  if (group_key == resource_key || group_key == activity_key)
-    throw std::invalid_argument("KeyError: " + python_repr(group_key));
-  if (o.explicit_groups.empty() && resource_key == activity_key)
-    throw std::invalid_argument("KeyError: " + python_repr(resource_key));
 
   LocalDiagnosticsResult result;
   result.diagnostics.trace_count = input.trace_count();
@@ -161,6 +157,17 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
     }
   try {
     (void)python::groupby(pair_keys);
+  } catch (const python::TypeError& error) {
+    throw std::invalid_argument(std::string("TypeError: ") + error.what());
+  }
+  if (!keys.contains(group_key)) throw std::invalid_argument("KeyError: " + python_repr(group_key));
+  // A column named twice (the group as resource or activity, or with a group
+  // attribute the resource as activity) is no single column to pandas there.
+  if (group_key == resource_key || group_key == activity_key)
+    throw std::invalid_argument("KeyError: " + python_repr(group_key));
+  if (o.explicit_groups.empty() && resource_key == activity_key)
+    throw std::invalid_argument("KeyError: " + python_repr(resource_key));
+  try {
     (void)python::groupby(group_keys);
   } catch (const python::TypeError& error) {
     throw std::invalid_argument(std::string("TypeError: ") + error.what());
