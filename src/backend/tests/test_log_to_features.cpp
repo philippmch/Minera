@@ -6,8 +6,10 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/json_export.hpp"
 #include "minera/timestamp.hpp"
 
@@ -726,6 +728,75 @@ static void default_trace_strings_have_fixed_cardinality_limit() {
   result = log_to_features(log, options);
   assert(count_prefix(result, "trace:group@") == 13);
   assert(count_prefix(result, "event:label@") == 13);
+}
+
+static void csv_case_column_is_the_reference_trace_concept_name() {
+  // read_csv, format_dataframe and convert_to_event_log: the case column is
+  // the trace's concept:name; a case_id header also stays an event
+  // attribute; the activity column is the events' concept:name and keeps its
+  // own header too (pm4py, 3 cases; names compared as sets, since the
+  // reference orders TRACE_BASED columns by Python set order).
+  const auto sorted = [](std::vector<std::string> names) {
+    std::sort(names.begin(), names.end());
+    return names;
+  };
+  for (const std::string header : {"case:concept:name", "case_id"}) {
+    std::istringstream csv(header + ",activity,timestamp,case:grp\n"
+                           "c1,a,2024-01-01T00:00:00+00:00,g1\n"
+                           "c2,b,2024-01-01T01:00:00+00:00,g2\n"
+                           "c3,a,2024-01-01T02:00:00+00:00,g1\n");
+    minera::CsvImportOptions import;
+    import.case_id_column = header;
+    const auto log = minera::import_csv_event_log(csv, import);
+    LogToFeaturesOptions options;
+    const auto native = log_to_features(log, options);
+    assert(std::count(native.feature_names.begin(), native.feature_names.end(),
+                      "trace:" + header + "@c1") == 1);
+    options.standard_keys = true;
+    const bool copied = header == "case_id";
+    std::vector<std::string> trace_names{
+        "trace:grp@g1", "trace:grp@g2", "event:concept:name@a", "event:concept:name@b",
+        "event:activity@a", "event:activity@b", "succession:concept:name@UNDEFINED"};
+    std::vector<std::string> event_names{"event:activity@a", "event:activity@b",
+                                         "event:concept:name@a", "event:concept:name@b"};
+    if (copied)
+      for (const char* id : {"c1", "c2", "c3"}) {
+        trace_names.push_back(std::string("event:case_id@") + id);
+        event_names.push_back(std::string("event:case_id@") + id);
+      }
+    const auto reference = log_to_features(log, options);
+    assert(sorted(reference.feature_names) == sorted(trace_names));
+    assert(reference.trace_rows.size() == 3);
+    if (copied) {
+      const auto at = std::find(reference.feature_names.begin(), reference.feature_names.end(),
+                                "event:case_id@c2") - reference.feature_names.begin();
+      assert(std::get<double>(reference.trace_rows[1][at]) == 1.0);
+      assert(std::get<double>(reference.trace_rows[0][at]) == 0.0);
+    }
+    options.variant = LogToFeaturesVariant::EVENT_BASED;
+    const auto events = log_to_features(log, options);
+    assert(sorted(events.feature_names) == sorted(event_names));
+  }
+  // format_dataframe leaves a resource column under its header, so the
+  // default org:resource key gives no workload columns (pm4py).
+  for (const std::string header : {"org:resource", "resource"}) {
+    std::istringstream csv("case:concept:name,concept:name,time:timestamp," + header + "\n"
+                           "c1,a,2024-01-01T00:00:00+00:00,r1\n"
+                           "c2,b,2024-01-01T01:00:00+00:00,r2\n");
+    minera::CsvImportOptions import;
+    import.case_id_column = "case:concept:name";
+    import.activity_column = "concept:name";
+    import.timestamp_column = "time:timestamp";
+    import.resource_column = header;
+    const auto log = minera::import_csv_event_log(csv, import);
+    LogToFeaturesOptions options;
+    options.standard_keys = true;
+    options.enable_all_extra_features = true;
+    const auto result = log_to_features(log, options);
+    const auto workload = std::count_if(result.feature_names.begin(), result.feature_names.end(),
+        [](const std::string& name) { return name.starts_with("resource_workload@@"); });
+    assert(workload == (header == "org:resource" ? 2 : 0));
+  }
 }
 
 static void default_trace_selection_validates_all_candidate_hashability() {
@@ -3202,6 +3273,7 @@ int main() {
   temporal_calendar_semi_month_and_week_of_month();
   default_trace_selection_validates_all_candidate_hashability();
   default_trace_strings_have_fixed_cardinality_limit();
+  csv_case_column_is_the_reference_trace_concept_name();
   default_trace_selection_ignores_custom_core_schema();
   trace_extra_timestamps_respect_native_values_and_presence();
   concurrency_uses_exact_comparison_and_required_accesses();

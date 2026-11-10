@@ -5620,7 +5620,8 @@ void handle_profile_clustering(const httplib::Request& request,
     };
     const bool include_cases = clustering_cases_requested(request, *session);
     // The reference SKLEARN_PROFILES pipeline unless profile_engine=native.
-    const auto profile_request = minera::parse_profile_clustering_request(lookup, present);
+    auto profile_request = minera::parse_profile_clustering_request(lookup, present);
+    profile_request.options.standard_keys = standard_keys_for_session(*session);
     const auto& options = profile_request.options;
     if (options.cluster_count > kServerProfileMaxClusters ||
         options.max_iterations > kServerProfileMaxIterations ||
@@ -7324,7 +7325,8 @@ void handle_log_to_features(const httplib::Request& request,
     const auto lookup = [&](std::string_view name) { const auto key = std::string(name); return request.has_param(key) ? request.get_param_value(key) : std::string{}; };
     const auto present = [&](std::string_view name) { return request.has_param(std::string(name)); };
     const bool include_source = transformation_source_requested(request, *session);
-    const auto options = minera::parse_log_to_features_params(lookup, present);
+    auto options = minera::parse_log_to_features_params(lookup, present);
+    options.standard_keys = standard_keys_for_session(*session);
     auto body = minera::log_to_features_json(minera::log_to_features(require_prepared_log(*session), options));
     if (include_source) body = transformation_json(*session, std::move(body));
     response.set_content(body, "application/json");
@@ -11655,9 +11657,12 @@ bool loopback_port_in_use(int port) {
 int main(int argc, char** argv) {
 #if defined(__GLIBC__)
   // Bound the per-thread arenas and map large buffers (logs, response bodies)
-  // directly, so memory freed after a request returns to the system.
+  // directly, so memory freed after a request returns to the system. Four
+  // arenas let the alignment searches that run side by side on a large log
+  // (up to four threads, see check_alignment) allocate without queueing on
+  // one arena lock: with two, four threads ran about as fast as one.
 #if defined(M_ARENA_MAX)
-  mallopt(M_ARENA_MAX, 2);
+  mallopt(M_ARENA_MAX, 4);
 #endif
 #if defined(M_MMAP_THRESHOLD)
   mallopt(M_MMAP_THRESHOLD, 1 << 20);

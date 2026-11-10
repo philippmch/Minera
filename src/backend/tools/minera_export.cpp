@@ -900,7 +900,7 @@ int usage(const char* program) {
                "  --drift-sub-log-size <n> Positive raw sub-log size\n"
                "  --drift-window-size <n> Positive comparison window size\n"
                "  --drift-num-permutations <n> Permutation count\n"
-               "  --drift-threshold <f>    Threshold in [0,1]\n"
+               "  --drift-threshold <f>    P-value threshold (any finite value)\n"
                "  --drift-max-no-change-points <n> Result cap\n"
                "  --drift-seed <n>         Non-negative RNG seed\n"
                "  --drift-include-timestamps <bool> Include timestamps\n"
@@ -7245,7 +7245,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       };
       // The reference SKLEARN_PROFILES pipeline unless
       // --profile-clustering-engine native.
-      const auto request = minera::parse_profile_clustering_request(lookup, present);
+      auto request = minera::parse_profile_clustering_request(lookup, present);
+      request.options.standard_keys = ends_with_ci(cli_path_text(input), ".csv");
       const auto body = minera::profile_clustering_json(
           minera::run_profile_clustering(log, request));
       if (output.empty()) std::cout << body << '\n';
@@ -7336,7 +7337,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto present = [&](std::string_view name) {
         return features_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_log_to_features_params(lookup, present);
+      auto params = minera::parse_log_to_features_params(lookup, present);
+      params.standard_keys = ends_with_ci(cli_path_text(input), ".csv");
       write_cli_json(output, minera::log_to_features_json(minera::log_to_features(log, params)));
       return 0;
     }

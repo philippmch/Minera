@@ -98,7 +98,16 @@ bool is_numeric_kind(AttributeKind k) {
 }
 
 std::optional<EventAttribute> numeric_cell(const Event& event, const std::string& key) {
-  return native_event_attribute(event, key);
+  auto cell = native_event_attribute(event, key);
+  // A CSV row's case column under its own header (see event_feature_keys).
+  if (!cell && !key.empty() && key == event.case_id_source_key && !key.starts_with("case:") &&
+      key != "concept:name" && event.case_id_state == FirstClassAttributeState::kPresent) {
+    EventAttribute value;
+    value.key = key;
+    value.value = event.case_id;
+    return value;
+  }
+  return cell;
 }
 
 std::optional<EventAttribute> numeric_cell(const Trace& trace, const std::string& key) {
@@ -155,7 +164,7 @@ bool native_string_cell(const EventAttribute& attribute) {
 }
 
 std::optional<EventAttribute> event_feature_cell(const Event& event, const std::string& key) {
-  auto cell = native_event_attribute(event, key);
+  auto cell = numeric_cell(event, key);
   const auto matches_projection = [&](const std::string& source,
                                       const std::optional<EventAttribute>& stored,
                                       const char* canonical, const char* alias) {
@@ -176,7 +185,13 @@ std::optional<EventAttribute> event_feature_cell(const Event& event, const std::
   return cell;
 }
 
-std::vector<std::string> event_feature_keys(const EventLog& log) {
+// standard_keys (a CSV-sourced log): format_dataframe copies the case,
+// activity and timestamp columns into case:concept:name, concept:name and
+// time:timestamp and keeps the original columns, so convert_to_event_log
+// gives every event both names; a case column not prefixed with case:
+// becomes an ordinary event attribute (a case:-prefixed one goes to the
+// trace, the standard one is the trace's concept:name).
+std::vector<std::string> event_feature_keys(const EventLog& log, bool standard_keys) {
   std::set<std::string> keys;
   for (const auto& trace : log.traces) for (const auto& event : trace.events) {
     for (const auto& attribute : event.attributes) keys.insert(attribute.key);
@@ -188,6 +203,12 @@ std::vector<std::string> event_feature_keys(const EventLog& log) {
     };
     add(event.activity_source_key, event.activity_attribute, "concept:name");
     add(event.timestamp_source_key, event.timestamp_attribute, "time:timestamp");
+    if (standard_keys) {
+      keys.insert("concept:name");
+      keys.insert("time:timestamp");
+      if (!event.case_id_source_key.empty() && !event.case_id_source_key.starts_with("case:"))
+        keys.insert(event.case_id_source_key);
+    }
     add(event.resource_source_key, event.resource_attribute, "org:resource");
     add(event.lifecycle_source_key, event.lifecycle_attribute, "lifecycle:transition");
   }
@@ -257,12 +278,12 @@ bool trace_inference_hashable(EventAttribute attribute) {
 }
 
 std::vector<std::string> inferred_event_attributes(const EventLog& log,
-                                                   bool numeric) {
+                                                   bool numeric, bool standard_keys) {
   std::map<std::string, std::size_t> occurrences;
   std::map<std::string, std::set<std::string>> string_values;
   std::set<std::string> has_string;
   const auto trace_count = log.trace_count();
-  const auto keys = event_feature_keys(log);
+  const auto keys = event_feature_keys(log, standard_keys);
   for (const auto& trace : log.traces) {
     std::set<std::string> seen;
     for (const auto& event : trace.events) {
@@ -291,7 +312,8 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
 }
 
 std::vector<std::string> inferred_trace_attributes(const EventLog& log,
-                                                   bool numeric) {
+                                                   bool numeric,
+                                                   bool standard_keys) {
   std::map<std::string, std::size_t> occurrences;
   std::map<std::string, std::set<std::string>> string_values;
   std::set<std::string> has_string;
@@ -299,9 +321,11 @@ std::vector<std::string> inferred_trace_attributes(const EventLog& log,
   for (const auto& trace : log.traces) {
     std::set<std::string> keys;
     for (const auto& attribute : trace.attributes) keys.insert(attribute.key);
-    keys.insert(!trace.case_id_source_key.empty() ? trace.case_id_source_key
+    const std::string case_key = standard_keys ? "concept:name"
+        : !trace.case_id_source_key.empty() ? trace.case_id_source_key
         : trace.case_id_attribute && !trace.case_id_attribute->key.empty()
-            ? trace.case_id_attribute->key : "concept:name");
+            ? trace.case_id_attribute->key : "concept:name";
+    keys.insert(case_key);
     keys.erase("concept:name");
     for (const auto& key : keys) {
       const auto attribute = numeric_cell(trace, key);
@@ -1042,10 +1066,10 @@ LogToFeaturesResult log_to_features(const EventLog& log,
       !event_numbers.empty() || !case_strings.empty() || !case_numbers.empty();
   if (options.variant == LogToFeaturesVariant::TRACE_BASED) {
     if (!explicit_trace_selection) {
-      event_strings = inferred_event_attributes(log, false);
-      event_numbers = inferred_event_attributes(log, true);
-      case_strings = inferred_trace_attributes(log, false);
-      case_numbers = inferred_trace_attributes(log, true);
+      event_strings = inferred_event_attributes(log, false, options.standard_keys);
+      event_numbers = inferred_event_attributes(log, true, options.standard_keys);
+      case_strings = inferred_trace_attributes(log, false, options.standard_keys);
+      case_numbers = inferred_trace_attributes(log, true, options.standard_keys);
       if (options.enable_activity_def_representation &&
           std::find(event_strings.begin(), event_strings.end(), options.activity_key) == event_strings.end())
         event_strings.push_back(options.activity_key);
@@ -1056,7 +1080,7 @@ LogToFeaturesResult log_to_features(const EventLog& log,
     append_unique(event_strings, {}); append_unique(event_numbers, {});
     if (log.traces.empty())
       throw std::invalid_argument("log_to_features: event-based extraction requires a trace");
-    const auto candidates = event_feature_keys(log);
+    const auto candidates = event_feature_keys(log, options.standard_keys);
     if (options.event_string_attributes.empty() && options.event_attributes.empty())
       event_strings = options.event_string_attributes_supplied ? std::vector<std::string>{} : candidates;
     if (options.event_numeric_attributes.empty() && options.event_attributes.empty())
@@ -1216,6 +1240,14 @@ LogToFeaturesResult log_to_features(const EventLog& log,
         add_name("indirectPathPerformanceLastOcc@@" + from + "##" + to);
     if (wip) add_name("@@work_in_progress");
     const auto resource_value = [&](const Event& event) -> std::optional<std::string> {
+      // format_dataframe copies only the case, activity and timestamp
+      // columns: a CSV's resource column keeps its header, so the default
+      // org:resource key finds nothing when the header differs.
+      if (options.standard_keys && !event.resource_source_key.empty() &&
+          event.resource_source_key != options.resource_key &&
+          std::none_of(event.attributes.begin(), event.attributes.end(),
+                       [&](const EventAttribute& value) { return value.key == options.resource_key; }))
+        return std::nullopt;
       const auto attribute = numeric_cell(event, options.resource_key);
       if (!attribute) return std::nullopt;
       if (!native_string_cell(*attribute))

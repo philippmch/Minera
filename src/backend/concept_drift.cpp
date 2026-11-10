@@ -79,10 +79,10 @@ void validate_options(const ConceptDriftOptions& options, std::size_t trace_coun
     throw std::invalid_argument(
         "concept drift: max_no_change_points exceeds safe bound");
   }
-  if (!std::isfinite(options.threshold) || options.threshold < 0.0 ||
-      options.threshold > 1.0) {
-    throw std::invalid_argument(
-        "concept drift: threshold must be finite and in [0,1]");
+  // Any finite threshold is accepted, as the reference compares p < threshold
+  // without a range check: above 1 every window qualifies, below 0 none does.
+  if (!std::isfinite(options.threshold)) {
+    throw std::invalid_argument("concept drift: threshold must be finite");
   }
 
   const std::size_t sublog_count =

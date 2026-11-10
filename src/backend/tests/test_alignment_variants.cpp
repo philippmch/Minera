@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cmath>
 #include <limits>
@@ -36,6 +37,28 @@ minera::EventLog log_with_activity_attribute() {
       minera::Event{"1", "raw-b", {}, {}, 1,
                     {{"phase", "b", minera::AttributeKind::kString}}});
   return minera::EventLog{{std::move(trace)}};
+}
+minera::EventLog log_with_variants(const std::vector<std::vector<std::string>>& traces) {
+  minera::EventLog log;
+  std::size_t index = 0;
+  for (std::size_t k = 0; k < traces.size(); ++k) {
+    minera::Trace trace;
+    trace.case_id = std::to_string(k);
+    for (const auto& activity : traces[k])
+      trace.events.push_back(minera::Event{trace.case_id, activity, {}, {}, index++});
+    log.traces.push_back(std::move(trace));
+  }
+  return log;
+}
+
+bool same_moves(const std::vector<minera::AlignmentMove>& left,
+                const std::vector<minera::AlignmentMove>& right) {
+  if (left.size() != right.size()) return false;
+  for (std::size_t i = 0; i < left.size(); ++i)
+    if (left[i].type != right[i].type || left[i].activity != right[i].activity ||
+        left[i].transition != right[i].transition)
+      return false;
+  return true;
 }
 }
 
@@ -458,6 +481,62 @@ int main() {
     options.variant = variant;
     const auto result = minera::check_alignment(log_of({"a", "b"}), v1_net, options);
     assert(result.computed && result.fitness == 1.0 && result.total_cost == 0.0);
+  }
+  // Review AJ3: a log of 32 or more variants aligns them on several threads;
+  // each variant's result, the totals and the summed diagnostics are those of
+  // aligning it alone (one variant runs the sequential loop).
+  {
+    std::vector<std::vector<std::string>> traces;
+    for (int noise = 0; noise < 5; ++noise)
+      for (int repeats = 1; repeats <= 8; ++repeats) {
+        std::vector<std::string> trace{"a"};
+        for (int i = 0; i < noise; ++i) trace.push_back("x");
+        for (int i = 0; i < repeats; ++i) trace.push_back(i % 2 ? "y" : "b");
+        traces.push_back(std::move(trace));
+      }
+    traces.push_back(traces[3]);  // a repeated variant counts twice
+    const auto many = log_with_variants(traces);
+    minera::AlignmentOptions options;
+    const auto all = minera::check_alignment(many, model, options);
+    assert(all.computed && all.variants.size() == 40);
+    double total = 0.0;
+    std::uint64_t visited = 0;
+    for (const auto& variant : all.variants) {
+      const auto alone = minera::check_alignment(log_with_variants({variant.activities}), model,
+                                                 options);
+      assert(alone.computed && alone.variants.size() == 1);
+      const auto& single = alone.variants.front();
+      assert(variant.count ==
+             std::uint64_t(std::count(traces.begin(), traces.end(), variant.activities)));
+      assert(same_moves(variant.moves, single.moves));
+      assert(variant.cost == single.cost && variant.fitness == single.fitness);
+      assert(variant.diagnostics.visited_states == single.diagnostics.visited_states);
+      total += single.cost * double(variant.count);
+      visited += single.diagnostics.visited_states;
+    }
+    assert(all.total_cost == total && all.diagnostics.visited_states == visited);
+
+    // A search that stops (here at its state budget) on any variant leaves
+    // the log uncomputed, as the sequential loop does.
+    auto capped_traces = traces;
+    capped_traces[37] = std::vector<std::string>(40, "x");
+    auto capped_options = options;
+    capped_options.max_states = 30;
+    const auto capped = minera::check_alignment(log_with_variants(capped_traces), model,
+                                                capped_options);
+    assert(!capped.computed && capped.exhausted && capped.variants.empty());
+
+    // Cancellation (called from every thread) and the total time bound stop
+    // the log the same way.
+    std::atomic<int> polls{0};
+    auto cancelled_options = options;
+    cancelled_options.cancelled = [&] { return ++polls > 5; };
+    const auto cancelled = minera::check_alignment(many, model, cancelled_options);
+    assert(!cancelled.computed && cancelled.exhausted && !cancelled.time_limit_reached);
+    auto timed_options = options;
+    timed_options.max_total_time_seconds = 1e-9;
+    const auto timed = minera::check_alignment(many, model, timed_options);
+    assert(!timed.computed && timed.exhausted && timed.time_limit_reached);
   }
   return 0;
 }

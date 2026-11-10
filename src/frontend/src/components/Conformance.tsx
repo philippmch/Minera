@@ -499,7 +499,7 @@ function ConceptDriftPanel({ onRequest }: { onRequest?: (options?: ConceptDriftO
       <label>Sub-log size<input type="number" min={1} step={1} value={subLogSize} onChange={event => setSubLogSize(event.target.valueAsNumber)} /></label>
       <label>Window size<input type="number" min={1} step={1} value={windowSize} onChange={event => setWindowSize(event.target.valueAsNumber)} /></label>
       <label>Permutations<input type="number" min={1} max={1_000_000} step={1} value={numPermutations} onChange={event => setNumPermutations(event.target.valueAsNumber)} /></label>
-      <label>Threshold<input type="number" min={0} max={1} step="any" value={threshold} onChange={event => setThreshold(event.target.valueAsNumber)} /></label>
+      <label>Threshold<input type="number" step="any" value={threshold} onChange={event => setThreshold(event.target.valueAsNumber)} /></label>
       <label>Maximum change points<input type="number" min={0} max={1_000_000} step={1} value={maxChangePoints} onChange={event => setMaxChangePoints(event.target.valueAsNumber)} /></label>
       <label>Random seed<input type="number" min={0} step={1} value={seed} onChange={event => setSeed(event.target.valueAsNumber)} /></label>
       <label>Activity attribute<input value={activityAttribute} onChange={event => setActivityAttribute(event.target.value)} /></label>

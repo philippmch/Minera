@@ -95,6 +95,17 @@ struct LogToFeaturesOptions {
   bool enable_max_concurrent_events_per_activity_supplied = false;
   // Omitted: concept:name for TRACE; case:concept:name for calendar TEMPORAL.
   std::optional<std::string> case_id_key;
+  // A CSV-sourced log reaches the reference through read_csv,
+  // format_dataframe and convert_to_event_log. format_dataframe copies the
+  // case, activity and timestamp columns to case:concept:name, concept:name
+  // and time:timestamp and keeps the originals, so the trace's case id is
+  // its concept:name (which default inference never selects), every event
+  // also carries the standard activity and timestamp keys, and a case column
+  // without the case: prefix stays an event attribute. The resource column
+  // keeps only its own header. Otherwise each keeps its own source key (an
+  // XES trace attribute chosen as case id stays an inferable trace
+  // attribute, say).
+  bool standard_keys = false;
   // Calendar TEMPORAL destinations for derived event-table columns.
   std::string arrival_rate = "@@arrival_rate";
   std::string finish_rate = "@@finish_rate";

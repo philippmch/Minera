@@ -1200,6 +1200,7 @@ LogToFeaturesOptions reference_profile_features(const ProfileClusteringOptions& 
   features.event_numeric_attributes_supplied = !options.event_numeric_attributes.empty();
   features.feature_names = options.feature_names;                              // feature_names
   features.feature_names_supplied = !options.feature_names.empty();
+  features.standard_keys = options.standard_keys;
   return features;
 }
 

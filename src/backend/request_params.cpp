@@ -5389,8 +5389,6 @@ ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
   }
   if (supplied("drift_threshold")) {
     params.threshold = parse_finite_double(require("drift_threshold"), "drift_threshold");
-    if (params.threshold < 0.0 || params.threshold > 1.0)
-      throw std::invalid_argument("drift_threshold must be finite and in [0,1]");
   }
   if (supplied("drift_max_no_change_points"))
     params.max_no_change_points = parse_nonnegative_size(require("drift_max_no_change_points"), "drift_max_no_change_points");

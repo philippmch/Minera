@@ -737,8 +737,11 @@ void concept_drift_params_contract() {
   assert(p.activity_attribute == "event:type" &&
          p.timestamp_attribute == "started_at" &&
          p.case_id_attribute == "case:order");
+  // Thresholds outside [0, 1] are accepted as the reference accepts them.
+  assert(minera::parse_concept_drift_params(fields({{"drift_threshold", "2"}})).threshold == 2.0);
+  assert(minera::parse_concept_drift_params(fields({{"drift_threshold", "-0.5"}})).threshold == -0.5);
   bool threw = false;
-  try { (void)minera::parse_concept_drift_params(fields({{"drift_threshold", "2"}})); }
+  try { (void)minera::parse_concept_drift_params(fields({{"drift_threshold", "nan"}})); }
   catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
   threw = false;

@@ -20783,3 +20783,109 @@ declared items remain.
 Tests: `minera_ocel_tests` (`standard_json_declares_frame_column_types_contract`;
 the catalog round trip now expects `string` for an integer attribute that
 has values), `minera_ocel_xml_tests`.
+
+## Review AJ1: concept drift thresholds, feature keys of CSV logs (2026-11-10)
+
+A sweep compared concept drift (BOSE) and feature extraction with pm4py on
+generated logs. Both were already close; two root causes were left, both
+fixed:
+
+- **AJ1-1 Drift thresholds outside [0, 1].** pm4py compares each p-value
+  with `p < thresh_p_value` and does no range check, so a threshold above 1
+  makes every window a change point (up to the cap) and a negative one finds
+  none. `/api/concept-drift`, the CLI (`--drift-threshold`), the BOSE
+  workbench and the core rejected anything outside [0, 1]. They now accept
+  any finite value with pm4py's results; NaN and infinity are still refused.
+  The Conformance view's threshold field has no bounds any more.
+- **AJ1-2 Feature keys of a CSV log.** pm4py reaches a CSV log through
+  `read_csv`, `format_dataframe` and `convert_to_event_log`.
+  `format_dataframe` copies the case, activity and timestamp columns into
+  `case:concept:name`, `concept:name` and `time:timestamp` and keeps the
+  originals. So on pm4py's side:
+  - the case id is the trace's `concept:name`, which default inference never
+    selects. Minera inferred it as a trace attribute under its own header
+    (`trace:case_id@c1`, …);
+  - a case column without the `case:` prefix stays an event attribute, so
+    pm4py one-hot encodes it (`event:case_id@c1`, …), and an activity or
+    timestamp column with its own header appears beside the standard key
+    (`event:activity@a`). Minera listed neither;
+  - the resource column is not copied, so with a header other than
+    `org:resource` the default resource key finds nothing and
+    `enable_all_extra_features` gives no `resource_workload` columns. Minera
+    read the mapped resource column under any header.
+
+  `LogToFeaturesOptions::standard_keys` now models this; the server and the
+  CLI set it for a CSV source, for `/api/log-to-features` and for the
+  profile features of trace clustering. XES and other sources keep their
+  own keys.
+
+Declared:
+
+- **BLAS rounding on exact norm ties.** BOSE compares Euclidean norms of
+  mean differences with `>=`. When two splits of a window give the same
+  norm mathematically, the BLAS kernel's rounding decides. Minera emulates
+  the OpenBLAS kernel of the Windows runtime declared in the BOSE
+  checkpoint. This container's numpy uses the SkylakeX kernel (AVX-512),
+  which sums the 16 lanes in another order. On fuzz seed 258 (window size 3,
+  100 permutations) the window at offset 3 has three splits with the norm
+  6.429100507328637. For permutation seed 0, pm4py here gives that window
+  p = 0.33 and Minera 0.14, so the two pick different change points (pm4py
+  one at p = 0.06, Minera another at 0.04). A SkylakeX model of the same
+  norm matched pm4py on all 30 permutation seeds tried. On such ties,
+  pm4py's own results depend on the CPU it runs on.
+- **Negative counts stay refused.** pm4py also accepts a negative
+  `sub_log_size`, `num_permutations` or `max_no_change_points` and slices
+  or loops with it (a negative window size raises in both). Minera keeps
+  rejecting these, as the strict controls of the concept-drift adapters
+  do.
+
+Verification against pm4py:
+
+| Check | Cases | Result |
+|---|---|---|
+| Concept drift fuzz (`/api/concept-drift`; 1–3 played-out trees per log, random sizes, windows, permutations, thresholds and caps; change points, p-values, sub-log sizes) | 295 logs | 294 equal; seed 258 is the declared tie |
+| Drift edge parameters (thresholds −0.1, 0, 1, 1.5; window 1, 30 and −2; sub-log size 1, 1000 and −5; 1 and −3 permutations; cap 0 and −1) | 3 logs × 14 | equal, except the negative sub-log size, permutation count and cap, which Minera refuses (declared) |
+| Feature fuzz (`/api/log-to-features`, trace-based, event-based and all extra features; case, activity, timestamp and resource headers standard or custom) | 300 CSV logs | equal (25 of the first 150 differed before AJ1-2) |
+
+Tests: `minera_log_to_features_tests`
+(`csv_case_column_is_the_reference_trace_concept_name`),
+`minera_request_params_tests` (thresholds 2 and −0.5 accepted, NaN
+refused), `minera_bose_workbench_json_tests` (threshold 1.1 returns).
+
+## Review AJ2: alignments of a large log on several threads (2026-11-10)
+
+A large-log sweep timed the routes that round AD did not cover. On a
+50,000-case CSV log (1,440 variants, inductive model), `/api/align` took
+918 s. The variant searches made up nearly all of it, and they are
+independent of each other. pm4py's A* needs about nine times as long per
+variant on the same net, so this is not a parity gap, but the route is the
+slowest one a user reaches from the UI.
+
+- **AJ2-1 Variant searches in parallel.** `check_alignment` now runs the
+  per-variant searches of a log with 32 or more variants on up to four
+  threads (three helpers and the caller), then reads the outcomes in variant
+  order exactly as the sequential loop does. The first variant that stops
+  the log (a search bound, an invalid cost, the total time limit or
+  cancellation) ends it as before, and a variant that throws rethrows in
+  order. Cost callbacks, which need not be thread-safe, keep the sequential
+  loop, and the caller's cancellation callback is called under a lock.
+- **AJ2-2 Malloc arenas in the server.** The server limited glibc to two
+  malloc arenas (so freed memory returns to the system), and the searches,
+  which allocate a node per state, then queued on the arena locks: four
+  threads aligned a 3,000-case slice in about 245 s against 288 s for one.
+  Four arenas bring it to 73.5 s (eight gave 73.2 s).
+
+Verification:
+
+| Check | Log | Result |
+|---|---|---|
+| `/api/align` JSON, parallel against the sequential build | 1,000-, 2,000- and 3,000-case slices (245, 247 and 454 variants) | byte-identical |
+| Same, whole log | 50,000 cases (1,440 variants) | byte-identical (5.9 MB) |
+| `/api/align` time, whole log | 50,000 cases | 918 s (923 s on the rerun) → 215 s |
+| `/api/align` time, 3,000-case slice | 454 variants | 288 s → 73.5 s |
+| Small slices | 1,000 and 2,000 cases | 1.5 s → 0.6 s, 1.0 s → 0.5 s |
+
+Tests: `minera_alignment_variants_tests` (40 variants: each equals its
+own alignment, totals and summed diagnostics; a capped variant, a
+cancellation called from every thread and the total time bound leave the
+log uncomputed).

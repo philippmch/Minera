@@ -103,6 +103,9 @@ struct ProfileClusteringOptions {
   std::vector<std::string> trace_numeric_attributes;
   std::vector<std::string> event_numeric_attributes;
   std::vector<std::string> feature_names;
+  // LogToFeaturesOptions::standard_keys for the reference profile
+  // extraction (true for a CSV-sourced log).
+  bool standard_keys = false;
 };
 
 struct ProfileClusteringDiagnostics {

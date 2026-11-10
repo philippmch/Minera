@@ -6802,40 +6802,147 @@ AlignmentResult check_alignment(const EventLog& event_log,
     return result;
   }
   const double baseline_model_cost = weighted_empty;
-  for (const auto& variant : variants) {
-    if ((options.max_total_time_seconds > 0.0 &&
-         std::chrono::duration<double>(std::chrono::steady_clock::now() - total_start)
-                 .count() >= options.max_total_time_seconds) ||
-        (options.cancelled && options.cancelled())) {
-      result.computed = false;
-      result.exhausted = true;
-      result.time_limit_reached = out_of_time(total_start, 0.0);
-      return result;
-    }
-    AlignmentOptions trace_options = options;
-    if (options.max_total_time_seconds > 0.0) {
-      const double elapsed = std::chrono::duration<double>(
-          std::chrono::steady_clock::now() - total_start).count();
-      const double remaining = std::max(0.0, options.max_total_time_seconds - elapsed);
-      if (trace_options.max_time_seconds <= 0.0 || remaining < trace_options.max_time_seconds)
-        trace_options.max_time_seconds = remaining;
-    }
-    if (trace_options.trace_cost_function) {
-      trace_options.trace_costs_by_position.resize(variant.names.size());
-      for (std::size_t i = 0; i < variant.names.size(); ++i) {
-        trace_options.trace_costs_by_position[i] =
-            trace_options.trace_cost_function(variant.names[i], i);
-        if (!std::isfinite(trace_options.trace_costs_by_position[i]) ||
-            trace_options.trace_costs_by_position[i] < 0.0) {
-          result.computed = false;
-          result.exhausted = false;
-          return result;
+  // The variant searches are independent and deterministic, so a large log
+  // runs them on up to four threads and the loop below consumes the
+  // outcomes in variant order, exactly as it consumes sequential ones (a
+  // failure stops the helpers from starting later variants). Cost callbacks,
+  // which need not be thread-safe, keep the sequential loop; the caller's
+  // cancellation callback is called under a lock.
+  constexpr std::size_t kParallelAlignmentVariants = 32;
+  constexpr std::size_t kMaxAlignmentHelpers = 3;
+  const std::size_t hardware_threads =
+      std::max<std::size_t>(1, std::thread::hardware_concurrency());
+  const bool parallel_variants =
+      variants.size() >= kParallelAlignmentVariants && hardware_threads > 1 &&
+      !options.model_cost_function && !options.sync_cost_function &&
+      !options.trace_cost_function;
+  struct PrecomputedVariant {
+    bool stopped = false;  // out of total time or cancelled before it began
+    std::exception_ptr error;
+    Aligner::ConfiguredOutcome outcome;
+    std::chrono::steady_clock::time_point start;
+    double time_limit = 0.0;
+  };
+  std::vector<PrecomputedVariant> precomputed;
+  std::mutex cancel_mutex;
+  std::function<bool()> locked_cancel;
+  if (parallel_variants) {
+    if (options.cancelled)
+      locked_cancel = [&] {
+        const std::lock_guard<std::mutex> lock(cancel_mutex);
+        return options.cancelled();
+      };
+    precomputed.resize(variants.size());
+    std::atomic<std::size_t> next_variant{0};
+    std::atomic<std::size_t> first_stop{variants.size()};
+    const auto stop_at = [&](std::size_t index) {
+      std::size_t current = first_stop.load();
+      while (index < current && !first_stop.compare_exchange_weak(current, index)) {}
+    };
+    const auto work = [&] {
+      for (;;) {
+        const std::size_t index = next_variant.fetch_add(1);
+        if (index >= variants.size() || index > first_stop.load()) return;
+        auto& slot = precomputed[index];
+        try {
+          if ((options.max_total_time_seconds > 0.0 &&
+               std::chrono::duration<double>(std::chrono::steady_clock::now() - total_start)
+                       .count() >= options.max_total_time_seconds) ||
+              (locked_cancel && locked_cancel())) {
+            slot.stopped = true;
+            stop_at(index);
+            continue;
+          }
+          AlignmentOptions trace_options = options;
+          trace_options.cancelled = locked_cancel;
+          if (options.max_total_time_seconds > 0.0) {
+            const double elapsed = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - total_start).count();
+            const double remaining = std::max(0.0, options.max_total_time_seconds - elapsed);
+            if (trace_options.max_time_seconds <= 0.0 || remaining < trace_options.max_time_seconds)
+              trace_options.max_time_seconds = remaining;
+          }
+          slot.time_limit = trace_options.max_time_seconds;
+          slot.start = std::chrono::steady_clock::now();
+          slot.outcome = aligner.align_configured(variants[index].ids, variants[index].names,
+                                                  trace_options);
+          if (slot.outcome.invalid_cost || slot.outcome.primary.capped) stop_at(index);
+        } catch (...) {
+          slot.error = std::current_exception();
+          stop_at(index);
         }
       }
-      trace_options.trace_cost_function = {};
+    };
+    std::vector<std::thread> helpers;
+    struct JoinHelpers {
+      std::vector<std::thread>& threads;
+      ~JoinHelpers() {
+        for (auto& thread : threads)
+          if (thread.joinable()) thread.join();
+      }
+    } join_helpers{helpers};
+    const std::size_t helper_count = std::min<std::size_t>(
+        {kMaxAlignmentHelpers, hardware_threads - 1, variants.size() - 1});
+    for (std::size_t k = 0; k < helper_count; ++k) {
+      try {
+        helpers.emplace_back(work);
+      } catch (...) {
+        break;  // fewer threads; the calling thread takes the rest
+      }
     }
-    const auto trace_start = std::chrono::steady_clock::now();
-    auto configured = aligner.align_configured(variant.ids, variant.names, trace_options);
+    work();
+  }
+  for (std::size_t variant_index = 0; variant_index < variants.size(); ++variant_index) {
+    const auto& variant = variants[variant_index];
+    AlignmentOptions trace_options = options;
+    std::chrono::steady_clock::time_point trace_start;
+    Aligner::ConfiguredOutcome configured;
+    if (parallel_variants) {
+      auto& slot = precomputed[variant_index];
+      if (slot.error) std::rethrow_exception(slot.error);
+      if (slot.stopped) {
+        result.computed = false;
+        result.exhausted = true;
+        result.time_limit_reached = out_of_time(total_start, 0.0);
+        return result;
+      }
+      trace_options.max_time_seconds = slot.time_limit;
+      trace_start = slot.start;
+      configured = std::move(slot.outcome);
+    } else {
+      if ((options.max_total_time_seconds > 0.0 &&
+           std::chrono::duration<double>(std::chrono::steady_clock::now() - total_start)
+                   .count() >= options.max_total_time_seconds) ||
+          (options.cancelled && options.cancelled())) {
+        result.computed = false;
+        result.exhausted = true;
+        result.time_limit_reached = out_of_time(total_start, 0.0);
+        return result;
+      }
+      if (options.max_total_time_seconds > 0.0) {
+        const double elapsed = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - total_start).count();
+        const double remaining = std::max(0.0, options.max_total_time_seconds - elapsed);
+        if (trace_options.max_time_seconds <= 0.0 || remaining < trace_options.max_time_seconds)
+          trace_options.max_time_seconds = remaining;
+      }
+      if (trace_options.trace_cost_function) {
+        trace_options.trace_costs_by_position.resize(variant.names.size());
+        for (std::size_t i = 0; i < variant.names.size(); ++i) {
+          trace_options.trace_costs_by_position[i] =
+              trace_options.trace_cost_function(variant.names[i], i);
+          if (!std::isfinite(trace_options.trace_costs_by_position[i]) ||
+              trace_options.trace_costs_by_position[i] < 0.0) {
+            result.computed = false;
+            result.exhausted = false;
+            return result;
+          }
+        }
+        trace_options.trace_cost_function = {};
+      }
+      trace_start = std::chrono::steady_clock::now();
+      configured = aligner.align_configured(variant.ids, variant.names, trace_options);
+    }
     result.diagnostics.visited_states += configured.diagnostics.visited_states;
     result.diagnostics.queued_states = std::max(
         result.diagnostics.queued_states, configured.diagnostics.queued_states);
