@@ -219,6 +219,11 @@ node scripts/verify-reference-parity.mjs /path/to/reference-2.7.22 --require-com
 | `data/` | The sample event log. |
 | `third_party/` | Vendored build dependencies. |
 
+## Contributing
+
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+Report security problems privately as described in [SECURITY.md](SECURITY.md).
+
 ## Acknowledgements
 
 Minera owes a great deal to [PM4Py](https://github.com/process-intelligence-solutions/pm4py).
