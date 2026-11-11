@@ -4388,7 +4388,10 @@ row-wise `BusinessHours` apply with its errors, every time statistic now
 shares one `BusinessHours.get_seconds` model (the old segment sum differed
 on 752 of 30,000 pairs), and case arrival on frames ignores business hours
 as pm4py's pandas variant does. Details: Review AY1. mingw-w64 with Wine
-reproduced the Windows failures that are not MSVC-specific.
+reproduced the Windows failures that are not MSVC-specific. The second
+Windows run left two (Review AY3): the evaluation regression test removed
+an open file, and the future offsets of Greenland's and Chile's zones
+follow Windows' ICU tz release (declared; the test prints them).
 
 Next round (AZ) should start by re-reviewing round AY:
 
@@ -4406,8 +4409,9 @@ Next round (AZ) should start by re-reviewing round AY:
   Windows through the zone database) and its three callers; only CI shows
   the Windows side;
 - `case_arrival.cpp`: frames ignore business hours, logs keep them;
-- the CI run of the AY commit: Windows should now pass ctest; any failure
-  there is a finding.
+- the CI run of the AY3 commit: Windows should now pass ctest; any failure
+  there is a finding, and the zone-database test's stderr lists the values
+  that follow the OS tz release (check they are only the declared zones);
 
 Found in AY's sweeps and not yet fixed (CSV uploads of `aysweep.py`, the
 same on round AX's server): local diagnostics on an upload without

@@ -22507,3 +22507,22 @@ from ICU in the user's locale (`GMT+2` where the IANA database says
 `CEST`), so a zone abbreviation in a Windows build's text can differ from
 pm4py's; offsets and instants are the same. The tests accept any
 non-empty abbreviation on MSVC.
+
+## Review AY3: the second Windows test run (2026-11-11)
+
+With AY2's fixes the Windows run passed 449 of 451 tests (run 42952886689).
+Findings:
+
+- **AY3-1** The evaluation regression test removed the export's output
+  file while its stream was still open; Windows refuses to delete an open
+  file, so `std::filesystem::remove` threw and the test aborted without a
+  message. The stream is now closed first, and the test reports an
+  unexpected exception instead of aborting.
+
+Declaration: MSVC's `std::chrono` time-zone database is the tz release in
+Windows' ICU, which can predate rule changes the reference's zoneinfo has
+(Greenland's in 2023 and 2024, Chile's). For those zones a Windows build's
+offsets after the change can differ from pm4py's; the zone-database test
+prints and counts such values for America/Nuuk, America/Godthab,
+America/Scoresbysund and America/Santiago on MSVC and requires every other
+zone to match.

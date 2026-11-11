@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -68,8 +69,13 @@ std::string run_export(const std::vector<std::string>& arguments) {
 #endif
   const int status = std::system(command.c_str());
   assert(status == 0);
-  std::ifstream input(output);
-  std::string text((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+  std::string text;
+  {
+    std::ifstream input(output);
+    text.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+  }
+  // Closed first: Windows cannot remove a file that is still open, and
+  // fs::remove throws there (review AY3).
   fs::remove(output);
   return text;
 }
@@ -191,11 +197,16 @@ int main(int argc, char** argv) {
   }
   fixtures = argv[1];
   if (argc > 2) export_binary = argv[2];
-  align_etconformance_uses_pnml_ids();
-  emd_compares_variant_probabilities();
-  emd_rejects_empty_trace_like_reference();
-  petri_footprints_follow_reference();
-  ptml_import_sorts_like_reference();
+  try {
+    align_etconformance_uses_pnml_ids();
+    emd_compares_variant_probabilities();
+    emd_rejects_empty_trace_like_reference();
+    petri_footprints_follow_reference();
+    ptml_import_sorts_like_reference();
+  } catch (const std::exception& error) {
+    std::cerr << "unexpected exception: " << error.what() << "\n";
+    return 1;
+  }
   std::cout << "evaluation quality regressions passed\n";
   return 0;
 }

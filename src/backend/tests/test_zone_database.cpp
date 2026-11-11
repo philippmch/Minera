@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -26,8 +27,29 @@ bool missing_backward_link(std::string_view zone) {
 }
 
 // MSVC's database takes abbreviations from the system ICU in the user's
-// locale ("GMT+2" or "MEZ" for CEST; declared, review AY1); offsets and
-// transitions are IANA's everywhere.
+// locale ("GMT+2" or "MEZ" for CEST; declared, review AY2).
+// MSVC's database is the tz release in Windows' ICU, which can predate the
+// rule changes of Greenland (2023-2024) and Chile that the expected values
+// (Python zoneinfo on Linux) have: those zones are compared and their
+// differences printed and counted there (declared, review AY3).
+bool os_release_rules(std::string_view zone) {
+#if defined(_MSC_VER)
+  return zone == "America/Godthab" || zone == "America/Nuuk" ||
+         zone == "America/Scoresbysund" || zone == "America/Santiago";
+#else
+  (void)zone;
+  return false;
+#endif
+}
+int os_release_differences = 0;
+void os_release_difference(std::string_view zone, std::int64_t at, std::int64_t expected,
+                           std::int64_t got) {
+  ++os_release_differences;
+  std::fprintf(stderr, "OS tz release: %.*s at %lld: offset %lld, IANA %lld\n",
+               static_cast<int>(zone.size()), zone.data(), static_cast<long long>(at),
+               static_cast<long long>(got), static_cast<long long>(expected));
+}
+
 bool abbreviation_is(const zd::SysInfo& info, std::string_view expected) {
 #if defined(_MSC_VER)
   (void)expected;
@@ -127,7 +149,12 @@ void recurring_rules_after_2037() {
   };
   for (const auto& expected : kExpected) {
     if (missing_backward_link(expected.zone)) continue;
-    assert(zd::info_at_utc(expected.zone, expected.utc).offset_seconds == expected.offset);
+    const auto got = zd::info_at_utc(expected.zone, expected.utc).offset_seconds;
+    if (got != expected.offset) {
+      os_release_difference(expected.zone, expected.utc, expected.offset, got);
+      assert(os_release_rules(expected.zone));
+      continue;
+    }
     // The same instant read back as wall time is unique at that offset.
     const auto back = zd::info_at_local(expected.zone, expected.utc + expected.offset);
     assert(back.result == zd::LocalResult::kUnique && back.first_offset_seconds == expected.offset);
@@ -146,7 +173,12 @@ void recurring_rules_after_2037() {
   for (const auto& expected : kExpectedLocal) {
     if (missing_backward_link(expected.zone)) continue;
     const auto info = zd::info_at_local(expected.zone, expected.wall);
-    assert(static_cast<int>(info.result) == expected.result);
+    if (static_cast<int>(info.result) != expected.result || info.first_offset_seconds != expected.first ||
+        info.second_offset_seconds != expected.second) {
+      os_release_difference(expected.zone, expected.wall, expected.first, info.first_offset_seconds);
+      assert(os_release_rules(expected.zone));
+      continue;
+    }
     assert(info.first_offset_seconds == expected.first && info.second_offset_seconds == expected.second);
     const auto localized = minera::localize_timestamp_wall_time(wall(expected.wall), expected.zone);
     assert(localized.has_value() == (expected.result == 0));
@@ -162,6 +194,11 @@ void negative_transition_hours() {
   constexpr std::int64_t kOverlap = 2550699000;      // 2050-10-29 23:30
   for (const std::string_view zone : {"America/Nuuk", "America/Godthab"}) {
     if (missing_backward_link(zone)) continue;
+    if (const auto got = zd::info_at_utc(zone, kJuly15_2038).offset_seconds; got != -3600) {
+      os_release_difference(zone, kJuly15_2038, -3600, got);
+      assert(os_release_rules(zone));
+      continue;
+    }
     assert(zd::info_at_utc(zone, kJuly15_2038).offset_seconds == -3600);
     auto local = zd::info_at_local(zone, kGap);
     assert(local.result == zd::LocalResult::kNonexistent &&
@@ -172,7 +209,10 @@ void negative_transition_hours() {
     assert(!minera::localize_timestamp_wall_time(wall(kGap), zone));
     assert(!minera::localize_timestamp_wall_time(wall(kOverlap), zone));
   }
-  assert(zd::info_at_utc("America/Scoresbysund", kJuly15_2038).offset_seconds == -3600);
+  if (const auto got = zd::info_at_utc("America/Scoresbysund", kJuly15_2038).offset_seconds; got != -3600) {
+    os_release_difference("America/Scoresbysund", kJuly15_2038, -3600, got);
+    assert(os_release_rules("America/Scoresbysund"));
+  }
 }
 
 // A unique wall time reports no second offset at all.
@@ -203,5 +243,7 @@ int main() {
   negative_transition_hours();
   unique_local_times_have_no_second_offset();
   unknown_zones_are_rejected();
+  if (os_release_differences != 0)
+    std::fprintf(stderr, "%d values follow the OS tz release (declared, review AY3)\n", os_release_differences);
   return 0;
 }
