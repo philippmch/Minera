@@ -4391,7 +4391,17 @@ as pm4py's pandas variant does. Details: Review AY1. mingw-w64 with Wine
 reproduced the Windows failures that are not MSVC-specific. The second
 Windows run left two (Review AY3): the evaluation regression test removed
 an open file, and the future offsets of Greenland's and Chile's zones
-follow Windows' ICU tz release (declared; the test prints them).
+follow Windows' ICU tz release (declared; the test prints them). With
+those, the CI run of the AY3 commit passed on every platform. AY also ran
+the suite under AddressSanitizer and UBSan (a separate tree, `-O1`, core
+as a shared library so the test binaries fit the disk): no memory error
+or undefined behaviour in 449 tests. The server contract test's
+address-space limits cannot run under ASan (its shadow memory needs the
+address space), the POWL and fast-path timing bounds do not hold at ASan's
+speed, the cancellation test's one-second bound missed once, and seven
+large test files (conformance contracts, the pandas LTL and Polars
+workbench banks) run the container out of memory when compiled with
+ASan; build those one at a time on a larger machine if needed.
 
 Next round (AZ) should start by re-reviewing round AY:
 
@@ -4409,9 +4419,9 @@ Next round (AZ) should start by re-reviewing round AY:
   Windows through the zone database) and its three callers; only CI shows
   the Windows side;
 - `case_arrival.cpp`: frames ignore business hours, logs keep them;
-- the CI run of the AY3 commit: Windows should now pass ctest; any failure
-  there is a finding, and the zone-database test's stderr lists the values
-  that follow the OS tz release (check they are only the declared zones);
+- the CI runs: AY3's passed everywhere; the zone-database test prints the
+  values that follow Windows' tz release only when it fails, so a later
+  Windows image may need the declared zone list revisited;
 
 Found in AY's sweeps and not yet fixed (CSV uploads of `aysweep.py`, the
 same on round AX's server): local diagnostics on an upload without
@@ -4427,8 +4437,7 @@ single characters (probe: `ldprobe_ay.py` in the round's harness).
 Candidate new areas: business hours on the EventLog paths; CPython's
 `year 0 is out of range` for `datetime(1, 1, 1).timestamp()` in a zone
 east of UTC (Minera returns a value); `long` (32-bit on Windows) in
-`trace_attribute_reference.cpp`; the ASan/UBSan pass if AY's did not
-finish (see the round's summary). Still open from earlier rounds: the
+`trace_attribute_reference.cpp`. Still open from earlier rounds: the
 trace-based selection of mixed-type and bool-with-gaps keys by Python set
 order (AQ, AV1). Harness: `review-harness/round-ay/` (README there).
 
