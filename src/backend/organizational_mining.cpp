@@ -308,8 +308,13 @@ OrganizationalSnaResult discover_organizational_sna(
       require_sortable_variants(sequences);
     }
     std::vector<python::Scalar> resource_values, activity_values;
+    // The case-grouped pandas variants sort the resources of the rows their
+    // groupby keeps: a row without a case is left out (round BD, observed
+    // black-box).
+    const bool grouped = case_id_variant(options.variant);
     for (const auto& trace : log.traces)
       for (const auto& event : trace.events) {
+        if (grouped && !frame_row_scalar(log, trace, event, options.case_id_attribute)) continue;
         const auto resource = cell(trace, event, options.resource_attribute);
         if (joint) {
           const auto activity = cell(trace, event, options.activity_attribute);

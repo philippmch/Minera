@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BB (2026-11-05 to 2026-11-11, cloud container)
+## Review-fix loop, rounds T–BD (2026-11-05 to 2026-11-11, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4464,7 +4464,45 @@ which pm4py types by the first element of the Python set of its cells
 `llmsweep.py` is closed). The device check on the Mac was skipped again
 (the round's thread had no device linked).
 
-Next round (BD) should start by re-reviewing round BC:
+Round BD re-reviewed BC and took its open targets (Review BD1). It fixed:
+the trace-based default selection of an XES trace attribute (a `case:`
+column) of numbers, bools and gaps, which follows the same Python set
+order as event columns (profile clustering gets the same features); the
+workload metrics without a start column on an XES object timestamp column
+(the per-case shift is float64 when every shifted cell is a number, and
+the intervals are converted in the order of a second sort by start and
+timestamp: BC's open `objtime.py` seed 279); the case-grouped SNA pandas
+variants leave a row without a case out of the resource sort; and the
+event distribution on uploads now follows pm4py's DataFrame statistics
+(NaT makes the parts floats, `'3.0'` labels, the frame's datetimes are
+UTC, pandas' errors). The device check on the Mac was skipped again (the
+round's thread had no device linked).
+
+Next round (BE) should start by re-reviewing round BD:
+
+- `src/backend/log_to_features.cpp`: `frame_trace_set_numeric` (each
+  case's first row, `case:` columns of CSV uploads with per-row cells,
+  `VARY=1` of `boolselcase.py`);
+- `src/backend/resource_profiles.cpp`: `workload_conversion_error` (the
+  `same_case` shift, `shifted_numbers`, `value_codes` and the second sort),
+  swept with `wlshift.py` and `objtime.py`; check that
+  `average_duration_activity` without a start column needs no second sort
+  (`probes/adaprobe.py` says it compares with the window first);
+- `src/backend/organizational_mining.cpp`: the `grouped` skip of rows
+  without a case (`snamixcsv.py` with case columns of other types);
+- `src/backend/attribute_distribution.cpp`: `frame_event_distribution`
+  (`evdist.py` with ISO week 53 and pre-1970 dates, the CLI path);
+- new: attribute KDE on uploads (`kdesweep.py`: 64 of 90 jobs give
+  pm4py's own error texts, which Minera words as its own, and a bool or
+  bool-and-int column is a numeric KDE in pm4py but an error in Minera);
+- new: pandas' mixed date parsing of number-like text in a CSV column of
+  dates (format_dataframe converts every text column whose cells all
+  parse: `007` is 0001-01-07, `2020` is 2020-01-01; Minera keeps such a
+  column as text, `snamixcsv.py` seed 152);
+- the CI run of the BD commit.
+
+Round BC's targets, re-reviewed in BD (findings BD1-1 to BD1-4):
+
 
 - `src/backend/organizational_mining.cpp`: `require_sortable` (first
   appearance, `column_type_error`), `require_sortable_variants` (numpy's
@@ -4489,8 +4527,8 @@ Next round (BD) should start by re-reviewing round BC:
 Still open: the set-order selection of mixed-type keys (AQ, AV1; text and
 dates hash with the seed, so it stays declared), and Philipp's answer on
 whether the roles to diagnostics button should refuse uploads without an
-`org:group` column (AT). Harness: `review-harness/round-bc/` (README
-there).
+`org:group` column (AT). Harness: `review-harness/round-bd/` (README
+there; round BC's is `review-harness/round-bc/`).
 
 Round BB's targets, re-reviewed in BC (findings BC1-1 to BC1-8 in the
 code BB touched, its open SNA and LLM targets, and network analysis):

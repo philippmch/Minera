@@ -953,42 +953,99 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
   // is the previous row's timestamp in the sorted frame when that row is of
   // the same case (a missing one, or the case's first row, takes the row's
   // own timestamp); shifting makes an int64 column floats (round BB,
-  // observed black-box).
+  // observed black-box). The shift is per case, and pandas types the
+  // shifted column by the cells it holds: on an object column (XES) whose
+  // shifted cells are all ints and floats (no bool, text or date), it is
+  // float64, so a previous int cell becomes a float; a case's first row
+  // keeps its own cell's type (round BD, observed black-box).
+  const auto same_case = [&](std::size_t i) {
+    if (i == 0) return false;
+    const auto case_cell = frame_row_scalar(frame, *compared_rows[i].first, *compared_rows[i].second, c);
+    const auto previous_case =
+        frame_row_scalar(frame, *compared_rows[i - 1].first, *compared_rows[i - 1].second, c);
+    return case_cell && previous_case && python::identity(*case_cell) == python::identity(*previous_case);
+  };
   const auto workload_conversion_error = [&]() -> std::optional<std::string> {
     const auto t_dtype = frame_column_type(frame, t);
+    bool shifted_numbers = t_dtype == DataFrameColumnType::kObject;
+    if (!start && shifted_numbers)
+      for (std::size_t i = 1; i < compared_rows.size() && shifted_numbers; ++i)
+        if (same_case(i))
+          if (const auto previous = frame_row_scalar(frame, *compared_rows[i - 1].first, *compared_rows[i - 1].second, t))
+            shifted_numbers = python::is_number(*previous) && previous->kind != python::Scalar::Kind::kBool;
     const auto convert = [&](const std::optional<python::Scalar>& cell, const std::string& key,
-                             bool shifted) -> std::optional<std::string> {
+                             bool shifted, bool previous = false) -> std::optional<std::string> {
       if (!cell) {
         if (frame_column_type(frame, key) == DataFrameColumnType::kDate)
           return std::string("ValueError: NaTType does not support timestamp");
         return "AttributeError: '" + missing_name(key) + "' object has no attribute 'timestamp'";
       }
       if (cell->kind == python::Scalar::Kind::kDate) return std::nullopt;
-      const auto type = shifted && t_dtype == DataFrameColumnType::kInt64 ? std::string("float")
-                                                                           : python::type_name(*cell);
+      const bool floated = shifted && (t_dtype == DataFrameColumnType::kInt64 ||
+                                       (previous && shifted_numbers && cell->kind == python::Scalar::Kind::kInt));
+      const auto type = floated ? std::string("float") : python::type_name(*cell);
       return "AttributeError: '" + type + "' object has no attribute 'timestamp'";
     };
-    for (std::size_t i = 0; i < compared_rows.size(); ++i) {
-      const auto& [trace, event] = compared_rows[i];
-      const auto cell = frame_row_scalar(frame, *trace, *event, r);
-      if (!cell || (!all_resources && python::identity(*cell) != wanted)) continue;
-      const auto end = frame_row_scalar(frame, *trace, *event, t);
-      std::optional<python::Scalar> begin;
-      if (start) {
-        begin = frame_row_scalar(frame, *trace, *event, s);
-        if (const auto error = convert(begin, s, false)) return error;
-      } else {
-        begin = end;
-        if (i > 0) {
-          const auto case_cell = frame_row_scalar(frame, *trace, *event, c);
-          const auto& [previous_trace, previous_event] = compared_rows[i - 1];
-          const auto previous_case = frame_row_scalar(frame, *previous_trace, *previous_event, c);
-          if (case_cell && previous_case && python::identity(*case_cell) == python::identity(*previous_case))
-            if (auto previous = frame_row_scalar(frame, *previous_trace, *previous_event, t)) begin = std::move(previous);
-        }
-        if (const auto error = convert(begin, t, true)) return error;
+    const auto of_resource = [&](std::size_t i) {
+      const auto cell = frame_row_scalar(frame, *compared_rows[i].first, *compared_rows[i].second, r);
+      return cell && (all_resources || python::identity(*cell) == wanted);
+    };
+    if (start) {
+      // With a start column the rows keep the frame's order.
+      for (std::size_t i = 0; i < compared_rows.size(); ++i) {
+        if (!of_resource(i)) continue;
+        const auto& [trace, event] = compared_rows[i];
+        if (const auto error = convert(frame_row_scalar(frame, *trace, *event, s), s, false)) return error;
+        if (const auto error = convert(frame_row_scalar(frame, *trace, *event, t), t, false)) return error;
       }
-      if (const auto error = convert(end, t, false)) return error;
+      return std::nullopt;
+    }
+    // Without one the frame is sorted again, by the start and then the
+    // timestamp column, each an ordered Categorical (numbers before text,
+    // missing cells last), before the intervals are converted (round BD,
+    // observed black-box with cells that log their conversion).
+    std::vector<std::optional<python::Scalar>> begins(compared_rows.size()), ends(compared_rows.size());
+    std::vector<bool> previous_cells(compared_rows.size(), false);
+    for (std::size_t i = 0; i < compared_rows.size(); ++i) {
+      ends[i] = frame_row_scalar(frame, *compared_rows[i].first, *compared_rows[i].second, t);
+      begins[i] = ends[i];
+      if (same_case(i))
+        if (auto previous = frame_row_scalar(frame, *compared_rows[i - 1].first, *compared_rows[i - 1].second, t)) {
+          begins[i] = std::move(previous);
+          previous_cells[i] = true;
+        }
+    }
+    const auto value_codes = [&](const std::vector<std::optional<python::Scalar>>& values) {
+      std::vector<std::vector<python::Scalar>> keys;
+      std::vector<std::size_t> keyed;
+      for (std::size_t i = 0; i < values.size(); ++i)
+        if (values[i] && !python::is_missing(*values[i])) {
+          keys.push_back({*values[i]});
+          keyed.push_back(i);
+        }
+      std::vector<python::Group> groups;
+      try {
+        groups = python::groupby(keys);
+      } catch (const python::TypeError&) {
+        fail("TypeError: 'values' is not ordered, please explicitly specify the categories order by passing in a "
+             "categories argument.");
+      }
+      std::vector<std::size_t> code(values.size(), groups.size());
+      for (std::size_t g = 0; g < groups.size(); ++g)
+        for (const auto member : groups[g].rows) code[keyed[member]] = g;
+      return code;
+    };
+    const auto begin_codes = value_codes(begins);
+    const auto end_codes = value_codes(ends);
+    std::vector<std::size_t> order(compared_rows.size());
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t x, std::size_t y) {
+      return std::tie(begin_codes[x], end_codes[x]) < std::tie(begin_codes[y], end_codes[y]);
+    });
+    for (const auto i : order) {
+      if (!of_resource(i)) continue;
+      if (const auto error = convert(begins[i], t, true, previous_cells[i])) return error;
+      if (const auto error = convert(ends[i], t, false)) return error;
     }
     return std::nullopt;
   };

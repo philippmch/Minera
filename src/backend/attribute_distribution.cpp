@@ -11,7 +11,9 @@
 #include <stdexcept>
 #include <string_view>
 
+#include "minera/dataframe_columns.hpp"
 #include "minera/timestamp.hpp"
+#include "frame_cells.hpp"
 #include "reference_activity_selector.hpp"
 
 namespace minera {
@@ -112,6 +114,89 @@ int iso_week(const UtcParts& value) {
   return week;
 }
 
+// pm4py's DataFrame statistics (what view_events_distribution_graph calls
+// on a frame) take the column's .dt part: a column that is no datetime
+// column has no .dt accessor; a NaT cell makes the part a float column (its
+// labels '3.0'), while ISO weeks stay integers; the present values are
+// counted, labelled str(v).zfill(2) (weekdays by name, keyed by str(v)),
+// the fixed range gains the missing integers, years span min to max (a
+// float range raises), and the labels sort as text (round BD, observed
+// black-box and modelled against pm4py on 2,400 requests).
+AttributeDistributionResult frame_event_distribution(const EventLog& input, const AttributeDistributionOptions& options) {
+  const auto frame = dataframe_frame_event_log(input);
+  const auto& key = options.timestamp_key;
+  const auto type = frame_column_type(frame, key);
+  if (!type) throw std::invalid_argument("KeyError: '" + key + "'");
+  if (type != DataFrameColumnType::kDate)
+    throw std::invalid_argument("AttributeError: Can only use .dt accessor with datetimelike values");
+  AttributeDistributionResult result;
+  result.options = options;
+  const bool weeks = options.distribution == EventDistributionType::kWeeks;
+  const bool weekdays = options.distribution == EventDistributionType::kDaysWeek;
+  bool nat = false;
+  std::map<int, std::uint64_t> counts;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      const auto cell = frame_row_scalar(frame, trace, event, key);
+      if (!cell || cell->kind != python::Scalar::Kind::kDate) {
+        nat = true;
+        continue;
+      }
+      // A frame's datetime column is UTC (pm4py's read_xes keeps an XES
+      // date's wall clock as UTC; the frame cell carries that instant).
+      auto instant = cell->date;
+      instant.timezone_aware = false;
+      instant.offset_minutes = 0;
+      const auto parts = exact_parts(instant);
+      ++result.timed_events;
+      int bucket = 0;
+      switch (options.distribution) {
+        case EventDistributionType::kDaysMonth: bucket = parts.day; break;
+        case EventDistributionType::kMonths: bucket = parts.month; break;
+        case EventDistributionType::kYears: bucket = parts.year; break;
+        case EventDistributionType::kHours: bucket = parts.hour; break;
+        case EventDistributionType::kDaysWeek: bucket = parts.weekday; break;
+        case EventDistributionType::kWeeks: bucket = iso_week(parts); break;
+      }
+      ++counts[bucket];
+    }
+  const bool floats = nat && !weeks;
+  int first = 0, last = 0;
+  switch (options.distribution) {
+    case EventDistributionType::kDaysMonth: first = 1; last = 31; break;
+    case EventDistributionType::kMonths: first = 1; last = 12; break;
+    case EventDistributionType::kHours: first = 0; last = 23; break;
+    case EventDistributionType::kDaysWeek: first = 0; last = 6; break;
+    case EventDistributionType::kWeeks: first = 0; last = 52; break;
+    case EventDistributionType::kYears:
+      if (counts.empty()) throw std::invalid_argument("ValueError: min() arg is an empty sequence");
+      if (floats) throw std::invalid_argument("TypeError: 'float' object cannot be interpreted as an integer");
+      first = counts.begin()->first;
+      last = counts.rbegin()->first;
+      break;
+  }
+  const auto zfill = [](std::string text) { return text.size() < 2 ? std::string(2 - text.size(), '0') + text : text; };
+  std::map<std::string, std::uint64_t> labelled;  // sorted as text
+  for (const auto& [bucket, count] : counts) {
+    const auto text = floats ? std::to_string(bucket) + ".0" : std::to_string(bucket);
+    labelled[weekdays ? text : zfill(text)] = count;
+  }
+  for (int i = first; i <= last; ++i)
+    if (!counts.contains(i)) labelled[weekdays ? std::to_string(i) : zfill(std::to_string(i))] = 0;
+  static constexpr const char* kWeekdays[] = {"Monday", "Tuesday", "Wednesday", "Thursday",
+                                              "Friday", "Saturday", "Sunday"};
+  for (const auto& [label, count] : labelled) {
+    if (weekdays) {
+      if (label.size() != 1 || label[0] < '0' || label[0] > '6') throw std::invalid_argument("KeyError: '" + label + "'");
+      result.labels.emplace_back(kWeekdays[label[0] - '0']);
+    } else {
+      result.labels.push_back(label);
+    }
+    result.counts.push_back(count);
+  }
+  return result;
+}
+
 }  // namespace
 
 const char* event_distribution_name(EventDistributionType type) {
@@ -129,6 +214,7 @@ const char* event_distribution_name(EventDistributionType type) {
 AttributeDistributionResult discover_event_distribution(
     const EventLog& log, const AttributeDistributionOptions& options) {
   (void)event_distribution_name(options.distribution);
+  if (log.dataframe_columns) return frame_event_distribution(log, options);
   AttributeDistributionResult result;
   result.options = options;
   std::map<int, std::uint64_t> bins;

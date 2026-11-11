@@ -22995,3 +22995,104 @@ Verification (scripts in the project files under `review-harness/round-bc/`):
 
 `minera_review_bc1_tests` binds the values and messages above (taken from
 pm4py black-box on the same uploads, and from CPython for the set orders).
+
+## Review BD1: re-review of round BC, trace attributes in the set-order selection, the workload conversion order, and the event distribution on uploads (2026-11-11)
+
+Round BD re-reviewed BC (SNA's `NaT` resources and sort errors, resource
+profiles on XES object columns, the set-order selection) on CSV uploads,
+which BC had swept on XES only, took BC's open workload message, and swept
+the event distribution and the attribute KDE on uploads, which no earlier
+round had diffed on the DataFrame path. Findings, all fixed:
+
+- **BD1-1 The set-order selection of trace attributes.** pm4py types a
+  trace attribute (a `case:` column) of numbers, bools and gaps by the
+  first element of the Python set of the cases' cells (each case's first
+  row), as BC1-8 found for event columns: an XES log whose traces hold
+  `f` = `True`, `0.5`, `2.0` has a feature `trace:f` (0.5 hashes 2**60,
+  the first slot), `True`, `2.5` has none. Minera required a non-bool
+  number in every case (11 of 200 uploads of the new `boolselcase.py`,
+  all XES; CSV reads such a column as text). Profile clustering takes the
+  same features (`profsel.py`: one upload clustered by pm4py, refused by
+  Minera before the fix).
+- **BD1-2 The workload conversion without a start column.** On an XES
+  object timestamp column, `average_workload` and `multitasking` shift
+  the timestamp per case over the frame sorted by case and timestamp; the
+  shifted column is float64 when every shifted cell is an int or a float
+  (no bool, text or date), so an int start becomes a float, while a
+  case's first row keeps its own cell; the frame is then sorted again by
+  start and timestamp (each an ordered Categorical: numbers before text,
+  missing cells last) and each row of the resource converts its start,
+  then its end, with `.timestamp()`. Cells that log their conversion
+  showed the order. So `[c0: 'x' | c1: 'x', 1]` (resource of the two
+  `'x'` rows) raises `'float' object has no attribute 'timestamp'` (BC's
+  open `objtime.py` seed 279) and `[c0: 'x' | c1: 3]` names `int`. A
+  Python model matched pm4py on 2,780 requests before the port; the new
+  `wlshift.py` had 51 other messages of 1,200 before the fix.
+- **BD1-3 The case-grouped SNA pandas variants leave caseless rows out of
+  the resource sort.** Handover, working together and subcontracting
+  (pandas) group by the case column, so a row whose case cell is missing
+  takes no part in the sort of the resources: a NaN resource on such a
+  row no longer raises `'<' not supported between instances of 'float'
+  and 'str'` (`snamixcsv.py` seed 92, a CSV case column with gaps).
+- **BD1-4 The event distribution on uploads follows pm4py's DataFrame
+  statistics** (`attributes.pandas.get.get_events_distribution`, which
+  `view_events_distribution_graph` calls on a frame). Minera read the
+  event log: it refused a missing cell and binned an aware date by its
+  own offset. pm4py takes the column's `.dt` part: a column with `NaT`
+  makes the day, month, year, hour and weekday float columns, whose
+  present values are labelled `str(v).zfill(2)` (`'3.0'`), beside the
+  missing integers of the fixed range (`'04'`), all sorted as text;
+  weekdays are named by `str(v)` (`KeyError: '3.0'`), years span min to
+  max (`TypeError: 'float' object cannot be interpreted as an integer`,
+  or `ValueError: min() arg is an empty sequence` without dates), ISO
+  weeks stay integers; the frame's datetimes are UTC (a CSV `+02:00` cell
+  bins at its UTC hour; `read_xes` keeps an XES date's wall clock as
+  UTC); a column that is no datetime column has no `.dt` accessor, an
+  absent one is a `KeyError`. A Python model matched pm4py on 2,400
+  requests before the port; `evdist.py` had 9 differences and 29 other
+  messages of 120 before the fix.
+
+Re-review of BC without further findings: SNA's `NaT` resources, sort and
+categorical errors on CSV uploads (`snamixcsv.py`, the new CSV variant of
+BC's `snamix2.py`), resource profiles on XES object columns (`rpfuzzx.py`,
+`objtime.py`), the set-order selection of event columns (`boolsel.py`),
+the LLM context and features with varying case columns, ints past 64 bits
+in the set order (`probes/bigint.py`, 11 XES columns).
+
+Declarations:
+
+- pm4py's `format_dataframe` converts every text column whose cells all
+  parse as dates with pandas' mixed parser, including number-like text
+  such as `007` (0001-01-07) or `2020` beside real dates; Minera's date
+  grammar does not read those shapes and keeps such a column as text
+  (`snamixcsv.py` seed 152). Open for round BE.
+- A CSV text column of numbers, `True` and gaps (`3`, `-1`, `True`, blank)
+  is typed by a set holding text, whose order follows the hash seed: pm4py
+  makes it numeric (and raises `could not convert string to float:
+  'True'`) under some seeds and one-hot encodes it under others, as Minera
+  does (`boolselcase.py` seeds 72, 154, 170; the AQ and AV1 declaration).
+- Attribute KDE on uploads gives pandas' and numpy's own errors (a sort of
+  mixed cells, `str.replace` on a non-text cell, ufunc dtype errors) where
+  Minera words its own, and pm4py computes a numeric KDE of a bool or
+  bool-and-int column that Minera refuses (`kdesweep.py`: 6 differences
+  and 64 other messages of 90). Open for round BE.
+
+Verification (scripts in the project files under `review-harness/round-bd/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Trace-based selection of trace attributes of numbers, bools and gaps, CSV and XES (`boolselcase.py`, seeds 0 to 199) | 200 | before: 11 differences (XES); final: 197 equal, 3 declared hash-seed text columns |
+| Profile clustering on the same uploads (`profsel.py`, seeds 0 to 29) | 30 | before: 1 difference; final: 18 equal, 12 raise in both |
+| Workload metrics without a start column on XES object columns (`wlshift.py`, seeds 0 to 299) | 1,200 | before: 51 other messages; final: 97 equal, 1,103 raise in both with pm4py's message |
+| Resource profiles, XES object time columns (`objtime.py`, seeds 0 to 299) | 1,200 | 667 equal, 506 raise in both (seed 279 now equal), 27 declared NaN |
+| Resource profiles on XES uploads (`rpfuzzx.py`, seeds 0 to 149) and typed CSV (`rpfuzz.py`, seeds 300 to 399) | 2,000 | 1,046 equal, 915 raise in both, 39 declared NaN |
+| SNA, every variant, CSV columns of text, ints, floats, date strings and bools with gaps (`snamixcsv.py`, seeds 0 to 299) | 1,800 | before: 3 differences (seeds 53, 92, 124: 2 declared NaN, BD1-3); final: 656 equal, 910 raise in both, 233 declared NaN, 1 declared date parse (seed 152) |
+| BC's SNA sweep on mixed XES (`snamix2.py`, seeds 250 to 349) | 600 | 255 equal, 253 raise in both, 24 declared NaN, 68 messages under another hash seed or of a declared pair, 0 differences |
+| Round AS's SNA and roles sweep on CSV (`orgsweep.py`, seeds 600 to 699) and BC's network analysis on mixed XES (`namix.py`, seeds 300 to 399) | 1,000 | 569 equal, 352 raise in both, 79 declared NaN, 0 differences |
+| Set-order selection of event columns (`boolsel.py`, seeds 0 to 199) | 200 | 200 equal |
+| LLM context with varying case columns (`llmsweep.py` with `VARY=1`, seeds 0 to 99) and features (`featsweep.py`, seeds 0 to 59) | 680 | 670 equal (94 under another hash seed), 10 raise in both |
+| Event distribution on CSV and XES uploads (`evdist.py`, seeds 0 to 199) | 600 | before (seeds 0 to 39): 9 differences, 29 other messages; final: 600 equal |
+| Full ctest | 462 tests | 462 pass |
+
+`minera_review_bd1_tests` binds the values and messages above (taken from
+pm4py black-box on the same uploads).

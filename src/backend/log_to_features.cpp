@@ -351,9 +351,28 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
   return result;
 }
 
+// The same rule for a trace attribute of a frame (a case: column): the set
+// of the cases' cells, each case's first row, added in case order (round
+// BD, observed black-box: [True, 0.5, 2.0] is numeric, 0.5 hashing to the
+// first slot).
+std::optional<bool> frame_trace_set_numeric(const EventLog& frame, const std::string& key) {
+  const auto column = "case:" + key;
+  if (!frame_column_type(frame, column)) return std::nullopt;
+  std::vector<python::Scalar> cells;
+  for (const auto& trace : frame.traces) {
+    if (trace.events.empty()) continue;
+    auto cell = frame_row_scalar(frame, trace, trace.events.front(), column);
+    if (!cell) cell = python::real(std::numeric_limits<double>::quiet_NaN());
+    if (!python::is_number(*cell)) return std::nullopt;
+    cells.push_back(std::move(*cell));
+  }
+  if (cells.empty()) return std::nullopt;
+  return cells[python::number_set_order(cells).front()].kind != python::Scalar::Kind::kBool;
+}
+
 std::vector<std::string> inferred_trace_attributes(const EventLog& log,
                                                    bool numeric,
-                                                   bool standard_keys) {
+                                                   bool standard_keys, bool frame) {
   std::map<std::string, std::size_t> occurrences;
   std::map<std::string, std::set<std::string>> string_values;
   std::set<std::string> has_string;
@@ -380,6 +399,22 @@ std::vector<std::string> inferred_trace_attributes(const EventLog& log,
     }
   }
   std::vector<std::string> result;
+  if (frame && numeric) {
+    std::set<std::string> keys;
+    for (const auto& trace : log.traces)
+      for (const auto& attribute : trace.attributes)
+        if (attribute.key != "concept:name") keys.insert(attribute.key);
+    for (const auto& [key, count] : occurrences) keys.insert(key);
+    for (const auto& key : keys) {
+      const auto set_numeric = frame_trace_set_numeric(log, key);
+      const auto counted = occurrences.find(key);
+      const bool taken = set_numeric ? *set_numeric
+                                     : counted != occurrences.end() && counted->second == trace_count &&
+                                           !has_string.contains(key);
+      if (taken) result.push_back(key);
+    }
+    return result;
+  }
   for (const auto& [key, count] : occurrences)
     if (count == trace_count && has_string.contains(key) != numeric &&
         (numeric || string_values[key].size() <= 12))
@@ -1124,8 +1159,8 @@ LogToFeaturesResult log_to_features(const EventLog& source,
     if (!explicit_trace_selection) {
       event_strings = inferred_event_attributes(log, false, options.standard_keys, frame.has_value());
       event_numbers = inferred_event_attributes(log, true, options.standard_keys, frame.has_value());
-      case_strings = inferred_trace_attributes(log, false, options.standard_keys);
-      case_numbers = inferred_trace_attributes(log, true, options.standard_keys);
+      case_strings = inferred_trace_attributes(log, false, options.standard_keys, frame.has_value());
+      case_numbers = inferred_trace_attributes(log, true, options.standard_keys, frame.has_value());
       if (options.enable_activity_def_representation &&
           std::find(event_strings.begin(), event_strings.end(), options.activity_key) == event_strings.end())
         event_strings.push_back(options.activity_key);
