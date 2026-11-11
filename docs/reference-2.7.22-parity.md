@@ -22607,3 +22607,131 @@ CLI and the library, since every upload takes the frame path.
 `minera_review_az1_tests` binds the values and messages above (taken from
 pm4py black-box on the same uploads, and from CPython under
 `TZ=Europe/Berlin`).
+
+## Review BA1: re-review of round AZ, resource profiles on one column, and the time statistics through the CLI (2026-11-11)
+
+Round BA re-reviewed AZ (the two-row label rule, per-row `case:` columns,
+the per-resource duration check, CPython's year range, the OCEL
+microsecond rule) and took the targets AX had left open (the column
+subtraction and its callers, passed time, case statistics,
+`frame_column_type`, the NaN cell rule). Findings, all fixed:
+
+- **BA1-1 OCEL 1.0 JSON files with digits past the microsecond.**
+  `read_ocel_json` stores `datetime64[us]`, so `06:15:00.123456789Z` is
+  `06:15:00.123456` (pm4py's OCDFG edge `a -> b` lasts 7199.876544 s).
+  AZ kept nanoseconds for this format because routes pass Minera's own
+  classic JSON to each other as a lossless transport (declared in AZ1-6).
+  The transport now says so itself: a document Minera writes for another
+  route carries `"minera:nanoseconds": true` when an event or object change
+  time has digits past the microsecond, and only such a document is read at
+  nanoseconds; any other file is read at microseconds, as pm4py reads it.
+  Files written for users (CLI, export download) carry no marker. Of 400
+  random files, 64 exports and 21 OCDFG results differed before.
+- **BA1-2 `activity_frequency` with the activity and resource on the
+  timestamp column.** The selection names one column three times; pandas
+  then masks instead of realigning, so every row stays (a non-matching cell
+  is NaN) and pm4py returns len / len = 1.0 for any resource and activity,
+  unless the timestamp comparison meets a matching resource cell that is no
+  date (`TypeError: '>=' not supported ...`). Minera raised `cannot reindex
+  on an axis with duplicate labels` (AZ's two-row seed 727).
+- **BA1-3 `distinct_activities` on one column.** The same masks; `nunique`
+  skips the NaN cells, so each copy of the column counts the resource's one
+  value when a row of it lies in the window. pm4py returns that count (0 or
+  1) once per copy, as a Series; Minera returns the count (declared: a
+  profile row holds one value). Minera raised the reindex error (180
+  combinations of the duplicate-column matrix).
+- **BA1-4 The case metrics with the case column on the timestamp column.**
+  `case_completions` and `fraction_case_completions` group by the case
+  column before they compare or realign anything: pm4py raises `ValueError:
+  Grouper for '<column>' not 1-dimensional` whatever the resource and the
+  column's type. Minera raised the reindex error (900 combinations).
+- **BA1-5 `average_case_duration` with a start key.** pm4py reads the start
+  column from the cases' frame after it compared the timestamps and grouped
+  the cases, and any column but the timestamp column is a `KeyError` there
+  (even the resource column). Minera raised the `KeyError` first, where
+  pm4py raises the comparison's `TypeError` or the `Grouper` error (720
+  combinations).
+- **BA1-6 Passed time on an XES object column.** An XES column of dates
+  whose last row holds the text `NaT` (pm4py's `write_xes` writes a NaT
+  cell so) is an object column. With it as the timestamp key and a date
+  start column, the raised starts less the timestamps is pandas' column
+  subtraction: one pair is the whole array's subtraction and gives a
+  timedelta (pm4py returns the pair's 3,660 s), several pairs go cell by
+  cell and leave no `.dt` accessor. Minera always raised the `.dt` error
+  for a timestamp column that is no date column (AX's XES seed 2018).
+  Passed time now uses `frame_times::column_subtraction`, with the shifted
+  start column's dtype (int64 becomes float64, bool object).
+- **BA1-7 A column missing from the frame, named twice.** pandas names each
+  missing label once in `"[...] not in index"` (passed time with the start
+  key on the timestamp key, both missing: `KeyError: "['st'] not in
+  index"`); Minera listed it twice. The all-missing message keeps the full
+  index, as pandas does; the list-key checks of the pandas attribute and
+  timestamp filters counted a label named twice once, so an all-missing
+  `['b', 'b']` said `['b'] not in index` where pandas says `None of
+  [Index(['b', 'b'], dtype='str')] are in the [columns]`.
+- **BA1-8 A `case:` column of `True`/`False` with a blank.** `read_csv`
+  makes such a column object dtype, a `case:` column too; Minera applied
+  the rule to event columns only, so case statistics with the column as
+  timestamp key raised numpy's boolean subtraction error where pm4py
+  raises `AttributeError: Can only use .dt accessor with datetimelike
+  values`.
+- **BA1-9 The export CLI on XES files.** `minera_export` read an XES file as
+  an event log, so its time statistics took the log path: case statistics
+  with an event column as case key (`org:resource`) grouped nothing, and a
+  float start column for cycle time was `invalid start timestamp` where
+  pandas raises `AttributeError: 'float' object has no attribute
+  'timestamp'`. The CLI now reads the frame `pm4py.read_xes` returns, as
+  the server does (found by running round AX's time-statistics sweep
+  through the CLI).
+
+Re-review of AZ without further findings: local diagnostics, resource
+profiles and network analysis on CSV (seeds 1,200 to 1,349; varying case
+columns 150 to 269), two-row CSV (700 to 999) and XES uploads with varying
+case columns (450 to 549, `azsweep.py`), SNA and roles with varying case
+columns and on two rows (`orgsweep.py`), root cause, features, attribute
+statistics and the LLM context with varying case columns, and OCDFG,
+flattening and export of 430 random OCEL 1.0 JSON files with nanosecond
+texts against `read_ocel_json` (`ocelns.py`). The LLM sweep left one
+difference, open: trace-based feature selection of a bool column with gaps
+(below).
+
+Declarations:
+
+- `distinct_activities` on one column: pm4py returns a Series of three
+  equal counts, Minera the count (BA1-3).
+- The LLM context's `log_features` on a CSV with a bool column with gaps
+  (seed 17 of `llmsweep.py` with varying case columns): pm4py's default
+  trace-based selection leaves the column out under 58 of 60 hash seeds
+  (two raise `could not convert string to float: 'a'`), Minera selects it
+  as numeric. Probes over the column's other values (floats, ints, NaN,
+  text beside the bools) did not give a rule; it stays open with the
+  earlier set-order selection of mixed-type keys (AQ, AV1).
+
+Verification (`azsweep.py`, `orgsweep.py`, `statsweep.py`, `rccsv4.py`,
+`llmsweep.py`, `featsweep.py` from earlier rounds; `ocelns.py`,
+`mtmatrix2.py`, `ptnat.py`, `axsweep2.py` and `clisweep.py` new, in the
+project files under `review-harness/round-ba/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Re-review of AZ: profiles, diagnostics, network, CSV (seeds 1,200 to 1,349) | 2,384 | 1,401 equal, 923 raise in both, 60 NaN, 0 differences |
+| The same, `case:` columns varying within a case (seeds 150 to 269) | 1,995 | 1,182 equal, 755 raise in both, 58 NaN, 0 differences |
+| The same, two-row CSV (seeds 700 to 999) | 3,522 | before: 1 Minera-only error (BA1-2); final: 1,602 equal, 1,881 raise in both, 39 NaN |
+| The same, XES with varying `case:` columns (seeds 450 to 549) | 1,425 | 990 equal, 400 raise in both, 35 NaN, 0 differences |
+| SNA and roles, varying case columns (seeds 450 to 599) and two rows (seeds 400 to 549) | 1,800 | 683 equal, 1,006 raise in both, 111 declared NaN identities, 0 differences |
+| Attribute statistics (seeds 600 to 749), root cause and features with varying case columns | 5,884 | 5,111 equal, 773 raise in both, 0 differences |
+| LLM context, varying case columns (seeds 0 to 99) | 500 | 489 equal (24 under another hash seed), 10 raise in both, 1 open (seed 17, declared above) |
+| OCDFG, flattening and export of OCEL 1.0 JSON files with nanosecond texts | 1,862 / 2,005 | before (400 files): 21 OCDFG and 64 export differences; final (430 files): 0 differences |
+| Duplicate-column matrix of resource profiles: 10 metrics, 5 columns in each role, start or none, 3 case columns, 2 resources | 45,000 | before: 2,880 differences (BA1-2 to BA1-5) beside the 92 declared NaN; final: 0 differences (162 Series counts, BA1-3) |
+| Passed time, XES object timestamp columns of dates, `NaT` and other text, one to four events, one or two cases (`ptnat.py`) | 8,424 | before: 12 Minera-only errors (BA1-6), 24 `KeyError` texts (BA1-7); final: 594 equal, 7,830 raise in both |
+| Time statistics, XES round trip (seeds 2,000 to 2,119) | 1,800 | before (seeds 2,000 to 2,079): 1 Minera-only error (seed 2,018, BA1-6); final: 573 equal, 1,227 raise in both |
+| The same with typed `case:` columns, varying (XES seeds 3,000 to 3,079) | 1,200 | 286 equal, 914 raise in both |
+| Time statistics, CSV (seeds 2,000 to 2,119) | 1,800 | 611 equal, 1,189 raise in both |
+| Time statistics, CSV with typed `case:` columns (seeds 0 to 119, varying 200 to 319) | 3,600 | 1,025 equal, 2,575 raise in both (passed time rerun on the final build: 302 equal, 418 raise in both) |
+| Passed time, CSV, final build (seeds 2,000 to 2,119 and 2,200 to 2,499; typed `case:` columns 500 to 799, varying) | 2,160 | 1,048 equal, 1,112 raise in both |
+| Business hours, CSV (seeds 1,000 to 1,099) and XES (1,000 to 1,059) | 2,400 | 788 equal, 1,612 raise in both |
+| Time statistics through `minera_export`, XES and CSV (seeds 0 to 59 each) | 1,800 | before: XES case statistics with an event case key and float start columns differed (BA1-9); final: 619 equal, 1,181 raise in both |
+
+`minera_review_ba1_tests` binds the values and messages above (taken from
+pm4py black-box on the same uploads and files) and runs `minera_export` on
+an XES file.

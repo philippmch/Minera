@@ -1,3 +1,4 @@
+#include "minera/dataframe_columns.hpp"
 #include "minera/exact_filter_discovery_json.hpp"
 #include <memory>
 #include <streambuf>
@@ -6408,7 +6409,15 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       // write_xes(read_xes(..., return_legacy_log_object=True)) does.
       // The case-relation merger reads the frame's rows themselves.
       if (merge_requested) xes_frame_rows = log;
-      if (!convert_only) minera::merge_dataframe_cases(log);
+      if (!convert_only) {
+        minera::merge_dataframe_cases(log);
+        // The frame's columns and dtypes, as the server attaches them to an
+        // uploaded XES: the modes with a DataFrame path (time statistics,
+        // attribute statistics, features, root cause, organizational
+        // mining) then read the frame pm4py.read_xes returns (round BA).
+        log.dataframe_columns =
+            std::make_shared<minera::DataFrameColumns>(minera::xes_dataframe_columns(log));
+      }
     } else if (!correlation_variants.empty() || merge_requested) {
       csv_data = minera::import_csv_event_data(input, options);
       log = std::move(csv_data->log);

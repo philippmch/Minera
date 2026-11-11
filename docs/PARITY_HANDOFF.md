@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AZ (2026-11-05 to 2026-11-11, cloud container)
+## Review-fix loop, rounds T–BA (2026-11-05 to 2026-11-11, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4429,7 +4429,65 @@ trace-attribute helpers are 64-bit on Windows. The device check for new
 reviewer handoffs on the Mac was skipped (no device access from the
 round's thread).
 
-Next round (BA) should start by re-reviewing round AZ:
+Round BA re-reviewed AZ without a finding in its code (the AZ sweeps on
+fresh seeds, the two-row and varying-case-column sweeps of the
+organizational routes, root cause, features and the LLM context) and took
+AX's open targets. It fixed (Review BA1): the OCEL 1.0 JSON transport now
+marks itself (`"minera:nanoseconds": true`), so any other classic JSON
+file is read at microseconds as `read_ocel_json` reads it (the AZ
+declaration is gone); resource profiles with one column selected several
+times (`activity_frequency` and `distinct_activities` mask instead of
+realigning; the case metrics raise the `Grouper` error on the case column
+on the timestamp column; `average_case_duration` reads its start key after
+the comparison and the groupby); passed time on an XES object timestamp
+column of one pair now subtracts like pandas (`column_subtraction` with the
+shifted start dtype); a missing column named twice is named once in
+`not in index`; a `case:` bool column with a blank is object dtype; and
+the export CLI reads XES files as the frame, as the server does. Open: the
+trace-based selection of a bool column with gaps in the LLM context's
+`log_features` (seed 17, below). The device check on the Mac was skipped
+again (no device access from the round's thread).
+
+Next round (BB) should start by re-reviewing round BA:
+
+- `src/backend/resource_profiles.cpp`: `masked_frequency` and
+  `masked_distinct` (the one-column masks, the error branch they share
+  with `activity_completions`, the all-resources rows), the `Grouper`
+  check of the case metrics in `require_unique_selection`, the moved
+  start-key `KeyError` of `average_case_duration`; sweep
+  `mtmatrix2.py` with typed (int, float, bool, object) columns in each
+  role, which round BA's matrix did not vary;
+- `frame_passed_time` in `src/backend/passed_time.cpp`: the
+  `column_subtraction` call (the shifted dtype table, the one-pair whole
+  array) on CSV and XES uploads whose timestamp or start columns are
+  object, text, int, float or bool with missing cells, one pair or several;
+- `require_frame_columns` in `src/backend/frame_keys.cpp` (missing labels
+  once) and `check_list_columns` in `pandas_attributes_filter.cpp` and
+  `pandas_timestamp_filter.cpp` (an all-missing list key that names a
+  label twice is `None of [Index([...])]` with both, as pandas says);
+  still unchecked: `require_columns` in `pandas_sequence_filters.cpp`
+  deduplicates the names before its `None of` message, right only if the
+  pm4py function never selects a label twice;
+- the `minera:nanoseconds` marker in `src/backend/ocel.cpp`
+  (`write_nanoseconds`, the reader's `keep_nanoseconds`, every route that
+  passes classic JSON on: filters, flattening, OCDFG, statistics, exports,
+  the frontend's OCEL store);
+- `frame_column_type` for `case:` columns and the CLI's XES frame
+  (`minera_export.cpp`): every CLI flag on XES inputs now takes the frame
+  path, not only the time statistics;
+- the CI run of the BA commit.
+
+Still open: the LLM context's trace-based selection of a bool column with
+gaps (Review BA1 declarations; `llmsweep.py` seed 17 with `VARY=1`, and
+the probes `boolnan.py` and `boolnan2.py` in the round's harness), and the
+set-order selection of mixed-type keys (AQ, AV1). Candidate new areas: the
+EventLog paths of the business-hours model through the CLI; two-row
+uploads through the remaining routes; the other CLI flags on XES and CSV
+inputs against pm4py's frame functions. Harness: `review-harness/round-ba/`
+(README there).
+
+Round AZ's targets, re-reviewed in BA (no finding in AZ's code; BA1-1
+replaced the OCEL 1.0 JSON declaration):
 
 - the two-row label rule: `pandas_row_label_keys` and `label_characters`
   (`src/backend/frame_keys.cpp`), the `pair_labels` branches of
@@ -4454,10 +4512,11 @@ Next round (BA) should start by re-reviewing round AZ:
   such timestamps from JSON and XML against SQLite and CSV inputs;
 - the CI run of the AZ commit.
 
-Carried over from AX (not taken in AY or AZ): `frame_times::
-column_subtraction` and its callers, `frame_passed_time`, `frame_cases`
-and `frame_column_type`, and the NaN cell rule of `note_cell` and
-`typed_columns` (details in AX's list below). Candidate new areas: the
+Carried over from AX (not taken in AY or AZ, taken in BA: BA1-6 to
+BA1-8): `frame_times::column_subtraction` and its callers,
+`frame_passed_time`, `frame_cases` and `frame_column_type`, and the NaN
+cell rule of `note_cell` and `typed_columns` (details in AX's list
+below). Candidate new areas: the
 EventLog paths of the business-hours model through the CLI (uploads all
 take the frame path), and two-row uploads through the remaining routes.
 Still open from earlier rounds: the trace-based selection of mixed-type
@@ -4836,8 +4895,7 @@ easy soundness on 5 of 36 parallel-arc probe nets; the
 (pm4py sums per variant); BOSE norm ties decided by the BLAS kernel
 (pm4py's results depend on the CPU; Minera models the Windows kernel); the
 OCEL 1.0 JSON reader reads an empty timestamp in file order (pm4py raises;
-the classic format is the native transport) and keeps digits past the
-microsecond (pm4py drops them, as its other ISO readers do), and repeated object ids in
+the classic format is the native transport), and repeated object ids in
 the XML and SQLite readers stay refused (pm4py keeps a SQLite event or object
 per type-table row; native reads the first), a SQLite type missing from the
 map table falls back to native table names (pm4py raises); `merge_dataframe_cases` and gzip decompression are

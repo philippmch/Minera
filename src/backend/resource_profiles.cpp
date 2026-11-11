@@ -826,7 +826,6 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     if (!keys.contains(r)) fail("KeyError: '" + r + "'");
     if (!keys.contains(c)) fail("KeyError: '" + c + "'");
     if (!keys.contains(t)) fail("KeyError: 'Column not found: " + t + "'");
-    if (start && s != t) fail("KeyError: '" + s + "'");
   } else {
     try {
       require_frame_columns(keys, selection);
@@ -942,9 +941,26 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     if (named_in_selection(r) > 1) reindex();
     if (metric == ResourceProfileMetric::kAverageDurationActivity && named_in_selection(a) > 1) reindex();
   };
+  // activity_frequency with the activity and resource on the timestamp
+  // column selects that one column three times: its masks keep every row (a
+  // non-matching cell is NaN), as activity_completions does with the
+  // resource on the timestamp column, so the frame's length is both the
+  // numerator and the denominator (round BA).
+  const bool masked_frequency = metric == ResourceProfileMetric::kActivityFrequency && one_column;
+  // distinct_activities masks so too; nunique skips the NaN cells, so each
+  // copy of the column counts the resource's one value when a row of it
+  // lies in the window (pm4py returns that count three times, as a Series).
+  const bool masked_distinct = metric == ResourceProfileMetric::kDistinctActivities && one_column;
   const auto require_unique_selection = [&] {
     if (timed) return require_timed_selection(false);
+    // The case metrics group by the case column before they realign or
+    // compare anything: the case column on the timestamp column is two.
+    if ((metric == ResourceProfileMetric::kCaseCompletions ||
+         metric == ResourceProfileMetric::kFractionCaseCompletions) &&
+        c == t)
+      fail("ValueError: Grouper for '" + c + "' not 1-dimensional");
     if (metric == ResourceProfileMetric::kSocialPosition && one_column) return;
+    if (masked_frequency || masked_distinct) return;
     if (metric == ResourceProfileMetric::kAverageCaseDuration || metric == ResourceProfileMetric::kActivityCompletions)
       return;
     for (const auto& key : selection)
@@ -1042,8 +1058,13 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
                "' and 'datetime.datetime'");
       }
     if (c == t) fail("ValueError: Grouper for '" + t + "' not 1-dimensional");
+    // The cases' frame then reads the start column: any column but the
+    // timestamp one is a KeyError there (round BA: after the comparison and
+    // the groupby, observed black-box).
+    if (start && s != t) fail("KeyError: '" + s + "'");
     if (non_date_type(frame, t)) fail("AttributeError: Can only use .dt accessor with datetimelike values");
-  } else if (metric == ResourceProfileMetric::kActivityCompletions && r == t) {
+  } else if ((metric == ResourceProfileMetric::kActivityCompletions && r == t) || masked_frequency ||
+             masked_distinct) {
     // The resource on the timestamp column: the masks keep every row (a
     // non-matching cell is NaN), and the frame's timestamp comparison then
     // raises for a typed (numeric or bool) column of no dates, or for an
@@ -1218,15 +1239,22 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     }
   // activity_completions with the resource on the timestamp column selects
   // that column twice; its masks then keep every row (len of the frame).
-  if (metric == ResourceProfileMetric::kActivityCompletions && r == t) {
+  // activity_frequency on one column three times: len / len.
+  if ((metric == ResourceProfileMetric::kActivityCompletions && r == t) || masked_frequency) {
     const auto rows = static_cast<std::uint64_t>(frame.event_count());
+    const double value = masked_frequency ? 1.0 : static_cast<double>(rows);
+    const bool activity_given = !o.activity.empty() || o.activity_given;
+    const auto activity_of = [&](const std::string& resource) {
+      if (!masked_frequency) return std::string{};
+      return activity_given ? native.activity : resource;
+    };
     result.rows.clear();
     if (!all_resources) {
-      add_row(result, {native.resource, "", "", static_cast<double>(rows), rows}, o.max_rows);
+      add_row(result, {native.resource, activity_of(native.resource), "", value, rows}, o.max_rows);
     } else {
       for (const auto& [key, name] : resource_names) {
         (void)name;
-        add_row(result, {key, "", "", static_cast<double>(rows), rows}, o.max_rows);
+        add_row(result, {key, activity_of(key), "", value, rows}, o.max_rows);
       }
     }
   }

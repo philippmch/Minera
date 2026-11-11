@@ -98,11 +98,6 @@ std::optional<DataFrameColumnType> column_type(const frame_times::Frame& frame, 
   return frame.dtype(key);
 }
 
-bool numeric_type(std::optional<DataFrameColumnType> type) {
-  return type == DataFrameColumnType::kInt64 || type == DataFrameColumnType::kFloat64 ||
-         type == DataFrameColumnType::kBool || type == DataFrameColumnType::kObject;
-}
-
 // A cell as the shifted or unshifted column holds it: a missing cell is NaT
 // in a date column and NaN otherwise; shifting makes an int column floats.
 Scalar held(const std::optional<Scalar>& cell, std::optional<DataFrameColumnType> type, bool shifted) {
@@ -337,14 +332,26 @@ PassedTimeResult frame_passed_time(const EventLog& log, const PassedTimeOptions&
         std::none_of(pairs.begin(), pairs.end(), [&](const FramePair& pair) { return rows[pair.previous].timestamp.has_value(); }))
       fail("TypeError: Cannot subtract tz-naive and tz-aware datetime-like objects.");
     if (timestamp_type != DataFrameColumnType::kDate) {
-      // A text or object column subtracts the pairs with both cells present
-      // cell by cell (as frame_times::column_subtraction); a number column
-      // or no failing pair leaves no timedelta for the .dt accessor.
-      for (std::size_t i = 0; i < pairs.size(); ++i)
-        if (rows[pairs[i].previous].timestamp && starts[i])
-          if (const auto error = frame_times::subtraction_error(*starts[i], *rows[pairs[i].previous].timestamp, true))
-            fail("TypeError: " + *error);
-      fail("AttributeError: Can only use .dt accessor with datetimelike values");
+      // The pairs' starts less their timestamps as pandas subtracts two
+      // columns (frame_times::column_subtraction): the starts are the
+      // shifted start column (int64 cells become float64, bool ones
+      // object), raised in place. A text or object column subtracts the
+      // pairs with both cells present cell by cell, which leaves no
+      // timedelta for the .dt accessor, except a date column less an object
+      // column of one pair (round BA: an XES column of dates whose last row
+      // holds the text NaT), which is the whole array's subtraction.
+      std::vector<std::optional<Scalar>> ends, begins;
+      for (std::size_t i = 0; i < pairs.size(); ++i) {
+        ends.push_back(starts[i]);
+        begins.push_back(rows[pairs[i].previous].timestamp);
+      }
+      auto shifted_type = raised_start ? start_type : timestamp_type;
+      if (shifted_type == DataFrameColumnType::kInt64) shifted_type = DataFrameColumnType::kFloat64;
+      if (shifted_type == DataFrameColumnType::kBool) shifted_type = DataFrameColumnType::kObject;
+      const auto difference = frame_times::column_subtraction(shifted_type, ends, timestamp_type, begins);
+      if (difference.error) fail("TypeError: " + *difference.error);
+      if (!difference.timedelta)
+        fail("AttributeError: Can only use .dt accessor with datetimelike values");
     }
     for (std::size_t i = 0; i < pairs.size(); ++i) {
       const auto& previous = rows[pairs[i].previous];

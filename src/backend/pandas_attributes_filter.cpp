@@ -164,14 +164,16 @@ std::optional<std::size_t> column(const EventTable& source,const EventAttribute&
 bool empty_list(const EventAttribute& v){return v.container==AttributeContainerKind::kList&&v.children.empty();}
 // df[[...]]: every listed label must be a column.
 void check_list_columns(const EventTable& source,const EventAttribute& key){
- std::vector<std::string> names,absent;bool strings=true,integers=true;
+ std::vector<std::string> names,absent;bool strings=true,integers=true;std::size_t missing=0;
  for(const auto& item:key.children){
   names.push_back(repr(item));strings&=text_value(item);integers&=type_name(item)=="int";
-  if(!column(source,item)&&std::find(absent.begin(),absent.end(),names.back())==absent.end())absent.push_back(names.back());
+  if(!column(source,item)){++missing;if(std::find(absent.begin(),absent.end(),names.back())==absent.end())absent.push_back(names.back());}
  }
  const auto list=[](const std::vector<std::string>& values){std::string output="[";for(std::size_t i=0;i<values.size();++i){if(i)output+=", ";output+=values[i];}return output+"]";};
  if(absent.empty())return;
- if(absent.size()==names.size()){
+ // Every label missing (a label named twice counts twice): pandas lists
+ // the whole index; otherwise each missing label once (round BA).
+ if(missing==names.size()){
   const std::string dtype=names.empty()?"object":strings?"str":integers?"int64":"object";
   error("KeyError",string_key_repr("None of [Index("+list(names)+", dtype='"+dtype+"')] are in the [columns]"));
  }

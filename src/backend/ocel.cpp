@@ -1105,6 +1105,8 @@ Ocel project_ocpn_labels(const Ocel& log,
                              options.object_type_attribute, "OCPN");
 }
 
+static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_nanoseconds);
+
 static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& limits,
                                  bool literal_names) {
   // pm4py reads the document with json.load: an object id repeated in the
@@ -1140,8 +1142,19 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     if (std::get<bool>(marker->value) && !standard)
       for (const auto& event : result.events) offset_times.emplace(event.id, event.timestamp);
   }
-  sort_ocel_events_by_timestamp(result, standard ? OcelTimestampReader::kIsoFormat
-                                                 : OcelTimestampReader::kIsoFormatOrFileOrder);
+  // A classic document Minera wrote for a log with times past the
+  // microsecond (an OCEL SQLite or CSV import, which the reference reads at
+  // nanoseconds) says so, and keeps them; read_ocel_json of any other file
+  // keeps microseconds, as the OCEL 2.0 readers do (round BA).
+  bool keep_nanoseconds = false;
+  if (const auto* marker = optional(r, "minera:nanoseconds")) {
+    if (!marker->is_bool())
+      throw std::invalid_argument("minera:nanoseconds must be boolean");
+    keep_nanoseconds = std::get<bool>(marker->value) && !standard;
+  }
+  sort_ocel_events(result, standard ? OcelTimestampReader::kIsoFormat
+                                    : OcelTimestampReader::kIsoFormatOrFileOrder,
+                   keep_nanoseconds);
   if (!offset_times.empty())
     for (auto& event : result.events)
       if (const auto found = offset_times.find(event.id); found != offset_times.end())
@@ -1792,6 +1805,12 @@ void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds) {
 }
 
 void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
+  sort_ocel_events(log, reader, false);
+}
+
+// `keep_nanoseconds`: a classic document Minera wrote with the
+// "minera:nanoseconds" marker keeps the digits past the microsecond.
+static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_nanoseconds) {
   // The key is the timestamp at the importer's precision: SQLite keeps
   // nanoseconds of the instant, the JSON and XML importers microseconds of
   // the ISO wall-clock fields (an OCEL 2.0 XML dateutil fallback with an
@@ -1803,7 +1822,7 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
   // stamped UTC for an ISO reading, the UTC instant for SQLite and for an
   // aware dateutil value, the wall clock for a naive one.
   std::vector<std::pair<std::size_t, std::string>> rewrites;
-  const bool truncates = reader != OcelTimestampReader::kIsoFormatOrFileOrder;
+  const bool truncates = !(reader == OcelTimestampReader::kIsoFormatOrFileOrder && keep_nanoseconds);
   const auto store = [&](std::size_t index, std::int64_t microseconds, bool aware = true) {
     const auto& text = log.events[index].timestamp;
     if (!natively_stored(text, microseconds, aware, truncates))
@@ -2062,6 +2081,21 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
       offset = parsed->offset_minutes;
     }
     if (offset) out << ",\"minera:eventTimeOffset\":true";
+  };
+  // Marks a log whose event or object-change times hold digits past the
+  // microsecond (the SQLite and CSV readers keep nanoseconds), so
+  // parse_ocel_json keeps them instead of the microseconds read_ocel_json
+  // keeps: routes pass OCELs to each other as this JSON.
+  const auto write_nanoseconds = [&] {
+    const auto fine = [](const std::string& text) {
+      const auto parsed = parse_timestamp_exact(text);
+      return parsed && parsed->nanoseconds % 1000 != 0;
+    };
+    const bool any =
+        std::any_of(log.events.begin(), log.events.end(), [&](const auto& event) { return fine(event.timestamp); }) ||
+        std::any_of(log.object_changes.begin(), log.object_changes.end(),
+                    [&](const auto& change) { return fine(change.timestamp); });
+    if (any) out << ",\"minera:nanoseconds\":true";
   };
   const auto write_table_columns = [&] {
     const auto& columns = log.table_columns;
@@ -2343,6 +2377,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
   write_keep_unrelated();
   if (transport_markers) {
     write_event_time_offset();
+    write_nanoseconds();
     if (log.event_activity_first) out << ",\"minera:eventActivityFirst\":true";
   }
   out << '}';

@@ -6,6 +6,7 @@
 #include "minera/dataframe_columns.hpp"
 #include "minera/timestamp.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -284,19 +285,21 @@ std::optional<python::Scalar> frame_row_scalar(const EventLog& frame, const Trac
 // time:timestamp dates.
 std::optional<DataFrameColumnType> frame_column_type(const EventLog& frame, const std::string& key) {
   const auto& columns = *frame.dataframe_columns;
+  // read_csv keeps a True/False column with a missing cell as objects
+  // (observed black-box); the importer records it as bool. A case: column
+  // too (round BA: case statistics on it raised numpy's bool subtraction).
+  const auto typed = [&](const DataFrameColumn& column) {
+    if (column.type == DataFrameColumnType::kBool && columns.csv_text)
+      for (const auto& trace : frame.traces)
+        for (const auto& event : trace.events)
+          if (!frame_row_scalar(frame, trace, event, key)) return DataFrameColumnType::kObject;
+    return column.type;
+  };
   for (const auto& column : columns.columns)
-    if (column.key == key) {
-      // read_csv keeps a True/False column with a missing cell as objects
-      // (observed black-box); the importer records it as bool.
-      if (column.type == DataFrameColumnType::kBool && columns.csv_text)
-        for (const auto& trace : frame.traces)
-          for (const auto& event : trace.events)
-            if (!frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame)) return DataFrameColumnType::kObject;
-      return column.type;
-    }
+    if (column.key == key) return typed(column);
   if (key.starts_with("case:") && key != "case:concept:name")
     for (const auto& column : columns.trace_columns)
-      if ("case:" + column.key == key) return column.type;
+      if ("case:" + column.key == key) return typed(column);
   if (key == "concept:name" || key == "case:concept:name") return DataFrameColumnType::kString;
   if (key == "@@index" || key == "@@case_index") return DataFrameColumnType::kInt64;
   if (key == "time:timestamp") return DataFrameColumnType::kDate;
@@ -313,13 +316,20 @@ void require_frame_columns(const std::set<std::string>& keys,
   for (const auto& key : selection)
     if (!keys.contains(key)) absent.push_back(key);
   if (absent.empty()) return;
-  std::string list = "[";
-  for (std::size_t i = 0; i < absent.size(); ++i) list += (i ? ", '" : "'") + absent[i] + "'";
-  list += "]";
+  const auto quoted = [](const std::vector<std::string>& labels) {
+    std::string list = "[";
+    for (std::size_t i = 0; i < labels.size(); ++i) list += (i ? ", '" : "'") + labels[i] + "'";
+    return list + "]";
+  };
   if (absent.size() == selection.size())
-    throw std::invalid_argument("KeyError: \"None of [Index(" + list +
+    throw std::invalid_argument("KeyError: \"None of [Index(" + quoted(absent) +
                                 ", dtype='str')] are in the [columns]\"");
-  throw std::invalid_argument("KeyError: \"" + list + " not in index\"");
+  // Some labels present: pandas names each missing label once, in the order
+  // of its first appearance (round BA).
+  std::vector<std::string> unique;
+  for (const auto& key : absent)
+    if (std::find(unique.begin(), unique.end(), key) == unique.end()) unique.push_back(key);
+  throw std::invalid_argument("KeyError: \"" + quoted(unique) + " not in index\"");
 }
 
 python::Scalar frame_number_scalar(const FrameValue& value) {
