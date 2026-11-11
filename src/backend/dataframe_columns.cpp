@@ -190,12 +190,21 @@ struct SeenColumn {
   // Python ints as objects, with or without gaps or floats (observed).
   bool above_int64 = false;
   bool negative = false;
+  bool nan = false;  // a float NaN cell (no kind of its own)
 };
 
 void note_cell(std::map<std::string, SeenColumn>& seen, const std::string& key,
                const EventAttribute& value) {
   auto [entry, inserted] = seen.try_emplace(key);
   if (inserted) entry->second.order = seen.size();
+  // A float NaN cell (pm4py writes a frame's NaN as <float value="nan">) is
+  // a missing value to pandas' inference: text with NaN is a str column,
+  // dates with NaN a datetime column (observed on read_xes).
+  if (const auto* real = std::get_if<double>(&value.typed_value);
+      real && std::isnan(*real) && cell_type(value) == CellType::kFloat) {
+    entry->second.nan = true;
+    return;
+  }
   ++entry->second.count;
   entry->second.types[static_cast<int>(cell_type(value))] = true;
   if (const auto* natural = std::get_if<std::uint64_t>(&value.typed_value))
@@ -217,7 +226,8 @@ std::vector<DataFrameColumn> typed_columns(const std::map<std::string, SeenColum
     for (const bool present : entry.types) kinds += present ? 1 : 0;
     DataFrameColumn column;
     column.key = key;
-    if (entry.above_int64 && entry.negative) column.type = DataFrameColumnType::kObject;
+    if (kinds == 0) column.type = DataFrameColumnType::kFloat64;  // NaN only
+    else if (entry.above_int64 && entry.negative) column.type = DataFrameColumnType::kObject;
     else if (kinds == 1 && has(CellType::kInt) && !missing) column.type = DataFrameColumnType::kInt64;
     else if ((has(CellType::kInt) || has(CellType::kFloat)) &&
              kinds == (has(CellType::kInt) ? 1 : 0) + (has(CellType::kFloat) ? 1 : 0))

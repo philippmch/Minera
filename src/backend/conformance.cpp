@@ -5146,7 +5146,9 @@ class Aligner {
     // The bound depends on the marking alone (solve_lp is deterministic), so
     // it is solved once per marking, including markings it rules out.
     struct Known {
-      std::uint64_t best = kUnseen;
+      // kUnseen spelled out: MSVC rejects a local constant of the enclosing
+      // function in a local class's default member initializer.
+      std::uint64_t best = std::numeric_limits<std::uint64_t>::max();
       bool bounded = false;
       std::optional<std::uint64_t> bound;
     };

@@ -859,7 +859,7 @@ int main() {
     std::filesystem::remove(written_path, ignored);
     minera::export_ocel_sqlite(read, written_path);
     sqlite3* written_db = nullptr;
-    assert(sqlite3_open_v2(written_path.c_str(), &written_db, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+    assert(sqlite3_open_v2(written_path.string().c_str(), &written_db, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
     for (const char* type : {"Create", "Pay"}) {
       std::string table;
       sqlite3_stmt* statement = nullptr;

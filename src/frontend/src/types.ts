@@ -6271,7 +6271,8 @@ export interface ChaoticActivitiesResult {
 
 export interface PassedTimeEntry {
   activity: string;
-  performance: number;
+  /** null when no pair had both times (an upload with missing dates). */
+  performance: number | null;
   frequency: number;
 }
 
@@ -6292,8 +6293,12 @@ export interface PassedTimeResult {
   activity: string;
   pre: PassedTimeEntry[];
   post: PassedTimeEntry[];
-  pre_avg_perf: number;
-  post_avg_perf: number;
+  pre_avg_perf: number | null;
+  post_avg_perf: number | null;
+}
+
+function finiteOrNull(value: unknown): boolean {
+  return value === null || (typeof value === "number" && Number.isFinite(value));
 }
 
 function isPassedTimeEntries(value: unknown): value is PassedTimeEntry[] {
@@ -6301,7 +6306,8 @@ function isPassedTimeEntries(value: unknown): value is PassedTimeEntry[] {
     if (typeof item !== "object" || item === null) return false;
     const entry = item as Partial<PassedTimeEntry>;
     return typeof entry.activity === "string" &&
-      typeof entry.performance === "number" && Number.isFinite(entry.performance) &&
+      (entry.performance === null ||
+        (typeof entry.performance === "number" && Number.isFinite(entry.performance))) &&
       typeof entry.frequency === "number" && Number.isInteger(entry.frequency) &&
       entry.frequency >= 0;
   });
@@ -6313,9 +6319,8 @@ export function isPassedTimeResult(value: unknown): value is PassedTimeResult {
   return data.family === "PASSED_TIME" &&
     (data.variant === "PRE" || data.variant === "POST" || data.variant === "PREPOST") &&
     typeof data.activity === "string" && isPassedTimeEntries(data.pre) &&
-    isPassedTimeEntries(data.post) && typeof data.pre_avg_perf === "number" &&
-    Number.isFinite(data.pre_avg_perf) && typeof data.post_avg_perf === "number" &&
-    Number.isFinite(data.post_avg_perf);
+    isPassedTimeEntries(data.post) && finiteOrNull(data.pre_avg_perf) &&
+    finiteOrNull(data.post_avg_perf);
 }
 
 export interface ServiceTimeOptions {

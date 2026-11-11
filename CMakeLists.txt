@@ -1186,7 +1186,11 @@ if(MINERA_BUILD_TESTS)
   )
   target_link_libraries(minera_cancellation_hooks_tests PRIVATE minera::core)
   target_compile_features(minera_cancellation_hooks_tests PRIVATE cxx_std_20)
-  target_compile_options(minera_cancellation_hooks_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  # Timed (a cancel must stop within a second): built at the build type's
+  # optimization, so the log copies and destructors it instantiates run at the
+  # core's speed (at -O0 they took most of the second on a CI runner).
+  target_compile_options(minera_cancellation_hooks_tests PRIVATE
+                         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG> $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG>)
   add_test(NAME minera_cancellation_hooks_tests COMMAND minera_cancellation_hooks_tests)
 
   add_executable(minera_genetic_matrix_conversion_tests
@@ -1225,6 +1229,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_review_aw1_tests PRIVATE cxx_std_20)
   target_compile_options(minera_review_aw1_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_aw1_tests COMMAND minera_review_aw1_tests)
+
+  add_executable(minera_review_ax1_tests src/backend/tests/test_review_ax1.cpp)
+  target_link_libraries(minera_review_ax1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_ax1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_ax1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_ax1_tests COMMAND minera_review_ax1_tests)
 
   add_executable(minera_resource_profiles_tests
     src/backend/tests/test_resource_profiles.cpp

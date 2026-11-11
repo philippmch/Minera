@@ -22219,3 +22219,196 @@ time with NaT starts, cycle time on NaT, network durations, multitasking
 with columns in two roles and a reversed interval) and the frontend type
 tests (null and negative values). Full suite: 455 ctest targets, vitest
 (10,726), the Python script tests (406) and `tsc`.
+
+## Review AX1: re-review of round AW, and passed time on uploads (2026-11-10)
+
+Round AW's time statistics on uploads were swept again with typed extra
+columns (ints, floats, True/False and text with blanks, nanosecond
+fractions, custom case, activity and timestamp headers, a non-default case
+key for case statistics, business hours) on CSV uploads and their pm4py XES
+round trip, comparing error types and messages as well as values. The new
+area was passed time, which on an upload now reads the frame as pm4py's
+pandas variant does. Findings, all fixed:
+
+- **AX1-1 A True/False column with a blank cell** (CSV) is an object
+  column in pandas (`read_csv` keeps the cells as Python objects); Minera
+  typed it bool, so the time statistics and resource profiles raised the
+  numpy boolean errors where pandas reaches the `.dt` accessor or a Python
+  error (`'Timestamp' and 'bool'`).
+- **AX1-2 Case statistics on uploads.** The case key names any frame
+  column (Minera grouped by the case id whatever the key); without a sort
+  column the cases are sorted by their start time (pandas' `sort_values`
+  of one column: quicksort, NaN last, a descending sort reverses the
+  values and the result); the same column as case and timestamp key fails
+  with `Grouper for '<key>' not 1-dimensional`; a case key whose cells are
+  all missing gives no group, so business hours fail with `Cannot set a
+  DataFrame with multiple columns to the single column caseDuration` and
+  without them only a bool column fails before the `.dt` accessor; with
+  business hours a numpy column fails on its scalars (`'numpy.int64' object
+  has no attribute 'replace'`, also `numpy.float64`, `numpy.bool`), an
+  object column's group without a cell is None (`'NoneType' object has no
+  attribute 'replace'`, which also settles AW1's declaration), and an
+  object column of dates fails at `int()` on the first group's last cell
+  (`not 'datetime.datetime'`).
+- **AX1-3 The column subtraction** of service time, case statistics and
+  passed time follows pandas 3.0 (`frame_times::column_subtraction`, fuzzed
+  against `a - b` on 30,000 random column pairs): a text (`str`) column
+  subtracts only the rows where both cells are present, so the error names
+  the first such row's types and a column of no such row reaches the `.dt`
+  accessor; the retry of an object column's failed cell-by-cell subtraction
+  does the same; a date column less a text column with one such row fails
+  as the whole array (`'DatetimeArray' and 'str'`); a date column less an
+  object column goes cell by cell over every row (NaT minus an integer is
+  NaT, a Timestamp minus one fails with pandas' integer message, one row is
+  the whole array); a date column less a float or bool column names the
+  first row's `Timestamp` or `NaTType` (Minera always said `Timestamp`);
+  an XES object column's dates are `datetime.datetime` in the messages
+  (also in passed time's `'>=' not supported` errors).
+- **AX1-4 XES cells written as `<float value="nan">`** (pm4py writes a
+  frame's NaN that way) are missing values to pandas' dtype inference: text
+  with NaN is a `str` column, dates with NaN a datetime column, bools with
+  NaN objects, NaN only float64. Minera typed such columns as objects
+  (this also removed two network-analysis differences in the AT sweep).
+- **AX1-5 Service time with business hours on uploads** took epoch-second
+  doubles (29.5107319355011 for 29.510732 s); it now counts the week
+  offsets from the exact microseconds as case statistics and passed time
+  do (29.510731999995187 in pm4py).
+- **AX1-6 Passed time on uploads** (new area; Minera read the native
+  table). Keys are frame columns (`""`/`activity` is `concept:name`,
+  `""`/`timestamp` is `time:timestamp`); without a start key the start is
+  the timestamp column. The rows are sorted by case, start and timestamp
+  (each an ordered Categorical: values pandas cannot sort raise `'values'
+  is not ordered`; missing cells last; ties keep frame order) and every two
+  successive rows of one case are a pair. With a start column other than
+  the timestamp column each next start is raised to the row's timestamp by
+  a Python `>=` (values Python cannot compare raise): a missing date start
+  takes the timestamp, a missing float64 start stays missing, a missing
+  start of a text or object column takes the timestamp, a missing timestamp
+  leaves a start that is no date missing; without a pair it fails as pandas
+  does (`cannot subtract DatetimeArray from ndarray[object]` on dates, the
+  `.dt` accessor otherwise; with business hours a bool or date timestamp
+  column fails and anything else gives the empty result); when no pair has
+  a timestamp, dates fail with `Cannot subtract tz-naive and tz-aware
+  datetime-like objects.`. A pair's time is the next start less the row's
+  timestamp as `Timedelta.total_seconds` (NaN when either is missing); a
+  timestamp column that is no date subtracts its present pairs cell by
+  cell (`'str' and 'str'`, `'str' and 'datetime.datetime'`) and otherwise
+  fails at the `.dt` accessor. With business hours both columns are made
+  dates first (a bool timestamp column fails with `dtype bool cannot be
+  converted to datetime64[ns]`, bool cells with `<class 'bool'> is not
+  convertible to datetime`; text spelled `NaT`, `nan` or empty is NaT; when
+  the first other text parses its inferred format binds the rest, `time
+  data "soon" doesn't match format "%Y-%m-%d %H:%M:%S". You might want to
+  try: ...`; otherwise `Given date string "a" not likely a datetime` for a
+  single a, m, p or t or a number below 1000, else `Unknown datetime string
+  format, unable to parse`), numbers are nanoseconds, a NaT fails with
+  `cannot convert float NaN to integer`, and the business seconds count the
+  week offsets from exact microseconds. The pairs are grouped by both
+  activities (a missing activity drops the pair; values equal in Python are
+  one group), each group's times averaged without NaN (NaN when none is
+  left), the averages weighted by the pair counts in the groupby's order.
+
+**Contract.** On CSV and XES uploads case statistics and passed time read
+the frame as pm4py's pandas functions do; native table sources keep their
+rules. The passed-time JSON writes a NaN performance or average as null (the
+frontend validator accepts it); infinite values stay an error.
+
+Declarations:
+
+- Case statistics order of equal sort keys: pandas' quicksort is numpy's
+  SIMD sort on CPUs with AVX-512 (and other kernels on other CPUs), which
+  orders ties differently; Minera models numpy's generic introsort, the
+  order pm4py gives with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4
+  AVX512_ICL AVX512_SPR"`. With the SIMD kernels left on, 4 of 487 case
+  statistics comparisons (CSV seeds 1500 to 1799) differ, each only in the
+  order of tied cases.
+- Case statistics sorted by case id (Minera's option) keep the groupby's
+  ascending case order, a descending sort reverses it; pm4py's pandas
+  variant has no such sort.
+- Passed time's aggregation option: pm4py's pandas variant averages;
+  Minera's median, min, max, stdev and sum (an empty group sums to 0) are
+  extensions.
+- Passed time with business hours on text columns: a later text of another
+  date shape than the first (`2020-01-01T10:00:00` after `2020-01-01
+  10:00:00`, extra fractions or an offset: pandas' `doesn't match format`
+  or `unconverted data remains`) and texts only dateutil reads (`1000`,
+  `05`) are parsed by Minera; pandas fails on the first and reads the
+  second.
+
+Open for the next round: network analysis on the XES round trip of round
+AT's generator, seed 59 (`atsweep2.py --xes`): with a mixed-type sorting
+column pm4py first fails sorting it (`'<' not supported between instances
+of 'str' and 'float'`), Minera first refuses the merge on case ids of str
+and float64 (seen with the AW binary too).
+
+Verification (`axsweep.py`, `submodel.py`, `ptmodel.py`, `ptmatrix.py`,
+`nopairs.py`, `stmatrix.py` in the project files under
+`review-harness/round-ax/`; reference runs with numpy's generic sort,
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Passed time model against pm4py, date columns with NaT (12,000 random frames) | 12,000 | 0 differences |
+| Passed time error matrix over column dtypes (11 timestamp × 12 start keys, business hours or not; frames without a pair) | 264 + 220 | ported |
+| pandas column subtraction model against `a - b` (random str, object, date, float, int and bool columns of 0 to 4 rows) | 30,000 | 0 differences |
+| Time statistics and passed time, CSV (seeds 0 to 39), first AX binary | 600 | 361 raise in both, 231 equal, 6 differences (4 in the sweep's own comparison of nanosecond columns, 2 sort ties), 2 error types (AX1-2, AX1-6) |
+| The same, XES round trip (seeds 0 to 29) | 450 | 304 raise in both, 139 equal, 4 messages (AX1-3, AX1-4), 2 error types and 1 pm4py-only error (AX1-2, AX1-6) |
+| CSV (seeds 100 to 399) | 4,500 | 2,888 raise in both, 1,610 equal, 2 (AX1-6, fixed) |
+| XES round trip (seeds 100 to 299) | 3,000 | 2,050 raise in both, 927 equal, 23 (AX1-3, AX1-4, AX1-6, fixed) |
+| CSV (seeds 400 to 799) | 6,000 | 3,899 raise in both, 2,101 equal, 0 differences |
+| XES round trip (seeds 300 to 599) | 4,500 | 3,153 raise in both, 1,346 equal, 1 difference (AX1-5, fixed) |
+| XES round trip (seeds 600 to 799) | 3,000 | 2,023 raise in both, 976 equal, 1 Minera-only error (AX1-6 float64 starts, fixed) |
+| Final binary: CSV (seeds 1,200 to 1,499) | 4,500 | 2,987 raise in both, 1,513 equal, 0 differences |
+| Final binary: XES round trip (seeds 800 to 1,099) | 4,500 | 3,054 raise in both, 1,446 equal, 0 differences |
+| Final binary: case statistics and passed time, CSV (seeds 1,500 to 1,799, four requests per seed) | 2,400 | 1,320 raise in both, 1,080 equal, 0 differences |
+| Final binary: service time only, CSV (seeds 1,000 to 1,199) | 600 | 453 raise in both, 147 equal |
+| Resource profiles, local diagnostics, network analysis, CSV (`atsweep2.py`, seeds 0 to 59) | 1,003 | 0 differences |
+| The same, XES (seeds 0 to 59) | 868 | 1 open error order (above; the AW binary also had 2 network differences there, gone with AX1-4) |
+
+Tests: `minera_review_ax1_tests` (case statistics on a custom case key,
+the default start-time order, the grouper error, bool-with-blank and bool
+columns, numpy and text replace errors; passed time values with and without
+a start column and business hours, a NaN group as null JSON, text and key
+errors; service time messages of text, bool-with-blank and integer
+columns; an XES upload with a mixed object column and a text column with a
+missing cell; `column_subtraction` cases), the frontend type tests (a null
+passed-time performance), and the existing time-statistics tests.
+
+## Review AX2: the first CI runs on the public repository (2026-11-10)
+
+With the repository public, the CI matrix ran in full for the first time
+(on round AW's commit). Linux, the Python and frontend tests and the parity
+verifier passed; the Windows build and three macOS tests failed, and one
+Linux run had aborted in the cancellation test. Findings, all fixed:
+
+- **AX2-1 The Windows build (MSVC 14.44).** The build ran with `-k 0`, so
+  every object was compiled once and 31 failed: `token_integer.hpp` named
+  two variables `small`, which the Windows SDK's `rpcndr.h` defines as
+  `char` (28 objects that include a Windows header first); a local class's
+  default member initializer named a local constant of the enclosing
+  function (`kUnseen` in `conformance.cpp`, which MSVC rejects); a test
+  passed a `std::filesystem::path`'s wide `c_str()` to `sqlite3_open_v2`;
+  a test built events with `emplace_back` of a parenthesized aggregate,
+  which MSVC's `construct_at` constraints refuse. No object links or tests
+  ran on Windows before this fix.
+- **AX2-2 macOS.** The address-space checks of the server contract test
+  (2 GiB `RLIMIT_AS` lowers the mining budget, 1.5 GiB runs a mine out of
+  memory) cannot be observed on macOS, which does not enforce `RLIMIT_AS`;
+  they run on Linux only. The DFG test's one-microsecond gap read a
+  reference into a temporary result (a heap use after free that glibc's
+  allocator left readable; AddressSanitizer finds it on Linux). The classic
+  DFG playout probabilities differed in the last bit (below).
+- **AX2-3 The cancellation test** timed the source build of 200,000 XES
+  events together with a copy and a destruction of the log that the test
+  translation unit instantiates at `-O0` (908 ms of the one-second bound
+  locally, 1,027 ms on a CI runner). The log is now moved in, as the server
+  moves its import, and the test is built at the build type's optimization
+  (129 ms).
+
+Declaration: a classic DFG playout trace's probability is
+`exp(-sum(-log(p)))` in pm4py and in Minera, so its last bits follow the
+platform's `log` and `exp`. The bank was captured with glibc, which
+Minera's `std::log` and `std::exp` match on Linux; on Apple's libm (5 of
+2,286 traces on the CI runner) and other C libraries both can be one or two
+units in the last place away, so the test accepts a probability within 4
+units in the last place off glibc and counts it.

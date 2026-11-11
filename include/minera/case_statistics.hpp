@@ -27,6 +27,9 @@ struct CaseStatisticsOptions {
   std::string timestamp_key = "timestamp";
   bool enable_sort = true;
   CaseStatisticsSortBy sort_by = CaseStatisticsSortBy::kCaseId;
+  // Whether sort_by was asked for. On an upload's frame (pm4py's DataFrame
+  // path) the reference sorts by the start time unless told otherwise.
+  bool sort_by_given = false;
   bool sort_ascending = true;
   std::size_t max_cases = 0;  // zero means return every case
   bool use_business_hours = false;

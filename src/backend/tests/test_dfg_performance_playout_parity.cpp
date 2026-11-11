@@ -8,8 +8,11 @@
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
+#include <bit>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <fstream>
 #include <sstream>
@@ -150,9 +153,31 @@ std::vector<ClassicCase> load_classic(const char* path) {
   return cases;
 }
 
+// A trace probability is exp(-sum(-log(p))) in the reference and in Minera,
+// so its last bits follow the platform's libm: the bank was captured with
+// glibc, which Minera's std::log and std::exp match on Linux. Elsewhere (Apple
+// libm, the UCRT) both pm4py and Minera can be an ulp or two away, so a
+// probability within 4 ulps passes there and is counted (declared).
+bool probability_matches(const std::string& got, const std::string& expected, std::size_t& tolerated) {
+  if (got == expected) return true;
+#if defined(__GLIBC__)
+  (void)tolerated;
+  return false;
+#else
+  const double a = std::strtod(got.c_str(), nullptr);
+  const double b = std::strtod(expected.c_str(), nullptr);
+  if (!(a > 0.0) || !(b > 0.0) || !std::isfinite(a) || !std::isfinite(b)) return false;
+  const auto ua = std::bit_cast<std::uint64_t>(a);
+  const auto ub = std::bit_cast<std::uint64_t>(b);
+  if ((ua > ub ? ua - ub : ub - ua) > 4) return false;
+  ++tolerated;
+  return true;
+#endif
+}
+
 int compare_classic(const char* path) {
   int failures = 0;
-  std::size_t compared = 0, traces = 0, raised = 0;
+  std::size_t compared = 0, traces = 0, raised = 0, tolerated = 0;
   for (const auto& item : load_classic(path)) {
     // Declared: the reference raises KeyError when the search reaches an
     // activity with neither successors nor an end weight; Minera skips it.
@@ -170,7 +195,7 @@ int compare_classic(const char* path) {
         for (const auto& event : trace.events) activities.push_back(event.activity);
         const auto* probability = trace.attribute("probability");
         if (trace.case_id != std::to_string(i) || activities != item.expected[i].second ||
-            !probability || *probability != item.expected[i].first) {
+            !probability || !probability_matches(*probability, item.expected[i].first, tolerated)) {
           detail += " | trace " + std::to_string(i) + " expected " + item.expected[i].first;
           for (const auto& a : item.expected[i].second) detail += " " + a;
           detail += " got " + (probability ? *probability : std::string("-"));
@@ -189,6 +214,7 @@ int compare_classic(const char* path) {
   }
   std::printf("%zu CLASSIC DFG playouts compared (%zu traces, %zu reference errors skipped), %d failing\n",
               compared, traces, raised, failures);
+  if (tolerated != 0) std::printf("%zu probabilities within 4 ulps of the glibc capture (platform libm)\n", tolerated);
   if (compared < 350) {
     ++failures;
     std::fprintf(stderr, "CLASSIC bank coverage below the pinned floor\n");

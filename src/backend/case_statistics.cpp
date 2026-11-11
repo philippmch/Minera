@@ -14,6 +14,8 @@
 #include "minera/timestamp.hpp"
 
 #include <limits>
+#include <map>
+#include <type_traits>
 
 namespace minera {
 namespace {
@@ -146,62 +148,164 @@ std::string case_id(const Trace& trace, std::string_view key,
   return "EMPTY" + std::to_string(index);
 }
 
+// The column an upload's case statistics group by: the native default
+// ("case_id", or no key) is the frame's case column; any other key names a
+// frame column as pm4py's case_id_key does (concept:name is the activity).
+std::string frame_case_column(std::string_view key) {
+  if (key.empty() || key == "case_id") return "case:concept:name";
+  return std::string(key);
+}
+
+// One group's sort values as the reference's frame holds them: the first and
+// last dates as int64 // 10**9 (microseconds, or nanoseconds for a CSV
+// column that has a sub-microsecond cell; NaT's integer for a group without
+// a date) and the duration (NaN without dates).
+struct FrameSortValues {
+  std::int64_t start = 0;
+  std::int64_t end = 0;
+  double duration = 0.0;
+};
+
+std::int64_t floor_div(std::int64_t value, std::int64_t divisor) {
+  std::int64_t q = value / divisor;
+  if ((value % divisor != 0) && ((value < 0) != (divisor < 0))) --q;
+  return q;
+}
+
 // The case rows on an upload's frame, as pm4py's DataFrame
-// get_cases_description reads them: the case and timestamp columns are
-// selected (pandas' KeyError), each case group runs from its first to its
-// last present cell in frame order (NaT cells skipped; a case of NaT cells
-// only has NaN times), and a column of no dates fails as pandas does: bools
-// and text in the subtraction, any other dtype at the .dt accessor
-// (observed black-box). The times are seconds since the epoch.
+// get_cases_description reads them (observed black-box): the case and
+// timestamp columns are selected (pandas' KeyError), one column in both
+// roles fails the groupby (`Grouper for '<key>' not 1-dimensional`), the
+// rows are grouped by the case column (a missing key drops the row; values
+// equal in Python are one group, named by the first met; groups in sorted
+// key order), each group runs from its first to its last present cell in
+// frame order (NaT cells skipped; a group of NaT cells only has NaN times),
+// and a column of no dates fails as pandas does: bools and text in the
+// subtraction, any other dtype at the .dt accessor; with business hours each
+// group's first, then last cell is first made naive (.replace(tzinfo=None)),
+// which only a date has. The times are seconds since the epoch.
 void frame_cases(const EventLog& log, const CaseStatisticsOptions& options,
-                 const std::vector<BusinessHourSlot>& slots, CaseStatisticsResult& result) {
+                 const std::vector<BusinessHourSlot>& slots, CaseStatisticsResult& result,
+                 std::vector<FrameSortValues>& sort_values) {
   const frame_times::Frame frame(log);
   const auto key = frame_times::timestamp_column(options.timestamp_key);
-  require_frame_columns(frame.keys(), {"case:concept:name", key});
-  const auto dtype = frame.dtype(key);
-  if (dtype == DataFrameColumnType::kBool)
-    throw std::invalid_argument(
-        "TypeError: numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, "
-        "the `^` operator, or the logical_xor function instead.");
-  if (dtype == DataFrameColumnType::kString)
-    throw std::invalid_argument("TypeError: unsupported operand type(s) for -: 'str' and 'str'");
-  // An object column subtracts each case's first cell from its last, case by
-  // case, as Python does (only an XES upload's object column holds dates:
-  // datetime.datetime cells).
-  // With business hours each case's first, then last cell is first made
-  // naive (.replace(tzinfo=None)), which only a date has.
-  if (dtype == DataFrameColumnType::kObject)
-    for (const auto& cell : frame_times::case_cells(frame, key)) {
-      if (!slots.empty())
-        for (const auto* value : {&cell.first, &cell.last}) {
-          if (value->kind == python::Scalar::Kind::kDate) continue;
-          if (value->kind == python::Scalar::Kind::kText)
-            throw std::invalid_argument("TypeError: str.replace() takes no keyword arguments");
-          throw std::invalid_argument("AttributeError: '" + python::type_name(*value) +
-                                      "' object has no attribute 'replace'");
-        }
-      if (const auto error = frame_times::subtraction_error(cell.last, cell.first, true))
-        throw std::invalid_argument("TypeError: " + *error);
+  const auto case_key = frame_case_column(options.case_id_key);
+  require_frame_columns(frame.keys(), {case_key, key});
+  if (case_key == key) throw std::invalid_argument("ValueError: Grouper for '" + key + "' not 1-dimensional");
+  // The groupby (python::groupby: pandas' sorted, null-dropping groupby).
+  struct Group {
+    python::Scalar key;
+    std::optional<python::Scalar> first, last;
+  };
+  std::vector<std::vector<python::Scalar>> keys;
+  std::vector<std::optional<python::Scalar>> cells;
+  bool nanosecond_unit = false;
+  for (const auto& trace : frame.log().traces)
+    for (const auto& event : trace.events) {
+      auto id = frame.cell(trace, event, case_key);
+      keys.push_back({id ? std::move(*id) : python::none()});
+      auto value = frame.cell(trace, event, key);
+      if (value && value->kind == python::Scalar::Kind::kDate && value->date.nanoseconds % 1000 != 0)
+        nanosecond_unit = true;
+      cells.push_back(std::move(value));
     }
-  if (dtype != DataFrameColumnType::kDate)
-    throw std::invalid_argument("AttributeError: Can only use .dt accessor with datetimelike values");
-  constexpr double nan = std::numeric_limits<double>::quiet_NaN();
-  const auto& traces = frame.log().traces;
-  for (std::size_t index = 0; index < traces.size(); ++index) {
-    const auto& trace = traces[index];
-    if (trace.events.empty()) continue;
-    std::optional<ParsedExactTimestamp> first, last;
-    for (const auto& event : trace.events)
-      if (const auto date = frame.date(trace, event, key)) {
-        if (!first) first = date;
-        last = date;
+  std::vector<python::Group> grouped;
+  try {
+    grouped = python::groupby(keys);
+  } catch (const python::TypeError& error) {
+    throw std::invalid_argument(std::string("TypeError: ") + error.what());
+  }
+  std::vector<Group> groups;
+  for (auto& entry : grouped) {
+    Group group{entry.labels.front(), std::nullopt, std::nullopt};
+    for (const auto row : entry.rows)
+      if (cells[row]) {
+        if (!group.first) group.first = cells[row];
+        group.last = cells[row];
       }
-    const auto id = case_id(log.traces.size() == traces.size() ? log.traces[index] : trace,
-                            options.case_id_key, index);
-    if (!first) {
-      // Business hours take the case's NaT endpoints as integers.
+    groups.push_back(std::move(group));
+  }
+  std::vector<std::size_t> order(groups.size());
+  for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+  const auto dtype = frame.dtype(key);
+  const bool csv_nanoseconds = nanosecond_unit && frame.log().dataframe_columns->csv_text;
+  // With no group (every case cell missing) the business hours' empty apply
+  // cannot fill the duration column, and the plain subtraction of empty
+  // columns only fails for booleans before the .dt accessor (observed).
+  if (groups.empty() && !slots.empty())
+    throw std::invalid_argument(
+        "ValueError: Cannot set a DataFrame with multiple columns to the single column caseDuration");
+  if (!slots.empty()) {
+    // Each group's first, then last cell made naive, group by group; a
+    // numpy column's cells are numpy scalars there.
+    const auto numpy_name = [&]() -> std::string {
+      if (!dtype) return {};
+      switch (*dtype) {
+        case DataFrameColumnType::kInt64: return "numpy.int64";
+        case DataFrameColumnType::kFloat64: return "numpy.float64";
+        case DataFrameColumnType::kBool: return "numpy.bool";
+        default: return {};
+      }
+    }();
+    for (const auto index : order)
+      for (const auto* cell : {&groups[index].first, &groups[index].last}) {
+        if (!numpy_name.empty())
+          throw std::invalid_argument("AttributeError: '" + numpy_name + "' object has no attribute 'replace'");
+        if (dtype == DataFrameColumnType::kDate) continue;
+        if (*cell && (*cell)->kind == python::Scalar::Kind::kDate) continue;
+        if (*cell && (*cell)->kind == python::Scalar::Kind::kText)
+          throw std::invalid_argument("TypeError: str.replace() takes no keyword arguments");
+        // A group without a present cell takes None in an object column,
+        // NaN (a float) otherwise.
+        const std::string missing = dtype == DataFrameColumnType::kObject ? "NoneType" : "float";
+        throw std::invalid_argument("AttributeError: '" + (*cell ? python::type_name(**cell) : missing) +
+                                    "' object has no attribute 'replace'");
+      }
+    // An object column's dates (an XES upload's datetime.datetime cells)
+    // stay Python objects, which the business hours cannot take as integers;
+    // the first group's last cell fails first (observed).
+    if (dtype == DataFrameColumnType::kObject && !order.empty())
+      throw std::invalid_argument(
+          "TypeError: int() argument must be a string, a bytes-like object or a real number, not "
+          "'datetime.datetime'");
+  } else {
+    // The groups' last cells less their first cells as pandas subtracts the
+    // two columns (frame_times::column_subtraction), then the .dt accessor.
+    std::vector<std::optional<python::Scalar>> lasts, firsts;
+    for (const auto index : order) {
+      lasts.push_back(groups[index].last);
+      firsts.push_back(groups[index].first);
+    }
+    const auto difference = frame_times::column_subtraction(dtype, lasts, dtype, firsts);
+    if (difference.error) throw std::invalid_argument("TypeError: " + *difference.error);
+    if (!difference.timedelta)
+      throw std::invalid_argument("AttributeError: Can only use .dt accessor with datetimelike values");
+  }
+  constexpr double nan = std::numeric_limits<double>::quiet_NaN();
+  constexpr std::int64_t nat = std::numeric_limits<std::int64_t>::min();
+  const auto ticks = [&](const std::optional<ParsedExactTimestamp>& date) -> std::int64_t {
+    if (!date) return floor_div(nat, 1000000000LL);
+    const auto micros = date->seconds * 1000000LL + date->nanoseconds / 1000;
+    if (!csv_nanoseconds) return floor_div(micros, 1000000000LL);
+    return date->seconds + floor_div(date->nanoseconds, 1000000000LL);
+  };
+  for (const auto index : order) {
+    const auto& group = groups[index];
+    const auto as_date = [&](const std::optional<python::Scalar>& cell) -> std::optional<ParsedExactTimestamp> {
+      if (!cell || cell->kind != python::Scalar::Kind::kDate) return std::nullopt;
+      auto date = cell->date;
+      date.timezone_aware = true;
+      date.offset_minutes = 0;
+      return date;
+    };
+    const auto first = as_date(group.first);
+    const auto last = as_date(group.last);
+    const auto id = python::str(group.key);
+    if (!first || !last) {
+      // Business hours take the group's NaT endpoints as integers.
       if (!slots.empty()) throw std::invalid_argument("ValueError: cannot convert float NaN to integer");
       result.cases.push_back({id, nan, nan, nan});
+      sort_values.push_back({ticks(std::nullopt), ticks(std::nullopt), nan});
       continue;
     }
     double duration = frame_times::total_seconds(*first, *last);
@@ -213,7 +317,38 @@ void frame_cases(const EventLog& log, const CaseStatisticsOptions& options,
     if (!slots.empty()) duration = detail::business_elapsed_microseconds(micros(*first), micros(*last), slots);
     result.cases.push_back(
         {id, frame_times::epoch_seconds(*first), frame_times::epoch_seconds(*last), duration});
+    sort_values.push_back({ticks(first), ticks(last), duration});
   }
+}
+
+// pandas' sort_values of one column (nargsort, kind="quicksort"): the
+// missing values (NaN durations) last; descending sorts the reversed values
+// and reverses the result. numpy's quicksort is its generic introsort here;
+// builds with SIMD sorts break ties among more values otherwise (declared).
+template <typename Value>
+std::vector<std::size_t> pandas_nargsort(const std::vector<Value>& values, bool ascending) {
+  std::vector<std::size_t> present, missing;
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    if constexpr (std::is_floating_point_v<Value>) {
+      if (std::isnan(values[i])) {
+        missing.push_back(i);
+        continue;
+      }
+    }
+    present.push_back(i);
+  }
+  if (!ascending) std::reverse(present.begin(), present.end());
+  const auto sorted = detail::numpy_object_quick_argsort(present.size(), [&](std::size_t a, std::size_t b) {
+    const auto& x = values[present[a]];
+    const auto& y = values[present[b]];
+    return x < y ? -1 : (y < x ? 1 : 0);
+  });
+  std::vector<std::size_t> order;
+  order.reserve(values.size());
+  for (const auto i : sorted) order.push_back(present[i]);
+  if (!ascending) std::reverse(order.begin(), order.end());
+  order.insert(order.end(), missing.begin(), missing.end());
+  return order;
 }
 
 // a < b with NaN (a case without times) before every number.
@@ -243,7 +378,41 @@ CaseStatisticsResult discover_case_statistics(
   CaseStatisticsResult result;
   result.options = options;
   result.cases.reserve(log.traces.size());
-  if (log.dataframe_columns) frame_cases(log, options, slots, result);
+  std::vector<FrameSortValues> frame_sort_values;
+  if (log.dataframe_columns) {
+    if (!options.sort_by_given) result.options.sort_by = CaseStatisticsSortBy::kStartTime;
+    frame_cases(log, options, slots, result, frame_sort_values);
+    // The reference sorts its frame of groups with pandas; case ids keep the
+    // groupby's sorted order (a native extension: descending reverses it).
+    if (result.options.enable_sort) {
+      std::vector<std::size_t> order;
+      const bool ascending = options.sort_ascending;
+      switch (result.options.sort_by) {
+        case CaseStatisticsSortBy::kCaseId:
+          order.resize(result.cases.size());
+          for (std::size_t i = 0; i < order.size(); ++i) order[i] = ascending ? i : order.size() - 1 - i;
+          break;
+        case CaseStatisticsSortBy::kStartTime:
+        case CaseStatisticsSortBy::kEndTime: {
+          std::vector<std::int64_t> values;
+          for (const auto& v : frame_sort_values)
+            values.push_back(result.options.sort_by == CaseStatisticsSortBy::kStartTime ? v.start : v.end);
+          order = pandas_nargsort(values, ascending);
+          break;
+        }
+        case CaseStatisticsSortBy::kDuration: {
+          std::vector<double> values;
+          for (const auto& v : frame_sort_values) values.push_back(v.duration);
+          order = pandas_nargsort(values, ascending);
+          break;
+        }
+      }
+      std::vector<CaseStatisticsEntry> sorted;
+      sorted.reserve(order.size());
+      for (const auto i : order) sorted.push_back(std::move(result.cases[i]));
+      result.cases = std::move(sorted);
+    }
+  }
   for (std::size_t index = 0; !log.dataframe_columns && index < log.traces.size(); ++index) {
     const auto& trace = log.traces[index];
     if (trace.events.empty()) continue;
@@ -268,7 +437,7 @@ CaseStatisticsResult discover_case_statistics(
     result.cases.push_back({case_id(trace, options.case_id_key, index), start,
                             end, duration});
   }
-  if (options.enable_sort) {
+  if (options.enable_sort && !log.dataframe_columns) {
     const auto sort_by = options.sort_by;
     std::stable_sort(result.cases.begin(), result.cases.end(),
                      [sort_by, ascending = options.sort_ascending](

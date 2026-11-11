@@ -10,6 +10,7 @@
 #include <tuple>
 
 #include "frame_times.hpp"
+#include "performance_arithmetic.hpp"
 #include "minera/timestamp.hpp"
 
 #include <limits>
@@ -212,60 +213,19 @@ std::map<std::string, std::vector<double>> frame_service_durations(
   const auto end_type = frame.dtype(timestamp_key);
   const auto start_type = frame.dtype(start_key);
   const auto is = [](std::optional<DataFrameColumnType> type, DataFrameColumnType wanted) { return type == wanted; };
-  const auto numeric = [&](std::optional<DataFrameColumnType> type) {
-    return is(type, DataFrameColumnType::kInt64) || is(type, DataFrameColumnType::kFloat64) ||
-           is(type, DataFrameColumnType::kBool);
-  };
-  const auto unsupported = [&](const std::string& left, const std::string& right) {
-    fail("TypeError: unsupported operand type(s) for -: '" + left + "' and '" + right + "'");
-  };
   const auto no_accessor = [&] { fail("AttributeError: Can only use .dt accessor with datetimelike values"); };
   const auto& traces = frame.log().traces;
   if (slots.empty()) {
-    const bool end_dates = is(end_type, DataFrameColumnType::kDate);
-    const bool start_dates = is(start_type, DataFrameColumnType::kDate);
-    if (end_dates && !start_dates) {
-      if (is(start_type, DataFrameColumnType::kInt64))
-        fail("TypeError: Addition/subtraction of integers and integer-arrays with DatetimeArray is no longer "
-             "supported.  Instead of adding/subtracting `n`, use `n * obj.freq`");
-      if (is(start_type, DataFrameColumnType::kFloat64) || is(start_type, DataFrameColumnType::kBool)) {
-        if (frame.log().event_count() != 0)
-          unsupported("Timestamp", is(start_type, DataFrameColumnType::kBool) ? "bool" : "float");
-        no_accessor();
+    // The column difference (frame_times::column_subtraction), then its .dt.
+    std::vector<std::optional<python::Scalar>> ends, starts;
+    for (const auto& trace : traces)
+      for (const auto& event : trace.events) {
+        ends.push_back(frame.cell(trace, event, timestamp_key));
+        starts.push_back(frame.cell(trace, event, start_key));
       }
-      // Text and object columns subtract cell by cell.
-      for (const auto& trace : traces)
-        for (const auto& event : trace.events) {
-          const auto start = frame.cell(trace, event, start_key);
-          if (start && start->kind == python::Scalar::Kind::kDate) continue;
-          unsupported(frame.date(trace, event, timestamp_key) ? "Timestamp" : "NaTType",
-                      frame.cell_type(trace, event, start_key));
-        }
-      no_accessor();
-    }
-    if (!end_dates && start_dates) {
-      const std::string array = numeric(end_type) ? (is(end_type, DataFrameColumnType::kInt64)     ? "int64"
-                                                     : is(end_type, DataFrameColumnType::kFloat64) ? "float64"
-                                                                                                    : "bool")
-                                                  : "object";
-      fail("TypeError: cannot subtract DatetimeArray from ndarray[" + array + "]");
-    }
-    if (!end_dates) {
-      if (is(end_type, DataFrameColumnType::kBool) && is(start_type, DataFrameColumnType::kBool))
-        fail("TypeError: numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, the `^` "
-             "operator, or the logical_xor function instead.");
-      if (!numeric(end_type) || !numeric(start_type))
-        for (const auto& trace : traces)
-          for (const auto& event : trace.events) {
-            const auto end = frame.cell(trace, event, timestamp_key);
-            const auto start = frame.cell(trace, event, start_key);
-            const bool texts = (end && end->kind == python::Scalar::Kind::kText) ||
-                               (start && start->kind == python::Scalar::Kind::kText);
-            if (texts)
-              unsupported(frame.cell_type(trace, event, timestamp_key), frame.cell_type(trace, event, start_key));
-          }
-      no_accessor();
-    }
+    const auto difference = frame_times::column_subtraction(end_type, ends, start_type, starts);
+    if (difference.error) fail("TypeError: " + *difference.error);
+    if (!difference.timedelta) no_accessor();
   }
   struct Row {
     const Trace* trace;
@@ -293,10 +253,14 @@ std::map<std::string, std::vector<double>> frame_service_durations(
         ends[index++] = frame.date(trace, event, *key);
       }
       if (!ends[0] || !ends[1]) fail("ValueError: cannot convert float NaN to integer");
-      const auto local_start = parse_timestamp(frame_times::utc_text(*ends[0]));
-      const auto local_finish = parse_timestamp(frame_times::utc_text(*ends[1]));
-      if (!local_start || !local_finish) fail("service time: invalid business-hours timestamp");
-      rows.push_back({&trace, &event, business_elapsed(*local_start, *local_finish, slots)});
+      // The UTC wall clock's business seconds, the week offsets taken from
+      // the exact microseconds (epoch-second doubles lose sub-microsecond
+      // precision, observed on XES uploads).
+      const auto micros = [](const ParsedExactTimestamp& date) {
+        return date.seconds * 1000000LL + static_cast<std::int64_t>(date.nanoseconds / 1000);
+      };
+      rows.push_back(
+          {&trace, &event, detail::business_elapsed_microseconds(micros(*ends[0]), micros(*ends[1]), slots)});
     }
   if (!frame.has(activity_key)) fail("KeyError: '" + activity_key + "'");
   std::map<std::string, std::string> names;

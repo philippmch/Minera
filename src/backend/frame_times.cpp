@@ -88,6 +88,101 @@ std::optional<std::string> subtraction_error(const python::Scalar& a, const pyth
   return "unsupported operand type(s) for -: '" + name(a) + "' and '" + name(b) + "'";
 }
 
+namespace {
+
+using Kind = python::Scalar::Kind;
+
+std::string integer_message(const std::string& owner) {
+  return "Addition/subtraction of integers and integer-arrays with " + owner +
+         " is no longer supported.  Instead of adding/subtracting `n`, use `n * obj.freq`";
+}
+
+std::string unsupported(const std::string& left, const std::string& right) {
+  return "unsupported operand type(s) for -: '" + left + "' and '" + right + "'";
+}
+
+// A cell's Python type in the subtraction: a date column's missing cell is
+// NaT, any other missing cell NaN (a float).
+std::string operand_name(const std::optional<python::Scalar>& cell, bool date_column) {
+  if (date_column) return cell ? "Timestamp" : "NaTType";
+  if (!cell) return "float";
+  if (cell->kind == Kind::kDate) return "datetime.datetime";
+  return python::type_name(*cell);
+}
+
+// Python's `a - b` on two cells (only the left may come from a date column).
+std::optional<std::string> cell_subtraction(const std::optional<python::Scalar>& a, bool a_dates,
+                                            const std::optional<python::Scalar>& b) {
+  const bool a_number = !a_dates && (!a || python::is_number(*a));
+  const bool b_number = !b || python::is_number(*b);
+  if (a_number && b_number) return std::nullopt;
+  if (a_dates && b && b->kind == Kind::kInt) {
+    if (!a) return std::nullopt;  // NaT - n is NaT
+    return integer_message("Timestamp");
+  }
+  const bool a_time = a_dates || (a && a->kind == Kind::kDate);
+  if (a_time && b && b->kind == Kind::kDate) return std::nullopt;
+  return unsupported(operand_name(a, a_dates), operand_name(b, false));
+}
+
+}  // namespace
+
+ColumnSubtraction column_subtraction(std::optional<DataFrameColumnType> left_type,
+                                     const std::vector<std::optional<python::Scalar>>& left,
+                                     std::optional<DataFrameColumnType> right_type,
+                                     const std::vector<std::optional<python::Scalar>>& right) {
+  using Type = DataFrameColumnType;
+  const bool left_dates = left_type == Type::kDate;
+  if (left_dates && right_type == Type::kDate) return {std::nullopt, true};
+  if (right_type == Type::kDate) {
+    const std::string array = left_type == Type::kFloat64 ? "float64"
+                              : left_type == Type::kInt64 ? "int64"
+                              : left_type == Type::kBool  ? "bool"
+                                                          : "object";
+    return {"cannot subtract DatetimeArray from ndarray[" + array + "]"};
+  }
+  const auto rows = std::min(left.size(), right.size());
+  std::vector<std::size_t> present;
+  for (std::size_t i = 0; i < rows; ++i)
+    if (left[i] && right[i]) present.push_back(i);
+  if (left_type == Type::kString || right_type == Type::kString) {
+    if (present.empty()) return {};
+    if (left_dates && present.size() == 1)
+      return {unsupported("DatetimeArray", operand_name(right[present.front()], false))};
+    for (const auto i : present)
+      if (auto error = cell_subtraction(left[i], left_dates, right[i])) return {std::move(error)};
+    return {};
+  }
+  const auto numeric = [](std::optional<Type> type) {
+    return type == Type::kInt64 || type == Type::kFloat64 || type == Type::kBool;
+  };
+  if (left_dates) {
+    if (right_type == Type::kInt64) return {integer_message("DatetimeArray")};
+    if (right_type == Type::kFloat64 || right_type == Type::kBool) {
+      if (rows == 0) return {};
+      return {unsupported(operand_name(left.front(), true), right_type == Type::kBool ? "bool" : "float")};
+    }
+    if (rows == 1) {
+      const auto& cell = right.front();
+      if (cell && cell->kind == Kind::kInt) return {integer_message("DatetimeArray")};
+      if (cell_subtraction(left.front(), true, cell)) return {unsupported("DatetimeArray", operand_name(cell, false))};
+      return {std::nullopt, true};
+    }
+    for (std::size_t i = 0; i < rows; ++i)
+      if (auto error = cell_subtraction(left[i], true, right[i])) return {std::move(error)};
+    return {};
+  }
+  if (numeric(left_type) && numeric(right_type)) {
+    if (left_type == Type::kBool && right_type == Type::kBool)
+      return {"numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, the `^` operator, or "
+              "the logical_xor function instead."};
+    return {};
+  }
+  for (const auto i : present)
+    if (auto error = cell_subtraction(left[i], false, right[i])) return {std::move(error)};
+  return {};
+}
+
 std::string utc_text(const ParsedExactTimestamp& date) {
   auto utc = date;
   utc.timezone_aware = true;

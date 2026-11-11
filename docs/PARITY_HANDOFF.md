@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AW (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AX (2026-11-05 to 2026-11-10, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4356,7 +4356,65 @@ statistics (NaT cases null, exact business-hour microseconds, object
 columns case by case). The round was paused for the 2026-11-10 history
 rewrite and finished on the rewritten main. Details: Review AW1.
 
-Next round (AX) should start by re-reviewing round AW:
+Round AX re-reviewed AW with typed extra columns, custom case keys and
+business hours on CSV uploads and their XES round trip, comparing error
+messages too (fixed: a True/False CSV column with a blank is an object
+column; case statistics group by the case key's column, sort by start time
+by default and raise pandas' grouper, replace and empty-group errors; the
+column subtraction of service time, case statistics and passed time is
+pandas' (`frame_times::column_subtraction`: text columns subtract only
+rows with both cells, object columns retry on them, date less object cell
+by cell); XES cells written as `<float value="nan">` are missing values to
+the dtype inference; service time's business hours count exact
+microseconds) and took passed time to the upload frame (sorted pairs, the
+raised start, NaN means as null, business hours through pandas' datetime
+conversion). Details: Review AX1. The first full CI run on the public
+repository also gave findings (Review AX2): the Windows build's compile
+errors (a `small` macro of the Windows SDK, a local constant in a local
+class, a wide path, a parenthesized aggregate), macOS-only address-space
+checks, a use after free in a DFG test, last-bit libm differences of the
+classic DFG playout (declared) and a cancellation test that timed `-O0`
+copies.
+
+Next round (AY) should start by re-reviewing round AX:
+
+- `frame_times::column_subtraction` in `src/backend/frame_times.cpp` and
+  its callers: the `slots.empty()` branch of `frame_service_durations`
+  (`service_time.cpp`), the non-business branch of `frame_cases`
+  (`case_statistics.cpp`), and whether cycle time, case arrival, resource
+  profiles or network analysis subtract columns in ways the model now
+  covers;
+- `frame_passed_time` in `src/backend/passed_time.cpp`: the sort codes,
+  the raised start (`held`, `ge_error`, the float64 and missing-timestamp
+  rules), the pair-less errors, the text and object pairs, the business
+  conversion (`nat_text`, `unlikely_date`, `inferred_date_format`), the
+  aggregation, and `passed_time_json` with the frontend validator;
+- `frame_cases` in `case_statistics.cpp` (custom case key, `nargsort`
+  order, `sort_by_given`, the business-hour replace and `int()` errors,
+  the empty-group errors) and `frame_column_type` in `frame_keys.cpp`
+  (bool with a blank, CSV only);
+- `note_cell` and `typed_columns` in `src/backend/dataframe_columns.cpp`
+  (the NaN cell rule): every XES consumer of frame dtypes (LLM context,
+  attribute statistics, organizational routes, features, root cause) sees
+  the new `str`/date/float64 types on round-trip XES files.
+
+- the CI run of the AX commit: Windows has never linked or run ctest, so
+  its first link and test failures are findings; the macOS run should be
+  green. Run the suite once under AddressSanitizer and UBSan on Linux (a
+  separate build tree; it found AX2-2's use after free at once), and check
+  other tests for references into temporaries.
+
+Candidate new areas: passed time on the native path with an explicit
+`time:timestamp` start and another timestamp key; pandas' inferred datetime
+format for business hours on text columns (declared in AX1); event
+distribution and the remaining DataFrame statistics on frames with NaT
+cells; business hours in network analysis with fractional seconds (still
+epoch doubles there, not swept in AX); the open network-analysis error
+order of AX1 (XES seed 59 of `atsweep2.py`). Still open from earlier rounds: the trace-based selection
+of mixed-type and bool-with-gaps keys by Python set order (AQ, AV1).
+Harness: `review-harness/round-ax/` (README there).
+
+Round AW's targets, re-reviewed in AX (findings AX1-1 to AX1-5, fixed):
 
 - `src/backend/frame_times.{hpp,cpp}` (`Frame`, `case_cells`,
   `subtraction_error` with XES `datetime.datetime` cells, `total_seconds`,
@@ -4371,14 +4429,6 @@ Next round (AX) should start by re-reviewing round AW:
   duration, the reversed-interval error;
 - the exact durations in `network_analysis.cpp` (business hours still use
   epoch doubles there: worth a sweep with fractional seconds).
-
-Candidate new areas: passed time and event distribution on frames with NaT
-cells, a non-default `case_id_key` on the time statistics frames, business
-hours on network analysis with fractional seconds. Still open from earlier
-rounds: the trace-based selection of mixed-type and bool-with-gaps keys by
-Python set order (AQ, AV1), which a "most likely set order" model could
-narrow. Harness: `review-harness/round-aw/` (README there; it reuses round
-AV's scripts and theirs).
 
 Round AV's targets, re-reviewed in AW (findings AW1-1 to AW1-3, fixed):
 

@@ -220,9 +220,11 @@ int main() {
       return minera::import_xes_event_log(input, o).traces.size();
     }, std::chrono::milliseconds(300));
     std::istringstream big_xes_input(big_xes);
-    const auto big_xes_log = minera::import_xes_event_log(big_xes_input);
+    // Moved in, as the server moves its import: copying 200,000 events in
+    // this -O0 test took most of a second before the first poll (CI flake).
+    auto big_xes_log = minera::import_xes_event_log(big_xes_input);
     check_disconnect("XES source build (200,000 events)", CallbackOnly{}, [&](const CallbackOnly& o) {
-      return minera::ActiveEventSource::from_xes_frame(big_xes_log, {"x.xes", "xes", ""}, xes_selectors,
+      return minera::ActiveEventSource::from_xes_frame(std::move(big_xes_log), {"x.xes", "xes", ""}, xes_selectors,
                                                        minera::EventDataKind::kEventLog, o.cancelled)
           .checked_log().traces.size();
     }, std::chrono::milliseconds(200));

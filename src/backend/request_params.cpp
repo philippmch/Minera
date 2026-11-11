@@ -6885,6 +6885,7 @@ CaseStatisticsOptions parse_case_statistics_params(
     options.enable_sort = parse_boolean(require("case_statistics_enable_sort"),
                                         "case_statistics_enable_sort");
   if (supplied("case_statistics_sort_by")) {
+    options.sort_by_given = true;
     const auto value = require("case_statistics_sort_by");
     if (value == "case_id" || value == "CASE_ID")
       options.sort_by = CaseStatisticsSortBy::kCaseId;

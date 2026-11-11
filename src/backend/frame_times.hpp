@@ -69,6 +69,23 @@ struct CaseCells {
 [[nodiscard]] std::optional<std::string> subtraction_error(const python::Scalar& a, const python::Scalar& b,
                                                            bool python_dates = false);
 
+// pandas' `a - b` of two frame columns (pandas 3.0, observed black-box and
+// fuzzed against it): the TypeError's message, or none with whether the
+// difference is a timedelta column. A text (str) column subtracts only the
+// rows where both cells are present, as does the retry of an object column's
+// failed cell-by-cell subtraction; a date column minus an object column goes
+// cell by cell over every row, a single row as the whole array. The cells
+// are a column's rows in frame order (nullopt: missing); an object column's
+// dates are datetime.datetime, a date column's Timestamps.
+struct ColumnSubtraction {
+  std::optional<std::string> error;
+  bool timedelta = false;
+};
+[[nodiscard]] ColumnSubtraction column_subtraction(std::optional<DataFrameColumnType> left_type,
+                                                   const std::vector<std::optional<python::Scalar>>& left,
+                                                   std::optional<DataFrameColumnType> right_type,
+                                                   const std::vector<std::optional<python::Scalar>>& right);
+
 // A UTC instant as text ("2020-01-01 08:00:00.250000+00:00"), which
 // parse_timestamp_exact reads back to the same instant.
 [[nodiscard]] std::string utc_text(const ParsedExactTimestamp& date);

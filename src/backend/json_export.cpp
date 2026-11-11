@@ -7353,32 +7353,32 @@ std::string chaotic_activities_json(const ChaoticActivitiesResult& result) {
 }
 
 std::string passed_time_json(const PassedTimeResult& result) {
-  const auto write_entries = [](std::ostringstream& out,
-                                const std::vector<PassedTimeEntry>& entries) {
+  // On an upload's frame a pair whose times are missing has no mean, and
+  // pm4py reports NaN; that is written as null. Infinite values stay an error.
+  const auto write_value = [](std::ostringstream& out, double value,
+                              const char* what) {
+    if (std::isnan(value)) {
+      out << "null";
+      return;
+    }
+    if (!std::isfinite(value)) throw std::invalid_argument(what);
+    out << std::setprecision(17) << value;
+  };
+  const auto write_entries = [&](std::ostringstream& out,
+                                 const std::vector<PassedTimeEntry>& entries) {
     out << '[';
     for (std::size_t i = 0; i < entries.size(); ++i) {
       if (i) out << ',';
       const auto& entry = entries[i];
       out << "{\"activity\":";
       write_json_string(out, entry.activity);
-      out << ",\"performance\":" << std::setprecision(17)
-          << entry.performance << ",\"frequency\":" << entry.frequency
-          << '}';
+      out << ",\"performance\":";
+      write_value(out, entry.performance,
+                  "passed time performance must be finite");
+      out << ",\"frequency\":" << entry.frequency << '}';
     }
     out << ']';
   };
-  if (!std::isfinite(result.pre_avg_perf) ||
-      !std::isfinite(result.post_avg_perf)) {
-    throw std::invalid_argument("passed time averages must be finite");
-  }
-  for (const auto& entry : result.pre) {
-    if (!std::isfinite(entry.performance))
-      throw std::invalid_argument("passed time performance must be finite");
-  }
-  for (const auto& entry : result.post) {
-    if (!std::isfinite(entry.performance))
-      throw std::invalid_argument("passed time performance must be finite");
-  }
   std::ostringstream out;
   out << "{\"family\":\"PASSED_TIME\",\"variant\":\""
       << passed_time_variant_name(result.variant) << "\",\"activity\":";
@@ -7387,9 +7387,11 @@ std::string passed_time_json(const PassedTimeResult& result) {
   write_entries(out, result.pre);
   out << ",\"post\":";
   write_entries(out, result.post);
-  out << ",\"pre_avg_perf\":" << std::setprecision(17)
-      << result.pre_avg_perf << ",\"post_avg_perf\":"
-      << result.post_avg_perf << '}';
+  out << ",\"pre_avg_perf\":";
+  write_value(out, result.pre_avg_perf, "passed time averages must be finite");
+  out << ",\"post_avg_perf\":";
+  write_value(out, result.post_avg_perf, "passed time averages must be finite");
+  out << '}';
   return out.str();
 }
 

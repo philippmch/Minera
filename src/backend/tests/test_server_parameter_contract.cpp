@@ -1620,6 +1620,9 @@ int main(int argc, char** argv) {
   // instead of running the server out of memory. With the budget raised past
   // a 1.5 GiB limit, a mine of 400,000 events that runs out of memory gets
   // 503 naming it (it was 400 "std::bad_alloc") and the server lives on.
+  // Linux only: macOS does not enforce RLIMIT_AS (on its CI runner the
+  // server saw no lowered limit), so neither check can be observed there.
+#if defined(__linux__)
   for (const bool raised : {false, true}) {
     const int as_port = free_port();
     const std::string as_port_text = std::to_string(as_port);
@@ -1683,6 +1686,7 @@ int main(int argc, char** argv) {
     int as_status = 0;
     ::waitpid(as_server, &as_status, 0);
   }
+#endif
 
   ::kill(server, SIGTERM);
   int status = 0;

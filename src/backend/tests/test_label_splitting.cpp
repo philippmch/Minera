@@ -77,10 +77,8 @@ static EventLog weighted_gain_fixture() {
     Trace trace;
     std::size_t timestamp = i * 4;
     for (const auto& activity : prefixes[i])
-      trace.events.emplace_back("c" + std::to_string(i), activity, "", "",
-                                timestamp++);
-    trace.events.emplace_back("c" + std::to_string(i), "A", "", "",
-                              timestamp);
+      trace.events.push_back(Event{"c" + std::to_string(i), activity, "", "", timestamp++});
+    trace.events.push_back(Event{"c" + std::to_string(i), "A", "", "", timestamp});
     log.traces.push_back(std::move(trace));
   }
   return log;
@@ -106,12 +104,9 @@ static EventLog tied_edges_fixture() {
       {"a", "a"}, {"a", "b"}, {"x", "x"}, {"x", "y"}};
   for (std::size_t i = 0; i < prefixes.size(); ++i) {
     Trace trace;
-    trace.events.emplace_back("c" + std::to_string(i), prefixes[i][0], "", "",
-                              i * 3);
-    trace.events.emplace_back("c" + std::to_string(i), prefixes[i][1], "", "",
-                              i * 3 + 1);
-    trace.events.emplace_back("c" + std::to_string(i), "A", "", "",
-                              i * 3 + 2);
+    trace.events.push_back(Event{"c" + std::to_string(i), prefixes[i][0], "", "", i * 3});
+    trace.events.push_back(Event{"c" + std::to_string(i), prefixes[i][1], "", "", i * 3 + 1});
+    trace.events.push_back(Event{"c" + std::to_string(i), "A", "", "", i * 3 + 2});
     log.traces.push_back(std::move(trace));
   }
   return log;

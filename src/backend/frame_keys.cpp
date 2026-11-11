@@ -267,7 +267,15 @@ std::optional<python::Scalar> frame_row_scalar(const EventLog& frame, const Trac
 std::optional<DataFrameColumnType> frame_column_type(const EventLog& frame, const std::string& key) {
   const auto& columns = *frame.dataframe_columns;
   for (const auto& column : columns.columns)
-    if (column.key == key) return column.type;
+    if (column.key == key) {
+      // read_csv keeps a True/False column with a missing cell as objects
+      // (observed black-box); the importer records it as bool.
+      if (column.type == DataFrameColumnType::kBool && columns.csv_text)
+        for (const auto& trace : frame.traces)
+          for (const auto& event : trace.events)
+            if (!frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame)) return DataFrameColumnType::kObject;
+      return column.type;
+    }
   if (key.starts_with("case:") && key != "case:concept:name")
     for (const auto& column : columns.trace_columns)
       if ("case:" + column.key == key) return column.type;

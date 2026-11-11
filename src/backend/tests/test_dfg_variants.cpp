@@ -433,7 +433,10 @@ void performance_arithmetic_follows_the_reference_paths() {
   options.performance_aggregation = DfgPerformanceAggregation::kAll;
   for (const bool dataframe : {false, true}) {
     options.dataframe_arithmetic = dataframe;
-    const auto& summary = performance(discover_performance_dfg(micro, options), "A", "B").summary;
+    // Kept alive: a reference into the temporary would dangle (heap use
+    // after free, which macOS's allocator exposed).
+    const auto dfg = discover_performance_dfg(micro, options);
+    const auto& summary = performance(dfg, "A", "B").summary;
     assert(summary.mean == 1e-06 && summary.sum == 1e-06 && summary.minimum == 1e-06);
   }
 

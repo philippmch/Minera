@@ -246,8 +246,9 @@ class TokenInteger {
       value.negative = negative && !value.limbs.empty();
       return value;
     }
-    static Wide from_small(std::int64_t small) {
-      return from_magnitude(small < 0, small < 0 ? std::uint64_t(-(small + 1)) + 1 : std::uint64_t(small));
+    static Wide from_small(std::int64_t inline_value) {
+      return from_magnitude(inline_value < 0,
+                            inline_value < 0 ? std::uint64_t(-(inline_value + 1)) + 1 : std::uint64_t(inline_value));
     }
     // The value as an int64 when it lies in that range.
     [[nodiscard]] bool fits_small(std::int64_t& out) const noexcept {
@@ -350,9 +351,10 @@ class TokenInteger {
   [[nodiscard]] Wide to_wide() const { return wide_ ? *wide_ : Wide::from_small(small_); }
   // Stores `value` in canonical form: inline whenever it fits.
   void assign(Wide&& value) {
-    std::int64_t small = 0;
-    if (value.fits_small(small)) {
-      delete wide_; wide_ = nullptr; small_ = small;
+    // Not named `small`: the Windows SDK's rpcndr.h defines that as a macro.
+    std::int64_t inline_value = 0;
+    if (value.fits_small(inline_value)) {
+      delete wide_; wide_ = nullptr; small_ = inline_value;
     } else if (wide_) {
       *wide_ = std::move(value); small_ = 0;
     } else {

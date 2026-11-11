@@ -790,6 +790,12 @@ describe("isPassedTimeResult", () => {
     expect(isPassedTimeResult({ ...valid,
       post: [{ ...valid.post[0], frequency: -1 }] })).toBe(false);
   });
+  it("accepts null for an upload's pairs whose times are all missing", () => {
+    expect(isPassedTimeResult({ ...valid,
+      pre: [{ ...valid.pre[0], performance: null }], pre_avg_perf: null })).toBe(true);
+    expect(isPassedTimeResult({ ...valid, post_avg_perf: Number.POSITIVE_INFINITY })).toBe(false);
+    expect(isPassedTimeResult({ ...valid, post_avg_perf: undefined })).toBe(false);
+  });
 });
 
 describe("isServiceTimeResult", () => {
