@@ -22735,3 +22735,142 @@ project files under `review-harness/round-ba/`):
 `minera_review_ba1_tests` binds the values and messages above (taken from
 pm4py black-box on the same uploads and files) and runs `minera_export` on
 an XES file.
+
+## Review BB1: re-review of round BA, typed columns in resource profiles, and mixed XES columns in the organizational routes (2026-11-11)
+
+Round BB re-reviewed BA (the one-column masks of resource profiles, the case
+metrics' `Grouper` check, the column subtraction in passed time, the
+missing-label messages, the `minera:nanoseconds` marker, the CLI's XES
+frame) and swept resource profiles with typed CSV columns (int, float with
+blanks, bool, bool with a blank, text, dates with blanks) in every role,
+which BA's matrix did not vary. Findings, all fixed:
+
+- **BB1-1 The workload metrics convert every interval first.**
+  `average_workload` and `multitasking` turn each row of the resource into
+  an interval with `.timestamp()`, its start and then its end, before any
+  window comparison: the first cell that is no date fails with its own
+  type (`AttributeError: 'str' object has no attribute 'timestamp'`), a
+  missing date is NaT (`ValueError: NaTType does not support timestamp`).
+  Without a start column the start is the previous row's timestamp when
+  that row is of the same case in the frame sorted by case and timestamp,
+  otherwise the row's own; the shift makes an int64 column float. Minera
+  raised the window comparison's `TypeError` or always named `float`. A
+  Python model of the rule matched pm4py on 1,792 random cases before the
+  port; before the fix, 132 of 2,400 workload jobs of the typed fuzz
+  differed.
+- **BB1-2 Masked frames keep their column's dtype.** With one column
+  selected more than once (`activity_completions` with the resource on the
+  timestamp column, `activity_frequency` and `distinct_activities` on one
+  column), the comparison meets the masked column: a bool column raises
+  with `bool` once a row of the resource is kept, an int column stays
+  `int` only when every row is kept (NaN cells make it float), a column
+  of no kept row compares nothing. Minera named the cell's own type or
+  raised where pm4py returns a value.
+- **BB1-3 A missing cell's type in the conversion.** The case and activity
+  columns of a CSV upload are pandas' `string` dtype (missing value NA,
+  type `NoneType`); every other missing cell is NaN (`float`).
+- **BB1-4 The case metrics compare rows with a case only.**
+  `case_completions` and `fraction_case_completions` group by the case
+  column before comparing times, which drops rows without a case: their
+  timestamp cells are never compared (fuzz seed 556).
+- **BB1-5 `average_case_duration` on a bool timestamp column** raises
+  numpy's `TypeError: numpy boolean subtract, the '-' operator, is not
+  supported, ...` before the `.dt` accessor error.
+- **BB1-6 `average_duration_activity` with its start column named twice.**
+  The start column then is a frame: a date timestamp column subtracts it
+  (`AttributeError: 'DataFrame' object has no attribute 'dt'`), any other
+  fails by the dtypes (`cannot subtract DatetimeArray from
+  ndarray[float64]`, `unsupported operand type(s) for -: 'DatetimeArray'
+  and 'NAType'`, `Cannot subtract NaT from ndarray with dtype int64`, by
+  the start column's dtype; fuzz seeds 354 and 860).
+- **BB1-7 `average_duration_activity` with a start column skips NaT
+  durations.** A row whose start or end is NaT has a NaN duration, which
+  the mean skips; Minera took the previous event's time (seed 789).
+- **BB1-8 `average_duration_activity` without a start column, rows without
+  a case.** The start is the previous row's timestamp of the same case;
+  when no case has two rows with a date among them, the start column is an
+  object column of dates, whose subtraction leaves no `.dt` accessor
+  unless exactly one row is selected (0.0). Minera skipped rows without a
+  case in that count and counted cases whose rows have no date (seed 1576,
+  and both probes of `p15.py`/`p16.py`).
+- **BB1-9 An OCEL SQLite file opened in the app lost nanoseconds.** The
+  frontend imports an OCEL SQLite file and posts the standard OCEL 2.0
+  JSON back to the discovery routes; BA's marker covered the classic form
+  only, so the times were cut to microseconds (132 of 150 OCDFG results
+  differed from `read_ocel2_sqlite` + `discover_ocdfg`). The standard
+  transport now carries `"minera:nanoseconds": true` too; files written
+  for users still carry no marker.
+- **BB1-10 Local diagnostics on XES object columns.** pandas' `groupby([a,
+  r])` sorts each level over every row, also the rows the other level's
+  null drops: an activity column of dates and floats fails though only one
+  row has a resource (XES seed 661 of `azsweep.py`; Minera raised
+  `ZeroDivisionError` later). Dates in such a column are
+  `datetime.datetime` in the message, and in the member `KeyError`
+  (`KeyError: datetime.datetime(2021, 1, 1, 0, 0,
+  tzinfo=datetime.timezone.utc)`); a group's members follow the membership
+  groupby (sorted by resource), so the `KeyError` names the first in that
+  order; with the activity on the resource column, the membership groupby
+  sorts the group column before the `KeyError`.
+- **BB1-11 Pandas roles on XES object columns.** The groupby sorts text
+  beside numbers in pandas' mixed order (numbers first) where Minera raised
+  `'<' not supported between instances of 'float' and 'str'`; dates beside
+  numbers raise (named `datetime.datetime`), also on rows the other level
+  drops; a role's resources follow that order; the activity join names
+  `datetime.datetime` for an object column; the first missing key is the
+  resource's.
+
+- **BB1-12 Log-variant roles name a resource per role.** The EventLog
+  variant counts `(resource, activity)` pairs in a `Counter`, so the int
+  `1` and `True` in one XES column are one resource, named in each role by
+  its first value there (`1` in one role, `True` in another), and by the
+  left role's name on a merge. Minera named it once for the whole log
+  (XES seed 567 of round AS's `orgxes.py`, found by rerunning it). The
+  EventLog also keeps a datetime column's missing cells as `pd.NaT`, one
+  object, so they are one resource `NaT` (a NaN cell is a float of its own
+  each time and stays declared), a missing activity there is `NaTType` in
+  the join's message, and an object column's dates are
+  `datetime.datetime`.
+
+Re-review of BA without further findings: the CLI's XES and CSV frame path
+against the server on every organizational and statistics mode
+(`clidiff.py`), passed time on CSV and XES uploads with typed and object
+columns, and the rework filter's selection of missing keys.
+
+Declarations:
+
+- The rework filter with both its keys missing lists them in Python set
+  order (`None of [Index(['p', 'q'], ...)]` or `['q', 'p']` by hash seed);
+  Minera lists them in one order.
+- The frontend's downloadable `imported-*.json` of an OCEL SQLite file now
+  carries `"minera:nanoseconds": true`, which pm4py's readers ignore.
+- An XES object column with two unequal values of one `str()` (the text
+  `'5'` and the int `5`): pm4py keeps two resources both shown `5`;
+  Minera's roles merge them, its local diagnostics refuse the result
+  (`local diagnostics counts are inconsistent`).
+- Still open: the LLM context's trace-based selection of a bool column with
+  gaps (BA1 declarations; seed 17 of `llmsweep.py`).
+
+Verification (scripts in the project files under `review-harness/round-bb/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| CLI (`minera_export`) against the server, XES and CSV, every frame mode (`clidiff.py`) | 1,680 | 0 differences |
+| Passed time, CSV (seeds 4,000 to 4,149) and XES with varying `case:` columns (5,000 to 5,099) | 1,500 | 681 equal, 819 raise in both |
+| Resource profiles, typed CSV fuzz, all metrics (`rpfuzz.py`, seeds 0 to 299) | 2,400 | before: 33 differences beside 84 declared NaN |
+| The same, workload metrics only (seeds 300 to 599) | 2,400 | before: 132 differences (BB1-1) |
+| The same on intermediate builds (seeds 0 to 1,899) | 15,200 | Minera-only results or other errors at seeds 354, 556, 789, 860 and 1,576 (BB1-4, BB1-6 to BB1-8) |
+| The same on the final code (seeds 1,550 to 1,609 and 1,900 to 2,649) | 6,480 | 3,422 equal, 2,768 raise in both, 290 declared NaN, 0 differences |
+| Typed duplicate-column matrix (`mtmatrix3.py`) | 8,004 | before: 78 differences (BB1-2, BB1-3); final: 0 beside 17 declared NaN and 4 Series counts |
+| BA's duplicate-column matrix (`mtmatrix2p.py`) | 45,000 | 0 differences beside 92 declared NaN and 162 Series counts |
+| OCEL SQLite opened as the app opens it, OCDFG against `read_ocel2_sqlite` (`ocelsq.py`) | 150 | before: 132 differences (BB1-9); final: 0 |
+| Pandas roles and local diagnostics on XES with mixed object columns (`rolesmix.py`) | 800 / 6,000 | before (seeds 0 to 99): 110 roles and 69 diagnostics differences; after BB1-10 and BB1-11 (seeds 0 to 749): 0 beside 61 declared name clashes |
+| The same with the log variant of roles in a third of the requests (seeds 800 to 1,199) | 3,200 | before BB1-12: `NaT` resources, per-role names and the `datetime.datetime`/`NaTType` messages differed; final: 0 beside 103 declared NaN resources and 35 name clashes |
+| Round AZ's sweeps of profiles, diagnostics and network (`azsweep.py`, CSV, XES and two-row CSV) | 7,607 | 1 difference: XES seed 661 (BB1-10) |
+| Round AS's SNA and roles sweeps rerun (`orgsweep.py`, CSV seeds 450 to 599; `orgxes.py`, XES seeds 450 to 599) | 1,800 | before BB1-12: 1 XES difference (seed 567); final: 724 equal, 872 raise in both, 204 declared NaN |
+| The same, CSV with varying `case:` columns (seeds 600 to 699) | 600 | 197 equal, 325 raise in both, 78 declared NaN, 0 differences |
+| Round AZ's profiles and diagnostics on XES (`azsweep.py --xes`, seeds 600 to 799) | 2,326 | 1,790 equal, 464 raise in both, 72 NaN, 0 differences |
+| Fixture replay, 16 manifests, a fresh server each | 2,673 | unchanged |
+| Full ctest | 460 tests | all pass |
+
+`minera_review_bb1_tests` binds the values and messages above (taken from
+pm4py black-box on the same uploads and files).

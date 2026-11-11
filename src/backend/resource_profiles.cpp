@@ -591,7 +591,7 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
 // fail cell by cell); an object column fails as the whole array for one row,
 // else cell by cell at the first cell that is no date. Without a start
 // column the start of a row is the previous timestamp of its case, an object
-// column of dates when no case has two rows. A subtraction that leaves no
+// column of dates when no case has two rows with a date among them. A subtraction that leaves no
 // datetime result (no row, or object cells) then has no .dt accessor.
 // `resource` is the identity of the resource's cells (pm4py's call is per
 // resource; the all-resources request checks each one on its own rows).
@@ -628,13 +628,21 @@ void require_duration_rows(const EventLog& frame, const ResourceProfilesOptions&
   };
   const auto activity = wanted(o.activity, o.activity_given, date_column(a));
   std::vector<std::optional<python::Scalar>> starts;
-  std::map<std::string, std::size_t> case_rows;
+  // A case's rows sort with their missing timestamps last, so its second
+  // row follows a dated one when any of its timestamps is a date; a row
+  // without a case still counts below (no groupby drops it; round BB,
+  // observed black-box).
+  std::map<std::string, std::pair<std::size_t, bool>> case_rows;
   bool repeated_case = false;
   for (const auto& trace : frame.traces)
     for (const auto& event : trace.events) {
-      const auto case_cell = frame_row_scalar(frame, trace, event, c);
-      if (!case_cell) continue;
-      repeated_case = ++case_rows[python::identity(*case_cell)] > 1 || repeated_case;
+      if (const auto case_cell = frame_row_scalar(frame, trace, event, c)) {
+        auto& [count, dated] = case_rows[python::identity(*case_cell)];
+        ++count;
+        if (const auto time = frame_row_scalar(frame, trace, event, t); time && time->kind == python::Scalar::Kind::kDate)
+          dated = true;
+        repeated_case = repeated_case || (count > 1 && dated);
+      }
       const auto resource_cell = frame_row_scalar(frame, trace, event, r);
       if (!resource_cell || (resource && python::identity(*resource_cell) != *resource)) continue;
       const auto activity_cell = frame_row_scalar(frame, trace, event, a);
@@ -888,9 +896,14 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     for (const auto& event : trace.events) compared_rows.emplace_back(&trace, &event);
   // A float64 column compares NaN cells too (numpy, not the masked object
   // comparison), so a compared row of it always fails.
+  // The case metrics compare the rows of a case only: the groupby of the
+  // case column drops a row without one (round BB, observed black-box).
+  const bool case_metric = metric == ResourceProfileMetric::kCaseCompletions ||
+                           metric == ResourceProfileMetric::kFractionCaseCompletions;
   const auto offending_type = [&](const std::string& key) -> std::optional<std::string> {
     const bool floats = frame_column_type(frame, key) == DataFrameColumnType::kFloat64;
     for (const auto& [trace, event] : compared_rows) {
+      if (case_metric && !frame_row_scalar(frame, *trace, *event, c)) continue;
       if (resource_first) {
         const auto cell = frame_row_scalar(frame, *trace, *event, r);
         if (!cell) continue;
@@ -904,6 +917,61 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       const auto value = frame_row_scalar(frame, *trace, *event, key);
       if (!value && floats) return std::string("float");
       if (value && value->kind != python::Scalar::Kind::kDate) return python::type_name(*value);
+    }
+    return std::nullopt;
+  };
+  // A missing cell as pm4py's timestamp conversion meets it: None in the
+  // case and activity columns of a CSV frame (format_dataframe makes them
+  // the "string" dtype, whose missing value is NA), NaN elsewhere (round
+  // BB, observed black-box).
+  const auto missing_name = [&](const std::string& key) {
+    const bool na_string = frame.dataframe_columns && frame.dataframe_columns->csv_text &&
+                           (key == "case:concept:name" || key == "concept:name");
+    return std::string(na_string ? "NoneType" : "float");
+  };
+  // The workload metrics convert each row of the resource to an interval,
+  // its start and then its end with .timestamp(), before they compare
+  // anything with the window: the first cell that is no date fails, with
+  // its own type (a missing date is NaT). Without a start column the start
+  // is the previous row's timestamp in the sorted frame when that row is of
+  // the same case (a missing one, or the case's first row, takes the row's
+  // own timestamp); shifting makes an int64 column floats (round BB,
+  // observed black-box).
+  const auto workload_conversion_error = [&]() -> std::optional<std::string> {
+    const auto t_dtype = frame_column_type(frame, t);
+    const auto convert = [&](const std::optional<python::Scalar>& cell, const std::string& key,
+                             bool shifted) -> std::optional<std::string> {
+      if (!cell) {
+        if (frame_column_type(frame, key) == DataFrameColumnType::kDate)
+          return std::string("ValueError: NaTType does not support timestamp");
+        return "AttributeError: '" + missing_name(key) + "' object has no attribute 'timestamp'";
+      }
+      if (cell->kind == python::Scalar::Kind::kDate) return std::nullopt;
+      const auto type = shifted && t_dtype == DataFrameColumnType::kInt64 ? std::string("float")
+                                                                           : python::type_name(*cell);
+      return "AttributeError: '" + type + "' object has no attribute 'timestamp'";
+    };
+    for (std::size_t i = 0; i < compared_rows.size(); ++i) {
+      const auto& [trace, event] = compared_rows[i];
+      const auto cell = frame_row_scalar(frame, *trace, *event, r);
+      if (!cell || (!all_resources && python::identity(*cell) != wanted)) continue;
+      const auto end = frame_row_scalar(frame, *trace, *event, t);
+      std::optional<python::Scalar> begin;
+      if (start) {
+        begin = frame_row_scalar(frame, *trace, *event, s);
+        if (const auto error = convert(begin, s, false)) return error;
+      } else {
+        begin = end;
+        if (i > 0) {
+          const auto case_cell = frame_row_scalar(frame, *trace, *event, c);
+          const auto& [previous_trace, previous_event] = compared_rows[i - 1];
+          const auto previous_case = frame_row_scalar(frame, *previous_trace, *previous_event, c);
+          if (case_cell && previous_case && python::identity(*case_cell) == python::identity(*previous_case))
+            if (auto previous = frame_row_scalar(frame, *previous_trace, *previous_event, t)) begin = std::move(previous);
+        }
+        if (const auto error = convert(begin, t, true)) return error;
+      }
+      if (const auto error = convert(end, t, false)) return error;
     }
     return std::nullopt;
   };
@@ -1027,7 +1095,7 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       if (frame_column_type(frame, r) == DataFrameColumnType::kDate) {
         if (!kept) fail("ValueError: NaTType does not support timestamp");
       } else {
-        fail("AttributeError: '" + (kept ? python::type_name(*cell) : std::string("float")) +
+        fail("AttributeError: '" + (kept ? python::type_name(*cell) : missing_name(r)) +
              "' object has no attribute 'timestamp'");
       }
     }
@@ -1062,6 +1130,12 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     // timestamp one is a KeyError there (round BA: after the comparison and
     // the groupby, observed black-box).
     if (start && s != t) fail("KeyError: '" + s + "'");
+    // The cases' last less first timestamps: numpy refuses to subtract a
+    // bool column (even with no case kept); other columns of no dates leave
+    // no .dt accessor (round BB, observed black-box).
+    if (frame_column_type(frame, t) == DataFrameColumnType::kBool)
+      fail("TypeError: numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, the `^` "
+           "operator, or the logical_xor function instead.");
     if (non_date_type(frame, t)) fail("AttributeError: Can only use .dt accessor with datetimelike values");
   } else if ((metric == ResourceProfileMetric::kActivityCompletions && r == t) || masked_frequency ||
              masked_distinct) {
@@ -1072,14 +1146,34 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     const auto dtype = frame_column_type(frame, t);
     if (dtype && *dtype != DataFrameColumnType::kDate && *dtype != DataFrameColumnType::kObject &&
         *dtype != DataFrameColumnType::kString) {
-      if (const auto t_type = non_date_type(frame, t))
+      // A masked int64 column is float64 unless every row matches, a
+      // masked bool column object (its comparison skips the NaN cells, so
+      // it fails only at a matching cell); numpy compares every cell of a
+      // number column (round BB, observed black-box).
+      bool any_kept = false, all_kept = true;
+      for (const auto& [trace, event] : compared_rows) {
+        const auto cell = frame_row_scalar(frame, *trace, *event, r);
+        const bool kept = cell && (all_resources || python::identity(*cell) == wanted);
+        any_kept = any_kept || kept;
+        all_kept = all_kept && kept;
+      }
+      std::optional<std::string> t_type;
+      if (*dtype == DataFrameColumnType::kBool) {
+        if (any_kept) t_type = "bool";
+      } else if (*dtype == DataFrameColumnType::kInt64) {
+        if (!compared_rows.empty()) t_type = all_kept ? "int" : "float";
+      } else {
+        t_type = non_date_type(frame, t);
+      }
+      if (t_type)
         fail("TypeError: '>=' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
     } else if (const auto t_type = offending_type(t)) {
       fail("TypeError: '>=' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
     }
   } else if (interaction) {
+  } else if (workload) {
+    if (const auto error = workload_conversion_error()) fail(*error);
   } else if (const auto t_type = offending_type(t)) {
-    if (workload) fail("AttributeError: 'float' object has no attribute 'timestamp'");
     fail("TypeError: '>=' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
   } else if (metric == ResourceProfileMetric::kAverageDurationActivity && start && named_in_selection(t) > 1) {
     reindex();
@@ -1088,8 +1182,22 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     // timestamp column is subtracted from: a datetime column realigns it
     // when rows of the resource and activity remain, and fails on NaT when
     // none do; any other column gives a frame with no .dt accessor.
-    if (frame_column_type(frame, t) != DataFrameColumnType::kDate)
+    const auto t_dtype = frame_column_type(frame, t);
+    if (t_dtype != DataFrameColumnType::kDate) {
+      // A date start column is subtracted from the masked timestamp column
+      // (round BB, observed black-box): a masked int or float column is
+      // float64, a bool or object one object, a text column's missing
+      // cells NaN (NA in format_dataframe's case and activity columns).
+      if (frame_column_type(frame, s) == DataFrameColumnType::kDate) {
+        if (t_dtype == DataFrameColumnType::kInt64 || t_dtype == DataFrameColumnType::kFloat64)
+          fail("TypeError: cannot subtract DatetimeArray from ndarray[float64]");
+        if (t_dtype == DataFrameColumnType::kString)
+          fail("TypeError: unsupported operand type(s) for -: 'DatetimeArray' and '" +
+               std::string(missing_name(t) == "NoneType" ? "NAType" : "float") + "'");
+        fail("TypeError: cannot subtract DatetimeArray from ndarray[object]");
+      }
       fail("AttributeError: 'DataFrame' object has no attribute 'dt'");
+    }
     const bool kept = std::any_of(compared_rows.begin(), compared_rows.end(), [&](const auto& row) {
       const auto cell = frame_row_scalar(frame, *row.first, *row.second, r);
       if (!cell || (!all_resources && python::identity(*cell) != wanted)) return false;
@@ -1098,7 +1206,16 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       return activity && python::identity(*activity) == *activity_wanted;
     });
     if (kept) reindex();
-    fail("TypeError: Cannot subtract NaT from ndarray with dtype object");
+    // A date start column leaves a frame of no .dt accessor, any other the
+    // subtraction of NaT from the column's own dtype (round BB, observed
+    // black-box).
+    const auto s_dtype = frame_column_type(frame, s);
+    if (s_dtype == DataFrameColumnType::kDate) fail("AttributeError: 'DataFrame' object has no attribute 'dt'");
+    const char* s_name = s_dtype == DataFrameColumnType::kInt64     ? "int64"
+                         : s_dtype == DataFrameColumnType::kFloat64 ? "float64"
+                         : s_dtype == DataFrameColumnType::kBool    ? "bool"
+                                                                    : "object";
+    fail(std::string("TypeError: Cannot subtract NaT from ndarray with dtype ") + s_name);
   } else if (metric == ResourceProfileMetric::kAverageDurationActivity && non_date_type(frame, t)) {
     // No compared row fails; a date start column cannot be subtracted from
     // the column, any other durations then use the .dt accessor.
@@ -1123,8 +1240,6 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       fail("KeyError: \"None of ['case:concept:name'] are in the columns\"");
   }
   const bool uses_start = start && (workload || metric == ResourceProfileMetric::kAverageDurationActivity);
-  if (uses_start && workload)
-    if (const auto s_type = offending_type(s)) fail("AttributeError: '" + *s_type + "' object has no attribute 'timestamp'");
   if (metric == ResourceProfileMetric::kAverageDurationActivity) require_duration_column(frame, o, b, r, a, c, t, s, uses_start);
   // The metrics that read cases (workload and multitasking only without a
   // start column).
@@ -1178,6 +1293,17 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     if (!uses_case) view.traces.emplace_back();
     for (const auto& event : trace.events) {
       ++row_number;
+      // average_duration_activity with a start column: a row whose start or
+      // end is NaT has a NaN duration, which the mean skips (round BB,
+      // observed black-box); the native intervals would take the previous
+      // event's time.
+      if (uses_start && metric == ResourceProfileMetric::kAverageDurationActivity) {
+        const auto begin = frame_row_scalar(frame, trace, event, s);
+        const auto end = frame_row_scalar(frame, trace, event, t);
+        if (!begin || begin->kind != python::Scalar::Kind::kDate || !end ||
+            end->kind != python::Scalar::Kind::kDate)
+          continue;
+      }
       std::string case_key;
       if (uses_case) {
         const auto cell = frame_row_scalar(frame, trace, event, c);

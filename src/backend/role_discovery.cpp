@@ -33,6 +33,10 @@ struct WorkingRole {
   // merge, so the left role's keys come first and the right role's new keys
   // follow in its own order.
   std::vector<std::string> resource_order;
+  // The EventLog variant on a frame: a resource's name in this role, the
+  // str() of the first value of its identity among the role's events (its
+  // Counter key; 1 and True are one key), the left role's on a merge.
+  std::map<std::string, std::string> display;
 };
 
 // The role's sorted activity list, which the reference compares as a Python
@@ -120,29 +124,71 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
       frame && scope == FrameKeyScope::kDataFrame &&
       pandas_row_label_keys(log.event_count(), keys.contains(options.activity_attribute) &&
                                                    keys.contains(options.resource_attribute));
+  // The pandas variant's resources in its groupby's order: the rank of each
+  // resource's Python identity.
+  std::map<std::string, std::size_t> resource_rank;
   if (frame && !pair_labels) {
-    require_frame_key(keys, options.activity_attribute);
-    require_frame_key(keys, options.resource_attribute);
-    // The pandas variant's groupby sorts the resources: text beside
-    // numbers or dates raises TypeError there.
-    std::set<FrameValueClass> resource_classes;
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events) {
-        const auto activity = frame_value(log, trace, event, options.activity_attribute, scope);
-        if (scope == FrameKeyScope::kDataFrame) {
-          const auto resource = frame_value(log, trace, event, options.resource_attribute, scope);
-          if (activity.missing() || resource.missing()) continue;
-          resource_classes.insert(resource.value_class);
-        }
-        if (activity.value_class != FrameValueClass::kText)
-          throw std::invalid_argument(
-              std::string("TypeError: sequence item 0: expected str instance, ") +
-              (activity.value_class == FrameValueClass::kDate ? std::string("Timestamp")
-               : activity.missing() ? std::string("float")
-                                    : python::type_name(frame_number_scalar(activity))) +
-              " found");
+    // The pandas variant's groupby [resource, activity] names the first
+    // missing key in that order (round BB, observed black-box).
+    if (scope == FrameKeyScope::kDataFrame) {
+      require_frame_key(keys, options.resource_attribute);
+      require_frame_key(keys, options.activity_attribute);
+    } else {
+      require_frame_key(keys, options.activity_attribute);
+      require_frame_key(keys, options.resource_attribute);
+    }
+    if (scope == FrameKeyScope::kDataFrame) {
+      // groupby([resource, activity]) sorts each level over every row, also
+      // the rows the other level's null drops: text beside numbers takes
+      // pandas' mixed order (numbers first), values Python cannot order
+      // raise, and an XES object column's dates are datetime.datetime. The
+      // roles' sort keys then join each role's activity names in the
+      // groups' order: the first that is no text raises (round BB, observed
+      // black-box).
+      std::vector<std::vector<python::Scalar>> pair_keys;
+      for (const auto& trace : log.traces)
+        for (const auto& event : trace.events)
+          pair_keys.push_back({frame_row_scalar(log, trace, event, options.resource_attribute).value_or(python::none()),
+                               frame_row_scalar(log, trace, event, options.activity_attribute).value_or(python::none())});
+      std::vector<python::Group> groups;
+      try {
+        groups = python::groupby(pair_keys);
+      } catch (const python::TypeError& error) {
+        std::string message = error.what();
+        for (std::size_t at; (at = message.find("'Timestamp'")) != std::string::npos;)
+          message.replace(at, 11, "'datetime.datetime'");
+        throw std::invalid_argument("TypeError: " + message);
       }
-    require_sortable_classes(resource_classes);
+      const bool object_activity = frame_column_type(log, options.activity_attribute) == DataFrameColumnType::kObject;
+      for (const auto& group : groups) {
+        const auto& activity = group.labels[1];
+        if (activity.kind != python::Scalar::Kind::kText)
+          throw std::invalid_argument(
+              "TypeError: sequence item 0: expected str instance, " +
+              (activity.kind == python::Scalar::Kind::kDate && object_activity ? std::string("datetime.datetime")
+                                                                               : python::type_name(activity)) +
+              " found");
+        resource_rank.try_emplace(python::identity(group.labels[0]), resource_rank.size());
+      }
+    } else {
+      // An XES object column's dates stay datetime.datetime in the EventLog.
+      const bool object_activity = frame_column_type(log, options.activity_attribute) == DataFrameColumnType::kObject;
+      for (const auto& trace : log.traces)
+        for (const auto& event : trace.events) {
+          const auto activity = frame_value(log, trace, event, options.activity_attribute, scope);
+          if (activity.value_class != FrameValueClass::kText)
+            throw std::invalid_argument(
+                std::string("TypeError: sequence item 0: expected str instance, ") +
+                (activity.value_class == FrameValueClass::kDate
+                     ? std::string(object_activity ? "datetime.datetime" : "Timestamp")
+                 : activity.missing()
+                     ? std::string(frame_column_type(log, options.activity_attribute) == DataFrameColumnType::kDate
+                                       ? "NaTType"
+                                       : "float")
+                                      : python::type_name(frame_number_scalar(activity))) +
+                " found");
+        }
+    }
   }
   // Resources and activities are separate dicts to pm4py.
   FrameNames frame_names, frame_activity_names;
@@ -163,6 +209,12 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
   // variant's Counter order); the pandas variant groups by name instead.
   std::map<std::string, std::vector<std::string>> first_seen;
   std::set<std::string> resources;
+  std::map<std::string, std::size_t> rank_of;
+  std::map<std::string, std::map<std::string, std::string>> first_text;
+  const bool log_on_frame = frame && options.variant == RoleDiscoveryVariant::kLog;
+  const bool nat_resources =
+      log_on_frame && !pair_labels &&
+      frame_column_type(log, options.resource_attribute) == DataFrameColumnType::kDate;
   if (pair_labels) {
     std::map<std::string, std::size_t> labels;
     ++labels[options.resource_attribute];
@@ -174,12 +226,25 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
     }
   } else for (const auto& trace : log.traces) for (const auto& event : trace.events) {
     const auto activity_value = select(trace, event, options.activity_attribute, false);
-    const auto resource_value = select(trace, event, options.resource_attribute, true);
+    auto resource_value = select(trace, event, options.resource_attribute, true);
+    // The EventLog keeps a datetime column's missing cell as pd.NaT, one
+    // object, so the Counter keys them all as one resource (a NaN cell is a
+    // float of its own each time: left out; round BB, observed black-box).
+    if (!resource_value && nat_resources) resource_value = std::string("NaT");
     if (!activity_value || !resource_value) continue;
     const auto& activity = *activity_value;
     const auto& resource = *resource_value;
-    if (activity_resources[activity][resource]++ == 0)
+    if (!resource_rank.empty())
+      if (const auto cell = frame_row_scalar(log, trace, event, options.resource_attribute))
+        if (const auto rank = resource_rank.find(python::identity(*cell)); rank != resource_rank.end())
+          rank_of.try_emplace(resource, rank->second);
+    if (activity_resources[activity][resource]++ == 0) {
       first_seen[activity].push_back(resource);
+      if (log_on_frame) {
+        const auto text = frame_value(log, trace, event, options.resource_attribute, scope).text;
+        first_text[activity][resource] = text.empty() && resource == "NaT" ? resource : text;
+      }
+    }
     resources.insert(resource);
   }
   if (resources.size() > options.max_resources)
@@ -189,17 +254,28 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
 
   std::vector<WorkingRole> roles;
   for (const auto& [activity, counts] : activity_resources) {
-    WorkingRole role{{activity}, counts, {}};
+    WorkingRole role{{activity}, counts, {}, {}};
     if (options.variant == RoleDiscoveryVariant::kLog) {
       role.resource_order = first_seen[activity];
+      if (log_on_frame) role.display = first_text[activity];
     } else {
       for (const auto& [name, count] : counts) {
         (void)count;
         role.resource_order.push_back(name);
       }
       // On the DataFrame path the groupby orders a role's resources by their
-      // typed value (numbers by value, text by code point).
-      if (frame)
+      // typed value (numbers by value, text by code point, numbers before
+      // text in a mixed column).
+      if (!rank_of.empty())
+        std::stable_sort(role.resource_order.begin(), role.resource_order.end(),
+                         [&](const std::string& left, const std::string& right) {
+                           const auto rank = [&](const std::string& name) {
+                             const auto it = rank_of.find(name);
+                             return it == rank_of.end() ? rank_of.size() : it->second;
+                           };
+                           return rank(left) < rank(right);
+                         });
+      else if (frame)
         std::stable_sort(role.resource_order.begin(), role.resource_order.end(),
                          [&](const std::string& left, const std::string& right) {
                            return frame_names.less(left, right);
@@ -233,8 +309,11 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
     // carries the summed event counts of both source roles, which then feed
     // the normalized similarities of later merges.
     for (const auto& name : roles[bj].resource_order)
-      if (!roles[bi].resources.contains(name))
+      if (!roles[bi].resources.contains(name)) {
         roles[bi].resource_order.push_back(name);
+        if (const auto it = roles[bj].display.find(name); it != roles[bj].display.end())
+          roles[bi].display.emplace(name, it->second);
+      }
     for (const auto& [name, count] : roles[bj].resources)
       roles[bi].resources[name] += count;
     roles.erase(roles.begin() + static_cast<std::ptrdiff_t>(bj));
@@ -251,11 +330,20 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
   for (const auto& role : roles) {
     DiscoveredRole out;
     out.activities.assign(role.activities.begin(), role.activities.end());
-    for (const auto& name : role.resource_order)
-      out.resources.push_back({name, role.resources.at(name)});
+    for (const auto& name : role.resource_order) {
+      const auto shown = role.display.find(name);
+      out.resources.push_back({shown == role.display.end() ? name : shown->second, role.resources.at(name)});
+    }
     result.roles.push_back(std::move(out));
   }
   result.diagnostics.role_count = result.roles.size();
+  if (log_on_frame) {
+    // One resource may show two names in two roles (1 here, True there).
+    std::set<std::string> shown;
+    for (const auto& role : result.roles)
+      for (const auto& resource : role.resources) shown.insert(resource.name);
+    result.diagnostics.resource_count = shown.size();
+  }
   result.diagnostics.computed = true;
   result.diagnostics.message = result.roles.empty() ? "no resource activity pairs" : "ok";
   return result;

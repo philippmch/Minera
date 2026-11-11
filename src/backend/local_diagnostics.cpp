@@ -78,6 +78,54 @@ std::string python_repr(const std::string& text) {
   throw std::invalid_argument("ZeroDivisionError: float division by zero");
 }
 
+// repr() of a date cell: a datetime.datetime in its own UTC offset in an
+// XES object column, a Timestamp in a datetime column (UTC).
+std::string date_repr(const python::Scalar& date, bool object_column) {
+  const auto text = python::str(date);  // "YYYY-MM-DD HH:MM:SS[.ffffff][+HH:MM]"
+  if (!object_column) {
+    auto shown = text;
+    if (shown.size() >= 6 && (shown[shown.size() - 6] == '+' || shown[shown.size() - 6] == '-') &&
+        shown[shown.size() - 3] == ':')
+      shown.erase(shown.size() - 3, 1);
+    return "Timestamp('" + shown + "'" + (date.date.timezone_aware ? ", tz='UTC'" : "") + ")";
+  }
+  const auto number = [&](std::size_t at, std::size_t width) { return std::stoi(text.substr(at, width)); };
+  std::string out = "datetime.datetime(" + std::to_string(number(0, 4)) + ", " + std::to_string(number(5, 2)) + ", " +
+                    std::to_string(number(8, 2)) + ", " + std::to_string(number(11, 2)) + ", " +
+                    std::to_string(number(14, 2));
+  const int second = number(17, 2);
+  std::size_t position = 19;
+  int micro = 0;
+  if (position < text.size() && text[position] == '.') {
+    std::string digits;
+    ++position;
+    while (position < text.size() && std::isdigit(static_cast<unsigned char>(text[position]))) digits += text[position++];
+    digits.resize(6, '0');
+    micro = std::stoi(digits.substr(0, 6));
+  }
+  if (second || micro) out += ", " + std::to_string(second);
+  if (micro) out += ", " + std::to_string(micro);
+  if (position < text.size()) {
+    const int sign = text[position] == '-' ? -1 : 1;
+    const int seconds = sign * (number(position + 1, 2) * 60 + number(position + 4, 2)) * 60;
+    if (seconds == 0) out += ", tzinfo=datetime.timezone.utc";
+    else
+      out += ", tzinfo=datetime.timezone(datetime.timedelta(" +
+             (seconds < 0 ? "days=-1, seconds=" + std::to_string(86400 + seconds) : "seconds=" + std::to_string(seconds)) +
+             "))";
+  }
+  return out + ")";
+}
+
+// A groupby's TypeError: an XES object column's dates are datetime.datetime
+// cells (a datetime column never fails to sort).
+[[noreturn]] void sort_error(const python::TypeError& error) {
+  std::string message = error.what();
+  for (std::size_t at; (at = message.find("'Timestamp'")) != std::string::npos;)
+    message.replace(at, 11, "'datetime.datetime'");
+  throw std::invalid_argument("TypeError: " + message);
+}
+
 // pm4py's local diagnostics on a DataFrame (CSV and XES uploads), which runs
 // its pandas implementation (observed black-box, 3,000 random frames against
 // a model of it): keys are frame columns (activity, then resource, then group
@@ -86,7 +134,9 @@ std::string python_repr(const std::string& text) {
 //   no NaN (a pair seen only with NaN groups counts 0); rows without a
 //   resource or an activity are left out;
 // - group-attribute mode takes a group's members from the rows with that
-//   group value and a resource, in first-seen order; explicit groups list
+//   group value and a resource, in the order of the groupby [resource,
+//   group] (the groups by their first member, members by resource; round
+//   BB: the KeyError below names the first such member); explicit groups list
 //   their members (repeats once), and a member the resource column does not
 //   hold raises KeyError;
 // - focus[g][a] = sum of C[r][a] over g's members / sum over all resources,
@@ -140,12 +190,17 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
   // identity (1, 1.0 and True are one key) and named by str() of the first.
   struct Names {
     std::map<std::string, std::string> name;
+    std::map<std::string, python::Scalar> dates;
     std::size_t size() const { return name.size(); }
     const std::string& add(const python::Scalar& value) {
-      return name.try_emplace(python::identity(value), python::str(value)).first->first;
+      const auto& id = name.try_emplace(python::identity(value), python::str(value)).first->first;
+      if (value.kind == python::Scalar::Kind::kDate) dates.try_emplace(id, value);
+      return id;
     }
-    // KeyError's repr of the key: text quoted, numbers as printed.
-    std::string repr(const std::string& id) const {
+    // KeyError's repr of the key: text quoted, numbers as printed, dates as
+    // their datetime.datetime or Timestamp.
+    std::string repr(const std::string& id, bool object_column) const {
+      if (const auto it = dates.find(id); it != dates.end()) return date_repr(it->second, object_column);
       return id.starts_with("S") ? python_repr(name.at(id)) : name.at(id);
     }
   };
@@ -159,9 +214,12 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
   rows.reserve(input.event_count());
   // A listed name is a str: it matches only a text cell equal to it.
   std::map<std::string, std::string> text_resources;
-  // The groupby keys: (resource, activity), and the group with a group
+  // The groupby keys: (activity, resource), and the group with a group
   // attribute; pandas sorts them, so values Python cannot order raise.
   std::vector<std::vector<python::Scalar>> pair_keys, group_keys;
+  // The membership groupby [resource, group]: its groups in pandas' order
+  // give each group's members (sorted by resource) and the groups' order.
+  std::vector<python::Group> membership;
   for (const auto& trace : frame.traces)
     for (const auto& event : trace.events) {
       Row row;
@@ -174,15 +232,19 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
       }
       if (a) row.activity = &activities.add(*a);
       if (g) row.group = &groups.add(*g);
-      if (r && a) pair_keys.push_back({*r, *a});
-      if (g && o.explicit_groups.empty()) group_keys.push_back({*g});
+      // Each level is sorted over every row, also the rows the other
+      // level's null drops (round BB, observed black-box: an activity
+      // column of dates and floats fails though only one row has a
+      // resource).
+      pair_keys.push_back({a.value_or(python::none()), r.value_or(python::none())});
+      if (o.explicit_groups.empty()) group_keys.push_back({r.value_or(python::none()), g.value_or(python::none())});
       rows.push_back(row);
     }
   if (!pair_labels) {
     try {
       (void)python::groupby(pair_keys);
     } catch (const python::TypeError& error) {
-      throw std::invalid_argument(std::string("TypeError: ") + error.what());
+      sort_error(error);
     }
   }
   if (!keys.contains(group_key)) throw std::invalid_argument("KeyError: " + python_repr(group_key));
@@ -235,16 +297,18 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
   } else {
     // A column named twice (the group as resource or activity, or with a
     // group attribute the resource as activity) is no single column to
-    // pandas there.
+    // pandas there: the counts' column is missing after the groupby (the
+    // membership groupby [resource, group] sorts first; round BB, observed
+    // black-box).
     if (group_key == resource_key || group_key == activity_key)
       throw std::invalid_argument("KeyError: " + python_repr(group_key));
+    try {
+      membership = python::groupby(group_keys);
+    } catch (const python::TypeError& error) {
+      sort_error(error);
+    }
     if (o.explicit_groups.empty() && resource_key == activity_key)
       throw std::invalid_argument("KeyError: " + python_repr(resource_key));
-    try {
-      (void)python::groupby(group_keys);
-    } catch (const python::TypeError& error) {
-      throw std::invalid_argument(std::string("TypeError: ") + error.what());
-    }
     if (resources.size() > o.max_resources)
       throw std::invalid_argument("local_diagnostics resource bound exceeded");
     for (const auto& row : rows) {
@@ -285,11 +349,12 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
     }
   } else if (group_attribute_mode) {
     std::map<std::string, std::size_t> position;
-    for (const auto& row : rows) {
-      if (!row.group || !row.resource) continue;
-      const auto [it, inserted] = position.try_emplace(*row.group, members.size());
-      if (inserted) members.push_back({groups.name.at(*row.group), *row.group, {}});
-      add_member(members[it->second].members, *row.resource);
+    for (const auto& pair : membership) {
+      const auto& resource = resources.add(pair.labels[0]);
+      const auto& group = groups.add(pair.labels[1]);
+      const auto [it, inserted] = position.try_emplace(group, members.size());
+      if (inserted) members.push_back({groups.name.at(group), group, {}});
+      add_member(members[it->second].members, resource);
     }
   } else {
     if (o.explicit_groups.size() > o.max_groups)
@@ -381,7 +446,9 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
     auto& by_resource = result.group_member_contribution[group.name];
     for (const auto& r : group.members) {
       const auto it = counts.find(r);
-      if (it == counts.end()) throw std::invalid_argument("KeyError: " + resources.repr(r));
+      if (it == counts.end())
+        throw std::invalid_argument(
+            "KeyError: " + resources.repr(r, frame_column_type(frame, resource_key) == DataFrameColumnType::kObject));
       auto& out = by_resource[resources.name.at(r)];
       for (const auto& [a, n] : it->second)
         if (add_leaf()) out[activities.name.at(a)] = n;

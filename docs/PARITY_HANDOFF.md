@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BA (2026-11-05 to 2026-11-11, cloud container)
+## Review-fix loop, rounds T–BB (2026-11-05 to 2026-11-11, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4448,7 +4448,53 @@ trace-based selection of a bool column with gaps in the LLM context's
 `log_features` (seed 17, below). The device check on the Mac was skipped
 again (no device access from the round's thread).
 
-Next round (BB) should start by re-reviewing round BA:
+Next round (BC) should start by re-reviewing round BB:
+
+- `src/backend/resource_profiles.cpp`: `workload_conversion_error` (the
+  per-row `.timestamp()` order, the shifted start of the previous same-case
+  row, `missing_name`), the masked branch's dtype rule (`any_kept`,
+  `all_kept`), the `case_metric` filter in `offending_type`, the
+  `average_case_duration` bool message, the subtraction messages of
+  `average_duration_activity` with its start column named twice, the NaT
+  skip in the view, and `require_duration_rows` (rows without a case now
+  counted, `repeated_case` only for a case with a dated row); sweep
+  `rpfuzz.py` and `mtmatrix3.py` with XES uploads (object columns of
+  dates, text and numbers), which round BB swept on CSV only;
+- `src/backend/local_diagnostics.cpp`: the pair groupby over every row,
+  `membership` (members in the groupby's order), `sort_error`, `date_repr`
+  (datetime.datetime in its own offset, Timestamp in a datetime column)
+  and the moved resource-as-activity `KeyError`;
+- `src/backend/role_discovery.cpp`: the pandas variant's `groupby` model
+  (`resource_rank`, the activity join over the groups), the log variant's
+  per-role names (`display`, `first_text`), `NaT` as one resource of a
+  datetime column, and `resource_count` from the shown names;
+- found at the end of BB, not yet fixed: SNA on a datetime resource
+  column with gaps (CSV or XES). pm4py keeps the missing cells as `pd.NaT`,
+  one resource `NaT` that sorts beside Timestamps without error, in every
+  variant (`working_together`: `('NaT', '2020-01-01 00:00:00+00:00'): 1.0`);
+  Minera's `require_sortable_classes` counts the missing cell as a float
+  and raises `TypeError: '<' not supported between instances of
+  'Timestamp' and 'float'` (`snamix.py` seed 16 in the round's harness;
+  150 seeds: 38 such or NaN-declared results, plus three seeds where
+  pm4py's empty-network `ValueError` comes first). Check the same `NaT`
+  and `Counter` rules in resource profiles' and network analysis' frame
+  paths;
+- the standard OCEL JSON transport's `minera:nanoseconds` (`ocel.cpp`:
+  `parse_ocel_json_names`, the standard writer): every route that posts
+  the standard form (OCEL filters, flattening, statistics, exports);
+- the CI run of the BB commit.
+
+Still open: the LLM context's trace-based selection of a bool column with
+gaps (Review BA1 declarations; `llmsweep.py` seed 17 with `VARY=1`), the
+set-order selection of mixed-type keys (AQ, AV1), and Philipp's answer on
+whether the roles to diagnostics button should refuse uploads without an
+`org:group` column (AT). Harness: `review-harness/round-bb/` (README
+there).
+
+Round BA's targets, re-reviewed in BB (findings BB1-1 to BB1-9 in the code
+BA touched or its neighbours; BB1-10 to BB1-12 from reruns of earlier
+sweeps):
+
 
 - `src/backend/resource_profiles.cpp`: `masked_frequency` and
   `masked_distinct` (the one-column masks, the error branch they share
@@ -4904,8 +4950,13 @@ types a mixed-type key by the first value in Python set order (random with
 strings or NaN), Minera reads it as one-hot when any value is a string;
 pm4py's SNA, log-variant roles and resource profiles key each NaN resource
 cell apart (float identity, several unequal `nan` nodes), Minera leaves NaN
-cells out; an all-resources profile request raises when pm4py would raise
-for any one resource.
+cells out (a datetime column's NaT cells are one `NaT` resource in the
+log-variant roles, BB1-12); an all-resources profile request raises when
+pm4py would raise for any one resource; an XES object column with two
+unequal values of one `str()` (the text `'5'` and the int `5`) is one name
+to Minera (roles merge them, local diagnostics refuse); the rework filter
+names two missing keys in a fixed order where pm4py's set order follows
+the hash seed.
 
 Suite before each push (about 2 h at -j2; run it from one session only):
 touch the changed sources, `cmake --build build -j2`, `ctest --test-dir build

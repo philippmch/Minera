@@ -1142,15 +1142,16 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     if (std::get<bool>(marker->value) && !standard)
       for (const auto& event : result.events) offset_times.emplace(event.id, event.timestamp);
   }
-  // A classic document Minera wrote for a log with times past the
-  // microsecond (an OCEL SQLite or CSV import, which the reference reads at
-  // nanoseconds) says so, and keeps them; read_ocel_json of any other file
-  // keeps microseconds, as the OCEL 2.0 readers do (round BA).
+  // A document Minera wrote for a log with times past the microsecond (an
+  // OCEL SQLite or CSV import, which the reference reads at nanoseconds)
+  // says so, and keeps them; read_ocel_json and read_ocel2_json of any other
+  // file keep microseconds (round BA). The OCEL 2.0 form carries the marker
+  // too: the frontend opens an OCEL SQLite file as that form (round BB).
   bool keep_nanoseconds = false;
   if (const auto* marker = optional(r, "minera:nanoseconds")) {
     if (!marker->is_bool())
       throw std::invalid_argument("minera:nanoseconds must be boolean");
-    keep_nanoseconds = std::get<bool>(marker->value) && !standard;
+    keep_nanoseconds = std::get<bool>(marker->value);
   }
   sort_ocel_events(result, standard ? OcelTimestampReader::kIsoFormat
                                     : OcelTimestampReader::kIsoFormatOrFileOrder,
@@ -1822,7 +1823,7 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
   // stamped UTC for an ISO reading, the UTC instant for SQLite and for an
   // aware dateutil value, the wall clock for a naive one.
   std::vector<std::pair<std::size_t, std::string>> rewrites;
-  const bool truncates = !(reader == OcelTimestampReader::kIsoFormatOrFileOrder && keep_nanoseconds);
+  const bool truncates = !keep_nanoseconds;
   const auto store = [&](std::size_t index, std::int64_t microseconds, bool aware = true) {
     const auto& text = log.events[index].timestamp;
     if (!natively_stored(text, microseconds, aware, truncates))
@@ -2302,6 +2303,9 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
     }
     write_table_columns();
     write_keep_unrelated();
+    // The OCEL 2.0 transport (the frontend's opened OCEL SQLite, split and
+    // enriched logs) keeps times past the microsecond too (round BB).
+    if (transport_markers) write_nanoseconds();
     out << '}';
     return out.str();
   }
