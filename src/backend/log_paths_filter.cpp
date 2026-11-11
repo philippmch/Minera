@@ -213,8 +213,10 @@ double timestamp(const EventAttribute& value) {
     // Public datetime.timestamp() uses the host local zone for naive values.
     // CPython's fold-0 search in the process time zone (local_time.hpp).
     const bool clock=text.size()>=19;
+    std::int64_t refused_year=0;
     const auto resolved=local_time::naive_timestamp(local_time::civil_seconds(std::stoi(text.substr(0,4)),std::stoi(text.substr(5,2)),std::stoi(text.substr(8,2)),
-      clock?std::stoi(text.substr(11,2)):0,clock?std::stoi(text.substr(14,2)):0,clock?std::stoi(text.substr(17,2)):0));
+      clock?std::stoi(text.substr(11,2)):0,clock?std::stoi(text.substr(14,2)):0,clock?std::stoi(text.substr(17,2)):0),&refused_year);
+    if(!resolved&&refused_year)throw std::invalid_argument("ValueError: year "+std::to_string(refused_year)+" is out of range");
     if(!resolved)throw std::invalid_argument("paths filter naive timestamp is outside the host calendar");seconds=*resolved;
   }
   return static_cast<double>(seconds*1000000+parsed->nanoseconds/1000)/1000000.0;

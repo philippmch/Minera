@@ -198,8 +198,10 @@ int days_in_month(int year, int month) {
 // datetime.timestamp() of a naive datetime (fold 0): CPython's local_to_seconds
 // in the process time zone (local_time.hpp).
 double naive_timestamp(const FilteringDateTime& value) {
+  std::int64_t refused_year = 0;
   const auto seconds = local_time::naive_timestamp(local_time::civil_seconds(
-      value.year, value.month, value.day, value.hour, value.minute, value.second));
+      value.year, value.month, value.day, value.hour, value.minute, value.second), &refused_year);
+  if (!seconds && refused_year) fail("ValueError", "year " + std::to_string(refused_year) + " is out of range");
   if (!seconds) fail("OverflowError", "timestamp out of range for platform time_t");
   return static_cast<double>(*seconds) + value.microsecond / 1e6;
 }

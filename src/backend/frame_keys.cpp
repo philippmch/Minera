@@ -183,6 +183,24 @@ FrameValue frame_value(const EventLog& frame, const Trace& trace, const Event& e
   if (scope == FrameKeyScope::kDataFrame && key.starts_with(kCasePrefix)) {
     if (key == "case:concept:name")
       return trace.has_case_id() ? text_value(trace.case_id) : FrameValue{};
+    // A row's own case cell (CSV rows, merged XES cases): pandas keeps one
+    // value per row, which may differ within a case (round AZ).
+    if (const auto own = dataframe_cell::case_row_value(event, key)) {
+      if (!*own) return {};
+      const std::string bare = key.substr(kCasePrefix.size());
+      const auto* stored = last_attribute(event.case_row_attributes, bare);
+      const DataFrameColumn* column = nullptr;
+      if (frame.dataframe_columns)
+        for (const auto& candidate : frame.dataframe_columns->trace_columns)
+          if (candidate.key == bare) column = &candidate;
+      if (frame.dataframe_columns && frame.dataframe_columns->csv_text && column)
+        return attribute_value(csv_dataframe_cell(*column, **own));
+      auto value = stored ? attribute_value(*stored) : text_value(**own);
+      if (column && column->type == DataFrameColumnType::kFloat64 && stored &&
+          std::holds_alternative<std::int64_t>(stored->typed_value))
+        value.text = reference_csv_float_text(static_cast<double>(std::get<std::int64_t>(stored->typed_value)));
+      return value;
+    }
     if (const auto* attribute = last_attribute(trace.attributes, key.substr(kCasePrefix.size())))
       return attribute_value(*attribute);
   }
@@ -309,6 +327,22 @@ python::Scalar frame_number_scalar(const FrameValue& value) {
   if (value.text == "False") return python::boolean(false);
   if (auto integer = python::integer_literal(value.text)) return *integer;
   return python::real(std::strtod(value.text.c_str(), nullptr));
+}
+
+bool pandas_row_label_keys(std::size_t rows, bool all_keys_are_columns) {
+  return rows == 2 && !all_keys_are_columns;
+}
+
+std::pair<std::string, std::string> label_characters(const std::string& label) {
+  std::vector<std::string> characters;
+  for (std::size_t i = 0; i < label.size() && characters.size() < 2;) {
+    const auto lead = static_cast<unsigned char>(label[i]);
+    const std::size_t width = lead < 0x80 ? 1 : lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
+    characters.push_back(label.substr(i, width));
+    i += width;
+  }
+  if (characters.size() < 2) throw std::invalid_argument("IndexError: string index out of range");
+  return {characters[0], characters[1]};
 }
 
 double frame_number(const FrameValue& value) {

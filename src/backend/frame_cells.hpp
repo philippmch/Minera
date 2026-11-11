@@ -6,6 +6,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace minera {
 
@@ -32,5 +33,15 @@ namespace minera {
 
 // A FrameValue of class kNumber as its Python number (bool, int or float).
 [[nodiscard]] python::Scalar frame_number_scalar(const FrameValue& value);
+
+// pandas' groupby on a list of keys as long as the frame's rows, when not
+// every key is a column, reads the list as one array of row labels (row i
+// keyed by keys[i]), so a two-row frame groups by the key names themselves.
+// True for that case.
+[[nodiscard]] bool pandas_row_label_keys(std::size_t rows, bool all_keys_are_columns);
+
+// The first two characters (code points) of a label, as Python's label[0]
+// and label[1] read them; IndexError for a shorter one.
+[[nodiscard]] std::pair<std::string, std::string> label_characters(const std::string& label);
 
 }  // namespace minera

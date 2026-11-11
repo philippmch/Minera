@@ -9,6 +9,7 @@
 
 #include "../gzip_codec.hpp"
 
+#include <cstdint>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -93,13 +94,13 @@ std::string records_text(const std::vector<TraceAttributeVariantCount>& records)
   return out.empty() ? "." : out;
 }
 
-std::string pairs_text(const std::vector<std::pair<std::string, long>>& pairs) {
+std::string pairs_text(const std::vector<std::pair<std::string, std::int64_t>>& pairs) {
   std::string out;
   for (const auto& [k, v] : pairs) out += (out.empty() ? "" : " ") + (k.empty() ? "-" : k) + "=" + std::to_string(v);
   return out.empty() ? "." : out;
 }
 
-std::string longs_text(const std::vector<long>& values) {
+std::string longs_text(const std::vector<std::int64_t>& values) {
   std::string out;
   for (const auto v : values) out += (out.empty() ? "" : " ") + std::to_string(v);
   return out.empty() ? "." : out;
@@ -205,9 +206,9 @@ void filter_subsets_case(const Line& line) {
     const auto log = traces(f[0]);
     const auto args = tokens(f[1]);
     report(line, f.at(2), outcome([&] {
-             if (line.tag == "s2n") return records_text(reference_ta_sublog2df_num(log, std::stol(args[0])));
-             if (line.tag == "s2d") return records_text(reference_ta_sublog2df(log, std::stol(args[0]), std::stol(args[1])));
-             return traces_text(reference_ta_sublog2varlist(log, std::stol(args[0]), std::stol(args[1])));
+             if (line.tag == "s2n") return records_text(reference_ta_sublog2df_num(log, std::stoll(args[0])));
+             if (line.tag == "s2d") return records_text(reference_ta_sublog2df(log, std::stoll(args[0]), std::stoll(args[1])));
+             return traces_text(reference_ta_sublog2varlist(log, std::stoll(args[0]), std::stoll(args[1])));
            }));
   } else if (line.tag == "sp0" || line.tag == "sp1" || line.tag == "sp2") {
     // sublog_percent and its two aliases.
@@ -218,7 +219,7 @@ void filter_subsets_case(const Line& line) {
   } else if (line.tag == "lpa" || line.tag == "lp") {
     report(line, expected_from(line, 2), outcome([&] {
              std::string slices;
-             std::vector<long> counts;
+             std::vector<std::int64_t> counts;
              if (line.tag == "lpa") {
                const auto out = reference_ta_logslice_percent_act(traces(f[0]), number(f[1]));
                for (const auto& s : out.first) slices += (slices.empty() ? "" : ";") + traces_text(s);
@@ -244,7 +245,7 @@ void filter_subsets_case(const Line& line) {
 struct PairInputs {
   TraceAttributeLog log1, log2;
   std::vector<TraceAttributeVariant> v1, v2;
-  long freq_thres = 0, num = 0;
+  std::int64_t freq_thres = 0, num = 0;
   double alpha = 0;
 };
 
@@ -252,8 +253,8 @@ PairInputs pair_inputs(const Line& line) {
   const auto& f = line.fields;
   PairInputs in{traces(f.at(0)), traces(f.at(1)), traces(f.at(3)), traces(f.at(4)), 0, 0, 0};
   const auto args = tokens(f.at(2));
-  in.freq_thres = std::stol(args.at(0));
-  in.num = std::stol(args.at(1));
+  in.freq_thres = std::stoll(args.at(0));
+  in.num = std::stoll(args.at(1));
   in.alpha = number(args.at(2));
   return in;
 }
@@ -306,30 +307,30 @@ void suc_dist_calc_case(const Line& line) {
   if (line.tag == "ovs") {
     report(line, f.at(2), pairs_text(reference_ta_occu_var_suc(variant(f[0]), f[1] == "1")));
   } else if (line.tag == "osuc") {
-    std::vector<std::pair<TraceAttributeSuccession, long>> dfg;
+    std::vector<std::pair<TraceAttributeSuccession, std::int64_t>> dfg;
     for (const auto& item : tokens(f.at(0))) {
       const auto at = item.find('=');
-      dfg.push_back({{item.substr(0, 1), item.substr(1, at - 1)}, std::stol(item.substr(at + 1))});
+      dfg.push_back({{item.substr(0, 1), item.substr(1, at - 1)}, std::stoll(item.substr(at + 1))});
     }
     const auto chosen = reference_ta_occu_suc(dfg, number(f.at(1)));
-    std::vector<std::pair<std::string, long>> actual;
+    std::vector<std::pair<std::string, std::int64_t>> actual;
     for (const auto& [s, v] : chosen) actual.emplace_back(s.first + s.second, v);
     // The reference's unstable sort may pick other successions of a
     // frequency it takes only in part.
-    std::vector<std::pair<std::string, long>> expected;
+    std::vector<std::pair<std::string, std::int64_t>> expected;
     for (const auto& item : tokens(f.at(2))) {
       const auto at = item.find('=');
-      expected.emplace_back(item.substr(0, at), std::stol(item.substr(at + 1)));
+      expected.emplace_back(item.substr(0, at), std::stoll(item.substr(at + 1)));
     }
     bool ok = expected.size() == actual.size();
     for (std::size_t i = 0; ok && i < expected.size(); ++i) ok = expected[i].second == actual[i].second;
-    std::map<long, std::set<std::string>> expected_by, actual_by;
-    std::map<long, long> available;
+    std::map<std::int64_t, std::set<std::string>> expected_by, actual_by;
+    std::map<std::int64_t, std::int64_t> available;
     for (const auto& [k, v] : expected) expected_by[v].insert(k);
     for (const auto& [k, v] : actual) actual_by[v].insert(k);
     for (const auto& [s, v] : dfg) ++available[v];
     for (const auto& [v, keys] : expected_by)
-      if (ok && static_cast<long>(keys.size()) == available[v]) ok = keys == actual_by[v];
+      if (ok && static_cast<std::int64_t>(keys.size()) == available[v]) ok = keys == actual_by[v];
     report(line, f[2], ok ? f[2] : pairs_text(actual));
   } else if (line.tag == "ssim" || line.tag == "sdual") {
     const auto in = pair_inputs(line);
@@ -474,7 +475,7 @@ void merge_log_case(const Line& line) {
     const auto z = linkage_rows(f.at(2));
     std::vector<std::string> values;
     for (std::size_t i = 0; i <= z.size(); ++i) values.push_back("x" + std::to_string(i));
-    const auto [sublogs, groups] = reference_ta_clusteredlog(z, std::stol(f.at(0)), values, attributed(f.at(1)), "grp");
+    const auto [sublogs, groups] = reference_ta_clusteredlog(z, std::stoll(f.at(0)), values, attributed(f.at(1)), "grp");
     std::string logs_text, groups_text;
     for (const auto& s : sublogs) logs_text += (logs_text.empty() ? "" : ";") + names_text(s);
     for (const auto& g : groups) {
@@ -490,7 +491,7 @@ void merge_log_case(const Line& line) {
   } else {  // ml
     const auto args = tokens(f.at(0));
     report(line, f.at(1), outcome([&] {
-             reference_ta_merge_log(args.at(0) == "-" ? "" : args[0], args.at(1) == "-" ? "" : args[1], std::stol(args.at(2)));
+             reference_ta_merge_log(args.at(0) == "-" ? "" : args[0], args.at(1) == "-" ? "" : args[1], std::stoll(args.at(2)));
              return std::string();
            }));
   }

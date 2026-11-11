@@ -170,7 +170,7 @@ std::optional<python::Scalar> native_typed_value(const Event& e, const Trace* tr
 struct Reader {
   const EventLog* frame = nullptr;
   std::optional<python::Scalar> typed(const Event& e, const Trace* trace, std::string_view selector) const {
-    if (frame) return frame_scalar(*frame, *trace, e, std::string(selector), FrameKeyScope::kDataFrame);
+    if (frame) return frame_row_scalar(*frame, *trace, e, std::string(selector));
     return native_typed_value(e, trace, selector);
   }
 };
@@ -321,14 +321,14 @@ FrameDtype frame_dtype(const EventLog& frame, const std::string& key) {
   if (dtype.kind == FrameDtype::Kind::kBool)
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events)
-        if (!frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame)) dtype = of_type(DataFrameColumnType::kObject);
+        if (!frame_row_scalar(frame, trace, event, key)) dtype = of_type(DataFrameColumnType::kObject);
   if (dtype.kind != FrameDtype::Kind::kObject) return dtype;
   bool ints = false, floats = false, other = false, bools = false, texts = false, missing = false;
   std::size_t rows = 0;
   for (const auto& trace : frame.traces)
     for (const auto& event : trace.events) {
       ++rows;
-      const auto value = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
+      const auto value = frame_row_scalar(frame, trace, event, key);
       if (!value) missing = true;
       else if (value->kind == python::Scalar::Kind::kInt) ints = true;
       else if (value->kind == python::Scalar::Kind::kFloat) floats = true;

@@ -110,8 +110,17 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
   const EventLog& log = frame ? *frame_storage : input;
   const auto scope = options.variant == RoleDiscoveryVariant::kPandas
                          ? FrameKeyScope::kDataFrame : FrameKeyScope::kEventLog;
-  if (frame) {
-    const auto keys = frame_keys(log, scope);
+  // On a two-row frame where the activity or resource key is no column,
+  // the pandas variant's groupby reads the two key names as the rows' labels
+  // (frame_cells.hpp): each label's first character is a resource, its
+  // second an activity, counted by the rows carrying that label; a later
+  // label of the same pair overwrites (observed black-box).
+  const auto keys = frame ? frame_keys(log, scope) : std::set<std::string>{};
+  const bool pair_labels =
+      frame && scope == FrameKeyScope::kDataFrame &&
+      pandas_row_label_keys(log.event_count(), keys.contains(options.activity_attribute) &&
+                                                   keys.contains(options.resource_attribute));
+  if (frame && !pair_labels) {
     require_frame_key(keys, options.activity_attribute);
     require_frame_key(keys, options.resource_attribute);
     // The pandas variant's groupby sorts the resources: text beside
@@ -154,7 +163,16 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
   // variant's Counter order); the pandas variant groups by name instead.
   std::map<std::string, std::vector<std::string>> first_seen;
   std::set<std::string> resources;
-  for (const auto& trace : log.traces) for (const auto& event : trace.events) {
+  if (pair_labels) {
+    std::map<std::string, std::size_t> labels;
+    ++labels[options.resource_attribute];
+    ++labels[options.activity_attribute];
+    for (const auto& [label, rows] : labels) {
+      const auto [resource, activity] = label_characters(label);
+      activity_resources[activity][resource] = rows;
+      resources.insert(resource);
+    }
+  } else for (const auto& trace : log.traces) for (const auto& event : trace.events) {
     const auto activity_value = select(trace, event, options.activity_attribute, false);
     const auto resource_value = select(trace, event, options.resource_attribute, true);
     if (!activity_value || !resource_value) continue;

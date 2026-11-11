@@ -1556,10 +1556,18 @@ std::string utc_timestamp_text(std::int64_t microseconds, std::string_view suffi
 // `aware` is false (an OCEL 2.0 XML dateutil value without an offset).
 // Otherwise the stored text is replaced (stored_timestamp_text) so filters,
 // features, statistics and exporters see the value the reference stores.
-bool natively_stored(std::string_view text, std::int64_t microseconds, bool aware = true) {
+// A text with digits past the microsecond is respelled too: these readers
+// keep microseconds (fromisoformat drops the rest: "01:54:16.000000001Z" is
+// 01:54:16), where native parsing would keep the nanoseconds (round AZ: OCDFG
+// edge durations were a microsecond off). `truncates` is false for the event
+// and change times of the classic JSON, which routes use as a lossless
+// transport (read_ocel_json keeps microseconds there too; declared).
+bool natively_stored(std::string_view text, std::int64_t microseconds, bool aware = true,
+                     bool truncates = true) {
   const auto exact = parse_timestamp_exact(text);
   if (!exact || exact->timezone_aware != aware ||
-      (exact->timezone_aware && exact->offset_minutes != 0))
+      (exact->timezone_aware && exact->offset_minutes != 0) ||
+      (truncates && exact->nanoseconds % 1000 != 0))
     return false;
   const auto native = parse_timestamp_microseconds(text);
   return native && *native == microseconds;
@@ -1795,9 +1803,10 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
   // stamped UTC for an ISO reading, the UTC instant for SQLite and for an
   // aware dateutil value, the wall clock for a naive one.
   std::vector<std::pair<std::size_t, std::string>> rewrites;
+  const bool truncates = reader != OcelTimestampReader::kIsoFormatOrFileOrder;
   const auto store = [&](std::size_t index, std::int64_t microseconds, bool aware = true) {
     const auto& text = log.events[index].timestamp;
-    if (!natively_stored(text, microseconds, aware))
+    if (!natively_stored(text, microseconds, aware, truncates))
       rewrites.emplace_back(index, stored_timestamp_text(text, microseconds, true, aware));
   };
   // SQLite events without a time (NaT) go after every dated event, in their
@@ -1880,7 +1889,7 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
           aware = lenient->aware;
         }
     }
-    if (microseconds && !natively_stored(text, *microseconds, aware))
+    if (microseconds && !natively_stored(text, *microseconds, aware, truncates))
       change.timestamp = stored_timestamp_text(text, *microseconds, false, aware);
   }
   if (unknown) return;

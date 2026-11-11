@@ -51,6 +51,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -71,7 +72,7 @@ using TraceAttributeLog = std::vector<TraceAttributeVariant>;
 
 struct TraceAttributeVariantCount {
   TraceAttributeVariant variant;
-  long count = 0;
+  std::int64_t count = 0;
 };
 
 struct TraceAttributeReferenceTrace {
@@ -86,18 +87,18 @@ struct TraceAttributeReferenceTrace {
 [[nodiscard]] std::vector<TraceAttributeReferenceTrace> reference_ta_apply_trace_attributes(
     const std::vector<TraceAttributeReferenceTrace>& log, const std::vector<std::string>& values,
     const std::string& key = "concept:name", bool positive = true);
-[[nodiscard]] std::vector<TraceAttributeVariant> reference_ta_sublog2varlist(const TraceAttributeLog& log, long freq_thres,
-                                                                             long num);
-[[nodiscard]] std::vector<TraceAttributeVariantCount> reference_ta_sublog2df(const TraceAttributeLog& log, long freq_thres,
-                                                                             long num);
-[[nodiscard]] std::vector<TraceAttributeVariantCount> reference_ta_sublog2df_num(const TraceAttributeLog& log, long num);
+[[nodiscard]] std::vector<TraceAttributeVariant> reference_ta_sublog2varlist(const TraceAttributeLog& log, std::int64_t freq_thres,
+                                                                             std::int64_t num);
+[[nodiscard]] std::vector<TraceAttributeVariantCount> reference_ta_sublog2df(const TraceAttributeLog& log, std::int64_t freq_thres,
+                                                                             std::int64_t num);
+[[nodiscard]] std::vector<TraceAttributeVariantCount> reference_ta_sublog2df_num(const TraceAttributeLog& log, std::int64_t num);
 // sublog_percent (and its aliases sublog_percent2actlist / 2varlist): the
 // kept variants with counts, and the kept variants.
 [[nodiscard]] std::pair<std::vector<TraceAttributeVariantCount>, std::vector<TraceAttributeVariant>>
 reference_ta_sublog_percent(const TraceAttributeLog& log, double upper_percent);
-[[nodiscard]] std::pair<std::vector<std::vector<TraceAttributeVariant>>, std::vector<long>> reference_ta_logslice_percent_act(
+[[nodiscard]] std::pair<std::vector<std::vector<TraceAttributeVariant>>, std::vector<std::int64_t>> reference_ta_logslice_percent_act(
     const TraceAttributeLog& log, double unit);
-[[nodiscard]] std::pair<std::vector<TraceAttributeLog>, std::vector<long>> reference_ta_logslice_percent(
+[[nodiscard]] std::pair<std::vector<TraceAttributeLog>, std::vector<std::int64_t>> reference_ta_logslice_percent(
     const TraceAttributeLog& log, double unit);
 // apply_variants_filter: the traces of the admitted (positive) or the other
 // variants, grouped per variant in first-appearance order.
@@ -109,10 +110,10 @@ reference_ta_sublog_percent(const TraceAttributeLog& log, double upper_percent);
 
 // ---- variants.act_dist_calc ----
 
-[[nodiscard]] std::vector<std::pair<std::string, long>> reference_ta_occu_var_act(const TraceAttributeVariant& variant);
+[[nodiscard]] std::vector<std::pair<std::string, std::int64_t>> reference_ta_occu_var_act(const TraceAttributeVariant& variant);
 [[nodiscard]] double reference_ta_act_sim(const std::vector<TraceAttributeVariant>& var_list_1,
                                           const std::vector<TraceAttributeVariant>& var_list_2, const TraceAttributeLog& log1,
-                                          const TraceAttributeLog& log2, long freq_thres, long num);
+                                          const TraceAttributeLog& log2, std::int64_t freq_thres, std::int64_t num);
 struct TraceAttributeMedianOutcomes {
   std::vector<double> values;  // every tie choice's result (NaN included)
   bool may_raise = false;      // some tie choice raises IndexError
@@ -120,12 +121,12 @@ struct TraceAttributeMedianOutcomes {
 // act_sim_med; raises when every tie choice raises.
 [[nodiscard]] TraceAttributeMedianOutcomes reference_ta_act_sim_med_outcomes(
     const std::vector<TraceAttributeVariant>& var_list_1, const std::vector<TraceAttributeVariant>& var_list_2,
-    const TraceAttributeLog& log1, const TraceAttributeLog& log2, long freq_thres, long num);
+    const TraceAttributeLog& log1, const TraceAttributeLog& log2, std::int64_t freq_thres, std::int64_t num);
 // act_sim_dual (and suc_sim_dual): 0, NaN without weights, IndexError as act_sim.
 [[nodiscard]] double reference_ta_act_sim_dual(const std::vector<TraceAttributeVariant>& var_list_1,
                                                const std::vector<TraceAttributeVariant>& var_list_2,
-                                               const TraceAttributeLog& log1, const TraceAttributeLog& log2, long freq_thres,
-                                               long num);
+                                               const TraceAttributeLog& log1, const TraceAttributeLog& log2, std::int64_t freq_thres,
+                                               std::int64_t num);
 [[nodiscard]] double reference_ta_act_sim_percent(const TraceAttributeLog& log1, const TraceAttributeLog& log2,
                                                   double percent_1, double percent_2);
 // act_sim_percent_avg (act_sim_percent_avg_actset with a 'var' frame).
@@ -138,15 +139,15 @@ using TraceAttributeSuccession = std::pair<std::string, std::string>;
 // occu_suc: the first round(filter_percent * size) successions by frequency
 // (ties among equal frequencies kept in input order here; the reference's
 // sort is unstable).
-[[nodiscard]] std::vector<std::pair<TraceAttributeSuccession, long>> reference_ta_occu_suc(
-    const std::vector<std::pair<TraceAttributeSuccession, long>>& dfg, double filter_percent);
+[[nodiscard]] std::vector<std::pair<TraceAttributeSuccession, std::int64_t>> reference_ta_occu_suc(
+    const std::vector<std::pair<TraceAttributeSuccession, std::int64_t>>& dfg, double filter_percent);
 // occu_var_suc: "x,y" successions in first-appearance order, frequency 1 when
 // binarised.
-[[nodiscard]] std::vector<std::pair<std::string, long>> reference_ta_occu_var_suc(const TraceAttributeVariant& variant,
+[[nodiscard]] std::vector<std::pair<std::string, std::int64_t>> reference_ta_occu_var_suc(const TraceAttributeVariant& variant,
                                                                                   bool binarize = true);
 [[nodiscard]] double reference_ta_suc_sim(const std::vector<TraceAttributeVariant>& var_list_1,
                                           const std::vector<TraceAttributeVariant>& var_list_2, const TraceAttributeLog& log1,
-                                          const TraceAttributeLog& log2, long freq_thres, long num);
+                                          const TraceAttributeLog& log2, std::int64_t freq_thres, std::int64_t num);
 [[nodiscard]] double reference_ta_suc_sim_percent(const TraceAttributeLog& log1, const TraceAttributeLog& log2,
                                                   double percent_1, double percent_2);
 [[nodiscard]] double reference_ta_suc_sim_percent_avg(const TraceAttributeLog& log1, const TraceAttributeLog& log2,
@@ -157,8 +158,8 @@ using TraceAttributeSuccession = std::pair<std::string, std::string>;
 // dist_calc: alpha act_sim + (1 - alpha) suc_sim.
 [[nodiscard]] double reference_ta_dist_calc(const std::vector<TraceAttributeVariant>& var_list_1,
                                             const std::vector<TraceAttributeVariant>& var_list_2,
-                                            const TraceAttributeLog& log1, const TraceAttributeLog& log2, long freq_thres,
-                                            long num, double alpha);
+                                            const TraceAttributeLog& log1, const TraceAttributeLog& log2, std::int64_t freq_thres,
+                                            std::int64_t num, double alpha);
 // inner_prod_calc: (x . y, |x|, |y|) of the freq_x and freq_y columns.
 [[nodiscard]] std::array<double, 3> reference_ta_inner_prod_calc(const std::vector<double>& freq_x,
                                                                  const std::vector<double>& freq_y);
@@ -214,7 +215,7 @@ using TraceAttributeLinkage = std::vector<std::array<double, 4>>;
     const std::vector<std::vector<TraceAttributeReferenceTrace>>& loglist);
 
 struct TraceAttributeTreeNode {
-  long node_id = -1;  // removed (-1) once labelled
+  std::int64_t node_id = -1;  // removed (-1) once labelled
   std::string name;
   std::vector<TraceAttributeTreeNode> children;
 };
@@ -225,11 +226,11 @@ struct TraceAttributeTreeNode {
 // names joined by '-'; returns the leaf names left to right.
 std::vector<std::string> reference_ta_label_tree(TraceAttributeTreeNode& node, const std::vector<std::string>& id2name);
 // scipy.cluster.hierarchy.fcluster(Z, maxclust, 'maxclust') for monotonic Z.
-[[nodiscard]] std::vector<long> reference_ta_fcluster_maxclust(const TraceAttributeLinkage& z, long maxclust);
+[[nodiscard]] std::vector<std::int64_t> reference_ta_fcluster_maxclust(const TraceAttributeLinkage& z, std::int64_t maxclust);
 // clusteredlog: per label 1..maxclust the log sliced on attr_name by the
 // values of that flat cluster (none when fcluster made fewer), and the values.
 [[nodiscard]] std::pair<std::vector<std::vector<TraceAttributeReferenceTrace>>, std::vector<std::vector<std::string>>>
-reference_ta_clusteredlog(const TraceAttributeLinkage& z, long maxclust, const std::vector<std::string>& list_of_vals,
+reference_ta_clusteredlog(const TraceAttributeLinkage& z, std::int64_t maxclust, const std::vector<std::string>& list_of_vals,
                           const std::vector<TraceAttributeReferenceTrace>& log, const std::string& attr_name);
 // log2sublog / logslice: the traces whose key is value / among values.
 [[nodiscard]] std::vector<TraceAttributeReferenceTrace> reference_ta_merge_log2sublog(
@@ -237,6 +238,6 @@ reference_ta_clusteredlog(const TraceAttributeLinkage& z, long maxclust, const s
 [[nodiscard]] std::vector<TraceAttributeReferenceTrace> reference_ta_logslice(
     const std::vector<TraceAttributeReferenceTrace>& log, const std::vector<std::string>& values, const std::string& key);
 // merge_log(path, cate, iter) with a string cate: always raises TypeError.
-[[noreturn]] void reference_ta_merge_log(const std::string& path, const std::string& cate, long iterations);
+[[noreturn]] void reference_ta_merge_log(const std::string& path, const std::string& cate, std::int64_t iterations);
 
 }  // namespace minera

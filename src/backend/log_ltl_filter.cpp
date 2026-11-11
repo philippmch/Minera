@@ -220,9 +220,11 @@ double epoch_timestamp(const EventAttribute& value) {
   const auto& source=date?date->value:value.value;
   // datetime.timestamp() of a naive value: CPython's fold-0 search in the
   // process time zone; Windows' runtime refuses instants before 1970.
+  std::int64_t refused_year=0;
   const auto seconds=local_time::naive_timestamp(local_time::civil_seconds(std::stoi(source.substr(0,4)),std::stoi(source.substr(5,2)),
     std::stoi(source.substr(8,2)),source.size()>12?std::stoi(source.substr(11,2)):0,source.size()>15?std::stoi(source.substr(14,2)):0,
-    source.size()>18?std::stoi(source.substr(17,2)):0));
+    source.size()>18?std::stoi(source.substr(17,2)):0),&refused_year);
+  if(!seconds&&refused_year)fail("ValueError","year "+std::to_string(refused_year)+" is out of range");
   if(!seconds)fail("OSError","[Errno 22] Invalid argument");
   return static_cast<double>(*seconds)+static_cast<double>(parsed.nanoseconds)/1e9;
 }

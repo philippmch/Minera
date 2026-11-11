@@ -461,7 +461,7 @@ std::optional<std::string> non_date_type(const EventLog& frame, const std::strin
   std::optional<std::string> first;
   for (const auto& trace : frame.traces)
     for (const auto& event : trace.events) {
-      const auto cell = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame);
+      const auto cell = frame_row_scalar(frame, trace, event, key);
       if (!cell) continue;
       if (cell->kind == python::Scalar::Kind::kDate) return std::nullopt;
       return python::type_name(*cell);
@@ -493,15 +493,15 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
   for (const auto& trace : frame.traces)
     for (const auto& event : trace.events) {
       Row row;
-      if (const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame)) {
+      if (const auto cell = frame_row_scalar(frame, trace, event, r)) {
         row.resource = python::identity(*cell);
         resource_names.try_emplace(*row.resource, python::str(*cell));
       }
-      if (const auto cell = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame))
+      if (const auto cell = frame_row_scalar(frame, trace, event, "case:concept:name"))
         row.case_name = python::identity(*cell);
-      if (const auto cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame))
+      if (const auto cell = frame_row_scalar(frame, trace, event, c))
         row.group = python::identity(*cell);
-      if (auto cell = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+      if (auto cell = frame_row_scalar(frame, trace, event, t);
           cell && cell->kind == python::Scalar::Kind::kDate)
         row.time = std::move(cell);
       rows.push_back(std::move(row));
@@ -593,9 +593,12 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
 // column the start of a row is the previous timestamp of its case, an object
 // column of dates when no case has two rows. A subtraction that leaves no
 // datetime result (no row, or object cells) then has no .dt accessor.
-void require_duration_column(const EventLog& frame, const ResourceProfilesOptions& o, const Bounds& b,
-                             const std::string& r, const std::string& a, const std::string& c,
-                             const std::string& t, const std::string& s, bool uses_start) {
+// `resource` is the identity of the resource's cells (pm4py's call is per
+// resource; the all-resources request checks each one on its own rows).
+void require_duration_rows(const EventLog& frame, const ResourceProfilesOptions& o, const Bounds& b,
+                           const std::optional<std::string>& resource, const std::string& r,
+                           const std::string& a, const std::string& c, const std::string& t,
+                           const std::string& s, bool uses_start) {
   const auto fail = [](const std::string& message) {
     throw std::invalid_argument("resource profiles: " + message);
   };
@@ -604,7 +607,7 @@ void require_duration_column(const EventLog& frame, const ResourceProfilesOption
     bool any = false;
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events)
-        if (const auto cell = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame)) {
+        if (const auto cell = frame_row_scalar(frame, trace, event, key)) {
           if (cell->kind != python::Scalar::Kind::kDate) return false;
           any = true;
         }
@@ -623,25 +626,24 @@ void require_duration_column(const EventLog& frame, const ResourceProfilesOption
       }
     return python::identity(python::text(value));
   };
-  const auto resource = wanted(o.resource, o.resource_given, date_column(r));
   const auto activity = wanted(o.activity, o.activity_given, date_column(a));
   std::vector<std::optional<python::Scalar>> starts;
   std::map<std::string, std::size_t> case_rows;
   bool repeated_case = false;
   for (const auto& trace : frame.traces)
     for (const auto& event : trace.events) {
-      const auto case_cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame);
+      const auto case_cell = frame_row_scalar(frame, trace, event, c);
       if (!case_cell) continue;
       repeated_case = ++case_rows[python::identity(*case_cell)] > 1 || repeated_case;
-      const auto resource_cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
+      const auto resource_cell = frame_row_scalar(frame, trace, event, r);
       if (!resource_cell || (resource && python::identity(*resource_cell) != *resource)) continue;
-      const auto activity_cell = frame_scalar(frame, trace, event, a, FrameKeyScope::kDataFrame);
+      const auto activity_cell = frame_row_scalar(frame, trace, event, a);
       if (!activity_cell || (activity && python::identity(*activity_cell) != *activity)) continue;
-      const auto time = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+      const auto time = frame_row_scalar(frame, trace, event, t);
       if (!time || time->kind != python::Scalar::Kind::kDate) continue;
       if (!in_slot(static_cast<double>(time->date.seconds) + static_cast<double>(time->date.nanoseconds) / 1e9, b))
         continue;
-      starts.push_back(uses_start ? frame_scalar(frame, trace, event, s, FrameKeyScope::kDataFrame)
+      starts.push_back(uses_start ? frame_row_scalar(frame, trace, event, s)
                                   : std::optional<python::Scalar>{});
     }
   if (!uses_start) {
@@ -654,7 +656,7 @@ void require_duration_column(const EventLog& frame, const ResourceProfilesOption
   if (*dtype == DataFrameColumnType::kBool)
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events)
-        if (!frame_scalar(frame, trace, event, s, FrameKeyScope::kDataFrame)) dtype = DataFrameColumnType::kObject;
+        if (!frame_row_scalar(frame, trace, event, s)) dtype = DataFrameColumnType::kObject;
   const std::string integers =
       "TypeError: Addition/subtraction of integers and integer-arrays with ";
   const std::string integers_tail =
@@ -686,6 +688,37 @@ void require_duration_column(const EventLog& frame, const ResourceProfilesOption
   no_accessor();
 }
 
+void require_duration_column(const EventLog& frame, const ResourceProfilesOptions& o, const Bounds& b,
+                             const std::string& r, const std::string& a, const std::string& c,
+                             const std::string& t, const std::string& s, bool uses_start) {
+  if (!o.resource.empty() || o.resource_given) {
+    bool dates = false, other = false;
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events)
+        if (const auto cell = frame_row_scalar(frame, trace, event, r))
+          (cell->kind == python::Scalar::Kind::kDate ? dates : other) = true;
+    std::optional<std::string> resource = python::identity(python::text(o.resource));
+    if (dates && !other)
+      if (const auto parsed = parse_timestamp_exact(o.resource)) {
+        python::Scalar date;
+        date.kind = python::Scalar::Kind::kDate;
+        date.date = *parsed;
+        date.date.timezone_aware = true;
+        date.date.offset_minutes = 0;
+        resource = python::identity(date);
+      }
+    return require_duration_rows(frame, o, b, resource, r, a, c, t, s, uses_start);
+  }
+  // Every resource of the column (seed 324 of round AY: two resources with
+  // one row each pass alone, though their two rows together would not).
+  std::set<std::string> resources;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events)
+      if (const auto cell = frame_row_scalar(frame, trace, event, r))
+        resources.insert(python::identity(*cell));
+  for (const auto& resource : resources) require_duration_rows(frame, o, b, resource, r, a, c, t, s, uses_start);
+}
+
 // interaction_two_resources on the frame, observed black-box: the selection
 // [t, r, c, a] holds the resource column once (one column named four times
 // masks instead of realigning) and needs case:concept:name; the rows of the
@@ -714,14 +747,14 @@ std::uint64_t frame_interaction_count(const EventLog& frame, const ResourceProfi
   std::vector<Row> rows;
   for (const auto& trace : frame.traces)
     for (const auto& event : trace.events) {
-      const auto cell = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+      const auto cell = frame_row_scalar(frame, trace, event, "case:concept:name");
       rows.push_back({&trace, &event, cell ? python::identity(*cell) : std::string("\x01missing")});
     }
   const auto keep_cases_of = [&](const std::string& resource) {
     const auto wanted = python::identity(python::text(resource));
     std::set<std::string> cases;
     for (const auto& row : rows)
-      if (const auto cell = frame_scalar(frame, *row.trace, *row.event, r, FrameKeyScope::kDataFrame);
+      if (const auto cell = frame_row_scalar(frame, *row.trace, *row.event, r);
           cell && python::identity(*cell) == wanted)
         cases.insert(row.case_key);
     std::erase_if(rows, [&](const Row& row) { return !cases.contains(row.case_key); });
@@ -732,7 +765,7 @@ std::uint64_t frame_interaction_count(const EventLog& frame, const ResourceProfi
   std::vector<std::vector<python::Scalar>> keys;
   std::vector<std::size_t> keyed;
   for (std::size_t i = 0; i < rows.size(); ++i)
-    if (auto cell = frame_scalar(frame, *rows[i].trace, *rows[i].event, c, FrameKeyScope::kDataFrame)) {
+    if (auto cell = frame_row_scalar(frame, *rows[i].trace, *rows[i].event, c)) {
       keys.push_back({std::move(*cell)});
       keyed.push_back(i);
     }
@@ -746,8 +779,7 @@ std::uint64_t frame_interaction_count(const EventLog& frame, const ResourceProfi
   for (const auto& group : groups) {
     std::optional<python::Scalar> last;
     for (const auto member : group.rows)
-      if (auto cell = frame_scalar(frame, *rows[keyed[member]].trace, *rows[keyed[member]].event, t,
-                                   FrameKeyScope::kDataFrame);
+      if (auto cell = frame_row_scalar(frame, *rows[keyed[member]].trace, *rows[keyed[member]].event, t);
           cell && !python::is_missing(*cell))
         last = std::move(*cell);
     // A float64 column's group of NaN cells is NaN, which numpy compares.
@@ -812,7 +844,7 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     bool any = false;
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events)
-        if (const auto cell = frame_scalar(frame, trace, event, key, FrameKeyScope::kDataFrame)) {
+        if (const auto cell = frame_row_scalar(frame, trace, event, key)) {
           if (cell->kind != python::Scalar::Kind::kDate) return false;
           any = true;
         }
@@ -861,16 +893,16 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     const bool floats = frame_column_type(frame, key) == DataFrameColumnType::kFloat64;
     for (const auto& [trace, event] : compared_rows) {
       if (resource_first) {
-        const auto cell = frame_scalar(frame, *trace, *event, r, FrameKeyScope::kDataFrame);
+        const auto cell = frame_row_scalar(frame, *trace, *event, r);
         if (!cell) continue;
         if (!all_resources && python::identity(*cell) != wanted) continue;
         // average_duration_activity keeps the rows of the activity too.
         if (metric == ResourceProfileMetric::kAverageDurationActivity && activity_wanted) {
-          const auto activity = frame_scalar(frame, *trace, *event, a, FrameKeyScope::kDataFrame);
+          const auto activity = frame_row_scalar(frame, *trace, *event, a);
           if (!activity || python::identity(*activity) != *activity_wanted) continue;
         }
       }
-      const auto value = frame_scalar(frame, *trace, *event, key, FrameKeyScope::kDataFrame);
+      const auto value = frame_row_scalar(frame, *trace, *event, key);
       if (!value && floats) return std::string("float");
       if (value && value->kind != python::Scalar::Kind::kDate) return python::type_name(*value);
     }
@@ -938,8 +970,7 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       std::vector<std::vector<python::Scalar>> keys;
       std::vector<std::size_t> keyed;
       for (std::size_t i = 0; i < compared_rows.size(); ++i)
-        if (auto cell = frame_scalar(frame, *compared_rows[i].first, *compared_rows[i].second, key,
-                                     FrameKeyScope::kDataFrame);
+        if (auto cell = frame_row_scalar(frame, *compared_rows[i].first, *compared_rows[i].second, key);
             cell && !python::is_missing(*cell)) {
           keys.push_back({std::move(*cell)});
           keyed.push_back(i);
@@ -975,7 +1006,7 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       fail("AttributeError: 'DataFrame' object has no attribute 'dt'");
     else if (!frame.traces.empty() && !frame.traces.front().events.empty()) {
       const auto& trace = frame.traces.front();
-      const auto cell = frame_scalar(frame, trace, trace.events.front(), r, FrameKeyScope::kDataFrame);
+      const auto cell = frame_row_scalar(frame, trace, trace.events.front(), r);
       const bool kept = cell && (all_resources || python::identity(*cell) == wanted);
       if (frame_column_type(frame, r) == DataFrameColumnType::kDate) {
         if (!kept) fail("ValueError: NaTType does not support timestamp");
@@ -993,8 +1024,8 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     std::set<std::string> cases;
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events) {
-        const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
-        const auto case_name = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+        const auto cell = frame_row_scalar(frame, trace, event, r);
+        const auto case_name = frame_row_scalar(frame, trace, event, "case:concept:name");
         if (cell && case_name && (all_resources || python::identity(*cell) == text_key(o.resource)))
           cases.insert(python::identity(*case_name));
       }
@@ -1002,9 +1033,9 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     const bool float_times = frame_column_type(frame, t) == DataFrameColumnType::kFloat64;
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events) {
-        const auto case_name = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+        const auto case_name = frame_row_scalar(frame, trace, event, "case:concept:name");
         if (!case_name || !cases.contains(python::identity(*case_name))) continue;
-        auto value = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+        auto value = frame_row_scalar(frame, trace, event, t);
         if (!value && float_times) value = python::real(NAN);
         if (value && value->kind != python::Scalar::Kind::kDate)
           fail("TypeError: '<' not supported between instances of '" + python::type_name(*value) +
@@ -1039,10 +1070,10 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     if (frame_column_type(frame, t) != DataFrameColumnType::kDate)
       fail("AttributeError: 'DataFrame' object has no attribute 'dt'");
     const bool kept = std::any_of(compared_rows.begin(), compared_rows.end(), [&](const auto& row) {
-      const auto cell = frame_scalar(frame, *row.first, *row.second, r, FrameKeyScope::kDataFrame);
+      const auto cell = frame_row_scalar(frame, *row.first, *row.second, r);
       if (!cell || (!all_resources && python::identity(*cell) != wanted)) return false;
       if (!activity_wanted) return true;
-      const auto activity = frame_scalar(frame, *row.first, *row.second, a, FrameKeyScope::kDataFrame);
+      const auto activity = frame_row_scalar(frame, *row.first, *row.second, a);
       return activity && python::identity(*activity) == *activity_wanted;
     });
     if (kept) reindex();
@@ -1055,7 +1086,7 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       if (dtype == DataFrameColumnType::kBool)
         for (const auto& trace : frame.traces)
           for (const auto& event : trace.events)
-            if (!frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame)) dtype = DataFrameColumnType::kObject;
+            if (!frame_row_scalar(frame, trace, event, t)) dtype = DataFrameColumnType::kObject;
       const char* name = dtype == DataFrameColumnType::kInt64     ? "int64"
                          : dtype == DataFrameColumnType::kFloat64 ? "float64"
                          : dtype == DataFrameColumnType::kBool    ? "bool"
@@ -1091,8 +1122,8 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     if (metric == ResourceProfileMetric::kAverageCaseDuration)
       for (const auto& trace : frame.traces)
         for (const auto& event : trace.events) {
-          const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame);
-          const auto case_name = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+          const auto cell = frame_row_scalar(frame, trace, event, r);
+          const auto case_name = frame_row_scalar(frame, trace, event, "case:concept:name");
           if (cell && case_name && (all_resources || python::identity(*cell) == text_key(o.resource)))
             resource_cases.insert(python::identity(*case_name));
         }
@@ -1100,10 +1131,10 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events) {
         if (metric == ResourceProfileMetric::kAverageCaseDuration) {
-          const auto case_name = frame_scalar(frame, trace, event, "case:concept:name", FrameKeyScope::kDataFrame);
+          const auto case_name = frame_row_scalar(frame, trace, event, "case:concept:name");
           if (!case_name || !resource_cases.contains(python::identity(*case_name))) continue;
         }
-        if (auto cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame))
+        if (auto cell = frame_row_scalar(frame, trace, event, c))
           case_keys.push_back({std::move(*cell)});
       }
     try {
@@ -1128,7 +1159,7 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       ++row_number;
       std::string case_key;
       if (uses_case) {
-        const auto cell = frame_scalar(frame, trace, event, c, FrameKeyScope::kDataFrame);
+        const auto cell = frame_row_scalar(frame, trace, event, c);
         if (!cell) {
           // The interval metrics keep a row with no case, its interval
           // starting at its own time; the other metrics' groupby drops it.
@@ -1145,21 +1176,21 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       }
       auto& target = uses_case ? view.traces[case_index[case_key]] : view.traces.back();
       Event out;
-      if (const auto cell = frame_scalar(frame, trace, event, r, FrameKeyScope::kDataFrame)) {
+      if (const auto cell = frame_row_scalar(frame, trace, event, r)) {
         out.resource = python::identity(*cell);
         out.resource_state = FirstClassAttributeState::kPresent;
         resource_names.try_emplace(out.resource, python::str(*cell));
       }
-      if (const auto cell = frame_scalar(frame, trace, event, a, FrameKeyScope::kDataFrame)) {
+      if (const auto cell = frame_row_scalar(frame, trace, event, a)) {
         out.activity = python::identity(*cell);
         out.activity_state = FirstClassAttributeState::kPresent;
         activity_names.try_emplace(out.activity, python::str(*cell));
       }
-      if (const auto cell = frame_scalar(frame, trace, event, t, FrameKeyScope::kDataFrame);
+      if (const auto cell = frame_row_scalar(frame, trace, event, t);
           cell && cell->kind == python::Scalar::Kind::kDate)
         out.timestamp = utc_text(*cell);
       if (uses_start)
-        if (const auto cell = frame_scalar(frame, trace, event, s, FrameKeyScope::kDataFrame);
+        if (const auto cell = frame_row_scalar(frame, trace, event, s);
             cell && cell->kind == python::Scalar::Kind::kDate)
           out.attributes.push_back(EventAttribute{start_key, utc_text(*cell)});
       target.events.push_back(std::move(out));

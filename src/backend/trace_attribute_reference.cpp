@@ -1,5 +1,6 @@
 #include "minera/trace_attribute_reference.hpp"
 
+#include <cstdint>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -27,7 +28,7 @@ constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
 
 // Variants by (count, variant) descending.
 std::vector<VariantCount> variants(const Log& log) {
-  std::map<Variant, long> counts;
+  std::map<Variant, std::int64_t> counts;
   for (const auto& trace : log) ++counts[trace];
   std::vector<VariantCount> out;
   for (const auto& [variant, count] : counts) out.push_back({variant, count});
@@ -37,13 +38,13 @@ std::vector<VariantCount> variants(const Log& log) {
   return out;
 }
 
-std::vector<VariantCount> selected(const Log& log, long freq_thres, long num) {
+std::vector<VariantCount> selected(const Log& log, std::int64_t freq_thres, std::int64_t num) {
   auto all = variants(log);
   std::vector<VariantCount> kept;
   for (const auto& v : all)
     if (v.count >= freq_thres) kept.push_back(v);
-  if (static_cast<long>(kept.size()) >= num) return kept;
-  if (num < static_cast<long>(all.size())) all.resize(static_cast<std::size_t>(std::max(0L, num)));
+  if (static_cast<std::int64_t>(kept.size()) >= num) return kept;
+  if (num < static_cast<std::int64_t>(all.size())) all.resize(static_cast<std::size_t>(std::max(std::int64_t{0}, num)));
   return all;
 }
 
@@ -51,7 +52,7 @@ std::vector<VariantCount> percent_records(const Log& log, double percent) {
   const auto all = variants(log);
   const auto n = static_cast<double>(log.size());
   std::vector<VariantCount> out;
-  long total = 0;
+  std::int64_t total = 0;
   for (const auto& v : all) {
     if (static_cast<double>(total + v.count) / n > percent) break;
     total += v.count;
@@ -64,11 +65,11 @@ std::vector<std::vector<VariantCount>> slices(const Log& log, double unit) {
   if (unit == 0.0) throw TraceAttributeReferenceError("ZeroDivisionError", "float division by zero");
   const auto all = variants(log);
   const auto n = static_cast<double>(log.size());
-  const auto k_max = static_cast<long>(1.0 / unit);
+  const auto k_max = static_cast<std::int64_t>(1.0 / unit);
   std::vector<std::vector<VariantCount>> out;
   std::size_t i = 0;
-  long cumulative = 0;
-  for (long k = 1; k <= k_max; ++k) {
+  std::int64_t cumulative = 0;
+  for (std::int64_t k = 1; k <= k_max; ++k) {
     const double bound = unit + static_cast<double>(k - 1) * unit;
     std::vector<VariantCount> current;
     while (i < all.size() && static_cast<double>(cumulative + all[i].count) / n <= bound) {
@@ -267,14 +268,14 @@ double percent_distance(const Log& log1, const Log& log2, double p1, double p2, 
 }
 
 // The counts act_sim and suc_sim weigh by: sublog2df's, sorted by variant.
-std::vector<double> sorted_counts(const Log& log, long freq_thres, long num) {
+std::vector<double> sorted_counts(const Log& log, std::int64_t freq_thres, std::int64_t num) {
   std::vector<double> out;
   for (const auto& r : reference_ta_sublog2df(log, freq_thres, num)) out.push_back(static_cast<double>(r.count));
   return out;
 }
 
 double pair_sim(const std::vector<Variant>& v1, const std::vector<Variant>& v2, const Log& log1, const Log& log2,
-                long freq_thres, long num, const std::function<Counts(const Variant&)>& vec) {
+                std::int64_t freq_thres, std::int64_t num, const std::function<Counts(const Variant&)>& vec) {
   const auto k1 = sorted_counts(log1, freq_thres, num);
   const auto k2 = sorted_counts(log2, freq_thres, num);
   const bool first = v1.size() >= v2.size();
@@ -300,7 +301,7 @@ double slice_distance(const Log& log1, const Log& log2, double unit, bool succes
   const auto s2 = reference_ta_logslice_percent(log2, unit);
   if (s1.first.empty() && s2.first.empty()) return 0.0;
   if (s1.first.empty() || s2.first.empty()) return kNaN;
-  const auto build = [successions](const std::pair<std::vector<Log>, std::vector<long>>& s) {
+  const auto build = [successions](const std::pair<std::vector<Log>, std::vector<std::int64_t>>& s) {
     std::vector<Weighted> out;
     for (std::size_t i = 0; i < s.first.size(); ++i)
       out.push_back({{}, static_cast<double>(s.second[i]), log_counts(s.first[i], successions)});
@@ -383,14 +384,14 @@ TraceAttributeLinkage linkage(const std::vector<Log>& logs, const std::vector<st
   return z;
 }
 
-void add_subtree(const TraceAttributeLinkage& z, long id, TraceAttributeTreeNode& parent) {
-  const auto n = static_cast<long>(z.size()) + 1;
+void add_subtree(const TraceAttributeLinkage& z, std::int64_t id, TraceAttributeTreeNode& parent) {
+  const auto n = static_cast<std::int64_t>(z.size()) + 1;
   TraceAttributeTreeNode node;
   node.node_id = id;
   if (id >= n) {
     const auto& row = z[static_cast<std::size_t>(id - n)];
-    add_subtree(z, static_cast<long>(row[0]), node);
-    add_subtree(z, static_cast<long>(row[1]), node);
+    add_subtree(z, static_cast<std::int64_t>(row[0]), node);
+    add_subtree(z, static_cast<std::int64_t>(row[1]), node);
   }
   parent.children.push_back(std::move(node));
 }
@@ -407,21 +408,21 @@ std::vector<Trace> reference_ta_apply_trace_attributes(const std::vector<Trace>&
   return out;
 }
 
-std::vector<Variant> reference_ta_sublog2varlist(const Log& log, long freq_thres, long num) {
+std::vector<Variant> reference_ta_sublog2varlist(const Log& log, std::int64_t freq_thres, std::int64_t num) {
   std::vector<Variant> out;
   for (const auto& r : selected(log, freq_thres, num)) out.push_back(r.variant);
   return out;
 }
 
-std::vector<VariantCount> reference_ta_sublog2df(const Log& log, long freq_thres, long num) {
+std::vector<VariantCount> reference_ta_sublog2df(const Log& log, std::int64_t freq_thres, std::int64_t num) {
   auto out = selected(log, freq_thres, num);
   std::sort(out.begin(), out.end(), [](const VariantCount& a, const VariantCount& b) { return a.variant < b.variant; });
   return out;
 }
 
-std::vector<VariantCount> reference_ta_sublog2df_num(const Log& log, long num) {
+std::vector<VariantCount> reference_ta_sublog2df_num(const Log& log, std::int64_t num) {
   auto out = variants(log);
-  if (num < static_cast<long>(out.size())) out.resize(static_cast<std::size_t>(std::max(0L, num)));
+  if (num < static_cast<std::int64_t>(out.size())) out.resize(static_cast<std::size_t>(std::max(std::int64_t{0}, num)));
   return out;
 }
 
@@ -432,11 +433,11 @@ std::pair<std::vector<VariantCount>, std::vector<Variant>> reference_ta_sublog_p
   return {std::move(records), std::move(list)};
 }
 
-std::pair<std::vector<std::vector<Variant>>, std::vector<long>> reference_ta_logslice_percent_act(const Log& log, double unit) {
-  std::pair<std::vector<std::vector<Variant>>, std::vector<long>> out;
+std::pair<std::vector<std::vector<Variant>>, std::vector<std::int64_t>> reference_ta_logslice_percent_act(const Log& log, double unit) {
+  std::pair<std::vector<std::vector<Variant>>, std::vector<std::int64_t>> out;
   for (const auto& slice : slices(log, unit)) {
     std::vector<Variant> list;
-    long count = 0;
+    std::int64_t count = 0;
     for (const auto& r : slice) {
       list.push_back(r.variant);
       count += r.count;
@@ -447,9 +448,9 @@ std::pair<std::vector<std::vector<Variant>>, std::vector<long>> reference_ta_log
   return out;
 }
 
-std::pair<std::vector<Log>, std::vector<long>> reference_ta_logslice_percent(const Log& log, double unit) {
+std::pair<std::vector<Log>, std::vector<std::int64_t>> reference_ta_logslice_percent(const Log& log, double unit) {
   const auto act = reference_ta_logslice_percent_act(log, unit);
-  std::pair<std::vector<Log>, std::vector<long>> out;
+  std::pair<std::vector<Log>, std::vector<std::int64_t>> out;
   for (const auto& list : act.first) out.first.push_back(reference_ta_apply_variants_filter(log, list, true));
   out.second = act.second;
   return out;
@@ -458,7 +459,7 @@ std::pair<std::vector<Log>, std::vector<long>> reference_ta_logslice_percent(con
 Log reference_ta_apply_variants_filter(const Log& log, const std::vector<Variant>& admitted, bool positive) {
   const std::set<Variant> allowed(admitted.begin(), admitted.end());
   std::vector<Variant> order;
-  std::map<Variant, long> counts;
+  std::map<Variant, std::int64_t> counts;
   for (const auto& t : log) {
     if (allowed.contains(t) != positive) continue;
     if (counts[t]++ == 0) order.push_back(t);
@@ -474,19 +475,19 @@ void reference_ta_act_dist() {
 
 // ---- variants.act_dist_calc ----
 
-std::vector<std::pair<std::string, long>> reference_ta_occu_var_act(const Variant& variant) {
-  std::vector<std::pair<std::string, long>> out;
-  for (const auto& [k, v] : activity_counts(variant)) out.emplace_back(k, static_cast<long>(v));
+std::vector<std::pair<std::string, std::int64_t>> reference_ta_occu_var_act(const Variant& variant) {
+  std::vector<std::pair<std::string, std::int64_t>> out;
+  for (const auto& [k, v] : activity_counts(variant)) out.emplace_back(k, static_cast<std::int64_t>(v));
   return out;
 }
 
 double reference_ta_act_sim(const std::vector<Variant>& v1, const std::vector<Variant>& v2, const Log& log1, const Log& log2,
-                            long freq_thres, long num) {
+                            std::int64_t freq_thres, std::int64_t num) {
   return pair_sim(v1, v2, log1, log2, freq_thres, num, activity_counts);
 }
 
 TraceAttributeMedianOutcomes reference_ta_act_sim_med_outcomes(const std::vector<Variant>& v1, const std::vector<Variant>& v2,
-                                                               const Log& log1, const Log& log2, long freq_thres, long num) {
+                                                               const Log& log1, const Log& log2, std::int64_t freq_thres, std::int64_t num) {
   TraceAttributeMedianOutcomes out;
   if (v1 == v2) {
     out.values.push_back(kNaN);
@@ -542,7 +543,7 @@ TraceAttributeMedianOutcomes reference_ta_act_sim_med_outcomes(const std::vector
 }
 
 double reference_ta_act_sim_dual(const std::vector<Variant>& v1, const std::vector<Variant>& v2, const Log& log1,
-                                 const Log& log2, long freq_thres, long num) {
+                                 const Log& log2, std::int64_t freq_thres, std::int64_t num) {
   const auto k1 = sorted_counts(log1, freq_thres, num);
   const auto k2 = sorted_counts(log2, freq_thres, num);
   const bool first = v1.size() >= v2.size();
@@ -567,8 +568,8 @@ double reference_ta_act_sim_percent_avg(const Log& log1, const Log& log2, double
 
 // ---- variants.suc_dist_calc ----
 
-std::vector<std::pair<TraceAttributeSuccession, long>> reference_ta_occu_suc(
-    const std::vector<std::pair<TraceAttributeSuccession, long>>& dfg, double filter_percent) {
+std::vector<std::pair<TraceAttributeSuccession, std::int64_t>> reference_ta_occu_suc(
+    const std::vector<std::pair<TraceAttributeSuccession, std::int64_t>>& dfg, double filter_percent) {
   auto out = dfg;
   std::stable_sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
   // Python's round: half to even.
@@ -577,17 +578,17 @@ std::vector<std::pair<TraceAttributeSuccession, long>> reference_ta_occu_suc(
   return out;
 }
 
-std::vector<std::pair<std::string, long>> reference_ta_occu_var_suc(const Variant& variant, bool binarize) {
-  std::vector<std::pair<std::string, long>> out;
+std::vector<std::pair<std::string, std::int64_t>> reference_ta_occu_var_suc(const Variant& variant, bool binarize) {
+  std::vector<std::pair<std::string, std::int64_t>> out;
   for (const auto& [k, v] : succession_counts(variant, binarize)) {
     const auto at = k.find('\0');
-    out.emplace_back(k.substr(0, at) + "," + k.substr(at + 1), static_cast<long>(v));
+    out.emplace_back(k.substr(0, at) + "," + k.substr(at + 1), static_cast<std::int64_t>(v));
   }
   return out;
 }
 
 double reference_ta_suc_sim(const std::vector<Variant>& v1, const std::vector<Variant>& v2, const Log& log1, const Log& log2,
-                            long freq_thres, long num) {
+                            std::int64_t freq_thres, std::int64_t num) {
   return pair_sim(v1, v2, log1, log2, freq_thres, num, [](const Variant& v) { return succession_counts(v, false); });
 }
 
@@ -602,7 +603,7 @@ double reference_ta_suc_sim_percent_avg(const Log& log1, const Log& log2, double
 // ---- variants.sim_calc ----
 
 double reference_ta_dist_calc(const std::vector<Variant>& v1, const std::vector<Variant>& v2, const Log& log1, const Log& log2,
-                              long freq_thres, long num, double alpha) {
+                              std::int64_t freq_thres, std::int64_t num, double alpha) {
   const double act = reference_ta_act_sim(v1, v2, log1, log2, freq_thres, num);
   const double suc = reference_ta_suc_sim(v1, v2, log1, log2, freq_thres, num);
   return alpha * act + (1 - alpha) * suc;
@@ -720,7 +721,7 @@ std::vector<Trace> reference_ta_update_merge(const std::vector<std::vector<Trace
 
 TraceAttributeTreeNode reference_ta_add_node(const TraceAttributeLinkage& z) {
   TraceAttributeTreeNode parent;
-  add_subtree(z, static_cast<long>(2 * z.size()), parent);
+  add_subtree(z, static_cast<std::int64_t>(2 * z.size()), parent);
   return std::move(parent.children.front());
 }
 
@@ -742,11 +743,11 @@ std::vector<std::string> reference_ta_label_tree(TraceAttributeTreeNode& node, c
   return leaves;
 }
 
-std::vector<long> reference_ta_fcluster_maxclust(const TraceAttributeLinkage& z, long maxclust) {
+std::vector<std::int64_t> reference_ta_fcluster_maxclust(const TraceAttributeLinkage& z, std::int64_t maxclust) {
   const auto n = z.size() + 1;
-  std::vector<long> labels(n, 0);
-  if (maxclust >= static_cast<long>(n)) {
-    for (std::size_t i = 0; i < n; ++i) labels[i] = static_cast<long>(i) + 1;
+  std::vector<std::int64_t> labels(n, 0);
+  if (maxclust >= static_cast<std::int64_t>(n)) {
+    for (std::size_t i = 0; i < n; ++i) labels[i] = static_cast<std::int64_t>(i) + 1;
     return labels;
   }
   // The smallest merge height leaving at most maxclust clusters (0 if none).
@@ -756,13 +757,13 @@ std::vector<long> reference_ta_fcluster_maxclust(const TraceAttributeLinkage& z,
   double threshold = 0.0;
   for (const auto h : heights) {
     const auto merged = std::count_if(z.begin(), z.end(), [h](const auto& row) { return row[2] <= h; });
-    if (static_cast<long>(n) - merged <= maxclust) {
+    if (static_cast<std::int64_t>(n) - merged <= maxclust) {
       threshold = h;
       break;
     }
   }
-  long next = 0;
-  std::function<void(std::size_t, long)> paint = [&](std::size_t id, long label) {
+  std::int64_t next = 0;
+  std::function<void(std::size_t, std::int64_t)> paint = [&](std::size_t id, std::int64_t label) {
     if (id < n) {
       labels[id] = label;
       return;
@@ -787,12 +788,12 @@ std::vector<long> reference_ta_fcluster_maxclust(const TraceAttributeLinkage& z,
 }
 
 std::pair<std::vector<std::vector<Trace>>, std::vector<std::vector<std::string>>> reference_ta_clusteredlog(
-    const TraceAttributeLinkage& z, long maxclust, const std::vector<std::string>& list_of_vals, const std::vector<Trace>& log,
+    const TraceAttributeLinkage& z, std::int64_t maxclust, const std::vector<std::string>& list_of_vals, const std::vector<Trace>& log,
     const std::string& attr_name) {
   const auto labels = reference_ta_fcluster_maxclust(z, maxclust);
   // One group per label 1..maxclust, empty when fcluster used fewer.
   std::pair<std::vector<std::vector<Trace>>, std::vector<std::vector<std::string>>> out;
-  for (long label = 1; label <= maxclust; ++label) {
+  for (std::int64_t label = 1; label <= maxclust; ++label) {
     std::vector<std::string> values;
     for (std::size_t i = 0; i < labels.size() && i < list_of_vals.size(); ++i)
       if (labels[i] == label) values.push_back(list_of_vals[i]);
@@ -812,7 +813,7 @@ std::vector<Trace> reference_ta_logslice(const std::vector<Trace>& log, const st
   return reference_ta_apply_trace_attributes(log, values, key, true);
 }
 
-void reference_ta_merge_log(const std::string&, const std::string&, long) {
+void reference_ta_merge_log(const std::string&, const std::string&, std::int64_t) {
   throw TraceAttributeReferenceError("TypeError", "can only concatenate str (not \"int\") to str");
 }
 

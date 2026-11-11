@@ -97,6 +97,25 @@ std::string python_repr(const std::string& text) {
 //   the members' rows (activity or not);
 // - contribution[g][r] = C[r] with its zero counts, KeyError for a member
 //   with no row that has an activity.
+//
+// pandas reads a list of two names as the row labels of a two-row frame
+// when one of them is no column (row i is keyed by the i-th name), so on a
+// two-row upload without the activity or resource column (round AZ, seeds
+// 231, 301 and 324 of round AY; a model of it matched pm4py on 3,700 random
+// two-row frames):
+// - the pair groupby [activity, resource] keys row 0 by the activity name
+//   and row 1 by the resource name; each label reads activity = label[0]
+//   and resource = label[1] (IndexError for a name shorter than two
+//   characters), in sorted label order, a later label of the same pair
+//   replacing the earlier count; the counts are the rows' present group
+//   cells, read after the group column's KeyError;
+// - with a group attribute, a resource column means the coverage count
+//   reads the missing activity column (KeyError); without one the
+//   membership groupby [resource, group] keys row 0 by the resource name
+//   and row 1 by the group name (resource = label[0], group = label[1]),
+//   after the activity column's KeyError, and coverage counts the rows'
+//   present activity cells per label, again replaced per pair;
+// - explicit groups read the resource column (KeyError) as before.
 LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
                                                const LocalDiagnosticsOptions& o) {
   const auto frame = dataframe_frame_event_log(input);
@@ -105,10 +124,14 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
   const std::string resource_key = o.resource_attribute.empty() ? "org:resource" : o.resource_attribute;
   const std::string activity_key = o.activity_attribute.empty() ? "concept:name" : o.activity_attribute;
   const std::string& group_key = o.group_attribute;
+  std::size_t frame_rows = 0;
+  for (const auto& trace : frame.traces) frame_rows += trace.events.size();
+  const bool pair_labels = pandas_row_label_keys(frame_rows, keys.contains(activity_key) && keys.contains(resource_key));
   // The activity and resource columns are read first, and their groupby
   // sorts before the group column is read.
-  for (const auto* key : {&activity_key, &resource_key})
-    if (!keys.contains(*key)) throw std::invalid_argument("KeyError: " + python_repr(*key));
+  if (!pair_labels)
+    for (const auto* key : {&activity_key, &resource_key})
+      if (!keys.contains(*key)) throw std::invalid_argument("KeyError: " + python_repr(*key));
 
   LocalDiagnosticsResult result;
   result.diagnostics.trace_count = input.trace_count();
@@ -142,9 +165,9 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
   for (const auto& trace : frame.traces)
     for (const auto& event : trace.events) {
       Row row;
-      const auto r = frame_scalar(frame, trace, event, resource_key, scope);
-      const auto a = frame_scalar(frame, trace, event, activity_key, scope);
-      const auto g = frame_scalar(frame, trace, event, group_key, scope);
+      const auto r = frame_row_scalar(frame, trace, event, resource_key);
+      const auto a = frame_row_scalar(frame, trace, event, activity_key);
+      const auto g = frame_row_scalar(frame, trace, event, group_key);
       if (r) {
         row.resource = &resources.add(*r);
         if (r->kind == python::Scalar::Kind::kText) text_resources.emplace(r->text, *row.resource);
@@ -155,45 +178,84 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
       if (g && o.explicit_groups.empty()) group_keys.push_back({*g});
       rows.push_back(row);
     }
-  try {
-    (void)python::groupby(pair_keys);
-  } catch (const python::TypeError& error) {
-    throw std::invalid_argument(std::string("TypeError: ") + error.what());
+  if (!pair_labels) {
+    try {
+      (void)python::groupby(pair_keys);
+    } catch (const python::TypeError& error) {
+      throw std::invalid_argument(std::string("TypeError: ") + error.what());
+    }
   }
   if (!keys.contains(group_key)) throw std::invalid_argument("KeyError: " + python_repr(group_key));
-  // A column named twice (the group as resource or activity, or with a group
-  // attribute the resource as activity) is no single column to pandas there.
-  if (group_key == resource_key || group_key == activity_key)
-    throw std::invalid_argument("KeyError: " + python_repr(group_key));
-  if (o.explicit_groups.empty() && resource_key == activity_key)
-    throw std::invalid_argument("KeyError: " + python_repr(resource_key));
-  try {
-    (void)python::groupby(group_keys);
-  } catch (const python::TypeError& error) {
-    throw std::invalid_argument(std::string("TypeError: ") + error.what());
-  }
-  if (resources.size() > o.max_resources)
-    throw std::invalid_argument("local_diagnostics resource bound exceeded");
-
   // C[r][a] with each resource's activities in first-seen order, and each
   // resource's rows (any activity).
   std::map<std::string, std::vector<std::pair<std::string, std::uint64_t>>> counts;
   std::map<std::string, std::uint64_t> resource_rows;
   std::vector<std::string> pair_resources;
   std::size_t skipped = 0;
-  for (const auto& row : rows) {
-    if (row.resource) ++resource_rows[*row.resource];
-    if (!row.resource || !row.activity) {
-      ++skipped;
-      continue;
-    }
-    const auto [it, inserted] = counts.try_emplace(*row.resource);
-    if (inserted) pair_resources.push_back(*row.resource);
+  const auto count_pair = [&](const std::string& r, const std::string& a) -> std::uint64_t& {
+    const auto [it, inserted] = counts.try_emplace(r);
+    if (inserted) pair_resources.push_back(r);
     auto& pairs = it->second;
-    auto pair = std::find_if(pairs.begin(), pairs.end(),
-                             [&](const auto& p) { return p.first == *row.activity; });
-    if (pair == pairs.end()) pair = pairs.emplace(pairs.end(), *row.activity, 0);
-    if (row.group) ++pair->second;
+    auto pair = std::find_if(pairs.begin(), pairs.end(), [&](const auto& p) { return p.first == a; });
+    if (pair == pairs.end()) pair = pairs.emplace(pairs.end(), a, 0);
+    return pair->second;
+  };
+  // Group-attribute membership read from the row labels: (group identity,
+  // resource identity) -> coverage count, groups in sorted label order.
+  std::vector<std::pair<std::string, std::string>> label_members;
+  std::map<std::string, std::map<std::string, std::uint64_t>> label_shares;
+  if (pair_labels) {
+    const auto by_label = [&](const std::string& first, const std::string& second, auto present) {
+      std::map<std::string, std::uint64_t> labelled;
+      labelled[first] += present(rows[0]) ? 1 : 0;
+      labelled[second] += present(rows[1]) ? 1 : 0;
+      return labelled;
+    };
+    for (const auto& [label, n] : by_label(activity_key, resource_key, [](const Row& row) { return row.group; })) {
+      const auto [a, r] = label_characters(label);
+      count_pair(resources.add(python::text(r)), activities.add(python::text(a))) = n;
+    }
+    for (const auto& row : rows)
+      if (row.resource) ++resource_rows[*row.resource];
+    if (o.explicit_groups.empty()) {
+      if (keys.contains(resource_key) || !keys.contains(activity_key))
+        throw std::invalid_argument("KeyError: " + python_repr(activity_key));
+      for (const auto& [label, n] : by_label(resource_key, group_key, [](const Row& row) { return row.activity; })) {
+        const auto [r, g] = label_characters(label);
+        const auto& resource = resources.add(python::text(r));
+        const auto& group = groups.add(python::text(g));
+        label_members.emplace_back(group, resource);
+        label_shares[group][resource] = n;
+      }
+    } else if (!keys.contains(resource_key)) {
+      throw std::invalid_argument("KeyError: " + python_repr(resource_key));
+    }
+    if (resources.size() > o.max_resources)
+      throw std::invalid_argument("local_diagnostics resource bound exceeded");
+  } else {
+    // A column named twice (the group as resource or activity, or with a
+    // group attribute the resource as activity) is no single column to
+    // pandas there.
+    if (group_key == resource_key || group_key == activity_key)
+      throw std::invalid_argument("KeyError: " + python_repr(group_key));
+    if (o.explicit_groups.empty() && resource_key == activity_key)
+      throw std::invalid_argument("KeyError: " + python_repr(resource_key));
+    try {
+      (void)python::groupby(group_keys);
+    } catch (const python::TypeError& error) {
+      throw std::invalid_argument(std::string("TypeError: ") + error.what());
+    }
+    if (resources.size() > o.max_resources)
+      throw std::invalid_argument("local_diagnostics resource bound exceeded");
+    for (const auto& row : rows) {
+      if (row.resource) ++resource_rows[*row.resource];
+      if (!row.resource || !row.activity) {
+        ++skipped;
+        continue;
+      }
+      auto& n = count_pair(*row.resource, *row.activity);
+      if (row.group) ++n;
+    }
   }
   std::vector<std::string> activity_order;
   std::map<std::string, std::uint64_t> activity_totals;
@@ -214,7 +276,14 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
   const auto add_member = [](std::vector<std::string>& list, const std::string& r) {
     if (std::find(list.begin(), list.end(), r) == list.end()) list.push_back(r);
   };
-  if (group_attribute_mode) {
+  if (group_attribute_mode && pair_labels) {
+    std::map<std::string, std::size_t> position;
+    for (const auto& [group, resource] : label_members) {
+      const auto [it, inserted] = position.try_emplace(group, members.size());
+      if (inserted) members.push_back({groups.name.at(group), group, {}});
+      add_member(members[it->second].members, resource);
+    }
+  } else if (group_attribute_mode) {
     std::map<std::string, std::size_t> position;
     for (const auto& row : rows) {
       if (!row.group || !row.resource) continue;
@@ -284,7 +353,12 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
     }
     std::map<std::string, std::uint64_t> share;
     std::uint64_t share_total = 0;
-    if (group_attribute_mode) {
+    if (group_attribute_mode && pair_labels) {
+      for (const auto& [r, n] : label_shares[group.id]) {
+        share[r] = n;
+        share_total += n;
+      }
+    } else if (group_attribute_mode) {
       for (const auto& row : rows) {
         if (!row.resource || !row.activity || !row.group || *row.group != group.id) continue;
         ++share[*row.resource];

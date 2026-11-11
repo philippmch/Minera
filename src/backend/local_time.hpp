@@ -24,7 +24,12 @@ namespace minera::local_time {
 // datetime.timestamp() of a naive datetime with fold 0 (CPython's
 // local_to_seconds): the POSIX second of wall clock `wall` (civil_seconds).
 // In a gap the offset before it applies, in an overlap the first instant.
-// nullopt where wall_seconds fails for a probe.
-[[nodiscard]] std::optional<std::int64_t> naive_timestamp(std::int64_t wall);
+// nullopt where wall_seconds fails for a probe, or where a probe's local
+// wall clock lies outside years 1..9999, which CPython refuses with
+// "ValueError: year N is out of range" (the year is stored in
+// `refused_year`): datetime(1, 1, 1).timestamp() east of UTC, whose probe a
+// day earlier lands in year 0.
+[[nodiscard]] std::optional<std::int64_t> naive_timestamp(std::int64_t wall,
+                                                          std::int64_t* refused_year = nullptr);
 
 }  // namespace minera::local_time

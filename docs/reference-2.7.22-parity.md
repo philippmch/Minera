@@ -22526,3 +22526,84 @@ offsets after the change can differ from pm4py's; the zone-database test
 prints and counts such values for America/Nuuk, America/Godthab,
 America/Scoresbysund and America/Santiago on MSVC and requires every other
 zone to match.
+
+## Review AZ1: re-review of round AY, two-row uploads and per-row case columns (2026-11-11)
+
+Round AZ re-reviewed AY (network analysis with business hours and NaN
+lists, the shared business-hours model, the `local_time` seam), closed the
+two upload errors AY left open, and swept the organizational routes on
+uploads whose `case:` columns vary within a case. Findings, all fixed:
+
+- **AZ1-1 Two-row uploads in local diagnostics.** pandas' `groupby` on a
+  list of keys as long as the frame has rows, when not every key is a
+  column, reads the list as one array of row labels (row *i* keyed by
+  `keys[i]`). On a two-row upload without `org:resource` pm4py therefore
+  groups by the key names themselves and reads each label's first and
+  second character (`IndexError: string index out of range` for a shorter
+  name): `[concept:name, org:resource]` gives resource `c` with activity
+  `o` and resource `o` with activity `r`, and the group membership comes
+  from `[org:resource, org:group]` the same way. A later label of the same
+  pair overwrites the earlier one. The errors follow: `KeyError:
+  'org:group'` with default options, `ZeroDivisionError` where a group has
+  no activity, and a `KeyError` on a missing activity column only where
+  the resource column exists. Minera raised `KeyError: 'org:resource'`
+  (AY's seeds 231, 301 and 324). A Python model of the rule matched pm4py
+  on 7,000 random two-row frames before the port.
+- **AZ1-2 The same rule in the pandas roles.** The pandas variant groups
+  by `[resource, activity]`, so on two rows a label's first character is a
+  resource and its second an activity, counted by the rows carrying the
+  label (`ZZ` for both keys gives role `Z` with resource `Z` twice).
+  Minera raised `KeyError`. One- and three-row frames keep the column
+  errors.
+- **AZ1-3 The duration check per resource.** `average_duration_activity`
+  checks the duration column per resource (pm4py's call takes one
+  resource's rows): two resources with one row
+  each pass alone, though their two rows together have no `.dt` accessor
+  (AY's seed 324: pm4py returns 0.0 for each). The all-resources request
+  checks each resource on its own rows.
+- **AZ1-4 `case:` columns per row.** pandas keeps a `case:` column's value
+  per row, and on CSV uploads (and merged XES cases) it can vary within a
+  case. Local diagnostics, resource profiles, network analysis and the
+  pandas SNA and roles variants read the trace's value instead (handover
+  pandas with `case:region` as the case key gave other handovers).
+  `frame_value` in the DataFrame scope and `frame_row_scalar` now read the
+  row's own cell.
+- **AZ1-5 CPython's year range.** A naive `datetime.timestamp()` whose
+  local wall clock (or the probe a day earlier) lies outside years 1 to
+  9999 raises `ValueError: year N is out of range` in CPython (under
+  `TZ=Europe/Berlin`: year 0 for `datetime(1, 1, 1).timestamp()`, year
+  10000 for `datetime(9999, 12, 31, 23).timestamp()`). The common filter
+  bank, the LTL filter and
+  the paths filter returned a value or another error; `naive_timestamp`
+  now reports the refused year and the three callers raise CPython's
+  message.
+- **AZ1-6 OCEL readers keep microseconds.** pm4py's OCEL 2.0 JSON and XML
+  and OCEL 1.0 JSON and XML readers store timestamps as `datetime64[us]`
+  (digits past the microsecond are dropped), while the SQLite and CSV
+  readers keep nanoseconds (declared date attributes alike). Minera kept
+  nanoseconds from the ISO texts, so OCDFG edge durations with business
+  hours were a microsecond off (5 of 900 comparisons). Such texts are now
+  respelled at the microsecond, except the event and change times of the
+  OCEL 1.0 JSON, which routes pass to each other as a lossless transport
+  (declared: `read_ocel_json` of a file with digits past the microsecond
+  keeps microseconds, Minera's reading of it nanoseconds).
+- **AZ1-7 64-bit trace-attribute helpers.** `trace_attribute_reference`
+  took counts and thresholds as `long`, 32 bits on Windows; they are
+  `std::int64_t` now.
+
+Re-review of AY without further findings: network analysis, resource
+profiles and local diagnostics on 350 CSV and 350 XES upload seeds with
+business hours, NaN lists and varying case columns, and on 700 two-row
+CSV seeds (`azsweep.py`), OCDFG edge performance with business hours on 400
+random OCEL 2.0 JSON files read by `pm4py.read_ocel2_json` (1,200
+comparisons, `ocdfgbh.py`), the SNA and roles sweep on 350 seeds with
+varying case columns and 300 two-row seeds (`orgsweep.py`), and root cause
+on 150 CSV seeds with varying case columns (`rccsv4.py`; seed 53 differs
+only under another hash seed, the declared trace-based selection order).
+The EventLog paths of the business-hours model (service time, heuristics,
+the temporal profile, token-replay durations) are reached only from the
+CLI and the library, since every upload takes the frame path.
+
+`minera_review_az1_tests` binds the values and messages above (taken from
+pm4py black-box on the same uploads, and from CPython under
+`TZ=Europe/Berlin`).

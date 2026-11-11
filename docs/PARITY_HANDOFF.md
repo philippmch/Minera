@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AY (2026-11-05 to 2026-11-11, cloud container)
+## Review-fix loop, rounds T–AZ (2026-11-05 to 2026-11-11, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4403,7 +4403,69 @@ large test files (conformance contracts, the pandas LTL and Polars
 workbench banks) run the container out of memory when compiled with
 ASan; build those one at a time on a larger machine if needed.
 
-Next round (AZ) should start by re-reviewing round AY:
+Round AZ re-reviewed AY and found nothing further in its code: network
+analysis with business hours, NaN lists and case columns that vary within
+a case on 350 CSV and 350 XES upload seeds plus 700 two-row CSV seeds
+(`azsweep.py`, which also runs resource profiles and local diagnostics),
+OCDFG edge performance with business hours against
+`pm4py.read_ocel2_json` on 400 random files, SNA and roles on 350 seeds
+with varying case columns and 300 two-row seeds (`orgsweep.py`), root
+cause on 150 seeds with varying case columns (`rccsv4.py`, only the
+declared hash-seed selection differs). It fixed the two upload errors AY
+left open and what the sweeps found (Review AZ1): on a two-row frame
+pandas reads a list of two key names as the rows' labels when one is no
+column, so local diagnostics and the pandas roles on two-row uploads
+without `org:resource` work on the names' first two characters
+(`pandas_row_label_keys` and `label_characters` in `frame_cells.hpp`); the
+duration check of resource profiles runs per resource; `case:` columns
+are read per row in the DataFrame scope (`frame_value`,
+`frame_row_scalar`), which changed local diagnostics, resource profiles,
+network analysis and the pandas SNA and roles on uploads whose case
+columns vary; CPython's `year N is out of range` in the naive timestamps
+of the three filters; the OCEL 2.0 JSON and XML and OCEL 1.0 XML readers
+keep microseconds (OCDFG durations were a microsecond off; the OCEL 1.0
+JSON transport keeps nanoseconds, declared); the
+trace-attribute helpers are 64-bit on Windows. The device check for new
+reviewer handoffs on the Mac was skipped (no device access from the
+round's thread).
+
+Next round (BA) should start by re-reviewing round AZ:
+
+- the two-row label rule: `pandas_row_label_keys` and `label_characters`
+  (`src/backend/frame_keys.cpp`), the `pair_labels` branches of
+  `src/backend/local_diagnostics.cpp` (`label_members`, `label_shares`,
+  the error order against the group `KeyError`) and of
+  `src/backend/role_discovery.cpp`; and whether other pandas `groupby`
+  calls with a key list (attribute statistics, case statistics, features,
+  the temporal profile, the DataFrame DFG) meet the same rule on two-row
+  uploads with a key that is no column;
+- the DataFrame-scope `case:` branch of `frame_value` and
+  `frame_row_scalar` in `frame_keys.cpp`: every consumer that reads a
+  `case:` key on the frame (attribute statistics, features, root cause,
+  the filters on the frame, LLM context) now sees the row's own value;
+  sweep uploads whose `case:` cells vary within a case through them;
+- `require_duration_column` and `require_duration_rows` in
+  `src/backend/resource_profiles.cpp` (the per-resource identities, the
+  date identity of an all-date resource column);
+- `naive_timestamp`'s `refused_year` (`local_time.{hpp,cpp}`) and the
+  three callers, and `natively_stored` in `src/backend/ocel.cpp` (texts
+  with nanoseconds respelled, `truncates` off for the classic JSON
+  transport): OCEL exports, filters and statistics on
+  such timestamps from JSON and XML against SQLite and CSV inputs;
+- the CI run of the AZ commit.
+
+Carried over from AX (not taken in AY or AZ): `frame_times::
+column_subtraction` and its callers, `frame_passed_time`, `frame_cases`
+and `frame_column_type`, and the NaN cell rule of `note_cell` and
+`typed_columns` (details in AX's list below). Candidate new areas: the
+EventLog paths of the business-hours model through the CLI (uploads all
+take the frame path), and two-row uploads through the remaining routes.
+Still open from earlier rounds: the trace-based selection of mixed-type
+and bool-with-gaps keys by Python set order (AQ, AV1). Harness:
+`review-harness/round-az/` (README there).
+
+Round AY's targets, re-reviewed in AZ (no finding in the code AY
+changed; AZ1-6 came from the OCDFG business-hours sweep):
 
 - `business_durations` and `local_wall_micros` in
   `src/backend/network_analysis.cpp` (the row-wise apply, its error order
@@ -4423,8 +4485,8 @@ Next round (AZ) should start by re-reviewing round AY:
   values that follow Windows' tz release only when it fails, so a later
   Windows image may need the declared zone list revisited;
 
-Found in AY's sweeps and not yet fixed (CSV uploads of `aysweep.py`, the
-same on round AX's server): local diagnostics on an upload without
+Found in AY's sweeps and fixed in AZ (AZ1-1, AZ1-3; CSV uploads of
+`aysweep.py`, the same on round AX's server): local diagnostics on an upload without
 `org:resource` raises `KeyError: 'org:resource'` where pm4py raises
 `KeyError: 'org:group'` (default options, seeds 231 and 301) or
 `ZeroDivisionError: float division by zero` (another group column, seeds
@@ -4434,12 +4496,10 @@ where pm4py returns 0.0 (seed 324). pm4py tolerates the missing resource
 column in odd ways: with an `org:group` column it returns groups keyed by
 single characters (probe: `ldprobe_ay.py` in the round's harness).
 
-Candidate new areas: business hours on the EventLog paths; CPython's
-`year 0 is out of range` for `datetime(1, 1, 1).timestamp()` in a zone
-east of UTC (Minera returns a value); `long` (32-bit on Windows) in
-`trace_attribute_reference.cpp`. Still open from earlier rounds: the
-trace-based selection of mixed-type and bool-with-gaps keys by Python set
-order (AQ, AV1). Harness: `review-harness/round-ay/` (README there).
+AY's candidate new areas, taken in AZ (AZ1-5, AZ1-7): CPython's `year 0
+is out of range` for `datetime(1, 1, 1).timestamp()` in a zone east of
+UTC; `long` (32-bit on Windows) in `trace_attribute_reference.cpp`.
+Harness of AY: `review-harness/round-ay/` (README there).
 
 Round AX's targets (AY took the CI run, network analysis and business
 hours from this list, findings AY1 and AY2; the column subtraction, passed
@@ -4776,7 +4836,8 @@ easy soundness on 5 of 36 parallel-arc probe nets; the
 (pm4py sums per variant); BOSE norm ties decided by the BLAS kernel
 (pm4py's results depend on the CPU; Minera models the Windows kernel); the
 OCEL 1.0 JSON reader reads an empty timestamp in file order (pm4py raises;
-the classic format is the native transport), and repeated object ids in
+the classic format is the native transport) and keeps digits past the
+microsecond (pm4py drops them, as its other ISO readers do), and repeated object ids in
 the XML and SQLite readers stay refused (pm4py keeps a SQLite event or object
 per type-table row; native reads the first), a SQLite type missing from the
 map table falls back to native table names (pm4py raises); `merge_dataframe_cases` and gzip decompression are
@@ -4800,5 +4861,7 @@ uses at the same time (routes read the latest mined session). The 16
 `original-*` bundle manifests and `literal-controls` are not replayable
 (the script raises KeyError on them); 16 manifests replay. The script tests
 need a Python with duckdb (`/tmp/refvenv/bin/python`). `minera_portable_integers` fails on
-any `__int128` or compiler builtin in core code. GitHub Actions has not run
-since 2026-10-28 (billing), so macOS and Windows are checked by nothing else.
+any `__int128` or compiler builtin in core code. CI (Linux, macOS, Windows)
+runs on every push to `main` since the repository became public on
+2026-11-10; integrations cannot rerun or dispatch a workflow, so only a
+push or Philipp's Re-run starts one.

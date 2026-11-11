@@ -25,6 +25,20 @@ std::int64_t days_from_civil(std::int64_t y, unsigned m, unsigned d) noexcept {
   return era * 146097 + static_cast<std::int64_t>(doe) - 719468;
 }
 
+// The proleptic Gregorian year of civil_seconds `seconds`.
+std::int64_t civil_year(std::int64_t seconds) noexcept {
+  auto days = seconds / 86400;
+  if (seconds % 86400 < 0) --days;
+  days += 719468;
+  const std::int64_t era = (days >= 0 ? days : days - 146096) / 146097;
+  const auto doe = static_cast<unsigned>(days - era * 146097);
+  const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const unsigned mp = (5 * doy + 2) / 153;
+  const unsigned month = mp < 10 ? mp + 3 : mp - 9;
+  return static_cast<std::int64_t>(yoe) + era * 400 + (month <= 2);
+}
+
 #if defined(_WIN32)
 // The UTC offset of the IANA zone named by TZ, or nullopt when TZ is unset or
 // names no zone of the database (then the C runtime reads it).
@@ -77,9 +91,20 @@ std::optional<std::int64_t> wall_seconds(std::int64_t utc_seconds) {
                        fields.tm_hour, fields.tm_min, fields.tm_sec);
 }
 
-std::optional<std::int64_t> naive_timestamp(std::int64_t wall) {
+std::optional<std::int64_t> naive_timestamp(std::int64_t wall, std::int64_t* refused_year) {
   constexpr std::int64_t kMaxFoldSeconds = 24 * 3600;
-  const auto local = [](std::int64_t u) { return wall_seconds(u); };
+  // CPython's local(u): utc_to_seconds of the local fields, which refuses a
+  // year outside 1..9999.
+  const auto local = [refused_year](std::int64_t u) -> std::optional<std::int64_t> {
+    const auto seconds = wall_seconds(u);
+    if (!seconds) return std::nullopt;
+    const auto year = civil_year(*seconds);
+    if (year < 1 || year > 9999) {
+      if (refused_year) *refused_year = year;
+      return std::nullopt;
+    }
+    return seconds;
+  };
   const auto lt = local(wall);
   if (!lt) return std::nullopt;
   const std::int64_t a = *lt - wall;
