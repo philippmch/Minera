@@ -339,6 +339,13 @@ python::Scalar frame_number_scalar(const FrameValue& value) {
   return python::real(std::strtod(value.text.c_str(), nullptr));
 }
 
+std::string column_type_error(std::string message, std::optional<DataFrameColumnType> type) {
+  if (type == DataFrameColumnType::kObject)
+    for (std::size_t at; (at = message.find("'Timestamp'")) != std::string::npos;)
+      message.replace(at, 11, "'datetime.datetime'");
+  return message;
+}
+
 bool pandas_row_label_keys(std::size_t rows, bool all_keys_are_columns) {
   return rows == 2 && !all_keys_are_columns;
 }

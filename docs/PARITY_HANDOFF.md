@@ -4448,7 +4448,52 @@ trace-based selection of a bool column with gaps in the LLM context's
 `log_features` (seed 17, below). The device check on the Mac was skipped
 again (no device access from the round's thread).
 
-Next round (BC) should start by re-reviewing round BB:
+Round BC re-reviewed BB and took its open targets (Review BC1). It fixed:
+SNA on a datetime resource column with gaps (one resource `NaT`, as
+pm4py's frame keeps `pd.NaT`) and SNA's error texts (the case-grouped
+pandas variants' `Column not found` and ordered-Categorical errors,
+`datetime.datetime` in an object column, scipy's pearsonr message);
+resource profiles on XES object columns (the case metrics read each
+case's last timestamp, `average_case_duration` takes each case's minimum
+and windows an unsorted case by its least and greatest timestamp,
+`average_duration_activity` subtracts two object columns cell by cell);
+`datetime.datetime` in network analysis' sort and groupby errors; and the
+trace-based default selection of a column of numbers, bools and gaps,
+which pm4py types by the first element of the Python set of its cells
+(`python::number_set_order` emulates CPython's set; BA's open seed 17 of
+`llmsweep.py` is closed). The device check on the Mac was skipped again
+(the round's thread had no device linked).
+
+Next round (BD) should start by re-reviewing round BC:
+
+- `src/backend/organizational_mining.cpp`: `require_sortable` (first
+  appearance, `column_type_error`), `require_sortable_variants` (numpy's
+  argsort of the cases' tuples, then the per-position categorical check),
+  the `NaT` selector (`nat_cells`) and the case-grouped variants' key
+  order; sweep `snamix2.py` with CSV uploads (round BC swept XES);
+- `src/backend/resource_profiles.cpp`: `case_groupby`, the `case_metric`
+  branch, `average_case_duration`'s per-group minimum and
+  `frame_average_case_duration`'s window, and the two-object-column
+  subtraction of `average_duration_activity`;
+- `src/backend/log_to_features.cpp`: `frame_set_numeric` (event columns
+  only; the case-level `inferred_trace_attributes` still counts cases,
+  check pm4py's selection of `case:` columns of numbers and bools with
+  gaps), and every route that reads the trace-based default selection on
+  uploads (features, LLM context, clustering, root cause);
+  `python::numeric_hash` for ints past 64 bits;
+- open from BC: `average_workload` and `multitasking` without a start
+  column on an XES object timestamp column of text and ints
+  (`objtime.py` seed 279, pm4py names `float`, Minera `str`);
+- the CI run of the BC commit.
+
+Still open: the set-order selection of mixed-type keys (AQ, AV1; text and
+dates hash with the seed, so it stays declared), and Philipp's answer on
+whether the roles to diagnostics button should refuse uploads without an
+`org:group` column (AT). Harness: `review-harness/round-bc/` (README
+there).
+
+Round BB's targets, re-reviewed in BC (findings BC1-1 to BC1-8 in the
+code BB touched, its open SNA and LLM targets, and network analysis):
 
 - `src/backend/resource_profiles.cpp`: `workload_conversion_error` (the
   per-row `.timestamp()` order, the shifted start of the previous same-case

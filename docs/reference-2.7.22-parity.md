@@ -22874,3 +22874,124 @@ Verification (scripts in the project files under `review-harness/round-bb/`):
 
 `minera_review_bb1_tests` binds the values and messages above (taken from
 pm4py black-box on the same uploads and files).
+
+## Review BC1: re-review of round BB, SNA on datetime resource columns, and set-order feature selection (2026-11-11)
+
+Round BC re-reviewed BB (resource profiles, local diagnostics and roles on
+XES object columns, the standard OCEL transport's `minera:nanoseconds`)
+and took its open targets: SNA on a datetime resource column with gaps,
+the same `NaT` and sort rules in network analysis, and the LLM context's
+trace-based selection of a bool column with gaps, open since BA. Findings,
+all fixed:
+
+- **BC1-1 SNA keeps a datetime column's missing cells as `NaT`.** pm4py's
+  frame holds them as `pd.NaT`, one resource `NaT` that sorts beside the
+  Timestamps without error, in every variant but the joint-activities
+  pandas one, which drops rows without a resource or activity
+  (`working_together`: `('NaT', '2020-01-01 00:00:00+00:00'): 1.0`).
+  Minera counted the cell as a float and raised `'<' not supported between
+  instances of 'Timestamp' and 'float'` (seed 16 of round BB's
+  `snamix.py`; before the fix 131 of 600 jobs of `snamix2.py` raised in
+  Minera only, 104 had another message and 35 another error type).
+- **BC1-2 SNA's errors as pandas words them.** The case-grouped pandas
+  variants (handover, working together, subcontracting) group by the case
+  column first, so an absent column is `KeyError: 'Column not found:
+  <resource>'` after the case column's own `KeyError`; they sort the cases'
+  resource tuples with numpy's argsort, which compares tuples as Python
+  does, and when two tuples do not compare the per-position categorical
+  sort raises `TypeError: 'values' is not ordered, please explicitly
+  specify the categories order by passing in a categories argument.`; an
+  XES object column names its dates `datetime.datetime`; joint activities
+  with fewer than two activities is scipy's `ValueError: `x` and `y` must
+  have length at least 2.`
+- **BC1-3 Resource profiles' case metrics on XES object columns.**
+  `case_completions` and `fraction_case_completions` read each case's last
+  present timestamp (`groupby(case).last()`), so a text or int last cell
+  fails the window comparison with its own type and an earlier one is
+  never compared; the groupby's sort error names dates
+  `datetime.datetime` when the case column is an object column.
+- **BC1-4 `average_case_duration` on XES object columns.** Each case's
+  minimum over an object column of dates beside text raises `TypeError:
+  agg function failed [how->min,dtype->object]`; a float column with
+  groups, or a number or text minimum, fails the window comparison with
+  that type; the `.dt` accessor error follows the column's dtype, not its
+  cells.
+- **BC1-5 An unsorted XES case in `average_case_duration`.** The window
+  keeps a case when its least timestamp is before `t2` and its greatest
+  after `t1` (strictly); the duration is its last row less its first, so
+  a case written June, January, March lasts -7,948,800 seconds.
+- **BC1-6 `average_duration_activity` with two object columns.** A start
+  and a timestamp column that are both XES object columns subtract cell by
+  cell over the resource's rows of the activity: the first pair that is
+  not two dates or two numbers raises `TypeError: unsupported operand
+  type(s) for -: '<A>' and '<B>'` (dates `datetime.datetime`).
+- **BC1-7 Network analysis on XES object columns.** The sort by the
+  sorting column and the groupby over source, target and edge name an
+  object column's dates `datetime.datetime`, not `Timestamp` (12 of 240
+  jobs of the new `namix.py` before the fix). The helper
+  `column_type_error` in `frame_cells.hpp` now does this rename for SNA,
+  resource profiles and network analysis.
+- **BC1-8 The trace-based default selection types a column by Python's set
+  order.** pm4py decides whether an event column of numbers, bools and
+  gaps is numeric from the first element of the Python set of its cells,
+  added in log order: an int or a float (NaN included) makes it numeric,
+  a bool leaves it out. CPython's set order of numbers is deterministic
+  (the documented numeric hash modulo 2**61 - 1, an 8-slot table that
+  probes and grows); Minera now emulates
+  it (`python::numeric_hash`, `python::number_set_order`, checked against
+  CPython on 5,000 random sequences) on the upload's frame. So
+  `[1.5, True | 2.5, False]` has no feature (False hashes 0, first slot)
+  and `[1.5, 2.0 | 2.5, True]` has one though the second case holds only a
+  bool. Minera required a non-bool number in every case. This closes BA1's
+  open seed 17 of `llmsweep.py` (a bool column with gaps in the LLM
+  context's `log_features`), and the same rule now drives
+  `/api/log-to-features` on uploads. A Python model matched pm4py on 400
+  random number and bool columns and on 300 CSV columns with blanks before
+  the port.
+
+Re-review of BB without further findings: roles and local diagnostics on
+mixed XES columns (`rolesmix.py`), resource profiles on typed CSV
+(`rpfuzz.py`), the standard OCEL transport through OCDFG and flattening.
+
+Declarations:
+
+- SNA's `'<' not supported` message names the first unorderable pair of
+  the sorted set, whose order follows the hash seed (text, dates) or a NaN
+  cell's address; Minera sorts the values in first appearance (70 jobs of
+  the final SNA sweep, and seed 122 with a NaN).
+- Network analysis lists absent columns in set order (`['x',
+  'org:resource'] not in index` under some hash seeds, the other order
+  under others; `namix.py` seed 63).
+- A NaN cell's place in the set follows its address, which moves with how
+  the Python process started (a float64 column's NaNs are distinct
+  objects); Minera hashes NaN as 2**60 - 1, the last slot of any table it
+  meets. A column of `True` and gaps whose first cell is a gap is
+  therefore never numeric in Minera; pm4py makes it numeric when the NaN's
+  address lands in the first slots. Sets holding text or dates follow the
+  hash seed (the earlier AQ and AV1 declarations).
+- `average_workload` and `multitasking` without a start column on an XES
+  object timestamp column of text and ints (`objtime.py` seed 279): pm4py
+  names `'float' object has no attribute 'timestamp'`, Minera `'str'`;
+  open.
+
+Verification (scripts in the project files under `review-harness/round-bc/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| SNA, every variant, XES columns of dates with gaps beside text, ints, floats and bools (`snamix2.py`, seeds 0 to 99) | 600 | before: 131 Minera-only errors, 104 other messages, 35 other error types |
+| The same on the final code (seeds 0 to 249) | 1,500 | 636 equal, 632 raise in both, 98 declared NaN, 130 messages under another hash seed or of a declared pair, 1 NaN-order message (seed 122), 3 jobs of seed 106 from a stale upload (rerun clean) |
+| Resource profiles on XES uploads, all metrics (`rpfuzzx.py`, seeds 0 to 149) | 1,200 | before: 36 differences; final: 602 equal, 579 raise in both, 19 declared NaN |
+| Resource profiles, XES object time columns (`objtime.py`, seeds 0 to 299) | 1,200 | before: 79 differences; final: 667 equal, 505 raise in both, 27 declared NaN, 1 declared message (seed 279) |
+| Resource profiles, typed CSV (`rpfuzz.py`, seeds 0 to 149) | 1,200 | 635 equal, 517 raise in both, 48 declared NaN |
+| Network analysis on mixed XES columns (`namix.py`, seeds 0 to 299) | 1,200 | 1,064 equal, 135 raise in both, 1 declared set-order message |
+| Roles and local diagnostics on mixed XES (`rolesmix.py`, seeds 300 to 449) | 1,200 | 0 differences beside 45 declared NaN resources and 10 name clashes |
+| Round AS's SNA and roles sweeps (`orgsweep.py` CSV and `orgxes.py` XES, seeds 450 to 599) | 1,800 | 724 equal, 872 raise in both, 204 declared NaN, 0 differences |
+| OCEL SQLite opened as the app opens it: OCDFG (`ocelsq.py`, seeds 300 to 399) and flattening against `ocel_flattening` (`ocelflat.py`, seeds 0 to 59) | 180 | 0 differences |
+| Trace-based selection of number, bool and gap columns, CSV and XES (`boolsel.py`, seeds 0 to 459) | 460 | 0 differences |
+| LLM context with varying case columns (`llmsweep.py` with `VARY=1`, seeds 0 to 99) | 500 | 490 equal (62 under another hash seed), 10 raise in both; seed 17 now equal |
+| LLM context with date columns (`llmsweep.py`, seeds 100 to 179) | 400 | 383 equal (10 under another hash seed), 17 raise in both |
+| Features with varying case columns (`featsweep.py`, seeds 0 to 59) | 180 | 180 equal |
+| Full ctest | 461 tests | 460 pass; the portability scan caught a 128-bit integer in the first hash, replaced (checked against CPython), and the 53 tests of the rebuilt sources pass again |
+
+`minera_review_bc1_tests` binds the values and messages above (taken from
+pm4py black-box on the same uploads, and from CPython for the set orders).

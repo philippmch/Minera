@@ -528,36 +528,43 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
   const auto profile = [&](const std::string& key) -> std::optional<std::pair<double, std::uint64_t>> {
     const auto found = resource_cases.find(key);
     if (found == resource_cases.end()) return std::nullopt;
-    // Each group's first and last row (frame order) among the cases' rows.
-    std::map<std::string, std::pair<std::size_t, std::size_t>> spans;
+    // Each group's first and last row (frame order) among the cases' rows,
+    // and its least and greatest timestamps.
+    struct Span {
+      std::size_t first, last, least, greatest;
+    };
+    std::map<std::string, Span> spans;
     for (const auto& case_name : found->second)
       for (const auto i : case_rows.at(case_name)) {
         const auto& row = rows[i];
         if (!row.group || !row.time) continue;
-        auto [it, inserted] = spans.try_emplace(*row.group, i, i);
+        auto [it, inserted] = spans.try_emplace(*row.group, Span{i, i, i, i});
         if (!inserted) {
-          it->second.first = std::min(it->second.first, i);
-          it->second.second = std::max(it->second.second, i);
+          auto& span = it->second;
+          span.first = std::min(span.first, i);
+          span.last = std::max(span.last, i);
+          if (seconds(*row.time) < seconds(*rows[span.least].time)) span.least = i;
+          if (seconds(*row.time) > seconds(*rows[span.greatest].time)) span.greatest = i;
         }
       }
-    std::vector<std::pair<const python::Scalar*, const python::Scalar*>> groups;
-    std::vector<std::pair<std::size_t, std::size_t>> ordered;
+    std::vector<Span> ordered;
     for (const auto& [group, span] : spans) {
       (void)group;
       ordered.push_back(span);
     }
-    std::sort(ordered.begin(), ordered.end());
-    for (const auto& [first, last] : ordered) groups.emplace_back(&*rows[first].time, &*rows[last].time);
+    std::sort(ordered.begin(), ordered.end(), [](const Span& x, const Span& y) { return x.first < y.first; });
     double sum = 0.0;
     std::uint64_t count = 0;
-    // pm4py's pandas variant keeps a group only when its first row lies
-    // before t2 and its last after t1, both strictly (observed black-box: a
-    // case ending at t1 or starting at t2 is outside, so is a one-instant
-    // case at either bound), unlike the closed window of the EventLog one.
-    for (const auto& [first, last] : groups) {
-      const double f = seconds(*first), l = seconds(*last);
-      if (!((!b.hi || f < *b.hi) && (!b.lo || l > *b.lo))) continue;
-      sum += duration(*first, *last);
+    // pm4py's pandas variant keeps a group only when its least timestamp
+    // lies before t2 and its greatest after t1, both strictly (observed
+    // black-box: a case ending at t1 or starting at t2 is outside, so is a
+    // one-instant case at either bound; round BC: by value, not by the
+    // rows' order, in an unsorted XES case), unlike the closed window of
+    // the EventLog one. The duration runs from the first row to the last.
+    for (const auto& span : ordered) {
+      const double least = seconds(*rows[span.least].time), greatest = seconds(*rows[span.greatest].time);
+      if (!((!b.hi || least < *b.hi) && (!b.lo || greatest > *b.lo))) continue;
+      sum += duration(*rows[span.first].time, *rows[span.last].time);
       ++count;
     }
     if (count == 0) return std::nullopt;
@@ -920,6 +927,16 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     }
     return std::nullopt;
   };
+  // groupby over the case column: its sort's TypeError names an XES object
+  // column's dates datetime.datetime (round BC, observed black-box).
+  const auto case_groupby = [&](const std::vector<std::vector<python::Scalar>>& keys) -> std::vector<python::Group> {
+    try {
+      return python::groupby(keys);
+    } catch (const python::TypeError& error) {
+      fail("TypeError: " + column_type_error(error.what(), frame_column_type(frame, c)));
+    }
+    return {};
+  };
   // A missing cell as pm4py's timestamp conversion meets it: None in the
   // case and activity columns of a CSV frame (format_dataframe makes them
   // the "string" dtype, whose missing value is NA), NaN elsewhere (round
@@ -1113,18 +1130,43 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
         if (cell && case_name && (all_resources || python::identity(*cell) == text_key(o.resource)))
           cases.insert(python::identity(*case_name));
       }
-    // A float64 column compares its NaN cells too (numpy).
-    const bool float_times = frame_column_type(frame, t) == DataFrameColumnType::kFloat64;
+    // Their rows group by the case column (which sorts its values; a row
+    // without one is dropped), and each group's least and greatest
+    // timestamps are compared with the window: the least first, the groups
+    // in the groupby's order. An object column's group of dates beside text
+    // or numbers has no minimum (round BC, observed black-box).
+    std::vector<std::vector<python::Scalar>> keys;
+    std::vector<std::pair<const Trace*, const Event*>> keyed;
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events) {
         const auto case_name = frame_row_scalar(frame, trace, event, "case:concept:name");
         if (!case_name || !cases.contains(python::identity(*case_name))) continue;
-        auto value = frame_row_scalar(frame, trace, event, t);
-        if (!value && float_times) value = python::real(NAN);
-        if (value && value->kind != python::Scalar::Kind::kDate)
-          fail("TypeError: '<' not supported between instances of '" + python::type_name(*value) +
-               "' and 'datetime.datetime'");
+        if (auto cell = frame_row_scalar(frame, trace, event, c)) {
+          keys.push_back({std::move(*cell)});
+          keyed.emplace_back(&trace, &event);
+        }
       }
+    const auto groups = case_groupby(keys);
+    std::vector<std::optional<python::Scalar>> minima;
+    for (const auto& group : groups) {
+      std::optional<python::Scalar> least;
+      std::set<int> classes;
+      for (const auto member : group.rows) {
+        auto value = frame_row_scalar(frame, *keyed[member].first, *keyed[member].second, t);
+        if (!value) continue;
+        classes.insert(python::is_number(*value) ? 0 : value->kind == python::Scalar::Kind::kText ? 1 : 2);
+        if (classes.size() > 1) fail("TypeError: agg function failed [how->min,dtype->object]");
+        if (!least || python::less(*value, *least)) least = std::move(value);
+      }
+      minima.push_back(std::move(least));
+    }
+    // A float64 column compares its NaN minima too (numpy).
+    if (frame_column_type(frame, t) == DataFrameColumnType::kFloat64 && !groups.empty())
+      fail("TypeError: '<' not supported between instances of 'float' and 'datetime.datetime'");
+    for (const auto& least : minima)
+      if (least && least->kind != python::Scalar::Kind::kDate)
+        fail("TypeError: '<' not supported between instances of '" + python::type_name(*least) +
+             "' and 'datetime.datetime'");
     if (c == t) fail("ValueError: Grouper for '" + t + "' not 1-dimensional");
     // The cases' frame then reads the start column: any column but the
     // timestamp one is a KeyError there (round BA: after the comparison and
@@ -1136,7 +1178,10 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     if (frame_column_type(frame, t) == DataFrameColumnType::kBool)
       fail("TypeError: numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, the `^` "
            "operator, or the logical_xor function instead.");
-    if (non_date_type(frame, t)) fail("AttributeError: Can only use .dt accessor with datetimelike values");
+    // Durations of an object column (dates in it, round BC) leave no .dt
+    // accessor either.
+    if (frame_column_type(frame, t) != DataFrameColumnType::kDate)
+      fail("AttributeError: Can only use .dt accessor with datetimelike values");
   } else if ((metric == ResourceProfileMetric::kActivityCompletions && r == t) || masked_frequency ||
              masked_distinct) {
     // The resource on the timestamp column: the masks keep every row (a
@@ -1171,6 +1216,31 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
       fail("TypeError: '>=' not supported between instances of '" + *t_type + "' and 'datetime.datetime'");
     }
   } else if (interaction) {
+  } else if (case_metric) {
+    // groupby(case)[timestamp].last(): each case's last present cell is
+    // compared with the window, the cases in the groupby's order (it sorts
+    // the case values first); an earlier cell that is no date never fails
+    // (round BC, observed black-box on XES object columns).
+    std::vector<std::vector<python::Scalar>> keys;
+    std::vector<std::size_t> keyed;
+    for (std::size_t i = 0; i < compared_rows.size(); ++i)
+      if (auto cell = frame_row_scalar(frame, *compared_rows[i].first, *compared_rows[i].second, c)) {
+        keys.push_back({std::move(*cell)});
+        keyed.push_back(i);
+      }
+    const auto groups = case_groupby(keys);
+    const bool floats = frame_column_type(frame, t) == DataFrameColumnType::kFloat64;
+    if (floats && !groups.empty()) fail("TypeError: '>=' not supported between instances of 'float' and 'datetime.datetime'");
+    for (const auto& group : groups) {
+      std::optional<python::Scalar> last;
+      for (const auto member : group.rows)
+        if (auto cell = frame_row_scalar(frame, *compared_rows[keyed[member]].first,
+                                         *compared_rows[keyed[member]].second, t))
+          last = std::move(cell);
+      if (last && last->kind != python::Scalar::Kind::kDate)
+        fail("TypeError: '>=' not supported between instances of '" + python::type_name(*last) +
+             "' and 'datetime.datetime'");
+    }
   } else if (workload) {
     if (const auto error = workload_conversion_error()) fail(*error);
   } else if (const auto t_type = offending_type(t)) {
@@ -1216,9 +1286,33 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
                          : s_dtype == DataFrameColumnType::kBool    ? "bool"
                                                                     : "object";
     fail(std::string("TypeError: Cannot subtract NaT from ndarray with dtype ") + s_name);
-  } else if (metric == ResourceProfileMetric::kAverageDurationActivity && non_date_type(frame, t)) {
+  } else if (metric == ResourceProfileMetric::kAverageDurationActivity &&
+             frame_column_type(frame, t) != DataFrameColumnType::kDate) {
     // No compared row fails; a date start column cannot be subtracted from
-    // the column, any other durations then use the .dt accessor.
+    // the column, any other durations then use the .dt accessor. Two
+    // object columns (XES, round BC, observed black-box) subtract cell by
+    // cell over the rows of the resource and activity, where Python's first
+    // unsupported operands raise.
+    if (start && s != t && frame_column_type(frame, t) == DataFrameColumnType::kObject &&
+        frame_column_type(frame, s) == DataFrameColumnType::kObject) {
+      const auto python_type = [](const python::Scalar& value) {
+        return value.kind == python::Scalar::Kind::kDate ? std::string("datetime.datetime") : python::type_name(value);
+      };
+      for (const auto& [trace, event] : compared_rows) {
+        const auto cell = frame_row_scalar(frame, *trace, *event, r);
+        if (!cell || (!all_resources && python::identity(*cell) != wanted)) continue;
+        if (activity_wanted) {
+          const auto activity = frame_row_scalar(frame, *trace, *event, a);
+          if (!activity || python::identity(*activity) != *activity_wanted) continue;
+        }
+        const auto end = frame_row_scalar(frame, *trace, *event, t);
+        const auto begin = frame_row_scalar(frame, *trace, *event, s);
+        if (!end || !begin) continue;
+        const bool dates = end->kind == python::Scalar::Kind::kDate && begin->kind == python::Scalar::Kind::kDate;
+        if (!dates && !(python::is_number(*end) && python::is_number(*begin)))
+          fail("TypeError: unsupported operand type(s) for -: '" + python_type(*end) + "' and '" + python_type(*begin) + "'");
+      }
+    }
     if (start && s != t && frame_column_type(frame, s) == DataFrameColumnType::kDate) {
       auto dtype = frame_column_type(frame, t);
       if (dtype == DataFrameColumnType::kBool)

@@ -562,4 +562,112 @@ inline std::vector<Group> groupby(const std::vector<std::vector<Scalar>>& keys, 
   return ordered;
 }
 
+// CPython's hash of a number (bool, int, float) as an unsigned 64-bit
+// pattern: the documented numeric hash modulo 2**61 - 1, -1 mapped to -2,
+// infinities +-314159. A NaN hashes by its address in CPython, which moves
+// with how the process started (and a float64 column's NaNs are distinct
+// objects); Minera hashes a NaN as 2**60 - 1, the last slot of any table
+// it meets (declared, round BC).
+inline std::uint64_t numeric_hash(const Scalar& s) {
+  constexpr std::uint64_t kModulus = (std::uint64_t(1) << 61) - 1;
+  const auto finish = [](std::uint64_t magnitude, bool negative) {
+    std::uint64_t x = negative ? std::uint64_t(0) - magnitude : magnitude;
+    if (x == ~std::uint64_t(0)) x = ~std::uint64_t(0) - 1;
+    return x;
+  };
+  if (s.kind == Scalar::Kind::kBool) return s.boolean ? 1 : 0;
+  if (s.kind == Scalar::Kind::kInt) {
+    // x * 10 + digit modulo 2**61 - 1 without 128-bit integers (MSVC):
+    // 2**61 is 1 modulo the modulus, so the bits above 61 fold back in.
+    const auto reduce = [](std::uint64_t v) {
+      v = (v & kModulus) + (v >> 61);
+      return v >= kModulus ? v - kModulus : v;
+    };
+    std::uint64_t x = 0;
+    for (const char digit : s.digits)
+      x = reduce(reduce(x << 3) + reduce(x << 1) + static_cast<std::uint64_t>(digit - '0'));
+    return finish(x, s.negative);
+  }
+  const double value = s.real;
+  if (std::isnan(value)) return (std::uint64_t(1) << 60) - 1;
+  if (std::isinf(value)) return finish(314159, value < 0);
+  int exponent = 0;
+  double mantissa = std::frexp(value, &exponent);
+  const bool negative = mantissa < 0;
+  if (negative) mantissa = -mantissa;
+  std::uint64_t x = 0;
+  while (mantissa != 0.0) {
+    x = ((x << 28) & kModulus) | x >> (61 - 28);
+    mantissa *= 268435456.0;
+    exponent -= 28;
+    const auto integral = static_cast<std::uint64_t>(mantissa);
+    mantissa -= static_cast<double>(integral);
+    x += integral;
+    if (x >= kModulus) x -= kModulus;
+  }
+  exponent = exponent >= 0 ? exponent % 61 : 61 - 1 - ((-1 - exponent) % 61);
+  x = ((x << exponent) & kModulus) | x >> (61 - exponent);
+  return finish(x, negative);
+}
+
+// The iteration order of a CPython (3.11) set built by adding the numbers
+// `values` in order: the indices of the values kept (the first of each
+// equal group: 1, True and 1.0 are one element), in table order. The table
+// starts at 8 slots, probes linearly within 9 slots when they fit and
+// otherwise perturbs (i * 5 + 1 + perturb, perturb >>= 5), and grows to the
+// smallest power of two above four times its size once filled to 3/5.
+inline std::vector<std::size_t> number_set_order(const std::vector<Scalar>& values) {
+  struct Slot {
+    std::size_t index = 0;
+    std::uint64_t hash = 0;
+    bool used = false;
+  };
+  std::vector<Slot> table(8);
+  std::size_t fill = 0;
+  const auto probe = [](std::vector<Slot>& slots, std::uint64_t hash, const auto& stop) {
+    const std::size_t mask = slots.size() - 1;
+    std::uint64_t perturb = hash;
+    std::size_t i = static_cast<std::size_t>(hash) & mask;
+    while (true) {
+      std::size_t probes = i + 9 <= mask ? 9 : 0;
+      for (std::size_t j = i;; ++j) {
+        if (stop(slots[j], j)) return;
+        if (probes == 0) break;
+        --probes;
+      }
+      perturb >>= 5;
+      i = (i * 5 + 1 + static_cast<std::size_t>(perturb)) & mask;
+    }
+  };
+  for (std::size_t index = 0; index < values.size(); ++index) {
+    const auto hash = numeric_hash(values[index]);
+    const auto key = identity(values[index]);
+    bool added = false;
+    probe(table, hash, [&](Slot& slot, std::size_t) {
+      if (!slot.used) {
+        slot = {index, hash, true};
+        added = true;
+        return true;
+      }
+      return slot.hash == hash && identity(values[slot.index]) == key;
+    });
+    if (!added || ++fill * 5 < (table.size() - 1) * 3) continue;
+    std::size_t size = 8;
+    while (size <= fill * 4) size <<= 1;
+    std::vector<Slot> grown(size);
+    for (const auto& old : table)
+      if (old.used)
+        probe(grown, old.hash, [&](Slot& slot, std::size_t) {
+          if (slot.used) return false;
+          slot = old;
+          return true;
+        });
+    table = std::move(grown);
+  }
+  std::vector<std::size_t> order;
+  for (const auto& slot : table)
+    if (slot.used) order.push_back(slot.index);
+  return order;
+}
+
 }  // namespace minera::python

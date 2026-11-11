@@ -17,6 +17,8 @@
 
 #include "minera/dataframe_columns.hpp"
 #include "minera/timestamp.hpp"
+#include "frame_cells.hpp"
+#include "python_scalar.hpp"
 #include "root_cause_trace_key.hpp"
 
 namespace minera {
@@ -279,8 +281,29 @@ bool trace_inference_hashable(EventAttribute attribute) {
   return root_cause_key_is_hashable(attribute);
 }
 
+// On a frame (convert_to_event_log's events: every column on every event,
+// NaN cells) the default selection types a column of numbers, bools and
+// NaN by the first element of the Python set of its cells, added in log
+// order: an int or a float (NaN included) makes it numeric, a bool leaves
+// it out (round BC, observed black-box and fuzzed against pm4py). nullopt
+// for a column holding anything else (text, dates), whose set order
+// follows the hash seed.
+std::optional<bool> frame_set_numeric(const EventLog& frame, const std::string& key) {
+  if (!frame_column_type(frame, key)) return std::nullopt;
+  std::vector<python::Scalar> cells;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      auto cell = frame_row_scalar(frame, trace, event, key);
+      if (!cell) cell = python::real(std::numeric_limits<double>::quiet_NaN());
+      if (!python::is_number(*cell)) return std::nullopt;
+      cells.push_back(std::move(*cell));
+    }
+  if (cells.empty()) return std::nullopt;
+  return cells[python::number_set_order(cells).front()].kind != python::Scalar::Kind::kBool;
+}
+
 std::vector<std::string> inferred_event_attributes(const EventLog& log,
-                                                   bool numeric, bool standard_keys) {
+                                                   bool numeric, bool standard_keys, bool frame) {
   std::map<std::string, std::size_t> occurrences;
   std::map<std::string, std::set<std::string>> string_values;
   std::set<std::string> has_string;
@@ -306,6 +329,19 @@ std::vector<std::string> inferred_event_attributes(const EventLog& log,
     for (const auto& key : seen) ++occurrences[key];
   }
   std::vector<std::string> result;
+  if (frame && numeric) {
+    for (const auto& key : keys) {
+      const auto set_numeric = frame_set_numeric(log, key);
+      const auto counted = occurrences.find(key);
+      const bool taken = set_numeric ? *set_numeric
+                                     : counted != occurrences.end() && counted->second == trace_count &&
+                                           !has_string.contains(key);
+      if (taken && key != "lifecycle:transition") result.push_back(key);
+    }
+    std::sort(result.begin(), result.end());
+    result.erase(std::unique(result.begin(), result.end()), result.end());
+    return result;
+  }
   for (const auto& [key, count] : occurrences)
     // The default trace-based selection never takes lifecycle:transition
     // (observed black-box: another header with the same cells is taken).
@@ -1086,8 +1122,8 @@ LogToFeaturesResult log_to_features(const EventLog& source,
       !event_numbers.empty() || !case_strings.empty() || !case_numbers.empty();
   if (options.variant == LogToFeaturesVariant::TRACE_BASED) {
     if (!explicit_trace_selection) {
-      event_strings = inferred_event_attributes(log, false, options.standard_keys);
-      event_numbers = inferred_event_attributes(log, true, options.standard_keys);
+      event_strings = inferred_event_attributes(log, false, options.standard_keys, frame.has_value());
+      event_numbers = inferred_event_attributes(log, true, options.standard_keys, frame.has_value());
       case_strings = inferred_trace_attributes(log, false, options.standard_keys);
       case_numbers = inferred_trace_attributes(log, true, options.standard_keys);
       if (options.enable_activity_def_representation &&

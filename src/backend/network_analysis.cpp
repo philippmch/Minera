@@ -520,7 +520,10 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
       return python::compare(refs[present[a]].sort.value, refs[present[b]].sort.value);
     });
   } catch (const python::TypeError& error) {
-    throw std::invalid_argument(std::string("network analysis: TypeError: ") + error.what());
+    // An XES object column names its dates datetime.datetime (round BC).
+    throw std::invalid_argument(
+        "network analysis: TypeError: " +
+        column_type_error(error.what(), reader.frame ? frame_column_type(log, o.sorting_attribute) : std::nullopt));
   }
   std::vector<Ref> sorted;
   sorted.reserve(refs.size());
@@ -609,7 +612,13 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
   try {
     groups = python::groupby(keys);
   } catch (const python::TypeError& error) {
-    throw std::invalid_argument(std::string("network analysis: TypeError: ") + error.what());
+    // Only an object column mixes dates with other cells, and an XES one
+    // holds them as datetime.datetime (round BC, observed black-box).
+    std::optional<DataFrameColumnType> type;
+    if (reader.frame)
+      for (const auto* key : {&o.source_node_attribute, &o.target_node_attribute, &o.edge_attribute})
+        if (frame_column_type(log, *key) == DataFrameColumnType::kObject) type = DataFrameColumnType::kObject;
+    throw std::invalid_argument("network analysis: TypeError: " + column_type_error(error.what(), type));
   }
   for (const auto& group : groups) {
     if (result.edges.size() >= o.max_rows) { result.diagnostics.output_truncated = true; break; }

@@ -31,6 +31,12 @@ namespace minera {
 // time:timestamp dates.
 [[nodiscard]] std::optional<DataFrameColumnType> frame_column_type(const EventLog& frame, const std::string& key);
 
+// A TypeError message from comparing a column's cells, as Python words it
+// for that column: an XES object column holds its dates as
+// datetime.datetime, so its 'Timestamp' names become 'datetime.datetime';
+// any other column keeps them (round BC, observed black-box).
+[[nodiscard]] std::string column_type_error(std::string message, std::optional<DataFrameColumnType> type);
+
 // A FrameValue of class kNumber as its Python number (bool, int or float).
 [[nodiscard]] python::Scalar frame_number_scalar(const FrameValue& value);
 

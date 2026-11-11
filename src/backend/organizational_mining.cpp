@@ -1,5 +1,7 @@
 #include "minera/organizational_mining.hpp"
 
+#include "frame_cells.hpp"
+#include "numpy_object_sort.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "minera/frame_keys.hpp"
 
@@ -129,6 +131,74 @@ void emit_edges(const std::map<Pair, double>& weights,
   }
 }
 
+// sorted() over a column's distinct values, as every SNA variant but the
+// joint-activities pandas one sorts its resources: Python's TypeError of
+// the first comparison it cannot make. pm4py sorts a set, whose order
+// follows the hash seed (any pair of unorderable types can come first);
+// Minera sorts the values in their first appearance. A NaN cell is a float;
+// a datetime column's NaT orders with nothing and never raises; an object
+// column's dates are datetime.datetime (round BC, observed black-box).
+void require_sortable(const std::vector<python::Scalar>& values, bool object_column) {
+  std::vector<python::Scalar> distinct;
+  std::set<std::string> seen;
+  for (const auto& value : values)
+    if (seen.insert(python::identity(value)).second) distinct.push_back(value);
+  try {
+    python::sort(distinct, [](const python::Scalar& a, const python::Scalar& b) { return python::less(a, b); });
+  } catch (const python::TypeError& error) {
+    throw std::invalid_argument(
+        "TypeError: " + column_type_error(error.what(), object_column ? std::optional(DataFrameColumnType::kObject)
+                                                                      : std::nullopt));
+  }
+}
+
+// The handover, working-together and subcontracting pandas variants group
+// the cases' resource sequences (one tuple a case, the cases in the case
+// column's sorted order) and sort the distinct ones with numpy's argsort,
+// which compares tuples as Python does (the first unequal items decide; a
+// missing cell is NaN). When a comparison raises, pandas sorts them again
+// position by position, each position an ordered Categorical, which fails
+// when a position's values (NaN left out; text sorts apart from the rest)
+// hold a date beside a number (round BC, observed black-box).
+void require_sortable_variants(const std::vector<std::vector<python::Scalar>>& sequences) {
+  std::vector<const std::vector<python::Scalar>*> distinct;
+  std::set<std::vector<std::string>> seen;
+  for (const auto& sequence : sequences) {
+    std::vector<std::string> identity;
+    for (const auto& value : sequence) identity.push_back(python::identity(value));
+    if (seen.insert(std::move(identity)).second) distinct.push_back(&sequence);
+  }
+  const auto tuple_compare = [&](std::size_t x, std::size_t y) {
+    const auto& a = *distinct[x];
+    const auto& b = *distinct[y];
+    for (std::size_t i = 0; i < std::min(a.size(), b.size()); ++i)
+      if (!python::equal(a[i], b[i])) return python::compare(a[i], b[i]);
+    return a.size() < b.size() ? -1 : a.size() > b.size() ? 1 : 0;
+  };
+  try {
+    (void)detail::numpy_object_quick_argsort(distinct.size(), tuple_compare);
+    return;
+  } catch (const python::TypeError&) {
+  }
+  std::size_t longest = 0;
+  for (const auto* sequence : distinct) longest = std::max(longest, sequence->size());
+  for (std::size_t position = 0; position < longest; ++position) {
+    std::vector<python::Scalar> values;
+    std::set<std::string> present;
+    for (const auto* sequence : distinct)
+      if (position < sequence->size() && !python::is_missing((*sequence)[position]) &&
+          present.insert(python::identity((*sequence)[position])).second)
+        values.push_back((*sequence)[position]);
+    try {
+      (void)python::safe_sort_order(values);
+    } catch (const python::TypeError&) {
+      throw std::invalid_argument(
+          "TypeError: 'values' is not ordered, please explicitly specify the categories order by passing in a "
+          "categories argument.");
+    }
+  }
+}
+
 }  // namespace
 
 OrganizationalSnaResult discover_organizational_sna(
@@ -162,41 +232,98 @@ OrganizationalSnaResult discover_organizational_sna(
                       options.variant == OrganizationalSnaVariant::kSubcontractingPandas ||
                       options.variant == OrganizationalSnaVariant::kJointActivitiesPandas;
   const auto scope = pandas ? FrameKeyScope::kDataFrame : FrameKeyScope::kEventLog;
+  const bool joint = options.variant == OrganizationalSnaVariant::kJointActivities ||
+                     options.variant == OrganizationalSnaVariant::kJointActivitiesPandas;
+  const bool drop_missing = options.variant == OrganizationalSnaVariant::kJointActivitiesPandas;
+  // A datetime column (an XES attribute holding only dates) keeps its
+  // missing cells as pd.NaT, one object: pm4py counts them as one resource
+  // (or activity) NaT in every variant but the joint-activities pandas one,
+  // which drops them (round BC, observed black-box).
+  const auto nat_cells = [&](const std::string& key) {
+    return frame && !drop_missing && frame_column_type(log, key) == DataFrameColumnType::kDate;
+  };
+  const bool nat_resource = nat_cells(options.resource_attribute);
+  const bool nat_activity = joint && nat_cells(options.activity_attribute);
   // Resources and activities are separate dicts to pm4py.
   FrameNames frame_names, frame_activity_names;
   const Selector select = [&](const Trace& trace, const Event& event, const std::string& key,
                               bool resource) -> std::optional<std::string> {
     if (frame) {
       const auto value = frame_value(log, trace, event, key, scope);
-      if (value.missing()) return std::nullopt;
+      if (value.missing()) {
+        if (resource ? nat_resource : nat_activity) return std::string("NaT");
+        return std::nullopt;
+      }
       return (resource ? frame_names : frame_activity_names).name(value);
     }
     auto value = selected_value(event, key, resource);
     if (value.empty()) return std::nullopt;
     return value;
   };
-  const bool joint = options.variant == OrganizationalSnaVariant::kJointActivities ||
-                     options.variant == OrganizationalSnaVariant::kJointActivitiesPandas;
   if (frame) {
     const auto keys = frame_keys(log, scope);
-    require_frame_key(keys, options.resource_attribute);
-    if (joint) require_frame_key(keys, options.activity_attribute);
-    if (case_id_variant(options.variant)) require_frame_key(keys, options.case_id_attribute);
-    const bool drop_missing = options.variant == OrganizationalSnaVariant::kJointActivitiesPandas;
-    std::set<FrameValueClass> resource_classes, activity_classes;
+    if (case_id_variant(options.variant)) {
+      // These variants group the frame by the case column first, then
+      // select the resource column of the groups (pandas' 'Column not
+      // found'; round BC, observed black-box).
+      require_frame_key(keys, options.case_id_attribute);
+      if (!keys.contains(options.resource_attribute))
+        throw std::invalid_argument("KeyError: 'Column not found: " + options.resource_attribute + "'");
+    } else {
+      require_frame_key(keys, options.resource_attribute);
+      if (joint) require_frame_key(keys, options.activity_attribute);
+    }
+    const auto cell = [&](const Trace& trace, const Event& event, const std::string& key) {
+      return frame_scalar(log, trace, event, key, scope);
+    };
+    // A missing cell sorts as NaN, except a datetime column's NaT, which
+    // orders with nothing.
+    const auto sorted_cell = [&](const std::optional<python::Scalar>& value, const std::string& key)
+        -> std::optional<python::Scalar> {
+      if (value) return value;
+      if (frame_column_type(log, key) == DataFrameColumnType::kDate) return std::nullopt;
+      return python::real(std::numeric_limits<double>::quiet_NaN());
+    };
+    if (case_id_variant(options.variant) &&
+        frame_column_type(log, options.resource_attribute) != DataFrameColumnType::kDate) {
+      // A datetime column's Timestamps and NaT always compare.
+      std::vector<std::vector<python::Scalar>> case_keys;
+      std::vector<python::Scalar> resources;
+      for (const auto& trace : log.traces)
+        for (const auto& event : trace.events)
+          if (const auto case_cell = frame_row_scalar(log, trace, event, options.case_id_attribute)) {
+            case_keys.push_back({*case_cell});
+            resources.push_back(cell(trace, event, options.resource_attribute)
+                                    .value_or(python::real(std::numeric_limits<double>::quiet_NaN())));
+          }
+      std::vector<std::vector<python::Scalar>> sequences;
+      try {
+        for (const auto& group : python::groupby(case_keys)) {
+          auto& sequence = sequences.emplace_back();
+          for (const auto row : group.rows) sequence.push_back(resources[row]);
+        }
+      } catch (const python::TypeError&) {
+        sequences.clear();  // the case column's own sort error is not modelled here
+      }
+      require_sortable_variants(sequences);
+    }
+    std::vector<python::Scalar> resource_values, activity_values;
     for (const auto& trace : log.traces)
       for (const auto& event : trace.events) {
-        const auto resource = frame_value(log, trace, event, options.resource_attribute, scope);
+        const auto resource = cell(trace, event, options.resource_attribute);
         if (joint) {
-          const auto activity = frame_value(log, trace, event, options.activity_attribute, scope);
-          if (drop_missing && (resource.missing() || activity.missing())) continue;
-          activity_classes.insert(activity.value_class);
+          const auto activity = cell(trace, event, options.activity_attribute);
+          if (drop_missing && (!resource || !activity)) continue;
+          if (const auto value = sorted_cell(activity, options.activity_attribute)) activity_values.push_back(*value);
         }
-        if (drop_missing && resource.missing()) continue;
-        resource_classes.insert(resource.value_class);
+        if (drop_missing && !resource) continue;
+        if (const auto value = sorted_cell(resource, options.resource_attribute)) resource_values.push_back(*value);
       }
-    require_sortable_classes(resource_classes);
-    if (joint) require_sortable_classes(activity_classes);
+    const auto object_column = [&](const std::string& key) {
+      return frame_column_type(log, key) == DataFrameColumnType::kObject;
+    };
+    require_sortable(resource_values, object_column(options.resource_attribute));
+    if (joint) require_sortable(activity_values, object_column(options.activity_attribute));
   }
 
   OrganizationalSnaResult result;
@@ -353,10 +480,10 @@ OrganizationalSnaResult discover_organizational_sna(
           const auto ai = activity_ids.find(*activity);
           if (ri != ids.end() && ai != activity_ids.end()) vectors[ri->second][ai->second] += 1.0;
         }
-      // pearsonr rejects vectors shorter than two activities.
+      // pearsonr rejects vectors shorter than two activities (scipy's
+      // message; round BC, observed black-box).
       if (vectors.size() > 1 && activities.size() < 2)
-        throw std::invalid_argument(
-            "organizational SNA joint activities needs at least two activities");
+        throw std::invalid_argument("ValueError: `x` and `y` must have length at least 2.");
       for (std::size_t a = 0; a < vectors.size(); ++a) {
         for (std::size_t b = a + 1; b < vectors.size(); ++b) {
           const auto& x = vectors[a];
