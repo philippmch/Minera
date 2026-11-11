@@ -17,6 +17,7 @@
 #include "minera/cancellation.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
+#include "business_hours.hpp"
 
 namespace minera {
 namespace {
@@ -186,49 +187,13 @@ std::optional<double> local_wall_instant(std::string_view text) {
   return parse_timestamp(text.substr(0, end));
 }
 
-double active_segment(double start, double end,
-                      const std::vector<BusinessHourSlot>& slots) {
-  double total = 0.0;
-  for (const auto& slot : slots) {
-    const double left = std::max(start, slot.start_seconds);
-    const double right = std::min(end, slot.end_seconds);
-    if (right > left) total += right - left;
-  }
-  return total;
-}
-
+// pm4py's BusinessHours on microsecond wall clocks
+// (detail::business_elapsed_seconds_microseconds); an epoch double holds its
+// microsecond exactly enough for rounding to recover it (review AY1).
 double business_elapsed(double source, double target,
                         const std::vector<BusinessHourSlot>& slots) {
-  if (target <= source || slots.empty()) return 0.0;
-  // Unix epoch day zero is Thursday. Shift by three days so quotient
-  // boundaries are Monday 00:00, matching BusinessHourSlot's coordinate
-  // system, including for dates before 1970.
-  constexpr double kEpochToMonday = 3.0 * 86400.0;
-  const double adjusted_source = source + kEpochToMonday;
-  const double adjusted_target = target + kEpochToMonday;
-  const long long source_week = static_cast<long long>(
-      std::floor(adjusted_source / kWeekSeconds));
-  const long long target_week = static_cast<long long>(
-      std::floor(adjusted_target / kWeekSeconds));
-  const double source_offset =
-      adjusted_source - source_week * kWeekSeconds;
-  const double target_offset =
-      adjusted_target - target_week * kWeekSeconds;
-  const double full_week_seconds = [&] {
-    double total = 0.0;
-    for (const auto& slot : slots) total += slot.end_seconds - slot.start_seconds;
-    return total;
-  }();
-  if (source_week == target_week) {
-    return active_segment(source_offset, target_offset, slots);
-  }
-  const auto full_weeks = target_week - source_week - 1;
-  double total = active_segment(source_offset, kWeekSeconds, slots) +
-                 active_segment(0.0, target_offset, slots);
-  if (full_weeks > 0) {
-    total += static_cast<double>(full_weeks) * full_week_seconds;
-  }
-  return total;
+  return detail::business_elapsed_seconds_microseconds(std::llround(source * 1e6),
+                                                       std::llround(target * 1e6), slots);
 }
 
 double elapsed_between(double source, double target,

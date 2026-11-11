@@ -18,6 +18,7 @@
 #include <utility>
 
 #include "minera/timestamp.hpp"
+#include "business_hours.hpp"
 #include "full_double.hpp"
 #include "performance_arithmetic.hpp"
 
@@ -757,40 +758,13 @@ std::optional<double> local_wall_timestamp(const std::string& text) {
   return parse_timestamp(std::string_view(text).substr(0, end));
 }
 
-double active_segment(double begin, double end,
-                      const std::vector<BusinessHourSlot>& slots) {
-  double total = 0.0;
-  for (const auto& slot : slots) {
-    const double overlap_begin = std::max(begin, slot.start_seconds);
-    const double overlap_end = std::min(end, slot.end_seconds);
-    if (overlap_end > overlap_begin) total += overlap_end - overlap_begin;
-  }
-  return total;
-}
-
+// pm4py's BusinessHours on microsecond wall clocks
+// (detail::business_elapsed_seconds_microseconds); an epoch double holds its
+// microsecond exactly enough for rounding to recover it (review AY1).
 double business_elapsed(double begin, double end,
                         const std::vector<BusinessHourSlot>& slots) {
-  if (end <= begin || slots.empty()) return 0.0;
-  constexpr double epoch_to_monday = 3.0 * kDaySeconds;
-  const double adjusted_begin = begin + epoch_to_monday;
-  const double adjusted_end = end + epoch_to_monday;
-  const auto begin_week = static_cast<long long>(
-      std::floor(adjusted_begin / kWeekSeconds));
-  const auto end_week =
-      static_cast<long long>(std::floor(adjusted_end / kWeekSeconds));
-  const double begin_offset =
-      adjusted_begin - static_cast<double>(begin_week) * kWeekSeconds;
-  const double end_offset =
-      adjusted_end - static_cast<double>(end_week) * kWeekSeconds;
-  if (begin_week == end_week)
-    return active_segment(begin_offset, end_offset, slots);
-  double weekly_total = 0.0;
-  for (const auto& slot : slots) weekly_total += slot.end_seconds - slot.start_seconds;
-  double total = active_segment(begin_offset, kWeekSeconds, slots) +
-                 active_segment(0.0, end_offset, slots);
-  const auto full_weeks = end_week - begin_week - 1;
-  if (full_weeks > 0) total += static_cast<double>(full_weeks) * weekly_total;
-  return total;
+  return detail::business_elapsed_seconds_microseconds(std::llround(begin * 1e6),
+                                                       std::llround(end * 1e6), slots);
 }
 
 // Polars measures a flow in whole seconds: Duration.total_seconds() truncates

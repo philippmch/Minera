@@ -7784,7 +7784,7 @@ std::string network_analysis_json(const NetworkAnalysisResult& result) {
     // groups "" like any other string); only a count of zero is malformed.
     if (edge.count == 0 ||
         std::any_of(edge.performance.begin(), edge.performance.end(),
-                    [](double value) { return !std::isfinite(value); }))
+                    [](double value) { return std::isinf(value); }))
       throw std::invalid_argument("network analysis edge is invalid");
     links += edge.count;
     performance_values += edge.performance.size();
@@ -7807,7 +7807,9 @@ std::string network_analysis_json(const NetworkAnalysisResult& result) {
     out << ",\"count\":" << e.count << ",\"performance\":[";
     for (std::size_t j = 0; j < e.performance.size(); ++j) {
       if (j) out << ',';
-      out << std::setprecision(17) << e.performance[j];
+      // A NaT in a joined row is pandas' NaN difference (review AY1-3).
+      if (std::isnan(e.performance[j])) out << "null";
+      else out << std::setprecision(17) << e.performance[j];
     }
     out << "]}";
   }

@@ -4,6 +4,7 @@
 #include "minera/pandas_attribute_repetition_filter.hpp"
 #include "minera/polars_attribute_repetition_filter.hpp"
 #include "minera/xes_event_log_importer.hpp"
+#include "../zone_database.hpp"
 
 #include <cassert>
 #include <sstream>
@@ -119,8 +120,14 @@ void polars_named_zone_literals_compare_only_with_the_same_zone() {
   auto missing = options;
   missing.case_id_key = std::string("rd-missing");
   const auto plan = polars_error([&] { (void)filter_polars_attribute_value_repetition(berlin, named, missing); });
+#if defined(_MSC_VER)
+  // MSVC's abbreviations come from the system ICU locale (declared, AY1).
+  const std::string zone = minera::zone_database::info_at_utc("Europe/Berlin", 1635647400).abbrev;
+#else
+  const std::string zone = "CET";
+#endif
   assert(plan.type == "ColumnNotFoundError" &&
-         plan.message.find("FILTER col(\"concept:name\") == 2021-10-31 03:30:00 CET\n") != std::string::npos);
+         plan.message.find("FILTER col(\"concept:name\") == 2021-10-31 03:30:00 " + zone + "\n") != std::string::npos);
   // A fixed offset becomes a UTC literal, which a Berlin column cannot compare.
   const auto fixed = polars_error([&] {
     (void)filter_polars_attribute_value_repetition(berlin, target(R"({"type":"date","value":"2021-10-31T03:30:00+01:00"})"), options);

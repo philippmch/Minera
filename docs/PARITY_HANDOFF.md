@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–AX (2026-11-05 to 2026-11-10, cloud container)
+## Review-fix loop, rounds T–AY (2026-11-05 to 2026-11-11, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4376,7 +4376,61 @@ checks, a use after free in a DFG test, last-bit libm differences of the
 classic DFG playout (declared) and a cancellation test that timed `-O0`
 copies.
 
-Next round (AY) should start by re-reviewing round AX:
+Round AY fixed the ten Windows test failures of AX's CI run (Review AY2:
+the process time zone behind `local_time.{hpp,cpp}` with an IANA `TZ`
+read through the zone database on Windows, 8 MiB stacks and 256 MiB for
+tests, `cmd /c` quoting, `ntpath` separators, MSVC's 32-bit
+`std::chrono::minutes`; ICU zone abbreviations declared), and re-reviewed
+network analysis on uploads (AX's open XES seed 59: the sort fails before
+the merge checks; a NaT in a joined row is a NaN kept in the list, JSON
+`null`). The new area was business hours: network analysis runs pm4py's
+row-wise `BusinessHours` apply with its errors, every time statistic now
+shares one `BusinessHours.get_seconds` model (the old segment sum differed
+on 752 of 30,000 pairs), and case arrival on frames ignores business hours
+as pm4py's pandas variant does. Details: Review AY1. mingw-w64 with Wine
+reproduced the Windows failures that are not MSVC-specific.
+
+Next round (AZ) should start by re-reviewing round AY:
+
+- `business_durations` and `local_wall_micros` in
+  `src/backend/network_analysis.cpp` (the row-wise apply, its error order
+  against the sort and merge checks, the NaN differences and
+  `network_analysis_json`'s `null`, the frontend validators and the
+  organizational workbench tables);
+- `detail::business_elapsed_seconds_microseconds` (`business_hours.hpp`)
+  through its consumers on the EventLog paths, which AY swept only on
+  frames: service time, the DFG performance, heuristics, the temporal
+  profile, OCDFG edge performance, token-replay durations, OCEL
+  statistics, with fractional slots and cross-week gaps;
+- `local_time.{hpp,cpp}` (CPython's fold-0 search, `wall_seconds` on
+  Windows through the zone database) and its three callers; only CI shows
+  the Windows side;
+- `case_arrival.cpp`: frames ignore business hours, logs keep them;
+- the CI run of the AY commit: Windows should now pass ctest; any failure
+  there is a finding.
+
+Found in AY's sweeps and not yet fixed (CSV uploads of `aysweep.py`, the
+same on round AX's server): local diagnostics on an upload without
+`org:resource` raises `KeyError: 'org:resource'` where pm4py raises
+`KeyError: 'org:group'` (default options, seeds 231 and 301) or
+`ZeroDivisionError: float division by zero` (another group column, seeds
+231 and 324); resource profiles' `average_duration_activity` with a
+`resource` column and a text start column raises the `.dt` accessor error
+where pm4py returns 0.0 (seed 324). pm4py tolerates the missing resource
+column in odd ways: with an `org:group` column it returns groups keyed by
+single characters (probe: `ldprobe_ay.py` in the round's harness).
+
+Candidate new areas: business hours on the EventLog paths; CPython's
+`year 0 is out of range` for `datetime(1, 1, 1).timestamp()` in a zone
+east of UTC (Minera returns a value); `long` (32-bit on Windows) in
+`trace_attribute_reference.cpp`; the ASan/UBSan pass if AY's did not
+finish (see the round's summary). Still open from earlier rounds: the
+trace-based selection of mixed-type and bool-with-gaps keys by Python set
+order (AQ, AV1). Harness: `review-harness/round-ay/` (README there).
+
+Round AX's targets (AY took the CI run, network analysis and business
+hours from this list, findings AY1 and AY2; the column subtraction, passed
+time, case statistics and NaN-cell items carry over to AZ):
 
 - `frame_times::column_subtraction` in `src/backend/frame_times.cpp` and
   its callers: the `slots.empty()` branch of `frame_service_durations`

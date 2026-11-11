@@ -1077,6 +1077,9 @@ describe("isNetworkAnalysisResult", () => {
   it("accepts deterministic edge rows", () => expect(isNetworkAnalysisResult(valid)).toBe(true));
   it("rejects an unknown adapter variant", () => expect(isNetworkAnalysisResult({ ...valid, variant: "log" })).toBe(false));
   it("rejects negative diagnostics", () => expect(isNetworkAnalysisResult({ ...valid, diagnostics: { ...valid.diagnostics, row_count: -1 } })).toBe(false));
+  // pandas' NaN difference of a joined row with a NaT stays in the list (review AY1-3).
+  it("accepts a null performance value", () => expect(isNetworkAnalysisResult({ ...valid, edges: [{ ...valid.edges[0], performance: [null] }] })).toBe(true));
+  it("rejects a text performance value", () => expect(isNetworkAnalysisResult({ ...valid, edges: [{ ...valid.edges[0], performance: ["NaN"] }] })).toBe(false));
 });
 
 describe("isClusteringResult", () => {

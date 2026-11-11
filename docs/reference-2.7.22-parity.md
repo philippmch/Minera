@@ -22412,3 +22412,98 @@ Minera's `std::log` and `std::exp` match on Linux; on Apple's libm (5 of
 2,286 traces on the CI runner) and other C libraries both can be one or two
 units in the last place away, so the test accepts a probability within 4
 units in the last place off glibc and counts it.
+
+## Review AY1: network analysis on uploads, business hours and the process time zone (2026-11-11)
+
+Round AY re-reviewed network analysis on CSV and XES uploads (AX1 had left
+one error order open, XES seed 59 of `atsweep2.py`), took business hours in
+network analysis and on the other frame paths as the new area (cross-week
+gaps, microsecond fractions, unsorted, overlapping and fractional slots),
+and moved the process time zone behind one seam (see AY2). Findings, all
+fixed:
+
+- **AY1-1 Business hours in network analysis.** pm4py applies
+  `BusinessHours` row by row over the joined frame whatever the performance
+  flag, on the cells' wall clocks with the zone dropped
+  (`x.replace(tzinfo=None)`, the source cell first). Each week's seconds
+  since Monday are a float of the microseconds (nanoseconds are truncated);
+  the slots are sorted and merged where they touch. The apply's own errors
+  replace the subtraction checks: a `str` cell fails with `TypeError:
+  str.replace() takes no keyword arguments`, another non-date with
+  `AttributeError: '<type>' object has no attribute 'replace'`, a NaT with
+  `ValueError: cannot convert float NaN to integer`, and no joined row at
+  all with `ValueError: Cannot set a DataFrame with multiple columns to the
+  single column @@timestamp_diff`. Minera computed the durations from epoch
+  doubles and checked the timestamp column first.
+- **AY1-2 The error order.** The sort fails before the merge checks: a
+  sorting column of floats and strings raises `'<' not supported between
+  instances of 'float' and 'str'` before the `@@index` and merge-key
+  checks (XES seed 59). The order is now missing columns, the sort, the
+  `@@index` and merge checks, then the business-hours apply or the
+  subtraction checks, then the groupby.
+- **AY1-3 NaN differences stay in the list.** A NaT on either side of a
+  joined row is pandas' NaN difference, which stays in the edge's
+  performance list (in the joined frame's order); Minera dropped it. The
+  native list now holds NaN, `network_analysis_json` writes it as `null`,
+  and the frontend validators accept `null` there.
+- **AY1-4 Case arrival on frames.** pm4py's pandas case arrival and
+  dispersion take no business-hours parameters, so on a frame (every
+  upload, or the pandas variant on a log) the gaps are plain differences
+  whatever is asked; Minera applied business hours there. The log variant
+  keeps them.
+- **AY1-5 One business-hours model.** The time statistics shared a
+  segment sum (`business_elapsed_microseconds` and per-module
+  `active_segment` helpers) that differed from `BusinessHours.get_seconds`
+  on 752 of 30,000 random pairs (cross-week gaps and fractional slot
+  bounds, checked against pm4py). Every consumer (service time, case
+  statistics, passed time, case arrival on logs, the DataFrame DFG, the
+  temporal profile, OCEL statistics, network analysis) now calls
+  `business_elapsed_seconds_microseconds` (`business_hours.hpp`). Swept on
+  300 CSV and 200 XES seeds of service time, case statistics, passed time
+  and case arrival with business hours always on and random slots in half
+  of the jobs: 0 differences; network analysis on 450 CSV and 450 XES
+  seeds (`aysweep.py`): see the handoff.
+- **AY1-6 The naive `datetime.timestamp()`** of the filters (paths, LTL,
+  the common filter bank) is CPython's fold-0 search (`local_to_seconds`):
+  in a gap the offset before it, in an overlap the first instant. The LTL
+  and paths filters called `mktime`, which glibc resolves the same way but
+  Windows' runtime does not (AY2-1); the common filter bank had its own
+  copy of the search. `local_time::naive_timestamp` now serves all three.
+
+`minera_review_ay1_tests` binds the values and messages above (taken from
+pm4py black-box on the same uploads, and from CPython under
+`TZ=Europe/Berlin`).
+
+## Review AY2: the first Windows test run (2026-11-11)
+
+Round AX's commit linked on Windows for the first time; 10 of 450 tests
+failed (run 42929542797). They were reproduced with mingw-w64 under Wine
+where the cause is not specific to MSVC. Findings, all fixed:
+
+- **AY2-1 The process time zone.** Windows' C runtime reads only the
+  POSIX `EST5EDT` form of `TZ` (with US rules) and parses an IANA name as
+  garbage, and its `localtime_s` refuses instants before 1970. On Windows
+  an IANA name in `TZ` now goes through the time-zone database
+  (`local_time.cpp`); without `TZ` every platform uses its C library. The
+  LTL filter and workbench tests and the common filter bank failed on it.
+- **AY2-2 Stack size.** Windows reserves the executable's `/STACK` for
+  every thread, 1 MiB by default, where Linux and macOS give 8 MiB.
+  Executables now reserve 8 MiB, and test executables 256 MiB: the
+  generated fixture tables of the token-replay arc-order and
+  case-relations banks build their cases in one function, whose frame MSVC
+  keeps whole at `/Od` (both segfaulted).
+- **AY2-3 `std::system` on Windows** runs `cmd /c`, which strips the outer
+  quotes of a command that starts with a quoted path; the evaluation
+  regression test now quotes the whole command once more.
+- **AY2-4 Image file names in the LLM connectors** take both separators on
+  Windows, as `ntpath.basename` does.
+- **AY2-5 MSVC's `std::chrono::minutes` holds an `int`**, which overflows
+  after the year 6053: the CSV timestamp branch that moves a large offset's
+  instant to -14:00 or +14:00 (`9999-12-31T20:00:00-15:00`) computed in
+  those minutes. It now uses 64-bit minutes.
+
+Declaration: MSVC's `std::chrono` time-zone database takes abbreviations
+from ICU in the user's locale (`GMT+2` where the IANA database says
+`CEST`), so a zone abbreviation in a Windows build's text can differ from
+pm4py's; offsets and instants are the same. The tests accept any
+non-empty abbreviation on MSVC.

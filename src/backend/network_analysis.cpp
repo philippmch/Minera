@@ -4,6 +4,7 @@
 #include <charconv>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -12,6 +13,7 @@
 #include <tuple>
 #include <variant>
 
+#include "business_hours.hpp"
 #include "frame_cells.hpp"
 #include "frame_times.hpp"
 #include "minera/dataframe_columns.hpp"
@@ -210,34 +212,13 @@ std::optional<double> instant(const Reader& reader, const Event& e, const Trace*
   return parse_timestamp(*v);
 }
 
-std::optional<double> local_wall(std::string_view text) {
-  if (!parse_timestamp(text)) return std::nullopt;
-  std::size_t end = text.size();
-  while (end && std::isspace(static_cast<unsigned char>(text[end - 1]))) --end;
-  const auto tz = text.substr(0, end).find_first_of("Zz+-", 10);
-  if (tz != std::string_view::npos) end = tz;
-  return parse_timestamp(text.substr(0, end));
-}
-
-double active(double left, double right, const std::vector<BusinessHourSlot>& slots) {
-  double total = 0.0;
-  for (const auto& s : slots) total += std::max(0.0, std::min(right, s.end_seconds) - std::max(left, s.start_seconds));
-  return total;
-}
-
-double business_elapsed(double source, double target, const std::vector<BusinessHourSlot>& slots) {
-  if (target <= source) return 0.0;
-  constexpr double shift = 3.0 * 86400.0;
-  const double a = source + shift, b = target + shift;
-  const auto wa = static_cast<long long>(std::floor(a / kWeekSeconds));
-  const auto wb = static_cast<long long>(std::floor(b / kWeekSeconds));
-  const double oa = a - wa * kWeekSeconds, ob = b - wb * kWeekSeconds;
-  double full = 0.0;
-  for (const auto& s : slots) full += s.end_seconds - s.start_seconds;
-  if (wa == wb) return active(oa, ob, slots);
-  double total = active(oa, kWeekSeconds, slots) + active(0.0, ob, slots);
-  if (wb - wa > 1) total += static_cast<double>(wb - wa - 1) * full;
-  return total;
+// The wall clock of a timestamp text in microseconds, its offset dropped
+// (the event-log path: the converted frame keeps each event's own zone).
+std::optional<std::int64_t> local_wall_micros(std::string_view text) {
+  const auto parsed = parse_timestamp_exact(text);
+  if (!parsed) return std::nullopt;
+  const std::int64_t wall = parsed->seconds + std::int64_t{parsed->offset_minutes} * 60;
+  return wall * 1000000 + parsed->nanoseconds / 1000;
 }
 
 struct Ref {
@@ -434,6 +415,63 @@ void require_timestamp_column(const EventLog& frame, const Reader& reader, const
   throw std::invalid_argument("network analysis: AttributeError: Can only use .dt accessor with datetimelike values");
 }
 
+// The business-hour durations of the joined rows (observed black-box). On
+// the DataFrame path pandas applies, row by row in the joined order, the
+// source cell's .replace(tzinfo=None) and then the target's: a str fails
+// ("takes no keyword arguments"), any other non-date has no attribute
+// 'replace', and a NaT fails in BusinessHours afterwards. The wall clocks
+// are the frame's (UTC) dates truncated to microseconds. On the event-log
+// path each timestamp keeps its own wall clock and a pair without two
+// readable timestamps has no duration. Either way a join of no rows cannot
+// take the applied (empty) frame as its column, performance or not.
+std::vector<std::optional<double>> business_durations(const EventLog& log, const Reader& reader, const std::string& key,
+                                                      const std::vector<Ref>& refs,
+                                                      const std::vector<const Ref*>& successors,
+                                                      const std::vector<BusinessHourSlot>& slots) {
+  if (std::none_of(successors.begin(), successors.end(), [](const Ref* ref) { return ref != nullptr; }))
+    throw std::invalid_argument(
+        "network analysis: ValueError: Cannot set a DataFrame with multiple columns to the single column "
+        "@@timestamp_diff");
+  std::vector<std::optional<double>> durations(refs.size());
+  if (!reader.frame) {
+    for (std::size_t i = 0; i < refs.size(); ++i) {
+      if (!successors[i]) continue;
+      const auto st = value(reader, *refs[i].event, refs[i].trace, key);
+      const auto et = value(reader, *successors[i]->event, successors[i]->trace, key);
+      const auto from = st ? local_wall_micros(*st) : std::nullopt;
+      const auto to = et ? local_wall_micros(*et) : std::nullopt;
+      if (from && to) durations[i] = detail::business_elapsed_seconds_microseconds(*from, *to, slots);
+    }
+    return durations;
+  }
+  const bool date_column = frame_dtype(log, key).kind == FrameDtype::Kind::kDate;
+  const auto wall = [&](const Ref& ref) -> std::optional<std::int64_t> {
+    using Kind = python::Scalar::Kind;
+    const auto cell = reader.typed(*ref.event, ref.trace, key);
+    if (!cell || python::is_missing(*cell)) {
+      if (date_column) return std::nullopt;  // NaT
+      throw std::invalid_argument("network analysis: AttributeError: '" +
+                                  std::string(cell ? python::type_name(*cell) : "float") +
+                                  "' object has no attribute 'replace'");
+    }
+    if (cell->kind == Kind::kDate)
+      return (cell->date.seconds + std::int64_t{cell->date.offset_minutes} * 60) * 1000000 +
+             cell->date.nanoseconds / 1000;
+    if (cell->kind == Kind::kText)
+      throw std::invalid_argument("network analysis: TypeError: str.replace() takes no keyword arguments");
+    throw std::invalid_argument("network analysis: AttributeError: '" + python::type_name(*cell) +
+                                "' object has no attribute 'replace'");
+  };
+  for (std::size_t i = 0; i < refs.size(); ++i) {
+    if (!successors[i]) continue;
+    const auto from = wall(refs[i]);
+    const auto to = wall(*successors[i]);
+    if (!from || !to) throw std::invalid_argument("network analysis: ValueError: cannot convert float NaN to integer");
+    durations[i] = detail::business_elapsed_seconds_microseconds(*from, *to, slots);
+  }
+  return durations;
+}
+
 }  // namespace
 
 NetworkAnalysisResult discover_network_analysis(const EventLog& input, const NetworkAnalysisOptions& o) {
@@ -458,14 +496,6 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
   }
   const EventLog& log = reader.frame ? *reader.frame : input;
   require_columns(log, o, reader.frame ? &frame_columns : nullptr);
-  if (reader.frame && log.event_count() != 0) {
-    // format_dataframe's @@index is a second column of that name beside
-    // the one the merge adds.
-    for (const auto* relation : {&o.out_relation_attribute, &o.in_relation_attribute})
-      if (*relation == "@@index" && log.dataframe_columns->csv_text)
-        throw std::invalid_argument("network analysis: ValueError: The column label '@@index' is not unique.");
-    require_mergeable(log, o.out_relation_attribute, o.in_relation_attribute);
-  }
   const auto slots = o.business_hours ? normalized_slots(o) : std::vector<BusinessHourSlot>{};
   NetworkAnalysisResult result;
   result.variant = o.variant;
@@ -498,6 +528,16 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
   for (const auto i : missing) sorted.push_back(std::move(refs[i]));
   refs = std::move(sorted);
   for (std::size_t i = 0; i < refs.size(); ++i) refs[i].index = i;
+  // The merge checks follow the sort: a sorting column pandas cannot order
+  // fails first (review AY1-2).
+  if (reader.frame && log.event_count() != 0) {
+    // format_dataframe's @@index is a second column of that name beside
+    // the one the merge adds.
+    for (const auto* relation : {&o.out_relation_attribute, &o.in_relation_attribute})
+      if (*relation == "@@index" && log.dataframe_columns->csv_text)
+        throw std::invalid_argument("network analysis: ValueError: The column label '@@index' is not unique.");
+    require_mergeable(log, o.out_relation_attribute, o.in_relation_attribute);
+  }
   std::vector<const Ref*> successors(refs.size(), nullptr);
   std::map<std::string, const Ref*> next_by_relation;
   for (std::size_t i = refs.size(); i-- > 0;) {
@@ -506,6 +546,9 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
     if (target != next_by_relation.end()) successors[i] = target->second;
     next_by_relation[relation_key(reader, *refs[i].event, refs[i].trace, o.in_relation_attribute)] = &refs[i];
   }
+  const auto business = o.business_hours
+      ? business_durations(log, reader, o.timestamp_attribute, refs, successors, slots)
+      : std::vector<std::optional<double>>{};
   // Each link is a row of the joined frame; the edges are its groupby over
   // (source, target, edge), with pandas' typed key identity and labels.
   struct Link {
@@ -534,28 +577,33 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
     Link link;
     ++result.diagnostics.link_count;
     if (o.include_performance) {
-      const auto st = instant(reader, *source.event, source.trace, o.timestamp_attribute);
-      const auto tt = instant(reader, *target->event, target->trace, o.timestamp_attribute);
-      if (st && tt) {
-        double duration = o.business_hours
-            ? business_elapsed(local_wall(value(reader, *source.event, source.trace, o.timestamp_attribute).value_or("")).value_or(*st), local_wall(value(reader, *target->event, target->trace, o.timestamp_attribute).value_or("")).value_or(*tt), slots)
-            : (*tt - *st);
+      std::optional<double> duration;
+      if (o.business_hours) {
+        duration = business[source_index];
+      } else {
+        const auto st = instant(reader, *source.event, source.trace, o.timestamp_attribute);
+        const auto tt = instant(reader, *target->event, target->trace, o.timestamp_attribute);
+        // A NaT on either side of the joined row is pandas' NaN difference,
+        // which stays in the edge's list (review AY1-3).
+        duration = st && tt ? *tt - *st : std::numeric_limits<double>::quiet_NaN();
         // The frame's dates subtract exactly, as Timedelta.total_seconds.
-        if (reader.frame && !o.business_hours) {
+        if (duration && reader.frame) {
           const auto from = reader.typed(*source.event, source.trace, o.timestamp_attribute);
           const auto to = reader.typed(*target->event, target->trace, o.timestamp_attribute);
           if (from && to && from->kind == python::Scalar::Kind::kDate && to->kind == python::Scalar::Kind::kDate)
             duration = frame_times::total_seconds(from->date, to->date);
         }
-        if (std::isfinite(duration) && result.diagnostics.performance_value_count < o.max_values) {
-          link.duration = duration;
+      }
+      if (duration) {
+        if (result.diagnostics.performance_value_count < o.max_values) {
+          link.duration = *duration;
           ++result.diagnostics.performance_value_count;
         } else if (result.diagnostics.performance_value_count >= o.max_values) result.diagnostics.output_truncated = true;
       }
     }
     links.push_back(link);
   }
-  if (reader.frame && log.event_count() != 0)
+  if (reader.frame && log.event_count() != 0 && !o.business_hours)
     require_timestamp_column(log, reader, o.timestamp_attribute, refs, successors);
   std::vector<python::Group> groups;
   try {

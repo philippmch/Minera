@@ -25,6 +25,18 @@ bool missing_backward_link(std::string_view zone) {
   }
 }
 
+// MSVC's database takes abbreviations from the system ICU in the user's
+// locale ("GMT+2" or "MEZ" for CEST; declared, review AY1); offsets and
+// transitions are IANA's everywhere.
+bool abbreviation_is(const zd::SysInfo& info, std::string_view expected) {
+#if defined(_MSC_VER)
+  (void)expected;
+  return !info.abbrev.empty();
+#else
+  return info.abbrev == expected;
+#endif
+}
+
 // 2021-03-28 and 2021-10-31 are Europe/Berlin's DST transitions.
 constexpr std::int64_t kMarch28 = 1616889600;    // 2021-03-28T00:00:00 (wall)
 constexpr std::int64_t kOctober31 = 1635638400;  // 2021-10-31T00:00:00 (wall)
@@ -55,8 +67,8 @@ void iana_zones() {
   assert(new_york && new_york->offset_minutes == -240);
 
   const auto utc_info = zd::info_at_utc("Europe/Berlin", kJuly15);
-  assert(utc_info.offset_seconds == 7200 && utc_info.abbrev == "CEST");
-  assert(zd::info_at_utc("Europe/Berlin", kJanuary15).abbrev == "CET");
+  assert(utc_info.offset_seconds == 7200 && abbreviation_is(utc_info, "CEST"));
+  assert(abbreviation_is(zd::info_at_utc("Europe/Berlin", kJanuary15), "CET"));
 }
 
 void dst_gap_and_overlap() {
@@ -81,7 +93,7 @@ void recurring_rules_after_2037() {
   constexpr std::int64_t kJuly15_2038 = 2162808000;     // 12:00 UTC
   constexpr std::int64_t kJanuary15_2038 = 2147169600;  // 12:00 UTC
   auto at = zd::info_at_utc("Europe/Berlin", kJuly15_2038);
-  assert(at.offset_seconds == 7200 && at.abbrev == "CEST");
+  assert(at.offset_seconds == 7200 && abbreviation_is(at, "CEST"));
   assert(zd::info_at_utc("America/New_York", kJuly15_2038).offset_seconds == -4 * 3600);
   assert(zd::info_at_utc("Australia/Sydney", kJuly15_2038).offset_seconds == 10 * 3600);
   assert(zd::info_at_utc("Australia/Sydney", kJanuary15_2038).offset_seconds == 11 * 3600);

@@ -307,7 +307,8 @@ export interface OrganizationalSnaOptions {
   sna_metric_normalization?: boolean; sna_max_resources?: number; sna_max_edges?: number;
 }
 
-export interface NetworkAnalysisEdge { source: string; target: string; activity: string; count: number; performance: number[]; }
+/** A null performance value is pandas' NaN difference of a joined row with a NaT. */
+export interface NetworkAnalysisEdge { source: string; target: string; activity: string; count: number; performance: Array<number | null>; }
 export interface NetworkAnalysisDiagnostics { computed: boolean; output_truncated: boolean; trace_count: number; event_count: number; link_count: number; row_count: number; performance_value_count: number; message: string; }
 export type NetworkAnalysisVariant = "dataframe";
 export interface NetworkAnalysisResult { family: "NETWORK_ANALYSIS"; variant: NetworkAnalysisVariant; edges: NetworkAnalysisEdge[]; diagnostics: NetworkAnalysisDiagnostics; }
@@ -324,7 +325,7 @@ export function isNetworkAnalysisResult(value: unknown): value is NetworkAnalysi
   if (!value || typeof value !== "object") return false;
   const v = value as Partial<NetworkAnalysisResult>;
   if (v.family !== "NETWORK_ANALYSIS" || v.variant !== "dataframe" || !Array.isArray(v.edges) || !v.diagnostics) return false;
-  if (!v.edges.every((e) => !!e && typeof e.source === "string" && typeof e.target === "string" && typeof e.activity === "string" && Number.isInteger(e.count) && e.count >= 0 && Array.isArray(e.performance) && e.performance.every((x) => typeof x === "number" && Number.isFinite(x)))) return false;
+  if (!v.edges.every((e) => !!e && typeof e.source === "string" && typeof e.target === "string" && typeof e.activity === "string" && Number.isInteger(e.count) && e.count >= 0 && Array.isArray(e.performance) && e.performance.every((x) => x === null || (typeof x === "number" && Number.isFinite(x))))) return false;
   const d = v.diagnostics as Partial<NetworkAnalysisDiagnostics>;
   const performanceCount = v.edges.reduce((sum, edge) => sum + edge.performance.length, 0);
   const linkCount = v.edges.reduce((sum, edge) => sum + edge.count, 0);

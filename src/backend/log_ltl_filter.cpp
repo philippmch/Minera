@@ -3,6 +3,7 @@
 #include "minera/token_integer.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
+#include "local_time.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -217,10 +218,13 @@ double epoch_timestamp(const EventAttribute& value) {
   if(parsed.timezone_aware)return static_cast<double>(parsed.seconds)+static_cast<double>(parsed.nanoseconds)/1e9;
   const auto* date=std::get_if<NativeDate>(&value.typed_value);
   const auto& source=date?date->value:value.value;
-  std::tm local{};local.tm_year=std::stoi(source.substr(0,4))-1900;local.tm_mon=std::stoi(source.substr(5,2))-1;
-  local.tm_mday=std::stoi(source.substr(8,2));local.tm_hour=source.size()>12?std::stoi(source.substr(11,2)):0;
-  local.tm_min=source.size()>15?std::stoi(source.substr(14,2)):0;local.tm_sec=source.size()>18?std::stoi(source.substr(17,2)):0;local.tm_isdst=-1;
-  return static_cast<double>(std::mktime(&local))+static_cast<double>(parsed.nanoseconds)/1e9;
+  // datetime.timestamp() of a naive value: CPython's fold-0 search in the
+  // process time zone; Windows' runtime refuses instants before 1970.
+  const auto seconds=local_time::naive_timestamp(local_time::civil_seconds(std::stoi(source.substr(0,4)),std::stoi(source.substr(5,2)),
+    std::stoi(source.substr(8,2)),source.size()>12?std::stoi(source.substr(11,2)):0,source.size()>15?std::stoi(source.substr(14,2)):0,
+    source.size()>18?std::stoi(source.substr(17,2)):0));
+  if(!seconds)fail("OSError","[Errno 22] Invalid argument");
+  return static_cast<double>(*seconds)+static_cast<double>(parsed.nanoseconds)/1e9;
 }
 EventAttribute boolean(bool value) {
   EventAttribute result{"",value?"true":"false",AttributeKind::kBoolean};result.typed_value=value;return result;

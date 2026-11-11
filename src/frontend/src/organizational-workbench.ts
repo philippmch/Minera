@@ -232,7 +232,7 @@ export function isOrganizationalWorkbenchResult(value: unknown, family?: Organiz
     if (value.variant !== "dataframe" || !Array.isArray(value.edges) || !diagnosticsShape(d, ["link_count", "row_count", "performance_value_count"])) return false;
     let links = 0n, performance = 0;
     for (const edge of value.edges) {
-      if (!object(edge) || !["source", "target", "activity"].every(key => typeof edge[key] === "string") || unsigned(edge, "count") === undefined || unsigned(edge, "count") === 0n || !Array.isArray(edge.performance) || !edge.performance.every((_, i) => numeric(edge.performance as unknown[], i) !== undefined)) return false;
+      if (!object(edge) || !["source", "target", "activity"].every(key => typeof edge[key] === "string") || unsigned(edge, "count") === undefined || unsigned(edge, "count") === 0n || !Array.isArray(edge.performance) || !edge.performance.every((x, i) => x === null || numeric(edge.performance as unknown[], i) !== undefined)) return false;
       links += unsigned(edge, "count")!; performance += edge.performance.length;
     }
     return equalCount(d, "row_count", value.edges.length) && (d.output_truncated ? unsigned(d, "link_count")! >= links && unsigned(d, "performance_value_count")! >= BigInt(performance) : equalCount(d, "link_count", links) && equalCount(d, "performance_value_count", performance));

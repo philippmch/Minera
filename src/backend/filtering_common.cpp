@@ -11,7 +11,7 @@
 #include <optional>
 
 #include "root_cause_unicode.hpp"
-#include "portable_time.hpp"
+#include "local_time.hpp"
 
 namespace minera {
 namespace {
@@ -195,62 +195,13 @@ int days_in_month(int year, int month) {
   return month == 2 && leap(year) ? 29 : days[month - 1];
 }
 
-// Days from 1970-01-01 of a proleptic Gregorian date.
-std::int64_t days_from_civil(std::int64_t y, unsigned m, unsigned d) {
-  y -= m <= 2;
-  const std::int64_t era = (y >= 0 ? y : y - 399) / 400;
-  const auto yoe = static_cast<unsigned>(y - era * 400);
-  const unsigned doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
-  const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-  return era * 146097 + static_cast<std::int64_t>(doe) - 719468;
-}
-
-std::int64_t wall_seconds(std::int64_t y, int m, int d, int hh, int mm, int ss) {
-  return days_from_civil(y, static_cast<unsigned>(m), static_cast<unsigned>(d)) * 86400 + hh * 3600 + mm * 60 + ss;
-}
-
-// local(u) of CPython's datetime: the wall clock of POSIX second u under the
-// process time zone, as seconds.
-std::int64_t local_wall(std::int64_t u) {
-  const auto t = static_cast<std::time_t>(u);
-  std::tm fields{};
-  if (!local_fields(t, fields)) fail("OverflowError", "timestamp out of range for platform time_t");
-  return wall_seconds(fields.tm_year + 1900LL, fields.tm_mon + 1, fields.tm_mday, fields.tm_hour, fields.tm_min,
-                      fields.tm_sec);
-}
-
-// datetime.timestamp() of a naive datetime (fold 0): CPython's local_to_seconds.
+// datetime.timestamp() of a naive datetime (fold 0): CPython's local_to_seconds
+// in the process time zone (local_time.hpp).
 double naive_timestamp(const FilteringDateTime& value) {
-  constexpr std::int64_t max_fold_seconds = 24 * 3600;
-  const std::int64_t t = wall_seconds(value.year, value.month, value.day, value.hour, value.minute, value.second);
-  const std::int64_t a = local_wall(t) - t;
-  const std::int64_t u1 = t - a;
-  const std::int64_t t1 = local_wall(u1);
-  std::int64_t b = 0;
-  std::int64_t seconds = 0;
-  bool done = false;
-  if (t1 == t) {
-    const std::int64_t u2 = u1 - max_fold_seconds;
-    b = local_wall(u2) - u2;
-    if (a == b) {
-      seconds = u1;
-      done = true;
-    }
-  } else {
-    b = t1 - u1;
-  }
-  if (!done) {
-    const std::int64_t u2 = t - b;
-    const std::int64_t t2 = local_wall(u2);
-    if (t2 == t) {
-      seconds = u2;
-    } else if (t1 == t) {
-      seconds = u1;
-    } else {
-      seconds = std::max(u1, u2);
-    }
-  }
-  return static_cast<double>(seconds) + value.microsecond / 1e6;
+  const auto seconds = local_time::naive_timestamp(local_time::civil_seconds(
+      value.year, value.month, value.day, value.hour, value.minute, value.second));
+  if (!seconds) fail("OverflowError", "timestamp out of range for platform time_t");
+  return static_cast<double>(*seconds) + value.microsecond / 1e6;
 }
 
 // ---------------------------------------------------------------- numerics

@@ -25,6 +25,11 @@ else()
   # "■" and "μs" literally; without /utf-8 MSVC reads them in the runner's
   # ANSI code page and re-encodes them (C4819), so read and emit UTF-8.
   add_compile_options(/bigobj /utf-8)
+  # Linux and macOS give the main thread 8 MiB of stack and glibc threads
+  # the same; Windows reserves the executable's /STACK for every thread,
+  # 1 MiB by default. Reserve the POSIX size so recursion depth limits agree
+  # (test executables reserve more below).
+  add_link_options(/STACK:8388608)
 endif()
 
 # Reuse earlier compilations when ccache is installed; a rebuild after a small
@@ -340,6 +345,7 @@ add_library(minera_core
   src/backend/secure_random.cpp
   src/backend/timestamp.cpp
   src/backend/zone_database.cpp
+  src/backend/local_time.cpp
   src/backend/temporal_profile.cpp
   src/backend/timestamp_interleavings.cpp
   src/backend/interleavings_merge.cpp
@@ -638,6 +644,14 @@ endif()
 
 if(MINERA_BUILD_TESTS)
   enable_testing()
+
+  # Generated fixture tables build their cases in one function; at /Od MSVC
+  # keeps every temporary in that frame (the case-relations and token-replay
+  # banks overflowed 8 MiB-class stacks on Windows), so test executables
+  # reserve 256 MiB. Only touched pages are committed.
+  if(MSVC)
+    set_property(DIRECTORY PROPERTY LINK_OPTIONS /STACK:268435456)
+  endif()
 
   # The tests are assert()-based; Release's -DNDEBUG would compile every
   # check away and leave the suite vacuously green. Re-enable assert for the
@@ -1235,6 +1249,11 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_review_ax1_tests PRIVATE cxx_std_20)
   target_compile_options(minera_review_ax1_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_ax1_tests COMMAND minera_review_ax1_tests)
+  add_executable(minera_review_ay1_tests src/backend/tests/test_review_ay1.cpp)
+  target_link_libraries(minera_review_ay1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_ay1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_ay1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_ay1_tests COMMAND minera_review_ay1_tests)
 
   add_executable(minera_resource_profiles_tests
     src/backend/tests/test_resource_profiles.cpp

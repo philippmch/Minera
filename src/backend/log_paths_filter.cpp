@@ -3,6 +3,7 @@
 #include "minera/timestamp.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
+#include "local_time.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -210,9 +211,11 @@ double timestamp(const EventAttribute& value) {
   auto seconds=parsed->seconds;
   if(!parsed->timezone_aware) {
     // Public datetime.timestamp() uses the host local zone for naive values.
-    std::tm local{};local.tm_year=std::stoi(text.substr(0,4))-1900;local.tm_mon=std::stoi(text.substr(5,2))-1;local.tm_mday=std::stoi(text.substr(8,2));
-    if(text.size()>=19){local.tm_hour=std::stoi(text.substr(11,2));local.tm_min=std::stoi(text.substr(14,2));local.tm_sec=std::stoi(text.substr(17,2));}
-    local.tm_isdst=-1;const auto resolved=std::mktime(&local);if(resolved==static_cast<std::time_t>(-1))throw std::invalid_argument("paths filter naive timestamp is outside the host calendar");seconds=static_cast<std::int64_t>(resolved);
+    // CPython's fold-0 search in the process time zone (local_time.hpp).
+    const bool clock=text.size()>=19;
+    const auto resolved=local_time::naive_timestamp(local_time::civil_seconds(std::stoi(text.substr(0,4)),std::stoi(text.substr(5,2)),std::stoi(text.substr(8,2)),
+      clock?std::stoi(text.substr(11,2)):0,clock?std::stoi(text.substr(14,2)):0,clock?std::stoi(text.substr(17,2)):0));
+    if(!resolved)throw std::invalid_argument("paths filter naive timestamp is outside the host calendar");seconds=*resolved;
   }
   return static_cast<double>(seconds*1000000+parsed->nanoseconds/1000)/1000000.0;
 }

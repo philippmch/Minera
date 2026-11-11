@@ -9,6 +9,7 @@
 #include <string_view>
 #include <tuple>
 
+#include "business_hours.hpp"
 #include "frame_times.hpp"
 #include "performance_arithmetic.hpp"
 #include "minera/timestamp.hpp"
@@ -100,42 +101,13 @@ std::optional<double> local_wall_timestamp(std::string_view text) {
   return parse_timestamp(text.substr(0, end));
 }
 
-double active_segment(double start, double end,
-                      const std::vector<BusinessHourSlot>& slots) {
-  double total = 0.0;
-  for (const auto& slot : slots) {
-    const double lo = std::max(start, slot.start_seconds);
-    const double hi = std::min(end, slot.end_seconds);
-    if (hi > lo) total += hi - lo;
-  }
-  return total;
-}
-
+// pm4py's BusinessHours on microsecond wall clocks
+// (detail::business_elapsed_seconds_microseconds); an epoch double holds its
+// microsecond exactly enough for rounding to recover it (review AY1).
 double business_elapsed(double start, double end,
                         const std::vector<BusinessHourSlot>& slots) {
-  if (end <= start || slots.empty()) return 0.0;
-  constexpr double epoch_to_monday = 3.0 * kDaySeconds;
-  const double adjusted_start = start + epoch_to_monday;
-  const double adjusted_end = end + epoch_to_monday;
-  const auto start_week = static_cast<long long>(
-      std::floor(adjusted_start / kWeekSeconds));
-  const auto end_week =
-      static_cast<long long>(std::floor(adjusted_end / kWeekSeconds));
-  const double start_offset =
-      adjusted_start - static_cast<double>(start_week) * kWeekSeconds;
-  const double end_offset =
-      adjusted_end - static_cast<double>(end_week) * kWeekSeconds;
-  if (start_week == end_week)
-    return active_segment(start_offset, end_offset, slots);
-  double weekly_total = 0.0;
-  for (const auto& slot : slots)
-    weekly_total += slot.end_seconds - slot.start_seconds;
-  double total = active_segment(start_offset, kWeekSeconds, slots) +
-                 active_segment(0.0, end_offset, slots);
-  const auto full_weeks = end_week - start_week - 1;
-  if (full_weeks > 0)
-    total += static_cast<double>(full_weeks) * weekly_total;
-  return total;
+  return detail::business_elapsed_seconds_microseconds(std::llround(start * 1e6),
+                                                       std::llround(end * 1e6), slots);
 }
 
 bool scalar_aggregation(DfgPerformanceAggregation aggregation) {

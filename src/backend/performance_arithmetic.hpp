@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "exact_mean.hpp"
+#include "business_hours.hpp"
 #include "exact_stdev.hpp"
 #include "minera/temporal_profile.hpp"
 #include "minera/timestamp.hpp"
@@ -213,45 +214,13 @@ inline PerformanceAggregates aggregate_performance(
 
 // Business seconds between two wall-clock instants given in exact
 // microseconds, against weekly slots (seconds from Monday 00:00, sorted and
-// merged). Week positions are taken from the integers, so only the small
-// within-week offsets are doubles and the epoch magnitude costs no precision.
+// merged): pm4py's BusinessHours (business_hours.hpp). A clipped-segment sum
+// differed from it in the last bit for 752 of 30,000 random pairs (review
+// AY1).
 inline double business_elapsed_microseconds(
     std::int64_t start, std::int64_t end,
     const std::vector<BusinessHourSlot>& slots) {
-  if (end <= start || slots.empty()) return 0.0;
-  constexpr std::int64_t kWeek = 7LL * 86400LL * 1000000LL;
-  // 1970-01-01 was a Thursday; shift so that weeks begin on Monday.
-  constexpr std::int64_t kEpochToMonday = 3LL * 86400LL * 1000000LL;
-  const auto floor_div = [](std::int64_t value, std::int64_t divisor) {
-    std::int64_t quotient = value / divisor;
-    if (value % divisor < 0) --quotient;
-    return quotient;
-  };
-  const std::int64_t adjusted_start = start + kEpochToMonday;
-  const std::int64_t adjusted_end = end + kEpochToMonday;
-  const std::int64_t start_week = floor_div(adjusted_start, kWeek);
-  const std::int64_t end_week = floor_div(adjusted_end, kWeek);
-  const double start_offset =
-      static_cast<double>(adjusted_start - start_week * kWeek) / 1e6;
-  const double end_offset =
-      static_cast<double>(adjusted_end - end_week * kWeek) / 1e6;
-  const auto segment = [&](double from, double to) {
-    double total = 0.0;
-    for (const auto& slot : slots) {
-      const double low = std::max(from, slot.start_seconds);
-      const double high = std::min(to, slot.end_seconds);
-      if (high > low) total += high - low;
-    }
-    return total;
-  };
-  if (start_week == end_week) return segment(start_offset, end_offset);
-  double weekly_total = 0.0;
-  for (const auto& slot : slots)
-    weekly_total += slot.end_seconds - slot.start_seconds;
-  double total = segment(start_offset, 7.0 * 86400.0) + segment(0.0, end_offset);
-  const std::int64_t full_weeks = end_week - start_week - 1;
-  if (full_weeks > 0) total += static_cast<double>(full_weeks) * weekly_total;
-  return total;
+  return business_elapsed_seconds_microseconds(start, end, slots);
 }
 
 }  // namespace minera::detail

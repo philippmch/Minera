@@ -124,7 +124,12 @@ std::optional<Image> image_of(const Json& parameters) {
   Image out;
   out.data = base64(std::string(std::istreambuf_iterator<char>(file), {}));
   const auto& p = path->text;
+  // os.path is ntpath on Windows: either slash ends a directory there.
+#ifdef _WIN32
+  const auto slash = p.find_last_of("/\\");
+#else
   const auto slash = p.find_last_of('/');
+#endif
   const std::string name = slash == std::string::npos ? p : p.substr(slash + 1);
   // splitext ignores leading dots of the file name.
   std::size_t lead = 0;

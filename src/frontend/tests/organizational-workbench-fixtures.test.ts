@@ -118,7 +118,7 @@ describe("actual own-server organizational workbench fixtures", () => {
       const frequency = readEntry(manifest.entries.find(entry => entry.name === "network-frequency")!);
       if (perf.family !== "NETWORK_ANALYSIS" || frequency.family !== "NETWORK_ANALYSIS") throw new Error("Wrong actual family");
       const all = perf.edges.flatMap(edge => edge.performance);
-      expect(all.some(seconds => seconds < 0)).toBe(true); expect(all).toContain(0.125);
+      expect(all.some(seconds => seconds !== null && seconds < 0)).toBe(true); expect(all).toContain(0.125);
       expect(frequency.edges.every(edge => edge.performance.length === 0)).toBe(true);
       expect(organizationalWorkbenchTables(perf).find(table => table.id === "network_performance")?.rows.length).toBe(40);
     });

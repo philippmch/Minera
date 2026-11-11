@@ -885,9 +885,12 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
   // its wall clock fits; otherwise the cell counts as unconvertible.
   if (offset_minutes > 14 * 60 || offset_minutes < -14 * 60) {
     using namespace std::chrono;
-    const auto wall = sys_days{std::chrono::year{year} / month / day} + hours{hour} +
-                      minutes{minute};
-    const auto set_clock = [&](sys_time<minutes> local, int stored_offset) {
+    // 64-bit minutes: MSVC's std::chrono::minutes holds an int, which
+    // overflows after the year 6053 (review AY2).
+    using Minutes = duration<std::int64_t, std::ratio<60>>;
+    const auto wall = sys_days{std::chrono::year{year} / month / day} +
+                      Minutes{std::int64_t{hour} * 60 + minute};
+    const auto set_clock = [&](sys_time<Minutes> local, int stored_offset) {
       const auto date = floor<days>(local);
       const year_month_day ymd{date};
       const hh_mm_ss clock{local - date};
@@ -904,9 +907,9 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
       offset = text;
       return true;
     };
-    const auto utc = wall - minutes{offset_minutes};
+    const auto utc = wall - Minutes{offset_minutes};
     const int nearest = offset_minutes < 0 ? -14 * 60 : 14 * 60;
-    if (!set_clock(utc, 0) && !set_clock(utc + minutes{nearest}, nearest))
+    if (!set_clock(utc, 0) && !set_clock(utc + Minutes{nearest}, nearest))
       return std::nullopt;
   }
   // Off the ISO path pandas keeps microseconds only, unless a `.` fraction's

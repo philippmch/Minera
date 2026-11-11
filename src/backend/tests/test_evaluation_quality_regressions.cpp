@@ -61,6 +61,11 @@ std::string run_export(const std::vector<std::string>& arguments) {
   std::string command = "\"" + export_binary + "\"";
   for (const auto& argument : arguments) command += " \"" + argument + "\"";
   command += " -o \"" + output.string() + "\"";
+#ifdef _WIN32
+  // cmd /c strips the first and last quote of a line that starts with one;
+  // an outer pair keeps the quoted program path and arguments intact.
+  command = "\"" + command + "\"";
+#endif
   const int status = std::system(command.c_str());
   assert(status == 0);
   std::ifstream input(output);
