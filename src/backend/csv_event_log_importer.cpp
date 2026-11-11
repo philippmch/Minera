@@ -1231,6 +1231,298 @@ std::size_t timestamp_fraction_digits(std::string_view text) {
   return end - dot - 1;
 }
 
+// pandas' to_datetime(format="mixed") on a cell of digits and the
+// separators ` `, `.`, `/`, `-`, `;` and `'` that the shapes above leave
+// out: partial dates ("2020-01", "07/2020", "2020", "2020.5"), compact ones
+// ("20200101", "202001011230", "250677" as DDMMYY), dates without a year
+// ("07-12" is 0001-07-12), numbers led by a zero ("007" is 0001-01-07,
+// "039" 2039-01-01) and three numbers with mixed separators ("03.24-2020")
+// (round BE, observed black-box and modelled against pandas on 30,000
+// cells; see review-harness/round-be pdmodel.py). In that order:
+// - the ISO path: YYYY, YYYY<s>M[M] and YYYY<s>M[M]<s>D[D] with one of
+//   `-`, `/`, `.` and a space as <s>, leading blanks allowed, or YYYYMMDD;
+// - a cell not led by `0` that reads fully as a number below 1000 is "not
+//   likely a datetime";
+// - MM<s>DD<s>YYYY (one-digit M or D too) with any mix of those separators,
+//   or MM<s>YYYY without `.`, for a year from 1000: month first unless the
+//   month cannot be one;
+// - a four-character cell int() reads (blanks around digits) is a year;
+// - dateutil: tokens of digits (one `.` makes a decimal; more, or a trailing
+//   one, split it), six digits DDMMYY-like, 8/12/14 digits YYYYMMDD[HHMM[SS]],
+//   a number joined by `-`, `/` or `.` kept as text (more than two digits is
+//   the year), a standalone number by value (above 100 the year), then one
+//   number a day (above 31 the year), two month-day (one above 31 the
+//   year), three as for the long dates; a two-digit year without its
+//   century in the window around today; missing parts from 0001-01-01.
+// Year 0 and negative years (pandas' ISO path; a cell led by `/`, `.` or
+// `-`), a `,` (dateutil's decimal comma), clocks HHMMSS[.ss] and offsets
+// after a compact clock are left out (nullopt; declared). Returns "YYYY-MM-DD[ HH:MM:SS]".
+std::optional<std::string> reference_numeric_cell_date(std::string_view text) {
+  if (text.empty()) return std::nullopt;
+  for (const char ch : text)
+    if (!std::isdigit(static_cast<unsigned char>(ch)) && ch != ' ' && ch != '.' && ch != '/' && ch != '-' &&
+        ch != ';' && ch != '\'')
+      return std::nullopt;
+  const auto digit = [](char ch) { return ch >= '0' && ch <= '9'; };
+  const auto all_digits = [&](std::string_view part) {
+    return !part.empty() && std::all_of(part.begin(), part.end(), digit);
+  };
+  const auto number_of = [](std::string_view part) {
+    long long value = 0;
+    for (const char ch : part) value = std::min<long long>(value * 10 + (ch - '0'), 1'000'000'000'000LL);
+    return value;
+  };
+  const auto valid = [](long long y, long long m, long long d) {
+    return y >= 1 && y <= 9999 && m >= 1 && m <= 12 && d >= 1 &&
+           d <= month_days(static_cast<int>(y), static_cast<int>(m));
+  };
+  const auto spell = [](long long y, long long m, long long d, std::optional<std::array<long long, 3>> clock) {
+    char buffer[48];
+    if (clock)
+      std::snprintf(buffer, sizeof(buffer), "%04lld-%02lld-%02lld %02lld:%02lld:%02lld", y, m, d, (*clock)[0],
+                    (*clock)[1], (*clock)[2]);
+    else
+      std::snprintf(buffer, sizeof(buffer), "%04lld-%02lld-%02lld", y, m, d);
+    return std::string(buffer);
+  };
+  // pandas' ISO path.
+  {
+    std::size_t at = 0;
+    while (at < text.size() && text[at] == ' ') ++at;
+    const auto rest = text.substr(at);
+    // A cell led by `/`, `.` or `-` can be a negative year or pandas' year 0
+    // ("/08" is 0000-08-01): left out (declared).
+    if (!rest.empty() && (rest.front() == '-' || rest.front() == '/' || rest.front() == '.')) return std::nullopt;
+    if (rest.size() >= 4 && all_digits(rest.substr(0, 4))) {
+      const auto year = number_of(rest.substr(0, 4));
+      std::optional<std::array<long long, 3>> iso;
+      if (rest.size() == 4) {
+        iso = std::array<long long, 3>{year, 1, 1};
+      } else if (rest.size() == 8 && at == 0 && all_digits(rest)) {
+        iso = std::array<long long, 3>{year, number_of(rest.substr(4, 2)), number_of(rest.substr(6, 2))};
+      } else if (rest[4] == '-' || rest[4] == '/' || rest[4] == '.' || rest[4] == ' ') {
+        const char separator = rest[4];
+        std::size_t end = 5;
+        while (end < rest.size() && digit(rest[end]) && end - 5 < 3) ++end;
+        const auto month = rest.substr(5, end - 5);
+        if (!month.empty() && month.size() <= 2) {
+          if (end == rest.size()) {
+            iso = std::array<long long, 3>{year, number_of(month), 1};
+          } else if (rest[end] == separator) {
+            const auto day = rest.substr(end + 1);
+            if (all_digits(day) && day.size() <= 2)
+              iso = std::array<long long, 3>{year, number_of(month), number_of(day)};
+          }
+        }
+      }
+      if (iso) {
+        const auto [y, m, d] = *iso;
+        if (y == 0 && valid(1, m, d)) return std::nullopt;  // year 0 (declared)
+        if (valid(y, m, d)) return spell(y, m, d, std::nullopt);
+      }
+    }
+  }
+  // "Given date string ... not likely a datetime".
+  if (text.front() != '0') {
+    std::size_t first = 0, last = text.size();
+    while (first < last && text[first] == ' ') ++first;
+    while (last > first && text[last - 1] == ' ') --last;
+    auto body = text.substr(first, last - first);
+    std::size_t at = 0;
+    if (at < body.size() && body[at] == '-') ++at;
+    std::size_t integral = 0, fraction = 0;
+    while (at < body.size() && digit(body[at])) { ++at; ++integral; }
+    bool dot = false;
+    if (at < body.size() && body[at] == '.') {
+      dot = true;
+      ++at;
+      while (at < body.size() && digit(body[at])) { ++at; ++fraction; }
+    }
+    if (at == body.size() && (integral > 0 || (dot && fraction > 0)) &&
+        std::strtod(std::string(body).c_str(), nullptr) < 1000)
+      return std::nullopt;
+  }
+  // pandas' delimited dates.
+  {
+    const auto separator = [](char ch) { return ch == ' ' || ch == '/' || ch == '-' || ch == '.'; };
+    const auto field = [&](std::size_t from, std::size_t width) -> long long {
+      if (from + width > text.size()) return -1;
+      const auto part = text.substr(from, width);
+      return all_digits(part) ? number_of(part) : -1;
+    };
+    const auto n = text.size();
+    long long month = -1, day = 1, year = -1;
+    bool matched = true, swap = true;
+    if (n == 10 && separator(text[2]) && separator(text[5])) {
+      month = field(0, 2); day = field(3, 2); year = field(6, 4);
+    } else if (n == 9 && separator(text[1]) && separator(text[4])) {
+      month = field(0, 1); day = field(2, 2); year = field(5, 4);
+    } else if (n == 9 && separator(text[2]) && separator(text[4])) {
+      month = field(0, 2); day = field(3, 1); year = field(5, 4);
+    } else if (n == 8 && separator(text[1]) && separator(text[3])) {
+      month = field(0, 1); day = field(2, 1); year = field(4, 4);
+    } else if (n == 7 && separator(text[2]) && text[2] != '.') {
+      month = field(0, 2); year = field(3, 4); swap = false;
+    } else {
+      matched = false;
+    }
+    if (matched && month >= 0 && day >= 0 && year >= 1000) {
+      if (month >= 1 && month <= 31 && day >= 1 && day <= 31 && (month <= 12 || day <= 12)) {
+        if (month > 12 && swap) std::swap(month, day);
+        if (valid(year, month, day)) return spell(year, month, day, std::nullopt);
+      }
+      return std::nullopt;
+    }
+  }
+  // A four-character cell int() reads is a year.
+  if (text.size() == 4) {
+    std::size_t first = 0, last = 4;
+    while (first < last && text[first] == ' ') ++first;
+    while (last > first && text[last - 1] == ' ') --last;
+    const auto body = text.substr(first, last - first);
+    if (all_digits(body)) {
+      const auto year = number_of(body);
+      if (year >= 1 && year <= 9999) return spell(year, 1, 1, std::nullopt);
+    }
+  }
+  // dateutil.
+  std::vector<std::string> tokens;
+  for (std::size_t at = 0; at < text.size();) {
+    if (!digit(text[at])) {
+      tokens.emplace_back(1, text[at]);
+      ++at;
+      continue;
+    }
+    std::size_t end = at;
+    while (end < text.size() && (digit(text[end]) || text[end] == '.')) ++end;
+    const auto token = text.substr(at, end - at);
+    const auto dots = static_cast<std::size_t>(std::count(token.begin(), token.end(), '.'));
+    if (dots > 1 || (dots == 1 && token.back() == '.')) {
+      std::size_t from = 0;
+      for (std::size_t i = 0; i <= token.size(); ++i)
+        if (i == token.size() || token[i] == '.') {
+          if (i > from) tokens.emplace_back(token.substr(from, i - from));
+          if (i < token.size()) tokens.emplace_back(".");
+          from = i + 1;
+        }
+    } else {
+      tokens.emplace_back(token);
+    }
+    at = end;
+  }
+  const auto jump = [](const std::string& token) {
+    return token == " " || token == "." || token == ";" || token == "-" || token == "/" || token == "'";
+  };
+  std::vector<long long> ymd;
+  std::optional<std::size_t> year_index;
+  bool century = false;
+  std::optional<long long> hour, minute, second;
+  const auto strict_int = [&](std::string_view part) -> std::optional<long long> {
+    if (!all_digits(part)) return std::nullopt;
+    return number_of(part);
+  };
+  const auto label_year = [&]() {
+    if (year_index) return false;
+    year_index = ymd.size() - 1;
+    return true;
+  };
+  const auto append_text = [&](std::string_view part, bool year_label = false) {
+    const auto value = strict_int(part);
+    if (!value) return false;
+    if (part.size() > 2) {
+      century = true;
+      year_label = true;
+    }
+    ymd.push_back(*value);
+    return !year_label || label_year();
+  };
+  const auto append_value = [&](double value) {
+    const bool year_label = value > 100;
+    if (year_label) century = true;
+    ymd.push_back(value >= 1e12 ? 1'000'000'000'000LL : static_cast<long long>(value));
+    return !year_label || label_year();
+  };
+  const auto n = tokens.size();
+  for (std::size_t i = 0; i < n; ++i) {
+    const auto& token = tokens[i];
+    if (!digit(token.front())) {
+      if (token == "-" && hour) return std::nullopt;  // an offset sign (declared)
+      if (!jump(token)) return std::nullopt;
+      continue;
+    }
+    const double value = std::strtod(token.c_str(), nullptr);
+    const auto li = token.size();
+    if (ymd.size() == 3 && (li == 2 || li == 4) && !hour) {
+      hour = strict_int(std::string_view(token).substr(0, 2));
+      if (!hour) return std::nullopt;
+      if (li == 4) {
+        minute = strict_int(std::string_view(token).substr(2));
+        if (!minute) return std::nullopt;
+      }
+    } else if (li == 6 || (li > 6 && token.find('.') == 6)) {
+      if (!ymd.empty() || token.find('.') != std::string::npos) return std::nullopt;  // a clock (declared)
+      const std::string_view s = token;
+      if (!append_text(s.substr(0, 2)) || !append_text(s.substr(2, 2)) || !append_text(s.substr(4)))
+        return std::nullopt;
+    } else if (li == 8 || li == 12 || li == 14) {
+      const std::string_view s = token;
+      if (!append_text(s.substr(0, 4), true) || !append_text(s.substr(4, 2)) || !append_text(s.substr(6, 2)))
+        return std::nullopt;
+      if (li > 8) {
+        hour = strict_int(s.substr(8, 2));
+        minute = strict_int(s.substr(10, 2));
+        if (!hour || !minute) return std::nullopt;
+        if (li > 12) {
+          second = strict_int(s.substr(12));
+          if (!second) return std::nullopt;
+        }
+      }
+    } else if (i + 1 < n && (tokens[i + 1] == "-" || tokens[i + 1] == "/" || tokens[i + 1] == ".")) {
+      const auto separator = tokens[i + 1];
+      if (!append_text(token)) return std::nullopt;
+      if (i + 2 < n && !jump(tokens[i + 2])) {
+        if (!all_digits(tokens[i + 2]) || !append_text(tokens[i + 2])) return std::nullopt;
+        if (i + 3 < n && tokens[i + 3] == separator) {
+          if (i + 4 >= n || !append_text(tokens[i + 4])) return std::nullopt;
+          i += 2;
+        }
+        ++i;
+      }
+      ++i;
+    } else if (i + 1 >= n || jump(tokens[i + 1])) {
+      if (!append_value(value)) return std::nullopt;
+      ++i;
+    } else if (value >= 1 && value <= 31 && ymd.size() < 3) {
+      if (!append_value(value)) return std::nullopt;
+    } else {
+      return std::nullopt;
+    }
+  }
+  if (ymd.size() > 3 || (ymd.empty() && !hour)) return std::nullopt;
+  std::optional<long long> y, m, d;
+  if (ymd.size() == 1 && year_index) {
+    y = ymd[0];
+  } else if (ymd.size() == 1) {
+    if (ymd[0] > 31) y = ymd[0];
+    else d = ymd[0];
+  } else if (ymd.size() == 2) {
+    if (ymd[0] > 31) { y = ymd[0]; m = ymd[1]; }
+    else if (ymd[1] > 31) { m = ymd[0]; y = ymd[1]; }
+    else { m = ymd[0]; d = ymd[1]; }
+  } else if (ymd.size() == 3) {
+    if (ymd[0] > 31 || year_index == std::size_t{0}) { y = ymd[0]; m = ymd[1]; d = ymd[2]; }
+    else if (ymd[0] > 12) { d = ymd[0]; m = ymd[1]; y = ymd[2]; }
+    else { m = ymd[0]; d = ymd[1]; y = ymd[2]; }
+  }
+  if (y && *y < 100 && !century) y = expand_two_digit_year(static_cast<unsigned>(*y));
+  const long long year = y.value_or(1), month = m.value_or(1), day = d.value_or(1);
+  if (!valid(year, month, day)) return std::nullopt;
+  if (!hour) return spell(year, month, day, std::nullopt);
+  const std::array<long long, 3> clock{*hour, minute.value_or(0), second.value_or(0)};
+  if (clock[0] > 23 || clock[1] > 59 || clock[2] > 59) return std::nullopt;
+  return spell(year, month, day, clock);
+}
+
 // The stored text of a present CSV cell, and whether pandas needs nanosecond
 // resolution for it (an ISO-path cell with more than six fraction digits).
 struct ReferenceTimestamp {
@@ -1241,9 +1533,12 @@ struct ReferenceTimestamp {
 // Returns the timestamp to store for a present CSV cell, or nullopt when the
 // reference conversion would fail for it.
 // `padded` tells that the source cell ended in white space the importer
-// trimmed, which matters after an hour-only offset.
-std::optional<ReferenceTimestamp> reference_timestamp(const std::string& value,
-                                                      bool padded = false) {
+// trimmed, which matters after an hour-only offset. `numeric_cells` reads
+// the all-numeric shapes of reference_numeric_cell_date too, as pandas does
+// for a cell of a text column (read_csv keeps a column of numbers as
+// numbers, which format_dataframe does not convert).
+std::optional<ReferenceTimestamp> general_reference_timestamp(const std::string& value,
+                                                              bool padded) {
   const auto digits = timestamp_fraction_digits(value);
   if (const auto exact = parse_timestamp_exact(value)) {
     // Year 0 (a wall clock before 0001-01-01) is held only on pandas' ISO
@@ -1268,6 +1563,31 @@ std::optional<ReferenceTimestamp> reference_timestamp(const std::string& value,
   if (normalized && parse_timestamp_exact(normalized->text))
     return ReferenceTimestamp{std::move(normalized->text), normalized->nanosecond};
   return std::nullopt;
+}
+
+std::optional<ReferenceTimestamp> reference_timestamp(const std::string& value,
+                                                      bool padded = false, bool numeric_cells = false) {
+  auto general = general_reference_timestamp(value, padded);
+  if (!numeric_cells) return general;
+  // pandas' ISO path is the general grammar's ("0047 01 08 19" is year 47
+  // at 19:00); dateutil's reading of the other all-numeric cells is
+  // modelled whole by reference_numeric_cell_date (a year joined to a
+  // trailing `/` keeps its century, "9 7 0001/" is year 1). Where both read
+  // the same instant, the general spelling is kept ("01/02/2024" stays
+  // "2024-01-02 00:00:00").
+  if (general) {
+    const auto shape = normalize_reference_timestamp(padded ? value + " " : value);
+    if (shape && shape->iso_path) return general;
+  }
+  auto date = reference_numeric_cell_date(padded ? value + " " : value);
+  if (!date) return general;
+  if (general) {
+    const auto a = parse_timestamp_exact(general->text), b = parse_timestamp_exact(*date);
+    if (a && b && a->seconds == b->seconds && a->offset_minutes == b->offset_minutes &&
+        a->nanoseconds == b->nanoseconds)
+      return general;
+  }
+  return ReferenceTimestamp{std::move(*date), false};
 }
 
 // pandas holds nanosecond timestamps in int64: from 1677-09-21
@@ -2261,6 +2581,28 @@ CsvEventData import_csv_event_data_impl(
     if (!first_outside_nanoseconds && outside_nanosecond_range(parsed.text))
       first_outside_nanoseconds = std::make_pair(line, cell);
   };
+  // Whether read_csv keeps the timestamp column as text (then its
+  // all-numeric cells read as dates too); decided once, when a cell needs it.
+  std::optional<bool> timestamp_text_column;
+  const auto numeric_timestamps = [&]() {
+    if (!timestamp_text_column) {
+      std::vector<std::string> cells;
+      cells.reserve(pending.size());
+      for (const auto& row : pending) cells.push_back(row.event.timestamp);
+      timestamp_text_column = infer_reference_column(cells).kind == ReferenceCsvColumnKind::kText;
+    }
+    return *timestamp_text_column;
+  };
+  const auto parse_timestamp = [&](const std::string& timestamp, bool padded) {
+    const bool numeric = reference_batch &&
+                         std::all_of(timestamp.begin(), timestamp.end(),
+                                     [](char ch) {
+                                       return (ch >= '0' && ch <= '9') || ch == ' ' || ch == '.' || ch == '/' ||
+                                              ch == '-' || ch == ';' || ch == '\'';
+                                     }) &&
+                         numeric_timestamps();
+    return reference_timestamp(timestamp, padded, numeric);
+  };
   if (reference_batch && timestamp_index) {
     for (const auto& row : pending) {
       poll();
@@ -2277,7 +2619,7 @@ CsvEventData import_csv_event_data_impl(
       }
       // Once the column holds dates, the scan below parses the kept rows.
       if (drop_untimed_rows && case_ids[row.token] && activities[row.token]) continue;
-      if (auto parsed = reference_timestamp(timestamp, row.padded_timestamp)) {
+      if (auto parsed = parse_timestamp(timestamp, row.padded_timestamp)) {
         drop_untimed_rows = true;
         note_timestamp(*parsed, row.line_number, timestamp);
       } else if (!first_unconverted_timestamp)
@@ -2306,7 +2648,7 @@ CsvEventData import_csv_event_data_impl(
       const auto& timestamp = row.event.timestamp;
       if (is_reference_na_token(timestamp)) {
         timestamp_texts.emplace_back(std::string{});
-      } else if (auto parsed = reference_timestamp(timestamp, row.padded_timestamp)) {
+      } else if (auto parsed = parse_timestamp(timestamp, row.padded_timestamp)) {
         note_timestamp(*parsed, row.line_number, timestamp);
         timestamp_texts.push_back(std::move(parsed->text));
         ++parsed_timestamps;
@@ -2559,7 +2901,7 @@ EventAttribute csv_dataframe_cell(const DataFrameColumn& column, const std::stri
 }
 
 std::optional<ReferenceMixedTimestamp> reference_mixed_timestamp(const std::string& cell) {
-  auto parsed = reference_timestamp(cell);
+  auto parsed = reference_timestamp(cell, false, true);
   if (!parsed) return std::nullopt;
   const bool outside = outside_nanosecond_range(parsed->text);
   return ReferenceMixedTimestamp{std::move(parsed->text), parsed->nanosecond_fraction, outside};

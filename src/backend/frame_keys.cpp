@@ -281,7 +281,7 @@ std::optional<python::Scalar> frame_row_scalar(const EventLog& frame, const Trac
 
 // The dtype of a frame column (nullopt for no such column): the CSV and XES
 // columns as typed, the case and activity copies text, the CSV activity
-// column under its own header as read_csv typed it, @@index ints, an XES
+// column under its own header as read_csv typed it, a CSV frame's @@index ints, an XES
 // time:timestamp dates.
 std::optional<DataFrameColumnType> frame_column_type(const EventLog& frame, const std::string& key) {
   const auto& columns = *frame.dataframe_columns;
@@ -301,7 +301,9 @@ std::optional<DataFrameColumnType> frame_column_type(const EventLog& frame, cons
     for (const auto& column : columns.trace_columns)
       if ("case:" + column.key == key) return typed(column);
   if (key == "concept:name" || key == "case:concept:name") return DataFrameColumnType::kString;
-  if (key == "@@index" || key == "@@case_index") return DataFrameColumnType::kInt64;
+  // format_dataframe adds the index columns; read_xes's frame has none
+  // (round BE, observed black-box: KeyError on an XES upload).
+  if ((key == "@@index" || key == "@@case_index") && columns.csv_text) return DataFrameColumnType::kInt64;
   if (key == "time:timestamp") return DataFrameColumnType::kDate;
   for (const auto& trace : frame.traces)
     for (const auto& event : trace.events)

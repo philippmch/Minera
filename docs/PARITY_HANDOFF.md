@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BD (2026-11-05 to 2026-11-11, cloud container)
+## Review-fix loop, rounds T–BE (2026-11-05 to 2026-11-11, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4478,7 +4478,45 @@ event distribution on uploads now follows pm4py's DataFrame statistics
 UTC, pandas' errors). The device check on the Mac was skipped again (the
 round's thread had no device linked).
 
-Next round (BE) should start by re-reviewing round BD:
+Round BE re-reviewed BD and took its open targets (Review BE1). It fixed:
+the attribute KDE on uploads, which now follows pm4py's DataFrame
+statistics (the column's present cells sorted by Python's `sorted()`, one
+distinct value read through `float()`, several numbers as floats so a
+bool column has a KDE, pandas' and numpy's own errors, and the date
+estimator's `replace(tzinfo=None)` on the first sorted cell); `@@index` and
+`@@case_index` exist on CSV frames only (an XES upload gives `KeyError`);
+a date KDE whose grid leaves datetime64[ns] raises pandas' `OverflowError`;
+and pandas' mixed date parsing of all-numeric text in CSV columns (`2020`,
+`2020-01`, `20200101`, `03.24-2020`, `007`, `250699`, `202001011230`), so
+such a timestamp column is read as pandas reads it and a column of dates
+and `2020` becomes a date column (BD's `snamixcsv.py` seed 152). The
+device check on the Mac was skipped again (the round's thread had no
+device linked).
+
+Next round (BF) should start by re-reviewing round BE:
+
+- `src/backend/attribute_kde.cpp`: `frame_attribute_kde` (the sort, the
+  single-value `float()` branch with `parse_python_float_text`, bools and
+  dates in the numeric estimator, the first sorted cell of the date
+  estimator), swept with `kdesweep2.py` and through the CLI
+  (`clipost.py`);
+- `src/backend/frame_keys.cpp`: `@@index` and `@@case_index` on XES
+  uploads in every other route that reads `frame_column_type` (filters,
+  features, SNA, resource profiles);
+- `src/backend/csv_event_log_importer.cpp`: `reference_numeric_cell_date`
+  (fuzz with `ndfuzz.py` and `mixfuzz.py`, new shapes such as clocks after
+  delimited dates and longer digit runs), `reference_timestamp`'s choice
+  between it and the general grammar (the ISO path stays the general
+  grammar's; `isonum.py`), and the timestamp scan's gate
+  (`numeric_timestamps()`: only a column read_csv types as text);
+- the public `dataframe_format` route and every other caller of
+  `reference_mixed_timestamp`, which now read partial dates too;
+- `python::sort` for 64 items or more (CPython 3.11's powersort runs and
+  galloping; 8 of 1,700 random mixed lists name the failing pair the other
+  way round);
+- the CI run of the BE commit.
+
+Round BD's targets, re-reviewed in BE (findings BE1-1 to BE1-4):
 
 - `src/backend/log_to_features.cpp`: `frame_trace_set_numeric` (each
   case's first row, `case:` columns of CSV uploads with per-row cells,

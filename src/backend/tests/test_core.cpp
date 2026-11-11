@@ -8960,8 +8960,11 @@ void csv_timestamps_review_aa1_skipped_separators() {
   assert(stamp("2024-01-05T03:15:34.123456789;") == "2024-01-05 03:15:34.123456");
   // A single row that is no timestamp keeps its text.
   for (const auto* cell : {"2024-01-05 03:15:34.5..", "2024-01-05 03:15:34.5.;",
-                           "2024-01-05 03:15:34.p", "2024-01-05;03:15:34", "01/05/2024-"})
+                           "2024-01-05 03:15:34.p", "2024-01-05;03:15:34"})
     assert(stamp(cell) == cell);
+  // An all-numeric cell is read as dateutil reads it (review BE1-4; AA1's
+  // declaration of a trailing `-`).
+  assert(stamp("01/05/2024-") == "2024-01-05");
   // Runs dateutil does not skip (review AB1-2): pandas rejects these cells.
   for (const auto* cell : {".20240105", "2024 12/31/", "5 12/31/", "Jan.12.34.", "Jan.5.2024.",
                            "2024-01-05 5/am", "01/05/2024 5. pm", "2024-01-05 5 .am",

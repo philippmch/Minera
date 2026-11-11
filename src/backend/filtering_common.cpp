@@ -557,6 +557,16 @@ std::string get_kde_numeric_attribute_json(const std::vector<double>& values, st
 
 namespace {
 
+// A point of the date grid as the datetime64[ns] the reference converts it
+// to: outside that range the conversion overflows (round BE, observed
+// black-box: a date before 1677-09-21 or after 2262-04-11, or a single date
+// within an hour of those bounds).
+std::int64_t date_grid_ns(double seconds) {
+  const auto ns = seconds_to_ns(seconds);
+  if (ns == std::numeric_limits<std::int64_t>::min()) fail("OverflowError", "Python int too large to convert to C long");
+  return ns;
+}
+
 FilteringDateKde date_kde_from_seconds(const std::vector<double>& seconds, bool single, std::int64_t graph_points,
                                        std::int64_t points_to_sample) {
   FilteringDateKde out;
@@ -564,7 +574,7 @@ FilteringDateKde date_kde_from_seconds(const std::vector<double>& seconds, bool 
     const double s = seconds.front();
     const auto grid = linspace(s - 3600, s + 3600, graph_points);
     out.y = single_spike(graph_points);
-    for (const double v : grid) out.x_ns.push_back(seconds_to_ns(v));
+    for (const double v : grid) out.x_ns.push_back(date_grid_ns(v));
     return out;
   }
   const auto n = static_cast<std::int64_t>(seconds.size());
@@ -584,7 +594,7 @@ FilteringDateKde date_kde_from_seconds(const std::vector<double>& seconds, bool 
   std::sort(data.begin(), data.end());
   const auto grid = linspace(data.front(), data.back(), graph_points);
   out.y = gaussian_kde(data, grid);
-  for (const double v : grid) out.x_ns.push_back(seconds_to_ns(v));
+  for (const double v : grid) out.x_ns.push_back(date_grid_ns(v));
   return out;
 }
 

@@ -23096,3 +23096,113 @@ Verification (scripts in the project files under `review-harness/round-bd/`):
 
 `minera_review_bd1_tests` binds the values and messages above (taken from
 pm4py black-box on the same uploads).
+
+
+## Review BE1: re-review of round BD, the attribute KDE on uploads, and partial dates in CSV text columns (2026-11-11)
+
+Round BE re-reviewed BD (the set-order selection of trace attributes, the
+workload conversion order, the case-grouped SNA rows, the event
+distribution on uploads) with fresh seeds, ISO week 53, day 31 and
+pre-1970 dates, and took BD's two open targets: the attribute KDE on
+uploads and pandas' mixed date parsing of number-like text. Findings, all
+fixed:
+
+- **BE1-1 The attribute KDE on uploads follows pm4py's DataFrame
+  statistics** (`attributes.pandas.get.get_kde_numeric_attribute` and
+  `get_kde_date_attribute` on the frame). Minera read the event log and
+  worded its own errors. pm4py takes the column's cells without the
+  missing ones (`dropna`; a key that is no column is `KeyError: ['k']`),
+  sorts them with Python's `sorted()` (its `'<' not supported between
+  instances of ...` for mixed cells, `datetime.datetime` in an XES object
+  column), then: the numeric estimator reads one distinct value through
+  `float()` (a text cell as numpy's `str_`: `"12"` is a spike at 12,
+  `"x"` raises `could not convert string to float: np.str_('x')`, a date
+  `float() argument must be a string or a real number, not 'Timestamp'`),
+  several distinct numbers as floats (bools as 0 and 1, so a bool column
+  has a KDE), several texts the ufunc `dtype` error and several dates
+  `unsupported operand type(s) for *: 'Timestamp' and 'float'`; the date
+  estimator calls `replace(tzinfo=None)` on each sorted cell, so the first
+  cell that is no date raises (`'int' object has no attribute 'replace'`,
+  `str.replace() takes no keyword arguments`). A Python model matched
+  pm4py on 6,000 random columns before the port; BD's `kdesweep.py` had 6
+  differences and 64 other messages of 90.
+- **BE1-2 An XES frame has no `@@index`.** `frame_column_type` typed
+  `@@index` and `@@case_index` as int columns on XES uploads too, where
+  `read_xes`'s frame has neither (`KeyError: ['@@index']` in the KDE);
+  only a CSV frame (format_dataframe) has them.
+- **BE1-3 A date KDE outside datetime64[ns] overflows.** The date
+  estimator converts its grid back to nanosecond timestamps: a date before
+  1677-09-21 00:12:43.145224193 or after 2262-04-11 23:47:16.854775807 at
+  either end of the grid (a single date within an hour of them) raises
+  `OverflowError: Python int too large to convert to C long`. Minera
+  saturated the points.
+- **BE1-4 Partial and number-like dates in CSV text columns.** pandas'
+  `to_datetime(format="mixed")`, which format_dataframe applies to the
+  timestamp column and to every other text column whose cells all parse,
+  reads all-numeric cells Minera's date grammar refused: on the ISO path
+  `YYYY`, `YYYY-MM` (also `/`, `.` and a space; `2020.5` is May 2020) and
+  `YYYYMMDD`; a cell not led by `0` that reads fully as a number below
+  1000 is "not likely a datetime"; `MM?DD?YYYY` with any mix of ` `, `/`,
+  `-` and `.` (`03.24-2020`) and `MM/YYYY` for a year from 1000; a
+  four-character cell `int()` reads is a year (`014 ` is year 14); then
+  dateutil's numeric tokens with the default date 0001-01-01: `007` is
+  0001-01-07, `039` 2039-01-01, `07-12` 0001-07-12, `250699` 1999-06-25,
+  `202001011230` 2020-01-01 12:30, `2992.20` the year 2992, `9 7 0001/`
+  0001-09-07 (a year joined to a separator keeps its century), and
+  version strings such as `1.2.3` are 2003-01-02. A CSV whose timestamp
+  column holds `2020-01` was refused by Minera ("cannot be parsed as a
+  date/time"); a column such as `d` of dates and `2020` stayed text. The
+  timestamp column takes these shapes only when read_csv types it as text
+  (a column of numbers such as `20200101` stays numbers, as in pm4py). A
+  Python model, then the C++ port, matched pandas on 25,000 random cells
+  (`ndfuzz.py`, `mixfuzz.py`) before the end-to-end sweep. A cell on
+  pandas' ISO path keeps the importer's ISO reading (`0047 01 08 19` is
+  year 47 at 19:00), and a cell both readings agree on keeps its earlier
+  spelling (`01/02/2024` is stored as `2024-01-02 00:00:00`). This closes
+  round AA1's declaration of a trailing `-` for all-numeric cells
+  (`01/05/2024-` is 2024-01-05, as in pandas); a `-` after a clock
+  (`2024-01-05-03:15:34`) stays declared.
+
+Re-review of BD without further findings: the set-order selection with
+per-row case cells (`boolselcase.py` with `VARY=1`), the workload metrics
+on XES object columns (`wlshift.py`), the case-grouped SNA variants on CSV
+(`snamixcsv.py`), the event distribution with ISO week 53, day 31 and
+pre-1970 dates (`evdist2.py`), and the event distribution and KDE through
+`minera_export` (`clipost.py`, which runs a sweep with the CLI in place of
+the HTTP route).
+
+Declarations:
+
+- A numeric KDE of a single infinite value (`inf`, or text `"inf"`) is a
+  grid of NaN in pm4py; Minera's KDE result keeps finite points only and
+  refuses it (`kdesweep2.py` seeds 190, 299, 327).
+- pandas reads some numeric cells as year 0 or a negative year (`0000`,
+  `/08` is 0000-08-01, `-2020`), a decimal comma (`1,5` is 0001-01-05), a
+  six-digit clock (`123456.7` is 0001-01-01 12:34:56.7) and an offset
+  after a compact clock (`202112311230-0500`); Minera leaves such a cell
+  unparsed (a column holding one stays text, a timestamp column refuses
+  the upload as before). A cell led by `/`, `.` or `-` is left out for
+  the same reason.
+- `python::sort` emulates CPython's `list.sort` exactly below 64 items;
+  for longer mixed columns the operands of the first failing comparison
+  can differ from CPython 3.11's powersort merges (8 of 1,700 random lists
+  of 64 to 300 items), so a long mixed XES column may name its types the
+  other way round (`'int' and 'str'`). Open for round BF.
+
+Verification (scripts in the project files under `review-harness/round-be/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Attribute KDE on CSV and XES uploads, BD's sweep (`kdesweep.py`, seeds 0 to 299) | 900 | before (seeds 0 to 29): 6 differences, 64 other messages of 90; final: 264 equal, 636 raise in both with pm4py's message |
+| Attribute KDE with ints, floats, bools, text, dates, `inf`, `@@index` and old dates (`kdesweep2.py`, seeds 0 to 499) | 1,500 | seeds 0 to 199 before BE1-2: 20 differences, 13 other messages (`@@index` on XES, single `inf`); seeds 200 to 499 final: 235 equal, 663 raise in both, 2 declared single `inf` |
+| Partial and number-like dates: `reference_numeric_cell_date` and the whole mixed parser vs pandas (`ndfuzz.py`, `mixfuzz.py`; `isonum.py` for spaced and delimited ISO dates with an hour alone, seeds 1 and 2) | about 35,000 cells | equal apart from the declared shapes (year 0, negative years, decimal comma, six-digit clocks, offsets after a compact clock, separator-led cells) |
+| CSV uploads with partial dates in the timestamp and other columns, mine and KDE (`pdsweep.py`, seeds 0 to 149) | 741 requests, 24 uploads | 226 equal, 500 raise in both, 15 declared year 0, 24 uploads Minera refuses where pm4py keeps the timestamp column as text (`5`, `999`, `x`, `2020-13`, `/08`; declared since U1) |
+| SNA, every variant, CSV columns of mixed types (`snamixcsv.py`, seeds 100 to 199 on the BE build; seeds 5000 to 5149 on BD's code) | 1,500 | 550 equal, 763 raise in both, 186 declared NaN, 1 NaN-keyed joint activities (seed 5147, declared since AS); seed 152 now equal |
+| Set-order selection with per-row case cells (`boolselcase.py` with `VARY=1`, seeds 5000 to 5149) | 150 | 149 equal, 1 declared hash-seed text column (seed 5110: `trace:f2` under 5 of 6 hash seeds) |
+| Workload metrics on XES object columns (`wlshift.py`, seeds 5000 to 5199) | 800 | 61 equal, 739 raise in both |
+| Event distribution on uploads (`evdist.py`, seeds 0 to 199 and 5000 to 5299; `evdist2.py` with ISO week 53, day 31 and pre-1970 dates, seeds 6000 to 6299) | 2,400 | 2,400 equal |
+| The CLI path, `minera_export` (`clipost.py` with `kdesweep2.py` and `evdist2.py`, seeds 7000 to 7099) | 600 | KDE: 75 equal, 225 raise in both; distribution: 300 equal |
+| Full ctest | 463 tests | 463 pass |
+
+`minera_review_be1_tests` binds the values and messages above (taken from
+pandas and pm4py black-box on the same uploads and cells).
