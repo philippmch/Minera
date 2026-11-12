@@ -25,7 +25,62 @@ struct TimedEvent {
   std::string activity;
   double instant = 0.0;
   std::size_t source_order = 0;
+  // The DataFrame and LazyFrame variants' instant of a table cell (round
+  // BP, frame_instant), when it parses exactly; else instant * scale.
+  std::optional<double> frame_instant;
 };
+
+// pandas' DataFrame spectrum reads a datetime column as its int64 units
+// divided by 1e9 (numpy's true division of the int64 by an int): a
+// microsecond column (pandas 3's default, an XES frame's too) gives seconds
+// scaled down by 1e3, a nanosecond one (a CSV column with digits below the
+// microsecond) the seconds themselves (round BP, observed black-box). A
+// finer cell than the unit is truncated, as a datetime64 of that unit holds
+// it.
+std::int64_t pandas_units_per_second(const EventTable& table, std::size_t column) {
+  if (column >= table.dtypes.size()) return 1000000;
+  const std::string_view dtype = table.dtypes[column];
+  if (dtype.starts_with("datetime64[ns")) return 1000000000;
+  if (dtype.starts_with("datetime64[ms")) return 1000;
+  if (dtype.starts_with("datetime64[s")) return 1;
+  return 1000000;
+}
+
+// The cell's int64 units of `units_per_second` over `divisor`.
+std::optional<double> datetime_units_instant(std::string_view text, std::int64_t units_per_second,
+                                             double divisor) {
+  const auto exact = parse_timestamp_exact(text);
+  if (!exact) return std::nullopt;
+  constexpr std::int64_t kBillion = 1000000000;
+  if (exact->seconds > std::numeric_limits<std::int64_t>::max() / units_per_second - 1 ||
+      exact->seconds < std::numeric_limits<std::int64_t>::min() / units_per_second + 1)
+    return std::nullopt;
+  const auto units = exact->seconds * units_per_second +
+                     static_cast<std::int64_t>(exact->nanoseconds) / (kBillion / units_per_second);
+  return static_cast<double>(units) / divisor;
+}
+
+// A table cell's instant as the component reads it: pandas' units over 1e9
+// (above); Polars' epoch microseconds over 1e6, a nanosecond cell truncated
+// (round BP, observed black-box); nullopt for the log components.
+std::optional<double> frame_instant(std::string_view text, Component component,
+                                    std::int64_t units_per_second) {
+  switch (component) {
+    case Component::kDataframe:
+    case Component::kDataframeDisconnected:
+      return datetime_units_instant(text, units_per_second, 1e9);
+    case Component::kLazyframe:
+    case Component::kLazyframeDisconnected:
+      return datetime_units_instant(text, 1000000, 1e6);
+    default:
+      return std::nullopt;
+  }
+}
+
+double scaled_instant(const TimedEvent& event, double scale) {
+  if (event.frame_instant) return *event.frame_instant;
+  return event.instant * scale;
+}
 
 using CaseEvents = std::vector<TimedEvent>;
 using Cases = std::vector<CaseEvents>;
@@ -311,8 +366,9 @@ Cases split_runs(std::vector<TimedEvent> events, bool sorted) {
 
 Cases project_table(const EventTable& table,
                     const std::set<std::string>& requested,
-                    const PerformanceSpectrumOptions& options) {
+                    const PerformanceSpectrumOptions& options, Component component) {
   const auto columns = table_columns(table, options);
+  const auto units_per_second = pandas_units_per_second(table, columns.timestamp);
   std::vector<TimedEvent> events;
   events.reserve(table.rows.size());
   for (std::size_t row_index = 0; row_index < table.rows.size(); ++row_index) {
@@ -330,14 +386,14 @@ Cases project_table(const EventTable& table,
           "performance spectrum: selected event has an invalid timestamp");
     }
     events.push_back({table_cell_text(row, columns.case_id), activity, *instant,
-                      row_index});
+                      row_index, frame_instant(timestamp, component, units_per_second)});
   }
   return split_runs(std::move(events), options.sort_log);
 }
 
 Cases project_lazy_table(const LazyEventTable& table,
                          const std::set<std::string>& requested,
-                         const PerformanceSpectrumOptions& options) {
+                         const PerformanceSpectrumOptions& options, Component component) {
   EventTable pending;
   pending.columns = table.columns();
   pending.validate();
@@ -373,7 +429,7 @@ Cases project_lazy_table(const LazyEventTable& table,
           "performance spectrum: selected event has an invalid timestamp");
     }
     events.push_back({table_cell_text(row, selected.case_id), activity,
-                      *instant, source_order});
+                      *instant, source_order, frame_instant(timestamp, component, 1000000)});
   };
 
   table.scan([&](const LazyEventTable::Row& row) {
@@ -592,7 +648,7 @@ std::vector<SpectrumObservation> connected_points(
       point.activities = pattern;
       point.instants.reserve(pattern.size());
       for (std::size_t offset = 0; offset < pattern.size(); ++offset) {
-        point.instants.push_back(events[start + offset].instant * scale);
+        point.instants.push_back(scaled_instant(events[start + offset], scale));
       }
       points.push_back(std::move(point));
     }
@@ -681,8 +737,8 @@ std::vector<SpectrumObservation> pair_disconnected_points(
       SpectrumObservation point;
       point.case_id = events[start].case_id;
       point.activities = {events[start].activity, events[start + 1].activity};
-      point.instants = {events[start].instant * scale,
-                        events[start + 1].instant * scale};
+      point.instants = {scaled_instant(events[start], scale),
+                        scaled_instant(events[start + 1], scale)};
       for (std::size_t offset = 0; offset + 1 < pattern.size(); ++offset) {
         if (pattern[offset] == point.activities[0] &&
             pattern[offset + 1] == point.activities[1]) {
@@ -734,7 +790,7 @@ std::vector<SpectrumObservation> full_disconnected_points(
         point.instants.reserve(length);
         for (std::size_t index = 0; index < length; ++index) {
           point.instants.push_back(
-              events[active[match.start + index]].instant * scale);
+              scaled_instant(events[active[match.start + index]], scale));
         }
         points.push_back(std::move(point));
       }
@@ -846,7 +902,7 @@ PerformanceSpectrum run_component(
     const EventTable& table, std::vector<std::string> activities,
     PerformanceSpectrumOptions options, Component component) {
   std::set<std::string> requested(activities.begin(), activities.end());
-  auto cases = project_table(table, requested, options);
+  auto cases = project_table(table, requested, options, component);
   return run_cases(std::move(cases), std::move(activities), std::move(options),
                    component);
 }
@@ -863,7 +919,7 @@ PerformanceSpectrum run_component(
     const LazyEventTable& table, std::vector<std::string> activities,
     PerformanceSpectrumOptions options, Component component) {
   std::set<std::string> requested(activities.begin(), activities.end());
-  auto cases = project_lazy_table(table, requested, options);
+  auto cases = project_lazy_table(table, requested, options, component);
   return run_cases(std::move(cases), std::move(activities), std::move(options),
                    component);
 }

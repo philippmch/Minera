@@ -1,4 +1,5 @@
 #include "minera/chaotic_activities.hpp"
+#include "reference_activity_selector.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -20,6 +21,8 @@ std::optional<std::string> activity_value(const Event& event,
   if (key.empty() || key == "activity" || key == "concept:name")
     return event.activity;
   const auto* attribute = event.attribute(key);
+  // A CSV's own header of a selected column (its source key; round BP).
+  if (!attribute) attribute = reference_selected_field(event, key);
   if (!attribute) return std::nullopt;
   return *attribute;
 }

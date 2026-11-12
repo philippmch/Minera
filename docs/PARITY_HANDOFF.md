@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BO (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BP (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4656,7 +4656,60 @@ active-source fixtures of a CSV with both its own and the standard headers
 were recaptured (the copies now replace the CSV's columns, as pm4py's
 frame). The device check on the Mac was skipped again (no device linked).
 
-Next round (BP) should start by re-reviewing round BO:
+Round BP re-reviewed BO (Review BP1; BO's batches, standard keys, Declare
+and log skeleton workbenches and CLI batches held on fresh seeds) and took
+its targets. It fixed pm4py's DataFrame performance spectrum instants (the
+datetime column's int64 units over 1e9, exactly divided: Minera multiplied
+by 0.001, an ulp off in about one answer of ten, and read a nanosecond column,
+which pandas gives as seconds, a thousandfold too small) and the LazyFrame
+ones on nanosecond cells (epoch microseconds over 1e6, truncated); the
+CLI's DataFrame spectrum and DFG adapters on CSV inputs, which now read
+the CSV's frame as the server does (the partial order with a start column
+followed the log's rows, not the frame's `@@index`); and seven log families
+that refused a CSV's own column header as their key (rework, chaotic
+activities, variant statistics, boundary activities, clustering, decision
+replay and interval overlap: `event is missing activity attribute 'act'`;
+they now read the selected column through its source key, in the CLI and
+on the server); and BO's Windows build (MSVC refused the CLI's frame
+helper, which took the input path as a string). One active-source fixture (a typed table declared
+`datetime64[ns, UTC]`) was recaptured: its DataFrame spectrum is in
+seconds, as pandas gives it. Declared: pm4py's log variants read a CSV
+frame's nanosecond cells through `Timestamp.timestamp()`, which rounds to
+microseconds; the DataFrame routes keyed by a number column read its cells
+as text. The device check on the Mac was skipped again (no device linked).
+
+Next round (BQ) should start by re-reviewing round BP:
+
+- `src/backend/performance_spectrum/components.cpp`: `frame_instant`
+  (`pandas_units_per_second` reads only `EventTable::dtypes`; a LazyFrame,
+  a stream table and a table without dtypes count as microseconds; the
+  DataFrame components on an `EventLog` still multiply by 0.001), the
+  points' `scaled_instant`, sorting by the parsed seconds;
+- `src/backend/tools/minera_export.cpp`: `csv_input_source` and its callers
+  (`csv_batch_frame`, the DataFrame spectrum variants, the DFG adapters with
+  `csv_frame_key` on their three keys and `mark_csv_nan_cells` for pandas);
+  the CLI's MSD still reads `event_log_to_table(log)` (it matched pm4py on
+  every swept shape);
+- the `reference_selected_field` fallbacks in rework, chaotic activities,
+  variant statistics, boundary activities, clustering, decision replay and
+  overlap (a resource, timestamp or lifecycle header as the activity key
+  reads that projection; `process_tree_reduction`, `petri_usage_comparison`,
+  `dfg_precision` and the alpha selector were not changed: check them on CSV
+  headers);
+- new areas: log families on CSV uploads with nanosecond cells (pm4py's
+  `Timestamp.timestamp()` rounds to microseconds: durations, sojourn and
+  waiting times, the spectrum's log variants; declared in BP for the
+  spectrum), the DataFrame routes keyed by a number column (pm4py's pandas
+  MSD and spectrum raise TypeError on an int activity column, the Polars MSD
+  names a float column's activities `1.0`; typed frame cells beyond the
+  batches), the CLI's remaining CSV modes against pm4py on the frame
+  (temporal profile, correlation, transition system);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BP commit.
+
+Round BO's targets, re-reviewed in BP (findings BP1-1 to BP1-4):
+
 
 - `src/backend/tools/csv_frame_table.hpp` (moved from the server, now also
   used by `minera_export`'s `csv_batch_frame`: the CLI rebuilds the source

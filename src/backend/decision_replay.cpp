@@ -1,4 +1,5 @@
 #include "decision_replay.hpp"
+#include "reference_activity_selector.hpp"
 
 #include <string>
 #include <stdexcept>
@@ -26,6 +27,8 @@ const std::string& activity_value(const Event& event,
                                   std::string_view activity_attribute) {
   if (standard_activity_attribute(activity_attribute)) return event.activity;
   if (const auto* value = event.attribute(activity_attribute)) return *value;
+  // A CSV's own header of a selected column (its source key; round BP).
+  if (const auto* value = reference_selected_field(event, activity_attribute)) return *value;
   throw std::invalid_argument(
       "decision mining: event is missing activity attribute '" +
       std::string(activity_attribute) + "'");

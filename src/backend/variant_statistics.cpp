@@ -1,4 +1,5 @@
 #include "minera/variant_statistics.hpp"
+#include "reference_activity_selector.hpp"
 
 #include "frame_cells.hpp"
 
@@ -17,7 +18,9 @@ const std::string* activity_value(const Event& event, std::string_view key) {
   if (key == "resource" || key == "org:resource") return &event.resource;
   if (key == "lifecycle" || key == "lifecycle:transition")
     return &event.lifecycle;
-  return event.attribute(key);
+  if (const auto* value = event.attribute(key)) return value;
+  // A CSV's own header of a selected column (its source key; round BP).
+  return reference_selected_field(event, key);
 }
 
 }  // namespace

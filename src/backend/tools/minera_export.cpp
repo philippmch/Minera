@@ -1885,22 +1885,30 @@ minera::MinimumSelfDistances discover_selected_minimum_self_distances(
   throw std::invalid_argument("minimum self-distance variant is invalid");
 }
 
+// `frame`: a CSV input's frame (csv_frame_table), which the DataFrame and
+// LazyFrame variants read as the server's spectrum route does (its
+// datetime unit sets the pandas instants; round BP).
 minera::PerformanceSpectrum discover_selected_performance_spectrum(
     const minera::EventLog& log, const std::vector<std::string>& activities,
-    const minera::PerformanceSpectrumOptions& options) {
+    const minera::PerformanceSpectrumOptions& options,
+    const minera::EventTable* frame = nullptr) {
+  const auto table = [&] {return frame ? *frame : minera::event_log_to_table(log);};
+  const auto lazy = [&] {
+    return frame ? minera::LazyEventTable::from_table(*frame) : minera::event_log_to_lazy_table(log);
+  };
   switch (options.variant) {
     case minera::PerformanceSpectrumVariant::kDataframe:
       return minera::discover_performance_spectrum_dataframe(
-          minera::event_log_to_table(log), activities, options);
+          table(), activities, options);
     case minera::PerformanceSpectrumVariant::kDataframeDisconnected:
       return minera::discover_performance_spectrum_dataframe_disconnected(
-          minera::event_log_to_table(log), activities, options);
+          table(), activities, options);
     case minera::PerformanceSpectrumVariant::kLazyframe:
       return minera::discover_performance_spectrum_lazyframe(
-          minera::event_log_to_lazy_table(log), activities, options);
+          lazy(), activities, options);
     case minera::PerformanceSpectrumVariant::kLazyframeDisconnected:
       return minera::discover_performance_spectrum_lazyframe_disconnected(
-          minera::event_log_to_lazy_table(log), activities, options);
+          lazy(), activities, options);
     case minera::PerformanceSpectrumVariant::kConnected:
     case minera::PerformanceSpectrumVariant::kDisconnected:
     case minera::PerformanceSpectrumVariant::kLog:
@@ -1910,13 +1918,14 @@ minera::PerformanceSpectrum discover_selected_performance_spectrum(
   throw std::invalid_argument("performance spectrum variant is invalid");
 }
 
-// A CSV input's frame (format_dataframe of read_csv, with its "@@index"),
-// which the pandas and Polars batches read as the server reads an upload
-// (round BO): nullopt when `log` is not the input's frame log (a filter
-// changed it) or the frame cannot be built.
-std::optional<minera::EventTable> csv_batch_frame(const std::string& input,
-                                                  const minera::CsvImportOptions& options,
-                                                  const minera::EventLog& log) {
+// A CSV input as the server binds an upload (its frame is format_dataframe
+// of read_csv): nullopt when `log` is not the input's frame log (a filter
+// changed it). The pandas and Polars batches (round BO) and the DataFrame
+// spectrum variants (round BP) read its frame, as the server's routes do.
+// (`input` is a path: on Windows it does not convert to std::string.)
+std::optional<minera::ActiveEventSource> csv_input_source(const std::filesystem::path& input,
+                                                          const minera::CsvImportOptions& options,
+                                                          const minera::EventLog& log) {
   auto data = minera::import_csv_event_data(input, options);
   // The selected columns under their headers, as the importer resolved its
   // aliases (the server binds an upload's selectors the same way).
@@ -1936,8 +1945,8 @@ std::optional<minera::EventTable> csv_batch_frame(const std::string& input,
     bind(selectors.lifecycle_key, event.lifecycle_source_key);
     break;
   }
-  const auto source = minera::ActiveEventSource::from_csv(std::move(data), minera::ActiveSourceFile{input, "csv", {}},
-                                                          selectors, minera::EventDataKind::kEventLog);
+  auto source = minera::ActiveEventSource::from_csv(std::move(data), minera::ActiveSourceFile{cli_path_text(input), "csv", {}},
+                                                    selectors, minera::EventDataKind::kEventLog);
   const auto& frame_log = source.checked_log();
   if (frame_log.traces.size() != log.traces.size()) return std::nullopt;
   for (std::size_t t = 0; t < log.traces.size(); ++t) {
@@ -1947,7 +1956,17 @@ std::optional<minera::EventTable> csv_batch_frame(const std::string& input,
     for (std::size_t e = 0; e < a.size(); ++e)
       if (a[e].input_order != b[e].input_order) return std::nullopt;
   }
-  return indexed_csv_frame_table(source);
+  return source;
+}
+
+// The frame with its "@@index" that the batches read (round BO); nullopt as
+// csv_input_source, or when the frame cannot be built.
+std::optional<minera::EventTable> csv_batch_frame(const std::filesystem::path& input,
+                                                  const minera::CsvImportOptions& options,
+                                                  const minera::EventLog& log) {
+  const auto source = csv_input_source(input, options, log);
+  if (!source) return std::nullopt;
+  return indexed_csv_frame_table(*source);
 }
 
 minera::BatchDiscovery discover_selected_batches(
@@ -6763,8 +6782,26 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto present = [&](std::string_view name) {
         return dfg_dataframe_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_mine_params(lookup, present);
-      const auto table = minera::event_log_to_table(log);
+      auto params = minera::parse_mine_params(lookup, present);
+      // A CSV input is read as format_dataframe's frame, as the server reads
+      // an upload (round BP): the pandas adapters with its "@@index" and its
+      // NaN cells null, the Polars ones on the frame; the standard keys name
+      // the selected columns (csv_frame_key).
+      std::optional<minera::EventTable> frame;
+      if (!input_is_xes)
+        if (const auto source = csv_input_source(input, options, log)) {
+          const bool pandas = params.dfg_backend == minera::DfgTableBackend::kPandas;
+          frame = csv_frame_table(*source, pandas);
+          if (frame && pandas) mark_csv_nan_cells(*frame);
+          if (frame) {
+            using Role = minera::FirstClassAttributeRole;
+            auto& keys = params.dfg_table_options;
+            keys.case_id_attribute = csv_frame_key(*source, Role::kCaseId, keys.case_id_attribute);
+            keys.activity_attribute = csv_frame_key(*source, Role::kActivity, keys.activity_attribute);
+            keys.timestamp_attribute = csv_frame_key(*source, Role::kTimestamp, keys.timestamp_attribute);
+          }
+        }
+      const auto table = frame ? std::move(*frame) : minera::event_log_to_table(log);
       std::string body;
       if (params.dfg_operation == minera::DfgTableOperation::kGraph) {
         if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
@@ -8322,8 +8359,14 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
     // Optionally compute the performance spectrum over an activity pattern.
     std::optional<minera::PerformanceSpectrum> spectrum;
     if (!spectrum_activities.empty()) {
+      using Variant = minera::PerformanceSpectrumVariant;
+      const auto variant = spectrum_options.variant;
+      std::optional<minera::EventTable> frame;
+      if (!input_is_xes && (variant == Variant::kDataframe || variant == Variant::kDataframeDisconnected ||
+                            variant == Variant::kLazyframe || variant == Variant::kLazyframeDisconnected))
+        if (const auto source = csv_input_source(input, options, log)) frame = csv_frame_table(*source, false);
       spectrum = discover_selected_performance_spectrum(
-          log, spectrum_activities, spectrum_options);
+          log, spectrum_activities, spectrum_options, frame ? &*frame : nullptr);
     }
     const minera::PerformanceSpectrum* spectrum_ptr =
         spectrum ? &*spectrum : nullptr;

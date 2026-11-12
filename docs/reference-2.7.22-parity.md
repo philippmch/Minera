@@ -24417,3 +24417,92 @@ fixes, on the same scripts):
 frame rows without the CSV's own standard columns, the log variant's NaN
 groups and TypeError, numeric resources and activities, and the frame's
 `KeyError`.
+
+## Review BP1: re-review of round BO, the DataFrame spectrum's instants, the CLI's DataFrame modes on CSV inputs and log families keyed by a CSV's own headers (2026-11-12)
+
+Round BP checked BO's CI run, re-reviewed BO (the standard keys and the frame's own copies on
+CSV uploads, the batches on the frame's typed cells, the CLI's batches)
+with fresh seeds: the metamorphic standard keys on 16 session routes
+(`keystd.py`, 60 uploads with and without the CSV's own junk standard
+columns, three shapes), the Declare and log skeleton workbenches
+(`declcsv.py`, 75 uploads), the batches (`batchcsv.py`, 240 uploads over
+eight shapes) and the CLI's batches (`clibatch.py`, 120) answered as pm4py
+or raised alike, but for the cases BO declared. It then took BO's targets:
+the CLI's other DataFrame modes on CSV inputs and the families that read
+the upload's log under a key. The device check on the Mac was skipped (the
+round's thread had no device linked). Findings, all fixed:
+
+- **BP1-1 The DataFrame spectrum's instants.** pm4py's DataFrame
+  performance spectrum (connected and disconnected) reads the timestamp
+  column as its int64 units divided by 1e9: a microsecond column (pandas
+  3's default, an XES frame's too) gives the seconds scaled down a
+  thousandfold, exactly divided (`1577836.809`), a nanosecond column (a
+  CSV with digits below the microsecond, or a typed table declared
+  `datetime64[ns, UTC]`) the seconds themselves (`1577836809.1234567`).
+  Minera multiplied the parsed seconds by 0.001 whatever the unit: one ulp
+  off in about one answer of ten (`1577836.8090000001`), and a nanosecond
+  frame's instants a thousandfold too small, on the server's spectrum route
+  and in the CLI. The LazyFrame variants read epoch microseconds over 1e6,
+  so a nanosecond cell is truncated (`1577836809.123456`); Minera kept the
+  nanoseconds. The DataFrame components now compute the instant from the
+  cell's exact units and the column's declared unit (`frame_instant`), the
+  LazyFrame ones from its truncated microseconds.
+- **BP1-2 The CLI's DFG adapters and spectrum on a CSV input.**
+  `minera_export --dfg-dataframe-output` and the DataFrame and LazyFrame
+  spectrum variants read a table made from the log: the partial order with
+  a start column paired the log's rows instead of the frame's `@@index`
+  (12 to 23 of 30 answers differed), and the spectrum had no datetime unit.
+  The CLI now reads the CSV's frame as the server reads an upload
+  (`csv_input_source`): the pandas adapters with `@@index` and the NaN cells
+  null, the Polars ones on the frame, the standard keys naming the selected
+  columns (`csv_frame_key`).
+- **BP1-3 Log families keyed by a CSV's own column headers.** pm4py reads
+  `activity_key="act"` (or `"res"`, or a start and completion column) on a
+  CSV upload's frame as that column. Minera's rework, chaotic activities,
+  variant statistics, boundary activities, trace clustering, decision
+  replay and interval overlap looked the key up among the events' attributes
+  only, where the import keeps the selected columns under their roles, and
+  refused it (`event is missing activity attribute 'act'`, `invalid
+  completion timestamp`), in the CLI and on the server's routes. They now
+  read the selected column through its source key
+  (`reference_selected_field`); passed and service time already did (their
+  frame path).
+- **BP1-4 Round BO's Windows build.** BO's CI run (43293820797) passed on
+  Linux and macOS but MSVC refused `minera_export.cpp`: the CLI's frame
+  helper took the input as `std::string`, and a `std::filesystem::path`
+  does not convert to it on Windows (`error C2664`). The helpers now take
+  the path.
+
+Declarations:
+
+- pm4py's log variants on a CSV upload read its frame's log, whose
+  timestamps are pandas `Timestamp`s: `Timestamp.timestamp()` rounds to
+  microseconds, so a cell with nanosecond digits is `1577837040.123457`
+  there; Minera's log variants keep the parsed nanoseconds
+  (`1577837040.1234567`; 2 of 30 nanosecond uploads in the spectrum's log
+  variants).
+- The DataFrame routes keyed by a number column (the frame's typed cells
+  beyond the batches) read its cells as text: pm4py's pandas minimum
+  self-distances and spectrum raise `TypeError` on an int activity column,
+  and the Polars minimum self-distances name a float column's activities
+  `1.0`.
+- The CSV timestamp columns of plain numbers and "roles to diagnostics
+  groups" (round AT) are still with Philipp.
+
+Verification (scripts in the project files under `review-harness/round-bp/`;
+"before" is round BO's CLI and server on the same scripts and seeds):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| CLI spectrum (four DataFrame and LazyFrame variants) and MSD (pandas, Polars) on CSV inputs vs pm4py on the frame (`clidf.py`: 30 plain, 30 with fractional and nanosecond cells, 30 with blanks and the CSV's own keys) | 540 | before: 16 DataFrame answers an ulp off, 22 a thousandfold too small, 6 LazyFrame answers with untruncated nanoseconds; after: all equal, 3 raise alike; MSD equal before and after |
+| Server spectrum route vs pm4py (`spectsrv.py`: 30 nanosecond CSV uploads, 30 fractional XES uploads, 30 CSV uploads with blanks as LazyFrame; six variants) | 540 | before: 42 DataFrame and 4 LazyFrame answers differed; after: all equal but 4 log answers with nanosecond cells (declared) |
+| CLI DFG adapters (graph, partial order, concurrent events) on CSV inputs vs pm4py's `df_statistics` on the frame (`clidfg.py`: 30 with a start column, 30 with blanks and options, 30 with nanoseconds) | 360 | before: 56 of 90 partial orders differed; after: all equal, 1 raises alike |
+| CLI log families keyed by the CSV's own headers vs the standard keys, and rework by resource vs pm4py (`clikeys.py`: 40 uploads, with and without blanks; nine checks) | 360 | before: 276 refused or differed; after: all the same or equal, 4 clusterings raise alike |
+| CLI activity position summary (pandas, log) vs pm4py (`clipos.py`, 80 uploads) | 160 | all equal |
+| BO's sweeps re-run on fresh seeds (`keystd.py`, `declcsv.py`, `batchcsv.py`, `clibatch.py`) | about 2,500 | all the same, equal or raise alike, but the cases BO and BL declared |
+| Full suites: ctest, script tests, frontend tests, fixture replay | 474 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; one active-source fixture recaptured (a typed table declared `datetime64[ns, UTC]`: its DataFrame spectrum is in seconds, as pandas gives it) |
+
+`minera_review_bp1_tests` binds the DataFrame spectrum's instants on
+microsecond, nanosecond and undeclared columns, the LazyFrame truncation,
+and the rework, variant statistics, chaotic activities, start activities
+and overlap keyed by a CSV's own headers.

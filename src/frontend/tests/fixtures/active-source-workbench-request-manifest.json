@@ -207,14 +207,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "227248",
+        "Content-Length": "227212",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-complete-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/typed-complete-dataframe.response.json",
-        "bytes": 227248,
-        "sha256": "1d6ceb60e1907e6bbd6358e4adae429b0930bee3aa5081f9178ae607f797bf60",
+        "bytes": 227212,
+        "sha256": "8081311c4644939b8772f547301f6ef9e24961acc6ffd2b948bd12f0785f3dcd",
         "status": 200
       },
       "exports": {},

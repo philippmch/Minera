@@ -1,4 +1,5 @@
 #include "minera/clustering.hpp"
+#include "reference_activity_selector.hpp"
 #include "minera/log_to_features.hpp"
 
 #include <algorithm>
@@ -73,6 +74,8 @@ const std::string& selected_activity(const Event& event,
     return event.lifecycle;
   }
   if (const auto* value = event.attribute(selector)) return *value;
+  // A CSV's own header of a selected column (its source key; round BP).
+  if (const auto* value = reference_selected_field(event, selector)) return *value;
   throw std::invalid_argument(std::string(family) +
                               ": event is missing activity attribute '" +
                               std::string(selector) + "'");

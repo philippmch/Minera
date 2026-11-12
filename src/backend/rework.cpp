@@ -1,4 +1,5 @@
 #include "minera/rework.hpp"
+#include "reference_activity_selector.hpp"
 
 #include <map>
 #include <stdexcept>
@@ -13,6 +14,8 @@ std::string activity_value(const Event& event, std::string_view key) {
     return event.activity;
   if (key == "resource") return event.resource;
   if (const auto* value = event.attribute(key)) return *value;
+  // A CSV's own header of a selected column (its source key; round BP).
+  if (const auto* value = reference_selected_field(event, key)) return *value;
   throw std::invalid_argument("rework: event is missing activity attribute '" +
                               std::string(key) + "'");
 }

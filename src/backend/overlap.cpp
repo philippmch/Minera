@@ -1,4 +1,5 @@
 #include "minera/overlap.hpp"
+#include "reference_activity_selector.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -37,7 +38,9 @@ std::string completion_key(const OverlapOptions& options) {
 const std::string* source_text(const Event& event, const std::string& key) {
   if (key.empty() || key == "time:timestamp" || key == "timestamp")
     return &event.timestamp;
-  return event.attribute(key);
+  if (const auto* value = event.attribute(key)) return value;
+  // A CSV's own header of a selected column (its source key; round BP).
+  return reference_selected_field(event, key);
 }
 
 std::string activity_label(const Event& event, const OverlapOptions& options) {
@@ -47,6 +50,8 @@ std::string activity_label(const Event& event, const OverlapOptions& options) {
   if (key.empty() || key == "concept:name" || key == "activity")
     return event.activity;
   const auto* value = event.attribute(key);
+  // A CSV's own header of a selected column (its source key; round BP).
+  if (value == nullptr) value = reference_selected_field(event, key);
   if (value == nullptr)
     throw std::invalid_argument("overlap: event is missing activity attribute");
   return *value;
