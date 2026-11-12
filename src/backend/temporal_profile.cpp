@@ -2,12 +2,15 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <deque>
 #include <initializer_list>
 #include <limits>
 #include <map>
+#include <numeric>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string_view>
 #include <tuple>
@@ -341,10 +344,15 @@ TemporalTableColumns temporal_table_columns(
       table, source_timestamp_key(options),
       FirstClassAttributeRole::kTimestamp,
       {"timestamp", "time:timestamp"});
-  const auto target = temporal_table_column(
+  auto target = temporal_table_column(
       table, target_timestamp_key(options),
       FirstClassAttributeRole::kTimestamp,
       {"timestamp", "time:timestamp"});
+  // pm4py's DataFrame algorithms take the completion column as the start
+  // when the frame has no start column (an XES upload whose events all lack
+  // it, say); a missing completion column raises (round BL, observed
+  // black-box).
+  if (!target) target = source;
   if (!case_id || !activity || !source || !target) {
     throw std::invalid_argument(
         "temporal profile: selected dataframe column is missing");
@@ -357,70 +365,177 @@ const std::string* table_value(const EventTable::Row& row, std::size_t column) {
   return &row[column]->value;
 }
 
+using PairRanks = std::vector<std::vector<std::int64_t>>;
+
+// The upload's timestamp column, which format_dataframe copies over
+// "time:timestamp" (round BL, observed black-box): the column whose cells
+// carry the timestamp role, else "time:timestamp" or "timestamp".
+std::optional<std::size_t> upload_timestamp_column(const EventTable& table) {
+  for (std::size_t index = 0; index < table.columns.size(); ++index)
+    for (const auto& row : table.rows)
+      if (index < row.size() && row[index] && row[index]->first_class_role == FirstClassAttributeRole::kTimestamp)
+        return index;
+  return temporal_table_column(table, "time:timestamp", FirstClassAttributeRole::kTimestamp,
+                               {"timestamp", "time:timestamp"});
+}
+
 struct TemporalTableEvent {
   std::string case_id;
   std::string activity;
-  std::string source_timestamp;
-  std::string target_timestamp;
+  // The completion (source) timestamp; none when the cell is missing (NaT).
+  std::optional<std::string> source_timestamp;
+  // The start (target) timestamp; none when the cell is missing (NaT).
+  std::optional<std::string> target_timestamp;
   double source_instant = 0.0;
   double target_instant = 0.0;
   std::optional<ParsedExactTimestamp> source_exact, target_exact;
   std::size_t row_index = 0;
+  // The row's "@@index" (or its frame position within the case).
+  std::int64_t rank = 0;
+  // The row's format_dataframe timestamp, on a CSV upload's rows.
+  std::optional<ParsedExactTimestamp> frame_exact;
+  double frame_instant = 0.0;
 };
 
+// The table's rows as a log for pm4py's DataFrame algorithms: cases by
+// sorted id, each case's rows sorted by the target (start) timestamp, then
+// the source (completion) one, then the row. A missing cell is NaN or NaT
+// there and never raises (round BL, observed black-box): a row without an
+// activity drops out of the groups, a row whose start is NaT sorts last and
+// pairs only as a source (so never without an "@@index"), one whose
+// completion is NaT sorts after equal starts and pairs only as a target. `first_rows`, when given, receives each
+// case's first row in the table (rows that drop out included); `ranks`, when
+// given, each kept row's "@@index" per case when the pairs follow it (left
+// empty when the sorted position decides). The rows without a case form one
+// more case, after the others (pm4py pairs rows by merging the frame with
+// itself on the case column, where NaN meets NaN; round BL, observed
+// black-box), except on a CSV upload's rows, where format_dataframe drops
+// the rows without a case or an activity.
 EventLog temporal_table_to_log(const EventTable& table,
-                               const TemporalProfileOptions& options) {
+                               const TemporalProfileOptions& options,
+                               std::vector<std::size_t>* first_rows = nullptr,
+                               PairRanks* ranks = nullptr) {
   const auto columns = temporal_table_columns(table, options);
-  std::map<std::string, std::vector<TemporalTableEvent>> grouped;
+  // pd.to_datetime reads an empty cell as NaT, as a missing one.
+  const auto timestamp_value = [](const EventTable::Row& row, std::size_t column) {
+    const auto* value = table_value(row, column);
+    return value && value->empty() ? nullptr : value;
+  };
+  // The pair order: the table's own "@@index" column; else, on a CSV
+  // upload's rows (file order), format_dataframe's: the rows with a
+  // timestamp, each case's by that timestamp, then file order.
+  const auto index_column = std::find(table.columns.begin(), table.columns.end(), "@@index");
+  const bool own_index = index_column != table.columns.end();
+  const auto frame_timestamp = !own_index && options.frame_index_rows ? upload_timestamp_column(table) : std::nullopt;
+  bool ranked = own_index || frame_timestamp.has_value();
+  const bool split = columns.source_timestamp != columns.target_timestamp;
+  // (no case, id): the rows without a case last.
+  using CaseKey = std::pair<bool, std::string>;
+  std::map<CaseKey, std::vector<TemporalTableEvent>> grouped;
+  std::map<CaseKey, std::size_t> first_row;
   for (std::size_t row_index = 0; row_index < table.rows.size(); ++row_index) {
     const auto& row = table.rows[row_index];
     const auto* case_id = table_value(row, columns.case_id);
+    if (case_id == nullptr && frame_timestamp) continue;
+    const CaseKey key{case_id == nullptr, case_id ? *case_id : std::string()};
     const auto* activity = table_value(row, columns.activity);
-    const auto* source = table_value(row, columns.source_timestamp);
-    const auto* target = table_value(row, columns.target_timestamp);
-    if (case_id == nullptr || activity == nullptr || source == nullptr ||
-        target == nullptr) {
-      if (options.strict_attributes) {
-        throw std::invalid_argument(
-            "temporal profile: selected dataframe value is missing");
-      }
-      continue;
+    if (frame_timestamp && activity == nullptr) continue;
+    std::int64_t rank = 0;
+    std::optional<ParsedExactTimestamp> frame_exact;
+    double frame_instant = 0.0;
+    if (frame_timestamp) {
+      // format_dataframe drops a row without a timestamp.
+      const auto* value = timestamp_value(row, *frame_timestamp);
+      const auto instant = value ? parse_timestamp(*value) : std::nullopt;
+      if (!instant) continue;
+      frame_instant = *instant;
+      frame_exact = parse_timestamp_exact(*value);
+    } else if (own_index) {
+      const auto* cell = table_value(row, static_cast<std::size_t>(index_column - table.columns.begin()));
+      const auto [end, error] = cell ? std::from_chars(cell->data(), cell->data() + cell->size(), rank)
+                                     : std::from_chars_result{nullptr, std::errc::invalid_argument};
+      if (!cell || error != std::errc{} || end != cell->data() + cell->size()) ranked = false;
     }
-    const auto source_instant = parse_timestamp(*source);
-    const auto target_instant = parse_timestamp(*target);
-    if (!source_instant || !target_instant) {
+    first_row.emplace(key, row_index);
+    grouped.try_emplace(key);
+    const auto* source = timestamp_value(row, columns.source_timestamp);
+    const auto* target = timestamp_value(row, columns.target_timestamp);
+    if (activity == nullptr || (!split && source == nullptr)) continue;
+    const auto target_instant = target ? parse_timestamp(*target) : std::nullopt;
+    const auto source_instant = source ? parse_timestamp(*source) : std::nullopt;
+    if ((target && !target_instant) || (source && !source_instant)) {
       if (options.strict_attributes) {
         throw std::invalid_argument(
             "temporal profile: selected dataframe timestamp is invalid");
       }
       continue;
     }
-    grouped[*case_id].push_back({*case_id, *activity, *source, *target, *source_instant,
-                                 *target_instant, parse_timestamp_exact(*source),
-                                 parse_timestamp_exact(*target), row_index});
+    grouped[key].push_back({key.second, *activity,
+                                 source ? std::optional<std::string>(*source) : std::nullopt,
+                                 target ? std::optional<std::string>(*target) : std::nullopt,
+                                 source_instant.value_or(0.0), target_instant.value_or(0.0),
+                                 source ? parse_timestamp_exact(*source) : std::nullopt,
+                                 target ? parse_timestamp_exact(*target) : std::nullopt, row_index, rank,
+                                 frame_exact, frame_instant});
+  }
+  if (frame_timestamp) {
+    // Each case's frame positions (the cases' blocks keep their relative
+    // order, so the position within a case serves as the "@@index").
+    for (auto& [case_id, events] : grouped) {
+      const bool exact = std::all_of(events.begin(), events.end(),
+                                     [](const TemporalTableEvent& event) { return event.frame_exact.has_value(); });
+      std::vector<std::size_t> order(events.size());
+      std::iota(order.begin(), order.end(), std::size_t{0});
+      std::stable_sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
+        const auto& l = events[left];
+        const auto& r = events[right];
+        if (exact)
+          return std::tie(l.frame_exact->seconds, l.frame_exact->nanoseconds, l.row_index) <
+                 std::tie(r.frame_exact->seconds, r.frame_exact->nanoseconds, r.row_index);
+        return std::tie(l.frame_instant, l.row_index) < std::tie(r.frame_instant, r.row_index);
+      });
+      for (std::size_t position = 0; position < order.size(); ++position)
+        events[order[position]].rank = static_cast<std::int64_t>(position);
+    }
+    // The frame is sorted by case: its cases' first rows are in id order.
+    std::size_t position = 0;
+    for (auto& [case_id, first] : first_row) first = position++;
   }
 
   EventLog log;
   log.traces.reserve(grouped.size());
-  for (auto& [case_id, events] : grouped) {
-    // pm4py's DataFrame algorithms sort a case's rows by the target (start)
-    // timestamp, then the source (completion) one, then the row (round BK,
-    // observed black-box; one column for both is a sort by timestamp).
+  for (auto& [key, events] : grouped) {
+    const auto& case_id = key.second;
     const bool exact = std::all_of(events.begin(), events.end(), [](const TemporalTableEvent& event) {
-      return event.source_exact && event.target_exact;
+      return (event.target_exact || !event.target_timestamp) && (event.source_exact || !event.source_timestamp);
     });
+    // Ties keep the frame's row order (format_dataframe's on a CSV upload).
+    const auto row_of = [&](const TemporalTableEvent& event) {
+      return frame_timestamp ? static_cast<std::int64_t>(event.rank) : static_cast<std::int64_t>(event.row_index);
+    };
     std::stable_sort(events.begin(), events.end(),
                      [&](const TemporalTableEvent& left, const TemporalTableEvent& right) {
-                       if (exact)
-                         return std::tie(left.target_exact->seconds, left.target_exact->nanoseconds,
-                                         left.source_exact->seconds, left.source_exact->nanoseconds,
-                                         left.row_index) <
-                                std::tie(right.target_exact->seconds, right.target_exact->nanoseconds,
-                                         right.source_exact->seconds, right.source_exact->nanoseconds,
-                                         right.row_index);
-                       return std::tie(left.target_instant, left.source_instant, left.row_index) <
-                              std::tie(right.target_instant, right.source_instant, right.row_index);
+                       // NaT sorts last (pandas' na_position).
+                       const bool left_missing = !left.source_timestamp, right_missing = !right.source_timestamp;
+                       const bool left_no_target = !left.target_timestamp, right_no_target = !right.target_timestamp;
+                       if (exact) {
+                         const auto exact_of = [](const std::optional<ParsedExactTimestamp>& value) {
+                           return value ? std::pair(value->seconds, value->nanoseconds)
+                                        : std::pair<std::int64_t, std::uint32_t>{0, 0};
+                         };
+                         return std::make_tuple(left_no_target, exact_of(left.target_exact), left_missing,
+                                                exact_of(left.source_exact), row_of(left)) <
+                                std::make_tuple(right_no_target, exact_of(right.target_exact), right_missing,
+                                                exact_of(right.source_exact), row_of(right));
+                       }
+                       return std::make_tuple(left_no_target, left.target_instant, left_missing, left.source_instant, row_of(left)) <
+                              std::make_tuple(right_no_target, right.target_instant, right_missing, right.source_instant, row_of(right));
                      });
+    if (first_rows) first_rows->push_back(first_row.at(key));
+    if (ranks && ranked) {
+      ranks->emplace_back();
+      for (const auto& item : events) ranks->back().push_back(item.rank);
+    }
     Trace trace;
     trace.case_id = case_id;
     trace.case_id_state = FirstClassAttributeState::kPresent;
@@ -431,12 +546,17 @@ EventLog temporal_table_to_log(const EventTable& table,
       event.case_id_state = FirstClassAttributeState::kPresent;
       event.activity = item.activity;
       event.activity_state = FirstClassAttributeState::kPresent;
-      event.timestamp = item.source_timestamp;
-      event.timestamp_state = FirstClassAttributeState::kPresent;
+      if (item.source_timestamp) {
+        event.timestamp = *item.source_timestamp;
+        event.timestamp_state = FirstClassAttributeState::kPresent;
+      } else {
+        event.timestamp_state = FirstClassAttributeState::kMissing;
+      }
       event.input_order = item.row_index;
-      event.attributes.push_back(
-          {"__minera_temporal_target", item.target_timestamp,
-           AttributeKind::kDate});
+      if (item.target_timestamp)
+        event.attributes.push_back(
+            {"__minera_temporal_target", *item.target_timestamp,
+             AttributeKind::kDate});
       trace.events.push_back(std::move(event));
     }
     log.traces.push_back(std::move(trace));
@@ -453,6 +573,9 @@ TemporalProfileOptions normalized_table_options(
   normalized.source_completion_timestamp_attribute.clear();
   normalized.target_timestamp_attribute = "__minera_temporal_target";
   normalized.target_start_timestamp_attribute.clear();
+  // temporal_table_to_log keeps a row whose completion is NaT (no value
+  // here), which pm4py's DataFrame algorithms skip as a source (round BL).
+  normalized.strict_attributes = false;
   return normalized;
 }
 
@@ -463,6 +586,15 @@ struct FrameProfileRow {
   // The target (start) timestamp when it is another column; else the
   // source's.
   std::optional<std::pair<std::int64_t, std::uint32_t>> target;
+  // False when the completion (source) is NaT: the row sorts after equal
+  // starts and pairs only as a target (round BL).
+  bool has_source = true;
+  // False when the start (target) is NaT: the row sorts last and pairs only
+  // as a source (round BL; with a frame "@@index" it can still pair).
+  bool has_target = true;
+  // The row's "@@index" when the frame has one (a CSV upload): a row pairs
+  // only with rows of a higher one; without it, with the later sorted rows.
+  std::optional<std::int64_t> index;
 };
 
 // pm4py's DataFrame arithmetic over cases given by sorted id, each case's rows
@@ -505,9 +637,15 @@ TemporalProfile discover_temporal_profile_log(
   return discover_temporal_profile(log, options, {});
 }
 
-TemporalProfile discover_temporal_profile(
+namespace {
+
+// The EventLog algorithm; with `ranks` (per trace, per event) an event pairs
+// with every event of a higher rank, before or after it, as pm4py's DataFrame
+// algorithms do with a frame "@@index" (round BL); without, with the later
+// events.
+TemporalProfile discover_temporal_profile_ranked(
     const EventLog& log, const TemporalProfileOptions& options,
-    const std::function<bool()>& cancelled) {
+    const std::function<bool()>& cancelled, const PairRanks* ranks) {
   if (options.activity_attribute.empty()) {
     throw std::invalid_argument(
         "temporal profile: activity attribute must not be empty");
@@ -570,10 +708,13 @@ TemporalProfile discover_temporal_profile(
   std::vector<TargetSide> targets;
   constexpr std::size_t kPairsPerCancellationPoll = std::size_t{1} << 20;
   std::size_t pairs_since_poll = 0;
-  for (const auto& trace : log.traces) {
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    const auto& trace = log.traces[t];
+    const auto* rank = ranks && t < ranks->size() && (*ranks)[t].size() == trace.events.size()
+                           ? &(*ranks)[t] : nullptr;
     targets.assign(trace.events.size(), TargetSide{});
-    for (std::size_t i = 0; i + 1 < trace.events.size(); ++i) {
-      pairs_since_poll += trace.events.size() - i;
+    for (std::size_t i = 0; i + (rank ? 0 : 1) < trace.events.size(); ++i) {
+      pairs_since_poll += trace.events.size() - (rank ? 0 : i);
       if (pairs_since_poll >= kPairsPerCancellationPoll) {
         pairs_since_poll = 0;
         throw_if_cancelled(cancelled, "temporal profile discovery was cancelled");
@@ -591,7 +732,8 @@ TemporalProfile discover_temporal_profile(
               : source_time;
       if (!source_local) continue;
       const std::uint32_t source_id = intern(*source_activity);
-      for (std::size_t j = i + 1; j < trace.events.size(); ++j) {
+      for (std::size_t j = rank ? 0 : i + 1; j < trace.events.size(); ++j) {
+        if (rank && (*rank)[j] <= (*rank)[i]) continue;
         auto& target = targets[j];
         if (!target.instant_read) {
           target.instant = event_instant(trace.events[j], target_attribute, "",
@@ -641,6 +783,14 @@ TemporalProfile discover_temporal_profile(
   return profile;
 }
 
+}  // namespace
+
+TemporalProfile discover_temporal_profile(
+    const EventLog& log, const TemporalProfileOptions& options,
+    const std::function<bool()>& cancelled) {
+  return discover_temporal_profile_ranked(log, options, cancelled, nullptr);
+}
+
 TemporalProfile discover_temporal_profile(
     const EventLog& log, const TemporalProfileOptions& options) {
   return discover_temporal_profile_log(log, options);
@@ -648,7 +798,8 @@ TemporalProfile discover_temporal_profile(
 
 TemporalProfile discover_temporal_profile_dataframe(
     const EventTable& table, const TemporalProfileOptions& options) {
-  const auto log = temporal_table_to_log(table, options);
+  PairRanks ranks;
+  const auto log = temporal_table_to_log(table, options, nullptr, &ranks);
   // pm4py's DataFrame discovery (without business hours): Timedelta
   // durations, the compensated mean and Welford's deviation over the cases
   // by sorted id, each sorted by timestamp (round BI, observed black-box;
@@ -662,22 +813,27 @@ TemporalProfile discover_temporal_profile_dataframe(
     bool exact = true;
     for (std::size_t t = 0; t < log.traces.size() && exact; ++t) {
       for (const auto& event : log.traces[t].events) {
-        const auto instant = parse_timestamp_exact(event.timestamp);
+        const bool has_source = event.timestamp_state != FirstClassAttributeState::kMissing;
+        const auto instant = has_source ? parse_timestamp_exact(event.timestamp) : std::nullopt;
         const auto* target_text = split ? selected_event_value(event, "__minera_temporal_target", "timestamp") : nullptr;
         const auto target = target_text ? parse_timestamp_exact(*target_text) : std::nullopt;
-        if (!instant || (split && !target)) {
+        if ((has_source && !instant) || (split && target_text && !target)) {
           exact = false;
           break;
         }
-        rows[t].push_back({instant->seconds, instant->nanoseconds, &event.activity,
-                           split ? std::optional(std::pair<std::int64_t, std::uint32_t>{target->seconds, target->nanoseconds})
-                                 : std::nullopt});
+        const auto e = rows[t].size();
+        rows[t].push_back({instant ? instant->seconds : 0, instant ? instant->nanoseconds : 0u, &event.activity,
+                           split ? std::optional(target ? std::pair<std::int64_t, std::uint32_t>{target->seconds, target->nanoseconds}
+                                                        : std::pair<std::int64_t, std::uint32_t>{0, 0})
+                                 : std::nullopt,
+                           has_source, !split || target.has_value(), ranks.empty() ? std::nullopt : std::optional(ranks[t][e])});
       }
       ordered.push_back({&log.traces[t].case_id, &rows[t]});
     }
     if (exact) return frame_arithmetic_profile(ordered, {});
   }
-  return discover_temporal_profile_log(log, normalized_table_options(options));
+  return discover_temporal_profile_ranked(log, normalized_table_options(options), {},
+                                          ranks.empty() ? nullptr : &ranks);
 }
 
 TemporalProfile discover_temporal_profile(
@@ -730,8 +886,10 @@ double timedelta_seconds(const ParsedExactTimestamp& source, const ParsedExactTi
 // business hours is the pandas Timedelta between the two timestamps
 // (pm4py's DataFrame conformance, round BJ, observed black-box) instead of
 // the difference of their epoch seconds (its EventLog conformance).
+// `ranks` as in discover_temporal_profile_ranked.
 TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile& profile,
-                                      const TemporalProfileOptions& options, bool timedelta) {
+                                      const TemporalProfileOptions& options, bool timedelta,
+                                      const PairRanks* ranks = nullptr) {
   if (options.activity_attribute.empty()) {
     throw std::invalid_argument(
         "temporal profile: activity attribute must not be empty");
@@ -754,7 +912,10 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
     const auto* value = selected_event_value(event, attribute, "timestamp");
     return value == nullptr ? std::nullopt : parse_timestamp_exact(*value);
   };
-  for (const auto& trace : log.traces) {
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    const auto& trace = log.traces[t];
+    const auto* rank = ranks && t < ranks->size() && (*ranks)[t].size() == trace.events.size()
+                           ? &(*ranks)[t] : nullptr;
     std::vector<TemporalDeviation> deviations;
     std::vector<std::optional<ParsedExactTimestamp>> exact_sources, exact_targets;
     if (exact) {
@@ -763,7 +924,7 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
         exact_targets.push_back(exact_instant(event, target_attribute));
       }
     }
-    for (std::size_t i = 0; i + 1 < trace.events.size(); ++i) {
+    for (std::size_t i = 0; i + (rank ? 0 : 1) < trace.events.size(); ++i) {
       const auto source_time =
           event_instant(trace.events[i], source_attribute, "",
                         options.strict_attributes);
@@ -776,7 +937,8 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
                                     options.strict_attributes)
               : source_time;
       if (!source_local) continue;
-      for (std::size_t j = i + 1; j < trace.events.size(); ++j) {
+      for (std::size_t j = rank ? 0 : i + 1; j < trace.events.size(); ++j) {
+        if (rank && (*rank)[j] <= (*rank)[i]) continue;
         const auto target_activity = event_activity(trace.events[j], options);
         if (!target_activity) continue;
         const auto entry_it = profile_lookup.find(
@@ -836,26 +998,32 @@ TemporalConformanceResult conform_temporal_profile_log(
 TemporalConformanceResult conform_temporal_profile_dataframe(
     const EventTable& table, const TemporalProfile& profile,
     const TemporalProfileOptions& options) {
-  auto log = temporal_table_to_log(table, options);
+  std::vector<std::size_t> case_first_rows;
+  PairRanks ranks;
+  auto log = temporal_table_to_log(table, options, &case_first_rows, &ranks);
   // pm4py's DataFrame conformance lists the cases in the order of their
   // first rows (an XES upload's frame in file order), not by case id, and
   // takes its durations as pandas Timedeltas (round BJ, observed black-box);
-  // each case's rows stay sorted by time.
+  // each case's rows stay sorted by time. A case is listed even when none of
+  // its rows can pair, the rows without a case as one more (round BL).
   std::vector<std::pair<std::size_t, std::size_t>> first_rows;
   first_rows.reserve(log.traces.size());
-  for (std::size_t index = 0; index < log.traces.size(); ++index) {
-    std::size_t first = std::numeric_limits<std::size_t>::max();
-    for (const auto& event : log.traces[index].events) first = std::min(first, event.input_order);
-    first_rows.emplace_back(first, index);
-  }
+  for (std::size_t index = 0; index < log.traces.size(); ++index)
+    first_rows.emplace_back(case_first_rows[index], index);
   if (!std::is_sorted(first_rows.begin(), first_rows.end())) {
     std::sort(first_rows.begin(), first_rows.end());
     std::vector<Trace> ordered;
+    PairRanks ordered_ranks;
     ordered.reserve(log.traces.size());
-    for (const auto& [first, index] : first_rows) ordered.push_back(std::move(log.traces[index]));
+    for (const auto& [first, index] : first_rows) {
+      ordered.push_back(std::move(log.traces[index]));
+      if (!ranks.empty()) ordered_ranks.push_back(std::move(ranks[index]));
+    }
     log.traces = std::move(ordered);
+    ranks = std::move(ordered_ranks);
   }
-  return conform_log(log, profile, normalized_table_options(options), true);
+  return conform_log(log, profile, normalized_table_options(options), true,
+                     ranks.empty() ? nullptr : &ranks);
 }
 
 TemporalConformanceResult conform_temporal_profile(
@@ -890,54 +1058,118 @@ std::vector<TemporalDeviation> check_temporal_profile_conformance(
 
 namespace {
 
+using FrameCases = std::map<const Trace*, std::vector<FrameProfileRow>>;
+
+// A row's case group: its trace, or none for a row without a case.
+const Trace* frame_case(const frame_times::Frame& frame, const FrameRow& row) {
+  return frame.cell(row.trace, row.event, "case:concept:name") ? &row.trace : nullptr;
+}
+
+// The cases by id, then the rows without a case as one more: pm4py pairs
+// rows by merging the frame with itself on the case column, where NaN meets
+// NaN (round BL, observed black-box; as temporal_table_to_log).
+std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>> frame_cases_ordered(FrameCases& cases) {
+  static const std::string no_case;
+  std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>> ordered;
+  std::vector<FrameProfileRow>* missing = nullptr;
+  for (auto& [trace, rows] : cases) {
+    if (trace == nullptr) missing = &rows;
+    else ordered.push_back({&trace->case_id, &rows});
+  }
+  std::stable_sort(ordered.begin(), ordered.end(),
+                   [](const auto& left, const auto& right) { return *left.first < *right.first; });
+  if (missing) ordered.push_back({&no_case, missing});
+  return ordered;
+}
+
 // discover_temporal_profile_frame on a built frame; nullopt when a row has no
-// timestamp (pm4py raises there).
+// timestamp (pm4py raises there). A row without an activity leaves the
+// groups (round BL).
 std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& frame,
                                                       const std::function<bool()>& cancelled) {
-  using Row = FrameProfileRow;
-  std::map<const Trace*, std::vector<Row>> cases;
+  FrameCases cases;
   for (const auto& row : frame_rows(frame.log())) {
     const auto date = frame.date(row.trace, row.event, "time:timestamp");
     if (!date) return std::nullopt;
-    cases[&row.trace].push_back({date->seconds, date->nanoseconds, &row.event.activity, std::nullopt});
+    if (!frame.cell(row.trace, row.event, "concept:name")) continue;
+    cases[frame_case(frame, row)].push_back({date->seconds, date->nanoseconds, &row.event.activity, std::nullopt});
   }
-  std::vector<std::pair<const std::string*, std::vector<Row>*>> ordered;
-  for (auto& [trace, rows] : cases) ordered.push_back({&trace->case_id, &rows});
-  std::stable_sort(ordered.begin(), ordered.end(),
-                   [](const auto& left, const auto& right) { return *left.first < *right.first; });
+  auto ordered = frame_cases_ordered(cases);
   return frame_arithmetic_profile(ordered, cancelled);
 }
 
-// The same with other columns: the activity from `activity_key` (text
-// cells only), each row's completion from `source_key` and start from
-// `target_key` (round BK, observed black-box). nullopt when a cell is
-// missing, an activity is no text or a timestamp no date (pm4py raises or
-// reads the column otherwise there).
+// The same with other columns: the activity from `activity_key` (text or
+// numbers or dates), each row's completion from `source_key` and start from
+// `target_key` (round BK, observed black-box); missing cells as pandas reads
+// them (round BL). nullopt when the paired activities do not sort or a
+// timestamp column holds no dates (pm4py raises or reads the column
+// otherwise there).
 std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& frame,
                                                       const std::string& activity_key,
                                                       const std::string& source_key,
                                                       const std::string& target_key,
                                                       const std::function<bool()>& cancelled) {
-  using Row = FrameProfileRow;
-  if (!frame.has(activity_key) || !frame.has(source_key) || !frame.has(target_key)) return std::nullopt;
-  std::deque<std::string> activities;
-  std::map<const Trace*, std::vector<Row>> cases;
+  if (!frame.has(activity_key) || !frame.has(source_key)) return std::nullopt;
+  // No start column: the completion column serves (round BL, as
+  // temporal_table_columns).
+  if (!frame.has(target_key))
+    return frame_temporal_profile(frame, activity_key, source_key, source_key, cancelled);
+  // One name per activity group: pandas groups values that are == (1, 1.0
+  // and True alike), named by str() of the first (pm4py's key, round BL).
+  std::map<std::string, std::string> activities;
+  std::map<std::string, python::Scalar> labels;
+  FrameCases cases;
+  if (frame.dtype(source_key) != DataFrameColumnType::kDate || frame.dtype(target_key) != DataFrameColumnType::kDate)
+    return std::nullopt;
+  const bool indexed = frame.has("@@index");
   for (const auto& row : frame_rows(frame.log())) {
     const auto activity = frame.cell(row.trace, row.event, activity_key);
+    if (activity && activity->kind == python::Scalar::Kind::kNone) return std::nullopt;
     const auto source = frame.date(row.trace, row.event, source_key);
     const auto target = source_key == target_key ? source : frame.date(row.trace, row.event, target_key);
-    if (!activity || activity->kind != python::Scalar::Kind::kText || !source || !target) return std::nullopt;
-    activities.push_back(activity->text);
-    cases[&row.trace].push_back({source->seconds, source->nanoseconds, &activities.back(),
+    // A NaN activity leaves the groups; a NaT start pairs only as a source
+    // and a NaT completion only as a target (round BL, as
+    // temporal_table_to_log).
+    if (!activity || (!source && source_key == target_key)) continue;
+    auto [name, added] = activities.try_emplace(python::identity(*activity));
+    if (added) {
+      name->second = python::str(*activity);
+      labels.try_emplace(name->second, *activity);
+    }
+    // A CSV upload's frame has format_dataframe's "@@index" (round BL).
+    std::optional<std::int64_t> index;
+    if (indexed)
+      if (const auto cell = frame.cell(row.trace, row.event, "@@index"); cell && cell->kind == python::Scalar::Kind::kInt) {
+        std::int64_t value = 0;
+        const auto [end, error] = std::from_chars(cell->digits.data(), cell->digits.data() + cell->digits.size(), value);
+        if (error == std::errc{} && end == cell->digits.data() + cell->digits.size())
+          index = cell->negative ? -value : value;
+      }
+    cases[frame_case(frame, row)].push_back({source ? source->seconds : 0, source ? source->nanoseconds : 0u, &name->second,
                                  source_key == target_key
                                      ? std::nullopt
-                                     : std::optional(std::pair<std::int64_t, std::uint32_t>{target->seconds, target->nanoseconds})});
+                                     : std::optional(target ? std::pair<std::int64_t, std::uint32_t>{target->seconds, target->nanoseconds}
+                                                            : std::pair<std::int64_t, std::uint32_t>{0, 0}),
+                                 source.has_value(), source_key == target_key || target.has_value(), index});
   }
-  std::vector<std::pair<const std::string*, std::vector<Row>*>> ordered;
-  for (auto& [trace, rows] : cases) ordered.push_back({&trace->case_id, &rows});
-  std::stable_sort(ordered.begin(), ordered.end(),
-                   [](const auto& left, const auto& right) { return *left.first < *right.first; });
-  return frame_arithmetic_profile(ordered, cancelled);
+  auto ordered = frame_cases_ordered(cases);
+  auto profile = frame_arithmetic_profile(ordered, cancelled);
+  // pandas groups the pairs by the source and the target activity, sorting
+  // each level's values: a date beside a number there raises (round BL,
+  // observed black-box), and the EventLog algorithm answers instead.
+  std::vector<python::Scalar> sources, targets;
+  std::set<std::string> seen_sources, seen_targets;
+  for (const auto& entry : profile.entries) {
+    if (seen_sources.insert(entry.source).second) sources.push_back(labels.at(entry.source));
+    if (seen_targets.insert(entry.target).second) targets.push_back(labels.at(entry.target));
+  }
+  try {
+    (void)python::safe_sort_order(sources);
+    (void)python::safe_sort_order(targets);
+  } catch (const python::TypeError&) {
+    return std::nullopt;
+  }
+  return profile;
 }
 
 TemporalProfile frame_arithmetic_profile(
@@ -959,14 +1191,22 @@ TemporalProfile frame_arithmetic_profile(
     // (round BK, observed black-box).
     const auto order = [](const Row& row) {
       const auto target = target_of(row);
-      return std::make_tuple(target.first, target.second, row.seconds, row.nanoseconds);
+      return std::make_tuple(!row.has_target, target.first, target.second, !row.has_source, row.seconds, row.nanoseconds);
     };
     std::stable_sort(rows->begin(), rows->end(),
                      [&](const Row& left, const Row& right) { return order(left) < order(right); });
+    // With a frame "@@index" (format_dataframe's, a CSV upload) pm4py pairs
+    // a row with the rows of a higher index in this sorted order, before or
+    // after it (round BL, observed black-box).
+    const bool ranked = !rows->empty() && std::all_of(rows->begin(), rows->end(),
+                                                      [](const Row& row) { return row.index.has_value(); });
     for (std::size_t i = 0; i < rows->size(); ++i)
-      for (std::size_t j = i + 1; j < rows->size(); ++j) {
+      for (std::size_t j = ranked ? 0 : i + 1; j < rows->size(); ++j) {
         if ((++visited & 0xfffff) == 0) throw_if_cancelled(cancelled, "temporal profile discovery was cancelled");
+        if (ranked && *(*rows)[j].index <= *(*rows)[i].index) continue;
         const auto& source = (*rows)[i];
+        if (!source.has_source) break;
+        if (!(*rows)[j].has_target) continue;
         const auto& [target_seconds, target_nanoseconds] = target_of((*rows)[j]);
         if (std::tie(target_seconds, target_nanoseconds) < std::tie(source.seconds, source.nanoseconds)) continue;
         std::int64_t whole = target_seconds - source.seconds;

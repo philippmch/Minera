@@ -23934,3 +23934,128 @@ profile and conformance, the DataFrame temporal profile and conformance
 with a start column, the resource as the activity key, the keyed upload
 profile and the variant statistics' slices (values taken from pm4py
 black-box on the same inputs).
+
+## Review BL1: re-review of round BK, the DataFrame temporal profile with missing cells, CSV uploads with a start column and other activity columns, and pm4py on event streams (2026-11-12)
+
+Round BL re-reviewed BK (XES boolean and float text, Declare on the frame's
+slices in the workbench and with `mining_input_shape`, the DataFrame
+temporal profile with a start column, the stream's temporal profile, the
+keyed upload profile, the variant statistics' slices) and took its targets
+with random toy logs whose events lack a start, a completion or an
+activity, XES uploads with a start column, other activity keys and traces
+without a name, CSV uploads with a start column and blank cells, and
+pm4py's other functions on an `EventStream`. The device check on the Mac
+was skipped (the round's thread had no device linked). Findings, all
+fixed:
+
+- **BL1-1 The DataFrame temporal profile with missing cells.** pm4py's
+  DataFrame discovery and conformance (the behavior route's
+  `variant=dataframe` and `lazyframe`, `/api/temporal-conformance`) read a
+  missing cell as NaN or NaT and never raise for it: a row without an
+  activity leaves the groups, a row whose start is NaT sorts last and pairs
+  only as a source (with an `@@index`, BL1-2), one whose completion is NaT
+  sorts after the equal starts and pairs only as a target, and the
+  conformance lists every case, even one whose rows cannot pair. Minera's
+  table adapters refused such uploads by default (`temporal profile:
+  selected dataframe timestamp is missing`), and the lenient path dropped
+  the rows without a completion. Before: on 80 toy logs with a quarter of
+  the events missing a start or a completion, discovery and conformance
+  refused 69 (both table adapters); after: 80 equal.
+- **BL1-2 CSV uploads with a start column.** A CSV upload reaches pm4py
+  through `format_dataframe`, which copies the upload's timestamp column
+  over `time:timestamp`, drops the rows without a case, an activity or a
+  timestamp, sorts each case's rows by the timestamp (then file order) and
+  numbers them in `@@index`; pm4py's DataFrame algorithms
+  pair a row with every row of a higher `@@index` that starts at or after
+  its completion, whatever the start order, and read a blank start as NaT.
+  Minera paired by the start order only (`frame_index_rows` on
+  `TemporalProfileOptions` now carries the CSV reading; a table's own
+  `@@index` column is followed too). With `s`: `a` 30/25, `b` 12/2, `c`
+  5/20, `d` 40/40 (completion/start, seconds), pm4py pairs `c-a` 20, `c-d`
+  35, `b-a` 13, `b-d` 28 and `a-d` 10. Before: on 100 CSV uploads,
+  `/api/mine` differed on 19, the behavior route refused 57 and differed on
+  4 more, the conformance differed on 61; after: 300 equal.
+- **BL1-3 `/api/mine`'s keyed temporal profile with missing cells.** BK1-5
+  kept the EventLog algorithm whenever a cell of the named columns was
+  missing; pm4py's DataFrame discovery reads them as BL1-1 describes, and
+  `discover_temporal_profile_as_uploaded` now does. Before: on 60 uploads
+  (interleaved, fractional seconds, 3 % of the starts missing), 31 differed
+  and 8 differed in the last digits; after: 60 equal.
+- **BL1-4 Other activity columns in the keyed temporal profile.** With a
+  number, boolean or date column as the activity key (an `<int>`
+  `org:resource` with an event without it becomes a float column), pandas
+  groups the values that are `==` (1, 1.0 and `True` alike) and pm4py keys
+  each pair by them; Minera kept the EventLog algorithm. The DataFrame
+  discovery now runs on them, each activity named by `str()` of pm4py's key
+  (`1.0`, `True`, `2020-02-02 00:00:00+00:00`). Before: on 60 uploads with
+  number, boolean and mixed activity columns, 33 differed (names, and
+  values where cells were missing); after: 49 equal and 11 raise in pm4py
+  only (declared below).
+- **BL1-5 Traces without a name.** An XES trace without `concept:name`
+  gives frame rows without a case. pm4py pairs rows by merging the frame
+  with itself on the case column, where NaN meets NaN, so all such rows
+  form one more case: discovery counts its pairs, and the conformance lists
+  it at its first row. Minera dropped those rows (the table adapters, and
+  `/api/mine` read each trace as its own case). Before: on 60 toy logs with
+  30 % of the traces unnamed (and missing cells), the table adapters refused
+  51; after: 58 equal and 2 raise in pm4py only (no trace named, declared
+  below).
+- **BL1-6 No start column.** When the frame has no start column at all (no
+  event of the upload carries the key), pm4py's DataFrame algorithms take
+  the completion column as the start; a missing completion column raises
+  `KeyError`. Minera refused with `temporal profile: selected dataframe
+  column is missing` (the table adapters) or kept the EventLog algorithm
+  (`/api/mine`).
+
+Re-review of BK without further findings: XES typed values through the
+table transport (odd int, float, boolean and date spellings, `tfuzz.py`),
+Declare on the slices in the workbench and with `mining_input_shape`, also
+after the mining filters, the start-column sort with business hours
+(`tptoy.py --bh`), the stream's temporal profile, the variant statistics
+with other activity keys. New area, pm4py's functions on an `EventStream`
+(`/api/mine` with `mining_input_shape=stream`, `streamfam.py`): the DFG,
+the minimum self-distances, the transition system and the temporal profile
+read the stream through its EventLog and match Minera.
+
+Declarations:
+
+- `/api/mine` with `mining_input_shape=stream`: pm4py's
+  `discover_log_skeleton` (`UnboundLocalError`), `discover_declare`
+  (`TypeError: string indices must be integers`) and
+  `discover_process_tree_inductive` (`AttributeError: 'EventStream' object
+  has no attribute 'loc'`) raise on an `EventStream`; Minera answers as for
+  the log.
+- `/api/mine`'s keyed temporal profile where pm4py's DataFrame discovery
+  raises: a completion key the frame does not have (`KeyError`), and an
+  activity column whose paired values mix dates and numbers (pandas cannot
+  sort the groups: `TypeError: '<' not supported between instances of
+  'datetime.datetime' and 'float'`). Minera keeps the EventLog algorithm so
+  that the rest of the response stands.
+- An XES upload where no trace has a name: pm4py's frame has no case
+  column and the DataFrame temporal profile raises `KeyError`; Minera
+  answers with all rows as one case. A CSV start column that is blank in
+  every row: pandas reads it as floats and pm4py raises `TypeError`;
+  Minera returns an empty profile.
+- The CSV timestamp columns of plain numbers and "roles to diagnostics
+  groups" (round AT) are still with Philipp.
+
+Verification (scripts in the project files under `review-harness/round-bl/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Toy logs with missing start, completion or activity cells, discovery and conformance on the table adapters (`tptoy2.py --miss`: 80 plain, 80 with business hours, 140 with the columns swapped) | 1,200 | before (80 plain): 69 of 80 refused; after: 1,172 equal, 24 raise in pm4py only (business hours without pairs, BK1's declaration), 4 raise on both sides; the log and stream adapters agree wherever pm4py answers |
+| Toy logs with unnamed traces, table adapters (`tptoy2.py --miss --nocase`: 60, and 60 with business hours) | 480 | before (60): 51 refused; after: 436 equal, 40 raise in pm4py only (no trace named, business hours without pairs; declared), 4 on both sides |
+| CSV uploads with a start column: `/api/mine`, behavior route discovery and conformance (`tpcsv.py`: 100 plain, 160 with blank and `NA` case, activity and timestamp cells, 60 with a second `time:timestamp` column beside the upload's) | 960 | before (100 plain): 19, 61 (57 refused) and 61 differed; after: 957 equal, 3 raise in pm4py only (a start column blank in every row, declared) |
+| `/api/mine` keyed temporal profile (`tpkeys.py`: 60 interleaved with fractions, 60 with unnamed traces, 140 with number, boolean and mixed activity columns, 80 of them interleaved) | 260 | before: 39 of 60 and 33 of 60 differed; after: 238 equal, 22 raise in pm4py only (declared) |
+| Re-review of BK: `tptoy.py --same` (80), `tempconf2.py --il --keys` (40), `minedf.py --il --frac` (30), `combodecl.py` (20) | 1,094 | 1,085 equal, 6 empty on both sides, 3 raise in pm4py only |
+| XES typed values through the table transport (`tfuzz.py`, 60 uploads, four shapes) | 240 | 240 read on both sides |
+| `/api/variant-statistics` with other activity keys (`varstat2.py`, 40 uploads, four keys, against the frame) | 160 | 84 equal, 54 raise in pm4py only (BK1's column-check declaration), 22 on both sides |
+| pm4py on an `EventStream` (`streamfam.py`, `/api/mine` with `mining_input_shape=stream`: 40 plain, 40 interleaved, 40 out of time order; and 40 with `dataframe`) | 1,120 | stream: 480 equal (DFG, minimum self-distances, transition system, temporal profile), 360 raise in pm4py only (log skeleton, Declare, inductive tree; declared); dataframe: 280 equal |
+| Full ctest, script tests, fixture replay (the frontend is unchanged) | 470 tests, 406 script tests, 2,673 responses of 16 manifests | 470 pass, 406 pass, 2,673 unchanged (two CSV fixtures with both `timestamp` and `time:timestamp` headers caught a first version that ordered the frame by the `time:timestamp` header instead of the upload's column) |
+
+`minera_review_bl1_tests` binds the DataFrame temporal profile and
+conformance with missing cells and rows without a case, a frame's own
+`@@index`, a CSV upload's rows (with the upload's timestamp beside another
+`time:timestamp` column), and the keyed upload profile with a numeric
+activity column, a date beside a number, and dates beside numbers (values
+taken from pm4py black-box on the same inputs).

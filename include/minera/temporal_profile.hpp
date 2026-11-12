@@ -68,6 +68,14 @@ struct TemporalProfileOptions {
   // into the older skip behavior.
   bool strict_attributes = true;
 
+  // A CSV upload's rows, in file order. pm4py sees format_dataframe's frame,
+  // whose "@@index" orders each case's rows by the upload timestamp, then
+  // file order (rows without one dropped), and its DataFrame algorithms pair
+  // a row only with rows of a higher "@@index" (round BL, observed
+  // black-box). A table's own "@@index" column takes precedence; without
+  // either, the sorted position decides.
+  bool frame_index_rows = false;
+
   // Used by conformance checking; discovery ignores this value.
   double zeta = 6.0;
 };

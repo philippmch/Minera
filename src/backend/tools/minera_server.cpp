@@ -1053,6 +1053,14 @@ bool standard_keys_for_session(const MinedSession& session) {
   return session.active_source && session.active_source->file().format == "csv";
 }
 
+// pm4py's DataFrame temporal profile pairs a row only with rows of a higher
+// "@@index", which format_dataframe gives a CSV upload (each case's rows by
+// the upload timestamp, then file order; round BL, observed black-box); the
+// table keeps the file order, so temporal_table_to_log derives the index.
+void mark_frame_index_rows(const MinedSession& session, minera::TemporalProfileOptions& options) {
+  if (session.active_source && session.active_source->file().format == "csv") options.frame_index_rows = true;
+}
+
 minera::DfgStatisticalOptions dfg_statistics_for_source(
     minera::DfgStatisticalOptions options,
     const minera::ActiveEventSource* source) {
@@ -4009,6 +4017,7 @@ void handle_behavior_analysis(const httplib::Request& request,
     };
     auto params = minera::parse_mine_params(lookup, present);
     if (temporal && !present("temporal_strict_attributes")) params.temporal_profile.strict_attributes = true;
+    if (temporal) mark_frame_index_rows(*session, params.temporal_profile);
     std::string adapter = family == "correlation" ? (request.has_param("adapter") ? request.get_param_value("adapter") : "dataframe") : variant;
     if (family == "minimum_self_distance") {
       variant = params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kLog ? "log" : params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kPandas ? "pandas" : "polars";
@@ -11074,6 +11083,7 @@ void handle_temporal_conformance(const httplib::Request& request,
     if (!present("temporal_strict_attributes")) {
       options.strict_attributes = true;
     }
+    mark_frame_index_rows(*session, options);
     const auto profile = parse_temporal_profile_parameter(
         request.get_param_value("temporal_profile"), "temporal_profile");
     minera::TemporalConformanceResult result;

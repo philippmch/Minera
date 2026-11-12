@@ -118,7 +118,9 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   std::optional<minera::TemporalProfile> temporal;
   run("temporal_profile", selected, [&](bool& native_returned) {
-    temporal = minera::discover_temporal_profile(data(), params.temporal_profile);
+    auto temporal_options = params.temporal_profile;
+    mark_frame_index_rows(*session, temporal_options);
+    temporal = minera::discover_temporal_profile(data(), temporal_options);
     native_returned = true;
     return minera::serialize_active_source_temporal_profile_json(*temporal);
   });

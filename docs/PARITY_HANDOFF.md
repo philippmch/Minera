@@ -4575,7 +4575,49 @@ the resource and lifecycle found as keys); and the variant statistics,
 which count the frame's slices. The device check on the Mac was skipped
 again (the round's thread had no device linked).
 
-Next round (BL) should start by re-reviewing round BK:
+Round BL re-reviewed BK (Review BL1) and took its targets. It fixed pm4py's
+DataFrame temporal profile and conformance on uploads with missing cells
+(a row without an activity leaves the groups, a NaT start sorts last and
+pairs only as a source, a NaT completion pairs only as a target, every case
+is listed), on CSV uploads with a start column (pairs follow
+`format_dataframe`'s `@@index`: each case by the upload timestamp, then file
+order; `TemporalProfileOptions::frame_index_rows`), with traces without a
+name (their rows form one more case, as pandas' self-merge on the case
+column matches NaN with NaN) and without any start column (the completion
+column serves); and `/api/mine`'s keyed temporal profile with missing cells
+and with number, boolean or date activity columns (named by `str()` of
+pm4py's key). pm4py's log skeleton, Declare and inductive tree raise on an
+`EventStream` (declared). The device check on the Mac was skipped again
+(the round's thread had no device linked).
+
+Next round (BM) should start by re-reviewing round BL:
+
+- `src/backend/temporal_profile.cpp`: `temporal_table_to_log` (the
+  `CaseKey` with the rows without a case last, the ranks from the frame
+  timestamp or a table's own `@@index`, `first_rows` for the conformance
+  order), `temporal_table_columns`' start fallback,
+  `frame_arithmetic_profile` with `index`, `has_source` and `has_target`,
+  `discover_temporal_profile_ranked` and `conform_log` with ranks, the keyed
+  `frame_temporal_profile` (`python::identity` groups, `safe_sort_order`
+  on each level, `frame_cases_ordered`) and the default one (rows without
+  an activity);
+- the `mark_frame_index_rows` call sites in
+  `src/backend/tools/minera_server.cpp` (behavior route, temporal
+  conformance route) and `active_source_mining.hpp`; whether other routes
+  reach `discover_temporal_profile_dataframe` or
+  `conform_temporal_profile_dataframe` with a CSV table and no flag;
+- new areas: other DataFrame algorithms on CSV uploads whose results follow
+  `format_dataframe`'s `@@index` or drop rows without a case or activity
+  (the DFG with a start column, the performance spectrum, the Declare and
+  log skeleton tables, the interval-based statistics); XES traces without a
+  name in the other DataFrame paths (pandas' `groupby` drops NaN cases, a
+  self-merge keeps them); `str()` names of non-text activity keys in the
+  other keyed DataFrame routes;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BL commit.
+
+Round BK's targets, re-reviewed in BL (findings BL1-1 to BL1-6):
 
 - `src/backend/xes_event_log_importer.cpp` (`parse_native_value`'s
   canonical boolean and float text; whether the line-by-line, chunk-regex
