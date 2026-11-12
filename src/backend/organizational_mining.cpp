@@ -85,6 +85,15 @@ std::optional<std::string> selected_case_id(const Trace& trace,
   return std::nullopt;
 }
 
+// The log's rows trace by trace.
+std::vector<FrameRow> trace_rows(const EventLog& log) {
+  std::vector<FrameRow> rows;
+  rows.reserve(log.event_count());
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events) rows.push_back({trace, event});
+  return rows;
+}
+
 std::vector<Trace> regroup_traces(const EventLog& log,
                                   const std::string& case_id_attribute,
                                   bool frame) {
@@ -93,25 +102,28 @@ std::vector<Trace> regroup_traces(const EventLog& log,
     return log.traces;
   std::vector<Trace> grouped;
   std::unordered_map<std::string, std::size_t> positions;
-  for (const auto& trace : log.traces) {
-    for (const auto& event : trace.events) {
-      std::optional<std::string> case_id;
-      if (frame) {
-        // groupby leaves out the rows whose key is NaN.
-        const auto value = frame_value(log, trace, event, case_id_attribute, FrameKeyScope::kDataFrame);
-        if (value.missing()) continue;
-        case_id = value.text;
-      } else {
-        case_id = selected_case_id(trace, event, case_id_attribute);
-      }
-      if (!case_id)
-        throw std::invalid_argument(
-            "organizational SNA case selector is missing: " +
-            case_id_attribute);
-      auto [it, inserted] = positions.emplace(*case_id, grouped.size());
-      if (inserted) grouped.push_back(Trace{*case_id, {}, {}});
-      grouped[it->second].events.push_back(event);
+  // A frame's groupby keeps each group's rows in the frame's row order (an
+  // XES upload's file order, where a case column other than the traces'
+  // names gathers rows of several traces; round BG).
+  for (const auto& row : frame ? frame_rows(log) : trace_rows(log)) {
+    const auto& trace = row.trace;
+    const auto& event = row.event;
+    std::optional<std::string> case_id;
+    if (frame) {
+      // groupby leaves out the rows whose key is NaN.
+      const auto value = frame_value(log, trace, event, case_id_attribute, FrameKeyScope::kDataFrame);
+      if (value.missing()) continue;
+      case_id = value.text;
+    } else {
+      case_id = selected_case_id(trace, event, case_id_attribute);
     }
+    if (!case_id)
+      throw std::invalid_argument(
+          "organizational SNA case selector is missing: " +
+          case_id_attribute);
+    auto [it, inserted] = positions.emplace(*case_id, grouped.size());
+    if (inserted) grouped.push_back(Trace{*case_id, {}, {}});
+    grouped[it->second].events.push_back(event);
   }
   for (auto& trace : grouped)
     for (auto& event : trace.events) event.case_id = trace.case_id;
@@ -318,22 +330,25 @@ OrganizationalSnaResult discover_organizational_sna(
     // groupby keeps: a row without a case is left out (round BD, observed
     // black-box).
     const bool grouped = case_id_variant(options.variant);
-    for (const auto& trace : log.traces)
-      for (const auto& event : trace.events) {
-        if (grouped && !frame_row_scalar(log, trace, event, options.case_id_attribute)) continue;
-        const auto resource = cell(trace, event, options.resource_attribute);
-        if (joint) {
-          // The joint-activities pandas variant drops each column's NaN on
-          // its own before sorting it: a row without an activity still
-          // sorts its resource, and the other way round (round BF, observed
-          // black-box).
-          const auto activity = cell(trace, event, options.activity_attribute);
-          if (!(drop_missing && !activity))
-            if (const auto value = sorted_cell(activity, options.activity_attribute)) activity_values.push_back(*value);
-        }
-        if (drop_missing && !resource) continue;
-        if (const auto value = sorted_cell(resource, options.resource_attribute)) resource_values.push_back(*value);
+    // The pandas variants read the frame in its row order (an XES upload's
+    // file order; round BG).
+    for (const auto& row : pandas ? frame_rows(log) : trace_rows(log)) {
+      const auto& trace = row.trace;
+      const auto& event = row.event;
+      if (grouped && !frame_row_scalar(log, trace, event, options.case_id_attribute)) continue;
+      const auto resource = cell(trace, event, options.resource_attribute);
+      if (joint) {
+        // The joint-activities pandas variant drops each column's NaN on
+        // its own before sorting it: a row without an activity still
+        // sorts its resource, and the other way round (round BF, observed
+        // black-box).
+        const auto activity = cell(trace, event, options.activity_attribute);
+        if (!(drop_missing && !activity))
+          if (const auto value = sorted_cell(activity, options.activity_attribute)) activity_values.push_back(*value);
       }
+      if (drop_missing && !resource) continue;
+      if (const auto value = sorted_cell(resource, options.resource_attribute)) resource_values.push_back(*value);
+    }
     const auto object_column = [&](const std::string& key) {
       return frame_column_type(log, key) == DataFrameColumnType::kObject;
     };
@@ -348,10 +363,12 @@ OrganizationalSnaResult discover_organizational_sna(
   result.diagnostics.trace_count = log.trace_count();
   result.diagnostics.event_count = log.event_count();
   std::set<std::string> names;
-  for (const auto& trace : log.traces)
-    for (const auto& event : trace.events)
-      if (const auto resource = select(trace, event, options.resource_attribute, true))
-        names.insert(*resource);
+  // Equal values (1, 1.0, True) take the first one's name: in the frame's
+  // row order for the pandas variants, the EventLog's for the others (round
+  // BG).
+  for (const auto& row : frame && pandas ? frame_rows(log) : trace_rows(log))
+    if (const auto resource = select(row.trace, row.event, options.resource_attribute, true))
+      names.insert(*resource);
   if (names.size() > options.max_resources)
     throw std::invalid_argument("organizational SNA resource bound exceeded");
   result.resources.assign(names.begin(), names.end());

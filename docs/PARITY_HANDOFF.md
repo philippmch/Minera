@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BF (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BG (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4507,7 +4507,44 @@ last); and the joint-activities pandas variant, which sorts each column
 after dropping its own NaN. The device check on the Mac was skipped again
 (the round's thread had no device linked).
 
-Next round (BG) should start by re-reviewing round BF:
+Round BG re-reviewed BF (Review BG1) and swept the remaining frame routes
+with interleaved XES uploads. It fixed: attribute statistics, case
+statistics grouped by another column, passed, cycle and service time,
+local diagnostics, the roles and SNA pandas variants, and the LLM event
+stream and column descriptions, which now read an XES upload's rows in
+`read_xes`'s file order (`value_counts` ties and the first of equal values,
+a group's first and last rows, the frame's column order); pandas' reading
+of `.` fractions longer than six digits off the ISO path (nanoseconds only
+when digits four to six are `000` after a two-digit `H:MM:SS` clock), of
+comma fractions (after a basic `YYYYMMDD` date; none after one-digit
+seconds), and of a clock before a month-name date or with a zone between
+the clock and the date. The device check on the Mac was skipped again (the
+round's thread had no device linked).
+
+Next round (BH) should start by re-reviewing round BG:
+
+- `src/backend/attribute_statistics.cpp` and `case_statistics.cpp`: the
+  frame branches in `frame_rows` order (once-per-case pairs across
+  non-adjacent rows, groups of another case column), swept with
+  `ilwrap.py statsweep.py --xes` and `ilwrap2.py axsweep2.py --xes`;
+- `src/backend/llm_abstractions.cpp`: `frame_view`'s column order from the
+  rows in file order, and the log-skeleton description's activity order,
+  which still reads the traces (`llmsweep.py` does not cover it);
+- `src/backend/csv_event_log_importer.cpp`: the long-fraction rule
+  (`two_digit_clock`), comma fractions after basic dates and the rewritten
+  `reference_clock_first` (month names, zones between clock and date),
+  fuzzed with `mixfuzz6.py` and `mixfuzz7.py` and BF's `mixfuzz5.py`;
+- frame loops not yet swept interleaved: the pandas filters on uploads,
+  the features' event-based rows, temporal profiles and the remaining
+  `log.traces` loops of `organizational_mining.cpp` and `role_discovery.cpp`
+  outside the pandas variants;
+- an open choice: a CSV timestamp column of plain numbers (int64 in
+  pm4py's frame) could be modelled as numbers in the frame routes instead
+  of the declared opaque timestamps (BG1 declaration, `pdsweep3.py` seed
+  3059);
+- the CI run of the BG commit.
+
+Round BF's targets, re-reviewed in BG (findings BG1-1 to BG1-6):
 
 - `src/backend/python_list_sort.hpp`: `PythonListSort` (run detection,
   `merge_lo`/`merge_hi` galloping, the state after a raising comparison),

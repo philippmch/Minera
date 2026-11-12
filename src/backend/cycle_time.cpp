@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "frame_cells.hpp"
 #include "frame_times.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
@@ -57,11 +58,12 @@ std::vector<std::pair<double, double>> frame_cycle_events(const EventLog& log, c
                                 "' object has no attribute 'timestamp'");
   };
   std::vector<std::pair<double, double>> events;
-  for (const auto& trace : frame.log().traces)
-    for (const auto& event : trace.events) {
-      const double start = seconds(trace, event, start_key);
-      events.emplace_back(start, seconds(trace, event, end_key));
-    }
+  // In the frame's row order: the first row that fails names the error (an
+  // XES upload's file order; round BG).
+  for (const auto& row : frame_rows(frame.log())) {
+    const double start = seconds(row.trace, row.event, start_key);
+    events.emplace_back(start, seconds(row.trace, row.event, end_key));
+  }
   return events;
 }
 

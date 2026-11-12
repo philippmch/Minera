@@ -124,6 +124,17 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
       frame && scope == FrameKeyScope::kDataFrame &&
       pandas_row_label_keys(log.event_count(), keys.contains(options.activity_attribute) &&
                                                    keys.contains(options.resource_attribute));
+  // The rows in the order the variant reads them: the pandas variant the
+  // frame's row order (an XES upload's file order), the log variant the
+  // EventLog's, each case's rows together (round BG).
+  std::vector<FrameRow> row_order;
+  if (frame && scope == FrameKeyScope::kDataFrame) {
+    row_order = frame_rows(log);
+  } else {
+    row_order.reserve(log.event_count());
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events) row_order.push_back({trace, event});
+  }
   // The pandas variant's resources in its groupby's order: the rank of each
   // resource's Python identity.
   std::map<std::string, std::size_t> resource_rank;
@@ -146,10 +157,9 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
       // groups' order: the first that is no text raises (round BB, observed
       // black-box).
       std::vector<std::vector<python::Scalar>> pair_keys;
-      for (const auto& trace : log.traces)
-        for (const auto& event : trace.events)
-          pair_keys.push_back({frame_row_scalar(log, trace, event, options.resource_attribute).value_or(python::none()),
-                               frame_row_scalar(log, trace, event, options.activity_attribute).value_or(python::none())});
+      for (const auto& row : row_order)
+        pair_keys.push_back({frame_row_scalar(log, row.trace, row.event, options.resource_attribute).value_or(python::none()),
+                             frame_row_scalar(log, row.trace, row.event, options.activity_attribute).value_or(python::none())});
       std::vector<python::Group> groups;
       try {
         groups = python::groupby(pair_keys);
@@ -224,7 +234,9 @@ RoleDiscoveryResult discover_roles(const EventLog& input,
       activity_resources[activity][resource] = rows;
       resources.insert(resource);
     }
-  } else for (const auto& trace : log.traces) for (const auto& event : trace.events) {
+  } else for (const auto& row : row_order) {
+    const auto& trace = row.trace;
+    const auto& event = row.event;
     const auto activity_value = select(trace, event, options.activity_attribute, false);
     auto resource_value = select(trace, event, options.resource_attribute, true);
     // The EventLog keeps a datetime column's missing cell as pd.NaT, one

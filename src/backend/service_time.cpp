@@ -10,6 +10,7 @@
 #include <tuple>
 
 #include "business_hours.hpp"
+#include "frame_cells.hpp"
 #include "frame_times.hpp"
 #include "performance_arithmetic.hpp"
 #include "minera/timestamp.hpp"
@@ -186,15 +187,15 @@ std::map<std::string, std::vector<double>> frame_service_durations(
   const auto start_type = frame.dtype(start_key);
   const auto is = [](std::optional<DataFrameColumnType> type, DataFrameColumnType wanted) { return type == wanted; };
   const auto no_accessor = [&] { fail("AttributeError: Can only use .dt accessor with datetimelike values"); };
-  const auto& traces = frame.log().traces;
+  // In the frame's row order (an XES upload's file order; round BG).
+  const auto frame_order = frame_rows(frame.log());
   if (slots.empty()) {
     // The column difference (frame_times::column_subtraction), then its .dt.
     std::vector<std::optional<python::Scalar>> ends, starts;
-    for (const auto& trace : traces)
-      for (const auto& event : trace.events) {
-        ends.push_back(frame.cell(trace, event, timestamp_key));
-        starts.push_back(frame.cell(trace, event, start_key));
-      }
+    for (const auto& row : frame_order) {
+      ends.push_back(frame.cell(row.trace, row.event, timestamp_key));
+      starts.push_back(frame.cell(row.trace, row.event, start_key));
+    }
     const auto difference = frame_times::column_subtraction(end_type, ends, start_type, starts);
     if (difference.error) fail("TypeError: " + *difference.error);
     if (!difference.timedelta) no_accessor();
@@ -205,35 +206,36 @@ std::map<std::string, std::vector<double>> frame_service_durations(
     double duration;
   };
   std::vector<Row> rows;
-  for (const auto& trace : traces)
-    for (const auto& event : trace.events) {
-      if (slots.empty()) {
-        const auto start = frame.date(trace, event, start_key);
-        const auto finish = frame.date(trace, event, timestamp_key);
-        rows.push_back({&trace, &event,
-                        start && finish ? frame_times::total_seconds(*start, *finish)
-                                        : std::numeric_limits<double>::quiet_NaN()});
-        continue;
-      }
-      std::optional<ParsedExactTimestamp> ends[2];
-      int index = 0;
-      for (const auto* key : {&start_key, &timestamp_key}) {
-        const auto cell = frame.cell(trace, event, *key);
-        if (cell && cell->kind == python::Scalar::Kind::kText) fail("TypeError: str.replace() takes no keyword arguments");
-        if (cell ? cell->kind != python::Scalar::Kind::kDate : !is(frame.dtype(*key), DataFrameColumnType::kDate))
-          fail("AttributeError: '" + frame.cell_type(trace, event, *key) + "' object has no attribute 'replace'");
-        ends[index++] = frame.date(trace, event, *key);
-      }
-      if (!ends[0] || !ends[1]) fail("ValueError: cannot convert float NaN to integer");
-      // The UTC wall clock's business seconds, the week offsets taken from
-      // the exact microseconds (epoch-second doubles lose sub-microsecond
-      // precision, observed on XES uploads).
-      const auto micros = [](const ParsedExactTimestamp& date) {
-        return date.seconds * 1000000LL + static_cast<std::int64_t>(date.nanoseconds / 1000);
-      };
-      rows.push_back(
-          {&trace, &event, detail::business_elapsed_microseconds(micros(*ends[0]), micros(*ends[1]), slots)});
+  for (const auto& frame_row : frame_order) {
+    const auto& trace = frame_row.trace;
+    const auto& event = frame_row.event;
+    if (slots.empty()) {
+      const auto start = frame.date(trace, event, start_key);
+      const auto finish = frame.date(trace, event, timestamp_key);
+      rows.push_back({&trace, &event,
+                      start && finish ? frame_times::total_seconds(*start, *finish)
+                                      : std::numeric_limits<double>::quiet_NaN()});
+      continue;
     }
+    std::optional<ParsedExactTimestamp> ends[2];
+    int index = 0;
+    for (const auto* key : {&start_key, &timestamp_key}) {
+      const auto cell = frame.cell(trace, event, *key);
+      if (cell && cell->kind == python::Scalar::Kind::kText) fail("TypeError: str.replace() takes no keyword arguments");
+      if (cell ? cell->kind != python::Scalar::Kind::kDate : !is(frame.dtype(*key), DataFrameColumnType::kDate))
+        fail("AttributeError: '" + frame.cell_type(trace, event, *key) + "' object has no attribute 'replace'");
+      ends[index++] = frame.date(trace, event, *key);
+    }
+    if (!ends[0] || !ends[1]) fail("ValueError: cannot convert float NaN to integer");
+    // The UTC wall clock's business seconds, the week offsets taken from
+    // the exact microseconds (epoch-second doubles lose sub-microsecond
+    // precision, observed on XES uploads).
+    const auto micros = [](const ParsedExactTimestamp& date) {
+      return date.seconds * 1000000LL + static_cast<std::int64_t>(date.nanoseconds / 1000);
+    };
+    rows.push_back(
+        {&trace, &event, detail::business_elapsed_microseconds(micros(*ends[0]), micros(*ends[1]), slots)});
+  }
   if (!frame.has(activity_key)) fail("KeyError: '" + activity_key + "'");
   std::map<std::string, std::string> names;
   std::map<std::string, std::vector<double>> durations;

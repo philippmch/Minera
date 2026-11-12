@@ -9,6 +9,7 @@
 #include <tuple>
 
 #include "business_hours.hpp"
+#include "frame_cells.hpp"
 #include "frame_times.hpp"
 #include "performance_arithmetic.hpp"
 #include "minera/frame_keys.hpp"
@@ -172,15 +173,16 @@ void frame_cases(const EventLog& log, const CaseStatisticsOptions& options,
   std::vector<std::vector<python::Scalar>> keys;
   std::vector<std::optional<python::Scalar>> cells;
   bool nanosecond_unit = false;
-  for (const auto& trace : frame.log().traces)
-    for (const auto& event : trace.events) {
-      auto id = frame.cell(trace, event, case_key);
-      keys.push_back({id ? std::move(*id) : python::none()});
-      auto value = frame.cell(trace, event, key);
-      if (value && value->kind == python::Scalar::Kind::kDate && value->date.nanoseconds % 1000 != 0)
-        nanosecond_unit = true;
-      cells.push_back(std::move(value));
-    }
+  // In the frame's row order (an XES upload's file order: a case column
+  // other than the traces' names groups rows of several traces; round BG).
+  for (const auto& row : frame_rows(frame.log())) {
+    auto id = frame.cell(row.trace, row.event, case_key);
+    keys.push_back({id ? std::move(*id) : python::none()});
+    auto value = frame.cell(row.trace, row.event, key);
+    if (value && value->kind == python::Scalar::Kind::kDate && value->date.nanoseconds % 1000 != 0)
+      nanosecond_unit = true;
+    cells.push_back(std::move(value));
+  }
   std::vector<python::Group> grouped;
   try {
     grouped = python::groupby(keys);

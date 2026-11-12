@@ -806,13 +806,25 @@ FrameView frame_view(const EventLog& log) {
   FrameView view;
   view.keys = columns.order;
   if (view.keys.empty()) {
-    // read_xes's frame lists each key where the converted event stream
-    // (event attributes in document order, then the case: attributes) first
-    // has it.
+    // read_xes's frame lists each key where its rows first have it (each
+    // row's event attributes in document order, then the case: attributes),
+    // the rows in file order: a case whose <trace> elements repeat its name
+    // apart from each other has its rows apart too (round BG, observed
+    // black-box).
+    const auto stream = event_log_to_event_stream(log);
+    std::vector<std::size_t> first_record;
+    std::size_t records = 0;
+    for (const auto& trace : log.traces) {
+      first_record.push_back(records);
+      records += trace.events.size();
+    }
     std::set<std::string> seen;
-    for (const auto& record : event_log_to_event_stream(log).events)
-      for (const auto& field : record.fields)
+    for (const auto& row : frame_rows(log)) {
+      const auto trace = static_cast<std::size_t>(&row.trace - log.traces.data());
+      const auto event = static_cast<std::size_t>(&row.event - row.trace.events.data());
+      for (const auto& field : stream.events[first_record[trace] + event].fields)
         if (seen.insert(field.key).second) view.keys.push_back(field.key);
+    }
   }
   std::map<std::string, FrameDtype> dtypes;
   for (const auto& column : columns.columns) dtypes[column.key] = frame_dtype(column.type);
@@ -839,22 +851,24 @@ FrameView frame_view(const EventLog& log) {
     const auto found = dtypes.find(key);
     view.dtypes.push_back(found == dtypes.end() ? FrameDtype::kObject : found->second);
   }
-  for (const auto& trace : frame.traces)
-    for (const auto& event : trace.events) {
-      std::vector<Cell> row;
-      row.reserve(view.keys.size());
-      std::optional<std::int64_t> micros;
-      for (std::size_t i = 0; i < view.keys.size(); ++i) {
-        const auto& key = view.keys[i];
-        const auto value = !csv && view.dtypes[i] == FrameDtype::kObject ? object_scalar(trace, event, key)
-                                                                          : frame_row_scalar(frame, trace, event, key);
-        row.push_back(value ? scalar_cell(*value) : Cell{});
-        if (key == "time:timestamp" && row.back().kind == CellKind::kDate) micros = row.back().micros;
-      }
-      if (!micros) throw std::invalid_argument("every event needs a timestamp");
-      view.rows.push_back(std::move(row));
-      view.micros.push_back(*micros);
+  // In the frame's row order (an XES upload's file order).
+  for (const auto& frame_row : frame_rows(frame)) {
+    const auto& trace = frame_row.trace;
+    const auto& event = frame_row.event;
+    std::vector<Cell> row;
+    row.reserve(view.keys.size());
+    std::optional<std::int64_t> micros;
+    for (std::size_t i = 0; i < view.keys.size(); ++i) {
+      const auto& key = view.keys[i];
+      const auto value = !csv && view.dtypes[i] == FrameDtype::kObject ? object_scalar(trace, event, key)
+                                                                        : frame_row_scalar(frame, trace, event, key);
+      row.push_back(value ? scalar_cell(*value) : Cell{});
+      if (key == "time:timestamp" && row.back().kind == CellKind::kDate) micros = row.back().micros;
     }
+    if (!micros) throw std::invalid_argument("every event needs a timestamp");
+    view.rows.push_back(std::move(row));
+    view.micros.push_back(*micros);
+  }
   return view;
 }
 

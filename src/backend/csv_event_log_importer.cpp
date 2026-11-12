@@ -607,6 +607,9 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
   int hour = 0, minute = 0, second = 0;
   std::string fraction;
   bool comma_fraction = false;
+  // H:MM:SS with two-digit minutes and seconds (nanoseconds off the ISO
+  // path need it).
+  bool two_digit_clock = false;
   std::string offset;
   int offset_minutes = 0;
   if (!in.done()) {
@@ -718,7 +721,8 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
       ++in.pos;
       // One-digit minutes and seconds read too, on pandas' ISO path as well
       // ("10:3:5"; "0000-01-05 10:3" is year 0).
-      if (in.digits(m, 2) == 0) return std::nullopt;
+      const auto minute_digits = in.digits(m, 2);
+      if (minute_digits == 0) return std::nullopt;
       if (in.peek() == '.') {
         // A fraction of a minute (dateutil): the seconds are the whole
         // seconds of 60 times the fraction, with no sub-second part
@@ -740,8 +744,13 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
           return std::nullopt;
       } else if (in.peek() == ':') {
         ++in.pos;
-        if (in.digits(s, 2) == 0) return std::nullopt;
+        const auto second_digits = in.digits(s, 2);
+        if (second_digits == 0) return std::nullopt;
+        two_digit_clock = minute_digits == 2 && second_digits == 2;
         if (!read_seconds_fraction(true)) return std::nullopt;
+        // A `,` fraction needs two-digit seconds ("2020-01-05 00:00:5,5"
+        // fails; round BG, observed black-box).
+        if (comma_fraction && second_digits != 2) return std::nullopt;
       }
     }
     // AM/PM takes an hour of 0 to 12 ("0:30 PM" is 12:30, "0 AM" 00:00).
@@ -913,10 +922,13 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_shapes(
       return std::nullopt;
   }
   // Off the ISO path pandas keeps microseconds only, unless a `.` fraction's
-  // microseconds end in three zeros: then its nanosecond digits are kept too
-  // ("2024-01-01t10:00:00.123000456" holds .123000456, ".1234567" .123456).
+  // microseconds end in three zeros after a clock with two-digit minutes
+  // and seconds: then its nanosecond digits are kept too
+  // ("2024-01-01t10:00:00.123000456" and "1/31/1960 0:05:59.123000456" hold
+  // .123000456; ".1234567", "1/31/1960 0:5:59.123000456" and the basic
+  // clock "100559.123000456" keep .123000; round BG, observed black-box).
   if (!iso_path && fraction.size() > 6 &&
-      (comma_fraction || fraction.compare(3, 3, "000") != 0))
+      (comma_fraction || !two_digit_clock || fraction.compare(3, 3, "000") != 0))
     fraction.resize(6);
 
   char buffer[40];
@@ -1008,15 +1020,15 @@ std::optional<std::string> reference_numeric_date(std::string_view text) {
 
 // A basic YYYYMMDD date followed by a clock after `T`, `t` or white space
 // ("20240105 11:07:52", "20240105T1107"): pandas reads it like YYYY-MM-DD
-// with that clock, nanoseconds included, but refuses a `,` fraction
-// ("20240105 11:07:52,5") and a date alone (review Y1-3). Returns the cell
-// with the date spelled YYYY-MM-DD, or nullopt.
+// with that clock, nanoseconds included, a `,` fraction too ("20240105
+// 11:07:52,5" is 11:07:52.5 as "2024-01-05 11:07:52,5" is; round BG,
+// observed black-box), but refuses a date alone (review Y1-3). Returns the
+// cell with the date spelled YYYY-MM-DD, or nullopt.
 std::optional<std::string> reference_basic_date(std::string_view text) {
   if (text.size() < 10) return std::nullopt;
   for (std::size_t i = 0; i < 8; ++i)
     if (!std::isdigit(static_cast<unsigned char>(text[i]))) return std::nullopt;
   if (text[8] != ' ' && text[8] != 'T' && text[8] != 't') return std::nullopt;
-  if (text.find(',') != std::string_view::npos) return std::nullopt;
   std::string out;
   out.reserve(text.size() + 2);
   out.append(text.substr(0, 4)).push_back('-');
@@ -1231,16 +1243,20 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_text(
 }
 
 // A clock before the date ("10:30 2020-01-05", "7:05 PM, 05.01.2024",
-// "00:00 19990513Z"): dateutil reads the tokens in either order, so the cell
-// reads as the date followed by that clock, any offset or zone name kept at
-// the end (round BF, observed black-box). The clock is H:M, H:M:S or
-// H:M:S.f (one or two digits each) with an optional AM/PM, then blanks and
-// commas (not a `T`: "00:30T2020-12-05" fails, and a `,` between "10:30"
-// and the date's first digit reads as a fraction on today's date); the date
-// is digits and one of `-`, `/`, `.` or blanks. Returns the reordered cell,
-// or nullopt.
+// "00:00 19990513Z", "10:30 Jan 5 2020", "7:05:15,5 PM UTC 5 Jan 2020"):
+// dateutil reads the tokens in either order, so the cell reads as the date
+// followed by that clock, any offset or zone name kept at the end (rounds BF
+// and BG, observed black-box). The clock is H:M, H:M:S or H:M:S.f (one or
+// two digits each; a `,` fraction after the seconds too) with an optional
+// AM/PM and an optional zone name or offset, then blanks and commas (not a
+// `T`: "00:30T2020-12-05" fails, and a `,` between the clock and the date's
+// first digit reads as a fraction on today's date); the date is digits and
+// one of `-`, `/`, `.` or blanks, or holds a month name (and maybe a weekday
+// name) among numbers, blanks, commas and `-`, `/`, `.`. Returns the
+// reordered cell, or nullopt.
 std::optional<std::string> reference_clock_first(std::string_view text) {
   const auto digit = [](char ch) { return ch >= '0' && ch <= '9'; };
+  const auto letter = [](char ch) { return std::isalpha(static_cast<unsigned char>(ch)) != 0; };
   std::size_t at = 0;
   while (at < text.size() && text[at] == ' ') ++at;
   const auto digits = [&](std::size_t from, std::size_t least, std::size_t most) {
@@ -1254,12 +1270,22 @@ std::optional<std::string> reference_clock_first(std::string_view text) {
   if (k == std::string_view::npos) return std::nullopt;
   bool fraction = false;
   if (k < text.size() && text[k] == ':') {
+    const auto seconds_begin = k + 1;
     k = digits(k + 1, 1, 2);
     if (k == std::string_view::npos) return std::nullopt;
-    if (k < text.size() && text[k] == '.') {
+    if (k + 1 < text.size() && (text[k] == '.' || text[k] == ',') && digit(text[k + 1])) {
+      const bool comma = text[k] == ',';
+      // A `,` fraction needs two-digit seconds ("00:00:5,5 2020-01-05" fails).
+      if (comma && k - seconds_begin != 2) return std::nullopt;
       k = digits(k + 1, 1, 64);
       if (k == std::string_view::npos) return std::nullopt;
+      // A `,` fraction runs into the date when a date separator follows
+      // ("10:30:15,2020-01-05" is a clock on today's date).
+      if (comma && k < text.size() && (text[k] == '-' || text[k] == '/' || text[k] == '.' || text[k] == ':'))
+        return std::nullopt;
       fraction = true;
+    } else if (k < text.size() && text[k] == '.') {
+      return std::nullopt;
     }
   }
   if (k < text.size() && digit(text[k])) return std::nullopt;
@@ -1275,18 +1301,43 @@ std::optional<std::string> reference_clock_first(std::string_view text) {
     }
   }
   const auto clock = text.substr(at, meridiem_end - at);
-  std::size_t date_begin = meridiem_end;
+  // A zone name or offset right after the clock, joined or after one blank
+  // ("10:30Z 2020-01-05", "10:30 PM UTC 2020-01-05", "10:30 +0100 ...").
+  std::string_view zone;
+  std::size_t clock_end = meridiem_end;
+  {
+    std::size_t z = clock_end < text.size() && text[clock_end] == ' ' ? clock_end + 1 : clock_end;
+    std::size_t e = z;
+    for (const std::string_view name : {"UTC", "GMT", "Z"})
+      if (text.substr(z, name.size()) == name) {
+        e = z + name.size();
+        break;
+      }
+    if (e == z && z < text.size() && (text[z] == '+' || text[z] == '-')) {
+      std::size_t j = digits(z + 1, 2, 2);
+      if (j != std::string_view::npos) {
+        if (j < text.size() && text[j] == ':') j = digits(j + 1, 2, 2);
+        else if (j + 1 < text.size() && digit(text[j])) j = digits(j, 2, 2);
+        if (j != std::string_view::npos) e = j;
+      }
+    }
+    if (e > z && (e == text.size() || text[e] == ' ' || text[e] == ',')) {
+      zone = text.substr(z, e - z);
+      clock_end = e;
+    }
+  }
+  std::size_t date_begin = clock_end;
   while (date_begin < text.size() && (text[date_begin] == ' ' || text[date_begin] == ',')) ++date_begin;
-  if (date_begin == meridiem_end || date_begin >= text.size() || !digit(text[date_begin])) return std::nullopt;
-  // "10:30,2020-01-05" is 10:30:12.12 today: one comma joining a clock
-  // without a fraction to the date ("10:30,,2020-01-05" reads).
-  if (meridiem_end == k && !fraction && date_begin == k + 1 && text[k] == ',') return std::nullopt;
+  if (date_begin == clock_end || date_begin >= text.size()) return std::nullopt;
+  if (!letter(text[date_begin]) && !digit(text[date_begin])) return std::nullopt;
   // A trailing offset or zone name stays last: after a blank, or joined.
   const auto rest = text.substr(date_begin);
   std::size_t tail = rest.size();
   char joined_sign = '\0';
-  for (const std::string_view zone : {"Z", "UTC", "GMT"})
-    if (rest.size() > zone.size() && rest.ends_with(zone)) tail = rest.size() - zone.size();
+  for (const std::string_view name : {"Z", "UTC", "GMT"})
+    if (rest.size() > name.size() && rest.ends_with(name) &&
+        !(name == "Z" && letter(rest[rest.size() - 2])))
+      tail = rest.size() - name.size();
   if (tail == rest.size()) {
     std::size_t j = rest.size();
     while (j > 0 && (digit(rest[j - 1]) || rest[j - 1] == ':')) --j;
@@ -1312,24 +1363,72 @@ std::optional<std::string> reference_clock_first(std::string_view text) {
   const bool joined = date_end < text.size() && text[date_end] != ' ';
   const auto date = text.substr(date_begin, date_end - date_begin);
   if (date.empty()) return std::nullopt;
-  // One kind of separator ("10:30, 31/5-1999" fails).
+  const bool named = std::any_of(date.begin(), date.end(), letter);
+  // "10:30,2020-01-05" is 10:30:12.12 today: one comma joining a clock
+  // without a fraction to the date ("10:30,,2020-01-05" reads); after an
+  // offset one comma joined to the date fails too ("10:30 +01:00,2020-01-05";
+  // "10:30 +01:00, 2020-01-05" and "10:30Z,2020-01-05" read).
+  if (clock_end == k && !fraction && date_begin == k + 1 && text[k] == ',' && digit(text[date_begin])) return std::nullopt;
+  if (!zone.empty() && (zone[0] == '+' || zone[0] == '-') && date_begin == clock_end + 1 &&
+      text[clock_end] == ',' && digit(text[date_begin]))
+    return std::nullopt;
+  // One zone: before the date or after it.
+  if (!zone.empty() && date_end < text.size()) return std::nullopt;
   char separator = '\0';
-  for (const char ch : date) {
-    if (digit(ch)) continue;
-    if (ch != '-' && ch != '/' && ch != '.' && ch != ' ') return std::nullopt;
-    if (separator != '\0' && ch != separator) return std::nullopt;
-    separator = ch;
+  if (named) {
+    // Month and weekday names (three letters or more, a trailing `.`
+    // allowed) among numbers; exactly one month name.
+    static constexpr std::array<std::string_view, 12> kMonths{
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december"};
+    static constexpr std::array<std::string_view, 7> kDays{
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"};
+    const auto matches = [](std::string_view word, std::string_view full) {
+      if (word == "sept" && full == "september") return true;
+      return word.size() >= 3 && (word.size() == 3 || word == full) && full.substr(0, word.size()) == word;
+    };
+    int months = 0;
+    for (std::size_t i = 0; i < date.size();) {
+      const char ch = date[i];
+      if (digit(ch) || ch == ' ' || ch == ',' || ch == '-' || ch == '/' || ch == '.') {
+        ++i;
+        continue;
+      }
+      if (!letter(ch)) return std::nullopt;
+      std::size_t j = i;
+      std::string word;
+      while (j < date.size() && letter(date[j]))
+        word.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(date[j++]))));
+      bool month = false, day = false;
+      for (const auto full : kMonths) month = month || matches(word, full);
+      for (const auto full : kDays) day = day || matches(word, full);
+      if (!month && !day) return std::nullopt;
+      months += month ? 1 : 0;
+      i = j;
+    }
+    if (months != 1) return std::nullopt;
+  } else {
+    // One kind of separator ("10:30, 31/5-1999" fails).
+    for (const char ch : date) {
+      if (digit(ch)) continue;
+      if (ch != '-' && ch != '/' && ch != '.' && ch != ' ') return std::nullopt;
+      if (separator != '\0' && ch != separator) return std::nullopt;
+      separator = ch;
+    }
   }
-  if (joined && separator == ' ') {
+  if (joined && (separator == ' ' || named)) {
     // A zone or offset joined to the last of blank-separated numbers reads
     // only when that number could be a day or month ("10:00 1960 07 05Z"
     // reads; "10:00 05 07 1960Z" and "10:30 2020 01 05-0500" fail).
-    std::size_t last = date.rfind(' ') + 1;
+    std::size_t last = date.find_last_not_of("0123456789");
+    last = last == std::string_view::npos ? 0 : last + 1;
     while (last + 1 < date.size() && date[last] == '0') ++last;
-    if (date.size() - last > 2 || std::stoi(std::string(date.substr(last))) > 31 || joined_sign == '-')
+    if (last >= date.size() || date.size() - last > 2 || std::stoi(std::string(date.substr(last))) > 31 ||
+        joined_sign == '-')
       return std::nullopt;
   }
   std::string reordered = std::string(date) + " " + std::string(clock);
+  if (!zone.empty()) reordered += " " + std::string(zone);
   if (date_end < text.size()) {
     std::size_t from = date_end;
     while (from < text.size() && text[from] == ' ') ++from;

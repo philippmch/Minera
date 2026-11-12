@@ -8874,7 +8874,9 @@ void csv_timestamps_review_y1_shapes() {
   assert(unconvertible("01 05 2024  1  pm  -12:00"));
   assert(unconvertible("2024-01-05 3:08pm pm"));
   assert(unconvertible("2024-01-05 3:08 P.M."));
-  assert(unconvertible("\"20240105 11:07:52,5\""));
+  // Round BG: pandas 3.0.5 reads a `,` fraction after a basic date as after
+  // YYYY-MM-DD (dateutil, microseconds).
+  assert(stamp("\"20240105 11:07:52,5\"") == "2024-01-05 11:07:52.5");
   assert(unconvertible("2024-01-05 3:08+530"));
   assert(unconvertible("2024-01-05 1107.5"));
 }

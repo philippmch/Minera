@@ -9,6 +9,7 @@
 #include <string_view>
 
 #include "business_hours.hpp"
+#include "frame_cells.hpp"
 #include "frame_times.hpp"
 #include "performance_arithmetic.hpp"
 #include "python_scalar.hpp"
@@ -245,10 +246,10 @@ PassedTimeResult frame_passed_time(const EventLog& log, const PassedTimeOptions&
     std::optional<Scalar> case_id, activity, timestamp, start;
   };
   std::vector<Row> rows;
-  for (const auto& trace : frame.log().traces)
-    for (const auto& event : trace.events)
-      rows.push_back({frame.cell(trace, event, case_key), frame.cell(trace, event, activity_key),
-                      frame.cell(trace, event, timestamp_key), frame.cell(trace, event, start_key)});
+  // In the frame's row order (an XES upload's file order; round BG).
+  for (const auto& row : frame_rows(frame.log()))
+    rows.push_back({frame.cell(row.trace, row.event, case_key), frame.cell(row.trace, row.event, activity_key),
+                    frame.cell(row.trace, row.event, timestamp_key), frame.cell(row.trace, row.event, start_key)});
   // The sort by case, start and timestamp, each an ordered Categorical.
   const auto codes = [&](auto member) {
     std::vector<std::vector<Scalar>> keys;

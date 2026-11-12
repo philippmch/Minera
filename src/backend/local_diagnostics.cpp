@@ -174,9 +174,8 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
   const std::string resource_key = o.resource_attribute.empty() ? "org:resource" : o.resource_attribute;
   const std::string activity_key = o.activity_attribute.empty() ? "concept:name" : o.activity_attribute;
   const std::string& group_key = o.group_attribute;
-  std::size_t frame_rows = 0;
-  for (const auto& trace : frame.traces) frame_rows += trace.events.size();
-  const bool pair_labels = pandas_row_label_keys(frame_rows, keys.contains(activity_key) && keys.contains(resource_key));
+  const auto row_order = frame_rows(frame);
+  const bool pair_labels = pandas_row_label_keys(row_order.size(), keys.contains(activity_key) && keys.contains(resource_key));
   // The activity and resource columns are read first, and their groupby
   // sorts before the group column is read.
   if (!pair_labels)
@@ -220,26 +219,29 @@ LocalDiagnosticsResult frame_local_diagnostics(const EventLog& input,
   // The membership groupby [resource, group]: its groups in pandas' order
   // give each group's members (sorted by resource) and the groups' order.
   std::vector<python::Group> membership;
-  for (const auto& trace : frame.traces)
-    for (const auto& event : trace.events) {
-      Row row;
-      const auto r = frame_row_scalar(frame, trace, event, resource_key);
-      const auto a = frame_row_scalar(frame, trace, event, activity_key);
-      const auto g = frame_row_scalar(frame, trace, event, group_key);
-      if (r) {
-        row.resource = &resources.add(*r);
-        if (r->kind == python::Scalar::Kind::kText) text_resources.emplace(r->text, *row.resource);
-      }
-      if (a) row.activity = &activities.add(*a);
-      if (g) row.group = &groups.add(*g);
-      // Each level is sorted over every row, also the rows the other
-      // level's null drops (round BB, observed black-box: an activity
-      // column of dates and floats fails though only one row has a
-      // resource).
-      pair_keys.push_back({a.value_or(python::none()), r.value_or(python::none())});
-      if (o.explicit_groups.empty()) group_keys.push_back({r.value_or(python::none()), g.value_or(python::none())});
-      rows.push_back(row);
+  // In the frame's row order: equal values (1, 1.0, True) take the first
+  // one's name (an XES upload's file order; round BG).
+  for (const auto& frame_row : row_order) {
+    const auto& trace = frame_row.trace;
+    const auto& event = frame_row.event;
+    Row row;
+    const auto r = frame_row_scalar(frame, trace, event, resource_key);
+    const auto a = frame_row_scalar(frame, trace, event, activity_key);
+    const auto g = frame_row_scalar(frame, trace, event, group_key);
+    if (r) {
+      row.resource = &resources.add(*r);
+      if (r->kind == python::Scalar::Kind::kText) text_resources.emplace(r->text, *row.resource);
     }
+    if (a) row.activity = &activities.add(*a);
+    if (g) row.group = &groups.add(*g);
+    // Each level is sorted over every row, also the rows the other
+    // level's null drops (round BB, observed black-box: an activity
+    // column of dates and floats fails though only one row has a
+    // resource).
+    pair_keys.push_back({a.value_or(python::none()), r.value_or(python::none())});
+    if (o.explicit_groups.empty()) group_keys.push_back({r.value_or(python::none()), g.value_or(python::none())});
+    rows.push_back(row);
+  }
   if (!pair_labels) {
     try {
       (void)python::groupby(pair_keys);

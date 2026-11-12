@@ -301,19 +301,23 @@ AttributeStatisticsResult discover_attribute_statistics(
     if (once && key == "case:concept:name")
       throw std::invalid_argument("attribute statistics: ValueError: cannot insert case:concept:name, already exists");
     std::vector<std::vector<python::Scalar>> group_keys;
-    for (const auto& trace : frame.traces)
-      for (const auto& event : trace.events) {
-        const auto cell = frame_row_scalar(frame, trace, event, key);
-        if (!cell) {
-          rows.push_back({&trace.case_id, std::nullopt, nullptr, 1});
-          continue;
-        }
-        if (once) group_keys.push_back({python::text(trace.case_id), *cell});
-        std::string text;
-        auto value_key = scalar_key(*cell, text);
-        frame_texts.push_back(std::move(text));
-        rows.push_back({&trace.case_id, std::move(value_key), &frame_texts.back(), 1});
+    // In the frame's row order: value_counts lists equal counts, and keeps
+    // the first cell of values that are equal (1, 1.0, True), in an XES
+    // upload's file order (round BG, observed black-box).
+    for (const auto& row : frame_rows(frame)) {
+      const auto& trace = row.trace;
+      const auto& event = row.event;
+      const auto cell = frame_row_scalar(frame, trace, event, key);
+      if (!cell) {
+        rows.push_back({&trace.case_id, std::nullopt, nullptr, 1});
+        continue;
       }
+      if (once) group_keys.push_back({python::text(trace.case_id), *cell});
+      std::string text;
+      auto value_key = scalar_key(*cell, text);
+      frame_texts.push_back(std::move(text));
+      rows.push_back({&trace.case_id, std::move(value_key), &frame_texts.back(), 1});
+    }
     // The groupby sorts the [case id, value] pairs: values Python cannot
     // order raise TypeError.
     if (once) {
@@ -389,8 +393,9 @@ AttributeStatisticsResult discover_attribute_statistics(
 
   Tally tally;
   tally.result = &result;
-  std::set<std::string> seen;
-  const std::string* seen_case = nullptr;
+  // (case, value) pairs counted once; a frame's rows of a case need not be
+  // adjacent (an XES upload's file order).
+  std::set<std::pair<const std::string*, std::string>> seen;
   for (auto& row : rows) {
     if (!row.key) continue;
     const std::string* text = row.text;
@@ -405,11 +410,7 @@ AttributeStatisticsResult discover_attribute_statistics(
     }
     if (options.scope == AttributeStatisticsScope::kEvents &&
         options.keep_once_per_case) {
-      if (seen_case != row.case_id) {
-        seen.clear();
-        seen_case = row.case_id;
-      }
-      if (seen.insert(row.key->first).second)
+      if (seen.emplace(row.case_id, row.key->first).second)
         tally.add_once(*row.case_id, *row.key, *text);
       continue;
     }
