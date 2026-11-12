@@ -677,6 +677,21 @@ const minera::EventLog& cached_model_log(const MinedSession& session,
   return require_prepared_log(session);
 }
 
+// The Inductive prepared log under an explicit activity key other than the
+// miner's (round BQ): pm4py reads the key on the upload's own log, where a
+// CSV's selected header and its concept:name copy are both columns, but the
+// cached log projects the miner's key over the header. nullopt when the key
+// is the miner's own (the cached log answers).
+std::optional<minera::EventLog> inductive_log_for_key(const MinedSession& session,
+                                                      const std::string& key) {
+  if (key.empty() || key == "concept:name" || key == session.inductive_options.activity_key)
+    return std::nullopt;
+  (void)cached_model_log(session, "inductive");  // the miner ran
+  auto options = session.inductive_options;
+  options.activity_key = key;
+  return minera::prepare_inductive_event_log(require_prepared_log(session), options);
+}
+
 // Marking defaults belong to the cached supplied document. An explicitly
 // supplied request vector wins independently for each marking.
 template <typename Options>
@@ -8533,9 +8548,15 @@ void handle_compare_petri(const httplib::Request& request,
         reference_options.activity_column = selector;
       reference = minera::import_csv_event_log(input, reference_options);
     }
+    // An explicit activity key other than the miner's reads both logs under
+    // that key (round BQ: the Inductive preparation projected the miner's
+    // key over it, and the replay raised KeyError).
+    std::optional<minera::EventLog> keyed_inductive_log;
     if (miner == "inductive") {
-      reference = minera::prepare_inductive_event_log(
-          reference, session->inductive_options);
+      keyed_inductive_log = inductive_log_for_key(*session, comparison_options.activity_attribute);
+      auto inductive_options = session->inductive_options;
+      if (keyed_inductive_log) inductive_options.activity_key = comparison_options.activity_attribute;
+      reference = minera::prepare_inductive_event_log(reference, inductive_options);
     } else if (miner == "alpha") {
       minera::AlphaMinerOptions alpha_projection_options;
       alpha_projection_options.activity_attribute =
@@ -8571,7 +8592,7 @@ void handle_compare_petri(const httplib::Request& request,
     }
     std::optional<minera::EventLog> projected_powl_log;
     const minera::EventLog* comparison_log =
-        &cached_model_log(*session, miner);
+        keyed_inductive_log ? &*keyed_inductive_log : &cached_model_log(*session, miner);
     if (miner == "powl") {
       projected_powl_log = project_powl_activity(
           require_prepared_log(*session), comparison_options.activity_attribute,
@@ -9071,7 +9092,7 @@ void handle_align_petri_multi(const httplib::Request& request, httplib::Response
 void handle_reduce_process_tree(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
-  try { if(!request.has_param("trace_index")) throw std::invalid_argument("trace_index: expected a non-negative integer"); const auto text=request.get_param_value("trace_index"); std::size_t idx=0; const auto r=std::from_chars(text.data(),text.data()+text.size(),idx); if(r.ec!=std::errc{}||r.ptr!=text.data()+text.size()||idx>=cached_model_log(*session,"inductive").traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_process_tree_reduction_params(lookup,present); const auto reduced=minera::reduce_process_tree(require_process_tree(*session),cached_model_log(*session,"inductive").traces[idx],o); response.set_content(minera::process_tree_reduction_json(reduced,session->graph,idx),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+  try { if(!request.has_param("trace_index")) throw std::invalid_argument("trace_index: expected a non-negative integer"); const auto text=request.get_param_value("trace_index"); std::size_t idx=0; const auto r=std::from_chars(text.data(),text.data()+text.size(),idx); if(r.ec!=std::errc{}||r.ptr!=text.data()+text.size()||idx>=cached_model_log(*session,"inductive").traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto lookup=[&](std::string_view n){const auto k=std::string(n);return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return request.has_param(std::string(n));}; const auto o=minera::parse_process_tree_reduction_params(lookup,present); const auto keyed=inductive_log_for_key(*session,o.activity_key); const auto& traces=keyed?keyed->traces:cached_model_log(*session,"inductive").traces; if(idx>=traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto reduced=minera::reduce_process_tree(require_process_tree(*session),traces[idx],o); response.set_content(minera::process_tree_reduction_json(reduced,session->graph,idx),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_alpha_plus_result(const httplib::Request& request, httplib::Response& response) {

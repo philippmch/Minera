@@ -16,6 +16,7 @@
 
 #include "minera/directly_follows_graph.hpp"
 #include "minera/timestamp.hpp"
+#include "frame_times.hpp"
 
 namespace minera {
 namespace {
@@ -332,6 +333,15 @@ std::string selected_flat_case(const std::vector<EventAttribute>& fields,
       select_flat_field(fields, selector, SelectorRole::kCaseId), selector);
 }
 
+// pm4py's correlation miner reads each instant as Timestamp.timestamp(): a
+// cell with nanosecond digits (a CSV frame keeps them) is rounded to the
+// microsecond (round BQ, observed black-box); else the parsed seconds.
+double python_epoch_seconds(std::string_view raw, double parsed) {
+  if (const auto exact = parse_timestamp_exact(raw); exact && exact->nanoseconds % 1000 != 0)
+    return frame_times::epoch_seconds(*exact);
+  return parsed;
+}
+
 double selected_timestamp(const std::vector<EventAttribute>& fields,
                           std::string_view selector,
                           std::string_view description) {
@@ -343,7 +353,7 @@ double selected_timestamp(const std::vector<EventAttribute>& fields,
     throw std::invalid_argument("correlation miner " + std::string(description) +
                                 " selector '" + std::string(selector) +
                                 "' contains an invalid timestamp");
-  return *parsed;
+  return python_epoch_seconds(raw, *parsed);
 }
 
 double selected_event_timestamp(const Event& event, std::string_view selector,
@@ -355,7 +365,7 @@ double selected_event_timestamp(const Event& event, std::string_view selector,
     throw std::invalid_argument("correlation miner " + std::string(description) +
                                 " selector '" + std::string(selector) +
                                 "' contains an invalid timestamp");
-  return *parsed;
+  return python_epoch_seconds(raw, *parsed);
 }
 
 std::string completion_selector(const CorrelationMinerOptions& options) {

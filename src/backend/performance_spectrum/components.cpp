@@ -16,6 +16,9 @@
 #include <vector>
 
 #include "minera/timestamp.hpp"
+#include "../frame_times.hpp"
+
+#include <cmath>
 
 namespace minera::performance_spectrum_detail {
 namespace {
@@ -28,7 +31,29 @@ struct TimedEvent {
   // The DataFrame and LazyFrame variants' instant of a table cell (round
   // BP, frame_instant), when it parses exactly; else instant * scale.
   std::optional<double> frame_instant;
+  // The exact instant the events sort by (seconds, nanoseconds): pandas and
+  // Polars sort a datetime column, and pm4py a log's Timestamps, at their
+  // full resolution, which a double of epoch seconds does not hold (two
+  // instants tens of nanoseconds apart are one double; round BQ).
+  std::pair<std::int64_t, std::int64_t> order{};
 };
+
+// The exact sort key of a timestamp cell; a cell that parse_timestamp reads
+// but parse_timestamp_exact does not keeps its double's nanoseconds.
+std::pair<std::int64_t, std::int64_t> order_key(std::string_view text, double instant) {
+  if (const auto exact = parse_timestamp_exact(text)) return {exact->seconds, exact->nanoseconds};
+  const double whole = std::floor(instant);
+  return {static_cast<std::int64_t>(whole), static_cast<std::int64_t>(std::llround((instant - whole) * 1e9))};
+}
+
+// A log event's instant as pm4py's log variants read it, Timestamp.timestamp():
+// a nanosecond cell (a CSV frame's log keeps the digits) rounded to the
+// microsecond (round BQ, observed black-box; declared in round BP).
+double log_instant(std::string_view text, double instant) {
+  if (const auto exact = parse_timestamp_exact(text); exact && exact->nanoseconds % 1000 != 0)
+    return frame_times::epoch_seconds(*exact);
+  return instant;
+}
 
 // pandas' DataFrame spectrum reads a datetime column as its int64 units
 // divided by 1e9 (numpy's true division of the int64 by an int): a
@@ -203,8 +228,8 @@ std::string selected_case(const Trace& trace, const Event& event,
 void sort_case_events(CaseEvents& events) {
   std::stable_sort(events.begin(), events.end(),
                    [](const TimedEvent& left, const TimedEvent& right) {
-                     return std::tie(left.instant, left.source_order) <
-                            std::tie(right.instant, right.source_order);
+                     return std::tie(left.order, left.source_order) <
+                            std::tie(right.order, right.source_order);
                    });
 }
 
@@ -226,10 +251,11 @@ Cases project_log(const EventLog& log, const std::set<std::string>& requested,
       if (!is_requested(requested, activity)) continue;
       const double instant =
           selected_timestamp(event, options.timestamp_attribute);
+      const auto& text = *event_attribute(event, options.timestamp_attribute);
       const std::size_t source_order = ordered ? event.input_order : position;
       events.push_back(
           {selected_case(trace, event, options.case_id_attribute), *activity,
-           instant, source_order});
+           log_instant(text, instant), source_order, std::nullopt, order_key(text, instant)});
     }
     if (options.sort_log) sort_case_events(events);
     if (!events.empty()) cases.push_back(std::move(events));
@@ -350,8 +376,8 @@ Cases split_runs(std::vector<TimedEvent> events, bool sorted) {
                        if (left.case_id != right.case_id) {
                          return left.case_id < right.case_id;
                        }
-                       return std::tie(left.instant, left.source_order) <
-                              std::tie(right.instant, right.source_order);
+                       return std::tie(left.order, left.source_order) <
+                              std::tie(right.order, right.source_order);
                      });
   }
   Cases cases;
@@ -386,7 +412,8 @@ Cases project_table(const EventTable& table,
           "performance spectrum: selected event has an invalid timestamp");
     }
     events.push_back({table_cell_text(row, columns.case_id), activity, *instant,
-                      row_index, frame_instant(timestamp, component, units_per_second)});
+                      row_index, frame_instant(timestamp, component, units_per_second),
+                      order_key(timestamp, *instant)});
   }
   return split_runs(std::move(events), options.sort_log);
 }
@@ -429,7 +456,8 @@ Cases project_lazy_table(const LazyEventTable& table,
           "performance spectrum: selected event has an invalid timestamp");
     }
     events.push_back({table_cell_text(row, selected.case_id), activity,
-                      *instant, source_order, frame_instant(timestamp, component, 1000000)});
+                      *instant, source_order, frame_instant(timestamp, component, 1000000),
+                      order_key(timestamp, *instant)});
   };
 
   table.scan([&](const LazyEventTable::Row& row) {
@@ -832,10 +860,9 @@ void stable_sort_points(std::vector<SpectrumObservation>& points,
 void sort_cases_by_first_instant(Cases& cases) {
   std::stable_sort(cases.begin(), cases.end(),
                    [](const CaseEvents& left, const CaseEvents& right) {
-                     constexpr double kNone = std::numeric_limits<double>::infinity();
-                     const double l = left.empty() ? kNone : left.front().instant;
-                     const double r = right.empty() ? kNone : right.front().instant;
-                     return l < r;
+                     // Empty cases last; else by the exact first instant.
+                     if (left.empty() || right.empty()) return !left.empty() && right.empty();
+                     return left.front().order < right.front().order;
                    });
 }
 

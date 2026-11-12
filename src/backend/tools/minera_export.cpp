@@ -7665,8 +7665,11 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       minera::register_correlation_activities(
           graph, *correlation_variants_analysis);
     }
+    // A CSV or XES input reaches pm4py as a DataFrame, as the server's mine
+    // route reads an upload (round BQ: the EventLog algorithm's
+    // Timestamp.timestamp() differences were an ulp or more off).
     const auto temporal_profile =
-        minera::discover_temporal_profile(log, temporal_profile_options);
+        minera::discover_temporal_profile_as_uploaded(log, temporal_profile_options);
     const auto minimum_self_distances =
         discover_selected_minimum_self_distances(
             log, minimum_self_distance_options);

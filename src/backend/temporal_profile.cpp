@@ -153,10 +153,15 @@ std::optional<std::string> event_activity(
   return std::nullopt;
 }
 
+// `python_epoch`: the instant as pm4py's EventLog algorithms read it,
+// Timestamp.timestamp() (rounded to the microsecond: a CSV cell with
+// nanosecond digits keeps them in the frame's log; round BQ, observed
+// black-box); else the parsed seconds.
 std::optional<double> event_instant(const Event& event,
                                     const std::string& primary,
                                     const std::string& alias,
-                                    bool strict_attributes) {
+                                    bool strict_attributes,
+                                    bool python_epoch = false) {
   const auto& attribute_name = configured_attribute(primary, alias);
   const auto* value = selected_event_value(event, attribute_name, "timestamp");
   if (value == nullptr) {
@@ -166,11 +171,14 @@ std::optional<double> event_instant(const Event& event,
     }
     return std::nullopt;
   }
-  const auto instant = parse_timestamp(*value);
+  auto instant = parse_timestamp(*value);
   if (!instant && strict_attributes) {
     throw std::invalid_argument(
         "temporal profile: selected timestamp attribute is invalid");
   }
+  if (instant && python_epoch)
+    if (const auto exact = parse_timestamp_exact(*value); exact && exact->nanoseconds % 1000 != 0)
+      instant = frame_times::epoch_seconds(*exact);
   return instant;
 }
 
@@ -644,9 +652,12 @@ namespace {
 // with every event of a higher rank, before or after it, as pm4py's DataFrame
 // algorithms do with a frame "@@index" (round BL); without, with the later
 // events.
+// `python_epoch` as in event_instant (the EventLog algorithm; the
+// DataFrame fallback keeps the parsed seconds).
 TemporalProfile discover_temporal_profile_ranked(
     const EventLog& log, const TemporalProfileOptions& options,
-    const std::function<bool()>& cancelled, const PairRanks* ranks) {
+    const std::function<bool()>& cancelled, const PairRanks* ranks,
+    bool python_epoch = true) {
   if (options.activity_attribute.empty()) {
     throw std::invalid_argument(
         "temporal profile: activity attribute must not be empty");
@@ -722,7 +733,7 @@ TemporalProfile discover_temporal_profile_ranked(
       }
       const auto source_time =
           event_instant(trace.events[i], source_attribute, "",
-                        options.strict_attributes);
+                        options.strict_attributes, python_epoch);
       if (!source_time) continue;
       const auto source_activity = event_activity(trace.events[i], options);
       if (!source_activity) continue;
@@ -738,7 +749,7 @@ TemporalProfile discover_temporal_profile_ranked(
         auto& target = targets[j];
         if (!target.instant_read) {
           target.instant = event_instant(trace.events[j], target_attribute, "",
-                                         options.strict_attributes);
+                                         options.strict_attributes, python_epoch);
           target.instant_read = true;
         }
         const auto& target_time = target.instant;
@@ -834,7 +845,7 @@ TemporalProfile discover_temporal_profile_dataframe(
     if (exact) return frame_arithmetic_profile(ordered, {});
   }
   return discover_temporal_profile_ranked(log, normalized_table_options(options), {},
-                                          ranks.empty() ? nullptr : &ranks);
+                                          ranks.empty() ? nullptr : &ranks, false);
 }
 
 TemporalProfile discover_temporal_profile(
@@ -928,7 +939,7 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
     for (std::size_t i = 0; i + (rank ? 0 : 1) < trace.events.size(); ++i) {
       const auto source_time =
           event_instant(trace.events[i], source_attribute, "",
-                        options.strict_attributes);
+                        options.strict_attributes, !timedelta);
       if (!source_time) continue;
       const auto source_activity = event_activity(trace.events[i], options);
       if (!source_activity) continue;
@@ -948,7 +959,7 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
         const auto* entry = entry_it->second;
         const auto target_time =
             event_instant(trace.events[j], target_attribute, "",
-                          options.strict_attributes);
+                          options.strict_attributes, !timedelta);
         if (!target_time) continue;
         if (exact && exact_sources[i] && exact_targets[j]
                 ? std::tie(exact_targets[j]->seconds, exact_targets[j]->nanoseconds) <

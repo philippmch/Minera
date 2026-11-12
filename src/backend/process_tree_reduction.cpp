@@ -1,4 +1,5 @@
 #include "minera/process_tree_reduction.hpp"
+#include "reference_activity_selector.hpp"
 
 #include <algorithm>
 #include <set>
@@ -215,6 +216,13 @@ ActivityNames trace_activities(const ProcessTree& tree, const Trace& trace,
         }
       }
       if (selected == nullptr) {
+        // A selected column's own header (its source key, a CSV header or
+        // the key the log was prepared under) reads that projection, a
+        // string, as pm4py reads the column (round BQ).
+        if (const auto* projected = reference_selected_field(event, options.activity_key)) {
+          if (known.find(*projected) != known.end()) result.emplace(*projected);
+          continue;
+        }
         throw std::invalid_argument("event is missing activity attribute '" +
                                     options.activity_key + "'");
       }

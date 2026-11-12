@@ -24506,3 +24506,111 @@ Verification (scripts in the project files under `review-harness/round-bp/`;
 microsecond, nanosecond and undeclared columns, the LazyFrame truncation,
 and the rework, variant statistics, chaotic activities, start activities
 and overlap keyed by a CSV's own headers.
+
+## Review BQ1: re-review of round BP, the log families on nanosecond CSV cells, CSV headers in the tree and Petri lookups, and the CLI's temporal profile and correlation (2026-11-12)
+
+Round BQ checked BP's CI run (43304285286: Linux, macOS, the frontend, the
+script tests and the verifier passed; the Windows build passed with BP's
+MSVC fix and its ctest was still running when the round closed),
+re-reviewed BP (the DataFrame spectrum's `frame_instant`, the CLI's
+`csv_input_source` callers, the `reference_selected_field` fallbacks) on
+fresh seeds, and took BP's targets: the lookups BP left unchanged on a CSV's
+own headers, the log families on nanosecond cells, and the CLI's remaining
+CSV modes. The device check on the Mac was skipped (the round's thread had
+no device linked). Findings, all fixed:
+
+- **BQ1-1 The spectrum's log variants on nanosecond cells.** pm4py's log
+  variants read the frame's log, whose instants are `Timestamp.timestamp()`
+  (rounded to the microsecond: `1577836805.123457`), and sort a trace by the
+  exact `datetime64` (two cells tens of nanoseconds apart sort apart, though
+  they are one double). Minera kept the parsed nanoseconds
+  (`1577836805.1234567`) and sorted by the double, so ties followed the
+  file. The log components now sort by the exact instant (`order_key`) and
+  give a nanosecond cell's instant rounded to the microsecond
+  (`log_instant`); the DataFrame and LazyFrame components sort by the exact
+  instant too. This withdraws BP's declaration on the spectrum's log
+  variants.
+- **BQ1-2 The temporal profile and its conformance on logs and streams.**
+  pm4py's EventLog discovery and conformance take differences of
+  `Timestamp.timestamp()` floats (`a>b=60.86419701576233`, where the exact
+  difference is `60.864197532`). Minera's log and stream variants on a
+  nanosecond CSV upload took differences of the exact seconds: 27 of 30
+  uploads differed in discovery and conformance, with and without a start
+  column. The log path now reads a nanosecond cell as the rounded float
+  (`event_instant` with `python_epoch`); the DataFrame variants keep the
+  exact units.
+- **BQ1-3 The CLI's temporal profile.** `minera_export` ran the EventLog
+  discovery on a CSV input, where the server's mine route reads the upload
+  as pm4py's DataFrame: 24 of 30 plain inputs gave the log's answer (ulps
+  off) and 29 of 30 inputs with nanosecond cells, blanks and a start column
+  differed. The CLI now calls `discover_temporal_profile_as_uploaded`, as
+  the server does.
+- **BQ1-4 The correlation miner's durations.** pm4py's correlation miner, on
+  a DataFrame and on a log, reads `Timestamp.timestamp()` floats; Minera
+  read the exact seconds, so every variant's performance DFG on a
+  nanosecond upload was an ulp or more off (20 of 25 uploads in each of 12
+  variant and adapter pairs on the server, 110 of 120 answers in the CLI).
+  The selected timestamps now round a nanosecond cell to the microsecond
+  (`python_epoch_seconds`); sorting stays on those floats and the input
+  order, as pandas' stable sort of the rounded column.
+- **BQ1-5 Tree reduction keyed by a CSV's own headers.**
+  `/api/reduce-process-tree` with `activity_key=act` (or `res`) raised
+  `event is missing activity attribute` on every CSV upload: the reduction
+  looked the key up among the events' attributes only, and the cached
+  Inductive log projects the miner's key over the selected header. The
+  reduction now reads a selected column through its source key
+  (`reference_selected_field`), and the route prepares the Inductive log
+  under an explicit key other than the miner's (`inductive_log_for_key`):
+  `act` gives the `concept:name` answer, `res` pm4py's reduction on the
+  resource column.
+- **BQ1-6 The Petri usage comparison with an explicit key.**
+  `/api/compare-petri` on the Inductive model with `activity_attribute=act`
+  failed on all 40 swept uploads: the reference and the session log were
+  prepared under the miner's key, which hid the header. Both logs are now
+  prepared under the explicit key, so `act` gives the `concept:name` answer.
+
+Checked without findings: the CLI's transition system on CSV inputs (three
+views, both directions, windows 1 to 3, with and without blanks) against
+pm4py's states and transitions; DFG precision, alpha and heuristics keyed by
+a CSV's own headers and DFG precision on the resource column; cycle time,
+case arrival and dispersion on nanosecond uploads; BP's CLI sweeps (DataFrame
+and LazyFrame spectrum, MSD, the DFG adapters, the header-keyed log families)
+on fresh seeds.
+
+Declarations:
+
+- pm4py's correlation LP (cvxopt) sometimes returns a frequency plan that is
+  not optimal: on 2 of 25 nanosecond uploads (and 2 of 40 CLI inputs) its
+  classic and classic_split plans cost more under pm4py's own cost matrix than the optimum (scipy's
+  `linprog`, `3614.74` against `3609.24`), while the precede-succeed and
+  duration matrices are identical to Minera's. Minera returns the optimal
+  plan. Plans that differ while both are optimal are the transportation
+  ties declared with the correlation miner.
+- Case statistics on a nanosecond column: pm4py's `startTime` and `endTime`
+  are the int64 units floor-divided by 10**9, whole seconds there (the
+  microsecond case is round AW's declaration); Minera keeps the epoch
+  seconds.
+- Number-keyed DataFrame routes stay as BP declared them; the CSV timestamp
+  columns of plain numbers and "roles to diagnostics groups" (round AT) are
+  still with Philipp.
+
+Verification (scripts in the project files under `review-harness/round-bq/`;
+"before" is round BP's CLI and server on the same scripts and seeds):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Spectrum (six variants) on the server vs pm4py (`spectsrv.py` of round BP: 40 CSV uploads with fractional and nanosecond cells, 30 XES uploads) | 420 | before (the CSV uploads): 6 log answers differed; after: all equal, 2 raise alike |
+| Temporal profile and conformance on `/api/analyze-behavior` (log, stream, DataFrame, LazyFrame) vs pm4py (`tpns.py`: 30 nanosecond uploads, 30 with a start column) | 480 | before: 216 log and stream answers differed; after: all equal |
+| CLI and server temporal profile vs pm4py's DataFrame discovery (`clitp.py`: 30 plain inputs, 30 with nanoseconds, blanks and a start column) | 120 | before: 25 CLI answers equal to the log's, 29 differed; after: all equal |
+| Correlation on `/api/analyze-behavior` (three variants, four adapters) vs pm4py (`corrsweep.py`: 25 CSV uploads of whole seconds, 25 with fractional and microsecond cells, 25 with nanosecond cells, 25 XES uploads) | 1,200 | before: 240 nanosecond performance DFGs differed; after: 1,144 equal, 16 frequency plans where pm4py's is not optimal (declared) and 40 where both are optimal (declared ties) |
+| CLI correlation (three variants) vs pm4py (`clicorr.py`, 40 nanosecond inputs) | 120 | before: 110 performance DFGs differed; after: 115 equal, 4 suboptimal pm4py plans, 1 optimal tie |
+| Lookups keyed by a CSV's own headers (`hdrkeys.py`, 40 uploads: tree reduction, Petri comparison, DFG precision, alpha, heuristics with `act` vs `concept:name`; tree reduction and DFG precision on `res` vs pm4py) | 277 | before: 120 refused (tree reduction and Petri comparison); after: all the same or equal |
+| CLI transition system vs pm4py (`clits.py`, 60 plain inputs, 60 with blanks) | 240 | all equal |
+| BP's CLI sweeps on fresh seeds (`clidf.py` twice, `clidfg.py`, `clikeys.py`) | 940 | all equal or the same, 10 raise alike |
+| Full suites: ctest, script tests, frontend tests, fixture replay | 475 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+`minera_review_bq1_tests` binds the spectrum's log variants on nanosecond
+cells (the exact-instant order and the rounded instants), the temporal
+profile's EventLog discovery and conformance, the correlation miner's three
+variants on nanosecond cells, and the tree reduction keyed by a CSV's own
+activity and resource headers.

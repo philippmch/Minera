@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BP (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BQ (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4678,7 +4678,59 @@ frame's nanosecond cells through `Timestamp.timestamp()`, which rounds to
 microseconds; the DataFrame routes keyed by a number column read its cells
 as text. The device check on the Mac was skipped again (no device linked).
 
-Next round (BQ) should start by re-reviewing round BP:
+Round BQ re-reviewed BP (Review BQ1; BP's DataFrame spectrum, CLI frame
+modes and header-keyed log families held on fresh seeds) and took its
+targets. It fixed the log families on CSV uploads with nanosecond cells,
+where pm4py reads `Timestamp.timestamp()` (rounded to the microsecond) and
+sorts by the exact `datetime64`: the spectrum's log variants (instants
+rounded, ties tens of nanoseconds apart sorted by the exact instant, which
+withdraws BP's declaration), the temporal profile and its conformance on
+logs and streams, and the correlation miner's durations on every adapter;
+the CLI's temporal profile, which ran the EventLog discovery where the
+server reads an upload as pm4py's DataFrame; and two lookups that refused a
+CSV's own header as their key, the process-tree reduction and the Petri
+usage comparison on the Inductive model (the cached Inductive log projects
+the miner's key over the header: `inductive_log_for_key` prepares it under
+the explicit key). Declared: pm4py's cvxopt correlation LP sometimes
+returns a frequency plan that is not optimal under its own cost matrix
+(Minera returns the optimum); case statistics on a nanosecond column give
+whole seconds in pm4py. No fixture changed. The device check on the Mac
+was skipped again (no device linked).
+
+Next round (BR) should start by re-reviewing round BQ:
+
+- `src/backend/performance_spectrum/components.cpp`: `order_key` (the
+  exact instant from `parse_timestamp_exact`, or the double's split when
+  the text does not parse exactly) in `sort_case_events`, `split_runs` and
+  `sort_cases_by_first_instant`; `log_instant` (only nanosecond cells are
+  rounded);
+- `src/backend/temporal_profile.cpp`: `event_instant`'s `python_epoch`
+  flag and its callers (`discover_temporal_profile_ranked` defaults it on,
+  the DataFrame fallback passes false, `conform_log` passes `!timedelta`);
+- `src/backend/correlation_miner.cpp`: `python_epoch_seconds` in
+  `selected_timestamp` and `selected_event_timestamp`; the sort still uses
+  the rounded floats and the input index (pandas' stable sort of the
+  rounded column agrees on every swept shape; classic_split chunks with
+  ties in one microsecond were not swept);
+- `src/backend/tools/minera_server.cpp`: `inductive_log_for_key` (used by
+  the tree reduction and the Petri comparison only; other routes on the
+  cached Inductive log with an activity key, such as alignments and the
+  tree workbench, were not checked on CSV headers);
+  `src/backend/process_tree_reduction.cpp`'s `reference_selected_field`
+  fallback;
+- new areas: the other log families on nanosecond cells (sojourn and
+  waiting times, Monte Carlo case arrival, the batches' log variant, the
+  log's interval and rework durations); DFG precision and alpha keyed by a
+  timestamp or lifecycle header; the Petri comparison with a CSV reference
+  log under its own headers (the route requires the standard headers
+  there); the CLI's other CSV modes against pm4py on the frame (the
+  footprints, Declare and log skeleton discovery, the alignments);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BQ commit (and BP's Windows ctest, still running when
+  BQ closed).
+
+Round BP's targets, re-reviewed in BQ (findings BQ1-1 to BQ1-6):
 
 - `src/backend/performance_spectrum/components.cpp`: `frame_instant`
   (`pandas_units_per_second` reads only `EventTable::dtypes`; a LazyFrame,
