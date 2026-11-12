@@ -24059,3 +24059,115 @@ conformance with missing cells and rows without a case, a frame's own
 `time:timestamp` column), and the keyed upload profile with a numeric
 activity column, a date beside a number, and dates beside numbers (values
 taken from pm4py black-box on the same inputs).
+
+## Review BM1: re-review of round BL, the DataFrame DFG adapters on uploads, XES traces without a name and CSV uploads on the DataFrame shapes (2026-11-12)
+
+Round BM re-reviewed BL (the DataFrame temporal profile with missing cells,
+CSV uploads with a start column, the `mark_frame_index_rows` call sites)
+with fresh seeds and took its targets: pm4py's DataFrame DFG adapters
+(`df_statistics.get_dfg_graph`, `get_partial_order_dataframe`,
+`get_concurrent_events_dataframe`, `/api/dfg-dataframe`) on CSV and XES
+uploads with a start column, blank cells, sub-second and nanosecond times
+and traces without a name; `/api/mine` with `mining_input_shape=dataframe`
+and `lazyframe` on XES traces without a name and on CSV uploads. The device
+check on the Mac was skipped (the round's thread had no device linked).
+Findings, all fixed:
+
+- **BM1-1 The DataFrame DFG adapters on a CSV upload.** pm4py reads a CSV
+  upload through `format_dataframe`: the rows without a case, an activity
+  or a timestamp dropped, the others sorted by case id, then the upload
+  timestamp, then file order, with `@@index` and `@@case_index` (a CSV's
+  own columns of those names are overwritten). `/api/dfg-dataframe`
+  (pandas) read the upload's table in file order, so the partial order
+  followed the wrong `@@index`. It now reads that frame
+  (`csv_frame_table`). Also: a blank start cell is NaT (Minera refused it
+  as an unparsable time); a NaT target start gives a NaN flow, which pm4py
+  clamps to 0; and the pandas errors are raised where pm4py raises them:
+  a start column without any value (`'>=' not supported between instances
+  of 'float' and 'Timestamp'`), starts but no directly-follows pair
+  (`cannot subtract DatetimeArray from ndarray[object]`), the partial order
+  without any start (`Invalid comparison between dtype=datetime64[us, UTC]
+  and ndarray`, `ns` for a nanosecond frame), and concurrent events with
+  starts but no case of two candidate rows (`Invalid comparison between
+  dtype=timedelta64[us] and int`). A row without an activity never pairs
+  there, and without column reduction neither does a row with any null; an
+  empty frame keeps the start column's type (a start read from the
+  completion column is a datetime column, a CSV start blank in every row a
+  float one). The older `minera_dfg_dataframe_tests` case of one row
+  without an activity expected no pair; pandas raises, and the test now
+  expects that.
+- **BM1-2 Sort order.** With `sort_timestamp_along_case_id=False`, pandas
+  sorts by the case only with numpy's unstable introsort (`nargsort`
+  quicksort), so a case of more than 16 rows leaves in that order, not the
+  file's; Minera kept the file order. The stable sort puts the rows without
+  a case last, as pandas does with NaN.
+- **BM1-3 Nanosecond and float times.** A frame with a value of more than
+  six fractional digits is `datetime64[ns]`, and the adapters compare
+  completions and starts at nanoseconds there (Minera compared
+  microseconds, so `00:02:50.000000001` equalled `00:02:50`). The
+  concurrent overlap is the difference of `Timestamp.timestamp()` floats
+  (each rounded to six decimals); `frame_times::epoch_seconds` now divides a
+  nanosecond time correctly rounded before that rounding.
+- **BM1-4 Rows without a case in the self-merge.** On an XES frame with
+  unnamed traces, pandas' merge on the case column matches NaN with NaN, so
+  the partial order and concurrent events pair rows of different unnamed
+  traces; Minera dropped them.
+- **BM1-5 The temporal profile on a CSV with its own `@@index` (re-review
+  of BL1-2).** `format_dataframe` overwrites the column, so the frame's
+  index orders the pairs; Minera used the CSV's column (`own_index` now
+  needs no frame timestamp). Found with `tpcsv2.py --ownidx`, which adds
+  such a column of random numbers.
+- **BM1-6 XES traces without a name on the DataFrame shapes.** `/api/mine`
+  with `mining_input_shape=dataframe` or `lazyframe` on an interleaved XES
+  upload with unnamed traces failed as a whole (`presentation_error:
+  Declare conformance must contain one result per trace`): the Declare
+  frame slices dropped the rows without a case. They now keep their place,
+  each such trace its own case (37 of 40 uploads failed before, none
+  after).
+- **BM1-7 CSV uploads on the DataFrame shapes.** pm4py's DataFrame
+  functions read the sorted frame of BM1-1; `/api/mine` with
+  `mining_input_shape=dataframe` or `lazyframe` gave its families the
+  upload's table in file order, and Declare, Declare conformance, the log
+  skeleton and its conformance, alpha and the transition system depend on
+  the row order. A CSV upload and the same upload with its rows already in
+  the frame's order (the same frame for pm4py) gave different results in
+  16 to 19 of 20 uploads for these families; against pm4py, Declare was
+  equal on 1 of 5. The families now read the frame's rows
+  (`prepare_csv_frame_view`).
+
+Declarations:
+
+- pm4py's high-level DataFrame functions (`discover_declare`,
+  `discover_log_skeleton`, `discover_temporal_profile`, and every other
+  `discover_*` but `discover_footprints`) refuse a frame with an empty case
+  id (`the case ID column should not contain any empty value.`), such as an
+  XES upload with unnamed traces; Minera answers with each unnamed trace as
+  its own case, as its log does.
+- `/api/dfg-dataframe` on an XES upload where no trace has a name: the
+  frame has no case column and pm4py raises `KeyError`; Minera answers (the
+  performance graph raises its own error). An XES upload without any start
+  attribute: both raise, with different messages.
+- Concurrent events on a CSV upload whose start values sit only in rows
+  `format_dataframe` drops (an empty frame with a datetime start column):
+  pandas raises its `timedelta64` comparison error, Minera returns no pair.
+- The CSV timestamp columns of plain numbers and "roles to diagnostics
+  groups" (round AT) are still with Philipp.
+
+Verification (scripts in the project files under `review-harness/round-bm/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| `/api/dfg-dataframe` on CSV uploads, the pandas graph (frequency and performance), partial order and concurrent events (`dfgdf.py`: during the round about 3,000 uploads with blank and `NA` cells, fractions, nanoseconds, no start column, other aggregations, windows, sort and strictness options; final run on fresh seeds: 100 `--blank --frac --extra`, 100 `--blank --ns --nostart --extra`, 100 `--blank`) | 1,200 (final) | before: the partial order on the file's `@@index`, blank starts refused, the four pandas errors missing, ns compared as us; final: 1,174 equal, 26 raise on both sides with the same message |
+| `/api/dfg-dataframe` on XES uploads with unnamed traces (`dfgxes.py --nocase --extra`: about 360 during the round; final run 60) | 240 (final) | 220 equal or raising alike; 20 on the 5 uploads where no trace has a name (pm4py `KeyError`; declared) |
+| `/api/mine` DataFrame shapes on XES uploads with unnamed traces (`minedf2.py --nocase`: 60 interleaved, 60 interleaved as LazyFrame, 60 plain), and the interleaved regression (60 named) | 960 | before: 37 of 40 interleaved uploads failed the response; after: none fails, 240 equal on the named run, 714 raise in pm4py only (empty case ids; declared), 6 equal where every trace had a name |
+| `/api/mine` DataFrame shapes on CSV uploads with blank cells and shuffled rows vs pm4py on `format_dataframe(read_csv)` (`minecsv.py`: 60 as DataFrame, 60 as LazyFrame with start and resource columns) | 480 | before: Declare 1 of 5 equal; after: 480 equal (Declare, its conformance, temporal profile, log skeleton) |
+| Metamorphic file order (`metacsv.py`: each CSV upload against its rows in the frame's order, all `/api/mine` families; 40 as DataFrame, 40 as LazyFrame) | 2,000 | before: alpha, Declare, its conformance, log skeleton, its conformance, transition system differed on 12 to 19 of 20; after: every family the same (the log preparation differs only in each event's own row number) |
+| Re-review of BL: `tpcsv2.py --ownidx` (80), `--blank --dual --ownidx` (80), `tptoy2.py --miss --nocase` (60), `tpkeys.py --il --frac --num` (60) | 680 | before: the CSV's own `@@index` ordered the pairs; after: equal except pm4py-only errors (an all-blank start column, no trace named, mixed date and number keys; declared) |
+| Full ctest, script tests, frontend typecheck and tests, fixture replay | 471 tests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | 471 pass, 406 pass, 10,729 pass; 2,667 responses unchanged, 6 active-source CSV fixtures on the DataFrame and LazyFrame shapes rewritten (BM1-7: their families now read the frame's order, e.g. `A` at 10:00 before `B` at 10:01 where the file lists `B` first) |
+
+`minera_review_bm1_tests` binds the DataFrame DFG adapters on a CSV frame
+(a blank start, the four pandas errors, the case-only introsort, a
+nanosecond partial order, a `Timestamp.timestamp()` overlap, rows without
+a case in the self-merge), the temporal profile on a CSV's own `@@index`,
+and the Declare frame slices with rows without a case (values taken from
+pm4py black-box on the same inputs).

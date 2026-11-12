@@ -72,8 +72,9 @@ struct TemporalProfileOptions {
   // whose "@@index" orders each case's rows by the upload timestamp, then
   // file order (rows without one dropped), and its DataFrame algorithms pair
   // a row only with rows of a higher "@@index" (round BL, observed
-  // black-box). A table's own "@@index" column takes precedence; without
-  // either, the sorted position decides.
+  // black-box); format_dataframe overwrites a CSV's own "@@index" column
+  // (round BM). Otherwise a table's own "@@index" column decides, else the
+  // sorted position.
   bool frame_index_rows = false;
 
   // Used by conformance checking; discovery ignores this value.

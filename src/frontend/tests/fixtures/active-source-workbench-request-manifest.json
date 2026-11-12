@@ -1603,14 +1603,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62424",
+        "Content-Length": "62074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-alias-default-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-alias-default-dataframe.response.json",
-        "bytes": 62424,
-        "sha256": "59f24e6aca90f7a56f4013c087aad3467cb143143c6aae5e92500e6c727aa91a",
+        "bytes": 62074,
+        "sha256": "6b8ad53bb6c1551c4f91fd018aa71076a2b48eefdb553e0954f81f77e4dfbc12",
         "status": 200
       },
       "exports": {},
@@ -1653,14 +1653,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62424",
+        "Content-Length": "62074",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-alias-default-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-alias-default-lazyframe.response.json",
-        "bytes": 62424,
-        "sha256": "0b99e4917f031f53b8515e792ccb3b0f1911c8438c7a5a5556cd38234c05c4e5",
+        "bytes": 62074,
+        "sha256": "de9d44da510284ba16b55a323134f269e770f6f64ee6b88b4c86e9379df600c4",
         "status": 200
       },
       "exports": {},
@@ -1853,14 +1853,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "70906",
+        "Content-Length": "70556",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-both-headers-default-exact.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-both-headers-default-exact.response.json",
-        "bytes": 70906,
-        "sha256": "5ef4818681144cf125aeb3d057bbb20b85960f32107ea086de6809e749629222",
+        "bytes": 70556,
+        "sha256": "23542f392142b0e6f2d04053388a442896b330a9459a583bea17a70c6cad750a",
         "status": 200
       },
       "exports": {},
@@ -2085,14 +2085,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "50927",
+        "Content-Length": "50740",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-custom-exact-controls.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-custom-exact-controls.response.json",
-        "bytes": 50927,
-        "sha256": "928b9e958244b754d3b7dcd9223de37178cff2ea9563136a1344401b7c8b4485",
+        "bytes": 50740,
+        "sha256": "81e8fda36a166b9504dbd11ca281401a4b96ce7975d70acbf64f8908c7adbe69",
         "status": 200
       },
       "exports": {},
@@ -2138,14 +2138,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "71179",
+        "Content-Length": "70829",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-family-explicit-activity-independent.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-family-explicit-activity-independent.response.json",
-        "bytes": 71179,
-        "sha256": "53eb6f82bc9837be887d899f22e29ff076f07e47ec458ddea8a170ad97de5cd3",
+        "bytes": 70829,
+        "sha256": "dfc72227672a510126ba3bd31c300948acb906fa6d43d31b72cf89dfc71128a4",
         "status": 200
       },
       "exports": {},
@@ -2240,14 +2240,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62878",
+        "Content-Length": "62528",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-case-alias-explicit-physical-control.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-case-alias-explicit-physical-control.response.json",
-        "bytes": 62878,
-        "sha256": "aa0a13219a10c35083535441fb015410c3203e8e75a9e9e3c333a4d3ebca0258",
+        "bytes": 62528,
+        "sha256": "b214d9def2f32112b2e5d45ffbf7587fc4205ee205c93e67c99b933fc858d41a",
         "status": 200
       },
       "exports": {},

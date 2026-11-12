@@ -1,5 +1,7 @@
 #include "frame_times.hpp"
 
+#include "exact_divide.hpp"
+
 #include "frame_cells.hpp"
 #include "minera/frame_keys.hpp"
 
@@ -208,8 +210,13 @@ double epoch_seconds(const ParsedExactTimestamp& date) {
     const std::int64_t micros = date.seconds * 1000000LL + date.nanoseconds / 1000;
     return static_cast<double>(micros) / 1e6;
   }
-  // round(value / 10**9, 6) of a nanosecond Timestamp.
-  const double seconds = static_cast<double>(date.seconds) + static_cast<double>(date.nanoseconds) / 1e9;
+  // round(value / 10**9, 6) of a nanosecond Timestamp, the quotient
+  // correctly rounded as Python's int / int (round BM: summing the seconds
+  // and the fraction can round the other way at the sixth decimal).
+  constexpr std::int64_t kNanosecondRange = 9223372036LL;  // datetime64[ns] spans about +-292 years
+  const double seconds = date.seconds > -kNanosecondRange && date.seconds < kNanosecondRange
+                             ? true_divide(date.seconds * 1000000000LL + date.nanoseconds, 1000000000LL)
+                             : static_cast<double>(date.seconds) + static_cast<double>(date.nanoseconds) / 1e9;
   char buffer[64];
   std::snprintf(buffer, sizeof(buffer), "%.6f", seconds);
   return std::strtod(buffer, nullptr);

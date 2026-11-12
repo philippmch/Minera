@@ -1101,8 +1101,10 @@ namespace {
 
 // A table in frame order with each case read as its slice: for every case
 // (by first row) the rows from its first row on, as many as it has, each
-// copy labelled with the case's id cell. Rows without a case cell are no
-// case; a table without the column is returned as is.
+// copy labelled with the case's id cell. Rows without a case cell (an XES
+// trace without a name, on which pm4py's DataFrame Declare raises) keep
+// their place, so each such trace stays its own case and the results stay
+// one per trace (round BM). A table without the column is returned as is.
 EventTable frame_slice_table(const EventTable& table, std::string_view case_id_key) {
   table.validate();
   const auto column = std::find(table.columns.begin(), table.columns.end(), case_id_key);
@@ -1132,9 +1134,14 @@ EventTable frame_slice_table(const EventTable& table, std::string_view case_id_k
   EventTable sliced = table;
   sliced.rows.clear();
   sliced.index.reset();
-  for (const auto& key : order) {
-    const auto& [first, count] = extent.at(key);
-    const auto& label = table.rows[first][index];
+  for (std::size_t at = 0; at < table.rows.size(); ++at) {
+    const auto& label = table.rows[at][index];
+    if (!label || label->is_null) {
+      sliced.rows.push_back(table.rows[at]);
+      continue;
+    }
+    const auto& [first, count] = extent.at(label->value);
+    if (first != at) continue;
     for (std::size_t row = first; row < first + count; ++row) {
       sliced.rows.push_back(table.rows[row]);
       sliced.rows.back()[index] = label;

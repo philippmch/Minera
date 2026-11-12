@@ -421,12 +421,13 @@ EventLog temporal_table_to_log(const EventTable& table,
     const auto* value = table_value(row, column);
     return value && value->empty() ? nullptr : value;
   };
-  // The pair order: the table's own "@@index" column; else, on a CSV
-  // upload's rows (file order), format_dataframe's: the rows with a
-  // timestamp, each case's by that timestamp, then file order.
+  // The pair order: on a CSV upload's rows (file order), format_dataframe's:
+  // the rows with a timestamp, each case's by that timestamp, then file
+  // order (format_dataframe overwrites a CSV's own "@@index" column; round
+  // BM, observed black-box); else the table's own "@@index" column.
   const auto index_column = std::find(table.columns.begin(), table.columns.end(), "@@index");
-  const bool own_index = index_column != table.columns.end();
-  const auto frame_timestamp = !own_index && options.frame_index_rows ? upload_timestamp_column(table) : std::nullopt;
+  const auto frame_timestamp = options.frame_index_rows ? upload_timestamp_column(table) : std::nullopt;
+  const bool own_index = index_column != table.columns.end() && !frame_timestamp;
   bool ranked = own_index || frame_timestamp.has_value();
   const bool split = columns.source_timestamp != columns.target_timestamp;
   // (no case, id): the rows without a case last.

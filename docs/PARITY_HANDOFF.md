@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BK (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BM (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4590,7 +4590,52 @@ pm4py's key). pm4py's log skeleton, Declare and inductive tree raise on an
 `EventStream` (declared). The device check on the Mac was skipped again
 (the round's thread had no device linked).
 
-Next round (BM) should start by re-reviewing round BL:
+Round BM re-reviewed BL (Review BM1) and took its targets. It fixed pm4py's
+DataFrame DFG adapters on uploads (`/api/dfg-dataframe` reads a CSV upload
+as `format_dataframe`'s frame with its `@@index`; a blank start is NaT; a
+NaN flow is 0; the pandas errors on frames without any start or without
+pairs; the case-only sort as numpy's introsort; nanosecond comparisons and
+`Timestamp.timestamp()` overlaps; rows without a case meet in the
+self-merge), the temporal profile on a CSV's own `@@index` column (the
+frame overwrites it), an `/api/mine` crash on interleaved XES uploads with
+unnamed traces in the DataFrame shapes (the Declare frame slices dropped
+the caseless rows), and `/api/mine` on CSV uploads in the DataFrame shapes,
+whose families read the upload's file order instead of the sorted frame
+(Declare, log skeleton, alpha, transition system). pm4py's high-level
+DataFrame functions refuse frames with an empty case id (declared). The
+device check on the Mac was skipped again (the round's thread had no device
+linked).
+
+Next round (BN) should start by re-reviewing round BM:
+
+- `src/backend/dfg_dataframe.cpp`: `parse_time` (blank is NaT),
+  `sort_rows` with `pandas` (the case-only `numpy_object_quick_argsort`,
+  missing cases last), `same_case`, `instant_less`, `sub_microsecond`, the
+  four modelled pandas errors in `discover_table_dfg`, the partial order and
+  the concurrent events (the candidate pre-check, the `epoch_seconds`
+  overlap); `src/backend/frame_times.cpp`'s `epoch_seconds` for nanosecond
+  times (other callers: cycle time and the other frame arithmetic);
+- `src/backend/tools/minera_server.cpp`: `csv_frame_table` (with and
+  without the index columns), `prepare_csv_frame_view` and its use in
+  `active_source_mining.hpp`; whether filtered CSV sessions keep the frame
+  order; `frame_slice_table` in `src/backend/declare.cpp` with caseless
+  rows;
+- new areas: the other routes that hand a CSV upload's table to a DataFrame
+  function in file order (the original Declare and log skeleton routes'
+  `source_table`/`source_lazy` calls, `/api/analyze-behavior`'s
+  `variant=dataframe` families other than the temporal profile,
+  `/api/discover-constraints`, the footprints and minimum self-distance
+  pandas variants; the metamorphic check `metacsv.py` fits them); the
+  interval-based statistics (`overlap` family) and batches with a start
+  column on CSV uploads; the DFG adapters without column reduction on CSV
+  uploads (pandas drops a row with any NaN, and a blank CSV cell is NaN
+  there, while `row_has_no_nulls` reads `""` as a value); `str()` names of non-text activity keys in the
+  other keyed DataFrame routes;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BM commit.
+
+Round BL's targets, re-reviewed in BM (findings BM1-1 to BM1-7):
 
 - `src/backend/temporal_profile.cpp`: `temporal_table_to_log` (the
   `CaseKey` with the rows without a case last, the ranks from the frame

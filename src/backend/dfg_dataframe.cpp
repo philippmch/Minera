@@ -19,7 +19,9 @@
 
 #include "minera/timestamp.hpp"
 #include "business_hours.hpp"
+#include "frame_times.hpp"
 #include "full_double.hpp"
+#include "numpy_object_sort.hpp"
 #include "performance_arithmetic.hpp"
 
 namespace minera {
@@ -278,7 +280,9 @@ std::optional<std::string> cell_text(const TableRow& row,
 
 std::optional<double> parse_time(const std::optional<std::string>& value,
                                  std::string_view description) {
-  if (!value) return std::nullopt;
+  // pandas reads an empty cell (a blank CSV start, say) as NaT (round BM,
+  // observed black-box).
+  if (!value || value->empty()) return std::nullopt;
   const auto parsed = parse_timestamp(*value);
   if (!parsed)
     throw std::invalid_argument("DFG table discovery: invalid " +
@@ -533,9 +537,30 @@ std::vector<TableRow> read_rows(const EventTable& table,
 // in an explicit start column is a missing start (it does not borrow the
 // completion time); missing values sort last, except that Polars sorts them
 // first.
+//
+// The eager (pandas) adapter sorts a missing case last (na_position), and by
+// the case alone with nargsort's default quicksort: numpy's introsort over
+// the frame's order, which does not keep the order of a case's rows (round
+// BM, observed black-box).
 void sort_rows(std::vector<TableRow>& rows, const DfgTableOptions& options,
-               bool nulls_first = false) {
+               bool nulls_first = false, bool pandas = false) {
   if (!options.sort_caseid_required) return;
+  if (pandas && !options.sort_timestamp_along_case_id) {
+    std::vector<std::size_t> present, missing;
+    for (std::size_t i = 0; i < rows.size(); ++i) (rows[i].case_value ? present : missing).push_back(i);
+    const auto order = detail::numpy_object_quick_argsort(present.size(), [&](std::size_t a, std::size_t b) {
+      const auto& x = *rows[present[a]].case_value;
+      const auto& y = *rows[present[b]].case_value;
+      return x < y ? -1 : (y < x ? 1 : 0);
+    });
+    std::vector<TableRow> sorted;
+    sorted.reserve(rows.size());
+    for (const auto i : order) sorted.push_back(std::move(rows[present[i]]));
+    for (const auto i : missing) sorted.push_back(std::move(rows[i]));
+    rows = std::move(sorted);
+    for (std::size_t i = 0; i < rows.size(); ++i) rows[i].generated_index = i;
+    return;
+  }
   // -1: lhs first, 1: rhs first, 0: tie.
   const auto compare = [&](const std::optional<ParsedExactTimestamp>& lhs,
                            const std::optional<ParsedExactTimestamp>& rhs) {
@@ -549,7 +574,10 @@ void sort_rows(std::vector<TableRow>& rows, const DfgTableOptions& options,
   };
   std::stable_sort(rows.begin(), rows.end(), [&](const TableRow& lhs,
                                                  const TableRow& rhs) {
-    if (lhs.case_value != rhs.case_value) return lhs.case_value < rhs.case_value;
+    if (lhs.case_value != rhs.case_value) {
+      if (pandas && (!lhs.case_value || !rhs.case_value)) return !rhs.case_value;
+      return lhs.case_value < rhs.case_value;
+    }
     if (options.sort_timestamp_along_case_id) {
       if (const int order = compare(lhs.start_exact, rhs.start_exact)) return order < 0;
       if (const int order = compare(lhs.completion_exact, rhs.completion_exact)) return order < 0;
@@ -778,13 +806,56 @@ double polars_whole_seconds(const ParsedExactTimestamp& from, const ParsedExactT
   return static_cast<double>(seconds);
 }
 
+// Whether a timestamp's text has digits below the microsecond: pandas then
+// reads its column as datetime64[ns], else datetime64[us].
+bool sub_microsecond(const std::optional<std::string>& text) {
+  if (!text) return false;
+  const auto colon = text->find(':');
+  const auto dot = text->find('.', colon == std::string::npos ? 0 : colon);
+  if (dot == std::string::npos) return false;
+  std::size_t digits = 0;
+  for (std::size_t i = dot + 1; i < text->size() && std::isdigit(static_cast<unsigned char>((*text)[i])); ++i)
+    ++digits;
+  return digits > 6;
+}
+
+// Whether two rows share a case; with `missing_matches` (pandas' merge on
+// the case column) two rows without a case do too.
+// Whether the frame has a start column of its own (not the completion's):
+// pandas types it by its cells, so one blank in every row is a float column,
+// while a start read from the completion column is a datetime column even on
+// an empty frame (round BM, observed black-box).
+bool own_start_column(const EventTable& table, const DfgTableOptions& options) {
+  const std::string name = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
+                               ? *options.start_timestamp_attribute
+                               : std::string("start_timestamp");
+  return name != options.timestamp_attribute &&
+         std::find(table.columns.begin(), table.columns.end(), name) != table.columns.end();
+}
+
+bool same_case(const TableRow& left, const TableRow& right, bool missing_matches) {
+  if (!left.case_value || !right.case_value)
+    return missing_matches && !left.case_value && !right.case_value;
+  return *left.case_value == *right.case_value;
+}
+
+// a < b, on the exact instants when both parse (pandas compares datetime64
+// values, finer than epoch doubles; round BM, observed black-box), else on
+// the epoch doubles.
+bool instant_less(double a, const std::optional<ParsedExactTimestamp>& a_exact, double b,
+                  const std::optional<ParsedExactTimestamp>& b_exact) {
+  if (a_exact && b_exact)
+    return std::tie(a_exact->seconds, a_exact->nanoseconds) < std::tie(b_exact->seconds, b_exact->nanoseconds);
+  return a < b;
+}
+
 double flow_time(const TableRow& source, const TableRow& target,
                  const DfgTableOptions& options, bool clamp_start, bool polars = false) {
   if (!source.completion || !target.start) return 0.0;
   double target_start = *target.start;
   std::optional<std::string> target_start_text = target.start_text;
   auto target_start_exact = target.start_exact;
-  if (clamp_start && target_start < *source.completion) {
+  if (clamp_start && instant_less(target_start, target_start_exact, *source.completion, source.completion_exact)) {
     target_start = *source.completion;
     target_start_text = source.completion_text;
     target_start_exact = source.completion_exact;
@@ -965,12 +1036,6 @@ DfgTableResult discover_table_dfg(const EventTable& table,
       computes_duration ||
       (backend == DfgTableBackend::kPandas && timestamp_sort_requested);
   const bool polars = backend == DfgTableBackend::kPolars;
-  if (!polars && (computes_duration || options.measure == DfgTableMeasure::kCost) &&
-      !options.custom_aggregation &&
-      options.performance_aggregation == DfgPerformanceAggregation::kStandardDeviation)
-    // The eager adapter calls a groupby method named after the key, and
-    // pandas has no SeriesGroupBy.stdev.
-    throw std::invalid_argument("'SeriesGroupBy' object has no attribute 'stdev'");
   if (polars && (computes_duration || options.measure == DfgTableMeasure::kCost) &&
       !options.custom_aggregation) {
     // The lazy adapter names its aggregations differently from the eager one.
@@ -984,7 +1049,7 @@ DfgTableResult discover_table_dfg(const EventTable& table,
                         false, options.measure == DfgTableMeasure::kCost, false,
                         backend == DfgTableBackend::kPandas,
                         requires_completion);
-  sort_rows(rows, options, polars);
+  sort_rows(rows, options, polars, !polars);
   assign_generated_indices(rows);
   const auto pairs = graph_pairs(rows, options, backend);
 
@@ -1018,6 +1083,23 @@ DfgTableResult discover_table_dfg(const EventTable& table,
       (backend == DfgTableBackend::kPolars &&
        !options.start_timestamp_attribute && conventional_start_column &&
        timestamp_column && *conventional_start_column != *timestamp_column);
+  // With a start column and no row followed by another of its case, the
+  // eager adapter's empty shifted frame holds the start as objects and its
+  // flow subtraction raises, before any aggregation (round BM, observed
+  // black-box).
+  if (!polars && computes_duration && clamp_start && pairs.empty())
+    throw std::invalid_argument("cannot subtract DatetimeArray from ndarray[object]");
+  // A start column blank in every row is a float column there, which the
+  // clamp compares with the completions (round BM, observed black-box).
+  if (!polars && computes_duration && clamp_start &&
+      std::none_of(rows.begin(), rows.end(), [](const TableRow& row) { return row.start.has_value(); }))
+    throw std::invalid_argument("'>=' not supported between instances of 'float' and 'Timestamp'");
+  if (!polars && (computes_duration || options.measure == DfgTableMeasure::kCost) &&
+      !options.custom_aggregation &&
+      options.performance_aggregation == DfgPerformanceAggregation::kStandardDeviation)
+    // The eager adapter calls a groupby method named after the key, and
+    // pandas has no SeriesGroupBy.stdev.
+    throw std::invalid_argument("'SeriesGroupBy' object has no attribute 'stdev'");
   // Polars keeps an edge whose duration is null and one whose source activity
   // is null in the performance result, but neither counts in frequency.
   std::map<std::string, std::vector<double>> null_source_values;
@@ -1055,8 +1137,10 @@ DfgTableResult discover_table_dfg(const EventTable& table,
     } else {
       if (!source.completion || !target.start) {
         // Polars clamps the start with max_horizontal(start, completion),
-        // which ignores a null start: the flow is then zero seconds.
-        if (polars && clamp_start && source.completion)
+        // which ignores a null start: the flow is then zero seconds. pandas
+        // clamps a NaN flow (a NaT start) to zero too (round BM, observed
+        // black-box).
+        if (clamp_start && source.completion)
           performance_values[pair].push_back(0.0);
         else if (polars)
           (void)performance_values[pair];
@@ -1094,7 +1178,8 @@ DfgTripleTable discover_triples_table(const EventTable& table,
                                 options.sort_timestamp_along_case_id;
   auto rows = read_rows(table, options, backend, needs_completion, false,
                         false, false);
-  sort_rows(rows, options, backend == DfgTableBackend::kPolars);
+  sort_rows(rows, options, backend == DfgTableBackend::kPolars,
+            backend == DfgTableBackend::kPandas);
   assign_generated_indices(rows);
   DfgTripleTable table_result;
   auto& result = table_result.triples;
@@ -1146,7 +1231,20 @@ DfgPartialOrderResult discover_partial_table(const EventTable& table,
         "DFG table discovery: eager first-following reduction requires @@index");
   }
   auto rows = read_rows(table, options, backend, true, true, true, false);
-  sort_rows(rows, options);
+  // A start column blank in every row (a CSV's) is a float column there,
+  // which the eager adapter compares with the completions (round BM,
+  // observed black-box).
+  if (backend == DfgTableBackend::kPandas &&
+      std::none_of(rows.begin(), rows.end(), [](const TableRow& row) { return row.start.has_value(); }) &&
+      (own_start_column(table, options) ||
+       std::any_of(rows.begin(), rows.end(), [](const TableRow& row) { return row.completion.has_value(); }))) {
+    const bool nanoseconds = std::any_of(rows.begin(), rows.end(), [](const TableRow& row) {
+      return sub_microsecond(row.completion_text);
+    });
+    throw std::invalid_argument(std::string("Invalid comparison between dtype=datetime64[") +
+                                (nanoseconds ? "ns" : "us") + ", UTC] and ndarray");
+  }
+  sort_rows(rows, options, false, backend == DfgTableBackend::kPandas);
   assign_generated_indices(rows);
   if (options.business_hours) (void)normalized_slots(options);
 
@@ -1157,11 +1255,13 @@ DfgPartialOrderResult discover_partial_table(const EventTable& table,
     for (std::size_t j = 0; j < rows.size(); ++j) {
       const auto& source = rows[i];
       const auto& target = rows[j];
-      if (!source.case_value || !target.case_value ||
-          *source.case_value != *target.case_value || !index_less(source, target))
+      // pandas merges the frame with itself on the case column, where a
+      // missing case meets every other missing one (an XES trace without a
+      // name; round BM, observed black-box).
+      if (!same_case(source, target, backend == DfgTableBackend::kPandas) || !index_less(source, target))
         continue;
       if (!source.completion || !target.start ||
-          *source.completion > *target.start)
+          instant_less(*target.start, target.start_exact, *source.completion, source.completion_exact))
         continue;
       DfgPartialOrderPair pair;
       pair.source = source.event;
@@ -1219,10 +1319,35 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
       row.index_is_generated = true;
     }
   }
-  sort_rows(rows, options);
+  sort_rows(rows, options, false, backend == DfgTableBackend::kPandas);
   assign_generated_indices(rows);
   if (options.business_hours) (void)normalized_slots(options);
 
+  if (pandas) {
+    // The eager adapter compares its overlap column with 0, which on an
+    // empty self-join (no two rows of a case that both have a start and a
+    // completion) is still a timedelta column (round BM, observed
+    // black-box); its unit is the frame's: nanoseconds when a timestamp has
+    // digits below the microsecond.
+    bool candidate = false, nanoseconds = false;
+    std::map<std::optional<std::string>, std::size_t> complete_rows;
+    for (const auto& row : rows) {
+      if (!row.start || !row.completion) continue;
+      if (options.reduce_columns ? !row.activity_value : !row_has_no_nulls(row)) continue;
+      if (++complete_rows[row.case_value] > 1) candidate = true;
+    }
+    // A start column blank in every row is a float column there: the empty
+    // join compares floats and returns no pair (own_start_column).
+    const bool any_start = std::any_of(rows.begin(), rows.end(), [](const TableRow& row) {
+      return row.start.has_value();
+    });
+    if (!candidate && (any_start || !own_start_column(table, options))) {
+      for (const auto& row : rows)
+        nanoseconds = nanoseconds || sub_microsecond(row.start_text) || sub_microsecond(row.completion_text);
+      throw std::invalid_argument(std::string("Invalid comparison between dtype=timedelta64[") +
+                                  (nanoseconds ? "ns" : "us") + "] and int");
+    }
+  }
   DfgConcurrentResult result;
   result.backend = backend;
   result.max_start_column = options.max_start_column;
@@ -1241,16 +1366,24 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
         continue;
       if (backend == DfgTableBackend::kPolars && !index_less(left, right))
         continue;
-      if (!left.case_value || !right.case_value ||
-          *left.case_value != *right.case_value || !left.completion ||
+      if (!same_case(left, right, pandas) || !left.completion ||
           !right.start || !left.start || !right.completion)
         continue;
       // Only the lazy adapter applies this one-sided prefilter before it
       // calculates interval overlap.
       if (!pandas && *left.completion > *right.start) continue;
-      const double maximum_start = std::max(*left.start, *right.start);
-      const double minimum_completion =
-          std::min(*left.completion, *right.completion);
+      double maximum_start = std::max(*left.start, *right.start);
+      double minimum_completion = std::min(*left.completion, *right.completion);
+      // pandas takes each instant's Timestamp.timestamp() (a float rounded
+      // to the microsecond) and compares their difference (round BM,
+      // observed black-box).
+      if (pandas && left.start_exact && right.start_exact && left.completion_exact &&
+          right.completion_exact) {
+        maximum_start = std::max(frame_times::epoch_seconds(*left.start_exact),
+                                 frame_times::epoch_seconds(*right.start_exact));
+        minimum_completion = std::min(frame_times::epoch_seconds(*left.completion_exact),
+                                      frame_times::epoch_seconds(*right.completion_exact));
+      }
       const double overlap = minimum_completion - maximum_start;
       if (options.strict ? overlap <= 0.0 : overlap < 0.0) continue;
       DfgConcurrentPair pair;

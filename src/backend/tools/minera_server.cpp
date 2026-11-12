@@ -97,6 +97,7 @@
 #include "minera/cycle_time.hpp"
 #include "minera/correlation_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
+#include "minera/dataframe_columns.hpp"
 #include "minera/data_petri_net.hpp"
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
@@ -1059,6 +1060,107 @@ bool standard_keys_for_session(const MinedSession& session) {
 // table keeps the file order, so temporal_table_to_log derives the index.
 void mark_frame_index_rows(const MinedSession& session, minera::TemporalProfileOptions& options) {
   if (session.active_source && session.active_source->file().format == "csv") options.frame_index_rows = true;
+}
+
+// A CSV upload's table as format_dataframe's frame, which pm4py's DataFrame
+// functions read (round BM, observed black-box): the rows without a case,
+// activity or timestamp dropped, the others in the frame's order (cases by
+// id, each case's rows by the upload timestamp, then file order). With
+// `index_columns`, also format_dataframe's "@@index" and "@@case_index" (a
+// CSV's own columns of those names are overwritten), which the DFG adapters
+// read. nullopt for other sources, or when the source's rows and events do
+// not pair up.
+std::optional<minera::EventTable> csv_frame_table(const minera::ActiveEventSource& source,
+                                                  bool index_columns = true) {
+  if (source.file().format != "csv") return std::nullopt;
+  const auto& log = source.checked_log();
+  if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
+  const auto& frame = *log.dataframe_columns;
+  const auto& table = source.checked_table();
+  const auto& rows = source.representative_row_ordinals();
+  if (rows.size() != log.traces.size()) return std::nullopt;
+  minera::EventTable result;
+  result.columns = table.columns;
+  result.attributes = table.attributes;
+  result.metadata = table.metadata;
+  result.dtypes = table.dtypes;
+  result.categorical_dtypes = table.categorical_dtypes;
+  const auto column = [&](const char* name) {
+    if (!index_columns) return std::size_t{0};
+    const auto found = std::find(result.columns.begin(), result.columns.end(), name);
+    if (found != result.columns.end()) return static_cast<std::size_t>(found - result.columns.begin());
+    result.columns.push_back(name);
+    if (!result.dtypes.empty()) result.dtypes.push_back("int64");
+    if (!result.categorical_dtypes.empty()) result.categorical_dtypes.push_back(std::nullopt);
+    return result.columns.size() - 1;
+  };
+  const auto index_column = column("@@index");
+  const auto case_index_column = column("@@case_index");
+  const auto cell = [](const char* key, std::int64_t value) {
+    minera::EventAttribute attribute{key, std::to_string(value), minera::AttributeKind::kInt};
+    attribute.typed_value = value;
+    return attribute;
+  };
+  std::vector<std::pair<std::int64_t, std::size_t>> positions;  // (@@index, result row)
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    const auto& events = log.traces[t].events;
+    if (rows[t].size() != events.size()) return std::nullopt;
+    for (std::size_t e = 0; e < events.size(); ++e) {
+      const auto order = events[e].input_order;
+      if (!rows[t][e] || *rows[t][e] >= table.rows.size() || order >= frame.row_index.size() ||
+          order >= frame.case_index.size())
+        return std::nullopt;
+      auto row = table.rows[*rows[t][e]];
+      if (index_columns) {
+        row.resize(result.columns.size());
+        row[index_column] = cell("@@index", frame.row_index[order]);
+        row[case_index_column] = cell("@@case_index", frame.case_index[order]);
+      }
+      positions.emplace_back(frame.row_index[order], result.rows.size());
+      result.rows.push_back(std::move(row));
+    }
+  }
+  // The frame's own row order.
+  std::stable_sort(positions.begin(), positions.end(),
+                   [](const auto& left, const auto& right) {return left.first < right.first;});
+  std::vector<minera::EventTable::Row> ordered;
+  ordered.reserve(positions.size());
+  for (const auto& [index, row] : positions) ordered.push_back(std::move(result.rows[row]));
+  result.rows = std::move(ordered);
+  return result;
+}
+
+std::optional<minera::EventTable> csv_frame_table(const MinedSession& session) {
+  if (!session.active_source) return std::nullopt;
+  return csv_frame_table(*session.active_source);
+}
+
+// The flat view a family reads on a CSV upload mined as a DataFrame or
+// LazyFrame: format_dataframe's frame rows (round BM: pm4py's DataFrame
+// Declare, log skeleton, transition system and alpha follow the frame's row
+// order, which the table's file order is not). Other sources and shapes, or a
+// source whose rows and events do not pair up, keep the selected view.
+struct CsvFrameView {
+  std::optional<minera::EventTable> table;
+  std::optional<minera::LazyEventTable> lazy;
+  std::optional<minera::EventDataView> view;
+};
+
+void prepare_csv_frame_view(const minera::ActiveEventSource& source, CsvFrameView& frame) {
+  const auto kind = source.selected_kind();
+  if (kind != minera::EventDataKind::kEventTable && kind != minera::EventDataKind::kLazyEventTable) return;
+  try {
+    frame.table = csv_frame_table(source, false);
+  } catch (const std::exception&) {
+    return;  // the families report the source's own error
+  }
+  if (!frame.table) return;
+  if (kind == minera::EventDataKind::kLazyEventTable) {
+    frame.lazy = minera::LazyEventTable::from_table(*frame.table);
+    frame.view = minera::EventDataView(*frame.lazy);
+  } else {
+    frame.view = minera::EventDataView(*frame.table);
+  }
 }
 
 minera::DfgStatisticalOptions dfg_statistics_for_source(
@@ -10466,7 +10568,10 @@ void handle_dfg_dataframe(const httplib::Request& request,
     auto params = minera::parse_mine_params(lookup, present);
     overlay_cached_source_selectors(request, *session, params, true);
     const auto table_view = cached_source_view(*session,minera::EventDataKind::kEventTable);
-    const auto& table = *table_view.table();
+    // pandas reads a CSV upload as format_dataframe's frame (round BM).
+    const auto frame_table = params.dfg_backend == minera::DfgTableBackend::kPandas
+                                 ? csv_frame_table(*session) : std::nullopt;
+    const auto& table = frame_table ? *frame_table : *table_view.table();
     if (params.dfg_operation == minera::DfgTableOperation::kGraph) {
       if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
         response.set_content(

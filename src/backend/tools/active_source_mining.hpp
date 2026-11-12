@@ -20,7 +20,11 @@ void handle_active_source_mining(const httplib::Request& request,
   session->powl_activity_key = params.powl.activity_key;
   session->powl_timestamp_key = params.powl.timestamp_key;
   session->powl_case_id_key = params.powl.case_id_key;
-  const auto data = [&] {return session->active_source->selected_view();};
+  // A CSV upload's DataFrame and LazyFrame families read format_dataframe's
+  // row order (prepare_csv_frame_view; round BM).
+  CsvFrameView frame;
+  prepare_csv_frame_view(*session->active_source, frame);
+  const auto data = [&] {return frame.view ? *frame.view : session->active_source->selected_view();};
   std::map<std::string, std::string> records;
   std::map<std::string, std::string> options_overrides;
   // A client that disconnected stops the request too, before a family and

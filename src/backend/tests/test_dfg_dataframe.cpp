@@ -509,7 +509,16 @@ void concurrency_contracts() {
        row({value("case:concept:name", "c"), value("concept:name", "B"),
             value("start_timestamp", "2026-01-05T10:00:00Z"),
             value("time:timestamp", "2026-01-05T12:00:00Z")})});
-  assert(discover_pandas_concurrent_events(null_activity, options).pairs.empty());
+  // A row without an activity never pairs; with one row left, pandas' empty
+  // self-join compares a timedelta column with 0 and raises (round BM,
+  // observed black-box).
+  bool raised = false;
+  try {
+    (void)discover_pandas_concurrent_events(null_activity, options);
+  } catch (const std::invalid_argument& error) {
+    raised = std::string(error.what()) == "Invalid comparison between dtype=timedelta64[us] and int";
+  }
+  assert(raised);
 
   const auto reverse_index = make_table(
       {"case:concept:name", "concept:name", "start_timestamp",
