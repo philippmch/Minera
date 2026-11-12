@@ -504,8 +504,9 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
   std::vector<Ref> refs;
   refs.reserve(log.event_count());
   std::size_t position = 0;
-  for (const auto& tr : log.traces) for (const auto& e : tr.events)
-    refs.push_back({&e, &tr, position++, sort_key(reader, e, &tr, o.sorting_attribute)});
+  // The frame's rows in its row order (an XES upload's file order, round BF).
+  for (const auto& row : frame_rows(log))
+    refs.push_back({&row.event, &row.trace, position++, sort_key(reader, row.event, &row.trace, o.sorting_attribute)});
   // sort_values on the object column (pandas' nargsort): numpy's default
   // quicksort argsorts the non-missing values, so equal keys come out in its
   // partition order (from 17 values on, not input order), then the missing

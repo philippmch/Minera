@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace minera {
 
@@ -36,6 +37,20 @@ namespace minera {
 // datetime.datetime, so its 'Timestamp' names become 'datetime.datetime';
 // any other column keeps them (round BC, observed black-box).
 [[nodiscard]] std::string column_type_error(std::string message, std::optional<DataFrameColumnType> type);
+
+// One row of a frame: the event and the trace (case) it belongs to.
+struct FrameRow {
+  const Trace& trace;
+  const Event& event;
+};
+
+// The frame's rows in the DataFrame's row order. A CSV frame lists them by
+// case, as format_dataframe sorted them, which is the traces' order. An XES
+// frame keeps read_xes's file order: a case whose <trace> elements repeat
+// its name apart from each other has its rows interleaved with other cases'
+// rows there, while the frame's traces hold each case's rows together (round
+// BF, observed black-box through sort ties, first/last rows and sorted()).
+[[nodiscard]] std::vector<FrameRow> frame_rows(const EventLog& frame);
 
 // A FrameValue of class kNumber as its Python number (bool, int or float).
 [[nodiscard]] python::Scalar frame_number_scalar(const FrameValue& value);

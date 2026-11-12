@@ -1194,12 +1194,35 @@ std::optional<std::string> skip_dateutil_separators(std::string_view text) {
   return out;
 }
 
+std::optional<std::string> reference_numeric_cell_date(std::string_view text);
+
+// Six digits followed by a clock after `T`, `t` or white space ("200113
+// 10:30", "250699T0730"): pandas' ISO path refuses the cell and dateutil
+// reads the six digits as it reads them alone (DDMMYY-like, see
+// reference_numeric_cell_date: "200113" is 2013-01-20) and the clock after
+// them (round BF, observed black-box). Returns the cell with the date
+// spelled YYYY-MM-DD, or nullopt.
+std::optional<std::string> reference_six_digit_date(std::string_view text) {
+  if (text.size() < 8) return std::nullopt;
+  for (std::size_t i = 0; i < 6; ++i)
+    if (!std::isdigit(static_cast<unsigned char>(text[i]))) return std::nullopt;
+  if (text[6] != ' ' && text[6] != 'T' && text[6] != 't') return std::nullopt;
+  const auto date = reference_numeric_cell_date(text.substr(0, 6));
+  if (!date || date->size() != 10) return std::nullopt;
+  return *date + std::string(text.substr(6));
+}
+
 std::optional<NormalizedTimestamp> normalize_reference_timestamp_text(
     std::string_view text, bool allow_year_zero, bool dateutil_only) {
   if (auto shaped = normalize_reference_timestamp_shapes(text, allow_year_zero, dateutil_only))
     return shaped;
   if (const auto basic = reference_basic_date(text))
     return normalize_reference_timestamp_shapes(*basic, allow_year_zero, dateutil_only);
+  if (const auto six = reference_six_digit_date(text)) {
+    auto shaped = normalize_reference_timestamp_shapes(*six, false, true);
+    if (shaped) shaped->iso_path = false;
+    return shaped;
+  }
   const auto date = reference_numeric_date(text);
   if (!date) return std::nullopt;
   auto shaped = normalize_reference_timestamp_shapes(*date, false, dateutil_only);
@@ -1207,9 +1230,124 @@ std::optional<NormalizedTimestamp> normalize_reference_timestamp_text(
   return shaped;
 }
 
+// A clock before the date ("10:30 2020-01-05", "7:05 PM, 05.01.2024",
+// "00:00 19990513Z"): dateutil reads the tokens in either order, so the cell
+// reads as the date followed by that clock, any offset or zone name kept at
+// the end (round BF, observed black-box). The clock is H:M, H:M:S or
+// H:M:S.f (one or two digits each) with an optional AM/PM, then blanks and
+// commas (not a `T`: "00:30T2020-12-05" fails, and a `,` between "10:30"
+// and the date's first digit reads as a fraction on today's date); the date
+// is digits and one of `-`, `/`, `.` or blanks. Returns the reordered cell,
+// or nullopt.
+std::optional<std::string> reference_clock_first(std::string_view text) {
+  const auto digit = [](char ch) { return ch >= '0' && ch <= '9'; };
+  std::size_t at = 0;
+  while (at < text.size() && text[at] == ' ') ++at;
+  const auto digits = [&](std::size_t from, std::size_t least, std::size_t most) {
+    std::size_t k = from;
+    while (k < text.size() && k - from < most && digit(text[k])) ++k;
+    return k - from >= least ? k : std::string_view::npos;
+  };
+  std::size_t k = digits(at, 1, 2);
+  if (k == std::string_view::npos || k >= text.size() || text[k] != ':') return std::nullopt;
+  k = digits(k + 1, 1, 2);
+  if (k == std::string_view::npos) return std::nullopt;
+  bool fraction = false;
+  if (k < text.size() && text[k] == ':') {
+    k = digits(k + 1, 1, 2);
+    if (k == std::string_view::npos) return std::nullopt;
+    if (k < text.size() && text[k] == '.') {
+      k = digits(k + 1, 1, 64);
+      if (k == std::string_view::npos) return std::nullopt;
+      fraction = true;
+    }
+  }
+  if (k < text.size() && digit(text[k])) return std::nullopt;
+  // An AM/PM, joined or after one blank.
+  std::size_t meridiem_end = k;
+  {
+    std::size_t m = k < text.size() && text[k] == ' ' ? k + 1 : k;
+    if (m + 1 < text.size()) {
+      const char a = static_cast<char>(std::tolower(static_cast<unsigned char>(text[m])));
+      const char b = static_cast<char>(std::tolower(static_cast<unsigned char>(text[m + 1])));
+      if ((a == 'a' || a == 'p') && b == 'm' && (m + 2 == text.size() || text[m + 2] == ' ' || text[m + 2] == ','))
+        meridiem_end = m + 2;
+    }
+  }
+  const auto clock = text.substr(at, meridiem_end - at);
+  std::size_t date_begin = meridiem_end;
+  while (date_begin < text.size() && (text[date_begin] == ' ' || text[date_begin] == ',')) ++date_begin;
+  if (date_begin == meridiem_end || date_begin >= text.size() || !digit(text[date_begin])) return std::nullopt;
+  // "10:30,2020-01-05" is 10:30:12.12 today: one comma joining a clock
+  // without a fraction to the date ("10:30,,2020-01-05" reads).
+  if (meridiem_end == k && !fraction && date_begin == k + 1 && text[k] == ',') return std::nullopt;
+  // A trailing offset or zone name stays last: after a blank, or joined.
+  const auto rest = text.substr(date_begin);
+  std::size_t tail = rest.size();
+  char joined_sign = '\0';
+  for (const std::string_view zone : {"Z", "UTC", "GMT"})
+    if (rest.size() > zone.size() && rest.ends_with(zone)) tail = rest.size() - zone.size();
+  if (tail == rest.size()) {
+    std::size_t j = rest.size();
+    while (j > 0 && (digit(rest[j - 1]) || rest[j - 1] == ':')) --j;
+    if (j > 1 && (rest[j - 1] == '+' || rest[j - 1] == '-') && rest.size() - j >= 2) {
+      if (rest[j - 2] == ' ') {
+        tail = j - 1;
+      } else if (digit(rest[j - 2]) &&
+                 (rest[j - 1] == '+' || std::count(rest.begin(), rest.begin() + static_cast<std::ptrdiff_t>(j - 1), '-') != 1)) {
+        // Joined: "+01", "+0100" or "+01:00"; a "-" after a dashed date's
+        // third part ("2020-01-05-0500"), or after a date without dashes.
+        const auto body = rest.substr(j);
+        const bool shaped = (body.size() == 2 || body.size() == 4) ? body.find(':') == std::string_view::npos
+                                                                   : body.size() == 5 && body[2] == ':' &&
+                                                                         body.find(':', 3) == std::string_view::npos;
+        if (!shaped) return std::nullopt;
+        tail = j - 1;
+        joined_sign = rest[j - 1];
+      }
+    }
+  }
+  std::size_t date_end = date_begin + tail;
+  while (date_end > date_begin && text[date_end - 1] == ' ') --date_end;
+  const bool joined = date_end < text.size() && text[date_end] != ' ';
+  const auto date = text.substr(date_begin, date_end - date_begin);
+  if (date.empty()) return std::nullopt;
+  // One kind of separator ("10:30, 31/5-1999" fails).
+  char separator = '\0';
+  for (const char ch : date) {
+    if (digit(ch)) continue;
+    if (ch != '-' && ch != '/' && ch != '.' && ch != ' ') return std::nullopt;
+    if (separator != '\0' && ch != separator) return std::nullopt;
+    separator = ch;
+  }
+  if (joined && separator == ' ') {
+    // A zone or offset joined to the last of blank-separated numbers reads
+    // only when that number could be a day or month ("10:00 1960 07 05Z"
+    // reads; "10:00 05 07 1960Z" and "10:30 2020 01 05-0500" fail).
+    std::size_t last = date.rfind(' ') + 1;
+    while (last + 1 < date.size() && date[last] == '0') ++last;
+    if (date.size() - last > 2 || std::stoi(std::string(date.substr(last))) > 31 || joined_sign == '-')
+      return std::nullopt;
+  }
+  std::string reordered = std::string(date) + " " + std::string(clock);
+  if (date_end < text.size()) {
+    std::size_t from = date_end;
+    while (from < text.size() && text[from] == ' ') ++from;
+    reordered += " " + std::string(text.substr(from));
+  }
+  return reordered;
+}
+
 std::optional<NormalizedTimestamp> normalize_reference_timestamp(std::string_view text,
                                                                  bool allow_year_zero = false) {
   if (auto shaped = normalize_reference_timestamp_text(text, allow_year_zero, false)) return shaped;
+  if (const auto reordered = reference_clock_first(text)) {
+    auto shaped = normalize_reference_timestamp_text(*reordered, false, true);
+    if (shaped) {
+      shaped->iso_path = false;
+      return shaped;
+    }
+  }
   // Separators dateutil skips (review AA1-5); such a cell never takes the ISO path.
   const auto skipped = skip_dateutil_separators(text);
   if (!skipped) return std::nullopt;

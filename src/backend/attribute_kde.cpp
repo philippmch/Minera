@@ -121,9 +121,9 @@ AttributeKdeResult frame_attribute_kde(const EventLog& input, const AttributeKde
   const auto type = frame_column_type(frame, key);
   if (!type) throw std::invalid_argument("KeyError: [" + ocel_frame::python_str_repr(key) + "]");
   std::vector<python::Scalar> cells;
-  for (const auto& trace : frame.traces)
-    for (const auto& event : trace.events)
-      if (auto cell = frame_row_scalar(frame, trace, event, key)) cells.push_back(std::move(*cell));
+  // In the frame's row order (an XES upload's file order, round BF).
+  for (const auto& row : frame_rows(frame))
+    if (auto cell = frame_row_scalar(frame, row.trace, row.event, key)) cells.push_back(std::move(*cell));
   const auto fail = [&](const std::string& message) { frame_kde_error(message, type); };
   try {
     python::sort(cells, [](const python::Scalar& a, const python::Scalar& b) { return python::less(a, b); });

@@ -248,6 +248,27 @@ std::optional<python::Scalar> frame_scalar(const EventLog& frame, const Trace& t
   return std::nullopt;
 }
 
+std::vector<FrameRow> frame_rows(const EventLog& frame) {
+  std::vector<FrameRow> rows;
+  rows.reserve(frame.event_count());
+  bool ordered = true;
+  for (const auto& trace : frame.traces)
+    for (const auto& event : trace.events) {
+      if (!rows.empty() && event.input_order < rows.back().event.input_order) ordered = false;
+      rows.push_back({trace, event});
+    }
+  if (ordered || !frame.dataframe_columns || frame.dataframe_columns->csv_text) return rows;
+  std::vector<std::size_t> order(rows.size());
+  for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+  std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+    return rows[a].event.input_order < rows[b].event.input_order;
+  });
+  std::vector<FrameRow> sorted;
+  sorted.reserve(rows.size());
+  for (const auto i : order) sorted.push_back(rows[i]);
+  return sorted;
+}
+
 std::optional<python::Scalar> frame_row_scalar(const EventLog& frame, const Trace& trace,
                                                const Event& event, const std::string& key) {
   if (key.starts_with("case:") && key != "case:concept:name")

@@ -23187,7 +23187,7 @@ Declarations:
   for longer mixed columns the operands of the first failing comparison
   can differ from CPython 3.11's powersort merges (8 of 1,700 random lists
   of 64 to 300 items), so a long mixed XES column may name its types the
-  other way round (`'int' and 'str'`). Open for round BF.
+  other way round (`'int' and 'str'`). Closed in round BF (BF1-1).
 
 Verification (scripts in the project files under `review-harness/round-be/`):
 
@@ -23206,3 +23206,125 @@ Verification (scripts in the project files under `review-harness/round-be/`):
 
 `minera_review_be1_tests` binds the values and messages above (taken from
 pandas and pm4py black-box on the same uploads and cells).
+
+## Review BF1: re-review of round BE, Python's sort of long lists, and XES frames in file order (2026-11-12)
+
+Round BF re-reviewed BE (the attribute KDE on uploads, `@@index` on XES
+uploads in the other frame routes, `reference_numeric_cell_date` and the
+timestamp reader's choice between grammars, the `dataframe_format` route)
+and took BE's open target, `python::sort` for 64 items or more. The device
+check on the Mac was skipped (the round's thread had no device linked).
+Findings, all fixed:
+
+- **BF1-1 CPython 3.11's `list.sort` for 64 items and more.**
+  `python::sort` (`python_list_sort.hpp`) now runs CPython 3.11's timsort
+  as it is documented and observed: natural runs (a strictly descending
+  run reversed), a minimum run length from the list's length, binary
+  insertion to extend short runs, the powersort merge order (each new
+  run's power decides which pending runs merge), `merge_lo` and
+  `merge_hi` with galloping and the adaptive `min_gallop` (7 at the
+  start), and the final collapse. The comparisons it makes, the order it
+  leaves and, when a comparison raises, the list state and the failing
+  operands follow CPython; this closes BE's declaration (a long mixed XES
+  column named its types the other way round). Lists under 64 items were
+  already exact (one binary insertion sort).
+- **BF1-2 An XES upload's frame keeps `read_xes`'s file order when a trace
+  name repeats.** Minera merges the traces of one name into one case;
+  pm4py's frame keeps the rows in file order (`c1, c2, c1, c2`). The
+  routes that read frame rows in order now take them in the frame's row
+  order (`frame_rows`): the attribute KDE (`sorted()` of the cells meets
+  `'str'` beside `'int'` instead of `'str'` beside `'float'`), network
+  analysis (links over a non-case relation attribute and rows that tie in
+  the sorting column), the resource profiles (15 frame loops), and the
+  SNA pandas variants, whose distinct case sequences meet numpy's sort in
+  the order of each case's first row, not the groupby's sorted case
+  order: this also matters for XES uploads whose trace names are not in
+  sorted order. Before the fix an interleaving sweep (`ilwrap.py`, every
+  XES upload rewritten with repeated trace names) gave 24 network and 4
+  resource-profile differences of 1,698 requests and SNA and KDE
+  messages; after it, none.
+- **BF1-3 A six-digit date before a clock.** pandas reads `200113 10:30`
+  as 2013-01-20 10:30 (dateutil splits the six digits as in BE1-4, so
+  `250699T0730` is 1999-06-25 07:30 and `991231 23:59:59` the last second
+  of 1999); Minera refused the cell (a CSV timestamp column holding one
+  was refused, another column stayed text).
+- **BF1-4 A clock before the date.** dateutil reads the date and the
+  clock in either order: `10:30 2020-01-05`, `7:05 PM 05/06/2020`,
+  `10:30, 2020.01.05`, `9:00am 2020/02/29`, `23:59:59 2019-12-31 Z` and
+  `11:59 pm 1999-12-31 +02:00` are the date at that clock. The clock is
+  `H:M`, `H:M:S` or `H:M:S.f` with an optional AM/PM; blanks and commas
+  separate it from a date of digits and one kind of separator (`-`, `/`,
+  `.` or blanks); a zone name or offset after the date stays last, also
+  when it is joined to the date (`2020-01-05-0500`, `05.06.2020+01:00`).
+  As in pandas, a zone or offset joined to blank-separated numbers reads
+  only when the last of them could be a day or month (`10:30 2020 01 05Z`
+  reads, `10:30 05 06 2020Z` and `10:30 2020 01 05-0500` fail), a `T`
+  between the clock and the date fails (`10:30T2020-01-05`), and so do
+  mixed separators (`10:30 31/5-1999`).
+- **BF1-5 Joint activities (pandas) drops each column's NaN on its own
+  before sorting it.** A row with a resource but no activity still sorts
+  its resource (and the other way round): an XES resource column of `7`
+  and dates raises `'<' not supported between instances of
+  'datetime.datetime' and 'int'` in pm4py even when the row of `7` has no
+  activity. Minera left out rows missing either cell (`snamix3.py` seed
+  7177).
+
+Re-review of BE without further findings: the attribute KDE on fresh
+seeds and on long mixed columns of 64 to 400 cells (`kdesweep2.py`,
+`kdelong.py`), `@@index` and `@@case_index` in the XES key pools of the
+resource profiles, local diagnostics and network analysis (`atsweep3.py`),
+the CLI path (`clidiff.py` on interleaved uploads), the set-order
+selection, roles and the event distribution on interleaved uploads,
+`reference_numeric_cell_date` with realistic dates and clocks
+(`mixfuzz4.py`), and the `dataframe_format` route on partial dates,
+number-like text, int, float and object columns (`fmtprobe.py`: an object
+column of ints and dates becomes datetime64[ns, UTC] with the ints as
+epoch nanoseconds, as in pandas, once the request carries typed values).
+
+Declarations:
+
+- A date KDE of dates within one second of each other (`.250` beside
+  whole seconds) differs from scipy's `gaussian_kde` in the density's
+  last digits (about 1e-6 relative): scipy's arithmetic order over such a
+  small spread is not reproduced bit for bit (`kdesweep2.py` on
+  interleaved uploads, seeds 3031 and 3121).
+- Clock and date shapes pandas reads that Minera leaves unparsed (a
+  column holding one stays text, a timestamp column refuses the upload as
+  before): a clock alone or joined to the date by one comma
+  (`10:30,2020-01-05` is 10:30:12.12 on today's date), a `T` between the
+  clock and the date when an offset follows (`10:30T2020-01-05 +01:00`;
+  in `10:30 PMT2020-01-05 +01:00` the `PMT` is a zone name and the PM is
+  lost), and partial dates with clocks (`01-2024 0:00:15 a.m.`,
+  `0001 13:00:59`, `0001T00:59`): about 10 percent of the broad fuzz
+  (`mixfuzz3.py`) and 2 percent of the clock-first fuzz (`mixfuzz5.py`).
+- Subcontracting (pandas) on a datetime resource column with missing
+  cells: case sequences that first differ at a NaT compare neither way in
+  Python, so their order comes from pandas' grouping and sorting
+  internals, which a model reproduces on small logs (600 of 600) but not
+  on logs of 60 to 120 cases (127 of 150). Minera keeps them in case
+  order with NaT first, so the intermediary of a NaT source can differ
+  (`snamix3.py` seed 7039).
+
+Verification (scripts in the project files under `review-harness/round-bf/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| `python::sort` vs CPython 3.11: comparison sequences, final order and raising comparisons (`seqfuzz.py`, 0 to 3,000 items, inconsistent and raising relations), and mixed int, float and text lists (`sort2_main.cpp`) | 8,100 lists | 0 differences |
+| Attribute KDE re-review (`kdesweep2.py`, seeds 2000 to 2299) | 900 | 226 equal, 673 raise in both, 1 declared single `inf` |
+| Long mixed KDE columns, 64 to 400 cells (`kdelong.py`) | 300 | 300 equal |
+| Attribute KDE on interleaved XES uploads (`ilwrap.py kdesweep2.py`, seeds 3001 to 3200) | 600 | before: 1 other message; after: 125 equal, 473 raise in both, 2 declared sub-second date KDE |
+| Resource profiles, local diagnostics, network analysis with `@@index` in the XES pools (`atsweep3.py --xes`, seeds 9000 to 9059 and 9100 to 9349, numpy's SIMD sorts disabled) | 4,531 | equal or raising in both, 73 declared NaN |
+| The same on interleaved uploads (`ilwrap.py atsweep3.py`, seeds 9500 to 9619) | 1,698 | before: 24 network, 4 profile differences; after: 0 |
+| SNA, every variant, on interleaved XES uploads (`ilwrap.py snamix3.py`, seeds 7000 to 7199) | 1,200 | before: 1 other message (seed 7058), 1 difference (seed 7177); after: 450 equal, 553 raise in both, 122 declared hash-seed messages, 73 declared NaN, 2 declared (7014, 7039) |
+| SNA, every variant, CSV columns of mixed types (`snamixcsv.py`, seeds 100 to 199) | 600 | 212 equal, 315 raise in both, 73 declared NaN |
+| Roles, set-order selection, event distribution and the CLI on interleaved uploads (`rolesmix.py`, `boolsel.py`, `boolselcase.py`, `evdist2.py`, `clidiff.py`) | 2,440 | equal apart from declared NaN, name collisions and one hash-seed text column (`boolselcase.py` seed 8088) |
+| Six-digit dates with clocks and clock-first cells vs pandas (`mixfuzz4.py` realistic, `mixfuzz5.py` clock first, `mixfuzz3.py` broad; seeds 1 to 3) | about 24,000 cells | 0 cells read differently; refusals only of the declared shapes |
+| BE's date fuzz again (`mixfuzz.py`, both generators) | about 4,800 cells | equal apart from BE's declared shapes |
+| CSV uploads with the new shapes in the timestamp and other columns, mine and KDE (`pdsweep3.py`, seeds 100 to 299) | 200 uploads, 968 KDE requests | 320 equal, 630 raise in both, 10 declared year 0, 8 declared today's-date cells (`10:30` alone); 15 uploads refused by both, 22 that pm4py keeps as text (declared since U1) |
+| `dataframe_format` on partial dates and int, float, object columns (`fmtprobe.py`) | 9 columns | 9 equal |
+| Full ctest | 464 tests | 464 pass |
+
+`minera_review_bf1_tests` binds the sort counts and orders, the
+interleaved KDE, network and SNA results, the joint-activities sort and
+the date cells above (taken from CPython, pm4py and pandas black-box on
+the same inputs).

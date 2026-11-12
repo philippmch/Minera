@@ -289,16 +289,22 @@ OrganizationalSnaResult discover_organizational_sna(
       // A datetime column's Timestamps and NaT always compare.
       std::vector<std::vector<python::Scalar>> case_keys;
       std::vector<python::Scalar> resources;
-      for (const auto& trace : log.traces)
-        for (const auto& event : trace.events)
-          if (const auto case_cell = frame_row_scalar(log, trace, event, options.case_id_attribute)) {
-            case_keys.push_back({*case_cell});
-            resources.push_back(cell(trace, event, options.resource_attribute)
-                                    .value_or(python::real(std::numeric_limits<double>::quiet_NaN())));
-          }
+      for (const auto& row : frame_rows(log))
+        if (const auto case_cell = frame_row_scalar(log, row.trace, row.event, options.case_id_attribute)) {
+          case_keys.push_back({*case_cell});
+          resources.push_back(cell(row.trace, row.event, options.resource_attribute)
+                                  .value_or(python::real(std::numeric_limits<double>::quiet_NaN())));
+        }
       std::vector<std::vector<python::Scalar>> sequences;
       try {
-        for (const auto& group : python::groupby(case_keys)) {
+        // The distinct sequences meet the sort in the order of their cases'
+        // first rows in the frame (an XES upload's file order; a CSV frame
+        // is sorted by case), not the groupby's sorted case order (round BF,
+        // observed black-box).
+        auto groups = python::groupby(case_keys);
+        std::stable_sort(groups.begin(), groups.end(),
+                         [](const auto& a, const auto& b) { return a.rows.front() < b.rows.front(); });
+        for (const auto& group : groups) {
           auto& sequence = sequences.emplace_back();
           for (const auto row : group.rows) sequence.push_back(resources[row]);
         }
@@ -317,9 +323,13 @@ OrganizationalSnaResult discover_organizational_sna(
         if (grouped && !frame_row_scalar(log, trace, event, options.case_id_attribute)) continue;
         const auto resource = cell(trace, event, options.resource_attribute);
         if (joint) {
+          // The joint-activities pandas variant drops each column's NaN on
+          // its own before sorting it: a row without an activity still
+          // sorts its resource, and the other way round (round BF, observed
+          // black-box).
           const auto activity = cell(trace, event, options.activity_attribute);
-          if (drop_missing && (!resource || !activity)) continue;
-          if (const auto value = sorted_cell(activity, options.activity_attribute)) activity_values.push_back(*value);
+          if (!(drop_missing && !activity))
+            if (const auto value = sorted_cell(activity, options.activity_attribute)) activity_values.push_back(*value);
         }
         if (drop_missing && !resource) continue;
         if (const auto value = sorted_cell(resource, options.resource_attribute)) resource_values.push_back(*value);

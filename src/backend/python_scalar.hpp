@@ -26,6 +26,7 @@
 #include "minera/filtering_common.hpp"
 #include "minera/timestamp.hpp"
 #include "numpy_object_sort.hpp"
+#include "python_list_sort.hpp"
 #include "python_float_text.hpp"
 
 namespace minera::python {
@@ -385,32 +386,14 @@ inline int compare(const Scalar& a, const Scalar& b) {
 
 inline bool less(const Scalar& a, const Scalar& b) { return compare(a, b) < 0; }
 
-// CPython's list.sort for fewer than 64 items (an initial run, descending runs
-// reversed, then binary insertion); the same stable result as timsort for any
-// strict weak ordering, and the same comparisons where the ordering is not
-// one (set-valued tuple members, TypeError operands).
+// CPython 3.11's list.sort: the same stable result as any stable sort for a
+// strict weak ordering, and the same comparisons in the same order where the
+// ordering is not one (set-valued tuple members, TypeError operands). Lists
+// under 64 items are one binary insertion sort; longer ones are timsort with
+// powersort merges and galloping (python_list_sort.hpp).
 template <class T, class Less>
 void sort(std::vector<T>& items, Less less) {
-  const std::size_t n = items.size();
-  if (n < 2) return;
-  std::size_t run = 2;
-  if (less(items[1], items[0])) {
-    while (run < n && less(items[run], items[run - 1])) ++run;
-    std::reverse(items.begin(), items.begin() + static_cast<std::ptrdiff_t>(run));
-  } else {
-    while (run < n && !less(items[run], items[run - 1])) ++run;
-  }
-  for (std::size_t i = run; i < n; ++i) {
-    T pivot = std::move(items[i]);
-    std::size_t low = 0, high = i;
-    while (low < high) {
-      const auto middle = low + ((high - low) >> 1);
-      if (less(pivot, items[middle])) high = middle;
-      else low = middle + 1;
-    }
-    for (std::size_t j = i; j > low; --j) items[j] = std::move(items[j - 1]);
-    items[low] = std::move(pivot);
-  }
+  detail::PythonListSort<T, Less>(items, less).run();
 }
 
 // sorted(items, key=..., reverse=True): CPython reverses, sorts stably and

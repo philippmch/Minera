@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BE (2026-11-05 to 2026-11-11, cloud container)
+## Review-fix loop, rounds T–BF (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4493,7 +4493,44 @@ and `2020` becomes a date column (BD's `snamixcsv.py` seed 152). The
 device check on the Mac was skipped again (the round's thread had no
 device linked).
 
-Next round (BF) should start by re-reviewing round BE:
+Round BF re-reviewed BE and took its open target (Review BF1). It fixed:
+`python::sort` for 64 items and more, which now runs CPython 3.11's
+timsort with powersort merges and galloping (comparisons, order and the
+operands of a failing comparison as in CPython; BE's declaration closed);
+an XES upload's frame rows in `read_xes`'s file order when a trace name
+repeats (`frame_rows` in the attribute KDE, network analysis, resource
+profiles and the SNA pandas variants' sequence sort, whose cases meet
+numpy's sort in the order of their first rows); pandas' reading of a
+six-digit date before a clock (`200113 10:30`) and of a clock before the
+date (`10:30 2020-01-05`, `7:05 PM, 05/06/2020`, zones and offsets kept
+last); and the joint-activities pandas variant, which sorts each column
+after dropping its own NaN. The device check on the Mac was skipped again
+(the round's thread had no device linked).
+
+Next round (BG) should start by re-reviewing round BF:
+
+- `src/backend/python_list_sort.hpp`: `PythonListSort` (run detection,
+  `merge_lo`/`merge_hi` galloping, the state after a raising comparison),
+  fuzzed with `seqfuzz.py`; every caller of `python::sort` and
+  `sort_reverse` (KDE, SNA, batches, organizational mining, the pandas
+  variants filter);
+- `src/backend/frame_keys.cpp`: `frame_rows`, and the frame loops that
+  still iterate `log.traces` (SNA `require_sortable` values, roles, LLM
+  context, statistics, features, filters): sweep them with `ilwrap.py`
+  (any sweep script with interleaved trace names) and with XES uploads
+  whose trace names are not in sorted order;
+- `src/backend/csv_event_log_importer.cpp`: `reference_clock_first` (zones
+  and offsets joined to the date, commas, AM/PM) and
+  `reference_six_digit_date`, fuzzed with `mixfuzz5.py` and `mixfuzz4.py`,
+  and through `/api/format-dataframe` (`fmtprobe.py`, which must send typed
+  values for int and float cells);
+- `src/backend/organizational_mining.cpp`: the first-row order of the case
+  sequences in `require_sortable_variants`, and joint activities' per-column
+  NaN drop (`snamix3.py` and `snamixcsv.py`); open: subcontracting
+  (pandas) with NaT ties (declared, seed 7039);
+- the CI run of the BF commit.
+
+Round BE's targets, re-reviewed in BF (findings BF1-1 to BF1-5):
 
 - `src/backend/attribute_kde.cpp`: `frame_attribute_kde` (the sort, the
   single-value `float()` branch with `parse_python_float_text`, bools and
