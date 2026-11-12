@@ -34,6 +34,14 @@ struct TimestampCaseGroupingOptions {
 [[nodiscard]] EventLog group_consecutive_activities(
     const EventLog& event_log,
     const ConsecutiveActivityGroupingOptions& options = {});
+// The same grouping on a CSV or XES upload, as pm4py's DataFrame grouping
+// does it: only rows adjacent in the frame's row order merge, so on an XES
+// upload whose trace names repeat apart a case's equal activities with
+// another case's rows between them stay apart (round BI, observed
+// black-box).
+[[nodiscard]] EventLog group_consecutive_frame_rows(
+    const EventLog& event_log,
+    const ConsecutiveActivityGroupingOptions& options = {});
 
 [[nodiscard]] EventLog filter_consecutive_activity_groups(
     const EventLog& event_log,

@@ -7,6 +7,7 @@
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
+#include <map>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -267,6 +268,25 @@ std::vector<FrameRow> frame_rows(const EventLog& frame) {
   sorted.reserve(rows.size());
   for (const auto i : order) sorted.push_back(rows[i]);
   return sorted;
+}
+
+EventLog frame_slice_cases(const EventLog& frame) {
+  const auto rows = frame_rows(frame);
+  std::map<const Trace*, std::pair<std::size_t, std::size_t>> extent;  // first row, rows
+  for (std::size_t i = 0; i < rows.size(); ++i)
+    ++extent.emplace(&rows[i].trace, std::pair<std::size_t, std::size_t>{i, 0}).first->second.second;
+  EventLog cases;
+  cases.attributes = frame.attributes;
+  for (const auto& trace : frame.traces) {
+    const auto found = extent.find(&trace);
+    if (found == extent.end()) continue;
+    Trace copy;
+    copy_trace_context(trace, copy);
+    for (std::size_t i = found->second.first; i < found->second.first + found->second.second; ++i)
+      copy.events.push_back(rows[i].event);
+    cases.traces.push_back(std::move(copy));
+  }
+  return cases;
 }
 
 std::optional<python::Scalar> frame_row_scalar(const EventLog& frame, const Trace& trace,

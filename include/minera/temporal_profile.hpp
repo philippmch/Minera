@@ -101,6 +101,17 @@ struct TemporalDeviation {
     const EventLog& log, const TemporalProfileOptions& options,
     const std::function<bool()>& cancelled);
 
+// The discovery of a CSV or XES upload, which reaches pm4py as a DataFrame:
+// with the default selectors (concept:name, the event timestamp, no business
+// hours) and a timestamp on every row it follows pm4py's DataFrame temporal
+// profile (each case's rows stably sorted by timestamp, Timedelta durations,
+// pandas' compensated mean and Welford's deviation; rounds BH and BI,
+// observed black-box). Other options, a log that is not a frame, or a row
+// without a timestamp (where pm4py raises) take discover_temporal_profile.
+[[nodiscard]] TemporalProfile discover_temporal_profile_as_uploaded(
+    const EventLog& log, const TemporalProfileOptions& options,
+    const std::function<bool()>& cancelled = {});
+
 // Input-specific components retained as distinct contracts. The table path
 // groups by case_id_attribute and stable-sorts each case by completion time.
 [[nodiscard]] TemporalProfile discover_temporal_profile_log(

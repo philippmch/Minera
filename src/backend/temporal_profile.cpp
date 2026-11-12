@@ -18,6 +18,7 @@
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
 #include "business_hours.hpp"
+#include "exact_stdev.hpp"
 #include "frame_cells.hpp"
 #include "frame_temporal_profile.hpp"
 #include "frame_times.hpp"
@@ -235,18 +236,11 @@ ProfileLookup build_profile_lookup(const TemporalProfile& profile) {
   return lookup;
 }
 
-struct Aggregate {
-  std::uint64_t count = 0;
-  double mean = 0.0;
-  double m2 = 0.0;
-
-  void add(double value) {
-    ++count;
-    const double delta = value - mean;
-    mean += delta / static_cast<double>(count);
-    m2 += delta * (value - mean);
-  }
-};
+// pm4py's EventLog temporal profile takes a pair's mean and deviation with
+// statistics.mean and statistics.stdev over the epoch-second durations:
+// exact sums rounded once (round BI, observed black-box; a running Welford
+// mean was a few ulps off in most profiles).
+using Aggregate = detail::ExactMoments;
 
 struct TemporalTableColumns {
   std::size_t case_id = 0;
@@ -427,6 +421,18 @@ TemporalProfileOptions normalized_table_options(
   return normalized;
 }
 
+struct FrameProfileRow {
+  std::int64_t seconds = 0;
+  std::uint32_t nanoseconds = 0;
+  const std::string* activity = nullptr;
+};
+
+// pm4py's DataFrame arithmetic over cases given by sorted id, each case's rows
+// in the frame's row order (stably sorted by timestamp here).
+TemporalProfile frame_arithmetic_profile(
+    std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>>& ordered,
+    const std::function<bool()>& cancelled);
+
 }  // namespace
 
 const TemporalProfileEntry* TemporalProfile::find(const std::string& source,
@@ -572,12 +578,9 @@ TemporalProfile discover_temporal_profile(
     TemporalProfileEntry entry;
     entry.source = key.first;
     entry.target = key.second;
-    entry.count = aggregate.count;
-    entry.mean_seconds = aggregate.mean;
-    entry.standard_deviation_seconds =
-        aggregate.count > 1
-            ? std::sqrt(aggregate.m2 / static_cast<double>(aggregate.count - 1))
-            : 0.0;
+    entry.count = aggregate.count();
+    entry.mean_seconds = aggregate.mean();
+    entry.standard_deviation_seconds = aggregate.stdev();
     profile.entries.push_back(std::move(entry));
   }
   return profile;
@@ -591,6 +594,28 @@ TemporalProfile discover_temporal_profile(
 TemporalProfile discover_temporal_profile_dataframe(
     const EventTable& table, const TemporalProfileOptions& options) {
   const auto log = temporal_table_to_log(table, options);
+  // pm4py's DataFrame discovery (one timestamp column, no business hours):
+  // Timedelta durations, the compensated mean and Welford's deviation over
+  // the cases by sorted id, each sorted by timestamp (round BI, observed
+  // black-box; temporal_table_to_log already orders both).
+  const auto columns = temporal_table_columns(table, options);
+  if (!options.use_business_hours && columns.source_timestamp == columns.target_timestamp) {
+    std::vector<std::vector<FrameProfileRow>> rows(log.traces.size());
+    std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>> ordered;
+    bool exact = true;
+    for (std::size_t t = 0; t < log.traces.size() && exact; ++t) {
+      for (const auto& event : log.traces[t].events) {
+        const auto instant = parse_timestamp_exact(event.timestamp);
+        if (!instant) {
+          exact = false;
+          break;
+        }
+        rows[t].push_back({instant->seconds, instant->nanoseconds, &event.activity});
+      }
+      ordered.push_back({&log.traces[t].case_id, &rows[t]});
+    }
+    if (exact) return frame_arithmetic_profile(ordered, {});
+  }
   return discover_temporal_profile_log(log, normalized_table_options(options));
 }
 
@@ -739,29 +764,37 @@ std::vector<TemporalDeviation> check_temporal_profile_conformance(
   return flattened;
 }
 
-TemporalProfile discover_temporal_profile_frame(const EventLog& log) {
-  const frame_times::Frame frame(log);
-  struct Row {
-    std::int64_t seconds = 0;
-    std::uint32_t nanoseconds = 0;
-    const std::string* activity = nullptr;
-  };
+namespace {
+
+// discover_temporal_profile_frame on a built frame; nullopt when a row has no
+// timestamp (pm4py raises there).
+std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& frame,
+                                                      const std::function<bool()>& cancelled) {
+  using Row = FrameProfileRow;
   std::map<const Trace*, std::vector<Row>> cases;
   for (const auto& row : frame_rows(frame.log())) {
     const auto date = frame.date(row.trace, row.event, "time:timestamp");
-    if (!date) throw std::invalid_argument("the timestamp column should not contain any empty value.");
+    if (!date) return std::nullopt;
     cases[&row.trace].push_back({date->seconds, date->nanoseconds, &row.event.activity});
   }
   std::vector<std::pair<const std::string*, std::vector<Row>*>> ordered;
   for (auto& [trace, rows] : cases) ordered.push_back({&trace->case_id, &rows});
   std::stable_sort(ordered.begin(), ordered.end(),
                    [](const auto& left, const auto& right) { return *left.first < *right.first; });
+  return frame_arithmetic_profile(ordered, cancelled);
+}
+
+TemporalProfile frame_arithmetic_profile(
+    std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>>& ordered,
+    const std::function<bool()>& cancelled) {
+  using Row = FrameProfileRow;
   struct Sums {
     std::uint64_t count = 0;
     double sum = 0.0, compensation = 0.0;  // Kahan
     double mean = 0.0, squares = 0.0;      // Welford
   };
   std::map<std::pair<std::string, std::string>, Sums> pairs;
+  std::uint64_t visited = 0;
   for (auto& [case_id, rows] : ordered) {
     (void)case_id;
     std::stable_sort(rows->begin(), rows->end(), [](const Row& left, const Row& right) {
@@ -769,6 +802,7 @@ TemporalProfile discover_temporal_profile_frame(const EventLog& log) {
     });
     for (std::size_t i = 0; i < rows->size(); ++i)
       for (std::size_t j = i + 1; j < rows->size(); ++j) {
+        if ((++visited & 0xfffff) == 0) throw_if_cancelled(cancelled, "temporal profile discovery was cancelled");
         const auto& source = (*rows)[i];
         const auto& target = (*rows)[j];
         std::int64_t whole = target.seconds - source.seconds;
@@ -804,6 +838,31 @@ TemporalProfile discover_temporal_profile_frame(const EventLog& log) {
     profile.entries.push_back(std::move(entry));
   }
   return profile;
+}
+
+}  // namespace
+
+TemporalProfile discover_temporal_profile_frame(const EventLog& log,
+                                                const std::function<bool()>& cancelled) {
+  auto profile = frame_temporal_profile(frame_times::Frame(log), cancelled);
+  if (!profile) throw std::invalid_argument("the timestamp column should not contain any empty value.");
+  return std::move(*profile);
+}
+
+TemporalProfile discover_temporal_profile_as_uploaded(const EventLog& log,
+                                                     const TemporalProfileOptions& options,
+                                                     const std::function<bool()>& cancelled) {
+  const auto canonical = [](const std::string& primary, const std::string& alias) {
+    const auto& key = primary.empty() ? alias : primary;
+    return key.empty() || key == "time:timestamp";
+  };
+  const bool defaults = options.activity_attribute == "concept:name" &&
+                        canonical(options.source_timestamp_attribute, options.source_completion_timestamp_attribute) &&
+                        canonical(options.target_timestamp_attribute, options.target_start_timestamp_attribute) &&
+                        !options.use_business_hours;
+  if (log.dataframe_columns && defaults)
+    if (auto profile = frame_temporal_profile(frame_times::Frame(log), cancelled)) return std::move(*profile);
+  return discover_temporal_profile(log, options, cancelled);
 }
 
 }  // namespace minera

@@ -19,7 +19,7 @@
   "variants": [
     {"activities": [0, 1], "count": 1, "duration": {"count": 1, "total": -60, "mean": -60, "median": -60, "min": -60, "max": -60}}
   ],
-  "temporal_profile": [],
+  "temporal_profile": [{"source": 1, "target": 0, "count": 1, "mean_seconds": 60, "standard_deviation_seconds": 0}],
   "minimum_self_distance_variant": "log",
   "minimum_self_distances": [],
   "transition_system": {"name": "", "view": "sequence", "direction": "forward", "window": 2, "include_data": false, "states": [{"id": 0, "payload": [], "in_root": true, "name_order": [], "incoming": [0], "outgoing": [], "start_count": 0, "end_count": 1}, {"id": 1, "payload": [1], "in_root": true, "name_order": [1], "incoming": [1], "outgoing": [0], "start_count": 0, "end_count": 0}, {"id": 2, "payload": [0, 1], "in_root": true, "name_order": [0, 1], "incoming": [], "outgoing": [1], "start_count": 1, "end_count": 0}], "transitions": [{"source": 1, "target": 0, "activity": 1, "count": 1}, {"source": 2, "target": 1, "activity": 0, "count": 1}]},

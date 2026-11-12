@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BH (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BI (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4534,7 +4534,57 @@ rank variants over those same slices and keep the cases whose own variant
 was chosen. The device check on the Mac was skipped again (the round's
 thread had no device linked).
 
-Next round (BI) should start by re-reviewing round BH:
+Round BI re-reviewed BH (Review BI1) and took its targets with
+interleaved, plain XES and CSV uploads. It fixed: Declare discovery on
+uploads in `/api/mine` and discover-constraints, which now reads each case
+as the frame's rows from its first row on, as many as it has (BH1-3's
+slices); the EventLog temporal profile's mean and deviation, now exact and
+rounded once as `statistics.mean` and `statistics.stdev`; `/api/mine`'s
+temporal profile on uploads and the behavior route's DataFrame variant,
+which use pandas' arithmetic (BH1-2); and three row-changing filters on XES
+frames: the activity split (cases labelled in sorted id order from their
+slices, labels handed to the rows in row order), `filter_between` (slices
+marked in sorted id order, later marks replacing earlier ones) and the
+consecutive activity grouping (only frame-adjacent rows merge). The device
+check on the Mac was skipped again (the round's thread had no device
+linked).
+
+Next round (BJ) should start by re-reviewing round BI:
+
+- `src/backend/log_filter.cpp`: `frame_cases`, `relabel_frame_rows` (case
+  cells when a sub-case gathers rows of several cases),
+  `frame_activity_split` and `frame_between` combined with the other
+  filters and with case attributes, swept with `combosweep.py` (plain,
+  `--plain`, `--novariant`, `--kinds`); whether the `segment_between_*`
+  variants on interleaved uploads follow the same marks;
+  `src/backend/case_grouping.cpp` (`group_consecutive_frame_rows`);
+- `src/backend/temporal_profile.cpp` and `exact_stdev.hpp`:
+  `ExactMoments` (speed and memory on large logs with many pairs, durations
+  far apart in magnitude), `frame_arithmetic_profile`, the defaults check of
+  `discover_temporal_profile_as_uploaded`, swept with `minemodels.py`
+  (`--xes`, `--frac`, through `bg/ilwrap2.py`) and `behaviortp.py`;
+- leads already confirmed against pm4py while BI's suite ran (harness
+  `round-bi/harness/bj/`): Declare conformance on XES uploads reads each
+  case as its slice in the list form (`/api/mine`'s `declare_conformance`,
+  discover-constraints; `declconf.py`: 5 of 5 interleaved uploads differ,
+  `declslice.py`'s slice model matches pm4py on 30 of 30), while the
+  diagnostics table reads the merged cases in file order (it already
+  matches); the DataFrame temporal conformance (behavior route
+  `variant=dataframe`, `/api/temporal-conformance`) lists the cases in the
+  order of their first rows, not by sorted id (`tempconf.py`; within a case
+  the order matches); `segment_between_*` on interleaved uploads follows
+  BI1-5's slice marks (`combosweep.py --novariant --kinds
+  segbetween,...`: 3 of 58 differ; `segbetween_model.py`: the model with
+  list endpoints and a separator matches pm4py on 3,000 random frames);
+- the other pm4py DataFrame functions that may read a case as a slice
+  (AE2-10): the Declare workbench, `get_variants`-based routes
+  (`/api/variant-statistics`, declared in BI1), the business-hours
+  temporal profile on frames;
+- the open choice on CSV timestamp columns of plain numbers (still
+  declared unless Philipp answers);
+- the CI run of the BI commit.
+
+Round BH's targets, re-reviewed in BI (findings BI1-1 to BI1-6):
 
 - `src/backend/llm_abstractions.cpp` (`llm_log_skeleton_description`) and
   `src/backend/llm_context.cpp` (`declare_frame_cases`, the temporal

@@ -1396,7 +1396,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // Quadratic in the trace length: one long case can keep it busy for
     // minutes, so a disconnect (or a cancel) stops it.
     const auto temporal_profile =
-        minera::discover_temporal_profile(log, params.temporal_profile, cancelled);
+        minera::discover_temporal_profile_as_uploaded(log, params.temporal_profile, cancelled);
     const auto minimum_self_distances =
         discover_selected_minimum_self_distances(
             log, params.minimum_self_distance);
@@ -1495,7 +1495,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         log, log_skeleton, params.log_skeleton);
     checkpoint("Declare constraints");
     const auto declare =
-        minera::discover_declare(log, params.declare_options);
+        minera::discover_declare_as_uploaded(log, params.declare_options);
     const auto declare_conformance =
         minera::check_declare_conformance(
             log, declare, params.declare_conformance_options);
@@ -4321,7 +4321,12 @@ void handle_constraint_discovery(const httplib::Request& request,
                      params.log_skeleton.activity_key, params.log_skeleton.case_id_key))
         : std::nullopt;
     if (family == "declare") {
-      declare = minera::discover_declare(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.declare_options);
+      // An upload's log is pm4py's DataFrame there, whose discovery reads
+      // each case as a slice of the frame's rows (discover_declare_as_uploaded).
+      const auto declare_view = session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session));
+      declare = declare_view.kind() == minera::EventDataKind::kEventLog
+          ? minera::discover_declare_as_uploaded(*declare_view.log(), params.declare_options)
+          : minera::discover_declare(declare_view, params.declare_options);
       auto options = params.declare_conformance_options; options.activity_key = conformance_activity;
       declare_conformance = minera::check_declare_conformance(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *declare, options);
       for (const auto& [name, rules] : declare->rules) for (const auto& rule : rules) {

@@ -386,4 +386,115 @@ inline double exact_stdev(const std::vector<double>& values) {
   return exact_stdev_detail::rounded_sqrt_ratio(numerator, denominator);
 }
 
+// The words of a wide unsigned sum that are in use: `words[i]` is word
+// `base + i` of the full-width accumulator. Durations of one activity pair
+// span a few words, so a pair keeps a few words instead of the full width.
+class SparseWords {
+ public:
+  // Adds `count` words, shifted left by `bit_shift` bits.
+  void add(const std::uint64_t* value, std::size_t count, std::size_t bit_shift) {
+    const std::size_t word = bit_shift / 64, offset = bit_shift % 64;
+    if (words_.empty()) {
+      base_ = word;
+    } else if (word < base_) {
+      words_.insert(words_.begin(), base_ - word, 0);
+      base_ = word;
+    }
+    if (words_.size() < word - base_ + count + 1) words_.resize(word - base_ + count + 1, 0);
+    std::uint64_t carry = 0;
+    std::size_t index = word - base_;
+    for (std::size_t i = 0; i <= count; ++i, ++index) {
+      const std::uint64_t low = i < count ? value[i] << offset : 0;
+      const std::uint64_t high = offset == 0 || i == 0 ? 0 : value[i - 1] >> (64 - offset);
+      const std::uint64_t part = low | high;
+      const std::uint64_t sum = words_[index] + part;
+      const std::uint64_t next = (sum < part ? 1 : 0);
+      const std::uint64_t total = sum + carry;
+      carry = next + (total < sum ? 1 : 0);
+      words_[index] = total;
+    }
+    for (; carry != 0; ++index) {
+      if (index == words_.size()) words_.push_back(0);
+      words_[index] += carry;
+      carry = words_[index] == 0 ? 1 : 0;
+    }
+  }
+
+  template <std::size_t N>
+  [[nodiscard]] std::array<std::uint64_t, N> expand() const {
+    std::array<std::uint64_t, N> full{};
+    for (std::size_t i = 0; i < words_.size() && base_ + i < N; ++i) full[base_ + i] = words_[i];
+    return full;
+  }
+
+ private:
+  std::size_t base_ = 0;
+  std::vector<std::uint64_t> words_;
+};
+
+// exact_mean and exact_stdev of finite values added one at a time: Python's
+// statistics.mean and statistics.stdev (exact, rounded once) without keeping
+// the values. A non-finite value makes both NaN.
+class ExactMoments {
+ public:
+  void add(double value) {
+    ++count_;
+    if (!std::isfinite(value)) {
+      nonfinite_ = true;
+      return;
+    }
+    const auto bits = std::bit_cast<std::uint64_t>(value);
+    const auto exponent = (bits >> 52) & 0x7ffu;
+    const auto fraction = bits & ((std::uint64_t{1} << 52) - 1);
+    if (fraction == 0 && exponent == 0) return;
+    const auto mantissa = exponent == 0 ? fraction : (std::uint64_t{1} << 52) | fraction;
+    const auto shift = static_cast<std::size_t>(exponent == 0 ? 0 : exponent - 1);
+    ((bits >> 63) == 0 ? positive_ : negative_).add(&mantissa, 1, shift);
+    const std::array<std::uint64_t, 1> mantissa_words{mantissa};
+    const auto square = exact_stdev_detail::multiply_words<1>(mantissa_words, mantissa_words);
+    squares_.add(square.data(), square.size(), 2 * shift);
+  }
+
+  [[nodiscard]] std::uint64_t count() const noexcept { return count_; }
+
+  [[nodiscard]] double mean() const {
+    if (count_ == 0) return 0.0;
+    if (nonfinite_) return std::numeric_limits<double>::quiet_NaN();
+    bool negative = false;
+    const auto magnitude = sum(negative);
+    if (exact_mean_detail::highest_bit(magnitude) < 0) return 0.0;
+    return exact_mean_detail::rounded_finite_mean(magnitude, count_, negative);
+  }
+
+  [[nodiscard]] double stdev() const {
+    if (count_ <= 1) return 0.0;
+    if (nonfinite_) return std::numeric_limits<double>::quiet_NaN();
+    bool negative = false;
+    const auto magnitude = sum(negative);
+    auto numerator = squares_.expand<exact_stdev_detail::kWordCount>();
+    exact_stdev_detail::multiply_by_u64(numerator, count_);
+    exact_stdev_detail::subtract(numerator, exact_stdev_detail::square(magnitude), numerator);
+    if (exact_stdev_detail::highest_bit(numerator) < 0) return 0.0;
+    return exact_stdev_detail::rounded_sqrt_ratio(numerator, exact_stdev_detail::multiply_u64(count_, count_ - 1));
+  }
+
+ private:
+  [[nodiscard]] exact_mean_detail::Magnitude sum(bool& negative) const {
+    exact_mean_detail::Magnitude positive, minus, magnitude;
+    positive.words = positive_.expand<exact_mean_detail::kWordCount>();
+    minus.words = negative_.expand<exact_mean_detail::kWordCount>();
+    const auto comparison = exact_mean_detail::compare(positive, minus);
+    negative = comparison < 0;
+    if (comparison > 0) exact_mean_detail::subtract(positive, minus, magnitude);
+    else if (comparison < 0) exact_mean_detail::subtract(minus, positive, magnitude);
+    return magnitude;
+  }
+
+  SparseWords positive_;
+  SparseWords negative_;
+  SparseWords squares_;
+  std::uint64_t count_ = 0;
+  bool nonfinite_ = false;
+};
+
 }  // namespace minera::detail

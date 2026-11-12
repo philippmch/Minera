@@ -52,6 +52,16 @@ struct FrameRow {
 // BF, observed black-box through sort ties, first/last rows and sorted()).
 [[nodiscard]] std::vector<FrameRow> frame_rows(const EventLog& frame);
 
+// Each case as several pm4py DataFrame functions read it: the frame's rows
+// from the case's first row on, as many as the case has rows (they take a
+// case's rows to be adjacent). A CSV frame is sorted by case, so a slice is
+// the case's own rows; an XES frame whose trace names repeat apart from each
+// other gives a case other cases' rows (declare discovery, get_variants
+// counts, filter_between, the activity split; rounds BH and BI, observed
+// black-box). The result lists the frame's traces in their order, each with
+// its slice's events; a trace without events is left out.
+[[nodiscard]] EventLog frame_slice_cases(const EventLog& frame);
+
 // A FrameValue of class kNumber as its Python number (bool, int or float).
 [[nodiscard]] python::Scalar frame_number_scalar(const FrameValue& value);
 

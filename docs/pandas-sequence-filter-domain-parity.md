@@ -167,7 +167,10 @@ All twelve modules are complete on this bank. The following are outside the
 domain:
 
 * `activity_split` on frames whose cases interleave. The reference's result
-  is not row-aligned there.
+  is not row-aligned there. (The mining filters on XES uploads model that
+  result since Review BI1: the cases are labelled in sorted id order, each
+  from its slice of the frame's rows, and the labels go to the rows in row
+  order. This bank's companion does not.)
 * Patterns with two adjacent `...` wildcards.
 * Non-string column labels.
 * `grouped_df` arguments other than None.

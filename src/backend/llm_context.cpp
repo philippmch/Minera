@@ -60,18 +60,6 @@ void petri(Text& text,const PetriNet& net,const PnmlDocument* document,bool head
  for(std::size_t t=0;t<net.transitions().size();++t){const auto& item=net.transitions()[t];for(std::size_t a=0;a<item.inputs.size();++a){std::ostringstream out;out<<place(item.inputs[a])<<" -> "<<transition(net,t)<<" (weight = "<<(item.input_arc_weight(a).negative?"-":"")<<item.input_arc_weight(a).magnitude<<")\n";text.line(out.str());}for(std::size_t a=0;a<item.outputs.size();++a){std::ostringstream out;out<<transition(net,t)<<" -> "<<place(item.outputs[a])<<" (weight = "<<(item.output_arc_weight(a).negative?"-":"")<<item.output_arc_weight(a).magnitude<<")\n";text.line(out.str());}for(auto p:item.reset_inputs)text.line(place(p)+" -> "+transition(net,t)+" (reset arc)\n");for(auto p:item.inhibitor_inputs)text.line(place(p)+" -> "+transition(net,t)+" (inhibitor arc)\n");}
  for(bool initial:{true,false}){std::ostringstream out;out<<(initial?"initial marking: [":"final marking: [");if(document){const auto& marking=initial?document->initial_marking:document->final_marking;for(std::size_t p=0;p<marking.size();++p)if(marking[p]!=0)out<<place(p)<<":"<<marking[p]<<" ";}else if(net.discovery_markings()){for(const auto& entry:initial?net.discovery_markings()->initial:net.discovery_markings()->final)out<<(entry.place.kind==PetriMarkingPlaceKind::kRoot?place(entry.place.id):"detached"+std::to_string(entry.place.id))<<":"<<entry.tokens<<" ";}else if(initial?net.has_source():net.has_sink())out<<place(initial?net.source():net.sink())<<":1";out<<"]\n";text.line(out.str());}text.value+="\n";
 }
-// pm4py's declare discovery on a DataFrame reads each case as the frame's
-// rows from the case's first row on, as many as the case has rows: it takes
-// a case's rows to be adjacent. A CSV upload's frame is sorted by case; an
-// XES upload whose trace names repeat apart from each other is not, and its
-// cases then read other cases' rows (round BH, observed black-box).
-EventLog declare_frame_cases(const EventLog& log){
- const auto rows=frame_rows(log);std::map<const Trace*,std::pair<std::size_t,std::size_t>> extent;
- for(std::size_t i=0;i<rows.size();++i){const auto [it,added]=extent.emplace(&rows[i].trace,std::pair<std::size_t,std::size_t>{i,0});(void)added;++it->second.second;}
- EventLog cases;cases.attributes=log.attributes;
- for(const auto& trace:log.traces){const auto found=extent.find(&trace);if(found==extent.end())continue;Trace copy=trace;copy.events.clear();for(std::size_t i=found->second.first;i<found->second.first+found->second.second;++i)copy.events.push_back(rows[i].event);cases.traces.push_back(std::move(copy));}
- return cases;
-}
 } // namespace
 std::vector<std::string> llm_context_variants(){return {"case","dfg","variants","event_stream","log_attributes","log_features","declare","log_skeleton","temporal_profile","petri_net","ocel","ocel_features","ocel_ocdfg"};}
 bool llm_context_is_ocel(std::string_view variant){return variant=="ocel"||variant=="ocel_features"||variant=="ocel_ocdfg";}
@@ -87,7 +75,7 @@ LlmContextResult build_llm_context(const EventLog& source,const LlmContextOption
  if(options.variant=="log_features")return exact("log_features",options,[&](const LlmAbstractionOptions& o){return llm_log_features_description(log,o);});
  if(options.variant=="log_skeleton")return exact("log_skeleton",options,[&](const LlmAbstractionOptions& o){return llm_log_skeleton_description(log,o);});
  // The reference model descriptions have no character budget.
- if(options.variant=="declare")return whole("declare",abstract_declare(discover_declare(log.dataframe_columns?declare_frame_cases(log):log),options.include_header));
+ if(options.variant=="declare")return whole("declare",abstract_declare(discover_declare(log.dataframe_columns?frame_slice_cases(log):log),options.include_header));
  // A CSV or XES upload reaches pm4py as a DataFrame, whose temporal profile
  // takes pandas' durations and groupby statistics (round BH).
  if(options.variant=="temporal_profile")return whole("temporal_profile",abstract_temporal_profile(log.dataframe_columns?discover_temporal_profile_frame(log):discover_temporal_profile(log),options.include_header));

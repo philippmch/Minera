@@ -9,11 +9,14 @@
 // groupby mean) and its deviation Welford's sample deviation (groupby std, 0
 // for a single pair). A missing timestamp raises pm4py's error.
 
+#include <functional>
+
 #include "minera/event_log.hpp"
 #include "minera/temporal_profile.hpp"
 
 namespace minera {
 
-[[nodiscard]] TemporalProfile discover_temporal_profile_frame(const EventLog& log);
+[[nodiscard]] TemporalProfile discover_temporal_profile_frame(
+    const EventLog& log, const std::function<bool()>& cancelled = {});
 
 }  // namespace minera

@@ -198,14 +198,19 @@ std::optional<std::pair<double, double>> trace_endpoint_times(
 // label, belongs to that later stretch only, so a,x,a,y,a yields [a,x] and
 // [a,y,a]. A stretch still open at the end of the trace is discarded, and a
 // missing activity matches neither endpoint.
-std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
-                                   const std::string& end) {
-  constexpr std::size_t kUnmarked = static_cast<std::size_t>(-1);
-  std::vector<std::size_t> marks(trace.events.size(), kUnmarked);
+constexpr std::size_t kUnmarked = static_cast<std::size_t>(-1);
+
+// The stretch of each of `count` events (event(row)) or kUnmarked; `subcases`
+// receives the number of stretches.
+template <typename At>
+std::vector<std::size_t> between_marks(std::size_t count, const At& event_at,
+                                       const std::string& start, const std::string& end,
+                                       std::size_t& subcases) {
+  std::vector<std::size_t> marks(count, kUnmarked);
   std::optional<std::size_t> opening;
   std::size_t subcase = 0;
-  for (std::size_t row = 0; row < trace.events.size(); ++row) {
-    const auto& event = trace.events[row];
+  for (std::size_t row = 0; row < count; ++row) {
+    const Event& event = event_at(row);
     const bool present = !dataframe_cell::activity_missing(event);
     const bool closing = present && event.activity == end;
     if (!opening) {
@@ -216,6 +221,16 @@ std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
       opening = start == end ? std::optional<std::size_t>(row) : std::nullopt;
     }
   }
+  subcases = subcase;
+  return marks;
+}
+
+std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
+                                   const std::string& end) {
+  std::size_t subcase = 0;
+  const auto marks = between_marks(
+      trace.events.size(), [&](std::size_t row) -> const Event& { return trace.events[row]; },
+      start, end, subcase);
   std::vector<Trace> segments(subcase);
   for (std::size_t row = 0; row < marks.size(); ++row) {
     if (marks[row] != kUnmarked) segments[marks[row]].events.push_back(trace.events[row]);
@@ -226,6 +241,160 @@ std::vector<Trace> extract_between(const Trace& trace, const std::string& start,
     set_trace_case_id(segments[i], trace.case_id + "##@@" + std::to_string(i));
   }
   return segments;
+}
+
+// An XES upload's frame keeps read_xes's file order, so its cases need not
+// be sorted by id nor their rows adjacent (trace names repeated apart). A
+// CSV frame is sorted by case. pm4py's DataFrame activity split and
+// filter_between read each case as the rows from its first row on, as many
+// as it has (frame_slice_cases); the activity split also lists the cases by
+// sorted id and hands the labels out to the frame's rows in row order
+// (rounds BI, observed black-box).
+struct FrameCases {
+  std::vector<FrameRow> rows;                   // the frame's rows in row order
+  std::vector<const Trace*> traces;             // the traces with rows, stably sorted by id
+  std::unordered_map<const Trace*, std::pair<std::size_t, std::size_t>> extent;  // first row, rows
+  bool adjacent = true;                         // every case's rows are adjacent
+  bool sorted = true;                           // ... and the cases follow in sorted id order
+};
+
+FrameCases frame_cases(const EventLog& frame) {
+  FrameCases cases{frame_rows(frame), {}, {}, true, true};
+  for (std::size_t i = 0; i < cases.rows.size(); ++i) {
+    const auto [it, added] = cases.extent.emplace(&cases.rows[i].trace, std::pair<std::size_t, std::size_t>{i, 0});
+    if (!added && it->second.first + it->second.second != i) cases.adjacent = false;
+    ++it->second.second;
+  }
+  for (const auto& trace : frame.traces)
+    if (cases.extent.contains(&trace)) cases.traces.push_back(&trace);
+  std::vector<const Trace*> by_row = cases.traces;
+  std::stable_sort(cases.traces.begin(), cases.traces.end(),
+                   [](const Trace* left, const Trace* right) { return left->case_id < right->case_id; });
+  std::sort(by_row.begin(), by_row.end(), [&](const Trace* left, const Trace* right) {
+    return cases.extent.at(left).first < cases.extent.at(right).first;
+  });
+  cases.sorted = cases.adjacent && by_row == cases.traces;
+  return cases;
+}
+
+// The traces of a frame whose rows were given new case labels (nullptr: the
+// row is dropped), in the order of their first rows, each event in row
+// order. A trace takes the case context of its first row's trace; where its
+// rows come from traces with other case cells, each row keeps its own
+// trace's cells (Event::case_row_attributes), as the frame's rows do.
+std::vector<Trace> relabel_frame_rows(const std::vector<FrameRow>& rows,
+                                      const std::vector<const std::string*>& labels) {
+  std::vector<Trace> traces;
+  std::vector<std::vector<const FrameRow*>> members;
+  std::unordered_map<std::string, std::size_t> index;
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    if (labels[i] == nullptr) continue;
+    const auto [it, added] = index.emplace(*labels[i], traces.size());
+    if (added) {
+      traces.emplace_back();
+      copy_trace_context(rows[i].trace, traces.back());
+      set_trace_case_id(traces.back(), *labels[i]);
+      members.emplace_back();
+    }
+    members[it->second].push_back(&rows[i]);
+  }
+  const auto cells = [](const FrameRow& row) {
+    return row.event.case_row_attributes.empty()
+               ? row.trace.attributes
+               : std::vector<EventAttribute>(row.event.case_row_attributes.begin(),
+                                             row.event.case_row_attributes.end());
+  };
+  for (std::size_t t = 0; t < traces.size(); ++t) {
+    auto& trace = traces[t];
+    const auto& own = members[t];
+    bool mixed = false;
+    for (const auto* row : own)
+      if (&row->trace != &own.front()->trace && cells(*row) != cells(*own.front())) mixed = true;
+    std::vector<std::string> keys;
+    if (mixed)
+      for (const auto* row : own)
+        for (const auto& attribute : cells(*row))
+          if (std::find(keys.begin(), keys.end(), attribute.key) == keys.end()) keys.push_back(attribute.key);
+    trace.events.reserve(own.size());
+    for (const auto* row : own) {
+      Event event = row->event;
+      event.case_id = trace.case_id;
+      if (mixed) {
+        const auto source = cells(*row);
+        std::vector<EventAttribute> row_cells;
+        for (const auto& key : keys) {
+          const auto found = std::find_if(source.begin(), source.end(),
+                                          [&](const EventAttribute& attribute) { return attribute.key == key; });
+          if (found != source.end()) {
+            row_cells.push_back(*found);
+          } else {
+            EventAttribute missing{key, ""};
+            missing.is_null = true;
+            row_cells.push_back(std::move(missing));
+          }
+        }
+        event.case_row_attributes = std::move(row_cells);
+      }
+      trace.events.push_back(std::move(event));
+    }
+  }
+  return traces;
+}
+
+// pm4py's DataFrame activity split of an XES upload whose cases are not
+// adjacent in sorted id order: each case, by sorted id, labels the rows of
+// its slice, and the labels go to the frame's rows in row order.
+std::optional<std::vector<Trace>> frame_activity_split(const EventLog& frame,
+                                                       const ActivitySplitOptions& options) {
+  const auto cases = frame_cases(frame);
+  if (cases.sorted) return std::nullopt;
+  const std::unordered_set<std::string> anchors(options.activities.begin(), options.activities.end());
+  std::vector<std::string> names;
+  names.reserve(cases.rows.size());
+  for (const auto* trace : cases.traces) {
+    const auto [first, count] = cases.extent.at(trace);
+    std::size_t subcase = 0;
+    for (std::size_t i = first; i < first + count; ++i) {
+      const bool anchor = anchors.contains(cases.rows[i].event.activity);
+      if (anchor && options.cut_mode == ActivitySplitCutMode::kThis) ++subcase;
+      names.push_back(trace->case_id + options.subcase_separator + std::to_string(subcase));
+      if (anchor && options.cut_mode == ActivitySplitCutMode::kNext) ++subcase;
+    }
+  }
+  std::vector<const std::string*> labels(cases.rows.size());
+  for (std::size_t i = 0; i < labels.size(); ++i) labels[i] = &names[i];
+  return relabel_frame_rows(cases.rows, labels);
+}
+
+// pm4py's DataFrame filter_between on an XES upload whose cases' rows are
+// not adjacent: each case, by sorted id, marks the stretches of its slice
+// (`<case>##@@<k>`), a later case's mark replacing an earlier one's on a
+// shared row, and the marked rows stay in row order.
+std::optional<std::vector<Trace>> frame_between(const EventLog& frame, const std::string& start,
+                                                const std::string& end) {
+  const auto cases = frame_cases(frame);
+  if (cases.adjacent) return std::nullopt;
+  std::vector<std::string> names;
+  std::vector<std::size_t> label_of(cases.rows.size(), kUnmarked);
+  for (const auto* trace : cases.traces) {
+    const auto [first, count] = cases.extent.at(trace);
+    std::size_t subcases = 0;
+    const auto marks = between_marks(
+        count, [&](std::size_t row) -> const Event& { return cases.rows[first + row].event; }, start, end,
+        subcases);
+    const std::size_t base = names.size();
+    for (std::size_t k = 0; k < subcases; ++k) names.push_back(trace->case_id + "##@@" + std::to_string(k));
+    for (std::size_t row = 0; row < count; ++row)
+      if (marks[row] != kUnmarked) label_of[first + row] = base + marks[row];
+  }
+  std::vector<const std::string*> labels(cases.rows.size(), nullptr);
+  for (std::size_t i = 0; i < labels.size(); ++i)
+    if (label_of[i] != kUnmarked) labels[i] = &names[label_of[i]];
+  return relabel_frame_rows(cases.rows, labels);
+}
+
+bool xes_frame(const EventLog& log) {
+  return log.dataframe_columns && !log.dataframe_columns->csv_text;
 }
 
 // Whether some listed succession appears in the trace with the successor as
@@ -1123,6 +1292,28 @@ EventLog filter_event_log(const EventLog& input, const LogFilterOptions& options
   // per-trace structural filters.
   std::vector<Trace> kept;
   kept.reserve(log.traces.size());
+  const auto accept_piece = [&](Trace piece) {
+    const std::size_t length = piece.events.size();
+    if (options.min_length != 0 && length < options.min_length) return;
+    if (options.max_length != 0 && length > options.max_length) return;
+
+    // Either polarity of an endpoint filter drops an empty trace, as the
+    // reference's `if trace and ...` does.
+    if (!starts.empty()) {
+      if (piece.events.empty()) return;
+      const bool found = starts.find(piece.events.front().activity) != starts.end();
+      if (found != options.start_activities_positive) return;
+    }
+    if (!ends.empty()) {
+      if (piece.events.empty()) return;
+      const bool found = ends.find(piece.events.back().activity) != ends.end();
+      if (found != options.end_activities_positive) return;
+    }
+    kept.push_back(std::move(piece));
+  };
+  const bool frame_between_input = xes_frame(log);
+  EventLog between_input;
+  between_input.dataframe_columns = log.dataframe_columns;
   for (const auto& trace : log.traces) {
     if (case_attribute.active() && !case_attribute.keeps_case(trace)) {
       continue;
@@ -1287,6 +1478,12 @@ EventLog filter_event_log(const EventLog& input, const LogFilterOptions& options
       projected = *cut;
     }
 
+    // An XES upload's between stretches depend on the other cases' rows
+    // (frame_between), so they are cut once every case is projected.
+    if (by_between && frame_between_input) {
+      between_input.traces.push_back(std::move(projected));
+      continue;
+    }
     std::vector<Trace> pieces;
     if (by_between) {
       pieces = extract_between(projected, options.between_start,
@@ -1294,26 +1491,17 @@ EventLog filter_event_log(const EventLog& input, const LogFilterOptions& options
     } else {
       pieces.push_back(std::move(projected));
     }
-
-    for (auto& piece : pieces) {
-      const std::size_t length = piece.events.size();
-      if (options.min_length != 0 && length < options.min_length) continue;
-      if (options.max_length != 0 && length > options.max_length) continue;
-
-      // Either polarity of an endpoint filter drops an empty trace, as the
-      // reference's `if trace and ...` does.
-      if (!starts.empty()) {
-        if (piece.events.empty()) continue;
-        const bool found = starts.find(piece.events.front().activity) != starts.end();
-        if (found != options.start_activities_positive) continue;
-      }
-      if (!ends.empty()) {
-        if (piece.events.empty()) continue;
-        const bool found = ends.find(piece.events.back().activity) != ends.end();
-        if (found != options.end_activities_positive) continue;
-      }
-      kept.push_back(std::move(piece));
+    for (auto& piece : pieces) accept_piece(std::move(piece));
+  }
+  if (by_between && frame_between_input) {
+    auto pieces = frame_between(between_input, options.between_start, options.between_end);
+    if (!pieces) {
+      pieces.emplace();
+      for (const auto& trace : between_input.traces)
+        for (auto& piece : extract_between(trace, options.between_start, options.between_end))
+          pieces->push_back(std::move(piece));
     }
+    for (auto& piece : *pieces) accept_piece(std::move(piece));
   }
 
   if (!options.activity_split_activities.empty()) {
@@ -1324,8 +1512,13 @@ EventLog filter_event_log(const EventLog& input, const LogFilterOptions& options
     EventLog split_log;
     split_log.traces = std::move(kept);
     copy_event_log_context(log, split_log);
-    split_log = split_activity(split_log, split_options);
-    kept = std::move(split_log.traces);
+    auto frame_split = xes_frame(log) ? frame_activity_split(split_log, split_options) : std::nullopt;
+    if (frame_split) {
+      kept = std::move(*frame_split);
+    } else {
+      split_log = split_activity(split_log, split_options);
+      kept = std::move(split_log.traces);
+    }
   }
 
   if (options.attribute_value_repetition) {
@@ -1341,8 +1534,11 @@ EventLog filter_event_log(const EventLog& input, const LogFilterOptions& options
     EventLog grouped;
     grouped.traces = std::move(kept);
     copy_event_log_context(log, grouped);
-    grouped = group_consecutive_activities(
-        grouped, *options.consecutive_activity_grouping);
+    // pm4py's DataFrame grouping merges adjacent rows: on an XES upload a
+    // case's equal activities with another case's row between them stay apart.
+    grouped = xes_frame(log)
+                  ? group_consecutive_frame_rows(grouped, *options.consecutive_activity_grouping)
+                  : group_consecutive_activities(grouped, *options.consecutive_activity_grouping);
     kept = std::move(grouped.traces);
   }
   if (options.timestamp_case_grouping) {

@@ -2289,14 +2289,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "15388",
+        "Content-Length": "15479",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-custom-clock-legacy-log.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-legacy-log.response.json",
-        "bytes": 15388,
-        "sha256": "7e89cf95c356ba6a469dcfffbc410f4feeb398e475a1a14f652a9bc86a1e0d2c",
+        "bytes": 15479,
+        "sha256": "a13204333ee0e10664901cc4760c9135be2db44c8204616f93d160f175a1ee9f",
         "status": 200
       },
       "exports": {},

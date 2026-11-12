@@ -5536,6 +5536,9 @@ Where pm4py's own two paths disagree:
 | `ltl_checker.eventually_follows` with timestamp bounds | each bound holds between the two matched events, over every ordered occurrence | the i-th bound is read between trace positions i and i + 1 | DataFrame (EventLog for `native_log` input) |
 | `ltl_checker.A_next_B_next_C` | the case's last B and last C must be adjacent and preceded by an A: `A,B,C,A,B,X` fails | any adjacent A, B, C window: `A,B,C,A,B,X` passes | DataFrame (EventLog for `native_log` input) |
 | `filter_variants_top_k`, `filter_variants_by_coverage_percentage` and the maximum coverage filter on an XES upload whose trace names repeat apart (`top_variants`, `variant_min_coverage`, `variant_max_coverage`) | variants counted and ranked over each case read as the frame's rows from its first row on, as many as it has (other cases' rows where its rows are apart); a case is kept when its own variant is among those chosen | each trace's own variant | DataFrame (Review BH1) |
+| `activity_split` on an XES upload whose trace names are not in sorted order or repeat apart (`activity_split_activities`) | the cases labelled in sorted id order, each from its slice of the frame's rows (its first row on, as many as it has); the labels go to the frame's rows in row order, so a row can take another case's label | each trace's own rows | DataFrame (Review BI1) |
+| `filter_between` on an XES upload whose trace names repeat apart (`between_*`) | each case's slice marked in sorted id order; a later case's mark replaces an earlier one's on the rows both cover | each trace's own rows | DataFrame (Review BI1) |
+| `consecutive_act_case_grouping` on an XES upload whose trace names repeat apart | only rows adjacent in the frame merge | a trace's consecutive events merge | DataFrame (Review BI1) |
 
 The generic attribute filter (`attribute_key`) names DataFrame columns, so
 `concept:name`, `org:resource`, `time:timestamp` and `lifecycle:transition`
@@ -20207,7 +20210,11 @@ Declared:
   row, so they take events of the traces that follow it (traces `14: x`,
   `30: b`, `16: ü`, ..., `14: b b` give case 14 the variant `x, b, ü`).
   Its log skeleton, start/end activities, DFG and `convert_to_event_log` see
-  the merged case. Native uses the merged case everywhere (AE2-1).
+  the merged case. Native uses the merged case everywhere (AE2-1). (Later
+  rounds model the slices where pm4py's DataFrame functions read them: the
+  LLM declare description in BH1-3, the top-k and coverage variant filters
+  in BH1-4, and Declare discovery in `/api/mine` and discover-constraints in
+  BI1-1.)
 
 Tests: `minera_xes_io_tests`
 (`dataframe_cases_merge_shared_ids_and_order_by_code_point`),
@@ -23554,3 +23561,139 @@ Verification (scripts in the project files under `review-harness/round-bh/`):
 `minera_review_bh1_tests` binds the three LLM descriptions and the four
 variant filter cases above (values taken from pm4py black-box on the same
 inputs).
+
+## Review BI1: re-review of round BH, `/api/mine`'s declare and temporal profile on uploads, and the row-changing filters on XES frames (2026-11-12)
+
+Round BI re-reviewed BH (the LLM log skeleton, temporal profile and declare
+descriptions, and the top-k and coverage variant filters on XES frames) and
+took its targets: `/api/mine`'s own `declare`, `log_skeleton` and
+`temporal_profile` sections on uploads, the discover-constraints route, the
+temporal profile of the behavior route, and the mining filters that change a
+case's rows (event projections, prefixes and suffixes, between, the activity
+split, consecutive and timestamp grouping, lengths and endpoints) before a
+variant filter, on interleaved XES uploads (trace names that repeat apart
+from each other), plain XES uploads and CSV uploads. The device check on the
+Mac was skipped (the round's thread had no device linked). Findings, all
+fixed:
+
+- **BI1-1 Declare discovery on uploads in `/api/mine` and
+  discover-constraints.** BH1-3 fixed the LLM description only. pm4py's
+  DataFrame `discover_declare` reads each case as the frame's rows from the
+  case's first row on, as many as the case has (`x[a]`, `y[c]`, `x[b]` in
+  file order read `x` as `a, c` and `y` as `c`), and `/api/mine`'s
+  `declare` section and `/api/discover-constraints` on an upload read each
+  trace's own rows. Both now discover on those slices
+  (`discover_declare_as_uploaded`; a native log keeps its traces). CSV
+  frames are sorted by case, so their slices are the cases' own rows.
+  Before: 59 of 60 interleaved uploads differed in `/api/mine` and 20 of 20
+  in discover-constraints.
+- **BI1-2 The EventLog temporal profile's mean and deviation.** pm4py's
+  EventLog discovery takes `statistics.mean` and `statistics.stdev` of each
+  pair's durations in epoch seconds: both are exact (the sum and the sum of
+  squared deviations as fractions) and rounded once. Minera kept a running
+  Welford mean and deviation, which differs in the last digits (`a -> b`
+  after 180.1 s, 60 s and 420.5 s gives `220.19999996821085` and
+  `183.56489316812252`, Welford `220.19999996821088` and
+  `183.5648931681225`). The profile now keeps the exact moments of each
+  pair (sparse 64-bit words that grow only as far as the durations' bits
+  reach) and rounds the mean and the deviation once; a single duration
+  gives a deviation of 0 and a non-finite one NaN as before. This reaches
+  native logs, the behavior route with `variant=log` and every caller of
+  `discover_temporal_profile`. Before: the behavior route's log variant
+  differed in the last digits on most uploads.
+- **BI1-3 `/api/mine`'s temporal profile on uploads and the behavior
+  route's DataFrame variant.** On an upload pm4py discovers the profile on
+  the DataFrame (BH1-2's arithmetic: each case's rows stably sorted by
+  timestamp, cases by sorted id, durations from pandas' `Timedelta` parts,
+  a compensated mean and Welford's deviation). `/api/mine`'s
+  `temporal_profile` section on an upload now uses that arithmetic when the
+  options are the defaults (activity `concept:name`, one timestamp column,
+  no business hours) and the EventLog algorithm otherwise. An upload with
+  a missing timestamp, on which every pm4py DataFrame discovery raises
+  `the timestamp column should not contain any empty value.`, keeps the
+  EventLog algorithm, which skips the event, like the route's other
+  sections. The
+  behavior route's `variant=dataframe` uses the same arithmetic when its
+  source and target timestamps are one column and no business hours are
+  set. Before: 48 of 60 plain XES, 40 of 60 CSV and 48 of 60 interleaved
+  uploads differed in the last digits, and the behavior route's DataFrame
+  variant on most uploads.
+- **BI1-4 The activity split on XES uploads.** pm4py's DataFrame
+  `activity_split` labels the cases in sorted id order, each from its slice
+  of the frame's rows (its first row on, as many as it has), and hands the
+  concatenated labels to the frame's rows in row order. On an XES upload
+  whose trace names are not in sorted order (`c2`, `c10`, `c1`) or repeat
+  apart, a row can take another case's label: `c2[a, b]`, `c10[a, c]`,
+  `c1[b, a]` with cut activity `a` and CUT_MODE `this` give
+  `c1##@@0: row 0`, `c1##@@1: row 1`, `c10##@@1: rows 2, 3` and
+  `c2##@@1: rows 4, 5` (Minera gave each case its own rows). The split's
+  sub-cases keep each row's own case attributes when the rows they gather
+  came from different cases. Later variant filters count the split frame's
+  slices (BH1-4). Before: 40 of 312 interleaved and 17 of 233 plain combined
+  requests differed through the split.
+- **BI1-5 `filter_between` on interleaved XES uploads.** pm4py's DataFrame
+  `filter_between` marks each case's slice in sorted id order, and a later
+  case's mark replaces an earlier one's on the rows both slices cover; the
+  marked rows keep the frame's order. With `x a`, `y a`, `x b`, `z a`,
+  `y c`, `x b`, `w a`, `z b`, `y b` in file order and `a .. b`, `x`'s slice
+  (rows 0 to 2: `a, a, b`) marks rows 0 to 2, `y`'s slice (rows 1 to 3:
+  `a, b, a`) marks rows 1 and 2, and the result is `x##@@0: row 0` and
+  `y##@@0: rows 1, 2`. Minera read each trace's own rows (`x##@@0: rows 0,
+  2`, `y##@@0: rows 1, 4, 8`, `z##@@0: rows 3, 7`). Uploads whose cases are
+  adjacent (CSV, XES without repeated trace names) are unchanged. Before:
+  23 of 312 interleaved combined requests differed through `between`.
+- **BI1-6 Consecutive activity grouping on interleaved XES uploads.**
+  pm4py's DataFrame `consecutive_act_case_grouping` merges only rows that
+  are adjacent in the frame (same case and activity as the row before), so
+  `x a`, `y a`, `x a`, `x a` keep `x`'s rows 0 and 2 (`first`) or 0 and 3
+  (`last`) and `y`'s row 1; Minera merged `x`'s three rows. Before: 24 of
+  312 interleaved combined requests differed through the grouping.
+
+Re-review of BH without further findings: the LLM log skeleton, temporal
+profile and declare descriptions on interleaved and CSV uploads, and the
+mining filters (BH1-4's variant filters among them) on interleaved and plain
+XES uploads. The timestamp case grouping already merged only adjacent rows.
+`/api/mine`'s `log_skeleton` section already matched on every upload.
+
+Declarations:
+
+- When an earlier filter (between, lengths, endpoints) leaves no row and a
+  later filter runs, pm4py raises `the case ID column should be of type
+  string.` on the empty frame; Minera returns an empty log (48 combined
+  requests in the sweeps below).
+- `/api/variant-statistics` counts each merged case's own variant, as the
+  EventLog variants do; pm4py's `get_variants` on an interleaved frame
+  counts the slices of BH1-4. Not changed in this round.
+- The open choice from BG1 stays declared: a CSV timestamp column of plain
+  numbers is int64 or float64 in pm4py's frame and opaque timestamps in
+  Minera.
+
+Verification (scripts in the project files under `review-harness/round-bi/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Row-changing filters then a variant filter, interleaved XES uploads (`combosweep.py`, seeds 0 to 79 and 300 to 379) | 614 | before (seeds 0 to 79): 78 of 312 differed (split, between, consecutive grouping); after: 614 equal, 26 raise in pm4py only (declared) |
+| The same, plain XES uploads (`combosweep.py --plain`, seeds 0 to 59 and 300 to 359) | 460 | before (seeds 0 to 59): 17 of 233 differed (split); after: 460 equal, 20 raise in pm4py only (declared) |
+| Row-changing filters without a variant filter (`combosweep.py --novariant`, interleaved seeds 200 to 259, plain seeds 200 to 239) | 398 | 398 equal, 2 raise in pm4py only (declared) |
+| `/api/mine` declare, log skeleton, temporal profile, interleaved XES uploads (`ilwrap2.py minemodels.py --xes`, seeds 0 to 59; with fractional seconds, seeds 600 to 659) | 360 | before (seeds 0 to 59): 59 declare and 48 temporal-profile differences; after: 360 equal |
+| The same, plain XES uploads (`minemodels.py --xes`, seeds 0 to 59 and 800 to 839; with fractional seconds, seeds 500 to 559) | 480 | before (seeds 0 to 59): 48 temporal-profile differences; after: 480 equal |
+| The same, CSV uploads (`minemodels.py`, seeds 0 to 59 and 700 to 759) | 360 | before (seeds 0 to 59): 40 temporal-profile differences; after: 360 equal |
+| discover-constraints declare (`constraintsx.py`, 60 interleaved and 30 plain XES uploads) | 90 | before: 20 of 20 interleaved differed; after: 90 equal |
+| Behavior route temporal profile, `variant=log` and `variant=dataframe` (`behaviortp.py`, 60 XES uploads with fractional seconds) | 120 | before: last-digit differences on most uploads; after: 120 equal |
+| LLM log skeleton, temporal profile, declare (`ilwrap2.py llmmodels.py --xes`, seeds 2000 to 2059, 3000 to 3029, 4000 to 4039; `llmmodels.py`, seeds 2000 to 2039 and 4000 to 4039) | 630 | 630 equal (skeleton relations and declare templates as sets) |
+| Mining filters, interleaved and plain XES uploads (`fsweep.py`, seeds 2000 to 2099 and 3000 to 3059; `--plain`, seeds 2000 to 2039 and 3000 to 3039) | 960 | 960 equal |
+| `statistics.mean` and `statistics.stdev` vs the exact moments (`em/`, random vectors of 1 to 30 doubles: durations, integers, random bit patterns below 2 (subnormals among them), mixed signs from 1e-20 to 1e23) | 20,000 | 0 differ |
+| Full ctest, frontend, script tests, fixture replay | 467 tests, 10,729 frontend tests, 406 script tests, 2,673 responses of 16 manifests | 467 pass, 10,729 pass, 406 pass; 2,672 responses unchanged, 1 changed as BI1-3 says (below) |
+
+The replay's one change is `xes-custom-clock-legacy-log` (active-source
+workbench): an XES upload whose custom `clock` timestamps run against the
+file order (`B` at 10:01, then `A` at 10:00). Its `/api/mine` temporal
+profile was empty (the EventLog algorithm pairs `B` with the earlier `A`
+and skips the pair); it is now `A -> B`, 60 s, deviation 0, as pm4py's
+DataFrame discovery gives on `read_xes`'s frame with `timestamp_key="clock"`.
+The fixture was rewritten.
+
+`minera_review_bi1_tests` binds the activity split (both cut modes, and
+with a top-k filter after it), the between filter, the consecutive grouping
+(`first` and `last`), Declare discovery on an upload and both temporal
+profile paths above (values taken from pm4py black-box on the same inputs).

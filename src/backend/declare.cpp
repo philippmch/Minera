@@ -1,6 +1,7 @@
 #include "minera/declare.hpp"
 
 #include "minera/log_conversion.hpp"
+#include "frame_cells.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1088,6 +1089,12 @@ EventTable declare_conformance_diagnostics(
     const DeclareDiagnosticsOptions& options) {
   return make_diagnostics_table(case_id_log(data, options.case_id_key),
                                 results, options);
+}
+
+DeclareModel discover_declare_as_uploaded(const EventLog& log,
+                                          const DeclareDiscoveryOptions& options) {
+  if (!log.dataframe_columns) return discover_declare(log, options);
+  return discover_declare(frame_slice_cases(log), options);
 }
 
 }  // namespace minera

@@ -1,7 +1,9 @@
 #include "minera/case_grouping.hpp"
+#include "frame_cells.hpp"
 
 #include <algorithm>
 #include <map>
+#include <unordered_map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -97,9 +99,11 @@ void validate_concat_separator(const std::string& separator) {
 
 }  // namespace
 
-EventLog group_consecutive_activities(
-    const EventLog& event_log,
-    const ConsecutiveActivityGroupingOptions& options) {
+namespace {
+
+EventLog group_consecutive(const EventLog& event_log,
+                           const ConsecutiveActivityGroupingOptions& options,
+                           const std::unordered_map<const Event*, std::size_t>* positions) {
   EventLog result;
   copy_event_log_context(event_log, result);
   result.traces.reserve(event_log.traces.size());
@@ -119,6 +123,9 @@ EventLog group_consecutive_activities(
             event_value(trace.events[end], options.activity_key);
         if (key == nullptr || candidate == nullptr || *candidate != *key)
           break;
+        if (positions != nullptr &&
+            positions->at(&trace.events[end]) != positions->at(&trace.events[end - 1]) + 1)
+          break;
         ++end;
       }
       const std::size_t selected =
@@ -129,6 +136,24 @@ EventLog group_consecutive_activities(
     result.traces.push_back(std::move(output));
   }
   return result;
+}
+
+}  // namespace
+
+EventLog group_consecutive_activities(
+    const EventLog& event_log,
+    const ConsecutiveActivityGroupingOptions& options) {
+  return group_consecutive(event_log, options, nullptr);
+}
+
+EventLog group_consecutive_frame_rows(
+    const EventLog& event_log,
+    const ConsecutiveActivityGroupingOptions& options) {
+  if (!event_log.dataframe_columns) return group_consecutive_activities(event_log, options);
+  std::unordered_map<const Event*, std::size_t> positions;
+  const auto rows = frame_rows(event_log);
+  for (std::size_t i = 0; i < rows.size(); ++i) positions.emplace(&rows[i].event, i);
+  return group_consecutive(event_log, options, &positions);
 }
 
 EventLog filter_consecutive_activity_groups(

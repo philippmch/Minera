@@ -73,6 +73,13 @@ struct DeclareDiscoveryOptions {
 
 [[nodiscard]] DeclareModel discover_declare(
     const EventLog& log, const DeclareDiscoveryOptions& options = {});
+// The discovery of a CSV or XES upload (a log with DataFrame columns), as
+// pm4py's DataFrame discovery reads it: each case is the frame's rows from
+// its first row on, as many as the case has (frame_slice_cases; an XES
+// upload whose trace names repeat apart gives a case other cases' rows;
+// rounds BH and BI, observed black-box). Any other log is discovered as is.
+[[nodiscard]] DeclareModel discover_declare_as_uploaded(
+    const EventLog& log, const DeclareDiscoveryOptions& options = {});
 // Retain the pre-adapter brace-call form (for example, an empty log as `{}`).
 [[nodiscard]] DeclareModel discover_declare(
     std::initializer_list<Trace> traces,
