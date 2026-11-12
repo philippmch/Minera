@@ -1097,4 +1097,21 @@ DeclareModel discover_declare_as_uploaded(const EventLog& log,
   return discover_declare(frame_slice_cases(log), options);
 }
 
+std::vector<DeclareConformance> check_declare_conformance_as_uploaded(
+    const EventLog& log, const DeclareModel& model,
+    const DeclareConformanceOptions& options) {
+  if (!log.dataframe_columns) return check_declare_conformance(log, model, options);
+  auto results = check_declare_conformance(frame_slice_cases(log), model, options);
+  if (results.size() == log.traces.size()) return results;
+  // A trace without rows has no slice; it keeps its own (empty) reading so
+  // that the results stay one per trace.
+  std::vector<DeclareConformance> all;
+  all.reserve(log.traces.size());
+  std::size_t next = 0;
+  for (const auto& trace : log.traces)
+    all.push_back(trace.events.empty() ? check_declare_conformance(trace, model, options)
+                                       : std::move(results.at(next++)));
+  return all;
+}
+
 }  // namespace minera

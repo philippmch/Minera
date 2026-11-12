@@ -5537,7 +5537,7 @@ Where pm4py's own two paths disagree:
 | `ltl_checker.A_next_B_next_C` | the case's last B and last C must be adjacent and preceded by an A: `A,B,C,A,B,X` fails | any adjacent A, B, C window: `A,B,C,A,B,X` passes | DataFrame (EventLog for `native_log` input) |
 | `filter_variants_top_k`, `filter_variants_by_coverage_percentage` and the maximum coverage filter on an XES upload whose trace names repeat apart (`top_variants`, `variant_min_coverage`, `variant_max_coverage`) | variants counted and ranked over each case read as the frame's rows from its first row on, as many as it has (other cases' rows where its rows are apart); a case is kept when its own variant is among those chosen | each trace's own variant | DataFrame (Review BH1) |
 | `activity_split` on an XES upload whose trace names are not in sorted order or repeat apart (`activity_split_activities`) | the cases labelled in sorted id order, each from its slice of the frame's rows (its first row on, as many as it has); the labels go to the frame's rows in row order, so a row can take another case's label | each trace's own rows | DataFrame (Review BI1) |
-| `filter_between` on an XES upload whose trace names repeat apart (`between_*`) | each case's slice marked in sorted id order; a later case's mark replaces an earlier one's on the rows both cover | each trace's own rows | DataFrame (Review BI1) |
+| `filter_between` on an XES upload whose trace names repeat apart (`between_*`, and `segment_between_*` with activity lists and a separator) | each case's slice marked in sorted id order; a later case's mark replaces an earlier one's on the rows both cover | each trace's own rows | DataFrame (Reviews BI1 and BJ1) |
 | `consecutive_act_case_grouping` on an XES upload whose trace names repeat apart | only rows adjacent in the frame merge | a trace's consecutive events merge | DataFrame (Review BI1) |
 
 The generic attribute filter (`attribute_key`) names DataFrame columns, so
@@ -23697,3 +23697,102 @@ The fixture was rewritten.
 with a top-k filter after it), the between filter, the consecutive grouping
 (`first` and `last`), Declare discovery on an upload and both temporal
 profile paths above (values taken from pm4py black-box on the same inputs).
+
+## Review BJ1: re-review of round BI, Declare and temporal conformance on uploads, and the segment filter's between on XES frames (2026-11-12)
+
+Round BJ re-reviewed BI (the Declare discovery and temporal profile on
+uploads, the exact EventLog moments, the activity split, between and
+consecutive grouping on XES frames) and took its targets with interleaved
+XES uploads (trace names that repeat apart from each other), plain XES
+uploads and uploads with fractional seconds. The device check on the Mac
+was skipped (the round's thread had no device linked). Findings, all fixed:
+
+- **BJ1-1 Declare conformance on uploads.** pm4py's DataFrame
+  `conformance_declare` lists one result per case by sorted id, each case
+  read as its slice of the frame's rows (from its first row on, as many as
+  it has; BI1-1's slices), while its diagnostics table
+  (`return_diagnostics_dataframe=True`) reads the merged cases in the
+  frame's order. With `x b`, `y c`, `x a`, `w b`, `y c` in file order and
+  `existence(a)`, the list gives `w` and `x` (slice `b, c`) one deviation
+  each and `y` (slice `c, a`) none, and the diagnostics give `x` (`b, a`)
+  none and `y` and `w` one each. `/api/mine`'s `declare_conformance` and
+  discover-constraints' conformance list read each trace's own rows; they
+  now read the slices (`check_declare_conformance_as_uploaded`), and the
+  diagnostics table keeps the merged reading. Before: 5 of 5 interleaved
+  uploads differed in `/api/mine`.
+- **BJ1-2 The DataFrame temporal conformance's case order.** pm4py's
+  DataFrame conformance lists the cases in the order of their first rows
+  (an XES upload's frame in file order: `q`, `p`, `r` stay in that order),
+  and its EventLog conformance does the same with the traces. Minera's
+  DataFrame variant (the behavior route's `variant=dataframe`,
+  `/api/temporal-conformance` with `temporal_variant=dataframe`, and the
+  table, stream and lazy-table inputs of `conform_temporal_profile`) listed
+  them by case id. Within a case the order already matched. Before: the
+  order differed on 6 of 6 interleaved and 4 of 6 plain XES uploads (CSV
+  frames are sorted by case, so both orders agree there).
+- **BJ1-3 The DataFrame temporal conformance's durations.** pm4py's
+  DataFrame conformance takes a duration as the pandas `Timedelta` between
+  the two timestamps (days times 86,400, plus seconds, microseconds times
+  1e-6 and nanoseconds times 1e-9, as BH1-2's discovery), not as the
+  difference of epoch seconds its EventLog conformance takes: 0.1 s to
+  6:00.314369 is `360.214369` where epoch seconds give
+  `360.21436905860901`, and the distance follows. Without business hours
+  Minera's DataFrame variant now computes the `Timedelta`; with business
+  hours it keeps the EventLog arithmetic. Before: 35 of 40 uploads with
+  fractional seconds differed in the elapsed times or distances (2 more
+  in the last digits only).
+- **BJ1-4 The segment filter's between on interleaved XES uploads.**
+  `segment_between_starts`, `segment_between_ends` and
+  `segment_between_separator` run pm4py's DataFrame between filter with
+  activity lists and a separator, which marks the slices as BI1-5 does: by
+  sorted case id, a later case's mark replacing an earlier one's on the
+  rows both slices cover, with BI1-5's reopening when the start and end
+  lists are equal. With `x a`, `y a`, `x b`, `z a`, `y c`, `x b`, `w a`,
+  `z b`, `y b`, starts `a, c`, end `b` and separator `_`, the result is
+  `x_0: row 0` and `y_0: rows 1, 2` (Minera read each trace's own rows).
+  BI1-5 reached only `between_*`; `filter_between` of the segment filter
+  now marks the slices when the frame's cases are not adjacent. Before: 3
+  of 58 interleaved requests differed.
+
+Re-review of BI without further findings: the sub-cases of the activity
+split and of `filter_between` keep each row's own case cells (attribute
+statistics of `case:region` after the filters, events and traces scope);
+the exact moments on a CSV upload of 3,000 cases and 120,000 events
+(2.34 million durations, 100 pairs) equal pm4py's EventLog and DataFrame
+profiles in every digit, in 0.5 s and 0.8 s on the behavior route; the
+row-changing filters followed by a variant filter and the segment filters
+on interleaved and plain uploads.
+
+Declarations:
+
+- As in BI1, pm4py raises `the case ID column should be of type string.`
+  once an earlier filter leaves no row and a later filter runs; Minera
+  returns an empty log.
+- `/api/mine`'s `temporal_profile` section with a non-default activity or
+  timestamp key keeps the EventLog algorithm (BI1-3 applies only to the
+  defaults), and its entries index the directly-follows graph's activities,
+  so an activity outside it is refused. Not changed in this round.
+
+Verification (scripts in the project files under `review-harness/round-bj/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| `/api/mine` Declare conformance list (`declconf.py`, 60 interleaved and 40 plain XES uploads) | 100 | before (5 interleaved uploads): 5 differed; after: 100 equal |
+| discover-constraints Declare conformance list and diagnostics table (`constrconf.py`, the same uploads) | 200 | 200 equal |
+| Behavior route temporal conformance, `variant=log` and `variant=dataframe` (`tempconf.py`: 60 interleaved, 60 plain XES uploads; with fractional seconds, 60 plain and 60 interleaved) | 480 | before: the DataFrame order on 10 of 12 sampled uploads, durations on 37 of 40 fractional uploads; after: 480 equal (one reference error of the harness, which reused a frame `convert_to_event_log` had changed, equal on rerun) |
+| Segment filters with between, split, consecutive grouping and lengths (`combosweep.py --novariant --kinds segbetween,segprefix,segsuffix,...`, interleaved seeds 500 to 579, plain seeds 500 to 539) | 473 | before (seeds 500 to 514): 3 of 58 differed; after: 473 equal, 7 raise in pm4py only (declared) |
+| Row-changing filters, the segment between and a variant filter, interleaved (`combosweep.py`, seeds 600 to 659) | 235 | 235 equal, 5 raise in pm4py only (declared) |
+| Case cells after the split and between (`splitcells.py`, seeds 100 to 249) | 246 | 246 equal; 48 raise in pm4py only (empty frames, declared) |
+| Exact moments on a large log (`bigtpcmp.py`, 120,000 events) | 200 | 200 equal |
+| The between model with list endpoints and a separator (`segbetween_model.py`, random frames) | 3,000 | 3,000 equal |
+| Full ctest, script tests, fixture replay | 468 tests, 406 script tests, 2,673 responses of 16 manifests | 468 pass, 406 pass, 2,673 unchanged |
+
+`minera_review_bj1_tests` binds the Declare conformance list and
+diagnostics reading, the DataFrame temporal conformance's case order and
+`Timedelta` durations, and the segment filter's between with unequal and
+equal endpoint lists (values taken from pm4py black-box on the same
+inputs). `minera_temporal_profile_parity_contracts_tests` had pinned the
+DataFrame conformance's cases by sorted id (`c1` before `c2` where `c2`
+comes first in the table); it now expects pm4py's order, `c2` then `c1`
+(pm4py's DataFrame variant on the same table gives `[[], [('A', 'B', 9.0,
+9223372036854775807)]]`).

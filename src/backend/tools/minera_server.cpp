@@ -1497,7 +1497,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto declare =
         minera::discover_declare_as_uploaded(log, params.declare_options);
     const auto declare_conformance =
-        minera::check_declare_conformance(
+        minera::check_declare_conformance_as_uploaded(
             log, declare, params.declare_conformance_options);
     for (const auto& [family, rules] : declare.rules) {
       (void)family;
@@ -4328,14 +4328,21 @@ void handle_constraint_discovery(const httplib::Request& request,
           ? minera::discover_declare_as_uploaded(*declare_view.log(), params.declare_options)
           : minera::discover_declare(declare_view, params.declare_options);
       auto options = params.declare_conformance_options; options.activity_key = conformance_activity;
-      declare_conformance = minera::check_declare_conformance(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *declare, options);
+      // The conformance list reads an upload's cases as slices too; pm4py's
+      // diagnostics table reads the merged cases (check_declare_conformance_as_uploaded).
+      const auto conformance_view = session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session));
+      const bool sliced = conformance_view.kind() == minera::EventDataKind::kEventLog && conformance_view.log()->dataframe_columns;
+      declare_conformance = sliced
+          ? minera::check_declare_conformance_as_uploaded(*conformance_view.log(), *declare, options)
+          : minera::check_declare_conformance(conformance_view, *declare, options);
+      const auto merged_conformance = sliced ? minera::check_declare_conformance(conformance_view, *declare, options) : std::vector<minera::DeclareConformance>{};
       for (const auto& [name, rules] : declare->rules) for (const auto& rule : rules) {
         (void)name; graph.ensure_activity(rule.first); if (rule.binary) graph.ensure_activity(rule.second);
       }
       for (const auto& trace : *declare_conformance) for (const auto& deviation : trace.deviations) {
         graph.ensure_activity(deviation.first); if (deviation.binary) graph.ensure_activity(deviation.second);
       }
-      try { diagnostics = minera::serialize_event_table_input_json(minera::declare_conformance_diagnostics(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *declare_conformance, {diagnostics_case})); }
+      try { diagnostics = minera::serialize_event_table_input_json(minera::declare_conformance_diagnostics(conformance_view, sliced ? merged_conformance : *declare_conformance, {diagnostics_case})); }
       catch (const std::exception& error) { diagnostics_error = error.what(); }
       if (ocel_query_bool(request, "generate_log", false)) {
         try {

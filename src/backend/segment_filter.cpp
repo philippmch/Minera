@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "dataframe_cell.hpp"
+#include "frame_cells.hpp"
 
 namespace minera {
 namespace {
@@ -155,14 +156,15 @@ EventLog filter_between(const EventLog& event_log,
   // stretch, and it then belongs to that later stretch only. A stretch still
   // open at the end of the trace is discarded.
   const bool reopen = options.start_activities == options.end_activities;
-  EventLog result = with_trace_attributes(event_log);
-  for (const auto& trace : event_log.traces) {
-    constexpr std::size_t kUnmarked = static_cast<std::size_t>(-1);
-    std::vector<std::size_t> marks(trace.events.size(), kUnmarked);
+  constexpr std::size_t kUnmarked = static_cast<std::size_t>(-1);
+  // The stretch of each of `count` events (event_at(row)) or kUnmarked;
+  // `subcases` receives the number of stretches.
+  const auto stretches = [&](std::size_t count, const auto& event_at, std::size_t& subcases) {
+    std::vector<std::size_t> marks(count, kUnmarked);
     std::optional<std::size_t> opening;
     std::size_t subcase = 0;
-    for (std::size_t row = 0; row < trace.events.size(); ++row) {
-      const auto& event = trace.events[row];
+    for (std::size_t row = 0; row < count; ++row) {
+      const Event& event = event_at(row);
       const bool closing = activity_in(event, ends);
       if (!opening) {
         if (activity_in(event, starts)) opening = row;
@@ -173,6 +175,41 @@ EventLog filter_between(const EventLog& event_log,
         opening = reopen ? std::optional<std::size_t>(row) : std::nullopt;
       }
     }
+    subcases = subcase;
+    return marks;
+  };
+  EventLog result = with_trace_attributes(event_log);
+  // An XES upload whose cases' rows are not adjacent (trace names repeated
+  // apart): pm4py's DataFrame filter marks each case's slice of the frame's
+  // rows (its first row on, as many as it has) by sorted case id, a later
+  // case's mark replacing an earlier one's on a shared row, and the marked
+  // rows keep the frame's order (rounds BI and BJ, observed black-box).
+  if (event_log.dataframe_columns && !event_log.dataframe_columns->csv_text) {
+    const auto cases = frame_cases(event_log);
+    if (!cases.adjacent) {
+      std::vector<std::string> names;
+      std::vector<std::size_t> label_of(cases.rows.size(), kUnmarked);
+      for (const auto* trace : cases.traces) {
+        const auto [first, count] = cases.extent.at(trace);
+        std::size_t subcases = 0;
+        const auto marks = stretches(
+            count, [&](std::size_t row) -> const Event& { return cases.rows[first + row].event; }, subcases);
+        const std::size_t base = names.size();
+        for (std::size_t k = 0; k < subcases; ++k) names.push_back(trace->case_id + separator + std::to_string(k));
+        for (std::size_t row = 0; row < count; ++row)
+          if (marks[row] != kUnmarked) label_of[first + row] = base + marks[row];
+      }
+      std::vector<const std::string*> labels(cases.rows.size(), nullptr);
+      for (std::size_t i = 0; i < labels.size(); ++i)
+        if (label_of[i] != kUnmarked) labels[i] = &names[label_of[i]];
+      result.traces = relabel_frame_rows(cases.rows, labels);
+      return result;
+    }
+  }
+  for (const auto& trace : event_log.traces) {
+    std::size_t subcase = 0;
+    const auto marks = stretches(
+        trace.events.size(), [&](std::size_t row) -> const Event& { return trace.events[row]; }, subcase);
     std::vector<Trace> segments(subcase);
     for (std::size_t row = 0; row < marks.size(); ++row) {
       if (marks[row] != kUnmarked)

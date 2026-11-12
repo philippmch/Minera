@@ -649,9 +649,28 @@ TemporalProfile discover_temporal_profile(
   throw std::invalid_argument("temporal profile: unsupported event-data input");
 }
 
-TemporalConformanceResult conform_temporal_profile_log(
-    const EventLog& log, const TemporalProfile& profile,
-    const TemporalProfileOptions& options) {
+namespace {
+
+// A pandas Timedelta between two exact instants in seconds, as pm4py's
+// DataFrame code reads it: days * 86400 + seconds (an int), plus
+// microseconds * 1e-6, plus nanoseconds * 1e-9, left to right.
+double timedelta_seconds(const ParsedExactTimestamp& source, const ParsedExactTimestamp& target) {
+  std::int64_t whole = target.seconds - source.seconds;
+  std::int64_t fraction = static_cast<std::int64_t>(target.nanoseconds) - source.nanoseconds;
+  if (fraction < 0) {
+    fraction += 1000000000;
+    --whole;
+  }
+  return static_cast<double>(whole) + static_cast<double>(fraction / 1000) * 1e-6 +
+         static_cast<double>(fraction % 1000) * 1e-9;
+}
+
+// conform_temporal_profile_log; with `timedelta`, a duration without
+// business hours is the pandas Timedelta between the two timestamps
+// (pm4py's DataFrame conformance, round BJ, observed black-box) instead of
+// the difference of their epoch seconds (its EventLog conformance).
+TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile& profile,
+                                      const TemporalProfileOptions& options, bool timedelta) {
   if (options.activity_attribute.empty()) {
     throw std::invalid_argument(
         "temporal profile: activity attribute must not be empty");
@@ -669,8 +688,20 @@ TemporalConformanceResult conform_temporal_profile_log(
 
   TemporalConformanceResult result;
   result.reserve(log.traces.size());
+  const bool exact = timedelta && !options.use_business_hours;
+  const auto exact_instant = [&](const Event& event, const std::string& attribute) {
+    const auto* value = selected_event_value(event, attribute, "timestamp");
+    return value == nullptr ? std::nullopt : parse_timestamp_exact(*value);
+  };
   for (const auto& trace : log.traces) {
     std::vector<TemporalDeviation> deviations;
+    std::vector<std::optional<ParsedExactTimestamp>> exact_sources, exact_targets;
+    if (exact) {
+      for (const auto& event : trace.events) {
+        exact_sources.push_back(exact_instant(event, source_attribute));
+        exact_targets.push_back(exact_instant(event, target_attribute));
+      }
+    }
     for (std::size_t i = 0; i + 1 < trace.events.size(); ++i) {
       const auto source_time =
           event_instant(trace.events[i], source_attribute, "",
@@ -701,9 +732,11 @@ TemporalConformanceResult conform_temporal_profile_log(
                                       options.strict_attributes)
                 : target_time;
         if (!target_local) continue;
-        const double duration = elapsed_between(
-            *source_time, *target_time, *source_local, *target_local, options,
-            options.use_business_hours ? &slots : nullptr);
+        const double duration =
+            exact && exact_sources[i] && exact_targets[j]
+                ? timedelta_seconds(*exact_sources[i], *exact_targets[j])
+                : elapsed_between(*source_time, *target_time, *source_local, *target_local, options,
+                                  options.use_business_hours ? &slots : nullptr);
         const double difference = std::abs(duration - entry->mean_seconds);
         double distance = 0.0;
         bool sentinel = false;
@@ -726,12 +759,37 @@ TemporalConformanceResult conform_temporal_profile_log(
   return result;
 }
 
+}  // namespace
+
+TemporalConformanceResult conform_temporal_profile_log(
+    const EventLog& log, const TemporalProfile& profile,
+    const TemporalProfileOptions& options) {
+  return conform_log(log, profile, options, false);
+}
+
 TemporalConformanceResult conform_temporal_profile_dataframe(
     const EventTable& table, const TemporalProfile& profile,
     const TemporalProfileOptions& options) {
-  const auto log = temporal_table_to_log(table, options);
-  return conform_temporal_profile_log(log, profile,
-                                      normalized_table_options(options));
+  auto log = temporal_table_to_log(table, options);
+  // pm4py's DataFrame conformance lists the cases in the order of their
+  // first rows (an XES upload's frame in file order), not by case id, and
+  // takes its durations as pandas Timedeltas (round BJ, observed black-box);
+  // each case's rows stay sorted by time.
+  std::vector<std::pair<std::size_t, std::size_t>> first_rows;
+  first_rows.reserve(log.traces.size());
+  for (std::size_t index = 0; index < log.traces.size(); ++index) {
+    std::size_t first = std::numeric_limits<std::size_t>::max();
+    for (const auto& event : log.traces[index].events) first = std::min(first, event.input_order);
+    first_rows.emplace_back(first, index);
+  }
+  if (!std::is_sorted(first_rows.begin(), first_rows.end())) {
+    std::sort(first_rows.begin(), first_rows.end());
+    std::vector<Trace> ordered;
+    ordered.reserve(log.traces.size());
+    for (const auto& [first, index] : first_rows) ordered.push_back(std::move(log.traces[index]));
+    log.traces = std::move(ordered);
+  }
+  return conform_log(log, profile, normalized_table_options(options), true);
 }
 
 TemporalConformanceResult conform_temporal_profile(

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BI (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BJ (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4549,7 +4549,43 @@ consecutive activity grouping (only frame-adjacent rows merge). The device
 check on the Mac was skipped again (the round's thread had no device
 linked).
 
-Next round (BJ) should start by re-reviewing round BI:
+Round BJ re-reviewed BI (Review BJ1) and took its targets. It fixed: the
+Declare conformance list on uploads in `/api/mine` and discover-constraints,
+which reads each case as its slice of the frame's rows while the
+diagnostics table keeps the merged cases; the DataFrame temporal
+conformance, which lists the cases in the order of their first rows and
+takes its durations as pandas `Timedelta`s; and the segment filter's
+between on interleaved XES uploads, which marks the slices as BI1-5 does.
+One older contract test (`minera_temporal_profile_parity_contracts_tests`)
+had pinned the DataFrame conformance's sorted case order and now follows
+pm4py's. The device check on the Mac was skipped again (the round's thread
+had no device linked).
+
+Next round (BK) should start by re-reviewing round BJ:
+
+- `src/backend/declare.cpp` (`check_declare_conformance_as_uploaded`, a
+  trace without rows) and the two Declare call sites in
+  `src/backend/tools/minera_server.cpp` (the list sliced, the diagnostics
+  merged), swept with `declconf.py` and `constrconf.py`, also after the
+  mining filters (`/api/mine` with filters on interleaved uploads) and with
+  a supplied model or `conformance_activity_key`;
+- `src/backend/temporal_profile.cpp` (`conform_log` with `timedelta`, the
+  first-row order of `conform_temporal_profile_dataframe`): different source
+  and target timestamp columns, nanoseconds, the stream and lazy-table
+  inputs, swept with `tempconf.py`;
+- `src/backend/segment_filter.cpp` (`filter_between` on frames, through
+  `frame_cases` and `relabel_frame_rows`, now in `frame_keys.cpp`) combined
+  with the segment prefix and suffix and the mining filters before it
+  (`combosweep.py --kinds ...,segbetween`);
+- `/api/mine`'s `temporal_profile` with non-default activity or timestamp
+  keys on uploads (declared in BJ1: the EventLog algorithm; `bj/tpkeys.py`
+  shows the differences), the Declare workbench, `/api/variant-statistics`
+  (declared in BI1), the business-hours temporal profile on frames;
+- the open choice on CSV timestamp columns of plain numbers (still
+  declared unless Philipp answers);
+- the CI runs of the BI and BJ commits.
+
+Round BI's targets, re-reviewed in BJ (findings BJ1-1 to BJ1-4):
 
 - `src/backend/log_filter.cpp`: `frame_cases`, `relabel_frame_rows` (case
   cells when a sub-case gathers rows of several cases),

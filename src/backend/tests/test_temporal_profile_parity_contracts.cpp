@@ -223,12 +223,15 @@ void temporal_profile_conformance_dataframe_variant_contract() {
   options.zeta = -1.0;
   const auto result =
       minera::conform_temporal_profile_dataframe(table, profile, options);
+  // The cases in the order of their first rows, c2 then c1, as pm4py's
+  // DataFrame variant lists them (round BJ, observed black-box).
   assert(result.size() == 2);
-  assert(result[0].size() == 1);
-  assert(result[1].empty());
-  assert(result[0][0].elapsed_seconds == 9.0);
+  assert(result[0].empty());
+  assert(result[1].size() == 1);
+  assert(result[1][0].case_id == "c1");
+  assert(result[1][0].elapsed_seconds == 9.0);
   // Zero variance: the reference's sys.maxsize, flagged for exact output.
-  assert(result[0][0].zero_variance_sentinel);
+  assert(result[1][0].zero_variance_sentinel);
 }
 
 void temporal_profile_conformance_dispatch_contract() {

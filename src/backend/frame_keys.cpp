@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
+#include <unordered_map>
 #include <variant>
 
 namespace minera {
@@ -268,6 +269,84 @@ std::vector<FrameRow> frame_rows(const EventLog& frame) {
   sorted.reserve(rows.size());
   for (const auto i : order) sorted.push_back(rows[i]);
   return sorted;
+}
+
+FrameCases frame_cases(const EventLog& frame) {
+  FrameCases cases{frame_rows(frame), {}, {}, true, true};
+  for (std::size_t i = 0; i < cases.rows.size(); ++i) {
+    const auto [it, added] = cases.extent.emplace(&cases.rows[i].trace, std::pair<std::size_t, std::size_t>{i, 0});
+    if (!added && it->second.first + it->second.second != i) cases.adjacent = false;
+    ++it->second.second;
+  }
+  for (const auto& trace : frame.traces)
+    if (cases.extent.contains(&trace)) cases.traces.push_back(&trace);
+  std::vector<const Trace*> by_row = cases.traces;
+  std::stable_sort(cases.traces.begin(), cases.traces.end(),
+                   [](const Trace* left, const Trace* right) { return left->case_id < right->case_id; });
+  std::sort(by_row.begin(), by_row.end(), [&](const Trace* left, const Trace* right) {
+    return cases.extent.at(left).first < cases.extent.at(right).first;
+  });
+  cases.sorted = cases.adjacent && by_row == cases.traces;
+  return cases;
+}
+
+std::vector<Trace> relabel_frame_rows(const std::vector<FrameRow>& rows,
+                                      const std::vector<const std::string*>& labels) {
+  std::vector<Trace> traces;
+  std::vector<std::vector<const FrameRow*>> members;
+  std::unordered_map<std::string, std::size_t> index;
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    if (labels[i] == nullptr) continue;
+    const auto [it, added] = index.emplace(*labels[i], traces.size());
+    if (added) {
+      traces.emplace_back();
+      copy_trace_context(rows[i].trace, traces.back());
+      set_trace_case_id(traces.back(), *labels[i]);
+      members.emplace_back();
+    }
+    members[it->second].push_back(&rows[i]);
+  }
+  const auto cells = [](const FrameRow& row) {
+    return row.event.case_row_attributes.empty()
+               ? row.trace.attributes
+               : std::vector<EventAttribute>(row.event.case_row_attributes.begin(),
+                                             row.event.case_row_attributes.end());
+  };
+  for (std::size_t t = 0; t < traces.size(); ++t) {
+    auto& trace = traces[t];
+    const auto& own = members[t];
+    bool mixed = false;
+    for (const auto* row : own)
+      if (&row->trace != &own.front()->trace && cells(*row) != cells(*own.front())) mixed = true;
+    std::vector<std::string> keys;
+    if (mixed)
+      for (const auto* row : own)
+        for (const auto& attribute : cells(*row))
+          if (std::find(keys.begin(), keys.end(), attribute.key) == keys.end()) keys.push_back(attribute.key);
+    trace.events.reserve(own.size());
+    for (const auto* row : own) {
+      Event event = row->event;
+      event.case_id = trace.case_id;
+      if (mixed) {
+        const auto source = cells(*row);
+        std::vector<EventAttribute> row_cells;
+        for (const auto& key : keys) {
+          const auto found = std::find_if(source.begin(), source.end(),
+                                          [&](const EventAttribute& attribute) { return attribute.key == key; });
+          if (found != source.end()) {
+            row_cells.push_back(*found);
+          } else {
+            EventAttribute missing{key, ""};
+            missing.is_null = true;
+            row_cells.push_back(std::move(missing));
+          }
+        }
+        event.case_row_attributes = std::move(row_cells);
+      }
+      trace.events.push_back(std::move(event));
+    }
+  }
+  return traces;
 }
 
 EventLog frame_slice_cases(const EventLog& frame) {

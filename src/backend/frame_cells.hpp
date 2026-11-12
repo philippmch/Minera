@@ -5,6 +5,7 @@
 #include "python_scalar.hpp"
 
 #include <optional>
+#include <unordered_map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -61,6 +62,32 @@ struct FrameRow {
 // black-box). The result lists the frame's traces in their order, each with
 // its slice's events; a trace without events is left out.
 [[nodiscard]] EventLog frame_slice_cases(const EventLog& frame);
+
+// An XES upload's frame keeps read_xes's file order, so its cases need not
+// be sorted by id nor their rows adjacent (trace names repeated apart). A
+// CSV frame is sorted by case. pm4py's DataFrame activity split and
+// filter_between (the mining filter's and the segment filter's) read each
+// case as the rows from its first row on, as many as it has
+// (frame_slice_cases); the activity split also lists the cases by sorted id
+// and hands the labels out to the frame's rows in row order (rounds BI and
+// BJ, observed black-box).
+struct FrameCases {
+  std::vector<FrameRow> rows;                   // the frame's rows in row order
+  std::vector<const Trace*> traces;             // the traces with rows, stably sorted by id
+  std::unordered_map<const Trace*, std::pair<std::size_t, std::size_t>> extent;  // first row, rows
+  bool adjacent = true;                         // every case's rows are adjacent
+  bool sorted = true;                           // ... and the cases follow in sorted id order
+};
+
+[[nodiscard]] FrameCases frame_cases(const EventLog& frame);
+
+// The traces of a frame whose rows were given new case labels (nullptr: the
+// row is dropped), in the order of their first rows, each event in row
+// order. A trace takes the case context of its first row's trace; where its
+// rows come from traces with other case cells, each row keeps its own
+// trace's cells (Event::case_row_attributes), as the frame's rows do.
+[[nodiscard]] std::vector<Trace> relabel_frame_rows(const std::vector<FrameRow>& rows,
+                                                    const std::vector<const std::string*>& labels);
 
 // A FrameValue of class kNumber as its Python number (bool, int or float).
 [[nodiscard]] python::Scalar frame_number_scalar(const FrameValue& value);

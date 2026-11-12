@@ -149,6 +149,16 @@ struct DeclareDiagnosticsOptions {
     const EventDataView& data, const DeclareModel& model,
     const DeclareConformanceOptions& options = {});
 
+// The conformance of a CSV or XES upload (a log with DataFrame columns) as
+// pm4py's DataFrame conformance_declare lists it: each case read as its
+// slice of the frame's rows (frame_slice_cases), one result per trace in the
+// log's order. Any other log is checked as is. pm4py's diagnostics table
+// reads the merged cases instead (check_declare_conformance; rounds BI and
+// BJ, observed black-box).
+[[nodiscard]] std::vector<DeclareConformance> check_declare_conformance_as_uploaded(
+    const EventLog& log, const DeclareModel& model,
+    const DeclareConformanceOptions& options = {});
+
 [[nodiscard]] EventTable declare_conformance_diagnostics(
     const EventLog& log, const std::vector<DeclareConformance>& results,
     const DeclareDiagnosticsOptions& options = {});
