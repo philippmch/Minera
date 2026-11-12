@@ -5535,6 +5535,7 @@ Where pm4py's own two paths disagree:
 | `filter_four_eyes_principle` (`ltl_checker.four_eyes_principle`) | the A resources are compared with the resource of the case's last B event only: `B(r1),A(r1),B(r2)` satisfies the principle; missing/NaN resources dropped, an empty string is a resource | the A resources are compared with every B resource: `B(r1),A(r1),B(r2)` violates it | DataFrame (EventLog for `native_log` input) |
 | `ltl_checker.eventually_follows` with timestamp bounds | each bound holds between the two matched events, over every ordered occurrence | the i-th bound is read between trace positions i and i + 1 | DataFrame (EventLog for `native_log` input) |
 | `ltl_checker.A_next_B_next_C` | the case's last B and last C must be adjacent and preceded by an A: `A,B,C,A,B,X` fails | any adjacent A, B, C window: `A,B,C,A,B,X` passes | DataFrame (EventLog for `native_log` input) |
+| `filter_variants_top_k`, `filter_variants_by_coverage_percentage` and the maximum coverage filter on an XES upload whose trace names repeat apart (`top_variants`, `variant_min_coverage`, `variant_max_coverage`) | variants counted and ranked over each case read as the frame's rows from its first row on, as many as it has (other cases' rows where its rows are apart); a case is kept when its own variant is among those chosen | each trace's own variant | DataFrame (Review BH1) |
 
 The generic attribute filter (`attribute_key`) names DataFrame columns, so
 `concept:name`, `org:resource`, `time:timestamp` and `lifecycle:transition`
@@ -23451,3 +23452,105 @@ Verification (scripts in the project files under `review-harness/round-bg/`):
 and without once per case), the case statistics grouped by the activity,
 and the date cells above (taken from pm4py and pandas black-box on the
 same inputs).
+
+## Review BH1: re-review of round BG, the LLM model descriptions on uploads, and variant filters on XES frames (2026-11-12)
+
+Round BH re-reviewed BG (attribute and case statistics in `frame_rows`
+order, the LLM frame view, the long-fraction, comma-fraction and
+clock-first date rules) and swept the frame loops BG left: the LLM
+descriptions of the log skeleton, the temporal profile and the declare
+model, the mining filters, the features' event-based rows and the temporal
+profile route, with interleaved XES uploads (trace names that repeat apart
+from each other), plain XES uploads and CSV uploads. The device check on
+the Mac was skipped (the round's thread had no device linked). Findings,
+all fixed:
+
+- **BH1-1 The LLM log-skeleton description's activity occurrences.** On
+  an upload pm4py discovers the skeleton on the DataFrame, whose activity
+  counts list the activities of the first case by sorted case id (in the
+  frame's row order), then the others in `value_counts` order (count
+  descending, ties in row order); `abstract_log_skeleton` prints each set
+  of counts sorted as text (`d: 0, 12, 2`). Minera listed the activities
+  in the traces' order and the counts in ascending numbers (`d: 0, 2,
+  12`). A native log keeps the EventLog order (first appearance over the
+  traces). Before: 22 of 40 interleaved and 9 of 40 CSV uploads differed.
+- **BH1-2 The LLM temporal-profile description on uploads.** pm4py's
+  DataFrame discovery pairs each row of a case with every later row of
+  that case after a stable sort by timestamp (a case whose rows are apart
+  and out of time order in an XES upload has other pairs than its trace in
+  file order), takes a duration from pandas' `Timedelta` parts (days times
+  86,400, plus seconds, microseconds times 1e-6 and nanoseconds times
+  1e-9, so 4.505 s is `4 + 505000e-6` where epoch seconds give
+  4.505000114 and print as 4.51), the mean as pandas' compensated sum over
+  the count and the deviation as Welford's sample deviation (0 for one
+  pair). A missing timestamp raises `the timestamp column should not
+  contain any empty value.`. Before: 2 of 40 interleaved uploads differed.
+- **BH1-3 The LLM declare description on uploads.** pm4py's DataFrame
+  declare discovery reads each case as the frame's rows from the case's
+  first row on, as many as the case has, without sorting: with `x[a]`,
+  `y[c]`, `x[b]` in file order, `x` is read as `a, c` and `y` as `c`
+  (`Exactly 1: c`, `Existence: c`, `Non Succession: ('c', 'a')`, `Non
+  Chain succession: ('c', 'a')`). Minera read each trace's own rows.
+  Before: 36 of 40 interleaved uploads differed (templates and pairs
+  compared as sets, as their order follows the hash seed).
+- **BH1-4 Top-k and coverage variant filters on XES uploads.**
+  `filter_variants_top_k`, `filter_variants_by_coverage_percentage` and the
+  maximum coverage filter count and rank variants over the same slices as
+  BH1-3 (each case read from its first row on, as many rows as it has),
+  then keep the cases whose own variant is among the chosen ones: with
+  `x a`, `y a`, `x b`, `y b`, `z c`, `w d` in file order the slices are
+  `(a, a)`, `(a, b)`, `(c)`, `(d)`, once each, so the top variant is `(d)`
+  and keeps `w` (Minera kept `x` and `y`, whose own variant `(a, b)`
+  occurs twice), and a minimum coverage of 0.4 keeps no case. Minera's
+  `top_variants`, `variant_min_coverage` and `variant_max_coverage` now
+  count the slices of the surviving rows on a frame (`frame_rows`); CSV
+  frames are sorted by case, so their slices are the cases' own rows.
+  Before: 84 of 129 interleaved top-k and coverage requests differed.
+
+Re-review of BG without further findings: attribute statistics and case
+statistics, passed, cycle and service time and case arrival on interleaved
+uploads; the LLM abstractions on interleaved uploads; the date fuzzers
+(`mixfuzz5.py`, `mixfuzz6.py`, `mixfuzz7.py`), which read no cell
+differently from pandas; the features, root cause and the temporal profile
+route on interleaved uploads; the mining filters other than BH1-4
+(endpoints, prefixes and suffixes, directly- and eventually-follows,
+lengths, admitted variants) on interleaved and plain uploads.
+
+Declarations:
+
+- A comma directly after a clock and before a dotted or dashed date
+  (`07:00,13.5.2020`, `00:00:00,01.13.99`) is a date to pandas and stays
+  unparsed in Minera, like BG1's clock-first shapes (a column holding one
+  stays text, a timestamp column refuses the upload). These are part of
+  the refusals counted below; no cell is read differently.
+- The open choice from BG1 stays declared: a CSV timestamp column of plain
+  numbers is int64 or float64 in pm4py's frame and opaque timestamps in
+  Minera.
+- The features and the LLM log features on uploads with a key of mixed
+  types (`mix`) still follow Python's set order (declared since BC1): on
+  interleaved uploads 20 of 180 feature requests and 28 of 60 LLM
+  log-features requests matched none of 10 hash seeds or raised on one
+  side only, all on that key.
+
+Verification (scripts in the project files under `review-harness/round-bh/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| LLM log skeleton, temporal profile, declare, interleaved XES uploads (`ilwrap2.py llmmodels.py --xes`, seeds 0 to 39 and 1000 to 1149) | 570 | before (seeds 0 to 39): 22 skeleton, 2 temporal-profile, 36 declare differences; after: 570 equal (skeleton relations and declare templates as sets) |
+| The same, CSV uploads (`llmmodels.py`, seeds 1000 to 1149) | 450 | 450 equal (before, seeds 0 to 39: 9 skeleton differences) |
+| The same, plain XES uploads (`llmmodels.py --xes`, seeds 100 to 139) | 120 | 120 equal |
+| Mining filters, interleaved XES uploads (`fsweep.py`, seeds 0 to 99) | 400 | before: 84 top-k and coverage differences; after: 400 equal |
+| Mining filters, plain XES uploads (`fsweep.py --plain`, seeds 0 to 59) | 240 | 240 equal |
+| pm4py's top-k and coverage filters vs BH1-4's model (`topkmodel.py`, 25 interleaved uploads) | 150 | 150 equal |
+| Attribute statistics, interleaved (`ilwrap.py statsweep.py --xes`, seeds 7000 to 7079) | 2,685 | 2,289 equal, 396 raise in both |
+| Service, cycle and passed time, case arrival, case statistics, interleaved (`ilwrap2.py axsweep2.py --xes`, seeds 7000 to 7049) | 750 | 199 equal, 551 raise in both |
+| LLM abstractions, interleaved (`ilwrap2.py llmsweep.py --xes`, seeds 7000 to 7059) | 300 | 220 equal, 22 log-features requests equal under one of 10 hash seeds, 30 raise in both, 28 declared (mixed-type set order) |
+| Features, interleaved (`featxes.py` on `rcxes3.py`'s interleaved uploads, seeds 8000 to 8059) | 180 | 152 equal, 7 equal under another hash seed, 1 raises in both, 20 declared (mixed-type set order) |
+| Root cause, interleaved (`ilwrap2.py rcxes3.py`, seeds 8000 to 8059) | 368 | 352 equal, 16 raise in both |
+| Temporal profile route, interleaved (`ilwrap.py tempxes.py`, seeds 8000 to 8059) | 180 | 177 equal, 3 raise in both |
+| Date cells vs pandas (`mixfuzz5.py` seeds 101 and 102, `mixfuzz6.py` and `mixfuzz7.py` seeds 101 to 103, `mixfuzz7.py` seed 201) | 34,982 cells | 0 cells read differently; 4,237 refusals of the declared shapes |
+| Full ctest, script tests, fixture replay | 466 tests, 406 script tests, 2,673 responses of 16 manifests | 466 pass, 406 pass, 2,673 unchanged |
+
+`minera_review_bh1_tests` binds the three LLM descriptions and the four
+variant filter cases above (values taken from pm4py black-box on the same
+inputs).

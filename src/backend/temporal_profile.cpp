@@ -18,6 +18,9 @@
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
 #include "business_hours.hpp"
+#include "frame_cells.hpp"
+#include "frame_temporal_profile.hpp"
+#include "frame_times.hpp"
 
 namespace minera {
 namespace {
@@ -734,6 +737,73 @@ std::vector<TemporalDeviation> check_temporal_profile_conformance(
     flattened.insert(flattened.end(), trace.begin(), trace.end());
   }
   return flattened;
+}
+
+TemporalProfile discover_temporal_profile_frame(const EventLog& log) {
+  const frame_times::Frame frame(log);
+  struct Row {
+    std::int64_t seconds = 0;
+    std::uint32_t nanoseconds = 0;
+    const std::string* activity = nullptr;
+  };
+  std::map<const Trace*, std::vector<Row>> cases;
+  for (const auto& row : frame_rows(frame.log())) {
+    const auto date = frame.date(row.trace, row.event, "time:timestamp");
+    if (!date) throw std::invalid_argument("the timestamp column should not contain any empty value.");
+    cases[&row.trace].push_back({date->seconds, date->nanoseconds, &row.event.activity});
+  }
+  std::vector<std::pair<const std::string*, std::vector<Row>*>> ordered;
+  for (auto& [trace, rows] : cases) ordered.push_back({&trace->case_id, &rows});
+  std::stable_sort(ordered.begin(), ordered.end(),
+                   [](const auto& left, const auto& right) { return *left.first < *right.first; });
+  struct Sums {
+    std::uint64_t count = 0;
+    double sum = 0.0, compensation = 0.0;  // Kahan
+    double mean = 0.0, squares = 0.0;      // Welford
+  };
+  std::map<std::pair<std::string, std::string>, Sums> pairs;
+  for (auto& [case_id, rows] : ordered) {
+    (void)case_id;
+    std::stable_sort(rows->begin(), rows->end(), [](const Row& left, const Row& right) {
+      return std::tie(left.seconds, left.nanoseconds) < std::tie(right.seconds, right.nanoseconds);
+    });
+    for (std::size_t i = 0; i < rows->size(); ++i)
+      for (std::size_t j = i + 1; j < rows->size(); ++j) {
+        const auto& source = (*rows)[i];
+        const auto& target = (*rows)[j];
+        std::int64_t whole = target.seconds - source.seconds;
+        std::int64_t fraction = static_cast<std::int64_t>(target.nanoseconds) - source.nanoseconds;
+        if (fraction < 0) {
+          fraction += 1000000000;
+          --whole;
+        }
+        // Timedelta: days * 86400 + seconds (an int), + microseconds * 1e-6,
+        // + nanoseconds * 1e-9, left to right.
+        const double value = static_cast<double>(whole) + static_cast<double>(fraction / 1000) * 1e-6 +
+                             static_cast<double>(fraction % 1000) * 1e-9;
+        auto& sums = pairs[{*source.activity, *target.activity}];
+        ++sums.count;
+        const double y = value - sums.compensation;
+        const double t = sums.sum + y;
+        sums.compensation = t - sums.sum - y;
+        sums.sum = t;
+        const double previous = sums.mean;
+        sums.mean += (value - previous) / static_cast<double>(sums.count);
+        sums.squares += (value - sums.mean) * (value - previous);
+      }
+  }
+  TemporalProfile profile;
+  for (const auto& [key, sums] : pairs) {
+    TemporalProfileEntry entry;
+    entry.source = key.first;
+    entry.target = key.second;
+    entry.count = sums.count;
+    entry.mean_seconds = sums.sum / static_cast<double>(sums.count);
+    entry.standard_deviation_seconds =
+        sums.count > 1 ? std::sqrt(sums.squares / static_cast<double>(sums.count - 1)) : 0.0;
+    profile.entries.push_back(std::move(entry));
+  }
+  return profile;
 }
 
 }  // namespace minera

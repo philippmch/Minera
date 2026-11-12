@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BG (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BH (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4521,7 +4521,44 @@ seconds), and of a clock before a month-name date or with a zone between
 the clock and the date. The device check on the Mac was skipped again (the
 round's thread had no device linked).
 
-Next round (BH) should start by re-reviewing round BG:
+Round BH re-reviewed BG (Review BH1) and swept the frame loops BG left
+with interleaved, plain XES and CSV uploads. It fixed the LLM descriptions
+of pm4py's DataFrame discoveries on uploads: the log skeleton's activity
+occurrences (the first case by sorted id, then `value_counts` order; each
+count set sorted as text), the temporal profile (each case's rows stably
+sorted by timestamp, durations from pandas' `Timedelta` parts, a
+compensated mean and Welford's deviation) and the declare model (each case
+read as the frame's rows from its first row on, as many as it has); and
+the top-k and minimum/maximum coverage variant filters, which count and
+rank variants over those same slices and keep the cases whose own variant
+was chosen. The device check on the Mac was skipped again (the round's
+thread had no device linked).
+
+Next round (BI) should start by re-reviewing round BH:
+
+- `src/backend/llm_abstractions.cpp` (`llm_log_skeleton_description`) and
+  `src/backend/llm_context.cpp` (`declare_frame_cases`, the temporal
+  profile dispatch), swept with `llmmodels.py` (plain, `--xes`, and
+  through `bg/ilwrap2.py`); `src/backend/temporal_profile.cpp`
+  (`discover_temporal_profile_frame`: nanosecond timestamps, equal
+  timestamps, days-long durations, NaT);
+- `src/backend/log_filter.cpp`: the frame slices in the variant pass
+  combined with earlier filters (endpoints, lengths, case splits,
+  consecutive-activity grouping) before `top_variants` and the coverage
+  bounds, and whether `variant_percentage`, `variant_coverage` and
+  `min_variant_frequency` have a DataFrame counterpart in pm4py that
+  counts the same slices (`fsweep.py`, `topkmodel.py`);
+- whether `/api/mine`'s own `declare`, `log_skeleton` and
+  `temporal_profile` sections on uploads should follow pm4py's DataFrame
+  discoveries the way the LLM descriptions now do, and the other pm4py
+  DataFrame functions that may read a case as a slice from its first row
+  (`get_variants`-based routes, the variants explorer, the LLM variants
+  description on interleaved uploads with performance);
+- the open choice on CSV timestamp columns of plain numbers (still
+  declared unless Philipp answers);
+- the CI run of the BH commit.
+
+Round BG's targets, re-reviewed in BH (findings BH1-1 to BH1-4):
 
 - `src/backend/attribute_statistics.cpp` and `case_statistics.cpp`: the
   frame branches in `frame_rows` order (once-per-case pairs across

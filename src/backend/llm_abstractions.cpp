@@ -1101,17 +1101,52 @@ std::string llm_log_skeleton_description(const EventLog& log, const LlmAbstracti
   pairs("Always Before", model.always_before);
   pairs("Always After", model.always_after);
   pairs("Never Together", model.never_together);
-  std::vector<std::string> activities;
+  // The cases in the order pm4py's log skeleton reads them: a DataFrame (a
+  // CSV or XES upload) groups its rows by the sorted case id, an EventLog
+  // keeps its traces' order (round BH, observed black-box).
+  const bool frame = log.dataframe_columns != nullptr;
+  std::vector<const Trace*> traces;
   for (const auto& trace : log.traces)
-    for (const auto& event : trace.events)
-      if (std::find(activities.begin(), activities.end(), event.activity) == activities.end())
-        activities.push_back(event.activity);
+    if (!frame || !trace.events.empty()) traces.push_back(&trace);
+  if (frame)
+    std::stable_sort(traces.begin(), traces.end(),
+                     [](const Trace* left, const Trace* right) { return left->case_id < right->case_id; });
+  // activ_freq lists the first case's activities in its row order, then the
+  // others in the order of the log's activity list: value_counts on a frame
+  // (descending count, equal counts in row order), first appearance over the
+  // traces in an EventLog.
+  std::vector<std::string> activities;
+  const auto add = [&](const std::string& activity) {
+    if (std::find(activities.begin(), activities.end(), activity) == activities.end())
+      activities.push_back(activity);
+  };
+  if (frame) {
+    std::vector<std::pair<std::string, std::size_t>> counts;
+    std::map<std::string, std::size_t> position;
+    for (const auto& row : frame_rows(log)) {
+      if (!traces.empty() && &row.trace == traces.front()) add(row.event.activity);
+      const auto [it, added] = position.emplace(row.event.activity, counts.size());
+      if (added) counts.push_back({row.event.activity, 0});
+      ++counts[it->second].second;
+    }
+    std::stable_sort(counts.begin(), counts.end(),
+                     [](const auto& left, const auto& right) { return left.second > right.second; });
+    for (const auto& entry : counts) add(entry.first);
+  } else {
+    for (const auto* trace : traces)
+      for (const auto& event : trace->events) add(event.activity);
+  }
   text += "Activity Occurrences: ";
   for (const auto& activity : activities) {
     const auto found = model.activ_freq.find(activity);
     if (found == model.activ_freq.end()) continue;
+    // pm4py prints a count set sorted as text: 17 before 2 (round BH,
+    // observed black-box).
+    std::vector<std::string> counts;
+    for (const auto count : found->second) counts.push_back(std::to_string(count));
+    std::sort(counts.begin(), counts.end());
     text += " " + activity + ":";
-    for (std::size_t i = 0; i < found->second.size(); ++i) text += (i ? ", " : " ") + std::to_string(found->second[i]);
+    for (std::size_t i = 0; i < counts.size(); ++i) text += (i ? ", " : " ") + counts[i];
     text += ";";
   }
   text += "\n\n";

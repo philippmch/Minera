@@ -17,6 +17,7 @@
 
 #include "minera/timestamp.hpp"
 #include "dataframe_cell.hpp"
+#include "frame_cells.hpp"
 
 namespace minera {
 namespace {
@@ -1432,9 +1433,68 @@ EventLog filter_event_log(const EventLog& input, const LogFilterOptions& options
     }
   }
 
+  // pm4py's DataFrame filter_variants_top_k and the minimum/maximum coverage
+  // filters count and rank variants over each case read as the frame's rows
+  // from its first row on, as many as it has (a case whose rows are apart in
+  // an XES upload reads other cases' rows), then keep the cases whose own
+  // variant is among those chosen (round BH, observed black-box).
+  const bool frame_ranks = log.dataframe_columns && (by_rank || by_min_coverage || by_max_coverage);
+  std::unordered_set<std::string> frame_allowed;
+  if (frame_ranks) {
+    EventLog surviving;
+    surviving.traces = std::move(kept);
+    surviving.dataframe_columns = log.dataframe_columns;
+    const auto rows = frame_rows(surviving);
+    std::unordered_map<const Trace*, std::pair<std::size_t, std::size_t>> extent;  // first row, rows
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+      const auto [it, added] = extent.emplace(&rows[i].trace, std::pair<std::size_t, std::size_t>{i, 0});
+      ++it->second.second;
+    }
+    std::unordered_map<std::string, std::uint64_t> frame_counts;
+    std::unordered_map<std::string, std::vector<std::string>> frame_sequences;
+    std::vector<std::string> frame_order;
+    for (const auto& trace : surviving.traces) {
+      const auto found = extent.find(&trace);
+      if (found == extent.end()) continue;
+      std::string key;
+      std::vector<std::string> sequence;
+      for (std::size_t i = found->second.first; i < found->second.first + found->second.second; ++i) {
+        key.push_back('\x1f');
+        key += rows[i].event.activity;
+        sequence.push_back(rows[i].event.activity);
+      }
+      if (frame_counts.emplace(key, 0).second) {
+        frame_order.push_back(key);
+        frame_sequences[key] = std::move(sequence);
+      }
+      ++frame_counts[key];
+    }
+    kept = std::move(surviving.traces);
+    std::sort(frame_order.begin(), frame_order.end(), [&](const std::string& a, const std::string& b) {
+      const auto count_a = frame_counts[a], count_b = frame_counts[b];
+      if (count_a != count_b) return count_a > count_b;
+      return frame_sequences[b] < frame_sequences[a];
+    });
+    const double cases = static_cast<double>(kept.size());
+    for (std::size_t i = 0; i < frame_order.size(); ++i) {
+      if (by_rank && i >= *options.top_variants) break;
+      const double share = cases == 0.0 ? 0.0 : static_cast<double>(frame_counts[frame_order[i]]) / cases;
+      if (by_min_coverage && share < *options.variant_min_coverage) continue;
+      if (by_max_coverage && share > *options.variant_max_coverage) continue;
+      frame_allowed.insert(frame_order[i]);
+    }
+  }
+
   std::unordered_set<std::string> allowed;
   const double denominator = static_cast<double>(kept.size());
   for (std::size_t i = 0; i < order.size(); ++i) {
+    if (frame_ranks) {
+      if (counts[order[i]] < options.min_variant_frequency) continue;
+      if (by_coverage && covered.find(order[i]) == covered.end()) continue;
+      if (by_percentage && percentage_allowed.find(order[i]) == percentage_allowed.end()) continue;
+      if (frame_allowed.find(order[i]) != frame_allowed.end()) allowed.insert(order[i]);
+      continue;
+    }
     if (by_rank && i >= *options.top_variants) break;
     if (counts[order[i]] < options.min_variant_frequency) continue;
     if (by_coverage && covered.find(order[i]) == covered.end()) continue;
