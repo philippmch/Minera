@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <deque>
 #include <initializer_list>
 #include <limits>
 #include <map>
@@ -116,7 +117,25 @@ const std::string* selected_event_value(const Event& event,
          matches_source(event.timestamp_source_key, key)))
       return &event.timestamp_attribute->value;
   }
-  return event.attribute(key);
+  if (const auto* value = event.attribute(key)) return value;
+  // The resource and lifecycle fields are first-class too: a log read from
+  // a file keeps org:resource and lifecycle:transition there, not among the
+  // attributes, and pm4py reads them as any other key (round BK).
+  const auto first_class = [&](std::string_view canonical, const std::string& value,
+                               FirstClassAttributeState state, std::string_view source_key,
+                               const std::optional<EventAttribute>& attribute) -> const std::string* {
+    if (key != canonical && !matches_source(source_key, key) && !(attribute && attribute->key == key))
+      return nullptr;
+    if (state == FirstClassAttributeState::kNull) return nullptr;
+    if (const auto* selected = first_class_value(value, state)) return selected;
+    if (attribute && !attribute->is_null) return &attribute->value;
+    return nullptr;
+  };
+  if (const auto* value = first_class("org:resource", event.resource, event.resource_state,
+                                      event.resource_source_key, event.resource_attribute))
+    return value;
+  return first_class("lifecycle:transition", event.lifecycle, event.lifecycle_state,
+                     event.lifecycle_source_key, event.lifecycle_attribute);
 }
 
 std::optional<std::string> event_activity(
@@ -344,6 +363,8 @@ struct TemporalTableEvent {
   std::string source_timestamp;
   std::string target_timestamp;
   double source_instant = 0.0;
+  double target_instant = 0.0;
+  std::optional<ParsedExactTimestamp> source_exact, target_exact;
   std::size_t row_index = 0;
 };
 
@@ -374,17 +395,31 @@ EventLog temporal_table_to_log(const EventTable& table,
       }
       continue;
     }
-    grouped[*case_id].push_back({*case_id, *activity, *source, *target,
-                                 *source_instant, row_index});
+    grouped[*case_id].push_back({*case_id, *activity, *source, *target, *source_instant,
+                                 *target_instant, parse_timestamp_exact(*source),
+                                 parse_timestamp_exact(*target), row_index});
   }
 
   EventLog log;
   log.traces.reserve(grouped.size());
   for (auto& [case_id, events] : grouped) {
+    // pm4py's DataFrame algorithms sort a case's rows by the target (start)
+    // timestamp, then the source (completion) one, then the row (round BK,
+    // observed black-box; one column for both is a sort by timestamp).
+    const bool exact = std::all_of(events.begin(), events.end(), [](const TemporalTableEvent& event) {
+      return event.source_exact && event.target_exact;
+    });
     std::stable_sort(events.begin(), events.end(),
-                     [](const auto& left, const auto& right) {
-                       return std::tie(left.source_instant, left.row_index) <
-                              std::tie(right.source_instant, right.row_index);
+                     [&](const TemporalTableEvent& left, const TemporalTableEvent& right) {
+                       if (exact)
+                         return std::tie(left.target_exact->seconds, left.target_exact->nanoseconds,
+                                         left.source_exact->seconds, left.source_exact->nanoseconds,
+                                         left.row_index) <
+                                std::tie(right.target_exact->seconds, right.target_exact->nanoseconds,
+                                         right.source_exact->seconds, right.source_exact->nanoseconds,
+                                         right.row_index);
+                       return std::tie(left.target_instant, left.source_instant, left.row_index) <
+                              std::tie(right.target_instant, right.source_instant, right.row_index);
                      });
     Trace trace;
     trace.case_id = case_id;
@@ -425,10 +460,17 @@ struct FrameProfileRow {
   std::int64_t seconds = 0;
   std::uint32_t nanoseconds = 0;
   const std::string* activity = nullptr;
+  // The target (start) timestamp when it is another column; else the
+  // source's.
+  std::optional<std::pair<std::int64_t, std::uint32_t>> target;
 };
 
 // pm4py's DataFrame arithmetic over cases given by sorted id, each case's rows
 // in the frame's row order (stably sorted by timestamp here).
+std::pair<std::int64_t, std::uint32_t> target_of(const FrameProfileRow& row) {
+  return row.target ? *row.target : std::pair<std::int64_t, std::uint32_t>{row.seconds, row.nanoseconds};
+}
+
 TemporalProfile frame_arithmetic_profile(
     std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>>& ordered,
     const std::function<bool()>& cancelled);
@@ -444,6 +486,19 @@ const TemporalProfileEntry* TemporalProfile::find(const std::string& source,
   }
   return nullptr;
 }
+
+namespace {
+
+// pm4py reads an event stream as its EventLog: cases in the order of their
+// first events, each case's events in stream order; the EventLog algorithm
+// (discovery and conformance) runs on that (round BK, observed black-box).
+EventLog temporal_stream_log(const EventStream& stream, const TemporalProfileOptions& options) {
+  LogConversionOptions conversion;
+  if (!options.case_id_attribute.empty()) conversion.case_id_key = options.case_id_attribute;
+  return event_data_to_event_log(EventDataView(stream), conversion);
+}
+
+}  // namespace
 
 TemporalProfile discover_temporal_profile_log(
     const EventLog& log, const TemporalProfileOptions& options) {
@@ -594,23 +649,29 @@ TemporalProfile discover_temporal_profile(
 TemporalProfile discover_temporal_profile_dataframe(
     const EventTable& table, const TemporalProfileOptions& options) {
   const auto log = temporal_table_to_log(table, options);
-  // pm4py's DataFrame discovery (one timestamp column, no business hours):
-  // Timedelta durations, the compensated mean and Welford's deviation over
-  // the cases by sorted id, each sorted by timestamp (round BI, observed
-  // black-box; temporal_table_to_log already orders both).
+  // pm4py's DataFrame discovery (without business hours): Timedelta
+  // durations, the compensated mean and Welford's deviation over the cases
+  // by sorted id, each sorted by timestamp (round BI, observed black-box;
+  // temporal_table_to_log already orders both); with a separate start
+  // column, each row's completion against the later rows' starts (round BK).
   const auto columns = temporal_table_columns(table, options);
-  if (!options.use_business_hours && columns.source_timestamp == columns.target_timestamp) {
+  if (!options.use_business_hours) {
+    const bool split = columns.source_timestamp != columns.target_timestamp;
     std::vector<std::vector<FrameProfileRow>> rows(log.traces.size());
     std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>> ordered;
     bool exact = true;
     for (std::size_t t = 0; t < log.traces.size() && exact; ++t) {
       for (const auto& event : log.traces[t].events) {
         const auto instant = parse_timestamp_exact(event.timestamp);
-        if (!instant) {
+        const auto* target_text = split ? selected_event_value(event, "__minera_temporal_target", "timestamp") : nullptr;
+        const auto target = target_text ? parse_timestamp_exact(*target_text) : std::nullopt;
+        if (!instant || (split && !target)) {
           exact = false;
           break;
         }
-        rows[t].push_back({instant->seconds, instant->nanoseconds, &event.activity});
+        rows[t].push_back({instant->seconds, instant->nanoseconds, &event.activity,
+                           split ? std::optional(std::pair<std::int64_t, std::uint32_t>{target->seconds, target->nanoseconds})
+                                 : std::nullopt});
       }
       ordered.push_back({&log.traces[t].case_id, &rows[t]});
     }
@@ -621,7 +682,7 @@ TemporalProfile discover_temporal_profile_dataframe(
 
 TemporalProfile discover_temporal_profile(
     const EventStream& stream, const TemporalProfileOptions& options) {
-  return discover_temporal_profile_dataframe(event_stream_to_table(stream), options);
+  return discover_temporal_profile_log(temporal_stream_log(stream, options), options);
 }
 
 TemporalProfile discover_temporal_profile(
@@ -725,7 +786,12 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
         const auto target_time =
             event_instant(trace.events[j], target_attribute, "",
                           options.strict_attributes);
-        if (!target_time || *target_time < *source_time) continue;
+        if (!target_time) continue;
+        if (exact && exact_sources[i] && exact_targets[j]
+                ? std::tie(exact_targets[j]->seconds, exact_targets[j]->nanoseconds) <
+                      std::tie(exact_sources[i]->seconds, exact_sources[i]->nanoseconds)
+                : *target_time < *source_time)
+          continue;
         const auto target_local =
             options.use_business_hours
                 ? event_local_instant(trace.events[j], target_attribute, "",
@@ -799,8 +865,8 @@ TemporalConformanceResult conform_temporal_profile(
     case EventDataKind::kEventLog:
       return conform_temporal_profile_log(*data.log(), profile, options);
     case EventDataKind::kEventStream:
-      return conform_temporal_profile_dataframe(
-          event_stream_to_table(*data.stream()), profile, options);
+      return conform_temporal_profile_log(temporal_stream_log(*data.stream(), options), profile,
+                                          options);
     case EventDataKind::kEventTable:
       return conform_temporal_profile_dataframe(*data.table(), profile,
                                                 options);
@@ -833,7 +899,39 @@ std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& 
   for (const auto& row : frame_rows(frame.log())) {
     const auto date = frame.date(row.trace, row.event, "time:timestamp");
     if (!date) return std::nullopt;
-    cases[&row.trace].push_back({date->seconds, date->nanoseconds, &row.event.activity});
+    cases[&row.trace].push_back({date->seconds, date->nanoseconds, &row.event.activity, std::nullopt});
+  }
+  std::vector<std::pair<const std::string*, std::vector<Row>*>> ordered;
+  for (auto& [trace, rows] : cases) ordered.push_back({&trace->case_id, &rows});
+  std::stable_sort(ordered.begin(), ordered.end(),
+                   [](const auto& left, const auto& right) { return *left.first < *right.first; });
+  return frame_arithmetic_profile(ordered, cancelled);
+}
+
+// The same with other columns: the activity from `activity_key` (text
+// cells only), each row's completion from `source_key` and start from
+// `target_key` (round BK, observed black-box). nullopt when a cell is
+// missing, an activity is no text or a timestamp no date (pm4py raises or
+// reads the column otherwise there).
+std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& frame,
+                                                      const std::string& activity_key,
+                                                      const std::string& source_key,
+                                                      const std::string& target_key,
+                                                      const std::function<bool()>& cancelled) {
+  using Row = FrameProfileRow;
+  if (!frame.has(activity_key) || !frame.has(source_key) || !frame.has(target_key)) return std::nullopt;
+  std::deque<std::string> activities;
+  std::map<const Trace*, std::vector<Row>> cases;
+  for (const auto& row : frame_rows(frame.log())) {
+    const auto activity = frame.cell(row.trace, row.event, activity_key);
+    const auto source = frame.date(row.trace, row.event, source_key);
+    const auto target = source_key == target_key ? source : frame.date(row.trace, row.event, target_key);
+    if (!activity || activity->kind != python::Scalar::Kind::kText || !source || !target) return std::nullopt;
+    activities.push_back(activity->text);
+    cases[&row.trace].push_back({source->seconds, source->nanoseconds, &activities.back(),
+                                 source_key == target_key
+                                     ? std::nullopt
+                                     : std::optional(std::pair<std::int64_t, std::uint32_t>{target->seconds, target->nanoseconds})});
   }
   std::vector<std::pair<const std::string*, std::vector<Row>*>> ordered;
   for (auto& [trace, rows] : cases) ordered.push_back({&trace->case_id, &rows});
@@ -855,16 +953,24 @@ TemporalProfile frame_arithmetic_profile(
   std::uint64_t visited = 0;
   for (auto& [case_id, rows] : ordered) {
     (void)case_id;
-    std::stable_sort(rows->begin(), rows->end(), [](const Row& left, const Row& right) {
-      return std::tie(left.seconds, left.nanoseconds) < std::tie(right.seconds, right.nanoseconds);
-    });
+    // With a separate start column pm4py sorts a case's rows by the start
+    // (target) timestamp, then the completion (source) timestamp, and pairs
+    // each row with the later ones that start at or after its completion
+    // (round BK, observed black-box).
+    const auto order = [](const Row& row) {
+      const auto target = target_of(row);
+      return std::make_tuple(target.first, target.second, row.seconds, row.nanoseconds);
+    };
+    std::stable_sort(rows->begin(), rows->end(),
+                     [&](const Row& left, const Row& right) { return order(left) < order(right); });
     for (std::size_t i = 0; i < rows->size(); ++i)
       for (std::size_t j = i + 1; j < rows->size(); ++j) {
         if ((++visited & 0xfffff) == 0) throw_if_cancelled(cancelled, "temporal profile discovery was cancelled");
         const auto& source = (*rows)[i];
-        const auto& target = (*rows)[j];
-        std::int64_t whole = target.seconds - source.seconds;
-        std::int64_t fraction = static_cast<std::int64_t>(target.nanoseconds) - source.nanoseconds;
+        const auto& [target_seconds, target_nanoseconds] = target_of((*rows)[j]);
+        if (std::tie(target_seconds, target_nanoseconds) < std::tie(source.seconds, source.nanoseconds)) continue;
+        std::int64_t whole = target_seconds - source.seconds;
+        std::int64_t fraction = static_cast<std::int64_t>(target_nanoseconds) - source.nanoseconds;
         if (fraction < 0) {
           fraction += 1000000000;
           --whole;
@@ -873,7 +979,7 @@ TemporalProfile frame_arithmetic_profile(
         // + nanoseconds * 1e-9, left to right.
         const double value = static_cast<double>(whole) + static_cast<double>(fraction / 1000) * 1e-6 +
                              static_cast<double>(fraction % 1000) * 1e-9;
-        auto& sums = pairs[{*source.activity, *target.activity}];
+        auto& sums = pairs[{*source.activity, *(*rows)[j].activity}];
         ++sums.count;
         const double y = value - sums.compensation;
         const double t = sums.sum + y;
@@ -920,6 +1026,21 @@ TemporalProfile discover_temporal_profile_as_uploaded(const EventLog& log,
                         !options.use_business_hours;
   if (log.dataframe_columns && defaults)
     if (auto profile = frame_temporal_profile(frame_times::Frame(log), cancelled)) return std::move(*profile);
+  // Other columns on an upload: pm4py's DataFrame discovery on them, unless
+  // a cell is missing or of another type (round BK; BJ1 kept the EventLog
+  // algorithm here).
+  if (log.dataframe_columns && !defaults && !options.use_business_hours &&
+      !options.activity_attribute.empty()) {
+    const auto key = [](const std::string& primary, const std::string& alias) {
+      const auto& configured = primary.empty() ? alias : primary;
+      return configured.empty() ? std::string("time:timestamp") : configured;
+    };
+    if (auto profile = frame_temporal_profile(
+            frame_times::Frame(log), options.activity_attribute,
+            key(options.source_timestamp_attribute, options.source_completion_timestamp_attribute),
+            key(options.target_timestamp_attribute, options.target_start_timestamp_attribute), cancelled))
+      return std::move(*profile);
+  }
   return discover_temporal_profile(log, options, cancelled);
 }
 

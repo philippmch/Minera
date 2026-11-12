@@ -1275,11 +1275,14 @@ void boolean_import_spelling_matches_public_variants() {
         const auto* attribute = find_attribute(log.traces.at(0).events.at(0).attributes, "flag");
         assert(attribute != nullptr);
         assert(std::get<bool>(attribute->typed_value) == expected);
-        assert(attribute->value == lexical);
+        // pm4py keeps only the bool, so the text is that of the value read
+        // (round BK; the table transport accepts no other spelling).
+        const std::string text = expected ? "true" : "false";
+        assert(attribute->value == text);
         const auto* trace_attribute = find_attribute(log.traces.at(0).attributes, "flag");
         assert(trace_attribute != nullptr);
         assert(std::get<bool>(trace_attribute->typed_value) == expected);
-        assert(trace_attribute->value == lexical);
+        assert(trace_attribute->value == text);
       }
     }
   }

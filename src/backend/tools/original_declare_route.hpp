@@ -105,7 +105,7 @@ void handle_original_declare_workbench(const httplib::Request& request,
         ",\"lazy_valid\":" + (lazy ? std::string(flag(lazy->valid())) : std::string("null")) + '}';
     };
     std::optional<minera::DeclareConformance> scalar;
-    std::optional<std::vector<minera::DeclareConformance>> conformances, generated_conformance;
+    std::optional<std::vector<minera::DeclareConformance>> conformances, generated_conformance, listed;
     std::optional<minera::EventLog> generated;
     std::optional<minera::EventTable> diagnostics;
     std::string failure = "null", diagnostics_error = "null", generated_check_error = "null";
@@ -194,6 +194,23 @@ void handle_original_declare_workbench(const httplib::Request& request,
         }
       } else
         invoke("declare_playout(model, options)", [&] {generated = minera::declare_playout(model, *playout_options);});
+      // pm4py's DataFrame conformance list reads each case of an XES upload
+      // as its slice of the frame's rows (traces that share a name apart in
+      // the file); the diagnostics table below keeps the merged cases.
+      if (conformances && source && source->file().format == "xes" &&
+          source->selected_kind() != minera::EventDataKind::kEventStream) {
+        const auto view = [&]() -> minera::EventDataView {
+          if (operation == "conformance_view") return source->selected_view();
+          switch (source->selected_kind()) {
+            case minera::EventDataKind::kEventLog: return minera::EventDataView(source->checked_log());
+            case minera::EventDataKind::kEventTable: return minera::EventDataView(source->checked_table());
+            case minera::EventDataKind::kLazyEventTable: return minera::EventDataView(source->checked_lazy());
+            case minera::EventDataKind::kEventStream: break;
+          }
+          return source->selected_view();
+        }();
+        listed = minera::check_declare_conformance_frame_slices(view, model, *conformance_options);
+      }
       executed = true;
       if (generated && check_generated) {
         try {
@@ -228,7 +245,7 @@ void handle_original_declare_workbench(const httplib::Request& request,
       conformances ? "{\"type\":\"conformance_vector\",\"value\":" + minera::serialize_declare_workbench_conformance_json(
           // An XES source's list in pm4py's DataFrame case order; the derived
           // diagnostics table keeps the frame's (file) order.
-          in_constraint_order(*conformances, source && conformance_options
+          in_constraint_order(listed ? *listed : *conformances, source && conformance_options
               ? constraint_case_order(*source, source->selected_view(), conformance_options->activity_key,
                                       conformance_options->case_id_key)
               : std::nullopt)) + '}' :

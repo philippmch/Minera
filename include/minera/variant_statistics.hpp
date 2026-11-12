@@ -28,6 +28,14 @@ struct VariantStatisticsResult {
 [[nodiscard]] VariantStatisticsResult discover_variant_statistics(
     const EventLog& log, const VariantStatisticsOptions& options = {});
 
+// An upload's variants as pm4py's get_variants counts them on its read_xes
+// frame: each case is the frame's rows from its first row on, as many as the
+// case has (frame_slice_cases), so an XES case whose <trace> elements repeat
+// its name apart from each other counts other cases' rows (round BK, observed
+// black-box). Any other log is counted as discover_variant_statistics does.
+[[nodiscard]] VariantStatisticsResult discover_variant_statistics_as_uploaded(
+    const EventLog& log, const VariantStatisticsOptions& options = {});
+
 [[nodiscard]] inline VariantStatisticsResult variant_statistics(
     const EventLog& log, const VariantStatisticsOptions& options = {}) {
   return discover_variant_statistics(log, options);

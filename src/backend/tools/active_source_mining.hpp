@@ -150,14 +150,23 @@ void handle_active_source_mining(const httplib::Request& request,
     return minera::serialize_active_source_skeleton_json(*skeleton, &ordered);
   });
   std::optional<std::vector<minera::DeclareConformance>> declare_conformance;
+  // pm4py's DataFrame Declare reads each case of an XES upload as its slice
+  // of the frame's rows (traces that share a name apart in the file), in
+  // every shape but the event stream (discover_declare_frame_slices).
+  const bool declare_slices = session->active_source->file().format == "xes" &&
+      session->active_source->selected_kind() != minera::EventDataKind::kEventStream;
   run("declare", selected, [&](bool& native_returned) {
-    session->declare = minera::discover_declare(data(), params.declare_options);
+    session->declare = declare_slices
+        ? minera::discover_declare_frame_slices(data(), params.declare_options)
+        : minera::discover_declare(data(), params.declare_options);
     session->declare_ready = true;
     native_returned = true;
     return minera::serialize_active_source_declare_json(session->declare);
   });
   if (session->declare_ready) run("declare_conformance", selected, [&](bool& native_returned) {
-    declare_conformance = minera::check_declare_conformance(data(), session->declare, params.declare_conformance_options);
+    declare_conformance = declare_slices
+        ? minera::check_declare_conformance_frame_slices(data(), session->declare, params.declare_conformance_options)
+        : minera::check_declare_conformance(data(), session->declare, params.declare_conformance_options);
     native_returned = true;
     const auto ordered = in_constraint_order(*declare_conformance,
         constraint_case_order(*session->active_source, data(),

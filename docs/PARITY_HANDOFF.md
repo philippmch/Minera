@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BJ (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BK (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4561,7 +4561,50 @@ had pinned the DataFrame conformance's sorted case order and now follows
 pm4py's. The device check on the Mac was skipped again (the round's thread
 had no device linked).
 
-Next round (BK) should start by re-reviewing round BJ:
+Round BK re-reviewed BJ (Review BK1) and took its targets. It fixed: XES
+booleans spelled other than `true`/`false` and floats with a leading plus,
+now kept as the value pm4py reads (the table transport had refused them);
+Declare discovery and the conformance list on the frame's case slices in
+the Declare workbench and in `/api/mine` with `mining_input_shape`; the
+DataFrame temporal profile and conformance with a separate start column
+(rows sorted by start, then completion; a pair when the target starts at
+or after the source completes); the temporal profile of an event stream,
+which pm4py reads through its EventLog; `/api/mine`'s temporal profile with
+other keys on uploads (pm4py's DataFrame discovery on the named columns,
+the resource and lifecycle found as keys); and the variant statistics,
+which count the frame's slices. The device check on the Mac was skipped
+again (the round's thread had no device linked).
+
+Next round (BL) should start by re-reviewing round BK:
+
+- `src/backend/xes_event_log_importer.cpp` (`parse_native_value`'s
+  canonical boolean and float text; whether the line-by-line, chunk-regex
+  and Rust variants' exact `true` test still matches pm4py's iterparse
+  variants on `TRUE` and valueless booleans);
+- `src/backend/declare.cpp` (`frame_slice_table`, `frame_slice_view`, the
+  two `*_frame_slices` functions) and their call sites in
+  `original_declare_route.hpp` (the list sliced, the diagnostics merged)
+  and `active_source_mining.hpp`, also with the mining filters, a supplied
+  model and `conformance_activity_key`;
+- `src/backend/temporal_profile.cpp`: `temporal_table_to_log`'s sort by
+  start, then completion; `frame_arithmetic_profile` with targets;
+  `frame_temporal_profile`'s keyed overload (text activities only, one
+  column for both keys); `temporal_stream_log`; `selected_event_value`'s
+  first-class fallback; `conform_log`'s exact comparison; with business
+  hours and a start column on frames (`tptoy.py --bh`), lifecycle as the
+  activity key, CSV uploads with a start column;
+- `discover_variant_statistics_as_uploaded` on the server and in the CLI
+  (`minera_export`), with a non-default activity key and after the mining
+  filters;
+- new areas: other pm4py functions that read an `EventStream` through its
+  EventLog (the log skeleton, footprints, the DFG on the behavior route's
+  `variant=stream`), and other routes that hand an upload on as a table
+  (any spelling the table transport still refuses);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BK commit.
+
+Round BJ's targets, re-reviewed in BK (findings BK1-1 to BK1-6):
 
 - `src/backend/declare.cpp` (`check_declare_conformance_as_uploaded`, a
   trace without rows) and the two Declare call sites in

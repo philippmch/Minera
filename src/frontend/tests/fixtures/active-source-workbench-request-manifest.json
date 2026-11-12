@@ -1553,14 +1553,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62193",
+        "Content-Length": "62016",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-alias-default-stream.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-alias-default-stream.response.json",
-        "bytes": 62193,
-        "sha256": "3df6cd6b602278f83d6b8d688b700393a614a91fb6d1a7c500e90e5068daaf8b",
+        "bytes": 62016,
+        "sha256": "bfa68ebfdd10a05e999f9fc951797ee6987be4f17b721c032f48f7267f3d5287",
         "status": 200
       },
       "exports": {},
@@ -1703,14 +1703,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "33516",
+        "Content-Length": "33464",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-header-only-aliases-stream.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-header-only-aliases-stream.response.json",
-        "bytes": 33516,
-        "sha256": "6492bcd810c7a3ec53a4ea1257f7111b9c76389c90dd6176eda50eacd23edcaf",
+        "bytes": 33464,
+        "sha256": "125815048c65d6713e61fafb17446811a3b193a36740f8953bf927c240d7c612",
         "status": 200
       },
       "exports": {},
@@ -2342,14 +2342,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "69768",
+        "Content-Length": "69591",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-custom-clock-native-flat-stream.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-stream.response.json",
-        "bytes": 69768,
-        "sha256": "aa7a41e052e7daa0241ac3c57026a1fbded1a48c912c3b34a8d167ee8648564c",
+        "bytes": 69591,
+        "sha256": "fbf377e35b67388201962616b541570153263790ee5098043f5991ab37094b65",
         "status": 200
       },
       "exports": {},

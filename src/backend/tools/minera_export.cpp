@@ -7087,7 +7087,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       };
       const auto params = minera::parse_variant_statistics_params(lookup, present);
       const auto body = minera::variant_statistics_json(
-          minera::discover_variant_statistics(log, params));
+          minera::discover_variant_statistics_as_uploaded(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {

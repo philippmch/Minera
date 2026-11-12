@@ -1409,6 +1409,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         graph.ensure_activity(witness);
       }
     }
+    // So can the temporal profile's activity column (an empty resource, say).
+    for (const auto& entry : temporal_profile.entries) {
+      graph.ensure_activity(entry.source);
+      graph.ensure_activity(entry.target);
+    }
     const auto transition_system =
         minera::discover_transition_system(log, params.transition_system);
     for (const auto& transition : transition_system.transitions()) {
@@ -6136,7 +6141,7 @@ void handle_variant_statistics(const httplib::Request& request,
         minera::parse_variant_statistics_params(lookup, present);
     response.set_content(
         minera::variant_statistics_json(
-            minera::discover_variant_statistics(require_prepared_log(*session), options)),
+            minera::discover_variant_statistics_as_uploaded(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

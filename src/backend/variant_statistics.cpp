@@ -1,5 +1,7 @@
 #include "minera/variant_statistics.hpp"
 
+#include "frame_cells.hpp"
+
 #include <algorithm>
 #include <map>
 #include <stdexcept>
@@ -57,6 +59,13 @@ VariantStatisticsResult discover_variant_statistics(
                           static_cast<double>(total);
   }
   return {options.activity_key, std::move(entries)};
+}
+
+VariantStatisticsResult discover_variant_statistics_as_uploaded(
+    const EventLog& log, const VariantStatisticsOptions& options) {
+  if (!log.dataframe_columns || log.dataframe_columns->csv_text)
+    return discover_variant_statistics(log, options);
+  return discover_variant_statistics(frame_slice_cases(log), options);
 }
 
 }  // namespace minera

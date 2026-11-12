@@ -1097,6 +1097,91 @@ DeclareModel discover_declare_as_uploaded(const EventLog& log,
   return discover_declare(frame_slice_cases(log), options);
 }
 
+namespace {
+
+// A table in frame order with each case read as its slice: for every case
+// (by first row) the rows from its first row on, as many as it has, each
+// copy labelled with the case's id cell. Rows without a case cell are no
+// case; a table without the column is returned as is.
+EventTable frame_slice_table(const EventTable& table, std::string_view case_id_key) {
+  table.validate();
+  const auto column = std::find(table.columns.begin(), table.columns.end(), case_id_key);
+  if (column == table.columns.end()) return table;
+  const auto index = static_cast<std::size_t>(column - table.columns.begin());
+  struct Extent {
+    std::size_t first = 0, count = 0;
+  };
+  std::vector<std::string> order;
+  std::unordered_map<std::string, Extent> extent;
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    const auto& cell = table.rows[row][index];
+    if (!cell || cell->is_null) continue;
+    const auto [found, added] = extent.emplace(cell->value, Extent{row, 0});
+    if (added) order.push_back(cell->value);
+    ++found->second.count;
+  }
+  bool adjacent = true;
+  for (const auto& key : order) {
+    const auto& [first, count] = extent.at(key);
+    for (std::size_t row = first; row < first + count && adjacent; ++row) {
+      const auto& cell = table.rows[row][index];
+      adjacent = cell && !cell->is_null && cell->value == key;
+    }
+  }
+  if (adjacent) return table;
+  EventTable sliced = table;
+  sliced.rows.clear();
+  sliced.index.reset();
+  for (const auto& key : order) {
+    const auto& [first, count] = extent.at(key);
+    const auto& label = table.rows[first][index];
+    for (std::size_t row = first; row < first + count; ++row) {
+      sliced.rows.push_back(table.rows[row]);
+      sliced.rows.back()[index] = label;
+    }
+  }
+  return sliced;
+}
+
+EventDataView frame_slice_view(const EventDataView& data, std::string_view case_id_key,
+                               std::optional<EventLog>& log, std::optional<EventTable>& table) {
+  switch (data.kind()) {
+    case EventDataKind::kEventLog:
+      if (!data.log()->dataframe_columns) return data;
+      log = frame_slice_cases(*data.log());
+      return EventDataView(*log);
+    case EventDataKind::kEventTable:
+      table = frame_slice_table(*data.table(), case_id_key);
+      return EventDataView(*table);
+    case EventDataKind::kLazyEventTable:
+      table = frame_slice_table(data.lazy_table()->materialize(), case_id_key);
+      return EventDataView(*table);
+    case EventDataKind::kEventStream:
+      return data;
+  }
+  return data;
+}
+
+}  // namespace
+
+DeclareModel discover_declare_frame_slices(const EventDataView& data,
+                                           const DeclareDiscoveryOptions& options) {
+  std::optional<EventLog> log;
+  std::optional<EventTable> table;
+  return discover_declare(frame_slice_view(data, options.case_id_key, log, table), options);
+}
+
+std::vector<DeclareConformance> check_declare_conformance_frame_slices(
+    const EventDataView& data, const DeclareModel& model,
+    const DeclareConformanceOptions& options) {
+  if (data.kind() == EventDataKind::kEventLog)
+    return check_declare_conformance_as_uploaded(*data.log(), model, options);
+  std::optional<EventLog> log;
+  std::optional<EventTable> table;
+  return check_declare_conformance(frame_slice_view(data, options.case_id_key, log, table), model,
+                                   options);
+}
+
 std::vector<DeclareConformance> check_declare_conformance_as_uploaded(
     const EventLog& log, const DeclareModel& model,
     const DeclareConformanceOptions& options) {

@@ -159,6 +159,19 @@ struct DeclareDiagnosticsOptions {
     const EventLog& log, const DeclareModel& model,
     const DeclareConformanceOptions& options = {});
 
+// pm4py's DataFrame Declare discovery and conformance list on an XES
+// upload's frame (its rows in file order) in any input shape: a log with
+// DataFrame columns as in discover_declare_as_uploaded and
+// check_declare_conformance_as_uploaded; a table or lazy table with each
+// case (by its case_id_key column) read as the rows from its first row on,
+// as many as it has, in the order of the cases' first rows; an event stream
+// as is (round BK, observed black-box).
+[[nodiscard]] DeclareModel discover_declare_frame_slices(
+    const EventDataView& data, const DeclareDiscoveryOptions& options = {});
+[[nodiscard]] std::vector<DeclareConformance> check_declare_conformance_frame_slices(
+    const EventDataView& data, const DeclareModel& model,
+    const DeclareConformanceOptions& options = {});
+
 [[nodiscard]] EventTable declare_conformance_diagnostics(
     const EventLog& log, const std::vector<DeclareConformance>& results,
     const DeclareDiagnosticsOptions& options = {});

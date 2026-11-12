@@ -23796,3 +23796,141 @@ DataFrame conformance's cases by sorted id (`c1` before `c2` where `c2`
 comes first in the table); it now expects pm4py's order, `c2` then `c1`
 (pm4py's DataFrame variant on the same table gives `[[], [('A', 'B', 9.0,
 9223372036854775807)]]`).
+
+## Review BK1: re-review of round BJ, Declare on the frame's slices in every upload route, and temporal profiles with a start column, on streams and with other keys (2026-11-12)
+
+Round BK re-reviewed BJ (the Declare conformance list on the frame's case
+slices, the DataFrame temporal conformance's case order and `Timedelta`
+durations, the segment filter's between on XES frames) and took its
+targets with interleaved XES uploads (trace names that repeat apart from
+each other), plain XES uploads, uploads with fractional and nanosecond
+timestamps, and random toy logs with a completion and a start column. The
+device check on the Mac was skipped (the round's thread had no device
+linked). Findings, all fixed:
+
+- **BK1-1 XES booleans and plus-signed floats.** `pm4py.read_xes` keeps a
+  `<boolean>` as `True` when its value is `true` in any letter case and as
+  `False` otherwise (`1`, `yes`, an empty or missing value), and a
+  `<float>` with a leading plus (`+1.5`) as the number. Minera kept the
+  file's spelling as the attribute's text next to the right typed value,
+  so the routes that hand an upload on as a table (the Declare workbench's
+  `dataframe` and `lazyframe` shapes, `/api/mine` with
+  `mining_input_shape`) refused it with `dataframe JSON: boolean value
+  disagrees with typed_value` or `invalid or out-of-range numeric cell`.
+  The importer now keeps the text of the value pm4py reads (`true`,
+  `false`, `1.5`). The line-by-line, chunk-regex and Rust XES variants
+  keep their exact `true` test.
+- **BK1-2 Declare on the frame's slices in the remaining upload routes.**
+  BI1-1 and BJ1-1 read each case of an XES upload as its slice of the
+  frame's rows (from its first row on, as many as it has) in `/api/mine`'s
+  `declare` and `declare_conformance` sections and in discover-constraints.
+  The Declare workbench's conformance list (`operation=conformance` and
+  `conformance_view`, every shape but the event stream; an XES upload
+  reaches pm4py as the frame, as AE2-2's case order already assumes) and
+  `/api/mine` with `mining_input_shape` (the `declare` and
+  `declare_conformance` family results, every shape but the event stream)
+  read each trace's own rows. Both now read the slices
+  (`discover_declare_frame_slices`, `check_declare_conformance_frame_slices`
+  for logs, tables and lazy tables); the workbench's diagnostics table
+  keeps the merged cases, as BJ1-1's. Before: `/api/mine` with
+  `mining_input_shape` differed in both sections on all 23 interleaved
+  uploads tried.
+- **BK1-3 The DataFrame temporal profile with a start column.** With
+  `START_TIMESTAMP_KEY` naming another column than `TIMESTAMP_KEY`,
+  pm4py's DataFrame discovery and conformance sort each case's rows by the
+  start, then the completion timestamp, then the row, and pair each row
+  with every later row that starts at or after its completion, the
+  duration being the `Timedelta` from the completion to the start. Minera's
+  DataFrame variant (the behavior route's `variant=dataframe` and
+  `lazyframe`, `/api/temporal-conformance`) sorted each case by
+  completion and, for discovery, took the EventLog algorithm's pairs and
+  arithmetic. With `p`: `a` 50/40, `b`
+  20/10, `c` 60/55, `d` 45/45 (completion/start, seconds), pm4py pairs
+  `b-a` 20, `b-d` 25, `b-c` 35, `a-c` 5 and `d-c` 10. The EventLog
+  conformance also decides whether a target starts before the source
+  completes on the exact (nanosecond) timestamps, as pandas compares them.
+  Before: on 60 random toy logs, discovery differed on 22 and conformance
+  on 26 (DataFrame and lazy-table variants alike); on 15 XES uploads with
+  nanosecond start and completion columns, the DataFrame conformance
+  differed on 12.
+- **BK1-4 The temporal profile of an event stream.** pm4py reads an
+  `EventStream` through its EventLog: the cases in the order of their
+  first events, each case's events in stream order (unsorted), the
+  EventLog algorithm's arithmetic. Minera grouped the stream into a table
+  and ran the DataFrame algorithm (each case sorted by time, `Timedelta`
+  durations). With case `1`: `a` at 10 s, `b` at 5 s, `c` at 20.25 s in
+  stream order, pm4py pairs `a-c` 10.25 and `b-c` 15.25 only. Both
+  discovery and conformance of the stream input (the behavior route's
+  `variant=stream`) now run on that EventLog. Before: the stream
+  conformance differed on 14 of 15 XES uploads with fractional seconds (and
+  in the last digits on the 15th).
+- **BK1-5 `/api/mine`'s temporal profile with other keys.** BJ1 declared
+  that a non-default activity or timestamp key kept the EventLog algorithm;
+  pm4py's DataFrame discovery runs on the named columns (text activities,
+  date timestamps; BK1-3's sort and pairs with a start column), and
+  `discover_temporal_profile_as_uploaded` now does so. The resource and
+  the lifecycle, first-class fields of a read log, were not found as an
+  activity key (`org:resource`) by the EventLog algorithm. The section's
+  activities are now registered in the response's activity list as the
+  minimum self-distances' are, where BJ1 declared a refusal of an activity
+  outside the directly-follows graph (a resource name, an empty resource,
+  which pm4py keys a pair by).
+- **BK1-6 Variant statistics on uploads.** `/api/variant-statistics` and
+  the CLI's variant statistics count the variants as `get_variants` on the
+  frame does, each case read as its slice (BI1 had declared the merged
+  reading). With `x b`, `y c`, `x a`, `w b`, `w c`, `y a` in file order
+  the variants are `b, c` twice (`x` and `w`) and `c, a` once. Before: 28 of
+  30 interleaved uploads differed.
+
+Re-review of BJ without further findings: the Declare conformance list and
+diagnostics table after the mining filters and with
+`conformance_activity_key` (discover-constraints), the DataFrame temporal
+conformance's case order with nanoseconds and separate columns, the
+segment filter's between combined with prefix, suffix and the mining
+filters.
+
+Declarations:
+
+- The Declare workbench's `stream` shape: pm4py's `conformance_declare`
+  raises `TypeError: string indices must be integers` on an
+  `EventStream`; Minera returns the merged cases' results.
+- The business-hours temporal profile of a frame whose cases give no pair
+  (one-row cases): pm4py's DataFrame discovery and conformance raise
+  `ValueError: Cannot set a DataFrame with multiple columns to the single
+  column @@flow_time`; Minera returns an empty profile (no deviations).
+- pm4py's DataFrame column checks raise where Minera computes: a
+  non-default activity key whose column is not text (`the activity column
+  should be of type string.`) or has empty values, a timestamp key with
+  empty values, and a frame without `concept:name` when another activity
+  key is selected (`KeyError: 'concept:name'`).
+- The CSV timestamp columns of plain numbers and "roles to diagnostics
+  groups" (round AT) are still with Philipp.
+
+Verification (scripts in the project files under `review-harness/round-bk/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Declare workbench conformance list, `conformance` and `conformance_view`, shapes log, dataframe, lazyframe (`declwb.py`, 30 interleaved, 20 plain, 15 interleaved with raw booleans and plus-signed floats; log against the frame, `--logframe`) | 390 | 390 equal; the stream shape raises in pm4py only (declared) |
+| Declare workbench diagnostics table (`declwbdiag.py`, 30 interleaved uploads, three shapes) | 90 | 90 equal |
+| `/api/mine` with `mining_input_shape` dataframe and lazyframe, declare, declare conformance, temporal profile, log skeleton (`minedf.py --il`) | 140 | before: declare and declare conformance on 23 of 23; after: 140 equal |
+| Declare and temporal profile after the mining filters (`combodecl.py`, seeds 850 to 869) | 168 | 168 equal (6 empty on both sides, 2 raise in pm4py only) |
+| Behavior route temporal conformance, four adapters (`tempconf2.py`: 20 uploads with nanosecond start and completion columns, 20 of them interleaved, 15 plain with fractions) | 220 | before: stream 14 of 15, DataFrame with start columns 12 of 15; after: 218 equal, 2 raise in pm4py only (declared) |
+| Toy logs with completion and start columns, discovery and conformance, four adapters (`tptoy.py`: 60 logs, 40 with the columns swapped, 40 with business hours) | 1,120 | before: DataFrame discovery 22 of 60, conformance 26 of 60; after: 1,104 equal, 16 raise in pm4py only (business hours without pairs, declared) |
+| Behavior route temporal profile, four adapters (`behaviortp4.py`, 30 toy logs) | 120 | 120 equal |
+| `/api/variant-statistics` (`varstat.py`, 50 interleaved, 40 plain uploads) | 90 | before: 28 of 30 interleaved; after: 90 equal |
+| Full ctest, frontend, script tests, fixture replay | 469 tests, 10,729 frontend tests, 406 script tests, 2,673 responses of 16 manifests | 469 pass (`minera_xes_io_tests` after its boolean import case expects the canonical text), 10,729 pass, 406 pass, 2,670 unchanged and 3 rewritten (below) |
+
+Three active-source workbench fixtures (`mining_input_shape=stream`) now
+give pm4py's answer on the stream: `csv-alias-default-stream` and
+`xes-custom-clock-native-flat-stream` (two events whose times run backwards
+in stream order) give no pair, where the DataFrame algorithm had sorted them
+(pm4py on the same EventStream: `{}`), and `csv-header-only-aliases-stream`
+gives an empty profile, where Minera raised `selected dataframe column is
+missing` (pm4py on an empty EventStream: `{}`).
+
+`minera_review_bk1_tests` binds the boolean and float spellings, Declare
+discovery and conformance on a table's slices, the stream's temporal
+profile and conformance, the DataFrame temporal profile and conformance
+with a start column, the resource as the activity key, the keyed upload
+profile and the variant statistics' slices (values taken from pm4py
+black-box on the same inputs).

@@ -264,9 +264,10 @@ double python_float_value(std::string_view text, std::string* canonical) {
     return parsed;
   }
   if (result.ec != std::errc{}) return invalid();
-  // A spelling only Python reads (whitespace, underscores, non-ASCII digits)
-  // is kept as the plain decimal it denotes.
-  if (canonical && (*ascii != text || body.find('_') != std::string_view::npos))
+  // A spelling only Python reads (whitespace, underscores, non-ASCII digits,
+  // a leading plus) is kept as the plain decimal it denotes.
+  if (canonical && (*ascii != text || body.find('_') != std::string_view::npos ||
+                    ascii->front() == '+'))
     *canonical = number;
   return parsed;
 }
@@ -356,16 +357,22 @@ NativeAttributeValue parse_native_value(AttributeKind kind,
       return parsed;
     }
     case AttributeKind::kBoolean: {
-      if (variant == XesImportVariant::kLineByLine ||
-          variant == XesImportVariant::kChunkRegex ||
-          variant == XesImportVariant::kRustXes)
-        return value == "true";
       // Iterparse accepts case-insensitive true; every other lexical value
       // (including the XSD spelling 1) is false in the pinned reference.
-      return value.size() == 4 && (value[0] == 't' || value[0] == 'T') &&
-          (value[1] == 'r' || value[1] == 'R') &&
-          (value[2] == 'u' || value[2] == 'U') &&
-          (value[3] == 'e' || value[3] == 'E');
+      const bool parsed =
+          variant == XesImportVariant::kLineByLine ||
+                  variant == XesImportVariant::kChunkRegex ||
+                  variant == XesImportVariant::kRustXes
+              ? value == "true"
+              : value.size() == 4 && (value[0] == 't' || value[0] == 'T') &&
+                    (value[1] == 'r' || value[1] == 'R') &&
+                    (value[2] == 'u' || value[2] == 'U') &&
+                    (value[3] == 'e' || value[3] == 'E');
+      // The reference keeps only the bool, so another spelling (TRUE, 1,
+      // yes, an empty value) is kept as the text of the value it denotes;
+      // the table transport accepts no other spelling (round BK).
+      if (canonical && value != (parsed ? "true" : "false")) *canonical = parsed ? "true" : "false";
+      return parsed;
     }
     case AttributeKind::kDate: {
       if (variant != XesImportVariant::kRustXes) {
@@ -770,7 +777,11 @@ std::optional<EventAttribute> parse_attribute_node(
     } else if (*kind == AttributeKind::kId) {
       result.kind = AttributeKind::kString;
       result.value = rust_uuid_value(*raw);
-    } else result.typed_value = parse_native_value(*kind, *raw, variant);
+    } else {
+      std::string canonical;
+      result.typed_value = parse_native_value(*kind, *raw, variant, &canonical);
+      if (*kind == AttributeKind::kBoolean && !canonical.empty()) result.value = std::move(canonical);
+    }
     return result;
   }
   // The lxml-based readers drop a <container> wherever it appears.
