@@ -71,6 +71,10 @@ void handle_original_log_skeleton_workbench(const httplib::Request& request,
     const auto source_view = [&] {return frame.view ? *frame.view : source->selected_view();};
     std::optional<minera::LogSkeletonOptions> conformance_options;
     std::optional<minera::LogSkeletonDiagnosticsOptions> diagnostics_options;
+    // The options as submitted, echoed in the response; a CSV source's calls
+    // read the standard keys as its selected columns (round BO).
+    std::optional<minera::LogSkeletonOptions> submitted_conformance;
+    std::optional<minera::LogSkeletonDiagnosticsOptions> submitted_diagnostics;
     std::set<std::string> conformance_members, diagnostics_members;
     bool include_diagnostics = false, executed = false;
     std::string input_shape = source_operation ? (supplied("mining_input_shape") ? field("mining_input_shape") : "log") :
@@ -180,6 +184,17 @@ void handle_original_log_skeleton_workbench(const httplib::Request& request,
         // pm4py reads a CSV upload's table shapes as format_dataframe's frame,
         // in its row order (round BN).
         prepare_csv_frame_view(*source, frame);
+        // That frame holds the standard keys as copies of its selected
+        // columns (round BO, csv_frame_key).
+        submitted_conformance = conformance_options;
+        submitted_diagnostics = diagnostics_options;
+        using Role = minera::FirstClassAttributeRole;
+        if (conformance_options) {
+          conformance_options->activity_key = csv_frame_key(*source, Role::kActivity, conformance_options->activity_key);
+          conformance_options->case_id_key = csv_frame_key(*source, Role::kCaseId, conformance_options->case_id_key);
+        }
+        if (diagnostics_options)
+          diagnostics_options->case_id_key = csv_frame_key(*source, Role::kCaseId, diagnostics_options->case_id_key);
       }
       input_before = input_snapshot();
       if (standalone) {
@@ -256,6 +271,8 @@ void handle_original_log_skeleton_workbench(const httplib::Request& request,
       for (const auto& member : members) {if (value.size() > 1) value += ','; value += quote(member);}
       return value + ']';
     };
+    if (submitted_conformance) conformance_options = submitted_conformance;
+    if (submitted_diagnostics) diagnostics_options = submitted_diagnostics;
     const std::string options_json = "{\"conformance\":" + (conformance_options ? minera::serialize_log_skeleton_workbench_options_json(*conformance_options) : "null") +
       ",\"diagnostics\":" + (diagnostics_options ? minera::serialize_log_skeleton_workbench_options_json(*diagnostics_options) : "null") + '}';
     std::map<std::string, std::string> exports;

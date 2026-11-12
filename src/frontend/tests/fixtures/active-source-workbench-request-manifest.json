@@ -1853,14 +1853,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "70556",
+        "Content-Length": "65457",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-both-headers-default-exact.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-both-headers-default-exact.response.json",
-        "bytes": 70556,
-        "sha256": "23542f392142b0e6f2d04053388a442896b330a9459a583bea17a70c6cad750a",
+        "bytes": 65457,
+        "sha256": "3593a2d688ea15ef1df3be1a77636a5646b14de7e4aba60b765b403e4c56bfb4",
         "status": 200
       },
       "exports": {},
@@ -2138,14 +2138,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "70829",
+        "Content-Length": "65497",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-family-explicit-activity-independent.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-family-explicit-activity-independent.response.json",
-        "bytes": 70829,
-        "sha256": "dfc72227672a510126ba3bd31c300948acb906fa6d43d31b72cf89dfc71128a4",
+        "bytes": 65497,
+        "sha256": "103e0eebc999815d7eed8f10bf9729592141c106c6dc1c919f7985af36814085",
         "status": 200
       },
       "exports": {},

@@ -1,4 +1,5 @@
 #include "minera/dataframe_columns.hpp"
+#include "csv_frame_table.hpp"
 #include "minera/exact_filter_discovery_json.hpp"
 #include <memory>
 #include <streambuf>
@@ -1909,15 +1910,58 @@ minera::PerformanceSpectrum discover_selected_performance_spectrum(
   throw std::invalid_argument("performance spectrum variant is invalid");
 }
 
+// A CSV input's frame (format_dataframe of read_csv, with its "@@index"),
+// which the pandas and Polars batches read as the server reads an upload
+// (round BO): nullopt when `log` is not the input's frame log (a filter
+// changed it) or the frame cannot be built.
+std::optional<minera::EventTable> csv_batch_frame(const std::string& input,
+                                                  const minera::CsvImportOptions& options,
+                                                  const minera::EventLog& log) {
+  auto data = minera::import_csv_event_data(input, options);
+  // The selected columns under their headers, as the importer resolved its
+  // aliases (the server binds an upload's selectors the same way).
+  minera::ActiveSourceSelectors selectors{options.case_id_column, options.activity_column,
+                                          options.timestamp_column, options.resource_column,
+                                          options.lifecycle_column};
+  for (const auto& trace : data.log.traces) {
+    if (trace.events.empty()) continue;
+    const auto& event = trace.events.front();
+    const auto bind = [](std::string& selected, const std::string& source) {
+      if (!source.empty()) selected = source;
+    };
+    bind(selectors.case_id_key, trace.case_id_source_key);
+    bind(selectors.activity_key, event.activity_source_key);
+    bind(selectors.timestamp_key, event.timestamp_source_key);
+    bind(selectors.resource_key, event.resource_source_key);
+    bind(selectors.lifecycle_key, event.lifecycle_source_key);
+    break;
+  }
+  const auto source = minera::ActiveEventSource::from_csv(std::move(data), minera::ActiveSourceFile{input, "csv", {}},
+                                                          selectors, minera::EventDataKind::kEventLog);
+  const auto& frame_log = source.checked_log();
+  if (frame_log.traces.size() != log.traces.size()) return std::nullopt;
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    const auto& a = frame_log.traces[t].events;
+    const auto& b = log.traces[t].events;
+    if (a.size() != b.size()) return std::nullopt;
+    for (std::size_t e = 0; e < a.size(); ++e)
+      if (a[e].input_order != b[e].input_order) return std::nullopt;
+  }
+  return indexed_csv_frame_table(source);
+}
+
 minera::BatchDiscovery discover_selected_batches(
-    const minera::EventLog& log, const minera::BatchDiscoveryOptions& options) {
+    const minera::EventLog& log, const minera::BatchDiscoveryOptions& options,
+    const minera::EventTable* frame = nullptr) {
   switch (options.variant) {
     case minera::BatchDiscoveryVariant::kLog:
       return minera::BatchLogDiscovery::apply(log, options);
     case minera::BatchDiscoveryVariant::kPandas:
+      if (frame) return minera::BatchPandasDiscovery::apply(*frame, options);
       return minera::BatchPandasDiscovery::apply(
           minera::event_log_to_table(log), options);
     case minera::BatchDiscoveryVariant::kPolars:
+      if (frame) return minera::BatchPolarsDiscovery::apply(minera::LazyEventTable::from_table(*frame), options);
       return minera::BatchPolarsDiscovery::apply(
           minera::event_log_to_lazy_table(log), options);
   }
@@ -8285,7 +8329,9 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         spectrum ? &*spectrum : nullptr;
     std::optional<minera::BatchDiscovery> batch_discovery;
     if (batches) {
-      batch_discovery = discover_selected_batches(log, batch_options);
+      const auto frame = !input_is_xes && batch_options.variant != minera::BatchDiscoveryVariant::kLog
+                             ? csv_batch_frame(input, options, log) : std::nullopt;
+      batch_discovery = discover_selected_batches(log, batch_options, frame ? &*frame : nullptr);
     }
     const minera::BatchDiscovery* batch_ptr =
         batch_discovery ? &*batch_discovery : nullptr;

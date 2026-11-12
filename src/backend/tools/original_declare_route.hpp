@@ -62,6 +62,10 @@ void handle_original_declare_workbench(const httplib::Request& request,
     std::optional<minera::ActiveEventSource> source;
     std::optional<minera::DeclareConformanceOptions> conformance_options;
     std::optional<minera::DeclareDiagnosticsOptions> diagnostics_options;
+    // The options as submitted, echoed in the response; a CSV source's calls
+    // read the standard keys as its selected columns (round BO).
+    std::optional<minera::DeclareConformanceOptions> submitted_conformance;
+    std::optional<minera::DeclareDiagnosticsOptions> submitted_diagnostics;
     std::optional<minera::DeclarePlayoutOptions> playout_options;
     std::set<std::string> conformance_members, diagnostics_members, playout_members;
     bool include_diagnostics = false, check_generated = false, executed = false;
@@ -179,6 +183,17 @@ void handle_original_declare_workbench(const httplib::Request& request,
         // pm4py reads a CSV upload's table shapes as format_dataframe's frame,
         // in its row order (round BN).
         prepare_csv_frame_view(*source, frame);
+        // pm4py's frame of a CSV upload holds the standard keys as copies of
+        // its selected columns (round BO, csv_frame_key).
+        submitted_conformance = conformance_options;
+        submitted_diagnostics = diagnostics_options;
+        using Role = minera::FirstClassAttributeRole;
+        if (conformance_options) {
+          conformance_options->activity_key = csv_frame_key(*source, Role::kActivity, conformance_options->activity_key);
+          conformance_options->case_id_key = csv_frame_key(*source, Role::kCaseId, conformance_options->case_id_key);
+        }
+        if (diagnostics_options)
+          diagnostics_options->case_id_key = csv_frame_key(*source, Role::kCaseId, diagnostics_options->case_id_key);
       }
       input_before = input_snapshot();
       stage = "native_error";
@@ -262,6 +277,8 @@ void handle_original_declare_workbench(const httplib::Request& request,
       for (const auto& member : members) {if (value.size() > 1) value += ','; value += quote(member);}
       return value + ']';
     };
+    if (submitted_conformance) conformance_options = submitted_conformance;
+    if (submitted_diagnostics) diagnostics_options = submitted_diagnostics;
     const std::string options_json = "{\"conformance\":" + (conformance_options ? minera::serialize_declare_workbench_options_json(*conformance_options) : "null") +
       ",\"diagnostics\":" + (diagnostics_options ? minera::serialize_declare_workbench_options_json(*diagnostics_options) : "null") +
       ",\"playout\":" + (playout_options ? minera::serialize_declare_workbench_options_json(*playout_options) : "null") + '}';

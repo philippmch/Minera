@@ -98,6 +98,7 @@
 #include "minera/correlation_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dataframe_columns.hpp"
+#include "csv_frame_table.hpp"
 #include "minera/data_petri_net.hpp"
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
@@ -569,8 +570,6 @@ const minera::DirectlyFollowsGraph& require_graph(const MinedSession& session) {
   return session.graph;
 }
 
-std::optional<minera::EventTable> csv_frame_table(const minera::ActiveEventSource& source,
-                                                  bool index_columns = true);
 std::optional<minera::EventStream> csv_frame_stream(const minera::ActiveEventSource& source);
 
 // A CSV session's table as format_dataframe's frame (csv_frame_table without
@@ -600,31 +599,15 @@ const minera::LazyEventTable* session_frame_lazy(const MinedSession& session) {
   return cache.lazy ? &*cache.lazy : nullptr;
 }
 
-// A CSV frame's cells that read_csv reads as NaN (a blank cell or a pandas
-// NA spelling; the table keeps them as text) marked null, as the DataFrame
-// holds them (round BN, observed black-box: the DFG adapters without column
-// reduction drop a row with any, the pandas batches drop a row without a
-// resource and the Polars ones group it under a null resource).
-void mark_csv_nan_cells(minera::EventTable& table) {
-  for (auto& row : table.rows)
-    for (auto& cell : row)
-      if (cell && !cell->is_null && cell->kind == minera::AttributeKind::kString &&
-          minera::is_pandas_csv_na_text(cell->value)) {
-        cell->value.clear();
-        cell->is_null = true;
-      }
-}
-
 // The frame with format_dataframe's "@@index" and "@@case_index" columns,
-// whose "@@index" the batches read as the default event id, and its NaN
-// cells null (round BN).
+// whose "@@index" the batches read as the default event id, its NaN cells
+// null (round BN) and its cells typed (round BO).
 const minera::EventTable* session_indexed_frame_table(const MinedSession& session) {
   if (!session.active_source || !session.csv_frame) return nullptr;
   auto& cache = *session.csv_frame;
   std::call_once(cache.indexed_once, [&] {
     try {
-      cache.indexed = csv_frame_table(*session.active_source, true);
-      if (cache.indexed) mark_csv_nan_cells(*cache.indexed);
+      cache.indexed = indexed_csv_frame_table(*session.active_source);
     } catch (const std::exception&) {
       // the routes report the source's own error
     }
@@ -1187,100 +1170,7 @@ void mark_frame_index_rows(const MinedSession& session, minera::TemporalProfileO
   if (session.active_source && session.active_source->file().format == "csv") options.frame_index_rows = true;
 }
 
-// A CSV upload's table as format_dataframe's frame, which pm4py's DataFrame
-// functions read (round BM, observed black-box): the rows without a case,
-// activity or timestamp dropped, the others in the frame's order (cases by
-// id, each case's rows by the upload timestamp, then file order). With
-// `index_columns`, also format_dataframe's "@@index" and "@@case_index" (a
-// CSV's own columns of those names are overwritten), which the DFG adapters
-// read. nullopt for other sources, or when the source's rows and events do
-// not pair up.
-std::optional<minera::EventTable> csv_frame_table(const minera::ActiveEventSource& source,
-                                                  bool index_columns) {
-  if (source.file().format != "csv") return std::nullopt;
-  const auto& log = source.checked_log();
-  if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
-  const auto& frame = *log.dataframe_columns;
-  const auto& table = source.checked_table();
-  const auto& rows = source.representative_row_ordinals();
-  if (rows.size() != log.traces.size()) return std::nullopt;
-  minera::EventTable result;
-  result.columns = table.columns;
-  result.attributes = table.attributes;
-  result.metadata = table.metadata;
-  result.dtypes = table.dtypes;
-  result.categorical_dtypes = table.categorical_dtypes;
-  const auto column = [&](const char* name) {
-    if (!index_columns) return std::size_t{0};
-    const auto found = std::find(result.columns.begin(), result.columns.end(), name);
-    if (found != result.columns.end()) return static_cast<std::size_t>(found - result.columns.begin());
-    result.columns.push_back(name);
-    if (!result.dtypes.empty()) result.dtypes.push_back("int64");
-    if (!result.categorical_dtypes.empty()) result.categorical_dtypes.push_back(std::nullopt);
-    return result.columns.size() - 1;
-  };
-  const auto index_column = column("@@index");
-  const auto case_index_column = column("@@case_index");
-  const auto cell = [](const char* key, std::int64_t value) {
-    minera::EventAttribute attribute{key, std::to_string(value), minera::AttributeKind::kInt};
-    attribute.typed_value = value;
-    return attribute;
-  };
-  std::vector<std::pair<std::int64_t, std::size_t>> positions;  // (@@index, result row)
-  for (std::size_t t = 0; t < log.traces.size(); ++t) {
-    const auto& events = log.traces[t].events;
-    if (rows[t].size() != events.size()) return std::nullopt;
-    for (std::size_t e = 0; e < events.size(); ++e) {
-      const auto order = events[e].input_order;
-      if (!rows[t][e] || *rows[t][e] >= table.rows.size() || order >= frame.row_index.size() ||
-          order >= frame.case_index.size())
-        return std::nullopt;
-      auto row = table.rows[*rows[t][e]];
-      if (index_columns) {
-        row.resize(result.columns.size());
-        row[index_column] = cell("@@index", frame.row_index[order]);
-        row[case_index_column] = cell("@@case_index", frame.case_index[order]);
-      }
-      positions.emplace_back(frame.row_index[order], result.rows.size());
-      result.rows.push_back(std::move(row));
-    }
-  }
-  // The frame's own row order.
-  std::stable_sort(positions.begin(), positions.end(),
-                   [](const auto& left, const auto& right) {return left.first < right.first;});
-  std::vector<minera::EventTable::Row> ordered;
-  ordered.reserve(positions.size());
-  for (const auto& [index, row] : positions) ordered.push_back(std::move(result.rows[row]));
-  result.rows = std::move(ordered);
-  // format_dataframe converts the timestamp column, and every other column of
-  // date texts, to UTC datetimes before it drops rows: datetime64[ns, UTC]
-  // when any of the column's cells has digits below the microsecond, else
-  // datetime64[us, UTC] (round BN, observed black-box). The DataFrame
-  // functions that read the unit (the pandas batches, the heuristics miner's
-  // durations) see it; the cells keep their CSV text.
-  if (result.dtypes.size() == result.columns.size()) {
-    const auto sub_microsecond = [](const std::string& text) {
-      const auto colon = text.find(':');
-      const auto dot = text.find('.', colon == std::string::npos ? 0 : colon);
-      if (dot == std::string::npos) return false;
-      std::size_t digits = 0;
-      for (std::size_t i = dot + 1; i < text.size() && std::isdigit(static_cast<unsigned char>(text[i])); ++i) ++digits;
-      return digits > 6;
-    };
-    for (const auto& date_column : frame.columns) {
-      if (date_column.type != minera::DataFrameColumnType::kDate) continue;
-      const auto found = std::find(result.columns.begin(), result.columns.end(), date_column.key);
-      if (found == result.columns.end()) continue;
-      const auto index = static_cast<std::size_t>(found - result.columns.begin());
-      if (index >= table.columns.size() || table.columns[index] != date_column.key) continue;
-      const bool nanoseconds = std::any_of(table.rows.begin(), table.rows.end(), [&](const auto& row) {
-        return index < row.size() && row[index] && sub_microsecond(row[index]->value);
-      });
-      result.dtypes[index] = nanoseconds ? "datetime64[ns, UTC]" : "datetime64[us, UTC]";
-    }
-  }
-  return result;
-}
+using ::csv_frame_table;  // the source overloads (csv_frame_table.hpp)
 
 std::optional<minera::EventTable> csv_frame_table(const MinedSession& session) {
   if (!session.active_source) return std::nullopt;
@@ -1317,6 +1207,12 @@ std::optional<minera::EventStream> csv_frame_stream(const minera::ActiveEventSou
   result.events.clear();
   result.events.reserve(positions.size());
   for (const auto& [index, row] : positions) result.events.push_back(stream.events[row]);
+  // A CSV column the frame's copies replace is not in the frame (round BO).
+  for (auto& event : result.events)
+    std::erase_if(event.fields, [&](const minera::EventAttribute& field) {
+      return field.first_class_role == minera::FirstClassAttributeRole::kNone &&
+             csv_frame_replaced_column(source, field.key);
+    });
   return result;
 }
 
@@ -4631,8 +4527,15 @@ void handle_constraint_discovery(const httplib::Request& request,
     auto params = minera::parse_mine_params(lookup, present);
     overlay_cached_source_selectors(request, *session, params);
     const auto activity = family == "declare" ? params.declare_options.activity_key : params.log_skeleton.activity_key;
-    const auto conformance_activity = request.has_param("conformance_activity_key") ? trim_text(request.get_param_value("conformance_activity_key")) : activity;
-    const auto diagnostics_case = request.has_param("diagnostics_case_id_key") ? trim_text(request.get_param_value("diagnostics_case_id_key")) : "case:concept:name";
+    // A CSV source reads the standard keys as its selected columns (round BO,
+    // csv_frame_key).
+    const auto frame_key = [&](minera::FirstClassAttributeRole role, std::string key) {
+      return session->active_source ? csv_frame_key(*session->active_source, role, std::move(key)) : key;
+    };
+    const auto conformance_activity = request.has_param("conformance_activity_key")
+        ? frame_key(minera::FirstClassAttributeRole::kActivity, trim_text(request.get_param_value("conformance_activity_key"))) : activity;
+    const auto diagnostics_case = frame_key(minera::FirstClassAttributeRole::kCaseId,
+        request.has_param("diagnostics_case_id_key") ? trim_text(request.get_param_value("diagnostics_case_id_key")) : "case:concept:name");
     if (conformance_activity.empty() || diagnostics_case.empty()) throw std::invalid_argument("constraint selectors must not be empty");
     std::optional<minera::DeclareModel> declare;
     std::optional<minera::LogSkeletonModel> skeleton;

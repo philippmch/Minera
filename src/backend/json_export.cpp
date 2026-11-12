@@ -1,4 +1,8 @@
 #include "minera/json_export.hpp"
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
+#include "frame_cells.hpp"
+#include "python_scalar.hpp"
 #include "minera/analysis_json_traces.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/pnml.hpp"
@@ -2965,6 +2969,33 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
     throw std::invalid_argument("batch discovery options are invalid");
   }
   std::set<std::pair<std::size_t, std::size_t>> identities;
+  // A CSV frame's log groups by the frame's typed cells ("1.0", NaN; round
+  // BO), which the event's text does not spell: a label matches the event's
+  // text or str() of its frame cell (the selected column for a role name).
+  std::optional<EventLog> frame;
+  std::set<std::string> frame_columns;
+  if (discovery.variant == BatchDiscoveryVariant::kLog && log.dataframe_columns &&
+      log.dataframe_columns->csv_text) {
+    frame = dataframe_frame_event_log(log);
+    frame_columns = frame_keys(*frame, FrameKeyScope::kEventLog);
+  }
+  const auto frame_label = [&](std::size_t trace_index, std::size_t event_index, std::string key,
+                               const std::string& role_key) -> std::optional<std::string> {
+    if (!frame || trace_index >= frame->traces.size() ||
+        event_index >= frame->traces[trace_index].events.size())
+      return std::nullopt;
+    if (!frame_columns.contains(key)) key = role_key;
+    if (key.empty() || !frame_columns.contains(key)) return std::nullopt;
+    const auto& trace = frame->traces[trace_index];
+    const auto cell = frame_scalar(*frame, trace, trace.events[event_index], key, FrameKeyScope::kEventLog);
+    return cell ? python::str(*cell) : std::string("nan");
+  };
+  const auto matches = [&](const std::string* text, const std::string& label, std::size_t trace_index,
+                           std::size_t event_index, const std::string& key, const std::string& role_key) {
+    if (text && *text == label) return true;
+    const auto typed = frame_label(trace_index, event_index, key, role_key);
+    return typed && *typed == label;
+  };
   std::size_t previous_group_batch_count = std::numeric_limits<std::size_t>::max();
   std::string previous_group_activity;
   std::string previous_group_resource;
@@ -2997,8 +3028,9 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
     double previous_start = -std::numeric_limits<double>::infinity();
     for (const auto& batch : group.batches) {
       (void)batch_type_name(batch.type);
-      if (!std::isfinite(batch.start) || !std::isfinite(batch.complete) ||
-          batch.start > batch.complete) {
+      // An event that starts after it completes is taken as it is (round
+      // BN), so a batch of such events can end before it starts (round BO).
+      if (!std::isfinite(batch.start) || !std::isfinite(batch.complete)) {
         throw std::invalid_argument("batch discovery has invalid batch range");
       }
       if (batch.events.empty() ||
@@ -3014,9 +3046,9 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
       previous_start = batch.start;
       double previous_event_start = -std::numeric_limits<double>::infinity();
       for (const auto& event : batch.events) {
+        const bool ordered = event.start <= event.complete && batch.start <= batch.complete;
         if (!std::isfinite(event.start) || !std::isfinite(event.complete) ||
-            event.start > event.complete || event.start < batch.start ||
-            event.complete > batch.complete) {
+            (ordered && (event.start < batch.start || event.complete > batch.complete))) {
           throw std::invalid_argument("batch discovery has invalid event range");
         }
         if (discovery.variant == BatchDiscoveryVariant::kLog) {
@@ -3031,9 +3063,10 @@ void validate_batch_discovery(const BatchDiscovery& discovery,
               source, discovery.options.activity_attribute, "activity");
           const auto* source_resource = batch_event_value(
               source, discovery.options.resource_attribute, "resource");
-          if (source_activity == nullptr || source_resource == nullptr ||
-              *source_activity != group.activity ||
-              *source_resource != group.resource) {
+          if (!matches(source_activity, group.activity, event.trace_index, event.event_index,
+                       discovery.options.activity_attribute, source.activity_source_key) ||
+              !matches(source_resource, group.resource, event.trace_index, event.event_index,
+                       discovery.options.resource_attribute, source.resource_source_key)) {
             throw std::invalid_argument(
                 "batch discovery event does not match its group");
           }

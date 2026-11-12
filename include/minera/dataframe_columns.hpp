@@ -31,6 +31,10 @@ struct DataFrameColumn {
   // (kCaseId), and the timestamp column with its copy time:timestamp
   // (kTimestamp, a UTC date); kNone for an ordinary attribute.
   FirstClassAttributeRole role = FirstClassAttributeRole::kNone;
+  // A CSV date column with a cell below the microsecond (more than six
+  // fraction digits), in any data row: to_datetime then gives
+  // datetime64[ns, UTC], else datetime64[us, UTC] (round BO).
+  bool nanoseconds = false;
 };
 
 // The event columns of a log's frame. For a CSV log (csv_text) the cells are

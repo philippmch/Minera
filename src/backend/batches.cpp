@@ -18,6 +18,9 @@
 #include <utility>
 #include <variant>
 
+#include "frame_cells.hpp"
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
 #include "python_scalar.hpp"
 
@@ -61,6 +64,11 @@ struct IndexedEvent {
   ScalarValue resource_value;
   // The Polars adapter groups a null resource as its own key.
   bool resource_is_null = false;
+  // A CSV frame log's missing activity or resource is NaN: pandas' one
+  // np.nan in a text or object column, else a float of its own row (round
+  // BO).
+  bool activity_shared_nan = false;
+  bool resource_shared_nan = false;
 };
 
 struct TableSelector {
@@ -579,10 +587,26 @@ BatchDiscovery detect_grouped(std::vector<IndexedEvent> values,
     nulls = nulls || value.resource_is_null;
   }
   std::vector<python::Group> groups;
-  try {
-    groups = python::groupby(keys, nulls);
-  } catch (const python::TypeError& error) {
-    throw std::invalid_argument(std::string("batches: ") + error.what());
+  if (!include_event_id) {
+    // The log variant (an EventLog's events, no event ids) groups the
+    // events in a dict keyed by (activity, resource): groups in the order
+    // their first event comes, each labelled by its first key, and a NaN
+    // only matches itself, the same object (round BO, observed black-box).
+    std::unordered_map<std::string, std::size_t> index;
+    for (std::size_t row = 0; row < values.size(); ++row) {
+      const auto& value = values[row];
+      const auto key = tuple_member(value.activity_value, row, value.activity_shared_nan) +
+                       tuple_member(value.resource_value, row, value.resource_shared_nan);
+      const auto [it, added] = index.try_emplace(key, groups.size());
+      if (added) groups.push_back({{value.activity_value, value.resource_value}, {}});
+      groups[it->second].rows.push_back(row);
+    }
+  } else {
+    try {
+      groups = python::groupby(keys, nulls);
+    } catch (const python::TypeError& error) {
+      throw std::invalid_argument(std::string("batches: ") + error.what());
+    }
   }
 
   // Each event tuple's identity, interned: equal tuples share one id.
@@ -659,19 +683,25 @@ BatchDiscovery detect_grouped(std::vector<IndexedEvent> values,
   return BatchDiscovery{options, options.variant, std::move(groups_out)};
 }
 
+// `frame_cells`: a missing activity or resource is read as "" here, for
+// append_frame_log_events to give its frame cell (NaN).
 void append_log_events(
     const EventLog& log, const BatchDiscoveryOptions& options,
-    std::vector<IndexedEvent>& values) {
+    std::vector<IndexedEvent>& values, bool frame_cells = false) {
+  static const std::string kMissing;
+  const auto read = [&](const Event& event, std::string_view key, std::string_view kind) -> const std::string& {
+    if (frame_cells)
+      if (const auto* value = event_value(event, key, kind)) return *value;
+    return frame_cells ? kMissing : required_event_value(event, key, kind);
+  };
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
        ++trace_index) {
     const auto& trace = log.traces[trace_index];
     for (std::size_t event_index = 0; event_index < trace.events.size();
          ++event_index) {
       const auto& event = trace.events[event_index];
-      const auto& activity =
-          required_event_value(event, options.activity_attribute, "activity");
-      const auto& resource =
-          required_event_value(event, options.resource_attribute, "resource");
+      const auto& activity = read(event, options.activity_attribute, "activity");
+      const auto& resource = read(event, options.resource_attribute, "resource");
       const auto& completion_text =
           required_event_value(event, options.timestamp_attribute, "timestamp");
       const auto complete = parse_timestamp(completion_text);
@@ -701,6 +731,70 @@ void append_log_events(
                              {}};
       values.push_back(IndexedEvent{std::move(batch_event), activity, resource, std::nullopt, false, false, false,
                                     text_scalar(case_id), text_scalar(activity), text_scalar(resource), false});
+    }
+  }
+}
+
+// A CSV upload's log as the reference's log variant reads it: pm4py's
+// convert_to_event_log of format_dataframe's frame (round BO, observed
+// black-box). The resource, and an activity key that names another column
+// than the activity's, are the frame's typed cells (a number with a gap in
+// its column is a float, "1.0"; a bool is True), a missing one NaN (pandas'
+// one np.nan in a text or object column, a float of its own row in a float
+// column, so those events never share a group), and an event key the frame
+// lacks raises KeyError (but Minera's role names, below). The activity
+// column and the case stay text: the routes select the CSV's own columns for
+// the frame's text copies concept:name and case:concept:name.
+void append_frame_log_events(const EventLog& log, const BatchDiscoveryOptions& options,
+                             std::vector<IndexedEvent>& values) {
+  const auto frame = dataframe_frame_event_log(log);
+  const auto keys = frame_keys(frame, FrameKeyScope::kEventLog);
+  // Minera's role names (activity, org:resource, ...) that the frame has no
+  // column of keep naming the selected column, or no resource ("") when the
+  // upload selects none, as before (declared: pm4py raises KeyError).
+  const auto alias = [&](const std::string& key, std::initializer_list<std::string_view> names) {
+    return !keys.contains(key) && std::find(names.begin(), names.end(), key) != names.end();
+  };
+  const bool activity_alias = alias(options.activity_attribute, {"activity", "concept:name"});
+  const bool resource_alias = alias(options.resource_attribute, {"resource", "org:resource"});
+  // An event is read only when there is one: an empty log raises nothing.
+  if (frame.event_count() > 0) {
+    if (!options.activity_attribute.empty() && !activity_alias) require_frame_key(keys, options.activity_attribute);
+    if (!options.resource_attribute.empty() && !resource_alias) require_frame_key(keys, options.resource_attribute);
+    for (const auto* key : {&options.timestamp_attribute, &options.start_timestamp_attribute})
+      if (!key->empty() && !alias(*key, {"timestamp", "time:timestamp"})) require_frame_key(keys, *key);
+  }
+  const auto first = values.size();
+  append_log_events(log, options, values, frame.traces.size() == log.traces.size());
+  if (frame.traces.size() != log.traces.size()) return;
+  const auto typed = [&](const Trace& trace, const Event& event, const std::string& key,
+                         ScalarValue& value, bool& shared_nan, std::string& text) {
+    if (auto cell = frame_scalar(frame, trace, event, key, FrameKeyScope::kEventLog)) {
+      value = std::move(*cell);
+    } else {
+      value = python::real(std::numeric_limits<double>::quiet_NaN());
+      shared_nan = frame_column_type(frame, key) != DataFrameColumnType::kFloat64;
+    }
+    text = python::str(value);
+  };
+  std::size_t row = first;
+  for (std::size_t t = 0; t < frame.traces.size(); ++t) {
+    const auto& trace = frame.traces[t];
+    if (trace.events.size() != log.traces[t].events.size()) return;
+    for (std::size_t e = 0; e < trace.events.size(); ++e) {
+      const auto& event = trace.events[e];
+      // The log's own event names its selected columns (the frame view's
+      // events have no first-class resource).
+      const auto& source = log.traces[t].events[e];
+      auto& value = values[row++];
+      const auto& activity_key = options.activity_attribute;
+      if (!activity_key.empty() && !activity_alias && activity_key != "concept:name" &&
+          activity_key != source.activity_source_key)
+        typed(trace, event, activity_key, value.activity_value, value.activity_shared_nan, value.activity);
+      // An alias reads the selected resource column's typed cells.
+      const auto& resource_key = resource_alias ? source.resource_source_key : options.resource_attribute;
+      if (!resource_key.empty() && keys.contains(resource_key))
+        typed(trace, event, resource_key, value.resource_value, value.resource_shared_nan, value.resource);
     }
   }
 }
@@ -779,6 +873,17 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
     if (!text)
       throw std::invalid_argument(
           "batches: the case ID column should be of type string.");
+  }
+  // So does its activity column (round BO, observed black-box).
+  if (polars && activity_selector.column && *activity_selector.column < table.dtypes.size()) {
+    const std::string_view dtype = table.dtypes[*activity_selector.column];
+    const bool text = dtype.starts_with("String") || dtype.starts_with("Utf8") ||
+                      dtype.starts_with("Categorical") || dtype.starts_with("Enum") ||
+                      dtype == "str" || dtype == "string" || dtype == "object" ||
+                      dtype == "category";
+    if (!text)
+      throw std::invalid_argument(
+          "batches: the activity column should be of type string.");
   }
   // The pandas adapter reads a datetime column as its integer units divided
   // by 1e9, so a microsecond, millisecond or second column gives seconds
@@ -937,7 +1042,10 @@ BatchDiscovery discover_batches(const EventLog& log,
                                 BatchDiscoveryOptions options) {
   validate_options(options);
   std::vector<IndexedEvent> values;
-  append_log_events(log, options, values);
+  if (log.dataframe_columns && log.dataframe_columns->csv_text)
+    append_frame_log_events(log, options, values);
+  else
+    append_log_events(log, options, values);
   return detect_grouped(std::move(values), std::move(options), false);
 }
 

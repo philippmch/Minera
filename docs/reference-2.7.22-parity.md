@@ -24286,3 +24286,134 @@ Verification (scripts in the project files under `review-harness/round-bn/`;
 frames, the DFG adapters on declared date dtypes and NaT starts, the
 adapters without column reduction on NaN rows, and the heuristics net on
 its own activity column, with values from pm4py black-box.
+
+## Review BO1: re-review of round BN, standard keys and the frame's own copies on CSV uploads, batches on the frame's typed cells, CSV conversions and the CLI's batches (2026-11-12)
+
+Round BO re-reviewed BN (the session routes and workbenches on CSV frames,
+the frame's date dtypes, the batches' `@@index`, NaT starts and inverted
+events, the heuristics fallbacks) with fresh seeds and took its targets:
+the upload workbenches and session routes on CSV uploads with custom
+headers and the standard keys, the batches' log variant with a blank
+resource, the conversions of a CSV frame, the CLI's batches on CSV inputs
+and `str()` names of non-text keys in the batches. The device check on the
+Mac was skipped (the round's thread had no device linked). Findings, all
+fixed:
+
+- **BO1-1 The standard keys on a CSV upload with its own headers.**
+  `format_dataframe` adds `case:concept:name`, `concept:name` and
+  `time:timestamp` as copies of the selected columns, so pm4py reads an
+  upload whose columns are `case,act,ts` under the standard keys too.
+  Minera's Declare and log skeleton workbenches on the DataFrame and
+  LazyFrame shapes, the footprints workbench (`entire_dataframe`,
+  `polars_lazyframes`, and its diagnostics case key),
+  `/api/discover-constraints` (conformance activity key, diagnostics case
+  key) and the alpha and inductive workflow discovery with supplied keys
+  refused them (`missing column 'concept:name'`) or answered otherwise than
+  for the same upload under the standard headers. A standard key now names
+  the selected column on a CSV upload's views (`csv_frame_key`), when that
+  column is one of the CSV's (an optional literal column the CSV lacks names
+  nothing).
+- **BO1-2 A CSV's own `concept:name`, `time:timestamp` or
+  `case:concept:name` column.** When the selected columns have other names,
+  `format_dataframe` drops the CSV's column of a copy's name and appends the
+  copy, so pm4py's frame and its log hold the selected cells under that key.
+  Minera's import kept the CSV's column as an event attribute, which
+  shadowed the selection: token replay, Declare, the constraints, the DFG,
+  the correlation miner, the temporal profile and the transition system read
+  the other column's values (activities `X`, `Y`, `Z`). The batch import
+  now leaves such a column out, and the frame's column order (the LLM
+  abstractions' frame view) is the header without the replaced columns, the
+  copies, then `@@index` and `@@case_index` (a CSV's own `@@index` is not
+  listed twice).
+- **BO1-3 The date unit of rows the frame drops (re-review of BN1-2).** BN
+  read the sub-microsecond digits from the upload's table, which lacks the
+  rows the import drops (a blank case, for one), so a frame whose only
+  nanosecond cell sat in such a row was declared `[us, UTC]`: the pandas
+  batches read seconds a thousand times too large there (1 of 60 nanosecond
+  uploads), and the DFG concurrent events' error named the wrong unit. The
+  import now records the unit of every date column over all data rows
+  (`DataFrameColumn::nanoseconds`).
+- **BO1-4 The batches on the frame's typed cells.** read_csv types a CSV
+  column of numbers as ints, or floats when it has a gap or a decimal, and
+  the batches group and name by those values: a numeric resource with a gap
+  is `1.0`, ints sort as numbers, a column of numbers or bools selected as
+  the activity is `1.5`, `2.0`, `True`. A blank resource is NaN: the log
+  variant (a dict of the events' keys) groups pandas' one `np.nan` of a
+  text column as `nan`, and sorting it beside a text resource of the same
+  activity and batch count raises `TypeError: '<' not supported between
+  instances of 'float' and 'str'`; a NaN of a float column is a float of its
+  own row and never shares a group. The Polars variant raises `the
+  activity column should be of type string.` for such an activity column.
+  Minera read the CSV text: labels `1` and `2`, a blank resource grouped
+  under `""`, no TypeError and no Polars refusal. The batches' frame (and
+  the log variant's events) now hold the typed cells, and a key the frame
+  lacks raises `KeyError` in the log variant.
+- **BO1-5 Batches with an inverted event in `/api/mine` and the CLI.**
+  BN1-4 made the batches take an event that starts after it completes as it
+  is, but the analysis output still checked each batch's events against its
+  range, so `/api/mine` and the CLI with batches and a start column failed
+  the whole response (`batch discovery has invalid event range`). The check
+  now accepts such batches (and on a CSV frame no longer compares a group's
+  typed labels with the events' text).
+- **BO1-6 The CLI's batches on a CSV input.** `minera_export --batches`
+  with the pandas and Polars variants read a table made from the log,
+  without the frame's `@@index` and date dtypes: pandas gave plain seconds
+  where pm4py's microsecond frame gives them scaled down a thousandfold, and
+  events alike in every other value collapsed (36 of 40 pandas and 4 of 40
+  Polars results differed). The CLI now reads the CSV's frame as the server
+  reads an upload (`csv_frame_table.hpp`, shared by both).
+
+Declarations:
+
+- `/api/log-convert` on a CSV upload keeps Minera's representation: the
+  event log, stream and table hold the selected cells once, under their
+  first-class roles and as CSV text; pm4py's `convert_to_event_log` and
+  `convert_to_event_stream` of the frame also hold the standard copies,
+  `@@index`, `@@case_index`, typed cells and NaN or NaT for blank cells (as
+  the XES downloads, "CSV columns are not repeated" and "CSV attribute
+  columns are XES strings"). The rows, their order, their cases,
+  activities, timestamps and resources are pm4py's (`convcsv.py`).
+- `pm4py.discover_batches` on a DataFrame first runs pm4py's column check
+  (an activity column of text without empty values); Minera's pandas
+  variant runs the batches algorithm as pm4py's algorithm does without it
+  (also the only path with a start column, which `pm4py.discover_batches`
+  cannot pass), so it computes on a number or bool activity column. The
+  Polars variant checks in both, sometimes with another of the check's
+  messages (`should not contain any empty value`, `a required table cell is
+  missing`) or another operand order in a TypeError.
+- Minera's role names for the batches' keys (`org:resource`, `resource`,
+  `activity`, `timestamp`) name the selected column of a CSV upload, or no
+  resource (`""`) when the upload selects none; pm4py's frame has no
+  `org:resource` column unless the CSV has one and raises `KeyError`. The
+  activity and case columns selected at upload stay text in the batches:
+  the routes select them for the frame's text copies `concept:name` and
+  `case:concept:name`, so pm4py keyed by the column's own name orders ties
+  of a number column as numbers where Minera orders them as text (the
+  labels are the same), and the Polars case check on an emptied frame
+  (whose case column is a float column) is not raised.
+- The harness's Polars frames follow `pl.from_pandas` (`nan_to_null`): a
+  NaN float is null there, as in Minera's Polars batches.
+- The CSV timestamp columns of plain numbers and "roles to diagnostics
+  groups" (round AT) are still with Philipp.
+
+Verification (scripts in the project files under `review-harness/round-bo/`;
+"before" is round BN's server, or this round's server before the batches
+fixes, on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Metamorphic standard keys on 16 session routes (`keystd.py`: an upload under its own headers vs the same rows under the standard headers, 30 uploads; `--shadow` adds the CSV's own junk standard columns, 30 more) | 960 | before: 166 of 480 and 303 of 480 differed (Declare, log skeleton, footprints, alpha, inductive, pandas batches; with the junk columns also correlation, DFG, MSD, spectrum, temporal profile, transition system); after: all the same |
+| Declare and log skeleton conformance on custom headers with the standard keys (`declcsv.py`, 40 uploads, four shapes, two operations) | 320 | before: 240 refused (every shape but the log); after: 240 equal, 80 on the stream where pm4py raises (declared in BL) |
+| Batches with numeric and blank resources (`batchcsv.py --resblank --res=2,10`, 80 uploads; `--res=r1,r2,3`, 80; `--blank --resnum`, 80; `--blank`, 80) | 960 | before (BN): 150 of 240 and 38 of 240 differed on the first two (the second's 20 log TypeErrors computed); after: 891 equal, 69 raise alike |
+| Batches with a number, bool or mixed column as the activity key (`batchcsv.py --xvals=...`, six columns, 40 uploads each) | 720 | before: 153 log results differed or were refused, 128 Polars results computed where pm4py raises; after: every log result equal, Polars raises alike; pandas computes where `pm4py.discover_batches` checks (declared) |
+| Batches with nanoseconds, a start column and blanks (`batchcsv.py --ns --start --blank`, 60) | 180 | before: 1 pandas result differed; after: 105 equal, 74 raise alike, 1 emptied frame where pm4py's Polars raises (declared) |
+| CLI batches on CSV inputs (`clibatch.py`: 40 plain, 40 with nanoseconds, a start column and blanks, 40 with blank resources, 40 with numeric resources) | 480 | before (40 plain): 40 of 120 differed, every start column upload with an inverted event failed; after: 411 equal, 68 raise alike, 1 emptied frame where pm4py's Polars raises (declared) |
+| Conversions of CSV uploads (`convcsv.py`: 60 as log, 40 as DataFrame, 40 as stream; three conversions) | 420 | all equal (rows, order, cases, roles) |
+| Metamorphic file order, re-run on the new server (`metaroute.py --res` 30, `metawb.py` 25, `metamine.py` 30 plus 45 with a start column and batches) | 1,270 answers, 75 responses | all the same (before: the batch responses with an inverted event failed) |
+| BN's sweeps re-run (`minecsv.py` 30, `dfgdf.py` 40, `declcsv.py --std --skel` 40) | 680 | all equal or raise alike, but the stream shape where pm4py raises (declared in BL) |
+| Full suites: ctest, script tests, frontend tests, fixture replay | 473 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; two active-source fixtures of a CSV with both its own and the standard headers recaptured (the copies replace the CSV's `concept:name` and `time:timestamp`, as pm4py's frame) |
+
+`minera_review_bo1_tests` binds the frame's column order and date unit, the
+frame rows without the CSV's own standard columns, the log variant's NaN
+groups and TypeError, numeric resources and activities, and the frame's
+`KeyError`.

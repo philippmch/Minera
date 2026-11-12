@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BN (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BO (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4631,7 +4631,63 @@ regression of BM's introsort model: keep `pyarrow` out of `/tmp/refvenv`
 device check on the Mac was skipped again (the round's thread had no
 device linked).
 
-Next round (BO) should start by re-reviewing round BN:
+Round BO re-reviewed BN (Review BO1) and took its targets. It fixed the
+standard keys on CSV uploads with their own headers (`concept:name` and the
+other copies `format_dataframe` adds now name the selected columns on the
+Declare, log skeleton and footprints workbenches, the constraint route and
+workflow discovery: `csv_frame_key`); a CSV's own `concept:name`,
+`time:timestamp` or `case:concept:name` column beside other selected
+columns (the frame replaces it by the copy; the import kept it and it
+shadowed the selection on every route); the date unit of rows the frame
+drops (BN read it from the upload's table, which lacks them; the import
+records it now, `DataFrameColumn::nanoseconds`); the batches on the frame's
+typed cells (numeric resources `1.0`, NaN resources as pandas' `np.nan`
+with the log variant's dict groups and its TypeError, number and bool
+activity keys, the Polars activity type check; `type_csv_frame_cells`,
+`append_frame_log_events`); the analysis output's batch check, which still
+refused BN's inverted events (`/api/mine` and the CLI failed the whole
+response); and the CLI's pandas and Polars batches on a CSV input, which
+now read the frame as the server does (`csv_frame_table.hpp`, shared).
+Declared: `/api/log-convert` on a CSV keeps Minera's representation (rows,
+order and roles are pm4py's), the pandas batches run without
+`pm4py.discover_batches`' column check, Minera's role names for batch keys
+on CSV uploads, the selected activity and case columns as text. Two
+active-source fixtures of a CSV with both its own and the standard headers
+were recaptured (the copies now replace the CSV's columns, as pm4py's
+frame). The device check on the Mac was skipped again (no device linked).
+
+Next round (BP) should start by re-reviewing round BO:
+
+- `src/backend/tools/csv_frame_table.hpp` (moved from the server, now also
+  used by `minera_export`'s `csv_batch_frame`: the CLI rebuilds the source
+  from the file and uses it only when the log's events pair up with it);
+  `csv_frame_key` and its callers (`overlay_active_source_selectors` with
+  `csv_frame`, the `EvaluationParams` overlay, the temporal source and
+  target keys, `handle_constraint_discovery`'s `frame_key`, the original
+  Declare, log skeleton and footprints routes' submitted options);
+  `type_csv_frame_cells` (only the batches' indexed frame is typed);
+- `src/backend/csv_event_log_importer.cpp`: `replaced_by_copy` (only the
+  batch import), the frame `order`, `nanosecond_cells`;
+- `src/backend/batches.cpp`: `append_frame_log_events` (the role-name
+  aliases, NaN identity by column type, the frame-key KeyError), the dict
+  groups of the log variant (`!include_event_id`), the Polars activity
+  check; `src/backend/json_export.cpp`'s relaxed batch checks;
+- carried over: the `activity_source_key`/`timestamp_source_key` lookups of
+  other families (grep for `event is missing activity attribute`), checked
+  in BO only through the metamorphic sweeps;
+- new areas: the CLI's other DataFrame modes on CSV inputs (performance
+  spectrum, DFG adapters, temporal profile and the rest still read
+  `event_log_to_table(log)`, not the frame: compare `minera_export` with
+  pm4py on the frame as `clibatch.py` does); typed frame cells on the other
+  frame-table routes (the DFG adapters, the spectrum and footprints keyed
+  by a number column); the pandas and Polars batches' `org:resource` alias
+  on CSV frames (pm4py raises `KeyError`; the log variant's role names are
+  declared);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BO commit.
+
+Round BN's targets, re-reviewed in BO (findings BO1-1 to BO1-6):
 
 - `src/backend/tools/minera_server.cpp`: `session_frame_table`,
   `session_frame_lazy`, `session_frame_stream`, `session_indexed_frame_*`

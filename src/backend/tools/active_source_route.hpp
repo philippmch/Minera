@@ -51,11 +51,27 @@ bool active_source_supplied(const httplib::Request& request, std::string_view na
   return request.has_file(std::string(name)) || request.has_param(std::string(name));
 }
 
+// The role whose selected column `value` names (one of `s`'s members).
+minera::FirstClassAttributeRole selector_role(const minera::ActiveSourceSelectors& s,
+                                              const std::string& value) {
+  if (&value == &s.case_id_key) return minera::FirstClassAttributeRole::kCaseId;
+  if (&value == &s.activity_key) return minera::FirstClassAttributeRole::kActivity;
+  if (&value == &s.timestamp_key) return minera::FirstClassAttributeRole::kTimestamp;
+  return minera::FirstClassAttributeRole::kNone;
+}
+
+// Unsupplied keys take the source's selected columns. On a CSV source
+// (`csv_frame`) a supplied case:concept:name, concept:name or time:timestamp
+// reads the selected column, as format_dataframe's copy holds it (round BO,
+// csv_frame_key).
 template <typename Supplied>
 void overlay_active_source_selectors(minera::MineParams& p,
-    const minera::ActiveSourceSelectors& s, const Supplied& supplied) {
+    const minera::ActiveSourceSelectors& s, const Supplied& supplied,
+    const std::vector<std::string>* csv_columns = nullptr) {
+  const bool csv_frame = csv_columns != nullptr;
   const auto set = [&](std::string_view control, std::string& target, const std::string& value) {
     if (!supplied(control)) target = value;
+    else if (csv_frame) target = csv_frame_key(s, selector_role(s, value), target, csv_columns);
   };
   set("alpha_case_id_attribute", p.alpha.case_id_attribute, s.case_id_key);
   set("alpha_activity_attribute", p.alpha.activity_attribute, s.activity_key);
@@ -97,8 +113,16 @@ void overlay_active_source_selectors(minera::MineParams& p,
   set("temporal_activity_attribute", p.temporal_profile.activity_attribute, s.activity_key);
   if (!supplied("temporal_source_timestamp_attribute") && !supplied("temporal_source_completion_timestamp_attribute"))
     p.temporal_profile.source_timestamp_attribute = s.timestamp_key;
+  else if (csv_frame)
+    p.temporal_profile.source_timestamp_attribute = csv_frame_key(s, minera::FirstClassAttributeRole::kTimestamp,
+                                                                  p.temporal_profile.source_timestamp_attribute,
+                                                                  csv_columns);
   if (!supplied("temporal_target_timestamp_attribute") && !supplied("temporal_target_start_timestamp_attribute"))
     p.temporal_profile.target_timestamp_attribute = s.timestamp_key;
+  else if (csv_frame)
+    p.temporal_profile.target_timestamp_attribute = csv_frame_key(s, minera::FirstClassAttributeRole::kTimestamp,
+                                                                  p.temporal_profile.target_timestamp_attribute,
+                                                                  csv_columns);
   set("dfg_case_id_attribute", p.dfg_table_options.case_id_attribute, s.case_id_key);
   set("dfg_activity_attribute", p.dfg_table_options.activity_attribute, s.activity_key);
   set("dfg_timestamp_attribute", p.dfg_table_options.timestamp_attribute, s.timestamp_key);
@@ -114,7 +138,8 @@ void overlay_cached_source_selectors(const httplib::Request& request,
     bool explicit_flat = false) {
   if (cached_source_uses_bound_defaults(session, explicit_flat))
     overlay_active_source_selectors(params, session.active_source->selectors(),
-        [&](std::string_view key) {return active_source_supplied(request, key);});
+        [&](std::string_view key) {return active_source_supplied(request, key);},
+        session.active_source->file().format == "csv" ? &session.active_source->original_table().columns : nullptr);
 }
 
 void overlay_cached_source_selectors(const httplib::Request& request,
@@ -122,9 +147,12 @@ void overlay_cached_source_selectors(const httplib::Request& request,
     bool explicit_flat = false) {
   if (!cached_source_uses_bound_defaults(session, explicit_flat)) return;
   const auto& selectors = session.active_source->selectors();
+  const auto& source = *session.active_source;
   const auto set = [&](std::string_view name, std::string& activity, std::string& case_id) {
     if (!active_source_supplied(request, std::string(name) + "_activity_attribute")) activity = selectors.activity_key;
+    else activity = csv_frame_key(source, minera::FirstClassAttributeRole::kActivity, activity);
     if (!active_source_supplied(request, std::string(name) + "_case_id_attribute")) case_id = selectors.case_id_key;
+    else case_id = csv_frame_key(source, minera::FirstClassAttributeRole::kCaseId, case_id);
   };
   set("evaluation", params.replay_fitness_options.activity_attribute, params.replay_fitness_options.case_id_attribute);
   set("evaluation", params.precision_options.activity_attribute, params.precision_options.case_id_attribute);
@@ -253,7 +281,7 @@ minera::ActiveEventSource prepare_active_event_source(
       bind_imported_csv_source_selectors(data, params.csv, literal, selectors);
       if (kind != minera::EventDataKind::kEventLog || !literal.empty())
         overlay_active_source_selectors(params, selectors,
-            [&](std::string_view key) {return active_source_supplied(request, key);});
+            [&](std::string_view key) {return active_source_supplied(request, key);}, &data.table.columns);
       return minera::ActiveEventSource::from_csv(std::move(data), std::move(file), selectors, kind, cancelled);
     } catch (const minera::OperationCancelled&) {
       throw;  // a canceled read is not retried as a legacy log

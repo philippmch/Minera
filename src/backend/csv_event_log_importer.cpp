@@ -2310,12 +2310,27 @@ CsvEventData import_csv_event_data_impl(
   constexpr std::string_view kCasePrefix = "case:";
   std::vector<std::size_t> attribute_indices;
   std::vector<std::size_t> case_attribute_indices;
+  // format_dataframe replaces a column named case:concept:name,
+  // concept:name or time:timestamp that is not the selected case, activity
+  // or timestamp column by a copy of the selected one, so the batch import
+  // drops such a column from the events and traces: under that key the
+  // frame, its log and its stream hold the selected values (round BO,
+  // observed black-box). The table keeps the CSV's cells.
+  const auto replaced_by_copy = [&](std::size_t i) {
+    if (!reference_batch) return false;
+    if (header[i] == "case:concept:name") return header[case_index] != header[i];
+    if (header[i] == "concept:name") return header[activity_index] != header[i];
+    if (header[i] == "time:timestamp")
+      return timestamp_index.has_value() && header[*timestamp_index] != header[i];
+    return false;
+  };
   for (std::size_t i = 0; i < header.size(); ++i) {
     if (i == case_index || i == activity_index) continue;
     if (timestamp_index && i == *timestamp_index) continue;
     if (resource_index && i == *resource_index) continue;
     if (lifecycle_index && i == *lifecycle_index) continue;
     if (header[i].empty()) continue;
+    if (replaced_by_copy(i)) continue;
     if (header[i].size() > kCasePrefix.size() &&
         std::string_view(header[i]).substr(0, kCasePrefix.size()) ==
             kCasePrefix) {
@@ -2640,6 +2655,15 @@ CsvEventData import_csv_event_data_impl(
       }
       return any && !(nanoseconds && outside);
     };
+    const auto nanosecond_cells = [](const std::vector<std::string>& cells,
+                                     const std::vector<std::optional<std::string>>& present) {
+      for (std::size_t i = 0; i < cells.size(); ++i) {
+        if (!present[i]) continue;
+        const auto parsed = reference_mixed_timestamp(cells[i]);
+        if (parsed && parsed->nanosecond_fraction) return true;
+      }
+      return false;
+    };
     // format_dataframe copies the timestamp into time:timestamp, replacing a
     // column of that name.
     const bool timestamp_copy = timestamp_index && header[*timestamp_index] != "time:timestamp";
@@ -2692,8 +2716,10 @@ CsvEventData import_csv_event_data_impl(
         for (std::size_t i = 0; i < cells.size() && ints; ++i)
           if (typed.text[i] && !python_int_text(cells[i])) ints = false;
       column.type = column_type(typed.kind, ints);
-      if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text))
+      if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text)) {
         column.type = DataFrameColumnType::kDate;
+        column.nanoseconds = nanosecond_cells(cells, typed.text);
+      }
       unique = keys.insert(column.key).second && unique;
       columns->columns.push_back(std::move(column));
     };
@@ -2767,13 +2793,19 @@ CsvEventData import_csv_event_data_impl(
       columns->columns.push_back(std::move(copy));
     }
     columns->activity_type = column_type(activity_kind, activity_ints);
-    columns->order = header;
+    // A column the copies replace leaves its place: the copies follow the
+    // header's other columns (round BO, observed black-box).
+    columns->order.clear();
+    for (std::size_t index = 0; index < header.size(); ++index)
+      if (!replaced_by_copy(index)) columns->order.push_back(header[index]);
     for (const char* name : {"case:concept:name", "concept:name", "time:timestamp"}) {
       if (std::string_view(name) == "time:timestamp" && !timestamp_index) continue;
-      if (std::find(header.begin(), header.end(), name) == header.end()) columns->order.emplace_back(name);
+      if (std::find(columns->order.begin(), columns->order.end(), name) == columns->order.end())
+        columns->order.emplace_back(name);
     }
-    columns->order.emplace_back("@@index");
-    columns->order.emplace_back("@@case_index");
+    for (const char* name : {"@@index", "@@case_index"})
+      if (std::find(columns->order.begin(), columns->order.end(), name) == columns->order.end())
+        columns->order.emplace_back(name);
     // Repeated column names are renamed by read_csv ("a.1"); such a frame
     // is not modelled.
     if (unique) frame_columns = std::move(columns);
@@ -3044,6 +3076,10 @@ CsvEventData import_csv_event_data_impl(
                      });
   }
   if (frame_columns) {
+    // The timestamp column (and its copy) is in nanoseconds when any data row
+    // has a cell below the microsecond (round BO; nanosecond_column).
+    for (auto& column : frame_columns->columns)
+      if (column.role == FirstClassAttributeRole::kTimestamp) column.nanoseconds = nanosecond_column;
     // format_dataframe's "@@index" and "@@case_index": each kept row's place
     // in the sorted frame and its case's place (observed black-box).
     std::size_t rows = 0;
