@@ -28,6 +28,11 @@ const std::string& selected_activity(const Event& event,
                                      std::string_view activity_attribute) {
   if (standard_activity_attribute(activity_attribute)) return event.activity;
   if (const auto* value = event.attribute(activity_attribute)) return *value;
+  // A table read as events keeps its activity column as the first-class
+  // activity under that column's name (a CSV upload's table shapes; round
+  // BN), as the heuristics miner reads it.
+  if (!event.activity_source_key.empty() && event.activity_source_key == activity_attribute)
+    return event.activity;
   throw std::invalid_argument(
       "model decoration: event is missing activity attribute '" +
       std::string(activity_attribute) + "'");
@@ -41,6 +46,8 @@ std::string_view selected_timestamp(const Event& event,
                                     std::string_view timestamp_attribute) {
   if (standard_timestamp_attribute(timestamp_attribute)) return event.timestamp;
   if (const auto* value = event.attribute(timestamp_attribute)) return *value;
+  if (!event.timestamp_source_key.empty() && event.timestamp_source_key == timestamp_attribute)
+    return event.timestamp;
   // A missing custom timestamp makes this event untimed. Do not substitute the
   // canonical event timestamp: callers may deliberately select a sparse field.
   return {};

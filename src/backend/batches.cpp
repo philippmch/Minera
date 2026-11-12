@@ -693,9 +693,8 @@ void append_log_events(
       }
       if (!std::isfinite(start))
         throw std::invalid_argument("batches: non-finite start timestamp");
-      if (start > *complete)
-        throw std::invalid_argument(
-            "batches: start timestamp is after completion");
+      // An event that starts after it completes is taken as it is (round BN,
+      // observed black-box).
       const auto& case_id = required_case_value(trace, event,
                                                 options.case_id_attribute);
       BatchEvent batch_event{start, *complete, case_id, trace_index, event_index,
@@ -744,12 +743,19 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
                                         table, options.start_timestamp_attribute,
                                         SelectorRole::kTimestamp,
                                         "start timestamp", true);
-  const auto event_id_selector = options.event_id_attribute.empty()
+  // Without an event-id selector the table adapters read a frame's
+  // "@@index" column (format_dataframe's) as the event id when it has one, so
+  // two rows alike in every other value stay two events (round BN, observed
+  // black-box).
+  const bool default_event_id = options.event_id_attribute.empty() && exact_column(table, "@@index");
+  const auto event_id_selector = default_event_id
+                                     ? TableSelector{"@@index", exact_column(table, "@@index"), SelectorRole::kGeneric}
+                                     : options.event_id_attribute.empty()
                                      ? TableSelector{}
                                      : resolve_selector(
                                            table, options.event_id_attribute,
                                            SelectorRole::kGeneric, "event id", true);
-  const bool event_id_selected = !options.event_id_attribute.empty() &&
+  const bool event_id_selected = (default_event_id || !options.event_id_attribute.empty()) &&
                                  event_id_selector.column.has_value();
   // pandas' "str" columns hold one np.nan object for every missing cell.
   const auto str_column = [&](const TableSelector& selector) {
@@ -865,7 +871,9 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
     std::optional<double> start = complete;
     if (!options.start_timestamp_attribute.empty()) {
       const auto* start_cell = row_cell(row, table, start_selector);
-      if (!start_cell && pandas) {
+      // pandas reads a missing start (a blank CSV cell is NaT in the frame)
+      // as the smallest datetime (round BN, observed black-box).
+      if ((!start_cell || attribute_text(*start_cell).empty()) && pandas) {
         start.reset();
       } else {
         if (!start_cell || attribute_text(*start_cell).empty())
@@ -878,9 +886,8 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
         start = parsed;
       }
     }
-    if (start && complete && *start > *complete)
-      throw std::invalid_argument(
-          "batches: start timestamp is after completion");
+    // An event that starts after it completes is taken as it is (round BN,
+    // observed black-box).
     const double completion =
         complete ? rescale(*complete, completion_scale) : kNaT;
     const double start_time =

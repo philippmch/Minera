@@ -3283,7 +3283,9 @@ included, since `read_csv` keeps the padded text (review Z1-4); in the
 timestamp column and in `case:` attribute columns it is still NA (declared,
 with field trimming). Declared: the flat table
 keeps source row order (with the converted case-id and activity text) where
-the formatted reference frame is sorted by case id, timestamp and row index.
+the formatted reference frame is sorted by case id, timestamp and row index
+(the routes and families that hand a CSV upload to a pm4py DataFrame
+function read the frame's rows and order since reviews BM1 and BN1).
 Case-relation files joined with a CSV log (case-relations merge and timestamp
 interleavings, CLI and server) are read like the reference reads a relations
 frame, and its key columns meet the CSV case-id column the way pandas' typed
@@ -24150,6 +24152,7 @@ Declarations:
 - Concurrent events on a CSV upload whose start values sit only in rows
   `format_dataframe` drops (an empty frame with a datetime start column):
   pandas raises its `timedelta64` comparison error, Minera returns no pair.
+  (Fixed in review BN1-6: the frame declares its columns' dtypes.)
 - The CSV timestamp columns of plain numbers and "roles to diagnostics
   groups" (round AT) are still with Philipp.
 
@@ -24171,3 +24174,115 @@ nanosecond partial order, a `Timestamp.timestamp()` overlap, rows without
 a case in the self-merge), the temporal profile on a CSV's own `@@index`,
 and the Declare frame slices with rows without a case (values taken from
 pm4py black-box on the same inputs).
+
+## Review BN1: re-review of round BM, CSV uploads on the session routes and workbenches in the frame's order, batches, heuristics and the DFG adapters on CSV frames (2026-11-12)
+
+Round BN re-reviewed BM (the DataFrame DFG adapters on uploads,
+`csv_frame_table`, `prepare_csv_frame_view`, the Declare frame slices) with
+fresh seeds and took its targets: every other route that hands a CSV
+upload to a pm4py DataFrame function (the analysis, timing, constraint,
+graph, workflow and conversion routes on the session, the original Declare
+and log skeleton routes, the token-replay and alignment workbenches), the
+interval statistics (`overlap`) and batches with a start column, the DFG
+adapters without column reduction, and the heuristics miner keyed by a
+CSV's own columns. The device check on the Mac was skipped (the round's
+thread had no device linked). Findings, all fixed:
+
+- **BN1-1 Session routes and workbenches on a CSV upload read the file's
+  order.** pm4py reads a CSV upload through `format_dataframe` (BM1-1),
+  whose rows are sorted by case id, upload timestamp and file order. The
+  session routes `/api/analyze-behavior` (minimum self-distances, pandas
+  and Polars), `/api/discover-timing` (batches and performance spectrum,
+  DataFrame and LazyFrame variants), `/api/discover-constraints`,
+  `/api/discover-graph` (transition system), `/api/discover-workflow`,
+  `/api/log-convert`, the literal-controls route and the original Declare
+  and log skeleton routes, and the token-replay, alignment and replay
+  duration workbenches on the DataFrame, LazyFrame and stream shapes, read
+  the upload's table (or its stream) in file order. A CSV upload and the
+  same rows already in the frame's order (the same frame for pm4py) gave
+  different answers. They now read the frame (`session_selected_view`,
+  `cached_source_view`, `adapter_source_table`, `csv_frame_stream`; a
+  session builds it once and its copies share it).
+- **BN1-2 The frame's date columns.** `format_dataframe` converts the
+  timestamp column and every other column of date texts to
+  `datetime64[us, UTC]`, or `datetime64[ns, UTC]` when any cell, including
+  those of rows it then drops, has more than six fractional digits; the
+  pandas batches divide the column's integers by 1e9 (seconds over a
+  thousand for a microsecond column). The frame now declares these dtypes
+  (Minera's pandas batches on a CSV upload read seconds).
+- **BN1-3 The batches' default event id.** Without an event-id key the
+  pandas and Polars batches take the frame's `@@index` column, when it has
+  one, as the event id, so two rows alike in every other value stay two
+  events; Minera made them one. The table adapters now do the same, and a
+  CSV upload's batches read the frame with its index columns.
+- **BN1-4 Batches with a start column.** pm4py takes an event that starts
+  after it completes as it is (all three variants), and the pandas batches
+  read a blank start (NaT) as the smallest datetime (`-9223372036.854776`);
+  Minera refused both (`start timestamp is after completion`, `configured
+  start timestamp is missing`). A blank resource cell is NaN there: the
+  pandas batches drop the row, the Polars ones group it under a null
+  resource; Minera grouped it under `""`. The older
+  `minera_temporal_behavioral_tests` case expected the inverted event to
+  be refused; it now expects pm4py's batch (one concurrent batch of the
+  five events, the inverted one kept as it is).
+- **BN1-5 The heuristics miner on a CSV upload's table shapes.** The table
+  read as events keeps the activity column as the first-class activity
+  under its own name; the heuristics miner and the model decoration keyed
+  by that name (`act`) refused every event (`event is missing activity
+  attribute 'act'`), so the heuristic family (and the footprints bundle
+  after it) failed on every CSV upload mined as a DataFrame or LazyFrame.
+  They now read it, as pm4py reads the frame's column.
+- **BN1-6 The DFG adapters on CSV frames (re-review of BM1-1).** A frame
+  emptied by `format_dataframe` (every row without a case) keeps the
+  column types read before the drop: its start column is a datetime
+  column, so the partial order is empty and the concurrent events raise
+  pandas' `timedelta64` comparison error, with the unit of the dropped
+  rows' digits; Minera treated it as a start column without values (the
+  float-column error, BM's declared case). Likewise a frame whose rows'
+  start values all sat in dropped rows: the performance graph clamps the
+  NaT flows to 0 where Minera raised the float-column error. Without
+  column reduction pandas
+  drops a row with a NaN in any column, and a blank or NA cell of a CSV's
+  other columns is NaN there; Minera read it as a value, so the concurrent
+  events kept pairs pm4py drops.
+
+Declarations:
+
+- The `overlap` family runs pm4py's three interval statistics (interval
+  events, cases, concurrent activities) as one analysis, so an error in
+  one fails the family. pm4py's interval-event statistic raises on an
+  event that starts after it completes and its interval-event and case
+  statistics on a blank (NaT) start (`NaTType does not support
+  timestamp`), while its case and concurrent statistics accept the
+  inverted event and its concurrent statistic compares a NaT start as
+  false. Minera refuses the event for the family (`overlap: start
+  timestamp is after completion timestamp`, `overlap: invalid start
+  timestamp`).
+- With field trimming (`trim_fields`, the default) a whitespace-only CSV
+  cell is blank, so the DFG adapters without column reduction drop its
+  row; pandas keeps the text `" "`.
+- The batches' log variant on a CSV upload groups a blank resource under
+  `""`; pm4py's log holds NaN there and groups it under `nan` (an XES
+  event without the attribute raises `KeyError`).
+
+Verification (scripts in the project files under `review-harness/round-bn/`;
+"before" is round BM's server on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Metamorphic file order on the session routes (`metaroute.py`: MSD, correlation, temporal profile, constraints, batches, spectrum, transition system, footprints, alpha, heuristic, inductive, POWL, conversions, DFG; 25 uploads as DataFrame with a resource column, 20 as LazyFrame, 20 as stream) | 1,885 | before (20 uploads): 177 of 580 differed (batches, constraints, conversions, MSD, spectrum, transition system, workflow discovery); after: 1,798 the same, 87 raise alike |
+| Metamorphic file order on the workbenches (`metawb.py`: token replay, alignments, Declare and log skeleton conformance on every shape, 20 uploads) | 320 | before (10 uploads): 140 of 160 differed (every shape but the log); after: all the same |
+| Metamorphic file order on the whole `/api/mine` response (`metamine.py`: 20 as DataFrame, 15 as LazyFrame with a start column and pandas batches) | 35 responses | every field and family the same |
+| Batches vs pm4py (`batchcsv.py`: 30 plain, 30 with blank cells, 30 with a start column and blanks, 30 with a start column and nanoseconds; pandas, Polars, log) | 360 | before (90 uploads): 92 of 270 equal; after: 322 equal, 38 raise on both sides (Polars and log on a blank start) |
+| Minimum self-distances vs pm4py (`msdcsv.py --blank`, 30 uploads, three variants) | 90 | before (20 uploads): 43 of 60 equal; after: all equal |
+| Heuristics net vs pm4py (`heurcsv.py --blank`: 30 as DataFrame, 20 as LazyFrame; DFG, dependencies, start and end activities, occurrences) | 250 | before (20 uploads): every upload refused; after: 245 equal, 5 on one upload pm4py refuses (no case left; declared in BM) |
+| `/api/dfg-dataframe` vs pm4py (`dfgdf.py`: 140 `--blank --extra`, 40 `--blank --ns --extra`) | 720 | 693 equal, 27 raise alike (the one difference, a start column whose values sat in dropped rows, is fixed and bound in the test) |
+| `/api/dfg-dataframe` without column reduction (`dfgnored.py`: 100 with a start column, 30 without; NaN cells in extra columns) | 520 | before (30 uploads): 9 concurrent-event lists differed and 8 raised in pm4py only; after: 473 equal, 47 raise alike |
+| Overlap family vs pm4py (`overlapcsv.py`: 30 plain, 30 with blank cells and nanoseconds) | 180 | 138 equal; 14 uploads with an event that starts after it completes fail the family (declared) |
+| Round BM's `/api/mine` CSV sweep (`minecsv.py`, 30 plain, 30 with a start column) | 240 | all equal |
+| Full ctest, script tests, frontend typecheck and tests, fixture replay | 472 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; 8 active-source fixtures rewritten (heuristic decoration now runs on custom literal selectors, CSV streams in frame order, XES custom clock wait sample) |
+
+`minera_review_bn1_tests` binds the batches' default event id on CSV
+frames, the DFG adapters on declared date dtypes and NaT starts, the
+adapters without column reduction on NaN rows, and the heuristics net on
+its own activity column, with values from pm4py black-box.

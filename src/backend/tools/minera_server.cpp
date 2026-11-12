@@ -362,17 +362,23 @@ minera::EventLog project_powl_activity(const minera::EventLog& source,
   return minera::normalize_powl_event_log(source, options);
 }
 
+// The DataFrame variants below read `frame_table`/`frame_lazy` (a CSV
+// session's frame, session_frame_table) when given, else the source's own.
 minera::MinimumSelfDistances discover_selected_minimum_self_distances(
     const minera::EventLog& log,
     const minera::MinimumSelfDistanceOptions& options,
-    const minera::ActiveEventSource* active_source = nullptr) {
+    const minera::ActiveEventSource* active_source = nullptr,
+    const minera::EventTable* frame_table = nullptr,
+    const minera::LazyEventTable* frame_lazy = nullptr) {
   switch (options.variant) {
     case minera::MinimumSelfDistanceVariant::kLog:
       return minera::MinimumSelfDistanceLogDiscovery::apply(active_source ? active_source->checked_log() : log, options);
     case minera::MinimumSelfDistanceVariant::kPandas:
+      if (frame_table) return minera::MinimumSelfDistancePandasDiscovery::apply(*frame_table, options);
       return minera::MinimumSelfDistancePandasDiscovery::apply(
           active_source ? active_source->checked_table() : minera::event_log_to_table(log), options);
     case minera::MinimumSelfDistanceVariant::kPolars:
+      if (frame_lazy) return minera::MinimumSelfDistancePolarsDiscovery::apply(*frame_lazy, options);
       return minera::MinimumSelfDistancePolarsDiscovery::apply(
           active_source ? active_source->checked_lazy() : minera::event_log_to_lazy_table(log), options);
   }
@@ -382,20 +388,20 @@ minera::MinimumSelfDistances discover_selected_minimum_self_distances(
 minera::PerformanceSpectrum discover_selected_performance_spectrum(
     const minera::EventLog& log, const std::vector<std::string>& activities,
     const minera::PerformanceSpectrumOptions& options,
-    const minera::ActiveEventSource* active_source = nullptr) {
+    const minera::ActiveEventSource* active_source = nullptr,
+    const minera::EventTable* frame_table = nullptr,
+    const minera::LazyEventTable* frame_lazy = nullptr) {
+  const auto table = [&] {return frame_table ? *frame_table : active_source ? active_source->checked_table() : minera::event_log_to_table(log);};
+  const auto lazy = [&] {return frame_lazy ? *frame_lazy : active_source ? active_source->checked_lazy() : minera::event_log_to_lazy_table(log);};
   switch (options.variant) {
     case minera::PerformanceSpectrumVariant::kDataframe:
-      return minera::discover_performance_spectrum_dataframe(
-          active_source ? active_source->checked_table() : minera::event_log_to_table(log), activities, options);
+      return minera::discover_performance_spectrum_dataframe(table(), activities, options);
     case minera::PerformanceSpectrumVariant::kDataframeDisconnected:
-      return minera::discover_performance_spectrum_dataframe_disconnected(
-          active_source ? active_source->checked_table() : minera::event_log_to_table(log), activities, options);
+      return minera::discover_performance_spectrum_dataframe_disconnected(table(), activities, options);
     case minera::PerformanceSpectrumVariant::kLazyframe:
-      return minera::discover_performance_spectrum_lazyframe(
-          active_source ? active_source->checked_lazy() : minera::event_log_to_lazy_table(log), activities, options);
+      return minera::discover_performance_spectrum_lazyframe(lazy(), activities, options);
     case minera::PerformanceSpectrumVariant::kLazyframeDisconnected:
-      return minera::discover_performance_spectrum_lazyframe_disconnected(
-          active_source ? active_source->checked_lazy() : minera::event_log_to_lazy_table(log), activities, options);
+      return minera::discover_performance_spectrum_lazyframe_disconnected(lazy(), activities, options);
     case minera::PerformanceSpectrumVariant::kConnected:
     case minera::PerformanceSpectrumVariant::kDisconnected:
     case minera::PerformanceSpectrumVariant::kLog:
@@ -407,14 +413,18 @@ minera::PerformanceSpectrum discover_selected_performance_spectrum(
 
 minera::BatchDiscovery discover_selected_batches(
     const minera::EventLog& log, const minera::BatchDiscoveryOptions& options,
-    const minera::ActiveEventSource* active_source = nullptr) {
+    const minera::ActiveEventSource* active_source = nullptr,
+    const minera::EventTable* frame_table = nullptr,
+    const minera::LazyEventTable* frame_lazy = nullptr) {
   switch (options.variant) {
     case minera::BatchDiscoveryVariant::kLog:
       return minera::BatchLogDiscovery::apply(active_source ? active_source->checked_log() : log, options);
     case minera::BatchDiscoveryVariant::kPandas:
+      if (frame_table) return minera::BatchPandasDiscovery::apply(*frame_table, options);
       return minera::BatchPandasDiscovery::apply(
           active_source ? active_source->checked_table() : minera::event_log_to_table(log), options);
     case minera::BatchDiscoveryVariant::kPolars:
+      if (frame_lazy) return minera::BatchPolarsDiscovery::apply(*frame_lazy, options);
       return minera::BatchPolarsDiscovery::apply(
           active_source ? active_source->checked_lazy() : minera::event_log_to_lazy_table(log), options);
   }
@@ -431,6 +441,18 @@ std::atomic<std::uint64_t> g_query_source_sequence{0};
 // was given in the X-Minera-Imported-Model header has its request refused
 // when the server's imported model is not that one for the whole request.
 std::atomic<std::uint64_t> g_imported_model_sequence{0};
+// A CSV source's DataFrame shapes as format_dataframe's frame
+// (csv_frame_table), built on first use (session_frame_table) and shared by
+// the copies of a session, whose source never changes (round BN).
+struct CsvFrameCache {
+  std::once_flag table_once, lazy_once, stream_once, indexed_once, indexed_lazy_once;
+  std::optional<minera::EventTable> table;
+  std::optional<minera::LazyEventTable> lazy;
+  std::optional<minera::EventStream> stream;
+  std::optional<minera::EventTable> indexed;  // with "@@index" and "@@case_index"
+  std::optional<minera::LazyEventTable> indexed_lazy;
+};
+
 struct MinedSession {
   std::uint64_t query_source_id=++g_query_source_sequence;
   std::uint64_t imported_model_id = 0;
@@ -477,6 +499,7 @@ struct MinedSession {
   const minera::EventLog* log_view = nullptr;
   const minera::EventLog* inductive_log_view = nullptr;
   const minera::EventLog* alpha_log_view = nullptr;
+  std::shared_ptr<CsvFrameCache> csv_frame = std::make_shared<CsvFrameCache>();
 };
 
 const minera::EventLog& session_log(const MinedSession& session) {
@@ -546,12 +569,114 @@ const minera::DirectlyFollowsGraph& require_graph(const MinedSession& session) {
   return session.graph;
 }
 
+std::optional<minera::EventTable> csv_frame_table(const minera::ActiveEventSource& source,
+                                                  bool index_columns = true);
+std::optional<minera::EventStream> csv_frame_stream(const minera::ActiveEventSource& source);
+
+// A CSV session's table as format_dataframe's frame (csv_frame_table without
+// the index columns); null for other sources, or when the source's rows and
+// events do not pair up. pm4py's DataFrame functions read that frame, and
+// several follow its row order where the upload's file order differs
+// (minimum self-distances, batches, the transition system, the discovery,
+// conversion and constraint routes; round BN, observed black-box).
+const minera::EventTable* session_frame_table(const MinedSession& session) {
+  if (!session.active_source || !session.csv_frame) return nullptr;
+  auto& cache = *session.csv_frame;
+  std::call_once(cache.table_once, [&] {
+    try {
+      cache.table = csv_frame_table(*session.active_source, false);
+    } catch (const std::exception&) {
+      // the routes report the source's own error
+    }
+  });
+  return cache.table ? &*cache.table : nullptr;
+}
+
+const minera::LazyEventTable* session_frame_lazy(const MinedSession& session) {
+  const auto* table = session_frame_table(session);
+  if (!table) return nullptr;
+  auto& cache = *session.csv_frame;
+  std::call_once(cache.lazy_once, [&] {cache.lazy = minera::LazyEventTable::from_table(*table);});
+  return cache.lazy ? &*cache.lazy : nullptr;
+}
+
+// A CSV frame's cells that read_csv reads as NaN (a blank cell or a pandas
+// NA spelling; the table keeps them as text) marked null, as the DataFrame
+// holds them (round BN, observed black-box: the DFG adapters without column
+// reduction drop a row with any, the pandas batches drop a row without a
+// resource and the Polars ones group it under a null resource).
+void mark_csv_nan_cells(minera::EventTable& table) {
+  for (auto& row : table.rows)
+    for (auto& cell : row)
+      if (cell && !cell->is_null && cell->kind == minera::AttributeKind::kString &&
+          minera::is_pandas_csv_na_text(cell->value)) {
+        cell->value.clear();
+        cell->is_null = true;
+      }
+}
+
+// The frame with format_dataframe's "@@index" and "@@case_index" columns,
+// whose "@@index" the batches read as the default event id, and its NaN
+// cells null (round BN).
+const minera::EventTable* session_indexed_frame_table(const MinedSession& session) {
+  if (!session.active_source || !session.csv_frame) return nullptr;
+  auto& cache = *session.csv_frame;
+  std::call_once(cache.indexed_once, [&] {
+    try {
+      cache.indexed = csv_frame_table(*session.active_source, true);
+      if (cache.indexed) mark_csv_nan_cells(*cache.indexed);
+    } catch (const std::exception&) {
+      // the routes report the source's own error
+    }
+  });
+  return cache.indexed ? &*cache.indexed : nullptr;
+}
+
+const minera::LazyEventTable* session_indexed_frame_lazy(const MinedSession& session) {
+  const auto* table = session_indexed_frame_table(session);
+  if (!table) return nullptr;
+  auto& cache = *session.csv_frame;
+  std::call_once(cache.indexed_lazy_once, [&] {cache.indexed_lazy = minera::LazyEventTable::from_table(*table);});
+  return cache.indexed_lazy ? &*cache.indexed_lazy : nullptr;
+}
+
+// A CSV session's event stream in the frame's order (csv_frame_stream).
+const minera::EventStream* session_frame_stream(const MinedSession& session) {
+  if (!session.active_source || !session.csv_frame) return nullptr;
+  auto& cache = *session.csv_frame;
+  std::call_once(cache.stream_once, [&] {
+    try {
+      cache.stream = csv_frame_stream(*session.active_source);
+    } catch (const std::exception&) {
+      // the routes report the source's own error
+    }
+  });
+  return cache.stream ? &*cache.stream : nullptr;
+}
+
 minera::EventDataView cached_source_view(const MinedSession& session,
                                        minera::EventDataKind kind) {
-  if (session.active_source) return session.active_source->view(kind);
+  if (session.active_source) {
+    if (kind == minera::EventDataKind::kEventStream)
+      if (const auto* stream = session_frame_stream(session)) return minera::EventDataView(*stream);
+    if (kind == minera::EventDataKind::kEventTable)
+      if (const auto* table = session_frame_table(session)) return minera::EventDataView(*table);
+    if (kind == minera::EventDataKind::kLazyEventTable)
+      if (const auto* lazy = session_frame_lazy(session)) return minera::EventDataView(*lazy);
+    return session.active_source->view(kind);
+  }
   if (kind == minera::EventDataKind::kEventLog)
     return minera::EventDataView(require_prepared_log(session));
   throw std::invalid_argument("this cached source has no retained flat native input");
+}
+
+// The session's input in the shape it was mined as (a CSV upload's stream
+// and table shapes in the frame's order), else its prepared log.
+minera::EventDataView session_selected_view(const MinedSession& session) {
+  if (!session.active_source) return minera::EventDataView(require_prepared_log(session));
+  const auto kind = session.active_source->selected_kind();
+  if (kind != minera::EventDataKind::kEventLog) return cached_source_view(session, kind);
+  return session.active_source->selected_view();
 }
 
 const minera::EventLog& cached_model_log(const MinedSession& session,
@@ -1071,7 +1196,7 @@ void mark_frame_index_rows(const MinedSession& session, minera::TemporalProfileO
 // read. nullopt for other sources, or when the source's rows and events do
 // not pair up.
 std::optional<minera::EventTable> csv_frame_table(const minera::ActiveEventSource& source,
-                                                  bool index_columns = true) {
+                                                  bool index_columns) {
   if (source.file().format != "csv") return std::nullopt;
   const auto& log = source.checked_log();
   if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
@@ -1127,12 +1252,87 @@ std::optional<minera::EventTable> csv_frame_table(const minera::ActiveEventSourc
   ordered.reserve(positions.size());
   for (const auto& [index, row] : positions) ordered.push_back(std::move(result.rows[row]));
   result.rows = std::move(ordered);
+  // format_dataframe converts the timestamp column, and every other column of
+  // date texts, to UTC datetimes before it drops rows: datetime64[ns, UTC]
+  // when any of the column's cells has digits below the microsecond, else
+  // datetime64[us, UTC] (round BN, observed black-box). The DataFrame
+  // functions that read the unit (the pandas batches, the heuristics miner's
+  // durations) see it; the cells keep their CSV text.
+  if (result.dtypes.size() == result.columns.size()) {
+    const auto sub_microsecond = [](const std::string& text) {
+      const auto colon = text.find(':');
+      const auto dot = text.find('.', colon == std::string::npos ? 0 : colon);
+      if (dot == std::string::npos) return false;
+      std::size_t digits = 0;
+      for (std::size_t i = dot + 1; i < text.size() && std::isdigit(static_cast<unsigned char>(text[i])); ++i) ++digits;
+      return digits > 6;
+    };
+    for (const auto& date_column : frame.columns) {
+      if (date_column.type != minera::DataFrameColumnType::kDate) continue;
+      const auto found = std::find(result.columns.begin(), result.columns.end(), date_column.key);
+      if (found == result.columns.end()) continue;
+      const auto index = static_cast<std::size_t>(found - result.columns.begin());
+      if (index >= table.columns.size() || table.columns[index] != date_column.key) continue;
+      const bool nanoseconds = std::any_of(table.rows.begin(), table.rows.end(), [&](const auto& row) {
+        return index < row.size() && row[index] && sub_microsecond(row[index]->value);
+      });
+      result.dtypes[index] = nanoseconds ? "datetime64[ns, UTC]" : "datetime64[us, UTC]";
+    }
+  }
   return result;
 }
 
 std::optional<minera::EventTable> csv_frame_table(const MinedSession& session) {
   if (!session.active_source) return std::nullopt;
   return csv_frame_table(*session.active_source);
+}
+
+// A CSV upload's event stream as pm4py's stream of format_dataframe's frame
+// (convert_to_event_stream): the events of the rows csv_frame_table keeps, in
+// its order (round BN, observed black-box). nullopt for other sources, or
+// when the stream does not list the table's rows one to one.
+std::optional<minera::EventStream> csv_frame_stream(const minera::ActiveEventSource& source) {
+  if (source.file().format != "csv") return std::nullopt;
+  const auto& log = source.checked_log();
+  if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
+  const auto& frame = *log.dataframe_columns;
+  const auto& table = source.checked_table();
+  const auto& stream = source.checked_stream();
+  const auto& rows = source.representative_row_ordinals();
+  if (stream.events.size() != table.rows.size() || rows.size() != log.traces.size()) return std::nullopt;
+  std::vector<std::pair<std::int64_t, std::size_t>> positions;  // (@@index, table row)
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    const auto& events = log.traces[t].events;
+    if (rows[t].size() != events.size()) return std::nullopt;
+    for (std::size_t e = 0; e < events.size(); ++e) {
+      const auto order = events[e].input_order;
+      if (!rows[t][e] || *rows[t][e] >= stream.events.size() || order >= frame.row_index.size())
+        return std::nullopt;
+      positions.emplace_back(frame.row_index[order], *rows[t][e]);
+    }
+  }
+  std::stable_sort(positions.begin(), positions.end(),
+                   [](const auto& left, const auto& right) {return left.first < right.first;});
+  minera::EventStream result = stream;
+  result.events.clear();
+  result.events.reserve(positions.size());
+  for (const auto& [index, row] : positions) result.events.push_back(stream.events[row]);
+  return result;
+}
+
+// The rows an upload workbench hands its stream, DataFrame and LazyFrame
+// adapters: a CSV upload as format_dataframe's frame, whose row order pm4py
+// follows (round BN, observed black-box), else `table` (the input echo keeps
+// the upload's own rows).
+std::optional<minera::EventTable> adapter_source_table(const minera::ActiveEventSource& source,
+                                                       const std::optional<minera::EventTable>& table) {
+  if (!table) return std::nullopt;
+  try {
+    if (auto frame = csv_frame_table(source, false)) return frame;
+  } catch (const std::exception&) {
+    // the adapters report the source's own error
+  }
+  return table;
 }
 
 // The flat view a family reads on a CSV upload mined as a DataFrame or
@@ -1143,11 +1343,21 @@ std::optional<minera::EventTable> csv_frame_table(const MinedSession& session) {
 struct CsvFrameView {
   std::optional<minera::EventTable> table;
   std::optional<minera::LazyEventTable> lazy;
+  std::optional<minera::EventStream> stream;
   std::optional<minera::EventDataView> view;
 };
 
 void prepare_csv_frame_view(const minera::ActiveEventSource& source, CsvFrameView& frame) {
   const auto kind = source.selected_kind();
+  if (kind == minera::EventDataKind::kEventStream) {
+    try {
+      frame.stream = csv_frame_stream(source);  // round BN
+    } catch (const std::exception&) {
+      return;  // the families report the source's own error
+    }
+    if (frame.stream) frame.view = minera::EventDataView(*frame.stream);
+    return;
+  }
   if (kind != minera::EventDataKind::kEventTable && kind != minera::EventDataKind::kLazyEventTable) return;
   try {
     frame.table = csv_frame_table(source, false);
@@ -4281,8 +4491,11 @@ void handle_timing_discovery(const httplib::Request& request,
           case minera::BatchDiscoveryVariant::kLog:
             return minera::BatchLogDiscovery::apply(*cached_source_view(*session,minera::EventDataKind::kEventLog).log(),params.batch_options);
           case minera::BatchDiscoveryVariant::kPandas:
+            // A CSV upload's frame with its "@@index", the default event id (round BN).
+            if (const auto* frame = session_indexed_frame_table(*session)) return minera::BatchPandasDiscovery::apply(*frame,params.batch_options);
             return minera::BatchPandasDiscovery::apply(*cached_source_view(*session,minera::EventDataKind::kEventTable).table(),params.batch_options);
           case minera::BatchDiscoveryVariant::kPolars:
+            if (const auto* frame = session_indexed_frame_lazy(*session)) return minera::BatchPolarsDiscovery::apply(*frame,params.batch_options);
             return minera::BatchPolarsDiscovery::apply(*cached_source_view(*session,minera::EventDataKind::kLazyEventTable).lazy_table(),params.batch_options);
         }
         throw std::invalid_argument("batch discovery variant is invalid");
@@ -4364,7 +4577,7 @@ void handle_graph_discovery(const httplib::Request& request,
       model_footprint = minera::footprint_json(footprints->model_footprint, graph);
       model_origin = params.footprints.model == "dfg" ? "selected_source_dfg" : "cached_analysis_model";
     } else {
-      transitions = minera::discover_transition_system(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.transition_system);
+      transitions = minera::discover_transition_system(session_selected_view(*session), params.transition_system);
       for (const auto& state : transitions->states()) for (const auto& activity : state.payload) if (activity) graph.ensure_activity(*activity);
       for (const auto& transition : transitions->transitions()) if (transition.label) graph.ensure_activity(*transition.label);
     }
@@ -4431,22 +4644,22 @@ void handle_constraint_discovery(const httplib::Request& request,
     // the diagnostics table keeps the frame's (file) order, as the reference's does.
     const auto constraint_order = session->active_source && session->log_ready
         ? (family == "declare"
-               ? constraint_case_order(*session->active_source, session->active_source->selected_view(),
+               ? constraint_case_order(*session->active_source, session_selected_view(*session),
                      params.declare_conformance_options.activity_key, params.declare_conformance_options.case_id_key)
-               : constraint_case_order(*session->active_source, session->active_source->selected_view(),
+               : constraint_case_order(*session->active_source, session_selected_view(*session),
                      params.log_skeleton.activity_key, params.log_skeleton.case_id_key))
         : std::nullopt;
     if (family == "declare") {
       // An upload's log is pm4py's DataFrame there, whose discovery reads
       // each case as a slice of the frame's rows (discover_declare_as_uploaded).
-      const auto declare_view = session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session));
+      const auto declare_view = session_selected_view(*session);
       declare = declare_view.kind() == minera::EventDataKind::kEventLog
           ? minera::discover_declare_as_uploaded(*declare_view.log(), params.declare_options)
           : minera::discover_declare(declare_view, params.declare_options);
       auto options = params.declare_conformance_options; options.activity_key = conformance_activity;
       // The conformance list reads an upload's cases as slices too; pm4py's
       // diagnostics table reads the merged cases (check_declare_conformance_as_uploaded).
-      const auto conformance_view = session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session));
+      const auto conformance_view = session_selected_view(*session);
       const bool sliced = conformance_view.kind() == minera::EventDataKind::kEventLog && conformance_view.log()->dataframe_columns;
       declare_conformance = sliced
           ? minera::check_declare_conformance_as_uploaded(*conformance_view.log(), *declare, options)
@@ -4482,10 +4695,10 @@ void handle_constraint_discovery(const httplib::Request& request,
       }
     } else {
       skeleton = constraint_order
-          ? minera::discover_log_skeleton(session->active_source->selected_view(), params.log_skeleton, *constraint_order)
-          : minera::discover_log_skeleton(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), params.log_skeleton);
+          ? minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton, *constraint_order)
+          : minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton);
       auto options = params.log_skeleton; options.activity_key = conformance_activity;
-      skeleton_conformance = minera::check_log_skeleton_conformance(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *skeleton, options);
+      skeleton_conformance = minera::check_log_skeleton_conformance(session_selected_view(*session), *skeleton, options);
       for (const auto* relations : {&skeleton->equivalence, &skeleton->always_after, &skeleton->always_before, &skeleton->never_together, &skeleton->directly_follows})
         for (const auto& relation : *relations) { graph.ensure_activity(relation.source); graph.ensure_activity(relation.target); }
       for (const auto& [name, frequencies] : skeleton->activ_freq) { (void)frequencies; graph.ensure_activity(name); }
@@ -4493,7 +4706,7 @@ void handle_constraint_discovery(const httplib::Request& request,
         if (deviation.constraint == "activ_freq") graph.ensure_activity(deviation.activity);
         else { graph.ensure_activity(deviation.relation.source); graph.ensure_activity(deviation.relation.target); }
       }
-      try { diagnostics = minera::serialize_event_table_input_json(minera::log_skeleton_conformance_diagnostics(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), *skeleton_conformance, {diagnostics_case})); }
+      try { diagnostics = minera::serialize_event_table_input_json(minera::log_skeleton_conformance_diagnostics(session_selected_view(*session), *skeleton_conformance, {diagnostics_case})); }
       catch (const std::exception& error) { diagnostics_error = error.what(); }
     }
     std::string result = "null", result_error;
@@ -4549,8 +4762,8 @@ void handle_structured_discovery(const httplib::Request& request,
   minera::PetriNet net;
   std::string variant, activity;
   if (family == "inductive") {
-    tree = minera::discover_process_tree(session.active_source ? session.active_source->selected_view() : minera::EventDataView(require_prepared_log(session)), params.inductive);
-    discovery_log = minera::prepare_inductive_event_log(session.active_source ? session.active_source->selected_view() : minera::EventDataView(require_prepared_log(session)), params.inductive);
+    tree = minera::discover_process_tree(session_selected_view(session), params.inductive);
+    discovery_log = minera::prepare_inductive_event_log(session_selected_view(session), params.inductive);
     const auto conversion = minera::parse_process_tree_petri_net_variant(
         request.has_param("discovery_tree_variant") ? request.get_param_value("discovery_tree_variant") : "standard");
     net = minera::to_petri_net(*tree, conversion);
@@ -4681,7 +4894,7 @@ void handle_workflow_discovery(const httplib::Request& request,
     overlay_cached_source_selectors(request,*session,params);
     if(minera::exact_heuristic_options_requested(present))params.heuristic=exact_cached_heuristic;
     minera::record_exact_effective_options(params);
-    const auto discovery_input = session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session));
+    const auto discovery_input = session_selected_view(*session);
     if (family == "heuristic")
       params.heuristic.connect_all = ocel_query_bool(request, "heuristic_connect_all", params.heuristic.connect_all);
     std::optional<minera::HeuristicsNet> heuristic;
@@ -5097,7 +5310,7 @@ void handle_log_conversion(const httplib::Request& request,
     }
     const auto result = [&]() -> minera::LogConversionResult {
       if (!session->active_source) return minera::convert_event_log(require_prepared_log(*session),options);
-      const auto data = session->active_source->selected_view();
+      const auto data = session_selected_view(*session);
       minera::LogConversionResult converted; converted.variant = options.variant;
       switch (options.variant) {
         case minera::LogConversionVariant::kToEventLog: converted.log = minera::event_data_to_event_log(data,options); break;
@@ -6519,16 +6732,17 @@ void handle_token_replay_workbench(const httplib::Request& request,
     minera::EventLog replay_log;
     if (adapter == "log") replay_log = source_log;
     else {
+      const auto adapter_table = adapter_source_table(owned_source, source_table);
       if (adapter == "stream") {
-        stream = source_table ? minera::event_table_to_event_stream(*source_table)
-                              : minera::event_log_to_event_stream(source_log);
+        stream = adapter_table ? minera::event_table_to_event_stream(*adapter_table)
+                               : minera::event_log_to_event_stream(source_log);
         replay_log = minera::normalize_token_replay_event_log(minera::EventDataView(*stream), options);
       } else if (adapter == "dataframe") {
-        table = source_table ? *source_table : minera::event_log_to_table(source_log);
+        table = adapter_table ? *adapter_table : minera::event_log_to_table(source_log);
         replay_log = minera::normalize_token_replay_event_log(minera::EventDataView(*table), options);
       } else {
-        lazy = source_table ? minera::LazyEventTable::from_table(*source_table)
-                            : minera::event_log_to_lazy_table(source_log);
+        lazy = adapter_table ? minera::LazyEventTable::from_table(*adapter_table)
+                             : minera::event_log_to_lazy_table(source_log);
         replay_log = minera::normalize_token_replay_event_log(minera::EventDataView(*lazy), options);
       }
     }
@@ -6684,15 +6898,18 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
       evaluated = source_log;
     }
     else if (adapter == "stream") {
-      const auto stream = source_table ? minera::event_table_to_event_stream(*source_table)
-                                      : minera::event_log_to_event_stream(source_log);
+      const auto adapter_table = adapter_source_table(owned_source, source_table);
+      const auto stream = adapter_table ? minera::event_table_to_event_stream(*adapter_table)
+                                       : minera::event_log_to_event_stream(source_log);
       evaluated = minera::normalize_token_replay_event_log(minera::EventDataView(stream), projection);
     } else if (adapter == "dataframe") {
-      const auto table = source_table ? *source_table : minera::event_log_to_table(source_log);
+      const auto adapter_table = adapter_source_table(owned_source, source_table);
+      const auto table = adapter_table ? *adapter_table : minera::event_log_to_table(source_log);
       evaluated = minera::normalize_token_replay_event_log(minera::EventDataView(table), projection);
     } else {
-      const auto lazy = source_table ? minera::LazyEventTable::from_table(*source_table)
-                                    : minera::event_log_to_lazy_table(source_log);
+      const auto adapter_table = adapter_source_table(owned_source, source_table);
+      const auto lazy = adapter_table ? minera::LazyEventTable::from_table(*adapter_table)
+                                     : minera::event_log_to_lazy_table(source_log);
       evaluated = minera::normalize_token_replay_event_log(minera::EventDataView(lazy), projection);
     }
     auto attribute_projection = minera::tools::evaluation_input_log(evaluated, options.activity_attribute);
@@ -8996,7 +9213,7 @@ void handle_alpha_plus_result(const httplib::Request& request, httplib::Response
       }
       overlay_cached_source_selectors(request,*session,params);
       options = params.alpha;
-      response.set_content(minera::alpha_plus_result_json(minera::discover_alpha_plus_result(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)),options)),"application/json");
+      response.set_content(minera::alpha_plus_result_json(minera::discover_alpha_plus_result(session_selected_view(*session),options)),"application/json");
       return;
     }
     response.set_content(minera::alpha_plus_result_json(
@@ -9080,10 +9297,10 @@ void handle_align_edit_distance(const httplib::Request& request, httplib::Respon
     const auto projection = present("projection") ? lookup("projection") : std::string("none");
     if (projection != "none" && projection != "log") throw std::invalid_argument("projection expects none or log");
     const auto result =
-        minera::align_typed_edit_distance(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), minera::EventDataView(reference), options);
+        minera::align_typed_edit_distance(session_selected_view(*session), minera::EventDataView(reference), options);
     if (projection == "log") { const auto projected = [&]() {
       minera::LogConversionOptions conversion; conversion.case_id_key = options.case_id_attribute;
-      const auto projection_source = minera::event_data_to_event_log(session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), conversion);
+      const auto projection_source = minera::event_data_to_event_log(session_selected_view(*session), conversion);
       return minera::project_log_on_typed_alignments(projection_source,result,options);
     }(); response.set_content(minera::typed_edit_distance_json(result, options.perform_anti_alignment, &projected), "application/json"); }
     else response.set_content(minera::typed_edit_distance_json(result, options.perform_anti_alignment), "application/json");
@@ -10568,9 +10785,12 @@ void handle_dfg_dataframe(const httplib::Request& request,
     auto params = minera::parse_mine_params(lookup, present);
     overlay_cached_source_selectors(request, *session, params, true);
     const auto table_view = cached_source_view(*session,minera::EventDataKind::kEventTable);
-    // pandas reads a CSV upload as format_dataframe's frame (round BM).
-    const auto frame_table = params.dfg_backend == minera::DfgTableBackend::kPandas
-                                 ? csv_frame_table(*session) : std::nullopt;
+    // pandas reads a CSV upload as format_dataframe's frame (round BM), where
+    // a cell read_csv reads as NaN is null: the adapters without column
+    // reduction drop a row with any (round BN, observed black-box).
+    auto frame_table = params.dfg_backend == minera::DfgTableBackend::kPandas
+                           ? csv_frame_table(*session) : std::nullopt;
+    if (frame_table) mark_csv_nan_cells(*frame_table);
     const auto& table = frame_table ? *frame_table : *table_view.table();
     if (params.dfg_operation == minera::DfgTableOperation::kGraph) {
       if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
@@ -10839,7 +11059,7 @@ void handle_dfg_precision(const httplib::Request& request,
     response.set_content(
         minera::serialize_dfg_precision_json(
             minera::evaluate_dfg_precision(
-                session->active_source ? session->active_source->selected_view() : minera::EventDataView(require_prepared_log(*session)), minera::parse_dfg(body), options)),
+                session_selected_view(*session), minera::parse_dfg(body), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

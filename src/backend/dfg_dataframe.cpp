@@ -825,12 +825,32 @@ bool sub_microsecond(const std::optional<std::string>& text) {
 // pandas types it by its cells, so one blank in every row is a float column,
 // while a start read from the completion column is a datetime column even on
 // an empty frame (round BM, observed black-box).
+std::string start_column_name(const DfgTableOptions& options) {
+  return options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
+             ? *options.start_timestamp_attribute
+             : std::string("start_timestamp");
+}
+
 bool own_start_column(const EventTable& table, const DfgTableOptions& options) {
-  const std::string name = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
-                               ? *options.start_timestamp_attribute
-                               : std::string("start_timestamp");
+  const std::string name = start_column_name(options);
   return name != options.timestamp_attribute &&
          std::find(table.columns.begin(), table.columns.end(), name) != table.columns.end();
+}
+
+// The unit of a column the table declares a UTC datetime column (true for
+// nanoseconds), nullopt when it declares none. A CSV upload's frame declares
+// the dtypes format_dataframe gives its date columns before it drops the rows
+// without a case, activity or timestamp, so a start column is a datetime
+// column even when only dropped rows have a start, and the unit counts the
+// dropped rows' digits (round BN, observed black-box).
+std::optional<bool> declared_datetime_unit(const EventTable& table, const std::string& name) {
+  if (table.dtypes.size() != table.columns.size()) return std::nullopt;
+  const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+  if (found == table.columns.end()) return std::nullopt;
+  const auto& dtype = table.dtypes[static_cast<std::size_t>(found - table.columns.begin())];
+  if (dtype.rfind("datetime64[ns", 0) == 0) return true;
+  if (dtype.rfind("datetime64[us", 0) == 0) return false;
+  return std::nullopt;
 }
 
 bool same_case(const TableRow& left, const TableRow& right, bool missing_matches) {
@@ -1090,8 +1110,11 @@ DfgTableResult discover_table_dfg(const EventTable& table,
   if (!polars && computes_duration && clamp_start && pairs.empty())
     throw std::invalid_argument("cannot subtract DatetimeArray from ndarray[object]");
   // A start column blank in every row is a float column there, which the
-  // clamp compares with the completions (round BM, observed black-box).
+  // clamp compares with the completions (round BM, observed black-box);
+  // not a column the frame declares a datetime column (its values sat in
+  // rows format_dataframe dropped; round BN).
   if (!polars && computes_duration && clamp_start &&
+      !declared_datetime_unit(table, start_column_name(options)) &&
       std::none_of(rows.begin(), rows.end(), [](const TableRow& row) { return row.start.has_value(); }))
     throw std::invalid_argument("'>=' not supported between instances of 'float' and 'Timestamp'");
   if (!polars && (computes_duration || options.measure == DfgTableMeasure::kCost) &&
@@ -1234,11 +1257,15 @@ DfgPartialOrderResult discover_partial_table(const EventTable& table,
   // A start column blank in every row (a CSV's) is a float column there,
   // which the eager adapter compares with the completions (round BM,
   // observed black-box).
-  if (backend == DfgTableBackend::kPandas &&
+  const auto declared_start = own_start_column(table, options)
+                                  ? declared_datetime_unit(table, start_column_name(options))
+                                  : std::nullopt;
+  if (backend == DfgTableBackend::kPandas && !declared_start &&
       std::none_of(rows.begin(), rows.end(), [](const TableRow& row) { return row.start.has_value(); }) &&
       (own_start_column(table, options) ||
        std::any_of(rows.begin(), rows.end(), [](const TableRow& row) { return row.completion.has_value(); }))) {
-    const bool nanoseconds = std::any_of(rows.begin(), rows.end(), [](const TableRow& row) {
+    const auto declared = declared_datetime_unit(table, options.timestamp_attribute);
+    const bool nanoseconds = declared ? *declared : std::any_of(rows.begin(), rows.end(), [](const TableRow& row) {
       return sub_microsecond(row.completion_text);
     });
     throw std::invalid_argument(std::string("Invalid comparison between dtype=datetime64[") +
@@ -1341,9 +1368,16 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
     const bool any_start = std::any_of(rows.begin(), rows.end(), [](const TableRow& row) {
       return row.start.has_value();
     });
-    if (!candidate && (any_start || !own_start_column(table, options))) {
-      for (const auto& row : rows)
-        nanoseconds = nanoseconds || sub_microsecond(row.start_text) || sub_microsecond(row.completion_text);
+    const auto declared_start = own_start_column(table, options)
+                                    ? declared_datetime_unit(table, start_column_name(options))
+                                    : std::nullopt;
+    if (!candidate && (any_start || declared_start || !own_start_column(table, options))) {
+      const auto declared_completion = declared_datetime_unit(table, options.timestamp_attribute);
+      if (declared_completion && (declared_start || !own_start_column(table, options)))
+        nanoseconds = *declared_completion || declared_start.value_or(false);
+      else
+        for (const auto& row : rows)
+          nanoseconds = nanoseconds || sub_microsecond(row.start_text) || sub_microsecond(row.completion_text);
       throw std::invalid_argument(std::string("Invalid comparison between dtype=timedelta64[") +
                                   (nanoseconds ? "ns" : "us") + "] and int");
     }

@@ -171,6 +171,11 @@ const std::string& selected_activity(const Event& event,
     return event.activity;
   if (const auto* value = event.attribute(options.activity_attribute))
     return *value;
+  // A table read as events keeps its activity column as the first-class
+  // activity under that column's name (a CSV upload's table shapes; round
+  // BN): the column still answers for its key, as in pm4py's frame.
+  if (!event.activity_source_key.empty() && event.activity_source_key == options.activity_attribute)
+    return event.activity;
   throw std::invalid_argument(
       "Heuristics Miner: event is missing activity attribute '" +
       options.activity_attribute + "'");
@@ -196,6 +201,9 @@ const std::string& selected_timestamp(const Event& event,
     return event.timestamp;
   if (const auto* value = event.attribute(options.timestamp_attribute))
     return *value;
+  // The timestamp column likewise (see selected_activity).
+  if (!event.timestamp_source_key.empty() && event.timestamp_source_key == options.timestamp_attribute)
+    return event.timestamp;
   throw std::invalid_argument(
       "Heuristics Miner: event is missing timestamp attribute '" +
       options.timestamp_attribute + "'");

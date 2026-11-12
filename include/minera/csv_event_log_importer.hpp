@@ -6,6 +6,7 @@
 #include <optional>
 #include <vector>
 #include <string>
+#include <string_view>
 
 #include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
@@ -107,6 +108,10 @@ struct ReferenceMixedTimestamp {
 [[nodiscard]] CsvEventData import_csv_event_data(
     const std::filesystem::path& path,
     const CsvImportOptions& options = {});
+
+// Whether pandas.read_csv reads a cell of this exact text as NaN (its default
+// NA spellings, the empty cell among them; whitespace is not NA).
+[[nodiscard]] bool is_pandas_csv_na_text(std::string_view text);
 
 // Reconcile a filtered case-grouped log with its original flat CSV rows.
 // Events retain their parser-assigned input_order, so this preserves source

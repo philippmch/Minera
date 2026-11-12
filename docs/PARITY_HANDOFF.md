@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BM (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BN (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4606,7 +4606,64 @@ DataFrame functions refuse frames with an empty case id (declared). The
 device check on the Mac was skipped again (the round's thread had no device
 linked).
 
-Next round (BN) should start by re-reviewing round BM:
+Round BN re-reviewed BM (Review BN1) and took its targets. It fixed the
+session routes and workbenches that handed a CSV upload's table to pm4py's
+DataFrame functions in file order (minimum self-distances, batches, the
+performance spectrum, the constraint, graph, workflow and conversion
+routes, the original Declare and log skeleton routes, token replay,
+alignments and replay durations, on the DataFrame, LazyFrame and stream
+shapes: they now read `format_dataframe`'s frame, built once per session);
+the frame's date columns (declared `datetime64[us, UTC]` or `[ns, UTC]` as
+`format_dataframe` types them before it drops rows, which the pandas
+batches' unit reads); the batches' default event id (the frame's
+`@@index`), an event that starts after it completes and a blank start
+(pandas: the smallest datetime), and a blank resource (NaN); the
+heuristics miner and model decoration keyed by a CSV's own activity column
+on the table shapes (the heuristic family failed on every CSV upload mined
+as a DataFrame); and the DFG adapters on a frame emptied by the dropped
+rows (the dtypes are kept) and without column reduction (a NaN cell drops
+its row). The overlap family's one-error-for-three-statistics, the trimmed
+whitespace-only cell and the batches' log variant with a blank resource
+are declared. A stray `pyarrow` install in the reference venv made pandas 3
+store `string` columns in Arrow and sort them stably, which looked like a
+regression of BM's introsort model: keep `pyarrow` out of `/tmp/refvenv`
+(the harness converts frames to Polars without it, `plconv.py`). The
+device check on the Mac was skipped again (the round's thread had no
+device linked).
+
+Next round (BO) should start by re-reviewing round BN:
+
+- `src/backend/tools/minera_server.cpp`: `session_frame_table`,
+  `session_frame_lazy`, `session_frame_stream`, `session_indexed_frame_*`
+  (the `CsvFrameCache` shared by session copies), `session_selected_view`
+  and `cached_source_view` (which kinds get the frame), `csv_frame_stream`,
+  `adapter_source_table` in the workbenches, the date dtypes at the end of
+  `csv_frame_table`, `mark_csv_nan_cells` (only the DFG route and the
+  batches use it) and the timing route's batches;
+- `src/backend/batches.cpp`: the default `@@index` event id in
+  `discover_table` (a table with its own `@@index` column that is not a
+  frame's), the NaT start (`kNaT`) for an empty start cell, the inverted
+  events in all three variants and their batch types;
+- `src/backend/dfg_dataframe.cpp`: `declared_datetime_unit` and its two
+  callers (a table with dtypes but rows, a start column declared as text);
+- `src/backend/heuristic_miner.cpp` and `src/backend/model_decoration.cpp`:
+  the `activity_source_key`/`timestamp_source_key` fallbacks (other
+  families with the same lookup: grep for `event is missing activity
+  attribute`);
+- new areas: the conversions of a CSV frame (`/api/log-convert`
+  `to_event_log`/`to_data_frame` against `convert_to_event_log(frame)`,
+  which keeps NaN and NaT attributes and the `@@index`/`@@case_index`
+  columns); the upload workbenches' table shapes on CSV uploads with custom
+  headers and the literal default keys (`concept:name`): pm4py's frame has
+  the standard columns, Minera's table refuses (`declcsv.py` without
+  `--std`); the batches' log variant with a blank resource (`nan`), and the
+  CLI's batches (`minera_export`) on CSV inputs; `str()` names of non-text
+  activity keys in the other keyed DataFrame routes (carried over);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BN commit.
+
+Round BM's targets, re-reviewed in BN (findings BN1-1 to BN1-6):
 
 - `src/backend/dfg_dataframe.cpp`: `parse_time` (blank is NaT),
   `sort_rows` with `pandas` (the case-only `numpy_object_quick_argsort`,

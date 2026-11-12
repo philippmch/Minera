@@ -1139,14 +1139,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "47268",
+        "Content-Length": "47878",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "literal-selectors-0.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/literal-selectors-0.response.json",
-        "bytes": 47268,
-        "sha256": "690fd106691cf3ab859210f7a65f7a710fda8871a32cb63c45a91f7eebb170cb",
+        "bytes": 47878,
+        "sha256": "da40117f918e60196cf5aa8e1ddebfc7770e83c570ccff8e0aa120f01ab2b4e9",
         "status": 200
       },
       "exports": {},
@@ -1202,14 +1202,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "86220",
+        "Content-Length": "86835",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "literal-selectors-1.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/literal-selectors-1.response.json",
-        "bytes": 86220,
-        "sha256": "4540eaf9766fbc3981fb098fc7a2fb5d9f93e3f7c0391c54f7e3253875d03e56",
+        "bytes": 86835,
+        "sha256": "b9cfb34d6b6bd966a26180857a4f28315c62d1362f41d10f0be5b367462fcf06",
         "status": 200
       },
       "exports": {},
@@ -1265,14 +1265,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "101669",
+        "Content-Length": "102295",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "literal-selectors-2.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/literal-selectors-2.response.json",
-        "bytes": 101669,
-        "sha256": "a205ff32f043c0aec95c563c27d9b33677562b1bca868f4a527bb632cbb6150e",
+        "bytes": 102295,
+        "sha256": "a78a06edb7b9b947cb4043883f05cc8967c74556421dab493230c4a4e6839251",
         "status": 200
       },
       "exports": {},
@@ -1553,14 +1553,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "62016",
+        "Content-Length": "62035",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-alias-default-stream.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-alias-default-stream.response.json",
-        "bytes": 62016,
-        "sha256": "bfa68ebfdd10a05e999f9fc951797ee6987be4f17b721c032f48f7267f3d5287",
+        "bytes": 62035,
+        "sha256": "19fbb2885f34d7790a90d75202dfff270f4da0e439e26d7041836db5690d8851",
         "status": 200
       },
       "exports": {},
@@ -2085,14 +2085,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "50740",
+        "Content-Length": "60078",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-custom-exact-controls.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-custom-exact-controls.response.json",
-        "bytes": 50740,
-        "sha256": "81e8fda36a166b9504dbd11ca281401a4b96ce7975d70acbf64f8908c7adbe69",
+        "bytes": 60078,
+        "sha256": "bc01ccc664da21507489c955151dca0950b371e2abc31f2848d30eed03073f5c",
         "status": 200
       },
       "exports": {},
@@ -2349,7 +2349,7 @@
         "filename": "xes-custom-clock-native-flat-stream.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-stream.response.json",
         "bytes": 69591,
-        "sha256": "fbf377e35b67388201962616b541570153263790ee5098043f5991ab37094b65",
+        "sha256": "ebf00c5a7478198cb2f47f4099a2c9bdd821c67de4916388ca2afbccb7dafb8c",
         "status": 200
       },
       "exports": {},
@@ -2403,7 +2403,7 @@
         "filename": "xes-custom-clock-native-flat-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-dataframe.response.json",
         "bytes": 69999,
-        "sha256": "56c5ca03fba9b55f7964afe0d17b5be712c9c9bc020f8240950fa3cc89d0a847",
+        "sha256": "86d29a63af441df76169330323a6fa93810425d949ee85a23d7491266c8de3a6",
         "status": 200
       },
       "exports": {},
@@ -2457,7 +2457,7 @@
         "filename": "xes-custom-clock-native-flat-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-lazyframe.response.json",
         "bytes": 69999,
-        "sha256": "10a0f3b973d86c87772bc3eb481b15f3983a7a6f12838151127a0b0ec5a46463",
+        "sha256": "fa4232197204d116158f40837a8581030b59473e5d1de31ca515fbda7bea2595",
         "status": 200
       },
       "exports": {},

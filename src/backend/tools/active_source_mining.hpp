@@ -21,10 +21,8 @@ void handle_active_source_mining(const httplib::Request& request,
   session->powl_timestamp_key = params.powl.timestamp_key;
   session->powl_case_id_key = params.powl.case_id_key;
   // A CSV upload's DataFrame and LazyFrame families read format_dataframe's
-  // row order (prepare_csv_frame_view; round BM).
-  CsvFrameView frame;
-  prepare_csv_frame_view(*session->active_source, frame);
-  const auto data = [&] {return frame.view ? *frame.view : session->active_source->selected_view();};
+  // row order (session_selected_view; rounds BM and BN).
+  const auto data = [&] {return session_selected_view(*session);};
   std::map<std::string, std::string> records;
   std::map<std::string, std::string> options_overrides;
   // A client that disconnected stops the request too, before a family and
@@ -185,9 +183,10 @@ void handle_active_source_mining(const httplib::Request& request,
     // Explicit variant dispatch is the public contract for this family.
     if (params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kLog)
       distances = minera::MinimumSelfDistanceLogDiscovery::apply(require_prepared_log(*session), params.minimum_self_distance);
+    // The DataFrame variants read a CSV upload as the frame (round BN).
     else if (params.minimum_self_distance.variant == minera::MinimumSelfDistanceVariant::kPandas)
-      distances = minera::MinimumSelfDistancePandasDiscovery::apply(session->active_source->checked_table(), params.minimum_self_distance);
-    else distances = minera::MinimumSelfDistancePolarsDiscovery::apply(session->active_source->checked_lazy(), params.minimum_self_distance);
+      distances = minera::MinimumSelfDistancePandasDiscovery::apply(*cached_source_view(*session, minera::EventDataKind::kEventTable).table(), params.minimum_self_distance);
+    else distances = minera::MinimumSelfDistancePolarsDiscovery::apply(*cached_source_view(*session, minera::EventDataKind::kLazyEventTable).lazy_table(), params.minimum_self_distance);
     native_returned = true;
     return minera::serialize_active_source_distances_json(*distances);
   });
@@ -200,13 +199,19 @@ void handle_active_source_mining(const httplib::Request& request,
   std::optional<minera::PerformanceSpectrum> spectrum;
   if (!params.spectrum_activities.empty()) run("performance_spectrum", "selected_native_variant", [&](bool& native_returned) {
     spectrum = discover_selected_performance_spectrum(session_log(*session), params.spectrum_activities,
-        params.spectrum, session->active_source.get());
+        params.spectrum, session->active_source.get(), session_frame_table(*session),
+        params.spectrum.variant == minera::PerformanceSpectrumVariant::kLazyframe ||
+                params.spectrum.variant == minera::PerformanceSpectrumVariant::kLazyframeDisconnected
+            ? session_frame_lazy(*session) : nullptr);
     native_returned = true;
     return minera::serialize_active_source_spectrum_json(*spectrum);
   });
   std::optional<minera::BatchDiscovery> batches;
   if (params.batches) run("batches", "selected_native_variant", [&](bool& native_returned) {
-    batches = discover_selected_batches(session_log(*session), params.batch_options, session->active_source.get());
+    batches = discover_selected_batches(session_log(*session), params.batch_options, session->active_source.get(),
+                                        session_indexed_frame_table(*session),
+                                        params.batch_options.variant == minera::BatchDiscoveryVariant::kPolars
+                                            ? session_indexed_frame_lazy(*session) : nullptr);
     native_returned = true;
     return minera::serialize_active_source_batches_json(*batches);
   });

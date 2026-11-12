@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 #include <limits>
@@ -393,9 +394,18 @@ int main() {
   invalid_log = merge_log;
   invalid_log.traces[0].events[0].attributes[0].value = "invalid";
   assert(throws([&] { (void)minera::discover_batches(invalid_log, merge_options); }));
+  // An event that starts after it completes is taken as it is (pm4py's three
+  // variants do; review BN1-4): one concurrent batch of all five events.
   invalid_log = merge_log;
   invalid_log.traces[0].events[0].attributes[0].value =
       "2024-01-01T00:02:00Z";
-  assert(throws([&] { (void)minera::discover_batches(invalid_log, merge_options); }));
+  const auto inverted = minera::discover_batches(invalid_log, merge_options);
+  assert(inverted.groups.size() == 1 && inverted.groups[0].batches.size() == 1);
+  assert(inverted.groups[0].batches[0].type == minera::BatchType::kConcurrent);
+  assert(inverted.groups[0].batches[0].events.size() == 5);
+  assert(inverted.groups[0].batches[0].start == 1704067230.0 &&
+         inverted.groups[0].batches[0].complete == 1704067400.0);
+  assert(std::any_of(inverted.groups[0].batches[0].events.begin(), inverted.groups[0].batches[0].events.end(),
+                     [](const auto& event) { return event.start == 1704067320.0 && event.complete == 1704067260.0; }));
   std::cout << "temporal/behavioral tests passed\n";
 }

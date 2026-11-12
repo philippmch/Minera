@@ -60,13 +60,13 @@ void handle_replay_duration_workbench(const httplib::Request& request, httplib::
   minera::EventLog log;
   if(adapter=="log")log=source_log;
   else if(adapter=="stream"){
-   const auto stream=source_table?minera::event_table_to_event_stream(*source_table):minera::event_log_to_event_stream(source_log);
+   const auto adapter_table=source?adapter_source_table(*source,source_table):source_table;const auto stream=adapter_table?minera::event_table_to_event_stream(*adapter_table):minera::event_log_to_event_stream(source_log);
    log=minera::normalize_token_replay_event_log(minera::EventDataView(stream),options);
   }else if(adapter=="dataframe"){
-   const auto table=source_table?*source_table:minera::event_log_to_table(source_log);
+   const auto adapter_table=source?adapter_source_table(*source,source_table):source_table;const auto table=adapter_table?*adapter_table:minera::event_log_to_table(source_log);
    log=minera::normalize_token_replay_event_log(minera::EventDataView(table),options);
   }else{
-   const auto lazy=source_table?minera::LazyEventTable::from_table(*source_table):minera::event_log_to_lazy_table(source_log);
+   const auto adapter_table=source?adapter_source_table(*source,source_table):source_table;const auto lazy=adapter_table?minera::LazyEventTable::from_table(*adapter_table):minera::event_log_to_lazy_table(source_log);
    log=minera::normalize_token_replay_event_log(minera::EventDataView(lazy),options);
   }
   const auto q=minera::serialize_embedding_workbench_string_json;

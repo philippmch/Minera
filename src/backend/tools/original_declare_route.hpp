@@ -104,6 +104,10 @@ void handle_original_declare_workbench(const httplib::Request& request,
         ",\"prepared_lazy_table\":" + lazy_table + ",\"lazy_row_count\":" + lazy_count +
         ",\"lazy_valid\":" + (lazy ? std::string(flag(lazy->valid())) : std::string("null")) + '}';
     };
+    CsvFrameView frame;
+    const auto source_view = [&] {return frame.view ? *frame.view : source->selected_view();};
+    const auto source_table = [&]() -> const minera::EventTable& {return frame.table ? *frame.table : source->checked_table();};
+    const auto source_lazy = [&]() -> const minera::LazyEventTable& {return frame.lazy ? *frame.lazy : source->checked_lazy();};
     std::optional<minera::DeclareConformance> scalar;
     std::optional<std::vector<minera::DeclareConformance>> conformances, generated_conformance, listed;
     std::optional<minera::EventLog> generated;
@@ -172,6 +176,9 @@ void handle_original_declare_workbench(const httplib::Request& request,
         source = prepare_active_event_source(request, input_file->content, input_file->filename, imports);
         source_before = source_snapshot();
         (void)source->selected_view();
+        // pm4py reads a CSV upload's table shapes as format_dataframe's frame,
+        // in its row order (round BN).
+        prepare_csv_frame_view(*source, frame);
       }
       input_before = input_snapshot();
       stage = "native_error";
@@ -180,17 +187,17 @@ void handle_original_declare_workbench(const httplib::Request& request,
       else if (operation == "conformance_trace")
         invoke("check_declare_conformance(trace, model, options)", [&] {scalar = minera::check_declare_conformance(*trace, model, *conformance_options);});
       else if (operation == "conformance_view")
-        invoke("check_declare_conformance(source_view, model, options)", [&] {conformances = minera::check_declare_conformance(source->selected_view(), model, *conformance_options);});
+        invoke("check_declare_conformance(source_view, model, options)", [&] {conformances = minera::check_declare_conformance(source_view(), model, *conformance_options);});
       else if (operation == "conformance") {
         switch (source->selected_kind()) {
           case minera::EventDataKind::kEventLog:
             invoke("check_declare_conformance(source_log, model, options)", [&] {conformances = minera::check_declare_conformance(source->checked_log(), model, *conformance_options);}); break;
           case minera::EventDataKind::kEventStream:
-            invoke("check_declare_conformance(source_stream, model, options)", [&] {conformances = minera::check_declare_conformance(source->checked_stream(), model, *conformance_options);}); break;
+            invoke("check_declare_conformance(source_stream, model, options)", [&] {conformances = minera::check_declare_conformance(frame.stream ? *frame.stream : source->checked_stream(), model, *conformance_options);}); break;
           case minera::EventDataKind::kEventTable:
-            invoke("check_declare_conformance(source_table, model, options)", [&] {conformances = minera::check_declare_conformance(source->checked_table(), model, *conformance_options);}); break;
+            invoke("check_declare_conformance(source_table, model, options)", [&] {conformances = minera::check_declare_conformance(source_table(), model, *conformance_options);}); break;
           case minera::EventDataKind::kLazyEventTable:
-            invoke("check_declare_conformance(source_lazy, model, options)", [&] {conformances = minera::check_declare_conformance(source->checked_lazy(), model, *conformance_options);}); break;
+            invoke("check_declare_conformance(source_lazy, model, options)", [&] {conformances = minera::check_declare_conformance(source_lazy(), model, *conformance_options);}); break;
         }
       } else
         invoke("declare_playout(model, options)", [&] {generated = minera::declare_playout(model, *playout_options);});
@@ -222,17 +229,17 @@ void handle_original_declare_workbench(const httplib::Request& request,
           if (generated_conformance)
             invoke("declare_conformance_diagnostics(generated_log, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(*generated, *generated_conformance, *diagnostics_options);});
           else if (operation == "conformance_view")
-            invoke("declare_conformance_diagnostics(source_view, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(source->selected_view(), *conformances, *diagnostics_options);});
+            invoke("declare_conformance_diagnostics(source_view, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(source_view(), *conformances, *diagnostics_options);});
           else {
             switch (source->selected_kind()) {
               case minera::EventDataKind::kEventLog:
                 invoke("declare_conformance_diagnostics(source_log, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(source->checked_log(), *conformances, *diagnostics_options);}); break;
               case minera::EventDataKind::kEventStream:
-                invoke("declare_conformance_diagnostics(source_stream, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(source->checked_stream(), *conformances, *diagnostics_options);}); break;
+                invoke("declare_conformance_diagnostics(source_stream, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(frame.stream ? *frame.stream : source->checked_stream(), *conformances, *diagnostics_options);}); break;
               case minera::EventDataKind::kEventTable:
-                invoke("declare_conformance_diagnostics(source_table, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(source->checked_table(), *conformances, *diagnostics_options);}); break;
+                invoke("declare_conformance_diagnostics(source_table, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(source_table(), *conformances, *diagnostics_options);}); break;
               case minera::EventDataKind::kLazyEventTable:
-                invoke("declare_conformance_diagnostics(source_lazy, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(source->checked_lazy(), *conformances, *diagnostics_options);}); break;
+                invoke("declare_conformance_diagnostics(source_lazy, results, options)", [&] {diagnostics = minera::declare_conformance_diagnostics(source_lazy(), *conformances, *diagnostics_options);}); break;
             }
           }
         } catch (const std::exception& error) {diagnostics_error = error_value("native_error", error.what());}

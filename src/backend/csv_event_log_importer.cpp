@@ -3202,6 +3202,10 @@ CsvEventData import_csv_event_data(
   return import_csv_event_data(input, options);
 }
 
+bool is_pandas_csv_na_text(std::string_view text) {
+  return is_reference_na_token(text);
+}
+
 EventTable project_csv_event_table(const EventTable& source,
                                    const EventLog& filtered) {
   source.validate();

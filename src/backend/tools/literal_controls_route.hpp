@@ -101,7 +101,7 @@ bool handle_literal_controls_request(const httplib::Request& request,
       const auto options=parse_literal_dfg_precision_options_json(lookup("dfg_precision_options_json"),&json_members);parsed_controls.push_back("dfg_precision_options_json");parsed_members.emplace("dfg_precision_options_json",json_members);configured=serialize_literal_controls_options_json(options);
       phase="preparation_error";if(dfg_bytes.empty())throw std::invalid_argument("missing DFG text body");
       const auto model=parse_dfg(dfg_bytes);
-      const auto view=session->active_source?session->active_source->selected_view():EventDataView(require_prepared_log(*session));
+      const auto view=session_selected_view(*session);  // a CSV upload's table shapes as the frame (round BN)
       phase="native_error";invoke("evaluate_dfg_precision(view,model,options)",[&]{precision_result=evaluate_dfg_precision(view,model,options);});native_result=serialize_literal_controls_result_json(*precision_result);
     }
   }catch(const std::exception& error){if(status!=409)status=400;failure=error_json_value(phase,error);failure_message=q(error.what());}

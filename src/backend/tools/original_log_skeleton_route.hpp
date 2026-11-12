@@ -67,6 +67,8 @@ void handle_original_log_skeleton_workbench(const httplib::Request& request,
     std::optional<minera::LogSkeletonVariantList> variants;
     std::optional<std::vector<minera::LogSkeletonConformance>> provided_results;
     std::optional<minera::ActiveEventSource> source;
+    CsvFrameView frame;
+    const auto source_view = [&] {return frame.view ? *frame.view : source->selected_view();};
     std::optional<minera::LogSkeletonOptions> conformance_options;
     std::optional<minera::LogSkeletonDiagnosticsOptions> diagnostics_options;
     std::set<std::string> conformance_members, diagnostics_members;
@@ -175,6 +177,9 @@ void handle_original_log_skeleton_workbench(const httplib::Request& request,
         source = prepare_active_event_source(request, input_file->content, input_file->filename, imports);
         source_before = source_snapshot();
         (void)source->selected_view();
+        // pm4py reads a CSV upload's table shapes as format_dataframe's frame,
+        // in its row order (round BN).
+        prepare_csv_frame_view(*source, frame);
       }
       input_before = input_snapshot();
       if (standalone) {
@@ -186,9 +191,9 @@ void handle_original_log_skeleton_workbench(const httplib::Request& request,
       const auto concrete = [&](const auto& call) {
         switch (source->selected_kind()) {
           case minera::EventDataKind::kEventLog: return call(source->checked_log());
-          case minera::EventDataKind::kEventStream: return call(source->checked_stream());
-          case minera::EventDataKind::kEventTable: return call(source->checked_table());
-          case minera::EventDataKind::kLazyEventTable: return call(source->checked_lazy());
+          case minera::EventDataKind::kEventStream: return call(frame.stream ? *frame.stream : source->checked_stream());
+          case minera::EventDataKind::kEventTable: return call(frame.table ? *frame.table : source->checked_table());
+          case minera::EventDataKind::kLazyEventTable: return call(frame.lazy ? *frame.lazy : source->checked_lazy());
         }
         throw std::invalid_argument("invalid native source kind");
       };
@@ -209,13 +214,13 @@ void handle_original_log_skeleton_workbench(const httplib::Request& request,
       else if (operation == "conformance_variants")
         invoke("check_log_skeleton_conformance(variants, model, options)", [&] {variant_conformance = minera::check_log_skeleton_conformance(*variants, *model, *conformance_options);});
       else if (operation == "conformance_view")
-        invoke("check_log_skeleton_conformance(source_view, model, options)", [&] {conformances = minera::check_log_skeleton_conformance(source->selected_view(), *model, *conformance_options);});
+        invoke("check_log_skeleton_conformance(source_view, model, options)", [&] {conformances = minera::check_log_skeleton_conformance(source_view(), *model, *conformance_options);});
       else if (operation == "conformance")
         invoke(std::string("check_log_skeleton_conformance(") + source_name() + ", model, options)", [&] {
           conformances = concrete([&](const auto& value) {return minera::check_log_skeleton_conformance(value, *model, *conformance_options);});
         });
       else if (operation == "diagnostics_view")
-        invoke("log_skeleton_conformance_diagnostics(source_view, results, options)", [&] {primary_diagnostics = minera::log_skeleton_conformance_diagnostics(source->selected_view(), *provided_results, *diagnostics_options);});
+        invoke("log_skeleton_conformance_diagnostics(source_view, results, options)", [&] {primary_diagnostics = minera::log_skeleton_conformance_diagnostics(source_view(), *provided_results, *diagnostics_options);});
       else
         invoke(std::string("log_skeleton_conformance_diagnostics(") + source_name() + ", results, options)", [&] {
           primary_diagnostics = concrete([&](const auto& value) {return minera::log_skeleton_conformance_diagnostics(value, *provided_results, *diagnostics_options);});
@@ -224,7 +229,7 @@ void handle_original_log_skeleton_workbench(const httplib::Request& request,
       if (include_diagnostics && conformances) {
         try {
           if (operation == "conformance_view")
-            invoke("log_skeleton_conformance_diagnostics(source_view, results, options)", [&] {diagnostics = minera::log_skeleton_conformance_diagnostics(source->selected_view(), *conformances, *diagnostics_options);});
+            invoke("log_skeleton_conformance_diagnostics(source_view, results, options)", [&] {diagnostics = minera::log_skeleton_conformance_diagnostics(source_view(), *conformances, *diagnostics_options);});
           else
             invoke(std::string("log_skeleton_conformance_diagnostics(") + source_name() + ", results, options)", [&] {
               diagnostics = concrete([&](const auto& value) {return minera::log_skeleton_conformance_diagnostics(value, *conformances, *diagnostics_options);});
