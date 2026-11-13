@@ -298,9 +298,12 @@ inline std::string civil_timestamp_text(const CivilTimestamp& time, char separat
 // "YYYY-MM-DD HH:MM:SS[.ffffff]+00:00" (separator ' ', suffix "+00:00"), or
 // with separator 'T' and suffix "Z" for the OCEL 1.0 XML date. A naive text
 // gets no suffix; text that is no timestamp is returned as is.
+// With `microseconds`, nanosecond digits are cut first, as a value passed
+// through a Python datetime is (pm4py.write_ocel2_sqlite, round BW).
 inline std::string utc_timestamp_text(std::string_view text, char separator,
-                                      std::string_view suffix) {
-  const auto parsed = parse_timestamp_exact(text);
+                                      std::string_view suffix, bool microseconds = false) {
+  auto parsed = parse_timestamp_exact(text);
+  if (parsed && microseconds) parsed->nanoseconds -= parsed->nanoseconds % 1000;
   const auto time = parsed ? civil_timestamp(*parsed) : std::nullopt;
   if (!time) return std::string(text);
   const int digits = time->nanoseconds == 0 ? 0 : time->nanoseconds % 1000 == 0 ? 6 : 9;
@@ -414,14 +417,16 @@ inline std::optional<std::int32_t> shared_nonzero_offset(
 // itself ("+02:00") when `suffix` is nullopt.
 inline std::string offset_timestamp_text(std::string_view text, char separator,
                                          std::optional<std::int32_t> offset_minutes,
-                                         std::optional<std::string_view> suffix) {
-  if (!offset_minutes) return utc_timestamp_text(text, separator, suffix.value_or("+00:00"));
+                                         std::optional<std::string_view> suffix,
+                                         bool microseconds = false) {
+  if (!offset_minutes) return utc_timestamp_text(text, separator, suffix.value_or("+00:00"), microseconds);
   auto parsed = parse_timestamp_exact(text);
   if (!parsed || !parsed->timezone_aware)
-    return utc_timestamp_text(text, separator, suffix.value_or("+00:00"));
+    return utc_timestamp_text(text, separator, suffix.value_or("+00:00"), microseconds);
+  if (microseconds) parsed->nanoseconds -= parsed->nanoseconds % 1000;
   parsed->seconds += static_cast<std::int64_t>(*offset_minutes) * 60;
   const auto time = civil_timestamp(*parsed);
-  if (!time) return utc_timestamp_text(text, separator, suffix.value_or("+00:00"));
+  if (!time) return utc_timestamp_text(text, separator, suffix.value_or("+00:00"), microseconds);
   const int digits = time->nanoseconds == 0 ? 0 : time->nanoseconds % 1000 == 0 ? 6 : 9;
   auto out = civil_timestamp_text(*time, separator, digits, true);
   if (suffix) return out.append(*suffix);

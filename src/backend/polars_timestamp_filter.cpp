@@ -1,4 +1,5 @@
 #include "minera/polars_timestamp_filter.hpp"
+#include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_list_literal.hpp"
 #include "pandas_parameter_carrier.hpp"
@@ -97,8 +98,8 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
   if (dtype == "Boolean" || dtype == "Int64" || dtype == "UInt64" || dtype == "UInt32" || dtype == "Int32") return "i" + exact(v).decimal();
-  if (dtype == "Date" || dtype.starts_with("Datetime(time_unit='us', time_zone=")) {
-    const auto parsed = parse_timestamp_microseconds(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value);
+  if (polars_datetime::temporal(dtype)) {
+    const auto parsed = polars_datetime::ticks(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value, polars_datetime::column_unit(dtype));
     if (!parsed) throw std::invalid_argument("Native Polars case grouping requires valid declared temporal cells");
     return "t" + std::to_string(*parsed);
   }
@@ -240,15 +241,15 @@ void time_dtype(const EventTable& source,std::size_t at,const Query& q,const std
     else plan=filtered_plan(source,q,false);
     fail("InvalidOperationError",phase,message+resolved(q.op,plan,nodes(q.op,true),true));
   }
-  if(dtype=="Boolean"||dtype=="Datetime(time_unit='us', time_zone=None)") {
+  if(dtype=="Boolean"||polars_datetime::naive(dtype)) {
     const auto column=q.op==Operation::kContained||q.op==Operation::kIntersecting?"first_timestamp":q.options.timestamp_key.value;
     const bool eq=(q.op==Operation::kEvents||q.op==Operation::kAttribute)&&equal(q.low,q.high);
     const std::string cmp=eq?"==":q.op==Operation::kIntersecting?(equal(q.low,q.high)?"<":">"):">=";
     const auto expression=compare_expr(column,cmp,bound_text(q.low));const auto larger=whole_expr(q);
-    std::string message="could not evaluate "+(eq?std::string{}:"'"+cmp+"' ")+"comparison between series '"+column+"' of dtype: "+(dtype=="Boolean"?"Boolean":"Datetime('μs')")+" and series 'literal' of dtype: Datetime('μs', 'UTC')\n\nThis error occurred in the following expression:\n\t"+expression+'\n';
+    std::string message="could not evaluate "+(eq?std::string{}:"'"+cmp+"' ")+"comparison between series '"+column+"' of dtype: "+(dtype=="Boolean"?"Boolean":"Datetime('"+polars_datetime::symbol(polars_datetime::column_unit(dtype))+"')")+" and series 'literal' of dtype: Datetime('μs', 'UTC')\n\nThis error occurred in the following expression:\n\t"+expression+'\n';
     if(larger!=expression)message+="while evaluating this larger expression:\n\t"+larger+'\n';fail("SchemaError",phase,message);
   }
-  if(dtype!="Date"&&!dtype.starts_with("Datetime(time_unit='us', time_zone=")&&dtype!="Null"&&dtype!="Int64"&&dtype!="UInt64"&&dtype!="Float64")throw std::invalid_argument("Unsupported native Polars timestamp dtype: "+dtype);
+  if(!polars_datetime::temporal(dtype)&&dtype!="Null"&&dtype!="Int64"&&dtype!="UInt64"&&dtype!="Float64")throw std::invalid_argument("Unsupported native Polars timestamp dtype: "+dtype);
 }
 void attribute_dtype(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
   const auto& dt=source.dtypes[at];const bool string=dt=="String"||dt=="Categorical"||dt.starts_with("Categorical(")||dt.starts_with("Enum(");
@@ -302,7 +303,9 @@ std::optional<Instant> instant(const std::optional<EventAttribute>& cell,const s
   if(dtype=="Int64"||dtype=="UInt64")return Instant{physical_instant(static_cast<std::int64_t>(exact(v))),std::nullopt};
   if(dtype=="Float64")return Instant{{},number(v)};
   const auto parsed=parse_timestamp_exact(std::get_if<NativeDate>(&v.typed_value)?std::get<NativeDate>(v.typed_value).value:v.value);
-  if(!parsed)throw std::invalid_argument("Native Polars timestamp filter requires valid declared temporal cells");return Instant{*parsed,std::nullopt};
+  if(!parsed)throw std::invalid_argument("Native Polars timestamp filter requires valid declared temporal cells");
+  // The column holds its unit (round BW).
+  return Instant{polars_datetime::floor(*parsed,polars_datetime::column_unit(dtype)),std::nullopt};
 }
 bool attribute_match(const std::optional<EventAttribute>& cell,const std::string& dt,const EventAttribute& value) {
   if(!cell||null(*cell)||null(value)||dt=="Null")return false;
@@ -343,12 +346,24 @@ EventTable collect(const EventTable& source,const Query& q,const std::string& ph
   if((q.op==Operation::kEvents||q.op==Operation::kAttribute)&&less(q.high,q.low))return result;
   if(attr_at)attribute_dtype(source,*attr_at,q,phase);
   time_dtype(source,time_at,q,phase);
+  // The microsecond bounds meet the column's unit as Polars 1.44.1 compares
+  // a Datetime column with a datetime literal (round BW): every comparison
+  // floors the bound to a millisecond column's unit; on a nanosecond column
+  // `<=` and `==` floor the cell to microseconds while `>` and `!=` compare
+  // the exact nanoseconds (`>=` and `<` agree either way).
+  const auto& time_dtype_name=source.dtypes[time_at];
+  const bool temporal_time=polars_datetime::temporal(time_dtype_name);
+  const auto time_unit=polars_datetime::column_unit(time_dtype_name);
+  const auto floor_bound=[&](const ParsedExactTimestamp& v){return temporal_time?polars_datetime::floor(v,polars_datetime::comparison_unit(time_unit)):v;};
+  const auto low=floor_bound(q.low),high=floor_bound(q.high);
+  // The cell side of a `<=` comparison.
+  const auto at_most=[&](const Instant& v){return temporal_time&&!v.physical_float?Instant{polars_datetime::floor(v.temporal,polars_datetime::comparison_unit(time_unit)),std::nullopt}:v;};
   if(constant){result.columns.push_back("literal");result.dtypes.push_back("Int32");if(!result.categorical_dtypes.empty())result.categorical_dtypes.push_back(std::nullopt);for(const auto& row:source.rows){auto kept=row;auto literal=q.options.case_id_key;literal.key="literal";kept.push_back(literal);result.rows.push_back(std::move(kept));}return result;}
   struct Group{bool absent=false,keep=false;std::optional<Instant> first,last;};
   std::vector<Group> groups;std::unordered_map<std::string,std::size_t> keys;std::vector<std::size_t> row_groups;
   for(const auto& row:source.rows){
     const auto time=instant(row[time_at],source.dtypes[time_at]);
-    const bool matches=time&&!less(*time,q.low)&&!less(q.high,*time)&&(q.op!=Operation::kAttribute||attribute_match(row[*attr_at],source.dtypes[*attr_at],q.value));
+    const bool matches=time&&!less(*time,low)&&!less(high,at_most(*time))&&(q.op!=Operation::kAttribute||attribute_match(row[*attr_at],source.dtypes[*attr_at],q.value));
     if(q.op==Operation::kEvents){if(matches)result.rows.push_back(row);continue;}
     const auto key=group_key(row[*case_at],source.dtypes[*case_at]);const auto [found,inserted]=keys.emplace(key,groups.size());
     if(inserted){groups.push_back({});groups.back().absent=key=="n";}
@@ -357,8 +372,8 @@ EventTable collect(const EventTable& source,const Query& q,const std::string& ph
     if(time){if(!group.first||less(*time,*group.first))group.first=time;if(!group.last||less(*group.last,*time))group.last=time;}
   }
   if(q.op==Operation::kContained||q.op==Operation::kIntersecting)for(auto& g:groups)if(g.first&&g.last){
-    if(q.op==Operation::kContained)g.keep=!less(*g.first,q.low)&&!less(q.high,*g.last);
-    else g.keep=(less(q.low,*g.first)&&less(*g.first,q.high))||(less(q.low,*g.last)&&less(*g.last,q.high))||(less(*g.first,q.low)&&less(q.high,*g.last));
+    if(q.op==Operation::kContained)g.keep=!less(*g.first,low)&&!less(high,at_most(*g.last));
+    else g.keep=(less(low,*g.first)&&less(*g.first,high))||(less(low,*g.last)&&less(*g.last,high))||(less(*g.first,low)&&less(high,*g.last));
   }
   if(q.op!=Operation::kEvents)for(std::size_t i=0;i<source.rows.size();++i){const auto& g=groups[row_groups[i]];if(g.keep&&!g.absent)result.rows.push_back(source.rows[i]);}
   return result;

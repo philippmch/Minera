@@ -1,4 +1,5 @@
 #include "minera/polars_variants_filter.hpp"
+#include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "pandas_parameter_carrier.hpp"
 
@@ -123,7 +124,7 @@ Dtype dtype(const std::string& value) {
   if (value == "Float64") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
   if (value == "Null") return Dtype::kNull;
-  if (value == "Date" || value.starts_with("Datetime(time_unit='us', time_zone=")) return Dtype::kDate;
+  if (polars_datetime::temporal(value)) return Dtype::kDate;
   throw std::invalid_argument("Unsupported native Polars variants dtype: " + value);
 }
 std::string frame_plan(const EventTable& source) {
@@ -212,8 +213,8 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
   if (dtype == "Boolean" || dtype == "Int64" || dtype == "UInt64" || dtype == "UInt32" || dtype == "Int32") return "i" + exact(v).decimal();
-  if (dtype == "Date" || dtype.starts_with("Datetime(time_unit='us', time_zone=")) {
-    const auto parsed = parse_timestamp_microseconds(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value);
+  if (polars_datetime::temporal(dtype)) {
+    const auto parsed = polars_datetime::ticks(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value, polars_datetime::column_unit(dtype));
     if (!parsed) throw std::invalid_argument("Native Polars case grouping requires valid declared temporal cells");
     return "t" + std::to_string(*parsed);
   }

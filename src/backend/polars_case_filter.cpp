@@ -1,4 +1,5 @@
 #include "minera/polars_case_filter.hpp"
+#include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_float_text.hpp"
 #include "polars_list_literal.hpp"
@@ -185,15 +186,15 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
   if (dtype == "Boolean" || dtype == "Int64" || dtype == "UInt64" || dtype == "UInt32" || dtype == "Int32") return "i" + exact(v).decimal();
-  if (dtype == "Date" || dtype.starts_with("Datetime(time_unit='us', time_zone=")) {
-    const auto parsed = parse_timestamp_microseconds(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value);
+  if (polars_datetime::temporal(dtype)) {
+    const auto parsed = polars_datetime::ticks(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value, polars_datetime::column_unit(dtype));
     if (!parsed) throw std::invalid_argument("Native Polars case grouping requires valid declared temporal cells");
     return "t" + std::to_string(*parsed);
   }
   throw std::invalid_argument("Unsupported native Polars case dtype: " + dtype);
 }
 void validate_time_dtype(const std::string& dtype, const std::string& phase) {
-  if (dtype == "Date" || dtype.starts_with("Datetime(time_unit='us', time_zone=")) return;
+  if (polars_datetime::temporal(dtype)) return;
   const std::string expression = "[(col(\"end_time\")) - (col(\"start_time\"))]";
   if (dtype == "String" || dtype == "Boolean") {
     fail("InvalidOperationError", phase, (dtype == "String" ? "sub operation not supported for dtypes `str` and `str`" : "`subtract` operation not supported for dtype `bool`") + std::string("\n\nThis error occurred in the following expression:\n\t") + expression + "\nwhile evaluating this larger expression:\n\t" + expression + ".dt.total_seconds()\n");
@@ -230,6 +231,8 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     validate_bound(low, high, false, op, phase);
     if (op == Operation::kPerformance || !null(high)) validate_bound(high, low, true, op, phase);
   }
+  // Durations count whole seconds of the column unit (round BW).
+  const auto time_unit = op == Operation::kPerformance ? polars_datetime::column_unit(source.dtypes[time_at]) : polars_datetime::Unit::kMicroseconds;
   struct Group { std::size_t count = 0; bool absent = false, keep = false; std::optional<std::int64_t> first, last; };
   std::vector<Group> groups; std::unordered_map<std::string, std::size_t> positions; std::vector<std::size_t> row_groups;
   for (const auto& row : source.rows) {
@@ -238,7 +241,7 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     if (inserted) { groups.push_back({}); groups.back().absent = !constant && key == "n"; }
     auto& group = groups[found->second]; ++group.count; row_groups.push_back(found->second);
     if (op == Operation::kPerformance && row[time_at] && !null(*row[time_at])) {
-      const auto& v = *row[time_at]; const auto parsed = parse_timestamp_microseconds(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value);
+      const auto& v = *row[time_at]; const auto parsed = polars_datetime::ticks(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value, time_unit);
       if (!parsed) throw std::invalid_argument("Native Polars performance requires valid declared temporal cells");
       if (!group.first || *parsed < *group.first) group.first = parsed;
       if (!group.last || *parsed > *group.last) group.last = parsed;
@@ -249,7 +252,7 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) { return groups[a].count > groups[b].count; });
     for (std::size_t i = 0; i < order.size() && (null(low) || TokenInteger(i) < exact(low)); ++i) groups[order[i]].keep = true;
   } else for (auto& group : groups) {
-    const auto value = op == Operation::kSize ? std::optional<std::int64_t>{static_cast<std::int64_t>(group.count)} : group.first ? std::optional<std::int64_t>{(*group.last - *group.first) / 1000000} : std::nullopt;
+    const auto value = op == Operation::kSize ? std::optional<std::int64_t>{static_cast<std::int64_t>(group.count)} : group.first ? std::optional<std::int64_t>{(*group.last - *group.first) / polars_datetime::per_second(time_unit)} : std::nullopt;
     group.keep = value && compare_bound(*value, low, false) && ((op == Operation::kSize && null(high)) || compare_bound(*value, high, true));
   }
   auto result = source; result.rows.clear();

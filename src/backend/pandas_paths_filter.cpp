@@ -125,6 +125,16 @@ int compare(const EventAttribute& a,const EventAttribute& b){
   return a.children.size()<b.children.size()?-1:a.children.size()>b.children.size()?1:0;
  }
  const auto ak=native_scalar_order_kind(a),bk=native_scalar_order_kind(b);
+ // pandas sorts datetime64[ns] cells by the exact instant: two cells
+ // nanoseconds apart sort apart (round BW). The scalar-key order compares
+ // microseconds, so dates of one awareness compare here.
+ if(ak==NativeScalarOrderKind::kDate&&bk==ak){
+  const auto x=instant(a),y=instant(b);
+  if(x&&y&&x->timezone_aware==y->timezone_aware){
+   if(x->seconds!=y->seconds)return x->seconds<y->seconds?-1:1;
+   return x->nanoseconds<y->nanoseconds?-1:x->nanoseconds>y->nanoseconds?1:0;
+  }
+ }
  if(ak==bk&&ak!=NativeScalarOrderKind::kUnsupported)return native_scalar_key_compare(a,b);
  const auto rank=[](NativeScalarOrderKind k){return k==NativeScalarOrderKind::kNumeric?0:k==NativeScalarOrderKind::kDate?1:k==NativeScalarOrderKind::kString?2:k==NativeScalarOrderKind::kBytes?3:4;};
  if(rank(ak)!=rank(bk))return rank(ak)<rank(bk)?-1:1;

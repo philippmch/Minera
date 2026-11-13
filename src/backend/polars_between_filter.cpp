@@ -1,4 +1,5 @@
 #include "minera/polars_between_filter.hpp"
+#include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_list_literal.hpp"
 #include "pandas_parameter_carrier.hpp"
@@ -160,7 +161,7 @@ Dtype dtype(const std::string& value) {
   if (value == "Float64") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
   if (value == "Null") return Dtype::kNull;
-  if (value == "Date" || value.starts_with("Datetime(time_unit='us', time_zone=")) return Dtype::kDate;
+  if (polars_datetime::temporal(value)) return Dtype::kDate;
   throw std::invalid_argument("Unsupported native Polars between dtype: " + value);
 }
 std::string frame_plan(const EventTable& source) {
@@ -266,7 +267,7 @@ void validate_membership(const EventTable& source, std::size_t at, const std::st
   const EventAttribute* incompatible = !compatible(act2, kind) ? &act2 : !compatible(act1, kind) ? &act1 : nullptr;
   if (!incompatible) return;
   auto data_type = source.dtypes[at];
-  if (data_type.starts_with("Datetime(")) data_type = "Datetime('\xCE\xBCs')";
+  if (polars_datetime::datetime(data_type)) data_type = polars_datetime::display(data_type);
   std::string message = "'is_in' cannot check for List(" + anchor_dtype(*incompatible) + ") values in " + data_type + " data";
   message += "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n WITH_COLUMNS:\n [col(" +
              quote(source.columns[at]) + ").is_in(" + anchor_expression(act1, incompatible == &act2) + ").alias(\"_is_act1\"), col(" +

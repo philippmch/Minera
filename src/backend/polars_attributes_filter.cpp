@@ -1,4 +1,5 @@
 #include "minera/polars_attributes_filter.hpp"
+#include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_float_text.hpp"
 #include "polars_list_literal.hpp"
@@ -100,8 +101,8 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
   if (dtype == "Boolean" || dtype == "Int64" || dtype == "UInt64" || dtype == "UInt32" || dtype == "Int32") return "i" + exact(v).decimal();
-  if (dtype == "Date" || dtype.starts_with("Datetime(time_unit='us', time_zone=")) {
-    const auto parsed = parse_timestamp_microseconds(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value);
+  if (polars_datetime::temporal(dtype)) {
+    const auto parsed = polars_datetime::ticks(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value, polars_datetime::column_unit(dtype));
     if (!parsed) throw std::invalid_argument("Native Polars case grouping requires valid declared temporal cells");
     return "t" + std::to_string(*parsed);
   }
@@ -296,7 +297,7 @@ std::string list_dtype(const EventAttribute& query) {
   return "Null";
 }
 std::string membership_type(std::string dtype) {
-  if(dtype.starts_with("Datetime("))return "Datetime('\xce\xbcs', 'UTC')";
+  if(polars_datetime::datetime(dtype))return polars_datetime::display(dtype);
   if(dtype.starts_with("Categorical"))return "Categorical";
   if(dtype.starts_with("Enum("))return "Enum";
   return dtype;
@@ -327,11 +328,14 @@ std::string datetime_literal(const EventAttribute& v) {
 bool integer_dtype(const std::string& dtype) { return dtype=="Int64"||dtype=="UInt64"; }
 bool numeric_dtype(const std::string& dtype) { return integer_dtype(dtype)||dtype=="Float64"; }
 // Columns Polars compares with a numeric literal through a physical integer:
-// Boolean as 0/1 (cast to Int32), Date as days and microsecond Datetime as
-// microseconds since the epoch, Null as null.
-bool microsecond_datetime(const std::string& dtype) { return dtype.starts_with("Datetime(time_unit='us'"); }
+// Boolean as 0/1 (cast to Int32), Date as days and Datetime as ticks of its
+// unit since the epoch (round BW), Null as null.
 bool physical_dtype(const std::string& dtype) {
-  return dtype=="Boolean"||dtype=="Date"||dtype=="Null"||microsecond_datetime(dtype);
+  return dtype=="Boolean"||dtype=="Date"||dtype=="Null"||polars_datetime::datetime(dtype);
+}
+std::int64_t datetime_ticks(const EventAttribute& v,const std::string& dtype) {
+  const auto parsed=polars_datetime::ticks(date_text(v),polars_datetime::column_unit(dtype));
+  if(!parsed)throw std::invalid_argument("Native Polars numeric filter requires valid declared temporal cells");return *parsed;
 }
 bool plain_number(const EventAttribute& v) { return (integer(v)&&!boolean(v)&&!date(v))||real(v); }
 // Days since 1970-01-01 of a Polars Date cell ("YYYY-MM-DD...").
@@ -360,7 +364,7 @@ std::pair<std::string,std::string> operands(const Leaf& l,bool cast_list=false) 
     if(l.dtype=="Boolean")return {column+".cast(Int32)",exact(v).decimal()};
     return {column,"dyn int: "+exact(v).decimal()};
   }
-  if(!numeric_dtype(l.dtype))throw std::invalid_argument("Native Polars numeric filter supports String, Int64, UInt64 and Float64 columns, and numeric bounds on Boolean, Date, microsecond Datetime and Null columns");
+  if(!numeric_dtype(l.dtype))throw std::invalid_argument("Native Polars numeric filter supports String, Int64, UInt64 and Float64 columns, and numeric bounds on Boolean, Date, Datetime and Null columns");
   if(collection(v))return {column,expression_literal(v)};
   if(text(v))return {column,quote(v.value)};
   if(l.dtype=="UInt64"&&integer(v)&&!date(v)&&exact(v)<TokenInteger(0))
@@ -442,7 +446,7 @@ int leaf_truth(const Leaf& l,const EventAttribute& v) {
   if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
     const auto rhs=boolean(b)?std::string(truth(b)?"true":"false"):b.value;c=v.value.compare(rhs);c=c<0?-1:c>0?1:0;
   } else if(physical_dtype(l.dtype)) {
-    const std::int64_t x=l.dtype=="Boolean"?(truth(v)?1:0):l.dtype=="Date"?epoch_days(v):date_micros(v);
+    const std::int64_t x=l.dtype=="Boolean"?(truth(v)?1:0):l.dtype=="Date"?epoch_days(v):datetime_ticks(v,l.dtype);
     if(real(b))c=total_compare(static_cast<double>(x),number(b));
     else{const TokenInteger left(x),right=exact(b);c=left<right?-1:right<left?1:0;}
   } else if(integer_dtype(l.dtype)&&!real(b)) {

@@ -25142,3 +25142,86 @@ Verification (scripts in the project files under `review-harness/round-bv/`;
 | LLM context with an activity and a timestamp attribute (`llmboth.py`: every variant; activity keys `act`, `concept:name`, int, float, text, bool; timestamp keys `ts`, `time:timestamp`, a date with gaps, an int, text) | 6,000 on CSV uploads before; 1,920 on CSV uploads with every column as timestamp key and 4,000 on XES uploads after | before: 72 of 6,000 equal or raising alike; after: all equal or raising alike except the declared date-with-gaps and text-column cases and AQ's `log_features` errors |
 | OCEL edge associations on nanosecond SQLite timestamps (`ocelsqlns.py`) | 68 files | all equal (pm4py's `total_seconds()` keeps microseconds; so does Minera) |
 | Full suites: ctest, script tests, frontend tests, fixture replay | 480 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+## Review BW1: re-review of round BV, the table filter routes on typed EventTable JSON, and the OCEL filter, features and exports on nanosecond timestamps (2026-11-13)
+
+Round BW checked BV's CI run (43375436443: green on all six jobs),
+re-reviewed BV (`frame_timestamp_context`, `frame_stream_ranks`,
+`discover_temporal_profile_frame`, the trace filter's `python_type`: no
+regressions) and took BV's targets. Findings, all fixed:
+
+- **BW1-1 Polars Datetime columns of ns and ms units on the table filters.**
+  The native Polars filters behind `/api/reference-table-*` (timestamp,
+  cases, variants, paths, between, LTL, attributes) refused every
+  `Datetime(time_unit='ns'|'ms', ...)` column (`Unsupported native Polars
+  ... dtype`). pm4py's Polars filters run on them: a cell holds its column
+  unit; Polars 1.44.1 compares a Datetime column with the microsecond
+  literal of a Python datetime by flooring the bound to a millisecond
+  column, while on a nanosecond column `<=` and `==` floor the cell to
+  microseconds and `>` and `!=` compare the exact nanoseconds (`>=` and `<`
+  agree either way), so the events and contained filters keep a cell
+  600 ns after the upper bound and the intersecting filter treats it as
+  after the bound; a naive column's `SchemaError` names its unit
+  (`Datetime('ns')`, `Datetime('ms')`); case and path durations count the
+  whole seconds of the column unit (truncated); grouping keys and orders
+  use the column unit; a numeric bound meets a Datetime column's physical
+  ticks of its unit; `is_in` errors print the column dtype with its zone
+  (`Datetime('ns', 'UTC')`). The shared rules are in
+  `src/backend/polars_datetime.hpp`. Before, 480 of 1,080 Polars answers on
+  ns and ms columns were equal or raised alike.
+- **BW1-2 pandas paths on nanosecond timestamps.** The pandas paths and
+  path performance filters ordered a case's events by microseconds, so two
+  events of one microsecond kept their row order; pandas sorts the
+  `datetime64[ns]` column by the exact instant (`pandas_paths_filter.cpp`).
+  Before, 8 of 120 paths and path performance answers differed.
+- **BW1-3 The OCEL SQLite export on nanosecond timestamps.**
+  `/api/ocel/sqlite?mode=export` wrote the event times (and the object
+  change times and typed timestamp attributes) with their nanoseconds;
+  pm4py's `write_ocel2_sqlite` writes them through Python datetimes, the
+  nanoseconds floored to microseconds (`2033-06-07
+  06:41:59.593824+00:00`). Before, the event times of all 25 files
+  differed.
+- **BW1-4 The OCEL features on nanosecond timestamps.**
+  `/api/ocel/features` read a nanosecond event time as a double of the
+  exact instant for `@@event_timestamp`, the lifecycle start, end and
+  duration and the prefix time differences; pm4py reads
+  `Timestamp.timestamp()`, the epoch seconds rounded to microseconds
+  (2001739319.593824). Before, 24 of 25 event and 25 of 32 object
+  comparisons differed.
+
+Declarations:
+
+- Polars sorts a case's events by case and timestamp with an unstable
+  sort: on some frames events with equal timestamps leave their row order
+  (deterministic, independent of the thread count). Minera sorts stably.
+  The paths, path performance and variants filters then differ on those
+  frames (4 of 1,440 answers on us and ns columns, 2 of 1,080 on us
+  columns; present before this round). Moved to round BX.
+- The LLM context's timestamp attribute on XES uploads with date
+  attributes that have gaps behaves as BV's declared CSV gap case (the DFG
+  and variants keep the projection and raise `context timestamp attribute
+  is absent or null`).
+- pm4py's Polars `filter_variants_from_list` (`var_from_list`) raises
+  `AttributeError: module 'pm4py.util.constants' has no attribute
+  'DEFAULT_NAME_KEY'` on polars 1.44.1; Minera raises the same.
+- Polars `between` row order and `filter_on_ncases` case choice vary per
+  run in Polars itself (the harness compares them as sets).
+- The non-exact `timestamp` variant of `/api/ocel/filter` is Minera's own
+  lenient bound parser; `timestamp_exact` is the pm4py one (equal on all
+  360 comparisons).
+
+Tests: `minera_review_bw1_tests` (values taken from pm4py on the same
+frames and OCEL, `review-harness/round-bw/bw1/mk.py`).
+
+Verification (scripts in the project files under `review-harness/round-bw/`;
+"before" is round BV's server on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Polars table filters on ns and ms Datetime columns (`tbl.py --eng=polars --units=ns,ms --nanos=1`: cases, timestamp, variants, paths, between, repetition, attributes) | 1,080 before, 1,440 after | before: 480 equal or raising alike; after: all equal or raising alike |
+| Polars table filters on us and ns columns (`tbl.py --eng=polars --units=us,ns` and `--units=us`) | 1,440 and 1,080 | all equal or raising alike except the declared sort ties (4 and 2) |
+| pandas table filters on ns, us, ms and s columns (`tbl.py --eng=pandas --units=ns,us,ms,s --nanos=1`) | 1,260 | before: 8 paths and path performance answers differed; after: all equal or raising alike |
+| OCEL time filter on nanosecond SQLite timestamps (`ocelns.py --parts=exact`: `/api/ocel/filter?variant=timestamp_exact` vs `filter_ocel_events_timestamp`) | 360 | all equal (before and after) |
+| OCEL CSV, OCEL 2.0 XML and SQLite exports on nanosecond timestamps (`ocelns.py --parts=io`) | 60 files each | CSV and XML equal before and after; SQLite: all 25 differed before, all equal after |
+| OCEL event and object features on nanosecond timestamps (`ocelfeat.py`) | 25 event, 32 object comparisons | before: 1 and 7 equal; after: all equal |
+| Full suites: ctest, script tests, fixture replay | 481 ctests, 406 script tests, 2,673 responses of 16 manifests | all pass; no fixture changed |

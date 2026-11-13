@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BV (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–BW (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4795,7 +4795,53 @@ timestamps showed no other difference. Declared: the LLM DFG and variants
 timed by a date column with gaps or a text column. No fixture changed. The
 device check on the Mac was skipped again (no device linked).
 
-Next round (BW) should start by re-reviewing round BV:
+Round BW re-reviewed BV (Review BW1; BV's CI run 43375436443 was green on
+all six jobs; BV's LLM timestamp context, stream ranks, temporal profile
+overload and trace filter types held) and took its targets. It fixed the
+native Polars table filters on `Datetime` columns of ns and ms units
+(refused before; now the rules of `polars_datetime.hpp`: cells at their
+unit, a ms column floors the microsecond bound, a ns column floors the
+cell for `<=` and `==` and compares exact nanoseconds for `>` and `!=`,
+naive-column errors name the unit, durations count whole seconds of the
+unit, numeric bounds meet the physical ticks), the pandas paths filters'
+order on nanosecond timestamps (exact instants), the OCEL SQLite export
+(event and change times floored to microseconds as `write_ocel2_sqlite`
+writes them) and the OCEL features on nanosecond timestamps
+(`Timestamp.timestamp()`, rounded to microseconds). The pandas table
+filters, the OCEL time filter and the CSV and XML exports showed no other
+difference. Declared: Polars' unstable sort of tied timestamps (4 of 1,440
+answers). No fixture changed. The device check on the Mac was skipped
+again (no device linked).
+
+Next round (BX) should start by re-reviewing round BW:
+
+- `src/backend/polars_datetime.hpp` (unit parsing, `floor`, `ticks`,
+  `display`) and its callers in the Polars timestamp, case, paths,
+  variants, between, LTL and attributes filters; in
+  `polars_timestamp_filter.cpp` `floor_bound` and `at_most` (which
+  comparisons floor on a ns column);
+- `src/backend/pandas_paths_filter.cpp`: the exact-instant order of dates
+  of one awareness in `compare`;
+- `src/backend/ocel_features.cpp`: `event_times` (ns instants through
+  `frame_times::epoch_seconds`) and its consumers (lifecycle, prefix time
+  differences);
+- `src/backend/ocel_sqlite.cpp` and `ocel_frame_types.hpp`: the
+  `microseconds` flag of `utc_timestamp_text` and `offset_timestamp_text`
+  (event times, change times, typed timestamp attributes);
+- new areas: Polars' unstable multi-column sort of tied timestamps (paths,
+  path performance, variants, between, LTL on frames with equal times in
+  a case: find whether a deterministic model, such as the Rust unstable
+  sort on Polars' row encoding, reproduces it; harness seeds 120, 133 and
+  346 of `tbl.py --eng=polars`); Polars Datetime columns as activity or
+  case keys (string casts print the column unit's fraction); Date and
+  pandas `datetime64[s]`/`[ms]` columns on the paths and performance
+  filters; the OCEL routes not yet swept on nanosecond SQLite timestamps
+  (statistics, description, conformance, object changes);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BW commit.
+
+Round BV's targets, re-reviewed in BW (findings BW1-1 to BW1-4):
 
 - `src/backend/llm_context.cpp`: `frame_timestamp_context` (which keys
   and variants take the frame, `own_timestamp_key`, the check order after

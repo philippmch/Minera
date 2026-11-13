@@ -1,4 +1,5 @@
 #include "minera/polars_paths_filter.hpp"
+#include "polars_datetime.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_float_text.hpp"
 #include "polars_column_hint.hpp"
@@ -123,7 +124,7 @@ Dtype dtype(const std::string& value) {
   if (value == "Float64") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
   if (value == "Null") return Dtype::kNull;
-  if (value == "Date" || value.starts_with("Datetime(time_unit='us', time_zone=")) return Dtype::kDate;
+  if (polars_datetime::temporal(value)) return Dtype::kDate;
   throw std::invalid_argument("Unsupported native Polars paths dtype: " + value);
 }
 std::string frame_plan(const EventTable& source) {
@@ -336,7 +337,7 @@ void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFi
   fail(text(bound) ? "ComputeError" : "SchemaError", phase, message);
 }
 void validate_time(const std::string& dtype, const PolarsPathsFilterOptions& options, const std::string& phase) {
-  if (dtype == "Date" || dtype.starts_with("Datetime(time_unit='us', time_zone=")) return;
+  if (polars_datetime::temporal(dtype)) return;
   const auto expression = "[(col(\"next_timestamp\")) - (col(" + quote(options.timestamp_key.value) + "))]";
   const auto condition = phase == "apply" ? "[(col(\"case_next\")) == (col(" + quote(options.case_id_key.value) + "))]" : "col(\"__POLARS_CSER_0x100000003\")";
   const std::string larger = "while evaluating this larger expression:\n\t.when(" + condition + ").then(" + expression + ".dt.total_seconds()).otherwise(null.cast(Int64))\n";
@@ -405,8 +406,10 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
       if (std::find(paths.begin(), paths.end(), label) == paths.end()) continue;
       if (performance) {
         if (!row[*time_at] || !next[*time_at] || null(*row[*time_at]) || null(*next[*time_at])) continue;
-        const auto instant = [](const EventAttribute& value) { const auto* stored = std::get_if<NativeDate>(&value.typed_value); const auto parsed = parse_timestamp_microseconds(stored ? stored->value : value.value); if (!parsed) throw std::invalid_argument("Native Polars path performance requires valid temporal cells"); return *parsed; };
-        const auto duration = (instant(*next[*time_at]) - instant(*row[*time_at])) / 1000000;
+        // Durations count whole seconds of the column unit (round BW).
+        const auto unit = polars_datetime::column_unit(source.dtypes[*time_at]);
+        const auto instant = [unit](const EventAttribute& value) { const auto* stored = std::get_if<NativeDate>(&value.typed_value); const auto parsed = polars_datetime::ticks(stored ? stored->value : value.value, unit); if (!parsed) throw std::invalid_argument("Native Polars path performance requires valid temporal cells"); return *parsed; };
+        const auto duration = (instant(*next[*time_at]) - instant(*row[*time_at])) / polars_datetime::per_second(unit);
         if (!bound_matches(duration, options.min_performance, false) || !bound_matches(duration, options.max_performance, true)) continue;
       }
       matched = true;

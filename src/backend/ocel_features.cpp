@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "minera/timestamp.hpp"
+#include "frame_times.hpp"
 
 namespace minera {
 namespace {
@@ -267,10 +268,19 @@ std::map<std::string, std::vector<std::size_t>> event_relations(
   return result;
 }
 
+// pm4py reads each event's instant as Timestamp.timestamp(): a time with
+// nanosecond digits (an OCEL SQLite file keeps them) is rounded to the
+// microsecond, and durations are differences of those floats (round BW,
+// observed black-box); other times are the parsed seconds.
 std::vector<std::optional<double>> event_times(const Ocel& log) {
   std::vector<std::optional<double>> times;
   times.reserve(log.events.size());
-  for (const auto& event : log.events) times.push_back(parse_timestamp(event.timestamp));
+  for (const auto& event : log.events) {
+    if (const auto exact = parse_timestamp_exact(event.timestamp); exact && exact->nanoseconds % 1000 != 0)
+      times.push_back(frame_times::epoch_seconds(*exact));
+    else
+      times.push_back(parse_timestamp(event.timestamp));
+  }
   return times;
 }
 

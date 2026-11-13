@@ -326,7 +326,8 @@ std::map<std::string, const OcelValue*> attribute_values(
 }
 
 // A TIMESTAMP column (an attribute the catalog declares a date) holds each
-// timestamp text as pandas prints the reference's datetime64[us, UTC] value.
+// timestamp text as pandas prints the reference's datetime64[us, UTC] value;
+// nanosecond digits are cut (the reference writes Python datetimes, round BW).
 void bind_type_attributes(sqlite3_stmt* statement, int start_index,
                           const TypeColumns& columns,
                           const std::vector<OcelAttribute>& attributes) {
@@ -338,7 +339,7 @@ void bind_type_attributes(sqlite3_stmt* statement, int start_index,
     else if (const auto* text = columns[index].second == "TIMESTAMP"
                                     ? ocel_frame::date_value_text(*value->second)
                                     : nullptr)
-      bind_text(statement, position, ocel_frame::utc_timestamp_text(*text, ' ', "+00:00"));
+      bind_text(statement, position, ocel_frame::utc_timestamp_text(*text, ' ', "+00:00", true));
     else bind_scalar(statement, position, *value->second);
   }
 }
@@ -1184,8 +1185,11 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
       database.exec(schema + ");");
       return insert + ")";
     };
+    // pm4py.write_ocel2_sqlite writes each time through a Python datetime:
+    // nanosecond digits are cut to the microsecond (round BW, observed
+    // black-box on event, change and date attribute times).
     const auto pandas_time = [](const std::string& text) {
-      return ocel_frame::utc_timestamp_text(text, ' ', "+00:00");
+      return ocel_frame::utc_timestamp_text(text, ' ', "+00:00", true);
     };
     // A CSV log whose times share an offset is written in that offset, as
     // the reference writes such a column (see shared_nonzero_offset).
@@ -1219,7 +1223,7 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
         bind_text(statement.get(), 1, event->id);
         bind_text(statement.get(), activity_first ? 3 : 2,
                   event_offset ? ocel_frame::offset_timestamp_text(event->timestamp, ' ',
-                                                                   event_offset, std::nullopt)
+                                                                   event_offset, std::nullopt, true)
                                : pandas_time(event->timestamp));
         bind_text(statement.get(), activity_first ? 2 : 3, event->activity);
         bind_type_attributes(statement.get(), 4, columns, event->attributes);

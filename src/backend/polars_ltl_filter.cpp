@@ -1,4 +1,5 @@
 #include "minera/polars_ltl_filter.hpp"
+#include "polars_datetime.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_column_hint.hpp"
 #include "pandas_parameter_carrier.hpp"
@@ -129,7 +130,7 @@ Dtype dtype(const std::string& value) {
   if (value == "Float64") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
   if (value == "Null") return Dtype::kNull;
-  if (value == "Date" || value.starts_with("Datetime(time_unit='us', time_zone=")) return Dtype::kDate;
+  if (polars_datetime::temporal(value)) return Dtype::kDate;
   throw std::invalid_argument("Unsupported native Polars LTL dtype: " + value);
 }
 std::string frame_plan(const EventTable& source) {
@@ -225,9 +226,9 @@ std::string group_key(const Cell& value, const std::string& declared) {
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
   if (declared == "Boolean" || declared == "Int64" || declared == "UInt64" || declared == "UInt32" || declared == "Int32") return "i" + exact(*value).decimal();
-  if (declared == "Date" || declared.starts_with("Datetime(")) {
+  if (polars_datetime::temporal(declared)) {
     const auto* stored = std::get_if<NativeDate>(&value->typed_value);
-    const auto parsed = parse_timestamp_microseconds(stored ? stored->value : value->value);
+    const auto parsed = polars_datetime::ticks(stored ? stored->value : value->value, polars_datetime::column_unit(declared));
     if (!parsed) throw std::invalid_argument("Native Polars LTL declared temporal cell is invalid");
     return "t" + std::to_string(*parsed);
   }
