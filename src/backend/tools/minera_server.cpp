@@ -3426,6 +3426,11 @@ void handle_ocel_playout(const httplib::Request& request,
           options.max_bindings_per_activity = 1;
       }
     }
+    // pm4py's extensive OCPN playout returns every complete sequence: the
+    // reference binding keeps them all unless max_traces is given (round CA).
+    if (model != "causal_net" && options.event_binding == minera::OcpnEventBinding::kReference &&
+        !request.has_param("max_traces"))
+      options.max_traces = 0;
     options.start = ocel_query_number(request, "start", options.start);
     options.case_interval =
         ocel_query_number(request, "case_interval", options.case_interval);

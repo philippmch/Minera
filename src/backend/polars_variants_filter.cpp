@@ -121,7 +121,7 @@ std::string core_type(const EventAttribute& value) {
 Dtype dtype(const std::string& value) {
   if (value == "String" || categorical_dtype(value)) return Dtype::kString;
   if (enum_dtype(value)) return Dtype::kEnum;
-  if (value == "Int64" || value == "UInt64" || value == "UInt32") return Dtype::kInteger;
+  if (value == "Int64" || value == "UInt64" || value == "UInt32" || value == "UInt16" || value == "UInt8" || value == "Int32" || value == "Int16" || value == "Int8") return Dtype::kInteger;
   if (value == "Float64") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
   if (value == "Null") return Dtype::kNull;
@@ -212,7 +212,7 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
     const auto n = number(v);
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
-  if (dtype == "Boolean" || dtype == "Int64" || dtype == "UInt64" || dtype == "UInt32" || dtype == "Int32") return "i" + exact(v).decimal();
+  if (dtype == "Boolean" || dtype == "Int64" || dtype == "UInt64" || dtype == "UInt32" || dtype == "Int32" || dtype == "UInt16" || dtype == "Int16" || dtype == "UInt8" || dtype == "Int8") return "i" + exact(v).decimal();
   if (polars_datetime::temporal(dtype)) {
     const auto parsed = polars_datetime::ticks(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value, polars_datetime::column_unit(dtype));
     if (!parsed) throw std::invalid_argument("Native Polars case grouping requires valid declared temporal cells");

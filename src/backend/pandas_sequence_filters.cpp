@@ -20,6 +20,7 @@
 #include "minera/timestamp.hpp"
 #include "python_scalar.hpp"
 #include "numpy_object_sort.hpp"
+#include "pandas_numpy_view.hpp"
 #include "pandas_range_index.hpp"
 
 namespace minera {
@@ -818,7 +819,11 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
     const bool ok = count && (count->integral ? int_at_least(count->integer, *threshold)
                                               : (threshold->integral ? count->real >= static_cast<double>(threshold->integer)
                                                                      : count->real >= threshold->real));
-    // The last activity of the most common variant is always kept.
+    // The last activity of the most common variant is always kept; a pd.NA
+    // boundary (masked or "string" column) fails that comparison (round CA).
+    if (!ok && !count0 && !entry.first && most_common_variant && !most_common_variant->items.empty() &&
+        (masked_dtype(dtype) || dtype == "string"))
+      fail("TypeError", "boolean value of NA is ambiguous");
     const bool protected_end = most_common_variant && !most_common_variant->items.empty() && entry.first &&
                                scalar_of(most_common_variant->items.back()) &&
                                same_activity(entry.first, scalar_of(most_common_variant->items.back()));
@@ -836,9 +841,12 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
   return {keep_cases(df, case_column, keep, true), kept};
 }
 
-Value counts_value(const Counts& counts) {
+// A missing boundary is NaN, or None in an object column (round CA: groupby
+// last() of an object column without a present value is None).
+Value counts_value(const Counts& counts, const std::string& dtype) {
   std::vector<std::pair<Value, Value>> entries;
-  for (const auto& [k, v] : counts) entries.emplace_back(k ? value_of(*k) : Value::of(std::nan("")), v);
+  for (const auto& [k, v] : counts)
+    entries.emplace_back(k ? value_of(*k) : dtype == "object" ? Value::none() : Value::of(std::nan("")), v);
   return Value::dict(std::move(entries));
 }
 
@@ -884,7 +892,10 @@ std::string join_pattern(const Value& item, VariantMode mode) {
 // numpy column's values are Python scalars, a masked column's are numpy
 // scalars (or pd.NA). A UInt64 column whose values all lie past the int64
 // range holds numpy's ulonglong instead of uint64.
-std::string activity_type_name(const Cell& cell, const std::string& dtype, bool ulonglong) {
+std::string activity_type_name(const Cell& cell, const std::string& dtype, bool ulonglong,
+                               bool datetime_categories = false) {
+  // A categorical gap is NaN (NaT for datetime categories), round CA.
+  if (dtype == "category" && null_cell(cell)) return datetime_categories ? "NaTType" : "float";
   if (masked_dtype(dtype)) {
     if (null_cell(cell)) return "NAType";
     if (dtype == "boolean") return "numpy.bool";
@@ -905,6 +916,8 @@ std::vector<std::pair<Key, std::string>> variants(const EventTable& df, std::siz
     const auto digits = scalar_of(row[act]).digits;
     return digits.size() > 19 || (digits.size() == 19 && digits > "9223372036854775807");
   });
+  const bool datetime_categories = act < df.categorical_dtypes.size() && df.categorical_dtypes[act] &&
+                                   df.categorical_dtypes[act]->categories_dtype.starts_with("datetime64[");
   std::vector<std::pair<Key, std::string>> out;
   for (const auto& key : cases.order) {
     const auto& rows = cases.rows.at(key);
@@ -914,7 +927,7 @@ std::vector<std::pair<Key, std::string>> variants(const EventTable& df, std::siz
       // The activities join with str.join, which takes str items only.
       if (!is_text(cell))
         fail("TypeError", "sequence item " + std::to_string(j) + ": expected str instance, " +
-                              activity_type_name(cell, dtype, ulonglong) + " found");
+                              activity_type_name(cell, dtype, ulonglong, datetime_categories) + " found");
       if (j) joined += ",";
       joined += cell->value;
     }
@@ -1084,6 +1097,33 @@ EventTable position_filter(const EventTable& df, const Value& activity, const Pa
     }
   std::vector<std::optional<std::int64_t>> temp(df.size());
   bool index_null = false, temp_null = df.empty();
+  // A categorical case column maps its categories (round CA, observed
+  // black-box): when every category has an occurrence and no two share one,
+  // the lookup is itself categorical and comparing the positions with it
+  // raises; a category without an occurrence makes it float64, even when no
+  // row holds that category.
+  if (dtype == "category") {
+    const auto* categorical = case_column < df.categorical_dtypes.size() && df.categorical_dtypes[case_column]
+                                  ? &*df.categorical_dtypes[case_column] : nullptr;
+    bool missing = false, repeated = false;
+    std::set<std::int64_t> seen;
+    if (categorical)
+      for (const auto& category : categorical->categories) {
+        const auto found = occurrence.find(key_of(category));
+        if (found == occurrence.end()) missing = true;
+        else if (!seen.insert(found->second).second) repeated = true;
+      }
+    if (categorical && !missing && !repeated) {
+      if (categorical->ordered) {
+        const char* op = prefix ? (strict ? "gt" : "ge") : (strict ? "lt" : "le");
+        fail("TypeError", std::string("Cannot compare a Categorical for op __") + op +
+                              "__ with type <class 'numpy.ndarray'>.\nIf you want to compare values, use "
+                              "'np.asarray(cat) <op> other'.");
+      }
+      fail("TypeError", "Unordered Categoricals can only compare equality or not");
+    }
+    if (missing) temp_null = true;
+  }
   for (std::size_t i = 0; i < df.size(); ++i) {
     if (!index[i]) {
       index_null = temp_null = true;
@@ -1214,7 +1254,7 @@ PandasEndActivitiesNocc pandas_filter_df_on_end_activities_nocc(const EventTable
                                                                 const std::optional<PandasFilterValue>& most_common_variant) {
   auto outcome = nocc_filter(df, nocc, ea_count0, case_id_glue, activity_key, true, most_common_variant);
   PandasEndActivitiesNocc out{std::move(outcome.table), std::nullopt};
-  if (return_dict && !df.empty()) out.counts = counts_value(outcome.kept);
+  if (return_dict && !df.empty()) out.counts = counts_value(outcome.kept, column_dtype(df, *find_column(df, activity_key)));
   return out;
 }
 
@@ -1409,6 +1449,22 @@ EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, cons
   const auto dtype = [&](std::size_t c) { return c < df.dtypes.size() ? df.dtypes[c] : std::string("object"); };
   // continues[i]: row i joins row i - 1's run.
   std::vector<bool> continues(df.size(), false);
+  // A categorical side refuses the addition whatever the cells (round CA):
+  // two array types name each other, any other partner is a NumPy op.
+  if (dtype(case_column) == "category" || dtype(act) == "category") {
+    const auto array_name = [](const std::string& name) -> std::string {
+      if (name == "category") return "Categorical";
+      if (name.starts_with("datetime64")) return "DatetimeArray";
+      if (name.starts_with("timedelta64")) return "TimedeltaArray";
+      if (name.starts_with("period")) return "PeriodArray";
+      if (name.starts_with("interval")) return "IntervalArray";
+      return {};
+    };
+    const auto left = array_name(dtype(case_column)), right = array_name(dtype(act));
+    if (!left.empty() && !right.empty())
+      fail("TypeError", "unsupported operand type(s) for +: '" + left + "' and '" + right + "'");
+    fail("TypeError", "Object with dtype category cannot perform the numpy op add");
+  }
   const auto case_dtype = numeric_dtype(dtype(case_column));
   const auto act_dtype = numeric_dtype(dtype(act));
   if (case_dtype && act_dtype) {
@@ -1458,8 +1514,13 @@ EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, cons
       auto key = python_add(scalar_of(c), scalar_of(a));
       if (!null_cell(df.rows[i][case_column]) && !null_cell(df.rows[i][act])) run_keys[i] = std::move(key);
     }
+    // A pandas "string" side makes the key a string array holding pd.NA,
+    // whose NA comparisons continue the run like a masked key (round CA).
+    const bool string_key = dtype(case_column) == "string" || dtype(act) == "string";
     for (std::size_t i = 1; i < df.size(); ++i)
-      continues[i] = run_keys[i] && run_keys[i - 1] && py_equal(*run_keys[i], *run_keys[i - 1]);
+      continues[i] = string_key && (!run_keys[i] || !run_keys[i - 1])
+                         ? true
+                         : run_keys[i] && run_keys[i - 1] && py_equal(*run_keys[i], *run_keys[i - 1]);
   }
   const bool first = filter_type.kind == Kind::kString && filter_type.text == "first";
   const bool last = filter_type.kind == Kind::kString && filter_type.text == "last";
@@ -1499,7 +1560,7 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
     auto out = merge_groups(df, groups, first, identity_order(df.columns.size()));
     out.columns.insert(out.columns.begin(), "index");
     if (!out.dtypes.empty()) out.dtypes.insert(out.dtypes.begin(), "str");
-    if (!out.categorical_dtypes.empty()) out.categorical_dtypes.insert(out.categorical_dtypes.begin(), {});
+    if (!out.categorical_dtypes.empty()) out.categorical_dtypes.insert(out.categorical_dtypes.begin(), std::nullopt);
     for (std::size_t g = 0; g < out.rows.size(); ++g)
       out.rows[g].insert(out.rows[g].begin(), string_cell("index", labels[g]));
     return out;
@@ -1751,6 +1812,15 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
   const bool this_row = mode.kind == Kind::kString && mode.text == "this";
   EventTable out = df;
   if (!out.dtypes.empty()) out.dtypes[case_column] = df.empty() ? "float64" : "str";
+  if (case_column < out.categorical_dtypes.size()) {
+    out.categorical_dtypes[case_column] = std::nullopt;
+    if (std::none_of(out.categorical_dtypes.begin(), out.categorical_dtypes.end(),
+                     [](const auto& descriptor) { return descriptor.has_value(); }))
+      out.categorical_dtypes.clear();
+  }
+  // The case and activity columns are read as NumPy holds them (round CA): a
+  // categorical column as its categories' array, a gap as NaN.
+  const auto nv = detail::numpy_view(df, {case_column, act});
   // The reference takes np.unique(cases, return_index, return_counts): a
   // stable sort of the case column (which raises on unorderable ids), runs
   // of equal neighbours (a NaN equals nothing), each run's first position
@@ -1765,13 +1835,13 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     std::string label;
   };
   std::vector<Run> runs;
-  if (const auto view = numpy_case_view(df, case_column)) {
+  if (const auto view = numpy_case_view(nv, case_column)) {
     // A numeric array sorts by value with NaN last; equal neighbours form a
     // run and every NaN joins one run (np.unique's equal_nan).
     using K = NumericDtype::Kind;
     std::vector<NumpyCase> cases;
     cases.reserve(df.size());
-    for (const auto& row : df.rows) cases.push_back(numpy_case(row[case_column]));
+    for (const auto& row : nv.rows) cases.push_back(numpy_case(row[case_column]));
     const auto less = [&](const NumpyCase& a, const NumpyCase& b) {
       if (view->kind == K::kFloat) return !a.nan && (b.nan || a.real < b.real);
       if (view->kind == K::kSigned) return static_cast<std::int64_t>(a.bits) < static_cast<std::int64_t>(b.bits);
@@ -1797,7 +1867,7 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
   } else {
     std::vector<python::Scalar> cases;
     cases.reserve(df.size());
-    for (const auto& row : df.rows) cases.push_back(scalar_of(row[case_column]));
+    for (const auto& row : nv.rows) cases.push_back(scalar_of(row[case_column]));
     std::vector<std::size_t> order;
     try {
       order = detail::numpy_object_stable_argsort(cases.size(), [&](std::size_t a, std::size_t b) {
@@ -1830,7 +1900,7 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     }
   else container = false;
   // A numeric activity column is read as numpy reads the case column.
-  const auto activity_view = numpy_case_view(df, act);
+  const auto activity_view = numpy_case_view(nv, act);
   const auto is_cut = [&](const Cell& cell) {
     if (!container)
       fail("TypeError", "argument of type '" + type_name(activity) + "' is not a container or iterable");
@@ -1855,7 +1925,7 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     std::int64_t count = 0;
     for (std::size_t j = run.first; j < run.first + run.size; ++j) {
       const auto before = count;
-      if (is_cut(df.rows[j][act])) ++count;
+      if (is_cut(nv.rows[j][act])) ++count;
       out.rows[written++][case_column] = string_cell(name, label + std::to_string(this_row ? count : before));
     }
   }

@@ -175,3 +175,22 @@ domain:
 * Non-string column labels.
 * `grouped_df` arguments other than None.
 * Float case columns with nulls.
+
+## Typed-key bank (round CA)
+
+`scripts/pandas_sequence_filter_typed_domain.py` extends the domain above:
+case columns are categorical (string and integer categories, gaps, unused
+categories), `Int64`, `UInt8`, `Float64`, `boolean`, `string` or object
+columns, activity columns categorical (sorted, reversed, ordered) or
+`string`. `scripts/capture-pandas-sequence-filter-bank.py --domain
+pandas_sequence_filter_typed_domain.py --count 3000 --bank-seed 2026111301`
+writes `docs/pandas-sequence-filter-typed-bank.json.gz`, replayed by the
+same test (`minera_pandas_sequence_filter_typed_bank_parity_tests`):
+
+| Calls | Values | Errors | Not stored (no public outcome) | Varying across seeds | Failures |
+| --- | --- | --- | --- | --- | --- |
+| 34,405 | 26,586 | 7,814 | 5 | 4 | 0 |
+
+The four varying calls are `rework.apply` with both keys missing: the
+KeyError lists them in a Python set's order. Review CA1 in
+`docs/reference-2.7.22-parity.md` lists the fixes.

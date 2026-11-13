@@ -110,7 +110,10 @@ std::string frame_plan(const std::vector<std::string>& columns) {
 }
 std::string contexts(const std::vector<std::string>& nodes) {
   std::string out = "\n\nThis error occurred with the following context stack:\n";
-  for (std::size_t i = 0; i < nodes.size(); ++i) out += "\t[" + std::to_string(i + 1) + "] '" + nodes[i] + "'\n";
+  // A node written "!name" prints as 'name' failed.
+  for (std::size_t i = 0; i < nodes.size(); ++i)
+    out += "\t[" + std::to_string(i + 1) + "] '" +
+           (nodes[i].starts_with('!') ? nodes[i].substr(1) + "' failed" : nodes[i] + "'") + "\n";
   return out;
 }
 std::string resolved(const std::string& node, const std::string& plan, const std::vector<std::string>& nodes) {
@@ -156,14 +159,36 @@ std::size_t require(const EventTable& df, const std::string& name, const Plan& p
 std::string dtype_of(const EventTable& df, std::size_t column) {
   return column < df.dtypes.size() ? df.dtypes[column] : std::string("String");
 }
-// The short dtype names of the join SchemaError.
+// Polars' short dtype names (join SchemaError, list[...] messages).
 std::string short_dtype(const std::string& dtype) {
   if (dtype == "String") return "str";
-  if (dtype == "Int64") return "i64";
-  if (dtype.rfind("Categorical", 0) == 0) return "cat";
+  if (dtype == "Boolean") return "bool";
   if (dtype == "Null") return "null";
-  if (dtype == "Float64") return "f64";
+  if (dtype == "Date") return "date";
+  if (dtype == "Time") return "time";
+  if (dtype == "Binary") return "binary";
+  if (dtype.rfind("Categorical", 0) == 0) return "cat";
+  if (dtype.rfind("Enum", 0) == 0) return "enum";
+  if (dtype.rfind("Float", 0) == 0) return "f" + dtype.substr(5);
+  if (dtype.rfind("UInt", 0) == 0) return "u" + dtype.substr(4);
+  if (dtype.rfind("Int", 0) == 0) return "i" + dtype.substr(3);
+  const auto unit = [&](std::string_view head) -> std::string {
+    const auto at = dtype.find("time_unit='");
+    if (at == std::string::npos) return {};
+    const auto u = dtype.substr(at + 11, 2);
+    return std::string(head) + "[" + (u == "us" ? std::string("\xce\xbc" "s") : u);
+  };
+  if (dtype.rfind("Datetime", 0) == 0) {
+    auto out = unit("datetime");
+    const auto zone = dtype.find("time_zone='");
+    if (zone != std::string::npos) out += ", " + dtype.substr(zone + 11, dtype.find('\'', zone + 11) - zone - 11);
+    return out + "]";
+  }
+  if (dtype.rfind("Duration", 0) == 0) return unit("duration") + "]";
   return dtype;
+}
+bool integer_dtype(const std::string& dtype) {
+  return dtype.rfind("Int", 0) == 0 || dtype.rfind("UInt", 0) == 0;
 }
 [[noreturn]] void join_dtype_error(const std::string& key, const std::string& left, const std::string& right) {
   fail("SchemaError", "datatypes of join keys don't match - `" + key + "`: " + left + " on left does not match `" + key +
@@ -190,12 +215,48 @@ std::int64_t integer_of(const EventAttribute& cell) {
   return std::stoll(cell.value);
 }
 
-// Polars sort order of one column's cells: nulls first, integers by value,
-// everything else by its UTF-8 text.
-bool cell_less(const Cell& a, const Cell& b, bool integral) {
+// Polars sort order of one column's cells: nulls first, integers and floats
+// by value (NaN last), Enum values by category position, Booleans false
+// first, everything else (Categorical included) by its UTF-8 text.
+struct CellOrder {
+  enum class Kind { kText, kInteger, kReal, kRank, kBoolean } kind = Kind::kText;
+  std::map<std::string, std::size_t> ranks;
+};
+double real_of(const EventAttribute& cell) {
+  if (const auto* d = std::get_if<double>(&cell.typed_value)) return *d;
+  if (const auto* i = std::get_if<std::int64_t>(&cell.typed_value)) return static_cast<double>(*i);
+  const auto& t = cell.value;
+  if (t == "nan" || t == "NaN") return std::nan("");
+  if (t == "inf" || t == "Infinity") return HUGE_VAL;
+  if (t == "-inf" || t == "-Infinity") return -HUGE_VAL;
+  return std::strtod(t.c_str(), nullptr);
+}
+bool true_of(const EventAttribute& cell) {
+  if (const auto* b = std::get_if<bool>(&cell.typed_value)) return *b;
+  return cell.value == "true" || cell.value == "True" || cell.value == "1";
+}
+bool cell_less(const Cell& a, const Cell& b, const CellOrder& order) {
   const bool an = null_cell(a), bn = null_cell(b);
   if (an || bn) return an && !bn;
-  if (integral) return integer_of(*a) < integer_of(*b);
+  switch (order.kind) {
+    case CellOrder::Kind::kInteger:
+      return integer_of(*a) < integer_of(*b);
+    case CellOrder::Kind::kReal: {
+      const double x = real_of(*a), y = real_of(*b);
+      if (std::isnan(x) || std::isnan(y)) return !std::isnan(x) && std::isnan(y);
+      return x < y;
+    }
+    case CellOrder::Kind::kBoolean:
+      return !true_of(*a) && true_of(*b);
+    case CellOrder::Kind::kRank: {
+      const auto x = order.ranks.find(a->value), y = order.ranks.find(b->value);
+      const auto rx = x == order.ranks.end() ? order.ranks.size() : x->second;
+      const auto ry = y == order.ranks.end() ? order.ranks.size() : y->second;
+      return rx < ry;
+    }
+    case CellOrder::Kind::kText:
+      break;
+  }
   return a->value < b->value;
 }
 
@@ -282,6 +343,76 @@ bool member(const Cell& cell, const std::vector<Value>& values) {
   return false;
 }
 
+// ------------------------------------------------------------------ Enum keys
+
+bool enum_dtype(const std::string& dtype) { return dtype.rfind("Enum", 0) == 0; }
+// An Enum column's categories in order (its descriptor, else its dtype text).
+std::vector<std::string> enum_category_list(const EventTable& df, std::size_t column) {
+  std::vector<std::string> out;
+  if (column < df.categorical_dtypes.size() && df.categorical_dtypes[column]) {
+    for (const auto& c : df.categorical_dtypes[column]->categories) out.push_back(c.value);
+    return out;
+  }
+  const auto dtype = dtype_of(df, column);
+  for (std::size_t at = dtype.find('\''); at != std::string::npos;) {
+    const auto end = dtype.find('\'', at + 1);
+    if (end == std::string::npos) break;
+    out.push_back(dtype.substr(at + 1, end - at - 1));
+    at = dtype.find('\'', end + 1);
+  }
+  return out;
+}
+std::set<std::string> enum_categories(const EventTable& df, std::size_t column) {
+  const auto list = enum_category_list(df, column);
+  return {list.begin(), list.end()};
+}
+CellOrder cell_order(const EventTable& df, std::size_t column) {
+  CellOrder out;
+  const auto dtype = dtype_of(df, column);
+  if (integer_dtype(dtype)) out.kind = CellOrder::Kind::kInteger;
+  else if (dtype.rfind("Float", 0) == 0) out.kind = CellOrder::Kind::kReal;
+  else if (dtype == "Boolean") out.kind = CellOrder::Kind::kBoolean;
+  else if (enum_dtype(dtype)) {
+    out.kind = CellOrder::Kind::kRank;
+    const auto list = enum_category_list(df, column);
+    for (std::size_t i = 0; i < list.size(); ++i) out.ranks.emplace(list[i], i);
+  }
+  return out;
+}
+std::string is_in_literal(const std::vector<Value>& values) {
+  std::string out = "[[";
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    if (i) out += ", ";
+    out += values[i].kind == Kind::kNone ? std::string("null") : quote(values[i].text);
+  }
+  return out + "]]";
+}
+// is_in with a list of str on an Enum column casts the list strictly: a
+// value outside the categories fails (the first ten failures shown as Polars
+// prints a short Series).
+void enum_is_in(const EventTable& df, std::size_t column, const std::vector<Value>& values, const std::string& node,
+                const std::string& plan, const std::vector<std::string>& stack) {
+  if (!enum_dtype(dtype_of(df, column))) return;
+  const auto categories = enum_categories(df, column);
+  std::vector<std::string> failed;
+  for (const auto& v : values)
+    if (v.kind == Kind::kString && !categories.count(v.text)) failed.push_back(v.text);
+  if (failed.empty()) return;
+  const auto shown = std::min<std::size_t>(failed.size(), 10);
+  std::string list = "[";
+  if (shown <= 3) {
+    for (std::size_t i = 0; i < shown; ++i) list += (i ? ", " : "") + quote(failed[i]);
+  } else {
+    list += quote(failed[0]) + ", " + quote(failed[1]) + ", \xe2\x80\xa6 " + quote(failed[shown - 1]);
+  }
+  fail("InvalidOperationError", "conversion from `str` to `enum` failed in column '' for " +
+                                    std::to_string(failed.size()) + " out of " + std::to_string(values.size()) +
+                                    " values: " + list +
+                                    "]\n\nEnsure that all values in the input column are present in the categories "
+                                    "of the enum datatype." +
+                                    resolved(node, plan, stack));
+}
+
 // ------------------------------------------------------------------ boundaries
 
 const Plan kBoundaryPlan{"join", {"group_by", "filter", "select", "join right", "join"}, {}, {}};
@@ -290,6 +421,13 @@ EventTable boundary_filter(const EventTable& df, const Value& values, const std:
                            const std::string& act_key, bool positive, bool end) {
   const auto case_column = require(df, case_glue, kBoundaryPlan);
   const auto act = require(df, act_key, kBoundaryPlan);
+  const std::string alias = end ? "end_activity" : "start_activity";
+  enum_is_in(df, act, values.items, "join",
+             "FILTER col(" + quote(alias) + ").is_in(" + is_in_literal(values.items) +
+                 ")\nFROM\n  AGGREGATE[maintain_order: false]\n    [col(" + quote(act_key) + ")." +
+                 (end ? "last" : "first") + "().alias(" + quote(alias) + ")] BY [col(" + quote(case_glue) +
+                 ")]\n    FROM\n    " + frame_plan(df.columns),
+             {"!filter", "select", "join right", "join"});
   const auto groups = groups_of(df, case_column, all_rows(df));
   std::vector<Key> kept;
   for (const auto& key : groups.order) {
@@ -346,15 +484,16 @@ Variants variants_of(const EventTable& df, const std::string& case_glue, const s
     plan.above = "SORT BY [col(" + quote(case_glue) + "), col(" + quote(kTimestamp) + ")]";
     column_not_found(df, act_key, plan);
   }
-  const bool integral = dtype_of(df, out.case_column) == "Int64";
+  const auto case_order = cell_order(df, out.case_column);
+  const CellOrder ts_order;
   auto rows = all_rows(df);
   // Polars' unstable multi-column sort leaves equal rows in its own order (round BX).
   polars_sort::sort_by_keys(rows, [&](std::size_t a, std::size_t b) {
     const auto& ca = df.rows[a][out.case_column];
     const auto& cb = df.rows[b][out.case_column];
-    if (cell_less(ca, cb, integral)) return true;
-    if (cell_less(cb, ca, integral)) return false;
-    return cell_less(df.rows[a][ts], df.rows[b][ts], false);
+    if (cell_less(ca, cb, case_order)) return true;
+    if (cell_less(cb, ca, case_order)) return false;
+    return cell_less(df.rows[a][ts], df.rows[b][ts], ts_order);
   }, dtype_of(df, out.case_column), dtype_of(df, ts));
   for (const auto i : rows) {
     const auto key = key_of(df.rows[i][out.case_column]);
@@ -463,11 +602,37 @@ const Plan kSuffixAggPlan{"group_by", {"group_by"}, {}, {}};
 const Plan kLazySortPlan{"join", {"sort", "group_by", "filter", "select", "join right", "join"}, {}, {}};
 const Plan kLazyAggPlan{"join", {"group_by", "filter", "select", "join right", "join"}, {}, {}};
 
+// The variants frame keeps the case column's Categorical/Enum descriptor.
+std::vector<std::optional<EventTableCategoricalDtype>> case_descriptor(const EventTable& df, std::size_t case_column,
+                                                                       std::size_t width) {
+  if (case_column >= df.categorical_dtypes.size() || !df.categorical_dtypes[case_column]) return {};
+  std::vector<std::optional<EventTableCategoricalDtype>> out(width);
+  out[0] = df.categorical_dtypes[case_column];
+  return out;
+}
+
+// variant_list joins the activity lists into str: only a String activity
+// column can (Categorical, Enum and every other dtype raise).
+void require_string_activities(const EventTable& df, const Variants& v, const std::string& case_glue,
+                               const std::string& act_key) {
+  const auto dtype = dtype_of(df, v.act);
+  if (dtype == "String") return;
+  fail("InvalidOperationError",
+       "attempted list join with non-string dtype: list[" + short_dtype(dtype) + "]" +
+           resolved("with_columns",
+                    "AGGREGATE[maintain_order: true]\n  [col(" + quote(act_key) +
+                        ").implode().alias(\"variant_list\"), len().alias(\"count\")] BY [col(" + quote(case_glue) +
+                        ")]\n  FROM\n  SORT BY [col(" + quote(case_glue) + "), col(" + quote(kTimestamp) + ")]\n    " +
+                        frame_plan(df.columns),
+                    {"with_columns"}));
+}
+
 EventTable trace_variants_frame(const EventTable& df, const Variants& v) {
   EventTable out;
   const auto& case_name = df.columns[v.case_column];
   out.columns = {case_name, "variant_list", "count", "variant"};
   out.dtypes = {dtype_of(df, v.case_column), "List(String)", "UInt32", "String"};
+  out.categorical_dtypes = case_descriptor(df, v.case_column, 4);
   for (std::size_t c = 0; c < v.order.size(); ++c) {
     EventAttribute list;
     list.key = "variant_list";
@@ -484,11 +649,18 @@ EventTable trace_variants_frame(const EventTable& df, const Variants& v) {
 EventTable join_case_list(const EventTable& df, std::size_t case_column, const std::vector<Key>& matched,
                           bool positive) {
   if (matched.empty()) return positive ? subset(df, std::vector<bool>(df.size(), false)) : df;
-  const auto left = short_dtype(dtype_of(df, case_column));
+  const auto dtype = dtype_of(df, case_column);
+  const auto left = short_dtype(dtype);
   bool any = false;
   for (const auto& k : matched) any = any || !k.null;
-  const std::string right = !any ? "null" : dtype_of(df, case_column) == "Int64" ? "i64" : "str";
-  if (left != right) join_dtype_error(df.columns[case_column], left, right);
+  // The list's dtype from its Python values (Categorical/Enum cases give
+  // str); an integer key of any width casts to the i64 side.
+  const std::string right = !any                         ? "null"
+                            : integer_dtype(dtype)       ? "i64"
+                            : dtype.rfind("Float", 0) == 0 ? "f64"
+                            : dtype == "Boolean"         ? "bool"
+                                                         : "str";
+  if (left != right && !(right == "i64" && integer_dtype(dtype))) join_dtype_error(df.columns[case_column], left, right);
   return join_cases(df, case_column, matched, positive);
 }
 
@@ -506,15 +678,6 @@ EventTable lazy_variant_filter(const EventTable& df, const PolarsFilterParameter
 
 const Plan kReworkPlan{"join", {"group_by", "filter", "select", "unique", "join right", "join"}, {}, {}};
 
-std::string is_in_literal(const Value& activities) {
-  std::string out = "[[";
-  for (std::size_t i = 0; i < activities.items.size(); ++i) {
-    if (i) out += ", ";
-    out += quote(activities.items[i].text);
-  }
-  return out + "]]";
-}
-
 EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters, const Value* activities) {
   const auto case_glue = case_key(parameters);
   const auto act_key = activity_key(parameters);
@@ -523,8 +686,12 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   if (activities) {
     act = require(df, act_key, kReworkPlan);
     plan.above = (activities->items.empty() ? "FILTER false.alias(" + quote(act_key) + ")"
-                                            : "FILTER col(" + quote(act_key) + ").is_in(" + is_in_literal(*activities) + ")") +
+                                            : "FILTER col(" + quote(act_key) + ").is_in(" +
+                                                  is_in_literal(activities->items) + ")") +
                  "\nFROM";
+    auto stack = kReworkPlan.stack;
+    stack.insert(stack.begin(), "!filter");
+    enum_is_in(df, act, activities->items, "join", plan.above + "\n  " + frame_plan(df.columns), stack);
   }
   const auto case_column = require(df, case_glue, plan);
   if (!activities) act = require(df, act_key, plan);
@@ -605,7 +772,9 @@ PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
 
 EventTable polars_trace_filter_get_variants_df(const EventTable& df, const std::string& case_id_key,
                                                const std::string& activity_key) {
-  return trace_variants_frame(df, variants_of(df, case_id_key, activity_key, kTraceSortPlan, kTraceAggPlan));
+  const auto v = variants_of(df, case_id_key, activity_key, kTraceSortPlan, kTraceAggPlan);
+  require_string_activities(df, v, case_id_key, activity_key);
+  return trace_variants_frame(df, v);
 }
 
 EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const std::string& case_id_key,
@@ -614,6 +783,7 @@ EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const s
   EventTable out;
   out.columns = {df.columns[v.case_column], "variant"};
   out.dtypes = {dtype_of(df, v.case_column), "String"};
+  out.categorical_dtypes = case_descriptor(df, v.case_column, 2);
   for (std::size_t c = 0; c < v.order.size(); ++c)
     out.rows.push_back({v.case_cells[c], string_cell("variant", variant_string(v.activities[c]))});
   return out;
@@ -622,6 +792,7 @@ EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const s
 EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterValue& admitted_traces,
                                      const PolarsFilterParameters& parameters) {
   const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kTraceSortPlan, kTraceAggPlan);
+  require_string_activities(df, v, case_key(parameters), activity_key(parameters));
   std::vector<std::string> patterns;
   for (const auto& item : admitted_traces.items) patterns.push_back(join_pattern(item));
   std::vector<Key> matched;
@@ -681,8 +852,24 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
     const auto column = require(df, case_glue, Plan{"join", {"join"}, {}, {}, frame_plan({case_glue})});
     join_dtype_error(case_glue, short_dtype(dtype_of(df, column)), "null");
   }
-  std::vector<std::vector<std::string>> lists;
-  for (const auto& item : patterns.items) lists.push_back(pattern_items(item));
+  // The pattern literal casts to the activity list's dtype: on an Enum
+  // column a value outside the categories becomes null (and a null item
+  // equals a null activity).
+  const auto act = find_column(df, activity_key(parameters));
+  const bool as_enum = act && enum_dtype(dtype_of(df, *act));
+  const auto categories = as_enum ? enum_categories(df, *act) : std::set<std::string>{};
+  std::vector<std::vector<std::optional<std::string>>> lists;
+  for (const auto& item : patterns.items) {
+    auto& list = lists.emplace_back();
+    if (item.kind == Kind::kString) {
+      for (auto& c : characters(item.text)) list.emplace_back(std::move(c));
+    } else {
+      for (const auto& v : item.items) list.push_back(v.kind == Kind::kNone ? std::nullopt : std::optional(v.text));
+    }
+    if (as_enum)
+      for (auto& x : list)
+        if (x && !categories.count(*x)) x.reset();
+  }
   return lazy_variant_filter(df, parameters, [&](const std::vector<Cell>& activities) {
     for (const auto& p : lists) {
       if (p.size() > activities.size()) continue;
@@ -690,7 +877,7 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
       bool same = true;
       for (std::size_t i = 0; i < p.size() && same; ++i) {
         const auto& cell = activities[offset + i];
-        same = !null_cell(cell) && cell->value == p[i];
+        same = null_cell(cell) ? !p[i] : p[i] && cell->value == *p[i];
       }
       if (same) return true;
     }
@@ -800,23 +987,35 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
                                                 "select", "with_columns", "select"},
            {},
            {}});
-  const auto act = require(
-      df, act_key,
-      Plan{"select",
-           this_mode ? std::vector<std::string>{"with_columns", "with_columns", "with_columns", "select"}
-                     : std::vector<std::string>{"with_columns", "with_columns", "with_columns", "select", "with_columns",
-                                                "select"},
-           " WITH_COLUMNS:\n [col(" + quote(case_glue) + ").cum_count().over([col(" + quote(case_glue) +
-               ")]).alias(\"_row_within_case\")] ",
-           {"_row_within_case"}});
+  const Plan act_plan{"select",
+                      this_mode ? std::vector<std::string>{"with_columns", "with_columns", "with_columns", "select"}
+                                : std::vector<std::string>{"with_columns", "with_columns", "with_columns", "select",
+                                                           "with_columns", "select"},
+                      " WITH_COLUMNS:\n [col(" + quote(case_glue) + ").cum_count().over([col(" + quote(case_glue) +
+                          ")]).alias(\"_row_within_case\")] ",
+                      {"_row_within_case"}};
+  const auto act = require(df, act_key, act_plan);
   const std::vector<Value> activities = activity.kind == Kind::kString ? std::vector<Value>{activity} : activity.items;
+  auto enum_stack = act_plan.stack;
+  enum_stack.front() = "!with_columns";
+  enum_is_in(df, act, activities, "select",
+             " WITH_COLUMNS:\n [col(" + quote(act_key) + ").is_in(" + is_in_literal(activities) +
+                 ").alias(\"_is_split_activity\")] \n   WITH_COLUMNS:\n   [col(" + quote(case_glue) +
+                 ").cum_count().over([col(" + quote(case_glue) + ")]).alias(\"_row_within_case\")] \n    " +
+                 frame_plan(df.columns),
+             enum_stack);
   // Per case: the running count ("this"), null on a null activity.
   std::map<Key, std::int64_t> running;
   std::map<Key, std::optional<std::int64_t>> previous;  // the previous row's running count
   std::map<Key, bool> seen;
   EventTable out = df;
   if (!out.dtypes.empty()) out.dtypes[case_column] = "String";
-  if (!out.categorical_dtypes.empty()) out.categorical_dtypes[case_column] = std::nullopt;
+  if (!out.categorical_dtypes.empty()) {
+    out.categorical_dtypes[case_column] = std::nullopt;
+    if (std::all_of(out.categorical_dtypes.begin(), out.categorical_dtypes.end(),
+                    [](const auto& d) { return !d.has_value(); }))
+      out.categorical_dtypes.clear();
+  }
   for (std::size_t i = 0; i < df.size(); ++i) {
     const auto& case_cell = df.rows[i][case_column];
     const auto key = key_of(case_cell);

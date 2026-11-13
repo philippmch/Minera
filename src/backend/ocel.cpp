@@ -3682,10 +3682,9 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
     related_by_event[relation.event_id].push_back(relation.object_id);
     events_by_object[relation.object_id].push_back(relation.event_id);
   }
-  for (auto& [event_id, objects] : related_by_event) {
-    std::sort(objects.begin(), objects.end());
-    objects.erase(std::unique(objects.begin(), objects.end()), objects.end());
-  }
+  // Related objects sort by id; a repeated event_object row lists its
+  // object again ("o1, o1"), as pm4py keeps the rows (round CA).
+  for (auto& [event_id, objects] : related_by_event) std::sort(objects.begin(), objects.end());
   // Events order by their exact instant (nanoseconds apart sort apart, round
   // BX), then activity and id.
   const auto event_less = [&](const std::string& left_id,

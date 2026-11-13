@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BZ (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–CA (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4887,37 +4887,60 @@ timedelta cells in the table transport, and the pandas sequence filters
 (no route; typed keys moved to CA). No fixture changed. The device check
 on the Mac was skipped again (no device linked).
 
-Next round (CA) should start by re-reviewing round BZ:
+Round CA re-reviewed BZ (Review CA1; BZ's CI run 43425776838 was green;
+the pandas table filters and LTL filters with typed keys held on 150 seeds
+and 1,500 answers) and took its targets. Two new banks replay the sequence
+filters on typed keys: `docs/pandas-sequence-filter-typed-bank.json.gz`
+(categorical, nullable, `boolean` and `string` cases and activities) and
+`docs/polars-sequence-filter-typed-bank.json.gz` (Categorical and Enum
+cases and activities, `UInt8`, `Boolean` and `Float64` cases), captured with
+the existing capture scripts and their new `--domain` option (the Polars one
+with `--repeats 8`). The pandas fixes cover categorical arithmetic in the
+case grouping, `<NA>` runs of `string` keys, categorical prefixes and
+suffixes, NumPy views in the activity split and NA end activities; the
+Polars fixes cover the variant list join (String activities only), the
+strict Enum cast of `is_in` values, the join key dtypes, Enum casts of
+prefix and suffix lists, and the case sort by dtype. The Polars table
+filters now take `UInt8` and the other narrow integer keys. On OCEL SQLite
+logs with repeated relations it fixed the edge metrics (repeats and
+self-edges) and the description (`o1, o1`); the reference OCPN playout no
+longer stops at 100 traces when `max_traces` is not given. Conformance
+(etot, otg, ocdfg), the other statistics, the event/object graph, splits
+and object graphs were equal on the same logs. Declared: the pandas rework
+KeyError column order (Python set order), Polars per-run row orders on a
+few frames, and the playout's size on logs with very many sequences. No
+fixture changed. The device check on the Mac was skipped again (no device
+linked).
 
-- `src/backend/pandas_numpy_view.hpp` (`numpy_view`: masked numeric,
-  `boolean`, `string` and categorical columns; categorical categories of
-  bool, datetime and float32 dtypes) and its callers in
-  `pandas_variants_filter.cpp` (`statistics`, the `statistics_kind` of
-  `membership`, `cell` for categorical gaps) and
-  `pandas_between_filter.cpp` (`case_values` on the view, the activity
-  cells); the other pandas filters that read columns through NumPy
-  (paths, LTL, case, repetition, sequence) with gaps in nullable columns;
-- the masked-`isin` rule in `pandas_attributes_filter.cpp`
-  (`project_cases`) and `pandas_timestamp_filter.cpp` (attribute in
-  timeframe); which other filters select cases with `isin` (paths
-  negative, LTL, sequence filters);
-- `src/backend/pandas_ltl_filter.cpp`: the duplicated-key order with the
-  timestamp key, and `next`/`four_eyes` with keys on typed columns;
-- `src/backend/ocel.cpp`: `minera:repeatedRelations` and
-  `minera:o2oOrder` in both transport forms (routes that pass a log on:
-  filters, playout, split, enrich; the XML and CSV writers with repeats),
-  the OCDFG relation index, `discover_ocpn`'s `object_rows` and the IMd
-  branch; `saw_nets.cpp` `flatten_type`; `ocel_transform.cpp`
-  `apply_lifecycle_qualifiers`;
-- new areas: the pandas sequence filters with typed keys (a new bank from
-  `scripts/pandas_sequence_filter_domain.py` with categorical and nullable
-  columns, replayed natively); the Polars table filters with nullable
-  and categorical columns (Polars has no `<NA>`, but Categorical and Enum
-  keys); OCEL conformance (etot, otg, ocdfg) and statistics on SQLite logs
-  with repeated relations; the OCEL playout on IMd models;
+Next round (CB) should start by re-reviewing round CA:
+
+- `src/backend/polars_sequence_filters.cpp`: `short_dtype`, `enum_is_in`
+  and its plan texts, `require_string_activities`, `CellOrder` (Enum
+  ranks, floats, Booleans), the Enum cast in `list_filter`, the case list
+  dtype in `join_case_list`; the same rules in the other Polars modules
+  that build `is_in` filters or variant lists (table filters on Enum
+  activities, DFG and statistics on Categorical/Enum activities);
+- `src/backend/pandas_sequence_filters.cpp`: the CA branches in
+  `consecutive_act_case_grouping`, `position_filter`, `counts_value`,
+  the `nocc` NA check and `pandas_activity_split_apply`;
+- the narrow integer dtypes in the Polars table filters (`Int8` to
+  `UInt32`, `Float32`, with nulls; error texts that print the dtype);
+- `ocel_statistics.cpp` `edge_associations` and `ocel.cpp`
+  `describe_ocel_tuples` with repeats; the other OCEL statistics and
+  routes that count relation rows (activity and object type associations,
+  enrichment, filters with repeats);
+- the OCPN playout route without `max_traces`: response size (the OCEL log
+  is serialized next to the traces) and the explicit bound; the reference
+  search's speed (one sweep log: 756,756 sequences in 574 s against
+  pm4py's 78 s, while another with 728,112 takes 24 s against 63 s;
+  pm4py seems to skip dead ends that `ocpn_reference_playout.cpp` explores);
+- new areas: the Polars sequence and table filters with Datetime, Date and
+  Int activity columns; the pandas sequence filters with `datetime64`,
+  period and interval keys; the OCPN playout with
+  `objects_unique_per_trace` and IMd models with repeats;
 - the open choices on CSV timestamp columns of plain numbers and "roles to
   diagnostics groups" (still declared unless Philipp answers);
-- the CI run of the BZ commit.
+- the CI run of the CA commit.
 
 Round BY's targets, re-reviewed in BZ (findings BZ1-1 to BZ1-10):
 

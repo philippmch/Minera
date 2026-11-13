@@ -25518,3 +25518,103 @@ Verification (scripts in the project files under `review-harness/round-bz/`;
 | pandas table filters with categorical, `Int64`, `boolean`, `string` keys and attributes (`tbl/tblkeys.py --eng=pandas`, `tblmod.py` adds `Float64`, `UInt8`, integer categorical and gap-free `Int64` columns) | 30 seeds before (17 operations each); 430 seeds after, plus 340 targeted seeds | before: 25 answers and 16 error texts differed; after: all equal or raising alike |
 | pandas LTL filters with non-default case, attribute, resource and timestamp keys (`tbl/ltlkeys.py`) and every duplicated key combination (`probes/ltldup.py`) | 1,500 answers before, 2,000 after; 120 combinations | before: 8 error texts and 32 combinations differed; after: all equal or raising alike |
 | Full suites: ctest, script tests, frontend, fixture replay | 484 ctests (rerun in full after ordering the OCPN and SAW per-type traces by event position, which `minera_ocel_nets_parity_tests` flagged on the first run), 406 script tests, 10,730 vitest tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+## Review CA1: re-review of round BZ, the pandas and Polars sequence filters with typed keys, the Polars table filters on narrow integer keys, and repeated OCEL relations in statistics, description and playout (2026-11-13)
+
+Round CA checked BZ's CI run (43425776838): green on all six jobs. It
+re-reviewed BZ (the pandas table filters with typed keys on 150 seeds and
+the pandas LTL filters with typed keys on 1,500 answers: all equal or
+raising alike) and took BZ's targets. Findings, all fixed:
+
+- **CA1-1 pandas sequence filters on typed keys.** A new bank
+  (`scripts/pandas_sequence_filter_typed_domain.py`: categorical case and
+  activity columns with gaps, unused, integer, reversed and ordered
+  categories, `Int64`, `UInt8`, `Float64`, `boolean`, `string` and object
+  cases) found: the consecutive case grouping adds the key columns, which
+  a categorical side refuses (`Object with dtype category cannot perform
+  the numpy op add`, or `unsupported operand type(s) for +: 'Categorical'
+  and 'DatetimeArray'` between two extension arrays), and a `string` key
+  holds `<NA>`, whose comparison continues the run; the timestamp case
+  grouping of two rows dropped the categorical descriptor of its first
+  column; the variants statistics name a categorical gap `float` (`NaTType`
+  for datetime categories); the activity split reads its case and
+  activity columns as NumPy hands them; prefixes and suffixes on a
+  categorical activity compare categories (the comparison error when no
+  category is missing or repeated, null otherwise); the end activity
+  counts give a missing key `None` on object columns and NaN otherwise;
+  `filter_df_on_end_activities_nocc` raises `boolean value of NA is
+  ambiguous` when a `<NA>` end activity below the threshold meets the most
+  common variant.
+- **CA1-2 Polars sequence filters on Categorical, Enum and narrow keys.**
+  A new bank (`scripts/polars_sequence_filter_typed_domain.py`) found:
+  the trace filter and `get_variants_df` join each case's activity list,
+  which only a String column can (`attempted list join with non-string
+  dtype: list[enum]`, `list[cat]`, `list[i64]`, ...); `is_in` with str
+  values on an Enum column casts them strictly (``conversion from `str` to
+  `enum` failed in column '' for N out of M values: [...]``, the first ten
+  failures printed as Polars prints a short Series) in the start and end
+  activity filters, `filter_df_on_end_activities` and its `nocc` form,
+  the rework activity set (before the case column is resolved) and the
+  activity split; the join key SchemaError names dtypes as Polars does
+  (`bool`, `u8`, `f64`, `enum`, `cat`, `datetime[μs, UTC]`), the trace
+  filter's case list takes the dtype of its Python values (ints `i64`,
+  floats `f64`, bools `bool`, Categorical and Enum values `str`) and an
+  integer case of any width joins it; a prefix or suffix list cast to an
+  Enum activity turns values outside the categories into nulls, and a
+  null item matches a null activity; the variants sort an Enum case by
+  category position, Float64 by value (NaN last) and Boolean false first;
+  the variants frames keep the case column's Categorical or Enum
+  descriptor.
+- **CA1-3 Polars table filters on narrow integer keys.** The case,
+  paths, variants, between, timestamp, attributes and LTL filters refused
+  `UInt8` (and `Int8`, `Int16`, `UInt16`) columns as "unsupported native
+  dtype"; they now treat every integer width as an integer key, and the
+  timestamp attribute filter names it in `cannot compare string with
+  numeric type (u8)`.
+- **CA1-4 OCEL edge metrics on repeated relations.** pm4py keeps an
+  event's repeated `event_object` rows, so the object's sequence repeats
+  the event and gives a self-edge (`b->b` with `(e3, e3, o1)`); Minera
+  deduplicated the rows.
+- **CA1-5 OCEL description on repeated relations** lists the object again
+  (`related objects: o1, o1`).
+- **CA1-6 OCPN playout without `max_traces`.** pm4py's extensive playout
+  returns every complete sequence; the reference binding of
+  `/api/ocel/playout` cut the result at the native default of 100 traces.
+  It now keeps them all unless `max_traces` is given (explicit values keep
+  the 10,000 safety bound).
+
+Declarations:
+
+- pandas `rework.apply` with both keys missing lists them in a Python set's
+  order (`None of [Index(['case:concept:name', 'concept:name'], ...)]` or
+  the reverse), which changes with `PYTHONHASHSEED`; the bank keeps both.
+- Polars `rework.apply` on a Float64 case and the consecutive case
+  grouping come back in Polars' hash or per-run order on a few frames;
+  the typed bank runs each call eight times per hash seed and compares
+  those calls up to row order.
+- The Polars case size and performance filters returned rows in another
+  order on 3 of 2,250 sweep answers (Polars' group_by order varies per
+  run, as for the declared `between` order).
+- OCPN playout with `max_bindings_per_activity=2` explodes on some logs on
+  both sides (pm4py does not finish within 300 s); the sweep uses 1. On a
+  log with 728,112 complete (all silent) sequences pm4py needs 63 s and
+  442 MB, Minera 24 s and 1.5 GB at its peak. Open (round CB): on another
+  log with 756,756 sequences Minera needs 574 s against pm4py's 78 s (the
+  same traces; the sweep's 120 s request limit cut it off).
+
+Tests: `minera_review_ca1_tests` (values taken from pm4py on the same
+frames and OCEL, `review-harness/round-ca/`), and the two typed banks
+replayed by `minera_pandas_sequence_filter_typed_bank_parity_tests` and
+`minera_polars_sequence_filter_typed_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-ca/`;
+"before" is round BZ's code on the same inputs):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| pandas sequence filters on typed keys (typed bank, `seq/`, `rp/rp_pandas.cpp`) | 34,405 calls on 3,000 frames, hash seeds 0-3 | before: 2,055 mismatches; after: 0 (the original bank: 0) |
+| Polars sequence filters on Categorical, Enum and narrow keys (typed bank) | 25,991 calls on 2,000 frames, hash seeds 0-1, 8 runs each | before: 4,396 mismatches; after: 0 (the original bank: 0) |
+| Polars table filters with Categorical, Enum, `UInt8`, nullable keys (`tbl/tblkeys.py --eng=polars`) | 2,149 answers before, 4,337 after | before: 95 answers and 70 error texts differed; after: all equal or raising alike but 3 row orders |
+| BZ's pandas table-filter and LTL sweeps with typed keys (`tbl/tblkeys.py`, `tbl/ltlkeys.py`) | 2,400 and 1,500 answers | all equal or raising alike |
+| OCEL SQLite logs with repeated relations and ties (`ocel/ocelca.py 0 60`): statistics, conformance (etot, otg, ocdfg), event/object graph, splits, description, object graphs, OCPN playout im/imd | 60 logs | before: edge metrics and description differed on most logs, playout cut at 100 traces; after: all equal but one playout log (the open timing above) |
+| Full suites: ctest, script tests, frontend, fixture replay | 487 ctests, 406 script tests, 10,730 vitest tests, 2,673 responses of 16 manifests | all pass; no fixture changed |

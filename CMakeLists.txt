@@ -1400,6 +1400,15 @@ if(MINERA_BUILD_TESTS)
   endif()
   add_test(NAME minera_review_bz1_tests COMMAND minera_review_bz1_tests)
 
+  add_executable(minera_review_ca1_tests src/backend/tests/test_review_ca1.cpp)
+  target_link_libraries(minera_review_ca1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_ca1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_ca1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  if(MSVC)
+    target_compile_options(minera_review_ca1_tests PRIVATE /bigobj)
+  endif()
+  add_test(NAME minera_review_ca1_tests COMMAND minera_review_ca1_tests)
+
   add_executable(minera_resource_profiles_tests
     src/backend/tests/test_resource_profiles.cpp
   )
@@ -3001,6 +3010,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_sequence_filter_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-bank.json.gz")
   set_tests_properties(minera_pandas_sequence_filter_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CA: the same replay on typed key columns (categorical, nullable,
+  # boolean, string[python] cases and activities).
+  add_test(NAME minera_pandas_sequence_filter_typed_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-typed-bank.json.gz")
+  set_tests_properties(minera_pandas_sequence_filter_typed_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_sequence_filter_bank_parity_tests
     src/backend/tests/test_polars_sequence_filter_bank_parity.cpp
@@ -3011,6 +3025,10 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CA: Categorical/Enum activities and cases, UInt8/Boolean/Float64 cases.
+  add_test(NAME minera_polars_sequence_filter_typed_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-typed-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_typed_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp

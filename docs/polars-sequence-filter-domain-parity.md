@@ -153,3 +153,25 @@ All twelve modules are complete on this bank. Outside the domain:
 * The grouped-dataframe and decreasing-factor parameters.
 * The order of Categorical case ids in sorted outputs beyond the generated
   labels.
+
+## Typed-key bank (round CA)
+
+`scripts/polars_sequence_filter_typed_domain.py` extends the domain above:
+case columns are Categorical, Enum (categories not in sorted order, unused
+categories), `Int64`, `UInt8`, `Float64`, `Boolean` or String, with nulls;
+activity columns Categorical, Enum (sorted or reversed categories) or
+String. `scripts/capture-polars-sequence-filter-bank.py --domain
+polars_sequence_filter_typed_domain.py --count 2000 --bank-seed 2026111302
+--hash-seeds 0,1 --repeats 8` writes
+`docs/polars-sequence-filter-typed-bank.json.gz` (eight runs per call and
+hash seed, since Polars varies some row orders per run), replayed by the
+same test (`minera_polars_sequence_filter_typed_bank_parity_tests`):
+
+| Calls | Values | Errors | Varying across seeds | Unordered | Failures |
+| --- | --- | --- | --- | --- | --- |
+| 25,991 | 17,171 | 8,820 | 55 | 1,763 | 0 |
+
+Review CA1 in `docs/reference-2.7.22-parity.md` lists the fixes (variant
+lists on String activities only, the strict Enum cast of `is_in` values,
+join key dtypes, Enum casts of prefix and suffix lists, the case sort by
+dtype).

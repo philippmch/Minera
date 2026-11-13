@@ -97,7 +97,7 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
     const auto n = number(v);
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
-  if (dtype == "Boolean" || dtype == "Int64" || dtype == "UInt64" || dtype == "UInt32" || dtype == "Int32") return "i" + exact(v).decimal();
+  if (dtype == "Boolean" || dtype == "Int64" || dtype == "UInt64" || dtype == "UInt32" || dtype == "Int32" || dtype == "UInt16" || dtype == "Int16" || dtype == "UInt8" || dtype == "Int8") return "i" + exact(v).decimal();
   if (polars_datetime::temporal(dtype)) {
     const auto parsed = polars_datetime::ticks(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value, polars_datetime::column_unit(dtype));
     if (!parsed) throw std::invalid_argument("Native Polars case grouping requires valid declared temporal cells");
@@ -265,9 +265,10 @@ void time_dtype(const EventTable& source,std::size_t at,const Query& q,const std
 }
 void attribute_dtype(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
   const auto& dt=source.dtypes[at];const bool string=dt=="String"||dt=="Categorical"||dt.starts_with("Categorical(")||dt.starts_with("Enum(");
-  const bool numeric=dt=="Int64"||dt=="UInt64"||dt=="Float64";
+  // Every integer width and float: Polars names it short (u8, i64, f64, ...).
+  const bool numeric=dt.starts_with("Int")||dt.starts_with("UInt")||dt.starts_with("Float");
   if((string&&(integer(q.value)||real(q.value)))||(numeric&&text(q.value))) {
-    const auto type=string?(integer(q.value)?"i32":"f64"):dt=="Float64"?"f64":dt=="UInt64"?"u64":"i64";
+    const auto type=string?std::string(integer(q.value)?"i32":"f64"):dt.starts_with("UInt")?"u"+dt.substr(4):dt.starts_with("Int")?"i"+dt.substr(3):"f"+dt.substr(5);
     fail("ComputeError",phase,"cannot compare string with numeric type ("+std::string(type)+")\n\nThis error occurred in the following expression:\n\t"+compare_expr(q.attribute.value,"==",literal(q.value,true))+"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n');
   }
 }

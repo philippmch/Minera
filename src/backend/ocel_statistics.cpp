@@ -463,21 +463,23 @@ OcelEdgeAssociations edge_associations(
       options.use_business_hours || !options.business_hour_slots.empty()
           ? normalized_business_slots(options)
           : std::vector<BusinessHourSlot>{};
-  std::map<std::string, std::set<std::string>> object_events;
+  // Relation rows per object and event: a repeated event_object row repeats
+  // the event in the object's sequence (pm4py keeps the rows, so the
+  // repeats sit next to each other and give self-edges).
+  std::map<std::string, std::map<std::string, std::size_t>> object_events;
   for (const auto& relation : log.relations)
-    object_events[relation.object_id].insert(relation.event_id);
+    ++object_events[relation.object_id][relation.event_id];
   std::unordered_map<std::string, const OcelEvent*> event_by_id;
   event_by_id.reserve(log.events.size());
   for (const auto& event : log.events) event_by_id.emplace(event.id, &event);
 
   OcelEdgeAssociations result;
-  // Event table order is the canonical source order.  A set above removes
-  // duplicate relation rows for the same object/event.
+  // Event table order is the canonical source order.
   for (const auto& [object_id, related_events] : object_events) {
     std::vector<const OcelEvent*> sequence;
-    sequence.reserve(related_events.size());
     for (const auto& event : log.events) {
-      if (related_events.contains(event.id)) sequence.push_back(&event);
+      const auto found = related_events.find(event.id);
+      if (found != related_events.end()) sequence.insert(sequence.end(), found->second, &event);
     }
     if (sequence.size() < 2) continue;
     const auto object_type = lookups.object_types.at(object_id);
