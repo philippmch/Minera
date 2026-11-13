@@ -25225,3 +25225,85 @@ Verification (scripts in the project files under `review-harness/round-bw/`;
 | OCEL CSV, OCEL 2.0 XML and SQLite exports on nanosecond timestamps (`ocelns.py --parts=io`) | 60 files each | CSV and XML equal before and after; SQLite: all 25 differed before, all equal after |
 | OCEL event and object features on nanosecond timestamps (`ocelfeat.py`) | 25 event, 32 object comparisons | before: 1 and 7 equal; after: all equal |
 | Full suites: ctest, script tests, fixture replay | 481 ctests, 406 script tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+## Review BX1: re-review of round BW, Polars' unstable sort of tied timestamps, temporal and Boolean columns as keys and attributes of the Polars table filters, and the OCEL description on nanosecond timestamps (2026-11-13)
+
+Round BX checked BW's CI run (43384361792: green on all six jobs),
+re-reviewed BW (`polars_datetime.hpp` and its callers, the pandas paths
+`compare`, `ocel_features` `event_times`, the SQLite `microseconds` flag:
+no regressions) and took BW's targets. Findings, all fixed:
+
+- **BX1-1 Polars' unstable sort of tied timestamps.** The native Polars
+  paths, path performance, variants, between, LTL and sequence filters
+  sorted a frame by case and timestamp stably. Polars 1.44.1 sorts by
+  several columns with rayon's parallel unstable sort (a port of the Rust
+  pdqsort: insertion sort up to 20 rows, median-of-three and ninther
+  pivots, BlockQuicksort partitions of 128-row blocks, an equal-run split
+  when the pivot equals the slice's predecessor, xorshift pattern breaking
+  after an imbalanced split, both sides recursed afresh when the larger
+  exceeds 2,000 rows). The order it leaves tied rows in is deterministic
+  and does not depend on the thread count. `src/backend/polars_sort.hpp`
+  reproduces it; the model matched Polars on 2,000 random frames of 21 to
+  4,100 rows (ties, nulls, string and integer first keys). A key of the
+  `Null` dtype (an all-null column) drops out of the sort, and the
+  single-column sort that remains keeps tied rows in their input order
+  (`sort_by_keys`; 700 random frames, and the retained LTL vector
+  PLTL-B1-130). Before, 12 and 7 of 5,000 answers on us and ns columns
+  differed (BW's declared ties).
+- **BX1-2 Polars Datetime and Date columns as activity keys.** The paths
+  and variants filters read a Datetime activity through its String cast
+  with the microsecond text of the cell; Polars prints the column unit's
+  fraction digits (9, 6 or 3) and, on an aware column, the "+HH:MM" offset
+  (`2024-01-01 00:00:00.000000001+00:00`); a Date prints `2024-01-01`
+  (`polars_datetime::cast_text`).
+- **BX1-3 Polars top_k with the activity key on the case column.**
+  `filter_variants_top_k` with `activity_key` equal to `case_id_key` fails
+  resolving the group_by with `DuplicateError: column with name '<case>'
+  has more than one occurrence` and the sort plan; Minera returned rows.
+- **BX1-4 The Polars timestamp attribute filter on Boolean, temporal and
+  nanosecond columns.** A Boolean attribute compared with a string value
+  matches through `col(b).cast(String) == "true"` (Minera matched
+  nothing); a Date or Datetime attribute with a string value raises
+  `InvalidOperationError: cannot compare 'date/datetime/time' to a string
+  value ...` resolving the join; on an aware nanosecond time column the
+  error expressions print the `<=` bound 999 ns on
+  (`2024-01-02 00:00:00.000000999 UTC`) and equal bounds stay a range
+  instead of `==`.
+- **BX1-5 The OCEL description on nanosecond timestamps.**
+  `/api/ocel/description` printed event and lifecycle times as ISO texts
+  and the lifecycle duration from the exact instants; pm4py prints
+  `str(Timestamp)` (`2033-06-07 06:41:59.593824219+00:00`) and the float
+  repr of `end.timestamp() - start.timestamp()` (microseconds, rounded:
+  `90179.00005412102`).
+
+Declarations:
+
+- With non-default case, activity and timestamp keys, Polars' join and
+  group_by results (case performance and size, contained and
+  intersecting, repetition, top_k, attribute traces) change row order from
+  run to run in Polars itself (26 of 5,400 answers; the same seed
+  reorders when rerun). The harness reports them as `ORDER`.
+- The native description variant2 objects carry a `has_lifecycle` flag
+  before the lifecycle fields (Minera's wire shape for objects without
+  events); the harness drops it.
+- The pandas filters with non-default keys (numbers, booleans or dates as
+  activities, the case key on the timestamp column, null case keys, a
+  datetime attribute against a string) show differences in error texts
+  and in a few answers; moved to round BY.
+
+Tests: `minera_review_bx1_tests` (values taken from pm4py on the same
+frames and OCEL, `review-harness/round-bx/bx1/mk.py`).
+
+Verification (scripts in the project files under `review-harness/round-bx/`;
+"before" is round BW's server on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Polars sort model vs `LazyFrame.sort` (`sortstress.py`, `sortstress2.py`) | 2,000 and 1,200 frames | all equal; the C++ port equals the Python model on 3,000 inputs |
+| Polars tie operations on us and ns columns (round BW's `tbl.py 0 1000 --eng=polars --units=us` and `--units=ns`, `--ops=paths,path_perf,var_top_k,var_membership,between`) | 5,000 each | before: 12 and 7 differed; after: all equal or raising alike |
+| Polars table filters with Datetime, Date, Boolean and number columns as keys and attributes (`tblkeys.py 0 20`, then `0 60` and `60 300`, `--eng=polars`) | 300 before, 5,400 after | before: 20 differed; after: all equal or raising alike except the declared per-run orders (26) |
+| Polars Date time column on the table filters (`tbldate.py`) | 1,650 | all equal or raising alike (before and after) |
+| pandas `datetime64[s]` and `[ms]` time columns on the paths, performance and variants filters (`tbl.py --eng=pandas --units=s,ms`) | 3,600 | all equal or raising alike (before and after) |
+| OCEL description variants 1 and 2 with and without timestamps on nanosecond SQLite timestamps (`ocelmore.py --parts=desc`) | 240 | before: 109 of the 120 with timestamps differed; after: all equal |
+| OCEL graphs (cobirth, codeath, descendants, inheritance, interaction) and activity and object type associations on nanosecond SQLite timestamps (`ocelmore.py --parts=graph,assoc,otassoc`) | 300 and 360 | all equal (before and after) |
+| Full suites: ctest, script tests, frontend, fixture replay | 482 ctests (the 64 Polars, review and table ctests rerun after the `Null` key fix), 406 script tests, 10,729 vitest tests, 2,673 responses of 16 manifests | all pass; no fixture changed |

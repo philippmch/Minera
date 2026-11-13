@@ -177,9 +177,9 @@ void selector(const EventAttribute& value) {
   if(!text(value)&&!collection(value))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(value)+"'.");
   if(collection(value)&&!value.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
 }
-struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;};
+struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;std::string attribute_dtype,time_dtype;};
 Query prepare(Operation op,const EventAttribute& low,const EventAttribute& high,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={}) {
-  Query q{op,bound(low),bound(high),options,attribute,value};
+  Query q{op,bound(low),bound(high),options,attribute,value,{},{}};
   if(op==Operation::kAttribute)selector(attribute);
   selector(options.timestamp_key);
   if(op!=Operation::kEvents&&null(options.case_id_key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
@@ -187,19 +187,31 @@ Query prepare(Operation op,const EventAttribute& low,const EventAttribute& high,
 }
 std::string compare_expr(const std::string& column,const std::string& op,const std::string& value) {return "[(col("+quote(column)+")) "+op+" ("+value+")]";}
 std::string combined(const std::string& a,const std::string& op,const std::string& b){return "[("+a+") "+op+" ("+b+")]";}
+// An aware nanosecond column meets a microsecond literal: Polars prints the
+// `<=` bound as its last nanosecond (bound + 999 ns) and so never merges equal
+// bounds into `==` (round BX, observed black-box).
+bool nanosecond_aware(const Query& q){return polars_datetime::unit(q.time_dtype)==polars_datetime::Unit::kNanoseconds&&!polars_datetime::naive(q.time_dtype);}
+std::string at_most_text(const Query& q){
+  auto v=q.high;
+  if(nanosecond_aware(q)){v.nanoseconds+=999;if(v.nanoseconds>=1000000000){v.nanoseconds-=1000000000;++v.seconds;}}
+  return bound_text(v);
+}
 std::string time_expr(const Query& q) {
-  const auto lo=bound_text(q.low),hi=bound_text(q.high);const auto& time=q.options.timestamp_key.value;
-  if(q.op==Operation::kContained)return combined(compare_expr("first_timestamp",">=",lo),"&",compare_expr("last_timestamp","<=",hi));
+  const auto lo=bound_text(q.low),hi=bound_text(q.high),hi_le=at_most_text(q);const auto& time=q.options.timestamp_key.value;
+  if(q.op==Operation::kContained)return combined(compare_expr("first_timestamp",">=",lo),"&",compare_expr("last_timestamp","<=",hi_le));
   if(q.op==Operation::kIntersecting){
     const auto cover=combined(compare_expr("first_timestamp","<",lo),"&",compare_expr("last_timestamp",">",hi));
     if(equal(q.low,q.high))return cover;
     return combined(combined(combined(compare_expr("first_timestamp",">",lo),"&",compare_expr("first_timestamp","<",hi)),"|",combined(compare_expr("last_timestamp",">",lo),"&",compare_expr("last_timestamp","<",hi))),"|",cover);
   }
-  if(equal(q.low,q.high))return compare_expr(time,"==",lo);
-  return combined(compare_expr(time,">=",lo),"&",compare_expr(time,"<=",hi));
+  if(equal(q.low,q.high)&&!nanosecond_aware(q))return compare_expr(time,"==",lo);
+  return combined(compare_expr(time,">=",lo),"&",compare_expr(time,"<=",hi_le));
 }
 std::string whole_expr(const Query& q) {
-  const auto time=time_expr(q);return q.op==Operation::kAttribute?combined(compare_expr(q.attribute.value,"==",literal(q.value,true)),"&",time):time;
+  const auto time=time_expr(q);if(q.op!=Operation::kAttribute)return time;
+  // A Boolean column meets a string value as its String cast (round BX).
+  const auto attribute=q.attribute_dtype=="Boolean"&&text(q.value)?"[(col("+quote(q.attribute.value)+").cast(String)) == ("+literal(q.value,true)+")]":compare_expr(q.attribute.value,"==",literal(q.value,true));
+  return combined(attribute,"&",time);
 }
 std::string agg_plan(const EventTable& source,const Query& q) {
   return "AGGREGATE[maintain_order: false]\n  [col("+quote(q.options.timestamp_key.value)+").min().alias(\"first_timestamp\"), col("+quote(q.options.timestamp_key.value)+").max().alias(\"last_timestamp\")] BY [col("+quote(q.options.case_id_key.value)+")]\n  FROM\n  "+frame_plan(source);
@@ -209,7 +221,7 @@ std::string indent(std::string value,const std::string& prefix){std::string out=
 std::string filtered_plan(const EventTable& source,const Query& q,bool upper) {
   std::string plan=q.op==Operation::kAttribute?attribute_plan(source,q):frame_plan(source);
   plan="FILTER col("+quote(q.options.timestamp_key.value)+") >= "+bound_text(q.low)+"\nFROM\n"+indent(plan,"  ");
-  if(upper)plan="FILTER col("+quote(q.options.timestamp_key.value)+") <= "+bound_text(q.high)+"\nFROM\n"+indent(plan,"  ");return plan;
+  if(upper)plan="FILTER col("+quote(q.options.timestamp_key.value)+") <= "+at_most_text(q)+"\nFROM\n"+indent(plan,"  ");return plan;
 }
 std::string missing_prefix(const std::string& key,const std::vector<std::string>& columns) {
   std::string out="unable to find column "+debug_quote(key)+"; valid columns: [";
@@ -263,6 +275,11 @@ void attribute_dtype(const EventTable& source,std::size_t at,const Query& q,cons
 // values on a String column.
 void attribute_resolution(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
   const auto& dt=source.dtypes[at];const bool string=dt=="String"||dt=="Categorical"||dt.starts_with("Categorical(")||dt.starts_with("Enum(");
+  // A Date or Datetime column rejects a string value the same way (round BX).
+  if(polars_datetime::temporal(dt)&&q.value.container==AttributeContainerKind::kScalar&&text(q.value)) {
+    const auto plan="FILTER col("+quote(q.attribute.value)+") == "+literal(q.value)+"\nFROM\n  "+frame_plan(source);
+    fail("InvalidOperationError",phase,"cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)"+resolved(q.op,plan,nodes(q.op,true),true));
+  }
   if(!string)return;
   const auto& v=q.value;
   if(v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple) {
@@ -316,13 +333,15 @@ bool attribute_match(const std::optional<EventAttribute>& cell,const std::string
     if(value.container==AttributeContainerKind::kContainer){std::string s="{";for(std::size_t i=0;i<value.children.size();++i){if(i)s+=',';s+=literal(value.children[i]);}return v.value==s+'}';}
     return false;
   }
+  if(dt=="Boolean"&&text(value))return (truth(v)?"true":"false")==value.value;
   if(integer(value)||real(value)||boolean(value)) {
     if(integer(v)&&integer(value))return exact(v)==exact(value);
     const auto a=number(v),b=number(value);return a==b||(std::isnan(a)&&std::isnan(b));
   }
   return false;
 }
-EventTable collect(const EventTable& source,const Query& q,const std::string& phase) {
+EventTable collect(const EventTable& source,const Query& query,const std::string& phase) {
+  auto q=query;
   source.validate();if(source.index||source.dtypes.size()!=source.columns.size())throw std::invalid_argument("Native Polars timestamp filters require declared dtypes and no dataframe index");
   // Python builds the attribute value literal first.
   if(q.op==Operation::kAttribute&&(q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple))
@@ -339,6 +358,7 @@ EventTable collect(const EventTable& source,const Query& q,const std::string& ph
   if(q.op==Operation::kAttribute){if(collection(q.attribute))empty_selector(source,q,phase,false);attr_at=position(q.attribute.value);}
   if(collection(q.options.timestamp_key))empty_selector(source,q,phase,true);
   const auto time_at=position(q.options.timestamp_key.value);
+  q.time_dtype=source.dtypes[time_at];if(attr_at)q.attribute_dtype=source.dtypes[*attr_at];
   if(attr_at)attribute_resolution(source,*attr_at,q,phase);
   if(q.op==Operation::kAttribute&&!constant)case_at=position(q.options.case_id_key.value,true);
   auto result=source;result.rows.clear();

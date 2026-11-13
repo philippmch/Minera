@@ -1,5 +1,6 @@
 #include "minera/polars_paths_filter.hpp"
 #include "polars_datetime.hpp"
+#include "polars_sort.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_float_text.hpp"
 #include "polars_column_hint.hpp"
@@ -180,7 +181,13 @@ std::string string_cast(const EventAttribute& value, const std::string& declared
   if (real(value)) return real_text(number(value), true);
   if (date(value)) {
     auto output = std::get_if<NativeDate>(&value.typed_value) ? std::get<NativeDate>(value.typed_value).value : value.value;
-    if (declared.starts_with("Datetime(")) std::replace(output.begin(), output.end(), 'T', ' ');
+    // A Datetime column casts with its unit's fraction digits (round BX).
+    if (polars_datetime::datetime(declared)) {
+      const auto cast = polars_datetime::cast_text(output, declared);
+      if (!cast) throw std::invalid_argument("Native Polars paths temporal cast requires valid declared datetime");
+      return *cast;
+    }
+    if (declared == "Date") return output.substr(0, 10);
     return output;
   }
   if (value.container == AttributeContainerKind::kContainer) {
@@ -389,10 +396,11 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
   // No admitted path keeps no case: a negative filter returns the frame as it is.
   if (!performance && paths.empty() && !truth(options.positive)) return source;
   std::vector<std::size_t> order(source.rows.size()); std::iota(order.begin(), order.end(), 0);
-  std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) {
+  // Polars' unstable multi-column sort leaves equal rows in its own order (round BX).
+  polars_sort::sort_by_keys(order, [&](auto a, auto b) {
     const auto by_case = compare(source.rows[a][case_at], source.rows[b][case_at], case_kind, case_dictionary);
     return by_case ? by_case < 0 : compare(source.rows[a][*time_at], source.rows[b][*time_at], time_kind, time_dictionary) < 0;
-  });
+  }, source.dtypes[case_at], source.dtypes[*time_at]);
   auto result = source; result.rows.clear();
   for (std::size_t begin = 0; begin < order.size();) {
     auto end = begin + 1;

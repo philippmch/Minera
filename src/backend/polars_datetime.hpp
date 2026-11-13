@@ -81,4 +81,30 @@ inline std::optional<std::int64_t> ticks(std::string_view text, Unit u) {
   return ticks(*parsed, u);
 }
 
+// A Datetime cell as Polars casts it to String (round BX, observed
+// black-box on Polars 1.44.1): "YYYY-MM-DD HH:MM:SS" with all the column
+// unit's fraction digits (9, 6 or 3) and, on an aware column, the wall time
+// in the zone with its "+HH:MM" offset (UTC prints "+00:00"; another zone
+// takes the cell's own offset).
+inline std::optional<std::string> cast_text(std::string_view text, std::string_view dtype) {
+  const auto u = unit(dtype);
+  const auto parsed = parse_timestamp_exact(text);
+  if (!u || !parsed) return std::nullopt;
+  const bool aware = !naive(dtype);
+  const bool utc = dtype.find("time_zone='UTC'") != std::string_view::npos;
+  const std::int32_t offset = aware && !utc && parsed->timezone_aware ? parsed->offset_minutes : 0;
+  auto out = format_timestamp(static_cast<double>(parsed->seconds + std::int64_t{offset} * 60)).substr(0, 19);
+  if (out.size() > 10 && out[10] == 'T') out[10] = ' ';
+  const auto digits = *u == Unit::kNanoseconds ? 9 : *u == Unit::kMicroseconds ? 6 : 3;
+  const auto step = 1000000000 / per_second(*u);
+  auto fraction = std::to_string(per_second(*u) + parsed->nanoseconds / step).substr(1);
+  out += '.' + fraction.substr(0, digits);
+  if (aware) {
+    const auto magnitude = offset < 0 ? -offset : offset;
+    const auto two = [](int v) { return std::string(1, static_cast<char>('0' + v / 10)) + static_cast<char>('0' + v % 10); };
+    out += (offset < 0 ? '-' : '+') + two(magnitude / 60) + ':' + two(magnitude % 60);
+  }
+  return out;
+}
+
 }  // namespace minera::polars_datetime

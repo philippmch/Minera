@@ -128,14 +128,16 @@ void ocpn_miner_policy_contract() {
 void variant1_text_contract(const minera::Ocel& log) {
   const auto text = minera::describe_ocel_text(log);
   assert(text.find("\n\nevents:\n") != std::string::npos);
+  // Times print as the reference's str(Timestamp), durations as a Python
+  // float (review BX).
   assert(text.find("Create ( related objects: o1 )  timestamp: "
-                   "2024-01-01T00:00:00Z") != std::string::npos);
+                   "2024-01-01 00:00:00+00:00") != std::string::npos);
   assert(text.find("Ship ( related objects: o1, o2 )  timestamp: "
-                   "2024-01-02T00:00:00Z") != std::string::npos);
+                   "2024-01-02 00:00:00+00:00") != std::string::npos);
   assert(text.find("\n\nobjects:\n") != std::string::npos);
   assert(text.find("o1 object type: order ( lifecycle start: "
-                   "2024-01-01T00:00:00Z ; lifecycle end: "
-                   "2024-01-02T00:00:00Z ; lifecycle duration: 86400") !=
+                   "2024-01-01 00:00:00+00:00 ; lifecycle end: "
+                   "2024-01-02 00:00:00+00:00 ; lifecycle duration: 86400.0 )") !=
          std::string::npos);
   assert(text.find("o2 object type: item") != std::string::npos);
 
@@ -158,7 +160,7 @@ void variant2_tuple_contract(const minera::Ocel& log) {
   assert(tuple_description.events[0].activity == "Create");
   assert(tuple_description.events[0].related_objects.size() == 1 &&
          tuple_description.events[0].related_objects[0] == "o1");
-  assert(tuple_description.events[0].timestamp == "2024-01-01T00:00:00Z");
+  assert(tuple_description.events[0].timestamp == "2024-01-01 00:00:00+00:00");
   assert(tuple_description.events[1].activity == "Ship");
   assert(tuple_description.events[1].related_objects.size() == 2 &&
          tuple_description.events[1].related_objects[0] == "o1" &&
@@ -166,9 +168,9 @@ void variant2_tuple_contract(const minera::Ocel& log) {
   assert(tuple_description.objects[0].id == "o1" &&
          tuple_description.objects[0].has_lifecycle &&
          tuple_description.objects[0].lifecycle_start ==
-             "2024-01-01T00:00:00Z" &&
+             "2024-01-01 00:00:00+00:00" &&
          tuple_description.objects[0].lifecycle_end ==
-             "2024-01-02T00:00:00Z" &&
+             "2024-01-02 00:00:00+00:00" &&
          tuple_description.objects[0].lifecycle_seconds == 86400.0);
   const auto tuple_json =
       minera::serialize_ocel_description_json(tuple_description);

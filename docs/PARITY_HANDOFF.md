@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BW (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–BX (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4813,7 +4813,72 @@ difference. Declared: Polars' unstable sort of tied timestamps (4 of 1,440
 answers). No fixture changed. The device check on the Mac was skipped
 again (no device linked).
 
-Next round (BX) should start by re-reviewing round BW:
+Round BX re-reviewed BW (Review BX1; BW's CI run 43384361792 was green on
+all six jobs; BW's Datetime units, pandas paths order, OCEL features and
+SQLite export held) and took its targets. It fixed the order of tied
+timestamps on the native Polars paths, path performance, variants,
+between, LTL and sequence filters (`polars_sort.hpp`, a port of rayon's
+parallel pdqsort that Polars 1.44.1 runs for multi-column sorts; it
+matched Polars on 3,200 random frames), Datetime and Date activity columns
+on the Polars paths and variants filters (the String cast prints the
+column unit's fraction and the zone offset), top_k with the activity key
+on the case column (`DuplicateError` resolving the group_by), the Polars
+timestamp attribute filter on Boolean columns (`cast(String)` match),
+temporal columns with a string value (`InvalidOperationError`) and aware
+nanosecond time columns (the `<=` bound printed 999 ns on, equal bounds
+not merged), and the OCEL description on nanosecond timestamps
+(`str(Timestamp)` texts, durations from `Timestamp.timestamp()`). The
+Polars Date time column, pandas `datetime64[s]`/`[ms]` columns and the
+OCEL graphs and associations on nanosecond SQLite timestamps showed no
+difference. Declared: Polars join and group_by orders with non-default
+keys vary per run in Polars itself. No fixture changed. The device check
+on the Mac was skipped again (no device linked).
+
+Next round (BY) should start by re-reviewing round BX:
+
+- `src/backend/polars_sort.hpp` (the pdqsort port: `partial_insertion_sort`,
+  `choose_pivot`, `partition_in_blocks`, the 2,000-row split) and its
+  callers in `polars_paths_filter.cpp`, `polars_between_filter.cpp`,
+  `polars_variants_filter.cpp`, `polars_ltl_filter.cpp` (which still sorts
+  stably when the case or timestamp column is missing) and
+  `polars_sequence_filters.cpp`; `sort_by_keys` (stable when a key has the
+  `Null` dtype: are other dtypes dropped or sorted differently, such as
+  Object, List or Struct keys?); the tie sweep did not cover the LTL and
+  sequence filters;
+- `polars_datetime::cast_text` (zones other than UTC, negative offsets,
+  cells before 1970, ms columns) and the String-cast branches of the paths
+  and variants filters;
+- `src/backend/polars_variants_filter.cpp`: the `DuplicateError` of top_k
+  with the activity key on the case column (other operations with equal
+  keys);
+- `src/backend/polars_timestamp_filter.cpp`: `nanosecond_aware`,
+  `at_most_text`, the Boolean `cast(String)` match and the temporal
+  attribute errors (`attribute_resolution`);
+- `src/backend/ocel.cpp`: `description_time` and the lifecycle duration
+  of the description;
+- new areas: the pandas table filters with non-default keys
+  (`tblkeys.py --eng=pandas`, 200 seeds: 140 paths and 126 path
+  performance error texts differ on number, boolean and datetime
+  activities, where pandas raises the vectorised `UFuncTypeError: ufunc
+  'add' did not contain a loop with signature matching types ...` or
+  `TypeError: unsupported operand type(s) for +: 'DatetimeArray' and
+  'str'`; path performance with the case key on the activity column
+  raises `ValueError: Can only compare identically-labeled ... DataFrame
+  objects`; case performance with the case key on the timestamp column
+  raises `ValueError: Grouper for 'time:timestamp' not 1-dimensional`
+  (39); top_k and between on a case column with NaT return results where
+  Minera raises `'<' not supported between instances of 'NoneType' ...`
+  (26 and 14); the timestamp attribute filter on a datetime attribute
+  parses a string value and matches (14); repetition with the target
+  `NaT` on a datetime column returns no rows (2)); the OCEL routes not yet
+  swept on nanosecond SQLite timestamps (conformance, enrich with
+  lifecycle qualifiers, ancestors and descendants splits, object changes,
+  statistics);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BX commit.
+
+Round BW's targets, re-reviewed in BX (findings BX1-1 to BX1-5):
 
 - `src/backend/polars_datetime.hpp` (unit parsing, `floor`, `ticks`,
   `display`) and its callers in the Polars timestamp, case, paths,

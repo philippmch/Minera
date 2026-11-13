@@ -1,5 +1,6 @@
 #include "minera/polars_sequence_filters.hpp"
 #include "polars_column_hint.hpp"
+#include "polars_sort.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -326,7 +327,8 @@ Counts end_counts(const EventTable& df, const std::string& case_glue, const std:
 
 const std::string kTimestamp(kPolarsFilterDefaultTimestampKey);
 
-// Rows sorted by case and timestamp (stable, nulls first), grouped by case.
+// Rows sorted by case and timestamp (Polars' unstable sort, nulls first),
+// grouped by case.
 struct Variants {
   std::size_t case_column = 0, act = 0;
   std::vector<Key> order;                              // cases in sorted order
@@ -346,13 +348,14 @@ Variants variants_of(const EventTable& df, const std::string& case_glue, const s
   }
   const bool integral = dtype_of(df, out.case_column) == "Int64";
   auto rows = all_rows(df);
-  std::stable_sort(rows.begin(), rows.end(), [&](std::size_t a, std::size_t b) {
+  // Polars' unstable multi-column sort leaves equal rows in its own order (round BX).
+  polars_sort::sort_by_keys(rows, [&](std::size_t a, std::size_t b) {
     const auto& ca = df.rows[a][out.case_column];
     const auto& cb = df.rows[b][out.case_column];
     if (cell_less(ca, cb, integral)) return true;
     if (cell_less(cb, ca, integral)) return false;
     return cell_less(df.rows[a][ts], df.rows[b][ts], false);
-  });
+  }, dtype_of(df, out.case_column), dtype_of(df, ts));
   for (const auto i : rows) {
     const auto key = key_of(df.rows[i][out.case_column]);
     if (out.order.empty() || !(out.order.back() == key)) {

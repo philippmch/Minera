@@ -7,6 +7,8 @@
 #include "ocel_frame_types.hpp"
 #include "ocpn_projection.hpp"
 #include "python_isoformat.hpp"
+#include "frame_times.hpp"
+#include "python_scalar.hpp"
 #include "reference_tree_net.hpp"
 
 #include <algorithm>
@@ -3449,6 +3451,16 @@ std::string serialize_ocpn_json(const OcpnGraph& graph) {
   return out.str();
 }
 
+namespace {
+// An event time as the reference prints its pandas Timestamp (str): UTC with
+// "+00:00", fraction digits as stored (round BX).
+std::string description_time(const std::string& text) {
+  const auto parsed = parse_timestamp_exact(text);
+  if (!parsed) return text;
+  return parsed->timezone_aware ? frame_times::utc_text(*parsed) : python::timestamp_str(*parsed);
+}
+}  // namespace
+
 OcelTupleDescription describe_ocel_tuples(const Ocel& log,
                                            const OcelDescriptionOptions& options) {
   OcelTupleDescription result;
@@ -3469,14 +3481,18 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
     std::sort(objects.begin(), objects.end());
     objects.erase(std::unique(objects.begin(), objects.end()), objects.end());
   }
+  // Events order by their exact instant (nanoseconds apart sort apart, round
+  // BX), then activity and id.
   const auto event_less = [&](const std::string& left_id,
                               const std::string& right_id) {
     const auto* left = events.at(left_id);
     const auto* right = events.at(right_id);
-    const auto left_time = parse_timestamp(left->timestamp);
-    const auto right_time = parse_timestamp(right->timestamp);
-    if (left_time && right_time && *left_time != *right_time)
-      return *left_time < *right_time;
+    const auto left_time = parse_timestamp_exact(left->timestamp);
+    const auto right_time = parse_timestamp_exact(right->timestamp);
+    if (left_time && right_time && (left_time->seconds != right_time->seconds ||
+                                    left_time->nanoseconds != right_time->nanoseconds))
+      return left_time->seconds != right_time->seconds ? left_time->seconds < right_time->seconds
+                                                       : left_time->nanoseconds < right_time->nanoseconds;
     if (left->timestamp != right->timestamp)
       return left->timestamp < right->timestamp;
     if (left->activity != right->activity)
@@ -3494,7 +3510,7 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
     OcelTupleEventDescription description;
     description.activity = event->activity;
     description.related_objects = related_by_event[event_id];
-    if (options.include_timestamps) description.timestamp = event->timestamp;
+    if (options.include_timestamps) description.timestamp = description_time(event->timestamp);
     result.events.push_back(std::move(description));
   }
 
@@ -3512,13 +3528,15 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
       if (it != events_by_object.end() && !it->second.empty()) {
         const auto* first = events.at(it->second.front());
         const auto* last = events.at(it->second.back());
-        description.lifecycle_start = first->timestamp;
-        description.lifecycle_end = last->timestamp;
-        const auto start = parse_timestamp(first->timestamp);
-        const auto end = parse_timestamp(last->timestamp);
+        description.lifecycle_start = description_time(first->timestamp);
+        description.lifecycle_end = description_time(last->timestamp);
+        const auto start = parse_timestamp_exact(first->timestamp);
+        const auto end = parse_timestamp_exact(last->timestamp);
         if (!start || !end)
           throw std::invalid_argument("OCEL description requires valid timestamps");
-        description.lifecycle_seconds = *end - *start;
+        // end.timestamp() - start.timestamp(): epoch seconds rounded to the
+        // microsecond (round BX, observed black-box).
+        description.lifecycle_seconds = frame_times::epoch_seconds(*end) - frame_times::epoch_seconds(*start);
         description.has_lifecycle = true;
       }
     }
@@ -3550,8 +3568,8 @@ std::string describe_ocel_text(const Ocel& log,
     if (description.includes_timestamps && object.has_lifecycle) {
       out << " ( lifecycle start: " << object.lifecycle_start
           << " ; lifecycle end: " << object.lifecycle_end
-          << " ; lifecycle duration: " << std::setprecision(17)
-          << object.lifecycle_seconds << " )";
+          << " ; lifecycle duration: "
+          << ocel_frame::float_repr(object.lifecycle_seconds) << " )";
     }
   }
   return out.str();

@@ -1,5 +1,6 @@
 #include "minera/polars_variants_filter.hpp"
 #include "polars_datetime.hpp"
+#include "polars_sort.hpp"
 #include "polars_column_hint.hpp"
 #include "pandas_parameter_carrier.hpp"
 
@@ -181,10 +182,9 @@ std::string string_cast(const EventAttribute& value, const std::string& declared
   if (date(value)) {
     const auto lexical=std::get_if<NativeDate>(&value.typed_value)?std::get<NativeDate>(value.typed_value).value:value.value;
     if(declared=="Date")return lexical.substr(0,10);
-    const auto parsed=parse_timestamp_exact(lexical);if(!parsed)throw std::invalid_argument("Native Polars variants temporal cast requires valid declared datetime");
-    auto result=format_timestamp(static_cast<double>(parsed->seconds)).substr(0,19);std::replace(result.begin(),result.end(),'T',' ');
-    result+='.'+std::to_string(1000000+parsed->nanoseconds/1000).substr(1);
-    if(declared.find("time_zone='UTC'")!=std::string::npos)result+="+00:00";return result;
+    // The column unit's fraction digits (round BX).
+    const auto cast=polars_datetime::cast_text(lexical,declared);if(!cast)throw std::invalid_argument("Native Polars variants temporal cast requires valid declared datetime");
+    return *cast;
   }
   if (value.container == AttributeContainerKind::kContainer) {
     std::string output = "{";
@@ -271,6 +271,8 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& opti
     fail("ColumnNotFoundError",phase,missing_prefix("variant",{options.case_id_key.value})+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nAGGREGATE[maintain_order: true]\n  [] BY [col("+quote(options.case_id_key.value)+")]\n  FROM\n  SORT BY [col("+quote(options.case_id_key.value)+"), col(\"time:timestamp\")]\n    "+frame_plan(source)+contexts({"select","join right","join"}));
   }
   const auto activity_at=position(options.activity_key.value,true);const auto case_kind=dtype(source.dtypes[case_at]),time_kind=dtype(source.dtypes[time_at]);
+  // Aggregating the case column by itself names it twice (round BX).
+  if(statistics&&activity_at==case_at)fail("DuplicateError",phase,"column with name '"+options.case_id_key.value+"' has more than one occurrence\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\n"+sort_plan(source,options,statistics)+contexts({"group_by"}));
   const auto dictionary=[&](std::size_t at,Dtype kind)->std::optional<EnumRanks>{
     if(kind!=Dtype::kEnum)return std::nullopt;
     if(source.categorical_dtypes.empty()||!source.categorical_dtypes[at])throw std::invalid_argument("Native Polars variants require an Enum dictionary for selected sort column: "+source.columns[at]);
@@ -279,7 +281,8 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& opti
   };
   const auto case_ranks=dictionary(case_at,case_kind),time_ranks=dictionary(time_at,time_kind);
   std::vector<std::size_t> order(source.rows.size());std::iota(order.begin(),order.end(),0);
-  std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){const auto bycase=compare(source.rows[a][case_at],source.rows[b][case_at],case_kind,case_ranks?&*case_ranks:nullptr);return bycase?bycase<0:compare(source.rows[a][time_at],source.rows[b][time_at],time_kind,time_ranks?&*time_ranks:nullptr)<0;});
+  // Polars' unstable multi-column sort leaves equal rows in its own order (round BX).
+  polars_sort::sort_by_keys(order,[&](auto a,auto b){const auto bycase=compare(source.rows[a][case_at],source.rows[b][case_at],case_kind,case_ranks?&*case_ranks:nullptr);return bycase?bycase<0:compare(source.rows[a][time_at],source.rows[b][time_at],time_kind,time_ranks?&*time_ranks:nullptr)<0;},source.dtypes[case_at],source.dtypes[time_at]);
   Grouped result;result.case_at=case_at;result.case_dtype=source.dtypes[case_at];result.activity_dtype=source.dtypes[activity_at];
   for(std::size_t at=0;at<order.size();){const auto key=group_key(source.rows[order[at]][case_at],source.dtypes[case_at]);auto end=at+1;while(end<order.size()&&group_key(source.rows[order[end]][case_at],source.dtypes[case_at])==key)++end;
     Group group;group.key=key;group.absent=key=="n";bool first=true;

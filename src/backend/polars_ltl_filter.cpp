@@ -1,5 +1,6 @@
 #include "minera/polars_ltl_filter.hpp"
 #include "polars_datetime.hpp"
+#include "polars_sort.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_column_hint.hpp"
 #include "pandas_parameter_carrier.hpp"
@@ -492,7 +493,9 @@ std::vector<std::size_t> sorted_rows(const EventTable& source, const Prepared& p
     for(const auto& row:source.rows)if(row[*index]&&!null(*row[*index])&&!map.contains(row[*index]->value))throw std::invalid_argument("Native Polars LTL Enum cell is absent from its category dictionary");
   }
   const auto cmp=[&](std::size_t index,std::size_t a,std::size_t b){const auto found=ranks.find(index);return compare(source.rows[a][index],source.rows[b][index],dtype(source.dtypes[index]),found==ranks.end()?nullptr:&found->second);};
-  std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){if(ci){const auto c=cmp(*ci,a,b);if(c)return c<0;}return ti && cmp(*ti,a,b)<0;});
+  const auto less=[&](auto a,auto b){if(ci){const auto c=cmp(*ci,a,b);if(c)return c<0;}return ti && cmp(*ti,a,b)<0;};
+  // Polars' unstable multi-column sort leaves equal rows in its own order (round BX).
+  if(ci && ti) polars_sort::sort_by_keys(order,less,source.dtypes[*ci],source.dtypes[*ti]); else std::stable_sort(order.begin(),order.end(),less);
   return order;
 }
 std::string schema_join_error(const std::string& key,const std::string& left,const std::string& right) {
