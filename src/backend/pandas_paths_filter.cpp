@@ -6,6 +6,7 @@
 #include <numeric>
 #include <string_view>
 #include <unordered_set>
+#include <unordered_map>
 #include "minera/timestamp.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
@@ -194,6 +195,24 @@ EventAttribute subscript(const EventAttribute& value,std::size_t i){
  }
  error("TypeError","'"+type_name(value)+"' object is not subscriptable");
 }
+// `column + ","` on a typed column is vectorised: NumPy dtypes have no string
+// add loop, the datetime-like extension arrays reject a str operand. It fails
+// even on an empty frame (round BY, observed on pandas 3.0.5).
+void typed_concatenation(const std::string& dtype){
+ if(dtype=="category")error("TypeError","unsupported operand type(s) for +: 'Categorical' and 'str'");
+ if(dtype.starts_with("datetime64"))error("TypeError","unsupported operand type(s) for +: 'DatetimeArray' and 'str'");
+ if(dtype.starts_with("timedelta64"))error("TypeError","unsupported operand type(s) for +: 'TimedeltaArray' and 'str'");
+ if(dtype.starts_with("period"))error("TypeError","unsupported operand type(s) for +: 'PeriodArray' and 'str'");
+ // Nullable extension dtypes add through their NumPy values.
+ static const std::unordered_map<std::string,std::string> nullable{{"boolean","bool"},{"Int8","int8"},{"Int16","int16"},{"Int32","int32"},{"Int64","int64"},
+  {"UInt8","uint8"},{"UInt16","uint16"},{"UInt32","uint32"},{"UInt64","uint64"},{"Float32","float32"},{"Float64","float64"}};
+ static const std::unordered_set<std::string> numpy{"bool","int8","int16","int32","int64","uint8","uint16","uint32","uint64","float16","float32","float64","complex64","complex128"};
+ std::string name;
+ if(const auto found=nullable.find(dtype);found!=nullable.end())name=found->second;
+ else if(numpy.contains(dtype))name=dtype;
+ else return;
+ error("UFuncTypeError","ufunc 'add' did not contain a loop with signature matching types (dtype('"+name+"'), dtype('<U1')) -> None");
+}
 std::optional<std::string> encoded_pair(const EventAttribute& a,const EventAttribute& b){
  if(is_native_na_attribute(a)||is_native_na_attribute(b))return std::nullopt;
  if(!text_value(a)){
@@ -255,7 +274,11 @@ EventTable apply_paths(const EventTable& source,const EventAttribute& query,cons
  const auto order=sorted_rows(source,cases,time);const auto sorted=reorder(source,order);
  const auto activity=activity_column(sorted,o.attribute_key);
  const auto target=performance?activity:activity_column(sorted,o.target_attribute_key?*o.target_attribute_key:o.attribute_key);
- if(!sorted.dtypes.empty()&&sorted.dtypes[activity]=="category")error("TypeError","unsupported operand type(s) for +: 'Categorical' and 'str'");
+ // Path performance selects the case, activity and timestamp columns; the
+ // case key on one of the others duplicates a label, and comparing the
+ // shifted case columns fails (round BY).
+ if(performance&&(activity==cases||time==cases))error("ValueError","Can only compare identically-labeled (both index and columns) DataFrame objects");
+ if(!sorted.dtypes.empty())typed_concatenation(sorted.dtypes[activity]);
  // The dataframe concatenation evaluates the selected attribute array before
  // membership, including ordinary unsupported nonstring scalar cells.
  for(std::size_t i=0;i<sorted.size();++i){const auto& a=cell(sorted,i,activity);if(!missing(a))(void)encoded_pair(a,EventAttribute{"",""});}

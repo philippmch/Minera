@@ -1,4 +1,5 @@
 #include "minera/pandas_timestamp_filter.hpp"
+#include "pandas_datetime_target.hpp"
 #include "pandas_parameter_carrier.hpp"
 #include <algorithm>
 #include <cctype>
@@ -288,8 +289,20 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
   if(vector&&wanted->children.size()!=source.size())error("ValueError","('Lengths must match to compare', ("+std::to_string(source.size())+",), ("+std::to_string(wanted->children.size())+",))");
   if(options.timestamp_key.container==AttributeContainerKind::kList&&options.timestamp_key.children.empty())error("ValueError","Cannot index with multidimensional key");
   const auto time=direct_column(source,options.timestamp_key);check_time(source,time,mode,nullptr);
+  // A datetime64 attribute parses a string value like pandas' comparison
+  // (round BY): the instant, the column zone for a naive text, NaT texts
+  // matching nothing.
+  const std::string attribute_dtype=selected&&!source.dtypes.empty()?source.dtypes[*selected]:"object";
+  const bool datetime_attribute=attribute_dtype.starts_with("datetime64");
+  const auto attribute_zone=pandas_datetime_target::zone(attribute_dtype);
+  const auto matches=[&](const EventAttribute& value,const EventAttribute& target){
+   if(!datetime_attribute||!text_value(target))return equal_value(value,target);
+   if(missing(value)||!date_value(value))return false;
+   const auto a=instant(value);const auto b=pandas_datetime_target::instant(target.value,attribute_zone,"pandas datetime column string values must be ISO-8601 timestamps");
+   return a&&b&&a->timezone_aware==b->timezone_aware&&compare_instants(*a,*b)==0;
+  };
   std::vector<std::size_t> candidates;
-  for(std::size_t i=0;i<source.size();++i){if(!selected||!equal_value(cell(source,i,*selected),vector?wanted->children[i]:*wanted))continue;
+  for(std::size_t i=0;i<source.size();++i){if(!selected||!matches(cell(source,i,*selected),vector?wanted->children[i]:*wanted))continue;
    // keep_nan_values also accepts the cases of matching rows without a time.
    const auto& value=cell(source,i,time);check_time(source,time,mode,&value);if(inside(instant(value),lower,upper)||(keep_missing&&missing(value)))candidates.push_back(i);
   }

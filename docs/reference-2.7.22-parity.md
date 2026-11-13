@@ -25307,3 +25307,111 @@ Verification (scripts in the project files under `review-harness/round-bx/`;
 | OCEL description variants 1 and 2 with and without timestamps on nanosecond SQLite timestamps (`ocelmore.py --parts=desc`) | 240 | before: 109 of the 120 with timestamps differed; after: all equal |
 | OCEL graphs (cobirth, codeath, descendants, inheritance, interaction) and activity and object type associations on nanosecond SQLite timestamps (`ocelmore.py --parts=graph,assoc,otassoc`) | 300 and 360 | all equal (before and after) |
 | Full suites: ctest, script tests, frontend, fixture replay | 482 ctests (the 64 Polars, review and table ctests rerun after the `Null` key fix), 406 script tests, 10,729 vitest tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+## Review BY1: re-review of round BX, the pandas table filters with non-default keys, and the OCEL routes on nanosecond SQLite timestamps (2026-11-13)
+
+Round BY checked BX's CI run (43393668614: green), re-reviewed BX
+(`polars_sort.hpp` line by line against rayon's pdqsort, its callers and
+`sort_by_keys` on 11 key dtypes, `polars_datetime::cast_text`, top_k's
+`DuplicateError`, `nanosecond_aware` and `at_most_text`, the OCEL
+`description_time`: no regressions; 2,000 Polars tie answers and 600 Polars
+LTL tie answers equal) and took BX's targets. Findings, all fixed:
+
+- **BY1-1 Vectorised concatenation errors of the pandas paths filters.**
+  The paths and path performance filters build `col + ","` over the
+  activity column, so pandas raises by the column's dtype, also on an
+  empty frame: `UFuncTypeError: ufunc 'add' did not contain a loop with
+  signature matching types (dtype('int64'), dtype('<U1')) -> None` for
+  numpy bool, integer, float and complex columns (nullable `Int64`,
+  `boolean`, `Float64` under their numpy names), and `TypeError:
+  unsupported operand type(s) for +: 'DatetimeArray' and 'str'` (also
+  `TimedeltaArray`, `PeriodArray`, `Categorical`). Minera matched the
+  cells' texts or raised its own message.
+- **BY1-2 Path performance with the case key on the activity or
+  timestamp column** raises `ValueError: Can only compare
+  identically-labeled (both index and columns) DataFrame objects`.
+- **BY1-3 Case performance with the case key on the timestamp column**
+  raises `ValueError: Grouper for 'time:timestamp' not 1-dimensional`.
+- **BY1-4 A string against a datetime column** (timestamp attribute
+  filter, repetition filter): pandas parses the text as a Timestamp and
+  compares instants; the texts it reads as NaT (`NaT`, `nat`, `NAT`,
+  `NaN`, `nan`, `NAN`, empty) match no cell, a naive text on an aware
+  column takes the column's zone, an aware text never equals a naive
+  column (`pandas_datetime_target.hpp`). Minera compared texts.
+- **BY1-5 Missing case values and activities on top_k and coverage.**
+  The variants come from `np.unique(..., return_index, return_counts)`
+  runs over the case column: typed arrays (float, integer, bool, naive
+  `datetime64`) sort NaN/NaT last and collapse them into one run; object
+  arrays (objects, aware `datetime64` as Timestamps) sort with Python's
+  comparisons (numpy's object timsort): `None` or mixed types raise
+  `TypeError: '<' not supported between instances of ...`, NaN and NaT
+  compare unordered and each stays its own run. The coverage denominator
+  counts the non-missing case ids; variants whose activities hold a NaN or
+  NaT handed out fresh by numpy (float and naive `datetime64` columns)
+  never equal another, and comparing variants of mixed item types raises.
+  Minera raised `'<' not supported between instances of 'NoneType' ...`
+  on every missing case value.
+- **BY1-6 Between on datetime case columns.** Naive `datetime64` case
+  values of every unit label the subcases with numpy's `str` at the unit's
+  digits (`2024-01-01T00:00:00.000000` for us, none for s) and the NaT run
+  `NaT`; an aware column with NaT takes the exact timsort order. On an
+  object case column the error of a failing comparison names the operands
+  in the order numpy's sort compares them at any length (Minera's own
+  merge order for more than 16 rows).
+- **BY1-7 The OCEL connected-component split** builds each component from
+  its events, objects and relations only: pm4py drops O2O rows and object
+  changes there (the ancestors/descendants split keeps them). Minera kept
+  them.
+- **BY1-8 OCEL SQLite relation order.** `read_ocel2_sqlite` keeps the
+  `event_object` rows in row order and sorts them by time, stably, so the
+  relations of events at one instant from different type tables keep the
+  row order, unlike the events (which the reader takes by row place, then
+  type). Minera sorted relations by their event's position. The lifecycle
+  qualifiers (`/api/ocel/enrich`, now per relation row in relation order)
+  and the DF edges of `/api/ocel/event-object-graph` follow the relation
+  order. Relations of every reader now sort by their event's instant
+  (stable), which equals the event position for the JSON, XML and CSV
+  readers; the OCEL JSON transport (both forms) carries
+  `"minera:relationOrder"` (each relation's event id in log order) when
+  the log order differs from the nesting.
+- **BY1-9 OCEL SQLite object change order.** pm4py takes the change rows
+  of the object type tables by row place, then type, and sorts them by
+  time; Minera kept table order, and the OCEL 2.0 transport (changes
+  nested per object) lost any order. The event/object graph numbers its
+  change nodes (`@@change##i`) in that order. The OCEL 2.0 transport now
+  carries `"minera:objectChangeOrder"` (each change's object and field in
+  log order) when the order a reader takes back differs.
+
+Declarations:
+
+- pandas membership of variant tuples whose naive `datetime64[ns]`
+  activities hold sub-microsecond values depends on `PYTHONHASHSEED` in
+  the reference (`np.datetime64` hashes such values with the seed, unlike
+  the equal `Timestamp`); top_k and coverage answers on such columns
+  change from seed to seed (6 of 16,000 answers). Minera answers as the
+  seeds where the two hashes differ.
+- A datetime column against a text outside ISO-8601 goes through pandas'
+  dateutil fallback, which Minera does not reproduce (native error).
+- pm4py orders the connected components by set iteration over object ids,
+  which changes with `PYTHONHASHSEED` (2 of 300 logs); the harness
+  compares them as a set.
+- An OCEL SQLite file with repeated `event_object` rows loses the repeats
+  through the OCEL 2.0 transport, which keeps one relation per event and
+  object as `read_ocel2_json` does (OC2); moved to round BZ.
+
+Tests: `minera_review_by1_tests` (values taken from pm4py on the same
+frames and OCEL files, `review-harness/round-by/by1/mk.py` and
+`by1/sqlitecase.py`).
+
+Verification (scripts in the project files under `review-harness/round-by/`;
+"before" is round BX's server on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| pandas table filters with Datetime, number, Boolean and string columns as keys and attributes, NaT/NaN/None cells (round BX's `tblkeys.py --eng=pandas`, `tblmod.py` with an aware `dz` column) | 2,800 before, 16,000 after | before: 285 error texts and 135 answers differed; after: all equal or raising alike except the 6 hash-seed answers (and 2 between error texts, fixed and rerun on 600 answers) |
+| pandas and Polars table filters with the default keys (round BW's `tbl.py 0 300`, pandas units ns, us, ms, s) | 300 seeds each | all equal or raising alike |
+| Polars tie operations and LTL ties (round BW's `tbl.py --eng=polars`, `ltlties.py`) | 2,000 and 600 | all equal or raising alike |
+| OCEL splits, enrichment, event/object graph, statistics and conformance on nanosecond SQLite files with O2O rows and object changes (`ocel/ocelns.py 0 300`) | 300 logs, 10,690 answers | before: the connected-component split (18 of 20), the event/object graph (14 of 20) and lifecycle qualifiers (3 of 60) differed; after: all equal except the 2 hash-seed component orders |
+| Earlier OCEL sweeps on nanosecond SQLite files after the relation order change (rounds BB `ocelsq.py`, BC `ocelflat.py`, BW `ocelns.py` and `ocelfeat.py`, BX `ocelmore.py`) | 60 to 80 logs each | all equal |
+| pandas variants filters with non-default keys after the list-case error order fix (`tblkeys.py 0 150 --eng=pandas --ops=var_top_k,var_min_cov,var_max_cov,var_membership,var_from_list`) | 750 | all equal or raising alike except 2 top_k answers on a sub-µs datetime activity, which flip with `PYTHONHASHSEED` in the reference (the declared hash-seed family) |
+| Full suites: ctest, script tests, frontend, fixture replay | 483 ctests (the 53 variants, OCEL and review ctests rerun after evaluating the case groupby before the np.unique runs, which keeps the retained `unhashable type: 'list'` vectors; the internal component contract in `minera_ocel_transform_tests` now expects no O2O rows or object changes), 406 script tests, 10,729 vitest tests, 2,673 responses of 16 manifests | all pass; no fixture changed |

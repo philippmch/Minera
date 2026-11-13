@@ -1,8 +1,10 @@
 #include "minera/ocel_sqlite.hpp"
 
 #include "ocel_frame_types.hpp"
+#include "minera/timestamp.hpp"
 
 #include <algorithm>
+#include <numeric>
 #include <cctype>
 #include <cstdint>
 #include <map>
@@ -553,7 +555,9 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
                              std::string_view object_type, Ocel& log,
                              const std::set<std::string>& object_ids,
                              bool validate_references, bool has_base_rows,
-                             std::unordered_set<std::string>& first_rows) {
+                             std::unordered_set<std::string>& first_rows,
+                             std::size_t type_rank,
+                             std::vector<std::pair<std::size_t, std::size_t>>& places) {
   const auto columns = table_columns(db, table);
   const auto changed = std::find_if(
       columns.begin(), columns.end(), [](const auto& column) {
@@ -574,7 +578,7 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
   const auto id_index = static_cast<int>(id - columns.begin());
   const auto changed_index = static_cast<int>(changed - columns.begin());
   const auto timestamp_index = static_cast<int>(timestamp - columns.begin());
-  while (true) {
+  for (std::size_t position = 0;; ++position) {
     const auto status = sqlite3_step(statement.get());
     if (status == SQLITE_DONE) break;
     if (status != SQLITE_ROW)
@@ -610,6 +614,7 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
                                           static_cast<int>(value_column - columns.begin()),
                                           value_column->declared_type);
     log.object_changes.push_back(std::move(change));
+    places.emplace_back(position, type_rank);
   }
 }
 
@@ -967,15 +972,42 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     std::set<std::string> visited_tables;
     std::set<std::string> object_ids;
     std::unordered_set<std::string> first_rows;
+    std::vector<std::pair<std::size_t, std::size_t>> places;
+    std::size_t type_rank = 0;
     for (const auto& [id, type] : object_types) object_ids.insert(id);
     for (const auto& type : object_type_names) {
       const auto table = object_table(type);
       if (visited_tables.insert(table).second && table_exists(db, table)) {
         read_type_table_changes(db, table, type, log, object_ids,
                                 options.validate_references.value_or(false), has_base_rows,
-                                first_rows);
+                                first_rows, type_rank, places);
       }
+      ++type_rank;
     }
+    // The reference frame of the changes takes the tables' rows by their
+    // place in the table, then the type, and sorts them by time, stably, as
+    // it does the events (round BY, observed black-box). A time it cannot
+    // read keeps the rows by place.
+    std::vector<std::size_t> order(log.object_changes.size());
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
+      return places[left] < places[right];
+    });
+    std::vector<std::pair<std::int64_t, std::int64_t>> instants;
+    bool readable = true;
+    for (const auto& change : log.object_changes) {
+      const auto instant = parse_timestamp_exact(change.timestamp);
+      if (!instant) { readable = false; break; }
+      instants.emplace_back(instant->seconds, instant->nanoseconds);
+    }
+    if (readable)
+      std::stable_sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
+        return instants[left] < instants[right];
+      });
+    std::vector<OcelObjectChange> sorted_changes;
+    sorted_changes.reserve(order.size());
+    for (const auto index : order) sorted_changes.push_back(std::move(log.object_changes[index]));
+    log.object_changes = std::move(sorted_changes);
     // A change takes its object's type (the id's last listing in the object
     // table), not its table's: pm4py types the change rows by the object
     // table (observed black-box).

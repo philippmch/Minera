@@ -12,6 +12,7 @@
 #include "reference_tree_net.hpp"
 
 #include <algorithm>
+#include <deque>
 #include <string_view>
 #include <bit>
 #include <charconv>
@@ -1134,6 +1135,51 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     result.relations.assign(std::make_move_iterator(kept.rbegin()),
                             std::make_move_iterator(kept.rend()));
   }
+  // A document Minera wrote for a log whose relations or object changes are
+  // not in the order the document nests them (an OCEL SQLite import: the
+  // reference keeps event_object rows and object type table rows in their
+  // own order, sorted by time) lists each relation's event, and each
+  // change's object and field, in log order (round BY). Entries take the
+  // nested ones per event, or per object and field, in turn; any left over
+  // keep their nested order after them.
+  if (const auto* marker = optional(r, "minera:relationOrder")) {
+    const auto order = string_array(marker, "minera:relationOrder");
+    std::unordered_map<std::string, std::deque<std::size_t>> pending;
+    for (std::size_t index = 0; index < result.relations.size(); ++index)
+      pending[result.relations[index].event_id].push_back(index);
+    std::vector<OcelRelation> ordered;
+    std::vector<bool> taken(result.relations.size(), false);
+    for (const auto& event_id : order) {
+      const auto found = pending.find(event_id);
+      if (found == pending.end() || found->second.empty()) continue;
+      const auto index = found->second.front();
+      found->second.pop_front();
+      taken[index] = true;
+      ordered.push_back(result.relations[index]);
+    }
+    for (std::size_t index = 0; index < result.relations.size(); ++index)
+      if (!taken[index]) ordered.push_back(std::move(result.relations[index]));
+    result.relations = std::move(ordered);
+  }
+  if (const auto* marker = optional(r, "minera:objectChangeOrder")) {
+    const auto order = pair_array(marker, "minera:objectChangeOrder");
+    std::map<std::pair<std::string, std::string>, std::deque<std::size_t>> pending;
+    for (std::size_t index = 0; index < result.object_changes.size(); ++index)
+      pending[{result.object_changes[index].object_id, result.object_changes[index].field}].push_back(index);
+    std::vector<OcelObjectChange> ordered;
+    std::vector<bool> taken(result.object_changes.size(), false);
+    for (const auto& key : order) {
+      const auto found = pending.find(key);
+      if (found == pending.end() || found->second.empty()) continue;
+      const auto index = found->second.front();
+      found->second.pop_front();
+      taken[index] = true;
+      ordered.push_back(result.object_changes[index]);
+    }
+    for (std::size_t index = 0; index < result.object_changes.size(); ++index)
+      if (!taken[index]) ordered.push_back(std::move(result.object_changes[index]));
+    result.object_changes = std::move(ordered);
+  }
   // A classic document Minera wrote for a log whose event times share one
   // non-zero offset (see serialize_ocel_json) keeps those texts as written;
   // their order is the same by wall clock and by instant.
@@ -1925,20 +1971,28 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
   std::stable_sort(keys.begin(), keys.end());
   std::vector<OcelEvent> events;
   events.reserve(log.events.size());
-  std::unordered_map<std::string, std::size_t> position;
-  for (const auto& key : keys) {
-    const auto index = std::get<2>(key);
-    position.emplace(log.events[index].id, events.size());
-    events.push_back(std::move(log.events[index]));
-  }
-  for (const auto index : undated) {
-    position.emplace(log.events[index].id, events.size());
-    events.push_back(std::move(log.events[index]));
-  }
+  for (const auto& key : keys) events.push_back(std::move(log.events[std::get<2>(key)]));
+  for (const auto index : undated) events.push_back(std::move(log.events[index]));
   log.events = std::move(events);
+  // Relations sort by their event's time, stably: events at one instant keep
+  // their relations' order, which is the event order in the JSON, XML and
+  // CSV files (relations nested in events) but the event_object row order
+  // in SQLite (round BY, observed black-box). An undated event's relations
+  // go after the dated ones, those of an unknown event last.
+  std::unordered_map<std::string, std::size_t> instant_rank;
+  std::size_t ranks = 0;
+  for (std::size_t index = 0; index < keys.size(); ++index) {
+    if (index > 0 && (std::get<0>(keys[index]) != std::get<0>(keys[index - 1]) ||
+                      std::get<1>(keys[index]) != std::get<1>(keys[index - 1])))
+      ++ranks;
+    instant_rank.emplace(log.events[index].id, ranks);
+  }
+  const auto undated_rank = ranks + 1;
+  for (std::size_t index = keys.size(); index < log.events.size(); ++index)
+    instant_rank.emplace(log.events[index].id, undated_rank);
   const auto rank = [&](const OcelRelation& relation) {
-    const auto found = position.find(relation.event_id);
-    return found == position.end() ? position.size() : found->second;
+    const auto found = instant_rank.find(relation.event_id);
+    return found == instant_rank.end() ? undated_rank + 1 : found->second;
   };
   std::stable_sort(log.relations.begin(), log.relations.end(),
                    [&](const auto& left, const auto& right) {
@@ -2151,6 +2205,80 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
       relations = found->second;
     return relations;
   };
+  // An object's changes as the OCEL 2.0 form writes them.
+  const auto sort_written_changes = [](std::vector<const OcelObjectChange*>& changes) {
+    std::stable_sort(changes.begin(), changes.end(), [](const auto* left, const auto* right) {
+      return std::tie(left->timestamp, left->field, left->object_type) <
+             std::tie(right->timestamp, right->field, right->object_type);
+    });
+  };
+  // "minera:relationOrder" and "minera:objectChangeOrder" (see
+  // parse_ocel_json_names): written when the log order of the relations, or
+  // of the changes a reader takes back, is not the order the document nests
+  // them in.
+  const auto write_order_markers = [&](bool standard) {
+    std::unordered_set<std::string_view> written_events;
+    for (const auto* event : events) written_events.insert(event->id);
+    std::vector<const OcelRelation*> nested, logged;
+    for (const auto* event : events)
+      if (const auto found = relations_by_event.find(event->id); found != relations_by_event.end())
+        nested.insert(nested.end(), found->second.begin(), found->second.end());
+    for (const auto& relation : log.relations)
+      if (written_events.contains(relation.event_id)) logged.push_back(&relation);
+    if (nested != logged) {
+      out << ",\"minera:relationOrder\":[";
+      for (std::size_t index = 0; index < logged.size(); ++index) {
+        if (index) out << ',';
+        write_string(out, logged[index]->event_id);
+      }
+      out << ']';
+    }
+    if (!standard) return;  // the classic form lists changes in log order
+    // The changes the OCEL 2.0 reader takes back, in its order: per object,
+    // per attribute name in first appearance (static values first), the
+    // entries after the name's first one (a name without a static value
+    // reads its first change as the static value).
+    std::vector<const OcelObjectChange*> read_back;
+    for (const auto* object : objects) {
+      std::vector<std::string_view> names;
+      std::unordered_map<std::string_view, std::vector<const OcelObjectChange*>> groups;
+      std::unordered_set<std::string_view> with_static;
+      for (const auto& attribute : object->attributes) {
+        if (reference_drops_attribute(attribute.key)) continue;
+        if (groups.try_emplace(attribute.key).second) names.push_back(attribute.key);
+        with_static.insert(attribute.key);
+      }
+      std::vector<const OcelObjectChange*> changes;
+      if (const auto found = changes_by_object.find(object->id); found != changes_by_object.end())
+        changes = found->second;
+      sort_written_changes(changes);
+      for (const auto* change : changes) {
+        if (reference_drops_attribute(change->field)) continue;
+        if (groups.try_emplace(change->field).second) names.push_back(change->field);
+        groups[change->field].push_back(change);
+      }
+      for (const auto name : names) {
+        const auto& group = groups[name];
+        const std::size_t skip = with_static.contains(name) ? 0 : 1;
+        for (std::size_t index = skip; index < group.size(); ++index) read_back.push_back(group[index]);
+      }
+    }
+    std::unordered_set<const OcelObjectChange*> kept(read_back.begin(), read_back.end());
+    std::vector<const OcelObjectChange*> logged_changes;
+    for (const auto& change : log.object_changes)
+      if (kept.contains(&change)) logged_changes.push_back(&change);
+    if (logged_changes == read_back) return;
+    out << ",\"minera:objectChangeOrder\":[";
+    for (std::size_t index = 0; index < logged_changes.size(); ++index) {
+      if (index) out << ',';
+      out << '[';
+      write_string(out, logged_changes[index]->object_id);
+      out << ',';
+      write_string(out, logged_changes[index]->field);
+      out << ']';
+    }
+    out << ']';
+  };
   // The frames the reference prints its cells from (write_frame_value).
   ocel_frame::Columns event_frame, object_frame, change_frame;
   if (format == OcelJsonFormat::kStandard) {
@@ -2257,10 +2385,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
       std::vector<const OcelObjectChange*> changes;
       if (const auto found = changes_by_object.find(object->id); found != changes_by_object.end())
         changes = found->second;
-      std::sort(changes.begin(), changes.end(), [](const auto* left, const auto* right) {
-        return std::tie(left->timestamp, left->field, left->object_type) <
-               std::tie(right->timestamp, right->field, right->object_type);
-      });
+      sort_written_changes(changes);
       // A field without a static value gets no base entry: write_ocel2_json
       // writes only its changes (observed black-box), and a reader takes
       // the first change as the base, as pm4py reads its own export.
@@ -2307,7 +2432,10 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
     write_keep_unrelated();
     // The OCEL 2.0 transport (the frontend's opened OCEL SQLite, split and
     // enriched logs) keeps times past the microsecond too (round BB).
-    if (transport_markers) write_nanoseconds();
+    if (transport_markers) {
+      write_nanoseconds();
+      write_order_markers(true);
+    }
     out << '}';
     return out.str();
   }
@@ -2384,6 +2512,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
   if (transport_markers) {
     write_event_time_offset();
     write_nanoseconds();
+    write_order_markers(false);
     if (log.event_activity_first) out << ",\"minera:eventActivityFirst\":true";
   }
   out << '}';

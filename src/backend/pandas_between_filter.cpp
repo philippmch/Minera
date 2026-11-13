@@ -108,7 +108,9 @@ ParsedExactTimestamp date_instant(const EventAttribute& value) {
   return *parsed;
 }
 
-std::string date_string(const EventAttribute& value, bool numpy) {
+// `numpy_digits`: str() of a numpy datetime64 prints its unit's fraction
+// digits (9 for ns, 6 for us, 3 for ms, none for s).
+std::string date_string(const EventAttribute& value, bool numpy, unsigned numpy_digits = 9) {
   if (value.is_null) return "NaT";
   const auto* native = std::get_if<NativeDate>(&value.typed_value);
   const auto& text = native ? native->value : value.value;
@@ -116,7 +118,12 @@ std::string date_string(const EventAttribute& value, bool numpy) {
   if (text.size() < 19) error("ValueError", "pandas between contains short datetime");
   std::string result = text.substr(0, 19);
   result[10] = numpy ? 'T' : ' ';
-  if (numpy || instant.nanoseconds) {
+  if (numpy && numpy_digits < 9) {
+    if (numpy_digits) {
+      auto fraction = std::to_string(1000000000 + instant.nanoseconds).substr(1);
+      result += '.' + fraction.substr(0, numpy_digits);
+    }
+  } else if (numpy || instant.nanoseconds) {
     const unsigned digits = numpy || instant.nanoseconds % 1000 ? 9 : 6;
     const auto fraction = std::to_string(digits == 9 ? instant.nanoseconds : instant.nanoseconds / 1000);
     result += '.' + std::string(digits - fraction.size(), '0') + fraction;
@@ -292,6 +299,10 @@ struct CaseValues {
   bool numeric_array = false;
   bool numpy_dates = false;
   bool float32_array = false;
+  // A tz-aware datetime64 column is an object array of Timestamps; NaT
+  // compares unordered with every value, so the exact timsort order counts.
+  bool unordered_nat = false;
+  unsigned numpy_digits = 9;
 };
 
 CaseValues case_values(const EventTable& source, std::size_t key) {
@@ -314,7 +325,18 @@ CaseValues case_values(const EventTable& source, std::size_t key) {
       value.typed_value = number;
     }
   }
-  result.numpy_dates = dtype == "datetime64[ns]";
+  // A missing cell of a datetime64 column is NaT (round BY). A naive column
+  // is a numpy datetime64 array of its unit: NaT sorts last, all NaT form one
+  // case, and str() prints the unit's fraction digits.
+  if (dtype.starts_with("datetime64[")) {
+    for (auto& value : result.values)
+      if (value.is_null && !date_value(value)) value.kind = AttributeKind::kDate;
+    const bool aware = dtype.find(',') != std::string::npos;
+    result.numpy_dates = !aware;
+    result.unordered_nat = aware && std::any_of(result.values.begin(), result.values.end(), [](const auto& v) { return v.is_null; });
+    const auto unit = dtype.substr(11, dtype.find_first_of(",]") - 11);
+    result.numpy_digits = unit == "ns" ? 9 : unit == "us" ? 6 : unit == "ms" ? 3 : 0;
+  }
   return result;
 }
 
@@ -457,12 +479,15 @@ EventTable filter_pandas_between(const EventTable& source, const EventAttribute&
   std::vector<std::size_t> sorted(source.rows.size()), buffer(source.rows.size());
   std::iota(sorted.begin(), sorted.end(), 0);
   const auto activity = column(source, options.activity_key, false);
-  // A short object column fails at the first comparison numpy's sort makes.
-  if (sorted.size() <= 16)
-    detail::numpy_object_stable_argsort(sorted.size(), [&](std::size_t a, std::size_t b) {
+  // An object column fails at the first comparison numpy's sort makes, at
+  // any length (round BY: the operands of "'<' not supported" follow it).
+  if (sorted.size() <= 16 || cases.unordered_nat || (!cases.numeric_array && !cases.numpy_dates)) {
+    auto order = detail::numpy_object_stable_argsort(sorted.size(), [&](std::size_t a, std::size_t b) {
       return case_compare(cases.values[a], cases.values[b], cases.numeric_array, cases.numpy_dates);
     });
-  merge_cases(sorted, buffer, cases, 0, sorted.size());
+    if (cases.unordered_nat) sorted = std::move(order);
+  }
+  if (!cases.unordered_nat) merge_cases(sorted, buffer, cases, 0, sorted.size());
   std::vector<std::optional<std::string>> marks(source.rows.size());
   for (std::size_t first = 0; first < sorted.size();) {
     std::size_t last = first + 1;
@@ -479,7 +504,7 @@ EventTable filter_pandas_between(const EventTable& source, const EventAttribute&
         if (contains(act1, value)) opening = row;
       } else if (closing) {
         const auto& case_value = cases.values[sorted[first]];
-        const auto label = (cases.numpy_dates ? date_string(case_value, true)
+        const auto label = (cases.numpy_dates ? date_string(case_value, true, cases.numpy_digits)
                            : cases.float32_array ? float32_string(case_value)
                            : ordinary_string(case_value)) + separator(options.subcase_concat_str) + std::to_string(subcase++);
         for (std::size_t kept = *opening; kept <= row; ++kept) marks[kept] = label;

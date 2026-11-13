@@ -1,6 +1,8 @@
 #include "minera/pandas_variants_filter.hpp"
 #include "pandas_parameter_carrier.hpp"
 #include <algorithm>
+#include <functional>
+#include <numeric>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -145,10 +147,39 @@ std::size_t direct_column(const EventTable& source,const EventAttribute& key){
  if(const auto found=column(source,key))return *found;
  error("KeyError",repr(key));
 }
+// A missing cell reads as its column's missing value (round BY): NaT in a
+// datetime64 column, NaN in a NumPy float column, None otherwise.
 const EventAttribute& cell(const EventTable& source,std::size_t row,std::size_t col){
  static const EventAttribute none{"","",AttributeKind::kString,true};
- return source.rows[row][col]?*source.rows[row][col]:none;
+ static const EventAttribute nat{"","NaT",AttributeKind::kDate,true};
+ static const EventAttribute nan=[]{EventAttribute v{"","nan",AttributeKind::kFloat};v.typed_value=std::numeric_limits<double>::quiet_NaN();return v;}();
+ if(source.rows[row][col])return *source.rows[row][col];
+ if(col<source.dtypes.size()){
+  const auto& dtype=source.dtypes[col];
+  if(dtype.starts_with("datetime64["))return nat;
+  if(dtype=="float16"||dtype=="float32"||dtype=="float64")return nan;
+ }
+ return none;
 }
+// How NumPy holds a column: typed numbers (bool, ints), typed floats, a naive
+// datetime64 array, or Python objects (object columns, aware datetimes as
+// Timestamps, extension dtypes).
+enum class ArrayKind { kObject, kNumber, kFloat, kDatetime };
+ArrayKind array_kind(const EventTable& source,std::size_t col){
+ if(col>=source.dtypes.size())return ArrayKind::kObject;
+ const auto& dtype=source.dtypes[col];
+ if(dtype=="float16"||dtype=="float32"||dtype=="float64")return ArrayKind::kFloat;
+ if(dtype=="bool"||((dtype.starts_with("int")||dtype.starts_with("uint"))&&dtype.find_first_not_of("uint0123456789")==std::string::npos))return ArrayKind::kNumber;
+ if(dtype.starts_with("datetime64[")&&dtype.find(',')==std::string::npos)return ArrayKind::kDatetime;
+ return ArrayKind::kObject;
+}
+// NumPy float and naive datetime64 arrays hand out a fresh NaN or NaT object
+// per item, which equals nothing, not even itself; None, pd.NaT and an object
+// column's NaN are single objects that equal themselves.
+bool fresh_missing(ArrayKind kind){return kind==ArrayKind::kFloat||kind==ArrayKind::kDatetime;}
+// NaN and NaT compare False both ways.
+bool unordered(const EventAttribute& value){return !is_native_na_attribute(value)&&value.container==AttributeContainerKind::kScalar&&((value.is_null&&date_value(value))||(!value.is_null&&numeric(value)&&std::isnan(native_attribute_number(value))));}
+bool holds_missing(const EventAttribute& variant){return std::any_of(variant.children.begin(),variant.children.end(),[](const EventAttribute& v){return unordered(v);});}
 EventAttribute tuple(std::vector<EventAttribute> children){
  EventAttribute result{"",""};result.container=AttributeContainerKind::kTuple;result.children=std::move(children);return result;
 }
@@ -225,14 +256,28 @@ std::vector<EventAttribute> admitted_values(const EventAttribute& admitted){
  if(admitted.container!=AttributeContainerKind::kScalar)return admitted.children;
  error("TypeError","only list-like objects are allowed to be passed to isin(), you passed a `"+type_name(admitted)+"`");
 }
-EventTable membership(const EventTable& source,const PandasVariantsFilterOptions& options,const EventAttribute* criterion,const std::vector<EventAttribute>* supplied=nullptr){
+// A naive datetime64[ns] cell with a sub-microsecond part.
+bool nanosecond_date(const EventAttribute& value){
+ if(value.is_null||!date_value(value))return false;
+ const auto parsed=instant(value);return parsed&&parsed->nanoseconds%1000!=0;
+}
+EventTable membership(const EventTable& source,const PandasVariantsFilterOptions& options,const EventAttribute* criterion,const std::vector<EventAttribute>* supplied=nullptr,bool from_statistics=false){
  const auto cache=membership_cache(source,options);
  std::vector<bool> keep(source.size());
  // Without a non-null case nothing is selected; a negative filter keeps all.
  if(cache.empty()){std::fill(keep.begin(),keep.end(),!truth(options.positive));return subset(source,keep);}
  const auto admitted=supplied?*supplied:admitted_values(*criterion);
  std::unordered_set<std::string> variants;for(const auto& value:admitted)variants.insert(identity(value));
- std::unordered_set<std::string> selected;for(const auto& row:cache)if(variants.contains(identity(row.variant)))selected.insert(identity(row.id));
+ // A variant holding a fresh NaN or NaT equals no admitted variant (round BY).
+ const auto activity=options.variants_df?std::nullopt:column(source,options.activity_key);
+ const bool fresh=activity&&fresh_missing(array_kind(source,*activity));
+ // The statistics hold numpy datetime64 items and the cases Timestamps; with
+ // a sub-microsecond part the two hash apart and never match (round BY).
+ const bool split_hash=from_statistics&&activity&&*activity<source.dtypes.size()&&source.dtypes[*activity]=="datetime64[ns]";
+ const auto unmatched=[&](const EventAttribute& variant){
+  return (fresh&&holds_missing(variant))||(split_hash&&std::any_of(variant.children.begin(),variant.children.end(),nanosecond_date));
+ };
+ std::unordered_set<std::string> selected;for(const auto& row:cache)if(!unmatched(row.variant)&&variants.contains(identity(row.variant)))selected.insert(identity(row.id));
  const auto cases=column(source,options.case_id_key);
  if(!cases)error("KeyError",string_key_repr("None of ["+repr(options.case_id_key)+"] are in the columns"));
  const bool positive=truth(options.positive);
@@ -240,38 +285,87 @@ EventTable membership(const EventTable& source,const PandasVariantsFilterOptions
  return subset(source,keep);
 }
 struct VariantCount {EventAttribute variant;std::size_t count=0;};
-struct Statistics {std::vector<VariantCount> variants;std::size_t cases=0;};
+struct Statistics {std::vector<VariantCount> variants;std::size_t cases=0;ArrayKind activity_kind=ArrayKind::kObject;};
+// Python's x == y of two items, identity first.
+bool items_equal(const EventAttribute& x,const EventAttribute& y,bool fresh){
+ if(unordered(x)||unordered(y))return !fresh&&identity(x)==identity(y);
+ if(identity(x)==identity(y))return true;
+ if(x.is_null||y.is_null||text_value(x)!=text_value(y))return false;
+ try{return order(x,y)==0;}catch(const std::exception&){return false;}
+}
+// Python's x < y of two variant tuples: the first position whose items are
+// not equal decides; NaN and NaT are never less nor greater (round BY).
+bool variant_less(const EventAttribute& x,const EventAttribute& y,bool fresh){
+ const auto n=std::min(x.children.size(),y.children.size());
+ for(std::size_t i=0;i<n;++i){
+  const auto& a=x.children[i];const auto& b=y.children[i];
+  if(items_equal(a,b,fresh))continue;
+  // Among numbers (or among dates) NaN and NaT compare False; against
+  // another type Python raises first.
+  const bool comparable=(date_value(a)&&date_value(b))||(numeric(a)&&numeric(b)&&!date_value(a)&&!date_value(b));
+  if((unordered(a)||unordered(b))&&comparable)return false;
+  return order(a,b)<0;
+ }
+ return x.children.size()<y.children.size();
+}
+// The case column as np.unique(return_index=True, return_counts=True) reads
+// it (round BY): a stable sort, runs of equal neighbours, each run's first
+// position and size. Typed arrays sort NaN and NaT last and gather them in
+// one run; object arrays sort with numpy's object timsort and Python's
+// comparisons (None and mixed types raise, NaN and NaT are unordered and
+// each stays a run of its own).
+struct CaseRun {std::size_t first=0,size=0;};
+std::vector<CaseRun> case_runs(const EventTable& source,std::size_t cases){
+ const auto kind=array_kind(source,cases);const auto n=source.size();
+ std::vector<std::size_t> sorted;std::function<bool(std::size_t,std::size_t)> same;
+ if(kind!=ArrayKind::kObject){
+  const auto less=[&](std::size_t a,std::size_t b){const auto& x=cell(source,a,cases);const auto& y=cell(source,b,cases);
+   if(unordered(x))return false;if(unordered(y))return true;return order(x,y)<0;};
+  sorted.resize(n);std::iota(sorted.begin(),sorted.end(),std::size_t{0});std::stable_sort(sorted.begin(),sorted.end(),less);
+  same=[&,less](std::size_t a,std::size_t b){return unordered(cell(source,a,cases))==unordered(cell(source,b,cases))&&!less(a,b)&&!less(b,a);};
+ }else{
+  sorted=detail::numpy_object_stable_argsort(n,[&](std::size_t a,std::size_t b)->int{
+   const auto& x=cell(source,a,cases);const auto& y=cell(source,b,cases);
+   if(is_native_na_attribute(x)||is_native_na_attribute(y))error("TypeError","boolean value of NA is ambiguous");
+   const bool none_x=x.is_null&&!date_value(x),none_y=y.is_null&&!date_value(y);
+   if(none_x||none_y||text_value(x)!=text_value(y))error("TypeError","'<' not supported between instances of '"+type_name(x)+"' and '"+type_name(y)+"'");
+   if(unordered(x)||unordered(y))return 0;
+   return order(x,y);
+  });
+  same=[&](std::size_t a,std::size_t b){const auto& x=cell(source,a,cases);const auto& y=cell(source,b,cases);
+   if(x.is_null&&!date_value(x)&&y.is_null&&!date_value(y))return true;
+   return !unordered(x)&&!unordered(y)&&items_equal(x,y,true);};
+ }
+ std::vector<CaseRun> runs;
+ for(std::size_t at=0;at<sorted.size();){
+  auto end=at+1;while(end<sorted.size()&&same(sorted[end-1],sorted[end]))++end;
+  runs.push_back({sorted[at],end-at});at=end;
+ }
+ return runs;
+}
 Statistics statistics(const EventTable& source,const PandasVariantsFilterOptions& options){
  if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("ValueError","No group keys passed!");
  const auto cases=direct_column(source,options.case_id_key);
  (void)direct_column(source,options.timestamp_key);
  if(options.activity_key.container==AttributeContainerKind::kList&&options.activity_key.children.empty())error("TypeError","unhashable type: 'numpy.ndarray'");
  const auto activity=direct_column(source,options.activity_key);
- bool strings=false,numbers=false,reals=false;
- for(std::size_t i=0;i<source.size();++i){const auto& value=cell(source,i,cases);
-  if(value.is_null&&!date_value(value))error("TypeError","'<' not supported between instances of 'NoneType' and 'NoneType'");
-  strings=strings||text_value(value);numbers=numbers||numeric(value);reals=reals||value.kind==AttributeKind::kFloat;
- }
- // The case ids go through numpy's object sort, which raises Python's "<"
- // TypeError at its first str/number comparison.
- if(strings&&numbers)detail::numpy_object_stable_argsort(source.size(),[&](std::size_t a,std::size_t b){
-  const auto& x=cell(source,a,cases);const auto& y=cell(source,b,cases);
-  if(text_value(x)!=text_value(y))error("TypeError","'<' not supported between instances of '"+type_name(x)+"' and '"+type_name(y)+"'");
-  if(text_value(x))return x.value<y.value?-1:y.value<x.value?1:0;
-  const auto u=native_attribute_number(x),v=native_attribute_number(y);
-  return u<v?-1:v<u?1:0;
- });
- (void)reals;
- auto grouped=groups(source,cases);std::stable_sort(grouped.begin(),grouped.end(),[](const Group& a,const Group& b){return order(a.id,b.id)<0;});
- Statistics result;result.cases=grouped.size();std::unordered_map<std::string,std::size_t> positions;
- for(const auto& group:grouped){
+ // The coverage counts the non-missing case ids (a groupby, which also
+ // refuses unhashable case cells first), while the variants count every
+ // np.unique run (round BY).
+ const auto case_count=groups(source,cases).size();
+ const auto runs=case_runs(source,cases);
+ Statistics result;result.cases=case_count;result.activity_kind=array_kind(source,activity);std::unordered_map<std::string,std::size_t> positions;
+ const bool fresh=fresh_missing(result.activity_kind);
+ for(std::size_t r=0;r<runs.size();++r){
   // Public witnesses confirm statistics slice from the first position for the
   // total case size, while membership aggregates the actual case rows.
   std::vector<EventAttribute> values;
-  for(std::size_t i=group.first;i<std::min(source.size(),group.first+group.rows.size());++i){
+  for(std::size_t i=runs[r].first;i<std::min(source.size(),runs[r].first+runs[r].size);++i){
    const auto& value=cell(source,i,activity);if(!root_cause_key_is_hashable(value))error("TypeError","unhashable type: '"+type_name(value)+"'");values.push_back(value);
   }
-  auto variant=tuple(std::move(values));const auto key=identity(variant);
+  auto variant=tuple(std::move(values));
+  // A tuple holding a fresh NaN or NaT is a dictionary key of its own.
+  const auto key=fresh&&holds_missing(variant)?"fresh:"+std::to_string(r):identity(variant);
   const auto [position,added]=positions.emplace(key,result.variants.size());
   if(added)result.variants.push_back({std::move(variant),0});
   ++result.variants[position->second].count;
@@ -304,7 +398,8 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& criterion
  if(mode==Mode::kTopK){
   // Sorted by (count, variant) with reverse=True, as Python orders it, before
   // k is read.
-  detail::python_list_sort(stats.variants,[](const VariantCount& a,const VariantCount& b){return a.count!=b.count?a.count<b.count:order(a.variant,b.variant)<0;},true);
+  const bool fresh=fresh_missing(stats.activity_kind);
+  detail::python_list_sort(stats.variants,[fresh](const VariantCount& a,const VariantCount& b){return a.count!=b.count?a.count<b.count:variant_less(a.variant,b.variant,fresh);},true);
   const auto selected=top_count(criterion,stats.variants.size());
   for(std::size_t i=0;i<selected;++i)admitted.push_back(stats.variants[i].variant);
  }else{
@@ -322,7 +417,7 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& criterion
    }
   }
  }
- return membership(source,options,nullptr,&admitted);
+ return membership(source,options,nullptr,&admitted,true);
 }
 PandasVariantsFilterOptions resolve_variants_options(const std::vector<PandasVariantsFilterParameter>& parameters){
  PandasVariantsFilterOptions options;

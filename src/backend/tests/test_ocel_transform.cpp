@@ -53,8 +53,9 @@ void connected_components_contract() {
 }
 
 // The single-pass component filter must equal filtering the whole log once
-// per component, including duplicate ids, cross-component o2o/e2e and
-// objects removed by the degree-centrality bound.
+// per component, including duplicate ids, cross-component e2e and objects
+// removed by the degree-centrality bound. The reference component keeps no
+// O2O rows and no object changes (round BY).
 minera::Ocel per_component_reference(const minera::Ocel& log,
                                      const std::set<std::string>& selected) {
   minera::Ocel result;
@@ -71,14 +72,9 @@ minera::Ocel per_component_reference(const minera::Ocel& log,
   }
   for (const auto& event : log.events)
     if (event_ids.contains(event.id)) result.events.push_back(event);
-  for (const auto& relation : log.o2o)
-    if (selected.contains(relation.source_id) && selected.contains(relation.target_id))
-      result.o2o.push_back(relation);
   for (const auto& relation : log.e2e)
     if (event_ids.contains(relation.source_id) && event_ids.contains(relation.target_id))
       result.e2e.push_back(relation);
-  for (const auto& change : log.object_changes)
-    if (selected.contains(change.object_id)) result.object_changes.push_back(change);
   return result;
 }
 

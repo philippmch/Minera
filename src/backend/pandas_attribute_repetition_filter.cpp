@@ -1,4 +1,5 @@
 #include "minera/pandas_attribute_repetition_filter.hpp"
+#include "pandas_datetime_target.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -111,11 +112,9 @@ bool same_instant(const ParsedExactTimestamp& a, const ParsedExactTimestamp& b) 
 std::optional<ParsedExactTimestamp> column_instant(const EventAttribute& target,
                                                    const std::optional<std::string>& zone) {
   if (date(target)) return instant(target);
-  auto parsed=parse_timestamp_exact(target.value);
-  if (!parsed) throw std::invalid_argument(
+  // "NaT" and the other NaT texts match no cell (round BY).
+  return pandas_datetime_target::instant(target.value,zone,
       "pandas datetime column string targets must be ISO-8601 timestamps");
-  if (zone && !parsed->timezone_aware) return localize_timestamp_wall_time(*parsed,*zone);
-  return parsed;
 }
 
 // NumPy comparison family of a typed numeric column (or categorical categories).

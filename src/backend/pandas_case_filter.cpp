@@ -382,6 +382,9 @@ bool double_holds(const EventAttribute& v){
 } // namespace
 EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribute& minimum,const EventAttribute& maximum,const PandasCaseFilterOptions& o){
  s.validate();const auto [c,t]=performance_columns(s,o);
+ // The case key on the timestamp column selects that column twice, and the
+ // groupby rejects the two-column frame (round BY).
+ if(c==t)error("ValueError","Grouper for '"+s.columns[c]+"' not 1-dimensional");
  // Grouping by a float16 column fails the first aggregation of the timestamps.
  if(c<s.dtypes.size()&&s.dtypes[c]=="float16")error("NotImplementedError","agg function failed [how->first,dtype->"+s.dtypes[t]+"]");
  const auto grouped=groups(s,c,t);const bool business=truth(o.business_hours);

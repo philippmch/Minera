@@ -552,25 +552,23 @@ std::set<ObjectPair> enrichment_inheritance_graph(
   return asymmetric;
 }
 
+// Each object's relations in relation order, which is the reference's: by
+// time, events at one instant in the order of their relation rows (an OCEL
+// SQLite file's event_object table can list them unlike the events; round
+// BY). The first is the creation, the last the termination.
 void apply_lifecycle_qualifiers(Ocel& log, const EnrichmentIndex& index) {
-  std::map<std::pair<std::size_t, std::string>, std::string> qualifiers;
-  for (const auto& [object, events] : index.events_by_object) {
-    if (events.empty()) continue;
-    for (std::size_t offset = 0; offset < events.size(); ++offset) {
-      const auto event = events[offset];
-      const auto qualifier = events.size() == 1 || offset == 0
-                                 ? "creation"
-                                 : offset + 1 == events.size()
-                                       ? "termination"
-                                       : "other";
-      qualifiers[{event, object}] = qualifier;
+  std::map<std::string, std::vector<std::size_t>> rows_by_object;
+  for (std::size_t row = 0; row < log.relations.size(); ++row)
+    if (index.event_index.contains(log.relations[row].event_id))
+      rows_by_object[log.relations[row].object_id].push_back(row);
+  for (const auto& [object, rows] : rows_by_object) {
+    for (std::size_t offset = 0; offset < rows.size(); ++offset) {
+      log.relations[rows[offset]].qualifier = rows.size() == 1 || offset == 0
+                                                  ? "creation"
+                                                  : offset + 1 == rows.size()
+                                                        ? "termination"
+                                                        : "other";
     }
-  }
-  for (auto& relation : log.relations) {
-    const auto event = index.event_index.find(relation.event_id);
-    if (event == index.event_index.end()) continue;
-    const auto qualifier = qualifiers.find({event->second, relation.object_id});
-    if (qualifier != qualifiers.end()) relation.qualifier = qualifier->second;
   }
 }
 
@@ -1161,6 +1159,12 @@ OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
     result.logs = filter_disjoint_objects(
         log, connected_components(interaction_edges(log, types),
                                   options.max_degree_centrality));
+    // The reference builds each component from its events, objects and
+    // relations only: no O2O rows and no object changes (round BY).
+    for (auto& component : result.logs) {
+      component.o2o.clear();
+      component.object_changes.clear();
+    }
     result.candidate_count = result.logs.size();
   } else {
     if (options.object_type.empty())

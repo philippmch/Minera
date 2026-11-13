@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BX (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–BY (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4834,7 +4834,70 @@ difference. Declared: Polars join and group_by orders with non-default
 keys vary per run in Polars itself. No fixture changed. The device check
 on the Mac was skipped again (no device linked).
 
-Next round (BY) should start by re-reviewing round BX:
+Round BY re-reviewed BX (Review BY1; BX's CI run 43393668614 was green;
+the pdqsort port, the Datetime casts, top_k's `DuplicateError`, the
+nanosecond bounds and the OCEL description held, and the Polars default-key
+sweeps stayed clean) and took its targets. It fixed the pandas table
+filters with non-default keys: the vectorised `col + ","` errors of number,
+boolean and datetime activity columns on the paths and path performance
+filters (also on empty frames), path performance with the case key on the
+activity or timestamp column and case performance with the case key on the
+timestamp column (pandas' `ValueError`s), datetime attributes compared with
+a string on the timestamp attribute and repetition filters (the text parsed
+as a Timestamp, NaT texts matching nothing), NaT, NaN and None case values
+and activities on top_k, coverage and between (numpy's unique runs: typed
+arrays collapse missing values into one last run, object arrays compare
+with Python and raise on None; coverage over the non-missing case ids;
+numpy labels of naive case dates at their unit). On the OCEL routes with
+nanosecond SQLite timestamps it fixed the connected-component split (pm4py
+drops O2O rows and object changes there) and the SQLite row order: pm4py
+keeps `event_object` rows, and object type table change rows, in their own
+order sorted by time, which the lifecycle qualifiers and the event/object
+graph (DF edges, change node numbering) follow; the JSON transport now
+carries `minera:relationOrder` and `minera:objectChangeOrder` when the log
+order differs from the nesting. Conformance (etot, otg, ocdfg), statistics
+and the ancestors/descendants split showed no difference. Declared: pandas
+membership of naive `datetime64[ns]` activity tuples with sub-microsecond
+values depends on `PYTHONHASHSEED` in pandas itself (6 of 12,000 answers),
+non-ISO texts against a datetime column, and the connected components'
+order in pm4py (set iteration). No fixture changed. The device check on
+the Mac was skipped again (no device linked).
+
+Next round (BZ) should start by re-reviewing round BY:
+
+- `src/backend/pandas_paths_filter.cpp`: `typed_concatenation` (dtype
+  names it does not list, such as `string[python]`, `Int64` with missing
+  values, `object` columns of mixed types, `float16`);
+- `src/backend/pandas_datetime_target.hpp` and its callers in the
+  timestamp attribute and repetition filters (zones other than UTC,
+  offsets, units other than ns and us);
+- `src/backend/pandas_variants_filter.cpp`: `case_runs`, `variant_less`,
+  `items_equal` with fresh NaN/NaT, the `split_hash` rule of `membership`,
+  the coverage denominator, and the `variants_df` and `positive=false`
+  paths with missing values;
+- `src/backend/pandas_between_filter.cpp`: `numpy_digits` and
+  `unordered_nat` (ms and s columns, NaT only cases);
+- `src/backend/ocel.cpp`: the relation sort by instant rank in
+  `sort_ocel_events` and the transport markers in `serialize_ocel_json` /
+  `parse_ocel_json_names` (logs that routes pass on: filter, playout,
+  split and enrich results; the XML and CSV writers);
+- `src/backend/ocel_sqlite.cpp`: the change order (NaT or unreadable
+  change times, the `object_changes` table branch) and
+  `src/backend/ocel_transform.cpp`: lifecycle qualifiers per relation row;
+- new areas: repeated `event_object` rows of an OCEL SQLite file through
+  the OCEL 2.0 transport (it keeps one relation per event and object, OC2,
+  while `read_ocel2_sqlite` keeps repeats; pm4py's lifecycle then labels
+  both repeats `other`); the order of O2O rows across source objects in
+  the OCEL 2.0 transport (nested per source; SQLite keeps `object_object`
+  row order); OCPN and SAW discovery (`imd`, relation order) and the OCEL
+  filters on SQLite logs with tied events; the pandas LTL and sequence
+  filters with non-default keys; timedelta, categorical and nullable
+  columns as keys on the pandas table filters;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BY commit.
+
+Round BX's targets, re-reviewed in BY (findings BY1-1 to BY1-9):
 
 - `src/backend/polars_sort.hpp` (the pdqsort port: `partial_insertion_sort`,
   `choose_pivot`, `partition_in_blocks`, the 2,000-row split) and its

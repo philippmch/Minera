@@ -80,7 +80,8 @@ struct PolarsEndActivitiesNocc {
     const std::string& case_id_glue = "case:concept:name", const std::string& activity_key = "concept:name",
     bool return_dict = false, const std::optional<PolarsFilterValue>& most_common_variant = std::nullopt);
 
-// Variants follow the rows sorted by case and "time:timestamp" (stable);
+// Variants follow the rows sorted by case and "time:timestamp" as Polars'
+// unstable multi-column sort orders tied rows (polars_sort.hpp);
 // the variant string joins the non-null activities with ",". The variants
 // frames are ordered by case id, nulls first.
 [[nodiscard]] EventTable polars_trace_filter_get_variants_df(const EventTable& df,
