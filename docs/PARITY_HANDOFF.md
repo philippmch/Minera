@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BQ (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BR (2026-11-05 to 2026-11-12, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4697,7 +4697,58 @@ returns a frequency plan that is not optimal under its own cost matrix
 whole seconds in pm4py. No fixture changed. The device check on the Mac
 was skipped again (no device linked).
 
-Next round (BR) should start by re-reviewing round BQ:
+Round BR re-reviewed BQ (Review BR1; BQ's CI run and BP's were green on
+all six jobs, BQ's spectrum, temporal profile, correlation and CLI sweeps
+held on fresh seeds) and took its targets. It fixed the routes on the
+cached model logs keyed by a CSV's own header (alignments, the
+process-tree alignment, evaluation, decomposed, anti- and
+multi-alignments, decisions, Monte Carlo: the Inductive log refused the
+header, the alpha and heuristics logs refused `concept:name`; a key naming
+the selected column under either spelling now reads the model's own log);
+the Petri comparison with a CSV reference log under its own headers (read
+with the session's selectors); the log families on nanosecond CSV cells
+that BQ left (the batches' log variant and the pandas `datetime64[ns]`
+batches, the trace-based and temporal features, the interval tree, the
+stochastic map's `Timedelta.total_seconds()` durations; the temporal
+features also divided a nanosecond instant through a double, so 600 ns past
+a second read as 0 where `Timestamp.timestamp()` gives 0.000001); and DFG
+precision on a CSV upload, which gave every event an empty activity under
+the default key (BQ's check of it sent the key as a multipart field the
+route ignores). Declared: transition labels of a date column as the
+activity key (pm4py's `str(Timestamp)`), the stochastic-map route failing as
+a whole on the reachability analysis Minera adds. No fixture changed. The
+device check on the Mac was skipped again (no device linked).
+
+Next round (BS) should start by re-reviewing round BR:
+
+- `src/backend/tools/minera_server.cpp`: `csv_activity_alias`,
+  `model_key_field` and `supplies_model_field` on every model route (a key
+  is hidden only when it names the selected column under either spelling
+  and the model's key does too; routes that take an explicit key outside
+  this list, such as the tree workbench or the BPMN and POWL views, were not
+  swept), `miner_activity_key` for imported models, the compare-petri CSV
+  reference read with the session's selectors (a reference whose headers
+  differ from the upload's falls back to the standard headers), the DFG
+  precision key mapped by `csv_frame_key`;
+- `src/backend/batches.cpp` (`log_instant`, `pandas_nanoseconds`; a frame
+  table without dtypes reads exact seconds), `log_to_features.cpp`
+  (`python_epoch`, `csv_nanosecond_column` scans the projected cells once
+  per key, `temporal_metric_instant` now parses nine decimals for a
+  nanosecond source), `interval_tree.cpp`, `stochastic_map.cpp`
+  (`token_time`, `elapsed_seconds`);
+- new areas: date columns as activity keys across the miners (pm4py labels
+  them `str()` of the UTC `Timestamp`: alpha, heuristics, Inductive, DFG,
+  the filters), the stochastic-map route's reachability failure (return the
+  map with the reachability as an optional section?), the remaining log
+  families on nanosecond cells (sojourn and waiting time statistics outside
+  the features, the rework and interval durations, the LLM abstractions'
+  durations), routes on XES uploads with nanosecond dates, the multipart
+  field handling of query-only routes such as `/api/dfg-precision`;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BR commit.
+
+Round BQ's targets, re-reviewed in BR (findings BR1-1 to BR1-7):
 
 - `src/backend/performance_spectrum/components.cpp`: `order_key` (the
   exact instant from `parse_timestamp_exact`, or the double's split when
@@ -4727,8 +4778,8 @@ Next round (BR) should start by re-reviewing round BQ:
   footprints, Declare and log skeleton discovery, the alignments);
 - the open choices on CSV timestamp columns of plain numbers and "roles to
   diagnostics groups" (still declared unless Philipp answers);
-- the CI run of the BQ commit (and BP's Windows ctest, still running when
-  BQ closed).
+- the CI run of the BQ commit (green on all six jobs, as was BP's run
+  43304285286, whose Windows ctest was still running when BQ closed).
 
 Round BP's targets, re-reviewed in BQ (findings BQ1-1 to BQ1-6):
 

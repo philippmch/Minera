@@ -24511,7 +24511,8 @@ and overlap keyed by a CSV's own headers.
 
 Round BQ checked BP's CI run (43304285286: Linux, macOS, the frontend, the
 script tests and the verifier passed; the Windows build passed with BP's
-MSVC fix and its ctest was still running when the round closed),
+MSVC fix and its ctest, still running when the round closed, passed
+afterwards: all six jobs of the run are green, as round BR checked),
 re-reviewed BP (the DataFrame spectrum's `frame_instant`, the CLI's
 `csv_input_source` callers, the `reference_selected_field` fallbacks) on
 fresh seeds, and took BP's targets: the lookups BP left unchanged on a CSV's
@@ -24614,3 +24615,120 @@ cells (the exact-instant order and the rounded instants), the temporal
 profile's EventLog discovery and conformance, the correlation miner's three
 variants on nanosecond cells, and the tree reduction keyed by a CSV's own
 activity and resource headers.
+
+## Review BR1: re-review of round BQ, CSV headers on the model routes, the log families on nanosecond CSV cells, DFG precision on CSV uploads, and the CLI's CSV modes (2026-11-12)
+
+Round BR checked BQ's CI run (43314774208: all six jobs green, the Windows
+ctest included; BP's run 43304285286 is green on all six jobs too),
+re-reviewed BQ (the spectrum components' `order_key` and `log_instant`, the
+temporal profile's `python_epoch` callers, the correlation miner's
+`python_epoch_seconds`, `inductive_log_for_key`) and took BQ's targets: the
+routes on the cached model logs keyed by a CSV's own header, the remaining
+log families on nanosecond cells, DFG precision and alpha keyed by a
+timestamp or lifecycle header, the Petri comparison with a CSV reference
+log, and the CLI's other CSV modes. The device check on the Mac was skipped
+(no device linked). Findings, all fixed:
+
+- **BR1-1 The model routes keyed by a CSV's own header.** pm4py's frame of a
+  CSV upload holds the selected column under its header (`act`) and under
+  `concept:name`, so both keys give one answer. Minera's cached model logs
+  hold one spelling: the Inductive log projects the miner's key over the
+  header, the alpha and heuristics logs keep the header. On 20 uploads (50
+  route and miner pairs each), the header failed 259 times on the Inductive
+  model (alignments, the process-tree alignment, evaluation, decomposed,
+  anti- and multi-alignments, decisions, decision tables, the data Petri
+  net, Monte Carlo: `event is missing activity attribute 'act'`) and
+  `concept:name` failed 122 times on the alpha and heuristics models
+  (evaluation, Monte Carlo). A key that names the selected column under
+  either spelling now reads the model's own log (`csv_activity_alias`,
+  `model_key_field`), on every route that takes an explicit key on a cached
+  model.
+- **BR1-2 The Petri comparison with a CSV reference log.**
+  `/api/compare-petri` read a CSV reference under the standard headers only
+  (`CSV column not found: case:concept:name` on every upload with its own
+  headers, all three miners). A CSV reference is now read with the
+  session's selectors first, and the standard headers stay the fallback;
+  the alpha model's default key is its own log's.
+- **BR1-3 The batches on nanosecond cells.** pm4py's log variant reads
+  `Timestamp.timestamp()` (rounded to the microsecond) and the pandas
+  variant a `datetime64[ns]` column's int64 nanoseconds over 1e9 (one
+  rounding of the integer to a double first: `1577836800.0000005` for
+  600 ns past the second). Minera read the exact seconds in both: 20 of 30
+  log answers and 3 of 30 pandas answers differed on the server, 22 and 5
+  in the CLI (`log_instant`, `pandas_nanoseconds`).
+- **BR1-4 The trace-based and temporal features on nanosecond cells.** The
+  trace-based time features (case duration, times from the first and last
+  occurrence, path times) read `Timestamp.timestamp()` floats
+  (`python_epoch`). The temporal features read a CSV column with nanosecond
+  cells as nanosecond instants (`csv_nanosecond_column`; the frame's cells
+  are `datetime64[ns]` then) and divide the nanoseconds exactly before the
+  six-digit rounding, as `Timestamp.timestamp()` does (600 ns past a second
+  is 0.000001; the double of the int64 gave 0). Before, 22 of 30 trace-based
+  answers and 19 of 30 temporal answers grouped by the second differed (27
+  and 19 grouped by the minute with a start column).
+- **BR1-5 The interval tree on nanosecond cells.** pm4py's
+  `log_to_interval_tree` reads `Timestamp.timestamp()` floats; Minera read
+  the exact seconds (27 of 30 trees differed).
+- **BR1-6 The stochastic map's durations.** pm4py's replay map takes
+  `Timedelta.total_seconds()` of the exact instants, which drops the
+  nanoseconds of the difference (`7.999999999 - 1.0000014` is `6.999998`).
+  Minera subtracted the parsed seconds: 9 of 30 fitted maps differed
+  (`elapsed_seconds` on exact token times).
+- **BR1-7 DFG precision on a CSV upload.** `/api/dfg-precision` without an
+  activity key (the frontend's default) or with `concept:name` gave every
+  event an empty activity on a CSV upload, so the precision was 0 or the
+  escaping-edge share of the start activities: the route converts the
+  session log to a stream and back, and that log holds the column under its
+  header only. The key is now mapped to the header (`csv_frame_key`), as
+  pm4py reads `concept:name` on the frame: 28 of 30 answers differed with
+  `concept:name` and 28 of 30 without a key, all equal now. Round BQ's check of this route (`hdrkeys.py`) sent the key as a
+  multipart field, which the route does not read (the frontend sends it in
+  the query string), so it compared the default with itself.
+
+Checked without findings: the CLI's default analysis of a CSV input against
+the server's mine route and on-demand alignments (100 inputs: plain,
+blanks, nanosecond cells, standard headers; footprints, Declare, log
+skeleton, conformance, temporal profile, transition system and the other
+sections); the CLI's footprints, Declare and log skeleton discovery against
+pm4py on the frame (200 inputs); DFG precision and alpha keyed by a
+lifecycle column (`life` and `lifecycle:transition`); passed time and Monte
+Carlo case arrival on nanosecond uploads; BQ's sweeps on fresh seeds.
+
+Declarations:
+
+- Alpha (and the other miners) keyed by a date column: pm4py's transition
+  labels are `str()` of the frame's UTC `Timestamp`
+  (`2020-01-01 00:00:00+00:00`, `...00:00.500000+00:00`); Minera keeps the
+  cell's text. The nets are otherwise equal (60 of 60 uploads). DFG
+  precision keyed by a date column has no reference answer: pm4py's
+  `discover_dfg` refuses a date activity column and `write_dfg` a `Timestamp`
+  key.
+- `/api/stochastic-map` fails as a whole when the stochastic Petri net's
+  reachability analysis (a Minera addition the route always runs) meets an
+  immediate closure without a tangible resolution (5 of 30 Inductive models
+  of nanosecond uploads); the fitted map, pm4py's part, equals pm4py's on
+  the other 25.
+- Number-keyed DataFrame routes, the CSV timestamp columns of plain numbers
+  and "roles to diagnostics groups" (round AT) stay as declared.
+
+Verification (scripts in the project files under `review-harness/round-br/`;
+"before" is round BQ's CLI and server on the same scripts and seeds):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Model routes keyed by `act` vs `concept:name` (`indkeys.py`: 20 uploads, 20 with blank activities; alignments, the process-tree alignment, evaluation with four adapters and three families, decomposed, anti- and multi-alignments, decisions, decision tables, data Petri net, Monte Carlo, Petri comparison with the CSV as reference, tree reduction; three miners) | 2,000 | before (the first 20): 259 refused the header, 122 refused `concept:name`, 60 Petri comparisons refused the CSV reference; after: 1,973 the same, 27 fail alike (search limits on the alpha and heuristics models, Monte Carlo cases without visible events) |
+| Batches (log, pandas, Polars) on the server vs pm4py (`batchns.py`: 30 nanosecond uploads, 30 with a start column and blanks) | 180 | before (the first 30): 23 differed; after: all equal, 30 raise alike |
+| CLI batches vs pm4py (`clibatchns.py`, 30 nanosecond inputs) | 90 | before: 27 differed; after: all equal |
+| Features on the server vs pm4py (`featns.py`: trace-based times, work in progress, concurrency, temporal; 30 uploads grouped by the second, 30 by the week, 30 by the minute with a start column) | 360 | before (by the second): 41 differed; (by the minute) 46; after: all equal |
+| Interval tree vs pm4py (`itns.py`, 30 uploads, 30 with a start column) | 60 | before (the first 30): 27 differed; after: all equal |
+| Stochastic map (fitted timing) vs pm4py (`smapns.py`, 30 uploads) | 30 | before: 14 differed (9 fitted maps, 5 reachability failures); after: 25 equal, the 5 reachability failures (declared) |
+| Passed time vs pm4py's log and pandas variants (`ptns.py`, 30 uploads) | 90 | all equal to the pandas variant (the frame) |
+| DFG precision and alpha keyed by `ts`, `time:timestamp`, a lifecycle column, `act`, `concept:name` and no key (`tskeys.py`: 30 uploads, 30 with `lifecycle:transition` and fractional cells) | 660 | before (the first 30): 56 precision answers differed (`concept:name` and no key); after: all equal or raise alike, alpha labels on date keys declared |
+| CLI default analysis vs the server (`clisrv.py`: 25 inputs each plain, with blanks, nanosecond cells, standard headers, and 25 more with nanosecond cells on the final build) | 4,125 | all the same |
+| CLI footprints, Declare, log skeleton vs pm4py (`clipm.py`: 40 each plain, blanks, nanoseconds, standard headers, and 40 with blanks and nanoseconds) | 600 | all equal |
+| BQ's and BP's sweeps on fresh seeds (`tpns.py`, 20 uploads and 20 with a start column; `corrsweep.py --ns`, 20; `clitp.py` with nanoseconds, blanks and a start column, 20; `spectsrv.py --ns`, 30) | 780 | all equal, 8 correlation frequency plans where both are optimal (declared ties) |
+| Full suites: ctest, script tests, frontend tests, fixture replay | 476 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+`minera_review_br1_tests` binds the batches' log and pandas variants, the
+interval tree, the trace-based and temporal features and the stochastic
+map's durations on one CSV with nanosecond cells.

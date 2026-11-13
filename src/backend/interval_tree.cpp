@@ -6,6 +6,7 @@
 #include <tuple>
 
 #include "minera/timestamp.hpp"
+#include "frame_times.hpp"
 
 namespace minera {
 namespace {
@@ -23,12 +24,17 @@ const std::string* timestamp_value(const Event& event, const std::string& key) {
   return event.attribute(key);
 }
 
+// pm4py reads each log event's instant as Timestamp.timestamp(): a cell with
+// nanosecond digits (a CSV frame keeps them) is rounded to the microsecond
+// (round BR, observed black-box); other cells are the parsed seconds.
 double require_timestamp(const Event& event, const std::string& key) {
   const auto* text = timestamp_value(event, key);
   const auto parsed = text == nullptr ? std::optional<double>{}
                                       : parse_timestamp(*text);
   if (!parsed || !std::isfinite(*parsed))
     throw std::invalid_argument("interval tree: invalid timestamp");
+  if (const auto exact = parse_timestamp_exact(*text); exact && exact->nanoseconds % 1000 != 0)
+    return frame_times::epoch_seconds(*exact);
   return *parsed;
 }
 

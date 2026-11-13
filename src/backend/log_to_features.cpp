@@ -18,6 +18,7 @@
 #include "minera/dataframe_columns.hpp"
 #include "minera/timestamp.hpp"
 #include "frame_cells.hpp"
+#include "frame_times.hpp"
 #include "python_scalar.hpp"
 #include "root_cause_trace_key.hpp"
 
@@ -430,6 +431,15 @@ struct TimedEvent {
   std::size_t index = 0;
 };
 
+// pm4py reads a log event's timestamp as Timestamp.timestamp(): a cell with
+// nanosecond digits (a CSV frame keeps them) is rounded to the microsecond
+// (round BR, observed black-box); other cells are the parsed seconds.
+double python_epoch(std::string_view text, double parsed) {
+  if (const auto exact = parse_timestamp_exact(text); exact && exact->nanoseconds % 1000 != 0)
+    return frame_times::epoch_seconds(*exact);
+  return parsed;
+}
+
 double instant(const Event& e, const std::string& key, bool required) {
   const auto text = value_for(e, key);
   if (text.empty()) {
@@ -439,7 +449,7 @@ double instant(const Event& e, const std::string& key, bool required) {
   const auto parsed = parse_timestamp(text);
   if (!parsed || !std::isfinite(*parsed))
     throw std::invalid_argument("log_to_features: invalid or non-finite timestamp");
-  return *parsed;
+  return python_epoch(text, *parsed);
 }
 
 enum class TemporalFrequencyUnit { kSecond, kMinute, kHour, kDay, kWeek,
@@ -581,22 +591,22 @@ std::string temporal_nanosecond_text(ExactTemporalInstant instant) {
 
 double temporal_metric_instant(ExactTemporalInstant instant, bool nanosecond_source) {
   auto integer = temporal_nanosecond_text(instant);
-  if (!nanosecond_source) {
-    if (integer == "0") return 0.0;
-    integer.resize(integer.size() - 3);
-    // Parse decimal seconds directly: converting the microsecond integer to
-    // double first loses low bits at distant dates. Padding also avoids
-    // subtractive cancellation for negative instants close to the epoch.
-    const auto sign = integer.front() == '-' ? 1u : 0u;
-    if (integer.size() - sign <= 6)
-      integer.insert(sign, 7 - (integer.size() - sign), '0');
-    integer.insert(integer.size() - 6, 1, '.');
-  }
+  if (integer == "0") return 0.0;
+  // Parse decimal seconds directly: converting the integer to double first
+  // loses low bits at distant dates (for nanoseconds, Timestamp.timestamp()
+  // divides the int64 exactly, so 600 ns past a second is
+  // 0.0000006 -> 0.000001, round BR, observed black-box). Padding also
+  // avoids subtractive cancellation for negative instants close to the epoch.
+  if (!nanosecond_source) integer.resize(integer.size() - 3);
+  const std::size_t digits = nanosecond_source ? 9 : 6;
+  const auto sign = integer.front() == '-' ? 1u : 0u;
+  if (integer.size() - sign <= digits)
+    integer.insert(sign, digits + 1 - (integer.size() - sign), '0');
+  integer.insert(integer.size() - digits, 1, '.');
   double value = 0.0;
   const auto parsed = std::from_chars(integer.data(), integer.data() + integer.size(), value);
   if (parsed.ec != std::errc{}) throw std::invalid_argument("log_to_features: temporal metric timestamp out of range");
   if (nanosecond_source) {
-    value /= 1e9;
     // Timestamp sources expose a double rounded to six decimal places.
     // Decimal formatting avoids changing halfway cases by multiplying first.
     char rounded[64];
@@ -1247,7 +1257,7 @@ LogToFeaturesResult log_to_features(const EventLog& source,
       const auto parsed = parse_timestamp(date ? date->value : cell->value);
       if (!parsed || !std::isfinite(*parsed))
         throw std::invalid_argument("log_to_features: invalid or non-finite timestamp");
-      return *parsed;
+      return python_epoch(date ? date->value : cell->value, *parsed);
     };
     const auto activities = categories_for_events(log, options.activity_key);
     std::set<std::pair<std::string, std::string>> observed_direct_paths;
@@ -1672,6 +1682,31 @@ LogToFeaturesResult log_to_features(const EventLog& source,
   std::unordered_map<std::string, std::optional<int>> calendar_timezones;
   std::map<std::pair<const Event*, std::string>, ExactTemporalInstant> exact_calendar_instants;
   std::unordered_map<std::string, bool> nanosecond_columns;
+  // A CSV frame's date column is at nanosecond resolution when any of its
+  // cells has more than six fraction digits (read_csv and format_dataframe's
+  // mixed parse); its cells are then Timestamps of nanoseconds, each read
+  // as a nanosecond instant (round BR, observed black-box: the microsecond
+  // cut gave the waiting and sojourn times a few ulps off).
+  std::unordered_map<std::string, bool> csv_nanosecond_columns;
+  const auto csv_nanosecond_column = [&](const std::string& key) {
+    if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return false;
+    const auto [entry, inserted] = csv_nanosecond_columns.try_emplace(key, false);
+    if (!inserted) return entry->second;
+    for (const auto& trace : log.traces) {
+      for (const auto& event : trace.events) {
+        const auto value = projected_column_value(trace, event, key);
+        if (!value || absent_attribute(*value)) continue;
+        const auto* date = std::get_if<NativeDate>(&value->typed_value);
+        const auto& text = date ? date->value : value->value;
+        const auto point = text.find('.', text.find_first_of("Tt "));
+        if (point == std::string::npos) continue;
+        auto end = point + 1;
+        while (end < text.size() && std::isdigit(static_cast<unsigned char>(text[end]))) ++end;
+        if (end - point - 1 > 6) return entry->second = true;
+      }
+    }
+    return false;
+  };
   const auto calendar_instant = [&](const Trace& trace, const Event& event,
                                       const std::string& key, bool required) {
     const auto value = projected_column_value(trace, event, key);
@@ -1687,7 +1722,8 @@ LogToFeaturesResult log_to_features(const EventLog& source,
         !std::holds_alternative<std::monostate>(value->typed_value)))
       throw std::invalid_argument("log_to_features: temporal timestamp must be a date");
     std::string lexical = native_date ? native_date->value : value->value;
-    const bool nanos = native_date && native_date->resolution == NativeDateResolution::kNanosecond;
+    const bool nanos = (native_date && native_date->resolution == NativeDateResolution::kNanosecond) ||
+                       csv_nanosecond_column(key);
     nanosecond_columns[key] = nanosecond_columns[key] || nanos;
     const auto point = lexical.find('.', lexical.find_first_of("Tt "));
     if (point != std::string::npos) {

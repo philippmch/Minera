@@ -466,6 +466,29 @@ StochasticMapTransition fit_stochastic_distribution(
   return best;
 }
 
+// A token's time: the exact instant (seconds, nanoseconds). pm4py's replay
+// compares the events' Timestamps exactly and measures a firing as the
+// Timedelta's total_seconds(): whole microseconds, the nanoseconds of the
+// difference dropped (round BR, observed black-box; truncating each instant
+// to the microsecond first differed by a microsecond on nanosecond cells).
+namespace {
+using TokenTime = std::pair<std::int64_t, std::int32_t>;
+
+std::optional<TokenTime> token_time(std::string_view text) {
+  if (!parse_timestamp_microseconds(text)) return std::nullopt;
+  const auto exact = parse_timestamp_exact(text);
+  if (!exact) return std::nullopt;
+  return TokenTime{exact->seconds, static_cast<std::int32_t>(exact->nanoseconds)};
+}
+
+double elapsed_seconds(const TokenTime& from, const TokenTime& to) {
+  const std::int64_t nanoseconds = static_cast<std::int64_t>(to.second) - from.second;
+  std::int64_t microseconds = nanoseconds / 1000;
+  if (nanoseconds % 1000 < 0) --microseconds;  // floor, as Timedelta's components
+  return static_cast<double>((to.first - from.first) * 1000000 + microseconds) / 1000000.0;
+}
+}  // namespace
+
 StochasticMapFitResult fit_stochastic_map_with_report(
     const EventLog& log, const PetriNet& net,
     const StochasticMapFitOptions& options) {
@@ -490,19 +513,19 @@ StochasticMapFitResult fit_stochastic_map_with_report(
     }
     return selected;
   };
-  auto selected_time = [&](const Event& event) -> std::optional<std::int64_t> {
+  auto selected_time = [&](const Event& event) -> std::optional<TokenTime> {
     const auto key = options.replay.timestamp_attribute.empty()
         ? std::string_view("time:timestamp")
         : std::string_view(options.replay.timestamp_attribute);
     if (const auto* value = selected_attribute(event, key)) {
       if (value->is_null || value->first_class_state == FirstClassAttributeState::kNull)
         return std::nullopt;
-      return parse_timestamp_microseconds(value->value);
+      return token_time(value->value);
     }
     if (key == "time:timestamp" || key == "timestamp" ||
         key == event.timestamp_source_key) {
       if (event.timestamp_state == FirstClassAttributeState::kNull) return std::nullopt;
-      return parse_timestamp_microseconds(event.timestamp);
+      return token_time(event.timestamp);
     }
     return std::nullopt;
   };
@@ -541,7 +564,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
           (options.replay.initial_marking_keys.size() == listed.size() &&
            options.replay.initial_marking_keys[place]);
     // Each token keeps its time and the index of the event that produced it.
-    std::vector<std::deque<std::pair<std::optional<std::int64_t>, std::size_t>>> arrivals(
+    std::vector<std::deque<std::pair<std::optional<TokenTime>, std::size_t>>> arrivals(
         net.place_count());
     auto initial_arrivals = marking;
     const auto first_time = trace.events.empty() ? std::nullopt
@@ -555,13 +578,13 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       auto& stats = statistics[transition_index];
       ++stats.activations;
       const auto& transition = net.transitions()[transition_index];
-      std::optional<std::int64_t> arrival;
+      std::optional<TokenTime> arrival;
       std::size_t arrival_source = 0;
       bool first_event_input = false;
       std::vector<bool> consumed(net.place_count(), false);
       for (const auto place : transition.inputs) {
         if (!consumed[place]) {
-          std::optional<std::int64_t> consumed_time;
+          std::optional<TokenTime> consumed_time;
           std::size_t source = 0;
           if (initial_arrivals[place] > 0) {
             --initial_arrivals[place];
@@ -603,7 +626,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
         arrivals[place].clear();
         initial_arrivals[place] = 0;
       }
-      std::optional<std::int64_t> time;
+      std::optional<TokenTime> time;
       std::size_t time_source = event_index;
       std::optional<double> performance;
       if (!transition.activity) {
@@ -622,7 +645,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
         const auto& event = trace.events[event_index];
         time = selected_time(event);
         if (time && arrival)
-          performance = static_cast<double>(*time - *arrival) / 1000000.0;
+          performance = elapsed_seconds(*arrival, *time);
         const auto activity = selected_activity(event);
         if (activity && *activity == net.activities()[*transition.activity])
           ++event_index;

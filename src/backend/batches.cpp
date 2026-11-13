@@ -19,6 +19,7 @@
 #include <variant>
 
 #include "frame_cells.hpp"
+#include "frame_times.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
@@ -683,6 +684,16 @@ BatchDiscovery detect_grouped(std::vector<IndexedEvent> values,
   return BatchDiscovery{options, options.variant, std::move(groups_out)};
 }
 
+// pm4py's log variant reads each instant as Timestamp.timestamp(): a cell
+// with nanosecond digits (a CSV frame keeps them) is rounded to the
+// microsecond (round BR, observed black-box, as the spectrum's log variants
+// in round BQ); other cells are the parsed seconds.
+std::optional<double> log_instant(const std::string& text) {
+  if (const auto exact = parse_timestamp_exact(text); exact && exact->nanoseconds % 1000 != 0)
+    return frame_times::epoch_seconds(*exact);
+  return parse_timestamp(text);
+}
+
 // `frame_cells`: a missing activity or resource is read as "" here, for
 // append_frame_log_events to give its frame cell (NaN).
 void append_log_events(
@@ -704,7 +715,7 @@ void append_log_events(
       const auto& resource = read(event, options.resource_attribute, "resource");
       const auto& completion_text =
           required_event_value(event, options.timestamp_attribute, "timestamp");
-      const auto complete = parse_timestamp(completion_text);
+      const auto complete = log_instant(completion_text);
       if (!complete || !std::isfinite(*complete))
         throw std::invalid_argument(
             "batches: event has an invalid completion timestamp");
@@ -715,7 +726,7 @@ void append_log_events(
         if (value == nullptr || value->empty())
           throw std::invalid_argument(
               "batches: configured start timestamp is missing");
-        const auto parsed = parse_timestamp(*value);
+        const auto parsed = log_instant(*value);
         if (!parsed || !std::isfinite(*parsed))
           throw std::invalid_argument(
               "batches: configured start timestamp is invalid");
@@ -887,13 +898,15 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
   }
   // The pandas adapter reads a datetime column as its integer units divided
   // by 1e9, so a microsecond, millisecond or second column gives seconds
-  // scaled down by 1e3, 1e6 or 1e9.
+  // scaled down by 1e3, 1e6 or 1e9, and a nanosecond column the int64
+  // nanoseconds as a double over 1e9 (round BR: not the exact seconds).
   const auto pandas_scale = [&](const TableSelector& selector)
       -> std::optional<double> {
     if (options.variant != BatchDiscoveryVariant::kPandas || !selector.column ||
         *selector.column >= table.dtypes.size())
       return std::nullopt;
     const std::string_view dtype = table.dtypes[*selector.column];
+    if (dtype.starts_with("datetime64[ns")) return 1e9;
     if (dtype.starts_with("datetime64[us")) return 1e6;
     if (dtype.starts_with("datetime64[ms")) return 1e3;
     if (dtype.starts_with("datetime64[s")) return 1.0;
@@ -907,6 +920,17 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
   const auto start_scale = options.start_timestamp_attribute.empty()
                                ? std::nullopt
                                : pandas_scale(start_selector);
+  // A pandas nanosecond cell: double(int64 nanoseconds) / 1e9.
+  const auto pandas_nanoseconds = [&](const std::string& text, std::optional<double> units)
+      -> std::optional<double> {
+    if (!units || *units != 1e9) return std::nullopt;
+    const auto exact = parse_timestamp_exact(text);
+    constexpr std::int64_t kBillion = 1000000000;
+    if (!exact || exact->seconds > std::numeric_limits<std::int64_t>::max() / kBillion - 1 ||
+        exact->seconds < std::numeric_limits<std::int64_t>::min() / kBillion + 1)
+      return std::nullopt;
+    return static_cast<double>(exact->seconds * kBillion + exact->nanoseconds) / 1e9;
+  };
   // The Polars adapter reads a timestamp as its epoch nanoseconds times
   // 1e-9, so second 15 is 15.000000000000002 and batch boundaries follow
   // that value.
@@ -969,6 +993,10 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
     const auto complete =
         timestamp_cell ? seconds_of(attribute_text(*timestamp_cell))
                        : std::optional<double>{};
+    const auto complete_ns =
+        timestamp_cell ? pandas_nanoseconds(attribute_text(*timestamp_cell), completion_scale)
+                       : std::optional<double>{};
+    std::optional<double> start_ns;
     if (timestamp_cell && (!complete || !std::isfinite(*complete)))
       throw std::invalid_argument(
           "batches: table row has an invalid completion timestamp");
@@ -989,16 +1017,17 @@ std::vector<IndexedEvent> table_events(const EventTable& table,
           throw std::invalid_argument(
               "batches: configured start timestamp is invalid");
         start = parsed;
+        start_ns = pandas_nanoseconds(attribute_text(*start_cell), start_scale);
       }
     }
     // An event that starts after it completes is taken as it is (round BN,
     // observed black-box).
     const double completion =
-        complete ? rescale(*complete, completion_scale) : kNaT;
+        complete_ns ? *complete_ns : complete ? rescale(*complete, completion_scale) : kNaT;
     const double start_time =
         options.start_timestamp_attribute.empty()
             ? completion
-            : (start ? rescale(*start, start_scale) : kNaT);
+            : start_ns ? *start_ns : (start ? rescale(*start, start_scale) : kNaT);
 
     // The selected event id stays a typed scalar (a null cell is None) so
     // equal ids of different types are one event and incomparable ids raise.
