@@ -32,6 +32,11 @@ struct LlmAbstractionOptions {
   // features descriptions read it; the stream and column descriptions list
   // the frame whatever the key.
   std::string activity_key;
+  // A column of an upload's frame the event stream is sorted by, as
+  // pm4py.llm's timestamp_key on the DataFrame (round BV): the rows sort by
+  // its cells whatever their type, and a row without one raises KeyError.
+  // Empty sorts by the events' timestamp.
+  std::string timestamp_key;
   // The object features' lifecycle path lines (enable_object_lifecycle_paths):
   // off at the description algorithm's default (ocel_fea_descr, the bank),
   // on at pm4py.llm.abstract_ocel_features' default (round BU).

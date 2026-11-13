@@ -10,6 +10,8 @@
 // for a single pair). A missing timestamp raises pm4py's error.
 
 #include <functional>
+#include <optional>
+#include <string>
 
 #include "minera/event_log.hpp"
 #include "minera/temporal_profile.hpp"
@@ -18,5 +20,13 @@ namespace minera {
 
 [[nodiscard]] TemporalProfile discover_temporal_profile_frame(
     const EventLog& log, const std::function<bool()>& cancelled = {});
+
+// pm4py's discover_temporal_profile(frame, activity_key, timestamp_key) on
+// other columns of the frame, the timestamp column as both completion and
+// start (round BV); nullopt where the frame's cells do not allow it (a
+// missing or non-date timestamp cell, activities that do not sort).
+[[nodiscard]] std::optional<TemporalProfile> discover_temporal_profile_frame(
+    const EventLog& log, const std::string& activity_key, const std::string& timestamp_key,
+    const std::function<bool()>& cancelled = {});
 
 }  // namespace minera

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BU (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–BV (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4778,7 +4778,47 @@ is unreachable in pm4py on polars 1.44.1; the LLM `case` variant stays
 Minera's own projection. No fixture changed. The device check on the Mac
 was skipped again (no device linked).
 
-Next round (BV) should start by re-reviewing round BU:
+Round BV re-reviewed BU (Review BV1; BU's CI run 43367732932 was green on
+all six jobs; BU's query audit held against the frontend's
+parameter combinations) and took its targets. It fixed the LLM context
+with a timestamp attribute on a CSV upload (the frame's own timestamp
+gives the plain text, the model descriptions run pm4py's DataFrame
+timestamp column check after the activity check and the temporal profile
+times its pairs by the column, the DFG and variants order and time each
+case by a date column with pandas' errors for missing and number columns,
+the event stream sorts the rows by the column) and the error texts of the
+trace filter (every value read before the join: `KeyError`, then
+`sequence item i: expected str instance, T found`) and the start and end
+filters (`KeyError`). The log filter bank and the attribute filters on
+typed XES attributes and the OCEL edge associations on nanosecond SQLite
+timestamps showed no other difference. Declared: the LLM DFG and variants
+timed by a date column with gaps or a text column. No fixture changed. The
+device check on the Mac was skipped again (no device linked).
+
+Next round (BW) should start by re-reviewing round BV:
+
+- `src/backend/llm_context.cpp`: `frame_timestamp_context` (which keys
+  and variants take the frame, `own_timestamp_key`, the check order after
+  `model_frame_key`, the declared fallbacks returning `nullopt`),
+  `frame_timestamped` and `frame_timestamp_check`;
+- `src/backend/llm_abstractions.cpp`: `frame_stream_ranks` (mixed types,
+  ties, nanosecond cells) and the event stream's `timestamp_key`;
+- `src/backend/temporal_profile.cpp`: the new
+  `discover_temporal_profile_frame` overload with a separate timestamp
+  key;
+- `src/backend/log_trace_filter.cpp`: `python_type` and the two-pass
+  value read (list, dict and date values on XES uploads);
+- new areas: the `/api/reference-table-*` routes on typed native
+  EventTable JSON inputs (never swept); the OCEL routes other than the
+  LLM context and the edge associations on nanosecond SQLite timestamps
+  (`/api/ocel/filter` time ranges, `/api/ocel/features` timestamp and
+  duration features, `/api/ocel/io` exports); the LLM context's timestamp
+  attribute on XES uploads with date attributes that have gaps;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BV commit.
+
+Round BU's targets, re-reviewed in BV (findings BV1-1 and BV1-2):
 
 - `src/backend/llm_context.cpp`: `model_frame_key` (which keys and
   variants take the frame, the error order, the case id KeyError) and

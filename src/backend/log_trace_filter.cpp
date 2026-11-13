@@ -1,6 +1,9 @@
 #include "minera/log_trace_filter.hpp"
 
 #include <algorithm>
+#include <optional>
+#include <string>
+#include <vector>
 #include <stdexcept>
 #include <string_view>
 
@@ -83,41 +86,70 @@ bool matches(std::string_view text, const Pattern& pattern) {
                              previous[text.size() - 1]);
 }
 
-const std::string& string_attribute(const EventAttribute& attribute,
-                                     std::string_view key) {
-  if (attribute.kind != AttributeKind::kString || attribute.is_null ||
-      attribute.container != AttributeContainerKind::kScalar ||
-      attribute.scalar_wrapper || attribute.scalar_children_list ||
-      !attribute.children.empty() ||
-      !std::holds_alternative<std::monostate>(attribute.typed_value))
-    throw std::invalid_argument("trace activity attribute must be a string: " + std::string(key));
-  return attribute.value;
+// The Python type of an attribute value, as str.join names it.
+std::string python_type(const EventAttribute& value) {
+  if (value.is_null) return "NoneType";
+  switch (value.container) {
+    case AttributeContainerKind::kList: return "list";
+    case AttributeContainerKind::kTuple: return "tuple";
+    case AttributeContainerKind::kContainer: return "dict";
+    case AttributeContainerKind::kSet: return "set";
+    case AttributeContainerKind::kFrozenSet: return "frozenset";
+    case AttributeContainerKind::kScalar: break;
+  }
+  if (value.kind == AttributeKind::kBoolean || std::holds_alternative<bool>(value.typed_value)) return "bool";
+  if (value.kind == AttributeKind::kInt || std::holds_alternative<std::int64_t>(value.typed_value) ||
+      std::holds_alternative<std::uint64_t>(value.typed_value)) return "int";
+  if (value.kind == AttributeKind::kFloat || std::holds_alternative<double>(value.typed_value)) return "float";
+  if (value.kind == AttributeKind::kBytes) return "bytes";
+  if (value.kind == AttributeKind::kId) return "UUID";
+  if (value.kind == AttributeKind::kDate || std::holds_alternative<NativeDate>(value.typed_value))
+    return "datetime.datetime";
+  return "str";
 }
 
-const std::string& activity(const Event& event, std::string_view key) {
+bool string_attribute(const EventAttribute& attribute) {
+  return attribute.kind == AttributeKind::kString && !attribute.is_null &&
+         attribute.container == AttributeContainerKind::kScalar &&
+         !attribute.scalar_wrapper && !attribute.scalar_children_list &&
+         attribute.children.empty() &&
+         std::holds_alternative<std::monostate>(attribute.typed_value);
+}
+
+// One event's selected value: its text, or the Python type of a value that
+// is no str.
+struct Selected {
+  const std::string* text = nullptr;
+  std::string type;
+};
+
+Selected activity(const Event& event, std::string_view key) {
+  const auto of = [](const EventAttribute& attribute) {
+    return string_attribute(attribute) ? Selected{&attribute.value, {}} : Selected{nullptr, python_type(attribute)};
+  };
   for (const auto& attribute : event.attributes)
-    if (attribute.key == key) return string_attribute(attribute, key);
+    if (attribute.key == key) return of(attribute);
   const auto projected = [&](std::string_view default_key, const std::string& source_key,
                              const std::optional<EventAttribute>& attribute,
                              FirstClassAttributeState state, const std::string& value)
-      -> const std::string* {
+      -> std::optional<Selected> {
     const auto actual = !source_key.empty() ? std::string_view(source_key)
         : attribute ? std::string_view(attribute->key) : default_key;
     if (actual != key || (state == FirstClassAttributeState::kMissing && value.empty() && !attribute))
-      return nullptr;
-    if (state == FirstClassAttributeState::kNull)
-      throw std::invalid_argument("trace activity attribute must be a string: " + std::string(key));
-    return attribute ? &string_attribute(*attribute, key) : &value;
+      return std::nullopt;
+    if (state == FirstClassAttributeState::kNull) return Selected{nullptr, "NoneType"};
+    return attribute ? of(*attribute) : Selected{&value, {}};
   };
-  if (const auto* value = projected("concept:name", event.activity_source_key,
+  if (auto value = projected("concept:name", event.activity_source_key,
           event.activity_attribute, event.activity_state, event.activity)) return *value;
-  if (const auto* value = projected("time:timestamp", event.timestamp_source_key,
+  if (auto value = projected("time:timestamp", event.timestamp_source_key,
           event.timestamp_attribute, event.timestamp_state, event.timestamp)) return *value;
-  if (const auto* value = projected("org:resource", event.resource_source_key,
+  if (auto value = projected("org:resource", event.resource_source_key,
           event.resource_attribute, event.resource_state, event.resource)) return *value;
-  if (const auto* value = projected("lifecycle:transition", event.lifecycle_source_key,
+  if (auto value = projected("lifecycle:transition", event.lifecycle_source_key,
           event.lifecycle_attribute, event.lifecycle_state, event.lifecycle)) return *value;
-  throw std::out_of_range("trace activity attribute is missing: " + std::string(key));
+  // pm4py reads x[activity_key] of every event: KeyError (round BV).
+  throw std::out_of_range("'" + std::string(key) + "'");
 }
 }  // namespace
 
@@ -129,10 +161,19 @@ EventLog filter_log_traces(const EventLog& source,
   EventLog result;
   copy_event_log_context(source, result);
   for (const auto& trace : source.traces) {
+    // pm4py joins the trace's values with ",": a missing one raises
+    // KeyError before the join's TypeError at the first value that is no
+    // str (round BV, observed black-box).
+    std::vector<Selected> values;
+    values.reserve(trace.events.size());
+    for (const auto& event : trace.events) values.push_back(activity(event, options.activity_key));
     std::string serialized;
-    for (std::size_t i = 0; i < trace.events.size(); ++i) {
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      if (!values[i].text)
+        throw std::invalid_argument("sequence item " + std::to_string(i) + ": expected str instance, " +
+                                    values[i].type + " found");
       if (i) serialized += ',';
-      serialized += activity(trace.events[i], options.activity_key);
+      serialized += *values[i].text;
     }
     const bool matched = patterns.empty() || std::any_of(patterns.begin(), patterns.end(),
         [&](const auto& pattern) { return matches(serialized, pattern); });

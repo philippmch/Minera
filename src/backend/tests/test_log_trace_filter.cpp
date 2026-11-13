@@ -158,7 +158,8 @@ void log_trace_filter_module_acceptance() {
       bool rejected=false;
       try { (void)filter_log_traces(source,captured.patterns,options); }
       catch(const std::invalid_argument& e) {
-        rejected=true; assert(std::string(e.what()).find("count")!=std::string::npos);
+        // pm4py joins the values: the TypeError names the item, not the key (round BV).
+        rejected=true; assert(std::string(e.what()).find("expected str instance, int found")!=std::string::npos);
       }
       assert(rejected);
     } else {

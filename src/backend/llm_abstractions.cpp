@@ -1038,8 +1038,48 @@ std::string stream_text(std::vector<StreamItem> items, const LlmAbstractionOptio
 
 // The frame's rows as dicts of their present cells in column order (NaN,
 // NaT and NA cells left out); a datetime column's cells are Timestamps.
+// Each row's rank among the rows sorted by the cells of `key` (equal cells
+// share a rank), for a stream sorted by another column (round BV, observed
+// black-box): pm4py sorts the row dicts by that cell, so a row without one
+// raises KeyError, and a str beside a number raises TypeError.
+std::vector<std::int64_t> frame_stream_ranks(const FrameView& view, const std::string& key) {
+  const auto found = std::find(view.keys.begin(), view.keys.end(), key);
+  if (found == view.keys.end()) throw std::invalid_argument("KeyError: '" + key + "'");
+  const auto column = static_cast<std::size_t>(found - view.keys.begin());
+  std::vector<std::size_t> order;
+  bool text = false, other = false;
+  for (std::size_t r = 0; r < view.rows.size(); ++r) {
+    const auto& cell = view.rows[r][column];
+    if (cell.kind == CellKind::kMissing) throw std::invalid_argument("KeyError: '" + key + "'");
+    (cell.kind == CellKind::kString ? text : other) = true;
+    order.push_back(r);
+  }
+  if (text && other) throw std::invalid_argument("TypeError: '<' not supported between instances of 'str' and a number");
+  const auto value = [&](std::size_t r) {
+    const auto& cell = view.rows[r][column];
+    return cell.kind == CellKind::kDate ? static_cast<double>(cell.micros) * 1000.0 + cell.nanos : cell.number;
+  };
+  const auto less = [&](std::size_t left, std::size_t right) {
+    const auto& a = view.rows[left][column];
+    const auto& b = view.rows[right][column];
+    if (text) return a.text < b.text;
+    if (a.kind == CellKind::kDate && b.kind == CellKind::kDate)
+      return a.micros != b.micros ? a.micros < b.micros : a.nanos < b.nanos;
+    return value(left) < value(right);
+  };
+  std::stable_sort(order.begin(), order.end(), less);
+  std::vector<std::int64_t> ranks(view.rows.size());
+  std::int64_t rank = 0;
+  for (std::size_t i = 0; i < order.size(); ++i) {
+    if (i && less(order[i - 1], order[i])) ++rank;
+    ranks[order[i]] = rank;
+  }
+  return ranks;
+}
+
 std::string frame_event_stream_description(const EventLog& log, const LlmAbstractionOptions& options) {
   const auto view = frame_view(log);
+  const auto ranks = options.timestamp_key.empty() ? std::vector<std::int64_t>{} : frame_stream_ranks(view, options.timestamp_key);
   std::vector<StreamItem> items;
   items.reserve(view.rows.size());
   for (std::size_t r = 0; r < view.rows.size(); ++r) {
@@ -1052,7 +1092,7 @@ std::string frame_event_stream_description(const EventLog& log, const LlmAbstrac
               (view.dtypes[i] == FrameDtype::kDate && cell.kind == CellKind::kDate ? timestamp_repr(cell.micros, true, cell.nanos)
                                                                                     : cell_repr(cell));
     }
-    items.push_back({view.micros[r], line + "}\n"});
+    items.push_back({ranks.empty() ? view.micros[r] : ranks[r], line + "}\n"});
   }
   return stream_text(std::move(items), options);
 }

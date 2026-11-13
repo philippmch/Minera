@@ -25063,3 +25063,82 @@ Verification (scripts in the project files under `review-harness/round-bu/`;
 | Unknown query parameters on the ten session routes (contract test; every other route that reads the query already checks an allow list) | 10 routes | unknown names refused, known controls and the routes' own errors unchanged |
 | Re-review of BT on fresh seeds: `dfgkeys.py`, `dfgdfkeys.py`, `statkeys.py` (round BT's scripts) | 1,200, 880 and 1,200 | all equal or raising alike with pm4py's message |
 | Full suites: ctest, script tests, frontend tests, fixture replay | 479 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+## Review BV1: re-review of round BU, the log filter bank on typed XES attributes, the LLM context with a timestamp attribute and the OCEL edge timings on nanosecond timestamps (2026-11-13)
+
+Round BV checked BU's CI run (43367732932: green on all six jobs),
+re-reviewed BU (the query-string audit of the ten session routes
+against the frontend's parameter combinations, the `FrameKeyScope`
+argument, the lifecycle path features: no regressions) and took BU's
+targets. Findings, all fixed:
+
+- **BV1-1 The LLM context with a timestamp attribute on a CSV upload.**
+  `/api/llm-context` with `timestamp_attribute` set projected each event's
+  timestamp from a plain event attribute, so on a CSV upload every column
+  of the frame that is no plain attribute (the upload's activity, case and
+  timestamp columns, `time:timestamp`) raised `context timestamp attribute
+  is absent or null` or `context activity attribute is absent or null`,
+  and the typed columns timed nothing. pm4py.llm on the upload's frame
+  with `timestamp_key`: the frame's own timestamp column (the CSV's or
+  `time:timestamp`) gives the text of no key; `log_attributes` and
+  `log_features` never read the key; `log_skeleton`, `declare` and
+  `temporal_profile` check it as a DataFrame timestamp column after the
+  activity column (`the specified timestamp column is not contained in the
+  dataframe. Available columns: [...]`, `the timestamp column should be of
+  time datetime. Use the function pandas.to_datetime`, `the timestamp
+  column should not contain any empty value.`) and the temporal profile
+  times its pairs by the column; the DFG and variants order and time each
+  case by a date column (a missing column raises `KeyError: 'x'`, for the
+  variants `KeyError: 'Column not found: x'`; a number column raises
+  `AttributeError: Can only use .dt accessor with datetimelike values` on
+  the DFG and `AttributeError: '<int|float|bool|str>' object has no
+  attribute 'timestamp'` on the variants); the event stream sorts the rows
+  by the column whatever its type (stable, a row without the cell raises
+  `KeyError`). Before, 72 of 6,000 answers on CSV uploads were equal or
+  raised alike.
+- **BV1-2 The trace and start activity filters' errors.**
+  `/api/reference-log-filter`'s trace filter (`traces`) raised Minera's own
+  `trace activity attribute must be a string: <key>` at the first event
+  whose value was no string and `trace activity attribute is missing:
+  <key>` at a missing one; pm4py's `trace_filter` reads every event's value
+  first (a missing one raises `KeyError: '<key>'`) and only then joins
+  them (`sequence item <i>: expected str instance, <type> found`, naming
+  the first value that is no `str`). The start and end filters' missing
+  key raised `boundary activity attribute is missing: <key>`; pm4py raises
+  `KeyError: '<key>'` from `trace[0][key]` (`trace[-1][key]`). The
+  filtered logs were already equal.
+
+Declarations:
+
+- The LLM context's DFG and variants timed by a date column with gaps:
+  pandas orders and subtracts `NaT` by the data (the error or the text
+  depends on where the gap falls and on `include_performance`); Minera
+  keeps its own projection there.
+- The LLM context's DFG timed by a text column raises a `TypeError` whose
+  wording depends on the cells (pandas' subtraction of the first pair it
+  meets); Minera keeps its own projection there.
+- The `case` and `petri_net` variants keep the projection (round BU's
+  declaration); AQ's hash-seed `could not convert string to float` in
+  `log_features` reconfirmed.
+- Not swept, moved to round BW: the `/api/reference-table-*` routes on
+  typed native EventTable JSON inputs, and the OCEL routes other than the
+  LLM context and the edge associations on nanosecond SQLite timestamps
+  (OCEL JSON and XML imports keep pm4py's microseconds, round BA).
+- The case statistics' start and end on nanosecond cells (round BQ), the
+  CSV timestamp columns of plain numbers and "roles to diagnostics groups"
+  (round AT) stay as declared.
+
+Tests: `minera_review_bv1_tests` (values taken from pm4py on the same
+CSV upload); `minera_log_trace_filter_tests` now expects the join's
+`TypeError` text.
+
+Verification (scripts in the project files under `review-harness/round-bv/`;
+"before" is round BU's server on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Log filter bank on typed XES attributes (`logfilt.py`: every operation of `/api/reference-log-filter` with string, int, float, bool and date keys and missing values) | 1,260 typed, 630 plain | all equal or raising alike; the error texts of BV1-2 differed before |
+| Log attribute filters on typed XES (`logattr.py`: traces, events, numeric traces/events, trace values, top activities, relative occurrence; typed and plain values) | 1,120 | all equal or raising alike (before and after) |
+| LLM context with an activity and a timestamp attribute (`llmboth.py`: every variant; activity keys `act`, `concept:name`, int, float, text, bool; timestamp keys `ts`, `time:timestamp`, a date with gaps, an int, text) | 6,000 on CSV uploads before; 1,920 on CSV uploads with every column as timestamp key and 4,000 on XES uploads after | before: 72 of 6,000 equal or raising alike; after: all equal or raising alike except the declared date-with-gaps and text-column cases and AQ's `log_features` errors |
+| OCEL edge associations on nanosecond SQLite timestamps (`ocelsqlns.py`) | 68 files | all equal (pm4py's `total_seconds()` keeps microseconds; so does Minera) |
+| Full suites: ctest, script tests, frontend tests, fixture replay | 480 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; no fixture changed |

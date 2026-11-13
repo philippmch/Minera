@@ -42,7 +42,8 @@ Selected endpoint(const Trace& trace, bool start, std::string_view key) {
   if (trace.events.empty()) throw std::out_of_range("list index out of range");
   const auto value=selected(start ? trace.events.front() : trace.events.back(),key);
   if (!value.present)
-    throw std::out_of_range("boundary activity attribute is missing: "+std::string(key));
+    // pm4py reads trace[0][activity_key]: KeyError (round BV).
+    throw std::out_of_range("'"+std::string(key)+"'");
   return value;
 }
 EventLog apply(const EventLog& source, const std::vector<std::string>& admitted,

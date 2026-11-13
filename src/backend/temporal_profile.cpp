@@ -1265,6 +1265,12 @@ TemporalProfile discover_temporal_profile_frame(const EventLog& log,
   return std::move(*profile);
 }
 
+std::optional<TemporalProfile> discover_temporal_profile_frame(const EventLog& log, const std::string& activity_key,
+                                                               const std::string& timestamp_key,
+                                                               const std::function<bool()>& cancelled) {
+  return frame_temporal_profile(frame_times::Frame(log), activity_key, timestamp_key, timestamp_key, cancelled);
+}
+
 TemporalProfile discover_temporal_profile_as_uploaded(const EventLog& log,
                                                      const TemporalProfileOptions& options,
                                                      const std::function<bool()>& cancelled) {

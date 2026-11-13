@@ -83,11 +83,77 @@ std::optional<EventLog> model_frame_key(const EventLog& source,const LlmContextO
  if(options.variant=="temporal_profile"&&key=="case:concept:name")throw std::invalid_argument("KeyError: \"['case:concept:name_2'] not in index\"");
  return std::move(keyed->log);
 }
+// Whether `key` names the timestamp pm4py's frame of the upload already
+// holds: time:timestamp, or the CSV's own timestamp column, which
+// format_dataframe leaves beside it as the same datetimes.
+bool own_timestamp_key(const EventLog& log,const std::string& key){
+ if(key=="time:timestamp")return true;
+ for(const auto& trace:log.traces)for(const auto& event:trace.events)if(!event.timestamp_source_key.empty())return event.timestamp_source_key==key;
+ return false;
+}
+// pm4py's DataFrame check of a timestamp column (after the activity's): a
+// column the frame lacks, one of another dtype than datetime, then a gap.
+void frame_timestamp_check(const EventLog& source,const std::string& key){
+ const auto columns=frame_keys(source,FrameKeyScope::kDataFrame);
+ if(!columns.contains(key))throw std::invalid_argument("the specified timestamp column is not contained in the dataframe. Available columns: "+dataframe_available_columns({columns.begin(),columns.end()}));
+ const auto keyed=frame_keyed_activities(source,key,FrameKeyScope::kDataFrame);
+ if(!keyed||keyed->column!=DataFrameColumnType::kDate)throw std::invalid_argument("the timestamp column should be of time datetime. Use the function pandas.to_datetime");
+ if(keyed->any_missing)throw std::invalid_argument("the timestamp column should not contain any empty value.");
+}
+// The upload with each event's timestamp taken from a date column of its
+// frame without gaps (str() of the cell); nullopt for any other column.
+std::optional<EventLog> frame_timestamped(const EventLog& source,const std::string& key){
+ const auto keyed=frame_keyed_activities(source,key,FrameKeyScope::kDataFrame);
+ if(!keyed||keyed->column!=DataFrameColumnType::kDate||keyed->any_missing)return std::nullopt;
+ auto log=source;
+ for(std::size_t t=0;t<log.traces.size();++t)for(std::size_t e=0;e<log.traces[t].events.size();++e){auto& event=log.traces[t].events[e];event.timestamp=keyed->log.traces[t].events[e].activity;event.timestamp_state=FirstClassAttributeState::kPresent;event.timestamp_attribute.reset();}
+ return log;
+}
+// The context with timestamp_attribute on an upload's frame: pm4py.llm with
+// timestamp_key as a column of the DataFrame (round BV, observed black-box;
+// the projection of the events read no frame column and failed even for
+// time:timestamp). nullopt where the events' projection still answers.
+std::optional<LlmContextResult> frame_timestamp_context(const EventLog& source,const LlmContextOptions& options,const PetriNet* net,const PnmlDocument* document){
+ const auto& key=options.timestamp_attribute;const auto& variant=options.variant;
+ if(!source.dataframe_columns||key.empty())return std::nullopt;
+ auto plain=options;plain.timestamp_attribute.clear();
+ // The frame's own timestamp describes as no key does; the column and
+ // features descriptions never read the key.
+ if(own_timestamp_key(source,key)||variant=="log_attributes"||variant=="log_features")return build_llm_context(source,plain,net,document);
+ if(variant=="log_skeleton"||variant=="declare"||variant=="temporal_profile"){
+  // pm4py checks the activity column, then the timestamp column; the log
+  // skeleton and Declare then read no timestamp.
+  if(!options.activity_attribute.empty()&&options.activity_attribute!="concept:name")(void)model_frame_key(source,plain);
+  frame_timestamp_check(source,key);
+  if(variant!="temporal_profile")return build_llm_context(source,plain,net,document);
+  if(const auto profile=discover_temporal_profile_frame(source,options.activity_attribute.empty()?std::string("concept:name"):options.activity_attribute,key))
+   return whole("temporal_profile",abstract_temporal_profile(*profile,options.include_header));
+  return std::nullopt;
+ }
+ if(variant!="dfg"&&variant!="variants"&&variant!="event_stream")return std::nullopt;
+ // A column the frame lacks: pandas' KeyError (the variants look it up).
+ if(!frame_keys(source,FrameKeyScope::kDataFrame).contains(key))throw std::invalid_argument(variant=="variants"?"KeyError: 'Column not found: "+key+"'":"KeyError: '"+key+"'");
+ // The stream sorts the frame's rows by the column, whatever its type.
+ if(variant=="event_stream")return exact("event_stream",plain,[&](LlmAbstractionOptions o){o.timestamp_key=key;return llm_event_stream_description(source,o);});
+ // The DFG and variants order and time each case by a date column.
+ if(const auto timed=frame_timestamped(source,key))return build_llm_context(*timed,plain,net,document);
+ // A number column fails on the DFG's .dt accessor; the variants read
+ // .timestamp() of a cell of any other type than datetime. A date column
+ // with gaps (NaT) and the DFG on a text column stay declared.
+ const auto keyed=frame_keyed_activities(source,key,FrameKeyScope::kDataFrame);
+ const auto column=keyed?keyed->column:std::optional<DataFrameColumnType>{};
+ if(!column||*column==DataFrameColumnType::kDate)return std::nullopt;
+ const bool numbers=*column==DataFrameColumnType::kInt64||*column==DataFrameColumnType::kFloat64||*column==DataFrameColumnType::kBool;
+ if(variant=="dfg"){if(numbers)throw std::invalid_argument("AttributeError: Can only use .dt accessor with datetimelike values");return std::nullopt;}
+ const char* type=*column==DataFrameColumnType::kInt64?"int":*column==DataFrameColumnType::kFloat64?"float":*column==DataFrameColumnType::kBool?"bool":"str";
+ throw std::invalid_argument(std::string("AttributeError: '")+type+"' object has no attribute 'timestamp'");
+}
 } // namespace
 std::vector<std::string> llm_context_variants(){return {"case","dfg","variants","event_stream","log_attributes","log_features","declare","log_skeleton","temporal_profile","petri_net","ocel","ocel_features","ocel_ocdfg"};}
 bool llm_context_is_ocel(std::string_view variant){return variant=="ocel"||variant=="ocel_features"||variant=="ocel_ocdfg";}
 LlmContextResult build_llm_context(const EventLog& source,const LlmContextOptions& options,const PetriNet* supplied_net,const PnmlDocument* document){
  validate(options);if(llm_context_is_ocel(options.variant))throw std::invalid_argument("object-centric context requires an OCEL source");
+ if(auto timed=frame_timestamp_context(source,options,supplied_net,document))return std::move(*timed);
  // On an upload's frame pm4py.llm takes activity_key as a column of the
  // DataFrame (round BT, observed black-box): the DFG, variants and features
  // descriptions read it (LlmAbstractionOptions::activity_key), the stream and
