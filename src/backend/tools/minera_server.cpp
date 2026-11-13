@@ -1034,11 +1034,31 @@ class FormFieldAuditScope {
     }
     return std::nullopt;
   }
+  // The same over the query parameters too, for a route that reads its
+  // controls from either.
+  std::optional<std::string> unconsulted_control(const httplib::Request& request) const {
+    if (auto name = unconsulted(request)) return name;
+    for (const auto& [name, value] : request.params) {
+      (void)value;
+      if (!audit_.consulted.contains(name)) return name;
+    }
+    return std::nullopt;
+  }
 
  private:
   FormFieldAudit audit_;
   FormFieldAudit* previous_;
 };
+
+// The replay, alignment and fitness upload routes read their controls
+// through lookups over the form fields and the query string
+// (parse_mine_params and the route parsers), so a misspelled or
+// inapplicable control was dropped silently (round BT). Their lookups record
+// each name they consult; a supplied name none of them consulted is refused.
+void reject_unconsulted_controls(const FormFieldAuditScope& audit, const httplib::Request& request) {
+  if (const auto name = audit.unconsulted_control(request))
+    throw std::invalid_argument("unknown or inapplicable " + request.path + " field: " + *name);
+}
 
 std::string form_field(const httplib::Request& request,
                        const std::string& name) {
@@ -1360,7 +1380,11 @@ minera::DfgVariantsAnalysis analyze_dfg_variants(
         {name, minera::discover_dfg_statistics(log, options)});
   }
   if (!causal_variants.empty()) {
-    const auto frequency = minera::discover_frequency_dfg(log, shared_options);
+    // The causal relations read the native DFG, keyed as the statistical
+    // variants are (round BT: a typed column of an upload's frame).
+    auto frequency_options = shared_options;
+    frequency_options.variant = minera::DfgStatisticalVariant::kNative;
+    const auto frequency = minera::discover_dfg_statistics(log, frequency_options).frequency_dfg;
     result.causal.reserve(causal_variants.size());
     for (const auto& name : causal_variants) {
       const auto variant = name == "heuristic"
@@ -1660,6 +1684,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           log, params.dfg_statistical_variants, params.dfg_causal_variants,
           dfg_statistics_for_source(params.dfg_statistics,
                                     active_source.get()));
+      for (const auto& activity : minera::dfg_variant_activities(*dfg_variants_analysis))
+        graph.ensure_activity(activity);
     }
     std::optional<minera::CorrelationVariantsAnalysis>
         correlation_variants_analysis;
@@ -2054,11 +2080,14 @@ std::size_t ocel_query_size(const httplib::Request& request,
   return parsed;
 }
 
+// `form_fields` also reads a multipart field of that name (the query string
+// wins).
 std::vector<std::uint32_t> parse_playout_marking(
-    const httplib::Request& request, std::string_view name) {
+    const httplib::Request& request, std::string_view name, bool form_fields = false) {
   const auto key = std::string(name);
-  if (!request.has_param(key)) return {};
-  const auto value = request.get_param_value(key);
+  const bool field = form_fields && !request.has_param(key) && request.has_file(key);
+  if (!request.has_param(key) && !field) return {};
+  const auto value = field ? request.get_file_value(key).content : request.get_param_value(key);
   if (value.empty())
     throw std::invalid_argument(key + ": expected a non-empty marking");
   std::vector<std::uint32_t> result;
@@ -4215,6 +4244,7 @@ void handle_dfg_discovery(const httplib::Request& request,
     auto graph = minera::discover_directly_follows_graph(require_prepared_log(*session));
     register_activity_selector_values(graph, require_prepared_log(*session), params.dfg_statistics.activity_attribute);
     const auto variants = analyze_dfg_variants(require_prepared_log(*session), params.dfg_statistical_variants, params.dfg_causal_variants, dfg_statistics_for_source(params.dfg_statistics, session->active_source.get()));
+    for (const auto& activity : minera::dfg_variant_activities(variants)) graph.ensure_activity(activity);
     std::optional<minera::OmitAnalysisTraces> omit_traces(std::in_place, !analysis_include_traces(request));
     const auto result = minera::analysis_json(
       /* dataset */ session->dataset,
@@ -6421,7 +6451,7 @@ void handle_boundary_activities(const httplib::Request& request,
         minera::parse_boundary_activities_params(lookup, present);
     response.set_content(
         minera::boundary_activities_json(
-            minera::discover_boundary_activities(require_prepared_log(*session), options)),
+            minera::discover_boundary_activities_as_uploaded(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -6630,12 +6660,17 @@ void handle_token_replay(const httplib::Request& request,
     if (!request.is_multipart_form_data() || !request.has_file("log") ||
         !request.has_file("model"))
       throw std::invalid_argument("token replay requires multipart fields log and model");
+    FormFieldAuditScope field_audit;
+    audit_form_field("log");
+    audit_form_field("model");
     const auto lookup = [&](std::string_view name) {
+      audit_form_field(name);
       const std::string key(name);
       return request.has_file(key) ? form_field(request, key)
              : request.has_param(key) ? request.get_param_value(key) : std::string{};
     };
     const auto present = [&](std::string_view name) {
+      audit_form_field(name);
       const std::string key(name);
       return request.has_file(key) || request.has_param(key);
     };
@@ -6654,6 +6689,7 @@ void handle_token_replay(const httplib::Request& request,
     auto options = minera::tools::default_replay_input_options(
         log, minera::tools::pnml_replay_options(document, params.token_replay),
         params.token_replay_activity_attribute_supplied);
+    reject_unconsulted_controls(field_audit, request);
     options.cancelled = connection_cancel_hook(request);
     response.set_content(minera::token_replay_result_json(
         minera::replay_token_result(log, document.net, options)), "application/json");
@@ -6671,12 +6707,17 @@ void handle_token_replay_workbench(const httplib::Request& request,
     if (!request.is_multipart_form_data() || !request.has_file("log") ||
         !request.has_file("model"))
       throw std::invalid_argument("token replay requires multipart fields log and model");
+    FormFieldAuditScope field_audit;
+    audit_form_field("log");
+    audit_form_field("model");
     const auto lookup = [&](std::string_view name) {
+      audit_form_field(name);
       const std::string key(name);
       return request.has_file(key) ? form_field(request, key)
              : request.has_param(key) ? request.get_param_value(key) : std::string{};
     };
     const auto present = [&](std::string_view name) {
+      audit_form_field(name);
       const std::string key(name);
       return request.has_file(key) || request.has_param(key);
     };
@@ -6722,6 +6763,7 @@ void handle_token_replay_workbench(const httplib::Request& request,
                     present("token_replay_disable_variants")))
       throw std::invalid_argument(
           "place/transition fitness, return-names and variant grouping require forward replay");
+    reject_unconsulted_controls(field_audit, request);
     std::optional<minera::EventStream> stream;
     std::optional<minera::EventTable> table;
     std::optional<minera::LazyEventTable> lazy;
@@ -6827,12 +6869,17 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
     if (!request.is_multipart_form_data() || !request.has_file("log") ||
         !request.has_file("model"))
       throw std::invalid_argument("Petri alignment requires multipart fields log and model");
+    FormFieldAuditScope field_audit;
+    audit_form_field("log");
+    audit_form_field("model");
     const auto lookup = [&](std::string_view name) {
+      audit_form_field(name);
       const std::string key(name);
       return request.has_file(key) ? form_field(request, key)
              : request.has_param(key) ? request.get_param_value(key) : std::string{};
     };
     const auto present = [&](std::string_view name) {
+      audit_form_field(name);
       const std::string key(name);
       return request.has_file(key) || request.has_param(key);
     };
@@ -6886,6 +6933,7 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
     }
     if (!typed_source && !present("mining_selectors_json") && !is_xes && !present("alignment_case_id_attribute"))
       projection.case_id_attribute = params.csv.case_id_column;
+    reject_unconsulted_controls(field_audit, request);
     options.activity_attribute = projection.activity_attribute;
     minera::EventLog evaluated;
     if (adapter == "log") {
@@ -7023,12 +7071,17 @@ void handle_replay_fitness(const httplib::Request& request,
     if (!request.is_multipart_form_data() || !request.has_file("log") ||
         !request.has_file("model"))
       throw std::invalid_argument("replay fitness requires multipart fields log and model");
+    FormFieldAuditScope field_audit;
+    audit_form_field("log");
+    audit_form_field("model");
     const auto lookup = [&](std::string_view name) {
+      audit_form_field(name);
       const std::string key(name);
       return request.has_file(key) ? form_field(request, key)
              : request.has_param(key) ? request.get_param_value(key) : std::string{};
     };
     const auto present = [&](std::string_view name) {
+      audit_form_field(name);
       const std::string key(name);
       return request.has_file(key) || request.has_param(key);
     };
@@ -7037,6 +7090,7 @@ void handle_replay_fitness(const httplib::Request& request,
     if (present("fitness_variant") &&
         params.replay_fitness_variant != minera::ReplayFitnessVariant::TOKEN_BASED)
       throw std::invalid_argument("standalone replay fitness supports token-based fitness");
+    reject_unconsulted_controls(field_audit, request);
     const auto& file = request.get_file_value("log");
     std::istringstream input(file.content);
     // pm4py's token fitness of a frame sums its cases in case-id order.
@@ -7048,9 +7102,14 @@ void handle_replay_fitness(const httplib::Request& request,
     model_options.public_marking_semantics = true;
     const auto document = minera::parse_pnml_document(
         request.get_file_value("model").content, model_options);
+    // An omitted activity selector follows the upload's own activity column
+    // (a CSV with its own headers raised KeyError 'concept:name' on every
+    // replay; round BT), as /api/token-replay and /api/evaluate read it.
+    const auto fitness_options = minera::tools::default_evaluation_input_options(
+        log, params.replay_fitness_options, present("evaluation_activity_attribute"));
     response.set_content(minera::token_replay_fitness_result_json(
         minera::evaluate_replay_fitness(log, document,
-            minera::ReplayFitnessVariant::TOKEN_BASED, params.replay_fitness_options)),
+            minera::ReplayFitnessVariant::TOKEN_BASED, fitness_options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -7073,6 +7132,19 @@ void handle_check_model(const httplib::Request& request,
   }
 
   try {
+    // Every control this route reads; any other name was dropped silently
+    // (round BT). The model is the `model` field or the raw body.
+    static const std::set<std::string> allowed_params = {
+        "source_id", "pnml_public_markings", "pnml_infer_legacy_boundaries", "activity_attribute"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed_params.contains(key)) throw std::invalid_argument("unknown check-model parameter: " + key);
+    }
+    for (const auto& [key, value] : request.files) {
+      (void)value;
+      if (key != "model" && key != "pnml_public_markings")
+        throw std::invalid_argument("unknown check-model field: " + key);
+    }
     if (request.has_param("source_id") && request.get_param_value("source_id") !=
         std::to_string(session->query_source_id))
       throw std::invalid_argument("the source log changed; rediscover the model before checking it");
@@ -8517,6 +8589,20 @@ void handle_compare_petri(const httplib::Request& request,
     return;
   }
   try {
+    // Every control this route reads, as a form field or in the query
+    // string; any other name was dropped silently (round BT).
+    static const std::set<std::string> allowed = {
+        "reference_log", "miner", "activity_attribute", "initial_marking", "final_marking",
+        "walk_through_hidden_trans", "try_to_reach_final_marking_through_hidden",
+        "stop_immediately_unfit", "exhaustive_invisible_exploration", "cleaning_token_flood"};
+    for (const auto& [key, value] : request.params) {
+      (void)value;
+      if (!allowed.contains(key)) throw std::invalid_argument("unknown compare-petri parameter: " + key);
+    }
+    for (const auto& [key, value] : request.files) {
+      (void)value;
+      if (!allowed.contains(key)) throw std::invalid_argument("unknown compare-petri field: " + key);
+    }
     if (!request.has_file("reference_log")) {
       response.status = 400;
       response.set_content(error_json("missing form field: reference_log"),
@@ -8701,12 +8787,14 @@ void handle_compare_petri(const httplib::Request& request,
       throw std::invalid_argument(
           "Petri usage comparison exceeds the server work budget");
     }
-    if (request.has_param("initial_marking")) {
-      comparison_options.initial_marking = parse_playout_marking(request, "initial_marking");
+    // The client sends the markings as form fields (round BT: they were read
+    // from the query string only, so a form field marking was dropped).
+    if (request.has_param("initial_marking") || request.has_file("initial_marking")) {
+      comparison_options.initial_marking = parse_playout_marking(request, "initial_marking", true);
       comparison_options.initial_marking_keys.clear();
     }
-    if (request.has_param("final_marking")) {
-      comparison_options.final_marking = parse_playout_marking(request, "final_marking");
+    if (request.has_param("final_marking") || request.has_file("final_marking")) {
+      comparison_options.final_marking = parse_playout_marking(request, "final_marking", true);
       comparison_options.final_marking_keys.clear();
     }
     std::optional<minera::EventLog> projected_powl_log;
@@ -10852,12 +10940,14 @@ void handle_dfg_dataframe(const httplib::Request& request,
     auto frame_table = params.dfg_backend == minera::DfgTableBackend::kPandas
                            ? csv_frame_table(*session) : std::nullopt;
     if (frame_table) mark_csv_nan_cells(*frame_table);
+    // pandas names the activities str() of the frame's cells (round BT).
+    const minera::EventLog* csv_frame = frame_table ? &session->active_source->checked_log() : nullptr;
     const auto& table = frame_table ? *frame_table : *table_view.table();
     if (params.dfg_operation == minera::DfgTableOperation::kGraph) {
       if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
         response.set_content(
             minera::serialize_dfg_dataframe_json(
-                minera::discover_pandas_dfg(table, params.dfg_table_options)),
+                minera::discover_pandas_dfg(table, params.dfg_table_options, csv_frame)),
             "application/json");
       } else {
         const auto lazy_view = cached_source_view(*session,minera::EventDataKind::kLazyEventTable);

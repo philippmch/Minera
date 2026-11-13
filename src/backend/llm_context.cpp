@@ -39,7 +39,7 @@ struct Text {
 // Reference abstraction options from the context request. The exact
 // abstractions (include/minera/llm_abstractions.hpp) do not report whether the
 // budget cut anything, so the result is compared with an unbounded call.
-LlmAbstractionOptions abstraction_options(const LlmContextOptions& options){LlmAbstractionOptions result;result.max_len=options.max_len;result.response_header=options.include_header;result.include_header=options.include_header;result.include_performance=options.include_performance;result.relative_frequency=options.relative_frequency;result.primary_performance_aggregation=options.primary_aggregation;result.secondary_performance_aggregation=options.secondary_aggregation;return result;}
+LlmAbstractionOptions abstraction_options(const LlmContextOptions& options){LlmAbstractionOptions result;result.max_len=options.max_len;result.response_header=options.include_header;result.include_header=options.include_header;result.include_performance=options.include_performance;result.relative_frequency=options.relative_frequency;result.primary_performance_aggregation=options.primary_aggregation;result.secondary_performance_aggregation=options.secondary_aggregation;result.activity_key=options.activity_attribute;return result;}
 template<class Describe>LlmContextResult exact(const std::string& variant,const LlmContextOptions& options,Describe describe){auto bounded=abstraction_options(options);auto text=describe(bounded);auto unbounded=bounded;unbounded.max_len=static_cast<std::size_t>(-1)/4;// A description can fail at a line max_len cuts off (a one-case variant's stdev): the bounded one is then cut.
 bool truncated=true;try{truncated=describe(unbounded)!=text;}catch(const std::invalid_argument&){}Text result(options.max_len);result.value=std::move(text);result.truncated=truncated;return result.finish(variant);}
 LlmContextResult whole(const std::string& variant,LlmContextResult described){Text result(static_cast<std::size_t>(-1));result.value=std::move(described.text);return result.finish(variant);}
@@ -64,7 +64,15 @@ void petri(Text& text,const PetriNet& net,const PnmlDocument* document,bool head
 std::vector<std::string> llm_context_variants(){return {"case","dfg","variants","event_stream","log_attributes","log_features","declare","log_skeleton","temporal_profile","petri_net","ocel","ocel_features","ocel_ocdfg"};}
 bool llm_context_is_ocel(std::string_view variant){return variant=="ocel"||variant=="ocel_features"||variant=="ocel_ocdfg";}
 LlmContextResult build_llm_context(const EventLog& source,const LlmContextOptions& options,const PetriNet* supplied_net,const PnmlDocument* document){
- validate(options);if(llm_context_is_ocel(options.variant))throw std::invalid_argument("object-centric context requires an OCEL source");const auto log=projected(source,options);
+ validate(options);if(llm_context_is_ocel(options.variant))throw std::invalid_argument("object-centric context requires an OCEL source");
+ // On an upload's frame pm4py.llm takes activity_key as a column of the
+ // DataFrame (round BT, observed black-box): the DFG, variants and features
+ // descriptions read it (LlmAbstractionOptions::activity_key), the stream and
+ // column descriptions list the frame whatever the key, and concept:name is
+ // the frame's own activity. The log then keeps its frame unprojected.
+ const bool frame_key=source.dataframe_columns&&!options.activity_attribute.empty()&&options.timestamp_attribute.empty()&&(options.variant=="dfg"||options.variant=="variants"||options.variant=="event_stream"||options.variant=="log_attributes"||options.variant=="log_features");
+ auto projection=options;if(frame_key||(source.dataframe_columns&&options.activity_attribute=="concept:name"))projection.activity_attribute.clear();
+ const auto log=projected(source,projection);
  // Reference abstractions (pm4py.llm abstract_dfg, abstract_variants,
  // abstract_log_attributes, abstract_log_features, abstract_event_stream,
  // abstract_log_skeleton, abstract_declare and abstract_temporal_profile).

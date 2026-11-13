@@ -33,6 +33,8 @@ struct VariantStatisticsResult {
 // case has (frame_slice_cases), so an XES case whose <trace> elements repeat
 // its name apart from each other counts other cases' rows (round BK, observed
 // black-box). Any other log is counted as discover_variant_statistics does.
+// A frame's key column passes pm4py's column check first
+// (frame_activity_column_error, round BT).
 [[nodiscard]] VariantStatisticsResult discover_variant_statistics_as_uploaded(
     const EventLog& log, const VariantStatisticsOptions& options = {});
 

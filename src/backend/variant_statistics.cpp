@@ -2,6 +2,7 @@
 #include "reference_activity_selector.hpp"
 
 #include "frame_cells.hpp"
+#include "minera/frame_keys.hpp"
 
 #include <algorithm>
 #include <map>
@@ -66,6 +67,17 @@ VariantStatisticsResult discover_variant_statistics(
 
 VariantStatisticsResult discover_variant_statistics_as_uploaded(
     const EventLog& log, const VariantStatisticsOptions& options) {
+  // pm4py.get_variants checks the key column of the frame first, then reads
+  // its cells, the upload's own case column too (round BT).
+  if (const auto keyed = frame_keyed_activities(log, options.activity_key)) {
+    if (const auto error = frame_activity_column_error(*keyed); !error.empty())
+      throw std::invalid_argument(error);
+    auto projected = options;
+    projected.activity_key = "concept:name";
+    auto result = discover_variant_statistics_as_uploaded(keyed->log, projected);
+    result.activity_key = options.activity_key;
+    return result;
+  }
   if (!log.dataframe_columns || log.dataframe_columns->csv_text)
     return discover_variant_statistics(log, options);
   return discover_variant_statistics(frame_slice_cases(log), options);

@@ -94,6 +94,8 @@ void require_sortable_classes(const std::set<FrameValueClass>& classes);
 struct FrameKeyedActivities {
   EventLog log;
   std::vector<std::vector<std::string>> types;
+  std::vector<std::vector<bool>> missing;  // NaN or NaT cells
+  bool any_missing = false;
   bool any_text = false;
   bool non_text = false;            // some cell is no str
   std::string first_non_text_type;  // in log order
@@ -117,5 +119,29 @@ struct FrameKeyedActivities {
 // another type: sorted() of the labels); empty when none.
 [[nodiscard]] std::string frame_keyed_inductive_error(const FrameKeyedActivities& keyed);
 [[nodiscard]] std::string frame_keyed_powl_error(const FrameKeyedActivities& keyed);
+
+// pm4py's DataFrame column check of an activity key on an upload's frame
+// (check_pandas_dataframe_columns, run by the simplified interface's
+// get_start_activities, get_end_activities, get_variants and
+// discover_performance_dfg): "the activity column should be of type
+// string." for a column of another dtype, then "the activity column should
+// not contain any empty value." for a gap (round BT, observed black-box).
+// Empty when the key passes, is concept:name, names no frame column, or the
+// log has no frame.
+[[nodiscard]] std::string frame_activity_column_error(const FrameKeyedActivities& keyed);
+[[nodiscard]] std::string frame_activity_column_error(const EventLog& log, std::string_view key);
+
+// pandas' DataFrame DFG on a CSV upload's frame names an activity str() of
+// the frame's cell (round BT, observed black-box): an int column's "007" is
+// "7", a float column's "2" is "2.0", a date cell its UTC Timestamp. The
+// next row's label goes through shift(), which turns an int64 column into
+// float64 ("7.0"). csv_frame_label_type is the key's dtype when its labels
+// are no text (nullopt: the cells' text is the label, or no CSV frame);
+// csv_frame_cell_label the label of a present cell (nullopt: missing).
+[[nodiscard]] std::optional<DataFrameColumnType> csv_frame_label_type(const EventLog& log,
+                                                                      const std::string& key);
+[[nodiscard]] std::optional<std::string> csv_frame_cell_label(DataFrameColumnType type,
+                                                              const std::string& key,
+                                                              const std::string& text, bool shifted);
 
 }  // namespace minera

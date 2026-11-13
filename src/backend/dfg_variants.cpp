@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -10,9 +11,11 @@
 #include <stdexcept>
 #include <string_view>
 
+#include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
 
 #include "business_hours.hpp"
+#include "python_scalar.hpp"
 #include "performance_arithmetic.hpp"
 
 namespace minera {
@@ -268,6 +271,28 @@ const std::string* dfg_event_field_value(const Event& event,
   return nullptr;
 }
 
+namespace {
+
+// pm4py's DFG variants keyed by a column of an upload's frame read that
+// column's cells as Python objects (round BT, observed black-box): a number,
+// a date or a missing cell names its activity str() of the cell ("7" for
+// "007", "2.0", "2021-05-01 00:00:00+00:00", "nan", "NaT"). The frame-keyed
+// log holds those labels under concept:name; nullopt when every cell is text
+// (the log's own lookup reads the same) or the log has no frame.
+std::optional<FrameKeyedActivities> dfg_frame_keyed(const EventLog& log,
+                                                    const DfgStatisticalOptions& options) {
+  auto keyed = frame_keyed_activities(log, options.activity_attribute);
+  if (!keyed || !keyed->non_text) return std::nullopt;
+  return keyed;
+}
+
+DfgStatisticalOptions dfg_concept_name(DfgStatisticalOptions options) {
+  options.activity_attribute = "concept:name";
+  return options;
+}
+
+}  // namespace
+
 DfgFrequency discover_frequency_dfg(const EventLog& log,
                                     const DfgStatisticalOptions& options) {
   DfgFrequency result;
@@ -469,34 +494,163 @@ DfgCleanAnalysis discover_clean_polars_dfg(
 
 DfgCleanTime discover_clean_time_dfg(
     const EventLog& log, const DfgStatisticalOptions& options) {
-  std::map<std::string, std::vector<double>> case_offsets;
+  // pandas' groupby means of the frame's datetime64 and timedelta64 values
+  // (round BT, observed black-box): each value a float64 of its int64 count
+  // of units, a Kahan-compensated sum, the quotient truncated to a whole
+  // unit. The per-case activity mean instant less the case's first instant
+  // is that case's offset; the result is the mean of an activity's offsets.
+  // The frame's unit is the microsecond unless a timestamp has digits below.
+  struct Instant {
+    const std::string* activity;
+    std::int64_t seconds;
+    std::uint32_t nanoseconds;
+  };
+  std::vector<std::vector<Instant>> cases;
+  bool nanoseconds = false;
   for (const auto& trace : log.traces) {
     const auto events = sorted_strict_events(trace, options);
     if (events.empty()) continue;
-    std::map<std::string, std::vector<double>> activity_instants;
+    auto& rows = cases.emplace_back();
     for (const auto& item : events) {
-      activity_instants[activity_value(*item.event, options)].push_back(
-          item.timestamp);
-    }
-    const double case_start = events.front().timestamp;
-    for (const auto& [activity, instants] : activity_instants) {
-      const double mean =
-          std::accumulate(instants.begin(), instants.end(), 0.0) /
-          static_cast<double>(instants.size());
-      case_offsets[activity].push_back(mean - case_start);
+      const auto exact = parse_timestamp_exact(timestamp_value(*item.event, options));
+      if (!exact) throw std::invalid_argument("DFG discovery: invalid event timestamp");
+      nanoseconds |= exact->nanoseconds % 1000 != 0;
+      rows.push_back({&activity_value(*item.event, options), exact->seconds, exact->nanoseconds});
     }
   }
+  // datetime64[ns] spans the years 1677-2262 only (outside them the frame
+  // keeps microseconds).
+  for (const auto& rows : cases)
+    for (const auto& row : rows)
+      if (row.seconds < -9'223'372'035 || row.seconds > 9'223'372'035) nanoseconds = false;
+  const std::int64_t per_second = nanoseconds ? 1'000'000'000 : 1'000'000;
+  // int64 counts of the unit.
+  const auto ticks = [&](const Instant& instant) {
+    return instant.seconds * per_second +
+           static_cast<std::int64_t>(nanoseconds ? instant.nanoseconds : instant.nanoseconds / 1000);
+  };
+  struct KahanMean {
+    double sum = 0.0;
+    double compensation = 0.0;
+    std::size_t count = 0;
+    void add(double value) {
+      const double y = value - compensation;
+      const double t = sum + y;
+      compensation = t - sum - y;
+      if (compensation != compensation) compensation = 0.0;
+      sum = t;
+      ++count;
+    }
+    // astype(int64) of the float mean: truncation toward zero.
+    [[nodiscard]] double truncated() const {
+      return std::trunc(sum / static_cast<double>(count));
+    }
+  };
+  std::map<std::string, KahanMean> offsets;
+  for (const auto& rows : cases) {
+    std::map<std::string, KahanMean> instants;
+    for (const auto& row : rows)
+      instants[*row.activity].add(static_cast<double>(ticks(row)));
+    // The mean instant and the case's first are int64 datetimes; their
+    // difference is exact before it becomes a float again.
+    const auto start = ticks(rows.front());
+    for (const auto& [activity, mean] : instants)
+      offsets[activity].add(static_cast<double>(static_cast<std::int64_t>(mean.truncated()) - start));
+  }
   DfgCleanTime result;
-  for (const auto& [activity, offsets] : case_offsets) {
-    result[activity] =
-        std::accumulate(offsets.begin(), offsets.end(), 0.0) /
-        static_cast<double>(offsets.size());
+  for (const auto& [activity, mean] : offsets)
+    result[activity] = mean.truncated() / static_cast<double>(per_second);
+  return result;
+}
+
+namespace {
+
+// pm4py's CLEAN variant on the frame keyed by a typed column (round BT,
+// observed black-box): a missing cell is no row of the case, and the rows on
+// either side of it are separate runs, each with its own start, end and
+// boundary rule. An int64 column's next-row labels pass through a float
+// column ("7.0").
+DfgCleanAnalysis frame_keyed_clean_dfg(const FrameKeyedActivities& keyed,
+                                       const DfgStatisticalOptions& options) {
+  const bool float_targets = keyed.column == DataFrameColumnType::kInt64;
+  const auto target_label = [&](const std::string& label) {
+    if (!float_targets) return label;
+    return python::float_repr(std::strtod(label.c_str(), nullptr));
+  };
+  DfgCleanAnalysis result;
+  for (std::size_t t = 0; t < keyed.log.traces.size(); ++t) {
+    const auto events = sorted_strict_events(keyed.log.traces[t], options);
+    std::vector<const std::string*> run;
+    const auto close_run = [&] {
+      if (run.empty()) return;
+      ++result.start_activities[*run.front()];
+      ++result.end_activities[*run.back()];
+      for (std::size_t i = 1; i + 1 < run.size(); ++i)
+        ++result.graph[{*run[i], target_label(*run[i + 1])}];
+      run.clear();
+    };
+    for (const auto& item : events) {
+      if (keyed.missing[t][item.position]) {
+        close_run();
+        continue;
+      }
+      run.push_back(&item.event->activity);
+    }
+    close_run();
   }
   return result;
 }
 
+DfgStatisticalAnalysis frame_keyed_dfg_statistics(const FrameKeyedActivities& keyed,
+                                                  const DfgStatisticalOptions& options) {
+  const auto projected = dfg_concept_name(options);
+  DfgStatisticalAnalysis result;
+  result.variant = options.variant;
+  switch (options.variant) {
+    case DfgStatisticalVariant::kPerformance:
+      // The DataFrame path (pm4py.discover_performance_dfg on the upload's
+      // frame) checks the key column first: a typed column is no str
+      // column, and a str or object column must have no gap.
+      if (options.dataframe_arithmetic)
+        if (const auto error = frame_activity_column_error(keyed); !error.empty())
+          throw std::invalid_argument(error);
+      result.performance_dfg = discover_performance_dfg(keyed.log, projected);
+      return result;
+    case DfgStatisticalVariant::kClean:
+      result.clean = frame_keyed_clean_dfg(keyed, projected);
+      result.frequency_dfg = result.clean.graph;
+      return result;
+    case DfgStatisticalVariant::kCleanTime:
+      // The CLEAN_TIME variant selects the key and timestamp columns, so the
+      // timestamp column as the key is a duplicate label; it fails on a key
+      // column with a missing cell (the message names these dtypes whatever
+      // the timestamps' unit).
+      if (const auto& timestamp = options.timestamp_attribute.empty() ? std::string("time:timestamp")
+                                                                       : options.timestamp_attribute;
+          options.activity_attribute == timestamp)
+        throw std::invalid_argument("ValueError: The column label '" + timestamp + "' is not unique.");
+      if (keyed.any_missing)
+        throw std::invalid_argument("TypeError: dtype datetime64[s] cannot be converted to timedelta64[ns]");
+      result.clean_time = discover_clean_time_dfg(keyed.log, projected);
+      return result;
+    case DfgStatisticalVariant::kCleanPolars:
+      // Not swept: the Polars frame keeps its own cells.
+      result.clean = discover_clean_polars_dfg(keyed.log, projected);
+      result.frequency_dfg = result.clean.graph;
+      return result;
+    default:
+      return discover_dfg_statistics(keyed.log, projected);
+  }
+}
+
+}  // namespace
+
 DfgStatisticalAnalysis discover_dfg_statistics(
     const EventLog& log, const DfgStatisticalOptions& options) {
+  // pm4py's EventLog variants keyed by a typed column of an upload's frame
+  // read its cells as Python objects (round BT).
+  if (const auto keyed = dfg_frame_keyed(log, options))
+    return frame_keyed_dfg_statistics(*keyed, options);
   DfgStatisticalAnalysis result;
   result.variant = options.variant;
   if (options.variant == DfgStatisticalVariant::kNative) {
@@ -517,6 +671,37 @@ DfgStatisticalAnalysis discover_dfg_statistics(
     result.clean_time = discover_clean_time_dfg(log, options);
   }
   return result;
+}
+
+std::vector<std::string> dfg_variant_activities(const DfgVariantsAnalysis& analysis) {
+  std::vector<std::string> out;
+  std::set<std::string> seen;
+  const auto add = [&](const std::string& activity) {
+    if (seen.insert(activity).second) out.push_back(activity);
+  };
+  const auto add_pair = [&](const DfgActivityPair& pair) {
+    add(pair.first);
+    add(pair.second);
+  };
+  for (const auto& named : analysis.statistical) {
+    const auto& a = named.analysis;
+    for (const auto& [pair, count] : a.frequency_dfg) add_pair(pair);
+    for (const auto& [triple, count] : a.frequency_triples) {
+      add(std::get<0>(triple));
+      add(std::get<1>(triple));
+      add(std::get<2>(triple));
+    }
+    for (const auto& [pair, statistics] : a.performance_dfg) add_pair(pair);
+    for (const auto& [pair, attributes] : a.case_attributes.edges) add_pair(pair);
+    for (const auto& [activity, attributes] : a.case_attributes.nodes) add(activity);
+    for (const auto& [pair, count] : a.clean.graph) add_pair(pair);
+    for (const auto& [activity, count] : a.clean.start_activities) add(activity);
+    for (const auto& [activity, count] : a.clean.end_activities) add(activity);
+    for (const auto& [activity, value] : a.clean_time) add(activity);
+  }
+  for (const auto& named : analysis.causal)
+    for (const auto& [pair, value] : named.analysis.relations) add_pair(pair);
+  return out;
 }
 
 DfgCausalAnalysis discover_dfg_causality(const DfgFrequency& dfg,

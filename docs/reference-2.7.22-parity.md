@@ -24858,3 +24858,121 @@ heuristics, Inductive and POWL errors), the LLM abstractions on a CSV with
 nanosecond cells and the stochastic map without a CTMC;
 `minera_server_parameter_contract_tests` binds the multipart rejection on
 DFG precision and an OCEL route.
+
+## Review BT1: re-review of round BS, typed columns as activity keys of the DFG variants, the DataFrame DFG, the LLM abstractions and the start/end and variant statistics, and unknown fields on the replay and model upload routes (2026-11-13)
+
+Round BT checked BS's CI run (43347116082: all jobs green), re-reviewed BS
+(the miners keyed by the frame's typed columns, the POWL Petri comparison on
+a CSV upload's own headers and the LLM abstractions on nanosecond cells: on
+fresh seeds only BS's declared differences remain) and took BS's targets:
+typed activity keys on the DFG routes, the LLM abstractions and the
+statistics families, the replay and alignment upload routes' unknown
+fields, and the LLM abstractions on XES uploads. The device check on the
+Mac was skipped (no device linked). Findings, all fixed:
+
+- **BT1-1 Typed columns as the activity key of the DFG variants.**
+  `/api/discover-dfg` (and the mine route's DFG variants) keyed by a typed
+  column of a CSV or XES upload's frame kept the cell's text. pm4py's
+  native, frequency-triples and causal variants (on `convert_to_event_log`)
+  name an activity `str()` of the typed cell (`007` is `7`, a float `2` is
+  `2.0`, a date its UTC `Timestamp`, a missing cell `nan` or `NaT`). The
+  CLEAN variant on the frame splits a case into runs at a missing key cell
+  (each run gives a start, an end and its inner pairs) and its shifted
+  target column turns an int64 key into floats (`2 -> 1.0`). CLEAN_TIME
+  raises `TypeError: dtype datetime64[s] cannot be converted to
+  timedelta64[ns]` on a missing key cell and `ValueError: The column label
+  'time:timestamp' is not unique.` keyed by the timestamp; its means are
+  pandas' groupby means of int64 units (microseconds, nanoseconds once a
+  cell has sub-microsecond digits; Kahan summation, truncated toward zero),
+  which also corrects the default key on fractional timestamps. The
+  performance variant, pm4py's `discover_performance_dfg` on the frame,
+  checks the key column first (`the activity column should be of type
+  string.`, then `the activity column should not contain any empty
+  value.`). The analysis registers every label it returns, so a typed label
+  no longer fails the graph lookup. On 10 uploads, 11 keys and 7 variants,
+  415 of 770 answers differed.
+- **BT1-2 The DataFrame DFG on typed keys.** `/api/dfg-dataframe` (pandas
+  `get_dfg_graph`) names an activity `str()` of the frame's typed cell and
+  its target through `shift()`, so an int64 key's targets are floats; Minera
+  kept the text. On 10 uploads, 106 of 220 answers differed. The pandas
+  adapter now reads the upload's frame (`csv_frame_cell_label`).
+- **BT1-3 The LLM abstractions keyed by a column.** `/api/llm-context` with
+  `activity_attribute` projected the events and dropped the frame, so on
+  every CSV upload `concept:name`, the upload's activity, case and
+  timestamp columns and any column with a blank raised `context activity
+  attribute is absent or null`, and the other keys gave the events' text.
+  pm4py's `abstract_dfg` keyed by a column is the DataFrame DFG of BT1-2
+  (pairs with a missing cell dropped); `abstract_variants` raises
+  `TypeError: sequence item N: expected str instance, T found` at the first
+  cell that is no `str`, or, when two variants tie on count and
+  performance, the `'<' not supported` TypeError of its sort comparing a
+  text with a NaN (the variants in case order, CPython's list.sort);
+  `abstract_event_stream` and `abstract_log_attributes` list the frame
+  whatever the key; `abstract_log_features` reads the key as its activity
+  (value and succession features). A key that names no column raises
+  pandas' KeyError (`"['x'] not in index"` for the DFG, `'Column not found:
+  x'` for the variants). On 10 uploads, 9 keys and 5 abstractions, 15 of 450
+  answers were equal.
+- **BT1-4 The features descriptions' budget.** pm4py's log and OCEL
+  features descriptions stop once the text reaches `max_len`; Minera added
+  one more line when the text was exactly `max_len` long (10 of 11 line
+  boundaries on one upload).
+- **BT1-5 Start/end activities and variant statistics keyed by a column.**
+  pm4py's `get_start_activities`, `get_end_activities` and `get_variants`
+  on an upload's frame check the key column as BT1-1's performance variant
+  does, and read the upload's own case column; Minera counted every key's
+  text (BK1 declared the column check) and returned nothing for the case
+  column. On 10 uploads and 10 keys, 158 of 200 answers differed. Both
+  routes (and the CLI) now go through `frame_activity_column_error` and the
+  keyed frame (`discover_boundary_activities_as_uploaded`).
+- **BT1-6 Unknown fields on the replay and model upload routes.**
+  `/api/token-replay`, `/api/replay-token-workbench`,
+  `/api/align-petri-workbench` and `/api/replay-fitness` read their controls
+  from either the form or the query string and ignored any other name;
+  `/api/check-model` and `/api/compare-petri` ignored names outside their
+  controls. A misspelled control was dropped silently; the four routes now
+  refuse a name none of their parsers consulted (`unknown or inapplicable
+  <route> field: <name>`) and the other two refuse names outside their
+  lists. `/api/compare-petri` read `initial_marking` and `final_marking`
+  from the query string only, so the markings the client sends as form
+  fields were dropped; it now reads both.
+- **BT1-7 Replay fitness on a CSV upload's own headers.**
+  `/api/replay-fitness` replayed `concept:name`, which a CSV upload with its
+  own headers holds under the header, so every such replay raised
+  `KeyError: 'concept:name'`; an omitted `evaluation_activity_attribute`
+  now follows the upload's activity column as `/api/token-replay` does
+  (equal to pm4py's `fitness_token_based_replay` on the frame).
+
+Declarations:
+
+- BS's float NaN declaration holds for the DFG variants too: pm4py's
+  EventLog holds each blank of a float column (and, on an XES upload, a
+  string attribute written as a float NaN) as its own object, so the
+  native, triples and causal variants give each blank event its own `nan`
+  activity; Minera labels them one `nan`.
+- `abstract_log_features` raises `could not convert string to float` in
+  pm4py only, on every key, under some hash seeds (AQ's declaration of
+  string keys with gaps typed as numbers by set order).
+- Not swept: the `clean_polars` variant keyed by a typed column, the LLM
+  context's other variants (case, Declare, log skeleton, temporal profile,
+  Petri net) keyed by a column and any variant with both an activity and a
+  timestamp attribute (these keep the projection of the events).
+- Still open: the session routes that read their controls from the query
+  string, such as `/api/align`, ignore unknown parameters.
+- The case statistics' start and end on nanosecond cells (round BQ), the
+  CSV timestamp columns of plain numbers and "roles to diagnostics groups"
+  (round AT) stay as declared.
+
+Verification (scripts in the project files under `review-harness/round-bt/`;
+"before" is round BS's server on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| DFG variants keyed by the frame's typed columns (`dfgkeys.py`: native, performance, frequency triples, clean, clean time, alpha and heuristic causal; keys `act`, `concept:name`, an integer, a float with gaps, a date with gaps, text with blanks, a bool, `ts`, `time:timestamp`, `@@index`, the case column) | 1,540 on 20 CSV uploads, 1,176 on 24 XES uploads | before (10 CSV uploads): 415 of 770 differed; after: 1,304 and 955 equal, 222 and 192 raise alike, 14 and 29 differ (declared float NaN) |
+| DataFrame DFG keyed by the frame's typed columns (`dfgdfkeys.py`, frequency and performance) | 440 on 20 uploads | before (10 uploads): 106 of 220 differed; after: all equal |
+| LLM abstractions keyed by a column (`llmkeys.py`: DFG, variants, event stream, log attributes, log features) | 3,780 on 132 CSV uploads, 600 on 20 XES uploads | before (10 uploads): 15 of 450 equal; after: equal or raising alike with the same message, apart from AQ's hash-seed feature error (pm4py only, 9 on one CSV upload, 24 on XES) |
+| Start/end activities and variant statistics keyed by the frame's columns (`statkeys.py`) | 800 on 40 CSV uploads, 560 on 40 XES uploads | before (10 uploads): 158 of 200 differed; after: all equal (errors with pm4py's message) |
+| Features budget at each line boundary (`budgetprobe.py`, `ocelbudget.py`: DFG, variants, event stream, log features, OCEL features) | 41 | before: 10 of 11 log-feature boundaries differed; after: all equal |
+| Unknown fields on the six upload routes, compare-petri markings, replay fitness on own headers (contract test and probes) | 6 routes | unknown names refused, known controls unchanged; replay fitness equal to pm4py |
+| Re-review of BS: `typedkeys.py` (15 uploads), `cmpxes.py` (15), `llmns.py` (15) | 915 | only BS's declared differences (blank float and text keys, alpha plus and POWL on `NaT`) |
+| Full suites: ctest, script tests, frontend tests, fixture replay | 478 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; no fixture changed |

@@ -1,5 +1,6 @@
 #include "minera/boundary_activities.hpp"
 #include "reference_activity_selector.hpp"
+#include "minera/frame_keys.hpp"
 
 #include <stdexcept>
 #include <string_view>
@@ -70,6 +71,18 @@ BoundaryActivitiesResult discover_boundary_activities(
     }
   }
   return result;
+}
+
+BoundaryActivitiesResult discover_boundary_activities_as_uploaded(
+    const EventLog& log, const BoundaryActivitiesOptions& options) {
+  if (const auto keyed = frame_keyed_activities(log, options.activity_key)) {
+    if (const auto error = frame_activity_column_error(*keyed); !error.empty())
+      throw std::invalid_argument(error);
+    auto projected = options;
+    projected.activity_key = "concept:name";
+    return discover_boundary_activities(keyed->log, projected);
+  }
+  return discover_boundary_activities(log, options);
 }
 
 BoundaryActivityCounts get_start_activities(const EventLog& log,

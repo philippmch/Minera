@@ -248,4 +248,11 @@ struct DfgVariantsAnalysis {
     const DfgFrequency& dfg,
     DfgCausalVariant variant = DfgCausalVariant::kAlpha);
 
+// Every activity an analysis names, in first-named order. A variant keyed by
+// a typed column of an upload's frame names str() of the cells (round BT),
+// which the log's selector values are not, so callers register these before
+// they resolve the analysis against an activity registry.
+[[nodiscard]] std::vector<std::string> dfg_variant_activities(
+    const DfgVariantsAnalysis& analysis);
+
 }  // namespace minera

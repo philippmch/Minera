@@ -744,6 +744,52 @@ int main(int argc, char** argv) {
             "an unbound run keeps working: " + describe(result));
     }
 
+    // Round BT: the replay, alignment and fitness upload routes refuse a
+    // form field or query parameter that none of their parsers reads (it was
+    // dropped silently); check-model and compare-petri refuse names outside
+    // their controls, and compare-petri reads its markings from form fields,
+    // as the client sends them.
+    {
+      const auto pnml = client.Get("/api/pnml?miner=inductive");
+      const std::string model = pnml ? pnml->body : std::string{};
+      for (const std::string route : {"/api/token-replay", "/api/replay-token-workbench",
+                                      "/api/align-petri-workbench", "/api/replay-fitness"}) {
+        httplib::MultipartFormDataItems items = {{"log", log, "log.csv", "text/csv"},
+                                                 {"model", model, "model.pnml", "application/xml"}};
+        result = client.Post(route, items);
+        check(result && result->status == 200, route + " runs: " + describe(result));
+        items.push_back({"zz_unknown", "1", "", ""});
+        result = client.Post(route, items);
+        check(result && result->status == 400 &&
+                  contains(result, "unknown or inapplicable " + route + " field: zz_unknown"),
+              route + " rejects an unknown form field: " + describe(result));
+        items.pop_back();
+        result = client.Post(route + "?zz_param=1", items);
+        check(result && result->status == 400 &&
+                  contains(result, "unknown or inapplicable " + route + " field: zz_param"),
+              route + " rejects an unknown query parameter: " + describe(result));
+      }
+      httplib::MultipartFormDataItems check_items = {{"model", model, "model.pnml", "application/xml"},
+                                                     {"activity_attribute", "activity", "", ""}};
+      result = client.Post("/api/check-model", check_items);
+      check(result && result->status == 400 && contains(result, "unknown check-model field: activity_attribute"),
+            "check-model rejects its query control sent as a form field: " + describe(result));
+      httplib::MultipartFormDataItems compare = {{"reference_log", log, "log.csv", "text/csv"},
+                                                 {"miner", "inductive", "", ""}};
+      result = client.Post("/api/compare-petri", compare);
+      check(result && result->status == 200, "compare-petri runs: " + describe(result));
+      compare.push_back({"initial_marking", "1", "", ""});
+      result = client.Post("/api/compare-petri", compare);
+      check(result && result->status == 400 && contains(result, "initial marking dimension does not match net"),
+            "compare-petri reads a form field marking: " + describe(result));
+      compare.back() = {"zz_unknown", "1", "", ""};
+      result = client.Post("/api/compare-petri", compare);
+      check(result && result->status == 400 && contains(result, "unknown compare-petri field: zz_unknown"),
+            "compare-petri rejects an unknown field: " + describe(result));
+      result = mine("/api/mine", {});
+      check(result && result->status == 200, "re-mine after the model checks: " + describe(result));
+    }
+
     // Item 4: basic Petri playout generates pm4py's 1000 traces by default.
     result = client.Get("/api/playout?miner=inductive");
     check(result && result->status == 200 && count(result->body, "<trace>") == 1000,

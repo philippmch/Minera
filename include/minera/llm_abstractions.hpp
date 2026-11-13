@@ -26,6 +26,12 @@ struct LlmAbstractionOptions {
   // OCDFG discovery setting; without edge performance the reference
   // description raises once the graph has an edge.
   bool compute_edges_performance = true;
+  // A column of an upload's frame (dataframe_columns) that names the
+  // activities, as pm4py.llm's activity_key on the DataFrame (round BT); empty
+  // or concept:name keeps the events' activity. The DFG, variants and
+  // features descriptions read it; the stream and column descriptions list
+  // the frame whatever the key.
+  std::string activity_key;
 };
 
 // Float and datetime columns of the event table (event attributes plus case:

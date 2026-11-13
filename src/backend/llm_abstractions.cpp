@@ -23,6 +23,7 @@
 #include "minera/log_conversion.hpp"
 #include "minera/log_skeleton.hpp"
 #include "minera/log_to_features.hpp"
+#include "python_list_sort.hpp"
 #include "python_scalar.hpp"
 #include "minera/ocel_features.hpp"
 #include "minera/timestamp.hpp"
@@ -372,6 +373,21 @@ struct LogClock {
   }
 };
 
+// The frame-keyed activities of options.activity_key (frame_keys.hpp), or
+// nullopt for the events' own activity. A key that names no column of the
+// frame throws pandas' KeyError: the DFG selects the columns ("['x'] not in
+// index"), the variants look the column up ("Column not found: x").
+std::optional<FrameKeyedActivities> frame_activity_key(const EventLog& log, const LlmAbstractionOptions& options,
+                                                       bool selection) {
+  const auto& key = options.activity_key;
+  if (key.empty() || key == "concept:name" || !log.dataframe_columns) return std::nullopt;
+  auto keyed = frame_keyed_activities(log, key);
+  if (!keyed)
+    throw std::invalid_argument(selection ? "KeyError: \"['" + key + "'] not in index\""
+                                          : "KeyError: 'Column not found: " + key + "'");
+  return keyed;
+}
+
 LogClock log_clock(const EventLog& log) {
   LogClock clock;
   if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return clock;
@@ -590,8 +606,11 @@ std::string describe_features(const std::vector<std::string>& descriptions,
     if (left.variation != right.variation) return left.variation > right.variation;
     return left.description > right.description;
   });
+  // The features descriptions stop once the text reaches max_len, so a text
+  // exactly max_len long takes no further line (round BT, observed
+  // black-box; the DFG, variants and stream descriptions stop only past it).
   for (const auto& entry : entries) {
-    if (code_points(text) > max_len) break;
+    if (code_points(text) >= max_len) break;
     text += entry.line;
   }
   return text;
@@ -1058,15 +1077,30 @@ std::string llm_log_dfg_description(const EventLog& log, const LlmAbstractionOpt
   std::map<std::pair<std::string, std::string>, std::vector<double>> arcs;
   std::map<std::pair<std::string, std::string>, std::size_t> cases;
   const auto clock = log_clock(log);
-  for (const auto& trace : log.traces) {
-    std::vector<std::pair<std::int64_t, const Event*>> events;
-    for (const auto& event : trace.events) events.emplace_back(clock.instant(event), &event);
+  // Keyed by a frame column, an arc is a pair of pandas' DataFrame DFG: str()
+  // of the typed cells, the target through shift() (an int64 column's 7 is
+  // "7.0"), and a pair with a missing cell dropped (round BT).
+  const auto keyed = frame_activity_key(log, options, true);
+  const bool int_targets = keyed && keyed->column == DataFrameColumnType::kInt64;
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    const auto& trace = keyed ? keyed->log.traces[t] : log.traces[t];
+    struct Item {
+      std::int64_t instant;
+      const Event* event;
+      std::size_t index;
+    };
+    std::vector<Item> events;
+    for (std::size_t e = 0; e < trace.events.size(); ++e)
+      events.push_back({clock.instant(trace.events[e]), &trace.events[e], e});
     std::stable_sort(events.begin(), events.end(),
-                     [](const auto& left, const auto& right) { return left.first < right.first; });
+                     [](const auto& left, const auto& right) { return left.instant < right.instant; });
     std::map<std::pair<std::string, std::string>, bool> seen;
     for (std::size_t i = 1; i < events.size(); ++i) {
-      const std::pair<std::string, std::string> arc{events[i - 1].second->activity, events[i].second->activity};
-      arcs[arc].push_back(clock.seconds(events[i - 1].first, events[i].first));
+      if (keyed && (keyed->missing[t][events[i - 1].index] || keyed->missing[t][events[i].index])) continue;
+      std::string target = events[i].event->activity;
+      if (int_targets) target = python::float_repr(std::strtod(target.c_str(), nullptr));
+      const std::pair<std::string, std::string> arc{events[i - 1].event->activity, std::move(target)};
+      arcs[arc].push_back(clock.seconds(events[i - 1].instant, events[i].instant));
       if (!seen[arc]) {
         seen[arc] = true;
         ++cases[arc];
@@ -1092,8 +1126,14 @@ std::string llm_log_dfg_description(const EventLog& log, const LlmAbstractionOpt
 
 std::string llm_log_variants_description(const EventLog& log, const LlmAbstractionOptions& options) {
   std::map<std::vector<std::string>, std::vector<double>> variants;
+  // Keyed by a frame column, a variant holds the typed cells, and the
+  // reference's " -> ".join raises TypeError at the first one that is no str
+  // (round BT): each label's Python type, "" for a str.
+  const auto keyed = frame_activity_key(log, options, false);
+  std::map<std::vector<std::string>, std::vector<std::string>> types;
   const auto clock = log_clock(log);
-  for (const auto& trace : log.traces) {
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    const auto& trace = keyed ? keyed->log.traces[t] : log.traces[t];
     if (trace.events.empty()) continue;
     std::vector<std::string> activities;
     std::int64_t first = 0, last = 0;
@@ -1103,7 +1143,25 @@ std::string llm_log_variants_description(const EventLog& log, const LlmAbstracti
       first = i ? std::min(first, micros) : micros;
       last = i ? std::max(last, micros) : micros;
     }
+    if (keyed && keyed->non_text) types.emplace(activities, keyed->types[t]);
     variants[activities].push_back(clock.seconds(first, last));
+  }
+  // The variants in the frame's case order (case ids sorted), where pm4py
+  // first meets them.
+  std::map<std::vector<std::string>, std::size_t> met;
+  if (!types.empty()) {
+    std::vector<std::size_t> cases(log.traces.size());
+    std::iota(cases.begin(), cases.end(), std::size_t{0});
+    std::stable_sort(cases.begin(), cases.end(), [&](std::size_t left, std::size_t right) {
+      return log.traces[left].case_id < log.traces[right].case_id;
+    });
+    for (const auto t : cases) {
+      const auto& trace = keyed->log.traces[t];
+      if (trace.events.empty()) continue;
+      std::vector<std::string> activities;
+      for (const auto& event : trace.events) activities.push_back(event.activity);
+      met.emplace(std::move(activities), met.size());
+    }
   }
   // A variant's primary aggregation can have no value (the stdev of a single
   // case): the reference then sorts it like an equal value (None == None
@@ -1117,16 +1175,58 @@ std::string llm_log_variants_description(const EventLog& log, const LlmAbstracti
   std::vector<Entry> order;
   for (const auto& [activities, durations] : variants)
     order.push_back({&activities, &durations, aggregate(options.primary_performance_aggregation, durations, false)});
-  std::sort(order.begin(), order.end(), [](const Entry& left, const Entry& right) {
-    if (left.durations->size() != right.durations->size()) return left.durations->size() > right.durations->size();
-    if (left.performance.has_value() != right.performance.has_value())
-      throw std::invalid_argument("primary performance aggregation has no value");
-    if (left.performance && *left.performance != *right.performance) return *left.performance > *right.performance;
-    return *left.activities > *right.activities;
-  });
+  if (types.empty()) {
+    std::sort(order.begin(), order.end(), [](const Entry& left, const Entry& right) {
+      if (left.durations->size() != right.durations->size()) return left.durations->size() > right.durations->size();
+      if (left.performance.has_value() != right.performance.has_value())
+        throw std::invalid_argument("primary performance aggregation has no value");
+      if (left.performance && *left.performance != *right.performance) return *left.performance > *right.performance;
+      return *left.activities > *right.activities;
+    });
+  } else {
+    // Cells that are no str: pm4py sorts (count, performance, variant) in
+    // reverse, so two variants tied on count and performance compare their
+    // typed cells, and a str beside a NaN (or another type) raises TypeError
+    // in that comparison (round BT, observed black-box). CPython's list.sort
+    // asks the same questions in the same order (python_list_sort.hpp).
+    std::sort(order.begin(), order.end(),
+              [&](const Entry& left, const Entry& right) { return met.at(*left.activities) < met.at(*right.activities); });
+    const auto type_of = [&](const Entry& entry, std::size_t i) {
+      const auto& type = types.at(*entry.activities)[i];
+      return type.empty() ? std::string("str") : type;
+    };
+    const auto number = [](const std::string& label) {
+      return label == "True" ? 1.0 : label == "False" ? 0.0 : std::strtod(label.c_str(), nullptr);
+    };
+    const auto less = [&](const Entry& left, const Entry& right) {
+      if (left.durations->size() != right.durations->size()) return left.durations->size() < right.durations->size();
+      if (left.performance.has_value() != right.performance.has_value())
+        throw std::invalid_argument("primary performance aggregation has no value");
+      if (left.performance && *left.performance != *right.performance) return *left.performance < *right.performance;
+      const auto& a = *left.activities;
+      const auto& b = *right.activities;
+      for (std::size_t i = 0; i < std::min(a.size(), b.size()); ++i) {
+        const auto ta = type_of(left, i), tb = type_of(right, i);
+        if (ta == tb && a[i] == b[i]) continue;  // the same cell (pandas' NaN and NaT are one object)
+        if ((ta == "str") != (tb == "str"))
+          throw std::invalid_argument("TypeError: '<' not supported between instances of '" + ta + "' and '" + tb + "'");
+        if (ta == "str") return a[i] < b[i];
+        if (ta == "NaTType" || tb == "NaTType") return false;
+        if (ta == "Timestamp") return a[i] < b[i];
+        return number(a[i]) < number(b[i]);
+      }
+      return a.size() < b.size();
+    };
+    detail::python_list_sort(order, less, true);
+  }
   std::string text = options.response_header ? "If I have a process with the following process variants:\n\n" : "\n\n";
   for (const auto& entry : order) {
     if (code_points(text) > options.max_len) break;
+    if (const auto found = types.find(*entry.activities); found != types.end())
+      for (std::size_t i = 0; i < found->second.size(); ++i)
+        if (!found->second[i].empty())
+          throw std::invalid_argument("TypeError: sequence item " + std::to_string(i) +
+                                      ": expected str instance, " + found->second[i] + " found");
     std::string joined;
     for (const auto& activity : *entry.activities) joined += (joined.empty() ? "" : " -> ") + activity;
     text += " " + joined + " ( frequency = " +
@@ -1142,6 +1242,7 @@ std::string llm_log_features_description(const EventLog& log, const LlmAbstracti
   // case, activity and timestamp copies carry the standard keys.
   LogToFeaturesOptions feature_options;
   feature_options.standard_keys = log.dataframe_columns && log.dataframe_columns->csv_text;
+  if (!options.activity_key.empty() && log.dataframe_columns) feature_options.activity_key = options.activity_key;
   const auto features = trace_based_log_features(log, feature_options);
   std::vector<std::string> descriptions;
   std::vector<std::vector<double>> columns(features.feature_names.size());

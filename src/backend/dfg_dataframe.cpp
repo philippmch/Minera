@@ -17,6 +17,7 @@
 #include <tuple>
 #include <utility>
 
+#include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
 #include "business_hours.hpp"
 #include "frame_times.hpp"
@@ -405,6 +406,9 @@ Event event_from_row(const EventTable::Row& row, const EventTable& table,
   return result;
 }
 
+// The CSV frame whose labels discover_pandas_dfg's frame overload reads.
+thread_local const EventLog* g_csv_frame = nullptr;
+
 std::vector<TableRow> read_rows(const EventTable& table,
                                 const DfgTableOptions& options,
                                 DfgTableBackend backend,
@@ -481,6 +485,17 @@ std::vector<TableRow> read_rows(const EventTable& table,
                                  FirstClassAttributeRole::kNone);
   }
 
+  // pandas' labels of a typed key column of a CSV upload's frame.
+  std::optional<DataFrameColumnType> activity_type, target_type;
+  if (g_csv_frame && backend == DfgTableBackend::kPandas) {
+    activity_type = csv_frame_label_type(*g_csv_frame, activity_selector.name);
+    target_type = csv_frame_label_type(*g_csv_frame, target_selector.name);
+  }
+  const auto frame_label = [](std::optional<std::string>& value, const std::optional<DataFrameColumnType>& type,
+                              const std::string& key, bool shifted) {
+    if (!value || !type) return;
+    if (auto label = csv_frame_cell_label(*type, key, *value, shifted)) value = std::move(*label);
+  };
   std::vector<TableRow> rows;
   rows.reserve(table.rows.size());
   for (std::size_t i = 0; i < table.rows.size(); ++i) {
@@ -493,6 +508,8 @@ std::vector<TableRow> read_rows(const EventTable& table,
                                       FirstClassAttributeRole::kActivity);
     result.target_activity_value = cell_text(
         result, table, target_selector, FirstClassAttributeRole::kActivity);
+    frame_label(result.activity_value, activity_type, activity_selector.name, false);
+    frame_label(result.target_activity_value, target_type, target_selector.name, true);
     if (need_completion) {
       result.completion_text = cell_text(
           result, table, timestamp_selector,
@@ -1183,6 +1200,16 @@ DfgTableResult discover_table_dfg(const EventTable& table,
 
 DfgTableResult discover_pandas_dfg(const EventTable& table,
                                    const DfgTableOptions& options) {
+  return discover_table_dfg(table, options, DfgTableBackend::kPandas);
+}
+
+DfgTableResult discover_pandas_dfg(const EventTable& table, const DfgTableOptions& options,
+                                   const EventLog* csv_frame) {
+  struct Scope {
+    const EventLog* previous;
+    ~Scope() { g_csv_frame = previous; }
+  } scope{g_csv_frame};
+  g_csv_frame = csv_frame;
   return discover_table_dfg(table, options, DfgTableBackend::kPandas);
 }
 

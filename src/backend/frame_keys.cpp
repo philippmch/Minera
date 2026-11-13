@@ -537,6 +537,7 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
   FrameKeyedActivities out;
   out.log = log;
   out.types.resize(frame.traces.size());
+  out.missing.resize(frame.traces.size());
   bool non_text = false;
   std::set<std::string> labels;
   for (std::size_t t = 0; t < frame.traces.size(); ++t) {
@@ -544,6 +545,7 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
     auto& target_trace = out.log.traces[t];
     if (trace.events.size() != target_trace.events.size()) return std::nullopt;
     out.types[t].resize(trace.events.size());
+    out.missing[t].resize(trace.events.size());
     for (std::size_t e = 0; e < trace.events.size(); ++e) {
       const auto cell = frame_scalar(frame, trace, trace.events[e], key, FrameKeyScope::kEventLog);
       std::string label;
@@ -552,6 +554,8 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
         // pandas' missing cell: NaN (a float), NaT in a date column
         label = dates ? "NaT" : "nan";
         type = dates ? "NaTType" : "float";
+        out.missing[t][e] = true;
+        out.any_missing = true;
       } else if (cell->kind == python::Scalar::Kind::kText) {
         label = cell->text;
       } else {
@@ -577,6 +581,37 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
   out.distinct = labels.size();
   out.column = column;
   return out;
+}
+
+std::string frame_activity_column_error(const FrameKeyedActivities& keyed) {
+  if (keyed.column != DataFrameColumnType::kString && keyed.column != DataFrameColumnType::kObject)
+    return "the activity column should be of type string.";
+  if (keyed.any_missing) return "the activity column should not contain any empty value.";
+  return {};
+}
+
+std::string frame_activity_column_error(const EventLog& log, std::string_view key) {
+  const auto keyed = frame_keyed_activities(log, key);
+  return keyed ? frame_activity_column_error(*keyed) : std::string{};
+}
+
+std::optional<DataFrameColumnType> csv_frame_label_type(const EventLog& log, const std::string& key) {
+  if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
+  const auto type = frame_column_type(log, key);
+  if (!type || *type == DataFrameColumnType::kString) return std::nullopt;
+  return type;
+}
+
+std::optional<std::string> csv_frame_cell_label(DataFrameColumnType type, const std::string& key,
+                                                const std::string& text, bool shifted) {
+  DataFrameColumn column;
+  column.key = key;
+  column.type = type;
+  const auto scalar = cell_scalar(csv_dataframe_cell(column, text));
+  if (!scalar) return std::nullopt;
+  if (shifted && type == DataFrameColumnType::kInt64 && scalar->kind == python::Scalar::Kind::kInt)
+    return python::float_repr(std::strtod(python::str(*scalar).c_str(), nullptr));
+  return python::str(*scalar);
 }
 
 std::string frame_keyed_heuristics_error(const FrameKeyedActivities& keyed) {

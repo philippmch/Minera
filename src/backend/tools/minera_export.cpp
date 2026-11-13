@@ -409,7 +409,11 @@ minera::DfgVariantsAnalysis analyze_dfg_variants(
         {name, minera::discover_dfg_statistics(log, options)});
   }
   if (!causal_variants.empty()) {
-    const auto frequency = minera::discover_frequency_dfg(log, shared_options);
+    // The causal relations read the native DFG, keyed as the statistical
+    // variants are (round BT: a typed column of an upload's frame).
+    auto frequency_options = shared_options;
+    frequency_options.variant = minera::DfgStatisticalVariant::kNative;
+    const auto frequency = minera::discover_dfg_statistics(log, frequency_options).frequency_dfg;
     result.causal.reserve(causal_variants.size());
     for (const auto& name : causal_variants) {
       const auto variant = name == "heuristic"
@@ -6788,8 +6792,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       // NaN cells null, the Polars ones on the frame; the standard keys name
       // the selected columns (csv_frame_key).
       std::optional<minera::EventTable> frame;
+      std::optional<minera::ActiveEventSource> frame_source;
       if (!input_is_xes)
-        if (const auto source = csv_input_source(input, options, log)) {
+        if ((frame_source = csv_input_source(input, options, log))) {
+          const auto& source = frame_source;
           const bool pandas = params.dfg_backend == minera::DfgTableBackend::kPandas;
           frame = csv_frame_table(*source, pandas);
           if (frame && pandas) mark_csv_nan_cells(*frame);
@@ -6805,8 +6811,9 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       std::string body;
       if (params.dfg_operation == minera::DfgTableOperation::kGraph) {
         if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
-          body = minera::serialize_dfg_dataframe_json(
-              minera::discover_pandas_dfg(table, params.dfg_table_options));
+          // pandas names the activities str() of the frame's cells (round BT).
+          body = minera::serialize_dfg_dataframe_json(minera::discover_pandas_dfg(
+              table, params.dfg_table_options, frame_source && frame ? &frame_source->checked_log() : nullptr));
         } else {
           body = minera::serialize_dfg_dataframe_json(
               minera::discover_polars_dfg(
@@ -7129,7 +7136,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto params =
           minera::parse_boundary_activities_params(lookup, present);
       const auto body = minera::boundary_activities_json(
-          minera::discover_boundary_activities(log, params));
+          minera::discover_boundary_activities_as_uploaded(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {
@@ -7647,6 +7654,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       dfg_variants_analysis =
           analyze_dfg_variants(log, dfg_statistical_variants,
                                dfg_causal_variants, dataframe_options);
+      for (const auto& activity : minera::dfg_variant_activities(*dfg_variants_analysis))
+        graph.ensure_activity(activity);
     }
     std::optional<minera::CorrelationVariantsAnalysis>
         correlation_variants_analysis;

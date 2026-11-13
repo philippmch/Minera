@@ -44,6 +44,13 @@ using SortedBoundaryActivities =
 [[nodiscard]] BoundaryActivitiesResult discover_boundary_activities(
     const EventLog& log, const BoundaryActivitiesOptions& options = {});
 
+// An upload's start and end activities as pm4py's get_start_activities and
+// get_end_activities give them on its frame: the key column passes pm4py's
+// column check first (frame_activity_column_error, round BT); any other log
+// is read as discover_boundary_activities does.
+[[nodiscard]] BoundaryActivitiesResult discover_boundary_activities_as_uploaded(
+    const EventLog& log, const BoundaryActivitiesOptions& options = {});
+
 [[nodiscard]] inline BoundaryActivitiesResult boundary_activities(
     const EventLog& log, const BoundaryActivitiesOptions& options = {}) {
   return discover_boundary_activities(log, options);

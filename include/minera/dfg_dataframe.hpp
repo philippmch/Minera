@@ -150,6 +150,12 @@ struct DfgConcurrentResult {
 
 [[nodiscard]] DfgTableResult discover_pandas_dfg(
     const EventTable& table, const DfgTableOptions& options = {});
+// The same on a CSV upload's frame table: `csv_frame` is the upload's log
+// with its frame (dataframe_columns), and the activities are named as pandas
+// names them, str() of the frame's typed cells (round BT;
+// csv_frame_cell_label). A null frame keeps the cells' text.
+[[nodiscard]] DfgTableResult discover_pandas_dfg(
+    const EventTable& table, const DfgTableOptions& options, const EventLog* csv_frame);
 [[nodiscard]] DfgTableResult discover_polars_dfg(
     const LazyEventTable& table, const DfgTableOptions& options = {});
 

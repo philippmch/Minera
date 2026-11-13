@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BS (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–BT (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4737,7 +4737,60 @@ activity keys (pm4py's distinct NaN objects), alpha plus and POWL on date
 keys with missing cells, the XES wording of some TypeErrors. No fixture
 changed. The device check on the Mac was skipped again (no device linked).
 
-Next round (BT) should start by re-reviewing round BS:
+Round BT re-reviewed BS (Review BT1; BS's CI run 43347116082 was green,
+BS's miner, comparison and nanosecond LLM sweeps held on fresh seeds with
+only BS's declared differences) and took its targets. It fixed typed
+columns as the activity key of the DFG variants (native, triples and causal
+variants label `str()` of the typed cell; CLEAN splits a case at a missing
+cell and shifts an int64 target to floats; CLEAN_TIME takes pandas' integer
+groupby means and raises pandas' errors; the performance variant runs
+pm4py's column check), the DataFrame DFG on typed keys (`str()` labels,
+float targets of an int64 key), the LLM abstractions keyed by a column
+(`concept:name` and every CSV column with a blank raised; the DFG is the
+DataFrame DFG, the variants raise pm4py's join or sort TypeError, the
+stream and attributes ignore the key, the features read it), the features
+descriptions' budget (one line too many at exactly `max_len`), the
+start/end activities and variant statistics keyed by a column (pm4py's
+column check, the upload's case column), unknown fields on the replay,
+alignment and fitness upload routes, check-model and compare-petri
+(compare-petri also dropped the marking form fields its client sends), and
+replay fitness on a CSV upload's own headers (`KeyError: 'concept:name'`).
+Declared: blank float cells as distinct NaN objects on the DFG variants
+too, AQ's hash-seed feature errors. No fixture changed. The device check on
+the Mac was skipped again (no device linked).
+
+Next round (BU) should start by re-reviewing round BT:
+
+- `src/backend/dfg_variants.cpp`: `frame_keyed_dfg_statistics`,
+  `frame_keyed_clean_dfg` (runs split at missing cells),
+  `discover_clean_time_dfg` (int64 ticks, `KahanMean`, the nanosecond
+  switch and its range guard), `dfg_variant_activities` and its callers in
+  `minera_server.cpp` and `minera_export.cpp`;
+- `src/backend/dfg_dataframe.cpp`: the `csv_frame` overload and its
+  `thread_local` (only the pandas graph takes it; partial order and
+  concurrent events keep the text);
+- `src/backend/llm_abstractions.cpp`: `frame_activity_key`, the keyed DFG
+  pairs, the variants' Python sort (`python_list_sort`, case order, typed
+  comparisons), `describe_features`' `>=`; `llm_context.cpp`'s `frame_key`
+  (which variants keep the projection);
+- `src/backend/boundary_activities.cpp` and `variant_statistics.cpp`:
+  `frame_activity_column_error` and the keyed frame;
+- `src/backend/tools/minera_server.cpp`: `reject_unconsulted_controls` on
+  the four upload routes (a control consulted only on some paths is now
+  refused on the others), the check-model and compare-petri allow lists,
+  `parse_playout_marking`'s form fields, replay fitness's default key;
+- new areas: the session routes that read their controls from the query
+  string and still ignore unknown parameters (`/api/align`, evaluation,
+  decomposed and multi-alignments); typed keys on the filters
+  (`reference-log-filter`, `reference-table-*`) and the remaining
+  statistics (attribute statistics, case statistics); the LLM context's
+  other variants keyed by a column; `clean_polars` on typed keys; the OCEL
+  routes on nanosecond timestamps (not reached in BT);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BT commit.
+
+Round BS's targets, re-reviewed in BT (findings BT1-1 to BT1-7):
 
 - `src/backend/frame_keys.cpp`: `frame_keyed_activities` (the key's typed
   cells as `python::str` labels, `NaT`/`nan` for missing cells, the
