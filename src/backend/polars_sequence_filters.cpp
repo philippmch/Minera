@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <map>
 #include <set>
 #include <variant>
@@ -501,27 +502,342 @@ std::string string_cast(const EventAttribute& cell, const std::string& dtype) {
   return out;
 }
 
-// A Python list as Polars builds it into a Series (the is_in, prefix and
-// suffix literals): the first value's type decides when every value fits it
-// (an Int64 list takes bools as 0/1, a Float64 one ints and bools); otherwise
-// Polars rebuilds it strictly, as the first value's type, or as the
-// supertype of the values (String, Float64, Int64, Boolean) when one is
-// None, and raises at the first value of another type.
-struct Literal {
-  std::string dtype;          // Null, String, Int64, Float64, Boolean, Datetime, Date
-  std::vector<Value> values;  // as the Series holds them
+// ------------------------------------------------------------------ list literals
+
+// Round CC: a Python list as pl.lit builds it (the is_in, prefix and suffix
+// literals; Polars 1.44, black-box). Each item becomes a typed value (an
+// aware datetime with a fixed offset in UTC, one with a named zone in that
+// zone, a nested list recursively). The items are read up to the first None:
+// a list without None whose last item is a bool, int, float or str goes
+// through the typed constructor of its first item (an int list takes bools,
+// a float list ints and bools; otherwise the first item's type is built
+// strictly); any other list folds the supertype of its distinct types in
+// order ("failed to determine supertype of A and B") and builds it strictly
+// ("unexpected value while building Series of type X; found value of type Y:
+// v", a list type without the found part).
+struct LitType {
+  enum class K { kNull, kBoolean, kInt64, kFloat64, kString, kDate, kDatetime, kList };
+  K kind = K::kNull;
+  std::string zone;            // kDatetime: empty when naive
+  std::vector<LitType> inner;  // kList: the element type
 };
-std::string literal_type(const Value& v) {
-  switch (v.kind) {
-    case Kind::kNone: return "Null";
-    case Kind::kBool: return "Boolean";
-    case Kind::kInt: return "Int64";
-    case Kind::kFloat: return "Float64";
-    case Kind::kString: return "String";
-    case Kind::kDatetime: return "Datetime";
-    case Kind::kDate: return "Date";
-    default: return "Object";
+bool operator==(const LitType& a, const LitType& b) {
+  return a.kind == b.kind && a.zone == b.zone && a.inner.size() == b.inner.size() &&
+         (a.inner.empty() || a.inner[0] == b.inner[0]);
+}
+LitType lit_type(LitType::K kind) { return LitType{kind, {}, {}}; }
+LitType list_of(const LitType& inner) { return LitType{LitType::K::kList, {}, {inner}}; }
+bool primitive(const LitType& t) {
+  using K = LitType::K;
+  return t.kind == K::kBoolean || t.kind == K::kInt64 || t.kind == K::kFloat64 || t.kind == K::kString;
+}
+// The dtype as a supertype error prints it (bool, i64, datetime[μs, UTC],
+// list[str]) and as a build error does (Boolean, Datetime('μs', 'UTC')).
+std::string short_name(const LitType& t) {
+  using K = LitType::K;
+  switch (t.kind) {
+    case K::kNull: return "null";
+    case K::kBoolean: return "bool";
+    case K::kInt64: return "i64";
+    case K::kFloat64: return "f64";
+    case K::kString: return "str";
+    case K::kDate: return "date";
+    case K::kDatetime: return t.zone.empty() ? "datetime[\xce\xbcs]" : "datetime[\xce\xbcs, " + t.zone + "]";
+    case K::kList: return "list[" + short_name(t.inner[0]) + "]";
   }
+  return "?";
+}
+std::string debug_name(const LitType& t) {
+  using K = LitType::K;
+  switch (t.kind) {
+    case K::kNull: return "Null";
+    case K::kBoolean: return "Boolean";
+    case K::kInt64: return "Int64";
+    case K::kFloat64: return "Float64";
+    case K::kString: return "String";
+    case K::kDate: return "Date";
+    case K::kDatetime: return t.zone.empty() ? "Datetime('\xce\xbcs')" : "Datetime('\xce\xbcs', '" + t.zone + "')";
+    case K::kList: return "List(" + debug_name(t.inner[0]) + ")";
+  }
+  return "?";
+}
+
+struct Literal {
+  LitType type;               // the element type
+  std::vector<Value> values;  // as the Series holds them (None for null)
+};
+// A literal value with its type (an AnyValue).
+struct LitValue {
+  LitType type;
+  Value value;
+};
+std::int64_t micros_of(const Value& v) { return floor_div(v.instant_nanoseconds(), 1000); }
+// A datetime as its literal: microseconds, a fixed offset in UTC.
+Value literal_datetime(const Value& v) {
+  const auto wall = floor_div(v.integer, 1000) * 1000;
+  if (!v.offset_minutes) return Value::datetime(wall);
+  if (v.text.empty()) return Value::datetime(wall - std::int64_t{*v.offset_minutes} * 60'000'000'000, 0, "UTC");
+  return Value::datetime(wall, *v.offset_minutes, v.text);
+}
+Literal list_literal(const std::vector<Value>& items);
+LitValue lit_value(const Value& v) {
+  using K = LitType::K;
+  switch (v.kind) {
+    case Kind::kNone: return {lit_type(K::kNull), v};
+    case Kind::kBool: return {lit_type(K::kBoolean), v};
+    case Kind::kInt: return {lit_type(K::kInt64), v};
+    case Kind::kFloat: return {lit_type(K::kFloat64), v};
+    case Kind::kString: return {lit_type(K::kString), v};
+    case Kind::kDate: return {lit_type(K::kDate), v};
+    case Kind::kDatetime: {
+      auto value = literal_datetime(v);
+      return {LitType{K::kDatetime, value.offset_minutes ? value.text : std::string{}, {}}, std::move(value)};
+    }
+    case Kind::kList:
+    case Kind::kTuple: {
+      auto inner = list_literal(v.items);
+      return {list_of(inner.type), Value::list(std::move(inner.values))};
+    }
+    case Kind::kDict: break;
+  }
+  fail("TypeError", "unsupported list literal item");
+}
+
+// Polars' float display: integers with one decimal, others as printed.
+std::string polars_float(double v) {
+  if (std::isnan(v)) return "NaN";
+  if (std::isinf(v)) return v < 0 ? "-inf" : "inf";
+  if (v == std::floor(v) && std::fabs(v) < 999'999.0) {
+    char buffer[64];
+    std::snprintf(buffer, sizeof(buffer), "%.1f", v);
+    return buffer;
+  }
+  return python::float_repr(v);
+}
+std::string literal_item(const Value& v);
+// A literal value as Polars displays it (errors, plans).
+std::string lit_display(const LitType& type, const Value& v) {
+  if (v.kind == Kind::kNone) return "null";
+  if (type.kind == LitType::K::kList) {
+    std::vector<std::string> parts;
+    for (const auto& item : v.items) parts.push_back(lit_display(type.inner[0], item));
+    std::string out = "[";
+    if (parts.size() <= 3) {
+      for (std::size_t i = 0; i < parts.size(); ++i) out += (i ? ", " : "") + parts[i];
+    } else {
+      out += parts[0] + ", " + parts[1] + ", \xe2\x80\xa6 " + parts.back();
+    }
+    return out + "]";
+  }
+  return literal_item(v);
+}
+
+std::optional<LitType> lit_supertype(const LitType& l, const LitType& r) {
+  using K = LitType::K;
+  const auto inner = [](const LitType& a, const LitType& b) -> std::optional<LitType> {
+    if (a == b) return a;
+    const auto x = a.kind, y = b.kind;
+    if ((x == K::kInt64 && y == K::kBoolean) || ((x == K::kDate || x == K::kDatetime) && y == K::kInt64))
+      return lit_type(K::kInt64);
+    if ((x == K::kInt64 || x == K::kBoolean || x == K::kDate || x == K::kDatetime) && y == K::kFloat64)
+      return lit_type(K::kFloat64);
+    if (x == K::kDate && y == K::kDatetime) return b;
+    if (y == K::kString) return lit_type(K::kString);
+    if (y == K::kNull) return a;
+    if (x == K::kDatetime && y == K::kDatetime && a.zone == b.zone) return b;
+    if (x == K::kList && y == K::kList) {
+      const auto s = lit_supertype(a.inner[0], b.inner[0]);
+      if (!s) return std::nullopt;
+      return list_of(*s);
+    }
+    return std::nullopt;
+  };
+  if (auto s = inner(l, r)) return s;
+  return inner(r, l);
+}
+
+// A list value cast (strict=False) to another element type while a list
+// Series is built: std::nullopt when the value becomes null.
+std::optional<Value> cast_lit(const Value& v, const LitType& from, const LitType& to) {
+  using K = LitType::K;
+  if (v.kind == Kind::kNone || from.kind == K::kNull) return std::nullopt;
+  if (from == to) return v;
+  if (to.kind == K::kList || from.kind == K::kList) {
+    if (to.kind != K::kList || from.kind != K::kList) return std::nullopt;
+    std::vector<Value> items;
+    for (const auto& item : v.items) items.push_back(cast_lit(item, from.inner[0], to.inner[0]).value_or(Value::none()));
+    return Value::list(std::move(items));
+  }
+  const auto micros = [&] { return micros_of(v); };
+  switch (to.kind) {
+    case K::kString:
+      if (from.kind == K::kDatetime) {
+        auto text = pandas_filter_value_str(Value::datetime(floor_div(micros(), 1'000'000) * 1'000'000'000)).substr(0, 19);
+        char buffer[16];
+        std::snprintf(buffer, sizeof(buffer), ".%06lld", static_cast<long long>(micros() - floor_div(micros(), 1'000'000) * 1'000'000));
+        return Value::of(text + buffer + (from.zone.empty() ? "" : "+00:00"));
+      }
+      if (from.kind == K::kDate) return Value::of(pandas_filter_value_str(v));
+      if (from.kind == K::kFloat64) {
+        if (std::isnan(v.real)) return Value::of("NaN");
+        if (std::isinf(v.real)) return Value::of(v.real < 0 ? "-inf" : "inf");
+      }
+      return Value::of(literal_item(v));
+    case K::kFloat64:
+      if (from.kind == K::kInt64 || from.kind == K::kDate) return Value::of(static_cast<double>(v.integer));
+      if (from.kind == K::kBoolean) return Value::of(v.boolean ? 1.0 : 0.0);
+      if (from.kind == K::kDatetime) return Value::of(static_cast<double>(micros()));
+      if (from.kind == K::kString) {
+        char* end = nullptr;
+        const double d = std::strtod(v.text.c_str(), &end);
+        if (v.text.empty() || *end) return std::nullopt;
+        return Value::of(d);
+      }
+      return std::nullopt;
+    case K::kInt64:
+      if (from.kind == K::kBoolean) return Value::of(std::int64_t{v.boolean});
+      if (from.kind == K::kDate) return Value::of(v.integer);
+      if (from.kind == K::kDatetime) return Value::of(micros());
+      if (from.kind == K::kFloat64) {
+        if (!std::isfinite(v.real) || std::fabs(v.real) >= 9.2e18) return std::nullopt;
+        return Value::of(static_cast<std::int64_t>(v.real));
+      }
+      if (from.kind == K::kString) {
+        std::int64_t parsed = 0;
+        const auto r = std::from_chars(v.text.data(), v.text.data() + v.text.size(), parsed);
+        if (v.text.empty() || r.ec != std::errc{} || r.ptr != v.text.data() + v.text.size()) return std::nullopt;
+        return Value::of(parsed);
+      }
+      return std::nullopt;
+    case K::kBoolean:
+      if (from.kind == K::kInt64) return Value::of(v.integer != 0);
+      if (from.kind == K::kFloat64) return Value::of(v.real != 0.0);
+      if (from.kind == K::kString && (v.text == "true" || v.text == "false")) return Value::of(v.text == "true");
+      return std::nullopt;
+    case K::kDatetime:
+      if (from.kind == K::kDate) return Value::datetime(v.integer * 86'400'000'000'000, to.zone.empty() ? std::nullopt : std::optional<std::int32_t>{0}, to.zone.empty() ? "" : "UTC");
+      if (from.kind == K::kInt64) return Value::datetime(v.integer * 1000, to.zone.empty() ? std::nullopt : std::optional<std::int32_t>{0}, to.zone.empty() ? "" : "UTC");
+      if (from.kind == K::kDatetime) return v;
+      return std::nullopt;
+    case K::kDate:
+      if (from.kind == K::kDatetime) return Value::date(floor_div(micros(), 86'400'000'000));
+      if (from.kind == K::kInt64) return Value::date(v.integer);
+      return std::nullopt;
+    default: return std::nullopt;
+  }
+}
+
+[[noreturn]] void build_error(const std::string& head) {
+  fail("TypeError", head +
+                        "\n\nThis error occurred with the following context stack:\n\t[1] while constructing Series "
+                        "''\n\n\nHint: Try setting `strict=False` to allow passing data with mixed types.");
+}
+// The values built strictly as `type` (a null type takes anything as null;
+// a Datetime type takes any datetime, keeping its microseconds).
+std::vector<Value> build_strict(const LitType& type, const std::vector<LitValue>& values) {
+  using K = LitType::K;
+  std::vector<Value> out;
+  if (type.kind == K::kNull) return std::vector<Value>(values.size());
+  if (type.kind == K::kList) {
+    bool valid = true;
+    for (const auto& v : values) {
+      if (v.type.kind == K::kNull) {
+        out.emplace_back();
+      } else if (v.type.kind != K::kList) {
+        valid = false;
+        out.emplace_back();
+      } else if (type.inner[0].kind == K::kNull) {
+        out.push_back(v.value);
+      } else {
+        std::vector<Value> items;
+        for (const auto& item : v.value.items) {
+          auto cast = cast_lit(item, v.type.inner[0], type.inner[0]);
+          if (!cast && item.kind != Kind::kNone) valid = false;
+          items.push_back(cast.value_or(Value::none()));
+        }
+        out.push_back(Value::list(std::move(items)));
+      }
+    }
+    if (!valid) build_error("unexpected value while building Series of type " + debug_name(type));
+    return out;
+  }
+  for (const auto& v : values) {
+    if (v.type.kind == K::kNull) {
+      out.emplace_back();
+      continue;
+    }
+    if (v.type.kind != type.kind)
+      build_error("unexpected value while building Series of type " + debug_name(type) + "; found value of type " +
+                  debug_name(v.type) + ": " + lit_display(v.type, v.value));
+    out.push_back(v.value);
+  }
+  return out;
+}
+bool nested_null(const LitValue& v) {
+  if (v.type.kind == LitType::K::kNull) return true;
+  if (v.type.kind != LitType::K::kList) return false;
+  return std::all_of(v.value.items.begin(), v.value.items.end(), [](const Value& x) { return x.kind == Kind::kNone; });
+}
+// Series.from_any_values(strict=True): the first value that is not a
+// (nested) null decides the type.
+Literal from_values_strict(const std::vector<LitValue>& values) {
+  const auto first = std::find_if(values.begin(), values.end(), [](const LitValue& v) { return !nested_null(v); });
+  LitType type;
+  if (first != values.end()) {
+    type = first->type;
+  } else {
+    const auto any = std::find_if(values.begin(), values.end(),
+                                  [](const LitValue& v) { return v.type.kind != LitType::K::kNull; });
+    if (any != values.end()) type = any->type;
+  }
+  return {type, build_strict(type, values)};
+}
+Literal list_literal(const std::vector<Value>& items) {
+  using K = LitType::K;
+  if (items.empty()) return {};
+  std::vector<LitValue> values;
+  std::size_t next = 0;
+  while (next < items.size()) {
+    values.push_back(lit_value(items[next++]));
+    if (values.back().type.kind == K::kNull) break;
+  }
+  if (values.back().type.kind != K::kNull && primitive(values.back().type)) {
+    // pl.Series(items): the first item's constructor, else strictly.
+    for (; next < items.size(); ++next) values.push_back(lit_value(items[next]));
+    const auto first = values.front().type.kind;
+    const auto all = [&](auto&& ok) { return std::all_of(values.begin(), values.end(), ok); };
+    if (first == K::kBoolean && all([](const LitValue& v) { return v.type.kind == K::kBoolean; }))
+      return {lit_type(K::kBoolean), items};
+    if (first == K::kInt64 && all([](const LitValue& v) { return v.type.kind == K::kInt64 || v.type.kind == K::kBoolean; })) {
+      Literal out{lit_type(K::kInt64), {}};
+      for (const auto& v : items) out.values.push_back(v.kind == Kind::kBool ? Value::of(std::int64_t{v.boolean}) : v);
+      return out;
+    }
+    if (first == K::kFloat64 && all([](const LitValue& v) {
+          return v.type.kind == K::kFloat64 || v.type.kind == K::kInt64 || v.type.kind == K::kBoolean;
+        })) {
+      Literal out{lit_type(K::kFloat64), {}};
+      for (const auto& v : items)
+        out.values.push_back(v.kind == Kind::kFloat ? v
+                                                    : Value::of(v.kind == Kind::kBool ? (v.boolean ? 1.0 : 0.0)
+                                                                                      : static_cast<double>(v.integer)));
+      return out;
+    }
+    if (first == K::kString && all([](const LitValue& v) { return v.type.kind == K::kString; }))
+      return {lit_type(K::kString), items};
+    return from_values_strict(values);
+  }
+  for (; next < items.size(); ++next) values.push_back(lit_value(items[next]));
+  std::vector<LitType> seen;
+  for (const auto& v : values)
+    if (std::find(seen.begin(), seen.end(), v.type) == seen.end()) seen.push_back(v.type);
+  LitType type;
+  for (const auto& t : seen) {
+    const auto s = lit_supertype(type, t);
+    if (!s) fail("TypeError", "failed to determine supertype of " + short_name(type) + " and " + short_name(t));
+    type = *s;
+  }
+  return {type, build_strict(type, values)};
 }
 // A datetime literal as Polars prints it: wall clock in its zone with 3 or 6
 // fractional digits only when needed, then the zone's abbreviation (round
@@ -553,7 +869,7 @@ std::string literal_datetime_text(const Value& v) {
     out += buffer;
   }
   if (!v.offset_minutes) return out;
-  if (v.text == "UTC") return out + " UTC";
+  if (v.text == "UTC" || v.text.empty()) return out + " UTC";
   try {
     return out + " " + ::minera::zone_database::info_at_utc(v.text, floor_div(v.instant_nanoseconds(), 1'000'000'000)).abbrev;
   } catch (const std::runtime_error&) {
@@ -565,69 +881,40 @@ std::string literal_item(const Value& v) {
     case Kind::kNone: return "null";
     case Kind::kBool: return v.boolean ? "true" : "false";
     case Kind::kInt: return std::to_string(v.integer);
-    case Kind::kFloat: return std::isnan(v.real) ? "NaN" : python::float_repr(v.real);
+    case Kind::kFloat: return polars_float(v.real);
     case Kind::kString: return quote(v.text);
     case Kind::kDatetime: return literal_datetime_text(v);
+    case Kind::kList:
+    case Kind::kTuple: {
+      std::string out = "[";
+      for (std::size_t i = 0; i < v.items.size(); ++i) out += (i ? ", " : "") + literal_item(v.items[i]);
+      return out + "]";
+    }
     default: return pandas_filter_value_str(v);
   }
-}
-Literal list_literal(const std::vector<Value>& items) {
-  Literal out{"Null", items};
-  const auto first = std::find_if(items.begin(), items.end(), [](const Value& v) { return v.kind != Kind::kNone; });
-  if (first == items.end()) return out;
-  const auto type = literal_type(*first);
-  const auto fits = [&](const Value& v) {
-    if (v.kind == Kind::kNone) return true;
-    if (type == "Int64") return v.kind == Kind::kInt || v.kind == Kind::kBool;
-    if (type == "Float64") return v.kind == Kind::kFloat || v.kind == Kind::kInt || v.kind == Kind::kBool;
-    return literal_type(v) == type;
-  };
-  if (std::all_of(items.begin(), items.end(), fits)) {
-    out.dtype = type;
-    for (auto& v : out.values) {
-      if (type == "Int64" && v.kind == Kind::kBool) v = Value::of(std::int64_t{v.boolean});
-      if (type == "Float64" && (v.kind == Kind::kBool || v.kind == Kind::kInt))
-        v = Value::of(v.kind == Kind::kBool ? (v.boolean ? 1.0 : 0.0) : static_cast<double>(v.integer));
-    }
-    return out;
-  }
-  std::string target = literal_type(items.front());
-  if (std::any_of(items.begin(), items.end(), [](const Value& v) { return v.kind == Kind::kNone; })) {
-    const auto rank = [](const std::string& t) { return t == "String" ? 4 : t == "Float64" ? 3 : t == "Int64" ? 2 : 1; };
-    target = type;
-    for (const auto& v : items)
-      if (v.kind != Kind::kNone && rank(literal_type(v)) > rank(target)) target = literal_type(v);
-  }
-  for (const auto& v : items)
-    if (v.kind != Kind::kNone && literal_type(v) != target)
-      fail("TypeError", "unexpected value while building Series of type " + target + "; found value of type " +
-                            literal_type(v) + ": " + literal_item(v) +
-                            "\n\nThis error occurred with the following context stack:\n\t[1] while constructing "
-                            "Series ''\n\n\nHint: Try setting `strict=False` to allow passing data with mixed types.");
-  out.dtype = target;
-  return out;
 }
 // The literal in a plan: up to three values, else the first two, an
 // ellipsis and the last.
 std::string literal_text(const Literal& literal) {
-  const auto& values = literal.values;
-  std::string out = "[[";
-  if (values.size() <= 3) {
-    for (std::size_t i = 0; i < values.size(); ++i) out += (i ? ", " : "") + literal_item(values[i]);
-  } else {
-    out += literal_item(values[0]) + ", " + literal_item(values[1]) + ", \xe2\x80\xa6 " + literal_item(values.back());
-  }
-  return out + "]]";
+  return "[" + lit_display(list_of(literal.type), Value::list(literal.values)) + "]";
 }
-// The literal's dtype as an error names it: a datetime list in
-// microseconds, in the zone of its first value.
-std::string literal_dtype_name(const Literal& literal) {
-  if (literal.dtype != "Datetime") return literal.dtype;
-  const auto first = std::find_if(literal.values.begin(), literal.values.end(),
-                                  [](const Value& v) { return v.kind == Kind::kDatetime; });
-  std::string out = "Datetime('\xce\xbc" "s'";
-  if (first != literal.values.end() && first->offset_minutes) out += ", '" + first->text + "'";
-  return out + ")";
+// The literal's dtype as an error names it.
+std::string literal_dtype_name(const Literal& literal) { return debug_name(literal.type); }
+
+// The literal's element kind as the is_in checks read it.
+std::string lit_kind(const Literal& literal) {
+  using K = LitType::K;
+  switch (literal.type.kind) {
+    case K::kNull: return "Null";
+    case K::kBoolean: return "Boolean";
+    case K::kInt64: return "Int64";
+    case K::kFloat64: return "Float64";
+    case K::kString: return "String";
+    case K::kDate: return "Date";
+    case K::kDatetime: return "Datetime";
+    case K::kList: return "List";
+  }
+  return "List";
 }
 
 // A column dtype as the is_in check names it.
@@ -649,7 +936,7 @@ std::string is_in_dtype_name(const std::string& dtype) {
 void check_is_in(const EventTable& df, std::size_t column, const Literal& literal, const std::string& node,
                  const std::string& plan, const std::vector<std::string>& stack) {
   const auto dtype = dtype_of(df, column);
-  const auto& l = literal.dtype;
+  const auto l = lit_kind(literal);
   const bool numeric = integer_dtype(dtype) || float_dtype(dtype);
   const bool ok = l == "Null" ||
                   (l == "String" && (dtype == "String" || categorical_dtype(dtype) || enum_dtype(dtype))) ||
@@ -673,11 +960,11 @@ void check_is_in(const EventTable& df, std::size_t column, const Literal& litera
 std::string coerced_is_in(const std::string& column, const std::string& dtype, const Literal& literal) {
   std::string cast;
   Literal shown = literal;
-  if (literal.dtype == "Int64" && integer_dtype(dtype) && dtype != "Int64")
+  if (lit_kind(literal) == "Int64" && integer_dtype(dtype) && dtype != "Int64")
     cast = dtype == "UInt64" ? ".cast(Int128)" : ".cast(Int64)";
-  else if (literal.dtype == "Float64" && integer_dtype(dtype))
+  else if (lit_kind(literal) == "Float64" && integer_dtype(dtype))
     cast = ".strict_cast(Float64)";
-  else if ((literal.dtype == "Int64" || literal.dtype == "Float64") && float_dtype(dtype)) {
+  else if ((lit_kind(literal) == "Int64" || lit_kind(literal) == "Float64") && float_dtype(dtype)) {
     if (dtype != "Float64") cast = ".cast(Float64)";
     for (auto& v : shown.values)
       if (v.kind == Kind::kInt) v = Value::of(static_cast<double>(v.integer));
@@ -691,9 +978,9 @@ bool literal_has(const Literal& literal, const Cell& cell, const std::string& dt
   const auto value = python_value(cell, dtype);
   for (const auto& v : literal.values) {
     if (v.kind == Kind::kNone) continue;
-    if (literal.dtype == "String") {
+    if (lit_kind(literal) == "String") {
       if (v.kind == Kind::kString && v.text == cell->value) return true;
-    } else if (literal.dtype == "Int64" || literal.dtype == "Float64") {
+    } else if (lit_kind(literal) == "Int64" || lit_kind(literal) == "Float64") {
       if (value.kind == Kind::kInt && v.kind == Kind::kInt) {
         if (value.integer == v.integer) return true;
         continue;
@@ -701,7 +988,7 @@ bool literal_has(const Literal& literal, const Cell& cell, const std::string& dt
       const double x = value.kind == Kind::kInt ? static_cast<double>(value.integer) : value.real;
       const double y = v.kind == Kind::kInt ? static_cast<double>(v.integer) : v.real;
       if (x == y || (std::isnan(x) && std::isnan(y))) return true;
-    } else if (literal.dtype == "Datetime") {
+    } else if (lit_kind(literal) == "Datetime") {
       if (v.kind == Kind::kDatetime && physical_of(*cell, dtype) == floor_div(v.instant_nanoseconds(), 1000))
         return true;
     } else if (same_key(value, v)) {
@@ -715,6 +1002,39 @@ bool literal_has(const Literal& literal, const Cell& cell, const std::string& dt
 // and suffix lists are: out of range, unparsable or unsupported is null.
 std::optional<Value> cast_to(const Value& v, const std::string& dtype, const std::set<std::string>* categories) {
   if (v.kind == Kind::kNone) return std::nullopt;
+  const auto in_float = [&](double x) {
+    return Value::of(dtype == "Float32" ? static_cast<double>(static_cast<float>(x)) : x);
+  };
+  // Round CC: a datetime value casts as its microseconds (a Date column
+  // takes its day, a Datetime column its microseconds in the column's unit),
+  // a date value as its days (a Datetime column its UTC midnight).
+  if (v.kind == Kind::kDatetime || v.kind == Kind::kDate) {
+    using K = LitType::K;
+    const bool date = v.kind == Kind::kDate;
+    const std::int64_t micros = date ? v.integer * 86'400'000'000 : micros_of(v);
+    if (dtype == "String" || categorical_dtype(dtype) || enum_dtype(dtype)) {
+      const LitType from = date ? lit_type(K::kDate) : LitType{K::kDatetime, v.offset_minutes ? v.text : "", {}};
+      auto text = cast_lit(v, from, lit_type(K::kString))->text;
+      if (categories && !categories->count(text)) return std::nullopt;
+      return Value::of(std::move(text));
+    }
+    if (integer_dtype(dtype)) {
+      const auto i = date ? v.integer : micros;
+      const bool unsigned_type = dtype.rfind("UInt", 0) == 0;
+      const int bits = std::stoi(dtype.substr(unsigned_type ? 4 : 3));
+      if (unsigned_type ? (i < 0 || (bits < 64 && i >= (std::int64_t{1} << bits)))
+                        : (bits < 64 && (i < -(std::int64_t{1} << (bits - 1)) || i >= (std::int64_t{1} << (bits - 1)))))
+        return std::nullopt;
+      return Value::of(i);
+    }
+    if (float_dtype(dtype)) return in_float(static_cast<double>(date ? v.integer : micros));
+    if (dtype == "Date") return date ? v : Value::date(floor_div(floor_div(v.integer, 1000), 86'400'000'000));
+    if (datetime_dtype(dtype)) {
+      const auto unit = unit_nanoseconds(dtype);
+      return Value::of(unit == 1 ? micros * 1000 : unit == 1'000'000 ? floor_div(micros, 1000) : micros);
+    }
+    return std::nullopt;
+  }
   const auto as_integer = [&](const Value& x) -> std::optional<std::int64_t> {
     if (x.kind == Kind::kInt) return x.integer;
     if (x.kind == Kind::kBool) return std::int64_t{x.boolean};
@@ -747,8 +1067,8 @@ std::optional<Value> cast_to(const Value& v, const std::string& dtype, const std
     return Value::of(*i);
   }
   if (float_dtype(dtype)) {
-    if (v.kind == Kind::kFloat) return v;
-    if (v.kind == Kind::kInt) return Value::of(static_cast<double>(v.integer));
+    if (v.kind == Kind::kFloat) return in_float(v.real);
+    if (v.kind == Kind::kInt) return in_float(static_cast<double>(v.integer));
     if (v.kind == Kind::kBool) return Value::of(v.boolean ? 1.0 : 0.0);
     return std::nullopt;
   }
@@ -778,6 +1098,145 @@ std::optional<Value> cast_to(const Value& v, const std::string& dtype, const std
   }
   return std::nullopt;
 }
+// Rust's Display of a double: the shortest digits that read back, without
+// an exponent.
+std::string rust_float(double v) {
+  char buffer[64];
+  for (int precision = 1; precision <= 17; ++precision) {
+    std::snprintf(buffer, sizeof(buffer), "%.*e", precision - 1, v);
+    if (std::strtod(buffer, nullptr) == v) break;
+  }
+  std::string text = buffer;
+  const bool negative = text[0] == '-';
+  if (negative) text.erase(0, 1);
+  const auto e = text.find('e');
+  const int exponent = std::stoi(text.substr(e + 1));
+  std::string digits;
+  for (const char c : text.substr(0, e))
+    if (c != '.') digits += c;
+  while (digits.size() > 1 && digits.back() == '0') digits.pop_back();
+  const int point = exponent + 1;
+  std::string out;
+  if (point <= 0) out = "0." + std::string(static_cast<std::size_t>(-point), '0') + digits;
+  else if (point >= static_cast<int>(digits.size())) out = digits + std::string(static_cast<std::size_t>(point) - digits.size(), '0');
+  else out = digits.substr(0, static_cast<std::size_t>(point)) + "." + digits.substr(static_cast<std::size_t>(point));
+  return (negative ? "-" : "") + out;
+}
+// Polars' float display in a frame or literal: integers with one decimal,
+// long values in scientific notation with four decimals or rounded to six.
+std::string polars_frame_float(double v) {
+  if (std::isnan(v)) return "NaN";
+  if (std::isinf(v)) return v < 0 ? "-inf" : "inf";
+  char buffer[64];
+  const double a = std::fabs(v);
+  if (v == std::floor(v) && a < 999'999.0) {
+    std::snprintf(buffer, sizeof(buffer), "%.1f", v);
+    return buffer;
+  }
+  const auto scientific = [&](int decimals) {
+    std::snprintf(buffer, sizeof(buffer), "%.*e", decimals, v);
+    std::string t = buffer;
+    const auto e = t.find('e');
+    const int exponent = std::stoi(t.substr(e + 1));
+    std::string mantissa = t.substr(0, e);
+    if (decimals < 0) {  // shortest
+      mantissa = rust_float(std::strtod(t.substr(0, e).c_str(), nullptr));
+    }
+    return mantissa + "e" + std::to_string(exponent);
+  };
+  const auto display = rust_float(v);
+  if (display.size() > 9) {
+    if (!(a >= 0.000001 && a <= 999'999.0) || a > 999'999.0) return scientific(4);
+    std::snprintf(buffer, sizeof(buffer), "%.6f", v);
+    std::string t = buffer;
+    if (t.back() == '0') {
+      while (t.back() == '0') t.pop_back();
+      if (t.back() == '.') t += '0';
+    }
+    return t;
+  }
+  if (v == std::floor(v)) {
+    // {:e}: the shortest mantissa.
+    std::snprintf(buffer, sizeof(buffer), "%.16e", v);
+    std::string t = buffer;
+    const auto e = t.find('e');
+    std::string mantissa = rust_float(std::strtod(t.substr(0, e).c_str(), nullptr));
+    if (mantissa.size() > 2 && mantissa.ends_with(".0")) mantissa.resize(mantissa.size() - 2);
+    return mantissa + "e" + std::to_string(std::stoi(t.substr(e + 1)));
+  }
+  return display;
+}
+// A wall clock (seconds and nanoseconds since the epoch) as Polars prints a
+// datetime: the fraction in 3, 6 or 9 digits when present.
+std::string wall_text(std::int64_t seconds, std::int64_t nanoseconds) {
+  const auto days = floor_div(seconds, 86'400);
+  const auto clock = seconds - days * 86'400;
+  auto text = pandas_filter_value_str(Value::date(days));
+  char buffer[48];
+  std::snprintf(buffer, sizeof(buffer), " %02lld:%02lld:%02lld", static_cast<long long>(clock / 3600),
+                static_cast<long long>(clock / 60 % 60), static_cast<long long>(clock % 60));
+  text += buffer;
+  if (nanoseconds) {
+    if (nanoseconds % 1'000'000 == 0) std::snprintf(buffer, sizeof(buffer), ".%03lld", static_cast<long long>(nanoseconds / 1'000'000));
+    else if (nanoseconds % 1000 == 0) std::snprintf(buffer, sizeof(buffer), ".%06lld", static_cast<long long>(nanoseconds / 1000));
+    else std::snprintf(buffer, sizeof(buffer), ".%09lld", static_cast<long long>(nanoseconds));
+    text += buffer;
+  }
+  return text;
+}
+// A cast pattern value as the plan prints it in the column's dtype.
+std::string column_value_text(const std::optional<Value>& v, const std::string& dtype) {
+  if (!v) return "null";
+  if (dtype == "String" || categorical_dtype(dtype) || enum_dtype(dtype)) return quote(v->text);
+  if (integer_dtype(dtype)) return std::to_string(v->integer);
+  if (float_dtype(dtype)) return polars_frame_float(v->real);
+  if (dtype == "Boolean") return v->boolean ? "true" : "false";
+  if (dtype == "Date") return pandas_filter_value_str(*v);
+  if (datetime_dtype(dtype)) {
+    const auto unit = unit_nanoseconds(dtype);
+    const auto per_second = 1'000'000'000 / unit;
+    const auto seconds = floor_div(v->integer, per_second);
+    const auto nanoseconds = (v->integer - seconds * per_second) * unit;
+    const auto zone = dtype_field(dtype, "time_zone");
+    if (!zone) return wall_text(seconds, nanoseconds);
+    try {
+      const auto info = ::minera::zone_database::info_at_utc(*zone, seconds);
+      return wall_text(seconds + info.offset_seconds, nanoseconds) + " " + info.abbrev;
+    } catch (const std::runtime_error&) {
+      return wall_text(seconds, nanoseconds) + " " + *zone;
+    }
+  }
+  return literal_item(*v);
+}
+// Round CC: an activity column and a pattern literal compare when their
+// element types have a supertype (Polars 1.44): a String column with
+// anything, a str literal with anything, Categorical and Enum only with str,
+// Boolean with numbers, integers with Date or Datetime only at 32 bits and
+// more (UInt32, UInt64, Int32, Int64), temporal types with each other (two
+// datetimes when both are naive or share their zone); a nested list never.
+bool comparable(const std::string& dtype, const LitType& lit) {
+  using K = LitType::K;
+  const auto k = lit.kind;
+  if (k == K::kNull || dtype == "String") return true;
+  if (k == K::kList) return false;
+  if (categorical_dtype(dtype) || enum_dtype(dtype)) return k == K::kString;
+  if (k == K::kString) return true;
+  if (dtype == "Boolean") return k == K::kInt64 || k == K::kFloat64 || k == K::kBoolean;
+  if (integer_dtype(dtype)) {
+    if (k == K::kDate || k == K::kDatetime)
+      return dtype == "Int32" || dtype == "Int64" || dtype == "UInt32" || dtype == "UInt64";
+    return true;
+  }
+  if (float_dtype(dtype)) return true;
+  if (dtype == "Date") return k != K::kBoolean;
+  if (datetime_dtype(dtype)) {
+    if (k == K::kBoolean) return false;
+    if (k != K::kDatetime) return true;
+    const auto zone = dtype_field(dtype, "time_zone");
+    return zone ? *zone == lit.zone : lit.zone.empty();
+  }
+  return false;
+}
 // A cell equals a cast pattern value.
 bool cell_equals(const EventAttribute& cell, const Value& v, const std::string& dtype) {
   if (dtype == "Date") return v.kind == Kind::kDate && physical_of(cell, dtype) == v.integer;
@@ -802,8 +1261,9 @@ std::string py_type(const Value& v) {
     case Kind::kList: return "list";
     case Kind::kTuple: return "tuple";
     case Kind::kDict: return "dict";
-    case Kind::kDatetime: return "datetime";
-    case Kind::kDate: return "date";
+    // Python's messages print the C type name (round CC).
+    case Kind::kDatetime: return "datetime.datetime";
+    case Kind::kDate: return "datetime.date";
   }
   return "object";
 }
@@ -1091,8 +1551,10 @@ EventTable join_case_list(const EventTable& df, std::size_t case_column, const s
 
 // A lazy variants filter over the sorted, grouped rows.
 template <typename Predicate>
-EventTable lazy_variant_filter(const EventTable& df, const PolarsFilterParameters& parameters, Predicate&& matches) {
+EventTable lazy_variant_filter(const EventTable& df, const PolarsFilterParameters& parameters, Predicate&& matches,
+                               const std::function<void()>& evaluate = {}) {
   const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kLazySortPlan, kLazyAggPlan);
+  if (evaluate) evaluate();
   std::vector<Key> kept;
   for (std::size_t c = 0; c < v.order.size(); ++c)
     if (matches(v.activities[c])) kept.push_back(v.order[c]);
@@ -1271,11 +1733,16 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
       suffixes.emplace_back(python_join(item));
     } else if (item.kind == Kind::kList || item.kind == Kind::kTuple) {
       fail("InvalidOperationError",
-           "cannot cast List type (inner: '" + list_literal(item.items).dtype + "', to: 'String')");
+           "cannot cast List type (inner: '" + debug_name(list_literal(item.items).type) + "', to: 'String')");
     } else if (item.kind == Kind::kNone) {
       suffixes.emplace_back();
     } else {
-      suffixes.emplace_back(item.kind == Kind::kString ? item.text : literal_item(item));
+      if (item.kind == Kind::kDatetime || item.kind == Kind::kDate) {
+        const auto v = lit_value(item);
+        suffixes.emplace_back(cast_lit(v.value, v.type, lit_type(LitType::K::kString))->text);
+      } else {
+        suffixes.emplace_back(item.kind == Kind::kString ? item.text : literal_item(item));
+      }
     }
   }
   std::vector<Key> kept;
@@ -1293,9 +1760,13 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
 namespace {
 EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
                        const PolarsFilterParameters& parameters, bool tail) {
-  // Every pattern is iterated in Python first (round CB).
-  for (const auto& item : patterns.items)
+  // Every pattern is iterated in Python and built into its literal in turn
+  // (rounds CB, CC).
+  std::vector<Literal> literals;
+  for (const auto& item : patterns.items) {
     if (!iterable(item)) fail("TypeError", "'" + py_type(item) + "' object is not iterable");
+    literals.push_back(list_literal(elements(item)));
+  }
   if (patterns.items.empty()) {
     const auto case_glue = case_key(parameters);
     const auto column = require(df, case_glue, Plan{"join", {"join"}, {}, {}, frame_plan({case_glue})});
@@ -1309,11 +1780,60 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
   const auto dtype = act ? dtype_of(df, *act) : std::string("String");
   const bool as_enum = act && enum_dtype(dtype);
   const auto categories = as_enum ? enum_categories(df, *act) : std::set<std::string>{};
+  // Round CC: a pattern compares with the activities when its element type
+  // and the column's have a supertype; it is then cast to the column dtype
+  // when the plan is built (a list pattern on a String column, a str one on
+  // a Boolean column cannot be cast), else the comparison fails when the
+  // filter runs, naming every pattern (the cast ones as cast).
   std::vector<std::vector<std::optional<Value>>> lists;
-  for (const auto& item : patterns.items) {
+  std::optional<std::size_t> failed;
+  for (std::size_t p = 0; p < literals.size(); ++p) {
+    const auto& literal = literals[p];
     auto& list = lists.emplace_back();
-    for (const auto& v : list_literal(elements(item)).values) list.push_back(cast_to(v, dtype, as_enum ? &categories : nullptr));
+    if (act && !comparable(dtype, literal.type)) {
+      if (!failed) failed = p;
+      continue;
+    }
+    if (act && literal.type.kind == LitType::K::kList)
+      fail("InvalidOperationError", "cannot cast List type (inner: '" + debug_name(literal.type.inner[0]) + "', to: 'String')");
+    if (act && dtype == "Boolean" && literal.type.kind == LitType::K::kString)
+      fail("InvalidOperationError", "casting from Utf8View to Boolean not supported");
+    for (const auto& v : literal.values) list.push_back(cast_to(v, dtype, as_enum ? &categories : nullptr));
   }
+  // An empty pattern matches every case, and the plan keeps no comparison.
+  if (std::any_of(literals.begin(), literals.end(), [](const Literal& l) { return l.values.empty(); })) failed.reset();
+  const auto evaluate = [&] {
+    if (!failed) return;
+    std::vector<std::string> comparisons;
+    for (std::size_t p = 0; p < literals.size(); ++p) {
+      const auto n = std::to_string(literals[p].values.size());
+      std::string shown;
+      if (comparable(dtype, literals[p].type)) {
+        std::vector<std::string> parts;
+        for (const auto& v : lists[p]) parts.push_back(column_value_text(v, dtype));
+        shown = "[";
+        if (parts.size() <= 3) {
+          for (std::size_t i = 0; i < parts.size(); ++i) shown += (i ? ", " : "") + parts[i];
+        } else {
+          shown += parts[0] + ", " + parts[1] + ", \xe2\x80\xa6 " + parts.back();
+        }
+        shown += "]";
+      } else {
+        shown = lit_display(list_of(literals[p].type), Value::list(literals[p].values));
+      }
+      comparisons.push_back("[(col(\"activities\").list.slice([" + (tail ? "-" + n : "dyn int: 0") + ", dyn int: " + n +
+                            "])) == (" + shown + ")]");
+    }
+    // The plan simplifies `a | a` to `a` (round CC).
+    std::string tree = comparisons.front();
+    for (std::size_t p = 1; p < comparisons.size(); ++p)
+      if (comparisons[p] != tree) tree = "[(" + tree + ") | (" + comparisons[p] + ")]";
+    fail("SchemaError", "could not evaluate comparison between series 'activities' of dtype: List(" +
+                            is_in_dtype_name(dtype) + ") and series 'literal' of dtype: List(" +
+                            debug_name(literals[*failed].type) +
+                            ")\n\nThis error occurred in the following expression:\n\t" + comparisons[*failed] + "\n" +
+                            (tree != comparisons[*failed] ? "while evaluating this larger expression:\n\t" + tree + "\n" : ""));
+  };
   return lazy_variant_filter(df, parameters, [&](const std::vector<Cell>& activities) {
     for (const auto& p : lists) {
       if (p.size() > activities.size()) continue;
@@ -1326,7 +1846,7 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
       if (same) return true;
     }
     return false;
-  });
+  }, evaluate);
 }
 }  // namespace
 
@@ -1423,6 +1943,10 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
   const auto mode = parameter_or(parameters, "CUT_MODE", "cut_mode", Value::of("this"));
   const bool this_mode = mode.kind == Kind::kString && mode.text == "this";
   const auto concat = parameter_or(parameters, "SUBCASE_CONCAT_STR", "subcase_concat_str", Value::of("##@@"));
+  // A list or tuple holds the activities; any other value is one (round CB).
+  const std::vector<Value> activities =
+      activity.kind == Kind::kList || activity.kind == Kind::kTuple ? activity.items : std::vector<Value>{activity};
+  const auto literal = list_literal(activities);
   const auto case_column = require(
       df, case_glue,
       Plan{"select",
@@ -1439,14 +1963,18 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
                           ")]).alias(\"_row_within_case\")] ",
                       {"_row_within_case"}};
   const auto act = require(df, act_key, act_plan);
-  // A list or tuple holds the activities; any other value is one (round CB).
-  const std::vector<Value> activities =
-      activity.kind == Kind::kList || activity.kind == Kind::kTuple ? activity.items : std::vector<Value>{activity};
-  const auto literal = list_literal(activities);
+  // A value that is no list, tuple or str reaches is_in as itself, which
+  // Polars implodes (round CC).
+  const bool scalar = activity.kind != Kind::kList && activity.kind != Kind::kTuple && activity.kind != Kind::kString;
+  std::string shown = literal_text(literal);
+  if (scalar) {
+    const auto v = literal.values.empty() ? Value::none() : literal.values.front();
+    shown = "[" + (v.kind == Kind::kInt ? "dyn int: " + literal_item(v) : v.kind == Kind::kFloat ? "dyn float: " + literal_item(v) : literal_item(v)) + ".implode()]";
+  }
   auto enum_stack = act_plan.stack;
   enum_stack.front() = "!with_columns";
   check_is_in(df, act, literal, "select",
-             " WITH_COLUMNS:\n [col(" + quote(act_key) + ").is_in(" + literal_text(literal) +
+             " WITH_COLUMNS:\n [col(" + quote(act_key) + ").is_in(" + shown +
                  ").alias(\"_is_split_activity\")] \n   WITH_COLUMNS:\n   [col(" + quote(case_glue) +
                  ").cum_count().over([col(" + quote(case_glue) + ")]).alias(\"_row_within_case\")] \n    " +
                  frame_plan(df.columns),

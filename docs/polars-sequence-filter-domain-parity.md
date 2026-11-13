@@ -196,3 +196,33 @@ Review CB1 in `docs/reference-2.7.22-parity.md` lists the fixes (Python
 list literals and their strict rebuild, the `is_in` dtype rules, the String
 casts of variants, the casts of prefix and suffix lists, datetime lists on
 ns and ms columns).
+
+## Temporal and narrow numeric arguments (round CC)
+
+`scripts/polars_sequence_filter_cc_domain.py` extends the CB domain with
+activity columns of `Datetime` in ms (naive), us in Asia/Kolkata, ns in
+America/New_York across the 2021 DST change, us in Europe/Berlin across
+both 2021 changes, naive us around the epoch, `Date` around the epoch, and
+the narrow numeric dtypes `Int8` to `UInt64` and `Float32` (with nulls). On
+temporal activity columns about half of the cases give the activity
+arguments as Python datetimes (naive, aware at the zone's offset, aware in
+UTC, or mixed in one list) or dates; on numeric columns some become floats,
+bools or nested lists. `scripts/capture-polars-sequence-filter-bank.py
+--domain polars_sequence_filter_cc_domain.py --count 1200 --bank-seed
+2026111333 --hash-seeds 0,1 --repeats 8` writes
+`docs/polars-sequence-filter-cc-bank.json.gz`, replayed by the same test
+(`minera_polars_sequence_filter_cc_bank_parity_tests`):
+
+| Calls | Values | Errors | Not stored (no public outcome) | Varying across seeds | Unordered | Failures |
+| --- | --- | --- | --- | --- | --- | --- |
+| 15,621 | 8,697 | 6,832 | 92 | 44 | 979 | 0 |
+
+A second capture (bank seed 4242, hash seeds 0 to 3, three runs; 10,481
+calls) also replays without a failure. The varying calls are
+`rework.apply_activity_set` on a Python set (its order). On MSVC the test
+compares a second time with the zone abbreviation after each datetime
+masked, since MSVC's zone database takes abbreviations from ICU (declared
+in Review AY2). Review CC1 in `docs/reference-2.7.22-parity.md` lists the
+fixes (Python list literals as `pl.lit` builds them, the supertype check
+and plan casts of prefix and suffix lists, datetime casts to numeric and
+temporal columns).

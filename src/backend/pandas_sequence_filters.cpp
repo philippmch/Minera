@@ -22,6 +22,7 @@
 #include "numpy_object_sort.hpp"
 #include "pandas_numpy_view.hpp"
 #include "pandas_range_index.hpp"
+#include "zone_database.hpp"
 
 namespace minera {
 
@@ -210,8 +211,9 @@ std::string type_name(const Value& v) {
     case Kind::kList: return "list";
     case Kind::kTuple: return "tuple";
     case Kind::kDict: return "dict";
-    case Kind::kDatetime: return "datetime";
-    case Kind::kDate: return "date";
+    // Python's messages print the C type name (round CC).
+    case Kind::kDatetime: return "datetime.datetime";
+    case Kind::kDate: return "datetime.date";
   }
   return "object";
 }
@@ -404,32 +406,38 @@ ScalarNumber scalar_number(const EventAttribute& cell) {
 bool is_text(const Cell& cell) { return cell && !null_cell(cell) && cell->kind == AttributeKind::kString; }
 
 // The dtype pandas infers for datetime cells: all aware or all naive,
-// microsecond unless one needs nanoseconds, in their one offset; nullopt
-// (Timestamp objects) when awareness or offsets differ.
+// microsecond unless one needs nanoseconds, in their one zone; nullopt
+// (Timestamp objects) when awareness or zones differ. A cell's zone is its
+// named zone when the transport carries one (round CC: Timestamps of one
+// named zone share it across offsets), else its offset ("UTC", "UTC+01:00").
 std::optional<std::string> datetime_dtype(const std::vector<Cell>& dates) {
-  bool naive = false, aware = false, nanoseconds = false, mixed_offsets = false;
-  std::optional<std::int32_t> offset;
+  bool naive = false, aware = false, nanoseconds = false, mixed_zones = false;
+  std::optional<std::string> zone;
   for (const auto& cell : dates) {
     const auto* date = std::get_if<NativeDate>(&cell->typed_value);
     const auto exact = *parse_timestamp_exact(date ? date->value : cell->value);
     (exact.timezone_aware ? aware : naive) = true;
     nanoseconds = nanoseconds || exact.nanoseconds % 1000 != 0;
     if (exact.timezone_aware) {
-      if (offset && *offset != exact.offset_minutes) mixed_offsets = true;
-      offset = exact.offset_minutes;
+      std::string name;
+      if (date && date->timezone) {
+        name = *date->timezone;
+      } else if (exact.offset_minutes == 0) {
+        name = "UTC";
+      } else {
+        const auto minutes = exact.offset_minutes;
+        char text[16];
+        std::snprintf(text, sizeof(text), "UTC%c%02d:%02d", minutes < 0 ? '-' : '+', std::abs(minutes) / 60,
+                      std::abs(minutes) % 60);
+        name = text;
+      }
+      if (zone && *zone != name) mixed_zones = true;
+      zone = std::move(name);
     }
   }
-  if (naive == aware || mixed_offsets) return std::nullopt;
+  if (naive == aware || mixed_zones) return std::nullopt;
   std::string dtype = std::string("datetime64[") + (nanoseconds ? "ns" : "us");
-  if (aware) {
-    const auto minutes = *offset;
-    if (minutes == 0) dtype += ", UTC";
-    else {
-      char zone[16];
-      std::snprintf(zone, sizeof(zone), ", UTC%c%02d:%02d", minutes < 0 ? '-' : '+', std::abs(minutes) / 60, std::abs(minutes) % 60);
-      dtype += zone;
-    }
-  }
+  if (aware) dtype += ", " + *zone;
   return dtype + "]";
 }
 
@@ -868,6 +876,57 @@ bool matches_value(const Activity& a, const Value& v, const std::string& dtype) 
   return scalar && !value_is_null(v) && py_equal(*a, *scalar);
 }
 
+// pandas' isin on a datetime64 column (round CC) converts the list to
+// datetimes when it holds only datetimes of the column's awareness (aware
+// ones of one UTC offset) and None or NaN, at least one datetime: values
+// then match by instant (wall clock when naive) and a NaT boundary is `isin`
+// a list with None or NaN. Otherwise it compares the column's Timestamps
+// with the list's objects as Python does: NaT matches nothing, and an aware
+// Timestamp whose wall clock repeats in its zone (a DST fold) equals no
+// datetime of another tzinfo.
+bool datetime_list_converts(const Value& values, const std::string& dtype) {
+  if (!dtype.starts_with("datetime64")) return false;
+  const bool aware = dtype.find(", ") != std::string::npos;
+  std::optional<std::int32_t> offset;
+  bool datetime = false;
+  for (const auto& v : values.items) {
+    if (v.kind == Kind::kDatetime) {
+      if (v.offset_minutes.has_value() != aware) return false;
+      if (aware && datetime && offset != v.offset_minutes) return false;
+      offset = v.offset_minutes;
+      datetime = true;
+    } else if (!value_is_null(v)) {
+      return false;
+    }
+  }
+  return datetime;
+}
+// An aware Timestamp of a datetime64 column whose wall clock occurs twice in
+// the column's zone.
+bool ambiguous_wall(const python::Scalar& s, const std::string& dtype) {
+  if (s.kind != python::Scalar::Kind::kDate || !s.date.timezone_aware) return false;
+  const auto comma = dtype.find(", ");
+  if (comma == std::string::npos) return false;
+  const auto zone = dtype.substr(comma + 2, dtype.size() - comma - 3);
+  try {
+    return zone_database::info_at_local(zone, s.date.seconds + std::int64_t{s.date.offset_minutes} * 60).result ==
+           zone_database::LocalResult::kAmbiguous;
+  } catch (const std::runtime_error&) {
+    return false;
+  }
+}
+bool boundary_isin(const Activity& a, const Value& values, const std::string& dtype, bool converts) {
+  if (converts) {
+    if (!a) return std::any_of(values.items.begin(), values.items.end(), value_is_null);
+    return std::any_of(values.items.begin(), values.items.end(), [&](const Value& v) {
+      return v.kind == Kind::kDatetime && py_equal(*a, *scalar_of(v));
+    });
+  }
+  if (a && ambiguous_wall(*a, dtype)) return false;
+  return std::any_of(values.items.begin(), values.items.end(),
+                     [&](const Value& v) { return matches_value(a, v, dtype); });
+}
+
 EventTable boundary_filter(const EventTable& df, const Value& values, const std::string& case_glue,
                            const std::string& act_key, const Value& positive, bool end) {
   const auto case_column = require_column(df, case_glue);
@@ -876,12 +935,10 @@ EventTable boundary_filter(const EventTable& df, const Value& values, const std:
   const auto cases = cases_of(df, case_column);
   const auto boundary = boundary_activities(df, cases, act, end);
   std::set<Key> kept;
+  const auto dtype = column_dtype(df, act);
+  const bool converts = datetime_list_converts(values, dtype);
   for (const auto& [key, a] : boundary)
-    for (const auto& v : values.items)
-      if (matches_value(a, v, column_dtype(df, act))) {
-        kept.insert(key);
-        break;
-      }
+    if (boundary_isin(a, values, dtype, converts)) kept.insert(key);
   require_case_index(df, case_column);
   return keep_cases(df, case_column, kept, truthy(positive));
 }
@@ -919,6 +976,9 @@ Counts counts_argument(const Value& dict) {
 struct NoccOutcome {
   EventTable table;
   Counts kept;
+  // The counted boundaries of a masked integer column hold a missing one:
+  // the column's boundaries then count as floats (round CC).
+  bool float_keys = false;
 };
 NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::optional<Value>& count0,
                         const std::string& case_glue, const std::string& act_key, bool end,
@@ -951,7 +1011,9 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
                                same_activity(entry.first, scalar_of(most_common_variant->items.back()));
     if (ok || protected_end) kept.push_back(entry);
   }
-  if (kept.size() == counts.size()) return {df, kept};
+  const bool float_keys = !count0 && masked_dtype(dtype) && (dtype.starts_with("Int") || dtype.starts_with("UInt")) &&
+                          std::any_of(boundary.begin(), boundary.end(), [](const auto& entry) { return !entry.second; });
+  if (kept.size() == counts.size()) return {df, kept, float_keys};
   std::set<Key> keep;
   // The kept activities are the numpy values of the counted dict: a naive
   // datetime64[ns] activity is then the int of its nanoseconds, which no
@@ -964,7 +1026,7 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
         break;
       }
   require_case_index(df, case_column);
-  return {keep_cases(df, case_column, keep, true), kept};
+  return {keep_cases(df, case_column, keep, true), kept, float_keys};
 }
 
 // A missing boundary is NaN, or None in an object column (round CA: groupby
@@ -985,15 +1047,19 @@ Value boundary_value(const python::Scalar& s, const std::string& dtype) {
                          comma == std::string::npos ? std::string() : dtype.substr(comma + 2, dtype.size() - comma - 3));
 }
 
-Value counts_value(const Counts& counts, const std::string& dtype) {
+// With float_keys (a masked integer column with a missing boundary, round
+// CC) the present boundaries are floats.
+Value counts_value(const Counts& counts, const std::string& dtype, bool float_keys) {
   std::vector<std::pair<Value, Value>> entries;
-  for (const auto& [k, v] : counts)
+  for (const auto& [k, v] : counts) {
     // A missing boundary of a datetime64 column is NaT, which numpy's
     // tolist() gives as None (round CB).
-    entries.emplace_back(k                                                    ? boundary_value(*k, dtype)
-                         : dtype == "object" || dtype.starts_with("datetime64") ? Value::none()
-                                                                                : Value::of(std::nan("")),
-                         v);
+    auto key = k                                                    ? boundary_value(*k, dtype)
+               : dtype == "object" || dtype.starts_with("datetime64") ? Value::none()
+                                                                      : Value::of(std::nan(""));
+    if (float_keys && key.kind == Kind::kInt) key = Value::of(static_cast<double>(key.integer));
+    entries.emplace_back(std::move(key), v);
+  }
   return Value::dict(std::move(entries));
 }
 
@@ -1402,7 +1468,8 @@ PandasEndActivitiesNocc pandas_filter_df_on_end_activities_nocc(const EventTable
                                                                 const std::optional<PandasFilterValue>& most_common_variant) {
   auto outcome = nocc_filter(df, nocc, ea_count0, case_id_glue, activity_key, true, most_common_variant);
   PandasEndActivitiesNocc out{std::move(outcome.table), std::nullopt};
-  if (return_dict && !df.empty()) out.counts = counts_value(outcome.kept, column_dtype(df, *find_column(df, activity_key)));
+  if (return_dict && !df.empty()) out.counts =
+        counts_value(outcome.kept, column_dtype(df, *find_column(df, activity_key)), outcome.float_keys);
   return out;
 }
 
@@ -2191,13 +2258,26 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
   else container = false;
   // A numeric activity column is read as numpy reads the case column.
   const auto activity_view = numpy_case_view(nv, act);
-  const bool activity_datetime = column_dtype(df, act).starts_with("datetime64[");
+  const auto activity_dtype = column_dtype(df, act);
+  const bool activity_datetime = activity_dtype.starts_with("datetime64[");
   const auto is_cut = [&](const Cell& cell) {
     if (!container)
       fail("TypeError", "argument of type '" + type_name(activity) + "' is not a container or iterable");
     // A datetime64 activity (numpy's datetime64 or a Timestamp, NaT
-    // included) equals no str, int or None argument (round CB).
-    if (activity_datetime) return false;
+    // included) equals no str, int or None argument (round CB). A datetime
+    // argument equals a naive s, ms or us activity of its wall clock (numpy
+    // datetime64), an aware activity (a Timestamp) of its instant when it is
+    // aware too and the activity's wall clock does not repeat in its zone; a
+    // naive ns activity (numpy compares its integer) and a date argument
+    // equal nothing (round CC).
+    if (activity_datetime) {
+      if (null_cell(cell) || activity_dtype == "datetime64[ns]") return false;
+      const auto value = scalar_of(cell);
+      if (ambiguous_wall(value, activity_dtype)) return false;
+      return std::any_of(cuts.begin(), cuts.end(), [&](const python::Scalar& cut) {
+        return cut.kind == python::Scalar::Kind::kDate && py_equal(value, cut);
+      });
+    }
     if (activity_view) {
       const auto value = numpy_case(cell);
       return std::any_of(cuts.begin(), cuts.end(),

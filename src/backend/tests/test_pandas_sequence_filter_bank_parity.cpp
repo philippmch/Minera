@@ -228,6 +228,34 @@ const std::string& tag_of(const Json& node) {
 }
 const Json& body(const Json& node) { return node.fields.begin()->second; }
 
+// A Python datetime or date argument (round CC): {"w": [wall clock
+// "YYYY-MM-DD HH:MM:SS.ffffff", UTC offset in minutes or null]} (an offset
+// of 0 is datetime.timezone.utc), {"date": "YYYY-MM-DD"}.
+std::int64_t civil_days(std::int64_t y, unsigned m, unsigned d) {
+  y -= m <= 2;
+  const std::int64_t era = (y >= 0 ? y : y - 399) / 400;
+  const auto yoe = static_cast<unsigned>(y - era * 400);
+  const unsigned doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+  const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146'097 + static_cast<std::int64_t>(doe) - 719'468;
+}
+PandasFilterValue temporal_of(const std::string& tag, const Json& v) {
+  int y = 0, mo = 0, d = 0, h = 0, mi = 0, s = 0;
+  long micros = 0;
+  if (tag == "date") {
+    std::sscanf(v.text.c_str(), "%d-%d-%d", &y, &mo, &d);
+    return PandasFilterValue::date(civil_days(y, static_cast<unsigned>(mo), static_cast<unsigned>(d)));
+  }
+  std::sscanf(v.items.at(0).text.c_str(), "%d-%d-%d %d:%d:%d.%ld", &y, &mo, &d, &h, &mi, &s, &micros);
+  const std::int64_t wall =
+      (civil_days(y, static_cast<unsigned>(mo), static_cast<unsigned>(d)) * 86'400 + h * 3600 + mi * 60 + s) *
+          1'000'000'000 +
+      static_cast<std::int64_t>(micros) * 1000;
+  if (v.items.at(1).kind != Json::kNumber) return PandasFilterValue::datetime(wall);
+  const auto offset = static_cast<std::int32_t>(std::stol(v.items.at(1).text));
+  return PandasFilterValue::datetime(wall, offset, offset == 0 ? "UTC" : "");
+}
+
 PandasFilterValue value_of(const Json& node) {
   const auto& tag = tag_of(node);
   const auto& v = body(node);
@@ -236,6 +264,7 @@ PandasFilterValue value_of(const Json& node) {
   if (tag == "i") return PandasFilterValue::of(static_cast<std::int64_t>(std::stoll(v.text)));
   if (tag == "f") return PandasFilterValue::of(hex_bits(v.text));
   if (tag == "s") return PandasFilterValue::of(v.text);
+  if (tag == "w" || tag == "date") return temporal_of(tag, v);
   std::vector<PandasFilterValue> items;
   if (tag == "l" || tag == "t") {
     for (const auto& item : v.items) items.push_back(value_of(item));

@@ -213,3 +213,29 @@ test (`minera_pandas_sequence_filter_cb_bank_parity_tests`):
 The two varying calls are `rework.apply` with both keys missing (a Python
 set's order again). Review CB1 in `docs/reference-2.7.22-parity.md` lists
 the fixes.
+
+## More datetime keys and datetime arguments (round CC)
+
+`scripts/pandas_sequence_filter_cc_domain.py` extends the CB domain: case
+and activity columns are also `datetime64[s]` and `datetime64[ms]`
+(naive), us in Asia/Kolkata, ns in America/New_York across the 2021 DST
+change, naive us around the epoch (negative instants with fractions), and
+object columns of Timestamps (naive, mixed with strings and `None`, or
+aware in two zones; the zone names travel as `date_timezone`). On datetime
+activity columns about half of the cases give the activity arguments as
+Python datetimes (naive, aware at the zone's offset, aware in UTC, or mixed
+with strings in one list). `scripts/capture-pandas-sequence-filter-bank.py
+--domain pandas_sequence_filter_cc_domain.py --count 1500 --bank-seed
+2026111334 --hash-seeds 0,1,2,3` writes
+`docs/pandas-sequence-filter-cc-bank.json.gz`, replayed by the same test
+(`minera_pandas_sequence_filter_cc_bank_parity_tests`):
+
+| Calls | Values | Errors | Not stored (no public outcome) | Varying across seeds | Failures |
+| --- | --- | --- | --- | --- | --- |
+| 17,110 | 11,314 | 5,795 | 1 | 2 | 0 |
+
+The two varying calls are `rework.apply` with both keys missing (a Python
+set's order). Review CC1 in `docs/reference-2.7.22-parity.md` lists the
+fixes (named zones of object Timestamps, `isin` of datetime lists on
+`datetime64` columns, datetime arguments of the activity split, float keys
+of masked integer end activities).

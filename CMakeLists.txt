@@ -3028,6 +3028,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_sequence_filter_cb_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cb-bank.json.gz")
   set_tests_properties(minera_pandas_sequence_filter_cb_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CC: datetime64 keys in s/ms/us/ns, Kolkata and New York zones,
+  # epoch instants, object Timestamps, datetime activity arguments.
+  add_test(NAME minera_pandas_sequence_filter_cc_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cc-bank.json.gz")
+  set_tests_properties(minera_pandas_sequence_filter_cc_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_sequence_filter_bank_parity_tests
     src/backend/tests/test_polars_sequence_filter_bank_parity.cpp
@@ -3046,6 +3051,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_cb_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cb-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_cb_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CC: temporal and narrow numeric activity columns with Python
+  # datetime, date, int, float and bool activity arguments.
+  add_test(NAME minera_polars_sequence_filter_cc_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cc-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_cc_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp

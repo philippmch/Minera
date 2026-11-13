@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CB (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–CC (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4939,7 +4939,80 @@ KeyError order, Polars per-run row orders, the 3.14 spelling of the
 membership error, and the playout explosion with two bindings. No fixture
 changed. The device check on the Mac was skipped again (no device linked).
 
-Next round (CC) should start by re-reviewing round CB:
+Round CC re-reviewed CB (Review CC1; CB's CI run 43495896217 was green
+except on Windows, where seven calls of the Polars CB bank printed ICU's
+`GMT+1` for `CET`: the declared MSVC abbreviations, now masked by the bank
+test on MSVC only; a fresh seed of the pandas CB domain found the float
+keys of masked integer end activities with a missing value, the Polars
+one held) and took its targets. Two new banks replay the sequence filters
+on more temporal keys: `docs/pandas-sequence-filter-cc-bank.json.gz`
+(`datetime64` in s, ms, us around the epoch, Kolkata us and New York ns
+across DST, object Timestamps naive, mixed or in two zones, Python
+datetime arguments; 17,110 calls, 71 mismatches before) and
+`docs/polars-sequence-filter-cc-bank.json.gz` (`Datetime` in ms, Kolkata,
+New York ns and Berlin across both DST changes, around the epoch, `Date`,
+`Int8` to `UInt64` and `Float32`; Python datetime, date, int, float, bool
+and nested list arguments; 15,621 calls, 830 mismatches before). The
+pandas fixes cover the `datetime.datetime` type names, the inferred zone
+of object Timestamps, `isin` of datetime lists on `datetime64` columns
+(converted only when every value fits the column; DST folds) and datetime
+arguments of the activity split; the Polars fixes rebuild list literals as
+`pl.lit` builds them (first-item constructors, the supertype fold and its
+errors), check prefix and suffix lists by supertype (plan-time casts, the
+collect-time comparison error), cast datetimes to numeric and temporal
+columns, and print cast values in the column's dtype. A new Polars table
+filter domain (`scripts/polars_filter_cc_domain.py`, `--domain` and
+`--repeats` in `scripts/capture-polars-filter-bank.py`) differs in 3,293
+of 33,137 calls; it is round CD's main target and not in the suite yet.
+Declared: MSVC's abbreviations in the Polars plans, Python set orders in
+`rework`. No fixture changed. The device check on the Mac was skipped
+again (no device linked).
+
+Next round (CD) should start by re-reviewing round CC:
+
+- the Polars table filters on typed keys: capture
+  `scripts/capture-polars-filter-bank.py --domain polars_filter_cc_domain.py
+  --count 1200 --bank-seed 2026111335 --hash-seeds 0,1 --repeats 4
+  --output BANK.json.gz` and replay it with
+  `minera_polars_filter_bank_parity_tests BANK.json.gz`:
+  3,293 mismatches, most in the LTL filters (283 to 347 each),
+  `filter_df_relative_occurrence_event_attribute` (270), `between.apply`
+  (251), `apply_numeric` (210), `filter_df_on_attribute_values`, `apply`
+  and `apply_events` (171 to 202); the causes seen: `Float32` case and
+  activity columns refused natively (`Unsupported native Polars case
+  dtype: Float32` and the same for LTL, between, variants and paths), the
+  join key dtypes of typed case columns (`datatypes of join keys don't
+  match`), the numeric filter's dtypes, and `is_in` lists and literals
+  that should follow `list_literal`, `check_is_in` and `coerced_is_in` of
+  `src/backend/polars_sequence_filters.cpp` (move them to a shared header
+  rather than copying); add the bank to the suite once it is clean;
+- `src/backend/polars_sequence_filters.cpp`: `lit_supertype` and
+  `cast_lit` (Duration, Time, Decimal and Int128 columns, `UInt8` and
+  `Int16` with dates, nested lists of lists), `build_strict` (nested nulls,
+  empty lists), `comparable` (Categorical and Enum columns against dates),
+  `column_value_text` (ns columns before 1970, fixed-offset zones), and
+  the `evaluate` hook of `lazy_variant_filter` (errors of later patterns);
+- `src/backend/pandas_sequence_filters.cpp`: `datetime_list_converts`
+  (aware lists of two offsets that are one zone, `numpy.datetime64` and
+  `pd.Timestamp` items, `date` items), `ambiguous_wall` (zones whose DST
+  shift is not one hour, the column's ns unit), `float_keys` on `UInt`
+  and `boolean` columns, the activity split's datetime rule on aware
+  columns of other zones and on `datetime64[s]` with fractions;
+- carried over from CB's list: `check_is_in` on Duration, Time, Decimal
+  and Int128 columns and `cast_to` parsing str to Datetime and Date; the
+  pandas case grouping with `timedelta64` partners; the OCPN playout's
+  dead-state memo with `objects_unique_per_trace`, two bindings and IMd
+  models, the visitor's stop at `max_traces` with `return_sequences`; the
+  other Polars modules that build `is_in` filters or variant lists (DFG
+  and statistics on Categorical and Enum activities); pandas period and
+  interval keys (no cell in the table transport; declare or add a
+  transport kind);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the CC commit (Windows in particular: the CC banks print
+  Kolkata, New York and Berlin abbreviations).
+
+Round CB's targets, taken in CC (findings CC1-1 to CC1-4):
 
 - `src/backend/polars_sequence_filters.cpp`: `list_literal` (mixed naive
   and aware datetimes, nested lists, values of other types),

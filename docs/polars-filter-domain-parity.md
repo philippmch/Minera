@@ -214,3 +214,17 @@ All seven modules are complete on this bank. Outside the domain:
   filters; datetimes with a non-UTC offset as bounds.
 * Floats in plans outside the generated values, where Polars' float display
   switches format at thresholds that were only sampled.
+
+## Typed keys (round CC, open)
+
+`scripts/polars_filter_cc_domain.py` rebuilds the frames of this domain
+with typed activity columns (Categorical, Enum, `Int8` to `UInt64`,
+`Float32`, `Float64`, `Date`, `Datetime` in us, ns and ms, naive, UTC,
+Europe/Berlin and Asia/Kolkata) and typed case columns (Categorical, Enum,
+the narrow integers and `Float32` with nulls, `Datetime`, `Date`); on
+non-String activity columns about half of the cases pass the activity
+values as values of the column's type, sometimes mixed with strings.
+`scripts/capture-polars-filter-bank.py --domain polars_filter_cc_domain.py
+--count 1200 --bank-seed 2026111335 --hash-seeds 0,1 --repeats 4` captures
+33,137 calls, of which 3,293 differ natively (Review CC1). The bank is not
+in the suite until they are fixed (round CD).

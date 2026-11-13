@@ -25722,3 +25722,110 @@ Verification (scripts in the project files under `review-harness/round-cb/`;
 | Re-review of CA: the Polars typed domain on a fresh seed (2026111325) | 13,096 calls on 1,000 frames, hash seeds 0-1, 8 runs each | 0 mismatches |
 | OCEL statistics with repeated relations (activity and object type associations, object type counts and activities) | probes against pm4py | repeated pairs kept as pm4py keeps them; equal |
 | Full suites: ctest, script tests, fixture replay | 490 ctests, 406 script tests, 2,673 responses of 16 manifests (the frontend is unchanged; CI runs vitest) | all pass; no fixture changed |
+
+## Review CC1: re-review of round CB, more `datetime64` keys and datetime arguments in the pandas sequence filters, and temporal and narrow numeric arguments in the Polars sequence filters (2026-11-13)
+
+Round CC checked CB's CI run (43495896217): five jobs green, the Windows
+job failed one test. It re-reviewed CB on fresh seeds of both CB domains
+and took CB's targets. Findings, all fixed:
+
+- **CC1-1 Zone abbreviations on Windows.** The Polars CB bank failed on
+  MSVC in seven `filter_df_on_end_activities_nocc` calls: their plans
+  print the activity values in the column's zone, and MSVC's zone
+  database names Europe/Berlin's winter offset `GMT+1` where Polars prints
+  `CET` (the ICU abbreviations declared in Review AY2). On MSVC the bank
+  test now compares a second time with the word after each datetime's
+  wall clock masked; elsewhere the abbreviations must match exactly.
+- **CC1-2 Float keys of masked integer end activities (re-review of
+  CB).** A fresh seed of the pandas CB domain (2026111332) found one call:
+  when a case of an `Int64` activity column ends with a missing value,
+  pandas counts the end activities with a NaN key, so the returned counts
+  of `filter_df_on_end_activities_nocc` hold every present key as a float
+  (`1.0`, not `1`). The fresh seed of the Polars CB domain (2026111331)
+  was equal.
+- **CC1-3 pandas sequence filters on more `datetime64` keys.** A new bank
+  (`scripts/pandas_sequence_filter_cc_domain.py`: `datetime64` in s, ms
+  and us around the epoch, us in Asia/Kolkata, ns in America/New_York
+  across the DST change, object columns of naive Timestamps, Timestamps
+  mixed with strings and `None`, and aware Timestamps of two zones; the
+  activity arguments as Python datetimes in half of the cases) found:
+  Python's messages name the types `datetime.datetime` and
+  `datetime.date`; when pandas infers the dtype of a copied object column
+  of Timestamps, those of one named zone become a column of that zone
+  across its offsets, while two zones stay objects (the capture now sends
+  the zone of an object column's Timestamps as `date_timezone`); on a
+  `datetime64` column `isin` converts the boundary list
+  only when it holds datetimes of the column's awareness (aware ones of
+  one UTC offset) and `None` or NaN, and then matches by instant (a NaT
+  boundary matches a list with `None` or NaN); any other list compares
+  the Timestamps with the list's objects as Python does (NaT matches
+  nothing; an aware Timestamp whose wall clock repeats in its zone equals
+  no datetime of another `tzinfo`); the activity split matches a datetime
+  argument against a naive s, ms or us activity by wall clock and an aware
+  one by instant (not in a repeated hour), while a naive ns activity and a
+  date argument match nothing.
+- **CC1-4 Polars sequence filters with temporal and narrow numeric
+  arguments.** A new bank (`scripts/polars_sequence_filter_cc_domain.py`:
+  `Datetime` in ms, us Kolkata, ns New York and us Berlin across both 2021
+  changes, around the epoch, `Date` around the epoch, `Int8` to `UInt64`
+  and `Float32` with nulls; the arguments as Python datetimes, dates,
+  ints, floats, bools or nested lists) found: Polars builds an argument
+  list as `pl.lit` does (the items up to the first `None`; a list whose
+  last item is a bool, int, float or str goes through the constructor of
+  its first item, an int list taking bools and a float list ints and
+  bools; any other list folds the supertype of its types in order,
+  `failed to determine supertype of datetime[μs, UTC] and datetime[μs]`
+  for naive and aware datetimes, and builds it strictly, `unexpected value
+  while building Series of type Datetime('μs'); found value of type Date:
+  2021-01-02` with its hint; an aware
+  datetime with a fixed offset becomes UTC, one with a named zone keeps
+  it); a prefix or suffix list compares with the activities when the two
+  element types have a supertype and is then cast to the column dtype in
+  the plan, otherwise the filter fails when it runs with `could not
+  evaluate comparison between series 'activities' of dtype:
+  List(Datetime('μs', 'Asia/Kolkata')) and series 'literal' of dtype:
+  List(Datetime('μs', 'UTC'))`, the expression and the
+  larger expression (`a | a` printed once, an empty pattern matching every
+  case); datetime values cast to integer, float, `Date` and `Datetime`
+  columns by their microseconds (days for `Date`, the column's unit for
+  `Datetime`), and the plans print cast values in the column's dtype
+  (floats as Polars prints them, datetimes in the column's zone with its
+  abbreviation, fractions in 3, 6 or 9 digits); `ends_with` compares
+  datetime suffix items as their String cast; the activity split implodes
+  a scalar argument (`[2021-03-21 00:00:00.001 UTC.implode()]`) and builds it
+  before it looks up the column.
+
+Open (handed to round CD): a new domain for the Polars table filters
+(`scripts/polars_filter_cc_domain.py`, with `--domain` and `--repeats` in
+`scripts/capture-polars-filter-bank.py`: typed case columns and
+Categorical, Enum, narrow integer, float, `Date` and `Datetime` activity
+columns with typed arguments) differs in 3,293 of 33,137 calls (unsupported
+`Float32` case and activity dtypes, join key dtypes, the numeric filter's
+dtypes, the `is_in` rules and list literals of CC1-4 not yet shared with
+the table filters). It is not in the test suite yet.
+
+Declarations:
+
+- MSVC's zone abbreviations (Review AY2) also reach the Polars sequence
+  filter plans; the bank test masks them on MSVC only.
+- pandas `rework.apply` with both keys missing and Polars
+  `rework.apply_activity_set` on a set follow Python's set order (two and
+  44 calls of the CC banks keep every observed outcome).
+
+Tests: the two CC banks replayed by
+`minera_pandas_sequence_filter_cc_bank_parity_tests` and
+`minera_polars_sequence_filter_cc_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-cc/`;
+"before" is round CB's code on the same inputs):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| pandas sequence filters on more `datetime64` keys (CC bank, `rp/rp_pandas.cpp`) | 17,110 calls on 1,500 frames, hash seeds 0-3 | before: 71 mismatches; after: 0 |
+| Polars sequence filters on temporal and narrow numeric activities (CC bank) | 15,621 calls on 1,200 frames, hash seeds 0-1, 8 runs each | before: 830 mismatches; after: 0 |
+| The same domain on a second seed (4242) | 10,481 calls on 800 frames, hash seeds 0-3, 3 runs each | before: 615; after: 0 |
+| Re-review of CB: the pandas CB domain on a fresh seed (2026111332) | 11,254 calls on 1,000 frames, hash seeds 0-1 | before: 1 (CC1-2); after: 0 |
+| Re-review of CB: the Polars CB domain on a fresh seed (2026111331) | 10,226 calls on 800 frames, hash seeds 0-1, 6 runs each | 0 mismatches |
+| Earlier banks (pandas and Polars sequence filters: original, typed, CB; Polars table filters) | 7 banks | 0 mismatches |
+| Polars table filters on typed keys (new domain, seed 2026111335) | 33,137 calls on 1,200 frames, hash seeds 0-1, 4 runs each | 3,293 mismatches (open, round CD) |
+| Full suites: ctest, script tests | 492 ctests, 406 script tests (the frontend and server routes are unchanged; CI runs vitest) | all pass |
