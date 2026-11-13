@@ -269,6 +269,20 @@ PandasFilterParameters parameters_of(const Json& node) {
 
 Json typed(const std::string& tag, std::string text) { return jtagged(tag, jstring(std::move(text))); }
 
+// A datetime as the bank codec writes it: a naive one as its wall clock in
+// microseconds ({"w": [text, null]}), an aware one as its UTC isoformat.
+Json datetime_node(const PandasFilterValue& v) {
+  if (!v.offset_minutes) {
+    auto text = pandas_filter_value_str(PandasFilterValue::datetime(v.integer - v.integer % 1000 -
+                                                                     (v.integer % 1000 < 0 ? 1000 : 0)));
+    if (text.size() == 19) text += ".000000";
+    else if (text.size() > 26) text.resize(26);
+    Json null;
+    return jtagged("w", jarray({jstring(std::move(text)), null}));
+  }
+  return typed("d", pandas_filter_value_str(PandasFilterValue::datetime(v.instant_nanoseconds(), 0, "UTC")));
+}
+
 Json typed_value(const PandasFilterValue& v) {
   using K = PandasFilterValue::Kind;
   switch (v.kind) {
@@ -285,6 +299,8 @@ Json typed_value(const PandasFilterValue& v) {
     case K::kInt: return typed("i", std::to_string(v.integer));
     case K::kFloat: return typed("f", bits_hex(v.real));
     case K::kString: return typed("s", v.text);
+    case K::kDatetime: return datetime_node(v);
+    case K::kDate: return typed("date", pandas_filter_value_str(v));
     case K::kList:
     case K::kTuple: {
       std::vector<Json> items;

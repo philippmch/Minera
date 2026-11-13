@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CA (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–CB (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4912,7 +4912,64 @@ few frames, and the playout's size on logs with very many sequences. No
 fixture changed. The device check on the Mac was skipped again (no device
 linked).
 
-Next round (CB) should start by re-reviewing round CA:
+Round CB re-reviewed CA (Review CB1; CA's CI run 43473813818 was green on
+all six jobs; fresh seeds of both typed sequence filter domains, 13,807 and
+13,096 calls, and the OCEL association statistics with repeated relations
+held) and took its targets. The reference OCPN playout now skips states
+from which no complete sequence is reachable, visits sequences without
+keeping the list, and `/api/ocel/playout` converts each trace as it is
+found and stops at `max_traces` (seed 35 of the round-CA sweep: 647 s to
+5.6 s, pm4py 81 s; a log with 5,187,076 sequences now finishes in 24 s).
+Two new banks replay the sequence filters on temporal keys:
+`docs/pandas-sequence-filter-cb-bank.json.gz` (`datetime64` cases and
+activities in us, ns, UTC and Berlin ms with NaT, `int64`/`Int64`
+activities; 22,745 calls) and `docs/polars-sequence-filter-cb-bank.json.gz`
+(`Int64`, `UInt8`, `Date` and `Datetime` activities in us, ns and Berlin
+ms; 19,431 calls, eight runs per seed). The pandas fixes cover the case
+grouping's addition errors with a `datetime64` side, the activity split's
+NumPy and object sorts of datetime cases, integer ids of naive ns keys in
+rework and `nocc`, and NaN keys of masked numeric end activities; the
+Polars fixes cover Python list literals (inference and the strict
+rebuild), the `is_in` dtype rules and plan casts, String casts of
+variants, casts of prefix and suffix lists, the item checks of the
+pattern filters, and datetime lists in microseconds (ns columns compare
+raw numbers, ms columns refuse them; plans print zone abbreviations and
+shorten lists of more than three values). Declared: the pandas rework
+KeyError order, Polars per-run row orders, the 3.14 spelling of the
+membership error, and the playout explosion with two bindings. No fixture
+changed. The device check on the Mac was skipped again (no device linked).
+
+Next round (CC) should start by re-reviewing round CB:
+
+- `src/backend/polars_sequence_filters.cpp`: `list_literal` (mixed naive
+  and aware datetimes, nested lists, values of other types),
+  `check_is_in` and `literal_dtype_name` (Duration, Time, Decimal and
+  Int128 columns, a Date list on Datetime data), `literal_datetime_text`
+  (fixed offsets, dates before 1970, DST gaps), `coerced_is_in`,
+  `cast_to` (str to Datetime and Date parsing), `string_cast` (ns
+  Datetime, Time, Duration), `python_value` and `same_key` in the end
+  activity counts;
+- `src/backend/pandas_sequence_filters.cpp`: `datetime_run_key` (object
+  partners of mixed elements, `timedelta64` partners, s and ms units),
+  the datetime branch of `pandas_activity_split_apply` (aware columns of
+  other zones, mixed units), the ns rule in rework and `nocc` (us, ms and
+  s keys), `counts_value` and `matches_value` on datetime keys;
+- `src/backend/ocpn_reference_playout.cpp`: the dead-state memo with
+  `objects_unique_per_trace`, two bindings and IMd models; the visitor's
+  stop at `max_traces` with `return_sequences`; the route's memory under
+  the server's limits;
+- carried over from CB's list: the Polars table filters with Datetime,
+  Date and Int activity columns (`scripts/polars_filter_domain.py` has no
+  `--domain` option yet); the other Polars modules that build `is_in`
+  filters or variant lists (DFG and statistics on Categorical and Enum
+  activities); the narrow Polars dtypes (`Int8` to `UInt32`, `Float32`,
+  with nulls) in the table filters; pandas period and interval keys (no
+  cell in the table transport; declare or add a transport kind);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the CB commit.
+
+Round CA's targets, taken in CB (findings CB1-1 to CB1-3):
 
 - `src/backend/polars_sequence_filters.cpp`: `short_dtype`, `enum_is_in`
   and its plan texts, `require_string_activities`, `CellOrder` (Enum

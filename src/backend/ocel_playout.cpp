@@ -969,22 +969,22 @@ OcpnPlayoutResult reference_mode_playout(const OcpnGraph& graph,
     result.trace_exists = reference_ocpn_trace_exists(graph, reference);
     return result;
   }
-  auto traces = reference_ocpn_extensive_traces(graph, reference);
-  result.trace_exists = !traces.empty();
-  if (options.max_traces != 0 && traces.size() > options.max_traces)
-    traces.resize(options.max_traces);
   std::map<std::string, std::string> object_types;
   for (const auto& [type, net] : graph.petri_nets) {
     (void)net;
     object_types.emplace(type + "_0", type);
   }
-  result.log = reference_ocpn_traces_to_ocel(traces, object_types,
-                                             options.objects_unique_per_trace);
-  if (options.return_sequences || options.return_traces) {
-    for (std::size_t index = 0; index < traces.size(); ++index) {
+  // The traces are converted as the search finds them, and the search stops
+  // once max_traces are kept (the first ones in search order, as a cut of the
+  // full list would keep).
+  OcpnReferenceOcelWriter writer(object_types, options.objects_unique_per_trace);
+  std::size_t index = 0;
+  reference_ocpn_extensive_visit(graph, reference, [&](const OcpnReferenceTrace& found) {
+    writer.add(found);
+    if (options.return_sequences || options.return_traces) {
       std::vector<OcpnBinding> sequence;
       std::vector<OcpnTraceEvent> trace;
-      for (const auto& step : traces[index]) {
+      for (const auto& step : found) {
         if (!step.activity) continue;
         OcpnTraceEvent event;
         event.activity = *step.activity;
@@ -995,13 +995,17 @@ OcpnPlayoutResult reference_mode_playout(const OcpnGraph& graph,
                               : object;
           event.objects.emplace_back(type, id);
         }
-        sequence.push_back({event.activity, event.objects});
+        if (options.return_sequences) sequence.push_back({event.activity, event.objects});
         trace.push_back(std::move(event));
       }
       if (options.return_sequences) result.sequences.push_back(std::move(sequence));
       if (options.return_traces) result.traces.push_back(std::move(trace));
     }
-  }
+    ++index;
+    return options.max_traces == 0 || index < options.max_traces;
+  });
+  result.trace_exists = index != 0;
+  result.log = writer.take();
   return result;
 }
 

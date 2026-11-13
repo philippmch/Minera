@@ -9,6 +9,8 @@
 #include <map>
 #include <set>
 #include <stdexcept>
+#include <string>
+#include <unordered_set>
 
 namespace minera {
 namespace {
@@ -33,11 +35,12 @@ struct Search {
   std::vector<TypeNet> types;
   std::vector<MergedTransition> transitions;
   std::size_t bound = 1;
-  bool stop_at_first = false;
+  const std::function<bool(const OcpnReferenceTrace&)>* visit = nullptr;
+  bool stopped = false;
+  std::size_t visited = 0;
   std::vector<std::vector<std::uint32_t>> markings;
   std::vector<std::size_t> fired;
   OcpnReferenceTrace current;
-  std::vector<OcpnReferenceTrace> traces;
 
   bool final_reached() const {
     for (std::size_t t = 0; t < types.size(); ++t) {
@@ -97,12 +100,40 @@ struct Search {
     }
   }
 
-  void run() {
-    if (stop_at_first && !traces.empty()) return;
-    if (final_reached()) {
-      traces.push_back(current);
-      return;
+  // Dead ends: states (markings and firing counts) from which no complete
+  // sequence was found. The search from a state depends on nothing else, so
+  // skipping a known dead state keeps every trace and its order.
+  std::unordered_set<std::string> dead;
+  std::size_t dead_bytes = 0;
+  static constexpr std::size_t kDeadBudget = std::size_t{256} << 20;
+
+  static void put(std::string& key, std::uint64_t value) {
+    while (value >= 0x80) {
+      key.push_back(static_cast<char>((value & 0x7f) | 0x80));
+      value >>= 7;
     }
+    key.push_back(static_cast<char>(value));
+  }
+
+  std::string state_key() const {
+    std::string key;
+    for (const auto& marking : markings)
+      for (const auto tokens : marking) put(key, tokens);
+    for (const auto count : fired) put(key, count);
+    return key;
+  }
+
+  // Returns whether this state reaches a complete sequence.
+  bool run() {
+    if (stopped) return true;
+    if (final_reached()) {
+      ++visited;
+      if (!(*visit)(current)) stopped = true;
+      return true;
+    }
+    auto key = state_key();
+    if (dead.contains(key)) return false;
+    bool found = false;
     for (std::size_t index = 0; index < transitions.size(); ++index) {
       const auto& transition = transitions[index];
       if (fired[index] >= bound) continue;
@@ -119,14 +150,18 @@ struct Search {
           if (chosen[part]) step.objects.push_back(types[transition.parts[part].first].object);
         std::sort(step.objects.begin(), step.objects.end());
         current.push_back(std::move(step));
-        run();
+        if (run()) found = true;
         current.pop_back();
         --fired[index];
         fire(transition, chosen, -1);
-        if (stop_at_first && !traces.empty()) return;
+        if (stopped) return true;
       }
-      if (stop_at_first && !traces.empty()) return;
     }
+    if (!found && dead_bytes < kDeadBudget) {
+      dead_bytes += key.size() + 64;
+      dead.insert(std::move(key));
+    }
+    return found;
   }
 };
 
@@ -185,46 +220,63 @@ std::string timestamp(long long seconds) {
 
 }  // namespace
 
+std::size_t reference_ocpn_extensive_visit(const OcpnGraph& graph, const OcpnReferencePlayoutOptions& options,
+                                           const std::function<bool(const OcpnReferenceTrace&)>& visit) {
+  auto search = prepare(graph, options);
+  search.visit = &visit;
+  search.run();
+  return search.visited;
+}
+
 std::vector<OcpnReferenceTrace> reference_ocpn_extensive_traces(const OcpnGraph& graph,
                                                                 const OcpnReferencePlayoutOptions& options) {
-  auto search = prepare(graph, options);
-  search.run();
-  return std::move(search.traces);
+  std::vector<OcpnReferenceTrace> traces;
+  reference_ocpn_extensive_visit(graph, options, [&](const OcpnReferenceTrace& trace) {
+    traces.push_back(trace);
+    return true;
+  });
+  return traces;
 }
 
 bool reference_ocpn_trace_exists(const OcpnGraph& graph, const OcpnReferencePlayoutOptions& options) {
-  auto search = prepare(graph, options);
-  search.stop_at_first = true;
-  search.run();
-  return !search.traces.empty();
+  return reference_ocpn_extensive_visit(graph, options, [](const OcpnReferenceTrace&) { return false; }) != 0;
+}
+
+OcpnReferenceOcelWriter::OcpnReferenceOcelWriter(const std::map<std::string, std::string>& object_types,
+                                                 bool objects_unique_per_trace)
+    : object_types_(object_types), objects_unique_per_trace_(objects_unique_per_trace) {}
+
+void OcpnReferenceOcelWriter::add(const OcpnReferenceTrace& trace) {
+  for (const auto& step : trace) {
+    if (!step.activity) continue;
+    const auto id = "event_" + std::to_string(log_.events.size());
+    log_.events.push_back({id, *step.activity, timestamp(clock_++), {}});
+    for (const auto& object : step.objects) {
+      const auto name = objects_unique_per_trace_ ? object + "_" + std::to_string(trace_) : object;
+      log_.relations.push_back({id, name, ""});
+      if (seen_.insert(name).second) log_.objects.push_back({name, object_types_.at(object), {}});
+    }
+  }
+  ++trace_;
 }
 
 Ocel reference_ocpn_traces_to_ocel(const std::vector<OcpnReferenceTrace>& traces,
                                    const std::map<std::string, std::string>& object_types,
                                    bool objects_unique_per_trace) {
-  Ocel log;
-  std::set<std::string> seen;
-  long long clock = 10000001;
-  for (std::size_t trace = 0; trace < traces.size(); ++trace) {
-    for (const auto& step : traces[trace]) {
-      if (!step.activity) continue;
-      const auto id = "event_" + std::to_string(log.events.size());
-      log.events.push_back({id, *step.activity, timestamp(clock++), {}});
-      for (const auto& object : step.objects) {
-        const auto name = objects_unique_per_trace ? object + "_" + std::to_string(trace) : object;
-        log.relations.push_back({id, name, ""});
-        if (seen.insert(name).second) log.objects.push_back({name, object_types.at(object), {}});
-      }
-    }
-  }
-  return log;
+  OcpnReferenceOcelWriter writer(object_types, objects_unique_per_trace);
+  for (const auto& trace : traces) writer.add(trace);
+  return writer.take();
 }
 
 Ocel reference_ocpn_extensive_playout(const OcpnGraph& graph, const OcpnReferencePlayoutOptions& options) {
   std::map<std::string, std::string> object_types;
   for (const auto& [type, net] : graph.petri_nets) object_types[type + "_0"] = type;
-  return reference_ocpn_traces_to_ocel(reference_ocpn_extensive_traces(graph, options), object_types,
-                                       options.objects_unique_per_trace);
+  OcpnReferenceOcelWriter writer(object_types, options.objects_unique_per_trace);
+  reference_ocpn_extensive_visit(graph, options, [&](const OcpnReferenceTrace& trace) {
+    writer.add(trace);
+    return true;
+  });
+  return writer.take();
 }
 
 }  // namespace minera

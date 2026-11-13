@@ -25618,3 +25618,107 @@ Verification (scripts in the project files under `review-harness/round-ca/`;
 | BZ's pandas table-filter and LTL sweeps with typed keys (`tbl/tblkeys.py`, `tbl/ltlkeys.py`) | 2,400 and 1,500 answers | all equal or raising alike |
 | OCEL SQLite logs with repeated relations and ties (`ocel/ocelca.py 0 60`): statistics, conformance (etot, otg, ocdfg), event/object graph, splits, description, object graphs, OCPN playout im/imd | 60 logs | before: edge metrics and description differed on most logs, playout cut at 100 traces; after: all equal but one playout log (the open timing above) |
 | Full suites: ctest, script tests, frontend, fixture replay | 487 ctests, 406 script tests, 10,730 vitest tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+## Review CB1: re-review of round CA, the reference OCPN playout's speed, the pandas sequence filters on `datetime64` keys, and the Polars sequence filters on temporal and integer activities (2026-11-13)
+
+Round CB checked CA's CI run (43473813818): green on all six jobs. It
+re-reviewed CA (fresh seeds of both typed sequence filter domains and the
+OCEL association statistics with repeated relations: all equal, see the
+table) and took CA's targets. Findings, all fixed:
+
+- **CB1-1 OCPN playout speed and size.** The reference search behind
+  `/api/ocel/playout` (pm4py's extensive variant) explored the same dead
+  ends again on logs with repeated relations: seed 35 of the round-CA
+  OCEL sweep (756,756 complete sequences of 15 silent steps) took 647 s,
+  pm4py 81 s. The search now remembers states from which no complete
+  sequence is reachable and skips them (5.6 s, the same traces), visits
+  each complete sequence without keeping the whole list, and the route
+  converts each trace to the OCEL result as it is found and stops the
+  search once `max_traces` traces are kept (the first ones in search
+  order, as the cut of the full list kept). A log with 5,187,076
+  sequences that ran out of memory under a 2.5 GB limit now finishes in
+  24 s.
+- **CB1-2 pandas sequence filters on `datetime64` keys.** A new bank
+  (`scripts/pandas_sequence_filter_cb_domain.py`: `datetime64` case and
+  activity columns in us, ns, UTC and Europe/Berlin ms, with NaT; `int64`
+  and `Int64` activities) found: the consecutive case grouping adds the
+  case and activity columns, and a `datetime64` side raises by the other
+  side's dtype (`cannot add DatetimeArray and DatetimeArray`, the integer
+  addition message of `DatetimeArray`, NumPy's `ufunc 'add' cannot use
+  operands with types dtype('<M8[us]') and dtype('float64')` for a naive
+  column and a float one, `Could not convert object to NumPy datetime`
+  for a Boolean one, elementwise `Timestamp`/`NaTType` errors for an
+  aware column, and for str, `string` and object partners an error that
+  depends on how many rows hold both values); the activity split sorts a
+  naive `datetime64` case column as NumPy does (NaT last, all NaT one run)
+  and an aware one as objects (NaT never equal), labels runs as NumPy and
+  pandas print them, and a `datetime64` activity column matches no str or
+  int argument; on naive `datetime64[ns]` keys the rework filter's kept
+  cases come back as integers and never match, and the `nocc` filter's
+  kept activities never match unless all are kept; a missing datetime key
+  counts as `None` in the end activity counts and never matches a
+  `None`/NaN boundary value; a missing value of a masked numeric end
+  activity column becomes a NaN key (CA1-1's `boolean value of NA is
+  ambiguous` holds only for `boolean` and `string` columns).
+- **CB1-3 Polars sequence filters on `Int64`, `UInt8`, `Date` and
+  `Datetime` activities.** A new bank
+  (`scripts/polars_sequence_filter_cb_domain.py`) found: Polars builds
+  the activity arguments into a Series as it builds a Python list (the
+  first value's type decides when the others fit it, else a strict
+  rebuild raises `unexpected value while building Series of type Int64;
+  found value of type String: "a"` with its hint), and `is_in` refuses a
+  list it cannot compare (`'is_in' cannot check for List(String) values in
+  Datetime('μs') data`, `... in Date data`, `... in Int64 data`), the
+  resolved plan showing Polars' casts (`col("concept:name").cast(Int64)`
+  on a `UInt8` column, `.strict_cast(Float64)` for a float list); the
+  variant strings of `starts_with`, `ends_with` and `get_variants_df`
+  cast the activities to String (`2021-01-03 03:00:00`, aware ones in
+  their zone with the offset); prefix and suffix lists are cast to the
+  activity dtype without strictness (unparsable or out-of-range values
+  become null, and null matches null), `starts_with` joins every item
+  with `","` (`sequence item 0: expected str instance, int found`),
+  `ends_with` joins only when the first item is a list or tuple, and the
+  trace filter reads its items as str (`decoding to str: need a
+  bytes-like object, int found`); the end activity counts hand out
+  Python values (`datetime.date`, `datetime.datetime` in microseconds,
+  ints); a Python datetime list is in microseconds, so on a nanosecond
+  column `is_in` compares the raw numbers (the `nocc` filter keeps
+  nothing) and a millisecond column refuses it (`'is_in' cannot check
+  for Microseconds precision values in Milliseconds Datetime data`, the
+  plan printing the values in the column's zone with its abbreviation,
+  `2021-03-24 04:00:00.004 CET`); plans print lists of more than three
+  values as Polars does (the first two, `…`, the last).
+
+Declarations:
+
+- pandas `rework.apply` with both keys missing (Python set order) as in
+  CA; the CB bank keeps both orders of its two such calls.
+- Polars per-run row orders of the consecutive case grouping with null
+  activities: the CB bank runs each call eight times per hash seed and
+  compares those calls up to row order (three runs per seed missed three
+  of them).
+- The membership error of the pandas filters is spelled `argument of
+  type 'int' is not a container or iterable` on Python 3.14 (the
+  reviewer's runtime) and `... is not iterable` on 3.11; Minera follows
+  3.14 and the bank test accepts the 3.11 spelling of the capture.
+- OCPN playout with `max_bindings_per_activity=2` still explodes on some
+  logs on both sides (24 of 239 such runs did not finish within 40 s and
+  2.5 GB on either side).
+
+Tests: `minera_review_cb1_tests` (the playout's dead ends and the
+`max_traces` cut on two round-CA logs, values from pm4py), and the two CB
+banks replayed by `minera_pandas_sequence_filter_cb_bank_parity_tests` and
+`minera_polars_sequence_filter_cb_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-cb/`;
+"before" is round CA's code on the same inputs):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| OCPN playout, IM and IMd, 1 and 2 bindings, on the round-CA OCEL logs with repeated relations (`play/cmp_old_new.sh`) | 479 runs on 120 logs | 444 equal traces, as fast or faster (seed 35 with one binding: 647 s to 5.6 s); 10 finished only after the change; 25 (24 with two bindings) finished on neither side within 40 s and 2.5 GB |
+| pandas sequence filters on `datetime64` and integer keys (CB bank, `rp/rp_pandas.cpp`) | 22,745 calls on 2,000 frames, hash seeds 0-3 | before: 965 mismatches; after: 0 (the original and typed banks: 0) |
+| Polars sequence filters on temporal and integer activities (CB bank, `rp/rp_polars.cpp`) | 19,431 calls on 1,500 frames, hash seeds 0-1, 8 runs each | before: 4,235 mismatches; after: 0 (the original and typed banks: 0) |
+| Re-review of CA: the pandas typed domain on a fresh seed (2026111324) | 13,807 calls on 1,200 frames, hash seeds 0-3 | 0 mismatches |
+| Re-review of CA: the Polars typed domain on a fresh seed (2026111325) | 13,096 calls on 1,000 frames, hash seeds 0-1, 8 runs each | 0 mismatches |
+| OCEL statistics with repeated relations (activity and object type associations, object type counts and activities) | probes against pm4py | repeated pairs kept as pm4py keeps them; equal |
+| Full suites: ctest, script tests, fixture replay | 490 ctests, 406 script tests, 2,673 responses of 16 manifests (the frontend is unchanged; CI runs vitest) | all pass; no fixture changed |

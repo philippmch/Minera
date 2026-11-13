@@ -1409,6 +1409,15 @@ if(MINERA_BUILD_TESTS)
   endif()
   add_test(NAME minera_review_ca1_tests COMMAND minera_review_ca1_tests)
 
+  add_executable(minera_review_cb1_tests src/backend/tests/test_review_cb1.cpp)
+  target_link_libraries(minera_review_cb1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_cb1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_cb1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  if(MSVC)
+    target_compile_options(minera_review_cb1_tests PRIVATE /bigobj)
+  endif()
+  add_test(NAME minera_review_cb1_tests COMMAND minera_review_cb1_tests)
+
   add_executable(minera_resource_profiles_tests
     src/backend/tests/test_resource_profiles.cpp
   )
@@ -3015,6 +3024,10 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_sequence_filter_typed_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-typed-bank.json.gz")
   set_tests_properties(minera_pandas_sequence_filter_typed_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CB: datetime64 (naive s/ms/us/ns and aware) case and activity columns.
+  add_test(NAME minera_pandas_sequence_filter_cb_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cb-bank.json.gz")
+  set_tests_properties(minera_pandas_sequence_filter_cb_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_sequence_filter_bank_parity_tests
     src/backend/tests/test_polars_sequence_filter_bank_parity.cpp
@@ -3029,6 +3042,10 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_typed_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-typed-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_typed_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CB: Int64/UInt8, Date and Datetime (us/ns/ms, naive/UTC/Berlin) activities.
+  add_test(NAME minera_polars_sequence_filter_cb_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cb-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_cb_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp

@@ -13,14 +13,22 @@
 namespace minera {
 
 // A Python argument value of the pandas sequence filters: None, bool, int,
-// float, str, list, tuple or dict (entries in insertion order).
+// float, str, list, tuple or dict (entries in insertion order), and the
+// temporal keys of returned dicts: a datetime.datetime (pandas' Timestamp
+// included) or a datetime.date.
 struct PandasFilterValue {
-  enum class Kind { kNone, kBool, kInt, kFloat, kString, kList, kTuple, kDict };
+  enum class Kind { kNone, kBool, kInt, kFloat, kString, kList, kTuple, kDict, kDatetime, kDate };
   Kind kind = Kind::kNone;
   bool boolean = false;
+  // kDatetime: the wall clock in nanoseconds since 1970-01-01T00:00 (local
+  // time when aware); kDate: days since 1970-01-01.
   std::int64_t integer = 0;
   double real = 0.0;
+  // kDatetime: the zone name of an aware value ("UTC", "Europe/Berlin"; empty
+  // for a naive value or a fixed offset).
   std::string text;
+  // kDatetime: the UTC offset of an aware value at its instant.
+  std::optional<std::int32_t> offset_minutes;
   std::vector<PandasFilterValue> items;
   std::vector<std::pair<PandasFilterValue, PandasFilterValue>> entries;
 
@@ -34,7 +42,25 @@ struct PandasFilterValue {
   [[nodiscard]] static PandasFilterValue list(std::vector<PandasFilterValue> values);
   [[nodiscard]] static PandasFilterValue tuple(std::vector<PandasFilterValue> values);
   [[nodiscard]] static PandasFilterValue dict(std::vector<std::pair<PandasFilterValue, PandasFilterValue>> values);
+  [[nodiscard]] static PandasFilterValue datetime(std::int64_t wall_nanoseconds,
+                                                  std::optional<std::int32_t> offset_minutes = std::nullopt,
+                                                  std::string zone = {});
+  [[nodiscard]] static PandasFilterValue date(std::int64_t days);
+  // The instant of an aware kDatetime (or the wall clock of a naive one) in
+  // nanoseconds since the epoch.
+  [[nodiscard]] std::int64_t instant_nanoseconds() const {
+    return offset_minutes ? integer - std::int64_t{*offset_minutes} * 60'000'000'000 : integer;
+  }
 };
+
+// Python's == of two filter values as dict keys and `in` compare them:
+// numbers by value (True == 1 == 1.0), NaN equal to nothing, text exactly,
+// datetimes by instant (a naive one never equals an aware one), dates by
+// day, containers item by item.
+[[nodiscard]] bool pandas_filter_values_equal(const PandasFilterValue& a, const PandasFilterValue& b);
+// str() of a kDatetime or kDate value as Python prints it
+// ("2021-01-01 01:02:03.123456+01:00", "2021-01-01").
+[[nodiscard]] std::string pandas_filter_value_str(const PandasFilterValue& value);
 
 // One parameters-dictionary entry: a Parameters enum member (by member name)
 // or a plain key. A member is read before the plain key equal to its value.

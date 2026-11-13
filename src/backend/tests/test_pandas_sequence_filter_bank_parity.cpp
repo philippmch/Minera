@@ -266,6 +266,20 @@ PandasFilterParameters parameters_of(const Json& node) {
 
 Json typed(const std::string& tag, std::string text) { return jtagged(tag, jstring(std::move(text))); }
 
+// A datetime as the bank codec writes it: a naive one as its wall clock in
+// microseconds ({"w": [text, null]}), an aware one as its UTC isoformat.
+Json datetime_node(const PandasFilterValue& v) {
+  if (!v.offset_minutes) {
+    auto text = pandas_filter_value_str(PandasFilterValue::datetime(v.integer - v.integer % 1000 -
+                                                                     (v.integer % 1000 < 0 ? 1000 : 0)));
+    if (text.size() == 19) text += ".000000";
+    else if (text.size() > 26) text.resize(26);
+    Json null;
+    return jtagged("w", jarray({jstring(std::move(text)), null}));
+  }
+  return typed("d", pandas_filter_value_str(PandasFilterValue::datetime(v.instant_nanoseconds(), 0, "UTC")));
+}
+
 Json typed_value(const PandasFilterValue& v) {
   using K = PandasFilterValue::Kind;
   switch (v.kind) {
@@ -282,6 +296,8 @@ Json typed_value(const PandasFilterValue& v) {
     case K::kInt: return typed("i", std::to_string(v.integer));
     case K::kFloat: return typed("f", bits_hex(v.real));
     case K::kString: return typed("s", v.text);
+    case K::kDatetime: return datetime_node(v);
+    case K::kDate: return typed("date", pandas_filter_value_str(v));
     case K::kList:
     case K::kTuple: {
       std::vector<Json> items;
@@ -301,9 +317,17 @@ Json table_node(const EventTable& table) { return jtagged("table", jstring(seria
 
 // Expected tables travel as the reference's event-table JSON; they compare
 // through the native carrier's canonical serialization.
+// A failed membership test is spelled as Python 3.14 spells it, the
+// reviewer's runtime ("is not a container or iterable"); the bank's 3.11
+// says "is not iterable" (round CB, as scripts/generate-recheck-c8ee22d-fixture.py).
 Json normalized(const Json& node) {
   if (node.kind == Json::kObject && node.fields.size() == 1 && node.fields.begin()->first == "table")
     return table_node(parse_event_table_json(serialize(node.fields.begin()->second)));
+  if (node.kind == Json::kString && node.text.starts_with("argument of type ") && node.text.ends_with("' is not iterable")) {
+    Json out = node;
+    out.text = node.text.substr(0, node.text.size() - 15) + "is not a container or iterable";
+    return out;
+  }
   Json out = node;
   for (auto& item : out.items) item = normalized(item);
   for (auto& [key, item] : out.fields) item = normalized(item);

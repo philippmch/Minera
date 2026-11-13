@@ -16,8 +16,10 @@
 // search enumerates every complete firing sequence.
 
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -43,6 +45,13 @@ struct OcpnReferencePlayoutOptions {
 [[nodiscard]] std::vector<OcpnReferenceTrace> reference_ocpn_extensive_traces(
     const OcpnGraph& graph, const OcpnReferencePlayoutOptions& options = {});
 
+// Calls `visit` with every complete firing sequence, in search order, without
+// keeping them (the trace is valid during the call only). The search stops
+// when `visit` returns false. Returns the number of sequences visited.
+std::size_t reference_ocpn_extensive_visit(
+    const OcpnGraph& graph, const OcpnReferencePlayoutOptions& options,
+    const std::function<bool(const OcpnReferenceTrace&)>& visit);
+
 // EXISTS_TRACE: whether a complete firing sequence exists.
 [[nodiscard]] bool reference_ocpn_trace_exists(const OcpnGraph& graph,
                                                const OcpnReferencePlayoutOptions& options = {});
@@ -55,6 +64,24 @@ struct OcpnReferencePlayoutOptions {
 [[nodiscard]] Ocel reference_ocpn_traces_to_ocel(const std::vector<OcpnReferenceTrace>& traces,
                                                  const std::map<std::string, std::string>& object_types,
                                                  bool objects_unique_per_trace = false);
+
+// The same conversion one trace at a time (trace numbers count from 0 in the
+// order the traces are added).
+class OcpnReferenceOcelWriter {
+ public:
+  OcpnReferenceOcelWriter(const std::map<std::string, std::string>& object_types,
+                          bool objects_unique_per_trace);
+  void add(const OcpnReferenceTrace& trace);
+  [[nodiscard]] Ocel take() { return std::move(log_); }
+
+ private:
+  const std::map<std::string, std::string>& object_types_;
+  bool objects_unique_per_trace_;
+  Ocel log_;
+  std::set<std::string> seen_;
+  long long clock_ = 10000001;
+  std::size_t trace_ = 0;
+};
 
 // The default OCEL result: the traces converted by the function above.
 [[nodiscard]] Ocel reference_ocpn_extensive_playout(const OcpnGraph& graph,

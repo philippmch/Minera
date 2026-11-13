@@ -68,6 +68,111 @@ PandasFilterValue PandasFilterValue::dict(std::vector<std::pair<PandasFilterValu
   return out;
 }
 
+PandasFilterValue PandasFilterValue::datetime(std::int64_t wall_nanoseconds, std::optional<std::int32_t> offset_minutes,
+                                              std::string zone) {
+  PandasFilterValue out;
+  out.kind = Kind::kDatetime;
+  out.integer = wall_nanoseconds;
+  out.offset_minutes = offset_minutes;
+  if (offset_minutes) out.text = std::move(zone);
+  return out;
+}
+PandasFilterValue PandasFilterValue::date(std::int64_t days) {
+  PandasFilterValue out;
+  out.kind = Kind::kDate;
+  out.integer = days;
+  return out;
+}
+
+namespace {
+
+// Proleptic Gregorian civil date of a day number (days since 1970-01-01).
+void civil_from_days(std::int64_t z, std::int64_t& y, unsigned& m, unsigned& d) {
+  z += 719468;
+  const std::int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+  const auto doe = static_cast<unsigned>(z - era * 146097);
+  const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  y = static_cast<std::int64_t>(yoe) + era * 400;
+  const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const unsigned mp = (5 * doy + 2) / 153;
+  d = doy - (153 * mp + 2) / 5 + 1;
+  m = mp < 10 ? mp + 3 : mp - 9;
+  if (m <= 2) ++y;
+}
+
+std::int64_t floor_div(std::int64_t a, std::int64_t b) { return a / b - ((a % b != 0) && ((a < 0) != (b < 0))); }
+
+std::string two(unsigned v) { return std::string(1, static_cast<char>('0' + v / 10)) + static_cast<char>('0' + v % 10); }
+
+std::string date_text(std::int64_t days) {
+  std::int64_t y = 0;
+  unsigned m = 0, d = 0;
+  civil_from_days(days, y, m, d);
+  std::string year = std::to_string(y);
+  while (year.size() < 4) year.insert(year.begin(), '0');
+  return year + "-" + two(m) + "-" + two(d);
+}
+
+}  // namespace
+
+std::string pandas_filter_value_str(const PandasFilterValue& value) {
+  if (value.kind == PandasFilterValue::Kind::kDate) return date_text(value.integer);
+  if (value.kind != PandasFilterValue::Kind::kDatetime) return value.text;
+  constexpr std::int64_t kDay = 86'400'000'000'000;
+  const auto days = floor_div(value.integer, kDay);
+  const auto rest = value.integer - days * kDay;
+  const auto seconds = rest / 1'000'000'000;
+  const auto nanos = rest % 1'000'000'000;
+  std::string out = date_text(days) + " " + two(static_cast<unsigned>(seconds / 3600)) + ":" +
+                    two(static_cast<unsigned>(seconds / 60 % 60)) + ":" + two(static_cast<unsigned>(seconds % 60));
+  if (nanos) {
+    auto digits = std::to_string(nanos);
+    digits.insert(digits.begin(), 9 - digits.size(), '0');
+    out += "." + (nanos % 1000 ? digits : digits.substr(0, 6));
+  }
+  if (value.offset_minutes) {
+    const auto offset = *value.offset_minutes;
+    const auto magnitude = static_cast<unsigned>(offset < 0 ? -offset : offset);
+    out += (offset < 0 ? "-" : "+") + two(magnitude / 60) + ":" + two(magnitude % 60);
+  }
+  return out;
+}
+
+bool pandas_filter_values_equal(const PandasFilterValue& a, const PandasFilterValue& b) {
+  using K = PandasFilterValue::Kind;
+  const auto numeric = [](const PandasFilterValue& v) { return v.kind == K::kBool || v.kind == K::kInt || v.kind == K::kFloat; };
+  if (numeric(a) && numeric(b)) {
+    const auto as_int = [](const PandasFilterValue& v) { return v.kind == K::kBool ? std::int64_t{v.boolean} : v.integer; };
+    if (a.kind != K::kFloat && b.kind != K::kFloat) return as_int(a) == as_int(b);
+    const double x = a.kind == K::kFloat ? a.real : static_cast<double>(as_int(a));
+    const double y = b.kind == K::kFloat ? b.real : static_cast<double>(as_int(b));
+    return x == y;
+  }
+  if (a.kind != b.kind) return false;
+  switch (a.kind) {
+    case K::kNone: return true;
+    case K::kString: return a.text == b.text;
+    case K::kDate: return a.integer == b.integer;
+    case K::kDatetime:
+      return a.offset_minutes.has_value() == b.offset_minutes.has_value() &&
+             a.instant_nanoseconds() == b.instant_nanoseconds();
+    case K::kList:
+    case K::kTuple:
+      if (a.items.size() != b.items.size()) return false;
+      for (std::size_t i = 0; i < a.items.size(); ++i)
+        if (!pandas_filter_values_equal(a.items[i], b.items[i])) return false;
+      return true;
+    case K::kDict:
+      if (a.entries.size() != b.entries.size()) return false;
+      for (std::size_t i = 0; i < a.entries.size(); ++i)
+        if (!pandas_filter_values_equal(a.entries[i].first, b.entries[i].first) ||
+            !pandas_filter_values_equal(a.entries[i].second, b.entries[i].second))
+          return false;
+      return true;
+    default: return false;
+  }
+}
+
 namespace {
 
 using Value = PandasFilterValue;
@@ -105,6 +210,8 @@ std::string type_name(const Value& v) {
     case Kind::kList: return "list";
     case Kind::kTuple: return "tuple";
     case Kind::kDict: return "dict";
+    case Kind::kDatetime: return "datetime";
+    case Kind::kDate: return "date";
   }
   return "object";
 }
@@ -119,6 +226,8 @@ bool truthy(const Value& v) {
     case Kind::kList:
     case Kind::kTuple: return !v.items.empty();
     case Kind::kDict: return !v.entries.empty();
+    case Kind::kDatetime:
+    case Kind::kDate: return true;
   }
   return false;
 }
@@ -382,6 +491,17 @@ std::optional<python::Scalar> scalar_of(const Value& v) {
     case Kind::kInt: return python::integer(v.integer);
     case Kind::kFloat: return python::real(v.real);
     case Kind::kString: return python::text(v.text);
+    case Kind::kDatetime: {
+      python::Scalar s;
+      s.kind = python::Scalar::Kind::kDate;
+      const auto instant = v.instant_nanoseconds();
+      s.date.seconds = instant / 1'000'000'000 - (instant % 1'000'000'000 < 0);
+      s.date.nanoseconds = static_cast<std::uint32_t>(instant - s.date.seconds * 1'000'000'000);
+      s.date.timezone_aware = v.offset_minutes.has_value();
+      s.date.offset_minutes = v.offset_minutes.value_or(0);
+      s.text = pandas_filter_value_str(v);
+      return s;
+    }
     default: return std::nullopt;
   }
 }
@@ -739,7 +859,8 @@ bool value_is_null(const Value& v) { return v.kind == Kind::kNone || (v.kind == 
 // matches; pd.NA in a masked column, which neither matches.
 bool matches_value(const Activity& a, const Value& v, const std::string& dtype) {
   if (!a) {
-    if (masked_dtype(dtype)) return false;
+    // A NaT boundary is `isin` no None or NaN (round CB).
+    if (masked_dtype(dtype) || dtype.starts_with("datetime64")) return false;
     if (float_bits(dtype)) return v.kind == Kind::kFloat && std::isnan(v.real);
     return v.kind == Kind::kNone;
   }
@@ -820,9 +941,10 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
                                               : (threshold->integral ? count->real >= static_cast<double>(threshold->integer)
                                                                      : count->real >= threshold->real));
     // The last activity of the most common variant is always kept; a pd.NA
-    // boundary (masked or "string" column) fails that comparison (round CA).
+    // boundary (a "boolean" or "string" column) fails that comparison (round
+    // CA); a masked number column's missing boundary is NaN (round CB).
     if (!ok && !count0 && !entry.first && most_common_variant && !most_common_variant->items.empty() &&
-        (masked_dtype(dtype) || dtype == "string"))
+        (dtype == "boolean" || dtype == "string"))
       fail("TypeError", "boolean value of NA is ambiguous");
     const bool protected_end = most_common_variant && !most_common_variant->items.empty() && entry.first &&
                                scalar_of(most_common_variant->items.back()) &&
@@ -831,9 +953,13 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
   }
   if (kept.size() == counts.size()) return {df, kept};
   std::set<Key> keep;
+  // The kept activities are the numpy values of the counted dict: a naive
+  // datetime64[ns] activity is then the int of its nanoseconds, which no
+  // boundary activity is `isin` (round CB).
+  const bool int_keys = dtype == "datetime64[ns]";
   for (const auto& [key, a] : boundary)
     for (const auto& entry : kept)
-      if (same_activity(entry.first, a)) {
+      if (!int_keys && same_activity(entry.first, a)) {
         keep.insert(key);
         break;
       }
@@ -843,10 +969,31 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
 
 // A missing boundary is NaN, or None in an object column (round CA: groupby
 // last() of an object column without a present value is None).
+// A datetime64 boundary comes back as numpy's tolist() gives it (round CB):
+// a naive ns column as the int of its nanoseconds, any other naive unit as
+// a datetime.datetime, an aware column (and a Timestamp in an object column)
+// as a Timestamp.
+Value boundary_value(const python::Scalar& s, const std::string& dtype) {
+  if (s.kind != python::Scalar::Kind::kDate) return value_of(s);
+  const auto& t = s.date;
+  const std::int64_t wall = (t.seconds + (t.timezone_aware ? std::int64_t{t.offset_minutes} * 60 : 0)) * 1'000'000'000 +
+                            static_cast<std::int64_t>(t.nanoseconds);
+  if (dtype == "datetime64[ns]") return Value::of(wall);
+  if (!t.timezone_aware) return Value::datetime(wall);
+  const auto comma = dtype.find(", ");
+  return Value::datetime(wall, t.offset_minutes,
+                         comma == std::string::npos ? std::string() : dtype.substr(comma + 2, dtype.size() - comma - 3));
+}
+
 Value counts_value(const Counts& counts, const std::string& dtype) {
   std::vector<std::pair<Value, Value>> entries;
   for (const auto& [k, v] : counts)
-    entries.emplace_back(k ? value_of(*k) : dtype == "object" ? Value::none() : Value::of(std::nan("")), v);
+    // A missing boundary of a datetime64 column is NaT, which numpy's
+    // tolist() gives as None (round CB).
+    entries.emplace_back(k                                                    ? boundary_value(*k, dtype)
+                         : dtype == "object" || dtype.starts_with("datetime64") ? Value::none()
+                                                                                : Value::of(std::nan("")),
+                         v);
   return Value::dict(std::move(entries));
 }
 
@@ -896,6 +1043,7 @@ std::string activity_type_name(const Cell& cell, const std::string& dtype, bool 
                                bool datetime_categories = false) {
   // A categorical gap is NaN (NaT for datetime categories), round CA.
   if (dtype == "category" && null_cell(cell)) return datetime_categories ? "NaTType" : "float";
+  if (dtype.starts_with("datetime64") && null_cell(cell)) return "NaTType";
   if (masked_dtype(dtype)) {
     if (null_cell(cell)) return "NAType";
     if (dtype == "boolean") return "numpy.bool";
@@ -1297,6 +1445,10 @@ EventTable pandas_rework_filter_apply(const EventTable& df, const PandasFilterVa
     const auto occurrence = seen[key]++;
     if (int_at_least(occurrence, threshold)) kept.insert(key);
   }
+  // The reworked cases come back as the numpy values of the groupby index:
+  // a naive datetime64[ns] id is then the int of its nanoseconds, which no
+  // datetime cell is `isin` (round CB).
+  if (column_dtype(df, case_column) == "datetime64[ns]") kept.clear();
   return keep_cases(df, case_column, kept, positive);
 }
 
@@ -1438,6 +1590,80 @@ bool same_run(const NumericKey& key, const NumericKey& previous, const NumericDt
   return result.kind == K::kBool ? key.bits == previous.bits : key.real == previous.real;
 }
 
+// A datetime64 side of the run key (round CB). DatetimeArray refuses a
+// second datetime array, any integer array and a naive float or boolean
+// array as a whole; an aware one adds a float or boolean array elementwise,
+// so the first row's pair raises. A str/"string" partner adds where both
+// cells are present: one such pair raises as the DatetimeArray, more as the
+// first Timestamp. An object partner adds one row as the DatetimeArray and
+// more rows elementwise, NaT + an int (or a Timestamp) giving NaT. Without a
+// failure every key is missing: returns whether neighbouring keys continue
+// a run (a "string" key's pd.NA does).
+std::optional<bool> datetime_run_key(const EventTable& df, std::size_t left, std::size_t right, const std::string& left_dtype,
+                                     const std::string& right_dtype) {
+  const auto is_dt = [](const std::string& d) { return d.starts_with("datetime64"); };
+  if (!is_dt(left_dtype) && !is_dt(right_dtype)) return std::nullopt;
+  const std::string kAddInt =
+      " is no longer supported.  Instead of adding/subtracting `n`, use `n * obj.freq`";
+  if (is_dt(left_dtype) && is_dt(right_dtype)) fail("TypeError", "cannot add DatetimeArray and DatetimeArray");
+  const bool dt_left = is_dt(left_dtype);
+  const auto dt_column = dt_left ? left : right, other_column = dt_left ? right : left;
+  const auto& dt_dtype = dt_left ? left_dtype : right_dtype;
+  const auto& other = dt_left ? right_dtype : left_dtype;
+  const bool aware = dt_dtype.find(", ") != std::string::npos;
+  const auto add_int = [&](const std::string& with) {
+    fail("TypeError", "Addition/subtraction of integers and integer-arrays with " + with + kAddInt);
+  };
+  const auto operands = [&](const std::string& dt_name, const std::string& other_name) {
+    fail("TypeError", "unsupported operand type(s) for +: '" + (dt_left ? dt_name : other_name) + "' and '" +
+                          (dt_left ? other_name : dt_name) + "'");
+  };
+  const auto element = [&](const Cell& cell) { return null_cell(cell) ? "NaTType" : "Timestamp"; };
+  const auto numeric = numeric_dtype(other);
+  if (numeric && (numeric->kind == NumericDtype::Kind::kSigned || numeric->kind == NumericDtype::Kind::kUnsigned))
+    add_int("DatetimeArray");
+  if (numeric && numeric->kind != NumericDtype::Kind::kSigned && numeric->kind != NumericDtype::Kind::kUnsigned &&
+      (numeric->masked || numeric->kind == NumericDtype::Kind::kFloat)) {
+    const bool real = numeric->kind == NumericDtype::Kind::kFloat;
+    if (!aware) {
+      if (!real) fail("ValueError", "Could not convert object to NumPy datetime");
+      const auto unit = dt_dtype.substr(11, dt_dtype.find(']') - 11);
+      const std::string m8 = "dtype('<M8[" + unit + "]')";
+      const std::string f = "dtype('float" + std::to_string(numeric->bits) + "')";
+      fail("UFuncTypeError", "ufunc 'add' cannot use operands with types " + (dt_left ? m8 : f) + " and " + (dt_left ? f : m8));
+    }
+    if (df.empty()) return false;
+    operands(element(df.rows[0][dt_column]), real ? "float" : "bool");
+  }
+  if (other == "str" || other == "string") {
+    std::size_t present = 0;
+    for (const auto& row : df.rows)
+      if (!null_cell(row[dt_column]) && !null_cell(row[other_column])) ++present;
+    if (present == 1) fail("TypeError", "unsupported operand type(s) for +: 'DatetimeArray' and 'str'");
+    if (present > 1) fail("TypeError", "unsupported operand type(s) for +: 'Timestamp' and 'str'");
+    return other == "string";
+  }
+  if (other == "object") {
+    const auto name = [](const Cell& cell) { return python::type_name(scalar_of(cell)); };
+    if (df.size() == 1) {
+      const auto& cell = df.rows[0][other_column];
+      const auto type = name(cell);
+      if (type == "int") add_int("DatetimeArray");
+      if (type == "Timestamp") fail("TypeError", "cannot add DatetimeArray and Timestamp");
+      fail("TypeError", "unsupported operand type(s) for +: 'DatetimeArray' and '" + type + "'");
+    }
+    for (const auto& row : df.rows) {
+      const auto type = name(row[other_column]);
+      const bool nat = null_cell(row[dt_column]);
+      if ((type == "int" || type == "Timestamp") && nat) continue;
+      if (type == "int") add_int("Timestamp");
+      fail("TypeError", std::string("unsupported operand type(s) for +: '") + element(row[dt_column]) + "' and '" + type + "'");
+    }
+    return false;
+  }
+  return std::nullopt;
+}
+
 EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, const PandasFilterParameters& parameters) {
   const auto case_column = require_column(df, case_key(parameters));
   const auto act = require_column(df, activity_key(parameters));
@@ -1467,7 +1693,9 @@ EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, cons
   }
   const auto case_dtype = numeric_dtype(dtype(case_column));
   const auto act_dtype = numeric_dtype(dtype(act));
-  if (case_dtype && act_dtype) {
+  if (const auto runs = datetime_run_key(df, case_column, act, dtype(case_column), dtype(act))) {
+    for (std::size_t i = 1; i < df.size(); ++i) continues[i] = *runs;
+  } else if (case_dtype && act_dtype) {
     const auto result = promote(*case_dtype, *act_dtype);
     if (result.masked && result.kind == NumericDtype::Kind::kFloat && result.bits == 16)
       fail("TypeError", "FloatingArray does not support np.float16 dtype.");
@@ -1835,7 +2063,69 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     std::string label;
   };
   std::vector<Run> runs;
-  if (const auto view = numpy_case_view(nv, case_column)) {
+  const auto case_dtype = column_dtype(df, case_column);
+  if (case_dtype.starts_with("datetime64[")) {
+    // A datetime64 case column (round CB): a naive one is numpy's datetime64
+    // array, sorted by value with NaT last and every NaT one run, labelled
+    // as numpy prints a value of its unit ("2021-01-01T00:00:00.000000"); an
+    // aware one is an object array of Timestamps, whose NaT orders against
+    // nothing and equals nothing, labelled by str().
+    const bool aware = case_dtype.find(", ") != std::string::npos;
+    const auto unit = case_dtype.substr(11, case_dtype.find_first_of(",]", 11) - 11);
+    struct Stamp {
+      bool nat = true;
+      std::int64_t seconds = 0;
+      std::uint32_t nanos = 0;
+      python::Scalar scalar;
+    };
+    std::vector<Stamp> stamps(df.size());
+    for (std::size_t i = 0; i < df.size(); ++i) {
+      const auto& cell = df.rows[i][case_column];
+      if (null_cell(cell)) continue;
+      auto scalar = scalar_of(cell);
+      if (scalar.kind != python::Scalar::Kind::kDate) continue;
+      stamps[i] = {false, scalar.date.seconds, scalar.date.nanoseconds, std::move(scalar)};
+    }
+    const auto lt = [&](std::size_t a, std::size_t b) {
+      const auto &x = stamps[a], &y = stamps[b];
+      if (x.nat || y.nat) return !aware && !x.nat;
+      return std::pair(x.seconds, x.nanos) < std::pair(y.seconds, y.nanos);
+    };
+    const auto same = [&](std::size_t a, std::size_t b) {
+      const auto &x = stamps[a], &y = stamps[b];
+      if (x.nat || y.nat) return !aware && x.nat && y.nat;
+      return x.seconds == y.seconds && x.nanos == y.nanos;
+    };
+    std::vector<std::size_t> order;
+    if (aware) {
+      order = detail::numpy_object_stable_argsort(df.size(), [&](std::size_t a, std::size_t b) {
+        return lt(a, b) ? -1 : lt(b, a) ? 1 : 0;
+      });
+    } else {
+      order.resize(df.size());
+      std::iota(order.begin(), order.end(), std::size_t{0});
+      std::stable_sort(order.begin(), order.end(), lt);
+    }
+    const auto label = [&](const Stamp& t) -> std::string {
+      if (t.nat) return "NaT";
+      if (aware) return python::str(t.scalar);
+      const auto wall = PandasFilterValue::datetime(t.seconds * 1'000'000'000 + t.nanos);
+      auto text = pandas_filter_value_str(wall).substr(0, 19);
+      text[10] = 'T';
+      std::string digits = std::to_string(t.nanos);
+      digits.insert(digits.begin(), 9 - digits.size(), '0');
+      if (unit == "ms") text += "." + digits.substr(0, 3);
+      else if (unit == "us") text += "." + digits.substr(0, 6);
+      else if (unit == "ns") text += "." + digits;
+      return text;
+    };
+    for (std::size_t start = 0; start < order.size();) {
+      std::size_t end = start + 1;
+      while (end < order.size() && same(order[end - 1], order[end])) ++end;
+      runs.push_back({order[start], end - start, label(stamps[order[start]])});
+      start = end;
+    }
+  } else if (const auto view = numpy_case_view(nv, case_column)) {
     // A numeric array sorts by value with NaN last; equal neighbours form a
     // run and every NaN joins one run (np.unique's equal_nan).
     using K = NumericDtype::Kind;
@@ -1901,9 +2191,13 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
   else container = false;
   // A numeric activity column is read as numpy reads the case column.
   const auto activity_view = numpy_case_view(nv, act);
+  const bool activity_datetime = column_dtype(df, act).starts_with("datetime64[");
   const auto is_cut = [&](const Cell& cell) {
     if (!container)
       fail("TypeError", "argument of type '" + type_name(activity) + "' is not a container or iterable");
+    // A datetime64 activity (numpy's datetime64 or a Timestamp, NaT
+    // included) equals no str, int or None argument (round CB).
+    if (activity_datetime) return false;
     if (activity_view) {
       const auto value = numpy_case(cell);
       return std::any_of(cuts.begin(), cuts.end(),

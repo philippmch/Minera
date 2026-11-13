@@ -194,3 +194,22 @@ same test (`minera_pandas_sequence_filter_typed_bank_parity_tests`):
 The four varying calls are `rework.apply` with both keys missing: the
 KeyError lists them in a Python set's order. Review CA1 in
 `docs/reference-2.7.22-parity.md` lists the fixes.
+
+## Datetime-key bank (round CB)
+
+`scripts/pandas_sequence_filter_cb_domain.py` extends the typed domain:
+case and activity columns are `datetime64` (us naive, ns naive, us UTC, ms
+Europe/Berlin, with NaT), activity columns also `int64` or `Int64` (with
+the activity arguments given as the mapped integers in about half of those
+cases). `scripts/capture-pandas-sequence-filter-bank.py --domain
+pandas_sequence_filter_cb_domain.py --count 2000 --bank-seed 2026111321`
+writes `docs/pandas-sequence-filter-cb-bank.json.gz`, replayed by the same
+test (`minera_pandas_sequence_filter_cb_bank_parity_tests`):
+
+| Calls | Values | Errors | Not stored (no public outcome) | Varying across seeds | Failures |
+| --- | --- | --- | --- | --- | --- |
+| 22,745 | 15,697 | 7,046 | 2 | 2 | 0 |
+
+The two varying calls are `rework.apply` with both keys missing (a Python
+set's order again). Review CB1 in `docs/reference-2.7.22-parity.md` lists
+the fixes.

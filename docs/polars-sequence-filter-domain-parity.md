@@ -175,3 +175,24 @@ Review CA1 in `docs/reference-2.7.22-parity.md` lists the fixes (variant
 lists on String activities only, the strict Enum cast of `is_in` values,
 join key dtypes, Enum casts of prefix and suffix lists, the case sort by
 dtype).
+
+## Temporal and integer activity bank (round CB)
+
+`scripts/polars_sequence_filter_cb_domain.py` extends the typed domain with
+activity columns of `Int64`, `UInt8`, `Date` and `Datetime` (us naive or
+UTC, ns naive or UTC, ms in Europe/Berlin across the 2021 DST change); on
+integer activity columns about half of the cases give the activity
+arguments as the mapped integers. `scripts/capture-polars-sequence-filter-bank.py
+--domain polars_sequence_filter_cb_domain.py --count 1500 --bank-seed
+2026111323 --hash-seeds 0,1 --repeats 8` writes
+`docs/polars-sequence-filter-cb-bank.json.gz`, replayed by the same test
+(`minera_polars_sequence_filter_cb_bank_parity_tests`):
+
+| Calls | Values | Errors | Not stored (no public outcome) | Varying across seeds | Unordered | Failures |
+| --- | --- | --- | --- | --- | --- | --- |
+| 19,431 | 10,702 | 8,596 | 133 | 83 | 1,220 | 0 |
+
+Review CB1 in `docs/reference-2.7.22-parity.md` lists the fixes (Python
+list literals and their strict rebuild, the `is_in` dtype rules, the String
+casts of variants, the casts of prefix and suffix lists, datetime lists on
+ns and ms columns).
