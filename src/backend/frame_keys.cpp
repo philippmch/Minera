@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -522,6 +523,97 @@ void require_sortable_classes(const std::set<FrameValueClass>& classes) {
   const auto second = *std::next(types.begin());
   throw std::invalid_argument(std::string("TypeError: '<' not supported between instances of '") +
                               first + "' and '" + second + "'");
+}
+
+std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, std::string_view key_view) {
+  if (!log.dataframe_columns) return std::nullopt;
+  const std::string key(key_view);
+  if (key.empty() || key == "concept:name" || key == "activity") return std::nullopt;
+  const auto frame = dataframe_frame_event_log(log);
+  if (!frame_keys(frame, FrameKeyScope::kEventLog).contains(key)) return std::nullopt;
+  if (frame.traces.size() != log.traces.size()) return std::nullopt;
+  const auto column = frame_column_type(frame, key);
+  const bool dates = column && *column == DataFrameColumnType::kDate;
+  FrameKeyedActivities out;
+  out.log = log;
+  out.types.resize(frame.traces.size());
+  bool non_text = false;
+  std::set<std::string> labels;
+  for (std::size_t t = 0; t < frame.traces.size(); ++t) {
+    const auto& trace = frame.traces[t];
+    auto& target_trace = out.log.traces[t];
+    if (trace.events.size() != target_trace.events.size()) return std::nullopt;
+    out.types[t].resize(trace.events.size());
+    for (std::size_t e = 0; e < trace.events.size(); ++e) {
+      const auto cell = frame_scalar(frame, trace, trace.events[e], key, FrameKeyScope::kEventLog);
+      std::string label;
+      std::string type;
+      if (!cell || python::is_missing(*cell)) {
+        // pandas' missing cell: NaN (a float), NaT in a date column
+        label = dates ? "NaT" : "nan";
+        type = dates ? "NaTType" : "float";
+      } else if (cell->kind == python::Scalar::Kind::kText) {
+        label = cell->text;
+      } else {
+        label = python::str(*cell);
+        type = python::type_name(*cell);
+      }
+      if (type.empty()) {
+        out.any_text = true;
+      } else if (!non_text) {
+        non_text = true;
+        out.first_non_text_type = type;
+      }
+      labels.insert(label);
+      auto& event = target_trace.events[e];
+      event.activity = label;
+      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity_source_key.clear();
+      event.activity_attribute.reset();
+      out.types[t][e] = std::move(type);
+    }
+  }
+  out.non_text = non_text;
+  out.distinct = labels.size();
+  out.column = column;
+  return out;
+}
+
+std::string frame_keyed_heuristics_error(const FrameKeyedActivities& keyed) {
+  if (!keyed.non_text) return {};
+  // The miner reads the directly-follows pairs in log order and fails at the
+  // first pair holding a cell that is no str: on its first element when
+  // that one is no str, else when it orders the second beside text
+  // (observed black-box). A log without such a pair is discovered.
+  for (std::size_t t = 0; t < keyed.types.size(); ++t) {
+    const auto& types = keyed.types[t];
+    for (std::size_t e = 1; e < types.size(); ++e) {
+      if (!types[e - 1].empty())
+        return column_type_error("TypeError: '" + types[e - 1] + "' object is not subscriptable", keyed.column);
+      if (!types[e].empty())
+        return column_type_error("TypeError: '<' not supported between instances of 'str' and '" + types[e] + "'",
+                                 keyed.column);
+    }
+  }
+  return {};
+}
+
+std::string frame_keyed_inductive_error(const FrameKeyedActivities& keyed) {
+  if (!keyed.non_text) return {};
+  if (keyed.any_text)
+    return column_type_error("TypeError: '<' not supported between instances of '" + keyed.first_non_text_type +
+                             "' and 'str'", keyed.column);
+  if (keyed.distinct == 1)
+    return column_type_error("TypeError: __str__ returned non-string (type " + keyed.first_non_text_type + ")",
+                             keyed.column);
+  return column_type_error("TypeError: can only concatenate str (not \"" + keyed.first_non_text_type + "\") to str",
+                           keyed.column);
+}
+
+std::string frame_keyed_powl_error(const FrameKeyedActivities& keyed) {
+  if (!keyed.non_text || !keyed.any_text) return {};
+  return column_type_error("TypeError: '<' not supported between instances of '" + keyed.first_non_text_type +
+                           "' and 'str'", keyed.column);
 }
 
 }  // namespace minera

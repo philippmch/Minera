@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BR (2026-11-05 to 2026-11-12, cloud container)
+## Review-fix loop, rounds T–BS (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4719,7 +4719,55 @@ activity key (pm4py's `str(Timestamp)`), the stochastic-map route failing as
 a whole on the reachability analysis Minera adds. No fixture changed. The
 device check on the Mac was skipped again (no device linked).
 
-Next round (BS) should start by re-reviewing round BR:
+Round BS re-reviewed BR (Review BS1; BR's CI run 43335386677 was green on
+all six jobs, BR's stochastic-map sweep held on fresh seeds) and took its
+targets. It fixed typed columns as activity keys on the workflow miners
+(alpha and alpha plus label `str()` of the frame's typed cell, a date
+column's UTC `Timestamp` included; heuristics, Inductive and POWL raise
+pm4py's TypeErrors on keys that are no `str`; the heuristics miner keyed by
+another text column now reads that column), POWL in the Petri comparison on
+a CSV upload's own headers (`KeyError: 'concept:name'` on every such
+upload), the stochastic-map route's reachability failure (the map is
+returned with the reachability marked unavailable), the LLM abstractions on
+nanosecond cells (nine-digit `Timestamp` reprs in the event stream, exact
+durations, numpy's int64 quantile interpolation for date columns) and the
+multipart fields of 30 query-only routes (a part other than the uploads is
+rejected instead of dropped). Declared: blank float or text cells as
+activity keys (pm4py's distinct NaN objects), alpha plus and POWL on date
+keys with missing cells, the XES wording of some TypeErrors. No fixture
+changed. The device check on the Mac was skipped again (no device linked).
+
+Next round (BT) should start by re-reviewing round BS:
+
+- `src/backend/frame_keys.cpp`: `frame_keyed_activities` (the key's typed
+  cells as `python::str` labels, `NaT`/`nan` for missing cells, the
+  `non_text`, `any_text`, `distinct` and `first_non_text_type` flags) and
+  the three error builders; the callers in `alpha_miner.cpp`
+  (`alpha_frame_keyed_log`, the alpha plus cleanup alternatives),
+  `heuristic_miner.cpp` (all-text keys now run on the keyed log and mark
+  `activity_ids_are_local`), `inductive_miner.cpp`
+  (`prepare_inductive_event_log`) and `powl_discovery.cpp`; the DFG,
+  filters and other families keyed by a typed column were not swept;
+- `src/backend/tools/minera_server.cpp`: `handle_compare_petri`'s
+  `powl_key`; `reject_unread_multipart_parts` and `ocel_request_body`'s
+  extra uploads on the 30 routes (routes that read controls from either the
+  query or the form, such as replay fitness, token replay, the alignment
+  workbench, check-model and compare-petri, still ignore unknown fields of
+  both kinds);
+- `src/backend/tools/pnml_model_options.hpp`: `stochastic_map_reachability`
+  (which exceptions count as an unavailable CTMC; the CLI shares it);
+- `src/backend/llm_abstractions.cpp`: `LogClock` (only CSV frame logs with
+  a nanosecond timestamp cell use nanoseconds), `timestamp_repr`'s nanos,
+  `numpy_int_quantile`;
+- new areas: typed activity keys on the DFG routes, the filters and the
+  statistics families (pm4py's frame keeps the typed cell); the replay and
+  alignment upload routes' unknown fields; the OCEL routes on nanosecond
+  timestamps; the LLM abstractions on XES uploads and with typed keys;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BS commit.
+
+Round BR's targets, re-reviewed in BS (findings BS1-1 to BS1-5):
 
 - `src/backend/tools/minera_server.cpp`: `csv_activity_alias`,
   `model_key_field` and `supplies_model_field` on every model route (a key

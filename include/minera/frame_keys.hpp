@@ -1,5 +1,9 @@
 #pragma once
 
+#include <optional>
+#include <string_view>
+
+#include "minera/dataframe_columns.hpp"
 #include "minera/event_log.hpp"
 
 #include <map>
@@ -79,5 +83,39 @@ class FrameNames {
 // would compare values of two classes (text beside numbers, a NaN cell or
 // dates). kMissing counts as a number (NaN is a float).
 void require_sortable_classes(const std::set<FrameValueClass>& classes);
+
+// pm4py's EventLog algorithms (alpha, heuristics, Inductive, POWL) keyed by a
+// column of an upload's frame read convert_to_event_log's cells: an activity
+// is the cell's Python object, so a number, a date or a missing cell is no
+// str (round BS, observed black-box). `log` is the input with each event's
+// activity set to str() of its cell ("7", "2.0", "True", "2020-01-01
+// 00:00:00+00:00", "nan" for a missing cell, "NaT" in a date column) under
+// concept:name; `types` holds each event's Python type name ("" for a str).
+struct FrameKeyedActivities {
+  EventLog log;
+  std::vector<std::vector<std::string>> types;
+  bool any_text = false;
+  bool non_text = false;            // some cell is no str
+  std::string first_non_text_type;  // in log order
+  std::size_t distinct = 0;         // distinct labels
+  std::optional<DataFrameColumnType> column;  // the key's dtype
+};
+
+// nullopt when the log has no frame, or the key is concept:name (or
+// "activity") or no column of the frame. With every cell text (non_text
+// false) the labels are the cells' text, which the log's own lookup reads
+// too, except for a first-class column such as the case column.
+[[nodiscard]] std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log,
+                                                                         std::string_view key);
+
+// The TypeError pm4py's heuristics miner raises on such activities when a
+// directly-follows pair holds one that is no str (empty when none does).
+[[nodiscard]] std::string frame_keyed_heuristics_error(const FrameKeyedActivities& keyed);
+
+// The TypeError pm4py's Inductive miner raises on such activities (any cell
+// that is no str), and the one its POWL discovery raises (only text beside
+// another type: sorted() of the labels); empty when none.
+[[nodiscard]] std::string frame_keyed_inductive_error(const FrameKeyedActivities& keyed);
+[[nodiscard]] std::string frame_keyed_powl_error(const FrameKeyedActivities& keyed);
 
 }  // namespace minera

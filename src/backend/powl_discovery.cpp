@@ -18,6 +18,7 @@
 
 #include "powl/semantics.hpp"
 #include "minera/cancellation.hpp"
+#include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -2134,9 +2135,33 @@ PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& op
   return discover_powl(event_log, options, {});
 }
 
+namespace {
+
+// pm4py's POWL discovery keyed by a typed column of an upload's frame names
+// each activity str() of the cell, and raises TypeError when it sorts text
+// beside another type (round BS): the frame-keyed log under concept:name, or
+// nullopt for the log's own activities.
+std::optional<EventLog> powl_frame_keyed_log(const EventLog& event_log,
+                                             const PowlDiscoveryOptions& options) {
+  auto keyed = frame_keyed_activities(event_log, options.activity_key);
+  if (!keyed || !keyed->non_text) return std::nullopt;
+  const auto error = frame_keyed_powl_error(*keyed);
+  if (!error.empty()) throw std::invalid_argument("powl_activity_key: " + error);
+  return std::move(keyed->log);
+}
+
+PowlDiscoveryOptions powl_concept_name_options(PowlDiscoveryOptions options) {
+  options.activity_key = "concept:name";
+  return options;
+}
+
+}  // namespace
+
 PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& options,
                        const std::function<bool()>& cancelled) {
   validate_options(options);
+  if (const auto keyed = powl_frame_keyed_log(event_log, options))
+    return discover_powl(*keyed, powl_concept_name_options(options), cancelled);
   State state{options, 0};
   if (cancelled) state.cancelled = &cancelled;
   const auto normalized = normalize_powl_event_log_impl(event_log, options);
@@ -2152,6 +2177,8 @@ PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& op
 EventLog normalize_powl_event_log(const EventLog& event_log,
                                   const PowlDiscoveryOptions& options) {
   validate_options(options);
+  if (const auto keyed = powl_frame_keyed_log(event_log, options))
+    return normalize_powl_event_log_impl(*keyed, powl_concept_name_options(options));
   return normalize_powl_event_log_impl(event_log, options);
 }
 

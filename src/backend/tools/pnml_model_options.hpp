@@ -188,20 +188,37 @@ inline PnmlImportOptions pnml_model_import_options(bool public_markings = false)
 
 // Signed fitted durations are meaningful log statistics, but a negative mean
 // has no rate in the CTMC approximation. Preserve the fitted map and explain
-// why this separate analysis could not be produced.
+// why this separate analysis could not be produced. The same holds when the
+// analysis itself fails on the fitted model (round BS: an immediate closure
+// without a tangible resolution failed the whole stochastic-map answer,
+// whose fitted map is pm4py's part); a marking of the wrong size stays an
+// input error.
 [[nodiscard]] inline StochasticPetriResult stochastic_map_reachability(
     const PetriNet& net, const StochasticMap& map,
     const StochasticMapFitOptions& fit, std::vector<std::uint32_t> initial_marking,
     std::size_t max_states) {
-  try {
-    const auto options = stochastic_map_to_options(
-        net, map, fit, std::move(initial_marking), max_states);
-    return stochastic_petri_reachability(net, options);
-  } catch (const std::domain_error& error) {
+  const auto unavailable = [](const std::exception& error) {
     StochasticPetriResult result;
     result.exhausted = true;
     result.diagnostic = std::string("CTMC unavailable: ") + error.what();
     return result;
+  };
+  if (!initial_marking.empty() && initial_marking.size() != net.place_count())
+    throw std::invalid_argument("stochastic Petri initial marking must match the place count");
+  StochasticPetriOptions options;
+  try {
+    options = stochastic_map_to_options(net, map, fit, std::move(initial_marking), max_states);
+  } catch (const std::domain_error& error) {
+    return unavailable(error);
+  }
+  try {
+    return stochastic_petri_reachability(net, options);
+  } catch (const std::invalid_argument& error) {
+    return unavailable(error);
+  } catch (const std::domain_error& error) {
+    return unavailable(error);
+  } catch (const std::runtime_error& error) {
+    return unavailable(error);
   }
 }
 

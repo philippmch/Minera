@@ -17,6 +17,7 @@
 
 #include "minera/dfg_variants.hpp"
 #include "minera/alpha_relations.hpp"
+#include "minera/frame_keys.hpp"
 
 namespace minera {
 namespace {
@@ -549,10 +550,27 @@ std::vector<Place> maximal_places(const Footprint& fp) {
   return maximal;
 }
 
+// pm4py's alpha miner keyed by a typed column of an upload's frame names
+// each transition str() of the cell (round BS): the frame-keyed log under
+// concept:name, or nullopt for the log's own activities.
+std::optional<EventLog> alpha_frame_keyed_log(const EventLog& log,
+                                              const AlphaMinerOptions& options) {
+  if (auto keyed = frame_keyed_activities(log, options.activity_attribute); keyed && keyed->non_text)
+    return std::move(keyed->log);
+  return std::nullopt;
+}
+
+AlphaMinerOptions concept_name_options(AlphaMinerOptions options) {
+  options.activity_attribute = "concept:name";
+  return options;
+}
+
 }  // namespace
 
 EventLog normalize_alpha_event_log(const EventLog& event_log,
                                    const AlphaMinerOptions& options) {
+  if (const auto keyed = alpha_frame_keyed_log(event_log, options))
+    return normalize_alpha_event_log(*keyed, concept_name_options(options));
   check_alpha_row_limit(event_log, options);
   EventLog normalized = event_log;
   const std::string selector = options.activity_attribute.empty()
@@ -892,6 +910,8 @@ AlphaPlusDiscoveryResult alpha_plus_with_cleanup_choices(
 
 AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
                              const AlphaMinerOptions& options) {
+  if (const auto keyed = alpha_frame_keyed_log(log, options))
+    return discover_alpha_plus_result(*keyed, concept_name_options(options));
   // Deterministic member of the public support: the first tied transition
   // in first-seen label order, with the boundary labels last.
   return alpha_plus_with_cleanup_choices(
@@ -900,6 +920,8 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
 
 std::vector<AlphaPlusCleanupAlternative> enumerate_alpha_plus_cleanup_alternatives(
     const EventLog& log, const AlphaMinerOptions& options) {
+  if (const auto keyed = alpha_frame_keyed_log(log, options))
+    return enumerate_alpha_plus_cleanup_alternatives(*keyed, concept_name_options(options));
   // Odometer over every reachable sequence of tied choices. Each run replays
   // the fixed prefix and takes the first candidate at later stages.
   std::vector<AlphaPlusCleanupAlternative> alternatives;
@@ -940,6 +962,8 @@ PetriNet discover_alpha_plus(const EventLog& log,
 
 PetriNet discover_petri_net(const EventLog& log,
                             const AlphaMinerOptions& options) {
+  if (const auto keyed = alpha_frame_keyed_log(log, options))
+    return discover_petri_net(*keyed, concept_name_options(options));
   return options.short_loops ? discover_alpha_plus(log, options)
                              : discover_alpha_classic(log, options);
 }

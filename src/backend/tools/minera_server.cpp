@@ -2146,9 +2146,29 @@ ParsedOcelCsvOptions parse_ocel_csv_options(const httplib::Request& request) {
   return result;
 }
 
+// A route that takes its controls in the query string reads only its upload
+// parts from a multipart body, so any other part (a control sent as a form
+// field, or a misspelled upload) was dropped silently: round BR found a check
+// of /api/dfg-precision whose activity key, sent as a form field, compared the
+// default with itself. Such a part is rejected, as /api/mine rejects query
+// parameters beside its multipart upload.
+void reject_unread_multipart_parts(const httplib::Request& request, std::string_view upload,
+                                   std::initializer_list<std::string_view> other_uploads = {}) {
+  if (!request.is_multipart_form_data()) return;
+  for (const auto& [name, file] : request.files) {
+    (void)file;
+    if (name != upload &&
+        std::find(other_uploads.begin(), other_uploads.end(), name) == other_uploads.end())
+      throw std::invalid_argument("multipart field " + name + " is not read by " + request.path +
+                                  "; send controls in the query string");
+  }
+}
+
 std::string ocel_request_body(const httplib::Request& request,
-                              std::string_view field) {
+                              std::string_view field,
+                              std::initializer_list<std::string_view> other_uploads = {}) {
   if (request.is_multipart_form_data()) {
+    reject_unread_multipart_parts(request, field, other_uploads);
     return form_field(request, std::string(field));
   }
   return request.body;
@@ -2632,6 +2652,7 @@ void handle_ocel_sqlite(const httplib::Request& request,
       if (!request.is_multipart_form_data() || !request.has_file("log"))
         throw std::invalid_argument(
             "OCEL SQLite import requires multipart field log");
+      reject_unread_multipart_parts(request, "log");
       const auto file = request.get_file_value("log");
       body = file.content;
       if (body.empty()) throw std::invalid_argument("empty SQLite upload");
@@ -2739,7 +2760,7 @@ void handle_ocel_exchange(const httplib::Request& request,
     if (include_objects && (mode != "export" || format != "csv"))
       throw std::invalid_argument("include_objects requires CSV event export");
 
-    const auto body = ocel_request_body(request, "log");
+    const auto body = ocel_request_body(request, "log", {"objects"});
     if (body.empty()) throw std::invalid_argument("missing OCEL exchange body");
 
     if (mode == "export") {
@@ -3958,6 +3979,7 @@ void handle_ocel_conformance(const httplib::Request& request,
       throw std::invalid_argument(
           "OCEL conformance requires multipart fields log or real_graph and normative");
     }
+    reject_unread_multipart_parts(request, real_mode == "graph" ? "real_graph" : "log", {"normative"});
     const auto real_body = form_field(
         request, real_mode == "graph" ? "real_graph" : "log");
     const auto normative_body = form_field(request, "normative");
@@ -6551,6 +6573,7 @@ void handle_pripel(const httplib::Request& request,
         throw std::invalid_argument("unknown PRIPEL parameter: " + key);
     }
     const bool release = anonymization_release_requested(request, *session);
+    reject_unread_multipart_parts(request, "trace_variant_query", {"query_log"});
     std::string query_content;
     std::string query_name;
     if (request.has_file("trace_variant_query")) {
@@ -7263,6 +7286,7 @@ void handle_reduce_petri_net(const httplib::Request& request,
         throw std::invalid_argument(
             "unknown Petri reduction parameter: " + key);
     }
+    reject_unread_multipart_parts(request, "model");
     const std::string model_xml = request.has_file("model")
                                       ? request.get_file_value("model").content
                                       : request.body;
@@ -8079,6 +8103,7 @@ void handle_case_relations(const httplib::Request& request,
       throw std::invalid_argument(
           "required multipart fields: base_log, incoming_log, case_relations");
     }
+    reject_unread_multipart_parts(request, "base_log", {"incoming_log", "case_relations"});
     static const std::set<std::string> allowed = {
         "merge_variant", "merge_timestamp_key", "merge_case_id_key",
         "merge_left_suffix", "merge_right_suffix", "merge_left_column",
@@ -8272,6 +8297,7 @@ void handle_timestamp_interleavings(const httplib::Request& request,
       throw std::invalid_argument(
           "required multipart fields: left, right, relations");
     }
+    reject_unread_multipart_parts(request, "left", {"right", "relations"});
     static const std::set<std::string> allowed = {
         "interleavings_timestamp_key", "interleavings_max_results",
         "interleavings_left_column", "interleavings_right_column"};
@@ -8550,7 +8576,13 @@ void handle_compare_petri(const httplib::Request& request,
       throw std::invalid_argument(
           "activity_attribute: expected a non-empty name when supplied");
     }
-    if (miner == "powl" && comparison_options.activity_attribute.empty())
+    // The POWL key projects both logs; a CSV alias of the upload's activity
+    // column leaves the replay on the logs' own activity field (round BS:
+    // concept:name raised KeyError on every CSV upload with its own headers).
+    const std::string powl_key = comparison_options.activity_attribute.empty()
+        ? session->powl_activity_key : comparison_options.activity_attribute;
+    if (miner == "powl" && comparison_options.activity_attribute.empty() &&
+        !csv_activity_alias(*session, "powl", session->powl_activity_key))
       comparison_options.activity_attribute = session->powl_activity_key;
     // The alpha key names a field on the alpha log, except a CSV alias of
     // the upload's activity column, which the log's own activity field holds
@@ -8682,11 +8714,11 @@ void handle_compare_petri(const httplib::Request& request,
         keyed_inductive_log ? &*keyed_inductive_log : &cached_model_log(*session, miner);
     if (miner == "powl") {
       projected_powl_log = project_powl_activity(
-          require_prepared_log(*session), comparison_options.activity_attribute,
+          require_prepared_log(*session), powl_key,
           session->powl_timestamp_key, session->powl_case_id_key);
       comparison_log = &*projected_powl_log;
       reference = project_powl_activity(
-          reference, comparison_options.activity_attribute,
+          reference, powl_key,
           session->powl_timestamp_key, session->powl_case_id_key);
     }
     const auto comparison = minera::compare_petri_usage_reference(
@@ -9039,6 +9071,7 @@ void handle_evaluate_emd(const httplib::Request& request,
         !request.has_file("reference_log")) {
       throw std::invalid_argument("missing form field: reference_log");
     }
+    reject_unread_multipart_parts(request, "reference_log");
     const auto parse_boolean = [&](std::string_view name, bool fallback) {
       const auto key = std::string(name);
       if (!request.has_param(key)) return fallback;
@@ -11550,6 +11583,7 @@ void handle_streaming_tbr(const httplib::Request& request,
       throw std::invalid_argument(
           "streaming TBR requires multipart model and log fields");
     }
+    reject_unread_multipart_parts(request, "model", {"log"});
     minera::StreamingTbrOptions options;
     if (request.has_param("streaming_tbr_variant")) {
       const auto variant = request.get_param_value("streaming_tbr_variant");
@@ -11638,6 +11672,7 @@ void handle_streaming_tbr(const httplib::Request& request,
 void handle_streaming_declare(const httplib::Request& request,httplib::Response& response) {
   live_response(response,[&]{
     live_params(request,{"streaming_declare_case_id_column","streaming_declare_activity_column","streaming_declare_timestamp_column","streaming_event_order","streaming_include_diagnostics","format"});
+    reject_unread_multipart_parts(request, "model", {"log"});
     const auto model_body=form_field(request,"model"),log_body=form_field(request,"log");if(model_body.empty()||log_body.empty())throw std::invalid_argument("Declare replay requires original model and event uploads");
     const auto model=minera::parse_declare_stream_model_json(model_body);minera::DeclareStreamingConformance monitor(model);minera::CsvImportOptions csv;csv.keep_na_first_class_values=true;
     if(request.has_param("streaming_declare_case_id_column"))csv.case_id_column=request.get_param_value("streaming_declare_case_id_column");if(request.has_param("streaming_declare_activity_column"))csv.activity_column=request.get_param_value("streaming_declare_activity_column");if(request.has_param("streaming_declare_timestamp_column"))csv.timestamp_column=request.get_param_value("streaming_declare_timestamp_column");

@@ -24732,3 +24732,129 @@ Verification (scripts in the project files under `review-harness/round-br/`;
 `minera_review_br1_tests` binds the batches' log and pandas variants, the
 interval tree, the trace-based and temporal features and the stochastic
 map's durations on one CSV with nanosecond cells.
+
+## Review BS1: re-review of round BR, typed columns as activity keys, the stochastic map's reachability, the LLM abstractions on nanosecond cells and multipart fields on query-only routes (2026-11-13)
+
+Round BS checked BR's CI run (43335386677: all six jobs green, the macOS and
+Windows ctest included), re-reviewed BR (`csv_activity_alias`,
+`model_key_field` and `supplies_model_field` on the model routes, the
+compare-petri CSV reference, DFG precision's `csv_frame_key`, the batches,
+features, interval tree and stochastic map on nanosecond cells) and took
+BR's targets: date and other typed columns as activity keys across the
+miners, the stochastic-map route's reachability failure, the remaining log
+families on nanosecond cells, routes on XES uploads with nanosecond dates
+and the multipart fields of query-only routes. The device check on the Mac
+was skipped (no device linked). Findings, all fixed:
+
+- **BS1-1 Typed columns as activity keys on the workflow miners.** pm4py's
+  EventLog algorithms read the typed cells of a CSV upload's frame. Alpha
+  and alpha plus label a transition `str()` of the cell (a date column's UTC
+  `Timestamp`, `2021-03-01 00:00:00+00:00`; an integer `1`; the timestamp
+  column; `@@index`); the heuristics miner raises TypeError at the first
+  directly-follows pair holding a cell that is no `str` (`'Timestamp'
+  object is not subscriptable` when the first element is one, `'<' not
+  supported between instances of 'str' and 'T'` when the second is);
+  Inductive raises on any key that is no `str` (`'<' not supported between
+  instances of 'T' and 'str'` beside text, `__str__ returned non-string
+  (type T)` for one distinct value, else `can only concatenate str (not
+  "T") to str`); POWL labels `str()` unless text sits beside such a cell,
+  where it raises the `'<'` TypeError. A missing cell is `NaT` in a date
+  column and `nan` (a float) elsewhere. Minera kept the cell's CSV text and
+  discovered on every key (BR declared the date labels); the heuristics
+  miner keyed by another text column (the case column) also kept the
+  activity column's labels. On 10 uploads, 11 keys and five miners, 274 of
+  550 answers differed. The miners now project the key through
+  `frame_keyed_activities` (`frame_keys.cpp`) and raise pm4py's errors
+  (`frame_keyed_heuristics_error`, `frame_keyed_inductive_error`,
+  `frame_keyed_powl_error`), on CSV and XES uploads.
+- **BS1-2 POWL in the Petri comparison on a CSV upload's own headers.**
+  `/api/compare-petri` with the POWL model projected both logs on the
+  session's POWL key, `concept:name`, which the logs of a CSV upload with its
+  own headers hold under the header: every such comparison raised
+  `KeyError: 'concept:name'`. A key that names the upload's activity column
+  now leaves the projection on the logs' own activity field, and an
+  explicit key projects both logs as before.
+- **BS1-3 The stochastic map's reachability.** `/api/stochastic-map` failed
+  as a whole when the stochastic Petri reachability analysis, a Minera
+  addition the route always runs, could not take the fitted map (BR
+  declared 5 of 30 Inductive models of nanosecond uploads: a fitted normal
+  with a negative mean, rows out of time order, has no CTMC rate). The
+  fitted map, pm4py's part, is now returned with the reachability marked
+  exhausted and a `CTMC unavailable: ...` diagnostic
+  (`stochastic_map_reachability`, also the CLI's); a wrong-size initial
+  marking still fails.
+- **BS1-4 The LLM abstractions on nanosecond cells.** pm4py's
+  `abstract_event_stream` prints a `datetime64[ns]` cell's `Timestamp` with
+  nine fraction digits (`00:00:00.000000600`); the variants' and the DFG's
+  durations read the exact nanoseconds; `abstract_log_attributes` takes a
+  date column's quantiles through numpy's linear interpolation on the int64
+  units (the neighbours' difference in int64, a float lerp: 600 ns past the
+  second reads `.000000512`). Minera printed and measured microseconds and
+  interpolated the exact instants: on 30 nanosecond uploads, 56 of 150
+  answers differed (event stream 28, log attributes 27, variants 1). The
+  abstractions now keep a cell's nanoseconds (`LogClock`,
+  `numpy_int_quantile` in `llm_abstractions.cpp`).
+- **BS1-5 Multipart fields on query-only routes.** Routes that take their
+  controls in the query string read only their upload parts from a
+  multipart body and dropped any other part silently (BR's finding: a
+  check that sent DFG precision's key as a form field compared the default
+  with itself). Such a part is now rejected with `multipart field NAME is
+  not read by ROUTE; send controls in the query string`, as `/api/mine`
+  rejects query parameters beside its upload, on 30 routes: DFG precision,
+  import and conversion, model exchange, the process cube, the five
+  streaming routes, the 14 OCEL routes, Petri reduction, both PRIPEL routes,
+  the case-relation merge, timestamp interleavings and EMD. The frontend
+  sends only the upload parts there. Routes that read their controls from
+  either the query or the form (the replay, alignment and comparison
+  uploads) are unchanged.
+
+Checked without findings: the model routes keyed by a CSV's own header on
+the POWL and imported models (alignments, evaluation with its adapters and
+families, decomposed, anti- and multi-alignments, decisions, decision
+tables, data Petri net, Monte Carlo, the Petri comparison); XES uploads
+with sub-microsecond dates against the same dates truncated to the
+microsecond (pm4py's `read_xes` truncates; the mine body, performance DFG,
+case statistics, sojourn time, interval tree, stochastic map and passed
+time agree); service time, cycle time and case arrival on nanosecond CSV
+cells against pm4py's pandas functions; the stochastic map's fitted timing
+(BR's sweep on fresh seeds).
+
+Declarations:
+
+- A blank cell of a float or text column as an activity key: pm4py's
+  EventLog holds each float NaN as its own object, so alpha, alpha plus and
+  POWL give every blank event a separate `nan` activity and the heuristics
+  miner an isolated `nan` node; Minera labels them one `nan` activity.
+- Alpha plus keyed by a date column with missing cells builds a different
+  net around the `NaT` activity, and POWL keyed by such a column drops the
+  traces whose cells are all `NaT`; Minera keeps them.
+- On XES uploads pm4py's frame holds a date attribute as
+  `datetime.datetime` objects in an object column, and Minera's errors name
+  that type there too; where such an attribute sits beside text cells,
+  pm4py's Inductive and POWL TypeError names the operands the other way
+  round (`'<' not supported between instances of 'str' and
+  'datetime.datetime'`; Minera `'datetime.datetime' and 'str'`).
+- The case statistics' start and end on nanosecond cells (round BQ), the
+  number-keyed DataFrame routes, the CSV timestamp columns of plain numbers
+  and "roles to diagnostics groups" (round AT) stay as declared.
+
+Verification (scripts in the project files under `review-harness/round-bs/`;
+"before" is round BR's server on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Workflow miners keyed by the frame's typed columns (`typedkeys.py`: alpha, alpha plus, heuristics, Inductive, POWL; keys `act`, `concept:name`, an integer, a float with gaps, a date with gaps, text with blanks, a bool, `ts`, `time:timestamp`, `@@index`, the case column) | 1,650 on 30 CSV uploads, 700 on 20 XES uploads | before (10 CSV uploads): 274 of 550 differed; after: 33 and 23 differ, all declared (blank float or text keys, alpha plus and POWL on dates with `NaT`), the rest equal or raise the same TypeError |
+| Petri comparison on the POWL and Inductive models, CSV with its own headers vs the same rows as XES (`cmpxes.py`) | 20 | before: every POWL comparison raised `KeyError: 'concept:name'`; after: all the same |
+| Model routes on the POWL and imported models keyed by the header vs `concept:name` (`indkeys2.py`, 36 route variants) | 720 | all the same, 2 multi-alignments fail alike |
+| LLM abstractions on nanosecond uploads vs pm4py (`llmns.py`: DFG, variants, event stream, log attributes, log features) | 200 on 40 uploads, and 200 on 40 fresh ones | before (30 uploads): 56 of 150 differed; after: all equal, 11 raise alike |
+| Stochastic map (fitted timing) vs pm4py (round BR's `smapns.py`, 30 uploads and 30 fresh ones) | 60 | before: 5 failed on the reachability analysis; after: all maps returned and equal |
+| XES uploads with sub-microsecond dates vs the same dates truncated (`xesns.py`: mine body, performance DFG, case statistics, sojourn time, interval tree, stochastic map, passed time) | 140 | all the same (the mine bodies apart from the upload's own name and size) |
+| Service time, cycle time and case arrival on nanosecond cells vs pm4py (`perfns.py` with `NS=1`, 30 uploads) | 270 | all equal, 39 raise alike |
+| Multipart parts on query-only routes (contract test and probes) | 30 routes | a part besides the uploads is rejected; query-string controls unchanged |
+| Full suites: ctest, script tests, frontend tests, fixture replay | 477 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+`minera_review_bs1_tests` binds the typed activity keys (alpha labels,
+heuristics, Inductive and POWL errors), the LLM abstractions on a CSV with
+nanosecond cells and the stochastic map without a CTMC;
+`minera_server_parameter_contract_tests` binds the multipart rejection on
+DFG precision and an OCEL route.

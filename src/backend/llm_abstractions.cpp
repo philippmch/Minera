@@ -194,6 +194,22 @@ double numpy_quantile(const std::vector<double>& sorted, double q) {
 
 constexpr std::array<double, 5> kQuantiles{0.0, 0.25, 0.5, 0.75, 1.0};
 
+// numpy.quantile(method="linear") of a sorted int64 array (a date column's
+// units): the neighbours' difference is taken in int64, then interpolated
+// as floats (round BS: a nanosecond column's quantiles are an ulp apart
+// from the float difference).
+double numpy_int_quantile(const std::vector<std::int64_t>& sorted, double q) {
+  const double virtual_index = static_cast<double>(sorted.size() - 1) * q;
+  const double previous = std::floor(virtual_index);
+  const auto low = static_cast<std::size_t>(previous);
+  const auto high = std::min(low + 1, sorted.size() - 1);
+  const double gamma = virtual_index - previous;
+  const auto a = sorted[low], b = sorted[high];
+  const double difference = static_cast<double>(b - a);
+  return gamma >= 0.5 ? static_cast<double>(b) - difference * (1.0 - gamma)
+                      : static_cast<double>(a) + difference * gamma;
+}
+
 template <typename Format>
 std::string quantile_dict(std::vector<double> values, Format format) {
   std::sort(values.begin(), values.end());
@@ -215,9 +231,26 @@ struct Cell {
   std::string text;      // string payload or integer digits
   double number = 0.0;   // int, float or bool value
   std::int64_t micros = 0;
+  std::int32_t nanos = 0;   // a date's nanoseconds below the microsecond
+  bool nano_text = false;   // a date spelled with more than six fraction digits
   bool aware = true;
   std::int32_t offset_minutes = 0;
 };
+
+// A date text with more than six fraction digits: read_csv's column of it is
+// datetime64[ns] (round BO), whose Timestamps keep the nanoseconds.
+bool nanosecond_text(std::string_view text) {
+  const auto separator = text.find_first_of("Tt ");
+  if (separator == std::string_view::npos) return false;
+  const auto point = text.find('.', separator);
+  if (point == std::string_view::npos) return false;
+  auto end = point + 1;
+  while (end < text.size() && text[end] >= '0' && text[end] <= '9') ++end;
+  return end - point - 1 > 6;
+}
+
+// A date cell's instant in nanoseconds.
+std::int64_t cell_nanos(const Cell& cell) { return cell.micros * 1000 + cell.nanos; }
 
 Cell date_cell(std::string_view text) {
   Cell cell;
@@ -229,6 +262,8 @@ Cell date_cell(std::string_view text) {
   }
   cell.kind = CellKind::kDate;
   cell.micros = parsed->seconds * 1000000 + parsed->nanoseconds / 1000;
+  cell.nanos = static_cast<std::int32_t>(parsed->nanoseconds % 1000);
+  cell.nano_text = nanosecond_text(text);
   cell.aware = parsed->timezone_aware;
   cell.offset_minutes = parsed->offset_minutes;
   return cell;
@@ -318,6 +353,37 @@ std::int64_t event_micros(const Event& event) {
   return cell.micros;
 }
 
+// The event's instant in the unit of the frame's timestamp column: a CSV
+// column with a cell of more than six fraction digits is datetime64[ns]
+// (round BS, observed black-box: pm4py's DFG and variant durations and the
+// stream's order keep the nanoseconds there), else microseconds.
+struct LogClock {
+  bool nanoseconds = false;
+  [[nodiscard]] std::int64_t instant(const Event& event) const {
+    if (!nanoseconds) return event_micros(event);
+    if (!event.has_timestamp() || event.timestamp_state == FirstClassAttributeState::kNull)
+      throw std::invalid_argument("every event needs a timestamp");
+    const auto cell = date_cell(event.timestamp);
+    if (cell.kind != CellKind::kDate) throw std::invalid_argument("unparseable event timestamp");
+    return cell_nanos(cell);
+  }
+  [[nodiscard]] double seconds(std::int64_t from, std::int64_t to) const {
+    return static_cast<double>(to - from) / (nanoseconds ? 1e9 : 1e6);
+  }
+};
+
+LogClock log_clock(const EventLog& log) {
+  LogClock clock;
+  if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return clock;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events)
+      if (event.has_timestamp() && nanosecond_text(event.timestamp)) {
+        clock.nanoseconds = true;
+        return clock;
+      }
+  return clock;
+}
+
 // Civil date of a day count since 1970-01-01.
 void civil(std::int64_t days, int& year, int& month, int& day) {
   days += 719468;
@@ -355,14 +421,18 @@ Fields fields(std::int64_t micros) {
   return out;
 }
 
-// repr() of a pandas Timestamp at microsecond resolution.
-std::string timestamp_repr(std::int64_t micros, bool aware) {
+// repr() of a pandas Timestamp: microseconds, and nine fraction digits when
+// it has nanoseconds below them.
+std::string timestamp_repr(std::int64_t micros, bool aware, std::int32_t nanos = 0) {
   const auto f = fields(micros);
   std::array<char, 64> text{};
   std::snprintf(text.data(), text.size(), "%04d-%02d-%02d %02d:%02d:%02d", f.year, f.month, f.day, f.hour, f.minute,
                 f.second);
   std::string out = "Timestamp('" + std::string(text.data());
-  if (f.micro) {
+  if (nanos) {
+    std::snprintf(text.data(), text.size(), ".%06d%03d", f.micro, static_cast<int>(nanos));
+    out += text.data();
+  } else if (f.micro) {
     std::snprintf(text.data(), text.size(), ".%06d", f.micro);
     out += text.data();
   }
@@ -493,8 +563,6 @@ std::string performance_text(const std::vector<double>& values, const LlmAbstrac
   }
   return text;
 }
-
-double seconds_between(std::int64_t from, std::int64_t to) { return static_cast<double>(to - from) / 1e6; }
 
 // Feature columns described by count of positive values and their quantiles,
 // by descending count, coefficient of variation and description.
@@ -643,16 +711,35 @@ std::string describe_columns(const std::vector<DescribedColumn>& columns, std::s
                                                  : ColumnClass::kSkip;
     const auto empty = std::to_string(missing);
     if (kind == ColumnClass::kDates) {
-      bool aware = false;
-      std::vector<double> values;
+      // pandas' quantiles of a date column interpolate its int64 units as
+      // floats: microseconds, or nanoseconds for a datetime64[ns] column
+      // (round BS: 1577836800123456789 ns reads back ...768).
+      bool aware = false, nanoseconds = false;
+      for (const auto* cell : present) nanoseconds |= cell->nano_text;
+      std::vector<std::int64_t> values;
       for (const auto* cell : present) {
-        values.push_back(static_cast<double>(cell->micros));
+        values.push_back(nanoseconds ? cell_nanos(*cell) : cell->micros);
         aware |= cell->aware;
       }
       if (values.empty()) continue;
-      lines[key] = key + "  empty: " + empty + "  quantiles: " + quantile_dict(values, [&](double value) {
-                     return timestamp_repr(static_cast<std::int64_t>(value), aware);
-                   });
+      std::sort(values.begin(), values.end());
+      std::string quantiles = "{";
+      for (std::size_t q = 0; q < kQuantiles.size(); ++q) {
+        if (q) quantiles += ", ";
+        quantiles += py_float(kQuantiles[q]) + ": ";
+        quantiles += [&] {
+                     const auto units = static_cast<std::int64_t>(numpy_int_quantile(values, kQuantiles[q]));
+                     if (!nanoseconds) return timestamp_repr(units, aware);
+                     auto micros = units / 1000;
+                     auto nanos = units % 1000;
+                     if (nanos < 0) {
+                       nanos += 1000;
+                       --micros;
+                     }
+                     return timestamp_repr(micros, aware, static_cast<std::int32_t>(nanos));
+                   }();
+      }
+      lines[key] = key + "  empty: " + empty + "  quantiles: " + quantiles + "}";
       measure += code_points(lines[key]);
     } else if (kind == ColumnClass::kNumbers) {
       std::vector<double> values;
@@ -671,7 +758,8 @@ std::string describe_columns(const std::vector<DescribedColumn>& columns, std::s
       const auto same = [&](const Cell& a, const Cell& b) {
         if (merge_numbers && numeric_cell_kind(a.kind) && numeric_cell_kind(b.kind))
           return a.kind == CellKind::kInt && b.kind == CellKind::kInt ? a.text == b.text : a.number == b.number;
-        return a.kind == b.kind && a.text == b.text && a.number == b.number && a.micros == b.micros;
+        return a.kind == b.kind && a.text == b.text && a.number == b.number && a.micros == b.micros &&
+               a.nanos == b.nanos;
       };
       std::vector<Count> counts;
       for (const auto* cell : present) {
@@ -694,7 +782,7 @@ std::string describe_columns(const std::vector<DescribedColumn>& columns, std::s
         const auto& a = *left.cell;
         const auto& b = *right.cell;
         if (family(a) == 0) return a.text > b.text;
-        if (family(a) == 2) return a.micros > b.micros;
+        if (family(a) == 2) return cell_nanos(a) > cell_nanos(b);
         return a.number > b.number;
       });
       for (std::size_t rank = 0; rank < counts.size(); ++rank)
@@ -739,7 +827,7 @@ struct FrameView {
   std::vector<std::string> keys;
   std::vector<FrameDtype> dtypes;
   std::vector<std::vector<Cell>> rows;  // a cell per key
-  std::vector<std::int64_t> micros;     // each row's time:timestamp
+  std::vector<std::int64_t> micros;     // each row's time:timestamp, in nanoseconds
 };
 
 FrameDtype frame_dtype(DataFrameColumnType type) {
@@ -777,6 +865,8 @@ Cell scalar_cell(const python::Scalar& value) {
     case Kind::kDate:
       cell.kind = CellKind::kDate;
       cell.micros = value.date.seconds * 1000000 + value.date.nanoseconds / 1000;
+      cell.nanos = static_cast<std::int32_t>(value.date.nanoseconds % 1000);
+      cell.nano_text = nanosecond_text(value.text) || cell.nanos != 0;
       cell.aware = value.date.timezone_aware;
       cell.offset_minutes = value.date.offset_minutes;
       return cell;
@@ -863,7 +953,7 @@ FrameView frame_view(const EventLog& log) {
       const auto value = !csv && view.dtypes[i] == FrameDtype::kObject ? object_scalar(trace, event, key)
                                                                         : frame_row_scalar(frame, trace, event, key);
       row.push_back(value ? scalar_cell(*value) : Cell{});
-      if (key == "time:timestamp" && row.back().kind == CellKind::kDate) micros = row.back().micros;
+      if (key == "time:timestamp" && row.back().kind == CellKind::kDate) micros = cell_nanos(row.back());
     }
     if (!micros) throw std::invalid_argument("every event needs a timestamp");
     view.rows.push_back(std::move(row));
@@ -896,7 +986,7 @@ std::string frame_columns_description(const EventLog& log, std::size_t max_len) 
 }
 
 struct StreamItem {
-  std::int64_t micros;
+  std::int64_t micros;  // the instant in nanoseconds
   std::string line;
 };
 
@@ -932,7 +1022,7 @@ std::string frame_event_stream_description(const EventLog& log, const LlmAbstrac
       if (cell.kind == CellKind::kMissing) continue;
       if (line.size() > 1) line += ", ";
       line += py_repr(view.keys[i]) + ": " +
-              (view.dtypes[i] == FrameDtype::kDate && cell.kind == CellKind::kDate ? timestamp_repr(cell.micros, true)
+              (view.dtypes[i] == FrameDtype::kDate && cell.kind == CellKind::kDate ? timestamp_repr(cell.micros, true, cell.nanos)
                                                                                     : cell_repr(cell));
     }
     items.push_back({view.micros[r], line + "}\n"});
@@ -967,15 +1057,16 @@ std::string llm_log_dfg_description(const EventLog& log, const LlmAbstractionOpt
     throw std::invalid_argument("unknown primary performance aggregation");
   std::map<std::pair<std::string, std::string>, std::vector<double>> arcs;
   std::map<std::pair<std::string, std::string>, std::size_t> cases;
+  const auto clock = log_clock(log);
   for (const auto& trace : log.traces) {
     std::vector<std::pair<std::int64_t, const Event*>> events;
-    for (const auto& event : trace.events) events.emplace_back(event_micros(event), &event);
+    for (const auto& event : trace.events) events.emplace_back(clock.instant(event), &event);
     std::stable_sort(events.begin(), events.end(),
                      [](const auto& left, const auto& right) { return left.first < right.first; });
     std::map<std::pair<std::string, std::string>, bool> seen;
     for (std::size_t i = 1; i < events.size(); ++i) {
       const std::pair<std::string, std::string> arc{events[i - 1].second->activity, events[i].second->activity};
-      arcs[arc].push_back(seconds_between(events[i - 1].first, events[i].first));
+      arcs[arc].push_back(clock.seconds(events[i - 1].first, events[i].first));
       if (!seen[arc]) {
         seen[arc] = true;
         ++cases[arc];
@@ -1001,17 +1092,18 @@ std::string llm_log_dfg_description(const EventLog& log, const LlmAbstractionOpt
 
 std::string llm_log_variants_description(const EventLog& log, const LlmAbstractionOptions& options) {
   std::map<std::vector<std::string>, std::vector<double>> variants;
+  const auto clock = log_clock(log);
   for (const auto& trace : log.traces) {
     if (trace.events.empty()) continue;
     std::vector<std::string> activities;
     std::int64_t first = 0, last = 0;
     for (std::size_t i = 0; i < trace.events.size(); ++i) {
       activities.push_back(trace.events[i].activity);
-      const auto micros = event_micros(trace.events[i]);
+      const auto micros = clock.instant(trace.events[i]);
       first = i ? std::min(first, micros) : micros;
       last = i ? std::max(last, micros) : micros;
     }
-    variants[activities].push_back(seconds_between(first, last));
+    variants[activities].push_back(clock.seconds(first, last));
   }
   // A variant's primary aggregation can have no value (the stdev of a single
   // case): the reference then sorts it like an equal value (None == None
@@ -1073,7 +1165,7 @@ std::string llm_event_stream_description(const EventLog& log, const LlmAbstracti
         if (line.size() > 1) line += ", ";
         line += py_repr(key) + ": " + cell_repr(cell);
       }
-      items.push_back({event_micros(event), line + "}\n"});
+      items.push_back({event_micros(event) * 1000, line + "}\n"});
     }
   return stream_text(std::move(items), options);
 }

@@ -643,6 +643,29 @@ int main(int argc, char** argv) {
     check(result && result->status == 200,
           "multipart mine accepts a known field: " + describe(result));
 
+    // Round BS: a route that takes its controls in the query string rejects
+    // any multipart part besides its uploads (a control sent as a form field
+    // was dropped silently before).
+    {
+      const std::string dfg = "1\na\n1\n0x1\n1\n0x1\n";
+      httplib::MultipartFormDataItems items = {{"dfg", dfg, "model.dfg", "text/plain"},
+                                               {"activity_attribute", "concept:name", "", ""}};
+      result = client.Post("/api/dfg-precision", items);
+      check(result && result->status == 400 &&
+                contains(result, "multipart field activity_attribute is not read by /api/dfg-precision"),
+            "DFG precision rejects a control sent as a form field: " + describe(result));
+      items.pop_back();
+      result = client.Post("/api/dfg-precision?activity_attribute=concept%3Aname", items);
+      check(result && result->status == 200,
+            "DFG precision reads its control from the query string: " + describe(result));
+      httplib::MultipartFormDataItems ocel = {{"log", "{}", "log.jsonocel", "application/json"},
+                                              {"zz_unknown", "1", "", ""}};
+      result = client.Post("/api/ocel/statistics", ocel);
+      check(result && result->status == 400 &&
+                contains(result, "multipart field zz_unknown is not read by /api/ocel/statistics"),
+            "OCEL statistics rejects an unread multipart part: " + describe(result));
+    }
+
     // Items 2 and 5: strict values and repeated controls.
     for (const auto* bad : {"1junk", "abc", "-1", "", " 1", "0x5"}) {
       result = mine("/api/mine", {{"top_variants", bad}});

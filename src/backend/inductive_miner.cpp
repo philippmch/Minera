@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
 #include "minera/token_integer.hpp"
 #include "inductive/semantics.hpp"
@@ -2470,6 +2471,11 @@ using namespace inductive_detail;
 EventLog prepare_inductive_event_log(const EventLog& event_log,
                                      const InductiveMinerOptions& options) {
   validate_options(options);
+  // pm4py's Inductive miner keyed by a typed column of an upload's frame
+  // reads each activity as the cell's Python object and raises TypeError on
+  // any that is no str (round BS).
+  if (const auto keyed = frame_keyed_activities(event_log, options.activity_key); keyed && keyed->non_text)
+    throw std::invalid_argument("inductive miner: " + frame_keyed_inductive_error(*keyed));
   return select_event_log_fields(event_log, options);
 }
 

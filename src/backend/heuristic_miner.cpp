@@ -4,6 +4,7 @@
 #include "exact_count_ratio.hpp"
 #include "exact_mean.hpp"
 #include "exact_stdev.hpp"
+#include "minera/frame_keys.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
 #include "root_cause_unicode.hpp"
@@ -2486,6 +2487,21 @@ HeuristicsNet discover_heuristics_net(
     const HeuristicMinerOptions& options) {
   if (options.variant == HeuristicMinerVariant::kPlusPlus)
     return discover_plus_plus(log, options);
+  // pm4py's classic heuristics miner keyed by a typed column of an upload's
+  // frame reads each activity as the cell's Python object: it raises
+  // TypeError once a directly-follows pair holds one that is no str, and
+  // names the nodes str() of the cells otherwise (round BS); a text column
+  // reads the same, the case column included.
+  if (auto keyed = frame_keyed_activities(log, options.activity_attribute)) {
+    const auto error = frame_keyed_heuristics_error(*keyed);
+    if (!error.empty()) throw std::invalid_argument("Heuristics Miner: " + error);
+    auto projected = options;
+    projected.activity_attribute = "concept:name";
+    auto net = discover_heuristics_net(keyed->log, projected);
+    net.activity_attribute = options.activity_attribute;
+    net.activity_ids_are_local = true;
+    return net;
+  }
   auto net = discover_classic_dfg(build_classic_input(log, options), options);
   net.activity_ids_are_local =
       !standard_activity_attribute(options.activity_attribute);
