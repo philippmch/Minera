@@ -25415,3 +25415,106 @@ Verification (scripts in the project files under `review-harness/round-by/`;
 | Earlier OCEL sweeps on nanosecond SQLite files after the relation order change (rounds BB `ocelsq.py`, BC `ocelflat.py`, BW `ocelns.py` and `ocelfeat.py`, BX `ocelmore.py`) | 60 to 80 logs each | all equal |
 | pandas variants filters with non-default keys after the list-case error order fix (`tblkeys.py 0 150 --eng=pandas --ops=var_top_k,var_min_cov,var_max_cov,var_membership,var_from_list`) | 750 | all equal or raising alike except 2 top_k answers on a sub-µs datetime activity, which flip with `PYTHONHASHSEED` in the reference (the declared hash-seed family) |
 | Full suites: ctest, script tests, frontend, fixture replay | 483 ctests (the 53 variants, OCEL and review ctests rerun after evaluating the case groupby before the np.unique runs, which keeps the retained `unhashable type: 'list'` vectors; the internal component contract in `minera_ocel_transform_tests` now expects no O2O rows or object changes), 406 script tests, 10,729 vitest tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+## Review BZ1: re-review of round BY, repeated relations and row order of OCEL SQLite files through discovery, nullable and categorical keys of the pandas table filters, and the pandas LTL filters with non-default keys (2026-11-13)
+
+Round BZ checked BY's CI run (43409678034) and BX's (43393668614): both green;
+it re-reviewed BY (`pandas_datetime_target.hpp` on zones other than UTC,
+offsets and units: 800 answers equal; BY's typed-key sweep on 300 seeds:
+equal) and took BY's targets. Findings, all fixed:
+
+- **BZ1-1 Repeated `event_object` rows through the OCEL transport.**
+  `read_ocel2_sqlite` keeps an event's repeated rows for one object; the
+  OCEL 2.0 JSON transport kept one relation per event and object (as
+  `read_ocel2_json` does), the classic transport one per `ocel:omap`
+  entry. Both forms now carry `"minera:repeatedRelations": true` when a
+  log holds a repeat, and the readers then keep every listed relation.
+- **BZ1-2 O2O row order across source objects.** pm4py keeps the
+  `object_object` rows in row order; the OCEL 2.0 transport nests them
+  per source object. It now carries `"minera:o2oOrder"` (each row's
+  source id in log order) when the order differs from the nesting.
+- **BZ1-3 OCDFG start and end activities on a tied log.** pm4py takes an
+  object's start and end activities from its first and last relation row
+  (relation order: rows sorted by time, stably), while the edges follow
+  the event order. Minera took both from the event order.
+- **BZ1-4 OCPN per-type logs.** Each object's trace is its relation rows,
+  repeats kept, in event order. The classic inductive miner sorts each
+  trace by time (stably); the token-based replay diagnostics read it as
+  listed. With `inductive_miner_variant="imd"` the DFG edges come from the
+  listed traces and the start and end activities from the relation rows'
+  first and last activity. (On imported logs event order is time order,
+  ties in file order; logs built in memory keep their own order.) Minera mined one event
+  per (event, object) in event order. `/api/ocel/discover` takes the new
+  `ocpn_variant` control (`log`/`im` or `dfg`/`imd`, as on the playout
+  route), and the OCEL explorer has an "Inductive miner" selector for the
+  OCPN model.
+- **BZ1-5 SAW nets** mine (without the time sort) and weigh (token-replay
+  firing counts) the same per-type traces as BZ1-4.
+- **BZ1-6 Lifecycle qualifiers on repeated rows.** Per object, the first
+  relation row labels its event `creation`, the last `termination`, the
+  others `other`; an event with several rows for the object takes `other`
+  when one of them is neither first nor last, otherwise `creation` before
+  `termination` (all its rows get that label). Minera labelled each row by
+  its own place.
+- **BZ1-7 What NumPy reads from nullable and categorical columns.** pandas
+  3 hands columns to NumPy through `to_numpy()`: a masked numeric column
+  (`Int64`, `UInt8`, `Float64`, ...) with a gap becomes a float array
+  holding NaN (without one, its NumPy dtype), `boolean` with a gap and
+  `string` stay object arrays holding `<NA>`, a categorical column becomes
+  its categories' array with NaN for a gap (float64 for numeric
+  categories, a NaN object otherwise). The variants statistics (top_k,
+  coverage: `np.unique` runs and variant tuples) and the between filter
+  read case and activity columns so: an `Int64` case column with `<NA>`
+  now groups its gap as one NaN run (pm4py returns results where Minera
+  raised `boolean value of NA is ambiguous`), labels between subcases
+  `1.0##@@0` and `nan##@@0`, and a categorical gap fails with `'<' not
+  supported between instances of 'str' and 'float'` (Minera named
+  `'NoneType'`).
+- **BZ1-8 `isin` on a masked numeric case column never matches `<NA>`**,
+  even when the selected cases hold one (`np.asarray` of the selection is
+  a float array): the attributes filter on traces and the timestamp
+  attribute filter keep `<NA>` case rows only when negative. A `boolean`
+  or `string` case column matches `<NA>` when the selection holds it.
+- **BZ1-9 The pandas LTL filters with duplicated role keys.** A resource
+  key naming the case column fails first (`Cannot set a DataFrame with
+  multiple columns to the single column @@conceptname`, also when all
+  three keys are one column); with timestamp differences, a timestamp key
+  on the activity column raises `cannot reindex on an axis with duplicate
+  labels` and on the case column `The column label '<name>' is not
+  unique.`
+- **BZ1-10 Paths on interval and Sparse activity columns** raise the
+  vectorised `col + ","` errors (`TypeError: unsupported operand type(s)
+  for +: 'IntervalArray' and 'str'`; a `Sparse[T, fill]` column the
+  `UFuncTypeError` of `T`).
+
+Declarations:
+
+- pm4py's O2O enrichment appends the computed graph links in set
+  iteration order, which changes with `PYTHONHASHSEED`; the harness
+  compares them as a multiset (Minera's order is deterministic).
+- The merged SAW net is compared on structure: pm4py keeps one weight
+  distribution per arc, Minera's JSON keeps each arc's (`arc_weights`)
+  and their sum per merged transition; the per-type nets compare weights
+  exactly.
+- The table transport has no timedelta cell kind, so `timedelta64`
+  columns cannot be keys or attributes of the table filters.
+- The pandas sequence filters (start and end activities, prefixes,
+  suffixes, rework, case grouping) have no HTTP route; their bank covers
+  string and integer keys only (moved to round CA for typed keys).
+
+Tests: `minera_review_bz1_tests` (values taken from pm4py on the same
+frames and OCEL files, `review-harness/round-bz/probes/bz1.py`,
+`bz1ocel.py`, `bz1ocel2.py`); the frontend test of the OCPN inductive miner
+selector.
+
+Verification (scripts in the project files under `review-harness/round-bz/`;
+"before" is round BY's server on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| OCEL SQLite files with repeated relations, O2O rows and tied events, opened through the import route (`ocel/ocelbz.py`: transport round trip, OCEL filters, flatten, OCDFG, OCPN im and imd, token replay, SAW, enrichment) | 30 to 40 logs per part, then 60 logs on all parts | before: differed on logs with repeats or ties; after: all equal except one IMd log where both raise |
+| OCPN and SAW per-type traces in event order, after the full suite flagged the in-memory OCEL net bank (`minera_ocel_nets_parity_tests`, events not in time order) | 1,080 bank calls; 120 SQLite logs on OCPN im and imd, token replay, SAW, OCDFG and enrichment (40 with `--tie=0.8 --rep=0.5`) | bank: equal (was 3 isomorphism and 1 IMd failure with time-sorted traces); sweeps: all equal, 5 IMd logs raise alike |
+| BY's OCEL sweep (`round-by/ocel/ocelns.py 0 40`) and the earlier OCEL sweeps (BB `ocelsq.py`, BC `ocelflat.py`, BW `ocelns.py` and `ocelfeat.py`, BX `ocelmore.py`) | 40 to 80 logs each | all equal |
+| pandas table filters with categorical, `Int64`, `boolean`, `string` keys and attributes (`tbl/tblkeys.py --eng=pandas`, `tblmod.py` adds `Float64`, `UInt8`, integer categorical and gap-free `Int64` columns) | 30 seeds before (17 operations each); 430 seeds after, plus 340 targeted seeds | before: 25 answers and 16 error texts differed; after: all equal or raising alike |
+| pandas LTL filters with non-default case, attribute, resource and timestamp keys (`tbl/ltlkeys.py`) and every duplicated key combination (`probes/ltldup.py`) | 1,500 answers before, 2,000 after; 120 combinations | before: 8 error texts and 32 combinations differed; after: all equal or raising alike |
+| Full suites: ctest, script tests, frontend, fixture replay | 484 ctests (rerun in full after ordering the OCPN and SAW per-type traces by event position, which `minera_ocel_nets_parity_tests` flagged on the first run), 406 script tests, 10,730 vitest tests, 2,673 responses of 16 manifests | all pass; no fixture changed |

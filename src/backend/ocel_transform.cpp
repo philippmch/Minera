@@ -555,19 +555,27 @@ std::set<ObjectPair> enrichment_inheritance_graph(
 // Each object's relations in relation order, which is the reference's: by
 // time, events at one instant in the order of their relation rows (an OCEL
 // SQLite file's event_object table can list them unlike the events; round
-// BY). The first is the creation, the last the termination.
+// BY). The first row is the creation, the last the termination, the rest
+// other. Rows repeating one event and object share one qualifier: other when
+// any of them is a middle row, else creation when one is the first row, else
+// termination (round BZ, observed black-box on pm4py's enrichment).
 void apply_lifecycle_qualifiers(Ocel& log, const EnrichmentIndex& index) {
   std::map<std::string, std::vector<std::size_t>> rows_by_object;
   for (std::size_t row = 0; row < log.relations.size(); ++row)
     if (index.event_index.contains(log.relations[row].event_id))
       rows_by_object[log.relations[row].object_id].push_back(row);
   for (const auto& [object, rows] : rows_by_object) {
+    // Per event: whether a row is the first, a middle or the last row.
+    struct Roles { bool first = false, middle = false; };
+    std::map<std::string, Roles> roles;
     for (std::size_t offset = 0; offset < rows.size(); ++offset) {
-      log.relations[rows[offset]].qualifier = rows.size() == 1 || offset == 0
-                                                  ? "creation"
-                                                  : offset + 1 == rows.size()
-                                                        ? "termination"
-                                                        : "other";
+      auto& role = roles[log.relations[rows[offset]].event_id];
+      if (offset == 0) role.first = true;
+      else if (offset + 1 != rows.size()) role.middle = true;
+    }
+    for (const auto row : rows) {
+      const auto& role = roles.at(log.relations[row].event_id);
+      log.relations[row].qualifier = role.middle ? "other" : role.first ? "creation" : "termination";
     }
   }
 }

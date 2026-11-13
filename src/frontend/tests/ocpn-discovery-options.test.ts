@@ -40,6 +40,14 @@ describe("OCPN inductive discovery controls", () => {
     const query = new URLSearchParams("seed=37"); appendOcpnDiscoveryFlags(query, flags);
     expect(query.get("seed")).toBe("37"); expect(query.get("ocpn_disable_strict_sequence_cut")).toBe("true");
   });
+  it("sends the OCPN inductive miner variant only when chosen for an OCPN", () => {
+    expect(ocelExplorerOptions("ocpn", settings)).not.toHaveProperty("ocpn_variant");
+    expect(ocelExplorerOptions("ocpn", {...settings, ocpnVariant: "dfg"})).toMatchObject({ocpn_variant: "dfg"});
+    for (const variant of ["ocdfg", "saw", "etot", "otg"] as const)
+      expect(ocelExplorerOptions(variant, {...settings, ocpnVariant: "dfg"})).not.toHaveProperty("ocpn_variant");
+    expect(new URLSearchParams(ocelDiscoveryQuery({variant: "ocpn", ocpn_variant: "dfg"})).get("ocpn_variant")).toBe("dfg");
+    expect(() => ocelDiscoveryQuery({variant: "ocpn", ocpn_variant: "imd" as "dfg"})).toThrow("ocpn_variant must be log or dfg");
+  });
   it("keeps discovery flags confined to the OCPN model selector", () => {
     expect(ocelExplorerOptions("ocpn", settings)).not.toHaveProperty("ocpn_disable_fallthroughs");
     expect(ocelExplorerOptions("ocpn", {...settings, ocpnDiscovery: flags})).toMatchObject(flags);

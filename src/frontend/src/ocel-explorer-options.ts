@@ -39,6 +39,8 @@ export interface OcelExplorerSettings {
   annotated: boolean;
   replayDiagnostics: boolean;
   ocpnDiscovery?: OcpnDiscoveryFlags;
+  /** Omitted keeps the native inductive miner on the flattened log (IM). */
+  ocpnVariant?: "log" | "dfg";
   ocdfgPerformance?: OcdfgPerformanceSettings;
   ocdfgEdgeMetrics?: OcdfgEdgeMetricsSettings;
 }
@@ -49,6 +51,7 @@ export function ocelExplorerOptions(variant: OcelDiscoveryVariant, settings: Oce
     Object.assign(options, settings.ocpnDiscovery);
     options.ocpn_annotation = settings.annotated ? "annotated" : "none";
     options.diagnostics_with_token_based_replay = settings.replayDiagnostics;
+    if (settings.ocpnVariant) options.ocpn_variant = settings.ocpnVariant;
     if (activity) options.ocpn_activity_attribute = activity;
     if (type) options.ocpn_object_type_attribute = type;
   } else if (variant === "saw") {

@@ -480,7 +480,7 @@ OcelValue standard_scalar(const Json& value, std::string_view field,
   return scalar(value, field);
 }
 
-Ocel parse_classic(const Json::Object& root, bool literal_names) {
+Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_relations = false) {
   Ocel log; std::unordered_set<std::string> object_ids, event_ids; std::unordered_map<std::string, std::string> types;
   parse_classic_type_catalog(optional(root, "ocel:objectTypes"),
                              log.object_type_attributes, "ocel:objectTypes");
@@ -512,7 +512,7 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
       // event goes too when it keeps no relation.
       if (!types.count(oid)) continue;
       const bool first=seen.insert(oid).second;
-      if(literal_names || first){occurrences[oid].push_back(log.relations.size());log.relations.push_back({id,oid,""});}
+      if(literal_names || repeated_relations || first){occurrences[oid].push_back(log.relations.size());log.relations.push_back({id,oid,""});}
     }
     if (const auto* typed = optional(x, "ocel:typedOmap")) {
       if (!typed->is_array()) throw std::invalid_argument("ocel:typedOmap must be array");
@@ -524,7 +524,7 @@ Ocel parse_classic(const Json::Object& root, bool literal_names) {
         // other object is ignored, as the reference reader ignores it.
         if(!seen.count(oid))continue;
         const auto qualifier=optional(rr,"ocel:qualifier")?str(*optional(rr,"ocel:qualifier"),"ocel:qualifier"):"";
-        if(literal_names){
+        if(literal_names || repeated_relations){
           const auto index=assigned[oid]++;
           if(index<occurrences[oid].size())log.relations[occurrences[oid][index]].qualifier=qualifier;
           else log.relations.push_back({id,oid,qualifier});
@@ -1123,11 +1123,20 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     literal_names=literal_names || std::get<bool>(marker->value);
   }
   const bool standard = r.find("events") != r.end() || r.find("objects") != r.end();
-  Ocel result = standard ? parse_standard(r) : parse_classic(r,literal_names);
-  // The reference OCEL 2.0 JSON reader keeps one relation per event and
-  // object; the last one wins (its qualifier and its place). The classic
-  // format stays lossless because native adapters use it as transport.
-  if (standard) {
+  // Both reference JSON readers keep one relation per event and object (the
+  // OCEL 2.0 reader the last one, its qualifier and place; the OCEL 1.0
+  // reader the first place with the last qualifier). A document Minera wrote
+  // for a log that relates an event to one object more than once (an OCEL
+  // SQLite import keeps every event_object row) says so with
+  // "minera:repeatedRelations" and keeps them all (round BZ).
+  bool repeated_relations = false;
+  if (const auto* marker = optional(r, "minera:repeatedRelations")) {
+    if (!marker->is_bool())
+      throw std::invalid_argument("minera:repeatedRelations must be boolean");
+    repeated_relations = std::get<bool>(marker->value);
+  }
+  Ocel result = standard ? parse_standard(r) : parse_classic(r, literal_names, repeated_relations);
+  if (standard && !repeated_relations) {
     std::set<std::pair<std::string, std::string>> seen;
     std::vector<OcelRelation> kept;
     for (auto it = result.relations.rbegin(); it != result.relations.rend(); ++it)
@@ -1160,6 +1169,28 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     for (std::size_t index = 0; index < result.relations.size(); ++index)
       if (!taken[index]) ordered.push_back(std::move(result.relations[index]));
     result.relations = std::move(ordered);
+  }
+  // O2O links nest per source object in both forms; "minera:o2oOrder" lists
+  // each link's source in log order (the object_object row order of an OCEL
+  // SQLite import), taken per source in turn like the relations (round BZ).
+  if (const auto* marker = optional(r, "minera:o2oOrder")) {
+    const auto order = string_array(marker, "minera:o2oOrder");
+    std::unordered_map<std::string, std::deque<std::size_t>> pending;
+    for (std::size_t index = 0; index < result.o2o.size(); ++index)
+      pending[result.o2o[index].source_id].push_back(index);
+    std::vector<OcelO2oRelation> ordered;
+    std::vector<bool> taken(result.o2o.size(), false);
+    for (const auto& source_id : order) {
+      const auto found = pending.find(source_id);
+      if (found == pending.end() || found->second.empty()) continue;
+      const auto index = found->second.front();
+      found->second.pop_front();
+      taken[index] = true;
+      ordered.push_back(result.o2o[index]);
+    }
+    for (std::size_t index = 0; index < result.o2o.size(); ++index)
+      if (!taken[index]) ordered.push_back(std::move(result.o2o[index]));
+    result.o2o = std::move(ordered);
   }
   if (const auto* marker = optional(r, "minera:objectChangeOrder")) {
     const auto order = pair_array(marker, "minera:objectChangeOrder");
@@ -2233,6 +2264,33 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
       }
       out << ']';
     }
+    // An event related to one object more than once keeps every relation
+    // (the reference readers would keep one).
+    {
+      std::set<std::pair<std::string_view, std::string_view>> pairs;
+      for (const auto* relation : logged)
+        if (!pairs.emplace(relation->event_id, relation->object_id).second) {
+          out << ",\"minera:repeatedRelations\":true";
+          break;
+        }
+    }
+    std::vector<const OcelO2oRelation*> nested_o2o, logged_o2o;
+    std::unordered_set<std::string_view> written_objects;
+    for (const auto* object : objects) {
+      written_objects.insert(object->id);
+      if (const auto found = o2o_by_source.find(object->id); found != o2o_by_source.end())
+        nested_o2o.insert(nested_o2o.end(), found->second.begin(), found->second.end());
+    }
+    for (const auto& relation : log.o2o)
+      if (written_objects.contains(relation.source_id)) logged_o2o.push_back(&relation);
+    if (nested_o2o != logged_o2o) {
+      out << ",\"minera:o2oOrder\":[";
+      for (std::size_t index = 0; index < logged_o2o.size(); ++index) {
+        if (index) out << ',';
+        write_string(out, logged_o2o[index]->source_id);
+      }
+      out << ']';
+    }
     if (!standard) return;  // the classic form lists changes in log order
     // The changes the OCEL 2.0 reader takes back, in its order: per object,
     // per attribute name in first appearance (static values first), the
@@ -2723,14 +2781,14 @@ OcdfgGraph discover_ocdfg_classic_with_options(
   std::sort(result.object_types.begin(), result.object_types.end());
   result.object_types.erase(std::unique(result.object_types.begin(), result.object_types.end()), result.object_types.end());
 
-  struct Rel { std::string event; std::string object; std::size_t order; };
+  struct Rel { std::string event; std::string object; std::size_t order; std::size_t index; };
   std::vector<Rel> rels;
   for (std::size_t i = 0; i < projected.relations.size(); ++i) {
     const auto& relation = projected.relations[i];
     const auto event_it = event_order.find(relation.event_id);
     const auto type_it = object_type.find(relation.object_id);
     if (event_it == event_order.end() || type_it == object_type.end()) continue;
-    rels.push_back({relation.event_id, relation.object_id, event_it->second * (projected.relations.size() + 1) + i});
+    rels.push_back({relation.event_id, relation.object_id, event_it->second * (projected.relations.size() + 1) + i, i});
   }
   auto add_association = [&](std::map<std::string, OcdfgActivityMetric>& target,
                              const std::string& act, const std::string& event,
@@ -2763,8 +2821,15 @@ OcdfgGraph discover_ocdfg_classic_with_options(
     std::sort(sequence.begin(), sequence.end(), [](const Rel& a, const Rel& b) { return a.order < b.order; });
     if (sequence.empty()) continue;
     const auto type = object_type[object];
-    add_association(result.start_activities[type], activity[sequence.front().event], sequence.front().event, object);
-    add_association(result.end_activities[type], activity[sequence.back().event], sequence.back().event, object);
+    // Start and end activities take the object's first and last relation in
+    // relation order, while the edges follow the event order; the two differ
+    // only among events at one instant whose relations an OCEL SQLite file
+    // lists in another order (round BZ, observed black-box).
+    const auto by_index = [](const Rel& a, const Rel& b) { return a.index < b.index; };
+    const auto& first = *std::min_element(sequence.begin(), sequence.end(), by_index);
+    const auto& last = *std::max_element(sequence.begin(), sequence.end(), by_index);
+    add_association(result.start_activities[type], activity[first.event], first.event, object);
+    add_association(result.end_activities[type], activity[last.event], last.event, object);
     for (std::size_t i = 1; i < sequence.size(); ++i) {
       const auto source = activity[sequence[i - 1].event];
       const auto target = activity[sequence[i].event];
@@ -3196,48 +3261,41 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       diagnostics.enabled = true;
       token_replay_diagnostics = &diagnostics;
     }
-    EventLog flattened;
-    // Each object's events by time, and in relation order (the first relation
-    // of an event to the object places it) for the replay diagnostics.
-    EventLog replay_flattened;
-    std::map<std::string, std::set<std::string>> object_event_ids;
-    std::map<std::string, std::vector<std::string>> replay_event_ids;
+    // Each relation row of an object of the type is one event of its trace
+    // (an event related twice to one object appears twice), as the
+    // reference's flattening keeps every relation row (round BZ). The
+    // flattened traces list an object's rows in event order (the events
+    // frame's order, which the readers sort by time); the IMd edges, the
+    // replay diagnostics and SAW discovery read them so, the classic miner
+    // sorts them by time. The IMd graph takes its start and end activities
+    // from each object's first and last relation row instead, like the OCDFG
+    // (observed black-box: the orders differ at instants whose relations an
+    // OCEL SQLite file lists in another order, and on logs whose events are
+    // not in time order).
+    std::map<std::string, std::vector<std::string>> object_rows;
     for (const auto& relation : projected.relations) {
       const auto type_it = flattening_type.find(relation.object_id);
       if (type_it == flattening_type.end() || type_it->second != type ||
-          !object_type.contains(relation.object_id))
+          !object_type.contains(relation.object_id) || !event_by_id.count(relation.event_id))
         continue;
-      if (event_by_id.count(relation.event_id)) {
-        object_event_ids[relation.object_id].insert(relation.event_id);
-        auto& ordered = replay_event_ids[relation.object_id];
-        if (std::find(ordered.begin(), ordered.end(), relation.event_id) == ordered.end())
-          ordered.push_back(relation.event_id);
-      }
+      object_rows[relation.object_id].push_back(relation.event_id);
     }
-    for (const auto& [object_id, event_ids] : object_event_ids) {
-      Trace trace;
-      trace.case_id = object_id;
-      for (const auto& event_id : event_ids) {
-        const auto event_it = event_by_id.find(event_id);
-        if (event_it == event_by_id.end()) continue;
-        const auto* event = event_it->second;
-        trace.events.push_back(Event{object_id, event->activity, event->timestamp,
-                                     {}, event_order[event_id], {}, {}});
-      }
-      order_events_by_time(trace.events);
-      if (!trace.events.empty()) flattened.traces.push_back(std::move(trace));
-    }
-
-    for (const auto& [object_id, event_ids] : replay_event_ids) {
+    EventLog replay_flattened;
+    for (const auto& [object_id, event_ids] : object_rows) {
       Trace trace;
       trace.case_id = object_id;
       for (const auto& event_id : event_ids) {
         const auto* event = event_by_id.at(event_id);
-        trace.events.push_back(Event{object_id, event->activity, event->timestamp, {},
-                                     event_order[event_id], {}, {}});
+        trace.events.push_back(Event{object_id, event->activity, event->timestamp,
+                                     {}, event_order[event_id], {}, {}});
       }
-      replay_flattened.traces.push_back(std::move(trace));
+      std::stable_sort(trace.events.begin(), trace.events.end(),
+                       [](const Event& a, const Event& b) { return a.input_order < b.input_order; });
+      if (!trace.events.empty()) replay_flattened.traces.push_back(std::move(trace));
     }
+    EventLog flattened = replay_flattened;
+    if (!options.mine_in_relation_order)
+      for (auto& trace : flattened.traces) order_events_by_time(trace.events);
 
     InductiveMinerOptions miner_options;
     miner_options.noise_threshold = options.noise_threshold;
@@ -3247,12 +3305,30 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
     miner_options.variant = options.variant == OcpnInductiveVariant::kDfg
                                 ? InductiveMinerVariant::kDfg
                                 : InductiveMinerVariant::kLog;
-    // The classic miner reads each object's events by time; the DFG variant
-    // (and SAW-net discovery) reads them in relation order.
-    const bool relation_order =
-        options.mine_in_relation_order || options.variant == OcpnInductiveVariant::kDfg;
-    const auto tree = discover_process_tree(relation_order ? replay_flattened : flattened, miner_options);
-    result.petri_nets[type] = process_tree_reference_net(tree);
+    if (options.variant == OcpnInductiveVariant::kDfg && !flattened.traces.empty()) {
+      std::set<std::string> alphabet;
+      for (const auto& trace : flattened.traces)
+        for (const auto& event : trace.events) alphabet.insert(event.activity);
+      const std::vector<std::string> names(alphabet.begin(), alphabet.end());
+      std::map<std::string, std::size_t> ids;
+      for (std::size_t id = 0; id < names.size(); ++id) ids.emplace(names[id], id);
+      std::map<std::pair<std::size_t, std::size_t>, std::uint64_t> edge_counts;
+      std::vector<std::uint64_t> starts(names.size(), 0), ends(names.size(), 0);
+      for (const auto& trace : replay_flattened.traces)
+        for (std::size_t i = 1; i < trace.events.size(); ++i)
+          ++edge_counts[{ids.at(trace.events[i - 1].activity), ids.at(trace.events[i].activity)}];
+      for (const auto& [object_id, event_ids] : object_rows) {
+        if (event_ids.empty()) continue;
+        ++starts[ids.at(event_by_id.at(event_ids.front())->activity)];
+        ++ends[ids.at(event_by_id.at(event_ids.back())->activity)];
+      }
+      std::vector<DirectlyFollowsEdge> edges;
+      for (const auto& [pair, count] : edge_counts) edges.push_back({pair.first, pair.second, count});
+      const auto graph = DirectlyFollowsGraph::from_frequencies(names, edges, starts, ends);
+      result.petri_nets[type] = process_tree_reference_net(discover_process_tree(graph, miner_options));
+    } else {
+      result.petri_nets[type] = process_tree_reference_net(discover_process_tree(flattened, miner_options));
+    }
 
     if (token_replay_diagnostics != nullptr) {
       const auto replay = replay_token_diagnostics(

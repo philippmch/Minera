@@ -1,5 +1,6 @@
 #include "minera/pandas_attributes_filter.hpp"
 #include "pandas_parameter_carrier.hpp"
+#include "pandas_numpy_view.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -229,7 +230,14 @@ bool isin(const EventTable& source,std::size_t col,const EventAttribute& value,c
 EventTable project_cases(const EventTable& source,const EventAttribute& case_key,const std::vector<bool>& selected,bool positive){
  const auto cases=case_column(source,case_key);std::unordered_set<std::string> ids;
  for(std::size_t i=0;i<source.size();++i)if(selected[i])ids.insert(identity(cell(source,i,cases)));
- std::vector<bool> keep(source.size());for(std::size_t i=0;i<source.size();++i)keep[i]=ids.contains(identity(cell(source,i,cases)))==positive;
+ // Index.isin on a masked numeric index (Int64, Float64, ...) never matches
+ // a <NA> label, even when the selected cases hold one (round BZ).
+ const bool masked=cases<source.dtypes.size()&&detail::masked_numeric_dtype(source.dtypes[cases]);
+ std::vector<bool> keep(source.size());
+ for(std::size_t i=0;i<source.size();++i){
+  const auto& id=cell(source,i,cases);
+  keep[i]=(!(masked&&(id.is_null||is_native_na_attribute(id)))&&ids.contains(identity(id)))==positive;
+ }
  return subset(source,keep);
 }
 EventTable values_filter(const EventTable& source,const EventAttribute& values,const PandasAttributesFilterOptions& options,bool events){

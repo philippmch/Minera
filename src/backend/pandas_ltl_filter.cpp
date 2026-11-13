@@ -232,8 +232,18 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
  if(pattern)anchors=iterable(*pattern);
  // A key naming the same column as another role duplicates it in the
  // reference's selections.
- if(columns[0]==columns[1]||(resources&&columns[1]==columns[2]))error("ValueError","cannot reindex on an axis with duplicate labels");
+ // The resource naming the case column fails first, when the case column
+ // is set from the selection (round BZ: also with all three keys equal).
  if(resources&&columns[0]==columns[2])error("ValueError","Cannot set a DataFrame with multiple columns to the single column @@conceptname");
+ if(columns[0]==columns[1]||(resources&&columns[1]==columns[2]))error("ValueError","cannot reindex on an axis with duplicate labels");
+ // With timestamp differences the timestamp key joins the selection: on the
+ // activity column it duplicates a label, on the case column the sort by
+ // case and time meets two columns of one label (round BZ).
+ if(timed){
+  const auto time=columns.back();
+  if(time==columns[1])error("ValueError","cannot reindex on an axis with duplicate labels");
+  if(time==columns[0])error("ValueError","The column label '"+source.columns[time]+"' is not unique.");
+ }
  std::vector<std::size_t> valid;
  for(std::size_t i=0;i<source.size();++i){bool good=true;for(const auto c:columns)if(missing(cell(source,i,c))){good=false;break;}if(good)valid.push_back(i);}
  for(const auto& target:anchors)check_target(target,source.size(),source.dtypes.empty()?"object":source.dtypes[columns[1]]);

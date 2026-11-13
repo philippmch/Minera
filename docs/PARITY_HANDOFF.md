@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BY (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–BZ (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4863,7 +4863,63 @@ non-ISO texts against a datetime column, and the connected components'
 order in pm4py (set iteration). No fixture changed. The device check on
 the Mac was skipped again (no device linked).
 
-Next round (BZ) should start by re-reviewing round BY:
+Round BZ re-reviewed BY (Review BZ1; BY's CI run 43409678034 and BX's
+43393668614 were green; the datetime targets and BY's typed-key sweep held)
+and took its targets. On OCEL SQLite files it fixed repeated
+`event_object` rows (kept by `read_ocel2_sqlite`; both JSON transport forms
+now carry `minera:repeatedRelations`), the O2O row order across source
+objects (`minera:o2oOrder`), the OCDFG start and end activities of tied
+logs (first and last relation row, edges in event order), the OCPN and SAW
+per-type traces (relation rows with repeats in event order, sorted by time
+only for the classic IM; IMd edges from those traces, its start and end
+activities from the relation rows; `/api/ocel/discover` takes `ocpn_variant` and the OCEL
+explorer has an "Inductive miner" selector) and the lifecycle qualifiers
+of repeated rows. On the pandas table filters it fixed nullable and
+categorical keys: pandas 3 hands an `Int64` column with a gap to NumPy as
+floats with NaN (variants statistics and between), a categorical gap as a
+NaN object, and `isin` on a masked numeric case column never matches
+`<NA>` (attributes and timestamp attribute filters); the paths filter
+raises the vectorised errors of interval and Sparse columns. The pandas
+LTL filters with non-default keys now fail on duplicated role keys in
+pandas' order. Declared: the O2O enrichment's hash-seed link order in
+pm4py, the merged SAW net weights per arc versus per transition, no
+timedelta cells in the table transport, and the pandas sequence filters
+(no route; typed keys moved to CA). No fixture changed. The device check
+on the Mac was skipped again (no device linked).
+
+Next round (CA) should start by re-reviewing round BZ:
+
+- `src/backend/pandas_numpy_view.hpp` (`numpy_view`: masked numeric,
+  `boolean`, `string` and categorical columns; categorical categories of
+  bool, datetime and float32 dtypes) and its callers in
+  `pandas_variants_filter.cpp` (`statistics`, the `statistics_kind` of
+  `membership`, `cell` for categorical gaps) and
+  `pandas_between_filter.cpp` (`case_values` on the view, the activity
+  cells); the other pandas filters that read columns through NumPy
+  (paths, LTL, case, repetition, sequence) with gaps in nullable columns;
+- the masked-`isin` rule in `pandas_attributes_filter.cpp`
+  (`project_cases`) and `pandas_timestamp_filter.cpp` (attribute in
+  timeframe); which other filters select cases with `isin` (paths
+  negative, LTL, sequence filters);
+- `src/backend/pandas_ltl_filter.cpp`: the duplicated-key order with the
+  timestamp key, and `next`/`four_eyes` with keys on typed columns;
+- `src/backend/ocel.cpp`: `minera:repeatedRelations` and
+  `minera:o2oOrder` in both transport forms (routes that pass a log on:
+  filters, playout, split, enrich; the XML and CSV writers with repeats),
+  the OCDFG relation index, `discover_ocpn`'s `object_rows` and the IMd
+  branch; `saw_nets.cpp` `flatten_type`; `ocel_transform.cpp`
+  `apply_lifecycle_qualifiers`;
+- new areas: the pandas sequence filters with typed keys (a new bank from
+  `scripts/pandas_sequence_filter_domain.py` with categorical and nullable
+  columns, replayed natively); the Polars table filters with nullable
+  and categorical columns (Polars has no `<NA>`, but Categorical and Enum
+  keys); OCEL conformance (etot, otg, ocdfg) and statistics on SQLite logs
+  with repeated relations; the OCEL playout on IMd models;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BZ commit.
+
+Round BY's targets, re-reviewed in BZ (findings BZ1-1 to BZ1-10):
 
 - `src/backend/pandas_paths_filter.cpp`: `typed_concatenation` (dtype
   names it does not list, such as `string[python]`, `Int64` with missing

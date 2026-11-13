@@ -1,6 +1,7 @@
 #include "minera/pandas_timestamp_filter.hpp"
 #include "pandas_datetime_target.hpp"
 #include "pandas_parameter_carrier.hpp"
+#include "pandas_numpy_view.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -309,7 +310,11 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
   if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("AttributeError","'DataFrame' object has no attribute 'unique'");
   const auto cases=direct_column(source,options.case_id_key);std::unordered_set<std::string> accepted;
   for(auto i:candidates)accepted.insert(identity(cell(source,i,cases)));
-  std::vector<bool> keep(source.size());for(std::size_t i=0;i<source.size();++i)keep[i]=accepted.contains(identity(cell(source,i,cases)));
+  // Series.isin on a masked numeric column (Int64, Float64, ...) never
+  // matches a <NA> cell, even when the accepted cases hold one (round BZ).
+  const bool masked=cases<source.dtypes.size()&&detail::masked_numeric_dtype(source.dtypes[cases]);
+  std::vector<bool> keep(source.size());
+  for(std::size_t i=0;i<source.size();++i){const auto& id=cell(source,i,cases);keep[i]=!(masked&&(id.is_null||is_native_na_attribute(id)))&&accepted.contains(identity(id));}
   return subset(source,keep);
  }
  if(options.case_id_key.is_null)error("TypeError","You have to supply one of 'by' and 'level'");

@@ -52,9 +52,9 @@ FlattenedTypeLog flatten_type(const Ocel& log, const std::string& type) {
     event_order[log.events[index].id] = index;
   }
 
-  // Each object's events are replayed in relation order (the first relation
-  // of an event to the object places it), not by time: the reference
-  // replays the flattened relations as they are listed.
+  // Each relation row is one event of its object's trace (an event related
+  // twice to the object appears twice), in event order, as the per-type
+  // miner reads it (round BZ, observed black-box).
   std::map<std::string, std::vector<std::string>> object_event_ids;
   for (const auto& relation : log.relations) {
     const auto object_it = object_types.find(relation.object_id);
@@ -62,27 +62,31 @@ FlattenedTypeLog flatten_type(const Ocel& log, const std::string& type) {
         !events.contains(relation.event_id)) {
       continue;
     }
-    auto& ordered = object_event_ids[relation.object_id];
-    if (std::find(ordered.begin(), ordered.end(), relation.event_id) == ordered.end())
-      ordered.push_back(relation.event_id);
+    object_event_ids[relation.object_id].push_back(relation.event_id);
   }
 
   FlattenedTypeLog result;
-  for (const auto& [object_id, ordered_ids] : object_event_ids) {
+  for (const auto& [object_id, rows] : object_event_ids) {
     Trace trace;
     trace.case_id = object_id;
-    for (const auto& event_id : ordered_ids) {
+    for (const auto& event_id : rows) {
       const auto* event = events.at(event_id);
       trace.events.push_back(Event{object_id, event->activity, event->timestamp,
                                    {}, event_order.at(event_id), {}, {}});
     }
+    std::stable_sort(trace.events.begin(), trace.events.end(),
+                     [](const Event& a, const Event& b) { return a.input_order < b.input_order; });
     if (trace.events.empty()) continue;
     std::vector<std::string> variant;
+    std::vector<std::string> ordered_ids;
     variant.reserve(trace.events.size());
-    for (const auto& event : trace.events) variant.push_back(event.activity);
+    for (const auto& event : trace.events) {
+      variant.push_back(event.activity);
+      ordered_ids.push_back(log.events[event.input_order].id);
+    }
     result.log.traces.push_back(std::move(trace));
     result.variants.push_back(std::move(variant));
-    result.trace_event_ids.push_back(ordered_ids);
+    result.trace_event_ids.push_back(std::move(ordered_ids));
   }
 
   std::map<std::vector<std::string>, std::size_t> variant_index;

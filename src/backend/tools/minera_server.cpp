@@ -2934,7 +2934,7 @@ void handle_ocel_discovery(const httplib::Request& request,
                            httplib::Response& response) {
   try {
     static const std::set<std::string> allowed = {
-        "variant", "compute_edges_performance", "ocpn_annotation",
+        "variant", "compute_edges_performance", "ocpn_annotation", "ocpn_variant",
         "diagnostics_with_token_based_replay", "ocpn_disable_strict_sequence_cut",
         "ocpn_disable_fallthroughs", "ocpn_activity_attribute",
         "ocpn_object_type_attribute", "ocdfg_activity_attribute",
@@ -2958,6 +2958,8 @@ void handle_ocel_discovery(const httplib::Request& request,
       throw std::invalid_argument(
           "variant expects etot, ocdfg, ocpn, otg, or saw");
     }
+    if (request.has_param("ocpn_variant") && variant != "ocpn")
+      throw std::invalid_argument("ocpn_variant requires the ocpn variant");
     const auto include_edge_metrics = ocel_query_bool(request, "include_edge_metrics", false);
     if (include_edge_metrics && variant != "ocdfg")
       throw std::invalid_argument("include_edge_metrics requires the ocdfg variant");
@@ -2979,6 +2981,18 @@ void handle_ocel_discovery(const httplib::Request& request,
           discovery.disable_strict_sequence_cut);
       discovery.disable_fallthroughs = ocel_query_bool(
           request, "ocpn_disable_fallthroughs", discovery.disable_fallthroughs);
+      // pm4py's inductive_miner_variant ("im" or "imd"), as on the playout
+      // route (round BZ).
+      if (request.has_param("ocpn_variant")) {
+        const auto value = request.get_param_value("ocpn_variant");
+        if (value == "log" || value == "im") {
+          discovery.variant = minera::OcpnInductiveVariant::kLog;
+        } else if (value == "dfg" || value == "imd") {
+          discovery.variant = minera::OcpnInductiveVariant::kDfg;
+        } else {
+          throw std::invalid_argument("ocpn_variant expects log or dfg");
+        }
+      }
       if (request.has_param("ocpn_annotation")) {
         const auto value = request.get_param_value("ocpn_annotation");
         if (value == "annotated" || value == "classic") {

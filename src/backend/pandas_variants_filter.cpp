@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include "minera/timestamp.hpp"
 #include "numpy_object_sort.hpp"
+#include "pandas_numpy_view.hpp"
 #include "python_list_sort.hpp"
 #include "minera/token_integer.hpp"
 #include "root_cause_trace_key.hpp"
@@ -148,7 +149,8 @@ std::size_t direct_column(const EventTable& source,const EventAttribute& key){
  error("KeyError",repr(key));
 }
 // A missing cell reads as its column's missing value (round BY): NaT in a
-// datetime64 column, NaN in a NumPy float column, None otherwise.
+// datetime64 column, NaN in a NumPy float column, None otherwise; a
+// categorical column's gap is NaN, or NaT for datetime categories (round BZ).
 const EventAttribute& cell(const EventTable& source,std::size_t row,std::size_t col){
  static const EventAttribute none{"","",AttributeKind::kString,true};
  static const EventAttribute nat{"","NaT",AttributeKind::kDate,true};
@@ -158,6 +160,7 @@ const EventAttribute& cell(const EventTable& source,std::size_t row,std::size_t 
   const auto& dtype=source.dtypes[col];
   if(dtype.starts_with("datetime64["))return nat;
   if(dtype=="float16"||dtype=="float32"||dtype=="float64")return nan;
+  if(dtype=="category")return date_value(detail::categorical_missing(source,col))?nat:nan;
  }
  return none;
 }
@@ -261,7 +264,7 @@ bool nanosecond_date(const EventAttribute& value){
  if(value.is_null||!date_value(value))return false;
  const auto parsed=instant(value);return parsed&&parsed->nanoseconds%1000!=0;
 }
-EventTable membership(const EventTable& source,const PandasVariantsFilterOptions& options,const EventAttribute* criterion,const std::vector<EventAttribute>* supplied=nullptr,bool from_statistics=false){
+EventTable membership(const EventTable& source,const PandasVariantsFilterOptions& options,const EventAttribute* criterion,const std::vector<EventAttribute>* supplied=nullptr,bool from_statistics=false,std::optional<ArrayKind> statistics_kind=std::nullopt){
  const auto cache=membership_cache(source,options);
  std::vector<bool> keep(source.size());
  // Without a non-null case nothing is selected; a negative filter keeps all.
@@ -270,7 +273,8 @@ EventTable membership(const EventTable& source,const PandasVariantsFilterOptions
  std::unordered_set<std::string> variants;for(const auto& value:admitted)variants.insert(identity(value));
  // A variant holding a fresh NaN or NaT equals no admitted variant (round BY).
  const auto activity=options.variants_df?std::nullopt:column(source,options.activity_key);
- const bool fresh=activity&&fresh_missing(array_kind(source,*activity));
+ // The statistics read the activities as NumPy holds them (round BZ).
+ const bool fresh=activity&&fresh_missing(statistics_kind?*statistics_kind:array_kind(source,*activity));
  // The statistics hold numpy datetime64 items and the cases Timestamps; with
  // a sub-microsecond part the two hash apart and never match (round BY).
  const bool split_hash=from_statistics&&activity&&*activity<source.dtypes.size()&&source.dtypes[*activity]=="datetime64[ns]";
@@ -343,12 +347,15 @@ std::vector<CaseRun> case_runs(const EventTable& source,std::size_t cases){
  }
  return runs;
 }
-Statistics statistics(const EventTable& source,const PandasVariantsFilterOptions& options){
+Statistics statistics(const EventTable& frame,const PandasVariantsFilterOptions& options){
  if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("ValueError","No group keys passed!");
- const auto cases=direct_column(source,options.case_id_key);
- (void)direct_column(source,options.timestamp_key);
+ const auto cases=direct_column(frame,options.case_id_key);
+ (void)direct_column(frame,options.timestamp_key);
  if(options.activity_key.container==AttributeContainerKind::kList&&options.activity_key.children.empty())error("TypeError","unhashable type: 'numpy.ndarray'");
- const auto activity=direct_column(source,options.activity_key);
+ const auto activity=direct_column(frame,options.activity_key);
+ // np.unique and the variant tuples read both columns through to_numpy()
+ // (round BZ): an Int64 column with a gap is a float array holding NaN.
+ const auto source=detail::numpy_view(frame,{cases,activity});
  // The coverage counts the non-missing case ids (a groupby, which also
  // refuses unhashable case cells first), while the variants count every
  // np.unique run (round BY).
@@ -417,7 +424,7 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& criterion
    }
   }
  }
- return membership(source,options,nullptr,&admitted,true);
+ return membership(source,options,nullptr,&admitted,true,stats.activity_kind);
 }
 PandasVariantsFilterOptions resolve_variants_options(const std::vector<PandasVariantsFilterParameter>& parameters){
  PandasVariantsFilterOptions options;

@@ -1,5 +1,6 @@
 #include "minera/pandas_between_filter.hpp"
 #include "numpy_object_sort.hpp"
+#include "pandas_numpy_view.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -310,12 +311,11 @@ CaseValues case_values(const EventTable& source, std::size_t key) {
   result.values.reserve(source.rows.size());
   for (std::size_t row = 0; row < source.rows.size(); ++row)
     result.values.push_back(cell(source, row, key));
+  // `source` is the NumPy view (round BZ): a masked numeric column with a
+  // gap is already a float array there.
   const auto dtype = source.dtypes.empty() ? std::string() : source.dtypes[key];
   result.float32_array = dtype == "float32";
-  result.numeric_array = dtype == "float64" || dtype == "Float64" || result.float32_array;
-  if ((dtype == "Int64" || dtype == "UInt64") && std::any_of(result.values.begin(), result.values.end(), [](const auto& v) {
-        return v.is_null || is_native_na_attribute(v);
-      })) result.numeric_array = true;
+  result.numeric_array = dtype == "float64" || result.float32_array;
   if (result.numeric_array) {
     for (auto& value : result.values) {
       double number = value.is_null || is_native_na_attribute(value)
@@ -475,10 +475,14 @@ EventTable filter_pandas_between(const EventTable& source, const EventAttribute&
                                 const EventAttribute& act2, const PandasBetweenOptions& options) {
   source.validate();
   const auto key = *column(source, options.case_id_key, true);
-  const auto cases = case_values(source, key);
+  const auto activity = column(source, options.activity_key, false);
+  // Both columns are read as to_numpy() hands them over (round BZ): an Int64
+  // column with a gap is a float array holding NaN, a categorical gap NaN.
+  const auto view = activity ? detail::numpy_view(source, {key, *activity})
+                             : detail::numpy_view(source, {key});
+  const auto cases = case_values(view, key);
   std::vector<std::size_t> sorted(source.rows.size()), buffer(source.rows.size());
   std::iota(sorted.begin(), sorted.end(), 0);
-  const auto activity = column(source, options.activity_key, false);
   // An object column fails at the first comparison numpy's sort makes, at
   // any length (round BY: the operands of "'<' not supported" follow it).
   if (sorted.size() <= 16 || cases.unordered_nat || (!cases.numeric_array && !cases.numpy_dates)) {
@@ -497,7 +501,7 @@ EventTable filter_pandas_between(const EventTable& source, const EventAttribute&
     std::optional<std::size_t> opening;
     std::size_t subcase = 0;
     for (std::size_t row = begin; row < end; ++row) {
-      const auto value = cell(source, row, *activity);
+      const auto value = cell(view, row, *activity);
       // Every event is tested against act2 before act1.
       const bool closing = contains(act2, value);
       if (!opening) {

@@ -448,8 +448,11 @@ struct OcpnDiscoveryOptions {
   // any event (the reference raises KeyError); SAW-net discovery keeps such
   // types with a net mined from their empty flattened log.
   bool require_related_object_types = true;
-  // Mine each object's events in relation order instead of by time (SAW-net
-  // discovery does; the DFG variant always does).
+  // Each object's trace is its relation rows (repeats kept) in event order
+  // (round BZ); the classic miner sorts them by time unless this is set
+  // (SAW-net discovery mines them as listed). The IMd edges and the replay
+  // diagnostics read the event order, the IMd start and end activities the
+  // relation rows' order.
   bool mine_in_relation_order = false;
 };
 

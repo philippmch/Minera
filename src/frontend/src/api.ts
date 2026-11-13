@@ -6408,6 +6408,8 @@ export interface OcelDiscoveryOptions extends OcpnDiscoveryFlags {
   saw_activity_attribute?: string;
   saw_object_type_attribute?: string;
   ocpn_annotation?: "annotated" | "none";
+  /** pm4py's inductive_miner_variant for each object type: "log" (IM) or "dfg" (IMd). */
+  ocpn_variant?: "log" | "dfg";
   ocpn_activity_attribute?: string;
   ocpn_object_type_attribute?: string;
   diagnostics_with_token_based_replay?: boolean;
@@ -6440,6 +6442,10 @@ export function ocelDiscoveryQuery(options: OcelDiscoveryOptions = {}): string {
   for (const key of ["ocdfg_business_hour_slots_json", "ocdfg_event_id_attribute", "ocdfg_timestamp_attribute", "ocdfg_workcalendar_json"] as const)
     if (options[key] !== undefined) query.set(key, options[key]);
   if (options.ocpn_annotation !== undefined) query.set("ocpn_annotation", options.ocpn_annotation);
+  if (options.ocpn_variant !== undefined) {
+    if (options.ocpn_variant !== "log" && options.ocpn_variant !== "dfg") throw new Error("ocpn_variant must be log or dfg");
+    query.set("ocpn_variant", options.ocpn_variant);
+  }
   const addSelector = (key: string, value: string | undefined) => {
     if (value === undefined) return;
     const selector = value.trim();

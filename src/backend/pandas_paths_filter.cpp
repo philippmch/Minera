@@ -203,14 +203,16 @@ void typed_concatenation(const std::string& dtype){
  if(dtype.starts_with("datetime64"))error("TypeError","unsupported operand type(s) for +: 'DatetimeArray' and 'str'");
  if(dtype.starts_with("timedelta64"))error("TypeError","unsupported operand type(s) for +: 'TimedeltaArray' and 'str'");
  if(dtype.starts_with("period"))error("TypeError","unsupported operand type(s) for +: 'PeriodArray' and 'str'");
+ if(dtype.starts_with("interval"))error("TypeError","unsupported operand type(s) for +: 'IntervalArray' and 'str'");
  // Nullable extension dtypes add through their NumPy values.
  static const std::unordered_map<std::string,std::string> nullable{{"boolean","bool"},{"Int8","int8"},{"Int16","int16"},{"Int32","int32"},{"Int64","int64"},
   {"UInt8","uint8"},{"UInt16","uint16"},{"UInt32","uint32"},{"UInt64","uint64"},{"Float32","float32"},{"Float64","float64"}};
  static const std::unordered_set<std::string> numpy{"bool","int8","int16","int32","int64","uint8","uint16","uint32","uint64","float16","float32","float64","complex64","complex128"};
- std::string name;
- if(const auto found=nullable.find(dtype);found!=nullable.end())name=found->second;
- else if(numpy.contains(dtype))name=dtype;
- else return;
+ // A Sparse[T, fill] column adds through its NumPy values of T (round BZ).
+ std::string name=dtype;
+ if(dtype.starts_with("Sparse[")){const auto end=dtype.find_first_of(",]",7);name=dtype.substr(7,end==std::string::npos?std::string::npos:end-7);}
+ if(const auto found=nullable.find(name);found!=nullable.end())name=found->second;
+ else if(!numpy.contains(name))return;
  error("UFuncTypeError","ufunc 'add' did not contain a loop with signature matching types (dtype('"+name+"'), dtype('<U1')) -> None");
 }
 std::optional<std::string> encoded_pair(const EventAttribute& a,const EventAttribute& b){
