@@ -15,6 +15,9 @@ struct DataFrameColumnOptions {
 // Validate the public dataframe schema and selected columns without mutation.
 // Declared dtypes are authoritative. Native tables without dtypes use a basic
 // scalar-kind inference; exhaustive pandas reader inference is not implied.
+// pandas' "Available columns: [...]" list: the names sorted, each in
+// Python's repr.
+[[nodiscard]] std::string dataframe_available_columns(std::vector<std::string> columns);
 void check_dataframe_columns(const EventTable& table,
                              const DataFrameColumnOptions& options = {});
 }  // namespace minera

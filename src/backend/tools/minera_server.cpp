@@ -725,6 +725,11 @@ bool csv_activity_alias(const MinedSession& session, std::string_view miner,
 
 // One model route's activity-key field, hidden from the route's parameter
 // lookups when it is a CSV alias of the miner's own column.
+// Lookups that record the name they consult (defined with FormFieldAudit).
+bool audited_has_param(const httplib::Request& request, const std::string& name);
+std::string audited_param_value(const httplib::Request& request, const std::string& name);
+bool audited_has_file(const httplib::Request& request, const std::string& name);
+
 struct ModelKeyField {
   std::string name;
   bool hidden = false;
@@ -734,9 +739,9 @@ struct ModelKeyField {
 ModelKeyField model_key_field(const httplib::Request& request, const MinedSession& session,
                               std::string_view miner, std::string name) {
   ModelKeyField field{std::move(name), false};
-  if (request.has_param(field.name))
-    field.hidden = csv_activity_alias(session, miner, request.get_param_value(field.name));
-  else if (request.has_file(field.name))
+  if (audited_has_param(request, field.name))
+    field.hidden = csv_activity_alias(session, miner, audited_param_value(request, field.name));
+  else if (audited_has_file(request, field.name))
     field.hidden = csv_activity_alias(session, miner, request.get_file_value(field.name).content);
   return field;
 }
@@ -744,7 +749,7 @@ ModelKeyField model_key_field(const httplib::Request& request, const MinedSessio
 // Whether the request supplies `name`, counting a hidden alias as omitted.
 bool supplies_model_field(const httplib::Request& request, const ModelKeyField& field,
                           const std::string& name) {
-  return !field.hides(name) && (request.has_param(name) || request.has_file(name));
+  return !field.hides(name) && (audited_has_param(request, name) || audited_has_file(request, name));
 }
 
 // Marking defaults belong to the cached supplied document. An explicitly
@@ -757,12 +762,12 @@ void cached_imported_markings(const httplib::Request& request,
                               std::string_view final = "final_marking") {
   if (miner != "imported" || !session.imported_document) return;
   const auto& document = *session.imported_document;
-  if (!request.has_param(std::string(initial))) {
+  if (!audited_has_param(request, std::string(initial))) {
     using Integer = typename decltype(options.initial_marking)::value_type;
     options.initial_marking =
         minera::tools::pnml_marking<Integer>(document.initial_marking);
   }
-  if (!request.has_param(std::string(final))) {
+  if (!audited_has_param(request, std::string(final))) {
     using Integer = typename decltype(options.final_marking)::value_type;
     options.final_marking =
         minera::tools::pnml_marking<Integer>(document.final_marking);
@@ -793,9 +798,9 @@ void cached_imported_monte_carlo_context(
   const auto& document = *session.imported_document;
   options.place_names = document.place_ids;
   options.transition_names = document.transition_ids;
-  options.initial_marking_keys = request.has_param("monte_carlo_initial_marking")
+  options.initial_marking_keys = audited_has_param(request, "monte_carlo_initial_marking")
       ? std::vector<bool>{} : document.initial_marking_keys;
-  options.final_marking_keys = request.has_param("monte_carlo_final_marking")
+  options.final_marking_keys = audited_has_param(request, "monte_carlo_final_marking")
       ? std::vector<bool>{} : document.final_marking_keys;
 }
 
@@ -805,14 +810,14 @@ void cached_imported_monte_carlo_context(
 std::optional<minera::PetriNet> selected_process_tree_net(
     const httplib::Request& request, const MinedSession& session,
     std::string_view miner) {
-  if (!request.has_param("process_tree_variant")) return std::nullopt;
+  if (!audited_has_param(request, "process_tree_variant")) return std::nullopt;
   if (miner != "inductive") {
     throw std::invalid_argument(
         "process_tree_variant requires miner=inductive");
   }
   const auto variant =
       minera::parse_process_tree_petri_net_variant(
-          request.get_param_value("process_tree_variant"));
+          audited_param_value(request, "process_tree_variant"));
   return minera::to_petri_net(require_process_tree(session), variant);
 }
 
@@ -959,6 +964,8 @@ void reject_unknown_monte_carlo_params(const httplib::Request& request,
     (void)value;
     if (!allowed.contains(key) && !(allow_workspace && key == "include_workspace"))
       throw std::invalid_argument("unknown Monte Carlo parameter: " + key);
+    // An allowed control counts as consulted for the playout's audit.
+    (void)audited_has_param(request, key);
   }
 }
 
@@ -975,6 +982,7 @@ void reject_unknown_stochastic_params(const httplib::Request& request) {
     (void)value;
     if (!allowed.contains(key))
       throw std::invalid_argument("unknown stochastic parameter: " + key);
+    (void)audited_has_param(request, key);
   }
 }
 
@@ -1058,6 +1066,22 @@ class FormFieldAuditScope {
 void reject_unconsulted_controls(const FormFieldAuditScope& audit, const httplib::Request& request) {
   if (const auto name = audit.unconsulted_control(request))
     throw std::invalid_argument("unknown or inapplicable " + request.path + " field: " + *name);
+}
+
+// Query and form lookups that record the name they consult, for the session
+// routes audited after they ran (audited_query_route); outside an audit they
+// are the plain lookups.
+bool audited_has_param(const httplib::Request& request, const std::string& name) {
+  audit_form_field(name);
+  return request.has_param(name);
+}
+std::string audited_param_value(const httplib::Request& request, const std::string& name) {
+  audit_form_field(name);
+  return request.get_param_value(name);
+}
+bool audited_has_file(const httplib::Request& request, const std::string& name) {
+  audit_form_field(name);
+  return request.has_file(name);
 }
 
 std::string form_field(const httplib::Request& request,
@@ -2032,15 +2056,15 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
 // /api/bpmn and the CLI do; an explicit empty or unknown miner is still
 // rejected by the caller's lookup.
 std::string requested_miner(const httplib::Request& request) {
-  return request.has_param("miner") ? request.get_param_value("miner")
+  return audited_has_param(request, "miner") ? audited_param_value(request, "miner")
                                     : std::string("inductive");
 }
 
 double ocel_query_number(const httplib::Request& request,
                          std::string_view name, double fallback) {
   const auto key = std::string(name);
-  if (!request.has_param(key)) return fallback;
-  const auto value = request.get_param_value(key);
+  if (!audited_has_param(request, key)) return fallback;
+  const auto value = audited_param_value(request, key);
   char* end = nullptr;
   // strtod accepts an empty or space-led text as 0 / the trailing number;
   // a supplied control must be the complete number.
@@ -2085,9 +2109,9 @@ std::size_t ocel_query_size(const httplib::Request& request,
 std::vector<std::uint32_t> parse_playout_marking(
     const httplib::Request& request, std::string_view name, bool form_fields = false) {
   const auto key = std::string(name);
-  const bool field = form_fields && !request.has_param(key) && request.has_file(key);
-  if (!request.has_param(key) && !field) return {};
-  const auto value = field ? request.get_file_value(key).content : request.get_param_value(key);
+  const bool field = form_fields && !audited_has_param(request, key) && audited_has_file(request, key);
+  if (!audited_has_param(request, key) && !field) return {};
+  const auto value = field ? request.get_file_value(key).content : audited_param_value(request, key);
   if (value.empty())
     throw std::invalid_argument(key + ": expected a non-empty marking");
   std::vector<std::uint32_t> result;
@@ -2113,8 +2137,8 @@ std::vector<std::uint32_t> parse_playout_marking(
 bool ocel_query_bool(const httplib::Request& request, std::string_view name,
                      bool fallback) {
   const auto key = std::string(name);
-  if (!request.has_param(key)) return fallback;
-  const auto value = request.get_param_value(key);
+  if (!audited_has_param(request, key)) return fallback;
+  const auto value = audited_param_value(request, key);
   if (value == "true" || value == "1") return true;
   if (value == "false" || value == "0") return false;
   throw std::invalid_argument(key + ": expected true, false, 1, or 0");
@@ -7295,12 +7319,12 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     const auto key_field = model_key_field(request, *session, miner, "alignment_activity_attribute");
     const auto lookup = [&](std::string_view name) {
       if (key_field.hides(name)) return std::string{};
-      return request.has_param(std::string(name))
-                 ? request.get_param_value(std::string(name))
+      return audited_has_param(request, std::string(name))
+                 ? audited_param_value(request, std::string(name))
                  : std::string{};
     };
     const auto present = [&](std::string_view name) {
-      return !key_field.hides(name) && request.has_param(std::string(name));
+      return !key_field.hides(name) && audited_has_param(request, std::string(name));
     };
     auto options = minera::parse_alignment_params(lookup, present);
     options.cancelled = connection_cancel_hook(request);
@@ -8859,9 +8883,9 @@ void handle_evaluate(const httplib::Request& request,
     return;
   }
 
-  const std::string miner = request.get_param_value("miner");
+  const std::string miner = audited_param_value(request, "miner");
   try {
-    if (request.has_param("source_id") && request.get_param_value("source_id") != std::to_string(session->query_source_id))
+    if (audited_has_param(request, "source_id") && audited_param_value(request, "source_id") != std::to_string(session->query_source_id))
       throw std::invalid_argument("the source log changed; refresh the model evaluation source");
     std::optional<minera::PetriNet> converted;
     const auto& selected = select_cached_or_process_tree_net(
@@ -8869,17 +8893,17 @@ void handle_evaluate(const httplib::Request& request,
     // The cached model log (the default adapter) reads a CSV activity alias
     // as the omitted key; the flat adapters already read either spelling.
     auto key_field = model_key_field(request, *session, miner, "evaluation_activity_attribute");
-    if (request.has_param("evaluation_input_adapter") &&
-        request.get_param_value("evaluation_input_adapter") != "log")
+    if (audited_has_param(request, "evaluation_input_adapter") &&
+        audited_param_value(request, "evaluation_input_adapter") != "log")
       key_field.hidden = false;
     const auto lookup = [&](std::string_view name) {
       const auto key = std::string(name);
       if (key_field.hides(name)) return std::string{};
-      return request.has_param(key) ? request.get_param_value(key)
+      return audited_has_param(request, key) ? audited_param_value(request, key)
                                     : std::string{};
     };
     const auto present = [&](std::string_view name) {
-      return !key_field.hides(name) && request.has_param(std::string(name));
+      return !key_field.hides(name) && audited_has_param(request, std::string(name));
     };
     auto params = minera::parse_evaluation_params(lookup, present);
     // Alignment-based fitness and precision stop when the client disconnects.
@@ -8934,7 +8958,7 @@ void handle_evaluate(const httplib::Request& request,
         params.generalization_options.activity_attribute = activity;
         params.composite_options.activity_attribute = activity;
       }
-      if (!request.has_param("evaluation_case_id_attribute") && session->active_source &&
+      if (!audited_has_param(request, "evaluation_case_id_attribute") && session->active_source &&
           session->active_source->selected_kind() != minera::EventDataKind::kEventLog) {
         const auto& case_id = miner == "alpha" ? session->alpha_case_id_attribute :
             miner == "heuristic" ? session->heuristic_case_id_attribute :
@@ -9054,11 +9078,11 @@ void handle_petri_analysis(const httplib::Request& request,
   try {
     const auto lookup = [&](std::string_view name) {
       const auto key = std::string(name);
-      return request.has_param(key) ? request.get_param_value(key)
+      return audited_has_param(request, key) ? audited_param_value(request, key)
                                     : std::string{};
     };
     const auto present = [&](std::string_view name) {
-      return request.has_param(std::string(name));
+      return audited_has_param(request, std::string(name));
     };
     auto params = minera::parse_petri_analysis_params(lookup, present);
     cached_imported_markings(request, *session, params.miner, params,
@@ -9156,14 +9180,14 @@ void handle_evaluate_emd(const httplib::Request& request,
 
   try {
     if (!request.is_multipart_form_data() ||
-        !request.has_file("reference_log")) {
+        !audited_has_file(request, "reference_log")) {
       throw std::invalid_argument("missing form field: reference_log");
     }
     reject_unread_multipart_parts(request, "reference_log");
     const auto parse_boolean = [&](std::string_view name, bool fallback) {
       const auto key = std::string(name);
-      if (!request.has_param(key)) return fallback;
-      const auto value = request.get_param_value(key);
+      if (!audited_has_param(request, key)) return fallback;
+      const auto value = audited_param_value(request, key);
       if (value == "true" || value == "1") return true;
       if (value == "false" || value == "0") return false;
       throw std::invalid_argument(key +
@@ -9173,8 +9197,8 @@ void handle_evaluate_emd(const httplib::Request& request,
     // native solver remains available through an explicit query selector.
     minera::EmdOptions options;
     options.variant = minera::EmdVariant::PYEMD;
-    if (request.has_param("emd_variant")) {
-      const auto value = lower_ascii(request.get_param_value("emd_variant"));
+    if (audited_has_param(request, "emd_variant")) {
+      const auto value = lower_ascii(audited_param_value(request, "emd_variant"));
       if (value == "exact") {
         options.variant = minera::EmdVariant::EXACT;
       } else if (value == "pyemd") {
@@ -9309,7 +9333,7 @@ void handle_align_petri_multi(const httplib::Request& request, httplib::Response
 void handle_reduce_process_tree(const httplib::Request& request, httplib::Response& response) {
   std::shared_ptr<const MinedSession> session; { std::lock_guard<std::mutex> lock(g_session_mutex); session = g_session; }
   if (!session) { response.status=409; response.set_content(error_json("no mined log; mine a log first"),"application/json"); return; }
-  try { if(!request.has_param("trace_index")) throw std::invalid_argument("trace_index: expected a non-negative integer"); const auto text=request.get_param_value("trace_index"); std::size_t idx=0; const auto r=std::from_chars(text.data(),text.data()+text.size(),idx); if(r.ec!=std::errc{}||r.ptr!=text.data()+text.size()||idx>=cached_model_log(*session,"inductive").traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto key_field=model_key_field(request,*session,"inductive","activity_key"); const auto lookup=[&](std::string_view n){const auto k=std::string(n);if(key_field.hides(n)) return std::string{};return request.has_param(k)?request.get_param_value(k):std::string{};}; const auto present=[&](std::string_view n){return !key_field.hides(n)&&request.has_param(std::string(n));}; const auto o=minera::parse_process_tree_reduction_params(lookup,present); const auto keyed=inductive_log_for_key(*session,o.activity_key); const auto& traces=keyed?keyed->traces:cached_model_log(*session,"inductive").traces; if(idx>=traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto reduced=minera::reduce_process_tree(require_process_tree(*session),traces[idx],o); response.set_content(minera::process_tree_reduction_json(reduced,session->graph,idx),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
+  try { if(!audited_has_param(request, "trace_index")) throw std::invalid_argument("trace_index: expected a non-negative integer"); const auto text=audited_param_value(request, "trace_index"); std::size_t idx=0; const auto r=std::from_chars(text.data(),text.data()+text.size(),idx); if(r.ec!=std::errc{}||r.ptr!=text.data()+text.size()||idx>=cached_model_log(*session,"inductive").traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto key_field=model_key_field(request,*session,"inductive","activity_key"); const auto lookup=[&](std::string_view n){const auto k=std::string(n);if(key_field.hides(n)) return std::string{};return audited_has_param(request, k)?audited_param_value(request, k):std::string{};}; const auto present=[&](std::string_view n){return !key_field.hides(n)&&audited_has_param(request, std::string(n));}; const auto o=minera::parse_process_tree_reduction_params(lookup,present); const auto keyed=inductive_log_for_key(*session,o.activity_key); const auto& traces=keyed?keyed->traces:cached_model_log(*session,"inductive").traces; if(idx>=traces.size()) throw std::invalid_argument("trace_index: out of range"); const auto reduced=minera::reduce_process_tree(require_process_tree(*session),traces[idx],o); response.set_content(minera::process_tree_reduction_json(reduced,session->graph,idx),"application/json"); } catch(const std::exception&e){response.status=400;response.set_content(error_json(e.what()),"application/json");}
 }
 
 void handle_alpha_plus_result(const httplib::Request& request, httplib::Response& response) {
@@ -9575,9 +9599,9 @@ void handle_pnml(const httplib::Request& request, httplib::Response& response) {
     // The standard inductive net exports the reference node names.
     const bool standard_tree_net =
         miner == "inductive" && session->tree_ready &&
-        (!request.has_param("process_tree_variant") ||
+        (!audited_has_param(request, "process_tree_variant") ||
          minera::parse_process_tree_petri_net_variant(
-             request.get_param_value("process_tree_variant")) ==
+             audited_param_value(request, "process_tree_variant")) ==
              minera::ProcessTreePetriNetVariant::kStandard);
     response.set_content(
         miner == "imported" && session->imported_document
@@ -9657,8 +9681,8 @@ void handle_ptml(const httplib::Request& request,
                          "application/json");
     return;
   }
-  const auto miner = request.has_param("miner")
-                         ? request.get_param_value("miner")
+  const auto miner = audited_has_param(request, "miner")
+                         ? audited_param_value(request, "miner")
                          : std::string("inductive");
   try {
     if (miner == "inductive") {
@@ -9700,12 +9724,12 @@ void handle_bpmn(const httplib::Request& request, httplib::Response& response) {
     return;
   }
 
-  const std::string miner = request.has_param("miner")
-                                ? request.get_param_value("miner")
+  const std::string miner = audited_has_param(request, "miner")
+                                ? audited_param_value(request, "miner")
                                 : std::string("inductive");
   try {
     if (miner == "inductive" &&
-        !request.has_param("process_tree_variant")) {
+        !audited_has_param(request, "process_tree_variant")) {
       response.set_content(minera::to_bpmn(require_process_tree(*session), "process"),
                            "application/xml");
       return;
@@ -10210,8 +10234,8 @@ void handle_playout(const httplib::Request& request,
 
   // The page names the mined source it shows; refuse to play out a session
   // that has since been replaced (another tab re-mined a different log).
-  if (request.has_param("source_id") &&
-      request.get_param_value("source_id") != std::to_string(session->query_source_id)) {
+  if (audited_has_param(request, "source_id") &&
+      audited_param_value(request, "source_id") != std::to_string(session->query_source_id)) {
     response.status = 409;
     response.set_content(
         error_json("the mined log changed since this analysis was shown; "
@@ -10220,10 +10244,10 @@ void handle_playout(const httplib::Request& request,
     return;
   }
 
-  const std::string miner = request.has_param("miner")
-                                ? request.get_param_value("miner")
+  const std::string miner = audited_has_param(request, "miner")
+                                ? audited_param_value(request, "miner")
                                 : std::string("inductive");
-  if (request.has_param("process_tree_variant") &&
+  if (audited_has_param(request, "process_tree_variant") &&
       miner != "inductive" && miner != "stochastic" &&
       miner != "monte_carlo") {
     response.status = 400;
@@ -10233,22 +10257,22 @@ void handle_playout(const httplib::Request& request,
     return;
   }
   const bool is_declare = miner == "declare";
-  const std::string mode = request.has_param("mode")
-                               ? request.get_param_value("mode")
+  const std::string mode = audited_has_param(request, "mode")
+                               ? audited_param_value(request, "mode")
                                : std::string{};
   const bool is_stochastic = mode == "stochastic" || miner == "stochastic";
   const bool is_monte_carlo =
       mode == "monte_carlo" || miner == "monte_carlo";
   const bool is_extensive = mode == "extensive";
-  if ((request.has_param("return_elements") ||
-       request.has_param("max_marking_occ")) && !is_extensive) {
+  if ((audited_has_param(request, "return_elements") ||
+       audited_has_param(request, "max_marking_occ")) && !is_extensive) {
     response.status = 400;
     response.set_content(
         error_json("return_elements and max_marking_occ require extensive Petri playout"),
         "application/json");
     return;
   }
-  if (request.has_param("return_visited_elements") &&
+  if (audited_has_param(request, "return_visited_elements") &&
       (is_declare || is_stochastic || is_monte_carlo ||
        miner == "process_tree" || miner == "dfg")) {
     response.status = 400;
@@ -10257,7 +10281,7 @@ void handle_playout(const httplib::Request& request,
         "application/json");
     return;
   }
-  if (request.has_param("return_set_strings") && miner != "process_tree") {
+  if (audited_has_param(request, "return_set_strings") && miner != "process_tree") {
     response.status = 400;
     response.set_content(
         error_json("return_set_strings requires process-tree extensive playout"),
@@ -10278,11 +10302,11 @@ void handle_playout(const httplib::Request& request,
       const auto lookup = [&](std::string_view name) {
         const std::string key(name);
         if (key_field.hides(name)) return std::string{};
-        return request.has_param(key) ? request.get_param_value(key)
+        return audited_has_param(request, key) ? audited_param_value(request, key)
                                       : std::string{};
       };
       const auto present = [&](std::string_view name) {
-        return !key_field.hides(name) && request.has_param(std::string(name));
+        return !key_field.hides(name) && audited_has_param(request, std::string(name));
       };
       const auto& selected = select_cached_or_process_tree_net(
           request, *session, selected_miner, converted);
@@ -10299,7 +10323,7 @@ void handle_playout(const httplib::Request& request,
       if (selected_miner == "powl") {
         if (!present("monte_carlo_activity_key"))
           options.activity_key = session->powl_activity_key;
-        if (!request.has_param("monte_carlo_timestamp_key"))
+        if (!audited_has_param(request, "monte_carlo_timestamp_key"))
           options.timestamp_key = session->powl_timestamp_key;
         projected_powl_log = project_powl_activity(
             require_prepared_log(*session), options.activity_key, options.timestamp_key,
@@ -10328,10 +10352,10 @@ void handle_playout(const httplib::Request& request,
       reject_unknown_stochastic_params(request);
       const auto lookup = [&](std::string_view name) {
         const std::string key(name);
-        return request.has_param(key) ? request.get_param_value(key) : std::string{};
+        return audited_has_param(request, key) ? audited_param_value(request, key) : std::string{};
       };
       const auto present = [&](std::string_view name) {
-        return request.has_param(std::string(name));
+        return audited_has_param(request, std::string(name));
       };
       auto options = minera::parse_stochastic_playout_params(lookup, present);
       cached_imported_markings(request, *session, selected_miner, options,
@@ -10392,7 +10416,7 @@ void handle_playout(const httplib::Request& request,
     return;
   }
   if (miner == "process_tree") {
-    if (request.has_param("process_tree_variant")) {
+    if (audited_has_param(request, "process_tree_variant")) {
       response.status = 400;
       response.set_content(
           error_json("process_tree_variant requires a Petri miner selection"),
@@ -10401,11 +10425,11 @@ void handle_playout(const httplib::Request& request,
     }
     const auto lookup = [&](std::string_view name) {
       const std::string key(name.substr(std::string_view("playout_").size()));
-      return request.has_param(key) ? request.get_param_value(key) : std::string{};
+      return audited_has_param(request, key) ? audited_param_value(request, key) : std::string{};
     };
     const auto present = [&](std::string_view name) {
       const std::string key(name.substr(std::string_view("playout_").size()));
-      return request.has_param(key);
+      return audited_has_param(request, key);
     };
     const auto reject = [&](std::string message) {
       response.status = 400;
@@ -10434,8 +10458,8 @@ void handle_playout(const httplib::Request& request,
           return;
         }
         if (options.max_traces > 10000) {
-          if (request.has_param("max_trace_cap") ||
-              request.has_param("max_traces")) {
+          if (audited_has_param(request, "max_trace_cap") ||
+              audited_has_param(request, "max_traces")) {
             reject("max_trace_cap must not exceed 10000");
             return;
           }
@@ -10483,11 +10507,11 @@ void handle_playout(const httplib::Request& request,
     try {
       const auto lookup = [&](std::string_view name) {
         const auto key = std::string(name);
-        return request.has_param(key) ? request.get_param_value(key)
+        return audited_has_param(request, key) ? audited_param_value(request, key)
                                       : std::string{};
       };
       const auto present = [&](std::string_view name) {
-        return request.has_param(std::string(name));
+        return audited_has_param(request, std::string(name));
       };
       auto options = minera::parse_dfg_playout_params(lookup, present);
       if (options.traces > 10000 || options.max_events_per_trace > 10000 ||
@@ -10563,7 +10587,7 @@ void handle_playout(const httplib::Request& request,
   const auto parse_bounded =
       [&](std::string_view name, std::uint64_t minimum,
           std::uint64_t maximum) -> std::optional<std::uint64_t> {
-    const auto value = request.get_param_value(std::string(name));
+    const auto value = audited_param_value(request, std::string(name));
     std::uint64_t parsed = 0;
     const auto result =
         std::from_chars(value.data(), value.data() + value.size(), parsed);
@@ -10583,12 +10607,12 @@ void handle_playout(const httplib::Request& request,
     }
     try {
       const auto lookup = [&](std::string_view name) {
-        return request.has_param(std::string(name))
-                   ? request.get_param_value(std::string(name))
+        return audited_has_param(request, std::string(name))
+                   ? audited_param_value(request, std::string(name))
                    : std::string{};
       };
       const auto present = [&](std::string_view name) {
-        return request.has_param(std::string(name));
+        return audited_has_param(request, std::string(name));
       };
       const auto options = minera::parse_declare_playout_params(lookup, present);
       const auto log = minera::declare_playout([&]() -> const minera::DeclareModel& {
@@ -10603,8 +10627,8 @@ void handle_playout(const httplib::Request& request,
     return;
   }
 
-  if (request.has_param("min_length") ||
-      (request.has_param("max_length") && mode != "extensive")) {
+  if (audited_has_param(request, "min_length") ||
+      (audited_has_param(request, "max_length") && mode != "extensive")) {
     reject("min_length and max_length are Declare-only unless max_length "
            "is used with Petri mode=extensive");
     return;
@@ -10614,40 +10638,40 @@ void handle_playout(const httplib::Request& request,
   // (play_out(net, im, fm) returns 1000 cases); the native struct keeps its
   // historical 100 for the hashed workbench captures.
   options.traces = 1000;
-  if (request.has_param("traces")) {
+  if (audited_has_param(request, "traces")) {
     const auto parsed = parse_bounded("traces", 1, 10000);
     if (!parsed) return;
     options.traces = static_cast<std::size_t>(*parsed);
   }
-  if (request.has_param("max_steps")) {
+  if (audited_has_param(request, "max_steps")) {
     const auto parsed = parse_bounded("max_steps", 0, 10000);
     if (!parsed) return;
     options.max_steps = static_cast<std::size_t>(*parsed);
   }
-  if (!request.has_param("traces"))
+  if (!audited_has_param(request, "traces"))
     options.traces = default_playout_traces(options.max_steps, options.traces);
-  if (request.has_param("seed")) {
+  if (audited_has_param(request, "seed")) {
     const auto parsed = parse_bounded(
         "seed", 0, std::numeric_limits<std::uint64_t>::max());
     if (!parsed) return;
     options.seed = *parsed;
   }
   if (mode == "extensive" &&
-      (request.has_param("max_steps") || request.has_param("seed") ||
-       request.has_param("start") || request.has_param("case_interval") ||
-       request.has_param("event_interval") ||
-       request.has_param("add_only_if_fm_is_reached") ||
-       request.has_param("fm_leq_accepted") ||
-       request.has_param("return_visited_elements"))) {
+      (audited_has_param(request, "max_steps") || audited_has_param(request, "seed") ||
+       audited_has_param(request, "start") || audited_has_param(request, "case_interval") ||
+       audited_has_param(request, "event_interval") ||
+       audited_has_param(request, "add_only_if_fm_is_reached") ||
+       audited_has_param(request, "fm_leq_accepted") ||
+       audited_has_param(request, "return_visited_elements"))) {
     reject("basic Petri playout controls require the default sampling mode");
     return;
   }
   try {
     // The reference envelope (cases "0".., epoch 10,000,000, one second per
     // event) unless the caller asks for its own timing.
-    options.add_envelope = request.has_param("start") ||
-                           request.has_param("case_interval") ||
-                           request.has_param("event_interval");
+    options.add_envelope = audited_has_param(request, "start") ||
+                           audited_has_param(request, "case_interval") ||
+                           audited_has_param(request, "event_interval");
     // A server-side bound on add_only_if_fm_is_reached resampling; the
     // reference has none.
     options.max_attempts = 100 * options.traces + 1000;
@@ -10681,14 +10705,14 @@ void handle_playout(const httplib::Request& request,
       const std::string wire =
           name == "extensive_return_elements" ? "return_elements"
                                                : "max_marking_occ";
-      return request.has_param(wire) ? request.get_param_value(wire)
+      return audited_has_param(request, wire) ? audited_param_value(request, wire)
                                      : std::string{};
     };
     const auto present = [&](std::string_view name) {
       const std::string wire =
           name == "extensive_return_elements" ? "return_elements"
                                                : "max_marking_occ";
-      return request.has_param(wire);
+      return audited_has_param(request, wire);
     };
     try {
       extensive = minera::parse_extensive_playout_params(lookup, present);
@@ -10698,7 +10722,7 @@ void handle_playout(const httplib::Request& request,
     }
     // pm4py's extensive playout has no trace cap; keep the native distinct
     // trace budget unless the caller asks for fewer.
-    if (request.has_param("traces")) extensive.max_traces = options.traces;
+    if (audited_has_param(request, "traces")) extensive.max_traces = options.traces;
     extensive.initial_marking = options.initial_marking;
     extensive.final_marking = options.final_marking;
   }
@@ -10725,7 +10749,7 @@ void handle_playout(const httplib::Request& request,
   // mode=extensive enumerates the model's distinct traces (shortest first,
   // capped by `traces` and `max_length`) instead of sampling randomly.
   if (mode == "extensive") {
-    if (request.has_param("max_length")) {
+    if (audited_has_param(request, "max_length")) {
       const auto parsed = parse_bounded("max_length", 1, 1000);
       if (!parsed) return;
       extensive.max_length = static_cast<std::size_t>(*parsed);
@@ -10769,12 +10793,12 @@ void handle_xes(const httplib::Request& request, httplib::Response& response) {
 
   try {
     minera::XesExportOptions options;
-    if (request.has_param("xes_export_variant")) {
+    if (audited_has_param(request, "xes_export_variant")) {
       options.variant = minera::parse_xes_export_variant(
-          request.get_param_value("xes_export_variant"));
+          audited_param_value(request, "xes_export_variant"));
     }
-    if (request.has_param("xes_compress")) {
-      const auto value = request.get_param_value("xes_compress");
+    if (audited_has_param(request, "xes_compress")) {
+      const auto value = audited_param_value(request, "xes_compress");
       if (value == "true" || value == "1") options.compress = true;
       else if (value == "false" || value == "0") options.compress = false;
       else throw std::invalid_argument(
@@ -11914,6 +11938,34 @@ void reject_stale_imported_model(httplib::Response& response) {
       "application/json");
 }
 
+// The session routes that read their controls from the query string one
+// lookup at a time (alignments, evaluation, playout, Petri analysis, the
+// process-tree reduction and the model and log downloads) dropped a name
+// none of them read (round BU: a misspelled or inapplicable control was
+// ignored). They run under a FormFieldAudit with lookups that record each
+// name (audited_has_param); a successful answer to a request that supplied
+// a name the route never consulted on its path is replaced by a 400 naming
+// it. The route has run by then, so its own errors keep precedence.
+httplib::Server::Handler audited_query_route(httplib::Server::Handler handler) {
+  return [handler = std::move(handler)](const httplib::Request& request, httplib::Response& response) {
+    FormFieldAuditScope audit;
+    handler(request, response);
+    // httplib leaves the status at -1 until it frames a handler's answer (200).
+    if (response.status != -1 && (response.status < 200 || response.status >= 300)) return;
+    const auto name = audit.unconsulted_control(request);
+    if (!name) return;
+    httplib::Response fresh;
+    for (const char* header : {"Access-Control-Allow-Origin", "Access-Control-Expose-Headers", "Vary"})
+      if (response.has_header(header)) fresh.set_header(header, response.get_header_value(header));
+    httplib::Response discarded = std::move(response);
+    response.content_provider_resource_releaser_ = nullptr;
+    response = std::move(fresh);
+    response.status = 400;
+    response.set_content(error_json("unknown or inapplicable " + request.path + " parameter: " + *name),
+                         "application/json");
+  };
+}
+
 // Every /api JSON body leaves as valid UTF-8 (json_utf8.hpp): results that
 // carry a log's own bytes (a Latin-1 CSV, WTF-8 surrogates) are repaired. The
 // repair must run before httplib frames the response: apply_ranges sets
@@ -12607,15 +12659,15 @@ int main(int argc, char** argv) {
   api_get(server, "/api/random-tree", handle_random_tree);
   api_post(server, "/api/generate-trees", handle_tree_generation);
   api_post(server, "/api/compare-petri", handle_compare_petri);
-  api_post(server, "/api/align", handle_align);
-  api_post(server, "/api/evaluate", handle_evaluate);
-  api_post(server, "/api/petri-analysis", handle_petri_analysis);
-  api_post(server, "/api/evaluate-emd", handle_evaluate_emd);
+  api_post(server, "/api/align", audited_query_route(handle_align));
+  api_post(server, "/api/evaluate", audited_query_route(handle_evaluate));
+  api_post(server, "/api/petri-analysis", audited_query_route(handle_petri_analysis));
+  api_post(server, "/api/evaluate-emd", audited_query_route(handle_evaluate_emd));
   api_post(server, "/api/align-process-tree", handle_align_process_tree);
   api_post(server, "/api/align-decomposed", handle_align_decomposed);
   api_post(server, "/api/align-petri-anti", handle_align_petri_anti);
   api_post(server, "/api/align-petri-multi", handle_align_petri_multi);
-  api_post(server, "/api/reduce-process-tree", handle_reduce_process_tree);
+  api_post(server, "/api/reduce-process-tree", audited_query_route(handle_reduce_process_tree));
   api_post(server, "/api/reduce-petri-net", handle_reduce_petri_net);
   api_post(server, "/api/align-dfg", handle_align_dfg);
   api_post(server, "/api/discover-alpha-plus", handle_alpha_plus_result);
@@ -12698,11 +12750,11 @@ int main(int argc, char** argv) {
     else handle_graph_alignment_workbench(request,response);
   });
   api_post(server, "/api/replay-fitness", handle_replay_fitness);
-  api_get(server, "/api/pnml", handle_pnml);
+  api_get(server, "/api/pnml", audited_query_route(handle_pnml));
   api_get(server, "/api/process-tree-petri", handle_process_tree_petri);
-  api_get(server, "/api/bpmn", handle_bpmn);
-  api_get(server, "/api/ptml", handle_ptml);
-  api_get(server, "/api/xes", handle_xes);
+  api_get(server, "/api/bpmn", audited_query_route(handle_bpmn));
+  api_get(server, "/api/ptml", audited_query_route(handle_ptml));
+  api_get(server, "/api/xes", audited_query_route(handle_xes));
   api_get(server, "/api/dfg", handle_dfg);
   api_get(server, "/api/dfg-dataframe", handle_dfg_dataframe);
   api_post(server, "/api/dfg-dataframe", handle_dfg_dataframe);
@@ -12741,8 +12793,8 @@ int main(int argc, char** argv) {
   api_get(server, "/api/live-stream/list",handle_live_list);
   api_get(server, "/api/live-stream/source",handle_live_source);
   api_post(server, "/api/live-stream/release",handle_live_release);
-  api_get(server, "/api/playout", handle_playout);
-  api_post(server, "/api/playout", handle_playout);
+  api_get(server, "/api/playout", audited_query_route(handle_playout));
+  api_post(server, "/api/playout", audited_query_route(handle_playout));
   api_get(server, "/api/stochastic-petri", handle_stochastic_petri);
   api_get(server, "/api/stochastic-map", handle_stochastic_map);
   api_get(server, "/api/monte-carlo", handle_monte_carlo_json);

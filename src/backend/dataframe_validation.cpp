@@ -65,6 +65,10 @@ std::string available_columns(std::vector<std::string> columns) {
 }
 }  // namespace
 
+std::string dataframe_available_columns(std::vector<std::string> columns) {
+  return available_columns(std::move(columns));
+}
+
 void check_dataframe_columns(const EventTable& table,
                              const DataFrameColumnOptions& options) {
   table.validate();

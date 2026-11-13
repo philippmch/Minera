@@ -1,9 +1,13 @@
 #include "minera/llm_context.hpp"
 #include "frame_cells.hpp"
 #include "frame_temporal_profile.hpp"
+#include "frame_times.hpp"
+#include "python_scalar.hpp"
 #include "minera/llm_abstractions.hpp"
 #include "minera/original_model_context.hpp"
+#include "minera/dataframe_validation.hpp"
 #include "minera/declare.hpp"
+#include "minera/frame_keys.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/event_table_json.hpp"
 #include "minera/log_conversion.hpp"
@@ -46,19 +50,38 @@ LlmContextResult whole(const std::string& variant,LlmContextResult described){Te
 std::string date(std::string value){if(value.size()>10&&value[10]=='T')value[10]=' ';if(!value.empty()&&value.back()=='Z'){value.pop_back();value+="+00:00";}return value;}
 std::string value(const EventAttribute& attribute){if(attribute.is_null||attribute.kind==AttributeKind::kNA)return "None";if(attribute.container!=AttributeContainerKind::kScalar){EventTable table;table.columns={attribute.key};table.rows={{attribute}};return serialize_event_table_json(table);}return attribute.kind==AttributeKind::kDate?date(attribute.value):attribute.value;}
 double aggregate(const std::vector<double>& samples,std::string_view kind){if(samples.empty())return 0;const auto stats=summarize_durations(samples);if(kind=="median")return stats.median;if(kind=="min")return stats.min;if(kind=="max")return stats.max;if(kind=="sum")return stats.total;if(kind=="stdev"){if(samples.size()<2)return 0;double squares=0;for(auto sample:samples)squares+=(sample-stats.mean)*(sample-stats.mean);return std::sqrt(squares/(samples.size()-1));}return stats.mean;}
-std::string quantiles(std::vector<double> values){std::sort(values.begin(),values.end());if(values.empty())return "{}";std::string text="{";for(int i=0;i<=4;++i){if(i)text+=", ";const double position=(values.size()-1)*i/4.0;const auto lower=static_cast<std::size_t>(position),upper=static_cast<std::size_t>(std::ceil(position));const auto value=values[lower]+(values[upper]-values[lower])*(position-lower);text+=(i==0?"0.0":i==1?"0.25":i==2?"0.5":i==3?"0.75":"1.0")+std::string(": ")+number(value);}return text+'}';}
 EventLog projected(const EventLog& source,const LlmContextOptions& options){auto log=source;for(auto& trace:log.traces)for(auto& event:trace.events){if(!options.activity_attribute.empty()){const auto* selected=event.attribute(options.activity_attribute);if(!selected)throw std::invalid_argument("context activity attribute is absent or null");const auto original=event;const auto label=*selected;set_event_activity_context(original,label,event);event.activity_source_key=options.activity_attribute;}if(!options.timestamp_attribute.empty()){const auto* selected=event.attribute(options.timestamp_attribute);if(!selected)throw std::invalid_argument("context timestamp attribute is absent or null");event.timestamp=*selected;event.timestamp_source_key=options.timestamp_attribute;event.timestamp_attribute.reset();event.timestamp_state=FirstClassAttributeState::kPresent;}}
  // A projected log is no longer the upload's frame: its abstractions read the events.
  if(!options.activity_attribute.empty()||!options.timestamp_attribute.empty())log.dataframe_columns.reset();
  return log;}
 using Edge=std::pair<std::string,std::string>;
-void feature_lines(Text& text,const std::vector<std::string>& names,const std::vector<std::vector<double>>& rows){struct Feature{std::size_t index;std::vector<double> nonzero;};std::vector<Feature> features;for(std::size_t c=0;c<names.size();++c){Feature item{c,{}};for(const auto& row:rows)if(c<row.size()&&std::isfinite(row[c])&&row[c]!=0)item.nonzero.push_back(row[c]);if(!item.nonzero.empty())features.push_back(std::move(item));}std::stable_sort(features.begin(),features.end(),[](const auto& a,const auto& b){return a.nonzero.size()>b.nonzero.size();});for(const auto& item:features)if(!text.line(names[item.index]+":    number of non-zero values: "+std::to_string(item.nonzero.size())+" ; quantiles of the non-zero: "+quantiles(item.nonzero)+"\n"))break;}
 std::string transition(const PetriNet& net,std::size_t id){const auto& item=net.transitions()[id];const auto name=net.transition_names()?(*net.transition_names())[id].value_or("None"):"t"+std::to_string(id);return "("+name+", "+(item.activity?quote(net.activities().at(*item.activity)):"None")+")";}
 void petri(Text& text,const PetriNet& net,const PnmlDocument* document,bool header){
  text.value="\n\n"+(header?std::string("If I have a Petri net:\n\n"):std::string());const auto place=[&](std::size_t id){return document&&id<document->place_ids.size()?document->place_ids[id]:"p"+std::to_string(id);};
  std::string line="places: [ ";for(std::size_t p=0;p<net.place_count();++p){if(p)line+=", ";line+=place(p);}text.line(line+" ]\n");line="transitions: [ ";for(std::size_t t=0;t<net.transitions().size();++t){if(t)line+=", ";line+=transition(net,t);}text.line(line+" ]\n");
  for(std::size_t t=0;t<net.transitions().size();++t){const auto& item=net.transitions()[t];for(std::size_t a=0;a<item.inputs.size();++a){std::ostringstream out;out<<place(item.inputs[a])<<" -> "<<transition(net,t)<<" (weight = "<<(item.input_arc_weight(a).negative?"-":"")<<item.input_arc_weight(a).magnitude<<")\n";text.line(out.str());}for(std::size_t a=0;a<item.outputs.size();++a){std::ostringstream out;out<<transition(net,t)<<" -> "<<place(item.outputs[a])<<" (weight = "<<(item.output_arc_weight(a).negative?"-":"")<<item.output_arc_weight(a).magnitude<<")\n";text.line(out.str());}for(auto p:item.reset_inputs)text.line(place(p)+" -> "+transition(net,t)+" (reset arc)\n");for(auto p:item.inhibitor_inputs)text.line(place(p)+" -> "+transition(net,t)+" (inhibitor arc)\n");}
  for(bool initial:{true,false}){std::ostringstream out;out<<(initial?"initial marking: [":"final marking: [");if(document){const auto& marking=initial?document->initial_marking:document->final_marking;for(std::size_t p=0;p<marking.size();++p)if(marking[p]!=0)out<<place(p)<<":"<<marking[p]<<" ";}else if(net.discovery_markings()){for(const auto& entry:initial?net.discovery_markings()->initial:net.discovery_markings()->final)out<<(entry.place.kind==PetriMarkingPlaceKind::kRoot?place(entry.place.id):"detached"+std::to_string(entry.place.id))<<":"<<entry.tokens<<" ";}else if(initial?net.has_source():net.has_sink())out<<place(initial?net.source():net.sink())<<":1";out<<"]\n";text.line(out.str());}text.value+="\n";
+}
+LlmContextResult model_context(const EventLog& log,const LlmContextOptions&,const LlmContextOptions& options){
+ if(options.variant=="log_skeleton")return exact("log_skeleton",options,[&](const LlmAbstractionOptions& o){return llm_log_skeleton_description(log,o);});
+ // The reference model descriptions have no character budget.
+ if(options.variant=="declare")return whole("declare",abstract_declare(discover_declare(log.dataframe_columns?frame_slice_cases(log):log),options.include_header));
+ // A CSV or XES upload reaches pm4py as a DataFrame, whose temporal profile
+ // takes pandas' durations and groupby statistics (round BH).
+ return whole("temporal_profile",abstract_temporal_profile(log.dataframe_columns?discover_temporal_profile_frame(log):discover_temporal_profile(log),options.include_header));
+}
+// The frame-keyed log of a model description keyed by a column of an
+// upload's frame (nullopt for the events' own activity or another variant).
+std::optional<EventLog> model_frame_key(const EventLog& source,const LlmContextOptions& options){
+ const auto& key=options.activity_attribute;
+ if(!source.dataframe_columns||key.empty()||key=="concept:name"||!options.timestamp_attribute.empty()||(options.variant!="log_skeleton"&&options.variant!="declare"&&options.variant!="temporal_profile"))return std::nullopt;
+ const auto columns=frame_keys(source,FrameKeyScope::kDataFrame);
+ if(!columns.contains(key))throw std::invalid_argument("the specified activity column is not contained in the dataframe. Available columns: "+dataframe_available_columns({columns.begin(),columns.end()}));
+ auto keyed=frame_keyed_activities(source,key,FrameKeyScope::kDataFrame);
+ if(!keyed)return std::nullopt;
+ if(const auto error=frame_activity_column_error(*keyed);!error.empty())throw std::invalid_argument(error);
+ if(options.variant=="temporal_profile"&&key=="case:concept:name")throw std::invalid_argument("KeyError: \"['case:concept:name_2'] not in index\"");
+ return std::move(keyed->log);
 }
 } // namespace
 std::vector<std::string> llm_context_variants(){return {"case","dfg","variants","event_stream","log_attributes","log_features","declare","log_skeleton","temporal_profile","petri_net","ocel","ocel_features","ocel_ocdfg"};}
@@ -72,6 +95,13 @@ LlmContextResult build_llm_context(const EventLog& source,const LlmContextOption
  // the frame's own activity. The log then keeps its frame unprojected.
  const bool frame_key=source.dataframe_columns&&!options.activity_attribute.empty()&&options.timestamp_attribute.empty()&&(options.variant=="dfg"||options.variant=="variants"||options.variant=="event_stream"||options.variant=="log_attributes"||options.variant=="log_features");
  auto projection=options;if(frame_key||(source.dataframe_columns&&options.activity_attribute=="concept:name"))projection.activity_attribute.clear();
+ // The model descriptions keyed by a column of an upload's frame describe
+ // pm4py.discover_log_skeleton, discover_declare and
+ // discover_temporal_profile(frame, activity_key=key) (round BU, observed
+ // black-box): the key is checked as a DataFrame activity column (a column
+ // the frame lacks, then one of another dtype than str, then a gap), and the
+ // temporal profile keyed by the case column itself fails on its merge.
+ if(const auto keyed=model_frame_key(source,options)){projection.activity_attribute.clear();return model_context(*keyed,projection,options);}
  const auto log=projected(source,projection);
  // Reference abstractions (pm4py.llm abstract_dfg, abstract_variants,
  // abstract_log_attributes, abstract_log_features, abstract_event_stream,
@@ -81,12 +111,7 @@ LlmContextResult build_llm_context(const EventLog& source,const LlmContextOption
  if(options.variant=="event_stream")return exact("event_stream",options,[&](const LlmAbstractionOptions& o){return llm_event_stream_description(log,o);});
  if(options.variant=="log_attributes")return exact("log_attributes",options,[&](const LlmAbstractionOptions& o){return llm_log_columns_description(log,o.max_len);});
  if(options.variant=="log_features")return exact("log_features",options,[&](const LlmAbstractionOptions& o){return llm_log_features_description(log,o);});
- if(options.variant=="log_skeleton")return exact("log_skeleton",options,[&](const LlmAbstractionOptions& o){return llm_log_skeleton_description(log,o);});
- // The reference model descriptions have no character budget.
- if(options.variant=="declare")return whole("declare",abstract_declare(discover_declare(log.dataframe_columns?frame_slice_cases(log):log),options.include_header));
- // A CSV or XES upload reaches pm4py as a DataFrame, whose temporal profile
- // takes pandas' durations and groupby statistics (round BH).
- if(options.variant=="temporal_profile")return whole("temporal_profile",abstract_temporal_profile(log.dataframe_columns?discover_temporal_profile_frame(log):discover_temporal_profile(log),options.include_header));
+ if(options.variant=="log_skeleton"||options.variant=="declare"||options.variant=="temporal_profile")return model_context(log,projection,options);
  Text text(options.max_len);
  if(options.variant=="case"){
   if(options.case_index>=log.traces.size())throw std::out_of_range("context case index is outside the log");const auto& trace=log.traces[options.case_index];text.value="\n";
@@ -100,15 +125,27 @@ LlmContextResult build_llm_context(const EventLog& source,const LlmContextOption
 LlmContextResult build_llm_context(const Ocel& log,const LlmContextOptions& options){
  validate(options);if(!llm_context_is_ocel(options.variant))throw std::invalid_argument("traditional log context requires a CSV/XES source");
  if(options.variant=="ocel_ocdfg")return exact("ocel_ocdfg",options,[&](const LlmAbstractionOptions& o){return llm_ocel_ocdfg_description(log,o);});
- // The reference object features always include the lifecycle activities;
- // without them the Minera feature summary below is used instead.
- if(options.variant=="ocel_features"&&options.include_lifecycle_paths){if(options.object_type.empty())throw std::invalid_argument("choose an object type for OCEL feature context");return exact("ocel_features",options,[&](const LlmAbstractionOptions& o){return llm_ocel_features_description(log,options.object_type,o);});}
+ // pm4py.llm.abstract_ocel_features with enable_object_lifecycle_paths set
+ // by include_lifecycle_paths (round BU: the paths were never described, and
+ // without them a Minera feature summary was printed instead).
+ if(options.variant=="ocel_features"){if(options.object_type.empty())throw std::invalid_argument("choose an object type for OCEL feature context");return exact("ocel_features",options,[&](LlmAbstractionOptions o){o.ocel_lifecycle_paths=options.include_lifecycle_paths;return llm_ocel_features_description(log,options.object_type,o);});}
  Text text(options.max_len);
  if(options.variant=="ocel"){
-  std::map<std::string,std::vector<std::string>> objects;std::map<std::string,std::vector<double>> timestamps;std::map<std::string,const OcelEvent*> events;for(const auto& event:log.events)events[event.id]=&event;for(const auto& relation:log.relations){objects[relation.event_id].push_back(relation.object_id);if(auto found=events.find(relation.event_id);found!=events.end())if(auto stamp=parse_timestamp(found->second->timestamp))timestamps[relation.object_id].push_back(*stamp);}
-  text.value="\n\nevents:\n\n";for(const auto& event:log.events){auto related=objects[event.id];std::sort(related.begin(),related.end());std::string line=event.activity+" ( related objects: ";for(std::size_t i=0;i<related.size();++i){if(i)line+=", ";line+=related[i];}line+=" ) ";if(options.include_timestamps)line+=" timestamp: "+date(event.timestamp);if(!text.line(line+"\n"))break;}text.value+="\nobjects:\n\n";auto ordered=log.objects;std::sort(ordered.begin(),ordered.end(),[](const auto& a,const auto& b){return a.id<b.id;});for(const auto& object:ordered){std::string line=object.id+" object type: "+object.type;const auto& samples=timestamps[object.id];if(options.include_timestamps&&!samples.empty()){const auto [start,end]=std::minmax_element(samples.begin(),samples.end());line+=" ( lifecycle start: "+date(format_timestamp(*start))+" ; lifecycle end: "+date(format_timestamp(*end))+" ; lifecycle duration: "+number(*end-*start)+" )";}if(!text.line(line+"\n"))break;}
- }else if(options.variant=="ocel_features"){
-  if(options.object_type.empty())throw std::invalid_argument("choose an object type for OCEL feature context");OcelFeatureOptions features;features.filter_per_type=options.object_type;features.include_all_object_features=true;features.include_lifecycle_path_features=options.include_lifecycle_paths;features.feature_name_style=OcelFeatureNameStyle::kCompatibility;const auto table=extract_ocel_features(log,OcelFeatureVariant::kObjects,features);text.value=options.include_header?"\nObject features describe lifecycle timing, activity occurrences and interaction/descendant/inheritance relationships.\n\n Given the following features:\n\n":"\n";feature_lines(text,table.feature_names,table.values);
+  // pm4py.llm.abstract_ocel on read_ocel_json's frame (round BU, observed
+  // black-box): the OCEL JSON readers hold UTC microseconds (offsets convert,
+  // naive times read as UTC, digits past the sixth are cut), printed as
+  // str(Timestamp); the events are ordered by timestamp, activity and id; a
+  // lifecycle lasts end.timestamp() - start.timestamp() seconds; the object
+  // lines are joined without a final newline.
+  const auto instant=[](const std::string& value)->std::optional<ParsedExactTimestamp>{auto parsed=parse_timestamp_exact(value);if(!parsed)return std::nullopt;parsed->nanoseconds-=parsed->nanoseconds%1000;return parsed;};
+  const auto before=[](const ParsedExactTimestamp& a,const ParsedExactTimestamp& b){return a.seconds!=b.seconds?a.seconds<b.seconds:a.nanoseconds<b.nanoseconds;};
+  std::map<std::string,std::vector<std::string>> objects;std::map<std::string,std::vector<ParsedExactTimestamp>> timestamps;std::map<std::string,const OcelEvent*> events;for(const auto& event:log.events)events[event.id]=&event;for(const auto& relation:log.relations){objects[relation.event_id].push_back(relation.object_id);if(auto found=events.find(relation.event_id);found!=events.end())if(auto stamp=instant(found->second->timestamp))timestamps[relation.object_id].push_back(*stamp);}
+  std::vector<std::pair<std::optional<ParsedExactTimestamp>,const OcelEvent*>> listed_events;for(const auto& event:log.events)listed_events.emplace_back(instant(event.timestamp),&event);
+  // The events print sorted by timestamp, activity and event id.
+  std::stable_sort(listed_events.begin(),listed_events.end(),[&](const auto& a,const auto& b){if(a.first&&b.first&&(a.first->seconds!=b.first->seconds||a.first->nanoseconds!=b.first->nanoseconds))return before(*a.first,*b.first);if(a.second->activity!=b.second->activity)return a.second->activity<b.second->activity;return a.second->id<b.second->id;});
+  text.value="\n\nevents:\n\n";for(const auto& [stamp_key,listed]:listed_events){(void)stamp_key;const auto& event=*listed;auto related=objects[event.id];std::sort(related.begin(),related.end());std::string line=event.activity+" ( related objects: ";for(std::size_t i=0;i<related.size();++i){if(i)line+=", ";line+=related[i];}line+=" ) ";if(options.include_timestamps){const auto stamp=instant(event.timestamp);line+=" timestamp: "+(stamp?frame_times::utc_text(*stamp):date(event.timestamp));}if(!text.line(line+"\n"))break;}text.value+="\nobjects:\n\n";auto ordered=log.objects;std::sort(ordered.begin(),ordered.end(),[](const auto& a,const auto& b){return a.id<b.id;});
+  bool listed=false;for(const auto& object:ordered){std::string line=object.id+" object type: "+object.type;const auto& samples=timestamps[object.id];if(options.include_timestamps&&!samples.empty()){const auto [start,end]=std::minmax_element(samples.begin(),samples.end(),before);line+=" ( lifecycle start: "+frame_times::utc_text(*start)+" ; lifecycle end: "+frame_times::utc_text(*end)+" ; lifecycle duration: "+python::float_repr(frame_times::epoch_seconds(*end)-frame_times::epoch_seconds(*start))+" )";}if(!text.line(line+"\n"))break;listed=true;}
+  if(listed&&text.value.ends_with('\n'))text.value.pop_back();
  }
  return text.finish(options.variant);
 }

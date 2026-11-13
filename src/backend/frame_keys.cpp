@@ -525,12 +525,13 @@ void require_sortable_classes(const std::set<FrameValueClass>& classes) {
                               first + "' and '" + second + "'");
 }
 
-std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, std::string_view key_view) {
+std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, std::string_view key_view,
+                                                           FrameKeyScope scope) {
   if (!log.dataframe_columns) return std::nullopt;
   const std::string key(key_view);
   if (key.empty() || key == "concept:name" || key == "activity") return std::nullopt;
   const auto frame = dataframe_frame_event_log(log);
-  if (!frame_keys(frame, FrameKeyScope::kEventLog).contains(key)) return std::nullopt;
+  if (!frame_keys(frame, scope).contains(key)) return std::nullopt;
   if (frame.traces.size() != log.traces.size()) return std::nullopt;
   const auto column = frame_column_type(frame, key);
   const bool dates = column && *column == DataFrameColumnType::kDate;
@@ -547,7 +548,7 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
     out.types[t].resize(trace.events.size());
     out.missing[t].resize(trace.events.size());
     for (std::size_t e = 0; e < trace.events.size(); ++e) {
-      const auto cell = frame_scalar(frame, trace, trace.events[e], key, FrameKeyScope::kEventLog);
+      const auto cell = frame_scalar(frame, trace, trace.events[e], key, scope);
       std::string label;
       std::string type;
       if (!cell || python::is_missing(*cell)) {

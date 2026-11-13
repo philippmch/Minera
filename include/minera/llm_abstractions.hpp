@@ -32,6 +32,10 @@ struct LlmAbstractionOptions {
   // features descriptions read it; the stream and column descriptions list
   // the frame whatever the key.
   std::string activity_key;
+  // The object features' lifecycle path lines (enable_object_lifecycle_paths):
+  // off at the description algorithm's default (ocel_fea_descr, the bank),
+  // on at pm4py.llm.abstract_ocel_features' default (round BU).
+  bool ocel_lifecycle_paths = false;
 };
 
 // Float and datetime columns of the event table (event attributes plus case:

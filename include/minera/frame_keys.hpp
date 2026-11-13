@@ -106,9 +106,10 @@ struct FrameKeyedActivities {
 // nullopt when the log has no frame, or the key is concept:name (or
 // "activity") or no column of the frame. With every cell text (non_text
 // false) the labels are the cells' text, which the log's own lookup reads
-// too, except for a first-class column such as the case column.
-[[nodiscard]] std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log,
-                                                                         std::string_view key);
+// too, except for a first-class column such as the case column. kDataFrame
+// also keys by the frame's case columns (pm4py's discover_* on a DataFrame).
+[[nodiscard]] std::optional<FrameKeyedActivities> frame_keyed_activities(
+    const EventLog& log, std::string_view key, FrameKeyScope scope = FrameKeyScope::kEventLog);
 
 // The TypeError pm4py's heuristics miner raises on such activities when a
 // directly-follows pair holds one that is no str (empty when none does).

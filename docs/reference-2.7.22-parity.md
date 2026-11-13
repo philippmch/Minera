@@ -24976,3 +24976,90 @@ Verification (scripts in the project files under `review-harness/round-bt/`;
 | Unknown fields on the six upload routes, compare-petri markings, replay fitness on own headers (contract test and probes) | 6 routes | unknown names refused, known controls unchanged; replay fitness equal to pm4py |
 | Re-review of BS: `typedkeys.py` (15 uploads), `cmpxes.py` (15), `llmns.py` (15) | 915 | only BS's declared differences (blank float and text keys, alpha plus and POWL on `NaT`) |
 | Full suites: ctest, script tests, frontend tests, fixture replay | 478 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; no fixture changed |
+
+## Review BU1: re-review of round BT, unknown parameters on the query-string session routes, the LLM model descriptions keyed by a column and the OCEL abstractions on nanosecond timestamps (2026-11-13)
+
+Round BU checked BT's CI run (43358535741: the Python, verifier, frontend
+and macOS jobs green, Linux and Windows ctest still running at the time of
+writing), re-reviewed BT (the DFG variants, the DataFrame DFG, the LLM
+abstractions and the statistics keyed by typed columns: on fresh seeds only
+BT's declared differences remain) and took BT's targets. Findings, all
+fixed:
+
+- **BU1-1 The LLM model descriptions keyed by a column.**
+  `/api/llm-context`'s `log_skeleton`, `declare` and `temporal_profile`
+  variants with `activity_attribute` set projected the events, so on a CSV
+  upload every key that is no plain event attribute (the upload's own
+  activity, case and timestamp columns, `case:concept:name`) raised
+  `context activity attribute is absent or null`, and the typed columns
+  described their text. pm4py's `discover_log_skeleton`, `discover_declare`
+  and `discover_temporal_profile` on the upload's frame check the key as a
+  DataFrame activity column: a name outside the frame raises `the specified
+  activity column is not contained in the dataframe. Available columns:
+  [...]` (the frame's columns, sorted), a column of another dtype `the
+  activity column should be of type string.`, a column with a blank `the
+  activity column should not contain any empty value.`; otherwise the
+  column's text is the activity (the case column too, so each case holds
+  one activity). The temporal profile keyed by `case:concept:name` fails on
+  its merge (`KeyError: "['case:concept:name_2'] not in index"`). On 25
+  uploads, 9 keys and 3 variants, 90 of 675 answers were equal or raised
+  alike before; all are now.
+- **BU1-2 The OCEL features description's lifecycle paths.**
+  `pm4py.llm.abstract_ocel_features` extracts the object features with the
+  lifecycle path features on (`Frequency of the path "A" -> "B" in the
+  lifecycle of the object`), which the feature extraction's own default
+  leaves off; Minera left them off. `/api/llm-context`'s `ocel_features`
+  now follows `include_lifecycle_paths` (default on, as pm4py). Before, 44
+  of 60 answers on OCEL 1.0 and 2.0 JSON differed.
+- **BU1-3 The OCEL events and objects text on nanosecond timestamps.**
+  `pm4py.llm.abstract_ocel` on `read_ocel_json` / `read_ocel2_json` prints
+  each timestamp as pandas' `str(Timestamp)` of the UTC microseconds
+  (`2029-05-12 06:16:59.641000+00:00`, no fraction on a whole second; the
+  nanosecond digits are dropped), orders the events by timestamp, then
+  activity, then id, prints the lifecycle duration as a Python float of
+  the seconds between those microseconds, and joins the object lines
+  without a final newline. Minera printed the texts' milliseconds, kept the
+  file's order on ties and ended with a newline: every `ocel` answer
+  differed.
+- **BU1-4 Unknown parameters on the query-string session routes.**
+  `/api/align`, `/api/evaluate`, `/api/evaluate-emd`, `/api/playout` (GET
+  and POST), `/api/petri-analysis`, `/api/reduce-process-tree` and the GET
+  exports `/api/pnml`, `/api/bpmn`, `/api/ptml` and `/api/xes` read their controls
+  from the query string and ignored any other name, so a misspelled control
+  was dropped silently (`traces` on a DFG playout, `miner` on the Petri
+  analysis, whose selector is `petri_analysis_miner`). Each read now goes
+  through the form field audit of BT1-6, and a successful answer is
+  replaced with 400 `unknown or inapplicable <route> parameter: <name>`
+  when a parameter or file part was never consulted.
+
+Declarations:
+
+- `clean_polars` keyed by any column is unreachable in pm4py on the pinned
+  polars 1.44.1: `CLEAN_POLARS` calls `DataFrame.with_column`, which this
+  polars no longer has, and a `LazyFrame` is not subscriptable, so nothing
+  compares; Minera keeps its own polars-free result.
+- The LLM context's `case` variant stays Minera's own log projection
+  (docs/case-description-audit.md); keyed by a column it is not a parity
+  target.
+- BT's float NaN declaration (each blank its own `nan` object) and AQ's
+  hash-seed `could not convert string to float` in `abstract_log_features`
+  reconfirmed on fresh seeds.
+- Not swept, moved to round BV: the log filter bank
+  (`/api/reference-log-filter`, `/api/reference-log-attributes`) on typed
+  XES attributes and the `/api/reference-table-*` routes on typed native
+  EventTable JSON inputs. The attribute and case statistics keyed by typed
+  columns were covered in rounds AU and AX.
+- The case statistics' start and end on nanosecond cells (round BQ), the
+  CSV timestamp columns of plain numbers and "roles to diagnostics groups"
+  (round AT) stay as declared.
+
+Verification (scripts in the project files under `review-harness/round-bu/`;
+"before" is round BT's server on the same scripts):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| LLM model descriptions keyed by the frame's columns (`llmkeys2.py`: log skeleton, Declare, temporal profile; keys `act`, `concept:name`, an integer, a float with gaps, a date with gaps, text with blanks, a bool, the case column, `ts`) | 675 on 25 CSV uploads, 180 more on 15 uploads keyed by `case:concept:name`, `@@case_index`, `@@index`, `time:timestamp`, 270 on 10 fresh uploads, 240 on 10 XES uploads | before: 90 of 675 equal or raising alike; after: all equal (relation lines in set order compare as sets) or raising alike with pm4py's message |
+| OCEL abstractions on nanosecond timestamps (`ocelllm.py`: `ocel`, `ocel_ocdfg`, `ocel_features`) | 450 on 150 OCEL 1.0/2.0 JSON files, 160 features answers with a random lifecycle paths flag | before: every `ocel` answer and 44 of 60 features answers differed; after: all equal |
+| Unknown query parameters on the ten session routes (contract test; every other route that reads the query already checks an allow list) | 10 routes | unknown names refused, known controls and the routes' own errors unchanged |
+| Re-review of BT on fresh seeds: `dfgkeys.py`, `dfgdfkeys.py`, `statkeys.py` (round BT's scripts) | 1,200, 880 and 1,200 | all equal or raising alike with pm4py's message |
+| Full suites: ctest, script tests, frontend tests, fixture replay | 479 ctests, 406 script tests, 10,729 frontend tests, 2,673 responses of 16 manifests | all pass; no fixture changed |

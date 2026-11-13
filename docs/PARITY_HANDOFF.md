@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–BT (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–BU (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4759,7 +4759,50 @@ Declared: blank float cells as distinct NaN objects on the DFG variants
 too, AQ's hash-seed feature errors. No fixture changed. The device check on
 the Mac was skipped again (no device linked).
 
-Next round (BU) should start by re-reviewing round BT:
+Round BU re-reviewed BT (Review BU1; BT's CI run 43358535741 was green on
+the Python, verifier, frontend and macOS jobs when BU pushed, Linux and
+Windows ctest still running; BT's DFG, DataFrame DFG and statistics sweeps
+held on fresh seeds) and took its targets. It fixed the LLM model
+descriptions keyed by a column (log skeleton, Declare and temporal profile
+run pm4py's DataFrame activity column check and key by the frame's column,
+the case id column too; the temporal profile keyed by `case:concept:name`
+raises pandas' merge KeyError), the OCEL features description's lifecycle
+paths (on by default in `abstract_ocel_features`), the OCEL events and
+objects text on nanosecond timestamps (pandas' `str(Timestamp)` of the UTC
+microseconds, events ordered by timestamp, activity and id, float
+durations, no final newline) and unknown parameters on the ten session
+routes that read their controls from the query string (`/api/align`,
+evaluate, evaluate-emd, playout, petri-analysis, reduce-process-tree and
+the GET exports, through `audited_query_route`). Declared: `clean_polars`
+is unreachable in pm4py on polars 1.44.1; the LLM `case` variant stays
+Minera's own projection. No fixture changed. The device check on the Mac
+was skipped again (no device linked).
+
+Next round (BV) should start by re-reviewing round BU:
+
+- `src/backend/llm_context.cpp`: `model_frame_key` (which keys and
+  variants take the frame, the error order, the case id KeyError) and
+  `model_context`; the `ocel` variant's `instant` order and texts;
+- `src/backend/frame_keys.cpp`: the new `FrameKeyScope` argument of
+  `frame_keyed_activities` (only the LLM context passes `kDataFrame`; XES
+  uploads' `case:` attributes now key the model descriptions);
+- `src/backend/llm_abstractions.cpp`: `ocel_lifecycle_paths` and the
+  `@@ocel_lif_path_` feature texts;
+- `src/backend/tools/minera_server.cpp`: `audited_query_route` (only
+  2xx answers are replaced; a parameter read on one path only is now
+  refused on the others), the `audited_*` lookups in the helpers shared
+  with unwrapped routes, the Monte Carlo and stochastic allow lists;
+- new areas: the log filter bank (`/api/reference-log-filter`,
+  `/api/reference-log-attributes`) on typed XES attributes and the
+  `/api/reference-table-*` routes on typed native EventTable JSON inputs
+  (never swept in rounds AO to BU); the LLM context with both an activity
+  and a timestamp attribute; the OCEL routes other than the LLM context on
+  nanosecond timestamps;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the BU commit (and BT's Linux and Windows ctest).
+
+Round BT's targets, re-reviewed in BU (findings BU1-1 to BU1-4):
 
 - `src/backend/dfg_variants.cpp`: `frame_keyed_dfg_statistics`,
   `frame_keyed_clean_dfg` (runs split at missing cells),

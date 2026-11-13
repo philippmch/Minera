@@ -790,6 +790,47 @@ int main(int argc, char** argv) {
       check(result && result->status == 200, "re-mine after the model checks: " + describe(result));
     }
 
+    // Round BU: the session routes that read their query controls one lookup
+    // at a time refuse a name none of their lookups consulted on the path
+    // they ran (a misspelled or inapplicable control was dropped silently).
+    {
+      struct Case { std::string path; bool post; std::string ok; std::string refused; std::string name; };
+      const std::vector<Case> cases = {
+          {"/api/align", true, "miner=inductive&alignment_variant=dijkstra_no_heuristics", "miner=inductive&zz_unknown=1", "zz_unknown"},
+          {"/api/align", true, "miner=inductive", "miner=inductive&exponent=2&theta=3", "exponent and theta cannot both be supplied"},
+          {"/api/evaluate", true, "miner=inductive&evaluation_family=simplicity", "miner=inductive&evaluation_family=simplicity&zz_unknown=1", "zz_unknown"},
+          {"/api/petri-analysis", true, "petri_analysis_miner=inductive", "miner=inductive", "miner"},
+          {"/api/reduce-process-tree", true, "trace_index=0", "trace_index=0&zz_unknown=1", "zz_unknown"},
+          {"/api/playout", true, "miner=inductive&traces=2", "miner=inductive&traces=2&zz_unknown=1", "zz_unknown"},
+          {"/api/playout", true, "miner=dfg&dfg_playout_traces=2", "miner=dfg&traces=2", "traces"},
+          {"/api/pnml", false, "miner=inductive", "miner=inductive&zz_unknown=1", "zz_unknown"},
+          {"/api/bpmn", false, "miner=inductive", "miner=inductive&zz_unknown=1", "zz_unknown"},
+          {"/api/ptml", false, "miner=inductive", "miner=inductive&zz_unknown=1", "zz_unknown"},
+          {"/api/xes", false, "xes_compress=false", "xes_compress=false&zz_unknown=1", "zz_unknown"},
+      };
+      for (const auto& item : cases) {
+        const auto send = [&](const std::string& query) {
+          const auto target = item.path + "?" + query;
+          return item.post ? client.Post(target, "", "application/x-www-form-urlencoded") : client.Get(target);
+        };
+        result = send(item.ok);
+        check(result && result->status == 200, item.path + "?" + item.ok + " runs: " + describe(result));
+        result = send(item.refused);
+        const auto expected = item.name.find(' ') == std::string::npos
+            ? "unknown or inapplicable " + item.path + " parameter: " + item.name : item.name;
+        check(result && result->status == 400 && contains(result, expected),
+              item.path + "?" + item.refused + " is refused: " + describe(result));
+      }
+      // The EMD comparison reads its options from the query beside its upload.
+      httplib::MultipartFormDataItems emd = {{"reference_log", log, "log.csv", "text/csv"}};
+      result = client.Post("/api/evaluate-emd?emd_variant=exact&normalize_masses=true", emd);
+      check(result && result->status == 200, "evaluate-emd runs: " + describe(result));
+      result = client.Post("/api/evaluate-emd?emd_variant=exact&zz_unknown=1", emd);
+      check(result && result->status == 400 &&
+                contains(result, "unknown or inapplicable /api/evaluate-emd parameter: zz_unknown"),
+            "evaluate-emd refuses an unknown parameter: " + describe(result));
+    }
+
     // Item 4: basic Petri playout generates pm4py's 1000 traces by default.
     result = client.Get("/api/playout?miner=inductive");
     check(result && result->status == 200 && count(result->body, "<trace>") == 1000,

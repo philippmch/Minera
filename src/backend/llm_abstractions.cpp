@@ -667,6 +667,14 @@ std::string object_feature_description(const std::string& name) {
   if (const auto found = fixed.find(name); found != fixed.end()) return found->second;
   constexpr std::string_view activity = "@@ocel_lif_activity_", interaction = "@@object_interaction_graph_";
   if (name.starts_with(activity)) return "Number of occurrences of the activity " + name.substr(activity.size());
+  constexpr std::string_view path = "@@ocel_lif_path_";
+  if (name.starts_with(path)) {
+    const auto pair = name.substr(path.size());
+    const auto split = pair.find("##");
+    if (split != std::string::npos)
+      return "Frequency of the path \"" + pair.substr(0, split) + "\" -> \"" + pair.substr(split + 2) +
+             "\" in the lifecycle of the object";
+  }
   if (name.starts_with(interaction))
     return "Number of object of type " + name.substr(interaction.size()) +
            " related to the current object in the object interaction graph";
@@ -1407,6 +1415,10 @@ std::string llm_ocel_features_description(const Ocel& log, const std::string& ob
   feature_options.feature_name_style = OcelFeatureNameStyle::kCompatibility;
   feature_options.filter_per_type = object_type;
   feature_options.include_all_object_features = true;
+  // With enable_object_lifecycle_paths (pm4py.llm's default) each
+  // directly-follows path of the objects' lifecycles is described too
+  // (round BU).
+  feature_options.include_lifecycle_path_features = options.ocel_lifecycle_paths;
   // The reference graph families look up every event's objects and raise
   // KeyError for an event without any.
   std::set<std::string> related;
