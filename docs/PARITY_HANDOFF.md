@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CI (2026-11-05 to 2026-11-14, cloud container)
+## Review-fix loop, rounds T–CJ (2026-11-05 to 2026-11-14, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5145,31 +5145,75 @@ and is in the suite as
 changed. The device check on the Mac was skipped again (no device
 linked).
 
-Next round (CJ) should start by re-reviewing round CI:
+Round CJ re-reviewed CI (Review CJ1). CI's CI run 43580317951 was green
+on all six jobs. Fresh CI seed 2026111420, CH table seed 2026111421, CH
+sequence seed 2026111422, CG seed 2026111423, CF seed 2026111424 and CE
+seed 2026111425 found 1 call: `between.apply` on a Null activity column
+prints the resolved `is_in` of a dynamic number as
+`.cast(Unknown(Float))` / `.cast(Unknown(Int(1)))` (round CF's
+`Float64`/`Int32` fit never met a bank case). Two new domains:
+- `scripts/polars_filter_cj_domain.py` passes dict bounds and anchors to
+  the numeric, relative occurrence, between, case and paths performance
+  filters, dict path items on typed columns, and lists that mix plain
+  lists, lists of dicts and scalars. Its banks found 607 and 7 calls.
+- `scripts/polars_sequence_filter_cj_domain.py` puts dicts into the
+  activity values of the sequence filters. Its banks found 39 and 1
+  calls.
 
-- the CI run of the CI commit (the CI bank runs on Windows and macOS for
-  the first time; the struct supertype recursion and context stacks are
-  plain string work, but check MSVC);
-- fresh seeds of `scripts/polars_filter_ci_domain.py` (CI used
-  2026111410, 4402, 2026111412 and 4403), of the CH table domain (CI used
-  2026111401 and 4301), the CH sequence domain (2026111402), the CG
-  domain (2026111403), the CF domain (2026111404) and the CE domain
-  (2026111405);
-- dict values in the filters the CI domain does not reach yet: the
-  sequence filters (`src/backend/polars_sequence_filters.cpp`, dicts as
-  activities and in `activity_split` lists), `between.apply` and the case
-  filters' bounds, `filter_df_relative_occurrence_event_attribute` and
-  the numeric attribute filters (`apply_numeric` with dict or list-of-dict
-  bounds), and dicts as paths items on non-String activity columns;
-- `[[1], [{"a": 1}], 5]`: a list whose first item is a plain list and a
-  later item a list of one-field dicts raises Polars' `cannot build list
-  with different dtypes` (`Expected list[i64], got struct[1].`); the model
-  says `unexpected value while building Series of type List(Int64)`
-  (probe `probe/ci/s10.py` in the round-ci harness);
-- struct items of `pl.lit` lists in a Series that meets a typed column
-  (Date, Datetime, Categorical, Enum, Boolean) through
-  `coerced_is_in`: only `is_in` failures are modelled, check the plans of
-  the other comparisons;
+What changed:
+- Dicts go through `pl.lit` strictly: a list field that fails gives the
+  `cannot create expression literal for value of type dict` TypeError.
+  The struct-to-String cast gives `}` for an empty struct and null for a
+  None field.
+- Dict bounds of the case and paths performance filters are struct
+  literals. The column is cast to the struct and fails on a present cell,
+  or else the struct comparison fails. Partitioning in the reference
+  races between those two errors; this is declared, and the bank test
+  accepts both.
+- Dicts in the numeric filters merge only with equal dicts on an uncast
+  column. A null-cast dict compares with null under AND and folds under
+  OR.
+- A dict, set or frozenset stake of the relative occurrence filter raises
+  Python's `*` TypeError.
+- `[[1], [{"a": 1}], 5]` fails in the list builder as Polars does.
+- Dict activities work in every sequence filter: keys in
+  `activity_split`, struct patterns cast field by field on numeric
+  columns, the String cast in `ends_with`.
+- The prefix and suffix cast failures now carry Polars' resolved plan.
+
+All fixed:
+- `docs/polars-filter-cj-bank.json.gz` (seed 2026111432, 27,050 calls) is
+  in the suite as `minera_polars_filter_cj_bank_parity_tests`.
+- `docs/polars-sequence-filter-cj-bank.json.gz` (seed 2026111433, 12,976
+  calls) is in the suite as
+  `minera_polars_sequence_filter_cj_bank_parity_tests`.
+
+No fixture changed. The device check on the Mac was skipped again (no
+device linked).
+
+Next round (CK) should start by re-reviewing round CJ:
+
+- the CI run of the CJ commit (the CJ banks run on Windows and macOS for
+  the first time; check the struct partition race tolerance there, since
+  runner core counts differ);
+- fresh seeds of `scripts/polars_filter_cj_domain.py` (CJ used 2026111430
+  and 2026111432) and `scripts/polars_sequence_filter_cj_domain.py` (CJ
+  used 2026111431 and 2026111433), of the CI domain (CJ used 2026111420),
+  the CH table and sequence domains (2026111421, 2026111422), the CG, CF
+  and CE domains (2026111423 to 2026111425);
+- dict values where the CJ domains do not reach yet: dicts as
+  `rework.apply_activity_set`/`traces` items on Categorical and Enum
+  activity columns, dicts in the `timestamp_case_grouping` and
+  `consecutive_act_case_grouping` parameters, dict case ids
+  (`CASE_ID_KEY` values) in the table filters, and dicts in the pandas
+  sequence and table filters (the pandas side has no dict domain yet);
+- the prefix/suffix resolved plans on Categorical and Enum columns (only
+  String and Boolean columns were probed) and with more than one cast
+  failure next to struct patterns on numeric columns;
+- Int128 literals; a list whose first item is a struct and a later item a
+  plain list (`[{"a": 1}, [-1], 5]`: Polars names the list item, the
+  model the scalar); `list[u64]` with a datetime struct field; a `bytes`
+  anchor on a Null column (`cast(Int64).is_in([[120]])`, not generated);
 - still open from CF's list: the remaining `coerced_scalar_is_in` gaps
   (str and Categorical/Enum columns return nullopt), `list_literal` with
   wide ints after a float and in nested lists, `lit_supertype` of Int128
@@ -5188,6 +5232,14 @@ Next round (CJ) should start by re-reviewing round CI:
   (list below);
 - the open choices on CSV timestamp columns of plain numbers and "roles to
   diagnostics groups" (still declared unless Philipp answers).
+
+Round CI's targets, taken in CJ (findings CJ1-1 to CJ1-10): CI's CI run,
+fresh seeds of the CI, CH, CG, CF and CE domains, dict values in the
+sequence filters, `between.apply`, the case filters' bounds,
+`filter_df_relative_occurrence_event_attribute`, `apply_numeric` and the
+paths items on non-String columns, the `[[1], [{"a": 1}], 5]` message,
+struct items of `pl.lit` lists against typed columns. Not taken (carried
+to CK): see the CK list above.
 
 Round CH's targets, taken in CI (findings CI1-1 to CI1-8): CH's CI run,
 fresh seeds of the CH, CG, CF and CE domains, the float-as-text sites,

@@ -40,6 +40,7 @@ bool enum_dtype(const std::string& value) {
 
 bool null(const EventAttribute& value) { return value.is_null || is_native_na_attribute(value); }
 bool collection(const EventAttribute& value) { return value.container != AttributeContainerKind::kScalar; }
+bool mapping(const EventAttribute& value) { return value.container == AttributeContainerKind::kContainer; }
 bool boolean(const EventAttribute& value) {
   return value.kind == AttributeKind::kBoolean || std::holds_alternative<bool>(value.typed_value);
 }
@@ -266,11 +267,16 @@ std::vector<std::string> validate_apply(const EventAttribute& value, bool perfor
   auto result = paths(value, performance);
   validate_column(options.case_id_key); validate_column(options.timestamp_key); validate_column(options.attribute_key);
   if (!performance && options.target_attribute_key) validate_column(*options.target_attribute_key);
-  // A list bound becomes a Series literal when the performance filter is built.
+  // A list bound becomes a Series literal when the performance filter is
+  // built; round CJ: a dict bound a struct literal (its own TypeError).
   if (performance)
-    for (const auto* bound : {&options.min_performance, &options.max_performance})
-      if (bound->container == AttributeContainerKind::kList || bound->container == AttributeContainerKind::kTuple)
+    for (const auto* bound : {&options.min_performance, &options.max_performance}) {
+      if (bound->container == AttributeContainerKind::kList || bound->container == AttributeContainerKind::kTuple) {
         if (const auto error = detail::polars_lit::argument_literal_error(*bound)) fail("TypeError", "apply", *error);
+      } else if (mapping(*bound)) {
+        if (const auto error = detail::polars_lit::dict_literal_error(*bound)) fail("TypeError", "apply", *error);
+      }
+    }
   return result;
 }
 std::string contexts(const std::vector<std::string>& nodes) {
@@ -327,6 +333,9 @@ std::int64_t date_micros(const EventAttribute& value) {
 }
 std::string literal(const EventAttribute& value) {
   if (null(value)) return "null";
+  // Round CJ: a dict bound as the struct literal (fields cast as the Int64
+  // duration meets them).
+  if (mapping(value)) return detail::polars_lit::struct_display(detail::polars_lit::struct_model(value, "Int64"));
   // Round CF: a list bound as pl.lit built it.
   if (collection(value)) return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(value));
   if (text(value)) return quote(value.value);
@@ -334,13 +343,31 @@ std::string literal(const EventAttribute& value) {
   if (boolean(value)) return truth(value) ? "true" : "false";
   return real_text(number(value));
 }
-void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFilterOptions& options, const std::string& path, const std::string& phase) {
+// Round CJ: a dict bound fails as the case performance bounds do (the
+// Int64 duration cast to the struct fails on a present duration, else the
+// struct comparison; a list field leaves the column alone, a SchemaError);
+// the failing node is the cast when the cast fails.
+void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFilterOptions& options, const std::string& path, const std::string& phase, bool present) {
   if (!text(bound) && !collection(bound)) return;
+  namespace lit = detail::polars_lit;
   const std::string cmp = upper ? "<=" : ">=";
-  std::string message = text(bound) ? "cannot compare string with numeric type (i64)" : "could not evaluate '" + cmp + "' comparison between series '@@duration' of dtype: Int64 and series 'literal' of dtype: " +
-      detail::polars_lit::debug_name(detail::polars_lit::list_of(detail::polars_lit::argument_literal(bound).type));
+  std::string type = text(bound) ? "ComputeError" : "SchemaError", node, message;
+  if (text(bound)) message = "cannot compare string with numeric type (i64)";
+  else if (mapping(bound)) {
+    const auto failure = lit::struct_failure("@@duration", "Int64", lit::struct_model(bound, "Int64"), present, upper ? lit::CompareOp::kLe : lit::CompareOp::kGe);
+    if (!failure) throw std::invalid_argument("Native Polars path dict bound outside observed domain");
+    type = failure->type;
+    message = failure->message;
+    if (!failure->larger.empty()) node = failure->expression;
+  } else {
+    message = "could not evaluate '" + cmp + "' comparison between series '@@duration' of dtype: Int64 and series 'literal' of dtype: " + lit::debug_name(lit::list_of(lit::argument_literal(bound).type));
+  }
   // The duration is Int64: a float bound casts the column.
   const auto expression = [](const EventAttribute& v, const std::string& comparison) {
+    if (mapping(v)) {
+      const auto operands = lit::struct_operands("@@duration", "Int64", lit::struct_model(v, "Int64"));
+      return "[(" + operands.lhs + ") " + comparison + " (" + operands.rhs + ")]";
+    }
     if (!null(v) && !collection(v) && !text(v)) {
       // Round CF: an int past the Int64 range is a UInt64 literal, which
       // meets the Int64 duration at Float64.
@@ -352,18 +379,23 @@ void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFi
     }
     return "[(col(\"@@duration\")) " + comparison + " (" + literal(v) + ")]";
   };
-  // Round CF: equal str or list bounds merge into one == comparison.
+  // Round CF: equal str or list bounds merge into one == comparison; round
+  // CJ: equal dicts too, unless the duration is cast to the struct.
+  const auto mergeable = [](const EventAttribute& v) {
+    return text(v) || (collection(v) && !mapping(v)) || (mapping(v) && !lit::struct_model(v, "Int64").cast_column);
+  };
   const auto key = [](const EventAttribute& v) {
-    return text(v) ? "s" + v.value : "l" + detail::polars_lit::literal_list_key(detail::polars_lit::argument_literal(v));
+    if (mapping(v)) return "d" + lit::struct_key(lit::struct_model(v, "Int64"));
+    return text(v) ? "s" + v.value : "l" + lit::literal_list_key(lit::argument_literal(v));
   };
   const auto& lo = options.min_performance;
   const auto& hi = options.max_performance;
-  if ((text(lo) || collection(lo)) && (text(hi) || collection(hi)) && key(lo) == key(hi)) {
+  if (mergeable(lo) && mergeable(hi) && key(lo) == key(hi)) {
     const auto eq = "[(col(\"@@duration\")) == (" + literal(bound) + ")]";
     if (!text(bound)) message.replace(message.find("'" + cmp + "' "), cmp.size() + 3, "");
     message += "\n\nThis error occurred in the following expression:\n\t" + eq + "\nwhile evaluating this larger expression:\n\t[(" + eq +
                ") & ([(col(\"@@path\")) == (" + quote(path) + ")])]\n";
-    fail(text(bound) ? "ComputeError" : "SchemaError", phase, message);
+    fail(type, phase, message);
   }
   // A null bound folds away: after the failing bound it drops with the AND,
   // before it the failing bound keeps a null mask and the path test folds.
@@ -372,8 +404,8 @@ void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFi
   if (null(options.max_performance)) larger = "[(" + expression(bound, cmp) + ") & (" + path_test + ")]";
   else if (null(options.min_performance)) larger = "[(" + expression(bound, cmp) + ") & (null.repeat([col(\"@@duration\").len()]))]";
   else larger = "[([(" + expression(options.min_performance, ">=") + ") & (" + expression(options.max_performance, "<=") + ")]) & (" + path_test + ")]";
-  message += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, cmp) + "\nwhile evaluating this larger expression:\n\t" + larger + "\n";
-  fail(text(bound) ? "ComputeError" : "SchemaError", phase, message);
+  message += "\n\nThis error occurred in the following expression:\n\t" + (node.empty() ? expression(bound, cmp) : node) + "\nwhile evaluating this larger expression:\n\t" + larger + "\n";
+  fail(type, phase, message);
 }
 void validate_time(const std::string& dtype, const PolarsPathsFilterOptions& options, const std::string& phase) {
   if (polars_datetime::temporal(dtype)) return;
@@ -427,7 +459,29 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
   // Round CG: str bounds with the lower above the upper (byte order) fold the
   // duration interval to an empty one: nothing raises and no path passes.
   const bool folded = performance && text(options.min_performance) && text(options.max_performance) && options.max_performance.value < options.min_performance.value;
-  if (performance) { validate_time(source.dtypes[*time_at], options, phase); if (!folded) { validate_bound(options.min_performance, false, options, paths.front(), phase); validate_bound(options.max_performance, true, options, paths.front(), phase); } }
+  // Whether the duration has a present cell: two rows of one case with
+  // timestamps (a dict bound's cast fails only then).
+  const auto duration_present = [&] {
+    if (!mapping(options.min_performance) && !mapping(options.max_performance)) return false;
+    std::vector<std::size_t> timed;
+    for (std::size_t i = 0; i < source.rows.size(); ++i) {
+      const auto& row = source.rows[i];
+      if (row[case_at] && !null(*row[case_at]) && row[*time_at] && !null(*row[*time_at])) timed.push_back(i);
+    }
+    if (case_kind == Dtype::kNull) return false;
+    std::sort(timed.begin(), timed.end(), [&](auto a, auto b) { return compare(source.rows[a][case_at], source.rows[b][case_at], case_kind, case_dictionary) < 0; });
+    for (std::size_t i = 1; i < timed.size(); ++i)
+      if (compare(source.rows[timed[i - 1]][case_at], source.rows[timed[i]][case_at], case_kind, case_dictionary) == 0) return true;
+    return false;
+  };
+  if (performance) {
+    validate_time(source.dtypes[*time_at], options, phase);
+    if (!folded) {
+      const bool present = duration_present();
+      validate_bound(options.min_performance, false, options, paths.front(), phase, present);
+      validate_bound(options.max_performance, true, options, paths.front(), phase, present);
+    }
+  }
   // No admitted path keeps no case: a negative filter returns the frame as it is.
   if (!performance && paths.empty() && !truth(options.positive)) return source;
   std::vector<std::size_t> order(source.rows.size()); std::iota(order.begin(), order.end(), 0);

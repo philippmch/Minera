@@ -26663,3 +26663,170 @@ Verification (scripts in the project files under `review-harness/round-ci/`):
 | CG, CF and CE seeds 2026111403, 2026111404, 2026111405 | 6,344, 26,506 and 17,421 calls | 0 mismatches |
 | Struct supertypes, builds and casts in `pl.lit` (`s1.py` to `s10.py`) | about 500 lists against Polars 1.44.1 | modelled |
 | The base, CC, CE, CF, CG and CH table banks and the base, typed, CB, CC and CH sequence banks | the banks in the suite | 0 mismatches |
+
+## Review CJ1: re-review of round CI, and dict values in the bounds, anchors and activities of the Polars table and sequence filters (2026-11-14)
+
+Round CJ checked CI's CI run (43580317951: green on all six jobs),
+replayed fresh seeds of the CI, CH, CG, CF and CE domains, and added two
+domains: one passes dicts as the bounds and anchors of the numeric,
+relative occurrence, between, case and paths performance filters, the
+other dicts as the activity values of the sequence filters. Findings, all
+fixed:
+
+- **CJ1-1 Fresh CI, CH, CG, CF and CE seeds.** CI seed 2026111420 (18,277
+  calls on 400 frames), CH table seed 2026111421 (32,007 calls on 800
+  frames), CH sequence seed 2026111422 (11,601 calls on 900 frames), CG
+  seed 2026111423 (6,314 calls on 1,000 frames), CF seed 2026111424
+  (26,624 calls on 700 frames) and CE seed 2026111425 (17,422 calls on 600
+  frames) differed in 0 calls but one: CE case 87, `between.apply` on a
+  Null activity column. There the resolved `is_in` of a dynamic number
+  keeps its unresolved type (`col("concept:name").cast(Unknown(Float))`,
+  `.cast(Unknown(Int(1)))`, `.cast(Unknown(Int(18446744073709551615)))`),
+  in the membership and the separator plans alike. Round CF's fit
+  (`Float64`, `Int32`, `Int64`, `UInt64`) never met a bank case.
+- **CJ1-2 Dicts through `pl.lit`.** A dict converts strictly, through
+  Polars' own value conversion, while Python builds the expression. A list
+  field that fails to build fails the whole literal with `cannot create
+  expression literal for value of type dict` and the `allow_object=True`
+  hint, whatever the list's own error. 8,000 random dicts agree with the
+  model in acceptance and display. A struct cast to String is `}` without
+  fields, null with a None field at its top level, else its display
+  (`{1,"x"}`).
+- **CJ1-3 Dict bounds of the case filters.** In `filter_case_performance`,
+  `filter_on_case_performance` and `filter_on_case_size` a dict bound is a
+  struct literal:
+  - the UInt32 size or the Int64 duration is cast to a struct of each
+    field's supertype with it; a list field leaves the column alone;
+  - the bound then always fails. On a present cell the cast fails (`must
+    specify one field in the struct` past one field, `Cannot cast from
+    struct to other types` for a nested one). Without one, the struct
+    comparison fails (`cannot perform '<=' comparison between series ...
+    struct[1]`). A column left alone gives the SchemaError (`could not
+    evaluate '<=' comparison`);
+  - the failing node is the cast when the cast fails. The larger
+    expression is the whole predicate, as for the other bounds;
+  - equal dicts merge into one comparison unless the column is cast.
+
+  With four threads the narrow aggregated duration frame can race to the
+  comparison error instead of the cast error. The reference shows both
+  messages across runs, so this is declared reference nondeterminism: the
+  bank test accepts the comparison error where the model gives the cast
+  error.
+- **CJ1-4 Dicts in the paths filters.** `paths.apply_performance` treats
+  dict bounds as the case performance bounds do, on the duration. The
+  cast fails only when two rows of one case have timestamps. A dict whose
+  list field cannot build raises the TypeError of CJ1-2. In `paths.apply`
+  a dict path item never reaches Polars on any column: pm4py joins each
+  path into a str first, so it fails with Python's own error
+  (`unsupported operand type(s) for +: 'dict' and 'str'`, `can only
+  concatenate str (not "dict") to str`). The CJ bank has about 300 such
+  calls, and all of them match.
+- **CJ1-5 Dicts in the numeric attribute filters.** In `apply_numeric` and
+  `apply_numeric_events` dict bounds and stream filter values convert
+  strictly (CJ1-2) and compare as structs: the String cast on String
+  columns, the cast column on integer, float and Null columns.
+  - On a String column a dict merges with the other bound as the str it
+    casts to. On any other column it merges only with an equal dict, and
+    only when the column is not cast (Boolean, temporal, a field without a
+    supertype). Against any other literal the bound stays as it is
+    (`m1.py`).
+  - A dict that casts to a null str compares with that null (`[(col("x"))
+    <= (null)]`) under an AND, and folds to `null.repeat(...)` under an OR
+    (`q4.py`).
+  - In a resolved plan, a dict after the failing leaf prints as written
+    (`{null,false}`).
+- **CJ1-6 Odd stakes of the relative occurrence filter.**
+  `filter_df_relative_occurrence_event_attribute` with a dict, set or
+  frozenset stake raises Python's `unsupported operand type(s) for *:
+  'dict' and 'int'`.
+- **CJ1-7 Lists that mix lists, lists of dicts and scalars.** A strictly
+  built list type that meets an item holding structs
+  (`pl.lit([[1], [{"a": 1}], 5])`) casts the item to its element type
+  field by field. A String element takes the struct's String cast. A
+  struct that casts keeps its struct type and fails in the list builder at
+  once (`cannot build list with different dtypes`), before items that
+  failed their cast are reported. A struct cast to a non-struct type
+  raises when one of its fields does (`l3.py`).
+- **CJ1-8 Dict activity values in the sequence filters.**
+  - `activity_split` uses a dict's unique keys as the activities.
+  - The value calls dedupe dict keys by type and text.
+  - `ends_with` builds every item's literal first (a list's or a dict's
+    TypeError), and the String casts fail after that. A dict item is the
+    suffix of its String cast.
+  - In `prefixes` and `suffixes`, a pattern of structs on an integer or
+    float column whose type every leaf meets is cast to the column dtype,
+    field by field. A single plain field compares as its value; the plan
+    shows the struct with cast leaves (`{0}` for `{"a": 0.1}` on Int64).
+  - A struct of several fields, an empty struct or a nested struct fails
+    with a SchemaError that names the cast type
+    (`List(Struct({'a': Float32, 'b': Float32}))`), but only when a case's
+    slice holds a non-null activity.
+  - On any other column (Boolean, Date, Datetime, or a struct with a list
+    field) the pattern always fails with its own type (`s1.py` to
+    `s7.py`).
+- **CJ1-9 Cast failures of the prefix and suffix filters.** A list pattern
+  on a String column, or a str pattern on a Boolean column, fails its cast
+  when the plan resolves, after the sort and group_by have found their
+  columns (a missing case column still fails first). The message carries
+  the plan resolved until the failure:
+  - patterns before the failing one show their casts (`["1"]`, `[true]`,
+    `["{1}"]`) and coerced slices (`(0 - n)`);
+  - the failing pattern shows `.cast(List(String))` or
+    `.cast(List(Boolean))`;
+  - patterns after it show as built, with `(dyn int: 0 - dyn int:
+    n.cast(Int64))` slices;
+  - an empty pattern is `true`, and a leading `true` drops the outer
+    parentheses;
+  - leading equal patterns fold into one, and a single comparison prints
+    its slice as `-n`.
+
+  This was checked against `s8.py` to `s11.py` and a probe bank of 240
+  calls.
+- **CJ1-10 New domains.**
+  - `scripts/polars_filter_cj_domain.py` builds on the CI domain, with
+    typed activity columns in about half of the frames. It passes dict,
+    list-of-dict and empty-dict bounds and anchors to the numeric,
+    relative occurrence, between, case and paths performance filters,
+    dict path items on typed columns, and lists mixing plain lists, lists
+    of dicts and scalars. Its first bank (seed 2026111430, 300 frames,
+    16,151 calls) differed in 607 calls; after CJ1-2 to CJ1-7, 0. Seed
+    2026111432 (500 frames, 27,050 calls) differed in 7 (CJ1-5's AND/OR
+    fold and the dict as written), then 0.
+  - `scripts/polars_sequence_filter_cj_domain.py` builds on the CH
+    sequence domain. In about 60% of the cases it puts dicts into the
+    activity values of the value calls. Seed 2026111431 (600 frames, 8,076
+    calls) differed in 39 calls, then 0. Seed 2026111433 (1,000 frames,
+    12,976 calls) differed in 1 (CJ1-9), then 0.
+
+Not taken (carried to CK):
+- Int128 literals.
+- A list whose first item is a struct and a later item a plain list
+  (`[{"a": 1}, [-1], 5]`). Polars names the list item; the model names
+  the scalar.
+- `list[u64]` with a datetime struct field.
+- A `bytes` anchor on a Null column (`cast(Int64).is_in([[120]])`; not
+  generated).
+- Items carried from CI: dicts and the comparison model on Duration,
+  Time, Decimal and Int128 columns (declared), the `coerced_scalar_is_in`
+  gaps, `list_literal` with wide ints after a float and in nested lists,
+  `lit_supertype` of Int128 with temporal types, ints past the UInt64
+  range as paths bounds, and `plan_text_at` when the failing leaf is
+  inside a merged node.
+- The items carried from CD.
+
+Tests:
+- `docs/polars-filter-cj-bank.json.gz` (seed 2026111432, 27,050 calls),
+  replayed by `minera_polars_filter_cj_bank_parity_tests`.
+- `docs/polars-sequence-filter-cj-bank.json.gz` (seed 2026111433, 12,976
+  calls), replayed by `minera_polars_sequence_filter_cj_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-cj/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Dict bounds and anchors (CJ table seeds 2026111430 and 2026111432) | 16,151 and 27,050 calls on 300 and 500 frames, hash seeds 0-1 | 607 and 7 found; after: 0 |
+| Dict activities (CJ sequence seeds 2026111431 and 2026111433) | 8,076 and 12,976 calls on 600 and 1,000 frames | 39 and 1 found; after: 0 |
+| Prefix and suffix cast-failure plans (probe bank) | 240 calls on 6 String and Boolean frames | 0 mismatches |
+| CI, CH, CG, CF and CE seeds 2026111420 to 2026111425 | 18,277, 32,007, 11,601, 6,314, 26,624 and 17,422 calls | 0, 0, 0, 0, 0 and 1 found; after: 0 |
+| Dict literals through `pl.lit` (`dl/gen.py`) | 8,000 random dicts against Polars 1.44.1 | modelled |
+| The base, CC, CE, CF, CG, CH and CI table banks and the base, typed, CB, CC and CH sequence banks | the banks in the suite | 0 mismatches |

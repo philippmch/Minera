@@ -287,18 +287,18 @@ std::string resolved_text(const Anchor& a, const std::string& column, const std:
     return "[[" + item + "].cast(List(" + to + "))]";
   };
   const auto& v = a.value;
-  // Round CF (probed): a Null column casts to the scalar's type, a dynamic
-  // int to Int32 (Int64 past it), an int past Int64 to UInt64; None stays.
+  // Round CF: a Null column casts to the scalar's type; None stays. Round
+  // CJ (probe/cj/b1.py, b2.py): a dynamic number keeps its unresolved type,
+  // Unknown(Int(<value>)) or Unknown(Float).
   if (dtype == "Null") {
     if (v.kind == lit::Kind::kNone) return c + ".is_in([[null]])";
     std::string to, item = lit::scalar_display(v);
     if (v.kind == lit::Kind::kInt) {
       item = lit::integer_text(v);
-      const bool narrow = v.integer >= std::numeric_limits<std::int32_t>::min() && v.integer <= std::numeric_limits<std::int32_t>::max();
-      to = lit::wide_int(v) ? "UInt64" : narrow ? "Int32" : "Int64";
+      to = "Unknown(Int(" + item + "))";
     } else if (v.kind == lit::Kind::kFloat) {
       item = lit::polars_frame_float(v.real);
-      to = "Float64";
+      to = "Unknown(Float)";
     } else {
       if (v.kind == lit::Kind::kBool) item = v.boolean ? "true" : "false";
       to = lit::debug_name(lit::lit_value(v).type);

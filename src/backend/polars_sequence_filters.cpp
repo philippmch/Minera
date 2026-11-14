@@ -589,8 +589,11 @@ std::vector<Value> elements(const Value& v) {
   std::vector<Value> out;
   if (v.kind == Kind::kString)
     for (auto& c : characters(v.text)) out.push_back(Value::of(std::move(c)));
-  else if (v.kind == Kind::kDict)
-    for (const auto& [key, item] : v.entries) out.push_back(key);
+  else if (v.kind == Kind::kDict) {
+    // A repeated key is one key of the Python dict (round CJ).
+    for (const auto& [key, item] : v.entries)
+      if (std::none_of(out.begin(), out.end(), [&](const Value& k) { return k.kind == key.kind && k.text == key.text; })) out.push_back(key);
+  }
   else
     out = v.items;
   return out;
@@ -744,9 +747,9 @@ EventTable join_case_list(const EventTable& df, std::size_t case_column, const s
 // A lazy variants filter over the sorted, grouped rows.
 template <typename Predicate>
 EventTable lazy_variant_filter(const EventTable& df, const PolarsFilterParameters& parameters, Predicate&& matches,
-                               const std::function<void()>& evaluate = {}) {
+                               const std::function<void(const std::vector<std::vector<Cell>>&)>& evaluate = {}) {
   const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kLazySortPlan, kLazyAggPlan);
-  if (evaluate) evaluate();
+  if (evaluate) evaluate(v.activities);
   std::vector<Key> kept;
   for (std::size_t c = 0; c < v.order.size(); ++c)
     if (matches(v.activities[c])) kept.push_back(v.order[c]);
@@ -919,6 +922,14 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
   // as null, a list fails with its inner dtype).
   const auto& front = admitted_suffixes.items.front();
   const bool joined = front.kind == Kind::kList || front.kind == Kind::kTuple;
+  // Round CJ: Python builds every item's literal first (a list's or a
+  // dict's TypeError), the String casts fail after.
+  if (!joined)
+    for (const auto& item : admitted_suffixes.items) {
+      if (item.kind == Kind::kList || item.kind == Kind::kTuple) (void)list_literal(item.items);
+      else if (item.kind == Kind::kDict)
+        if (const auto error = detail::polars_lit::dict_literal_error(item)) fail("TypeError", *error);
+    }
   std::vector<std::optional<std::string>> suffixes;
   for (const auto& item : admitted_suffixes.items) {
     if (joined) {
@@ -928,6 +939,12 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
            "cannot cast List type (inner: '" + debug_name(list_literal(item.items).type) + "', to: 'String')");
     } else if (item.kind == Kind::kNone) {
       suffixes.emplace_back();
+    } else if (item.kind == Kind::kDict) {
+      // Round CJ: a dict is a struct literal (its TypeError when a list
+      // field fails to build) cast to String: "}" without fields, null with
+      // a None field, else as it displays ({1,"x"}).
+      if (const auto error = detail::polars_lit::dict_literal_error(item)) fail("TypeError", *error);
+      suffixes.push_back(detail::polars_lit::struct_text(detail::polars_lit::StructModel{detail::polars_lit::struct_fields(item), false}));
     } else {
       if (item.kind == Kind::kDatetime || item.kind == Kind::kDate) {
         const auto v = lit_value(item);
@@ -981,57 +998,190 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
   // when the plan is built (a list pattern on a String column, a str one on
   // a Boolean column cannot be cast), else the comparison fails when the
   // filter runs, naming every pattern (the cast ones as cast).
+  // Round CJ: a pattern of structs (dict items) compares with a String
+  // column only. On an integer or float column whose type every leaf meets
+  // (a list field never does) it is cast to the column dtype, field by
+  // field: one plain field casts to that field's value, which compares, any
+  // other struct stays a struct of the column dtype and fails with it; on
+  // any other column it fails with its own type (probe/cj/s1.py).
   std::vector<std::vector<std::optional<Value>>> lists;
+  std::vector<bool> castable(literals.size(), true);
+  std::vector<std::optional<std::pair<std::string, std::vector<std::string>>>> struct_shown(literals.size());
+  std::vector<bool> struct_fails(literals.size(), false);  // a struct of the column dtype that cannot compare
   std::optional<std::size_t> failed;
+  std::optional<std::pair<std::size_t, std::string>> cast_failure;
+  const auto leaves_meet = [&](const auto& self, const LitType& t) -> bool {
+    for (const auto& f : t.inner) {
+      if (f.kind == LitType::K::kStruct ? !self(self, f) : !detail::polars_lit::struct_supertype(dtype, f)) return false;
+    }
+    return true;
+  };
+  const auto cast_name = [&](const auto& self, const LitType& t) -> std::string {
+    std::string out = "Struct({";
+    for (std::size_t i = 0; i < t.inner.size(); ++i)
+      out += (i ? ", '" : "'") + t.names[i] + "': " + (t.inner[i].kind == LitType::K::kStruct ? self(self, t.inner[i]) : dtype);
+    return out + "})";
+  };
+  const auto cast_text = [&](const auto& self, const LitType& t, const Value& v) -> std::string {
+    if (v.kind == Kind::kNone) return "null";
+    std::string out = "{";
+    for (std::size_t i = 0; i < t.inner.size() && i < v.entries.size(); ++i) {
+      const auto& x = v.entries[i].second;
+      out += (i ? "," : "") + (t.inner[i].kind == LitType::K::kStruct ? self(self, t.inner[i], x) : column_value_text(cast_to(x, dtype, nullptr), dtype));
+    }
+    return out + "}";
+  };
   for (std::size_t p = 0; p < literals.size(); ++p) {
     const auto& literal = literals[p];
     auto& list = lists.emplace_back();
+    if (act && literal.type.kind == LitType::K::kStruct && dtype != "String") {
+      const bool cast = detail::polars_lit::struct_cast_column(dtype) && leaves_meet(leaves_meet, literal.type);
+      if (cast) {
+        // The plan shows the struct with its leaves cast (Int64: {0.1} as {0}).
+        std::vector<std::string> parts;
+        for (const auto& v : literal.values) parts.push_back(cast_text(cast_text, literal.type, v));
+        struct_shown[p] = std::make_pair(cast_name(cast_name, literal.type), std::move(parts));
+      }
+      if (cast && literal.type.inner.size() == 1 && literal.type.inner[0].kind != LitType::K::kStruct) {
+        for (const auto& v : literal.values)
+          list.push_back(v.kind == Kind::kNone || v.entries.empty() ? std::nullopt : cast_to(v.entries[0].second, dtype, nullptr));
+        continue;
+      }
+      castable[p] = false;
+      if (cast) struct_fails[p] = true;
+      else if (!failed) failed = p;
+      continue;
+    }
     if (act && !comparable(dtype, literal.type)) {
+      castable[p] = false;
       if (!failed) failed = p;
       continue;
     }
-    if (act && literal.type.kind == LitType::K::kList)
-      fail("InvalidOperationError", "cannot cast List type (inner: '" + debug_name(literal.type.inner[0]) + "', to: 'String')");
-    if (act && dtype == "Boolean" && literal.type.kind == LitType::K::kString)
-      fail("InvalidOperationError", "casting from Utf8View to Boolean not supported");
+    // A list pattern on a String column, a str one on a Boolean column fails
+    // its cast when the plan is resolved, after the sort and group_by found
+    // their columns (round CJ, probe/cj/s10.py).
+    if (act && literal.type.kind == LitType::K::kList) {
+      cast_failure.emplace(p, "cannot cast List type (inner: '" + debug_name(literal.type.inner[0]) + "', to: 'String')");
+      break;
+    }
+    if (act && dtype == "Boolean" && literal.type.kind == LitType::K::kString) {
+      cast_failure.emplace(p, "casting from Utf8View to Boolean not supported");
+      break;
+    }
     for (const auto& v : literal.values) list.push_back(cast_to(v, dtype, as_enum ? &categories : nullptr));
   }
   // An empty pattern matches every case, and the plan keeps no comparison.
   if (std::any_of(literals.begin(), literals.end(), [](const Literal& l) { return l.values.empty(); })) failed.reset();
-  const auto evaluate = [&] {
+  // A pattern of structs cast to the column dtype fails only when a case's
+  // slice holds a present activity (an all-null slice compares).
+  const bool any_empty = std::any_of(literals.begin(), literals.end(), [](const Literal& l) { return l.values.empty(); });
+  // A pattern as the plan shows it once cast to the column dtype.
+  const auto cast_shown = [&](std::size_t p) {
+    if (!castable[p] && !struct_shown[p]) return lit_display(list_of(literals[p].type), Value::list(literals[p].values));
+    std::vector<std::string> parts;
+    if (struct_shown[p]) parts = struct_shown[p]->second;
+    else for (const auto& v : lists[p]) parts.push_back(column_value_text(v, dtype));
+    std::string shown = "[";
+    if (parts.size() <= 3) {
+      for (std::size_t i = 0; i < parts.size(); ++i) shown += (i ? ", " : "") + parts[i];
+    } else {
+      shown += parts[0] + ", " + parts[1] + ", \xe2\x80\xa6 " + parts.back();
+    }
+    return shown + "]";
+  };
+  // Round CJ: the plan resolved until the failing cast. The patterns before
+  // it show their casts and coerced slices, the failing one its cast, the
+  // ones after it as built; an empty pattern is `true`; leading equal
+  // patterns fold into one (probe/cj/s11.py).
+  const auto cast_failure_plan = [&]() {
+    const auto f = cast_failure->first;
+    std::vector<std::string> leaves, keys;
+    const auto leaf = [&](std::size_t p, bool single) {
+      const auto& l = literals[p];
+      const auto n = std::to_string(l.values.size());
+      const std::string start = !tail ? "dyn int: 0"
+                                : single ? "-" + n
+                                : p <= f ? "(0 - " + n + ")"
+                                         : "(dyn int: 0 - dyn int: " + n + ".cast(Int64))";
+      const std::string shown = p < f ? cast_shown(p)
+                                      : lit_display(list_of(l.type), Value::list(l.values)) +
+                                            (p == f ? ".cast(List(" + std::string(dtype == "Boolean" ? "Boolean" : "String") + "))" : "");
+      return "(col(\"activities\").list.slice([" + start + ", dyn int: " + n + "]) == " + shown + ")";
+    };
+    for (std::size_t p = 0; p < literals.size(); ++p) {
+      if (literals[p].values.empty()) {
+        leaves.push_back("true");
+        keys.push_back("true");
+        continue;
+      }
+      leaves.push_back(leaf(p, false));
+      keys.push_back(std::to_string(literals[p].values.size()) + " " + detail::polars_lit::literal_list_key(literals[p]));
+    }
+    std::string tree = leaves.front();
+    bool single = true;
+    for (std::size_t p = 1; p < leaves.size(); ++p)
+      if (!single || keys[p] != keys[0]) {
+        tree = "(" + tree + " | " + leaves[p] + ")";
+        single = false;
+      }
+    if (single) tree = leaf(0, true);
+    else if (leaves.front() == "true") tree = tree.substr(1, tree.size() - 2);
+    const auto case_glue = case_key(parameters);
+    fail("InvalidOperationError",
+         cast_failure->second +
+             resolved("join",
+                      "FILTER " + tree + "\nFROM\n  AGGREGATE[maintain_order: true]\n    [col(" + quote(activity_key(parameters)) +
+                          ").implode().alias(\"activities\")] BY [col(" + quote(case_glue) + ")]\n    FROM\n    SORT BY [col(" +
+                          quote(case_glue) + "), col(" + quote(kTimestamp) + ")]\n      " + frame_plan(df.columns),
+                      {"!filter", "select", "join right", "join"}));
+  };
+  const auto evaluate = [&](const std::vector<std::vector<Cell>>& variants) {
+    if (cast_failure) cast_failure_plan();
+    for (std::size_t p = 0; p < literals.size() && !any_empty && (!failed || p < *failed); ++p) {
+      if (!struct_fails[p]) continue;
+      const auto n = literals[p].values.size();
+      const bool present = std::any_of(variants.begin(), variants.end(), [&](const std::vector<Cell>& a) {
+        const auto take = std::min(n, a.size());
+        const auto begin = tail ? a.size() - take : 0;
+        for (auto i = begin; i < begin + take; ++i)
+          if (!null_cell(a[i])) return true;
+        return false;
+      });
+      if (present) {
+        failed = p;
+        break;
+      }
+    }
     if (!failed) return;
     std::vector<std::string> comparisons;
     for (std::size_t p = 0; p < literals.size(); ++p) {
       const auto n = std::to_string(literals[p].values.size());
-      std::string shown;
-      if (comparable(dtype, literals[p].type)) {
-        std::vector<std::string> parts;
-        for (const auto& v : lists[p]) parts.push_back(column_value_text(v, dtype));
-        shown = "[";
-        if (parts.size() <= 3) {
-          for (std::size_t i = 0; i < parts.size(); ++i) shown += (i ? ", " : "") + parts[i];
-        } else {
-          shown += parts[0] + ", " + parts[1] + ", \xe2\x80\xa6 " + parts.back();
-        }
-        shown += "]";
-      } else {
-        shown = lit_display(list_of(literals[p].type), Value::list(literals[p].values));
-      }
+      const auto shown = cast_shown(p);
       comparisons.push_back("[(col(\"activities\").list.slice([" + (tail ? "-" + n : "dyn int: 0") + ", dyn int: " + n +
                             "])) == (" + shown + ")]");
     }
-    // The plan simplifies `a | a` to `a` (round CC).
+    // The plan simplifies `a | a` to `a` (round CC), comparing the patterns
+    // as built, before the cast (round CJ: ["ab"] and ["a"] both cast to
+    // [null] on a numeric column and stay apart).
+    const auto key = [&](std::size_t p) { return comparisons[p].substr(0, comparisons[p].find(")) == (")) + " " + detail::polars_lit::literal_list_key(literals[p]); };
     std::string tree = comparisons.front();
+    bool single = true;
     for (std::size_t p = 1; p < comparisons.size(); ++p)
-      if (comparisons[p] != tree) tree = "[(" + tree + ") | (" + comparisons[p] + ")]";
+      if (!single || key(p) != key(0)) {
+        tree = "[(" + tree + ") | (" + comparisons[p] + ")]";
+        single = false;
+      }
     fail("SchemaError", "could not evaluate comparison between series 'activities' of dtype: List(" +
                             is_in_dtype_name(dtype) + ") and series 'literal' of dtype: List(" +
-                            debug_name(literals[*failed].type) +
+                            (struct_shown[*failed] ? struct_shown[*failed]->first : debug_name(literals[*failed].type)) +
                             ")\n\nThis error occurred in the following expression:\n\t" + comparisons[*failed] + "\n" +
                             (tree != comparisons[*failed] ? "while evaluating this larger expression:\n\t" + tree + "\n" : ""));
   };
   return lazy_variant_filter(df, parameters, [&](const std::vector<Cell>& activities) {
-    for (const auto& p : lists) {
+    for (std::size_t k = 0; k < lists.size(); ++k) {
+      const auto& p = lists[k];
+      // A pattern of structs that compared matches no case.
+      if (struct_fails[k]) continue;
       if (p.size() > activities.size()) continue;
       const std::size_t offset = tail ? activities.size() - p.size() : 0;
       bool same = true;
@@ -1140,8 +1290,13 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
   const bool this_mode = mode.kind == Kind::kString && mode.text == "this";
   const auto concat = parameter_or(parameters, "SUBCASE_CONCAT_STR", "subcase_concat_str", Value::of("##@@"));
   // A list or tuple holds the activities; any other value is one (round CB).
-  const std::vector<Value> activities =
-      activity.kind == Kind::kList || activity.kind == Kind::kTuple ? activity.items : std::vector<Value>{activity};
+  // Round CJ: is_in takes a dict as the list of its keys (Python's list()).
+  std::vector<Value> activities;
+  if (activity.kind == Kind::kList || activity.kind == Kind::kTuple) activities = activity.items;
+  else if (activity.kind == Kind::kDict) {
+    for (const auto& e : activity.entries)
+      if (std::none_of(activities.begin(), activities.end(), [&](const Value& k) { return k.text == e.first.text; })) activities.push_back(e.first);
+  } else activities = {activity};
   const auto literal = list_literal(activities);
   const auto case_column = require(
       df, case_glue,
@@ -1161,7 +1316,7 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
   const auto act = require(df, act_key, act_plan);
   // A value that is no list, tuple or str reaches is_in as itself, which
   // Polars implodes (round CC).
-  const bool scalar = activity.kind != Kind::kList && activity.kind != Kind::kTuple && activity.kind != Kind::kString;
+  const bool scalar = activity.kind != Kind::kList && activity.kind != Kind::kTuple && activity.kind != Kind::kString && activity.kind != Kind::kDict;
   std::string shown = literal_text(literal);
   if (scalar) {
     const auto v = literal.values.empty() ? Value::none() : literal.values.front();

@@ -33,6 +33,8 @@ using Op = PolarsAttributesFilterOperation;
 }
 bool null(const EventAttribute& v) { return v.is_null || is_native_na_attribute(v); }
 bool collection(const EventAttribute& v) { return v.container != AttributeContainerKind::kScalar; }
+// Round CJ: a dict argument (a struct literal in Polars).
+bool mapping(const EventAttribute& v) { return v.container == AttributeContainerKind::kContainer; }
 bool boolean(const EventAttribute& v) { return v.kind == AttributeKind::kBoolean || std::holds_alternative<bool>(v.typed_value); }
 bool integer(const EventAttribute& v) { return v.kind == AttributeKind::kInt || std::holds_alternative<std::int64_t>(v.typed_value) || std::holds_alternative<std::uint64_t>(v.typed_value); }
 bool real(const EventAttribute& v) { return v.kind == AttributeKind::kFloat || std::holds_alternative<double>(v.typed_value); }
@@ -54,7 +56,7 @@ bool truth(const EventAttribute& v) {
   return !v.value.empty();
 }
 std::string python_type(const EventAttribute& v) {
-  if (collection(v)) return v.container == AttributeContainerKind::kList ? "list" : v.container == AttributeContainerKind::kTuple ? "tuple" : v.container == AttributeContainerKind::kContainer ? "dict" : "set";
+  if (collection(v)) return v.container == AttributeContainerKind::kList ? "list" : v.container == AttributeContainerKind::kTuple ? "tuple" : v.container == AttributeContainerKind::kContainer ? "dict" : v.container == AttributeContainerKind::kFrozenSet ? "frozenset" : "set";
   if (null(v)) return "NoneType";
   if (boolean(v)) return "bool";
   if (integer(v)) return "int";
@@ -240,11 +242,16 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call) {
     };
     if(call.values)literal(*call.values);
     if(numeric(op)) {
-      // Python builds the bound literals, then each stream filter's column and literal.
-      literal(*call.lower);literal(*call.upper);
+      // Python builds the bound literals, then each stream filter's column and
+      // literal; round CJ: a dict literal converts strictly (its TypeError).
+      const auto scalar_literal=[&](const EventAttribute& v){
+        if(mapping(v)){if(const auto error=detail::polars_lit::dict_literal_error(v))fail("TypeError","apply",*error);return;}
+        literal(v);
+      };
+      scalar_literal(*call.lower);scalar_literal(*call.upper);
       if(op==Op::kNumericTraces)for(auto [key,value]:std::vector<std::pair<const std::optional<EventAttribute>*,const std::optional<EventAttribute>*>>{{&call.options.stream_filter_key1,&call.options.stream_filter_value1},{&call.options.stream_filter_key2,&call.options.stream_filter_value2}}) {
         if(!*key||null(**key))continue;
-        col_selector(**key);if(*value)literal(**value);
+        col_selector(**key);if(*value)scalar_literal(**value);
       }
     }
     if(traced(op)) {
@@ -259,6 +266,9 @@ std::string source_dtype(const EventTable& table,std::size_t column) {
   if(table.dtypes.size()!=table.columns.size())throw std::invalid_argument("Native Polars attribute filtering requires explicit source dtypes");return table.dtypes[column];
 }
 EventAttribute cell(const EventTable& source,std::size_t row,std::size_t col) { return source.rows[row][col]?*source.rows[row][col]:nil(); }
+bool has_present_cell(const EventTable& source,std::size_t col) {
+  return std::any_of(source.rows.begin(),source.rows.end(),[&](const auto& row){return !detail::polars_lit::null_cell(row[col]);});
+}
 bool scalar_equal(const EventAttribute& a,const EventAttribute& b) {
   if(null(a)||null(b))return null(a)&&null(b);
   if((integer(a)||boolean(a))&&(integer(b)||boolean(b)))return exact(a)==exact(b);
@@ -281,7 +291,7 @@ EventTable select_rows(const EventTable& source,const std::vector<bool>& selecte
   EventTable out=source;out.rows.clear();if(out.index)out.index->labels.clear();
   for(std::size_t i=0;i<source.rows.size();++i)if(selected[i]){out.rows.push_back(source.rows[i]);if(out.index)out.index->labels.push_back(source.index->labels[i]);}return out;
 }
-struct Leaf { std::string column, op, dtype; EventAttribute value; std::vector<std::string> categories; };
+struct Leaf { std::string column, op, dtype; EventAttribute value; std::vector<std::string> categories; bool present=true; };
 struct Expr { std::optional<Leaf> leaf; std::string op; std::vector<Expr> kids; };
 struct Predicate {
   PolarsAttributesFilterCall call;
@@ -503,6 +513,8 @@ detail::polars_lit::Operands operands(const Leaf& l,bool cast_list=false) {
   namespace lit=detail::polars_lit;
   const auto column="col("+quote(l.column)+")";
   const auto& v=l.value;
+  // Round CJ: a dict compares as a struct (cast column, String cast).
+  if(mapping(v))return lit::struct_operands(l.column,l.dtype,lit::struct_model(v,l.dtype));
   if(collection(v)) {
     if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum("))return {column,expression_literal(v)+(cast_list?".cast(String)":""),{}};
     // Round CE: a Null column casts to the list's type.
@@ -522,6 +534,8 @@ std::string plan_text_at(const Expr& e,const Leaf* cast,bool& past) {
   if(e.leaf) {
     const auto& l=*e.leaf;
     if(&l==cast){past=true;return operands(l,true).text(detail::polars_lit::compare_op(l.op));}
+    // Round CJ: a dict as written is its struct ({null,false}).
+    if(past&&mapping(l.value))return "col("+quote(l.column)+") "+l.op+" "+detail::polars_lit::struct_display(detail::polars_lit::StructModel{detail::polars_lit::struct_fields(l.value),false});
     if(past)return "col("+quote(l.column)+") "+l.op+" "+(null_leaf(l)?std::string("null"):collection(l.value)?expression_literal(l.value):detail::polars_lit::scalar_display(detail::polars_lit::value_of(l.value)));
     if(null_leaf(l))return null_text(l);
     return operands(l).text(detail::polars_lit::compare_op(l.op));
@@ -533,9 +547,13 @@ std::string plan_text_at(const Expr& e,const Leaf* cast,bool& past) {
 std::string plan_text(const Expr& e,const Leaf* cast=nullptr) { bool past=false;return plan_text_at(e,cast,past); }
 // Round CD: an evaluated folded form prints bare, a when-then with a leading
 // dot (as filter_traces_attribute_in_timeframe prints it).
-std::string error_text(const Expr& e) {
+std::string error_text(const Expr& e,const std::string& parent="") {
+  // Round CJ: a dict that casts to a null str on a String column compares
+  // with that null; under an OR it folds to a null column (probe/cj/q4.py).
+  if(e.leaf&&mapping(e.leaf->value)&&e.leaf->op!="=="&&e.leaf->dtype=="String"&&!detail::polars_lit::struct_text(detail::polars_lit::struct_model(e.leaf->value,e.leaf->dtype)))
+    return parent=="|"?null_text(*e.leaf):"[(col("+quote(e.leaf->column)+")) "+e.leaf->op+" (null)]";
   if(e.leaf){if(null_leaf(*e.leaf))return null_text(*e.leaf);const auto o=operands(*e.leaf);return o.whole.empty()?"[("+o.lhs+") "+e.leaf->op+" ("+o.rhs+")]":o.whole.starts_with("when(")?"."+o.whole:o.whole;}
-  return "[("+error_text(e.kids[0])+") "+e.op+" ("+error_text(e.kids[1])+")]";
+  return "[("+error_text(e.kids[0],e.op)+") "+e.op+" ("+error_text(e.kids[1],e.op)+")]";
 }
 std::string chain_plan(const EventTable& table,const std::vector<std::string>& filters) {
   std::string out,indent;
@@ -575,6 +593,20 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
   const auto o=operands(l);
   // Round CE: only comparisons on the bare column merge (a cast operand
   // never does; probed on Boolean, integer and temporal columns).
+  // Round CJ: a dict merges as the str it casts to on a String column.
+  // Round CJ: on any other column a dict merges when the column is not cast
+  // (Boolean, temporal, a field without a supertype), and only with an equal
+  // dict: any other literal leaves the bound as it is (probe/cj/m1.py).
+  if(mapping(l.value)) {
+    if(l.dtype!="String") {
+      if(o.lhs!="col("+quote(l.column)+")")return {};
+      MergeKey k;k.tag=21;k.s=lit::struct_key(lit::struct_model(l.value,l.dtype));return k;
+    }
+    const auto text=lit::struct_text(lit::struct_model(l.value,l.dtype));
+    if(!text)return {};
+    auto as_str=l;as_str.value=EventAttribute{l.value.key,*text};
+    return merge_key(as_str);
+  }
   const bool ns_point=l.op=="=="&&o.whole.starts_with("col("+quote(l.column)+").is_between([");
   if(!ns_point&&o.lhs!="col("+quote(l.column)+")")return {};
   // Round CF: list literals only compare equal or not at all (probed: [1]
@@ -654,7 +686,7 @@ std::optional<int> merge_order(const MergeKey& a,const MergeKey& b) {
     if(x||y)return x&&y?0:x?1:-1;
     return a.d<b.d?-1:a.d>b.d?1:0;
   }
-  if(a.tag==20){if(a.s==b.s)return 0;return {};}
+  if(a.tag==20||a.tag==21){if(a.s==b.s)return 0;return {};}
   if(a.tag==2||a.tag==10)return a.s<b.s?-1:a.s>b.s?1:0;
   if(a.tag==12&&a.s!=b.s)return {};
   return a.i<b.i?-1:a.i>b.i?1:0;
@@ -752,17 +784,23 @@ std::vector<Expr> pushdown(const std::vector<Expr>& chain,bool& empty) {
   }
   std::reverse(nodes.begin(),nodes.end());return nodes;
 }
-std::optional<std::pair<std::string,std::string>> leaf_error(const Leaf& l) {
+struct LeafError { std::string first,second,expression; };
+std::optional<LeafError> leaf_error(const Leaf& l) {
   namespace lit=detail::polars_lit;
   const auto& v=l.value;
   if(null(v))return {};
+  if(mapping(v)) {
+    const auto f=lit::struct_failure(l.column,l.dtype,lit::struct_model(v,l.dtype),l.present,lit::compare_op(l.op));
+    if(!f)return {};
+    return LeafError{f->type,f->message,f->larger.empty()?std::string():f->expression};
+  }
   if(collection(v)) {
     // Round CE: a Null column compares a list (cast to its type). Round CF:
     // but cannot order lists.
     if(l.dtype=="Null"&&l.op!="=="&&l.op!="!=") {
       try {
         const auto name=lit::physical_name(lit::list_of(lit::literal_of(lit::value_of(v)).type));
-        return std::pair<std::string,std::string>{"InvalidOperationError","cannot perform '"+l.op+"' comparison between series '"+l.column+"' of dtype: "+name+" and series 'literal' of dtype: "+name};
+        return LeafError{"InvalidOperationError","cannot perform '"+l.op+"' comparison between series '"+l.column+"' of dtype: "+name+" and series 'literal' of dtype: "+name};
       } catch(const PolarsSequenceFilterError&) {return {};}
     }
     if(l.dtype=="String"||l.dtype=="Null")return {};
@@ -770,27 +808,31 @@ std::optional<std::pair<std::string,std::string>> leaf_error(const Leaf& l) {
       // Round CD: a list never compares with a categorical column.
       try {
         const auto list=detail::polars_lit::literal_of(detail::polars_lit::value_of(v));
-        return std::pair<std::string,std::string>{"ComputeError","cannot compare categorical with "+detail::polars_lit::short_name(detail::polars_lit::list_of(list.type))};
+        return LeafError{"ComputeError","cannot compare categorical with "+detail::polars_lit::short_name(detail::polars_lit::list_of(list.type))};
       } catch(const PolarsSequenceFilterError&) {return {};}
     }
-    return std::pair<std::string,std::string>{"SchemaError","could not evaluate "+(l.op=="=="?std::string():"'"+l.op+"' ")+"comparison between series '"+l.column+"' of dtype: "+detail::polars_lit::is_in_dtype_name(l.dtype)+" and series 'literal' of dtype: List("+list_dtype(v)+")"};
+    return LeafError{"SchemaError","could not evaluate "+(l.op=="=="?std::string():"'"+l.op+"' ")+"comparison between series '"+l.column+"' of dtype: "+detail::polars_lit::is_in_dtype_name(l.dtype)+" and series 'literal' of dtype: List("+list_dtype(v)+")"};
   }
   if(wide_literal(v)) {
-    if(l.dtype=="String")return std::pair<std::string,std::string>{"ComputeError","cannot compare string with numeric type (u64)"};
-    if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum("))return std::pair<std::string,std::string>{"ComputeError","cannot compare categorical with u64"};
+    if(l.dtype=="String")return LeafError{"ComputeError","cannot compare string with numeric type (u64)"};
+    if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum("))return LeafError{"ComputeError","cannot compare categorical with u64"};
     return {};
   }
   const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(v),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
-  if(check.stage==lit::ScalarCheck::Stage::kCompute)return std::pair<std::string,std::string>{check.type,check.message};
+  if(check.stage==lit::ScalarCheck::Stage::kCompute)return LeafError{check.type,check.message};
   return {};
 }
-std::optional<std::pair<std::string,std::string>> first_error(const Expr& e,const Expr*& at) {
+std::optional<LeafError> first_error(const Expr& e,const Expr*& at) {
   if(e.leaf){auto error=leaf_error(*e.leaf);if(error)at=&e;return error;}
   for(const auto& k:e.kids)if(auto error=first_error(k,at))return error;
   return {};
 }
 // Kleene truth of a comparison: -1 null, 0 false, 1 true.
 int leaf_truth(const Leaf& l,const EventAttribute& v) {
+  if(mapping(l.value)) {
+    namespace lit=detail::polars_lit;
+    return lit::struct_truth(null(v)?lit::Cell{}:lit::Cell(v),l.dtype,lit::struct_model(l.value,l.dtype),lit::compare_op(l.op),l.present);
+  }
   if(null(v)||null(l.value))return -1;
   if(const auto u=wide_literal(l.value))return wide_truth(l,v,*u);
   namespace lit=detail::polars_lit;
@@ -833,10 +875,12 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
     for(auto node:levels[i]) {
       const auto dtype=source_dtype(source,*column);
       const auto categories=enum_category_list(source,*column);
-      each_leaf(node,[&](Leaf& l){l.dtype=dtype;l.categories=categories;});
+      const bool present=has_present_cell(source,*column);
+      each_leaf(node,[&](Leaf& l){l.dtype=dtype;l.categories=categories;l.present=present;});
       const Leaf* bad=nullptr;std::string message;
       each_leaf(node,[&](const Leaf& l) {
         if(bad||null(l.value))return;
+        if(mapping(l.value))return;
         if(collection(l.value)) {
           if(l.dtype!="String")return;
           bad=&l;message="cannot cast List type (inner: '"+list_dtype(l.value)+"', to: 'String')";
@@ -868,8 +912,11 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
   if(empty)p.empty=true;
   for(const auto& node:p.merged) {
     const Expr* at=nullptr;
-    if(const auto error=first_error(node,at))
+    if(const auto error=first_error(node,at)) {
+      // Round CJ: a failing struct cast names the cast, inside the node.
+      if(!error->expression.empty())fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error->expression+"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n");
       fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error_text(*at)+(node.leaf?"\n":"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n"));
+    }
   }
   return p;
 }
@@ -1147,7 +1194,8 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     denominator=case_denominator?distinct_case_count(source,options.case_id_key):source.size();
     // The stake multiplies the denominator once per counted value.
     if(counts.empty())return selection;
-    if(null(stake)||date(stake))fail("TypeError","apply","unsupported operand type(s) for *: '"+core_type(stake)+"' and 'int'");
+    // Round CJ: a dict (or set) stake cannot multiply either.
+    if(null(stake)||date(stake)||mapping(stake)||stake.container==AttributeContainerKind::kSet||stake.container==AttributeContainerKind::kFrozenSet)fail("TypeError","apply","unsupported operand type(s) for *: '"+core_type(stake)+"' and 'int'");
     if(text(stake)||collection(stake))threshold=stake;
     else {threshold=EventAttribute{"",real_text(number(stake)*static_cast<double>(denominator)),AttributeKind::kFloat};threshold.typed_value=number(stake)*static_cast<double>(denominator);}
   } else threshold=*call.threshold;

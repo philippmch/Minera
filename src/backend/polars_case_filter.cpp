@@ -31,6 +31,7 @@ bool integer(const EventAttribute& v) { return v.kind == AttributeKind::kInt || 
 bool real(const EventAttribute& v) { return v.kind == AttributeKind::kFloat || std::holds_alternative<double>(v.typed_value); }
 bool date(const EventAttribute& v) { return v.kind == AttributeKind::kDate || std::holds_alternative<NativeDate>(v.typed_value); }
 bool text(const EventAttribute& v) { return !collection(v) && !null(v) && !boolean(v) && !integer(v) && !real(v) && !date(v); }
+bool mapping(const EventAttribute& v) { return v.container == AttributeContainerKind::kContainer; }
 TokenInteger exact(const EventAttribute& v) {
   if (const auto* p = std::get_if<std::int64_t>(&v.typed_value)) return TokenInteger(*p);
   if (const auto* p = std::get_if<std::uint64_t>(&v.typed_value)) return TokenInteger(*p);
@@ -132,10 +133,16 @@ std::vector<std::string> nodes(Operation op, bool upper = false) {
   fail("ColumnNotFoundError", phase, message + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n" + frame_plan(source) + contexts(nodes(op, upper)));
 }
 // Python builds the bound literals before any Polars step.
+// Round CJ: a dict bound converts strictly too (a list field that fails to
+// build fails it with the dict TypeError).
 void validate_literals(const EventAttribute& low, const EventAttribute& high) {
-  for (const auto* value : {&low, &high})
-    if (collection(*value) && value->container != AttributeContainerKind::kContainer)
+  for (const auto* value : {&low, &high}) {
+    if (mapping(*value)) {
+      if (const auto error = detail::polars_lit::dict_literal_error(*value)) fail("TypeError", "apply", *error);
+    } else if (collection(*value)) {
       if (const auto error = detail::polars_lit::argument_literal_error(*value)) fail("TypeError", "apply", *error);
+    }
+  }
 }
 void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseFilterOptions& options) {
   if (op == Operation::kPerformance && truth(options.business_hours))
@@ -160,46 +167,78 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
 // larger expression), a None lower bound folds to a null column printed
 // after the failing upper bound (probed against Polars 1.44.1).
 bool list_bound(const EventAttribute& v) { return collection(v) && v.container != AttributeContainerKind::kContainer; }
-std::string bound_literal(const EventAttribute& v) {
+// Round CJ: a dict bound is a struct literal. The UInt32 count or the Int64
+// duration is cast to a struct of each field's supertype with it (a list
+// field leaves the column alone); the bound then always fails: the cast of a
+// present cell ("must specify one field in the struct" past one field,
+// "Cannot cast from struct to other types" for a nested one), else the
+// struct comparison itself, or the SchemaError of the column left alone.
+// The failing node is the cast when the cast fails, the larger expression
+// the whole predicate as for the other bounds (probe/cj/c1.py-c12.py; with
+// four threads the narrow duration frame may race to the comparison error,
+// which the bank test accepts).
+detail::polars_lit::StructModel bound_struct(const EventAttribute& v, Operation op) {
+  return detail::polars_lit::struct_model(v, op == Operation::kSize ? "UInt32" : "Int64");
+}
+std::string bound_literal(const EventAttribute& v, Operation op) {
+  if (mapping(v)) return detail::polars_lit::struct_display(bound_struct(v, op));
   if (list_bound(v)) return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(v));
   return literal(v);
 }
-void validate_bound(const EventAttribute& bound, const EventAttribute& other, bool upper, Operation op, const std::string& phase) {
+void validate_bound(const EventAttribute& bound, const EventAttribute& other, bool upper, Operation op, const std::string& phase, bool present) {
   if (null(bound) || (!text(bound) && !collection(bound))) return;
   namespace lit = detail::polars_lit;
   const auto column = op == Operation::kSize ? "count" : "case_duration";
   const std::string dtype = op == Operation::kSize ? "UInt32" : "Int64";
   const std::string cmp = upper ? "<=" : ">=";
-  std::string error;
+  std::string error, type = text(bound) ? "ComputeError" : "SchemaError", node;
   if (text(bound)) error = "cannot compare string with numeric type (" + std::string(op == Operation::kSize ? "u32" : "i64") + ")";
-  else {
+  else if (mapping(bound)) {
+    const auto failure = lit::struct_failure(column, dtype, bound_struct(bound, op), present, upper ? lit::CompareOp::kLe : lit::CompareOp::kGe);
+    if (!failure) throw std::invalid_argument("Native Polars case dict bound outside observed domain");
+    type = failure->type;
+    error = failure->message;
+    if (!failure->larger.empty()) node = failure->expression;
+  } else {
     const auto type = list_bound(bound) ? lit::debug_name(lit::list_of(lit::argument_literal(bound).type)) : std::string("List(Null)");
     error = "could not evaluate '" + cmp + "' comparison between series '" + column + "' of dtype: " + dtype + " and series 'literal' of dtype: " + type;
   }
   const auto expression = [&](const EventAttribute& v, bool at_most) -> std::string {
     const auto comparison = at_most ? lit::CompareOp::kLe : lit::CompareOp::kGe;
-    if (text(v) || collection(v)) return "[(col(" + quote(column) + ")) " + lit::op_text(comparison) + " (" + bound_literal(v) + ")]";
+    if (mapping(v)) {
+      const auto operands = lit::struct_operands(column, dtype, bound_struct(v, op));
+      return "[(" + operands.lhs + ") " + lit::op_text(comparison) + " (" + operands.rhs + ")]";
+    }
+    if (text(v) || collection(v)) return "[(col(" + quote(column) + ")) " + lit::op_text(comparison) + " (" + bound_literal(v, op) + ")]";
     const auto operands = lit::coerced_operands(column, dtype, lit::value_of(v), comparison);
     if (!operands.whole.empty()) return operands.whole.starts_with("when(") ? "." + operands.whole : operands.whole;
     return "[(" + operands.lhs + ") " + lit::op_text(comparison) + " (" + operands.rhs + ")]";
   };
   // Round CF: equal str or list bounds merge into one ==, the whole
-  // predicate (seed 4263 case 400); round CG: on the case size too.
-  const auto key = [](const EventAttribute& v) {
+  // predicate (seed 4263 case 400); round CG: on the case size too. Round
+  // CJ: equal dicts too, unless the column is cast to the struct.
+  const auto mergeable = [&](const EventAttribute& v) {
+    return text(v) || list_bound(v) || (mapping(v) && !bound_struct(v, op).cast_column);
+  };
+  const auto key = [&](const EventAttribute& v) {
+    if (mapping(v)) return "d" + lit::struct_key(bound_struct(v, op));
     return text(v) ? "s" + v.value : "l" + lit::literal_list_key(lit::argument_literal(v));
   };
-  if ((text(other) || list_bound(other)) && (text(bound) || list_bound(bound)) && key(bound) == key(other)) {
+  if (mergeable(other) && mergeable(bound) && key(bound) == key(other)) {
     if (!text(bound)) error.replace(error.find("'" + cmp + "' "), cmp.size() + 3, "");
-    error += "\n\nThis error occurred in the following expression:\n\t[(col(" + quote(column) + ")) == (" + bound_literal(bound) + ")]\n";
-    fail(text(bound) ? "ComputeError" : "SchemaError", phase, std::move(error));
+    error += "\n\nThis error occurred in the following expression:\n\t[(col(" + quote(column) + ")) == (" + bound_literal(bound, op) + ")]\n";
+    fail(type, phase, std::move(error));
   }
-  error += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, upper) + '\n';
+  const auto failing = node.empty() ? expression(bound, upper) : node;
+  std::string root = expression(bound, upper);
   if (null(other)) {
-    if (upper) error += "while evaluating this larger expression:\n\t[(" + expression(bound, true) + ") & (null.repeat([col(" + quote(column) + ").len()]))]\n";
+    if (upper) root = "[(" + expression(bound, true) + ") & (null.repeat([col(" + quote(column) + ").len()]))]";
   } else {
-    error += "while evaluating this larger expression:\n\t[(" + expression(upper ? other : bound, false) + ") & (" + expression(upper ? bound : other, true) + ")]\n";
+    root = "[(" + expression(upper ? other : bound, false) + ") & (" + expression(upper ? bound : other, true) + ")]";
   }
-  fail(text(bound) ? "ComputeError" : "SchemaError", phase, std::move(error));
+  error += "\n\nThis error occurred in the following expression:\n\t" + failing + '\n';
+  if (root != failing) error += "while evaluating this larger expression:\n\t" + root + "\n";
+  fail(type, phase, std::move(error));
 }
 bool compare_bound(std::int64_t value, const EventAttribute& bound, bool upper) {
   if (null(bound)) return false;
@@ -263,8 +302,11 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   // interval to an empty one: nothing raises and no case passes.
   const bool folded = op != Operation::kCount && text(low) && text(high) && high.value < low.value;
   if (op != Operation::kCount && !folded) {
-    validate_bound(low, high, false, op, phase);
-    if (op == Operation::kPerformance || !null(high)) validate_bound(high, low, true, op, phase);
+    // Whether the count or the duration has a present cell (a dict bound's
+    // cast fails only then).
+    const bool present = op == Operation::kSize ? !source.rows.empty() : std::any_of(source.rows.begin(), source.rows.end(), [&](const auto& row) { return row[time_at] && !null(*row[time_at]); });
+    validate_bound(low, high, false, op, phase, present);
+    if (op == Operation::kPerformance || !null(high)) validate_bound(high, low, true, op, phase, present);
   }
   // Durations count whole seconds of the column unit (round BW).
   const auto time_unit = op == Operation::kPerformance ? polars_datetime::column_unit(source.dtypes[time_at]) : polars_datetime::Unit::kMicroseconds;

@@ -1034,6 +1034,39 @@ Json zone_masked(Json node) {
   return node;
 }
 
+// Round CJ: an ordering comparison of a column with a dict (a struct
+// literal) casts the column to the struct type. Polars 1.44.1 evaluates a
+// filter on a frame at least as wide as its thread pool in row partitions,
+// one per thread: a partition with a present cell fails the cast ("must
+// specify one field in the struct", "Cannot cast from struct to other
+// types"), any other (an empty partition of a frame shorter than the pool)
+// casts and fails the comparison of the two structs, and the first failure
+// in time is raised (probe/cj/c12.py: thread count, width and height decide
+// it, and the scheduling race picks between them). The native filters raise
+// the cast failure, as Polars does with one thread; the comparison failure
+// of the same comparison is accepted for it.
+bool struct_partition_race(const Json& expected, const Json& actual) {
+  const auto* e = expected.get("error");
+  const auto* a = actual.get("error");
+  if (!e || !a || e->items.size() != 2 || a->items.size() != 2) return false;
+  if (e->items[0].text != "InvalidOperationError" || a->items[0].text != "InvalidOperationError") return false;
+  const auto& em = e->items[1].text;
+  const auto& am = a->items[1].text;
+  if (am.rfind("must specify one field in the struct", 0) != 0 && am.rfind("Cannot cast from struct to other types", 0) != 0)
+    return false;
+  if (em.rfind("cannot perform '", 0) != 0 || em.find("' of dtype: struct[") == std::string::npos) return false;
+  const std::string head = "This error occurred in the following expression:\n\t";
+  const auto at = em.find(head);
+  const auto cast_at = am.find(head);
+  const std::string larger = "while evaluating this larger expression:\n\t";
+  const auto node_at = am.find(larger);
+  if (at == std::string::npos || cast_at == std::string::npos || node_at == std::string::npos) return false;
+  const auto comparison = em.substr(at + head.size(), em.find('\n', at + head.size()) - at - head.size());
+  const auto cast = am.substr(cast_at + head.size(), am.find('\n', cast_at + head.size()) - cast_at - head.size());
+  const auto node = am.substr(node_at + larger.size());
+  return comparison.find(cast) != std::string::npos && node.find(comparison) != std::string::npos;
+}
+
 Json error_node(const std::string& type, const std::string& message) {
   Json out;
   out.kind = Json::kObject;
@@ -1240,6 +1273,8 @@ int main(int argc, char** argv) try {
         if (!matched && tables && (!maximum || tag_of(*maximum) == "i"))
           matched = valid_ncases(df, name, actual, maximum ? std::stoll(body(*maximum).text) : 1000);
       }
+      if (!matched)
+        for (const auto& e : expected) matched = matched || struct_partition_race(e, actual);
       auto& counts = tally[qualified];
       if (matched) {
         ++counts.first;

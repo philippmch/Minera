@@ -534,8 +534,13 @@ inline std::optional<Value> cast_lit(const Value& v, const LitType& from, const 
     return Value::dict({{Value::of(to.names[0]), std::move(*cast)}});
   }
   if (from.kind == K::kStruct) {
-    if (to.kind == K::kString) return Value::of(lit_display(from, v));
-    return std::nullopt;
+    // Round CJ: a struct without fields casts to "}", one with a None field
+    // (at its top level) to null ([["a"], [{"r1": None}]] fails to build).
+    if (to.kind != K::kString) return std::nullopt;
+    if (from.inner.empty()) return Value::of(std::string("}"));
+    for (const auto& e : v.entries)
+      if (e.second.kind == Kind::kNone) return std::nullopt;
+    return Value::of(lit_display(from, v));
   }
   if (to.kind == K::kList || from.kind == K::kList) {
     if (to.kind != K::kList || from.kind != K::kList) return std::nullopt;
@@ -618,6 +623,52 @@ inline std::optional<Value> cast_lit(const Value& v, const LitType& from, const 
                         "\n\nThis error occurred with the following context stack:\n\t[1] while constructing Series "
                         "''\n\n\nHint: Try setting `strict=False` to allow passing data with mixed types.");
 }
+// Round CJ: whether Polars' (non-strict) cast of a whole Series of type
+// `from` to `to` raises (a cast that only makes nulls does not). A struct
+// casts to a non-struct type field by field, so it raises when a field
+// does. Probed with struct items of pl.lit lists (probe/cj/l3.py).
+inline bool series_cast_raises(const LitType& from, const LitType& to) {
+  using K = LitType::K;
+  if (from.kind == K::kNull) return false;
+  if (from.kind == K::kStruct) {
+    for (const auto& field : from.inner)
+      if (series_cast_raises(field, to)) return true;
+    return false;
+  }
+  switch (to.kind) {
+    case K::kBoolean:
+      return from.kind == K::kString || from.kind == K::kDate || from.kind == K::kDatetime || from.kind == K::kList;
+    case K::kList:
+      if (from.kind == K::kList) return series_cast_raises(from.inner[0], to.inner[0]);
+      return from.kind == K::kDate || from.kind == K::kDatetime;
+    default: return from.kind == K::kList;
+  }
+}
+// A struct type cast to a non-struct type (every leaf field takes the type)
+// as Polars displays a dtype in a builder mismatch: struct {a: list[i64]}.
+inline std::string struct_cast_display(const LitType& from, const LitType& to) {
+  std::string out = "struct {";
+  for (std::size_t i = 0; i < from.inner.size(); ++i)
+    out += (i ? ", " : "") + from.names[i] + ": " +
+           (from.inner[i].kind == LitType::K::kStruct ? struct_cast_display(from.inner[i], to) : short_name(to));
+  return out + "}";
+}
+// Round CJ: a strictly built list type meets an item that is a list of
+// structs (pl.lit([[1], [{"a": 1}], 5])). The item casts to the element
+// type field by field (a String element takes the struct's String cast, see
+// cast_lit); a struct that casts keeps
+// its struct type and fails in the list builder at once, before items that
+// failed their cast are reported.
+inline void struct_item_builder_error(const LitType& item, const LitType& element) {
+  if (series_cast_raises(item, element)) return;
+  const auto n = std::to_string(item.inner.size());
+  if (element.kind == LitType::K::kBoolean)
+    build_error("invalid series dtype: expected `Boolean`, got `struct[" + n + "]` for series with name ``");
+  if (element.kind == LitType::K::kList)
+    build_error("dtypes don't match, got " + struct_cast_display(item, element) + ", expected: " + short_name(element));
+  build_error("cannot build list with different dtypes \n\nExpected list[" + short_name(element) + "], got struct[" + n +
+              "].");
+}
 // The values built strictly as `type` (a null type takes anything as null;
 // a Datetime type takes any datetime, keeping its microseconds).
 inline std::vector<Value> build_strict(const LitType& type, const std::vector<LitValue>& values) {
@@ -683,6 +734,10 @@ inline std::vector<Value> build_strict(const LitType& type, const std::vector<Li
         out.emplace_back();
       } else if (type.inner[0].kind == K::kNull) {
         out.push_back(v.value);
+      } else if (v.type.inner[0].kind == K::kStruct && type.inner[0].kind != K::kStruct && type.inner[0].kind != K::kString) {
+        struct_item_builder_error(v.type.inner[0], type.inner[0]);
+        valid = false;
+        out.emplace_back();
       } else {
         std::vector<Value> items;
         for (const auto& item : v.value.items) {
@@ -2013,6 +2068,89 @@ inline std::optional<StructFailure> struct_failure(const std::string& column, co
     throw std::invalid_argument("Unsupported native Polars struct comparison dtype: " + dtype);
   return StructFailure{"SchemaError", "could not evaluate comparison between series '" + column + "' of dtype: " + is_in_dtype_name(dtype) +
                                           " and series 'literal' of dtype: " + struct_dtype(m), comparison, {}};
+}
+// Round CJ: col(column) OP dict for every operator (the numeric attribute
+// filters, the case and paths performance bounds; probe/cj/c1.py, c2.py).
+// The plan operands as for ==: a String column compares the struct's String
+// cast (null when a field is None), an integer or float column with a
+// supertype for every leaf (and a Null column) is cast to the struct.
+inline Operands struct_operands(const std::string& column, const std::string& dtype, const StructModel& m) {
+  const auto c = "col(" + quote(column) + ")";
+  if (dtype == "String") return {c, struct_literal(m), {}};
+  if (m.cast_column) return {struct_cast_text(column, m), struct_display(m), {}};
+  return {c, struct_display(m), {}};
+}
+// The failure of an ordering comparison: a cast column fails its cast as ==
+// does when it has a present cell, else the comparison of the two structs
+// fails; a column without the cast cannot evaluate it (the operator named).
+inline std::optional<StructFailure> struct_failure(const std::string& column, const std::string& dtype, const StructModel& m, bool present,
+                                                   CompareOp op) {
+  if (op == CompareOp::kEq) return struct_failure(column, dtype, m, present);
+  if (dtype == "String") return std::nullopt;
+  const auto comparison = "[(" + struct_operands(column, dtype, m).lhs + ") " + op_text(op) + " (" + struct_display(m) + ")]";
+  const auto n = std::to_string(m.fields.size());
+  if (categorical_dtype(dtype) || enum_dtype(dtype))
+    return StructFailure{"ComputeError", "cannot compare categorical with struct[" + n + "]", comparison, {}};
+  if (m.cast_column) {
+    if (present && m.fields.size() != 1)
+      return StructFailure{"InvalidOperationError", "must specify one field in the struct", struct_cast_text(column, m), comparison};
+    if (present && m.fields[0].nested)
+      return StructFailure{"InvalidOperationError", "Cannot cast from struct to other types", struct_cast_text(column, m), comparison};
+    return StructFailure{"InvalidOperationError", "cannot perform '" + op_text(op) + "' comparison between series '" + column +
+                                                      "' of dtype: struct[" + n + "] and series 'literal' of dtype: struct[" + n + "]",
+                         comparison, {}};
+  }
+  if (dtype != "Boolean" && dtype != "Date" && !datetime_dtype(dtype) && !struct_cast_column(dtype) && dtype != "Null")
+    throw std::invalid_argument("Unsupported native Polars struct comparison dtype: " + dtype);
+  return StructFailure{"SchemaError", "could not evaluate '" + op_text(op) + "' comparison between series '" + column + "' of dtype: " +
+                                          is_in_dtype_name(dtype) + " and series 'literal' of dtype: " + struct_dtype(m),
+                       comparison, {}};
+}
+// Round CJ: a dict operand as pl.lit converts it (strictly, through Polars'
+// own value conversion, while Python builds the expression): a list field
+// that fails to build fails the whole literal with this TypeError, whatever
+// the list's own error (8,000 random dicts agree with struct_fields in
+// acceptance and display, probe dl/gen.py).
+inline const char* const kDictLiteralError =
+    "cannot create expression literal for value of type dict.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of "
+    "type Object.";
+inline std::optional<std::string> dict_literal_error(const Value& value) {
+  try {
+    (void)struct_fields(value);
+  } catch (const PolarsSequenceFilterError&) {
+    return std::string(kDictLiteralError);
+  }
+  return std::nullopt;
+}
+inline std::optional<std::string> dict_literal_error(const EventAttribute& value) { return dict_literal_error(value_of(value)); }
+// Every field of a struct literal with its type, untruncated: equal keys are
+// equal literals (the interval merge of a column that is not cast).
+inline std::string struct_fields_key(const std::vector<StructField>& fields) {
+  std::string out = "{";
+  for (std::size_t i = 0; i < fields.size(); ++i) {
+    const auto& f = fields[i];
+    out += (i ? "," : "") + f.key + ":";
+    out += f.nested ? struct_fields_key(f.fields) : debug_name(f.type) + " " + literal_list_key(f.type, f.value);
+  }
+  return out + "}";
+}
+inline std::string struct_key(const StructModel& m) { return struct_fields_key(m.fields); }
+// Kleene truth of a comparison that does not fail: a String column against
+// the struct's String cast (bytewise), == as struct_matches.
+inline int struct_truth(const Cell& cell, const std::string& dtype, const StructModel& m, CompareOp op, bool column_valid) {
+  if (op == CompareOp::kEq && dtype != "String") return struct_matches(cell, dtype, m, column_valid) ? 1 : 0;
+  const auto t = struct_text(m);
+  if (!t || null_cell(cell)) return -1;
+  const int c = cell->value.compare(*t);
+  const int order = c < 0 ? -1 : c > 0 ? 1 : 0;
+  switch (op) {
+    case CompareOp::kEq: return order == 0;
+    case CompareOp::kGe: return order >= 0;
+    case CompareOp::kLe: return order <= 0;
+    case CompareOp::kGt: return order > 0;
+    case CompareOp::kLt: return order < 0;
+  }
+  return -1;
 }
 
 }  // namespace minera::detail::polars_lit
