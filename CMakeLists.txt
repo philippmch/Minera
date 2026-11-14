@@ -3083,6 +3083,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cf_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cf-bank.json.gz")
   set_tests_properties(minera_polars_filter_cf_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CG: dict (struct) values of the timeframe filter on every column,
+  # list and str bounds of the case filters and str bounds of the paths
+  # performance filter, attribute columns after the timestamp column.
+  add_test(NAME minera_polars_filter_cg_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cg-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cg_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

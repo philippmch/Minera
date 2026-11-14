@@ -118,25 +118,126 @@ std::string literal(const EventAttribute& value, bool dynamic = false) {
   if (real(value)) return std::string(dynamic?"dyn float: ":"")+real_text(number(value));
   return quote(value.value);
 }
-// Round CF: a dict is a struct literal. A String column compares with its
-// String cast: "}" when empty, null when a field is None, else the fields
-// in braces (str quoted, probed); float, temporal and nested fields and
-// other columns are refused (declared in the parity notes).
-const char* const kStructRefusal="Native Polars timeframe filters take dict (struct) attribute values on String columns with str, int and bool fields only";
+// Round CF: a dict is a struct literal; round CG models it on every column
+// (probed per column dtype and field type against Polars 1.44.1, Review
+// CG1). Its fields take the types pl.lit gives the Python values (Null,
+// Boolean, Int64, Int128 past the Int64 range, Float64, String, Date,
+// Datetime('μs') with a fixed offset in UTC); a repeated key keeps its first
+// place and its last value, as the Python dict does. A String column
+// compares with the struct's String cast ("}" when empty, null when a field
+// is None, else the fields in braces as the literal shows them). Integer and
+// float columns cast to a struct of each field's supertype with the column
+// and compare one field (none or several raise "must specify one field in
+// the struct" while collecting; a field without a supertype leaves the
+// column uncast and the comparison raises a SchemaError). A Null column
+// casts to the literal's struct and keeps no row; Boolean and temporal
+// columns raise a SchemaError, Categorical and Enum ones a ComputeError.
+// Nested field values are refused.
+const char* const kStructRefusal="Native Polars timeframe filters take dict (struct) attribute values with scalar fields only";
 bool dict_value(const EventAttribute& v){return v.container==AttributeContainerKind::kContainer;}
-std::optional<std::string> struct_text(const EventAttribute& value) {
-  if(value.children.empty())return std::string("}");
-  for(const auto& c:value.children)if(null(c))return std::nullopt;
-  std::string s="{";
-  for(std::size_t i=0;i<value.children.size();++i) {
-    const auto& c=value.children[i];
-    if(c.container!=AttributeContainerKind::kScalar||date(c)||(real(c)&&!integer(c)&&!boolean(c)))throw std::invalid_argument(kStructRefusal);
-    if(i)s+=',';
-    s+=boolean(c)?(truth(c)?"true":"false"):integer(c)?exact(c).decimal():quote(c.value);
+namespace lit=detail::polars_lit;
+struct StructField{std::string key;lit::LitType type;lit::Value value;};
+std::vector<StructField> struct_fields(const EventAttribute& value) {
+  std::vector<StructField> out;
+  for(const auto& c:value.children) {
+    if(c.container!=AttributeContainerKind::kScalar)throw std::invalid_argument(kStructRefusal);
+    auto typed=lit::lit_value(lit::value_of(c));
+    const auto at=std::find_if(out.begin(),out.end(),[&](const StructField& f){return f.key==c.key;});
+    if(at!=out.end()){at->type=std::move(typed.type);at->value=std::move(typed.value);}
+    else out.push_back({c.key,std::move(typed.type),std::move(typed.value)});
   }
-  return s+'}';
+  return out;
 }
-std::string struct_literal(const EventAttribute& value){const auto t=struct_text(value);return t?quote(*t):"null";}
+bool struct_cast_column(const std::string& dtype){return lit::integer_dtype(dtype)||lit::float_dtype(dtype);}
+// The supertype of an integer or float column and a field type.
+std::optional<std::string> struct_supertype(const std::string& dtype,const lit::LitType& field) {
+  using K=lit::LitType::K;
+  if(field.kind==K::kString)return std::string("String");
+  if(dtype=="Float64")return std::string("Float64");
+  if(dtype=="Float32")return std::string(field.kind==K::kNull||field.kind==K::kBoolean||field.kind==K::kDate?"Float32":"Float64");
+  const bool wide=dtype=="Int32"||dtype=="Int64"||dtype=="UInt32"||dtype=="UInt64";
+  switch(field.kind) {
+    case K::kNull: case K::kBoolean: return dtype;
+    case K::kFloat64: return std::string("Float64");
+    case K::kInt128: return std::string("Int128");
+    case K::kInt64: case K::kUInt64: return std::string(dtype=="UInt64"?"Float64":"Int64");
+    case K::kDatetime: if(wide)return std::string("Int64");return std::nullopt;
+    case K::kDate: if(dtype=="Int32")return std::string("Int32");if(wide)return std::string("Int64");return std::nullopt;
+    default: return std::nullopt;
+  }
+}
+struct StructModel {
+  std::vector<StructField> fields;
+  std::vector<std::string> cast;  // the supertypes when the column casts (integer and float columns)
+  bool cast_column=false;         // the plan casts the column (integer and float with every supertype, Null)
+};
+StructModel struct_model(const EventAttribute& value,const std::string& dtype) {
+  StructModel m{struct_fields(value),{},false};
+  if(dtype=="Null"){m.cast_column=true;return m;}
+  if(!struct_cast_column(dtype))return m;
+  for(const auto& f:m.fields){const auto s=struct_supertype(dtype,f.type);if(!s){m.cast.clear();return m;}m.cast.push_back(*s);}
+  m.cast_column=true;
+  return m;
+}
+bool struct_null(const StructField& f){return f.value.kind==lit::Kind::kNone;}
+// A field value as a number of its supertype (Booleans 0 and 1, datetimes
+// their microseconds, dates their days).
+lit::Wide field_integer(const StructField& f) {
+  const auto& v=f.value;
+  switch(v.kind) {
+    case lit::Kind::kBool: return lit::Wide(v.boolean?1:0);
+    case lit::Kind::kInt: if(const auto u=lit::wide_int(v))return lit::Wide(*u);return lit::Wide(v.integer);
+    case lit::Kind::kDatetime: return lit::Wide(lit::micros_of(v));
+    case lit::Kind::kDate: return lit::Wide(v.integer);
+    default: throw std::invalid_argument(kStructRefusal);
+  }
+}
+double field_real(const StructField& f){return f.value.kind==lit::Kind::kFloat?f.value.real:lit::wide_double(field_integer(f));}
+std::string field_text(const StructField& f,const std::string* supertype) {
+  if(struct_null(f))return "null";
+  if(!supertype||*supertype=="String")return lit::lit_display(f.type,f.value);
+  if(lit::float_dtype(*supertype))return lit::polars_frame_float(field_real(f));
+  const auto w=field_integer(f);
+  if(f.value.kind==lit::Kind::kInt)return lit::integer_text(f.value);
+  return std::to_string(static_cast<std::int64_t>(w.lo));
+}
+std::string struct_display(const StructModel& m) {
+  std::string out="{";
+  for(std::size_t i=0;i<m.fields.size();++i){if(i)out+=',';out+=field_text(m.fields[i],m.cast.empty()?nullptr:&m.cast[i]);}
+  return out+'}';
+}
+std::string struct_dtype(const StructModel& m) {
+  std::string out="Struct({";
+  for(std::size_t i=0;i<m.fields.size();++i){if(i)out+=", ";out+="'"+m.fields[i].key+"': "+(m.cast.empty()?lit::debug_name(m.fields[i].type):m.cast[i]);}
+  return out+"})";
+}
+// The String cast of the struct (a String column): null when a field is None.
+std::optional<std::string> struct_text(const StructModel& m) {
+  if(m.fields.empty())return std::string("}");
+  for(const auto& f:m.fields)if(struct_null(f))return std::nullopt;
+  return struct_display(m);
+}
+std::string struct_literal(const StructModel& m){const auto t=struct_text(m);return t?quote(*t):"null";}
+// The cast column as the plan prints it.
+std::string struct_cast_text(const std::string& column,const StructModel& m){return "col("+quote(column)+").cast("+struct_dtype(m)+")";}
+// A cell of a cast column equals the one field: numbers by value (NaN equal
+// to NaN, -0.0 to 0.0), a String supertype by the cell's String cast, and a
+// null cell a None field, but only when the column has a valid cell (Polars
+// casts an all-null column to null structs, which match nothing, and any
+// other column to valid structs with a null field; Review CG1).
+bool struct_cell_match(const std::optional<EventAttribute>& cell,const std::string& dtype,const StructModel& m,bool column_valid) {
+  if(m.fields.size()!=1||dtype=="Null")return false;
+  const auto& f=m.fields[0];const auto& s=m.cast[0];
+  const bool absent=lit::null_cell(cell);
+  if(struct_null(f))return absent&&column_valid;
+  if(absent)return false;
+  if(s=="String")return f.value.kind==lit::Kind::kString&&lit::string_cast(*cell,dtype)==f.value.text;
+  if(lit::float_dtype(s)) {
+    const double a=lit::float_dtype(dtype)?lit::real_of(*cell):lit::wide_double(lit::wide_of(*cell)),b=field_real(f);
+    return a==b||(std::isnan(a)&&std::isnan(b));
+  }
+  return lit::wide_of(*cell)==field_integer(f);
+}
 std::string frame_plan(const EventTable& source) {
   std::string out="DF [";
   for(std::size_t i=0;i<std::min<std::size_t>(4,source.columns.size());++i){if(i)out+=", ";out+=quote(source.columns[i]);}
@@ -201,7 +302,6 @@ void selector(const EventAttribute& value) {
   if(collection(value)&&!value.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
 }
 struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;std::string attribute_dtype,time_dtype;std::vector<std::string> categories;};
-namespace lit=detail::polars_lit;
 bool scalar_value(const Query& q){return q.value.container==AttributeContainerKind::kScalar;}
 // Round CD: the attribute comparison typed by the shared comparison model.
 lit::ScalarCheck attribute_check(const Query& q){
@@ -249,7 +349,12 @@ std::string attribute_expr(const Query& q) {
     if(q.attribute_dtype=="Null")return "[(col("+quote(q.attribute.value)+").cast("+lit::debug_name(lit::list_of(list.type))+")) == ("+list_display(list)+")]";
     return compare_expr(q.attribute.value,"==",list_display(list));
   }
-  if(dict_value(q.value))return compare_expr(q.attribute.value,"==",struct_literal(q.value));
+  if(dict_value(q.value)) {
+    const auto m=struct_model(q.value,q.attribute_dtype);
+    if(q.attribute_dtype=="String")return compare_expr(q.attribute.value,"==",struct_literal(m));
+    if(m.cast_column)return "[("+struct_cast_text(q.attribute.value,m)+") == ("+struct_display(m)+")]";
+    return compare_expr(q.attribute.value,"==",struct_display(m));
+  }
   if(!scalar_value(q)||q.attribute_dtype.empty())return compare_expr(q.attribute.value,"==",literal(q.value,true));
   const auto v=lit::value_of(q.value);
   if(!attribute_check(q).ok())return lit::comparison_expression(q.attribute.value,lit::CompareOp::kEq,v);
@@ -257,19 +362,42 @@ std::string attribute_expr(const Query& q) {
   if(!ops.whole.empty())return ops.whole.starts_with("when(")?"."+ops.whole:ops.whole;
   return "[("+ops.lhs+") == ("+ops.rhs+")]";
 }
+// Round CG: the pushed-down predicates combine in the byte order of their
+// column names, so an attribute column after the timestamp column comes
+// second; when an equal window merges into one == leaf, the merge puts the
+// merged leaves after the others, and the attribute comes second only when
+// it merges too (a bare column against a typed literal, not a cast, a
+// dynamic literal, a folded constant or a null column; probed per form).
+bool mergeable_attribute(const Query& q,const std::string& expression) {
+  const auto prefix="[(col("+quote(q.attribute.value)+")) == (";
+  return expression.starts_with(prefix)&&expression.compare(prefix.size(),4,"dyn ")!=0;
+}
 std::string whole_expr(const Query& q) {
   const auto time=time_expr(q);if(q.op!=Operation::kAttribute)return time;
-  return combined(attribute_expr(q),"&",time);
+  const auto attribute=attribute_expr(q);
+  if(q.options.timestamp_key.value<q.attribute.value) {
+    const bool merged=equal(q.low,q.high)&&!nanosecond_aware(q);
+    if(!merged||mergeable_attribute(q,attribute))return combined(time,"&",attribute);
+  }
+  return combined(attribute,"&",time);
 }
 std::string agg_plan(const EventTable& source,const Query& q) {
   return "AGGREGATE[maintain_order: false]\n  [col("+quote(q.options.timestamp_key.value)+").min().alias(\"first_timestamp\"), col("+quote(q.options.timestamp_key.value)+").max().alias(\"last_timestamp\")] BY [col("+quote(q.options.case_id_key.value)+")]\n  FROM\n  "+frame_plan(source);
 }
+std::string struct_plan(const Query& q) {
+  const auto m=struct_model(q.value,q.attribute_dtype);
+  if(q.attribute_dtype=="String")return "col("+quote(q.attribute.value)+") == "+struct_literal(m);
+  if(m.cast_column)return struct_cast_text(q.attribute.value,m)+" == "+struct_display(m);
+  return "col("+quote(q.attribute.value)+") == "+struct_display(m);
+}
 std::string attribute_plan(const EventTable& source,const Query& q) {
   const auto filter=scalar_value(q)&&!q.attribute_dtype.empty()
       ?lit::comparison_plan(q.attribute.value,q.attribute_dtype,lit::value_of(q.value),lit::CompareOp::kEq,&q.categories)
-      :dict_value(q.value)?"col("+quote(q.attribute.value)+") == "+struct_literal(q.value)
+      :dict_value(q.value)?struct_plan(q)
       :list_value(q)&&q.attribute_dtype=="Null"
-      ?"col("+quote(q.attribute.value)+").cast("+lit::debug_name(lit::list_of(lit::argument_literal(q.value).type))+") == "+literal(q.value)
+      ?"col("+quote(q.attribute.value)+").cast("+lit::debug_name(lit::list_of(lit::argument_literal(q.value).type))+") == "+list_display(lit::argument_literal(q.value))
+      // Round CG: a list as the literal model shows it (seeds 2026111470, 4270).
+      :list_value(q)?"col("+quote(q.attribute.value)+") == "+list_display(lit::argument_literal(q.value))
       :"col("+quote(q.attribute.value)+") == "+literal(q.value);
   return "FILTER "+filter+"\nFROM\n  "+frame_plan(source);
 }
@@ -327,7 +455,7 @@ bool same_column(const Query& q){return q.op==Operation::kAttribute&&q.attribute
 std::string larger_expr(const Query& q){return same_column(q)?std::string("\n"):"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n';}
 // A list value as the comparison prints it.
 std::string list_display(const lit::Literal& list){return lit::lit_display(lit::list_of(list.type),lit::Value::list(list.values));}
-void attribute_dtype(const EventTable&,std::size_t,const Query& q,const std::string& phase) {
+void attribute_dtype(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
   // Round CD: a list value fails when the filter runs on any column but a
   // String one (which refuses its cast while resolving). Round CF: a Null
   // column casts to the list's type and matches no row.
@@ -340,6 +468,24 @@ void attribute_dtype(const EventTable&,std::size_t,const Query& q,const std::str
          " and series 'literal' of dtype: "+lit::debug_name(lit::list_of(list.type));
     fail(categorical?"ComputeError":"SchemaError",phase,message+"\n\nThis error occurred in the following expression:\n\t"+
          attribute_expr(q)+larger_expr(q));
+  }
+  if(dict_value(q.value)) {
+    const auto& dt=q.attribute_dtype;
+    if(dt=="String"||dt=="Null")return;
+    const auto m=struct_model(q.value,dt);
+    const auto where=[&](const std::string& expression){return "\n\nThis error occurred in the following expression:\n\t"+expression+larger_expr(q);};
+    if(dt.starts_with("Categorical")||dt.starts_with("Enum("))
+      fail("ComputeError",phase,"cannot compare categorical with struct["+std::to_string(m.fields.size())+"]"+where(attribute_expr(q)));
+    if(m.cast_column) {
+      // The cast fails only on a column with a present cell (an empty or
+      // all-null column casts).
+      const bool present=std::any_of(source.rows.begin(),source.rows.end(),[&](const auto& row){return !lit::null_cell(row[at]);});
+      if(m.fields.size()!=1&&present)fail("InvalidOperationError",phase,"must specify one field in the struct"+where(struct_cast_text(q.attribute.value,m)));
+      return;
+    }
+    if(dt!="Boolean"&&!polars_datetime::temporal(dt)&&!struct_cast_column(dt))throw std::invalid_argument("Unsupported native Polars timeframe struct dtype: "+dt);
+    fail("SchemaError",phase,"could not evaluate comparison between series '"+q.attribute.value+"' of dtype: "+lit::is_in_dtype_name(dt)+
+         " and series 'literal' of dtype: "+struct_dtype(m)+where(attribute_expr(q)));
   }
   if(!scalar_value(q))return;
   const auto check=attribute_check(q);
@@ -400,7 +546,8 @@ std::optional<Instant> instant(const std::optional<EventAttribute>& cell,const s
   // The column holds its unit (round BW).
   return Instant{polars_datetime::floor(*parsed,polars_datetime::column_unit(dtype)),std::nullopt};
 }
-bool attribute_match(const std::optional<EventAttribute>& cell,const std::string& dt,const EventAttribute& value,const std::vector<std::string>& categories) {
+bool attribute_match(const std::optional<EventAttribute>& cell,const std::string& dt,const EventAttribute& value,const std::vector<std::string>& categories,bool column_valid) {
+  if(dict_value(value)&&struct_cast_column(dt))return struct_cell_match(cell,dt,struct_model(value,dt),column_valid);
   if(!cell||null(*cell)||null(value)||dt=="Null")return false;
   if(value.container==AttributeContainerKind::kScalar)
     return lit::compare_scalar(cell,dt,lit::value_of(value),lit::CompareOp::kEq,&categories)==1;
@@ -408,7 +555,7 @@ bool attribute_match(const std::optional<EventAttribute>& cell,const std::string
   if(dt=="String"||dt=="Categorical"||dt.starts_with("Categorical(")||dt.starts_with("Enum(")) {
     if(text(value))return v.value==value.value;
     if(boolean(value))return v.value==(truth(value)?"true":"false");
-    if(dict_value(value)){const auto t=struct_text(value);return t&&v.value==*t;}
+    if(dict_value(value)){const auto t=struct_text(struct_model(value,dt));return t&&v.value==*t;}
     return false;
   }
   if(dt=="Boolean"&&text(value))return (truth(v)?"true":"false")==value.value;
@@ -443,7 +590,7 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
     if(q.attribute_dtype.starts_with("Enum(")&&*attr_at<source.categorical_dtypes.size()&&source.categorical_dtypes[*attr_at])
       for(const auto& c:source.categorical_dtypes[*attr_at]->categories)q.categories.push_back(c.value);
   }
-  if(attr_at&&dict_value(q.value)){if(q.attribute_dtype!="String")throw std::invalid_argument(kStructRefusal);(void)struct_text(q.value);}
+  if(attr_at&&dict_value(q.value))(void)struct_model(q.value,q.attribute_dtype);
   if(attr_at)attribute_resolution(source,*attr_at,q,phase);
   if(q.op==Operation::kAttribute&&!constant)case_at=position(q.options.case_id_key.value,true);
   auto result=source;result.rows.clear();
@@ -467,9 +614,10 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   if(constant){result.columns.push_back("literal");result.dtypes.push_back("Int32");if(!result.categorical_dtypes.empty())result.categorical_dtypes.push_back(std::nullopt);for(const auto& row:source.rows){auto kept=row;auto literal=q.options.case_id_key;literal.key="literal";kept.push_back(literal);result.rows.push_back(std::move(kept));}return result;}
   struct Group{bool absent=false,keep=false;std::optional<Instant> first,last;};
   std::vector<Group> groups;std::unordered_map<std::string,std::size_t> keys;std::vector<std::size_t> row_groups;
+  const bool column_valid=q.op==Operation::kAttribute&&std::any_of(source.rows.begin(),source.rows.end(),[&](const auto& row){return !lit::null_cell(row[*attr_at]);});
   for(const auto& row:source.rows){
     const auto time=instant(row[time_at],source.dtypes[time_at]);
-    const bool matches=time&&!less(*time,low)&&!less(high,at_most(*time))&&(q.op!=Operation::kAttribute||attribute_match(row[*attr_at],source.dtypes[*attr_at],q.value,q.categories));
+    const bool matches=time&&!less(*time,low)&&!less(high,at_most(*time))&&(q.op!=Operation::kAttribute||attribute_match(row[*attr_at],source.dtypes[*attr_at],q.value,q.categories,column_valid));
     if(q.op==Operation::kEvents){if(matches)result.rows.push_back(row);continue;}
     const auto key=group_key(row[*case_at],source.dtypes[*case_at]);const auto [found,inserted]=keys.emplace(key,groups.size());
     if(inserted){groups.push_back({});groups.back().absent=key=="n";}

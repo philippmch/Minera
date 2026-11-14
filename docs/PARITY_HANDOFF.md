@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CF (2026-11-05 to 2026-11-14, cloud container)
+## Review-fix loop, rounds T–CG (2026-11-05 to 2026-11-14, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5056,34 +5056,60 @@ bounds that Polars' merge orders totally, a declared case order of
 `minera_polars_filter_cf_bank_parity_tests`. No fixture changed. The
 device check on the Mac was skipped again (no device linked).
 
-Next round (CG) should start by re-reviewing round CF:
+Round CG re-reviewed CF (Review CG1). CF's CI run 43553607248 was green
+on all six jobs (the CF bank on Windows for the first time). Fresh CF
+seeds 2026111470 and 4270 and CE seeds 2026111471 and 4271 found eight
+calls: timeframe list values printed as transported text in the failed
+plan, a failing case-performance bound with a None upper bound naming a
+larger expression, inverted str bounds of the paths filter raising
+instead of folding, the one-item path `[65536]` raising an IndexError
+instead of pm4py's TypeError, and tied activities of
+`filter_df_keeping_spno_activities` (any k of them, null included; the
+bank test accepts any valid top-k listing). The timeframe filter now
+models dict (struct) values on every column (probed on 19 dtypes: String
+casts, one-field casts of integer and float columns to the fields'
+supertypes, "must specify one field in the struct" only on a column with
+a valid cell, SchemaErrors on Boolean, temporal and uncastable columns,
+ComputeErrors on Categorical and Enum, a None field matching null cells
+only when the column has a valid one) and the order of the pushed-down
+predicate when the attribute column sorts after the timestamp column
+(and only when it merges, on an equal window). The case filters name
+list bounds by their `pl.lit` type, coerce the other bound as Polars
+prints it, merge equal bounds and report larger expressions in
+`filter_on_case_size` too, and fold inverted str bounds to an empty
+interval (the paths filter too). A new domain
+(`scripts/polars_filter_cg_domain.py`) found 3 more calls in its first
+bank (predicate order) and fresh CG seeds 4280, 2026111481 and 4281
+found 2 (None fields on all-null columns), all fixed.
+`docs/polars-filter-cg-bank.json.gz` (19,011 calls) is in the suite as
+`minera_polars_filter_cg_bank_parity_tests`. No fixture changed. The
+device check on the Mac was skipped again (no device linked).
 
-- the CI run of the CF commit, Windows especially: `polars_plan_float`
-  in `src/backend/polars_float_text.hpp` now uses `std::to_chars` with a
-  precision (MSVC's rounding), and the CF bank runs there for the first
-  time (Europe/Berlin cells go through the abbreviation mask);
-- fresh seeds of `scripts/polars_filter_cf_domain.py` (CF used
-  2026111460, 2026111461, 4261 and 4262) and of the CE domain (CF used
-  2026111450, 4250, 4251 and 4263);
-- `src/backend/polars_timestamp_filter.cpp`: dict (struct) values beyond
-  String columns with str, int and bool fields (refused now; probe facts
-  in Review CF1: one-field casts on numeric columns, SchemaError on
-  Boolean and temporal columns, ComputeError on Categorical and Enum,
-  float and datetime fields cast to String);
-- `src/backend/polars_case_filter.cpp`: `validate_bound` prints only
-  `List(Null)` (non-empty list bounds; `filter_on_case_size` on its
-  `UInt32` count, where equal bounds did not merge in a quick probe,
-  while the performance filters merge them into `==` since CF);
-- `src/backend/polars_lit_model.hpp`: `literal_list_key` (Polars list
-  equality of -0.0 and 0.0, NaN and nulls inside lists), the remaining
+Next round (CH) should start by re-reviewing round CG:
+
+- the CI run of the CG commit, Windows especially (the CG bank runs
+  there for the first time);
+- fresh seeds of `scripts/polars_filter_cg_domain.py` (CG used
+  2026111480, 2026111481, 4280 and 4281), of the CF domain (CG used
+  2026111470 and 4270) and of the CE domain (CG used 2026111471 and
+  4271);
+- `src/backend/polars_lit_model.hpp`: Polars' Float to String cast
+  (`1e-5` casts to `"0.00001"`, `1e-7` to `"1e-7"`), which
+  `string_cast` and the struct String cast of float fields take from
+  Python's `repr` (they agree on the swept values only), Float32 cells
+  cast to String;
+- `src/backend/polars_timestamp_filter.cpp`: nested dict fields (lists
+  and dicts inside a struct, refused now), dicts on Duration, Time,
+  Decimal and Int128 columns;
+- still open from CF's list: `literal_list_key` (Polars list equality of
+  -0.0 and 0.0, NaN and nulls inside lists), the remaining
   `coerced_scalar_is_in` gaps (str and Categorical/Enum columns return
   nullopt), wide ints on `Float32` in `compare_scalar`, `list_literal`
   with wide ints after a float and in nested lists, `lit_supertype` of
-  Int128 with temporal types;
-- `src/backend/polars_paths_filter.cpp`: ints past the UInt64 range as
-  bounds (Polars folds them to `.when(col("@@duration").is_not_null())
+  Int128 with temporal types; ints past the UInt64 range as paths bounds
+  (Polars folds them to `.when(col("@@duration").is_not_null())
   .then(false).otherwise(null)`; the bank's typed JSON stops at UInt64);
-- `src/backend/polars_attributes_filter.cpp`: `plan_text_at` when the
+  `plan_text_at` in `src/backend/polars_attributes_filter.cpp` when the
   failing leaf is inside a merged node;
 - still open from CD's list: the comparison model on Duration, Time,
   Decimal and Int128 columns (no table cell; declare or add a transport
@@ -5096,6 +5122,12 @@ Next round (CG) should start by re-reviewing round CF:
 - the open choices on CSV timestamp columns of plain numbers and "roles to
   diagnostics groups" (still declared unless Philipp answers).
 
+Round CF's targets, taken in CG (findings CG1-1 to CG1-6): CF's CI run,
+fresh seeds of the CF and CE domains, timeframe dict values beyond String
+columns, list bounds of `validate_bound` in the case filters and
+`filter_on_case_size`'s merges. Not taken (carried to CH): see the CH
+list above.
+
 Round CE's targets, taken in CF (findings CF1-1 to CF1-9): CE's CI run,
 fresh seeds of the CE domain, edge values in the between anchors and
 timestamp attribute values, more numeric bounds, `coerced_scalar_is_in`
@@ -5104,15 +5136,15 @@ paths bounds before a failing one, timeframe dict values and all-str
 lists. Found unreachable: `validate_bound` with several paths
 (`paths.apply_performance` takes one path) and more than two stream
 filters (`apply_numeric` reads only `stream_filter_key1` and `key2`).
-Not taken (carried to CG): see the CG list above.
+Not taken (carried to CG and then CH): see the CH list above.
 
 Round CD's targets, taken in CE (findings CE1-1 to CE1-10): CD's CI run,
 the six open calls of Review CD1, Boolean and Null activity columns,
 ints past 2**53 and the Int64 range (now in every table filter), floats
 past 1e16, dates before 1970 on ms columns, the interval merge with mixed
 literals and cast columns, list values on Boolean and temporal attribute
-columns, and fresh seeds. Not taken (carried to CF and then CG): see the CG
-list above.
+columns, and fresh seeds. Not taken (carried to CF, CG and then CH): see the
+CH list above.
 
 Round CC's targets, taken in CD (findings CD1-1 to CD1-7): the Polars
 table filters on typed keys and CC's CI run. Not taken (carried to CE):

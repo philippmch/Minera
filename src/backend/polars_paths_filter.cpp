@@ -237,11 +237,14 @@ EventAttribute item(const EventAttribute& value, std::size_t at) {
   fail("TypeError", "apply", "'" + core_type(value) + "' object is not subscriptable");
 }
 std::string path_text(const EventAttribute& value) {
-  const auto left = item(value, 0), right = item(value, 1);
+  // path[0] + "," + path[1]: the first item meets the str before the second
+  // is read (round CG: [65536] raises the TypeError, not an IndexError).
+  const auto left = item(value, 0);
   // Round CE: a list or tuple refuses the str by its own message.
   if (left.container == AttributeContainerKind::kList || left.container == AttributeContainerKind::kTuple)
     fail("TypeError", "apply", "can only concatenate " + core_type(left) + " (not \"str\") to " + core_type(left));
   if (!text(left)) fail("TypeError", "apply", "unsupported operand type(s) for +: '" + core_type(left) + "' and 'str'");
+  const auto right = item(value, 1);
   if (!text(right)) fail("TypeError", "apply", "can only concatenate str (not \"" + core_type(right) + "\") to str");
   return left.value + ',' + right.value;
 }
@@ -419,7 +422,10 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
   const auto time_ranks = *time_at == case_at ? std::optional<EnumRanks>{} : enum_dictionary(*time_at, time_kind);
   const auto* case_dictionary = case_ranks ? &*case_ranks : nullptr;
   const auto* time_dictionary = *time_at == case_at ? case_dictionary : time_ranks ? &*time_ranks : nullptr;
-  if (performance) { validate_time(source.dtypes[*time_at], options, phase); validate_bound(options.min_performance, false, options, paths.front(), phase); validate_bound(options.max_performance, true, options, paths.front(), phase); }
+  // Round CG: str bounds with the lower above the upper (byte order) fold the
+  // duration interval to an empty one: nothing raises and no path passes.
+  const bool folded = performance && text(options.min_performance) && text(options.max_performance) && options.max_performance.value < options.min_performance.value;
+  if (performance) { validate_time(source.dtypes[*time_at], options, phase); if (!folded) { validate_bound(options.min_performance, false, options, paths.front(), phase); validate_bound(options.max_performance, true, options, paths.front(), phase); } }
   // No admitted path keeps no case: a negative filter returns the frame as it is.
   if (!performance && paths.empty() && !truth(options.positive)) return source;
   std::vector<std::size_t> order(source.rows.size()); std::iota(order.begin(), order.end(), 0);
@@ -445,7 +451,7 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
         const auto unit = polars_datetime::column_unit(source.dtypes[*time_at]);
         const auto instant = [unit](const EventAttribute& value) { const auto* stored = std::get_if<NativeDate>(&value.typed_value); const auto parsed = polars_datetime::ticks(stored ? stored->value : value.value, unit); if (!parsed) throw std::invalid_argument("Native Polars path performance requires valid temporal cells"); return *parsed; };
         const auto duration = (instant(*next[*time_at]) - instant(*row[*time_at])) / polars_datetime::per_second(unit);
-        if (!bound_matches(duration, options.min_performance, false) || !bound_matches(duration, options.max_performance, true)) continue;
+        if (folded || !bound_matches(duration, options.min_performance, false) || !bound_matches(duration, options.max_performance, true)) continue;
       }
       matched = true;
     }

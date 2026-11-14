@@ -26256,3 +26256,120 @@ Verification (scripts in the project files under `review-harness/round-cf/`):
 | CE domain on seeds 2026111450, 4250, 4251 | 17,425, 17,382 and 17,432 calls on 600 frames each | 0, 1 and 1 found; after: 0 and 1 declared order |
 | The base, CC and CE banks | the banks in the suite | 0 mismatches |
 | Float display (`polars_plan_float`) | 36 probed values against Polars 1.44.1, 2,000,000 random doubles against the CE model | 0 differences |
+
+## Review CG1: re-review of round CF, and dict values on every column, list and str bounds of the case filters and predicate order in the Polars table filters (2026-11-14)
+
+Round CG checked CF's CI run (43553607248: green on all six jobs, the
+CF bank on Windows for the first time), replayed fresh seeds of the CF
+and CE domains, modelled the dict values CF refused, and added a domain
+for them and for the case filters' bounds. Findings, all fixed:
+
+- **CG1-1 Fresh CF and CE seeds.** CF seeds 2026111470 and 4270 (26,559
+  and 26,502 calls on 700 frames) and CE seeds 2026111471 and 4271
+  (17,432 and 17,450 calls on 600 frames) differed in 3, 2, 2 and 1
+  calls. A list value of `filter_traces_attribute_in_timeframe` that a
+  typed column refuses while resolving prints in the failed plan as the
+  literal model shows it (`col("act") == [2020-12-31 18:30:00 UTC]`, a
+  tuple of a float and an int as `[10.0, 1.0]`), not as the transported
+  text (CF 2026111470 cases 99 and 414, CF 4270 case 6). A failing str
+  lower bound of `filter_case_performance` with a None upper bound names
+  no larger expression (CE 2026111471 case 145, CF 4270 case 197; CG1-5).
+  Inverted str bounds of `paths.apply_performance` (min `"b"`, max `""`)
+  fold to an empty interval instead of raising (CF 2026111470 case 394;
+  CG1-5). The one-item path `[65536]` raises pm4py's `unsupported operand
+  type(s) for +: 'int' and 'str'`: the first item meets the separator
+  before the second is read (CE 4271 case 528; the model read both first
+  and raised an IndexError). `filter_df_keeping_spno_activities` keeps
+  any k of tied activities, null among them (CE 2026111471 case 516: the
+  `is_in` list held null in the reference run and another tied value in
+  the native one); the bank test now accepts a listing of the captured
+  form and size that is a valid top-k selection of the frame's counts.
+- **CG1-2 New domain.** `scripts/polars_filter_cg_domain.py` (on top of
+  the CF domain) builds the CF frames, sometimes with a copy `zz` of
+  another column so that the attribute sorts after the timestamp column,
+  and gives each case `filter_traces_attribute_in_timeframe` with dicts of
+  none, one or two fields (a repeated key, None, typed, edge and str
+  fields) on every column, mostly over a window that holds every event,
+  sometimes an empty, inverted or random one;
+  `filter_case_performance`, `filter_on_case_performance` and
+  `filter_on_case_size` with list (typed, nested, empty, None items, wide
+  ints), str (inverted or equal pairs), None and odd numeric bounds; and
+  `paths.apply_performance` with str bound pairs and one-item paths. Its
+  first bank (seed 2026111480, 1,000 frames, 6,294 calls, written
+  alongside CG1-3 and CG1-5) differed in 3 calls (CG1-4).
+- **CG1-3 Dict values on every column.** A dict is a struct literal
+  whose fields take the types `pl.lit` gives the Python values (a
+  repeated key keeps its first place and its last value). Probed on 19
+  column dtypes with 36 dicts each (684 probes, `sp.py`): a String column
+  compares with the struct's String cast (CF1-6). An integer or float
+  column casts to a struct of each field's supertype with the column
+  (a str field `String`; a Float64 column `Float64`; a Float32 column
+  `Float32` for None, bool and date fields, else `Float64`; on integer
+  columns None and bool fields keep the column's type, a float field
+  `Float64`, an int field `Int64` (`Float64` on `UInt64`), an int past
+  the Int64 range `Int128`, a datetime field `Int64` and a date field
+  `Int32` or `Int64` on 32- and 64-bit columns only) and prints the
+  struct in those types: `col("x").cast(Struct({'a': Int64, 'b':
+  Float64})) == {1609459200000000,1.0}`. A struct of one field compares
+  that field; none or several raise `InvalidOperationError: must specify
+  one field in the struct` (naming the cast) while collecting, and only
+  when the column holds a valid cell, since an empty or all-null column
+  casts. A field without a supertype (a datetime on `Int8`) leaves the
+  column uncast: `SchemaError: could not evaluate comparison between
+  series 'x' of dtype: i8 and series 'literal' of dtype: Struct({...})`.
+  A Null column casts to the literal's struct and keeps no row; Boolean,
+  Date and Datetime columns raise that SchemaError, Categorical and Enum
+  columns `ComputeError: cannot compare categorical with struct[N]`.
+  Nested field values stay refused (no probe). CF's refusal and its
+  declaration in the bank test are gone.
+- **CG1-4 Predicate order.** Polars pushes the attribute filter and the
+  window down as one predicate whose parts follow the byte order of their
+  column names, so an attribute column after the timestamp column (`zz`)
+  comes second in the larger expression. An equal window merges into one
+  `==` leaf, which the merge places after the unmerged parts: the
+  attribute then comes second only when it merges too, as a bare column
+  against a typed literal (not a cast column, a `dyn` literal, a folded
+  constant or a null column; probed per form, `ord4.py` to `ord6.py`).
+  The CG bank's three calls (cases 101, 275 and 692) had the window first.
+- **CG1-5 Case filter bounds.** A list bound names its `pl.lit` type in
+  the SchemaError (`List(Int64)`, `List(String)`, `List(UInt64)` past the
+  Int64 range, `List(List(Int64))`, `List(Null)`, `List(Float64)` for
+  `[1.5, None]`) and prints as the literal model shows it; the other bound
+  prints as Polars coerces it against the `UInt32` count or the `Int64`
+  duration (a float casts the column, a wide int meets it at Float64, a
+  bool folds). `filter_on_case_size` reports the larger expression and
+  merges equal str or list bounds into one `==` as the performance
+  filters do. A None upper bound leaves a failing lower bound alone (no
+  larger expression); a None lower bound folds to a null column printed
+  after the failing upper bound. A str lower bound above a str upper
+  bound (byte order) folds the interval to an empty one in all three case
+  filters and in `paths.apply_performance`: nothing raises and no case or
+  path passes (probed with `cl.py`, `cl2.py`, `cl3.py`, `cp.py` and
+  `sb.py`).
+- **CG1-6 Fresh CG seeds.** Seeds 4280 and 2026111481 (6,324 calls on
+  1,000 frames each) differed in 2 and 0 calls: a dict with one None
+  field on an all-null `Float64` or `UInt16` column (seed 4280 cases 549
+  and 557). Polars casts an all-null column to null structs, which match
+  nothing, and any other column to valid structs with a null field, so a
+  null cell matches a None field only when the column holds a valid cell
+  (`sn.py`); the model matched it always. Seed 4281 (6,332 calls on
+  1,000 frames) differed in 0.
+
+Not taken (carried to CH): Polars casts a float to String with its own
+display (`1e-5` as `0.00001`, `1e-7` as `1e-7`), which the struct String
+cast of a float field and the `string_cast` of Float32 cells follow only
+where Python's `repr` agrees; nested dict fields.
+
+Tests: `docs/polars-filter-cg-bank.json.gz` (19,011 calls) replayed by
+`minera_polars_filter_cg_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-cg/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Dict values, case filter bounds and predicate order (CG bank, seed 2026111480) | 19,011 calls on 3,000 frames, hash seeds 0-1, 3 runs each | 0 mismatches (its first 1,000 frames: 3 before CG1-4) |
+| The same domain on seeds 4280, 2026111481 and 4281 | 6,324, 6,324 and 6,332 calls on 1,000 frames each | 2, 0 and 0 found; after: 0 |
+| CF domain on seeds 2026111470 and 4270 | 26,559 and 26,502 calls on 700 frames each | 3 and 2 found; after: 0 |
+| CE domain on seeds 2026111471 and 4271 | 17,432 and 17,450 calls on 600 frames each | 2 and 1 found; after: 0 |
+| Struct probes (`sp.py`, `sn.py`) | 684 dicts on 19 column dtypes, 30 null-cell probes against Polars 1.44.1 | 0 differences |
+| The base, CC, CE and CF banks | the banks in the suite | 0 mismatches |

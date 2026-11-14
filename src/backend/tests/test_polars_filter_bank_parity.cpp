@@ -20,6 +20,7 @@
 #include "minera/timestamp.hpp"
 
 #include "../gzip_codec.hpp"
+#include "../polars_lit_model.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -980,6 +981,43 @@ bool tied_listing(const std::vector<Json>& expected, const Json& actual) {
   return true;
 }
 
+// Round CG: the same failure may list another selection of the values tied
+// at the cut than the captured runs did (seed 2026111471 case 516: 4 of 12
+// reference runs listed a null where the capture had a datetime). The
+// listing passes when it has a captured run's form and size and its values
+// are a valid top-k selection of the frame's counts (values compared as the
+// literal shows them).
+bool valid_top_listing(const EventTable& df, const std::string& name, const std::vector<Json>& expected, const Json& actual, std::size_t k) {
+  namespace lit = minera::detail::polars_lit;
+  const auto mine = listed_values(actual);
+  if (!mine) return false;
+  if (std::none_of(expected.begin(), expected.end(), [&](const Json& e) {
+        const auto theirs = listed_values(e);
+        return theirs && theirs->first == mine->first && theirs->second.size() == mine->second.size();
+      }))
+    return false;
+  const auto at = std::find(df.columns.begin(), df.columns.end(), name);
+  if (at == df.columns.end() || df.dtypes.size() != df.columns.size()) return false;
+  const auto column = static_cast<std::size_t>(at - df.columns.begin());
+  const auto& dtype = df.dtypes[column];
+  std::map<std::string, std::size_t> counts;
+  for (const auto& row : df.rows) {
+    const auto v = lit::python_value(row[column], dtype);
+    ++counts[lit::lit_display(lit::lit_value(v).type, lit::lit_value(v).value)];
+  }
+  const std::set<std::string> listed(mine->second.begin(), mine->second.end());
+  const auto want = std::min(k, counts.size());
+  if (listed.size() != mine->second.size() || listed.size() != want || want == 0) return false;
+  std::vector<std::size_t> sizes;
+  for (const auto& [key, n] : counts) sizes.push_back(n);
+  std::sort(sizes.rbegin(), sizes.rend());
+  const auto cut = sizes[want - 1];
+  for (const auto& item : listed) if (!counts.count(item)) return false;
+  for (const auto& [key, n] : counts)
+    if (listed.count(key) ? n < cut : n > cut) return false;
+  return true;
+}
+
 // MSVC's time-zone database takes abbreviations from ICU ("GMT+1" where
 // Polars prints "CET"; declared in Review AY2), as in the sequence filter
 // bank test: on MSVC the word after a datetime's wall text in an error
@@ -1151,6 +1189,7 @@ int main(int argc, char** argv) try {
         if (!matched && k && *k >= 0 && std::any_of(expected.begin(), expected.end(), [](const Json& e) { return e.get("value") != nullptr; }))
           matched = valid_top_selection(df, name, actual, static_cast<std::size_t>(*k));
         if (!matched) matched = tied_listing(expected, actual);
+        if (!matched && k && *k >= 0) matched = valid_top_listing(df, name, expected, actual, static_cast<std::size_t>(*k));
       }
       // Round CF: so, rarely, do the cases kept by filter_on_case_performance
       // and filter_traces_intersecting (round CE seeds 4247 case 333 and
@@ -1186,15 +1225,6 @@ int main(int argc, char** argv) try {
         const bool tables = std::all_of(expected.begin(), expected.end(), [](const Json& e) { return e.get("value") != nullptr; });
         if (!matched && tables && (!maximum || tag_of(*maximum) == "i"))
           matched = valid_ncases(df, name, actual, maximum ? std::stoll(body(*maximum).text) : 1000);
-      }
-      // Round CF: dict values of the timeframe filter are struct literals;
-      // only String columns with str/int/bool fields are modelled, the rest
-      // is refused (declared, docs/reference-2.7.22-parity.md CF1).
-      if (!matched && qualified == "timestamp.filter_traces_attribute_in_timeframe" && args.size() > 1 &&
-          is_mapping(*args.at(1))) {
-        const auto* error = actual.get("error");
-        matched = error && error->items.size() > 1 && error->items.front().text == "native" &&
-                  error->items.at(1).text.rfind("Native Polars timeframe filters take dict", 0) == 0;
       }
       auto& counts = tally[qualified];
       if (matched) {

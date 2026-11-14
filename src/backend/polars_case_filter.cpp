@@ -151,39 +151,54 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
   if (!(text(options.case_id_key) || integer(options.case_id_key) || collection(options.case_id_key)))
     throw std::invalid_argument("Native Polars case selector outside observed scalar/list domain");
 }
+// Round CG: list bounds name their pl.lit type (List(Int64), List(String),
+// List(UInt64) past the Int64 range) and print as the literal model shows
+// them; the other bound prints as Polars coerces it against the UInt32
+// count or the Int64 duration (casts, folded constants); filter_on_case_size
+// merges equal bounds and reports the larger expression as the performance
+// filters do; a None upper bound leaves the failing lower bound alone (no
+// larger expression), a None lower bound folds to a null column printed
+// after the failing upper bound (probed against Polars 1.44.1).
+bool list_bound(const EventAttribute& v) { return collection(v) && v.container != AttributeContainerKind::kContainer; }
+std::string bound_literal(const EventAttribute& v) {
+  if (list_bound(v)) return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(v));
+  return literal(v);
+}
 void validate_bound(const EventAttribute& bound, const EventAttribute& other, bool upper, Operation op, const std::string& phase) {
   if (null(bound) || (!text(bound) && !collection(bound))) return;
+  namespace lit = detail::polars_lit;
   const auto column = op == Operation::kSize ? "count" : "case_duration";
+  const std::string dtype = op == Operation::kSize ? "UInt32" : "Int64";
   const std::string cmp = upper ? "<=" : ">=";
   std::string error;
   if (text(bound)) error = "cannot compare string with numeric type (" + std::string(op == Operation::kSize ? "u32" : "i64") + ")";
-  else error = "could not evaluate '" + cmp + "' comparison between series '" + column + "' of dtype: " + std::string(op == Operation::kSize ? "UInt32" : "Int64") + " and series 'literal' of dtype: List(Null)";
-  const auto expression = [&](const EventAttribute& v, const std::string& comparison) {
-    // The case duration is Int64: a float bound casts the column.
-    if (op == Operation::kPerformance && !null(v) && !collection(v) && !text(v)) {
-      // Round CF: an int past the Int64 range meets the duration at Float64.
-      if (const auto u = detail::polars_lit::wide_cell(v))
-        return "[(col(" + quote(column) + ").cast(Float64)) " + comparison + " (" + detail::polars_plan_float(static_cast<double>(*u)) + ")]";
-      if (real(v)) return "[(col(" + quote(column) + ").cast(Float64)) " + comparison + " (" + detail::polars_plan_float(number(v)) + ")]";
-      if (boolean(v)) return "[(col(" + quote(column) + ")) " + comparison + " (" + exact(v).decimal() + ")]";
-    }
-    return "[(col(" + quote(column) + ")) " + comparison + " (" + literal(v) + ")]";
+  else {
+    const auto type = list_bound(bound) ? lit::debug_name(lit::list_of(lit::argument_literal(bound).type)) : std::string("List(Null)");
+    error = "could not evaluate '" + cmp + "' comparison between series '" + column + "' of dtype: " + dtype + " and series 'literal' of dtype: " + type;
+  }
+  const auto expression = [&](const EventAttribute& v, bool at_most) -> std::string {
+    const auto comparison = at_most ? lit::CompareOp::kLe : lit::CompareOp::kGe;
+    if (text(v) || collection(v)) return "[(col(" + quote(column) + ")) " + lit::op_text(comparison) + " (" + bound_literal(v) + ")]";
+    const auto operands = lit::coerced_operands(column, dtype, lit::value_of(v), comparison);
+    if (!operands.whole.empty()) return operands.whole.starts_with("when(") ? "." + operands.whole : operands.whole;
+    return "[(" + operands.lhs + ") " + lit::op_text(comparison) + " (" + operands.rhs + ")]";
   };
-  // Round CF: equal str or list duration bounds merge into one ==, the
-  // whole predicate (seed 4263 case 400).
+  // Round CF: equal str or list bounds merge into one ==, the whole
+  // predicate (seed 4263 case 400); round CG: on the case size too.
   const auto key = [](const EventAttribute& v) {
-    return text(v) ? "s" + v.value : "l" + detail::polars_lit::literal_list_key(detail::polars_lit::argument_literal(v));
+    return text(v) ? "s" + v.value : "l" + lit::literal_list_key(lit::argument_literal(v));
   };
-  if (op == Operation::kPerformance && (text(other) || collection(other)) && key(bound) == key(other)) {
+  if ((text(other) || list_bound(other)) && (text(bound) || list_bound(bound)) && key(bound) == key(other)) {
     if (!text(bound)) error.replace(error.find("'" + cmp + "' "), cmp.size() + 3, "");
-    error += "\n\nThis error occurred in the following expression:\n\t[(col(" + quote(column) + ")) == (" + literal(bound) + ")]\n";
+    error += "\n\nThis error occurred in the following expression:\n\t[(col(" + quote(column) + ")) == (" + bound_literal(bound) + ")]\n";
     fail(text(bound) ? "ComputeError" : "SchemaError", phase, std::move(error));
   }
-  error += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, cmp) + '\n';
-  // A None bound folds to a null column, printed after the other (round CD).
-  if (op == Operation::kPerformance && null(other))
-    error += "while evaluating this larger expression:\n\t[(" + expression(bound, cmp) + ") & (null.repeat([col(" + quote(column) + ").len()]))]\n";
-  else if (op == Operation::kPerformance) error += "while evaluating this larger expression:\n\t[(" + expression(upper ? other : bound, ">=") + ") & (" + expression(upper ? bound : other, "<=") + ")]\n";
+  error += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, upper) + '\n';
+  if (null(other)) {
+    if (upper) error += "while evaluating this larger expression:\n\t[(" + expression(bound, true) + ") & (null.repeat([col(" + quote(column) + ").len()]))]\n";
+  } else {
+    error += "while evaluating this larger expression:\n\t[(" + expression(upper ? other : bound, false) + ") & (" + expression(upper ? bound : other, true) + ")]\n";
+  }
   fail(text(bound) ? "ComputeError" : "SchemaError", phase, std::move(error));
 }
 bool compare_bound(std::int64_t value, const EventAttribute& bound, bool upper) {
@@ -244,7 +259,10 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     time_at = position(options.timestamp_key.value);
     validate_time_dtype(source.dtypes[time_at], phase);
   }
-  if (op != Operation::kCount) {
+  // Round CG: str bounds with the lower above the upper (byte order) fold the
+  // interval to an empty one: nothing raises and no case passes.
+  const bool folded = op != Operation::kCount && text(low) && text(high) && high.value < low.value;
+  if (op != Operation::kCount && !folded) {
     validate_bound(low, high, false, op, phase);
     if (op == Operation::kPerformance || !null(high)) validate_bound(high, low, true, op, phase);
   }
@@ -270,7 +288,7 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     for (std::size_t i = 0; i < order.size() && (null(low) || TokenInteger(i) < exact(low)); ++i) groups[order[i]].keep = true;
   } else for (auto& group : groups) {
     const auto value = op == Operation::kSize ? std::optional<std::int64_t>{static_cast<std::int64_t>(group.count)} : group.first ? std::optional<std::int64_t>{(*group.last - *group.first) / polars_datetime::per_second(time_unit)} : std::nullopt;
-    group.keep = value && compare_bound(*value, low, false) && ((op == Operation::kSize && null(high)) || compare_bound(*value, high, true));
+    group.keep = !folded && value && compare_bound(*value, low, false) && ((op == Operation::kSize && null(high)) || compare_bound(*value, high, true));
   }
   auto result = source; result.rows.clear();
   if (constant) {

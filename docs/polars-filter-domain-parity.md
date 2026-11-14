@@ -411,3 +411,49 @@ anchors (not compared); datetime arguments outside the nanosecond range
 are refused; dict values of the timeframe filter other than str, int and
 bool fields on String columns are refused; `filter_on_ncases` may keep k
 or k - 1 cases when a null case id is among the k it picks.
+
+## Dict values, case filter bounds and predicate order (round CG)
+
+`scripts/polars_filter_cg_domain.py` builds the CF frames, sometimes with
+a copy `zz` of another column (an attribute that sorts after the
+timestamp column), and gives each case only dict values of
+`filter_traces_attribute_in_timeframe` on every column, list, str, None
+and odd numeric bounds of `filter_case_performance`,
+`filter_on_case_performance` and `filter_on_case_size`, and str bound
+pairs and one-item paths of `paths.apply_performance`.
+`scripts/capture-polars-filter-bank.py --domain polars_filter_cg_domain.py
+--count 3000 --bank-seed 2026111480 --hash-seeds 0,1 --repeats 3`
+captures `docs/polars-filter-cg-bank.json.gz` (19,011 calls), replayed by
+`minera_polars_filter_cg_bank_parity_tests`.
+
+* **Dicts.** A struct literal of the fields' `pl.lit` types (an int past
+  the Int64 range `Int128`). String columns compare with its String cast
+  (round CF); integer and float columns cast to a struct of the fields'
+  supertypes with the column and compare one field (none or several raise
+  `must specify one field in the struct` when the column holds a valid
+  cell); a field without a supertype raises a SchemaError, as Boolean,
+  Date and Datetime columns do; Categorical and Enum columns raise
+  `cannot compare categorical with struct[N]`; a Null column keeps no
+  row. A None field matches null cells only when the column has a valid
+  cell (an all-null column casts to null structs).
+* **Predicate order.** The pushed-down predicate follows the byte order of
+  the column names, so an attribute after the timestamp column comes
+  second; on an equal window (one merged `==` leaf, placed last) only an
+  attribute that merges too (a bare column against a typed literal) does.
+* **Case filter bounds.** List bounds name their `pl.lit` type
+  (`List(Int64)`, `List(UInt64)`, `List(List(Int64))`, `List(Null)`);
+  the other bound prints as Polars coerces it against the `UInt32` count
+  or the `Int64` duration; `filter_on_case_size` merges equal bounds and
+  names larger expressions as the performance filters do; a None upper
+  bound adds no larger expression, a None lower bound a null column.
+* **Inverted str bounds.** A str lower bound above a str upper bound
+  folds to an empty interval in the case filters and in
+  `paths.apply_performance`: nothing raises and nothing passes.
+* **Paths.** A one-item path meets the separator with its first item
+  before the second is read (`[65536]`: `unsupported operand type(s) for
+  +: 'int' and 'str'`).
+* **Top-k ties.** `filter_df_keeping_spno_activities` keeps any k of tied
+  activities (null included); the bank test accepts any valid top-k
+  listing of the captured form and size.
+
+Declared: nested dict fields stay refused (no probe).
