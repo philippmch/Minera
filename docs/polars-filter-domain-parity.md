@@ -297,9 +297,77 @@ cases of a group_by without `maintain_order` on every case dtype, and
 `filter_df_keeping_activ_exc_thresh` print the `is_in` list of a group_by
 in its unspecified order. The bank test compares these up to that order.
 
-Open after round CD (Review CD1): the position of merged bounds and of a
-None bound's null column in the evaluated predicate, the order of
-stream filter predicates across columns when one fails, an empty tuple in
-`attr_value_different_persons` on temporal columns, and tie orders of
-`filter_df_keeping_spno_activities` that reach an error message (six
-calls of fresh seeds 4244 and 4245).
+Round CE fixed the six calls round CD left open (Review CE1): Polars
+moves the bounds it merges after the column's unmerged predicates and
+nests the chain to the left, a None bound's null column joins the
+predicates above it, the stream filters of several columns come in the
+order pushdown leaves them, LTL compares a list on temporal, Boolean,
+Categorical and Enum columns, and the bank test checks
+`filter_df_keeping_spno_activities` ties as a tie set.
+
+## Edge values (round CE)
+
+`scripts/polars_filter_ce_domain.py` extends the typed domain with
+Boolean and all-null (`Null` dtype) activity columns, an edge argument
+mode (ints past 2**53, at and past the Int64 range up to 2**64 - 1, ints
+that do not fit the narrow integer columns, floats past 1e16, NaN, the
+infinities, -0.0, datetimes before 1970, bools and unknown strs, alone or
+in lists and tuples), and numeric filters (`apply_numeric`,
+`apply_numeric_events`) on the activity column with typed and edge
+bounds and as stream filter values.
+`scripts/capture-polars-filter-bank.py --domain polars_filter_ce_domain.py
+--count 800 --bank-seed 2026111436 --hash-seeds 0,1 --repeats 3` captures
+`docs/polars-filter-ce-bank.json.gz` (23,212 calls), replayed by
+`minera_polars_filter_ce_bank_parity_tests`.
+
+* **Ints past the Int64 range.** A Python int above 2**63 - 1 is an
+  Int128 value and makes a list of non-negative ints and bools UInt64
+  (any other such list builds strictly from its first item, so a bool
+  after it fails). `col(x) OP v` compares it exactly on `UInt64`, casts a
+  Boolean column to `UInt64`, a signed column to `Float64`, folds it to a
+  constant on a narrower unsigned column, and leaves a `dyn int` that
+  matches nothing on temporal and Null columns; String and Categorical
+  columns fail naming `u64`. In `is_in` a UInt64 list meets signed
+  columns in `Int128` and narrower unsigned columns in `UInt64`, an
+  Int128 list meets every integer column in `Int128`, and float columns
+  read the values as floats.
+* **Null columns.** A comparison casts the column to the literal's type
+  (str, bool, `Datetime('μs'[, zone])`), a dynamic int or float stays as
+  written; `is_in` casts it to the list's element type, and `==` with a
+  list to `List(T)`; a list of lists fails.
+* **Boolean columns.** A comparison with an int casts the column to
+  `Int32` (`Int64` past its range).
+* **Display.** Floats in list literals and build errors print as a frame
+  prints them (`1e6`, `9.99999e5`, `1.0000e17`, `9.0072e15`, `0.3`).
+* **Before 1970.** A microsecond literal reaches a millisecond column by
+  floor division.
+* **Merges.** Only comparisons on the bare column merge (a cast operand
+  never does); a str literal on an Enum column merges as text whether or
+  not it is a category; literals of different classes are unordered and
+  keep the first bound; an `==` on a nanosecond column
+  (`is_between([v, v + 999 ns])`) merges as the range it is.
+* **between.** The separator error casts a case column of any other dtype
+  than String (`col("case:concept:name").strict_cast(String)`) and prints
+  the anchors resolved, as the plan below the failing select is.
+* **Resolution errors.** A failing node prints the leaves before the
+  failing one coerced (a None leaf as `null.repeat`) and the leaves after
+  it as written (`col > null`, `dyn int: 2`). A scalar `is_in` that
+  resolves prints the scalar imploded and cast to the supertype of column
+  and value (300 on an `Int8` column:
+  `col("x").cast(Int16).is_in([[300].cast(List(Int16))])`; a float on
+  integers with `strict_cast(Float64)`).
+* **paths.** A list or tuple activity refuses the separator str with
+  Python's own message (`can only concatenate list (not "str") to
+  list`); in `apply_performance` a None bound after the failing one drops
+  from the larger expression, and before it leaves
+  `null.repeat([col("@@duration").len()])` in place of the path test.
+
+Declared orders: `filter_traces_intersecting` and
+`filter_on_case_performance` keep the cases of a group_by in an
+unspecified order (fresh seed 2026111437 case 518 and seed 4247 case 333:
+two cases came in one order in all six captured runs, while reruns over
+several hash seeds gave both orders).
+
+Outside the domain: Duration, Time, Decimal and Int128 columns (the table
+transport has no cell for their values) and ints above the UInt64 range
+(the bank's typed JSON carries at most UInt64).

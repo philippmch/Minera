@@ -25983,3 +25983,138 @@ Verification (scripts in the project files under `review-harness/round-cd/`;
 | Re-review of CC: the Polars CC sequence domain on a fresh seed (2026111342) | 7,866 calls on 600 frames, hash seeds 0-1, 6 runs each | 0 mismatches |
 | Re-review of CC: the pandas CC sequence domain on a fresh seed (2026111341) | 9,182 calls on 800 frames, hash seeds 0-1 | 1 (declared set order) |
 | Earlier banks (pandas and Polars sequence filters, Polars table filters) | 9 banks | 0 mismatches |
+
+## Review CE1: re-review of round CD, and edge values on typed keys in the Polars table filters (2026-11-14)
+
+Round CE checked CD's CI run (43532993607) and fixed the six calls CD
+left open, then extended the typed table filter domain with edge values.
+Findings, all fixed:
+
+- **CE1-1 CD's CI run on Windows.** Linux, macOS, the Python script
+  tests, the frontend and the verifier were green; the Windows ctest
+  failed in `minera_polars_filter_cc_bank_parity_tests` with 45 calls
+  (`filter_df_relative_occurrence_event_attribute` 27,
+  `filter_df_keeping_spno_activities` 11,
+  `filter_df_keeping_activ_exc_thresh` 7), all on Europe/Berlin
+  `Datetime` activity columns whose error text lists the kept values:
+  MSVC's zone database names the zone "GMT+1" (ICU) where Polars prints
+  "CET". The table filter bank test now masks the word after a wall time
+  in error messages on MSVC only, as the sequence filter bank test does
+  (CC1-1, declared in AY2).
+- **CE1-2 CD1's open calls.** Predicate pushdown, modelled on 12,000
+  random filter chains in Polars 1.44.1: walking down the plan, a filter
+  joins the pending predicates under its column; one equal to a pending
+  predicate is dropped, any other is combined in front (lower filters to
+  the left); a filter on a null column stays where it is and the pending
+  predicates join it. A node folds its columns left to right in bytewise
+  order, the null filter right after the predicates of its own column.
+  The interval merge runs on a node's whole conjunction and only when it
+  leaves fewer comparisons: the node becomes the comparisons it did not
+  merge, in order, then each column's lower and upper bound, folded to
+  the left; an empty interval empties the frame below the lowest filter,
+  and the filters above still run (and raise) on the empty frame. This
+  fixes merged bounds and None bounds in the evaluated predicate (seed
+  4245, cases 357 and 757) and the order of stream filters on two columns
+  when one fails (seed 4244, case 570). LTL casts a list literal to
+  String only on a String column; temporal, Boolean, Categorical and Enum
+  columns compare it as a list and fail (`attr_value_different_persons`
+  with an empty tuple on a `Datetime` column, case 121). The bank test
+  checks `filter_df_keeping_spno_activities` ties as a tie set: a kept
+  table holds k groups that no unkept group outranks (the null group may
+  take a place but never keeps rows), and an error text lists every value
+  all captured runs listed and only values some run listed (cases 804 and
+  1005).
+- **CE1-3 Edge values on typed keys.** `scripts/polars_filter_ce_domain.py`
+  adds Boolean and `Null` activity columns, edge arguments (ints past
+  2**53, at and past the Int64 range up to 2**64 - 1, ints that do not fit
+  narrow columns, floats past 1e16, NaN, the infinities, -0.0, datetimes
+  before 1970, bools, unknown strs, alone or in lists and tuples) and
+  numeric filters on the activity column. Its first bank (seed
+  2026111436) differed in 159 of 23,212 calls; CE1-4 to CE1-9 fixed them.
+- **CE1-4 Python ints past the Int64 range.** The shared literal model
+  holds them (decimal text up to 2**64 - 1): a scalar is an Int128 value,
+  a list of non-negative ints and bools is UInt64 and any other such list
+  builds strictly from its first item. Supertypes: Int128 takes Int64,
+  Boolean and UInt64; UInt64 with Boolean stays UInt64; UInt64 with Int64,
+  and either wide type with Float64, gives Float64. Comparisons follow
+  CD1-9 in every table filter (they wrapped in the signed model outside
+  the attribute filters). `is_in` with a UInt64 list casts signed columns
+  to Int128 and narrower unsigned ones to UInt64, with an Int128 list
+  every integer column to Int128; float columns read the values as
+  floats; other dtypes fail (`'is_in' cannot check for List(UInt64)
+  values in String data`).
+- **CE1-5 Null and Boolean columns.** On a `Null` column a comparison
+  casts the column to the literal's type (str, bool,
+  `Datetime('μs'[, zone])`) while a dynamic int or float stays as written;
+  `is_in` casts it to the element type (none for a null list), `==` with
+  a list to `List(T)`, and a list of lists fails. A Boolean column
+  compared with an int casts to `Int32` (`Int64` past its range).
+- **CE1-6 List literals everywhere.** The LTL, timestamp, between, case
+  and path filters build list arguments through the shared model, as the
+  attribute filters do: construction TypeErrors, element types (naive
+  datetimes as `Datetime('μs')`, the supertype fold) and the plan display,
+  whose floats print as a frame prints them (`1e6`, `9.99999e5`,
+  `1.0000e17`, `9.0072e15`, `0.3`). A datetime separator in between
+  casts to String as Polars casts it (`2021-03-01 08:00:00.000000`).
+- **CE1-7 Merge and comparison details.** Only comparisons on the bare
+  column merge (a cast operand never does: Boolean, integer and temporal
+  columns probed); literals of different classes are unordered and keep
+  the first bound; a str on an Enum column merges as text whether or not
+  it is a category. A microsecond literal reaches a millisecond column by
+  floor division, so datetimes before 1970 round down.
+- **CE1-8 Resolution errors.** A failing node prints the leaves before the
+  failing one coerced (a None leaf as `null.repeat`) and those after it
+  as written (`col > null`, `dyn int: 2`). A scalar `is_in` that resolves
+  prints the scalar imploded and cast to the supertype of column and
+  value (`col("x").cast(Int16).is_in([[300].cast(List(Int16))])` on
+  `Int8`; `strict_cast(Int64)` for a negative value on `UInt64`;
+  `strict_cast(Float64)` for a float on integers; a `Null` column cast to
+  `Unknown(Int(v))`, `Unknown(Float)`, `Boolean` or the datetime type).
+- **CE1-9 paths.** A list or tuple activity refuses the separator with
+  Python's own TypeError (`can only concatenate list (not "str") to
+  list`). In `apply_performance` a None bound after the failing bound
+  drops from the larger expression (`[(failing) & (path test)]`); before
+  it, the path test folds into `null.repeat([col("@@duration").len()])`.
+- **CE1-10 Fresh seeds.** Seed 2026111437 found five calls (a resolved
+  scalar `is_in` plan, a `Null` column with an empty-list stream value,
+  `List(List(Null))` on a `Null` column, the paths None bound of CE1-9,
+  and a declared row order below); seed 4246 found three (two Enum merges
+  of a category and a non-category str, a `Null` column with a UInt64
+  list). Seed 4247 found three: an `==` on a nanosecond column, which
+  Polars prints as `is_between([v, v + 999 ns])`, merges with other
+  bounds as the range it is (lower `v`, upper `v + 999 ns`); between's
+  separator error casts a case column of any dtype but String with
+  `strict_cast(String)` and prints the anchors resolved
+  (`is_in([[1].cast(List(Float32))])`, in the `_first_act` and
+  `_last_act` filters too); and a declared case order below. All fixed.
+
+Declarations:
+
+- `filter_traces_intersecting` keeps the cases of a group_by in an
+  unspecified order: seed 2026111437 case 518 captured one order in all
+  six runs, while 16 reruns over hash seeds 0-3 gave both. The bank in
+  the suite does not hit it.
+- `filter_on_case_performance` keeps its cases in an unspecified order as
+  well: seed 4247 case 333 captured one order, while 18 reruns over hash
+  seeds 0-2 gave both.
+
+Not covered: Duration, Time, Decimal and Int128 columns (no table cell
+for their values) and ints above the UInt64 range (not in the bank's
+typed JSON).
+
+Tests: `docs/polars-filter-ce-bank.json.gz` replayed by
+`minera_polars_filter_ce_bank_parity_tests`; the CC bank test passes on
+MSVC through the abbreviation mask.
+
+Verification (scripts in the project files under `review-harness/round-ce/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Edge values on typed keys (CE bank, seed 2026111436) | 23,212 calls on 800 frames, hash seeds 0-1, 3 runs each | before: 159 mismatches; after: 0 |
+| The same domain on seed 2026111437 | 23,269 calls on 800 frames, hash seeds 0-1, 3 runs each | 5 found; after: 0 and 1 declared order |
+| The same domain on seed 4246 | 17,418 calls on 600 frames, hash seeds 0-1, 3 runs each | 3 found; after: 0 |
+| The same domain on seed 4247 | 14,498 calls on 500 frames, hash seeds 0-1, 3 runs each | 3 found; after: 0 and 1 declared order |
+| CD's open fresh seeds (4244 typed, 4245 base) | 41,422 and 27,620 calls | before: 4 and 2; after: 0 |
+| CD's fresh seed 4243, the CC bank, the base bank | 16,634, 33,137 and the base bank's calls | 0 mismatches |
+| `col(x) OP v` probes (column dtypes, literal kinds, operators) | 4,730 probes against Polars 1.44.1 | 0 differences |
+| Pushdown model (Python) against Polars | 12,000 random filter chains | 0 differences |

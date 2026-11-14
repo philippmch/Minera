@@ -149,6 +149,9 @@ std::string filter_plan(const EventTable& table,const std::string& expression) {
 std::string expression_literal(const EventAttribute& value,bool dynamic=false,bool decimal=false) {
   if(null(value))return "null";
   if(collection(value)) {
+    // Round CE: a list or tuple as pl.lit built it.
+    if(value.container!=AttributeContainerKind::kContainer)
+      try{return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(value));}catch(const PolarsSequenceFilterError&){}
     // Polars prints the first two and the last item of a longer list.
     const auto& items=value.children;std::string out="[";
     for(std::size_t i=0;i<items.size();++i) {
@@ -315,6 +318,8 @@ std::string list_dtype(const EventAttribute& query) {
     return "String";
   }
   if(query.container==AttributeContainerKind::kContainer)return "String";
+  // Round CE: the element type as pl.lit builds the list.
+  try{return detail::polars_lit::debug_name(detail::polars_lit::argument_literal(query).type);}catch(const PolarsSequenceFilterError&){}
   for(const auto& v:query.children)if(!null(v)) {
     if(collection(v))return "List("+list_dtype(v)+")";
     if(date(v))return detail::polars_lit::debug_name(detail::polars_lit::lit_value(detail::polars_lit::value_of(v)).type);
@@ -413,19 +418,32 @@ detail::polars_lit::Operands operands(const Leaf& l,bool cast_list=false) {
   const auto& v=l.value;
   if(collection(v)) {
     if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum("))return {column,expression_literal(v)+(cast_list?".cast(String)":""),{}};
+    // Round CE: a Null column casts to the list's type.
+    if(l.dtype=="Null"&&v.container!=AttributeContainerKind::kContainer)
+      try{return {column+".cast("+lit::debug_name(lit::list_of(lit::argument_literal(v).type))+")",expression_literal(v),{}};}catch(const PolarsSequenceFilterError&){}
     return {column,expression_literal(v),{}};
   }
   if(auto wide=wide_operands(l))return *wide;
   const auto value=lit::value_of(v);const auto op=lit::compare_op(l.op);
-  if(!lit::check_scalar(l.column,l.dtype,value,op).ok())return {column,lit::scalar_display(value),{}};
+  if(!lit::check_scalar(l.column,l.dtype,value,op,l.categories.empty()?nullptr:&l.categories).ok())return {column,lit::scalar_display(value),{}};
   return lit::coerced_operands(l.column,l.dtype,value,op);
 }
 std::string null_text(const Leaf& l) { return "null.repeat([col("+quote(l.column)+").len()])"; }
-std::string plan_text(const Expr& e,const Leaf* cast=nullptr) {
-  if(e.leaf){if(null_leaf(*e.leaf))return null_text(*e.leaf);return operands(*e.leaf,cast==&*e.leaf).text(detail::polars_lit::compare_op(e.leaf->op));}
-  auto wrap=[&](const Expr& k){const auto t=plan_text(k,cast);return k.leaf&&null_leaf(*k.leaf)?t:"("+t+")";};
-  return wrap(e.kids[0])+" "+e.op+" "+wrap(e.kids[1]);
+// cast: the leaf whose resolution failed. Round CE: its node prints the
+// comparisons before it coerced, the ones after it as written.
+std::string plan_text_at(const Expr& e,const Leaf* cast,bool& past) {
+  if(e.leaf) {
+    const auto& l=*e.leaf;
+    if(&l==cast){past=true;return operands(l,true).text(detail::polars_lit::compare_op(l.op));}
+    if(past)return "col("+quote(l.column)+") "+l.op+" "+(null_leaf(l)?std::string("null"):collection(l.value)?expression_literal(l.value):detail::polars_lit::scalar_display(detail::polars_lit::value_of(l.value)));
+    if(null_leaf(l))return null_text(l);
+    return operands(l).text(detail::polars_lit::compare_op(l.op));
+  }
+  auto wrap=[&](const Expr& k){const bool folded=k.leaf&&null_leaf(*k.leaf)&&!past&&&*k.leaf!=cast;const auto t=plan_text_at(k,cast,past);return folded?t:"("+t+")";};
+  const auto left=wrap(e.kids[0]);
+  return left+" "+e.op+" "+wrap(e.kids[1]);
 }
+std::string plan_text(const Expr& e,const Leaf* cast=nullptr) { bool past=false;return plan_text_at(e,cast,past); }
 // Round CD: an evaluated folded form prints bare, a when-then with a leading
 // dot (as filter_traces_attribute_in_timeframe prints it).
 std::string error_text(const Expr& e) {
@@ -438,24 +456,42 @@ std::string chain_plan(const EventTable& table,const std::vector<std::string>& f
   return out+indent+frame_plan(table);
 }
 const Expr* leaf_node(const Expr& e) { return e.leaf?&e:nullptr; }
-// Predicate pushdown: walking down, a filter joins the pending predicates; a
-// filter on a null column stays in place with the pending ones. Predicates
-// combine per column name (bytewise order), lower filters to the left.
+// Predicate pushdown (round CE, modelled on 12,000 random chains in Polars
+// 1.44.1): walking down, a filter joins the pending predicates, keyed by its
+// column; a predicate equal to one already under its key is dropped, else it
+// is combined in front of them (lower filters to the left). A filter on a
+// null column (null.repeat) stays in place: the pending predicates join it.
+// A node folds its keys left to right in bytewise order, the null filter
+// right after the predicates of its own column.
 std::string predicate_column(const Expr& e) { std::string out;each_leaf(e,[&](const Leaf& l){if(out.empty())out=l.column;});return out; }
+void conjuncts(const Expr& e,std::vector<const Expr*>& out) {
+  if(!e.leaf&&e.op=="&"){conjuncts(e.kids[0],out);conjuncts(e.kids[1],out);}else out.push_back(&e);
+}
+Expr fold_left(std::vector<Expr> items) {
+  Expr acc=std::move(items.front());
+  for(std::size_t i=1;i<items.size();++i)acc=binary(std::move(acc),"&",std::move(items[i]));
+  return acc;
+}
 // Round CD: Polars merges the comparisons of one operand with typed
 // literals into an interval, in the order the filters apply: a tighter bound
 // replaces the current one, an equality bounds both sides, and a literal
 // without an order against the current bound (another type, NaN) leaves it.
 // The merge replaces the comparisons only when it leaves fewer of them: an
 // empty interval empties the frame, a point becomes ==, else the bounds.
-struct MergeKey { int tag=0; detail::polars_lit::Wide i; double d=0; std::string s; };
+// hi: the upper key of an == on a nanosecond column, which Polars prints as
+// is_between([v, v + 999 ns]) and merges as both bounds (round CE).
+struct MergeKey { int tag=0; detail::polars_lit::Wide i; double d=0; std::string s; std::optional<detail::polars_lit::Wide> hi; };
 std::optional<MergeKey> merge_key(const Leaf& l) {
   namespace lit=detail::polars_lit;
   if(null(l.value))return {};
   if(l.op!=">="&&l.op!="<="&&l.op!=">"&&l.op!="<"&&l.op!="==")return {};
   const auto o=operands(l);
+  // Round CE: only comparisons on the bare column merge (a cast operand
+  // never does; probed on Boolean, integer and temporal columns).
+  const bool ns_point=l.op=="=="&&o.whole.starts_with("col("+quote(l.column)+").is_between([");
+  if(!ns_point&&o.lhs!="col("+quote(l.column)+")")return {};
   if(collection(l.value)){MergeKey k;k.tag=20;k.s=o.rhs;return k;}
-  if(!o.whole.empty()||o.rhs.rfind("dyn ",0)==0)return {};
+  if((!o.whole.empty()&&!ns_point)||o.rhs.rfind("dyn ",0)==0)return {};
   if(const auto u=wide_literal(l.value)) {
     MergeKey k;
     if(l.dtype=="UInt64"||l.dtype=="Boolean"){k.i=lit::Wide(*u);return k;}
@@ -465,6 +501,8 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
   const auto v=lit::value_of(l.value);const auto op=lit::compare_op(l.op);
   const auto check=lit::check_scalar(l.column,l.dtype,v,op,l.categories.empty()?nullptr:&l.categories);
   MergeKey k;
+  // Round CE: str literals on an Enum column merge as text, members or not.
+  if(lit::enum_dtype(l.dtype)&&v.kind==lit::Kind::kString){k.tag=2;k.s=v.text;return k;}
   if(!check.ok()) {
     // A typed literal the comparison cannot coerce keeps its own type.
     switch(v.kind){
@@ -507,6 +545,8 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
     if(v.kind==lit::Kind::kDate){k.i=lit::wide_mul(v.integer,86'400'000'000'000LL/unit);return k;}
     const auto m=lit::literal_micros(v);
     k.i=unit==1?lit::wide_add(lit::wide_mul(m,1000),op==lit::CompareOp::kLe?999:0):lit::Wide(unit==1000?m:m/1000);
+    if(ns_point&&unit==1)k.hi=lit::wide_add(lit::wide_mul(m,1000),999);
+    if(ns_point&&!k.hi)return {};
     return k;
   }
   return {};
@@ -519,9 +559,9 @@ std::optional<int> merge_order(const MergeKey& a,const MergeKey& b) {
   return a.i<b.i?-1:a.i>b.i?1:0;
 }
 struct Bound { MergeKey key; bool inclusive=true; Leaf leaf; };
-// Merges one operand's comparisons (application order); nullopt: no change,
-// an empty vector: an empty interval.
-std::optional<std::vector<Leaf>> merge_interval(const std::vector<std::pair<Leaf,MergeKey>>& items) {
+// Merges one operand's comparisons (application order) into its bounds; an
+// empty vector: an empty interval.
+std::vector<Leaf> merge_interval(const std::vector<std::pair<Leaf,MergeKey>>& items) {
   std::optional<Bound> lower,upper;
   const auto tighten=[](std::optional<Bound>& bound,const Bound& next,int direction) {
     if(!bound){bound=next;return;}
@@ -532,7 +572,7 @@ std::optional<std::vector<Leaf>> merge_interval(const std::vector<std::pair<Leaf
   for(const auto& [leaf,key]:items) {
     const bool strict=leaf.op==">"||leaf.op=="<";
     if(leaf.op==">="||leaf.op==">"||leaf.op=="==")tighten(lower,Bound{key,!strict,leaf},1);
-    if(leaf.op=="<="||leaf.op=="<"||leaf.op=="==")tighten(upper,Bound{key,!strict,leaf},-1);
+    if(leaf.op=="<="||leaf.op=="<"||leaf.op=="=="){auto up=key;if(key.hi)up.i=*key.hi;tighten(upper,Bound{up,!strict,leaf},-1);}
   }
   std::vector<Leaf> out;
   const auto bound_leaf=[](const Bound& b,bool low){auto l=b.leaf;l.op=low?(b.inclusive?">=":">"):(b.inclusive?"<=":"<");return l;};
@@ -542,49 +582,73 @@ std::optional<std::vector<Leaf>> merge_interval(const std::vector<std::pair<Leaf
     if(c&&*c==0){auto l=lower->leaf;l.op="==";out.push_back(l);}
     else{out.push_back(bound_leaf(*lower,true));out.push_back(bound_leaf(*upper,false));}
   } else out.push_back(bound_leaf(lower?*lower:*upper,lower.has_value()));
-  if(out.size()>=items.size())return {};
   return out;
 }
-Expr combine(const std::vector<Expr>& items,bool& empty) {
-  std::map<std::string,std::vector<const Expr*>> groups;
-  for(const auto& item:items)groups[predicate_column(item)].push_back(&item);
-  std::optional<Expr> out;
-  for(const auto& [name,group]:groups) {
-    // Application order: the lowest filter first.
-    std::vector<Expr> applied;for(auto at=group.rbegin();at!=group.rend();++at)applied.push_back(**at);
-    std::map<std::string,std::vector<std::size_t>> operand_items;
-    for(std::size_t i=0;i<applied.size();++i)if(applied[i].leaf&&merge_key(*applied[i].leaf))operand_items[operands(*applied[i].leaf).lhs].push_back(i);
-    std::vector<std::optional<std::vector<Leaf>>> replacement(applied.size());
-    std::vector<bool> dropped(applied.size(),false);
-    for(const auto& [lhs,positions]:operand_items) {
-      if(positions.size()<2)continue;
-      std::vector<std::pair<Leaf,MergeKey>> list;
-      for(const auto i:positions)list.emplace_back(*applied[i].leaf,*merge_key(*applied[i].leaf));
-      const auto merged=merge_interval(list);
-      if(!merged)continue;
-      if(merged->empty()){empty=true;return Expr{};}
-      for(const auto i:positions)dropped[i]=true;
-      replacement[positions.front()]=*merged;
-    }
-    std::vector<Expr> kept;
-    for(std::size_t i=0;i<applied.size();++i) {
-      if(replacement[i])for(const auto& l:*replacement[i])kept.push_back(Expr{l,"",{}});
-      else if(!dropped[i])kept.push_back(applied[i]);
-    }
-    Expr acc=kept.back();for(std::size_t i=kept.size()-1;i-->0;)acc=binary(kept[i],"&",std::move(acc));
-    out=out?binary(std::move(*out),"&",std::move(acc)):std::move(acc);
+// Round CE: the interval merge runs on a node's whole conjunction. It changes
+// the node only when it leaves fewer comparisons in all: then the node is
+// rebuilt as the comparisons it did not merge, in order, followed by each
+// operand's bounds (lower, upper; operands in order of first appearance),
+// folded left. An empty interval empties the frame below the lowest filter
+// (scan = true); in a null filter's node it leaves the node unchanged.
+Expr merge_node(Expr node,bool scan,bool& empty) {
+  std::vector<const Expr*> leaves;conjuncts(node,leaves);
+  std::vector<std::string> order;std::map<std::string,std::vector<std::size_t>> by_operand;
+  for(std::size_t i=0;i<leaves.size();++i)if(leaves[i]->leaf&&merge_key(*leaves[i]->leaf)) {
+    const auto o=operands(*leaves[i]->leaf);
+    const auto lhs=o.whole.empty()?o.lhs:"col("+quote(leaves[i]->leaf->column)+")";  // an == range on ns
+    if(!by_operand.count(lhs))order.push_back(lhs);
+    by_operand[lhs].push_back(i);
   }
-  return *out;
+  if(order.empty())return node;
+  std::vector<bool> merged(leaves.size(),false);std::vector<Expr> bounds;std::size_t before=0;
+  for(const auto& lhs:order) {
+    const auto& positions=by_operand[lhs];
+    std::vector<std::pair<Leaf,MergeKey>> list;
+    for(const auto i:positions){list.emplace_back(*leaves[i]->leaf,*merge_key(*leaves[i]->leaf));merged[i]=true;}
+    const auto out=merge_interval(list);
+    if(out.empty()){if(scan)empty=true;return node;}
+    before+=positions.size();
+    for(const auto& l:out)bounds.push_back(Expr{l,"",{}});
+  }
+  if(bounds.size()>=before)return node;
+  std::vector<Expr> items;
+  for(std::size_t i=0;i<leaves.size();++i)if(!merged[i])items.push_back(*leaves[i]);
+  items.insert(items.end(),bounds.begin(),bounds.end());
+  return fold_left(std::move(items));
 }
+// pending: the predicates above the node, topmost first.
+Expr build_node(const std::vector<Expr>& pending,const Expr* own,bool scan,bool& empty) {
+  std::map<std::string,Expr> groups;
+  for(const auto& item:pending) {
+    const auto key=predicate_column(item);
+    const auto found=groups.find(key);
+    if(found==groups.end()){groups.emplace(key,item);continue;}
+    std::vector<const Expr*> present;conjuncts(found->second,present);
+    const auto text=plan_text(item);
+    if(item.leaf&&std::any_of(present.begin(),present.end(),[&](const Expr* e){return e->leaf&&plan_text(*e)==text;}))continue;
+    found->second=binary(item,"&",std::move(found->second));
+  }
+  std::vector<Expr> entries;bool placed=own==nullptr;
+  const auto own_key=own?predicate_column(*own):std::string();
+  for(auto& [key,expr]:groups) {
+    if(!placed&&key>own_key){entries.push_back(*own);placed=true;}
+    entries.push_back(std::move(expr));
+  }
+  if(!placed)entries.push_back(*own);
+  return merge_node(fold_left(std::move(entries)),scan,empty);
+}
+// Nodes bottom first; `empty`: the lowest node's interval is empty, so the
+// frame is empty below every node (the lowest node is dropped).
 std::vector<Expr> pushdown(const std::vector<Expr>& chain,bool& empty) {
   std::vector<Expr> nodes,pending;
   for(auto p=chain.rbegin();p!=chain.rend();++p) {
-    if(p->leaf&&null_leaf(*p->leaf)) {
-      std::vector<Expr> items{*p};items.insert(items.end(),pending.begin(),pending.end());
-      nodes.push_back(combine(items,empty));pending.clear();
-    } else pending.push_back(*p);
+    if(p->leaf&&null_leaf(*p->leaf)){bool unused=false;nodes.push_back(build_node(pending,&*p,false,unused));pending.clear();}
+    else pending.push_back(*p);
   }
-  if(!pending.empty())nodes.push_back(combine(pending,empty));
+  if(!pending.empty()) {
+    auto node=build_node(pending,nullptr,true,empty);
+    if(!empty)nodes.push_back(std::move(node));
+  }
   std::reverse(nodes.begin(),nodes.end());return nodes;
 }
 std::optional<std::pair<std::string,std::string>> leaf_error(const Leaf& l) {
@@ -592,7 +656,8 @@ std::optional<std::pair<std::string,std::string>> leaf_error(const Leaf& l) {
   const auto& v=l.value;
   if(null(v))return {};
   if(collection(v)) {
-    if(l.dtype=="String")return {};
+    // Round CE: a Null column compares a list (cast to its type).
+    if(l.dtype=="String"||l.dtype=="Null")return {};
     if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
       // Round CD: a list never compares with a categorical column.
       try {
@@ -600,14 +665,14 @@ std::optional<std::pair<std::string,std::string>> leaf_error(const Leaf& l) {
         return std::pair<std::string,std::string>{"ComputeError","cannot compare categorical with "+detail::polars_lit::short_name(detail::polars_lit::list_of(list.type))};
       } catch(const PolarsSequenceFilterError&) {return {};}
     }
-    return std::pair<std::string,std::string>{"SchemaError","could not evaluate "+(l.op=="=="?std::string():"'"+l.op+"' ")+"comparison between series '"+l.column+"' of dtype: "+detail::polars_lit::is_in_dtype_name(l.dtype)+" and series 'literal' of dtype: List("+detail::polars_list_literal(v).inner+")"};
+    return std::pair<std::string,std::string>{"SchemaError","could not evaluate "+(l.op=="=="?std::string():"'"+l.op+"' ")+"comparison between series '"+l.column+"' of dtype: "+detail::polars_lit::is_in_dtype_name(l.dtype)+" and series 'literal' of dtype: List("+list_dtype(v)+")"};
   }
   if(wide_literal(v)) {
     if(l.dtype=="String")return std::pair<std::string,std::string>{"ComputeError","cannot compare string with numeric type (u64)"};
     if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum("))return std::pair<std::string,std::string>{"ComputeError","cannot compare categorical with u64"};
     return {};
   }
-  const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(v),lit::compare_op(l.op));
+  const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(v),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
   if(check.stage==lit::ScalarCheck::Stage::kCompute)return std::pair<std::string,std::string>{check.type,check.message};
   return {};
 }
@@ -666,12 +731,12 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
         if(bad||null(l.value))return;
         if(collection(l.value)) {
           if(l.dtype!="String")return;
-          bad=&l;message="cannot cast List type (inner: '"+detail::polars_list_literal(l.value).inner+"', to: 'String')";
+          bad=&l;message="cannot cast List type (inner: '"+list_dtype(l.value)+"', to: 'String')";
           return;
         }
         if(wide_literal(l.value))return;
         namespace lit=detail::polars_lit;
-        const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(l.value),lit::compare_op(l.op));
+        const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(l.value),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
         if(check.stage==lit::ScalarCheck::Stage::kResolve){bad=&l;message=check.message;}
       });
       if(bad){auto with=resolved_filters;with.push_back(plan_text(node,bad));fail_at(i,true,"InvalidOperationError",message,chain_plan(source,with));}
@@ -690,8 +755,9 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
   }
   bool empty=false;
   p.merged=pushdown(p.chain,empty);
-  // An empty interval empties the frame before any filter runs.
-  if(empty){p.empty=true;p.merged.clear();}
+  // Round CE: an empty interval in the lowest node empties the frame; the
+  // filters above it still run (and raise) on the empty frame.
+  if(empty)p.empty=true;
   for(const auto& node:p.merged) {
     const Expr* at=nullptr;
     if(const auto error=first_error(node,at))
@@ -746,7 +812,10 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
   if(trace) {
     const auto& role=call.options.case_id_key;
     if(collection(role))fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
-    const auto plan=filter_plan(source,p.literal?list_membership(attr.value,p.dtype,*p.literal,true,true,cells?cells->empty():call.values->children.empty()):membership_expr(attr.value,*call.values,true));
+    // Round CE: a scalar value as the resolved plan coerces it.
+    std::optional<std::string> scalar;
+    if(!p.literal&&!null(*call.values)&&!collection(*call.values))scalar=detail::polars_lit::coerced_scalar_is_in(attr.value,p.dtype,detail::polars_lit::value_of(*call.values));
+    const auto plan=filter_plan(source,p.literal?list_membership(attr.value,p.dtype,*p.literal,true,true,cells?cells->empty():call.values->children.empty()):scalar?*scalar:membership_expr(attr.value,*call.values,true));
     if(integer(role))p.literal_case=true;
     else {
       const auto c=index_of(source,role.value);
@@ -812,7 +881,7 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
   if(collection(attr)) {
     if(attr.children.empty())fail("IndexError","apply","tuple index out of range");
     // A key list groups by each of its items.
-    if(result.once)if(const auto error=detail::polars_list_literal(attr).error)fail("TypeError","apply",*error);
+    if(result.once)if(const auto error=detail::polars_lit::argument_literal_error(attr))fail("TypeError","apply",*error);
     for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
       if(!result.once)fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),groupnodes));
     throw std::invalid_argument("Native Polars attribute counts accept a single key");

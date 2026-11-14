@@ -3071,6 +3071,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cc_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cc-bank.json.gz")
   set_tests_properties(minera_polars_filter_cc_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CE: Boolean and Null activity columns, edge arguments (ints past
+  # 2**53 and the Int64 range, NaN, infinities, -0.0, datetimes before
+  # 1970) and numeric filters on the activity column.
+  add_test(NAME minera_polars_filter_ce_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-ce-bank.json.gz")
+  set_tests_properties(minera_polars_filter_ce_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

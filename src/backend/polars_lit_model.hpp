@@ -46,6 +46,35 @@ inline std::int64_t integer_of(const EventAttribute& cell) {
   if (const auto* u = std::get_if<std::uint64_t>(&cell.typed_value)) return static_cast<std::int64_t>(*u);
   return std::stoll(cell.value);
 }
+// Round CE: a Python int above the Int64 range (up to 2**64 - 1, as typed
+// JSON carries it in UInt64) is a kInt value whose text holds its decimal
+// digits; integer then holds its low 64 bits. Polars types it Int128 as a
+// value, UInt64 in a list of non-negative ints.
+inline Value wide_value(std::uint64_t u) {
+  auto v = Value::of(static_cast<std::int64_t>(u));
+  v.text = std::to_string(u);
+  return v;
+}
+inline std::optional<std::uint64_t> wide_int(const Value& v) {
+  if (v.kind != Kind::kInt || v.text.empty()) return std::nullopt;
+  return static_cast<std::uint64_t>(v.integer);
+}
+inline std::optional<std::uint64_t> wide_cell(const EventAttribute& cell) {
+  constexpr auto top = static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+  if (const auto* u = std::get_if<std::uint64_t>(&cell.typed_value)) return *u > top ? std::optional<std::uint64_t>(*u) : std::nullopt;
+  if (!std::holds_alternative<std::monostate>(cell.typed_value)) return std::nullopt;
+  std::uint64_t u = 0;
+  const auto* first = cell.value.data();
+  const auto* last = first + cell.value.size();
+  const auto r = std::from_chars(first, last, u);
+  if (r.ec == std::errc{} && r.ptr == last && u > top) return u;
+  return std::nullopt;
+}
+inline double integer_real(const Value& v) {
+  if (const auto u = wide_int(v)) return static_cast<double>(*u);
+  return static_cast<double>(v.integer);
+}
+inline std::string integer_text(const Value& v) { return wide_int(v) ? v.text : std::to_string(v.integer); }
 inline double real_of(const EventAttribute& cell) {
   if (const auto* d = std::get_if<double>(&cell.typed_value)) return *d;
   if (const auto* i = std::get_if<std::int64_t>(&cell.typed_value)) return static_cast<double>(*i);
@@ -128,7 +157,10 @@ inline std::optional<std::int64_t> physical_of(const EventAttribute& cell, const
 // zone); a missing cell is None.
 inline Value python_value(const Cell& cell, const std::string& dtype) {
   if (null_cell(cell)) return Value::none();
-  if (integer_dtype(dtype)) return Value::of(integer_of(*cell));
+  if (integer_dtype(dtype)) {
+    if (const auto u = wide_cell(*cell)) return wide_value(*u);
+    return Value::of(integer_of(*cell));
+  }
   if (float_dtype(dtype)) return Value::of(real_of(*cell));
   if (dtype == "Boolean") return Value::of(true_of(*cell));
   if (dtype == "Date" || datetime_dtype(dtype)) {
@@ -149,7 +181,7 @@ inline bool same_key(const Value& a, const Value& b) {
   switch (a.kind) {
     case Kind::kNone: return true;
     case Kind::kBool: return a.boolean == b.boolean;
-    case Kind::kInt:
+    case Kind::kInt: return a.integer == b.integer && a.text == b.text;
     case Kind::kDate: return a.integer == b.integer;
     case Kind::kFloat: return a.real == b.real || (std::isnan(a.real) && std::isnan(b.real));
     case Kind::kDatetime: return pandas_filter_values_equal(a, b);
@@ -201,7 +233,7 @@ inline std::string string_cast(const EventAttribute& cell, const std::string& dt
 // ("unexpected value while building Series of type X; found value of type Y:
 // v", a list type without the found part).
 struct LitType {
-  enum class K { kNull, kBoolean, kInt64, kFloat64, kString, kDate, kDatetime, kList };
+  enum class K { kNull, kBoolean, kInt64, kFloat64, kString, kDate, kDatetime, kList, kUInt64, kInt128 };
   K kind = K::kNull;
   std::string zone;            // kDatetime: empty when naive
   std::vector<LitType> inner;  // kList: the element type
@@ -214,7 +246,11 @@ inline LitType lit_type(LitType::K kind) { return LitType{kind, {}, {}}; }
 inline LitType list_of(const LitType& inner) { return LitType{LitType::K::kList, {}, {inner}}; }
 inline bool primitive(const LitType& t) {
   using K = LitType::K;
-  return t.kind == K::kBoolean || t.kind == K::kInt64 || t.kind == K::kFloat64 || t.kind == K::kString;
+  return t.kind == K::kBoolean || t.kind == K::kInt64 || t.kind == K::kFloat64 || t.kind == K::kString ||
+         t.kind == K::kInt128 || t.kind == K::kUInt64;
+}
+inline bool python_int(const LitType& t) {
+  return t.kind == LitType::K::kInt64 || t.kind == LitType::K::kInt128 || t.kind == LitType::K::kUInt64;
 }
 // The dtype as a supertype error prints it (bool, i64, datetime[μs, UTC],
 // list[str]) and as a build error does (Boolean, Datetime('μs', 'UTC')).
@@ -229,6 +265,8 @@ inline std::string short_name(const LitType& t) {
     case K::kDate: return "date";
     case K::kDatetime: return t.zone.empty() ? "datetime[\xce\xbcs]" : "datetime[\xce\xbcs, " + t.zone + "]";
     case K::kList: return "list[" + short_name(t.inner[0]) + "]";
+    case K::kUInt64: return "u64";
+    case K::kInt128: return "i128";
   }
   return "?";
 }
@@ -243,6 +281,8 @@ inline std::string debug_name(const LitType& t) {
     case K::kDate: return "Date";
     case K::kDatetime: return t.zone.empty() ? "Datetime('\xce\xbcs')" : "Datetime('\xce\xbcs', '" + t.zone + "')";
     case K::kList: return "List(" + debug_name(t.inner[0]) + ")";
+    case K::kUInt64: return "UInt64";
+    case K::kInt128: return "Int128";
   }
   return "?";
 }
@@ -270,7 +310,7 @@ inline LitValue lit_value(const Value& v) {
   switch (v.kind) {
     case Kind::kNone: return {lit_type(K::kNull), v};
     case Kind::kBool: return {lit_type(K::kBoolean), v};
-    case Kind::kInt: return {lit_type(K::kInt64), v};
+    case Kind::kInt: return {lit_type(wide_int(v) ? K::kInt128 : K::kInt64), v};
     case Kind::kFloat: return {lit_type(K::kFloat64), v};
     case Kind::kString: return {lit_type(K::kString), v};
     case Kind::kDate: return {lit_type(K::kDate), v};
@@ -300,6 +340,8 @@ inline std::string polars_float(double v) {
   return python::float_repr(v);
 }
 inline std::string literal_item(const Value& v);
+inline std::string polars_frame_float(double v);
+inline std::string scalar_display(const Value& v);
 // A literal value as Polars displays it (errors, plans).
 inline std::string lit_display(const LitType& type, const Value& v) {
   if (v.kind == Kind::kNone) return "null";
@@ -314,6 +356,8 @@ inline std::string lit_display(const LitType& type, const Value& v) {
     }
     return out + "]";
   }
+  // Round CE: a Float64 value as a frame shows it (1e6, 9.0072e15, 0.3).
+  if (v.kind == Kind::kFloat) return polars_frame_float(v.real);
   return literal_item(v);
 }
 
@@ -322,6 +366,12 @@ inline std::optional<LitType> lit_supertype(const LitType& l, const LitType& r) 
   const auto inner = [](const LitType& a, const LitType& b) -> std::optional<LitType> {
     if (a == b) return a;
     const auto x = a.kind, y = b.kind;
+    // Round CE: Int128 takes Int64 and Boolean, UInt64 with Int64 widens to
+    // Float64 (probed in pl.lit lists).
+    if (x == K::kInt128 && (y == K::kInt64 || y == K::kBoolean || y == K::kUInt64)) return a;
+    if (x == K::kUInt64 && y == K::kBoolean) return a;
+    if (x == K::kUInt64 && y == K::kInt64) return lit_type(K::kFloat64);
+    if ((x == K::kInt128 || x == K::kUInt64) && y == K::kFloat64) return lit_type(K::kFloat64);
     if ((x == K::kInt64 && y == K::kBoolean) || ((x == K::kDate || x == K::kDatetime) && y == K::kInt64))
       return lit_type(K::kInt64);
     if ((x == K::kInt64 || x == K::kBoolean || x == K::kDate || x == K::kDatetime) && y == K::kFloat64)
@@ -369,7 +419,8 @@ inline std::optional<Value> cast_lit(const Value& v, const LitType& from, const 
       }
       return Value::of(literal_item(v));
     case K::kFloat64:
-      if (from.kind == K::kInt64 || from.kind == K::kDate) return Value::of(static_cast<double>(v.integer));
+      if (python_int(from)) return Value::of(integer_real(v));
+      if (from.kind == K::kDate) return Value::of(static_cast<double>(v.integer));
       if (from.kind == K::kBoolean) return Value::of(v.boolean ? 1.0 : 0.0);
       if (from.kind == K::kDatetime) return Value::of(static_cast<double>(micros()));
       if (from.kind == K::kString) {
@@ -380,6 +431,7 @@ inline std::optional<Value> cast_lit(const Value& v, const LitType& from, const 
       }
       return std::nullopt;
     case K::kInt64:
+      if (python_int(from)) return wide_int(v) ? std::nullopt : std::optional<Value>(v);
       if (from.kind == K::kBoolean) return Value::of(std::int64_t{v.boolean});
       if (from.kind == K::kDate) return Value::of(v.integer);
       if (from.kind == K::kDatetime) return Value::of(micros());
@@ -394,8 +446,17 @@ inline std::optional<Value> cast_lit(const Value& v, const LitType& from, const 
         return Value::of(parsed);
       }
       return std::nullopt;
+    case K::kUInt64:
+    case K::kInt128:
+      if (python_int(from)) return to.kind == K::kUInt64 && !wide_int(v) && v.integer < 0 ? std::nullopt : std::optional<Value>(v);
+      if (from.kind == K::kBoolean) return Value::of(std::int64_t{v.boolean});
+      if (from.kind == K::kFloat64) {
+        if (!std::isfinite(v.real) || v.real <= -1.0 || v.real >= 9.2e18) return std::nullopt;
+        return Value::of(static_cast<std::int64_t>(v.real));
+      }
+      return std::nullopt;
     case K::kBoolean:
-      if (from.kind == K::kInt64) return Value::of(v.integer != 0);
+      if (python_int(from)) return Value::of(v.integer != 0);
       if (from.kind == K::kFloat64) return Value::of(v.real != 0.0);
       if (from.kind == K::kString && (v.text == "true" || v.text == "false")) return Value::of(v.text == "true");
       return std::nullopt;
@@ -451,7 +512,7 @@ inline std::vector<Value> build_strict(const LitType& type, const std::vector<Li
       out.emplace_back();
       continue;
     }
-    if (v.type.kind != type.kind)
+    if (v.type.kind != type.kind && !(type.kind == K::kInt128 && v.type.kind == K::kInt64))
       build_error("unexpected value while building Series of type " + debug_name(type) + "; found value of type " +
                   debug_name(v.type) + ": " + lit_display(v.type, v.value));
     out.push_back(v.value);
@@ -493,19 +554,23 @@ inline Literal list_literal(const std::vector<Value>& items) {
     const auto all = [&](auto&& ok) { return std::all_of(values.begin(), values.end(), ok); };
     if (first == K::kBoolean && all([](const LitValue& v) { return v.type.kind == K::kBoolean; }))
       return {lit_type(K::kBoolean), items};
-    if (first == K::kInt64 && all([](const LitValue& v) { return v.type.kind == K::kInt64 || v.type.kind == K::kBoolean; })) {
-      Literal out{lit_type(K::kInt64), {}};
+    const auto int_or_bool = [](const LitValue& v) { return python_int(v.type) || v.type.kind == K::kBoolean; };
+    if (python_int(values.front().type) && all(int_or_bool)) {
+      const bool wide = std::any_of(values.begin(), values.end(), [](const LitValue& v) { return v.type.kind == K::kInt128; });
+      // Round CE: past the Int64 range non-negative ints build UInt64, any
+      // other list strictly from its first value.
+      const bool unsigned_list = std::all_of(items.begin(), items.end(), [](const Value& v) { return v.kind != Kind::kInt || wide_int(v) || v.integer >= 0; });
+      if (wide && !unsigned_list) return from_values_strict(values);
+      Literal out{lit_type(wide ? K::kUInt64 : K::kInt64), {}};
       for (const auto& v : items) out.values.push_back(v.kind == Kind::kBool ? Value::of(std::int64_t{v.boolean}) : v);
       return out;
     }
-    if (first == K::kFloat64 && all([](const LitValue& v) {
-          return v.type.kind == K::kFloat64 || v.type.kind == K::kInt64 || v.type.kind == K::kBoolean;
-        })) {
+    if (first == K::kFloat64 && all([&](const LitValue& v) { return v.type.kind == K::kFloat64 || int_or_bool(v); })) {
       Literal out{lit_type(K::kFloat64), {}};
       for (const auto& v : items)
         out.values.push_back(v.kind == Kind::kFloat ? v
                                                     : Value::of(v.kind == Kind::kBool ? (v.boolean ? 1.0 : 0.0)
-                                                                                      : static_cast<double>(v.integer)));
+                                                                                      : integer_real(v)));
       return out;
     }
     if (first == K::kString && all([](const LitValue& v) { return v.type.kind == K::kString; }))
@@ -565,7 +630,7 @@ inline std::string literal_item(const Value& v) {
   switch (v.kind) {
     case Kind::kNone: return "null";
     case Kind::kBool: return v.boolean ? "true" : "false";
-    case Kind::kInt: return std::to_string(v.integer);
+    case Kind::kInt: return integer_text(v);
     case Kind::kFloat: return polars_float(v.real);
     case Kind::kString: return quote(v.text);
     case Kind::kDatetime: return literal_datetime_text(v);
@@ -598,6 +663,8 @@ inline std::string lit_kind(const Literal& literal) {
     case K::kDate: return "Date";
     case K::kDatetime: return "Datetime";
     case K::kList: return "List";
+    case K::kUInt64: return "UInt64";
+    case K::kInt128: return "Int128";
   }
   return "List";
 }
@@ -646,12 +713,13 @@ inline std::string short_dtype(const std::string& dtype) {
 // Unknown(Int(1)) or Unknown(Float)).
 inline void check_is_in(const std::string& dtype, const std::vector<std::string>& categories, const Literal& literal,
                         const std::string& suffix, const std::string* shown = nullptr) {
-  if (dtype == "Null") return;
+  // Round CE: a Null column takes any element type but a list.
+  if (dtype == "Null" && literal.type.kind != LitType::K::kList) return;
   const auto l = lit_kind(literal);
   const bool numeric = integer_dtype(dtype) || float_dtype(dtype);
   const bool ok = l == "Null" ||
                   (l == "String" && (dtype == "String" || categorical_dtype(dtype) || enum_dtype(dtype))) ||
-                  ((l == "Int64" || l == "Float64") && numeric) || (l == "Boolean" && dtype == "Boolean") ||
+                  ((l == "Int64" || l == "Float64" || l == "UInt64" || l == "Int128") && numeric) || (l == "Boolean" && dtype == "Boolean") ||
                   (l == "Datetime" && datetime_dtype(dtype)) || (l == "Date" && dtype == "Date");
   if (!ok)
     fail("InvalidOperationError", "'is_in' cannot check for List(" + (shown ? *shown : literal_dtype_name(literal)) + ") values in " +
@@ -671,16 +739,88 @@ inline void check_is_in(const std::string& dtype, const std::vector<std::string>
 inline std::string coerced_is_in(const std::string& column, const std::string& dtype, const Literal& literal) {
   std::string cast;
   Literal shown = literal;
-  if (lit_kind(literal) == "Int64" && integer_dtype(dtype) && dtype != "Int64")
+  // Round CE: a Null column takes the element type (none for a null list).
+  if (dtype == "Null" && literal.type.kind != LitType::K::kNull)
+    cast = ".cast(" + debug_name(literal.type) + ")";
+  else if (lit_kind(literal) == "Int64" && integer_dtype(dtype) && dtype != "Int64")
     cast = dtype == "UInt64" ? ".cast(Int128)" : ".cast(Int64)";
+  // Round CE: a UInt64 list meets signed columns in Int128, narrower
+  // unsigned ones in UInt64; an Int128 list meets any integer column there.
+  else if (lit_kind(literal) == "UInt64" && integer_dtype(dtype) && dtype != "UInt64")
+    cast = dtype.rfind("UInt", 0) == 0 ? ".cast(UInt64)" : ".cast(Int128)";
+  else if (lit_kind(literal) == "Int128" && integer_dtype(dtype))
+    cast = ".cast(Int128)";
   else if (lit_kind(literal) == "Float64" && integer_dtype(dtype))
     cast = ".strict_cast(Float64)";
-  else if ((lit_kind(literal) == "Int64" || lit_kind(literal) == "Float64") && float_dtype(dtype)) {
+  else if ((lit_kind(literal) == "Int64" || lit_kind(literal) == "Float64" || lit_kind(literal) == "UInt64" ||
+            lit_kind(literal) == "Int128") && float_dtype(dtype)) {
     if (dtype != "Float64") cast = ".cast(Float64)";
+    shown.type = lit_type(LitType::K::kFloat64);
     for (auto& v : shown.values)
-      if (v.kind == Kind::kInt) v = Value::of(static_cast<double>(v.integer));
+      if (v.kind == Kind::kInt) v = Value::of(integer_real(v));
   }
   return "col(" + quote(column) + ")" + cast + ".is_in(" + literal_text(shown) + ")";
+}
+// Round CE: col(x).is_in(scalar) as a resolved plan prints it: the scalar
+// imploded and cast to the supertype of the column and the literal (an int
+// widens an integer column to the smallest type holding both, a float casts
+// it strictly to Float64), a Null column cast to the literal's type;
+// std::nullopt where the form is not modelled.
+inline std::optional<std::string> coerced_scalar_is_in(const std::string& column, const std::string& dtype, const Value& v) {
+  const auto c = "col(" + quote(column) + ")";
+  const auto item = [&] {
+    if (v.kind == Kind::kInt) return integer_text(v);
+    if (v.kind == Kind::kFloat) return polars_frame_float(v.real);
+    if (v.kind == Kind::kBool) return std::string(v.boolean ? "true" : "false");
+    return scalar_display(v);
+  };
+  const auto form = [&](const std::string& cast, const std::string& list_type) {
+    return c + cast + ".is_in([[" + item() + "]" + (list_type.empty() ? "" : ".cast(List(" + list_type + "))") + "])";
+  };
+  if (dtype == "Null") {
+    if (v.kind == Kind::kInt) return form(".cast(Unknown(Int(" + integer_text(v) + ")))", "");
+    if (v.kind == Kind::kFloat) return form(".cast(Unknown(Float))", "");
+    if (v.kind == Kind::kBool || v.kind == Kind::kDatetime) return form(".cast(" + debug_name(lit_value(v).type) + ")", "");
+    return std::nullopt;
+  }
+  if (dtype == "Boolean" && v.kind == Kind::kBool) return form("", "");
+  if (float_dtype(dtype) && (v.kind == Kind::kInt || v.kind == Kind::kFloat)) return form("", dtype);
+  if (!integer_dtype(dtype)) return std::nullopt;
+  if (v.kind == Kind::kFloat) return form(".strict_cast(Float64)", "Float64");
+  if (v.kind != Kind::kInt) return std::nullopt;
+  const bool is_unsigned = dtype.rfind("UInt", 0) == 0;
+  const int bits = std::stoi(dtype.substr(is_unsigned ? 4 : 3));
+  if (wide_int(v)) {
+    if (!is_unsigned) return form(".strict_cast(Float64)", "Float64");
+    return form(bits == 64 ? "" : ".cast(UInt64)", "UInt64");
+  }
+  const auto i = v.integer;
+  const auto signed_bits = [](std::int64_t x) {
+    for (int b = 8; b < 64; b *= 2)
+      if (x >= -(std::int64_t{1} << (b - 1)) && x < (std::int64_t{1} << (b - 1))) return b;
+    return 64;
+  };
+  const auto unsigned_bits = [](std::int64_t x) {
+    for (int b = 8; b < 64; b *= 2)
+      if (x < (std::int64_t{1} << b)) return b;
+    return 64;
+  };
+  std::string type;
+  int width = bits;
+  bool strict = false;
+  if (!is_unsigned) {
+    width = std::max(bits, signed_bits(i));
+    type = "Int" + std::to_string(width);
+  } else if (i >= 0) {
+    width = std::max(bits, unsigned_bits(i));
+    type = "UInt" + std::to_string(width);
+  } else {
+    strict = bits == 64;
+    width = std::max(std::min(bits * 2, 64), signed_bits(i));
+    type = "Int" + std::to_string(width);
+  }
+  if (type == dtype) return form("", type);
+  return form((strict ? ".strict_cast(" : ".cast(") + type + ")", type);
 }
 // A present cell `is_in` the literal: numbers by value (NaN in NaN), str by
 // text, temporal values by instant; a null never is.
@@ -691,13 +831,14 @@ inline bool literal_has(const Literal& literal, const Cell& cell, const std::str
     if (v.kind == Kind::kNone) continue;
     if (lit_kind(literal) == "String") {
       if (v.kind == Kind::kString && v.text == cell->value) return true;
-    } else if (lit_kind(literal) == "Int64" || lit_kind(literal) == "Float64") {
+    } else if (lit_kind(literal) == "Int64" || lit_kind(literal) == "Float64" || lit_kind(literal) == "UInt64" ||
+               lit_kind(literal) == "Int128") {
       if (value.kind == Kind::kInt && v.kind == Kind::kInt) {
-        if (value.integer == v.integer) return true;
+        if (value.integer == v.integer && value.text == v.text) return true;
         continue;
       }
-      const double x = value.kind == Kind::kInt ? static_cast<double>(value.integer) : value.real;
-      const double y = v.kind == Kind::kInt ? static_cast<double>(v.integer) : v.real;
+      const double x = value.kind == Kind::kInt ? integer_real(value) : value.real;
+      const double y = v.kind == Kind::kInt ? integer_real(v) : v.real;
       if (x == y || (std::isnan(x) && std::isnan(y))) return true;
     } else if (lit_kind(literal) == "Datetime") {
       if (v.kind == Kind::kDatetime && physical_of(*cell, dtype) == floor_div(v.instant_nanoseconds(), 1000))
@@ -981,7 +1122,10 @@ inline Value value_of(const EventAttribute& a) {
   const auto scalar = python::from_attribute(a);
   switch (scalar.kind) {
     case python::Scalar::Kind::kBool: return Value::of(scalar.boolean);
-    case python::Scalar::Kind::kInt: return Value::of(integer_of(a));
+    case python::Scalar::Kind::kInt: {
+      if (const auto u = wide_cell(a)) return wide_value(*u);
+      return Value::of(integer_of(a));
+    }
     case python::Scalar::Kind::kFloat: return Value::of(scalar.real);
     case python::Scalar::Kind::kDate: {
       const auto& t = scalar.date;
@@ -1011,6 +1155,18 @@ inline Literal literal_of(const Value& v) {
   }
   return list_literal(v.items);
 }
+// Round CE: a list or tuple argument as pl.lit builds it (its construction
+// TypeError, its element type, its plan display).
+inline Literal argument_literal(const EventAttribute& a) { return literal_of(value_of(a)); }
+inline std::optional<std::string> argument_literal_error(const EventAttribute& a) {
+  try {
+    (void)argument_literal(a);
+  } catch (const PolarsSequenceFilterError& e) {
+    return e.message;
+  }
+  return std::nullopt;
+}
+inline std::string literal_list_display(const Literal& l) { return lit_display(list_of(l.type), Value::list(l.values)); }
 
 // Round CD: col(x) OP v for a column dtype and a Python scalar v, as Polars
 // 1.44 types and evaluates it (probed per dtype, literal kind and operator).
@@ -1038,7 +1194,7 @@ inline std::string scalar_display(const Value& v) {
   switch (v.kind) {
     case Kind::kNone: return "null";
     case Kind::kBool: return v.boolean ? "true" : "false";
-    case Kind::kInt: return "dyn int: " + std::to_string(v.integer);
+    case Kind::kInt: return "dyn int: " + integer_text(v);
     case Kind::kFloat: return "dyn float: " + polars_dyn_float(v.real);
     case Kind::kString: return quote(v.text);
     case Kind::kDate: return pandas_filter_value_str(v);
@@ -1086,6 +1242,12 @@ inline ScalarCheck check_scalar(const std::string& column, const std::string& dt
   const auto numeric_string = [&](const std::string& name) {
     return ScalarCheck{Stage::kCompute, "ComputeError", "cannot compare string with numeric type (" + name + ")"};
   };
+  // Round CE: an int past the Int64 range is a UInt64 literal.
+  if (wide_int(v)) {
+    if (dtype == "String") return numeric_string("u64");
+    if (categorical_dtype(dtype) || enum_dtype(dtype)) return {Stage::kCompute, "ComputeError", "cannot compare categorical with u64"};
+    return {};
+  }
   if (dtype == "String") {
     if (number) return numeric_string(v.kind == Kind::kInt ? int_name() : "f64");
     if (temporal) return {Stage::kResolve, "InvalidOperationError", kTemporalString};
@@ -1221,6 +1383,17 @@ inline int compare_scalar(const Cell& cell, const std::string& dtype, const Valu
                           const std::vector<std::string>* categories = nullptr) {
   if (null_cell(cell) || v.kind == Kind::kNone || dtype == "Null") return -1;
   const auto& a = *cell;
+  // Round CE: an int past the Int64 range (see coerced_operands); a
+  // temporal column casts it to null.
+  if (const auto u = wide_int(v)) {
+    const double d = static_cast<double>(*u);
+    if (dtype == "UInt64") return apply_order(order_of(wide_of(a), Wide(*u)), op);
+    if (dtype == "Float32") return apply_order(total_order(static_cast<double>(static_cast<float>(real_of(a))), static_cast<double>(static_cast<float>(d))), op);
+    if (dtype == "Float64") return apply_order(total_order(real_of(a), d), op);
+    if (integer_dtype(dtype) && dtype.rfind("UInt", 0) != 0) return apply_order(total_order(static_cast<double>(integer_of(a)), d), op);
+    if (dtype == "Boolean" || integer_dtype(dtype)) return apply_order(-1, op);
+    return -1;
+  }
   if (dtype == "String" || categorical_dtype(dtype)) {
     const std::string rhs = v.kind == Kind::kBool ? (v.boolean ? "true" : "false") : v.text;
     return apply_order(order_of(a.value, rhs), op);
@@ -1285,7 +1458,8 @@ inline int compare_scalar(const Cell& cell, const std::string& dtype, const Valu
     return apply_order(order_of(at, lo), op);
   }
   if (unit == 1000) return apply_order(order_of(p, m), op);
-  return apply_order(order_of(p, m / 1000), op);
+  // Round CE: to milliseconds by floor division (before 1970 too).
+  return apply_order(order_of(p, floor_div(m, 1000)), op);
 }
 
 // The plan text of col(x) OP v once Polars coerced it (check_scalar passed):
@@ -1303,13 +1477,37 @@ inline Operands coerced_operands(const std::string& column, const std::string& d
   const auto cast = [&](const std::string& to, const std::string& rhs) { return Operands{c + ".cast(" + to + ")", rhs, {}}; };
   const auto folded = [&](std::string whole) { return Operands{{}, {}, std::move(whole)}; };
   if (v.kind == Kind::kNone) return folded("null.repeat([" + c + ".len()])");
+  // Round CE: an int past the Int64 range compares exactly on UInt64 (a
+  // Boolean column cast to it), as a float on float and signed columns,
+  // folds on narrower unsigned ones and stays dynamic on the others.
+  if (const auto u = wide_int(v)) {
+    const double d = static_cast<double>(*u);
+    if (dtype == "UInt64") return plain(v.text);
+    if (dtype == "Boolean") return cast("UInt64", v.text);
+    if (dtype == "Float32") return plain(polars_frame_float(static_cast<double>(static_cast<float>(d))));
+    if (dtype == "Float64") return plain(polars_frame_float(d));
+    if (dtype.rfind("UInt", 0) == 0)
+      return folded("when(" + c + ".is_not_null()).then(" + (apply_order(-1, op) ? "true" : "false") + ").otherwise(null)");
+    if (integer_dtype(dtype)) return cast("Float64", polars_frame_float(d));
+    return plain(scalar_display(v));
+  }
+  // Round CE: a Null column takes the type of a typed literal (a dynamic
+  // int or float stays as written).
+  if (dtype == "Null") {
+    if (v.kind == Kind::kInt || v.kind == Kind::kFloat) return plain(scalar_display(v));
+    return cast(debug_name(lit_value(v).type), scalar_display(v));
+  }
   if (dtype == "String") {
     if (v.kind == Kind::kBool) return plain(quote(v.boolean ? "true" : "false"));
     return plain(scalar_display(v));
   }
   if (dtype == "Boolean") {
     if (v.kind == Kind::kString) return cast("String", quote(v.text));
-    if (v.kind == Kind::kInt) return cast("Int32", std::to_string(v.integer));
+    // Round CE: a dynamic int materializes as Int32, Int64 past its range.
+    if (v.kind == Kind::kInt) {
+      const bool narrow = v.integer >= std::numeric_limits<std::int32_t>::min() && v.integer <= std::numeric_limits<std::int32_t>::max();
+      return cast(narrow ? "Int32" : "Int64", std::to_string(v.integer));
+    }
     return plain(scalar_display(v));
   }
   if (integer_dtype(dtype)) {
@@ -1363,7 +1561,7 @@ inline Operands coerced_operands(const std::string& column, const std::string& d
       if (op == CompareOp::kEq) return folded(c + ".is_between([" + text(lo) + ", " + text(hi) + "])");
       return plain(text(op == CompareOp::kLe ? hi : lo));
     }
-    return plain(text(unit == 1000 ? m : m / 1000));
+    return plain(text(unit == 1000 ? m : floor_div(m, 1000)));
   }
   return plain(scalar_display(v));
 }

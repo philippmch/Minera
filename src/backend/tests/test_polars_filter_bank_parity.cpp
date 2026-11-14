@@ -34,6 +34,8 @@
 #include <memory>
 #include <cstdlib>
 #include <optional>
+#include <regex>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -271,7 +273,17 @@ EventAttribute to_attribute(const Json& node, std::string key = {}) {
   } else if (tag == "i") {
     out.value = value.text;
     out.kind = AttributeKind::kInt;
-    out.typed_value = static_cast<std::int64_t>(std::stoll(value.text));
+    // Round CE: a Python int above the Int64 range arrives as UInt64.
+    std::int64_t signed_value = 0;
+    std::uint64_t unsigned_value = 0;
+    const auto* first = value.text.data();
+    const auto* last = first + value.text.size();
+    if (const auto r = std::from_chars(first, last, signed_value); r.ec == std::errc{} && r.ptr == last)
+      out.typed_value = signed_value;
+    else if (const auto u = std::from_chars(first, last, unsigned_value); u.ec == std::errc{} && u.ptr == last)
+      out.typed_value = unsigned_value;
+    else
+      throw std::runtime_error("integer argument outside the UInt64 range: " + value.text);
   } else if (tag == "f") {
     const double number = hex_bits(value.text);
     out.value = shortest(number);
@@ -846,6 +858,117 @@ bool same_selection(const EventTable& df, const std::string& name, const Json& e
   return serialize_event_table_input_json(rebuilt) == serialize_event_table_input_json(*e);
 }
 
+// Round CE: filter_df_keeping_spno_activities keeps the `k` largest groups
+// of unordered group_by counts, the null group among them (is_in never keeps
+// its rows). With ties at the cut any k groups that no unkept group outranks
+// may be kept (case 804 of seed 4244 kept r1, r2, r3 or two of them and the
+// null group across 48 runs); the output holds the source rows of the kept
+// values in order.
+bool valid_top_selection(const EventTable& df, const std::string& name, const Json& actual, std::size_t k) {
+  EventTable storage;
+  const auto* a = table_of(actual, storage);
+  if (!a) return false;
+  const auto at = std::find(df.columns.begin(), df.columns.end(), name);
+  if (at == df.columns.end()) return false;
+  const auto column = static_cast<std::size_t>(at - df.columns.begin());
+  const auto label = [&](const EventTable::Row& row) {
+    return row[column] && !row[column]->is_null ? "v" + row[column]->value : std::string("n");
+  };
+  std::map<std::string, std::size_t> counts;
+  for (const auto& row : df.rows) ++counts[label(row)];
+  std::set<std::string> kept;
+  for (const auto& row : a->rows) kept.insert(label(row));
+  if (kept.count("n")) return false;
+  EventTable rebuilt = df;
+  rebuilt.rows.clear();
+  for (const auto& row : df.rows)
+    if (kept.count(label(row))) rebuilt.rows.push_back(row);
+  if (serialize_event_table_input_json(rebuilt) != serialize_event_table_input_json(*a)) return false;
+  std::vector<std::size_t> sizes;
+  for (const auto& [key, n] : counts) sizes.push_back(n);
+  std::sort(sizes.rbegin(), sizes.rend());
+  const auto want = std::min(k, sizes.size());
+  if (want == 0) return kept.empty();
+  const auto cut = sizes[want - 1];
+  for (const bool with_null : {false, true}) {
+    auto chosen = kept;
+    if (with_null) {
+      if (!counts.count("n")) continue;
+      chosen.insert("n");
+    }
+    if (chosen.size() != want) continue;
+    bool ok = true;
+    for (const auto& [key, n] : counts) ok = ok && (chosen.count(key) ? n >= cut : n <= cut);
+    if (ok) return true;
+  }
+  return false;
+}
+
+// Round CE: the same failure of filter_df_keeping_spno_activities lists the
+// kept values in its is_in plan in tie order: every value all captured runs
+// listed must be listed, and each listed value some run listed (case 1005 of
+// seed 4244: five runs, five lists).
+std::optional<std::pair<std::string, std::vector<std::string>>> listed_values(const Json& outcome) {
+  const auto* error = outcome.get("error");
+  if (!error || error->items.size() != 2) return {};
+  auto text = error->items[0].text + "\n" + error->items[1].text;
+  const auto at = text.find("is_in([[");
+  if (at == std::string::npos) return {};
+  const auto begin = at + 8;
+  const auto end = text.find("]])", begin);
+  if (end == std::string::npos) return {};
+  const auto inner = text.substr(begin, end - begin);
+  std::vector<std::string> items;
+  for (std::size_t from = 0;;) {
+    const auto comma = inner.find(", ", from);
+    items.push_back(inner.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
+    if (comma == std::string::npos) break;
+    from = comma + 2;
+  }
+  text.replace(begin, end - begin, "*");
+  return std::pair<std::string, std::vector<std::string>>{text, items};
+}
+bool tied_listing(const std::vector<Json>& expected, const Json& actual) {
+  const auto mine = listed_values(actual);
+  if (!mine) return false;
+  std::optional<std::set<std::string>> every;
+  std::set<std::string> some;
+  for (const auto& e : expected) {
+    const auto theirs = listed_values(e);
+    if (!theirs || theirs->first != mine->first || theirs->second.size() != mine->second.size()) return false;
+    const std::set<std::string> items(theirs->second.begin(), theirs->second.end());
+    some.insert(items.begin(), items.end());
+    if (!every) every = items;
+    else {
+      std::set<std::string> both;
+      std::set_intersection(every->begin(), every->end(), items.begin(), items.end(), std::inserter(both, both.end()));
+      every = both;
+    }
+  }
+  if (!every) return false;
+  const std::set<std::string> listed(mine->second.begin(), mine->second.end());
+  if (listed.size() != mine->second.size()) return false;
+  for (const auto& item : *every) if (!listed.count(item)) return false;
+  for (const auto& item : listed) if (!some.count(item)) return false;
+  return true;
+}
+
+// MSVC's time-zone database takes abbreviations from ICU ("GMT+1" where
+// Polars prints "CET"; declared in Review AY2), as in the sequence filter
+// bank test: on MSVC the word after a datetime's wall text in an error
+// message is masked on both sides (CD's CC bank failed only on this on
+// Windows). Everywhere else the abbreviations must match exactly.
+Json zone_masked(Json node) {
+#if defined(_MSC_VER)
+  if (const auto found = node.fields.find("error"); found != node.fields.end() && found->second.items.size() == 2) {
+    static const std::regex wall(R"re((\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?) [^\s,\]\)"\\]+)re");
+    auto& message = found->second.items[1].text;
+    message = std::regex_replace(message, wall, "$1 <zone>");
+  }
+#endif
+  return node;
+}
+
 Json error_node(const std::string& type, const std::string& message) {
   Json out;
   out.kind = Json::kObject;
@@ -957,6 +1080,9 @@ int main(int argc, char** argv) try {
       else
         for (const auto& observed : node.at("observed").items) expected.push_back(normalized(observed));
       bool matched = false;
+      for (auto& e : expected) e = zone_masked(std::move(e));
+      for (auto& candidate : candidates) candidate = zone_masked(std::move(candidate));
+      actual = candidates.front();
       for (auto& e : expected) {
         if (unordered) e = canonical(e);
         else if (dicts_unordered) e = canonical(e, true);
@@ -977,8 +1103,17 @@ int main(int argc, char** argv) try {
         const auto* key = keyword(kwargs, keyword_name);
         return key && tag_of(*key) == "s" ? body(*key).text : std::string(fallback);
       };
-      if (!matched && function == "filter_df_keeping_spno_activities")
-        for (const auto& e : expected) matched = matched || same_selection(df, key_or("activity_key", "concept:name"), e, actual);
+      if (!matched && function == "filter_df_keeping_spno_activities") {
+        const auto name = key_or("activity_key", "concept:name");
+        for (const auto& e : expected) matched = matched || same_selection(df, name, e, actual);
+        const auto* maximum = keyword(kwargs, "max_no_activities");
+        std::optional<long long> k;
+        if (!maximum) k = 25;
+        else if (tag_of(*maximum) == "i") k = std::stoll(body(*maximum).text);
+        if (!matched && k && *k >= 0 && std::any_of(expected.begin(), expected.end(), [](const Json& e) { return e.get("value") != nullptr; }))
+          matched = valid_top_selection(df, name, actual, static_cast<std::size_t>(*k));
+        if (!matched) matched = tied_listing(expected, actual);
+      }
       if (!matched && (qualified == "between.apply" || qualified == "ltl.attr_value_different_persons")) {
         std::string key = "case:concept:name";
         const auto& last = *args.at(qualified == "between.apply" ? 2 : 1);

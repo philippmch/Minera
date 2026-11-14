@@ -329,8 +329,10 @@ void attribute_resolution(const EventTable& source,std::size_t at,const Query& q
   if(!string)return;
   const auto& v=q.value;
   if(v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple) {
-    const auto plan="FILTER col("+quote(q.attribute.value)+") == "+literal(v)+".cast(String)\nFROM\n  "+frame_plan(source);
-    fail("InvalidOperationError",phase,"cannot cast List type (inner: '"+detail::polars_list_literal(v).inner+"', to: 'String')"+resolved(q.op,plan,nodes(q.op,true),true));
+    // Round CE: the literal as pl.lit built it (built before this check).
+    const auto built=lit::argument_literal(v);
+    const auto plan="FILTER col("+quote(q.attribute.value)+") == "+lit::literal_list_display(built)+".cast(String)\nFROM\n  "+frame_plan(source);
+    fail("InvalidOperationError",phase,"cannot cast List type (inner: '"+lit::debug_name(built.type)+"', to: 'String')"+resolved(q.op,plan,nodes(q.op,true),true));
   }
 }
 ParsedExactTimestamp physical_instant(std::int64_t micros) {
@@ -386,7 +388,6 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   source.validate();if(source.index||source.dtypes.size()!=source.columns.size())throw std::invalid_argument("Native Polars timestamp filters require declared dtypes and no dataframe index");
   // Python builds the attribute value literal first.
   if(q.op==Operation::kAttribute&&(q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple)) {
-    if(const auto error=detail::polars_list_literal(q.value).error)fail("TypeError",phase,*error);
     try{(void)lit::literal_of(lit::value_of(q.value));}catch(const PolarsSequenceFilterError& error){fail(error.type,phase,error.what());}
   }
   const auto position=[&](const std::string& name,bool case_key=false){auto p=std::find(source.columns.begin(),source.columns.end(),name);if(p==source.columns.end())missing(source,name,q,phase,case_key);return static_cast<std::size_t>(p-source.columns.begin());};

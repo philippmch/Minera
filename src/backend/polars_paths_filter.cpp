@@ -2,6 +2,7 @@
 #include "polars_datetime.hpp"
 #include "polars_sort.hpp"
 #include "polars_list_literal.hpp"
+#include "polars_lit_model.hpp"
 #include "polars_float_text.hpp"
 #include "polars_column_hint.hpp"
 #include "pandas_parameter_carrier.hpp"
@@ -237,6 +238,9 @@ EventAttribute item(const EventAttribute& value, std::size_t at) {
 }
 std::string path_text(const EventAttribute& value) {
   const auto left = item(value, 0), right = item(value, 1);
+  // Round CE: a list or tuple refuses the str by its own message.
+  if (left.container == AttributeContainerKind::kList || left.container == AttributeContainerKind::kTuple)
+    fail("TypeError", "apply", "can only concatenate " + core_type(left) + " (not \"str\") to " + core_type(left));
   if (!text(left)) fail("TypeError", "apply", "unsupported operand type(s) for +: '" + core_type(left) + "' and 'str'");
   if (!text(right)) fail("TypeError", "apply", "can only concatenate str (not \"" + core_type(right) + "\") to str");
   return left.value + ',' + right.value;
@@ -261,7 +265,7 @@ std::vector<std::string> validate_apply(const EventAttribute& value, bool perfor
   if (performance)
     for (const auto* bound : {&options.min_performance, &options.max_performance})
       if (bound->container == AttributeContainerKind::kList || bound->container == AttributeContainerKind::kTuple)
-        if (const auto error = detail::polars_list_literal(*bound).error) fail("TypeError", "apply", *error);
+        if (const auto error = detail::polars_lit::argument_literal_error(*bound)) fail("TypeError", "apply", *error);
   return result;
 }
 std::string contexts(const std::vector<std::string>& nodes) {
@@ -340,7 +344,14 @@ void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFi
     }
     return "[(col(\"@@duration\")) " + comparison + " (" + literal(v) + ")]";
   };
-  message += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, cmp) + "\nwhile evaluating this larger expression:\n\t[([(" + expression(options.min_performance, ">=") + ") & (" + expression(options.max_performance, "<=") + ")]) & ([(col(\"@@path\")) == (" + quote(path) + ")])]\n";
+  // A null bound folds away: after the failing bound it drops with the AND,
+  // before it the failing bound keeps a null mask and the path test folds.
+  const auto path_test = "[(col(\"@@path\")) == (" + quote(path) + ")]";
+  std::string larger;
+  if (null(options.max_performance)) larger = "[(" + expression(bound, cmp) + ") & (" + path_test + ")]";
+  else if (null(options.min_performance)) larger = "[(" + expression(bound, cmp) + ") & (null.repeat([col(\"@@duration\").len()]))]";
+  else larger = "[([(" + expression(options.min_performance, ">=") + ") & (" + expression(options.max_performance, "<=") + ")]) & (" + path_test + ")]";
+  message += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, cmp) + "\nwhile evaluating this larger expression:\n\t" + larger + "\n";
   fail(text(bound) ? "ComputeError" : "SchemaError", phase, message);
 }
 void validate_time(const std::string& dtype, const PolarsPathsFilterOptions& options, const std::string& phase) {

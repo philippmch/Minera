@@ -3,6 +3,7 @@
 #include "polars_column_hint.hpp"
 #include "polars_float_text.hpp"
 #include "polars_list_literal.hpp"
+#include "polars_lit_model.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -134,7 +135,7 @@ std::vector<std::string> nodes(Operation op, bool upper = false) {
 void validate_literals(const EventAttribute& low, const EventAttribute& high) {
   for (const auto* value : {&low, &high})
     if (collection(*value) && value->container != AttributeContainerKind::kContainer)
-      if (const auto error = detail::polars_list_literal(*value).error) fail("TypeError", "apply", *error);
+      if (const auto error = detail::polars_lit::argument_literal_error(*value)) fail("TypeError", "apply", *error);
 }
 void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseFilterOptions& options) {
   if (op == Operation::kPerformance && truth(options.business_hours))

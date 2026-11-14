@@ -248,7 +248,7 @@ Anchor anchor_of(const EventAttribute& value) {
   out.scalar = true;
   out.value = null(value) ? lit::Value::none() : lit::value_of(value);
   out.literal = lit::list_literal({out.value});
-  out.shown = out.value.kind == lit::Kind::kInt ? "Unknown(Int(" + std::to_string(out.value.integer) + "))"
+  out.shown = out.value.kind == lit::Kind::kInt ? "Unknown(Int(" + lit::integer_text(out.value) + "))"
               : out.value.kind == lit::Kind::kFloat ? std::string("Unknown(Float)")
                                                     : lit::literal_dtype_name(out.literal);
   return out;
@@ -356,15 +356,38 @@ std::string interpolate(const std::string& pattern,
   return output;
 }
 void validate_separator(const EventTable& source, const std::string& key, const std::string& activity,
-                        const EventAttribute& act1, const EventAttribute& act2,
+                        const Anchor& act1, const Anchor& act2, const std::string& activity_dtype,
                         const EventAttribute& separator, const std::string& phase) {
   if (!collection(separator) || separator.container == AttributeContainerKind::kContainer) return;
   const auto expression = anchor_expression(separator);
-  auto message = interpolate(kSeparatorListDiagnostic, {
-      {"(inner: 'String',", "(inner: '" + detail::polars_list_literal(separator).inner + "',"},
+  // Round CE: the plan below the failing select is resolved, so each anchor
+  // prints as its resolved is_in (cast to the activity's list type).
+  auto pattern = kSeparatorListDiagnostic;
+  const auto substitute = [&](const std::string& form, const std::string& token) {
+    for (auto at = pattern.find(form); at != std::string::npos; at = pattern.find(form, at + token.size()))
+      pattern.replace(at, form.size(), token);
+  };
+  substitute("col(%ACTIVITY%).is_in(%ANCHOR1%)", "%RESOLVED1%");
+  substitute("col(%ACTIVITY%).is_in(%ANCHOR2%)", "%RESOLVED2%");
+  substitute("col(\"_first_act\").is_in(%ANCHOR1%)", "%FIRST1%");
+  substitute("col(\"_last_act\").is_in(%ANCHOR2%)", "%LAST2%");
+  auto message = interpolate(pattern, {
+      {"%RESOLVED1%", resolved_text(act1, activity, activity_dtype)},
+      {"%RESOLVED2%", resolved_text(act2, activity, activity_dtype)},
+      {"%FIRST1%", resolved_text(act1, "_first_act", activity_dtype)},
+      {"%LAST2%", resolved_text(act2, "_last_act", activity_dtype)},
+      {"(inner: 'String',", "(inner: '" + detail::polars_lit::debug_name(detail::polars_lit::argument_literal(separator).type) + "',"},
       {"%CASE%", quote(key)}, {"%ACTIVITY%", quote(activity)},
-      {"%ANCHOR1%", anchor_expression(act1)}, {"%ANCHOR2%", anchor_expression(act2)},
       {"%SEPARATOR%", expression.substr(1, expression.size() - 2)}, {"%FRAME%", frame_plan(source)}});
+  // Round CE: a case column of any other dtype is cast to String first
+  // (probed on integer, Float32, Categorical, Enum, temporal and Boolean).
+  const auto column = std::find(source.columns.begin(), source.columns.end(), key);
+  if (column != source.columns.end() && source.dtypes.size() == source.columns.size() &&
+      source.dtypes[static_cast<std::size_t>(column - source.columns.begin())] != "String") {
+    const auto plain = "col(" + quote(key) + ").str.concat_horizontal([";
+    if (const auto at = message.find(plain); at != std::string::npos)
+      message.replace(at, plain.size(), "col(" + quote(key) + ").strict_cast(String).str.concat_horizontal([");
+  }
   fail("InvalidOperationError", phase, message);
 }
 
@@ -411,6 +434,9 @@ std::string string_cast(const EventAttribute& value, const std::string& declared
   if (date(value)) {
     // cast(pl.String) of a temporal case id: its unit's fractional digits.
     if (declared == "Date" || declared.starts_with("Datetime(")) return lit::string_cast(value, declared);
+    // Round CE: a datetime separator literal as Polars casts it to String.
+    const auto literal = lit::lit_value(lit::value_of(value));
+    if (const auto cast = lit::cast_lit(literal.value, literal.type, lit::lit_type(lit::LitType::K::kString))) return cast->text;
     return std::get_if<NativeDate>(&value.typed_value) ? std::get<NativeDate>(value.typed_value).value : value.value;
   }
   if (value.container == AttributeContainerKind::kContainer) {
@@ -428,7 +454,7 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
   // Python builds the anchor and separator literals before Polars runs.
   validate_anchor(act1, phase); validate_anchor(act2, phase);
   if (collection(options.subcase_concat_str) && options.subcase_concat_str.container != AttributeContainerKind::kContainer)
-    if (const auto error = detail::polars_list_literal(options.subcase_concat_str).error) fail("TypeError", phase, *error);
+    if (const auto error = detail::polars_lit::argument_literal_error(options.subcase_concat_str)) fail("TypeError", phase, *error);
   source.validate();
   if (source.index) throw std::invalid_argument("Native Polars between tables cannot have dataframe index metadata");
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars between requires declared column dtypes");
@@ -463,7 +489,7 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
   validate_membership(source, activity_at, key, anchor1, anchor2, phase);
   const auto& activity_dtype = source.dtypes[activity_at];
   const auto lookup1 = lookup_literal(anchor1, activity_dtype), lookup2 = lookup_literal(anchor2, activity_dtype);
-  validate_separator(source, key, activity, act1, act2, options.subcase_concat_str, phase);
+  validate_separator(source, key, activity, anchor1, anchor2, activity_dtype, options.subcase_concat_str, phase);
   std::vector<std::size_t> order(source.rows.size()); std::iota(order.begin(), order.end(), 0);
   // Polars' unstable multi-column sort leaves equal rows in its own order (round BX).
   polars_sort::sort_by_keys(order, [&](auto a, auto b) {

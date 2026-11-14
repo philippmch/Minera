@@ -283,7 +283,18 @@ std::string render(std::string_view pattern, const EventTable& source, const Pre
     const auto& key = o.attribute_key.value;
     if (i >= p.values.size()) return "col(" + quote(key) + ") == null";
     const auto v = lit::value_of(p.values[i]);
-    if (!lit::scalar_literal(v)) return "col(" + quote(key) + ") == " + literal(p.values[i]);
+    if (!lit::scalar_literal(v)) {
+      // Round CE: a list as pl.lit built it; a Null column casts to its type.
+      std::string lhs = "col(" + quote(key) + ")", shown = literal(p.values[i]);
+      if (v.kind == lit::Kind::kList || v.kind == lit::Kind::kTuple) {
+        try {
+          const auto built = lit::literal_of(v);
+          shown = lit::literal_list_display(built);
+          if (attribute && source.dtypes[*attribute] == "Null") lhs += ".cast(" + lit::debug_name(lit::list_of(built.type)) + ")";
+        } catch (const PolarsSequenceFilterError&) {}
+      }
+      return lhs + " == " + shown;
+    }
     std::optional<std::string> declared;
     std::vector<std::string> categories;
     if (attribute) { declared = source.dtypes[*attribute]; categories = category_list(source, *attribute); }
@@ -375,7 +386,7 @@ Prepared prepare(const PolarsLtlFilterCall& call) {
   if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1))
     for (const auto& query : out.values)
       if (query.container == AttributeContainerKind::kList || query.container == AttributeContainerKind::kTuple)
-        if (const auto error = detail::polars_list_literal(query).error) fail("TypeError", "apply", *error);
+        if (const auto error = detail::polars_lit::argument_literal_error(query)) fail("TypeError", "apply", *error);
   return out;
 }
 
@@ -495,7 +506,9 @@ void validate_queries(const EventTable& source, const Prepared& p, bool eager, b
   namespace lit = detail::polars_lit;
   const auto ai = *column(source,p.options.attribute_key);
   const auto& declared = source.dtypes[ai];
-  const bool stringy = dtype(declared) == Dtype::kString || dtype(declared) == Dtype::kEnum;
+  // Round CE: only a String column casts a list literal to String; an Enum
+  // or Categorical column compares it (and fails) like any other column.
+  const bool stringy = declared == "String";
   const auto categories = category_list(source, ai);
   const auto phase=eager?"apply":"collect";
   const auto& key = p.options.attribute_key.value;
@@ -513,7 +526,16 @@ void validate_queries(const EventTable& source, const Prepared& p, bool eager, b
   for (std::size_t at = 0; at < count; ++at) {
     const auto& query = p.values[at];
     if (collection(query) && query.container != AttributeContainerKind::kContainer) {
-      if (stringy) resolve_fail(at,"cannot cast List type (inner: '"+detail::polars_list_literal(query).inner+"', to: 'String')","col("+quote(key)+") == "+literal(query)+".cast(String)");
+      if (stringy) {
+        // Round CE: the literal as pl.lit built it.
+        std::string inner = "Null", shown = literal(query);
+        try {
+          const auto built = lit::argument_literal(query);
+          inner = lit::debug_name(built.type);
+          shown = lit::literal_list_display(built);
+        } catch (const PolarsSequenceFilterError&) {}
+        resolve_fail(at,"cannot cast List type (inner: '"+inner+"', to: 'String')","col("+quote(key)+") == "+shown+".cast(String)");
+      }
       continue;
     }
     const auto value = lit::value_of(query);
@@ -529,11 +551,16 @@ void validate_queries(const EventTable& source, const Prepared& p, bool eager, b
     const auto at = backward && step ? p.values.size() - step : step;
     const auto value = lit::value_of(p.values[at]);
     if (!lit::scalar_literal(value)) {
-      // A list compares with a numeric column as a List literal.
-      if (value.kind == lit::Kind::kDict || !(lit::integer_dtype(declared) || lit::float_dtype(declared))) continue;
+      // A list compares with any column but a String (cast above) or Null
+      // one as a List literal (round CE: temporal, Boolean, Categorical and
+      // Enum columns too; probed in Polars 1.44.1).
+      if (value.kind == lit::Kind::kDict || declared == "String" || declared == "Null") continue;
       std::optional<lit::Literal> list;
       try { list = lit::list_literal(value.items); } catch (const PolarsSequenceFilterError&) { continue; }
-      fail("SchemaError",phase,"could not evaluate comparison between series '"+key+"' of dtype: "+declared+" and series 'literal' of dtype: List("+lit::literal_dtype_name(*list)+")\n\nThis error occurred in the following expression:\n\t[(col("+quote(key)+")) == ("+lit::lit_display(lit::list_of(list->type),lit::Value::list(list->values))+")]\n");
+      const auto shown = "\n\nThis error occurred in the following expression:\n\t[(col("+quote(key)+")) == ("+lit::lit_display(lit::list_of(list->type),lit::Value::list(list->values))+")]\n";
+      if (lit::categorical_dtype(declared) || lit::enum_dtype(declared))
+        fail("ComputeError",phase,"cannot compare categorical with "+lit::short_name(lit::list_of(list->type))+shown);
+      fail("SchemaError",phase,"could not evaluate comparison between series '"+key+"' of dtype: "+lit::is_in_dtype_name(declared)+" and series 'literal' of dtype: List("+lit::literal_dtype_name(*list)+")"+shown);
     }
     const auto check = lit::check_scalar(key, declared, value, lit::CompareOp::kEq, &categories);
     if (check.stage == lit::ScalarCheck::Stage::kCompute) fail(check.type,phase,check.message+lit::expression_suffix(key,lit::CompareOp::kEq,value));
