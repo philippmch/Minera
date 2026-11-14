@@ -3077,6 +3077,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_ce_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-ce-bank.json.gz")
   set_tests_properties(minera_polars_filter_ce_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CF: scalar values and odd bounds in the attribute, numeric,
+  # between, timeframe and paths filters (dicts, tuples, None, typed
+  # anchors, lists as bounds, missing case keys).
+  add_test(NAME minera_polars_filter_cf_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cf-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cf_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

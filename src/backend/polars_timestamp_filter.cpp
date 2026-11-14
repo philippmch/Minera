@@ -118,6 +118,25 @@ std::string literal(const EventAttribute& value, bool dynamic = false) {
   if (real(value)) return std::string(dynamic?"dyn float: ":"")+real_text(number(value));
   return quote(value.value);
 }
+// Round CF: a dict is a struct literal. A String column compares with its
+// String cast: "}" when empty, null when a field is None, else the fields
+// in braces (str quoted, probed); float, temporal and nested fields and
+// other columns are refused (declared in the parity notes).
+const char* const kStructRefusal="Native Polars timeframe filters take dict (struct) attribute values on String columns with str, int and bool fields only";
+bool dict_value(const EventAttribute& v){return v.container==AttributeContainerKind::kContainer;}
+std::optional<std::string> struct_text(const EventAttribute& value) {
+  if(value.children.empty())return std::string("}");
+  for(const auto& c:value.children)if(null(c))return std::nullopt;
+  std::string s="{";
+  for(std::size_t i=0;i<value.children.size();++i) {
+    const auto& c=value.children[i];
+    if(c.container!=AttributeContainerKind::kScalar||date(c)||(real(c)&&!integer(c)&&!boolean(c)))throw std::invalid_argument(kStructRefusal);
+    if(i)s+=',';
+    s+=boolean(c)?(truth(c)?"true":"false"):integer(c)?exact(c).decimal():quote(c.value);
+  }
+  return s+'}';
+}
+std::string struct_literal(const EventAttribute& value){const auto t=struct_text(value);return t?quote(*t):"null";}
 std::string frame_plan(const EventTable& source) {
   std::string out="DF [";
   for(std::size_t i=0;i<std::min<std::size_t>(4,source.columns.size());++i){if(i)out+=", ";out+=quote(source.columns[i]);}
@@ -224,7 +243,13 @@ std::string time_expr(const Query& q) {
 std::string list_display(const lit::Literal& list);
 bool list_value(const Query& q);
 std::string attribute_expr(const Query& q) {
-  if(list_value(q))return compare_expr(q.attribute.value,"==",list_display(lit::literal_of(lit::value_of(q.value))));
+  if(list_value(q)) {
+    const auto list=lit::literal_of(lit::value_of(q.value));
+    // Round CF: a Null column casts to the list's type.
+    if(q.attribute_dtype=="Null")return "[(col("+quote(q.attribute.value)+").cast("+lit::debug_name(lit::list_of(list.type))+")) == ("+list_display(list)+")]";
+    return compare_expr(q.attribute.value,"==",list_display(list));
+  }
+  if(dict_value(q.value))return compare_expr(q.attribute.value,"==",struct_literal(q.value));
   if(!scalar_value(q)||q.attribute_dtype.empty())return compare_expr(q.attribute.value,"==",literal(q.value,true));
   const auto v=lit::value_of(q.value);
   if(!attribute_check(q).ok())return lit::comparison_expression(q.attribute.value,lit::CompareOp::kEq,v);
@@ -242,6 +267,9 @@ std::string agg_plan(const EventTable& source,const Query& q) {
 std::string attribute_plan(const EventTable& source,const Query& q) {
   const auto filter=scalar_value(q)&&!q.attribute_dtype.empty()
       ?lit::comparison_plan(q.attribute.value,q.attribute_dtype,lit::value_of(q.value),lit::CompareOp::kEq,&q.categories)
+      :dict_value(q.value)?"col("+quote(q.attribute.value)+") == "+struct_literal(q.value)
+      :list_value(q)&&q.attribute_dtype=="Null"
+      ?"col("+quote(q.attribute.value)+").cast("+lit::debug_name(lit::list_of(lit::argument_literal(q.value).type))+") == "+literal(q.value)
       :"col("+quote(q.attribute.value)+") == "+literal(q.value);
   return "FILTER "+filter+"\nFROM\n  "+frame_plan(source);
 }
@@ -292,12 +320,18 @@ void time_dtype(const EventTable& source,std::size_t at,const Query& q,const std
   if(!polars_datetime::temporal(dtype)&&dtype!="Null"&&dtype!="Int64"&&dtype!="UInt64"&&dtype!="Float64")throw std::invalid_argument("Unsupported native Polars timestamp dtype: "+dtype);
 }
 bool list_value(const Query& q){return q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple;}
+// Round CF: an attribute on the timestamp column itself is filtered apart
+// from the time window: its errors name no larger expression, and an empty
+// window does not skip them.
+bool same_column(const Query& q){return q.op==Operation::kAttribute&&q.attribute.value==q.options.timestamp_key.value;}
+std::string larger_expr(const Query& q){return same_column(q)?std::string("\n"):"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n';}
 // A list value as the comparison prints it.
 std::string list_display(const lit::Literal& list){return lit::lit_display(lit::list_of(list.type),lit::Value::list(list.values));}
 void attribute_dtype(const EventTable&,std::size_t,const Query& q,const std::string& phase) {
   // Round CD: a list value fails when the filter runs on any column but a
-  // String one (which refuses its cast while resolving).
-  if(list_value(q)&&q.attribute_dtype!="String") {
+  // String one (which refuses its cast while resolving). Round CF: a Null
+  // column casts to the list's type and matches no row.
+  if(list_value(q)&&q.attribute_dtype!="String"&&q.attribute_dtype!="Null") {
     const auto list=lit::literal_of(lit::value_of(q.value));
     const auto& dt=q.attribute_dtype;
     const bool categorical=dt.starts_with("Categorical")||dt.starts_with("Enum(");
@@ -305,14 +339,13 @@ void attribute_dtype(const EventTable&,std::size_t,const Query& q,const std::str
         :"could not evaluate comparison between series '"+q.attribute.value+"' of dtype: "+lit::is_in_dtype_name(dt)+
          " and series 'literal' of dtype: "+lit::debug_name(lit::list_of(list.type));
     fail(categorical?"ComputeError":"SchemaError",phase,message+"\n\nThis error occurred in the following expression:\n\t"+
-         attribute_expr(q)+"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n');
+         attribute_expr(q)+larger_expr(q));
   }
   if(!scalar_value(q))return;
   const auto check=attribute_check(q);
   if(check.stage!=lit::ScalarCheck::Stage::kCompute)return;
   fail(check.type,phase,check.message+"\n\nThis error occurred in the following expression:\n\t"+
-       lit::comparison_expression(q.attribute.value,lit::CompareOp::kEq,lit::value_of(q.value))+
-       "\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n');
+       lit::comparison_expression(q.attribute.value,lit::CompareOp::kEq,lit::value_of(q.value))+larger_expr(q));
 }
 // Resolving the attribute filter, the lowest node, rejects list and datetime
 // values on a String column.
@@ -328,7 +361,9 @@ void attribute_resolution(const EventTable& source,std::size_t at,const Query& q
   }
   if(!string)return;
   const auto& v=q.value;
-  if(v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple) {
+  // Round CF: only a String column casts the list (Categorical and Enum
+  // columns compare it while collecting, which an empty time window skips).
+  if(dt=="String"&&(v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple)) {
     // Round CE: the literal as pl.lit built it (built before this check).
     const auto built=lit::argument_literal(v);
     const auto plan="FILTER col("+quote(q.attribute.value)+") == "+lit::literal_list_display(built)+".cast(String)\nFROM\n  "+frame_plan(source);
@@ -373,7 +408,7 @@ bool attribute_match(const std::optional<EventAttribute>& cell,const std::string
   if(dt=="String"||dt=="Categorical"||dt.starts_with("Categorical(")||dt.starts_with("Enum(")) {
     if(text(value))return v.value==value.value;
     if(boolean(value))return v.value==(truth(value)?"true":"false");
-    if(value.container==AttributeContainerKind::kContainer){std::string s="{";for(std::size_t i=0;i<value.children.size();++i){if(i)s+=',';s+=literal(value.children[i]);}return v.value==s+'}';}
+    if(dict_value(value)){const auto t=struct_text(value);return t&&v.value==*t;}
     return false;
   }
   if(dt=="Boolean"&&text(value))return (truth(v)?"true":"false")==value.value;
@@ -408,10 +443,12 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
     if(q.attribute_dtype.starts_with("Enum(")&&*attr_at<source.categorical_dtypes.size()&&source.categorical_dtypes[*attr_at])
       for(const auto& c:source.categorical_dtypes[*attr_at]->categories)q.categories.push_back(c.value);
   }
+  if(attr_at&&dict_value(q.value)){if(q.attribute_dtype!="String")throw std::invalid_argument(kStructRefusal);(void)struct_text(q.value);}
   if(attr_at)attribute_resolution(source,*attr_at,q,phase);
   if(q.op==Operation::kAttribute&&!constant)case_at=position(q.options.case_id_key.value,true);
   auto result=source;result.rows.clear();
   // Lazy predicate simplification occurs before comparing the temporal schemas.
+  if(same_column(q))attribute_dtype(source,*attr_at,q,phase);
   if((q.op==Operation::kEvents||q.op==Operation::kAttribute)&&less(q.high,q.low))return result;
   if(attr_at)attribute_dtype(source,*attr_at,q,phase);
   time_dtype(source,time_at,q,phase);

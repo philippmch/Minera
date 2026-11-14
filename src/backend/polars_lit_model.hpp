@@ -270,6 +270,15 @@ inline std::string short_name(const LitType& t) {
   }
   return "?";
 }
+// The physical short name (temporal types as their integers), as Polars
+// names list operands it cannot order (round CF).
+inline std::string physical_name(const LitType& t) {
+  using K = LitType::K;
+  if (t.kind == K::kDate) return "i32";
+  if (t.kind == K::kDatetime) return "i64";
+  if (t.kind == K::kList) return "list[" + physical_name(t.inner[0]) + "]";
+  return short_name(t);
+}
 inline std::string debug_name(const LitType& t) {
   using K = LitType::K;
   switch (t.kind) {
@@ -784,6 +793,9 @@ inline std::optional<std::string> coerced_scalar_is_in(const std::string& column
     return std::nullopt;
   }
   if (dtype == "Boolean" && v.kind == Kind::kBool) return form("", "");
+  // Round CF: a datetime on a Datetime column (a date on a Date column)
+  // stays as it is, without a cast.
+  if ((datetime_dtype(dtype) && v.kind == Kind::kDatetime) || (dtype == "Date" && v.kind == Kind::kDate)) return form("", "");
   if (float_dtype(dtype) && (v.kind == Kind::kInt || v.kind == Kind::kFloat)) return form("", dtype);
   if (!integer_dtype(dtype)) return std::nullopt;
   if (v.kind == Kind::kFloat) return form(".strict_cast(Float64)", "Float64");
@@ -976,48 +988,7 @@ inline std::string rust_float(double v) {
 }
 // Polars' float display in a frame or literal: integers with one decimal,
 // long values in scientific notation with four decimals or rounded to six.
-inline std::string polars_frame_float(double v) {
-  if (std::isnan(v)) return "NaN";
-  if (std::isinf(v)) return v < 0 ? "-inf" : "inf";
-  char buffer[64];
-  const double a = std::fabs(v);
-  if (v == std::floor(v) && a < 999'999.0) {
-    std::snprintf(buffer, sizeof(buffer), "%.1f", v);
-    return buffer;
-  }
-  const auto scientific = [&](int decimals) {
-    std::snprintf(buffer, sizeof(buffer), "%.*e", decimals, v);
-    std::string t = buffer;
-    const auto e = t.find('e');
-    const int exponent = std::stoi(t.substr(e + 1));
-    std::string mantissa = t.substr(0, e);
-    if (decimals < 0) {  // shortest
-      mantissa = rust_float(std::strtod(t.substr(0, e).c_str(), nullptr));
-    }
-    return mantissa + "e" + std::to_string(exponent);
-  };
-  const auto display = rust_float(v);
-  if (display.size() > 9) {
-    if (!(a >= 0.000001 && a <= 999'999.0) || a > 999'999.0) return scientific(4);
-    std::snprintf(buffer, sizeof(buffer), "%.6f", v);
-    std::string t = buffer;
-    if (t.back() == '0') {
-      while (t.back() == '0') t.pop_back();
-      if (t.back() == '.') t += '0';
-    }
-    return t;
-  }
-  if (v == std::floor(v)) {
-    // {:e}: the shortest mantissa.
-    std::snprintf(buffer, sizeof(buffer), "%.16e", v);
-    std::string t = buffer;
-    const auto e = t.find('e');
-    std::string mantissa = rust_float(std::strtod(t.substr(0, e).c_str(), nullptr));
-    if (mantissa.size() > 2 && mantissa.ends_with(".0")) mantissa.resize(mantissa.size() - 2);
-    return mantissa + "e" + std::to_string(std::stoi(t.substr(e + 1)));
-  }
-  return display;
-}
+inline std::string polars_frame_float(double v) { return polars_plan_float(v); }
 // A wall clock (seconds and nanoseconds since the epoch) as Polars prints a
 // datetime: the fraction in 3, 6 or 9 digits when present.
 inline std::string wall_text(std::int64_t seconds, std::int64_t nanoseconds) {
@@ -1131,6 +1102,10 @@ inline Value value_of(const EventAttribute& a) {
       const auto& t = scalar.date;
       const auto* native = std::get_if<NativeDate>(&a.typed_value);
       if ((native ? native->value : a.value).size() == 10) return Value::date(floor_div(t.seconds, 86'400));
+      // Round CF: the value holds nanoseconds; a datetime outside their
+      // range (1677-09-21 to 2262-04-11) is refused rather than wrapped.
+      if (t.seconds < -9'223'372'035LL || t.seconds > 9'223'372'035LL)
+        throw std::invalid_argument("Native Polars filters take datetime arguments from 1677-09-21 to 2262-04-11 only");
       if (!t.timezone_aware) return Value::datetime(t.seconds * 1'000'000'000 + t.nanoseconds);
       const std::int64_t wall = (t.seconds + std::int64_t{t.offset_minutes} * 60) * 1'000'000'000 + t.nanoseconds;
       return Value::datetime(wall, t.offset_minutes, t.offset_minutes == 0 ? "UTC" : "");
@@ -1167,6 +1142,18 @@ inline std::optional<std::string> argument_literal_error(const EventAttribute& a
   return std::nullopt;
 }
 inline std::string literal_list_display(const Literal& l) { return lit_display(list_of(l.type), Value::list(l.values)); }
+// Every item of a list literal with its type, untruncated: two list
+// literals with the same key are equal (round CF: the interval merge).
+inline std::string literal_list_key(const LitType& type, const Value& v) {
+  if (v.kind == Kind::kNone) return "null";
+  if (type.kind != LitType::K::kList) return lit_display(type, v);
+  std::string out = "[";
+  for (std::size_t i = 0; i < v.items.size(); ++i) out += (i ? ", " : "") + literal_list_key(type.inner[0], v.items[i]);
+  return out + "]";
+}
+inline std::string literal_list_key(const Literal& l) {
+  return debug_name(list_of(l.type)) + " " + literal_list_key(list_of(l.type), Value::list(l.values));
+}
 
 // Round CD: col(x) OP v for a column dtype and a Python scalar v, as Polars
 // 1.44 types and evaluates it (probed per dtype, literal kind and operator).
@@ -1412,6 +1399,12 @@ inline int compare_scalar(const Cell& cell, const std::string& dtype, const Valu
   }
   if (integer_dtype(dtype)) {
     const auto x = wide_of(a);
+    // Round CF: a negative int or a datetime before 1970 meets a UInt64
+    // column in Int64 (col("x").cast(Int64)), which turns cells past the
+    // Int64 range into nulls.
+    if (dtype == "UInt64" && x > Wide(std::numeric_limits<std::int64_t>::max()) &&
+        ((v.kind == Kind::kInt && !wide_int(v) && v.integer < 0) || (v.kind == Kind::kDatetime && literal_micros(v) < 0)))
+      return -1;
     switch (v.kind) {
       case Kind::kFloat: return apply_order(total_order(wide_double(x), v.real), op);
       case Kind::kBool: return apply_order(order_of(x, Wide(v.boolean ? 1 : 0)), op);

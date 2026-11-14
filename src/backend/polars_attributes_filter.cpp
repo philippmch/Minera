@@ -163,13 +163,17 @@ std::string expression_literal(const EventAttribute& value,bool dynamic=false,bo
   if(boolean(value))return truth(value)?"true":"false";
   if(date(value))return detail::polars_lit::scalar_display(detail::polars_lit::value_of(value));
   if(integer(value))return decimal?real_text(number(value))+ (real_text(number(value)).find('.')==std::string::npos?".0":"") : (dynamic?"dyn int: ":"")+exact(value).decimal();
-  if(real(value)) {auto out=real_text(number(value));if(decimal && std::isfinite(number(value)) && out.find_first_of(".eE")==std::string::npos)out+=".0";return std::string(dynamic?"dyn float: ":"")+out;}
+  // Round CF: a dynamic float prints as Rust's Display (1e17 in full).
+  if(real(value)&&dynamic)return "dyn float: "+detail::polars_dyn_float(number(value));
+  if(real(value)) {auto out=real_text(number(value));if(decimal && std::isfinite(number(value)) && out.find_first_of(".eE")==std::string::npos)out+=".0";return out;}
   return quote(value.value);
 }
 std::string membership_expr(const std::string& key,const EventAttribute& values,bool positive) {
   std::string operand;
   // Polars folds membership in an empty literal list to a false literal.
   if(positive&&collection(values)&&values.container!=AttributeContainerKind::kContainer&&values.children.empty())return "false.alias("+quote(key)+")";
+  // Round CF: a None scalar folds the membership to a false literal too.
+  if(positive&&null(values))return "false.alias("+quote(key)+")";
   if(text(values))operand="col("+quote(values.value)+").implode()";
   else if(collection(values)) {
     if(values.container==AttributeContainerKind::kContainer) {
@@ -490,7 +494,13 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
   // never does; probed on Boolean, integer and temporal columns).
   const bool ns_point=l.op=="=="&&o.whole.starts_with("col("+quote(l.column)+").is_between([");
   if(!ns_point&&o.lhs!="col("+quote(l.column)+")")return {};
-  if(collection(l.value)){MergeKey k;k.tag=20;k.s=o.rhs;return k;}
+  // Round CF: list literals only compare equal or not at all (probed: [1]
+  // and [3] never merge or fold, [1] and [1.0] neither).
+  if(collection(l.value)) {
+    MergeKey k;k.tag=20;
+    try{k.s=lit::literal_list_key(lit::argument_literal(l.value));}catch(const PolarsSequenceFilterError&){return {};}
+    return k;
+  }
   if((!o.whole.empty()&&!ns_point)||o.rhs.rfind("dyn ",0)==0)return {};
   if(const auto u=wide_literal(l.value)) {
     MergeKey k;
@@ -553,8 +563,16 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
 }
 std::optional<int> merge_order(const MergeKey& a,const MergeKey& b) {
   if(a.tag!=b.tag)return {};
-  if(a.tag==1){if(std::isnan(a.d)||std::isnan(b.d))return {};return a.d<b.d?-1:a.d>b.d?1:0;}
-  if(a.tag==2||a.tag==10||a.tag==20)return a.s<b.s?-1:a.s>b.s?1:0;
+  // Round CF: floats in their total order, NaN above every number and
+  // equal to itself (probed: >= NaN with <= -1000.0 empties the frame,
+  // >= NaN with <= NaN merges into == NaN).
+  if(a.tag==1) {
+    const bool x=std::isnan(a.d),y=std::isnan(b.d);
+    if(x||y)return x&&y?0:x?1:-1;
+    return a.d<b.d?-1:a.d>b.d?1:0;
+  }
+  if(a.tag==20){if(a.s==b.s)return 0;return {};}
+  if(a.tag==2||a.tag==10)return a.s<b.s?-1:a.s>b.s?1:0;
   if(a.tag==12&&a.s!=b.s)return {};
   return a.i<b.i?-1:a.i>b.i?1:0;
 }
@@ -656,7 +674,14 @@ std::optional<std::pair<std::string,std::string>> leaf_error(const Leaf& l) {
   const auto& v=l.value;
   if(null(v))return {};
   if(collection(v)) {
-    // Round CE: a Null column compares a list (cast to its type).
+    // Round CE: a Null column compares a list (cast to its type). Round CF:
+    // but cannot order lists.
+    if(l.dtype=="Null"&&l.op!="=="&&l.op!="!=") {
+      try {
+        const auto name=lit::physical_name(lit::list_of(lit::literal_of(lit::value_of(v)).type));
+        return std::pair<std::string,std::string>{"InvalidOperationError","cannot perform '"+l.op+"' comparison between series '"+l.column+"' of dtype: "+name+" and series 'literal' of dtype: "+name};
+      } catch(const PolarsSequenceFilterError&) {return {};}
+    }
     if(l.dtype=="String"||l.dtype=="Null")return {};
     if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
       // Round CD: a list never compares with a categorical column.

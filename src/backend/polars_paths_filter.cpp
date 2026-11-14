@@ -322,10 +322,8 @@ std::int64_t date_micros(const EventAttribute& value) {
 }
 std::string literal(const EventAttribute& value) {
   if (null(value)) return "null";
-  if (collection(value)) {
-    if (!value.children.empty()) throw std::invalid_argument("Native Polars path bound collection outside observed empty-list domain");
-    return "[]";
-  }
+  // Round CF: a list bound as pl.lit built it.
+  if (collection(value)) return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(value));
   if (text(value)) return quote(value.value);
   if (integer(value)) return exact(value).decimal();
   if (boolean(value)) return truth(value) ? "true" : "false";
@@ -334,16 +332,34 @@ std::string literal(const EventAttribute& value) {
 void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFilterOptions& options, const std::string& path, const std::string& phase) {
   if (!text(bound) && !collection(bound)) return;
   const std::string cmp = upper ? "<=" : ">=";
-  std::string message = text(bound) ? "cannot compare string with numeric type (i64)" : "could not evaluate '" + cmp + "' comparison between series '@@duration' of dtype: Int64 and series 'literal' of dtype: List(Null)";
+  std::string message = text(bound) ? "cannot compare string with numeric type (i64)" : "could not evaluate '" + cmp + "' comparison between series '@@duration' of dtype: Int64 and series 'literal' of dtype: " +
+      detail::polars_lit::debug_name(detail::polars_lit::list_of(detail::polars_lit::argument_literal(bound).type));
   // The duration is Int64: a float bound casts the column.
   const auto expression = [](const EventAttribute& v, const std::string& comparison) {
     if (!null(v) && !collection(v) && !text(v)) {
+      // Round CF: an int past the Int64 range is a UInt64 literal, which
+      // meets the Int64 duration at Float64.
+      if (const auto u = detail::polars_lit::wide_cell(v))
+        return "[(col(\"@@duration\").cast(Float64)) " + comparison + " (" + detail::polars_plan_float(static_cast<double>(*u)) + ")]";
       if (date(v)) return "[(col(\"@@duration\")) " + comparison + " (" + std::to_string(date_micros(v)) + ")]";
       if (boolean(v)) return "[(col(\"@@duration\")) " + comparison + " (" + exact(v).decimal() + ")]";
       if (real(v)) return "[(col(\"@@duration\").cast(Float64)) " + comparison + " (" + detail::polars_plan_float(number(v)) + ")]";
     }
     return "[(col(\"@@duration\")) " + comparison + " (" + literal(v) + ")]";
   };
+  // Round CF: equal str or list bounds merge into one == comparison.
+  const auto key = [](const EventAttribute& v) {
+    return text(v) ? "s" + v.value : "l" + detail::polars_lit::literal_list_key(detail::polars_lit::argument_literal(v));
+  };
+  const auto& lo = options.min_performance;
+  const auto& hi = options.max_performance;
+  if ((text(lo) || collection(lo)) && (text(hi) || collection(hi)) && key(lo) == key(hi)) {
+    const auto eq = "[(col(\"@@duration\")) == (" + literal(bound) + ")]";
+    if (!text(bound)) message.replace(message.find("'" + cmp + "' "), cmp.size() + 3, "");
+    message += "\n\nThis error occurred in the following expression:\n\t" + eq + "\nwhile evaluating this larger expression:\n\t[(" + eq +
+               ") & ([(col(\"@@path\")) == (" + quote(path) + ")])]\n";
+    fail(text(bound) ? "ComputeError" : "SchemaError", phase, message);
+  }
   // A null bound folds away: after the failing bound it drops with the AND,
   // before it the failing bound keeps a null mask and the path test folds.
   const auto path_test = "[(col(\"@@path\")) == (" + quote(path) + ")]";

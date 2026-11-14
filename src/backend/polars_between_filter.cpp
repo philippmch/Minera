@@ -7,6 +7,7 @@
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <charconv>
 #include <cmath>
 #include <numeric>
@@ -285,6 +286,24 @@ std::string resolved_text(const Anchor& a, const std::string& column, const std:
     return "[[" + item + "].cast(List(" + to + "))]";
   };
   const auto& v = a.value;
+  // Round CF (probed): a Null column casts to the scalar's type, a dynamic
+  // int to Int32 (Int64 past it), an int past Int64 to UInt64; None stays.
+  if (dtype == "Null") {
+    if (v.kind == lit::Kind::kNone) return c + ".is_in([[null]])";
+    std::string to, item = lit::scalar_display(v);
+    if (v.kind == lit::Kind::kInt) {
+      item = lit::integer_text(v);
+      const bool narrow = v.integer >= std::numeric_limits<std::int32_t>::min() && v.integer <= std::numeric_limits<std::int32_t>::max();
+      to = lit::wide_int(v) ? "UInt64" : narrow ? "Int32" : "Int64";
+    } else if (v.kind == lit::Kind::kFloat) {
+      item = lit::polars_frame_float(v.real);
+      to = "Float64";
+    } else {
+      if (v.kind == lit::Kind::kBool) item = v.boolean ? "true" : "false";
+      to = lit::debug_name(lit::lit_value(v).type);
+    }
+    return c + ".cast(" + to + ").is_in([[" + item + "]])";
+  }
   if (v.kind == lit::Kind::kNone) return c + ".is_in(" + cast_list("null", lit::is_in_dtype_name(dtype)) + ")";
   if (v.kind == lit::Kind::kInt && (lit::integer_dtype(dtype) || lit::float_dtype(dtype))) {
     const auto item = std::to_string(v.integer);

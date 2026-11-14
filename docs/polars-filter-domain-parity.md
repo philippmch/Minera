@@ -371,3 +371,43 @@ several hash seeds gave both orders).
 Outside the domain: Duration, Time, Decimal and Int128 columns (the table
 transport has no cell for their values) and ints above the UInt64 range
 (the bank's typed JSON carries at most UInt64).
+
+## Scalar values, bounds and argument shapes (round CF)
+
+`scripts/polars_filter_cf_domain.py` extends the CE domain with scalar
+values in the attribute filters (None, typed and edge values, a missing
+case key), numeric filters on any column with odd and typed bounds and up
+to two stream filters, typed, edge, None, empty, nested and tuple anchors
+in `between.apply`, edge bounds and typed, list, tuple, dict and None
+values in the timestamp filters, and odd path shapes and bounds in the
+paths filters. `scripts/capture-polars-filter-bank.py --domain
+polars_filter_cf_domain.py --count 800 --bank-seed 2026111460
+--hash-seeds 0,1 --repeats 3` captures `docs/polars-filter-cf-bank.json.gz`
+(30,328 calls), replayed by `minera_polars_filter_cf_bank_parity_tests`.
+
+* **Float display.** A `dyn float` prints as Rust's Display (no
+  exponent); a Float64 literal or cell as Polars' `fmt_float` (`1e7`,
+  `9.99999e5`, `1.0000e9`, `0.123457`, `2.5000e-7`).
+* **Null columns.** Ordering a list raises `cannot perform '>='
+  comparison` with physical list names (`list[i64]` for datetimes,
+  `list[i32]` for dates); a timeframe list value casts the column to the
+  list's type and keeps no row; a resolved between anchor casts the
+  column to the anchor's type (`Int32` for a dynamic int).
+* **Merges.** List literals merge only when equal (into `==`); unequal
+  lists are unordered and never empty the frame. Equal str or list
+  bounds of `paths.apply_performance` merge into one `==`.
+* **Wide ints as bounds.** An int past the Int64 range meets the Int64
+  duration of the paths and case performance filters at Float64.
+* **Timeframe attribute values.** Categorical and Enum columns compare a
+  list while collecting (an empty window skips the error); the timestamp
+  column as attribute is filtered apart from the window; a dict on a
+  String column compares with the struct's String cast (`"{"z","x"}"`,
+  `"}"`, `null`).
+* **UInt64 columns.** A negative int or a datetime before 1970 meets them
+  in Int64, so cells past the Int64 range match nothing.
+
+Declared: Polars panics on a Null activity column with Int64 between
+anchors (not compared); datetime arguments outside the nanosecond range
+are refused; dict values of the timeframe filter other than str, int and
+bool fields on String columns are refused; `filter_on_ncases` may keep k
+or k - 1 cases when a null case id is among the k it picks.

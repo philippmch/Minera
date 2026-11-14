@@ -26118,3 +26118,141 @@ Verification (scripts in the project files under `review-harness/round-ce/`):
 | CD's fresh seed 4243, the CC bank, the base bank | 16,634, 33,137 and the base bank's calls | 0 mismatches |
 | `col(x) OP v` probes (column dtypes, literal kinds, operators) | 4,730 probes against Polars 1.44.1 | 0 differences |
 | Pushdown model (Python) against Polars | 12,000 random filter chains | 0 differences |
+
+## Review CF1: re-review of round CE, and scalar values, odd bounds and argument shapes in the Polars table filters (2026-11-14)
+
+Round CF checked CE's CI run (43543514400: green on all six jobs, the
+Windows ctest 488/488 with the abbreviation mask), replayed fresh seeds of
+the CE domain, and added a domain for the argument shapes the earlier
+banks left out. Findings, all fixed or declared:
+
+- **CF1-1 Fresh CE seeds.** Seeds 2026111450, 4250 and 4251 (17,425,
+  17,382 and 17,432 calls on 600 frames) differed in 0, 1 and 1 calls: a
+  list value of `filter_traces_attribute_in_timeframe` on a Categorical
+  column with an empty time window (CF1-6), and a case order of
+  `filter_on_case_performance` (seed 4251 case 94, declared below).
+- **CF1-2 New domain.** `scripts/polars_filter_cf_domain.py` (on top of
+  the CE domain) adds per case `attributes.apply`, `apply_events` and
+  `filter_df_on_attribute_values` with scalar values (None, typed and
+  edge values, a missing case key), `apply_numeric(_events)` on any column
+  with odd and typed bounds and up to two stream filters, `between.apply`
+  with typed, edge, None, empty, nested and tuple anchors on other
+  columns, edge bounds of the timestamp filters and
+  `filter_traces_attribute_in_timeframe` with typed, list, all-str list,
+  tuple, dict and None values, and the paths filters with odd path shapes
+  (3-tuples, lists, the str "ab") and odd bounds. Its first bank (seed
+  2026111460) differed in 85 of 30,328 calls; CF1-3 to CF1-8 fixed them.
+- **CF1-3 Float display.** Polars prints a `dyn float` literal with
+  Rust's Display (the shortest digits, never an exponent: 2**63 as
+  `9223372036854776000`, 1e17 as `100000000000000000`), and a Float64
+  literal or frame cell with its `fmt_float`: an integral value under
+  999999 with one decimal; a Rust display longer than nine characters in
+  scientific notation with four decimals outside [1e-6, 999999] and
+  rounded to six decimals inside; any other integral value in the
+  shortest scientific notation (`1e7`, `9.99999e5`, `1.234567e6`); the
+  rest as Rust prints them. The plan display used sampled thresholds and
+  printed 1e7 as `1.0000e7` (in the paths and case performance bounds);
+  plans and frames now share one function, checked on 36 probed values
+  and on 2,000,000 random doubles against the CE frame model.
+- **CF1-4 Scalar values in the attribute filters.** A None value folds a
+  positive membership to `false.alias(key)`, as an empty list does (the
+  trace filters always use the positive plan). A negative int or a
+  datetime before 1970 meets a UInt64 column in Int64, so cells past the
+  Int64 range turn null and match nothing. A datetime on a Datetime
+  column and a date on a Date column resolve their scalar `is_in` without
+  a cast.
+- **CF1-5 Lists on Null columns and list merges.** A Null column cannot
+  order a list: `>=`, `>`, `<=` and `<` raise `InvalidOperationError:
+  cannot perform '>=' comparison between series 'x' of dtype: list[i64]
+  and series 'literal' of dtype: list[i64]`, naming physical types
+  (dates `i32`, datetimes `i64`, nested lists nested), while `==` and
+  `!=` compare and match nothing. In the interval merge list literals
+  compare only as equal or not at all: equal lists merge into `==`,
+  others (`[1]` and `[3]`, `[1]` and `[1.0]`) stay and never fold to an
+  empty frame. The model compared their display text, so
+  `rd >= [1969-12-31 23:59:59.999]` and `rd <= [""]` emptied the frame
+  where Polars raised the stream filter's error (case 212). In
+  `between.apply` a Null activity column casts to the type of a resolved
+  scalar anchor (`cast(Boolean)`, `Int32` for a dynamic int, `Int64` past
+  it, `UInt64` past the Int64 range, `Float64`, the datetime or `Date`
+  type; None stays `[[null]]`).
+- **CF1-6 filter_traces_attribute_in_timeframe.** Only a String column
+  refuses a list value while the plan resolves; Categorical and Enum
+  columns compare it while collecting, which an empty time window skips,
+  and a Null column casts to the list's type
+  (`col("x").cast(List(String)) == ["r1"]`) and keeps no row. An
+  attribute on the timestamp column itself is filtered apart from the
+  window: its errors name no larger expression, and an empty window does
+  not skip them. A dict value is a struct literal; on a String column
+  Polars compares the cell with the struct's String cast (`"{"z","x"}"`,
+  `"}"` for an empty dict, `null` when a field is None), now modelled for
+  str, int and bool fields in the plan and the match.
+- **CF1-7 paths.** List bounds go through the shared literal model
+  (`[(col("@@duration")) <= ([9.0072e15, -1.5])]`, `List(Float64)`); an
+  int past the Int64 range is a UInt64 literal that meets the Int64
+  duration at Float64 (`col("@@duration").cast(Float64) >= 9.2234e18`,
+  in `filter_on_case_performance` too); equal str or list bounds merge
+  into one `==` (`could not evaluate comparison ...` without the
+  operator).
+- **CF1-8 filter_on_ncases.** pm4py keeps the first k ids of an unordered
+  `unique`; a null id among them keeps no rows, so a frame with a null
+  case id keeps k or k - 1 cases (seed 2026111460 case 346 kept {2}, {3}
+  or {2, 3} of {null, 2, 3} over 24 runs). The bank test accepts the
+  frame's rows of any k ids, or k - 1 when the frame has a null id.
+- **CF1-9 Fresh CF seeds.** Seeds 2026111461 and 4261 (26,585 and 26,543
+  calls on 700 frames) differed in 1 and 0 calls: equal list bounds in
+  paths (CF1-7, seed 2026111461 case 519). Seed 4262 (26,781 calls on
+  700 frames) found two: a NaN lower bound above a lower upper bound,
+  which Polars' interval merge orders totally (NaN above every number and
+  equal to itself) and so folds to an empty frame (case 448: the model
+  left NaN unordered and raised the stream filter's error), and a case
+  order of `filter_case_performance` (case 27, both orders over 18
+  reference runs; compared as case blocks). CE seed 4263 (17,473 calls on
+  600 frames) found one: equal empty-list bounds of
+  `filter_case_performance` merge into one `==`, the whole predicate
+  (case 400). All fixed.
+
+Declarations:
+
+- Polars 1.44.1 panics (a pyo3 `PanicException`: "implementation error,
+  cannot get ref Int32 from Int64") in `between.apply` on a Null activity
+  column with the Int64 anchors 0 and -2**63. The domain records the
+  panic and the bank test does not compare it.
+- Datetime arguments outside the nanosecond range (before 1677-09-21 or
+  after 2262-04-11) are refused by the shared literal model instead of
+  wrapping.
+- Dict values of `filter_traces_attribute_in_timeframe` beyond CF1-6 are
+  refused (`Native Polars timeframe filters take dict (struct) attribute
+  values on String columns with str, int and bool fields only`) and the
+  bank test counts the refusal as declared (46 of the CF bank's 74 dict
+  calls). Probed: a numeric column casts to a one-field struct of the
+  field's type (zero or several fields raise `must specify one field in
+  the struct`), Boolean, Date and Datetime columns raise a SchemaError
+  naming `Struct({...})`, Categorical and Enum columns a ComputeError
+  (`cannot compare categorical with struct[N]`), a Null column keeps no
+  row; all of these are collect-time errors that an empty window skips.
+- `filter_on_case_performance` and `filter_case_performance` keep cases
+  in an unspecified order (seed 4251 case 94 and seed 4262 case 27, as
+  CE's seed 4247 case 333) and are compared as case blocks.
+
+Not reachable: `validate_bound` with several paths (a CE target), since
+`paths.apply_performance` takes exactly one path (a list of paths raises
+a TypeError before any bound is read); `apply_numeric` reads only
+`stream_filter_key1` and `stream_filter_key2`, so a node holds at most
+three columns.
+
+Tests: `docs/polars-filter-cf-bank.json.gz` (30,328 calls) replayed by
+`minera_polars_filter_cf_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-cf/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Scalar values, bounds and shapes (CF bank, seed 2026111460) | 30,328 calls on 800 frames, hash seeds 0-1, 3 runs each | before: 85 mismatches; after: 0 |
+| The same domain on seeds 2026111461 and 4261 | 26,585 and 26,543 calls on 700 frames each | 1 and 0 found; after: 0 |
+| The CF domain on seed 4262, the CE domain on seed 4263 | 26,781 calls on 700 frames, 17,473 calls on 600 frames | 2 and 1 found; after: 0 |
+| Comparison model probes (`probe2`: dtypes, literal kinds, operators; `probe4`: float display, str and Enum order) | 4,730 and 1,215 probes against Polars 1.44.1 | 0 differences |
+| Wide ints, dates before 1970 and outside the ns range (`probe3`) | 2,520 probes | 0 differences besides 180 declared refusals (datetimes outside the ns range) and 126 transport artifacts (zone-named literals travel as fixed offsets, year-1 cells as null) |
+| CE domain on seeds 2026111450, 4250, 4251 | 17,425, 17,382 and 17,432 calls on 600 frames each | 0, 1 and 1 found; after: 0 and 1 declared order |
+| The base, CC and CE banks | the banks in the suite | 0 mismatches |
+| Float display (`polars_plan_float`) | 36 probed values against Polars 1.44.1, 2,000,000 random doubles against the CE model | 0 differences |

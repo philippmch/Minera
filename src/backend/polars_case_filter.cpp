@@ -161,11 +161,24 @@ void validate_bound(const EventAttribute& bound, const EventAttribute& other, bo
   const auto expression = [&](const EventAttribute& v, const std::string& comparison) {
     // The case duration is Int64: a float bound casts the column.
     if (op == Operation::kPerformance && !null(v) && !collection(v) && !text(v)) {
+      // Round CF: an int past the Int64 range meets the duration at Float64.
+      if (const auto u = detail::polars_lit::wide_cell(v))
+        return "[(col(" + quote(column) + ").cast(Float64)) " + comparison + " (" + detail::polars_plan_float(static_cast<double>(*u)) + ")]";
       if (real(v)) return "[(col(" + quote(column) + ").cast(Float64)) " + comparison + " (" + detail::polars_plan_float(number(v)) + ")]";
       if (boolean(v)) return "[(col(" + quote(column) + ")) " + comparison + " (" + exact(v).decimal() + ")]";
     }
     return "[(col(" + quote(column) + ")) " + comparison + " (" + literal(v) + ")]";
   };
+  // Round CF: equal str or list duration bounds merge into one ==, the
+  // whole predicate (seed 4263 case 400).
+  const auto key = [](const EventAttribute& v) {
+    return text(v) ? "s" + v.value : "l" + detail::polars_lit::literal_list_key(detail::polars_lit::argument_literal(v));
+  };
+  if (op == Operation::kPerformance && (text(other) || collection(other)) && key(bound) == key(other)) {
+    if (!text(bound)) error.replace(error.find("'" + cmp + "' "), cmp.size() + 3, "");
+    error += "\n\nThis error occurred in the following expression:\n\t[(col(" + quote(column) + ")) == (" + literal(bound) + ")]\n";
+    fail(text(bound) ? "ComputeError" : "SchemaError", phase, std::move(error));
+  }
   error += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, cmp) + '\n';
   // A None bound folds to a null column, printed after the other (round CD).
   if (op == Operation::kPerformance && null(other))
