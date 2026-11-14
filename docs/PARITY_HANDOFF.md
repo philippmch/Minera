@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CC (2026-11-05 to 2026-11-13, cloud container)
+## Review-fix loop, rounds T–CD (2026-11-05 to 2026-11-13, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -4968,25 +4968,85 @@ Declared: MSVC's abbreviations in the Polars plans, Python set orders in
 `rework`. No fixture changed. The device check on the Mac was skipped
 again (no device linked).
 
-Next round (CD) should start by re-reviewing round CC:
+Round CD re-reviewed CC (Review CD1; CC's CI run 43510000808 was green on
+all six jobs, Windows included; fresh seeds of the CC sequence domains
+were equal apart from one declared set order) and took CC's main target.
+The Polars literal rules of CC1-4 now live in
+`src/backend/polars_lit_model.hpp`, shared by the sequence and table
+filters, together with a new comparison model (`check_scalar`,
+`compare_scalar`, `coerced_operands`, `comparison_plan`: how Polars 1.44
+types, folds, prints and evaluates `col(x) OP v` per column dtype and
+Python scalar). The table filters use it throughout: `Float32` keys, the
+numeric filters' typing and their same-column interval merge, the LTL
+plans in resolution order, between's anchors (imploded scalars, list
+literals, the second anchor reported first, resolved casts, `Float32`
+lookups, temporal case ids), `filter_traces_attribute_in_timeframe` on
+typed attributes, and the variants join height with a matching null
+case. Fresh seeds of the domain (4243, 4244) and of the base domain (4245)
+found three more (folded forms printed bare in evaluated predicates, None
+bounds of `filter_case_performance`, datetime lookups by microseconds in
+the value filters) and left six calls open (below). The first full ctest
+failed six tests (CD1-9: `__int128` in core code, `is_in` on Null
+columns, UInt64 literals above the Int64 range, between's empty
+categorical entries); all six were fixed before the commit.
+`docs/polars-filter-cc-bank.json.gz` (33,137 calls; 3,293
+mismatches before) is in the suite as
+`minera_polars_filter_cc_bank_parity_tests`. Declared: the between case
+order per run, rarely the case order of `attr_value_different_persons`,
+`filter_on_ncases` selections on every case dtype, and the `is_in` list
+order of the group_by filters (the bank test compares these up to that
+order). No fixture changed. The device check on the Mac was skipped again
+(no device linked).
 
-- the Polars table filters on typed keys: capture
-  `scripts/capture-polars-filter-bank.py --domain polars_filter_cc_domain.py
-  --count 1200 --bank-seed 2026111335 --hash-seeds 0,1 --repeats 4
-  --output BANK.json.gz` and replay it with
-  `minera_polars_filter_bank_parity_tests BANK.json.gz`:
-  3,293 mismatches, most in the LTL filters (283 to 347 each),
-  `filter_df_relative_occurrence_event_attribute` (270), `between.apply`
-  (251), `apply_numeric` (210), `filter_df_on_attribute_values`, `apply`
-  and `apply_events` (171 to 202); the causes seen: `Float32` case and
-  activity columns refused natively (`Unsupported native Polars case
-  dtype: Float32` and the same for LTL, between, variants and paths), the
-  join key dtypes of typed case columns (`datatypes of join keys don't
-  match`), the numeric filter's dtypes, and `is_in` lists and literals
-  that should follow `list_literal`, `check_is_in` and `coerced_is_in` of
-  `src/backend/polars_sequence_filters.cpp` (move them to a shared header
-  rather than copying); add the bank to the suite once it is clean;
-- `src/backend/polars_sequence_filters.cpp`: `lit_supertype` and
+Next round (CE) should start by re-reviewing round CD:
+
+- the six open calls of Review CD1 (banks `polars-filter-cc-4244.json.gz`
+  and `polars-filter-base-4245.json.gz` in `review-harness/round-cd/banks/`,
+  replayed with `MINERA_BANK_DUMP`): merged bounds and None bounds in the
+  evaluated predicate of `apply_numeric` (Polars appends merged bounds
+  after the column's unmerged predicates, left-nested; probes
+  `rng5.py`, `num.py`, `num2.py`; `combine` and `pushdown` in
+  `src/backend/polars_attributes_filter.cpp`), the order of stream
+  filters across columns when one fails (4244 case 570), an empty tuple in
+  `attr_value_different_persons` on a `Datetime` column (case 121), and
+  `filter_df_keeping_spno_activities` ties in error texts (cases 804 and
+  1005: declare, or compare the listed activities as a tie set);
+- the comparison model in `src/backend/polars_lit_model.hpp`:
+  `check_scalar`, `compare_scalar` and `coerced_operands` on Duration,
+  Time, Decimal and Int128 columns, Boolean columns with dates and ints,
+  `>`/`<` on Categorical and Enum columns with unknown strs, ints past
+  2**53 on `Float32`, dates and datetimes before 1970 on ms and ns
+  columns; `comparison_plan` floats past the sampled display thresholds;
+- `src/backend/polars_between_filter.cpp`: `resolved_text` and
+  `integer_supertype` for dynamic ints that do not fit the column (only
+  `UInt8`, `UInt64` and `Int16` were probed; the other widths follow a
+  guessed rule), float anchors past 1e16, Boolean and Null activity
+  columns, the separator diagnostic with typed anchors (it still prints
+  them unresolved);
+- `src/backend/polars_attributes_filter.cpp`: the interval merge with
+  mixed dynamic and typed literals, NaN bounds, `Float32` and cast
+  columns, and `!=`; the statistics filters on typed columns with nulls;
+  the UInt64-literal path (`wide_literal`, CD1-9) on Date columns and in
+  merges with ordinary bounds; the other table filters (timestamp
+  attribute, LTL, between) still give a Python int above the Int64 range
+  to the signed model, which wraps it;
+- `src/backend/polars_timestamp_filter.cpp`: list values on Boolean and
+  temporal attribute columns, dict values, all-str lists as selectors
+  (several columns);
+- more fresh seeds of `scripts/polars_filter_cc_domain.py` (CD used
+  2026111335, 4243 and 4244) and of the base domain (CD used 4245);
+- still open from CD's list below: the sequence filter helpers (now in
+  `polars_lit_model.hpp`), the pandas sequence filter items, and the items
+  carried over from CB;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers);
+- the CI run of the CD commit.
+
+Round CC's targets, taken in CD (findings CD1-1 to CD1-7): the Polars
+table filters on typed keys and CC's CI run. Not taken (carried to CE):
+
+- `src/backend/polars_lit_model.hpp` (moved from
+  `src/backend/polars_sequence_filters.cpp` in CD): `lit_supertype` and
   `cast_lit` (Duration, Time, Decimal and Int128 columns, `UInt8` and
   `Int16` with dates, nested lists of lists), `build_strict` (nested nulls,
   empty lists), `comparable` (Categorical and Enum columns against dates),
@@ -5006,11 +5066,7 @@ Next round (CD) should start by re-reviewing round CC:
   other Polars modules that build `is_in` filters or variant lists (DFG
   and statistics on Categorical and Enum activities); pandas period and
   interval keys (no cell in the table transport; declare or add a
-  transport kind);
-- the open choices on CSV timestamp columns of plain numbers and "roles to
-  diagnostics groups" (still declared unless Philipp answers);
-- the CI run of the CC commit (Windows in particular: the CC banks print
-  Kolkata, New York and Berlin abbreviations).
+  transport kind).
 
 Round CB's targets, taken in CC (findings CC1-1 to CC1-4):
 

@@ -122,7 +122,7 @@ Dtype dtype(const std::string& value) {
   if (value == "String" || categorical_dtype(value)) return Dtype::kString;
   if (enum_dtype(value)) return Dtype::kEnum;
   if (value == "Int64" || value == "UInt64" || value == "UInt32" || value == "UInt16" || value == "UInt8" || value == "Int32" || value == "Int16" || value == "Int8") return Dtype::kInteger;
-  if (value == "Float64") return Dtype::kFloat;
+  if (value == "Float64" || value == "Float32") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
   if (value == "Null") return Dtype::kNull;
   if (polars_datetime::temporal(value)) return Dtype::kDate;

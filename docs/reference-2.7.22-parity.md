@@ -25829,3 +25829,157 @@ Verification (scripts in the project files under `review-harness/round-cc/`;
 | Earlier banks (pandas and Polars sequence filters: original, typed, CB; Polars table filters) | 7 banks | 0 mismatches |
 | Polars table filters on typed keys (new domain, seed 2026111335) | 33,137 calls on 1,200 frames, hash seeds 0-1, 4 runs each | 3,293 mismatches (open, round CD) |
 | Full suites: ctest, script tests | 492 ctests, 406 script tests (the frontend and server routes are unchanged; CI runs vitest) | all pass |
+
+## Review CD1: re-review of round CC, and the Polars table filters on typed case and activity columns (2026-11-13)
+
+Round CD checked CC's CI run (43510000808): all six jobs green, Windows
+included (the MSVC abbreviation masking of CC1-1 holds). It re-reviewed
+CC on fresh seeds of both CC sequence domains and took CC's main target,
+the Polars table filter bank on typed keys. Findings, all fixed:
+
+- **CD1-1 One literal and comparison model for the Polars filters.** The
+  list literals, `is_in` checks and plan casts of CC1-4 moved from the
+  sequence filters into `src/backend/polars_lit_model.hpp`, shared by
+  the sequence and table filters, which now also models `col(x) OP v`
+  for a column dtype and a Python scalar as Polars 1.44 types it (probed
+  per dtype, literal kind and operator): a str with a temporal side fails
+  while the plan resolves (`cannot compare 'date/datetime/time' to a
+  string value`); a number on a String column, any non-str on a
+  Categorical or Enum column, a datetime on a small integer column, a
+  datetime of another zone or awareness on a `Datetime` column and a bool
+  on a temporal column fail when the filter runs, with the failing
+  expression; a list fails on any column but a String one. A typed
+  comparison prints coerced (`col("x") == 1`, `col("x").cast(Float64) ==
+  1.5`, a constant `when(...).then(false).otherwise(null)` for an int out
+  of the column's range, `null.repeat([col("x").len()])` for None,
+  `is_between([lo, lo + 999 ns])` for `==` on a nanosecond column).
+  Matching follows Polars: NaN equals NaN and sorts last, `Float32`
+  compares in single precision, a microsecond literal is truncated on a
+  millisecond column, Enum order is the category order.
+- **CD1-2 Typed keys in the attribute, case, path and variant filters.**
+  `Float32` case and activity columns are grouped and sorted; the numeric
+  and value filters type their literals with CD1-1 on every column dtype;
+  several `>=`, `<=` and `==` filters on one column merge into an
+  interval in filter order as Polars' predicate pushdown merges them (a
+  tighter bound replaces the current one, an equality bounds both sides,
+  a literal without order against the bound is kept, dynamic literals and
+  cast columns stay apart, an empty interval empties the frame, a point
+  becomes `==`; only when the merge leaves fewer predicates); the
+  statistics filters read the column's own values.
+- **CD1-3 LTL plan resolution.** The whole plan resolves before a filter
+  runs, so resolution errors come first, left inputs first: in
+  `four_eyes_principle` activity 0 is the left input of pair 0 and a later
+  activity first appears as the right input of pair (0, at);
+  `eventually_follows` evaluates index 0, then n-1 down to 1. The plans
+  print each activity comparison coerced (CD1-1), a missing value as
+  `col(x) == null`, and `A_next_B_next_C`'s Python-side matching never
+  equals a `datetime.date` with a `datetime.datetime`.
+- **CD1-4 between.** A str anchor is wrapped in a list, a list (a dict:
+  its keys) is a list literal built as `pl.lit` builds it (its strict
+  rebuild and supertype errors), any other scalar is imploded by Polars.
+  The second anchor resolves first and fails first, the type check before
+  the Enum conversion; an imploded scalar names its element type
+  `Unknown(Int(1))` or `Unknown(Float)`, prints `[x.implode()]` while it
+  fails and `[x]` before it resolves, and once resolved casts to the
+  column's list type (`[[1].cast(List(Int16))]`; a number that does not
+  fit casts the column to its supertype, a float on integer data with
+  `strict_cast(Float64)`). A datetime anchor on a `Date` column and any
+  datetime on a millisecond column are refused as in CC1-4; a float
+  anchor on a `Float32` column is rounded to single precision before the
+  lookup (a float list is not). A temporal case id casts to String with
+  its unit's fractional digits, and a result without a categorical column
+  carries no categorical dtypes.
+- **CD1-5 `filter_traces_attribute_in_timeframe` on typed attributes.**
+  The attribute comparison follows CD1-1: resolution errors with the
+  attribute filter's plan (an aware value printed in UTC), compute errors
+  with the expression and the larger predicate, whose attribute part is
+  printed coerced (a folded `when` with a leading dot); a list value
+  fails on non-String columns; `pl.col` of a list with a non-str item
+  raises `'int' object is not an instance of 'str'`.
+- **CD1-6 variants join height.** A null case whose variant is in the
+  list counts toward the join's list height (which decides between the
+  list's order and the frame's), though its key never joins.
+- **CD1-7 Fresh seeds of the typed domain.** Seeds 4243 and 4244 (and
+  4245 of the base domain) found: an evaluated predicate of the attribute
+  filters prints a folded comparison bare (`col("x").is_between([...])`,
+  a `when` with a leading dot), as CD1-5 does; `filter_case_performance`
+  with a None bound prints its null column after the other bound
+  (`[(...) <= ([])]) & (null.repeat([col("case_duration").len()]))`); a
+  datetime value of the attribute value filters on a `Datetime` column
+  is looked up by its microseconds whatever the zones, as `is_in` looks
+  it up (a UTC value finds a Kolkata cell of the same instant).
+- **CD1-8 Re-review of CC.** A fresh seed of the Polars CC sequence domain
+  (2026111342) was equal; a fresh seed of the pandas CC domain
+  (2026111341) found one `rework.apply` call whose KeyError lists the two
+  missing keys in Python's set order (declared in CC: hash seeds 3 and 4
+  give the native order).
+- **CD1-9 Full suite findings.** The first full ctest of the round failed
+  six tests, fixed before the commit:
+  - `minera_portable_integers`: the comparison model used `__int128`,
+    which MSVC lacks. It now uses a portable signed 128-bit pair
+    (`Wide`, exact products and sums, checked against `__int128` on 2
+    million random operands) and an Int64-only range check.
+  - Polars accepts any list in `is_in` on a `Null` column (int, float,
+    str, bool, date, datetime lists all give 0 rows in 1.44.1); the shared
+    `check_is_in` refused it (between and attribute vectors of round C1).
+  - A Python int above the Int64 range is a UInt64 literal in Polars,
+    which the model's signed values could not hold (vector B1-574). The
+    attribute filters give it its own path, as 1.44.1 prints and
+    evaluates it: `col("a") >= 9223372036854775809` on UInt64, Boolean
+    cast to UInt64, signed integers cast to Float64 (`>= 9.2234e18`), a
+    narrower unsigned column folded to a constant, temporal columns a
+    `dyn int` that matches nothing, String and Categorical columns a
+    ComputeError naming u64.
+  - between keeps an empty categorical entry per column after it casts a
+    categorical case id to String, as the frozen C1 vectors expect; the
+    bank test reads that as the frame without categorical dtypes that the
+    capture writes.
+
+Declarations:
+
+- The between result joins its segments back without an order: 14 of
+  180 sampled calls gave another case order over six runs (case kinds
+  str, int, Categorical, `Float32`, `UInt32`, `Datetime`), each case's
+  rows staying in event order. `attr_value_different_persons` rarely does
+  too (1 of 200 calls; seed 4243 case 201 gave cases [1, 2] in 7 of 16
+  runs and [2, 1] in 9). The bank test compares both up to the case order
+  when the captured order differs.
+- `filter_on_ncases` keeps the first cases of a group_by without
+  `maintain_order` on every case dtype (an `Int64` case column kept cases
+  {4, 2, 1} in 7 of 12 runs and {4, 3, 1} in 5); the bank test accepts
+  any equal-sized selection, as it did for Categorical columns.
+- `filter_df_relative_occurrence_event_attribute` and
+  `filter_df_keeping_activ_exc_thresh` print the `is_in` list of a
+  group_by in its unspecified order; the bank test compares that list as
+  a set.
+
+Open (handed to round CE; banks and probes in the harness): six calls of
+the fresh seeds. In the base domain (seed 4245, cases 357 and 757) Polars
+moves bounds it merged after the unmerged predicates of the column,
+left-nested (`(((x <= 50) & (x >= 7)) & (x >= "c")) & (x <= "d")`), and
+prints a None bound's null column last in a left-nested chain; the native
+plan keeps the merged bounds at the first position, right-nested. In the
+typed domain (seed 4244): the stream filter predicates of two columns
+come in another order when one of them fails (case 570, `org:resource ==
+0` reported before `concept:name == "b"` on a `Float32` column);
+`attr_value_different_persons` with an empty tuple on a `Datetime`
+column fails in the reference (`could not evaluate comparison ... List(Null)`,
+case 121) and not natively; and `filter_df_keeping_spno_activities`
+ties at the cut (cases 804 and 1005) reach an error message, which lists
+the kept activities, so the declared tie order shows in the text.
+
+Tests: `docs/polars-filter-cc-bank.json.gz` replayed by
+`minera_polars_filter_cc_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-cd/`;
+"before" is round CC's code where it was measured):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Polars table filters on typed keys (CC bank, seed 2026111335) | 33,137 calls on 1,200 frames, hash seeds 0-1, 4 runs each | before: 3,293 mismatches; after: 0 |
+| The same domain on seed 4243 | 16,634 calls on 600 frames, hash seeds 0-1, 3 runs each | 1 before the LTL order declaration; after: 0 |
+| The same domain on seed 4244 | 41,422 calls on 1,500 frames, hash seeds 0-1, 4 runs each | 11 found; after CD1-7: 4 (open) |
+| The base domain on seed 4245 | 27,620 calls on 1,000 frames, hash seeds 0-1, 3 runs each | 2 (open) |
+| Re-review of CC: the Polars CC sequence domain on a fresh seed (2026111342) | 7,866 calls on 600 frames, hash seeds 0-1, 6 runs each | 0 mismatches |
+| Re-review of CC: the pandas CC sequence domain on a fresh seed (2026111341) | 9,182 calls on 800 frames, hash seeds 0-1 | 1 (declared set order) |
+| Earlier banks (pandas and Polars sequence filters, Polars table filters) | 9 banks | 0 mismatches |

@@ -17,6 +17,7 @@
 #include "minera/polars_sequence_filters.hpp"
 #include "minera/polars_timestamp_filter.hpp"
 #include "minera/polars_variants_filter.hpp"
+#include "minera/timestamp.hpp"
 
 #include "../gzip_codec.hpp"
 
@@ -381,7 +382,18 @@ EventAttribute mapping_of(const Json& node) {
 // The bank's table JSON has no typed payload on null cells and spells float
 // NaN as "NaN"; native masked frames carry either lexical form.
 
-Json table_node(const EventTable& table) { return jtagged("table", jstring(serialize_event_table_input_json(table))); }
+// Round CD: a frame without categorical columns carries either no
+// categorical dtypes or an empty entry per column (between keeps the
+// entries of a categorical case id it casts to String); both are one frame.
+Json table_node(const EventTable& table) {
+  if (std::none_of(table.categorical_dtypes.begin(), table.categorical_dtypes.end(),
+                   [](const auto& c) { return c.has_value(); }) && !table.categorical_dtypes.empty()) {
+    auto plain = table;
+    plain.categorical_dtypes.clear();
+    return jtagged("table", jstring(serialize_event_table_input_json(plain)));
+  }
+  return jtagged("table", jstring(serialize_event_table_input_json(table)));
+}
 Json table_node(const LazyEventTable& table) { return table_node(table.materialize()); }
 
 // Expected tables travel as the reference's event-table JSON; they compare
@@ -392,6 +404,41 @@ Json normalized(const Json& node) {
   Json out = node;
   for (auto& item : out.items) item = normalized(item);
   for (auto& [key, item] : out.fields) item = normalized(item);
+  return out;
+}
+
+// Round CD: the statistics filters keep the values of a Polars group_by
+// without maintain_order; a failing is_in plan prints them in that
+// (unspecified) order. Their items compare as a set, and a list Polars
+// shortens (first two, last) only by its shape.
+std::string unordered_is_in_text(std::string text) {
+  for (std::size_t at = text.find("is_in([["); at != std::string::npos; at = text.find("is_in([[", at + 1)) {
+    const auto begin = at + 8;
+    const auto end = text.find("]])", begin);
+    if (end == std::string::npos) break;
+    const auto inner = text.substr(begin, end - begin);
+    std::string replaced;
+    if (inner.find("\xe2\x80\xa6") != std::string::npos) replaced = "\xe2\x80\xa6";
+    else {
+      std::vector<std::string> items;
+      for (std::size_t from = 0;;) {
+        const auto comma = inner.find(", ", from);
+        items.push_back(inner.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
+        if (comma == std::string::npos) break;
+        from = comma + 2;
+      }
+      std::sort(items.begin(), items.end());
+      for (std::size_t i = 0; i < items.size(); ++i) replaced += (i ? ", " : "") + items[i];
+    }
+    text.replace(begin, end - begin, replaced);
+  }
+  return text;
+}
+Json unordered_is_in(const Json& node) {
+  Json out = node;
+  if (out.kind == Json::kString) out.text = unordered_is_in_text(out.text);
+  for (auto& item : out.items) item = unordered_is_in(item);
+  for (auto& [key, item] : out.fields) item = unordered_is_in(item);
   return out;
 }
 
@@ -422,6 +469,28 @@ Json canonical(const Json& node, bool dicts_only = false) {
   return out;
 }
 
+// The between result joins its segments back without an order: its cases
+// come in another order on some runs (round CD: 14 of 180 calls varied over
+// six runs, case kinds str, int, Categorical, Float32, UInt32, Datetime),
+// each case's rows staying in event order. So, rarely, do the cases kept by
+// attr_value_different_persons (1 of 200 calls; seed 4243 case 201 gave
+// cases [1, 2] in 7 of 16 runs, [2, 1] in 9). Rows sort stably by case id.
+Json case_blocks(const Json& node, const std::string& key) {
+  if (node.kind == Json::kObject && node.fields.size() == 1 && node.fields.begin()->first == "table") {
+    auto table = parse_event_table_json(node.fields.begin()->second.text);
+    const auto at = std::find(table.columns.begin(), table.columns.end(), key);
+    if (at == table.columns.end()) return node;
+    const auto c = static_cast<std::size_t>(at - table.columns.begin());
+    const auto id = [c](const auto& row) { return row[c] ? row[c]->value : std::string(); };
+    std::stable_sort(table.rows.begin(), table.rows.end(), [&](const auto& a, const auto& b) { return id(a) < id(b); });
+    return table_node(table);
+  }
+  Json out = node;
+  for (auto& item : out.items) item = case_blocks(item, key);
+  for (auto& [name, item] : out.fields) item = case_blocks(item, key);
+  return out;
+}
+
 const Json* keyword(const Json& kwargs, const std::string& name) {
   for (const auto& pair : kwargs.items)
     if (pair.items.at(0).text == name) return &pair.items.at(1);
@@ -437,6 +506,11 @@ EventAttribute arg(const Args& args, std::size_t i) { return to_attribute(*args.
 bool is_mapping(const Json& node) { return tag_of(node) == "m"; }
 
 Json typed(const std::string& tag, std::string text) { return jtagged(tag, jstring(std::move(text))); }
+
+// A result value the capture cannot encode (its TypeError "unrepresentable ...").
+struct Unrepresentable : std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
 
 // A native scalar as the reference's typed JSON.
 Json typed_attribute(const EventAttribute& v) {
@@ -460,6 +534,38 @@ Json typed_attribute(const EventAttribute& v) {
     out.kind = Json::kBool;
     out.boolean = v.value == "true";
     return jtagged("b", out);
+  }
+  // Round CD: the capture encodes a datetime.date as unrepresentable and an
+  // aware datetime as its UTC isoformat ({"d": ...}).
+  const auto* native_date = std::get_if<NativeDate>(&v.typed_value);
+  const auto& date_text = native_date ? native_date->value : v.value;
+  if (v.kind == AttributeKind::kDate && date_text.size() == 10) throw Unrepresentable("unrepresentable date");
+  if (v.kind == AttributeKind::kDate && date_text.size() > 19 &&
+      (date_text.back() == 'Z' || date_text[date_text.size() - 3] == ':')) {
+    if (const auto parsed = parse_timestamp_exact(date_text); parsed && parsed->timezone_aware) {
+      const auto days = parsed->seconds >= 0 ? parsed->seconds / 86'400 : -((-parsed->seconds + 86'399) / 86'400);
+      const auto clock = parsed->seconds - days * 86'400;
+      // Proleptic Gregorian civil date of a day number.
+      const std::int64_t z = days + 719'468;
+      const std::int64_t era = (z >= 0 ? z : z - 146'096) / 146'097;
+      const auto doe = static_cast<unsigned>(z - era * 146'097);
+      const unsigned yoe = (doe - doe / 1460 + doe / 36'524 - doe / 146'096) / 365;
+      const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+      const unsigned mp = (5 * doy + 2) / 153;
+      const unsigned day = doy - (153 * mp + 2) / 5 + 1;
+      const unsigned month = mp < 10 ? mp + 3 : mp - 9;
+      const std::int64_t year = static_cast<std::int64_t>(yoe) + era * 400 + (month <= 2);
+      char buffer[64];
+      std::snprintf(buffer, sizeof buffer, "%04lld-%02u-%02u %02lld:%02lld:%02lld", static_cast<long long>(year), month,
+                    day, static_cast<long long>(clock / 3600), static_cast<long long>(clock / 60 % 60),
+                    static_cast<long long>(clock % 60));
+      std::string text = buffer;
+      if (parsed->nanoseconds / 1000) {
+        std::snprintf(buffer, sizeof buffer, ".%06u", parsed->nanoseconds / 1000);
+        text += buffer;
+      }
+      return typed("d", text + "+00:00");
+    }
   }
   if (v.kind == AttributeKind::kDate && v.value.size() >= 19) {
     // [wall clock with microseconds, UTC offset minutes or null]
@@ -755,6 +861,11 @@ Json run_call(Call&& call) {
     out.kind = Json::kObject;
     out.fields.emplace("value", call());
     return out;
+  } catch (const Unrepresentable& error) {
+    Json out;
+    out.kind = Json::kObject;
+    out.fields.emplace("unrepresentable", jstring(error.what()));
+    return out;
   } catch (const PolarsAttributesFilterError& error) {
     return error_node(error.type, error.message);
   } catch (const PolarsBetweenError& error) {
@@ -792,6 +903,8 @@ int main(int argc, char** argv) try {
   // MINERA_BANK_DUMP=path writes every mismatch as one JSON line.
   std::unique_ptr<std::ofstream> dump;
   if (const char* path = std::getenv("MINERA_BANK_DUMP")) dump = std::make_unique<std::ofstream>(path);
+  // MINERA_BANK_ONLY=text replays only the functions whose name contains it.
+  const char* only = std::getenv("MINERA_BANK_ONLY");
   const auto text = read_bank(argv[1]);
   const auto bank = JsonReader(text).value();
   std::map<std::string, std::pair<std::size_t, std::size_t>> tally;  // function -> passed, failed
@@ -802,6 +915,7 @@ int main(int argc, char** argv) try {
     const auto df = parse_event_table_json(serialize(item.at("source")));
     for (const auto& node : item.at("calls").items) {
       const auto qualified = node.at("function").text;
+      if (only && qualified.find(only) == std::string::npos) continue;
       const auto dot = qualified.find('.');
       const auto module = qualified.substr(0, dot);
       const auto function = qualified.substr(dot + 1);
@@ -836,6 +950,8 @@ int main(int argc, char** argv) try {
       // maintain_order: their dict order is unspecified even when every
       // captured run agreed.
       const bool dicts_unordered = function == "get_attribute_values";
+      const bool group_values = function == "filter_df_relative_occurrence_event_attribute" ||
+                                function == "filter_df_keeping_activ_exc_thresh";
       std::vector<Json> expected;
       if (const auto* single = node.get("outcome")) expected.push_back(normalized(*single));
       else
@@ -844,9 +960,11 @@ int main(int argc, char** argv) try {
       for (auto& e : expected) {
         if (unordered) e = canonical(e);
         else if (dicts_unordered) e = canonical(e, true);
+        if (group_values) e = unordered_is_in(e);
         for (auto& candidate : candidates) {
           if (unordered) candidate = canonical(candidate);
           else if (dicts_unordered) candidate = canonical(candidate, true);
+          if (group_values) candidate = unordered_is_in(candidate);
           if (serialize(e) == serialize(candidate)) {
             matched = true;
             actual = candidate;
@@ -861,13 +979,25 @@ int main(int argc, char** argv) try {
       };
       if (!matched && function == "filter_df_keeping_spno_activities")
         for (const auto& e : expected) matched = matched || same_selection(df, key_or("activity_key", "concept:name"), e, actual);
-      // filter_on_ncases keeps the first cases of a group_by; on a Categorical
-      // column their order follows the process-wide category cache.
+      if (!matched && (qualified == "between.apply" || qualified == "ltl.attr_value_different_persons")) {
+        std::string key = "case:concept:name";
+        const auto& last = *args.at(qualified == "between.apply" ? 2 : 1);
+        // The case id key as the filters resolve it: enum keys last.
+        if (is_mapping(last))
+          for (const bool enum_key : {false, true})
+            for (const auto& p : parameters_of<PolarsBetweenParameter>(last))
+              if (p.enum_key == enum_key && p.key == "pm4py:param:case_id_key" && !p.value.is_null) key = p.value.value;
+        const auto mine = case_blocks(actual, key);
+        for (const auto& e : expected) matched = matched || serialize(case_blocks(e, key)) == serialize(mine);
+      }
+      // filter_on_ncases keeps the first cases of a group_by without
+      // maintain_order: on a Categorical column their order follows the
+      // process-wide category cache, and on others it can vary per run too
+      // (round CD: an Int64 case column kept cases {4, 2, 1} in 7 of 12 runs
+      // and {4, 3, 1} in 5).
       if (!matched && function == "filter_on_ncases") {
         const auto name = key_or("case_id_glue", "case:concept:name");
-        const auto at = std::find(df.columns.begin(), df.columns.end(), name);
-        if (at != df.columns.end() && df.dtypes[at - df.columns.begin()].starts_with("Categorical"))
-          for (const auto& e : expected) matched = matched || same_selection(df, name, e, actual);
+        for (const auto& e : expected) matched = matched || same_selection(df, name, e, actual);
       }
       auto& counts = tally[qualified];
       if (matched) {

@@ -2,6 +2,7 @@
 #include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_list_literal.hpp"
+#include "polars_lit_model.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -93,7 +94,7 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
   if (!cell || null(*cell) || dtype == "Null") return "n";
   const auto& v = *cell;
   if (dtype == "String" || dtype == "Categorical" || dtype.starts_with("Categorical(") || dtype.starts_with("Enum(")) return "s" + v.value;
-  if (dtype == "Float64") {
+  if (dtype == "Float64" || dtype == "Float32") {
     const auto n = number(v);
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
@@ -175,9 +176,18 @@ std::string bound_text(const ParsedExactTimestamp& v) {
 }
 void selector(const EventAttribute& value) {
   if(!text(value)&&!collection(value))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(value)+"'.");
+  // pl.col of a list reads every item as a column name (round CD).
+  if(collection(value)&&value.container!=AttributeContainerKind::kContainer)
+    for(const auto& item:value.children)if(!text(item))fail("TypeError","apply","'"+core_type(item)+"' object is not an instance of 'str'");
   if(collection(value)&&!value.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
 }
-struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;std::string attribute_dtype,time_dtype;};
+struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;std::string attribute_dtype,time_dtype;std::vector<std::string> categories;};
+namespace lit=detail::polars_lit;
+bool scalar_value(const Query& q){return q.value.container==AttributeContainerKind::kScalar;}
+// Round CD: the attribute comparison typed by the shared comparison model.
+lit::ScalarCheck attribute_check(const Query& q){
+  return lit::check_scalar(q.attribute.value,q.attribute_dtype,lit::value_of(q.value),lit::CompareOp::kEq,&q.categories);
+}
 Query prepare(Operation op,const EventAttribute& low,const EventAttribute& high,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={}) {
   Query q{op,bound(low),bound(high),options,attribute,value,{},{}};
   if(op==Operation::kAttribute)selector(attribute);
@@ -207,16 +217,34 @@ std::string time_expr(const Query& q) {
   if(equal(q.low,q.high)&&!nanosecond_aware(q))return compare_expr(time,"==",lo);
   return combined(compare_expr(time,">=",lo),"&",compare_expr(time,"<=",hi_le));
 }
+// The attribute comparison inside the evaluated predicate: coerced once it
+// types (a Boolean column meets a string value as its String cast, round
+// BX), a folded form bare (a when-then printed with a leading dot), as
+// written when it fails.
+std::string list_display(const lit::Literal& list);
+bool list_value(const Query& q);
+std::string attribute_expr(const Query& q) {
+  if(list_value(q))return compare_expr(q.attribute.value,"==",list_display(lit::literal_of(lit::value_of(q.value))));
+  if(!scalar_value(q)||q.attribute_dtype.empty())return compare_expr(q.attribute.value,"==",literal(q.value,true));
+  const auto v=lit::value_of(q.value);
+  if(!attribute_check(q).ok())return lit::comparison_expression(q.attribute.value,lit::CompareOp::kEq,v);
+  const auto ops=lit::coerced_operands(q.attribute.value,q.attribute_dtype,v,lit::CompareOp::kEq);
+  if(!ops.whole.empty())return ops.whole.starts_with("when(")?"."+ops.whole:ops.whole;
+  return "[("+ops.lhs+") == ("+ops.rhs+")]";
+}
 std::string whole_expr(const Query& q) {
   const auto time=time_expr(q);if(q.op!=Operation::kAttribute)return time;
-  // A Boolean column meets a string value as its String cast (round BX).
-  const auto attribute=q.attribute_dtype=="Boolean"&&text(q.value)?"[(col("+quote(q.attribute.value)+").cast(String)) == ("+literal(q.value,true)+")]":compare_expr(q.attribute.value,"==",literal(q.value,true));
-  return combined(attribute,"&",time);
+  return combined(attribute_expr(q),"&",time);
 }
 std::string agg_plan(const EventTable& source,const Query& q) {
   return "AGGREGATE[maintain_order: false]\n  [col("+quote(q.options.timestamp_key.value)+").min().alias(\"first_timestamp\"), col("+quote(q.options.timestamp_key.value)+").max().alias(\"last_timestamp\")] BY [col("+quote(q.options.case_id_key.value)+")]\n  FROM\n  "+frame_plan(source);
 }
-std::string attribute_plan(const EventTable& source,const Query& q) {return "FILTER col("+quote(q.attribute.value)+") == "+literal(q.value)+"\nFROM\n  "+frame_plan(source);}
+std::string attribute_plan(const EventTable& source,const Query& q) {
+  const auto filter=scalar_value(q)&&!q.attribute_dtype.empty()
+      ?lit::comparison_plan(q.attribute.value,q.attribute_dtype,lit::value_of(q.value),lit::CompareOp::kEq,&q.categories)
+      :"col("+quote(q.attribute.value)+") == "+literal(q.value);
+  return "FILTER "+filter+"\nFROM\n  "+frame_plan(source);
+}
 std::string indent(std::string value,const std::string& prefix){std::string out=prefix;for(const char c:value){out+=c;if(c=='\n')out+=prefix;}return out;}
 std::string filtered_plan(const EventTable& source,const Query& q,bool upper) {
   std::string plan=q.op==Operation::kAttribute?attribute_plan(source,q):frame_plan(source);
@@ -263,36 +291,46 @@ void time_dtype(const EventTable& source,std::size_t at,const Query& q,const std
   }
   if(!polars_datetime::temporal(dtype)&&dtype!="Null"&&dtype!="Int64"&&dtype!="UInt64"&&dtype!="Float64")throw std::invalid_argument("Unsupported native Polars timestamp dtype: "+dtype);
 }
-void attribute_dtype(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
-  const auto& dt=source.dtypes[at];const bool string=dt=="String"||dt=="Categorical"||dt.starts_with("Categorical(")||dt.starts_with("Enum(");
-  // Every integer width and float: Polars names it short (u8, i64, f64, ...).
-  const bool numeric=dt.starts_with("Int")||dt.starts_with("UInt")||dt.starts_with("Float");
-  if((string&&(integer(q.value)||real(q.value)))||(numeric&&text(q.value))) {
-    const auto type=string?std::string(integer(q.value)?"i32":"f64"):dt.starts_with("UInt")?"u"+dt.substr(4):dt.starts_with("Int")?"i"+dt.substr(3):"f"+dt.substr(5);
-    fail("ComputeError",phase,"cannot compare string with numeric type ("+std::string(type)+")\n\nThis error occurred in the following expression:\n\t"+compare_expr(q.attribute.value,"==",literal(q.value,true))+"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n');
+bool list_value(const Query& q){return q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple;}
+// A list value as the comparison prints it.
+std::string list_display(const lit::Literal& list){return lit::lit_display(lit::list_of(list.type),lit::Value::list(list.values));}
+void attribute_dtype(const EventTable&,std::size_t,const Query& q,const std::string& phase) {
+  // Round CD: a list value fails when the filter runs on any column but a
+  // String one (which refuses its cast while resolving).
+  if(list_value(q)&&q.attribute_dtype!="String") {
+    const auto list=lit::literal_of(lit::value_of(q.value));
+    const auto& dt=q.attribute_dtype;
+    const bool categorical=dt.starts_with("Categorical")||dt.starts_with("Enum(");
+    const auto message=categorical?"cannot compare categorical with "+lit::short_name(lit::list_of(list.type))
+        :"could not evaluate comparison between series '"+q.attribute.value+"' of dtype: "+lit::is_in_dtype_name(dt)+
+         " and series 'literal' of dtype: "+lit::debug_name(lit::list_of(list.type));
+    fail(categorical?"ComputeError":"SchemaError",phase,message+"\n\nThis error occurred in the following expression:\n\t"+
+         attribute_expr(q)+"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n');
   }
+  if(!scalar_value(q))return;
+  const auto check=attribute_check(q);
+  if(check.stage!=lit::ScalarCheck::Stage::kCompute)return;
+  fail(check.type,phase,check.message+"\n\nThis error occurred in the following expression:\n\t"+
+       lit::comparison_expression(q.attribute.value,lit::CompareOp::kEq,lit::value_of(q.value))+
+       "\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n');
 }
 // Resolving the attribute filter, the lowest node, rejects list and datetime
 // values on a String column.
 void attribute_resolution(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
   const auto& dt=source.dtypes[at];const bool string=dt=="String"||dt=="Categorical"||dt.starts_with("Categorical(")||dt.starts_with("Enum(");
-  // A Date or Datetime column rejects a string value the same way (round BX).
-  if(polars_datetime::temporal(dt)&&q.value.container==AttributeContainerKind::kScalar&&text(q.value)) {
-    const auto plan="FILTER col("+quote(q.attribute.value)+") == "+literal(q.value)+"\nFROM\n  "+frame_plan(source);
-    fail("InvalidOperationError",phase,"cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)"+resolved(q.op,plan,nodes(q.op,true),true));
+  // A str meets a temporal side while the plan resolves (round CD: the
+  // shared comparison model).
+  if(scalar_value(q)) {
+    const auto check=attribute_check(q);
+    if(check.stage==lit::ScalarCheck::Stage::kResolve)
+      fail(check.type,phase,check.message+resolved(q.op,attribute_plan(source,q),nodes(q.op,true),true));
+    return;
   }
   if(!string)return;
   const auto& v=q.value;
   if(v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple) {
     const auto plan="FILTER col("+quote(q.attribute.value)+") == "+literal(v)+".cast(String)\nFROM\n  "+frame_plan(source);
     fail("InvalidOperationError",phase,"cannot cast List type (inner: '"+detail::polars_list_literal(v).inner+"', to: 'String')"+resolved(q.op,plan,nodes(q.op,true),true));
-  }
-  if(v.container==AttributeContainerKind::kScalar&&date(v)) {
-    const auto* native=std::get_if<NativeDate>(&v.typed_value);auto text=native?native->value:v.value;
-    if(text.size()>10)text[10]=' ';
-    text=text.size()>19?text.substr(0,19)+" UTC":text;
-    const auto plan="FILTER col("+quote(q.attribute.value)+") == "+text+"\nFROM\n  "+frame_plan(source);
-    fail("InvalidOperationError",phase,"cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)"+resolved(q.op,plan,nodes(q.op,true),true));
   }
 }
 ParsedExactTimestamp physical_instant(std::int64_t micros) {
@@ -325,8 +363,10 @@ std::optional<Instant> instant(const std::optional<EventAttribute>& cell,const s
   // The column holds its unit (round BW).
   return Instant{polars_datetime::floor(*parsed,polars_datetime::column_unit(dtype)),std::nullopt};
 }
-bool attribute_match(const std::optional<EventAttribute>& cell,const std::string& dt,const EventAttribute& value) {
+bool attribute_match(const std::optional<EventAttribute>& cell,const std::string& dt,const EventAttribute& value,const std::vector<std::string>& categories) {
   if(!cell||null(*cell)||null(value)||dt=="Null")return false;
+  if(value.container==AttributeContainerKind::kScalar)
+    return lit::compare_scalar(cell,dt,lit::value_of(value),lit::CompareOp::kEq,&categories)==1;
   const auto& v=*cell;
   if(dt=="String"||dt=="Categorical"||dt.starts_with("Categorical(")||dt.starts_with("Enum(")) {
     if(text(value))return v.value==value.value;
@@ -345,8 +385,10 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   auto q=query;
   source.validate();if(source.index||source.dtypes.size()!=source.columns.size())throw std::invalid_argument("Native Polars timestamp filters require declared dtypes and no dataframe index");
   // Python builds the attribute value literal first.
-  if(q.op==Operation::kAttribute&&(q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple))
+  if(q.op==Operation::kAttribute&&(q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple)) {
     if(const auto error=detail::polars_list_literal(q.value).error)fail("TypeError",phase,*error);
+    try{(void)lit::literal_of(lit::value_of(q.value));}catch(const PolarsSequenceFilterError& error){fail(error.type,phase,error.what());}
+  }
   const auto position=[&](const std::string& name,bool case_key=false){auto p=std::find(source.columns.begin(),source.columns.end(),name);if(p==source.columns.end())missing(source,name,q,phase,case_key);return static_cast<std::size_t>(p-source.columns.begin());};
   const bool constant=q.op!=Operation::kEvents&&integer(q.options.case_id_key);
   if(q.op!=Operation::kEvents&&collection(q.options.case_id_key)) {
@@ -359,7 +401,12 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   if(q.op==Operation::kAttribute){if(collection(q.attribute))empty_selector(source,q,phase,false);attr_at=position(q.attribute.value);}
   if(collection(q.options.timestamp_key))empty_selector(source,q,phase,true);
   const auto time_at=position(q.options.timestamp_key.value);
-  q.time_dtype=source.dtypes[time_at];if(attr_at)q.attribute_dtype=source.dtypes[*attr_at];
+  q.time_dtype=source.dtypes[time_at];
+  if(attr_at){
+    q.attribute_dtype=source.dtypes[*attr_at];
+    if(q.attribute_dtype.starts_with("Enum(")&&*attr_at<source.categorical_dtypes.size()&&source.categorical_dtypes[*attr_at])
+      for(const auto& c:source.categorical_dtypes[*attr_at]->categories)q.categories.push_back(c.value);
+  }
   if(attr_at)attribute_resolution(source,*attr_at,q,phase);
   if(q.op==Operation::kAttribute&&!constant)case_at=position(q.options.case_id_key.value,true);
   auto result=source;result.rows.clear();
@@ -384,7 +431,7 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   std::vector<Group> groups;std::unordered_map<std::string,std::size_t> keys;std::vector<std::size_t> row_groups;
   for(const auto& row:source.rows){
     const auto time=instant(row[time_at],source.dtypes[time_at]);
-    const bool matches=time&&!less(*time,low)&&!less(high,at_most(*time))&&(q.op!=Operation::kAttribute||attribute_match(row[*attr_at],source.dtypes[*attr_at],q.value));
+    const bool matches=time&&!less(*time,low)&&!less(high,at_most(*time))&&(q.op!=Operation::kAttribute||attribute_match(row[*attr_at],source.dtypes[*attr_at],q.value,q.categories));
     if(q.op==Operation::kEvents){if(matches)result.rows.push_back(row);continue;}
     const auto key=group_key(row[*case_at],source.dtypes[*case_at]);const auto [found,inserted]=keys.emplace(key,groups.size());
     if(inserted){groups.push_back({});groups.back().absent=key=="n";}

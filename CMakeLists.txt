@@ -3066,6 +3066,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-bank.json.gz")
   set_tests_properties(minera_polars_filter_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CD: typed case and activity columns (Categorical, Enum, narrow
+  # integers, Float32, Date, Datetime) with typed activity arguments.
+  add_test(NAME minera_polars_filter_cc_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cc-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cc_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

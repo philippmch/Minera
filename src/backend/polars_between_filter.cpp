@@ -3,6 +3,7 @@
 #include "polars_sort.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_list_literal.hpp"
+#include "polars_lit_model.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -123,19 +124,16 @@ std::vector<EventAttribute> anchors(const EventAttribute& value) {
   for (const auto& child : value.children) keys.push_back(EventAttribute{"", child.key});
   return keys;
 }
-void validate_anchor(const EventAttribute& value) {
+namespace lit = detail::polars_lit;
+
+// Python builds a list anchor as pl.lit builds a list (round CD: the shared
+// literal model, its strict construction and supertype errors).
+void validate_anchor(const EventAttribute& value, const std::string& phase = "apply") {
   if (!collection(value)) return;
-  const auto values = anchors(value);
-  const auto first = std::find_if(values.begin(), values.end(), [](const auto& item) { return !null(item); });
-  if (first == values.end()) return;
-  if (text(*first)) {
-    for (const auto& item : values) {
-      if (!null(item) && !text(item))
-        fail("TypeError", "apply", "unexpected value while building Series of type String; found value of type " +
-             std::string(integer(item) ? "Int64" : boolean(item) ? "Boolean" : "Float64") + ": " +
-             (integer(item) ? exact(item).decimal() : boolean(item) ? (static_cast<bool>(exact(item)) ? "true" : "false") : real_text(number(item))) +
-             "\n\nThis error occurred with the following context stack:\n\t[1] while constructing Series ''\n\n\nHint: Try setting `strict=False` to allow passing data with mixed types.");
-    }
+  try {
+    (void)lit::literal_of(lit::value_of(value));
+  } catch (const PolarsSequenceFilterError& error) {
+    fail(error.type, phase, error.what());
   }
 }
 std::string activity_key(const EventAttribute& value) {
@@ -159,7 +157,7 @@ Dtype dtype(const std::string& value) {
   if (value == "String" || categorical_dtype(value)) return Dtype::kString;
   if (enum_dtype(value)) return Dtype::kEnum;
   if (value == "Int64" || value == "UInt64" || value == "UInt32" || value == "UInt16" || value == "UInt8" || value == "Int32" || value == "Int16" || value == "Int8") return Dtype::kInteger;
-  if (value == "Float64") return Dtype::kFloat;
+  if (value == "Float64" || value == "Float32") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
   if (value == "Null") return Dtype::kNull;
   if (polars_datetime::temporal(value)) return Dtype::kDate;
@@ -220,18 +218,8 @@ std::string literal(const EventAttribute& value) {
 // A scalar anchor is imploded into a list; once resolved, the plan prints the
 // bare scalar.
 std::string anchor_expression(const EventAttribute& value, bool resolved = false) {
-  if (!collection(value) && !text(value) && !null(value)) {
-    std::string scalar;
-    if (date(value)) {
-      const auto* native = std::get_if<NativeDate>(&value.typed_value);
-      auto text = native ? native->value : value.value;
-      if (text.size() > 10) text[10] = ' ';
-      scalar = text.size() > 19 ? text.substr(0, 19) + " UTC" : text;
-    } else {
-      scalar = std::string(integer(value) ? "dyn int: " : real(value) ? "dyn float: " : "") + literal(value);
-    }
-    return '[' + scalar + (resolved ? "]" : ".implode()]");
-  }
+  if (!collection(value) && !text(value) && !null(value))
+    return '[' + lit::scalar_display(lit::value_of(value)) + (resolved ? "]" : ".implode()]");
   std::string output = "[[";
   const auto values = anchors(value);
   for (std::size_t i = 0; i < values.size(); ++i) {
@@ -240,41 +228,114 @@ std::string anchor_expression(const EventAttribute& value, bool resolved = false
   }
   return output + "]]";
 }
-std::string anchor_dtype(const EventAttribute& value) {
-  const auto values = anchors(value);
-  const auto first = std::find_if(values.begin(), values.end(), [](const auto& item) { return !null(item); });
-  if (first == values.end()) return "Null";
-  if (text(*first)) return "String";
-  if (boolean(*first)) return "Boolean";
-  if (integer(*first)) return collection(value) ? "Int64" : "Unknown(Int(" + exact(*first).decimal() + "))";
-  if (real(*first)) return collection(value) ? "Float64" : "Unknown(Float)";
-  return detail::polars_literal_dtype(*first);
-}
-bool compatible(const EventAttribute& query, Dtype kind) {
-  for (const auto& value : anchors(query)) {
-    if (null(value) || kind == Dtype::kNull) continue;
-    if ((kind == Dtype::kString || kind == Dtype::kEnum) && text(value)) continue;
-    if (kind == Dtype::kDate && date(value)) continue;
-    if ((kind == Dtype::kInteger || kind == Dtype::kFloat || kind == Dtype::kBoolean) &&
-        (integer(value) || real(value) || boolean(value))) continue;
-    return false;
+
+// Round CD: an anchor as the reference hands it to is_in. A str is wrapped
+// in a list, a list (a dict: its keys) is a list literal, and any other
+// scalar is a pl.lit Polars implodes into a one-element list.
+struct Anchor {
+  bool scalar = false;
+  lit::Value value;      // the imploded scalar
+  lit::Literal literal;  // the list literal (a scalar's one-element list)
+  std::string shown;     // the element type an is_in error names
+};
+Anchor anchor_of(const EventAttribute& value) {
+  Anchor out;
+  if (collection(value) || (!null(value) && text(value))) {
+    out.literal = collection(value) ? lit::literal_of(lit::value_of(value)) : lit::list_literal({lit::Value::of(value.value)});
+    out.shown = lit::literal_dtype_name(out.literal);
+    return out;
   }
-  return true;
+  out.scalar = true;
+  out.value = null(value) ? lit::Value::none() : lit::value_of(value);
+  out.literal = lit::list_literal({out.value});
+  out.shown = out.value.kind == lit::Kind::kInt ? "Unknown(Int(" + std::to_string(out.value.integer) + "))"
+              : out.value.kind == lit::Kind::kFloat ? std::string("Unknown(Float)")
+                                                    : lit::literal_dtype_name(out.literal);
+  return out;
+}
+// The is_in argument as the plan prints it before it resolves, and while it
+// fails (an imploded scalar shows its implode).
+std::string unresolved_text(const Anchor& a, bool failing) {
+  if (!a.scalar) return lit::literal_text(a.literal);
+  return '[' + lit::scalar_display(a.value) + (failing ? ".implode()]" : "]");
+}
+// The smallest integer dtype a dynamic integer that does not fit `dtype`
+// meets it in, and whether the column casts strictly.
+std::pair<std::string, bool> integer_supertype(const std::string& dtype, std::int64_t v) {
+  const bool is_unsigned = dtype.rfind("UInt", 0) == 0;
+  const int bits = std::stoi(dtype.substr(is_unsigned ? 4 : 3));
+  const auto signed_bits = [](std::int64_t x) {
+    for (const int b : {8, 16, 32}) if (x >= -(std::int64_t{1} << (b - 1)) && x < (std::int64_t{1} << (b - 1))) return b;
+    return 64;
+  };
+  if (is_unsigned && v >= 0) {
+    for (const int b : {16, 32}) if (static_cast<std::uint64_t>(v) < (std::uint64_t{1} << b)) return {"UInt" + std::to_string(b), false};
+    return {"UInt64", false};
+  }
+  if (is_unsigned) return {"Int" + std::to_string(std::min(64, std::max(2 * bits, signed_bits(v)))), bits == 64};
+  return {"Int" + std::to_string(std::max(bits, signed_bits(v))), false};
+}
+// A resolved is_in: a list meets the column in their supertype, an imploded
+// scalar casts to the column's list type (a number that does not fit to its
+// supertype, a float on integer data to Float64).
+std::string resolved_text(const Anchor& a, const std::string& column, const std::string& dtype) {
+  if (!a.scalar) return lit::coerced_is_in(column, dtype, a.literal);
+  const auto c = "col(" + quote(column) + ")";
+  const auto cast_list = [](const std::string& item, const std::string& to) {
+    return "[[" + item + "].cast(List(" + to + "))]";
+  };
+  const auto& v = a.value;
+  if (v.kind == lit::Kind::kNone) return c + ".is_in(" + cast_list("null", lit::is_in_dtype_name(dtype)) + ")";
+  if (v.kind == lit::Kind::kInt && (lit::integer_dtype(dtype) || lit::float_dtype(dtype))) {
+    const auto item = std::to_string(v.integer);
+    if (lit::float_dtype(dtype)) return c + ".is_in(" + cast_list(item, dtype) + ")";
+    if (lit::integer_range_side(v.integer, dtype) == 0) return c + ".is_in(" + cast_list(item, dtype) + ")";
+    const auto [to, strict] = integer_supertype(dtype, v.integer);
+    return c + (strict ? ".strict_cast(" : ".cast(") + to + ").is_in(" + cast_list(item, to) + ")";
+  }
+  if (v.kind == lit::Kind::kFloat && (lit::integer_dtype(dtype) || lit::float_dtype(dtype))) {
+    const auto item = lit::polars_frame_float(v.real);
+    if (lit::float_dtype(dtype)) return c + ".is_in(" + cast_list(item, dtype) + ")";
+    return c + ".strict_cast(Float64).is_in(" + cast_list(item, "Float64") + ")";
+  }
+  return c + ".is_in(" + lit::literal_text(a.literal) + ")";
+}
+// The literal a cell is looked up in: an imploded number cast to the
+// column's type (Float32 rounds it).
+lit::Literal lookup_literal(const Anchor& a, const std::string& dtype) {
+  if (!a.scalar) return a.literal;
+  const auto& v = a.value;
+  const auto narrow = [&](double x) { return dtype == "Float32" ? static_cast<double>(static_cast<float>(x)) : x; };
+  if (lit::float_dtype(dtype) && (v.kind == lit::Kind::kInt || v.kind == lit::Kind::kFloat))
+    return {lit::lit_type(lit::LitType::K::kFloat64), {lit::Value::of(narrow(v.kind == lit::Kind::kInt ? static_cast<double>(v.integer) : v.real))}};
+  return a.literal;
+}
+std::vector<std::string> enum_categories(const EventTable& source, std::size_t at) {
+  std::vector<std::string> out;
+  if (enum_dtype(source.dtypes[at]) && at < source.categorical_dtypes.size() && source.categorical_dtypes[at])
+    for (const auto& c : source.categorical_dtypes[at]->categories) out.push_back(c.value);
+  return out;
 }
 void validate_membership(const EventTable& source, std::size_t at, const std::string& key,
-                         const EventAttribute& act1, const EventAttribute& act2, const std::string& phase) {
-  const auto kind = dtype(source.dtypes[at]);
-  // The second anchor resolves last and is reported first.
-  const EventAttribute* incompatible = !compatible(act2, kind) ? &act2 : !compatible(act1, kind) ? &act1 : nullptr;
-  if (!incompatible) return;
-  auto data_type = source.dtypes[at];
-  if (polars_datetime::datetime(data_type)) data_type = polars_datetime::display(data_type);
-  std::string message = "'is_in' cannot check for List(" + anchor_dtype(*incompatible) + ") values in " + data_type + " data";
-  message += "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n WITH_COLUMNS:\n [col(" +
-             quote(source.columns[at]) + ").is_in(" + anchor_expression(act1, incompatible == &act2) + ").alias(\"_is_act1\"), col(" +
-             quote(source.columns[at]) + ").is_in(" + anchor_expression(act2) + ").alias(\"_is_act2\")] \n" +
-             indexed_plan(source, key, "  ") + stack(false, true);
-  fail("InvalidOperationError", phase, message);
+                         const Anchor& act1, const Anchor& act2, const std::string& phase) {
+  const auto& column = source.columns[at];
+  const auto& dtype = source.dtypes[at];
+  const auto categories = enum_categories(source, at);
+  const auto is_in = [&](const std::string& argument) { return "col(" + quote(column) + ").is_in(" + argument + ")"; };
+  const auto suffix = [&](const std::string& first, const std::string& second) {
+    return "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n WITH_COLUMNS:\n [" + first +
+           ".alias(\"_is_act1\"), " + second + ".alias(\"_is_act2\")] \n" + indexed_plan(source, key, "  ") +
+           stack(false, true);
+  };
+  // The second anchor resolves first.
+  try {
+    lit::check_is_in(dtype, categories, act2.literal,
+                     suffix(is_in(unresolved_text(act1, false)), is_in(unresolved_text(act2, true))), &act2.shown);
+    lit::check_is_in(dtype, categories, act1.literal,
+                     suffix(is_in(unresolved_text(act1, true)), resolved_text(act2, column, dtype)), &act1.shown);
+  } catch (const PolarsSequenceFilterError& error) {
+    fail(error.type, phase, error.what());
+  }
 }
 
 // Public diagnostic graph only, parameterized by roles, anchors and source schema.
@@ -341,19 +402,6 @@ int compare(const Cell& left, const Cell& right, Dtype kind,
   if (a.seconds != b.seconds) return a.seconds < b.seconds ? -1 : 1;
   return a.nanoseconds < b.nanoseconds ? -1 : a.nanoseconds > b.nanoseconds ? 1 : 0;
 }
-bool matches(const Cell& candidate, const EventAttribute& query, Dtype kind) {
-  if (!candidate || null(*candidate) || kind == Dtype::kNull) return false;
-  for (const auto& target : anchors(query)) {
-    if (null(target)) continue;
-    if ((kind == Dtype::kString || kind == Dtype::kEnum) && candidate->value == target.value) return true;
-    if (kind == Dtype::kDate && compare(candidate, target, kind) == 0) return true;
-    if (kind == Dtype::kFloat || real(target)) {
-      const auto a = number(*candidate), b = number(target);
-      if ((std::isnan(a) && std::isnan(b)) || a == b) return true;
-    } else if ((kind == Dtype::kInteger || kind == Dtype::kBoolean) && exact(*candidate) == exact(target)) return true;
-  }
-  return false;
-}
 std::string string_cast(const EventAttribute& value, const std::string& declared = "") {
   if (declared == "String" || categorical_dtype(declared) || enum_dtype(declared)) return value.value;
   if (text(value)) return value.value;
@@ -361,9 +409,9 @@ std::string string_cast(const EventAttribute& value, const std::string& declared
   if (integer(value)) return exact(value).decimal();
   if (real(value)) return real_text(number(value), true);
   if (date(value)) {
-    auto output = std::get_if<NativeDate>(&value.typed_value) ? std::get<NativeDate>(value.typed_value).value : value.value;
-    if (declared.starts_with("Datetime(")) std::replace(output.begin(), output.end(), 'T', ' ');
-    return output;
+    // cast(pl.String) of a temporal case id: its unit's fractional digits.
+    if (declared == "Date" || declared.starts_with("Datetime(")) return lit::string_cast(value, declared);
+    return std::get_if<NativeDate>(&value.typed_value) ? std::get<NativeDate>(value.typed_value).value : value.value;
   }
   if (value.container == AttributeContainerKind::kContainer) {
     std::string output = "{";
@@ -378,9 +426,9 @@ std::string string_cast(const EventAttribute& value, const std::string& declared
 EventTable collect(const EventTable& source, const EventAttribute& act1, const EventAttribute& act2,
                    const PolarsBetweenOptions& options, const std::string& phase) {
   // Python builds the anchor and separator literals before Polars runs.
-  for (const auto* value : {&act1, &act2, &options.subcase_concat_str})
-    if (collection(*value) && value->container != AttributeContainerKind::kContainer)
-      if (const auto error = detail::polars_list_literal(*value).error) fail("TypeError", phase, *error);
+  validate_anchor(act1, phase); validate_anchor(act2, phase);
+  if (collection(options.subcase_concat_str) && options.subcase_concat_str.container != AttributeContainerKind::kContainer)
+    if (const auto error = detail::polars_list_literal(options.subcase_concat_str).error) fail("TypeError", phase, *error);
   source.validate();
   if (source.index) throw std::invalid_argument("Native Polars between tables cannot have dataframe index metadata");
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars between requires declared column dtypes");
@@ -391,7 +439,8 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
     return static_cast<std::size_t>(found - source.columns.begin());
   };
   const auto case_at = position(key, false), time_at = position("time:timestamp", false), activity_at = position(activity, true);
-  const auto case_kind = dtype(source.dtypes[case_at]), time_kind = dtype(source.dtypes[time_at]), activity_kind = dtype(source.dtypes[activity_at]);
+  const auto case_kind = dtype(source.dtypes[case_at]), time_kind = dtype(source.dtypes[time_at]);
+  (void)dtype(source.dtypes[activity_at]);
   const auto enum_dictionary = [&](std::size_t at, Dtype kind) -> std::optional<EnumRanks> {
     if (kind != Dtype::kEnum) return std::nullopt;
     if (source.categorical_dtypes.empty() || !source.categorical_dtypes[at])
@@ -410,7 +459,10 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
   const auto time_ranks = time_at == case_at ? std::optional<EnumRanks>{} : enum_dictionary(time_at, time_kind);
   const auto* case_dictionary = case_ranks ? &*case_ranks : nullptr;
   const auto* time_dictionary = time_at == case_at ? case_dictionary : time_ranks ? &*time_ranks : nullptr;
-  validate_membership(source, activity_at, key, act1, act2, phase);
+  const auto anchor1 = anchor_of(act1), anchor2 = anchor_of(act2);
+  validate_membership(source, activity_at, key, anchor1, anchor2, phase);
+  const auto& activity_dtype = source.dtypes[activity_at];
+  const auto lookup1 = lookup_literal(anchor1, activity_dtype), lookup2 = lookup_literal(anchor2, activity_dtype);
   validate_separator(source, key, activity, act1, act2, options.subcase_concat_str, phase);
   std::vector<std::size_t> order(source.rows.size()); std::iota(order.begin(), order.end(), 0);
   // Polars' unstable multi-column sort leaves equal rows in its own order (round BX).
@@ -430,8 +482,8 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
       std::optional<std::size_t> start;
       for (auto i = begin; i < end; ++i) {
         const auto& row = source.rows[order[i]];
-        if (matches(row[activity_at], act1, activity_kind)) start = i;
-        if (start && matches(row[activity_at], act2, activity_kind)) {
+        if (lit::literal_has(lookup1, row[activity_at], activity_dtype)) start = i;
+        if (start && lit::literal_has(lookup2, row[activity_at], activity_dtype)) {
           segments.push_back({*start, i, std::to_string(*start - begin) + '_' + std::to_string(i - begin)});
           start.reset();
         }

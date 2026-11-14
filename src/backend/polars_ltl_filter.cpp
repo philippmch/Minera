@@ -3,6 +3,7 @@
 #include "polars_sort.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_column_hint.hpp"
+#include "polars_lit_model.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -128,7 +129,7 @@ Dtype dtype(const std::string& value) {
   if (value == "String" || categorical_dtype(value)) return Dtype::kString;
   if (enum_dtype(value)) return Dtype::kEnum;
   if (value == "Int64" || value == "UInt64" || value == "UInt32" || value == "UInt16" || value == "UInt8" || value == "Int32" || value == "Int16" || value == "Int8") return Dtype::kInteger;
-  if (value == "Float64") return Dtype::kFloat;
+  if (value == "Float64" || value == "Float32") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
   if (value == "Null") return Dtype::kNull;
   if (polars_datetime::temporal(value)) return Dtype::kDate;
@@ -222,7 +223,7 @@ std::string function_name(Op op) {
 std::string group_key(const Cell& value, const std::string& declared) {
   if (!value || null(*value) || declared == "Null") return "n";
   if (declared == "String" || categorical_dtype(declared) || enum_dtype(declared)) return "s" + value->value;
-  if (declared == "Float64") {
+  if (declared == "Float64" || declared == "Float32") {
     const auto n = number(*value);
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
@@ -261,18 +262,41 @@ struct Prepared {
   EventAttribute original;
   std::vector<EventAttribute> values;
 };
+std::vector<std::string> category_list(const EventTable& source, std::size_t column) {
+  std::vector<std::string> out;
+  if (enum_dtype(source.dtypes[column]) && column < source.categorical_dtypes.size() && source.categorical_dtypes[column])
+    for (const auto& c : source.categorical_dtypes[column]->categories) out.push_back(c.value);
+  return out;
+}
 std::string render(std::string_view pattern, const EventTable& source, const Prepared& p,
                    const std::string& expression = "") {
   const auto& o = p.options;
-  const auto value = [&](std::size_t i) { return i < p.values.size() ? literal(p.values[i]) : std::string("null"); };
+  // Round CD: each activity filter as the plan prints it, coerced to the
+  // attribute column's dtype.
+  std::optional<std::size_t> attribute;
+  if (text(o.attribute_key)) {
+    const auto found = std::find(source.columns.begin(), source.columns.end(), o.attribute_key.value);
+    if (found != source.columns.end()) attribute = static_cast<std::size_t>(found - source.columns.begin());
+  }
+  const auto value = [&](std::size_t i) {
+    namespace lit = detail::polars_lit;
+    const auto& key = o.attribute_key.value;
+    if (i >= p.values.size()) return "col(" + quote(key) + ") == null";
+    const auto v = lit::value_of(p.values[i]);
+    if (!lit::scalar_literal(v)) return "col(" + quote(key) + ") == " + literal(p.values[i]);
+    std::optional<std::string> declared;
+    std::vector<std::string> categories;
+    if (attribute) { declared = source.dtypes[*attribute]; categories = category_list(source, *attribute); }
+    return lit::comparison_plan(key, declared, v, lit::CompareOp::kEq, &categories);
+  };
   const std::map<std::string_view, std::string> substitutions = {
     {"FRAME", frame_plan(source)}, {"CASE_Q", quote(o.case_id_key.value)},
     {"ATTRIBUTE_Q", quote(o.attribute_key.value)}, {"TIME_Q", quote(o.timestamp_key.value)},
     {"RESOURCE_Q", quote(o.resource_key.value)}, {"RESOURCE2_Q", quote(o.resource_key.value + "_2")},
     {"LITERAL", integer(o.case_id_key) ? exact(o.case_id_key).decimal() : "0"},
-    {"FIRST", value(0)}, {"SECOND", value(1)}, {"LAST", p.values.empty() ? "null" : value(p.values.size() - 1)},
-    {"PAIR_A", p.values.size() < 2 ? "null" : value(p.values.size() - 2)},
-    {"PAIR_B", p.values.empty() ? "null" : value(p.values.size() - 1)}, {"EXPR", expression}
+    {"FIRST", value(0)}, {"SECOND", value(1)}, {"LAST", p.values.empty() ? value(static_cast<std::size_t>(-1)) : value(p.values.size() - 1)},
+    {"PAIR_A", p.values.size() < 2 ? value(static_cast<std::size_t>(-1)) : value(p.values.size() - 2)},
+    {"PAIR_B", p.values.empty() ? value(static_cast<std::size_t>(-1)) : value(p.values.size() - 1)}, {"EXPR", expression}
   };
   std::string out;
   for (std::size_t at = 0; at < pattern.size();) {
@@ -383,15 +407,20 @@ std::vector<std::string> eventually_stack(const Prepared& p, std::size_t at, boo
   return nodes;
 }
 // four_eyes_principle joins every activity pair; a negative filter filters
-// its first pair join.
-std::vector<std::string> four_eyes_stack(const Prepared& p, bool filter) {
+// its pair joins. Plans resolve left inputs first: the first activity
+// filters the left input of pair 0, a later activity `at` first the right
+// input of pair (0, at), whose result joins the earlier pairs from the right
+// (round CD).
+std::vector<std::string> four_eyes_stack(const Prepared& p, bool filter, std::size_t at = 0) {
   std::vector<std::string> nodes;
   if (filter) nodes.push_back("filter' failed");
-  nodes.insert(nodes.end(), {"select", "unique", "join left", "join"});
+  const auto k = static_cast<std::ptrdiff_t>(at == 0 ? 0 : at - 1);
+  nodes.insert(nodes.end(), {"select", "unique", at == 0 ? "join left" : "join right", "join"});
   if (truth(p.options.positive)) nodes.insert(nodes.end(), {"select", "unique", "join left", "join"});
   else nodes.insert(nodes.end(), {"filter", "select", "unique"});
   const auto pairs = static_cast<std::ptrdiff_t>(p.values.size() * (p.values.size() - 1) / 2);
-  repeat(nodes, pairs - 1, {"join left", "join"});
+  if (k > 0) nodes.insert(nodes.end(), {"join right", "join"});
+  repeat(nodes, pairs - 1 - k, {"join left", "join"});
   nodes.insert(nodes.end(), {"join right", "join"});
   return nodes;
 }
@@ -403,7 +432,7 @@ std::string missing_tail(const EventTable& source, const Prepared& p, bool eager
   if (p.operation == Op::kFourEyes) return restack(render(attribute ? kFourAttributeTail : kFourMissingTail, source, p), four_eyes_stack(p, false));
   return render(attribute ? kDifferentAttributeTail : kDifferentMissingTail, source, p);
 }
-void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false);
+void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false, bool first_only = false);
 void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   source.validate();
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars LTL requires every column dtype");
@@ -441,6 +470,9 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   if (!no_filter) required(o.attribute_key, false, true);
   // The attribute filter resolves before the case and resource columns.
   if (p.operation == Op::kDifferentPersons && text(o.attribute_key)) validate_queries(source, p, eager, true);
+  // The first activity's filter resolves before the first pair selects the
+  // case and resource columns.
+  if (p.operation == Op::kFourEyes && text(o.attribute_key)) validate_queries(source, p, eager, true, true);
   if (!sequence_rule(p.operation)) { required(o.case_id_key, false, false); required(o.resource_key, false, false); }
   if (collection(o.case_id_key)) {
     if (p.operation == Op::kEventuallyFollows) fail("InvalidOperationError", phase, restack(render(kEventEmptyJoin, source, p), eventually_stack(p, 0, false, true)));
@@ -454,30 +486,71 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     fail("DuplicateError", phase, render(p.operation==Op::kEventuallyFollows?kEventLiteralJoin:kFourLiteralJoin,source,p));
   }
 }
-void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only) {
+// Round CD: each activity filter compares the attribute column with one
+// value as Polars types it (detail::polars_lit::check_scalar): a str with a
+// temporal column fails while the plan resolves, a number with a string
+// column, mismatched temporal types and the like when the filter runs.
+void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only, bool first_only) {
   if (p.operation == Op::kNext || (p.operation == Op::kFourEyes && p.values.size() < 2) || p.values.empty()) return;
+  namespace lit = detail::polars_lit;
   const auto ai = *column(source,p.options.attribute_key);
-  if (dtype(source.dtypes[ai]) != Dtype::kString && dtype(source.dtypes[ai]) != Dtype::kEnum) return;
+  const auto& declared = source.dtypes[ai];
+  const bool stringy = dtype(declared) == Dtype::kString || dtype(declared) == Dtype::kEnum;
+  const auto categories = category_list(source, ai);
   const auto phase=eager?"apply":"collect";
-  for (std::size_t at = 0; at < p.values.size(); ++at) {
+  const auto& key = p.options.attribute_key.value;
+  const auto resolve_fail = [&](std::size_t at, const std::string& prefix, const std::string& expression) {
+    std::string tail;
+    if (!eager) {
+      if (p.operation == Op::kEventuallyFollows) tail = restack(render(kEventFilterTail,source,p,expression),eventually_stack(p,at,true));
+      else if (p.operation == Op::kFourEyes) tail = restack(render(kDifferentFilterTail,source,p,expression),four_eyes_stack(p,true,at));
+      else tail = render(kDifferentFilterTail,source,p,expression);
+    }
+    fail("InvalidOperationError",phase,prefix+tail);
+  };
+  // The whole plan resolves before any filter runs.
+  const auto count = first_only ? std::min<std::size_t>(1, p.values.size()) : p.values.size();
+  for (std::size_t at = 0; at < count; ++at) {
     const auto& query = p.values[at];
-    const auto expr="col("+quote(p.options.attribute_key.value)+") == "+literal(query);
-    if ((integer(query) || real(query)) && !resolution_only) {
-      const auto kind=real(query)?"f64":exact(query)>=TokenInteger(-2147483648LL)&&exact(query)<=TokenInteger(2147483647LL)?"i32":"i64";
-      fail("ComputeError",phase,"cannot compare string with numeric type ("+std::string(kind)+")\n\nThis error occurred in the following expression:\n\t[(col("+quote(p.options.attribute_key.value)+")) == ("+literal(query)+")]\n");
+    if (collection(query) && query.container != AttributeContainerKind::kContainer) {
+      if (stringy) resolve_fail(at,"cannot cast List type (inner: '"+detail::polars_list_literal(query).inner+"', to: 'String')","col("+quote(key)+") == "+literal(query)+".cast(String)");
+      continue;
     }
-    if ((collection(query) && query.container != AttributeContainerKind::kContainer) || date(query)) {
-      const auto prefix=date(query)?"cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)":"cannot cast List type (inner: '"+detail::polars_list_literal(query).inner+"', to: 'String')";
-      const auto expression=expr+(date(query)?"":".cast(String)");
-      fail("InvalidOperationError",phase,std::string(prefix)+(eager?"":(p.operation==Op::kEventuallyFollows?restack(render(kEventFilterTail,source,p,expression),eventually_stack(p,at,true)):render(kDifferentFilterTail,source,p,expression))));
+    const auto value = lit::value_of(query);
+    if (!lit::scalar_literal(value)) continue;
+    const auto check = lit::check_scalar(key, declared, value, lit::CompareOp::kEq, &categories);
+    if (check.stage == lit::ScalarCheck::Stage::kResolve) resolve_fail(at, check.message, "col("+quote(key)+") == "+lit::scalar_display(value));
+  }
+  if (resolution_only) return;
+  // eventually_follows runs its first activity's filter, then the others
+  // from the last one back.
+  const bool backward = p.operation == Op::kEventuallyFollows;
+  for (std::size_t step = 0; step < p.values.size(); ++step) {
+    const auto at = backward && step ? p.values.size() - step : step;
+    const auto value = lit::value_of(p.values[at]);
+    if (!lit::scalar_literal(value)) {
+      // A list compares with a numeric column as a List literal.
+      if (value.kind == lit::Kind::kDict || !(lit::integer_dtype(declared) || lit::float_dtype(declared))) continue;
+      std::optional<lit::Literal> list;
+      try { list = lit::list_literal(value.items); } catch (const PolarsSequenceFilterError&) { continue; }
+      fail("SchemaError",phase,"could not evaluate comparison between series '"+key+"' of dtype: "+declared+" and series 'literal' of dtype: List("+lit::literal_dtype_name(*list)+")\n\nThis error occurred in the following expression:\n\t[(col("+quote(key)+")) == ("+lit::lit_display(lit::list_of(list->type),lit::Value::list(list->values))+")]\n");
     }
+    const auto check = lit::check_scalar(key, declared, value, lit::CompareOp::kEq, &categories);
+    if (check.stage == lit::ScalarCheck::Stage::kCompute) fail(check.type,phase,check.message+lit::expression_suffix(key,lit::CompareOp::kEq,value));
   }
 }
 
 bool matches(const Cell& cell, const EventAttribute& value) {
   if (!cell || null(*cell) || null(value) || collection(value)) return false;
   if (text(*cell) || text(value)) return text(*cell) && text(value) && cell->value == value.value;
-  if (date(*cell) || date(value)) return date(*cell) && date(value) && root_cause_scalar_keys_equal(*cell,value);
+  if (date(*cell) || date(value)) {
+    // Python: a datetime.date never equals a datetime.datetime.
+    const auto day = [](const EventAttribute& v) {
+      const auto* native = std::get_if<NativeDate>(&v.typed_value);
+      return (native ? native->value : v.value).size() == 10;
+    };
+    return date(*cell) && date(value) && day(*cell) == day(value) && root_cause_scalar_keys_equal(*cell,value);
+  }
   return root_cause_scalar_keys_equal(*cell,value);
 }
 struct Selection { std::unordered_set<std::string> keys; std::string deferred_type, deferred_message; };
@@ -503,6 +576,15 @@ std::string schema_join_error(const std::string& key,const std::string& left,con
 }
 Selection select_cases(const EventTable& source,const Prepared& p) {
   const auto ci=column(source,p.options.case_id_key),ai=column(source,p.options.attribute_key),ri=column(source,p.options.resource_key);
+  namespace lit = detail::polars_lit;
+  // Round CD: activity filters compare as Polars types col == value.
+  const auto categories = ai ? category_list(source,*ai) : std::vector<std::string>{};
+  std::vector<lit::Value> typed;for(const auto& v:p.values)typed.push_back(lit::value_of(v));
+  const auto typed_original = lit::value_of(p.original);
+  const auto hit=[&](const Cell& cell,const EventAttribute& value,const lit::Value& v){
+    if(!lit::scalar_literal(v))return matches(cell,value);
+    return lit::compare_scalar(cell,source.dtypes[*ai],v,lit::CompareOp::kEq,&categories)==1;
+  };
   const auto case_key=[&](std::size_t i){return ci?group_key(source.rows[i][*ci],source.dtypes[*ci]):"i"+exact(p.options.case_id_key).decimal();};
   std::map<std::string,std::vector<std::size_t>> groups;
   for(const auto i:sorted_rows(source,p))groups[case_key(i)].push_back(i);
@@ -511,13 +593,13 @@ Selection select_cases(const EventTable& source,const Prepared& p) {
     bool keep=false;
     if(p.operation==Op::kDifferentPersons) {
       std::unordered_set<std::string> resources;bool present=false;
-      for(const auto i:rows)if(matches(source.rows[i][*ai],p.original)){present=true;resources.insert(ri?group_key(source.rows[i][*ri],source.dtypes[*ri]):"literal");}
+      for(const auto i:rows)if(hit(source.rows[i][*ai],p.original,typed_original)){present=true;resources.insert(ri?group_key(source.rows[i][*ri],source.dtypes[*ri]):"literal");}
       keep=present && ((resources.size()>1)==positive);
     } else if(p.operation==Op::kFourEyes) {
       keep=true;
       std::vector<bool> present(p.values.size(),false);
       std::vector<std::unordered_set<std::string>> performers(p.values.size());
-      for(std::size_t at=0;at<p.values.size();++at)for(const auto i:rows)if(matches(source.rows[i][*ai],p.values[at])) {
+      for(std::size_t at=0;at<p.values.size();++at)for(const auto i:rows)if(hit(source.rows[i][*ai],p.values[at],typed[at])) {
         present[at]=true;
         if(source.rows[i][*ri]&&!null(*source.rows[i][*ri]))performers[at].insert(group_key(source.rows[i][*ri],source.dtypes[*ri]));
       }
@@ -541,7 +623,7 @@ Selection select_cases(const EventTable& source,const Prepared& p) {
     } else {
       bool match=true;
       std::vector<std::size_t> first(p.values.size(),rows.size()),last(p.values.size(),0);
-      for(std::size_t at=0;at<p.values.size();++at)for(std::size_t i=0;i<rows.size();++i)if(matches(source.rows[rows[i]][*ai],p.values[at])){first[at]=std::min(first[at],i);last[at]=i;}
+      for(std::size_t at=0;at<p.values.size();++at)for(std::size_t i=0;i<rows.size();++i)if(hit(source.rows[rows[i]][*ai],p.values[at],typed[at])){first[at]=std::min(first[at],i);last[at]=i;}
       for(const auto pos:first)match=match&&pos<rows.size();
       for(std::size_t at=0;at+1<p.values.size();++at) {
         match=match&&first[at]<last[at+1];
@@ -554,7 +636,7 @@ Selection select_cases(const EventTable& source,const Prepared& p) {
   if(p.operation==Op::kNext && ci) {
     const auto& declared=source.dtypes[*ci];const bool empty=selected.keys.empty();
     if((empty && declared!="Null") || categorical_dtype(declared) || enum_dtype(declared)) {
-      const auto left=declared=="String"?"str":categorical_dtype(declared)?"cat":enum_dtype(declared)?"enum":declared=="Int64"?"i64":declared=="UInt64"?"u64":declared=="Float64"?"f64":declared=="Boolean"?"bool":"null";
+      const auto left=detail::polars_lit::short_dtype(declared);
       selected.deferred_type="SchemaError";selected.deferred_message=schema_join_error(p.options.case_id_key.value,left,empty?"null":"str");
     }
     if(!positive && selected.deferred_type.empty()) {

@@ -166,7 +166,10 @@ void validate_bound(const EventAttribute& bound, const EventAttribute& other, bo
     return "[(col(" + quote(column) + ")) " + comparison + " (" + literal(v) + ")]";
   };
   error += "\n\nThis error occurred in the following expression:\n\t" + expression(bound, cmp) + '\n';
-  if (op == Operation::kPerformance) error += "while evaluating this larger expression:\n\t[(" + expression(upper ? other : bound, ">=") + ") & (" + expression(upper ? bound : other, "<=") + ")]\n";
+  // A None bound folds to a null column, printed after the other (round CD).
+  if (op == Operation::kPerformance && null(other))
+    error += "while evaluating this larger expression:\n\t[(" + expression(bound, cmp) + ") & (null.repeat([col(" + quote(column) + ").len()]))]\n";
+  else if (op == Operation::kPerformance) error += "while evaluating this larger expression:\n\t[(" + expression(upper ? other : bound, ">=") + ") & (" + expression(upper ? bound : other, "<=") + ")]\n";
   fail(text(bound) ? "ComputeError" : "SchemaError", phase, std::move(error));
 }
 bool compare_bound(std::int64_t value, const EventAttribute& bound, bool upper) {
@@ -181,7 +184,7 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
   if (!cell || null(*cell) || dtype == "Null") return "n";
   const auto& v = *cell;
   if (dtype == "String" || dtype == "Categorical" || dtype.starts_with("Categorical(") || dtype.starts_with("Enum(")) return "s" + v.value;
-  if (dtype == "Float64") {
+  if (dtype == "Float64" || dtype == "Float32") {
     const auto n = number(v);
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }

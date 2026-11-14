@@ -122,7 +122,7 @@ Dtype dtype(const std::string& value) {
   if (value == "String" || categorical_dtype(value)) return Dtype::kString;
   if (enum_dtype(value)) return Dtype::kEnum;
   if (value == "Int64" || value == "UInt64" || value == "UInt32" || value == "UInt16" || value == "UInt8" || value == "Int32" || value == "Int16" || value == "Int8") return Dtype::kInteger;
-  if (value == "Float64") return Dtype::kFloat;
+  if (value == "Float64" || value == "Float32") return Dtype::kFloat;
   if (value == "Boolean") return Dtype::kBoolean;
   if (value == "Null") return Dtype::kNull;
   if (polars_datetime::temporal(value)) return Dtype::kDate;
@@ -208,7 +208,7 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
   if (!cell || null(*cell) || dtype == "Null") return "n";
   const auto& v = *cell;
   if (dtype == "String" || dtype == "Categorical" || dtype.starts_with("Categorical(") || dtype.starts_with("Enum(")) return "s" + v.value;
-  if (dtype == "Float64") {
+  if (dtype == "Float64" || dtype == "Float32") {
     const auto n = number(v);
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
@@ -298,8 +298,12 @@ EventTable collect(const EventTable& source,const std::vector<std::string>& labe
   // The kept case ids join back in sorted case order. An inner join whose
   // source frame is no taller than that list yields the list's order, each
   // case followed by its rows.
-  std::vector<std::string> kept;for(const auto& group:groups.groups)if(matches.at(group.key))kept.push_back(group.key);
-  if(truth(options.positive)&&source.rows.size()<=kept.size()){
+  // The list holds a null case whose variant matches too, though a null key
+  // never joins (round CD).
+  std::vector<std::string> kept;std::size_t listed=0;
+  for(const auto& group:groups.groups){if(matches.at(group.key))kept.push_back(group.key);if(group.absent&&std::find(labels.begin(),labels.end(),group.label)!=labels.end())++listed;}
+  listed+=kept.size();
+  if(truth(options.positive)&&source.rows.size()<=listed){
     for(const auto& key:kept)for(const auto& row:source.rows)if(group_key(row[groups.case_at],groups.case_dtype)==key)result.rows.push_back(row);
     return result;
   }

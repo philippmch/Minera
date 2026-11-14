@@ -215,7 +215,7 @@ All seven modules are complete on this bank. Outside the domain:
 * Floats in plans outside the generated values, where Polars' float display
   switches format at thresholds that were only sampled.
 
-## Typed keys (round CC, open)
+## Typed keys (rounds CC and CD)
 
 `scripts/polars_filter_cc_domain.py` rebuilds the frames of this domain
 with typed activity columns (Categorical, Enum, `Int8` to `UInt64`,
@@ -226,5 +226,80 @@ non-String activity columns about half of the cases pass the activity
 values as values of the column's type, sometimes mixed with strings.
 `scripts/capture-polars-filter-bank.py --domain polars_filter_cc_domain.py
 --count 1200 --bank-seed 2026111335 --hash-seeds 0,1 --repeats 4` captures
-33,137 calls, of which 3,293 differ natively (Review CC1). The bank is not
-in the suite until they are fixed (round CD).
+`docs/polars-filter-cc-bank.json.gz` (33,137 calls), replayed by
+`minera_polars_filter_cc_bank_parity_tests`. Round CC left 3,293 calls
+open (Review CC1); round CD fixed them (Review CD1).
+
+The table filters share one model of Polars literals with the sequence
+filters (`src/backend/polars_lit_model.hpp`): lists as `pl.lit` builds
+them, the `is_in` checks, and, new in round CD, `col(x) OP v` for a
+column dtype and a Python scalar.
+
+* **Comparison typing.** A str meets a temporal side, or a temporal value
+  a String column, while the plan resolves (`cannot compare
+  'date/datetime/time' to a string value`, with the resolved plan). A
+  number on a String column, any non-str on a Categorical or Enum column,
+  a datetime on a small integer column, a datetime of another zone (or
+  awareness) on a `Datetime` column, and a bool on a temporal column fail
+  when the filter runs (`cannot compare string with numeric type (i32)`,
+  `cannot compare categorical with i32`, `could not evaluate comparison
+  between series 'x' of dtype: Datetime('ms', 'Europe/Berlin') and series
+  'literal' of dtype: Datetime('μs', 'UTC')`), with the failing
+  expression and the larger one. A list value fails the same way on any
+  column but a String one.
+* **Coerced plans.** Once a comparison types, the plan prints it coerced:
+  `col("x") == 1` on any integer column the value fits,
+  `col("x").cast(Float64) == 1.5` for a float on integers, a constant
+  `when(col("x").is_not_null()).then(false).otherwise(null)` for an int
+  outside the column's range, `null.repeat([col("x").len()])` for None,
+  `col("x").is_between([lo, lo + 999 ns])` for `==` on a nanosecond
+  column, and the literal in the column's unit and zone otherwise. Inside
+  an evaluated predicate a folded form prints bare, a `when` with a
+  leading dot.
+* **Matching.** NaN equals NaN and sorts above every number; a `Float32`
+  column compares in single precision; a microsecond literal on a
+  millisecond column is truncated; Enum order follows the category list,
+  and an unknown str in an ordering raises the Enum conversion error. The
+  value filters look a datetime up on a `Datetime` column as `is_in`
+  does, by its microseconds whatever the zones.
+* **Merged bounds.** Several `>=`, `<=` and `==` filters on one column
+  merge in filter order as Polars' predicate pushdown merges them: a
+  tighter bound replaces the current one, an equality bounds both sides,
+  a literal without order against the current bound (another type, NaN)
+  is kept, dynamic literals and cast columns stay apart, an empty interval
+  empties the frame and a point becomes `==`; the merge applies only when
+  it yields fewer predicates.
+* **LTL.** The whole plan resolves before any filter runs (resolution
+  errors first), left inputs first: in `four_eyes_principle` activity 0
+  is the left input of pair 0 and a later activity first appears as the
+  right input of pair (0, at); `eventually_follows` evaluates index 0,
+  then n-1 down to 1. In the Python-side matching of `A_next_B_next_C` a
+  `datetime.date` never equals a `datetime.datetime`.
+* **between.** A str anchor is wrapped in a list, a list (a dict: its
+  keys) is a list literal, and any other scalar is a `pl.lit` Polars
+  implodes. The second anchor resolves first and its failure is reported
+  first, the type check before the Enum conversion; an imploded scalar
+  names its type `Unknown(Int(1))` or `Unknown(Float)`, prints
+  `[x.implode()]` while it fails and `[x]` before it resolves, and once
+  resolved casts to the column's list type (`[[1].cast(List(Int16))]`, a
+  number that does not fit to its supertype, a float on integers with
+  `strict_cast(Float64)`). A float anchor on a `Float32` column is cast to
+  single precision before the lookup (a float list is not). Temporal case
+  ids cast to String with their unit's fractional digits.
+* **variants.** A null case whose variant is in the list counts toward the
+  join's list height, though its key never joins.
+
+Declared orders: the between result joins its segments back without an
+order (14 of 180 sampled calls gave another case order over six runs;
+each case's rows stay in event order), `filter_on_ncases` keeps the first
+cases of a group_by without `maintain_order` on every case dtype, and
+`filter_df_relative_occurrence_event_attribute` and
+`filter_df_keeping_activ_exc_thresh` print the `is_in` list of a group_by
+in its unspecified order. The bank test compares these up to that order.
+
+Open after round CD (Review CD1): the position of merged bounds and of a
+None bound's null column in the evaluated predicate, the order of
+stream filter predicates across columns when one fails, an empty tuple in
+`attr_value_different_persons` on temporal columns, and tie orders of
+`filter_df_keeping_spno_activities` that reach an error message (six
+calls of fresh seeds 4244 and 4245).

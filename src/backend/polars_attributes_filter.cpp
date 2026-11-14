@@ -3,6 +3,7 @@
 #include "polars_column_hint.hpp"
 #include "polars_float_text.hpp"
 #include "polars_list_literal.hpp"
+#include "polars_lit_model.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <sstream>
@@ -96,7 +97,7 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
   if (!cell || null(*cell) || dtype == "Null") return "n";
   const auto& v = *cell;
   if (dtype == "String" || dtype == "Categorical" || dtype.starts_with("Categorical(") || dtype.starts_with("Enum(")) return "s" + v.value;
-  if (dtype == "Float64") {
+  if (dtype == "Float64" || dtype == "Float32") {
     const auto n = number(v);
     return std::isnan(n) ? "fNaN" : n == 0 ? "f0" : "f" + std::to_string(std::bit_cast<std::uint64_t>(n));
   }
@@ -157,11 +158,7 @@ std::string expression_literal(const EventAttribute& value,bool dynamic=false,bo
     return out+"]";
   }
   if(boolean(value))return truth(value)?"true":"false";
-  if(date(value)) {
-    const auto* native=std::get_if<NativeDate>(&value.typed_value);auto text=native?native->value:value.value;
-    if(text.size()>10)text[10]=' ';
-    return text.size()>19?text.substr(0,19)+" UTC":text;
-  }
+  if(date(value))return detail::polars_lit::scalar_display(detail::polars_lit::value_of(value));
   if(integer(value))return decimal?real_text(number(value))+ (real_text(number(value)).find('.')==std::string::npos?".0":"") : (dynamic?"dyn int: ":"")+exact(value).decimal();
   if(real(value)) {auto out=real_text(number(value));if(decimal && std::isfinite(number(value)) && out.find_first_of(".eE")==std::string::npos)out+=".0";return std::string(dynamic?"dyn float: ":"")+out;}
   return quote(value.value);
@@ -224,7 +221,11 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call) {
   }
   if(!statistics(op)) {
     col_selector(call.options.attribute_key);
-    auto literal=[](const EventAttribute& v){if(collection(v)&&v.container!=AttributeContainerKind::kContainer)if(const auto error=detail::polars_list_literal(v).error)fail("TypeError","apply",*error);};
+    auto literal=[](const EventAttribute& v){
+      if(!collection(v)||v.container==AttributeContainerKind::kContainer)return;
+      try{(void)detail::polars_lit::literal_of(detail::polars_lit::value_of(v));}
+      catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
+    };
     if(call.values)literal(*call.values);
     if(numeric(op)) {
       // Python builds the bound literals, then each stream filter's column and literal.
@@ -268,7 +269,7 @@ EventTable select_rows(const EventTable& source,const std::vector<bool>& selecte
   EventTable out=source;out.rows.clear();if(out.index)out.index->labels.clear();
   for(std::size_t i=0;i<source.rows.size();++i)if(selected[i]){out.rows.push_back(source.rows[i]);if(out.index)out.index->labels.push_back(source.index->labels[i]);}return out;
 }
-struct Leaf { std::string column, op, dtype; EventAttribute value; };
+struct Leaf { std::string column, op, dtype; EventAttribute value; std::vector<std::string> categories; };
 struct Expr { std::optional<Leaf> leaf; std::string op; std::vector<Expr> kids; };
 struct Predicate {
   PolarsAttributesFilterCall call;
@@ -277,31 +278,51 @@ struct Predicate {
   std::string dtype, case_dtype;
   bool literal_case=false;
   std::vector<EventAttribute> values;
-  std::vector<Expr> chain;
+  // Round CD: a list (tuple, dict keys) argument as pl.lit builds it.
+  std::optional<detail::polars_lit::Literal> literal;
+  std::vector<Expr> chain,merged;
   bool empty=false;
 };
+// An Enum column's categories in order.
+std::vector<std::string> enum_category_list(const EventTable& table,std::size_t column) {
+  std::vector<std::string> out;
+  if(column<table.categorical_dtypes.size()&&table.categorical_dtypes[column]){for(const auto& c:table.categorical_dtypes[column]->categories)out.push_back(c.value);return out;}
+  const auto& dtype=table.dtypes[column];
+  for(auto at=dtype.find('\'');at!=std::string::npos;) {
+    const auto end=dtype.find('\'',at+1);if(end==std::string::npos)break;
+    out.push_back(dtype.substr(at+1,end-at-1));at=dtype.find('\'',end+1);
+  }
+  return out;
+}
+// col(key).is_in(literal) as a plan prints it: before resolution with the
+// literal as built, once resolved with its coercion to the column (round CD);
+// a positive membership in an empty list folds to a false literal.
+std::string list_membership(const std::string& key,const std::string& dtype,const detail::polars_lit::Literal& literal,bool positive,bool coerced,bool empty_argument) {
+  if(positive&&empty_argument)return "false.alias("+quote(key)+")";
+  const auto text=coerced?detail::polars_lit::coerced_is_in(key,dtype,literal):"col("+quote(key)+").is_in("+detail::polars_lit::literal_text(literal)+")";
+  return text+(positive?"":".not()");
+}
+bool numeric_column(const std::string& dtype) {
+  return detail::polars_lit::integer_dtype(dtype)||dtype=="Float64"||dtype=="Float32";
+}
 std::string list_dtype(const EventAttribute& query) {
   if(!collection(query)) {
     if(boolean(query))return "Boolean";
     if(integer(query))return "Unknown(Int("+exact(query).decimal()+"))";
     if(real(query))return "Unknown(Float)";
     if(null(query))return "Null";
-    if(date(query))return detail::polars_literal_dtype(query);
+    if(date(query))return detail::polars_lit::debug_name(detail::polars_lit::lit_value(detail::polars_lit::value_of(query)).type);
     return "String";
   }
   if(query.container==AttributeContainerKind::kContainer)return "String";
   for(const auto& v:query.children)if(!null(v)) {
     if(collection(v))return "List("+list_dtype(v)+")";
+    if(date(v))return detail::polars_lit::debug_name(detail::polars_lit::lit_value(detail::polars_lit::value_of(v)).type);
     return detail::polars_literal_dtype(v);
   }
   return "Null";
 }
-std::string membership_type(std::string dtype) {
-  if(polars_datetime::datetime(dtype))return polars_datetime::display(dtype);
-  if(dtype.starts_with("Categorical"))return "Categorical";
-  if(dtype.starts_with("Enum("))return "Enum";
-  return dtype;
-}
+std::string membership_type(const std::string& dtype) { return detail::polars_lit::is_in_dtype_name(dtype); }
 int total_compare(double a,double b) {
   if(std::isnan(a))return std::isnan(b)?0:1;if(std::isnan(b))return -1;return a<b?-1:a>b?1:0;
 }
@@ -346,45 +367,69 @@ std::int64_t epoch_days(const EventAttribute& v) {
   return std::chrono::sys_days{std::chrono::year{y}/std::chrono::month{m}/std::chrono::day{d}}.time_since_epoch().count();
 }
 bool null_leaf(const Leaf& l) { return null(l.value); }
+// Round CD: an integer literal above the Int64 range, which Polars types
+// UInt64 (the literal model holds signed 64-bit integers, so these take
+// their own path): a UInt64 column compares it exactly, a Boolean one cast
+// to UInt64; float columns and signed integer columns (cast to Float64)
+// compare it as a float; a narrower unsigned column folds it to a
+// constant; temporal columns keep it as a dyn int that matches nothing;
+// String and categorical columns refuse it (u64).
+std::optional<std::uint64_t> wide_literal(const EventAttribute& v) {
+  constexpr auto top=static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+  if(const auto* u=std::get_if<std::uint64_t>(&v.typed_value))return *u>top?std::optional<std::uint64_t>(*u):std::nullopt;
+  if(collection(v)||!integer(v)||!std::holds_alternative<std::monostate>(v.typed_value))return {};
+  std::uint64_t u=0;const auto r=std::from_chars(v.value.data(),v.value.data()+v.value.size(),u);
+  if(r.ec==std::errc{}&&r.ptr==v.value.data()+v.value.size()&&u>top)return u;
+  return {};
+}
+std::optional<detail::polars_lit::Operands> wide_operands(const Leaf& l) {
+  namespace lit=detail::polars_lit;
+  const auto u=wide_literal(l.value);if(!u)return {};
+  const auto c="col("+quote(l.column)+")";const auto decimal=std::to_string(*u);const double d=static_cast<double>(*u);
+  if(l.dtype=="UInt64")return lit::Operands{c,decimal,{}};
+  if(l.dtype=="Boolean")return lit::Operands{c+".cast(UInt64)",decimal,{}};
+  if(l.dtype=="Float32")return lit::Operands{c,lit::polars_frame_float(static_cast<double>(static_cast<float>(d))),{}};
+  if(l.dtype=="Float64")return lit::Operands{c,lit::polars_frame_float(d),{}};
+  if(l.dtype.starts_with("UInt"))return lit::Operands{{},{},"when("+c+".is_not_null()).then("+(lit::apply_order(-1,lit::compare_op(l.op))?"true":"false")+").otherwise(null)"};
+  if(lit::integer_dtype(l.dtype))return lit::Operands{c+".cast(Float64)",lit::polars_frame_float(d),{}};
+  return lit::Operands{c,"dyn int: "+decimal,{}};
+}
+int wide_truth(const Leaf& l,const EventAttribute& v,std::uint64_t u) {
+  namespace lit=detail::polars_lit;
+  const auto op=lit::compare_op(l.op);const double d=static_cast<double>(u);
+  if(l.dtype=="UInt64")return lit::apply_order(lit::order_of(lit::wide_of(v),lit::Wide(u)),op);
+  if(l.dtype=="Float32")return lit::apply_order(lit::total_order(static_cast<double>(static_cast<float>(number(v))),static_cast<double>(static_cast<float>(d))),op);
+  if(l.dtype=="Float64"||(lit::integer_dtype(l.dtype)&&!l.dtype.starts_with("UInt")))return lit::apply_order(lit::total_order(number(v),d),op);
+  if(l.dtype=="Boolean"||lit::integer_dtype(l.dtype))return lit::apply_order(-1,op);
+  return -1;
+}
 // The (lhs, rhs) operands Polars prints once the literal is coerced to the
 // column; a None literal folds the comparison to a null column.
-std::pair<std::string,std::string> operands(const Leaf& l,bool cast_list=false) {
+// Round CD: scalars as detail::polars_lit types them for any column dtype
+// (uncoerced when the comparison fails); lists as built.
+detail::polars_lit::Operands operands(const Leaf& l,bool cast_list=false) {
+  namespace lit=detail::polars_lit;
   const auto column="col("+quote(l.column)+")";
   const auto& v=l.value;
-  if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
-    if(collection(v))return {column,expression_literal(v)+(cast_list?".cast(String)":"")};
-    if(date(v))return {column,datetime_literal(v)};
-    if(boolean(v))return {column,quote(truth(v)?"true":"false")};
-    if(integer(v))return {column,"dyn int: "+exact(v).decimal()};
-    if(real(v))return {column,"dyn float: "+polars_dyn_float(number(v))};
-    return {column,quote(v.value)};
+  if(collection(v)) {
+    if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum("))return {column,expression_literal(v)+(cast_list?".cast(String)":""),{}};
+    return {column,expression_literal(v),{}};
   }
-  if(physical_dtype(l.dtype)&&plain_number(v)) {
-    if(real(v))return {column,"dyn float: "+polars_dyn_float(number(v))};
-    if(l.dtype=="Boolean")return {column+".cast(Int32)",exact(v).decimal()};
-    return {column,"dyn int: "+exact(v).decimal()};
-  }
-  if(!numeric_dtype(l.dtype))throw std::invalid_argument("Native Polars numeric filter supports String, Int64, UInt64 and Float64 columns, and numeric bounds on Boolean, Date, Datetime and Null columns");
-  if(collection(v))return {column,expression_literal(v)};
-  if(text(v))return {column,quote(v.value)};
-  if(l.dtype=="UInt64"&&integer(v)&&!date(v)&&exact(v)<TokenInteger(0))
-    return {column+".cast(Int64)",exact(v).decimal()};  // a negative literal widens the column
-  if(integer_dtype(l.dtype)) {
-    if(real(v))return {column+".cast(Float64)",polars_plan_float(number(v))};
-    if(date(v))return {column,std::to_string(date_micros(v))};
-    return {column,exact(v).decimal()};
-  }
-  if(date(v))return {column,polars_plan_float(static_cast<double>(date_micros(v)))};
-  return {column,polars_plan_float(number(v))};
+  if(auto wide=wide_operands(l))return *wide;
+  const auto value=lit::value_of(v);const auto op=lit::compare_op(l.op);
+  if(!lit::check_scalar(l.column,l.dtype,value,op).ok())return {column,lit::scalar_display(value),{}};
+  return lit::coerced_operands(l.column,l.dtype,value,op);
 }
 std::string null_text(const Leaf& l) { return "null.repeat([col("+quote(l.column)+").len()])"; }
 std::string plan_text(const Expr& e,const Leaf* cast=nullptr) {
-  if(e.leaf){if(null_leaf(*e.leaf))return null_text(*e.leaf);const auto [a,b]=operands(*e.leaf,cast==&*e.leaf);return a+" "+e.leaf->op+" "+b;}
+  if(e.leaf){if(null_leaf(*e.leaf))return null_text(*e.leaf);return operands(*e.leaf,cast==&*e.leaf).text(detail::polars_lit::compare_op(e.leaf->op));}
   auto wrap=[&](const Expr& k){const auto t=plan_text(k,cast);return k.leaf&&null_leaf(*k.leaf)?t:"("+t+")";};
   return wrap(e.kids[0])+" "+e.op+" "+wrap(e.kids[1]);
 }
+// Round CD: an evaluated folded form prints bare, a when-then with a leading
+// dot (as filter_traces_attribute_in_timeframe prints it).
 std::string error_text(const Expr& e) {
-  if(e.leaf){if(null_leaf(*e.leaf))return null_text(*e.leaf);const auto [a,b]=operands(*e.leaf);return "[("+a+") "+e.leaf->op+" ("+b+")]";}
+  if(e.leaf){if(null_leaf(*e.leaf))return null_text(*e.leaf);const auto o=operands(*e.leaf);return o.whole.empty()?"[("+o.lhs+") "+e.leaf->op+" ("+o.rhs+")]":o.whole.starts_with("when(")?"."+o.whole:o.whole;}
   return "[("+error_text(e.kids[0])+") "+e.op+" ("+error_text(e.kids[1])+")]";
 }
 std::string chain_plan(const EventTable& table,const std::vector<std::string>& filters) {
@@ -397,41 +442,173 @@ const Expr* leaf_node(const Expr& e) { return e.leaf?&e:nullptr; }
 // filter on a null column stays in place with the pending ones. Predicates
 // combine per column name (bytewise order), lower filters to the left.
 std::string predicate_column(const Expr& e) { std::string out;each_leaf(e,[&](const Leaf& l){if(out.empty())out=l.column;});return out; }
-Expr combine(const std::vector<Expr>& items) {
+// Round CD: Polars merges the comparisons of one operand with typed
+// literals into an interval, in the order the filters apply: a tighter bound
+// replaces the current one, an equality bounds both sides, and a literal
+// without an order against the current bound (another type, NaN) leaves it.
+// The merge replaces the comparisons only when it leaves fewer of them: an
+// empty interval empties the frame, a point becomes ==, else the bounds.
+struct MergeKey { int tag=0; detail::polars_lit::Wide i; double d=0; std::string s; };
+std::optional<MergeKey> merge_key(const Leaf& l) {
+  namespace lit=detail::polars_lit;
+  if(null(l.value))return {};
+  if(l.op!=">="&&l.op!="<="&&l.op!=">"&&l.op!="<"&&l.op!="==")return {};
+  const auto o=operands(l);
+  if(collection(l.value)){MergeKey k;k.tag=20;k.s=o.rhs;return k;}
+  if(!o.whole.empty()||o.rhs.rfind("dyn ",0)==0)return {};
+  if(const auto u=wide_literal(l.value)) {
+    MergeKey k;
+    if(l.dtype=="UInt64"||l.dtype=="Boolean"){k.i=lit::Wide(*u);return k;}
+    if(!lit::float_dtype(l.dtype)&&!lit::integer_dtype(l.dtype))return {};
+    const double d=static_cast<double>(*u);k.tag=1;k.d=l.dtype=="Float32"?static_cast<double>(static_cast<float>(d)):d;return k;
+  }
+  const auto v=lit::value_of(l.value);const auto op=lit::compare_op(l.op);
+  const auto check=lit::check_scalar(l.column,l.dtype,v,op,l.categories.empty()?nullptr:&l.categories);
+  MergeKey k;
+  if(!check.ok()) {
+    // A typed literal the comparison cannot coerce keeps its own type.
+    switch(v.kind){
+      case lit::Kind::kString:k.tag=10;k.s=v.text;break;
+      case lit::Kind::kDate:k.tag=11;k.i=v.integer;break;
+      case lit::Kind::kDatetime:k.tag=12;k.i=lit::literal_micros(v);k.s=lit::lit_value(v).type.zone;break;
+      case lit::Kind::kBool:k.tag=13;k.i=v.boolean;break;
+      default:return {};
+    }
+    return k;
+  }
+  const auto& d=l.dtype;
+  if(d=="String"||d.starts_with("Categorical")||d.starts_with("Enum(")){k.tag=2;k.s=v.kind==lit::Kind::kBool?(v.boolean?"true":"false"):v.text;return k;}
+  if(d=="Boolean"){if(v.kind==lit::Kind::kString){k.tag=2;k.s=v.text;}else{k.tag=0;k.i=v.kind==lit::Kind::kBool?v.boolean:v.integer;}return k;}
+  const auto micros=[&]{return lit::Wide(lit::literal_micros(v));};
+  if(lit::integer_dtype(d)) {
+    switch(v.kind){
+      case lit::Kind::kFloat:k.tag=1;k.d=v.real;break;
+      case lit::Kind::kBool:k.i=v.boolean;break;
+      case lit::Kind::kDatetime:k.i=micros();break;
+      default:k.i=v.integer;break;
+    }
+    return k;
+  }
+  if(lit::float_dtype(d)) {
+    const bool f32=d=="Float32";const auto narrow=[&](double y){return f32?static_cast<double>(static_cast<float>(y)):y;};
+    k.tag=1;
+    switch(v.kind){
+      case lit::Kind::kFloat:k.d=narrow(v.real);break;
+      case lit::Kind::kInt:k.d=narrow(static_cast<double>(v.integer));break;
+      case lit::Kind::kBool:k.d=v.boolean?1.0:0.0;break;
+      case lit::Kind::kDate:k.d=static_cast<double>(v.integer);break;
+      default:k.d=static_cast<double>(lit::literal_micros(v));break;
+    }
+    return k;
+  }
+  if(d=="Date"){k.i=v.kind==lit::Kind::kDate?lit::Wide(v.integer):micros();return k;}
+  if(d.starts_with("Datetime")) {
+    const auto unit=lit::unit_nanoseconds(d);
+    if(v.kind==lit::Kind::kDate){k.i=lit::wide_mul(v.integer,86'400'000'000'000LL/unit);return k;}
+    const auto m=lit::literal_micros(v);
+    k.i=unit==1?lit::wide_add(lit::wide_mul(m,1000),op==lit::CompareOp::kLe?999:0):lit::Wide(unit==1000?m:m/1000);
+    return k;
+  }
+  return {};
+}
+std::optional<int> merge_order(const MergeKey& a,const MergeKey& b) {
+  if(a.tag!=b.tag)return {};
+  if(a.tag==1){if(std::isnan(a.d)||std::isnan(b.d))return {};return a.d<b.d?-1:a.d>b.d?1:0;}
+  if(a.tag==2||a.tag==10||a.tag==20)return a.s<b.s?-1:a.s>b.s?1:0;
+  if(a.tag==12&&a.s!=b.s)return {};
+  return a.i<b.i?-1:a.i>b.i?1:0;
+}
+struct Bound { MergeKey key; bool inclusive=true; Leaf leaf; };
+// Merges one operand's comparisons (application order); nullopt: no change,
+// an empty vector: an empty interval.
+std::optional<std::vector<Leaf>> merge_interval(const std::vector<std::pair<Leaf,MergeKey>>& items) {
+  std::optional<Bound> lower,upper;
+  const auto tighten=[](std::optional<Bound>& bound,const Bound& next,int direction) {
+    if(!bound){bound=next;return;}
+    const auto c=merge_order(next.key,bound->key);
+    if(!c)return;
+    if(*c*direction>0||(*c==0&&!next.inclusive&&bound->inclusive))bound=next;
+  };
+  for(const auto& [leaf,key]:items) {
+    const bool strict=leaf.op==">"||leaf.op=="<";
+    if(leaf.op==">="||leaf.op==">"||leaf.op=="==")tighten(lower,Bound{key,!strict,leaf},1);
+    if(leaf.op=="<="||leaf.op=="<"||leaf.op=="==")tighten(upper,Bound{key,!strict,leaf},-1);
+  }
+  std::vector<Leaf> out;
+  const auto bound_leaf=[](const Bound& b,bool low){auto l=b.leaf;l.op=low?(b.inclusive?">=":">"):(b.inclusive?"<=":"<");return l;};
+  if(lower&&upper) {
+    const auto c=merge_order(lower->key,upper->key);
+    if(c&&(*c>0||(*c==0&&!(lower->inclusive&&upper->inclusive))))return out;
+    if(c&&*c==0){auto l=lower->leaf;l.op="==";out.push_back(l);}
+    else{out.push_back(bound_leaf(*lower,true));out.push_back(bound_leaf(*upper,false));}
+  } else out.push_back(bound_leaf(lower?*lower:*upper,lower.has_value()));
+  if(out.size()>=items.size())return {};
+  return out;
+}
+Expr combine(const std::vector<Expr>& items,bool& empty) {
   std::map<std::string,std::vector<const Expr*>> groups;
   for(const auto& item:items)groups[predicate_column(item)].push_back(&item);
   std::optional<Expr> out;
   for(const auto& [name,group]:groups) {
-    Expr acc=*group[0];for(std::size_t i=1;i<group.size();++i)acc=binary(*group[i],"&",std::move(acc));
+    // Application order: the lowest filter first.
+    std::vector<Expr> applied;for(auto at=group.rbegin();at!=group.rend();++at)applied.push_back(**at);
+    std::map<std::string,std::vector<std::size_t>> operand_items;
+    for(std::size_t i=0;i<applied.size();++i)if(applied[i].leaf&&merge_key(*applied[i].leaf))operand_items[operands(*applied[i].leaf).lhs].push_back(i);
+    std::vector<std::optional<std::vector<Leaf>>> replacement(applied.size());
+    std::vector<bool> dropped(applied.size(),false);
+    for(const auto& [lhs,positions]:operand_items) {
+      if(positions.size()<2)continue;
+      std::vector<std::pair<Leaf,MergeKey>> list;
+      for(const auto i:positions)list.emplace_back(*applied[i].leaf,*merge_key(*applied[i].leaf));
+      const auto merged=merge_interval(list);
+      if(!merged)continue;
+      if(merged->empty()){empty=true;return Expr{};}
+      for(const auto i:positions)dropped[i]=true;
+      replacement[positions.front()]=*merged;
+    }
+    std::vector<Expr> kept;
+    for(std::size_t i=0;i<applied.size();++i) {
+      if(replacement[i])for(const auto& l:*replacement[i])kept.push_back(Expr{l,"",{}});
+      else if(!dropped[i])kept.push_back(applied[i]);
+    }
+    Expr acc=kept.back();for(std::size_t i=kept.size()-1;i-->0;)acc=binary(kept[i],"&",std::move(acc));
     out=out?binary(std::move(*out),"&",std::move(acc)):std::move(acc);
   }
   return *out;
 }
-std::vector<Expr> pushdown(const std::vector<Expr>& chain) {
+std::vector<Expr> pushdown(const std::vector<Expr>& chain,bool& empty) {
   std::vector<Expr> nodes,pending;
   for(auto p=chain.rbegin();p!=chain.rend();++p) {
     if(p->leaf&&null_leaf(*p->leaf)) {
       std::vector<Expr> items{*p};items.insert(items.end(),pending.begin(),pending.end());
-      nodes.push_back(combine(items));pending.clear();
+      nodes.push_back(combine(items,empty));pending.clear();
     } else pending.push_back(*p);
   }
-  if(!pending.empty())nodes.push_back(combine(pending));
+  if(!pending.empty())nodes.push_back(combine(pending,empty));
   std::reverse(nodes.begin(),nodes.end());return nodes;
 }
 std::optional<std::pair<std::string,std::string>> leaf_error(const Leaf& l) {
+  namespace lit=detail::polars_lit;
   const auto& v=l.value;
   if(null(v))return {};
-  if(l.dtype=="String") {
-    if(integer(v)&&!boolean(v)){const auto n=exact(v);const bool small=n>=TokenInteger(std::numeric_limits<std::int32_t>::min())&&n<=TokenInteger(std::numeric_limits<std::int32_t>::max());return std::pair<std::string,std::string>{"ComputeError",std::string("cannot compare string with numeric type (")+(small?"i32":"i64")+")"};}
-    if(real(v))return std::pair<std::string,std::string>{"ComputeError","cannot compare string with numeric type (f64)"};
+  if(collection(v)) {
+    if(l.dtype=="String")return {};
+    if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
+      // Round CD: a list never compares with a categorical column.
+      try {
+        const auto list=detail::polars_lit::literal_of(detail::polars_lit::value_of(v));
+        return std::pair<std::string,std::string>{"ComputeError","cannot compare categorical with "+detail::polars_lit::short_name(detail::polars_lit::list_of(list.type))};
+      } catch(const PolarsSequenceFilterError&) {return {};}
+    }
+    return std::pair<std::string,std::string>{"SchemaError","could not evaluate "+(l.op=="=="?std::string():"'"+l.op+"' ")+"comparison between series '"+l.column+"' of dtype: "+detail::polars_lit::is_in_dtype_name(l.dtype)+" and series 'literal' of dtype: List("+detail::polars_list_literal(v).inner+")"};
+  }
+  if(wide_literal(v)) {
+    if(l.dtype=="String")return std::pair<std::string,std::string>{"ComputeError","cannot compare string with numeric type (u64)"};
+    if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum("))return std::pair<std::string,std::string>{"ComputeError","cannot compare categorical with u64"};
     return {};
   }
-  if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
-    if((integer(v)&&!boolean(v))||real(v))return std::pair<std::string,std::string>{"ComputeError","cannot compare categorical with "+std::string(real(v)?"f64":"i32")};
-    return {};
-  }
-  if(text(v))return std::pair<std::string,std::string>{"ComputeError",std::string("cannot compare string with numeric type (")+(l.dtype=="Float64"?"f64":l.dtype=="UInt64"?"u64":"i64")+")"};
-  if(collection(v))return std::pair<std::string,std::string>{"SchemaError","could not evaluate "+(l.op=="=="?std::string():"'"+l.op+"' ")+"comparison between series '"+l.column+"' of dtype: "+l.dtype+" and series 'literal' of dtype: List("+detail::polars_list_literal(v).inner+")"};
+  const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(v),lit::compare_op(l.op));
+  if(check.stage==lit::ScalarCheck::Stage::kCompute)return std::pair<std::string,std::string>{check.type,check.message};
   return {};
 }
 std::optional<std::pair<std::string,std::string>> first_error(const Expr& e,const Expr*& at) {
@@ -442,41 +619,9 @@ std::optional<std::pair<std::string,std::string>> first_error(const Expr& e,cons
 // Kleene truth of a comparison: -1 null, 0 false, 1 true.
 int leaf_truth(const Leaf& l,const EventAttribute& v) {
   if(null(v)||null(l.value))return -1;
-  const auto& b=l.value;int c=0;
-  if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
-    const auto rhs=boolean(b)?std::string(truth(b)?"true":"false"):b.value;c=v.value.compare(rhs);c=c<0?-1:c>0?1:0;
-  } else if(physical_dtype(l.dtype)) {
-    const std::int64_t x=l.dtype=="Boolean"?(truth(v)?1:0):l.dtype=="Date"?epoch_days(v):datetime_ticks(v,l.dtype);
-    if(real(b))c=total_compare(static_cast<double>(x),number(b));
-    else{const TokenInteger left(x),right=exact(b);c=left<right?-1:right<left?1:0;}
-  } else if(integer_dtype(l.dtype)&&!real(b)) {
-    const TokenInteger x=exact(v),y=date(b)?TokenInteger(date_micros(b)):exact(b);c=x<y?-1:y<x?1:0;
-  } else c=total_compare(number(v),date(b)?static_cast<double>(date_micros(b)):number(b));
-  const auto& op=l.op;
-  return op==">="?c>=0:op=="<="?c<=0:op==">"?c>0:op=="<"?c<0:c==0;
-}
-// A literal comparable with another on the same coerced operand, as Polars'
-// range simplification sees it.
-std::optional<std::variant<std::string,TokenInteger,double>> range_value(const Leaf& l) {
-  const auto& v=l.value;
-  if(null(v)||collection(v))return {};
-  if(l.dtype=="String"){if(text(v))return v.value;if(boolean(v))return std::string(truth(v)?"true":"false");return {};}
-  if(text(v))return {};
-  if(integer_dtype(l.dtype)&&!real(v))return date(v)?TokenInteger(date_micros(v)):exact(v);
-  if(physical_dtype(l.dtype)&&!real(v))return exact(v);
-  return date(v)?static_cast<double>(date_micros(v)):number(v);
-}
-bool empty_range(const Expr& node) {
-  std::vector<const Leaf*> leaves;each_leaf(node,[&](const Leaf& l){leaves.push_back(&l);});
-  if(node.op=="|")return false;
-  for(const auto* lo:leaves)for(const auto* hi:leaves) {
-    if(lo->op!=">="||hi->op!="<="||lo->column!=hi->column||null_leaf(*lo)||null_leaf(*hi)||operands(*lo).first!=operands(*hi).first)continue;
-    const auto a=range_value(*lo),b=range_value(*hi);
-    if(!a||!b||a->index()!=b->index())continue;
-    if(const auto* x=std::get_if<double>(&*a)){if(total_compare(*x,std::get<double>(*b))>0)return true;}
-    else if(*b<*a)return true;
-  }
-  return false;
+  if(const auto u=wide_literal(l.value))return wide_truth(l,v,*u);
+  namespace lit=detail::polars_lit;
+  return lit::compare_scalar(std::optional<EventAttribute>(v),l.dtype,lit::value_of(l.value),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
 }
 int truth_of(const Expr& e,const EventTable& source,std::size_t row) {
   if(e.leaf)return leaf_truth(*e.leaf,cell(source,row,*index_of(source,e.leaf->column)));
@@ -514,13 +659,20 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
     if(i==0){p.column=*column;p.dtype=source_dtype(source,*column);}
     for(auto node:levels[i]) {
       const auto dtype=source_dtype(source,*column);
-      each_leaf(node,[&](Leaf& l){l.dtype=dtype;});
+      const auto categories=enum_category_list(source,*column);
+      each_leaf(node,[&](Leaf& l){l.dtype=dtype;l.categories=categories;});
       const Leaf* bad=nullptr;std::string message;
       each_leaf(node,[&](const Leaf& l) {
-        if(bad||l.dtype!="String"||(!collection(l.value)&&!date(l.value)))return;
-        bad=&l;
-        message=collection(l.value)?"cannot cast List type (inner: '"+detail::polars_list_literal(l.value).inner+"', to: 'String')"
-                                   :"cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)";
+        if(bad||null(l.value))return;
+        if(collection(l.value)) {
+          if(l.dtype!="String")return;
+          bad=&l;message="cannot cast List type (inner: '"+detail::polars_list_literal(l.value).inner+"', to: 'String')";
+          return;
+        }
+        if(wide_literal(l.value))return;
+        namespace lit=detail::polars_lit;
+        const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(l.value),lit::compare_op(l.op));
+        if(check.stage==lit::ScalarCheck::Stage::kResolve){bad=&l;message=check.message;}
       });
       if(bad){auto with=resolved_filters;with.push_back(plan_text(node,bad));fail_at(i,true,"InvalidOperationError",message,chain_plan(source,with));}
       resolved_filters.push_back(plan_text(node));p.chain.push_back(std::move(node));
@@ -536,16 +688,18 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
       p.case_column=c;p.case_dtype=source_dtype(source,*c);
     }
   }
-  for(const auto& node:pushdown(p.chain)) {
-    // The optimizer drops a merged filter whose bounds leave an empty range.
-    if(empty_range(node)){p.empty=true;continue;}
+  bool empty=false;
+  p.merged=pushdown(p.chain,empty);
+  // An empty interval empties the frame before any filter runs.
+  if(empty){p.empty=true;p.merged.clear();}
+  for(const auto& node:p.merged) {
     const Expr* at=nullptr;
     if(const auto error=first_error(node,at))
       fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error_text(*at)+(node.leaf?"\n":"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n"));
   }
   return p;
 }
-Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager) {
+Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager,const std::vector<EventAttribute>* cells=nullptr) {
   if(numeric(call.operation))return numeric_predicate(source,call,eager);
   const auto op=call.operation;const bool trace=traced(op);const auto& attr=call.options.attribute_key;
   const auto suffix=[&](const std::string& plan,bool failed=false) {
@@ -559,22 +713,40 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
   {
     const auto& query=*call.values;
     if(text(query)&&!index_of(source,query.value))fail("ColumnNotFoundError",phase(eager),column_prefix(source,query.value)+suffix(frame_plan(source)));
+    const bool positive_now=trace||truth(call.options.positive);
+    if(cells||collection(query)) {
+      // Statistics filter on the column's own values as Python reads them.
+      const auto value=cells?detail::polars_lit::Value::list(detail::polars_lit::python_values(*cells,p.dtype)):detail::polars_lit::value_of(query);
+      p.literal=detail::polars_lit::literal_of(value);
+      const bool empty_argument=cells?cells->empty():query.children.empty();
+      if(!(positive_now&&empty_argument)) {
+        try {
+          detail::polars_lit::check_is_in(p.dtype,detail::polars_lit::enum_dtype(p.dtype)?enum_category_list(source,p.column):std::vector<std::string>{},*p.literal,
+                                          suffix(filter_plan(source,list_membership(attr.value,p.dtype,*p.literal,positive_now,false,empty_argument)),true));
+        } catch(const PolarsSequenceFilterError& error) {fail(error.type,phase(eager),error.message);}
+      }
+    } else {
     const auto qdtype=list_dtype(query);bool compatible=qdtype=="Null"||p.dtype=="Null";
     if(qdtype=="String")compatible=p.dtype=="String"||p.dtype.starts_with("Categorical")||p.dtype.starts_with("Enum(");
-    else if(qdtype=="Int64"||qdtype=="Float64"||qdtype.starts_with("Unknown("))compatible=p.dtype=="Int64"||p.dtype=="UInt64"||p.dtype=="Float64"||p.dtype=="UInt32"||p.dtype=="Null";
+    else if(qdtype=="Int64"||qdtype=="Float64"||qdtype.starts_with("Unknown("))compatible=numeric_column(p.dtype)||p.dtype=="Null";
     else if(qdtype=="Boolean")compatible=p.dtype=="Boolean"||p.dtype=="Null";
     else if(qdtype=="Date")compatible=p.dtype=="Date"||p.dtype=="Null";
     else if(qdtype.starts_with("Datetime("))compatible=p.dtype.starts_with("Datetime(")||p.dtype=="Null";
     if(!compatible)fail("InvalidOperationError",phase(eager),"'is_in' cannot check for List("+qdtype+") values in "+membership_type(p.dtype)+" data"+suffix(filter_plan(source,membership_expr(attr.value,query,trace||truth(call.options.positive))),true));
-    if(collection(query)) {
-      if(query.container==AttributeContainerKind::kContainer)for(const auto& v:query.children)p.values.push_back(EventAttribute{"",v.key});
-      else p.values=query.children;
-    } else if(!null(query))p.values.push_back(query);
+    // Round CD: a datetime scalar checks its unit and zone like a list.
+    if(qdtype.starts_with("Datetime(")&&p.dtype.starts_with("Datetime(")) {
+      try {
+        detail::polars_lit::check_is_in(p.dtype,{},detail::polars_lit::literal_of(detail::polars_lit::Value::list({detail::polars_lit::value_of(query)})),
+                                        suffix(filter_plan(source,membership_expr(attr.value,query,trace||truth(call.options.positive))),true));
+      } catch(const PolarsSequenceFilterError& error) {fail(error.type,phase(eager),error.message);}
+    }
+    if(!null(query))p.values.push_back(query);
+    }
   }
   if(trace) {
     const auto& role=call.options.case_id_key;
     if(collection(role))fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
-    const auto plan=filter_plan(source,membership_expr(attr.value,*call.values,true));
+    const auto plan=filter_plan(source,p.literal?list_membership(attr.value,p.dtype,*p.literal,true,true,cells?cells->empty():call.values->children.empty()):membership_expr(attr.value,*call.values,true));
     if(integer(role))p.literal_case=true;
     else {
       const auto c=index_of(source,role.value);
@@ -588,10 +760,24 @@ std::vector<bool> matching(const EventTable& source,const Predicate& p) {
   const auto op=p.call.operation;const bool positive=truth(p.call.options.positive);std::vector<bool> flags(source.size(),false);
   for(std::size_t i=0;i<source.size();++i) {
     const auto v=cell(source,i,p.column);bool yes=false;
-    if(numeric(op))yes=!p.empty&&std::all_of(p.chain.begin(),p.chain.end(),[&](const Expr& node){return truth_of(node,source,i)==1;});
+    if(numeric(op))yes=!p.empty&&std::all_of(p.merged.begin(),p.merged.end(),[&](const Expr& node){return truth_of(node,source,i)==1;});
     else {
-      if(!null(v)) {for(const auto& q:p.values)if(!null(q)&&scalar_equal(v,q)){yes=true;break;}if(!positive&&!traced(op))yes=!yes;}
-      else if(p.values.empty()&&collection(*p.call.values)&&!positive&&!traced(op))yes=true;
+      if(!null(v)) {
+        if(p.literal)yes=detail::polars_lit::literal_has(*p.literal,v,p.dtype);
+        else for(const auto& q:p.values) {
+          if(null(q))continue;
+          // Round CD: a datetime on a Datetime column is looked up as is_in
+          // looks it up, by its microseconds whatever the zones.
+          if(p.dtype.starts_with("Datetime(")&&date(q)&&!collection(q)) {
+            namespace lit=detail::polars_lit;
+            if(lit::literal_has(lit::literal_of(lit::Value::list({lit::value_of(q)})),v,p.dtype)){yes=true;break;}
+            continue;
+          }
+          if(scalar_equal(v,q)){yes=true;break;}
+        }
+        if(!positive&&!traced(op))yes=!yes;
+      }
+      else if(p.literal&&p.literal->values.empty()&&!positive&&!traced(op))yes=true;
     }
     flags[i]=yes;
   }
@@ -704,7 +890,7 @@ bool variant_contains(const EventAttribute& variant,const EventAttribute& key) {
   }
   fail("TypeError","apply","argument of type '"+core_type(variant)+"' is not iterable");
 }
-struct StatisticalSelection { EventAttribute attribute,values; bool unchanged=false; };
+struct StatisticalSelection { EventAttribute attribute,values; bool unchanged=false,from_cache=false; };
 StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager) {
   const auto op=call.operation;const auto& options=call.options;const auto attr=op==Op::kRelative?options.attribute_key:options.activity_key;
   StatisticalSelection selection;selection.attribute=attr;selection.values.container=AttributeContainerKind::kList;
@@ -724,7 +910,7 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     schema=counts_schema(source,attr,countoptions,op==Op::kRelative);
     if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
     counts=counts_from(source,schema);
-  } else counts=cache_counts(*call.count_cache);
+  } else {counts=cache_counts(*call.count_cache);selection.from_cache=true;}
   if(op==Op::kTopActivities) {
     const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
     if(!null(maximum)) {
@@ -763,7 +949,7 @@ EventTable stats_output(const EventTable& source,const PolarsAttributesFilterCal
   if(call.operation==Op::kRelative)col_selector(selection.attribute);
   auto filtering=call;filtering.operation=Op::kEvents;filtering.values=selection.values;filtering.options.attribute_key=selection.attribute;
   if(call.operation!=Op::kRelative)filtering.options.positive=EventAttribute{"","true",AttributeKind::kBoolean};
-  return select_rows(source,matching(source,predicate(source,filtering,eager)));
+  return select_rows(source,matching(source,predicate(source,filtering,eager,selection.from_cache?nullptr:&selection.values.children)));
 }
 EventTable metadata_table(const LazyEventTable& source) {
   EventTable out;out.columns=source.columns();out.dtypes=source.dtypes();out.categorical_dtypes=source.categorical_dtypes();out.attributes=source.attributes();out.metadata=source.metadata();return out;
