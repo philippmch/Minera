@@ -177,7 +177,12 @@ std::string membership_expr(const std::string& key,const EventAttribute& values,
   if(text(values))operand="col("+quote(values.value)+").implode()";
   else if(collection(values)) {
     if(values.container==AttributeContainerKind::kContainer) {
-      EventAttribute keys=values;keys.container=AttributeContainerKind::kList;for(auto& v:keys.children)v=EventAttribute{"",v.key};operand=expression_literal(keys);
+      // Round CI: a dict's keys as Python iterates them (a repeated key once,
+      // in its first place).
+      EventAttribute keys=values;keys.container=AttributeContainerKind::kList;keys.children.clear();
+      for(const auto& v:values.children)
+        if(std::none_of(keys.children.begin(),keys.children.end(),[&](const EventAttribute& k){return k.value==v.key;}))keys.children.push_back(EventAttribute{"",v.key});
+      operand=expression_literal(keys);
     } else operand=expression_literal(values);
   } else operand=expression_literal(values,true)+".implode()";
   return "col("+quote(key)+").is_in(["+operand+"])"+(positive?"":".not()");

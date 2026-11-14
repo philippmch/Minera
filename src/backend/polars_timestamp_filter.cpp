@@ -115,56 +115,17 @@ std::string literal(const EventAttribute& value, bool dynamic = false) {
   }
   if (boolean(value)) return truth(value)?"true":"false";
   if (integer(value)) return std::string(dynamic?"dyn int: ":"")+exact(value).decimal();
-  if (real(value)) return std::string(dynamic?"dyn float: ":"")+real_text(number(value));
+  // Round CI: a dynamic float in Rust's float display, as the other filters print it.
+  if (real(value)) return dynamic?"dyn float: "+detail::polars_dyn_float(number(value)):real_text(number(value));
   return quote(value.value);
 }
-// Round CF: a dict is a struct literal; round CG models it on every column
-// (probed per column dtype and field type against Polars 1.44.1, Review
-// CG1). Its fields take the types pl.lit gives the Python values (Null,
-// Boolean, Int64, Int128 past the Int64 range, Float64, String, Date,
-// Datetime('μs') with a fixed offset in UTC); a repeated key keeps its first
-// place and its last value, as the Python dict does. A String column
-// compares with the struct's String cast ("}" when empty, null when a field
-// is None, else the fields in braces as the literal shows them). Integer and
-// float columns cast to a struct of each field's supertype with the column
-// and compare one field (none or several raise "must specify one field in
-// the struct" while collecting; a field without a supertype leaves the
-// column uncast and the comparison raises a SchemaError). A Null column
-// casts to the literal's struct and keeps no row; Boolean and temporal
-// columns raise a SchemaError, Categorical and Enum ones a ComputeError.
-// Round CH: a field may hold a list (the column then never casts: a
-// SchemaError on integer and float columns) or a dict (a nested struct whose
-// fields cast recursively; one such field fails the cast with "Cannot cast
-// from struct to other types" on a column with a present cell). A list of
-// dicts is refused.
-const char* const kStructRefusal="Native Polars timeframe filters take dict (struct) attribute values without lists of dicts only";
+// Round CF: a dict is a struct literal (round CG: on every column, round CH:
+// nested dicts and list fields); the model lives in polars_lit_model.hpp
+// since round CI, where list fields may hold dicts too.
 bool dict_value(const EventAttribute& v){return v.container==AttributeContainerKind::kContainer;}
 namespace lit=detail::polars_lit;
-struct StructField{std::string key;lit::LitType type;lit::Value value;bool nested=false;std::vector<StructField> fields;std::string cast;};
-bool holds_dict(const EventAttribute& v){return std::any_of(v.children.begin(),v.children.end(),[](const EventAttribute& c){return c.container==AttributeContainerKind::kContainer||holds_dict(c);});}
-// The fields as the Python dict holds them (a repeated key keeps its first
-// place and its last value, so an earlier value is never built); a list
-// field as pl.lit builds a list (round CH: a list that fails to build fails
-// the whole dict, see struct_literal_check).
-std::vector<StructField> struct_fields(const EventAttribute& value) {
-  std::vector<const EventAttribute*> last;
-  for(const auto& c:value.children) {
-    const auto at=std::find_if(last.begin(),last.end(),[&](const EventAttribute* f){return f->key==c.key;});
-    if(at!=last.end())*at=&c;else last.push_back(&c);
-  }
-  std::vector<StructField> out;
-  for(const auto* c:last) {
-    StructField field{c->key,{},{},false,{},{}};
-    if(c->container==AttributeContainerKind::kContainer){field.nested=true;field.fields=struct_fields(*c);}
-    else {
-      if(holds_dict(*c))throw std::invalid_argument(kStructRefusal);
-      auto typed=lit::lit_value(lit::value_of(*c));
-      field.type=std::move(typed.type);field.value=std::move(typed.value);
-    }
-    out.push_back(std::move(field));
-  }
-  return out;
-}
+using lit::StructModel;using lit::struct_fields;using lit::struct_model;using lit::struct_cast_column;using lit::struct_cell_match;
+using lit::struct_text;using lit::struct_literal;using lit::struct_display;using lit::struct_dtype;using lit::struct_cast_text;
 // Round CH: pl.lit of a dict with a list field that pl.lit cannot build as a
 // list (mixed types, an int list meeting a float, a list after an int)
 // raises while pm4py builds the comparison, after pl.col(attribute) and
@@ -175,113 +136,6 @@ void struct_literal_check(const EventAttribute& value) {
   } catch(const PolarsSequenceFilterError&) {
     fail("TypeError","apply","cannot create expression literal for value of type dict.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object.");
   }
-}
-bool struct_cast_column(const std::string& dtype){return lit::integer_dtype(dtype)||lit::float_dtype(dtype);}
-// The supertype of an integer or float column and a field type.
-std::optional<std::string> struct_supertype(const std::string& dtype,const lit::LitType& field) {
-  using K=lit::LitType::K;
-  if(field.kind==K::kList)return std::nullopt;
-  if(field.kind==K::kString)return std::string("String");
-  if(dtype=="Float64")return std::string("Float64");
-  if(dtype=="Float32")return std::string(field.kind==K::kNull||field.kind==K::kBoolean||field.kind==K::kDate?"Float32":"Float64");
-  const bool wide=dtype=="Int32"||dtype=="Int64"||dtype=="UInt32"||dtype=="UInt64";
-  switch(field.kind) {
-    case K::kNull: case K::kBoolean: return dtype;
-    case K::kFloat64: return std::string("Float64");
-    case K::kInt128: return std::string("Int128");
-    case K::kInt64: case K::kUInt64: return std::string(dtype=="UInt64"?"Float64":"Int64");
-    case K::kDatetime: if(wide)return std::string("Int64");return std::nullopt;
-    case K::kDate: if(dtype=="Int32")return std::string("Int32");if(wide)return std::string("Int64");return std::nullopt;
-    default: return std::nullopt;
-  }
-}
-// Each leaf's supertype with the column (nested structs recursively); false
-// when a leaf has none (a list never has one).
-bool assign_casts(std::vector<StructField>& fields,const std::string& dtype) {
-  for(auto& f:fields) {
-    if(f.nested){if(!assign_casts(f.fields,dtype))return false;continue;}
-    const auto s=struct_supertype(dtype,f.type);if(!s)return false;f.cast=*s;
-  }
-  return true;
-}
-void clear_casts(std::vector<StructField>& fields){for(auto& f:fields){f.cast.clear();clear_casts(f.fields);}}
-struct StructModel {
-  std::vector<StructField> fields;
-  bool cast_column=false;  // the plan casts the column (integer and float with every supertype, Null)
-};
-StructModel struct_model(const EventAttribute& value,const std::string& dtype) {
-  StructModel m{struct_fields(value),false};
-  if(dtype=="Null"){m.cast_column=true;return m;}
-  if(!struct_cast_column(dtype))return m;
-  if(!assign_casts(m.fields,dtype)){clear_casts(m.fields);return m;}
-  m.cast_column=true;
-  return m;
-}
-bool struct_null(const StructField& f){return !f.nested&&f.value.kind==lit::Kind::kNone;}
-// A field value as a number of its supertype (Booleans 0 and 1, datetimes
-// their microseconds, dates their days).
-lit::Wide field_integer(const StructField& f) {
-  const auto& v=f.value;
-  switch(v.kind) {
-    case lit::Kind::kBool: return lit::Wide(v.boolean?1:0);
-    case lit::Kind::kInt: if(const auto u=lit::wide_int(v))return lit::Wide(*u);return lit::Wide(v.integer);
-    case lit::Kind::kDatetime: return lit::Wide(lit::micros_of(v));
-    case lit::Kind::kDate: return lit::Wide(v.integer);
-    default: throw std::invalid_argument(kStructRefusal);
-  }
-}
-double field_real(const StructField& f){return f.value.kind==lit::Kind::kFloat?f.value.real:lit::wide_double(field_integer(f));}
-std::string fields_display(const std::vector<StructField>& fields);
-std::string field_text(const StructField& f) {
-  if(f.nested)return "{"+fields_display(f.fields)+"}";
-  if(struct_null(f))return "null";
-  if(f.cast.empty()||f.cast=="String")return lit::lit_display(f.type,f.value);
-  if(lit::float_dtype(f.cast))return lit::polars_frame_float(field_real(f));
-  const auto w=field_integer(f);
-  if(f.value.kind==lit::Kind::kInt)return lit::integer_text(f.value);
-  return std::to_string(static_cast<std::int64_t>(w.lo));
-}
-std::string fields_display(const std::vector<StructField>& fields) {
-  std::string out;
-  for(std::size_t i=0;i<fields.size();++i){if(i)out+=',';out+=field_text(fields[i]);}
-  return out;
-}
-std::string struct_display(const StructModel& m){return "{"+fields_display(m.fields)+"}";}
-std::string fields_dtype(const std::vector<StructField>& fields) {
-  std::string out="Struct({";
-  for(std::size_t i=0;i<fields.size();++i){
-    const auto& f=fields[i];if(i)out+=", ";
-    out+="'"+f.key+"': "+(f.nested?fields_dtype(f.fields):f.cast.empty()?lit::debug_name(f.type):f.cast);
-  }
-  return out+"})";
-}
-std::string struct_dtype(const StructModel& m){return fields_dtype(m.fields);}
-// The String cast of the struct (a String column): null when a field is None.
-std::optional<std::string> struct_text(const StructModel& m) {
-  if(m.fields.empty())return std::string("}");
-  for(const auto& f:m.fields)if(struct_null(f))return std::nullopt;
-  return struct_display(m);
-}
-std::string struct_literal(const StructModel& m){const auto t=struct_text(m);return t?quote(*t):"null";}
-// The cast column as the plan prints it.
-std::string struct_cast_text(const std::string& column,const StructModel& m){return "col("+quote(column)+").cast("+struct_dtype(m)+")";}
-// A cell of a cast column equals the one field: numbers by value (NaN equal
-// to NaN, -0.0 to 0.0), a String supertype by the cell's String cast, and a
-// null cell a None field, but only when the column has a valid cell (Polars
-// casts an all-null column to null structs, which match nothing, and any
-// other column to valid structs with a null field; Review CG1).
-bool struct_cell_match(const std::optional<EventAttribute>& cell,const std::string& dtype,const StructModel& m,bool column_valid) {
-  if(m.fields.size()!=1||dtype=="Null"||m.fields[0].nested)return false;
-  const auto& f=m.fields[0];const auto& s=f.cast;
-  const bool absent=lit::null_cell(cell);
-  if(struct_null(f))return absent&&column_valid;
-  if(absent)return false;
-  if(s=="String")return f.value.kind==lit::Kind::kString&&lit::string_cast(*cell,dtype)==f.value.text;
-  if(lit::float_dtype(s)) {
-    const double a=lit::float_dtype(dtype)?lit::real_of(*cell):lit::wide_double(lit::wide_of(*cell)),b=field_real(f);
-    return a==b||(std::isnan(a)&&std::isnan(b));
-  }
-  return lit::wide_of(*cell)==field_integer(f);
 }
 std::string frame_plan(const EventTable& source) {
   std::string out="DF [";

@@ -1208,9 +1208,13 @@ int main(int argc, char** argv) try {
       // filter_traces_contained and apply_numeric too (CH domain seed
       // 2026111495 case 294, a wide-int probe of apply_numeric: both orders
       // over 60 and 20 runs).
-      const std::size_t parameters_at = qualified == "ltl.attr_value_different_persons" ? 1 : 2;
+      // Round CI: eventually_follows too (CH domain seed 4301 case 497: both
+      // orders over 18 runs and three hash seeds).
+      const std::size_t parameters_at =
+          qualified == "ltl.attr_value_different_persons" || qualified == "ltl.eventually_follows" ? 1 : 2;
       if (!matched && args.size() > parameters_at &&
           (qualified == "between.apply" || qualified == "ltl.attr_value_different_persons" ||
+           qualified == "ltl.eventually_follows" ||
            qualified == "timestamp.filter_traces_intersecting" || qualified == "timestamp.filter_traces_contained" ||
            qualified == "cases.filter_case_performance" || qualified == "attributes.apply_numeric")) {
         std::string key = "case:concept:name";

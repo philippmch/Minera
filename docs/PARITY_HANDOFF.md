@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CH (2026-11-05 to 2026-11-14, cloud container)
+## Review-fix loop, rounds T–CI (2026-11-05 to 2026-11-14, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5118,23 +5118,58 @@ suite as `minera_polars_filter_ch_bank_parity_tests` and
 `minera_polars_sequence_filter_ch_bank_parity_tests`. No fixture changed.
 The device check on the Mac was skipped again (no device linked).
 
-Next round (CI) should start by re-reviewing round CH:
+Round CI re-reviewed CH (Review CI1). CH's CI run 43572000391 was green
+on all six jobs (the CH banks on Windows for the first time). Fresh CH
+table seeds 2026111401 and 4301, CH sequence seed 2026111402, CG seed
+2026111403, CF seed 2026111404 and CE seed 2026111405 found 1 call, a
+reference-random case order of `eventually_follows` (the bank test accepts
+it). A new domain (`scripts/polars_filter_ci_domain.py`) passes dicts,
+lists of dicts and lists Polars cannot build to the attribute, LTL, paths
+and timeframe filters, on missing columns too; its first bank found 641
+calls. The shared literal model (`src/backend/polars_lit_model.hpp`) now
+builds struct items of `pl.lit` lists (field types, struct supertypes
+with Polars' field order, strict builds with field context stacks, casts
+in nested lists, display), `is_in` fails on struct items on every column,
+the LTL filters compare dict activities with the timeframe filter's
+struct model (moved into the shared model), `eventually_follows` runs its
+filters first, last, then the middle ones in order, `A_next_B_next_C` on
+an empty frame with a missing attribute column fails the join, and the
+timeframe filter builds lists of dicts instead of refusing them. The
+remaining `real_text` uses were checked (fallbacks the reference never
+shows; dynamic floats now in Rust's display everywhere). All fixed: seed
+2026111412 found 1 more call (a struct field failing its cast inside a
+nested list fails the build), and seed 4402 found 0 on its first capture
+and is in the suite as
+`docs/polars-filter-ci-bank.json.gz`
+(`minera_polars_filter_ci_bank_parity_tests`, 22,843 calls). No fixture
+changed. The device check on the Mac was skipped again (no device
+linked).
 
-- the CI run of the CH commit, Windows especially (`std::to_chars` float
-  digits and the unsigned-int-to-Float32 rounding under MSVC; the CH banks
-  run there for the first time);
-- fresh seeds of `scripts/polars_filter_ch_domain.py` (CH used
-  2026111495, 4295 and 2026111498), of
-  `scripts/polars_sequence_filter_ch_domain.py` (CH used 2026111496 and
-  2026111497), of the CG domain (CH used 2026111490 and 4290), the CF
-  domain (2026111491) and the CE domain (2026111492);
-- the other Polars modules that render floats as text
-  (`src/backend/polars_attributes_filter.cpp`, `polars_case_filter.cpp`,
-  `polars_ltl_filter.cpp`, `polars_timestamp_filter.cpp` still call
-  `real_text` or `float_repr`): check each use against Polars' cast and
-  display (`polars_cast_float`, `polars_plan_float`);
-- `src/backend/polars_timestamp_filter.cpp`: lists of dicts as dict
-  fields (refused), dicts on Duration, Time, Decimal and Int128 columns;
+Next round (CJ) should start by re-reviewing round CI:
+
+- the CI run of the CI commit (the CI bank runs on Windows and macOS for
+  the first time; the struct supertype recursion and context stacks are
+  plain string work, but check MSVC);
+- fresh seeds of `scripts/polars_filter_ci_domain.py` (CI used
+  2026111410, 4402, 2026111412 and 4403), of the CH table domain (CI used
+  2026111401 and 4301), the CH sequence domain (2026111402), the CG
+  domain (2026111403), the CF domain (2026111404) and the CE domain
+  (2026111405);
+- dict values in the filters the CI domain does not reach yet: the
+  sequence filters (`src/backend/polars_sequence_filters.cpp`, dicts as
+  activities and in `activity_split` lists), `between.apply` and the case
+  filters' bounds, `filter_df_relative_occurrence_event_attribute` and
+  the numeric attribute filters (`apply_numeric` with dict or list-of-dict
+  bounds), and dicts as paths items on non-String activity columns;
+- `[[1], [{"a": 1}], 5]`: a list whose first item is a plain list and a
+  later item a list of one-field dicts raises Polars' `cannot build list
+  with different dtypes` (`Expected list[i64], got struct[1].`); the model
+  says `unexpected value while building Series of type List(Int64)`
+  (probe `probe/ci/s10.py` in the round-ci harness);
+- struct items of `pl.lit` lists in a Series that meets a typed column
+  (Date, Datetime, Categorical, Enum, Boolean) through
+  `coerced_is_in`: only `is_in` failures are modelled, check the plans of
+  the other comparisons;
 - still open from CF's list: the remaining `coerced_scalar_is_in` gaps
   (str and Categorical/Enum columns return nullopt), `list_literal` with
   wide ints after a float and in nested lists, `lit_supertype` of Int128
@@ -5143,10 +5178,10 @@ Next round (CI) should start by re-reviewing round CH:
   .then(false).otherwise(null)`; the bank's typed JSON stops at UInt64);
   `plan_text_at` in `src/backend/polars_attributes_filter.cpp` when the
   failing leaf is inside a merged node;
-- still open from CD's list: the comparison model on Duration, Time,
-  Decimal and Int128 columns (no table cell; declare or add a transport
-  kind), `>`/`<` on Categorical and Enum columns with unknown strs, dates
-  and datetimes before 1970 on ns columns,
+- still open from CD's list: the comparison model (and dicts) on
+  Duration, Time, Decimal and Int128 columns (no table cell; declare or
+  add a transport kind), `>`/`<` on Categorical and Enum columns with
+  unknown strs, dates and datetimes before 1970 on ns columns,
   `src/backend/polars_between_filter.cpp` `integer_supertype` for widths
   other than `UInt8`, `UInt64` and `Int16`, the sequence filter helpers,
   the pandas sequence filter items and the items carried over from CB
@@ -5154,10 +5189,15 @@ Next round (CI) should start by re-reviewing round CH:
 - the open choices on CSV timestamp columns of plain numbers and "roles to
   diagnostics groups" (still declared unless Philipp answers).
 
+Round CH's targets, taken in CI (findings CI1-1 to CI1-8): CH's CI run,
+fresh seeds of the CH, CG, CF and CE domains, the float-as-text sites,
+lists of dicts as dict fields. Not taken (carried to CJ): see the CJ list
+above.
+
 Round CG's targets, taken in CH (findings CH1-1 to CH1-7): CG's CI run,
 fresh seeds of the CG, CF and CE domains, Polars' Float to String cast,
 nested dict fields, `literal_list_key` and wide ints on `Float32`. Not
-taken (carried to CI): see the CI list above.
+taken (carried to CI): see the CI list in Review CH1.
 
 Round CF's targets, taken in CG (findings CG1-1 to CG1-6): CF's CI run,
 fresh seeds of the CF and CE domains, timeframe dict values beyond String

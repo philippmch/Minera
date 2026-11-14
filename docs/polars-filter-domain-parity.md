@@ -494,3 +494,54 @@ Polars casts them to, lists and nested dicts.
 
 Declared: lists of dicts as dict fields, dicts on Duration, Time, Decimal
 and Int128 columns (no table cell in the transport).
+
+## Dicts and lists of dicts as values (round CI)
+
+`scripts/polars_filter_ci_domain.py` builds the CH frames and passes
+dicts (odd float, nested dict and list fields), lists and tuples of dicts,
+lists Polars cannot build into one Series (an odd float next to a str, a
+list next to a float, a dict next to a scalar), nested float lists and
+odd floats to `attributes.apply`, `apply_events` and
+`filter_df_on_attribute_values`, the four LTL filters, `paths.apply` and
+`timestamp.filter_traces_attribute_in_timeframe`, on the activity column,
+another column or a missing one.
+`scripts/capture-polars-filter-bank.py --domain polars_filter_ci_domain.py
+--count 500 --bank-seed 4402 --hash-seeds 0,1 --repeats 3` captures
+`docs/polars-filter-ci-bank.json.gz` (22,843 calls), replayed by
+`minera_polars_filter_ci_bank_parity_tests`.
+
+* **Struct items.** A dict inside a list value is a struct item of the
+  `pl.lit` list: field types as `pl.lit` gives them, a repeated key in its
+  first place with its last value.
+* **Struct supertypes.** Same field names in the same order: each field's
+  supertype. Otherwise the union in the longer struct's order (the first
+  one's on a tie), the shorter one's new fields after, a common field the
+  supertype of the shorter one's type with the longer one's. An int or
+  float goes into every field; a str makes String; a bool, date, datetime
+  or list fails (`failed to determine supertype of bool and struct[1]`).
+* **Strict struct builds.** A value that is neither a struct nor None
+  fails first (`unexpected value while building Series of type
+  Struct(...); found value of type Float64: 1.0000e17`); a struct without
+  fields takes anything as `{}`; field errors name the field in the
+  context stack (`[1] while constructing Series 'b'`, innermost first,
+  above `Series ''`).
+* **Nested list casts.** A struct casts to a struct by field name, a
+  number to a struct of one plain field, a struct to String as its
+  display (`{1,"y"}`); other casts fail.
+* **`is_in`.** A list holding a struct fails on every column dtype:
+  `'is_in' cannot check for X values in List(Struct(...)) data`.
+* **LTL dicts.** A dict activity compares as the timeframe filter's dict
+  (String cast, one-field casts, SchemaErrors, `cannot compare categorical
+  with struct[1]`); an unbuildable list field raises pm4py's TypeError
+  while the filter is built.
+* **LTL order.** `eventually_follows` runs the first activity's filter,
+  then the last one's, then the others in order. `A_next_B_next_C` on an
+  empty frame with a missing attribute column fails the join instead of
+  the column lookup.
+* **Lists of dicts in the timeframe filter.** As the value or as a dict
+  field, built as `List(Struct(...))` (never casting the column).
+* **Row orders.** `eventually_follows` keeps its cases in either order
+  (accepted by case blocks).
+
+Declared: dicts on Duration, Time, Decimal and Int128 columns (no table
+cell in the transport).

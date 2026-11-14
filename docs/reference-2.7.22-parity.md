@@ -26530,3 +26530,136 @@ Verification (scripts in the project files under `review-harness/round-ch/`):
 | Wide ints on Float32 (probe domain, seed 77) | 6,021 calls on 150 frames | 90 found; after: 0 (1 reference-random order accepted) |
 | Float to String cast (`fs.py`) and dynamic literals (`lc.py`) | 805,046 Float64 and Float32 values, 9,024 literals against Polars 1.44.1 | 0 differences |
 | The base, CC, CE, CF and CG table banks and the base, typed, CB and CC sequence banks | the banks in the suite | 0 mismatches |
+
+## Review CI1: re-review of round CH, and dict and list-of-dict values in the Polars table filters (2026-11-14)
+
+Round CI checked CH's CI run (43572000391: green on all six jobs, the CH
+banks on Windows for the first time), replayed fresh seeds of the CH, CG,
+CF and CE domains, checked the remaining float-as-text sites of the
+Polars table filters, and added a domain that passes dicts, lists of
+dicts and lists Polars cannot build to the attribute, LTL, paths and
+timeframe filters. Findings, all fixed:
+
+- **CI1-1 Fresh CH, CG, CF and CE seeds.** CH table seeds 2026111401 and
+  4301 (31,999 and 32,003 calls on 800 frames), CH sequence seed
+  2026111402 (11,796 calls on 900 frames), CG seed 2026111403 (6,344
+  calls on 1,000 frames), CF seed 2026111404 (26,506 calls on 700 frames)
+  and CE seed 2026111405 (17,421 calls on 600 frames) differed in 0 calls
+  but one: `eventually_follows` keeps its cases in either order (CH 4301
+  case 497, both orders over 18 runs and three hash seeds; the bank test
+  now accepts any case order for it, as for `attr_value_different_persons`).
+- **CI1-2 Struct literals in `pl.lit` lists.** A dict inside a list value
+  (`[{"a": 0.1}, {"b": 1e16}]`) is a struct item of the list literal; the
+  shared literal model (`src/backend/polars_lit_model.hpp`) now builds it
+  as Polars 1.44.1 does (probed with about 500 lists):
+  - the fields take the types `pl.lit` gives the Python values, a repeated
+    key its first place and its last value;
+  - two structs with the same field names in the same order take each
+    field's supertype; other structs take the union of their fields in the
+    longer one's order (the first one's on a tie), then the shorter one's
+    new fields, a common field the supertype of the shorter one's type with
+    the longer one's (so in `[{"r": {"a": 1.0}, "x": 1.0}, {"r": {"b":
+    1.0}, "y": 1.0}]` the field `r` is `Struct({'b', 'a'})`); a struct and
+    an int or float take the number into every field (failing if a field
+    cannot take it, a list field always); a str turns a struct into String;
+    a bool, date, datetime or list fails (`failed to determine supertype
+    of bool and struct[1]`, `of struct[2] and struct[1]` for a failing
+    field);
+  - a strict struct build first fails on any value that is neither a struct
+    nor None (`unexpected value while building Series of type
+    Struct({'b': Float64}); found value of type Float64: 1.0000e17`); a
+    struct without fields takes any value as `{}`; then each field builds
+    strictly in field order, its errors naming the field in the context
+    stack above `Series ''` (`[1] while constructing Series 'b'`, the
+    innermost field first);
+  - inside a nested list a struct casts to a struct by field name and a
+    number to a struct of one plain field; other casts fail (`unexpected
+    value while building Series of type List(Struct(...))`), and so does a
+    struct with one field that fails to cast (an int field meeting a
+    struct of two fields); a struct cast to String is its display
+    (`{1,"y"}`);
+  - the display prints fields in braces with the frame's float display
+    (`{1.0000e16,0.0000001}`) and truncates long lists (`[{1}, {2}, …
+    {4}]`).
+- **CI1-3 `is_in` with struct items.** A list holding a dict fails `is_in`
+  on every column dtype, Null included, without a cast in the plan:
+  `'is_in' cannot check for Float64 values in List(Struct({'a':
+  Float64})) data`. A dict value's keys are the operand (as before), a
+  repeated key once in its first place.
+- **CI1-4 Dicts in the LTL filters.** `eventually_follows`,
+  `A_next_B_next_C`, `four_eyes_principle` and
+  `attr_value_different_persons` compare a dict activity as the timeframe
+  filter compares a dict (round CG's model, moved into the shared literal
+  model): the String cast on String columns, the one-field cast on integer
+  and float columns (`must specify one field in the struct` and `Cannot
+  cast from struct to other types` only on a column with a present cell),
+  SchemaErrors on the other columns and `cannot compare categorical with
+  struct[1]` on Categorical and Enum columns, each with pm4py's
+  expression and larger expression. A dict whose list field `pl.lit`
+  cannot build raises pm4py's `cannot create expression literal for value
+  of type dict` while the filter is built.
+- **CI1-5 LTL filter order and missing columns.** `eventually_follows`
+  runs its first activity's filter, then the last one's, then the others
+  in order (probed with 3 to 5 activities; round CE's fit of "the others
+  from the last one back" only held for three). `A_next_B_next_C` with a
+  missing attribute column on an empty frame never reads the column: its
+  empty selection fails the join (`datatypes of join keys don't match`).
+- **CI1-6 Lists of dicts in the timeframe filter.** A list of dicts, as
+  the value or as a dict field, is now built as a `List(Struct(...))`
+  literal instead of refused: a list field never casts the column (a
+  SchemaError on integer and float columns, the String cast on String
+  columns), and a list that cannot be built raises pm4py's TypeError while
+  the comparison is built.
+- **CI1-7 Floats as text.** The CI domain passes floats whose Rust
+  display, Python `repr`, `std::to_chars` and Polars' plan display differ
+  (`1e16`, `1e-7`, `1e-5`, `1e22`, `5e-324`, `0.30000000000000004`,
+  `9007199254740993.0`, `-0.0`) as scalars, list items and dict fields to
+  every value of these filters; they print as Polars prints them. The
+  `real_text` calls left in the attribute, case, LTL and timestamp filters
+  are fallbacks for literals the reference never shows; the LTL and
+  timestamp ones now print a dynamic float in Rust's display as the
+  others do.
+- **CI1-8 New table domain.** `scripts/polars_filter_ci_domain.py` (on top
+  of the CH domain) adds dicts with odd float, nested dict and list
+  fields, lists and tuples of dicts, lists Polars cannot build (an odd
+  float next to a str, a list next to a float, a dict next to a scalar),
+  nested float lists and odd floats to the attribute filters
+  (`apply`, `apply_events`, `filter_df_on_attribute_values`), the four LTL
+  filters, `paths.apply` and the timeframe filter, on the activity
+  column, another column or a missing one. Its first bank (seed
+  2026111410, 300 frames, 13,712 calls) differed in 641 calls (281
+  timeframe, 202 attribute, 158 LTL): lists of dicts refused or built
+  with the wrong type, error or field order, struct `is_in` failures,
+  dict LTL activities, the `eventually_follows` order and the empty-frame
+  join. After CI1-2 to CI1-6: 0. Seed 4402 (500 frames, 22,843 calls)
+  differed in 0 calls on its first capture; seed 2026111412 (400 frames,
+  18,384 calls) in 1 (case 354: a list field whose struct items meet an
+  int field and a struct field of two fields under one name; the model
+  nulled the failing field instead of failing the build), fixed; seed
+  4403 (400 frames, 18,301 calls) in 0.
+
+Not taken (carried to CJ): a list whose first item is a plain list and a
+later item a list of one-field dicts (`[[1], [{"a": 1}], 5]` raises
+`cannot build list with different dtypes` in Polars; the model says
+`unexpected value while building Series of type List(Int64)`; probed,
+not generated by the domain), dicts and the comparison model on Duration,
+Time, Decimal and Int128 columns (no table cell in the transport;
+declared), the remaining `coerced_scalar_is_in` gaps (str and
+Categorical/Enum columns), `list_literal` with wide ints after a float
+and in nested lists, `lit_supertype` of Int128 with temporal types, ints
+past the UInt64 range as paths bounds, `plan_text_at` when the failing
+leaf is inside a merged node, and the items carried from CD.
+
+Tests: `docs/polars-filter-ci-bank.json.gz` (seed 4402, 22,843 calls)
+replayed by `minera_polars_filter_ci_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-ci/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Dict and list-of-dict values (CI bank, seed 4402) | 22,843 calls on 500 frames, hash seeds 0-1, 3 runs each | 0 mismatches on the first capture |
+| The same domain on seeds 2026111410, 2026111412 and 4403 | 13,712, 18,384 and 18,301 calls on 300, 400 and 400 frames | 641, 1 and 0 found; after: 0 |
+| CH table seeds 2026111401 and 4301, CH sequence seed 2026111402 | 31,999, 32,003 and 11,796 calls | 0, 1 (reference-random, accepted) and 0 |
+| CG, CF and CE seeds 2026111403, 2026111404, 2026111405 | 6,344, 26,506 and 17,421 calls | 0 mismatches |
+| Struct supertypes, builds and casts in `pl.lit` (`s1.py` to `s10.py`) | about 500 lists against Polars 1.44.1 | modelled |
+| The base, CC, CE, CF, CG and CH table banks and the base, typed, CB, CC and CH sequence banks | the banks in the suite | 0 mismatches |

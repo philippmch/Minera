@@ -3100,6 +3100,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_ch_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-ch-bank.json.gz")
   set_tests_properties(minera_polars_filter_ch_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CI: dicts, lists of dicts and lists Polars cannot build as values
+  # of the attribute, LTL, paths and timeframe filters, on missing columns
+  # too (struct literals in pl.lit lists).
+  add_test(NAME minera_polars_filter_ci_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-ci-bank.json.gz")
+  set_tests_properties(minera_polars_filter_ci_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

@@ -241,7 +241,8 @@ std::string literal(const EventAttribute& value) {
   if (text(value)) return debug_quote(value.value);
   if (boolean(value)) return truth(value) ? "true" : "false";
   if (integer(value)) return "dyn int: " + exact(value).decimal();
-  if (real(value)) return "dyn float: " + real_text(number(value));
+  // Round CI: Rust's float display, as the other filters print it.
+  if (real(value)) return "dyn float: " + detail::polars_dyn_float(number(value));
   if (date(value)) {
     auto out = std::get_if<NativeDate>(&value.typed_value) ? std::get<NativeDate>(value.typed_value).value : value.value;
     std::replace(out.begin(), out.end(), 'T', ' ');
@@ -283,6 +284,14 @@ std::string render(std::string_view pattern, const EventTable& source, const Pre
     const auto& key = o.attribute_key.value;
     if (i >= p.values.size()) return "col(" + quote(key) + ") == null";
     const auto v = lit::value_of(p.values[i]);
+    // Round CI: a dict as the struct comparison prints it.
+    if (v.kind == lit::Kind::kDict && attribute) {
+      const auto& declared = source.dtypes[*attribute];
+      const auto m = lit::struct_model(p.values[i], declared);
+      if (declared == "String") return "col(" + quote(key) + ") == " + lit::struct_literal(m);
+      if (m.cast_column) return lit::struct_cast_text(key, m) + " == " + lit::struct_display(m);
+      return "col(" + quote(key) + ") == " + lit::struct_display(m);
+    }
     if (!lit::scalar_literal(v)) {
       // Round CE: a list as pl.lit built it; a Null column casts to its type.
       std::string lhs = "col(" + quote(key) + ")", shown = literal(p.values[i]);
@@ -384,9 +393,19 @@ Prepared prepare(const PolarsLtlFilterCall& call) {
     fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
   // A list activity becomes a Series literal when its filter is built.
   if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1))
-    for (const auto& query : out.values)
+    for (const auto& query : out.values) {
       if (query.container == AttributeContainerKind::kList || query.container == AttributeContainerKind::kTuple)
         if (const auto error = detail::polars_lit::argument_literal_error(query)) fail("TypeError", "apply", *error);
+      // Round CI: a dict becomes a struct literal then too (a list field
+      // that cannot be built fails it, as in the timeframe filter).
+      if (query.container == AttributeContainerKind::kContainer) {
+        try {
+          (void)detail::polars_lit::struct_fields(query);
+        } catch (const PolarsSequenceFilterError&) {
+          fail("TypeError", "apply", "cannot create expression literal for value of type dict.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object.");
+        }
+      }
+    }
   return out;
 }
 
@@ -452,7 +471,12 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   if (p.operation == Op::kFourEyes && p.values.size() < 2) return;
   const auto required = [&](const EventAttribute& role, bool sorting, bool attribute) {
     if (!text(role) || column(source, role)) return;
-    if (p.operation == Op::kNext && attribute && !eager) fail("ColumnNotFoundError", "apply", debug_quote(role.value) + " not found");
+    if (p.operation == Op::kNext && attribute && !eager) {
+      // Round CI: an empty frame never reads the attribute column; its empty
+      // selection fails the join instead (select_cases).
+      if (source.rows.empty()) return;
+      fail("ColumnNotFoundError", "apply", debug_quote(role.value) + " not found");
+    }
     const bool index = p.operation == Op::kEventuallyFollows && attribute;
     fail("ColumnNotFoundError", phase, missing_message(source, role.value, index) + missing_tail(source, p, eager, sorting, attribute));
   };
@@ -544,12 +568,22 @@ void validate_queries(const EventTable& source, const Prepared& p, bool eager, b
     if (check.stage == lit::ScalarCheck::Stage::kResolve) resolve_fail(at, check.message, "col("+quote(key)+") == "+lit::scalar_display(value));
   }
   if (resolution_only) return;
-  // eventually_follows runs its first activity's filter, then the others
-  // from the last one back.
+  // eventually_follows runs its first activity's filter, then the last
+  // one's, then the others in order (round CI: probed with 3 to 5
+  // activities; round CE fitted three).
   const bool backward = p.operation == Op::kEventuallyFollows;
   for (std::size_t step = 0; step < p.values.size(); ++step) {
-    const auto at = backward && step ? p.values.size() - step : step;
+    const auto at = backward && step ? (step == 1 ? p.values.size() - 1 : step - 1) : step;
     const auto value = lit::value_of(p.values[at]);
+    // Round CI: a dict compares as a struct (the timeframe filter's model).
+    if (value.kind == lit::Kind::kDict) {
+      const auto m = lit::struct_model(p.values[at], declared);
+      const bool present = std::any_of(source.rows.begin(), source.rows.end(), [&](const auto& row) { return !lit::null_cell(row[ai]); });
+      if (const auto f = lit::struct_failure(key, declared, m, present))
+        fail(f->type, phase, f->message + "\n\nThis error occurred in the following expression:\n\t" + f->expression +
+                                 (f->larger.empty() ? std::string() : "\nwhile evaluating this larger expression:\n\t" + f->larger) + "\n");
+      continue;
+    }
     if (!lit::scalar_literal(value)) {
       // A list compares with any column but a String (cast above) or Null
       // one as a List literal (round CE: temporal, Boolean, Categorical and
@@ -608,7 +642,10 @@ Selection select_cases(const EventTable& source,const Prepared& p) {
   const auto categories = ai ? category_list(source,*ai) : std::vector<std::string>{};
   std::vector<lit::Value> typed;for(const auto& v:p.values)typed.push_back(lit::value_of(v));
   const auto typed_original = lit::value_of(p.original);
+  // Round CI: a dict matches as the struct model compares it.
+  const bool column_valid = ai && std::any_of(source.rows.begin(),source.rows.end(),[&](const auto& row){return !lit::null_cell(row[*ai]);});
   const auto hit=[&](const Cell& cell,const EventAttribute& value,const lit::Value& v){
+    if(v.kind==lit::Kind::kDict)return lit::struct_matches(cell,source.dtypes[*ai],lit::struct_model(value,source.dtypes[*ai]),column_valid);
     if(!lit::scalar_literal(v))return matches(cell,value);
     return lit::compare_scalar(cell,source.dtypes[*ai],v,lit::CompareOp::kEq,&categories)==1;
   };
