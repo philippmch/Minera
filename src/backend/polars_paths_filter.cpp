@@ -179,7 +179,9 @@ std::string string_cast(const EventAttribute& value, const std::string& declared
   if (text(value)) return value.value;
   if (boolean(value)) return static_cast<bool>(exact(value)) ? "true" : "false";
   if (integer(value)) return exact(value).decimal();
-  if (real(value)) return real_text(number(value), true);
+  // Round CH: Polars' Float to String cast (1e-5 as "0.00001", a Float32
+  // column by its float digits).
+  if (real(value)) return detail::polars_cast_float(number(value), declared == "Float32");
   if (date(value)) {
     auto output = std::get_if<NativeDate>(&value.typed_value) ? std::get<NativeDate>(value.typed_value).value : value.value;
     // A Datetime column casts with its unit's fraction digits (round BX).

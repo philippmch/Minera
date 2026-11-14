@@ -933,7 +933,11 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
         const auto v = lit_value(item);
         suffixes.emplace_back(cast_lit(v.value, v.type, lit_type(LitType::K::kString))->text);
       } else {
-        suffixes.emplace_back(item.kind == Kind::kString ? item.text : literal_item(item));
+        // Round CH: a float casts as Polars casts a Float64 to String
+        // (1e-5 as "0.00001", the form a Float activity's variant holds).
+        suffixes.emplace_back(item.kind == Kind::kString  ? item.text
+                              : item.kind == Kind::kFloat ? detail::polars_cast_float(item.real)
+                                                          : literal_item(item));
       }
     }
   }
@@ -1171,6 +1175,22 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
                  ").cum_count().over([col(" + quote(case_glue) + ")]).alias(\"_row_within_case\")] \n    " +
                  frame_plan(df.columns),
              enum_stack);
+  // Round CH: a scalar int or float is a dynamic literal that takes a
+  // Float32 column's dtype (0.1 matches 0.1f, 16777217 matches 16777216f);
+  // a list is a Float64 Series, compared with the column widened.
+  const auto split_match = [&](const Cell& a) {
+    const auto dtype = dtype_of(df, act);
+    if (scalar && dtype == "Float32" && !literal.values.empty() && !null_cell(a)) {
+      const auto& v = literal.values.front();
+      if (v.kind == Kind::kFloat || v.kind == Kind::kInt) {
+        const double x = python_value(a, dtype).real;
+        const double y = v.kind == Kind::kInt ? detail::polars_lit::float32_of_int(v)
+                                              : static_cast<double>(static_cast<float>(v.real));
+        return x == y || (std::isnan(x) && std::isnan(y));
+      }
+    }
+    return literal_has(literal, a, dtype);
+  };
   // Per case: the running count ("this"), null on a null activity.
   std::map<Key, std::int64_t> running;
   std::map<Key, std::optional<std::int64_t>> previous;  // the previous row's running count
@@ -1189,7 +1209,7 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
     const auto& a = df.rows[i][act];
     std::optional<std::int64_t> current;
     if (!null_cell(a)) {
-      running[key] += literal_has(literal, a, dtype_of(df, act)) ? 1 : 0;
+      running[key] += split_match(a) ? 1 : 0;
       current = running[key];
     }
     std::optional<std::int64_t> counter;

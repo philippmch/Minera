@@ -606,7 +606,11 @@ int main(int argc, char** argv) try {
         candidates.push_back(call_with(permuted));
       }
       auto actual = candidates.front();
-      const bool unordered = node.get("unordered") && node.at("unordered").boolean;
+      // Round CH: the grouped consecutive filter's rows come from a group_by
+      // without maintain_order, in another order on every run even when the
+      // captured runs agreed (CH sequence domain seed 2026111496 case 461).
+      const bool unordered = (node.get("unordered") && node.at("unordered").boolean) ||
+                             qualified == "consecutive_act_case_grouping.apply";
       // End-activity counts come from a Polars group_by without
       // maintain_order: their dict order is unspecified even when every
       // captured run agreed.

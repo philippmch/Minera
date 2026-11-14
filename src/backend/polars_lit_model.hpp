@@ -59,6 +59,21 @@ inline std::optional<std::uint64_t> wide_int(const Value& v) {
   if (v.kind != Kind::kInt || v.text.empty()) return std::nullopt;
   return static_cast<std::uint64_t>(v.integer);
 }
+// An int cast to Float32 straight from its integer, as Polars casts it
+// (round CH: 2**63 + 2**39 + 1 rounds up to 2**63 + 2**40; through a double
+// it would tie down to 2**63).
+// An unsigned 64-bit int to Float32, correctly rounded on every compiler:
+// past the Int64 range it halves with the dropped bit kept as a sticky bit
+// (int64 to float rounds in hardware).
+inline double float32_of_u64(std::uint64_t u) {
+  if (u <= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+    return static_cast<double>(static_cast<float>(static_cast<std::int64_t>(u)));
+  return static_cast<double>(static_cast<float>(static_cast<std::int64_t>((u >> 1) | (u & 1))) * 2.0f);
+}
+inline double float32_of_int(const Value& v) {
+  if (const auto u = wide_int(v)) return float32_of_u64(*u);
+  return static_cast<double>(static_cast<float>(v.integer));
+}
 inline std::optional<std::uint64_t> wide_cell(const EventAttribute& cell) {
   constexpr auto top = static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
   if (const auto* u = std::get_if<std::uint64_t>(&cell.typed_value)) return *u > top ? std::optional<std::uint64_t>(*u) : std::nullopt;
@@ -93,13 +108,11 @@ inline bool integer_dtype(const std::string& dtype) {
 }
 inline bool enum_dtype(const std::string& dtype) { return dtype.rfind("Enum", 0) == 0; }
 
-inline void enum_is_in(const std::vector<std::string>& category_list, const std::vector<Value>& values,
-                       const std::string& suffix) {
-  const std::set<std::string> categories(category_list.begin(), category_list.end());
-  std::vector<std::string> failed;
-  for (const auto& v : values)
-    if (v.kind == Kind::kString && !categories.count(v.text)) failed.push_back(v.text);
-  if (failed.empty()) return;
+// A strict cast of strs to an Enum that meets strs outside its categories
+// (the first ten failures shown as Polars prints a short Series; the total
+// counts nulls too).
+inline std::string enum_conversion_message(const std::string& column, const std::vector<std::string>& failed,
+                                           std::size_t total) {
   const auto shown = std::min<std::size_t>(failed.size(), 10);
   std::string list = "[";
   if (shown <= 3) {
@@ -107,12 +120,18 @@ inline void enum_is_in(const std::vector<std::string>& category_list, const std:
   } else {
     list += quote(failed[0]) + ", " + quote(failed[1]) + ", \xe2\x80\xa6 " + quote(failed[shown - 1]);
   }
-  fail("InvalidOperationError", "conversion from `str` to `enum` failed in column '' for " +
-                                    std::to_string(failed.size()) + " out of " + std::to_string(values.size()) +
-                                    " values: " + list +
-                                    "]\n\nEnsure that all values in the input column are present in the categories "
-                                    "of the enum datatype." +
-                                    suffix);
+  return "conversion from `str` to `enum` failed in column '" + column + "' for " + std::to_string(failed.size()) +
+         " out of " + std::to_string(total) + " values: " + list +
+         "]\n\nEnsure that all values in the input column are present in the categories of the enum datatype.";
+}
+inline void enum_is_in(const std::vector<std::string>& category_list, const std::vector<Value>& values,
+                       const std::string& suffix) {
+  const std::set<std::string> categories(category_list.begin(), category_list.end());
+  std::vector<std::string> failed;
+  for (const auto& v : values)
+    if (v.kind == Kind::kString && !categories.count(v.text)) failed.push_back(v.text);
+  if (failed.empty()) return;
+  fail("InvalidOperationError", enum_conversion_message("", failed, values.size()) + suffix);
 }
 
 
@@ -189,15 +208,13 @@ inline bool same_key(const Value& a, const Value& b) {
   }
 }
 
-// cast(pl.String) of a cell: integers in decimal, floats as Python prints
-// them (NaN as "NaN"), Booleans lower case, a Date as YYYY-MM-DD and a
+// cast(pl.String) of a cell: integers in decimal, floats as Polars casts
+// them (polars_cast_float, round CH: 1e-5 as "0.00001", a Float32 cell by
+// its float digits), Booleans lower case, a Date as YYYY-MM-DD and a
 // Datetime as "YYYY-MM-DD HH:MM:SS" with its unit's digits, an aware one in
 // its zone with the offset.
 inline std::string string_cast(const EventAttribute& cell, const std::string& dtype) {
-  if (float_dtype(dtype)) {
-    const double v = real_of(cell);
-    return std::isnan(v) ? "NaN" : python::float_repr(v);
-  }
+  if (float_dtype(dtype)) return polars_cast_float(real_of(cell), dtype == "Float32");
   if (dtype == "Boolean") return true_of(cell) ? "true" : "false";
   if (!datetime_dtype(dtype) && dtype != "Date") return cell.value;
   const auto t = timestamp_of(cell);
@@ -932,7 +949,8 @@ inline std::optional<Value> cast_to(const Value& v, const std::string& dtype, co
   }
   if (float_dtype(dtype)) {
     if (v.kind == Kind::kFloat) return in_float(v.real);
-    if (v.kind == Kind::kInt) return in_float(static_cast<double>(v.integer));
+    if (v.kind == Kind::kInt)
+      return dtype == "Float32" ? Value::of(float32_of_int(v)) : in_float(static_cast<double>(v.integer));
     if (v.kind == Kind::kBool) return Value::of(v.boolean ? 1.0 : 0.0);
     return std::nullopt;
   }
@@ -1144,8 +1162,12 @@ inline std::optional<std::string> argument_literal_error(const EventAttribute& a
 inline std::string literal_list_display(const Literal& l) { return lit_display(list_of(l.type), Value::list(l.values)); }
 // Every item of a list literal with its type, untruncated: two list
 // literals with the same key are equal (round CF: the interval merge).
+// Round CH: floats by value, as Polars compares the lists (-0.0 equal to
+// 0.0, NaN to NaN; [1e-5] and [1.00000001e-5] differ though both display
+// as 0.00001).
 inline std::string literal_list_key(const LitType& type, const Value& v) {
   if (v.kind == Kind::kNone) return "null";
+  if (v.kind == Kind::kFloat) return std::isnan(v.real) ? "NaN" : python::float_repr(v.real == 0 ? 0.0 : v.real);
   if (type.kind != LitType::K::kList) return lit_display(type, v);
   std::string out = "[";
   for (std::size_t i = 0; i < v.items.size(); ++i) out += (i ? ", " : "") + literal_list_key(type.inner[0], v.items[i]);
@@ -1375,7 +1397,7 @@ inline int compare_scalar(const Cell& cell, const std::string& dtype, const Valu
   if (const auto u = wide_int(v)) {
     const double d = static_cast<double>(*u);
     if (dtype == "UInt64") return apply_order(order_of(wide_of(a), Wide(*u)), op);
-    if (dtype == "Float32") return apply_order(total_order(static_cast<double>(static_cast<float>(real_of(a))), static_cast<double>(static_cast<float>(d))), op);
+    if (dtype == "Float32") return apply_order(total_order(static_cast<double>(static_cast<float>(real_of(a))), float32_of_int(v)), op);
     if (dtype == "Float64") return apply_order(total_order(real_of(a), d), op);
     if (integer_dtype(dtype) && dtype.rfind("UInt", 0) != 0) return apply_order(total_order(static_cast<double>(integer_of(a)), d), op);
     if (dtype == "Boolean" || integer_dtype(dtype)) return apply_order(-1, op);
@@ -1418,7 +1440,7 @@ inline int compare_scalar(const Cell& cell, const std::string& dtype, const Valu
     const auto narrow = [&](double y) { return f32 ? static_cast<double>(static_cast<float>(y)) : y; };
     switch (v.kind) {
       case Kind::kFloat: return apply_order(total_order(narrow(x), narrow(v.real)), op);
-      case Kind::kInt: return apply_order(total_order(narrow(x), narrow(static_cast<double>(v.integer))), op);
+      case Kind::kInt: return apply_order(total_order(narrow(x), f32 ? float32_of_int(v) : static_cast<double>(v.integer)), op);
       case Kind::kBool: return apply_order(total_order(x, v.boolean ? 1.0 : 0.0), op);
       case Kind::kDate: return apply_order(total_order(x, static_cast<double>(v.integer)), op);
       default: return apply_order(total_order(x, static_cast<double>(literal_micros(v))), op);
@@ -1477,7 +1499,7 @@ inline Operands coerced_operands(const std::string& column, const std::string& d
     const double d = static_cast<double>(*u);
     if (dtype == "UInt64") return plain(v.text);
     if (dtype == "Boolean") return cast("UInt64", v.text);
-    if (dtype == "Float32") return plain(polars_frame_float(static_cast<double>(static_cast<float>(d))));
+    if (dtype == "Float32") return plain(polars_frame_float(float32_of_int(v)));
     if (dtype == "Float64") return plain(polars_frame_float(d));
     if (dtype.rfind("UInt", 0) == 0)
       return folded("when(" + c + ".is_not_null()).then(" + (apply_order(-1, op) ? "true" : "false") + ").otherwise(null)");
@@ -1529,7 +1551,7 @@ inline Operands coerced_operands(const std::string& column, const std::string& d
     const auto narrow = [&](double y) { return f32 ? static_cast<double>(static_cast<float>(y)) : y; };
     switch (v.kind) {
       case Kind::kBool: return plain(polars_frame_float(v.boolean ? 1.0 : 0.0));
-      case Kind::kInt: return plain(polars_frame_float(narrow(static_cast<double>(v.integer))));
+      case Kind::kInt: return plain(polars_frame_float(f32 ? float32_of_int(v) : static_cast<double>(v.integer)));
       case Kind::kFloat: return plain(polars_frame_float(narrow(v.real)));
       case Kind::kDate: return plain(polars_frame_float(static_cast<double>(v.integer)));
       case Kind::kDatetime: {

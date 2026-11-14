@@ -41,6 +41,39 @@ inline std::string polars_dyn_float(double x) {
   return (negative ? "-" : "") + out;
 }
 
+// Polars' cast of a float to String (round CH, black-box: fitted on 805,046
+// Float64 and Float32 values against Polars 1.44.1 without a difference).
+// The shortest digits that read back (as a float for a Float32 column) in
+// fixed notation while the leading digit's decimal exponent is below 16
+// (Float32: 13) and at least -5 (Float32: -6); integral values end in ".0";
+// other values as d.ddde+X or d.ddde-X without padding (1e-5 casts to
+// "0.00001", 1e-7 to "1e-7", 1e16 to "1e+16"; Python's repr differs).
+inline std::string polars_cast_float(double x, bool float32 = false) {
+  if (std::isnan(x)) return "NaN";
+  if (std::isinf(x)) return x < 0 ? "-inf" : "inf";
+  const std::string sign = std::signbit(x) ? "-" : "";
+  if (x == 0) return sign + "0.0";
+  char buffer[64];
+  const auto converted = float32
+      ? std::to_chars(buffer, buffer + sizeof(buffer), std::fabs(static_cast<float>(x)), std::chars_format::scientific)
+      : std::to_chars(buffer, buffer + sizeof(buffer), std::fabs(x), std::chars_format::scientific);
+  if (converted.ec != std::errc{}) throw std::invalid_argument("Unsupported native Polars numeric text");
+  const std::string text(buffer, converted.ptr);
+  const auto e = text.find('e');
+  std::string digits;
+  for (const char c : text.substr(0, e))
+    if (c != '.') digits += c;
+  const int length = static_cast<int>(digits.size());
+  const int point = std::stoi(text.substr(e + 1)) + 1;  // digits before the decimal point
+  const int high = float32 ? 13 : 16, low = float32 ? -6 : -5;
+  std::string out;
+  if (point >= length && point <= high) out = digits + std::string(static_cast<std::size_t>(point - length), '0') + ".0";
+  else if (point > 0 && point <= high) out = digits.substr(0, static_cast<std::size_t>(point)) + "." + digits.substr(static_cast<std::size_t>(point));
+  else if (point > low && point <= 0) out = "0." + std::string(static_cast<std::size_t>(-point), '0') + digits;
+  else out = digits.substr(0, 1) + (length > 1 ? "." + digits.substr(1) : "") + "e" + (point > 0 ? "+" : "") + std::to_string(point - 1);
+  return sign + out;
+}
+
 // Polars' fmt_float, used for Float64 literals in plans and for frame
 // cells: integral values under 999999 with one decimal; a Rust display
 // longer than nine characters in scientific notation with four decimals

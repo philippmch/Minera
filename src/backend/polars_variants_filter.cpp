@@ -1,5 +1,6 @@
 #include "minera/polars_variants_filter.hpp"
 #include "polars_datetime.hpp"
+#include "polars_float_text.hpp"
 #include "polars_sort.hpp"
 #include "polars_column_hint.hpp"
 #include "pandas_parameter_carrier.hpp"
@@ -178,7 +179,9 @@ std::string string_cast(const EventAttribute& value, const std::string& declared
   if (text(value)) return value.value;
   if (boolean(value)) return static_cast<bool>(exact(value)) ? "true" : "false";
   if (integer(value)) return exact(value).decimal();
-  if (real(value)) return real_text(number(value), true);
+  // Round CH: Polars' Float to String cast (1e-5 as "0.00001", a Float32
+  // column by its float digits).
+  if (real(value)) return detail::polars_cast_float(number(value), declared == "Float32");
   if (date(value)) {
     const auto lexical=std::get_if<NativeDate>(&value.typed_value)?std::get<NativeDate>(value.typed_value).value:value.value;
     if(declared=="Date")return lexical.substr(0,10);
@@ -342,6 +345,9 @@ std::vector<std::string> top_labels(const EventTable& source,const EventAttribut
   std::vector<Variant> variants;std::unordered_map<std::string,std::size_t> positions;
   for(const auto& group:groups.groups){
     std::string key;for(const auto& cell:group.activities){const auto item=group_key(cell,groups.activity_dtype);key+=std::to_string(item.size())+':'+item;}
+    // Round CH: each NaN reaches Python as its own float object, so a variant
+    // tuple holding one equals no other (two NaN cases are two variants).
+    if(std::any_of(group.activities.begin(),group.activities.end(),[](const Cell& c){return c&&!null(*c)&&real(*c)&&std::isnan(number(*c));}))key+="#nan"+std::to_string(variants.size());
     const auto [found,inserted]=positions.emplace(std::move(key),variants.size());if(inserted)variants.push_back({group.activities,1});else ++variants[found->second].count;
   }
   sort_variants(variants);

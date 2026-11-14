@@ -289,7 +289,39 @@ struct Predicate {
   std::optional<detail::polars_lit::Literal> literal;
   std::vector<Expr> chain,merged;
   bool empty=false;
+  // Round CH: a str value naming a column (is_in(col(value).implode())).
+  std::optional<std::size_t> other;
+  std::string other_dtype,other_super,other_plan;
+  // Round CH: an error the plan raises while collecting (a String column
+  // strictly cast to the other column's Enum).
+  std::string collect_error;
 };
+// Round CH: a str value that names a column of the frame is pl.col(value),
+// and is_in reads that column imploded into one list (probed on 19 x 19
+// column dtypes against Polars 1.44.1). Numbers meet at their supertype (a
+// Float64 side wins; Float32 with ints of up to 16 bits stays Float32, else
+// Float64; ints of one signedness the wider; a signed and an unsigned int
+// the signed int of twice the unsigned width, Int128 with UInt64), an int
+// side cast to a float with strict_cast, others with cast. A Null side casts
+// to the other's type; String meets Categorical or Enum by a strict cast to
+// it; a Datetime column reads another Datetime column's physical values
+// unless the other is finer (an error). Any other pair raises "'is_in'
+// cannot check for List(Z) values in X data".
+int integer_bits(const std::string& d){return std::stoi(d.substr(d.rfind("UInt",0)==0?4:3));}
+std::string numeric_supertype(const std::string& a,const std::string& b) {
+  if(a==b)return a;
+  if(a=="Float64"||b=="Float64")return "Float64";
+  if(a=="Float32"||b=="Float32")return integer_bits(a=="Float32"?b:a)<=16?"Float32":"Float64";
+  const bool ua=a.rfind("UInt",0)==0,ub=b.rfind("UInt",0)==0;const int ba=integer_bits(a),bb=integer_bits(b);
+  if(ua==ub)return ba>=bb?a:b;
+  const int sb=ua?bb:ba,ubits=ua?ba:bb;
+  if(ubits==64)return "Int128";
+  return "Int"+std::to_string(std::max(sb,2*ubits));
+}
+std::string unit_word(std::int64_t unit){return unit==1?"Nanoseconds":unit==1000?"Microseconds":"Milliseconds";}
+struct ColumnIn{std::string error,lhs,rhs,super;};
+ColumnIn column_is_in(const std::string& key,const std::string& x,const std::string& name,const std::string& z);
+bool numeric_column(const std::string& dtype);
 // An Enum column's categories in order.
 std::vector<std::string> enum_category_list(const EventTable& table,std::size_t column) {
   std::vector<std::string> out;
@@ -311,6 +343,51 @@ std::string list_membership(const std::string& key,const std::string& dtype,cons
 }
 bool numeric_column(const std::string& dtype) {
   return detail::polars_lit::integer_dtype(dtype)||dtype=="Float64"||dtype=="Float32";
+}
+ColumnIn column_is_in(const std::string& key,const std::string& x,const std::string& name,const std::string& z) {
+  namespace lit=detail::polars_lit;
+  ColumnIn out{{},"col("+quote(key)+")","col("+quote(name)+").implode()",x};
+  if(x==z)return out;
+  if(x=="Null"){out.lhs+=".cast("+lit::is_in_dtype_name(z)+")";out.super=z;return out;}
+  if(z=="Null"){out.rhs+=".cast(List("+lit::is_in_dtype_name(x)+"))";return out;}
+  if(numeric_column(x)&&numeric_column(z)) {
+    const auto s=numeric_supertype(x,z);out.super=s;
+    const auto cast=[&](const std::string& from){return std::string(lit::float_dtype(s)&&!lit::float_dtype(from)?".strict_cast(":".cast(");};
+    if(x!=s)out.lhs+=cast(x)+s+")";
+    if(z!=s)out.rhs+=cast(z)+"List("+s+"))";
+    return out;
+  }
+  const bool cx=lit::categorical_dtype(x)||lit::enum_dtype(x),cz=lit::categorical_dtype(z)||lit::enum_dtype(z);
+  if(x=="String"&&cz){out.lhs+=".strict_cast("+lit::is_in_dtype_name(z)+")";out.super=z;return out;}
+  if(cx&&z=="String"){out.rhs+=".strict_cast(List("+lit::is_in_dtype_name(x)+"))";return out;}
+  if(lit::datetime_dtype(x)&&lit::datetime_dtype(z)) {
+    const auto ux=lit::unit_nanoseconds(x),uz=lit::unit_nanoseconds(z);
+    if(uz<ux)out.error="'is_in' cannot check for "+unit_word(uz)+" precision values in "+unit_word(ux)+" Datetime data";
+    return out;
+  }
+  out.error="'is_in' cannot check for List("+lit::is_in_dtype_name(z)+") values in "+lit::is_in_dtype_name(x)+" data";
+  return out;
+}
+// A present cell of x is in the other column (present cells of z).
+bool column_has(const EventAttribute& v,const std::string& x,const std::vector<EventAttribute>& others,const std::string& z,const std::string& s) {
+  namespace lit=detail::polars_lit;
+  if(x=="Null"||z=="Null")return false;
+  for(const auto& w:others) {
+    if(numeric_column(x)&&numeric_column(z)) {
+      if(lit::integer_dtype(s)){if(exact(v)==exact(w))return true;continue;}
+      const double a=s=="Float32"?static_cast<double>(static_cast<float>(number(v))):number(v);
+      const double b=s=="Float32"?static_cast<double>(static_cast<float>(number(w))):number(w);
+      if(a==b||(std::isnan(a)&&std::isnan(b)))return true;
+      continue;
+    }
+    if(x=="Date"||lit::datetime_dtype(x)) {
+      const auto a=lit::physical_of(v,x),b=lit::physical_of(w,z);
+      if(a&&b&&*a==*b)return true;
+      continue;
+    }
+    if(scalar_equal(v,w))return true;
+  }
+  return false;
 }
 std::string list_dtype(const EventAttribute& query) {
   if(!collection(query)) {
@@ -397,7 +474,8 @@ std::optional<detail::polars_lit::Operands> wide_operands(const Leaf& l) {
   const auto c="col("+quote(l.column)+")";const auto decimal=std::to_string(*u);const double d=static_cast<double>(*u);
   if(l.dtype=="UInt64")return lit::Operands{c,decimal,{}};
   if(l.dtype=="Boolean")return lit::Operands{c+".cast(UInt64)",decimal,{}};
-  if(l.dtype=="Float32")return lit::Operands{c,lit::polars_frame_float(static_cast<double>(static_cast<float>(d))),{}};
+  // Round CH: an int rounds to Float32 straight from its digits.
+  if(l.dtype=="Float32")return lit::Operands{c,lit::polars_frame_float(lit::float32_of_u64(*u)),{}};
   if(l.dtype=="Float64")return lit::Operands{c,lit::polars_frame_float(d),{}};
   if(l.dtype.starts_with("UInt"))return lit::Operands{{},{},"when("+c+".is_not_null()).then("+(lit::apply_order(-1,lit::compare_op(l.op))?"true":"false")+").otherwise(null)"};
   if(lit::integer_dtype(l.dtype))return lit::Operands{c+".cast(Float64)",lit::polars_frame_float(d),{}};
@@ -407,7 +485,7 @@ int wide_truth(const Leaf& l,const EventAttribute& v,std::uint64_t u) {
   namespace lit=detail::polars_lit;
   const auto op=lit::compare_op(l.op);const double d=static_cast<double>(u);
   if(l.dtype=="UInt64")return lit::apply_order(lit::order_of(lit::wide_of(v),lit::Wide(u)),op);
-  if(l.dtype=="Float32")return lit::apply_order(lit::total_order(static_cast<double>(static_cast<float>(number(v))),static_cast<double>(static_cast<float>(d))),op);
+  if(l.dtype=="Float32")return lit::apply_order(lit::total_order(static_cast<double>(static_cast<float>(number(v))),lit::float32_of_u64(u)),op);
   if(l.dtype=="Float64"||(lit::integer_dtype(l.dtype)&&!l.dtype.starts_with("UInt")))return lit::apply_order(lit::total_order(number(v),d),op);
   if(l.dtype=="Boolean"||lit::integer_dtype(l.dtype))return lit::apply_order(-1,op);
   return -1;
@@ -506,7 +584,7 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
     MergeKey k;
     if(l.dtype=="UInt64"||l.dtype=="Boolean"){k.i=lit::Wide(*u);return k;}
     if(!lit::float_dtype(l.dtype)&&!lit::integer_dtype(l.dtype))return {};
-    const double d=static_cast<double>(*u);k.tag=1;k.d=l.dtype=="Float32"?static_cast<double>(static_cast<float>(d)):d;return k;
+    k.tag=1;k.d=l.dtype=="Float32"?lit::float32_of_u64(*u):static_cast<double>(*u);return k;
   }
   const auto v=lit::value_of(l.value);const auto op=lit::compare_op(l.op);
   const auto check=lit::check_scalar(l.column,l.dtype,v,op,l.categories.empty()?nullptr:&l.categories);
@@ -542,7 +620,7 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
     k.tag=1;
     switch(v.kind){
       case lit::Kind::kFloat:k.d=narrow(v.real);break;
-      case lit::Kind::kInt:k.d=narrow(static_cast<double>(v.integer));break;
+      case lit::Kind::kInt:k.d=f32?lit::float32_of_int(v):static_cast<double>(v.integer);break;
       case lit::Kind::kBool:k.d=v.boolean?1.0:0.0;break;
       case lit::Kind::kDate:k.d=static_cast<double>(v.integer);break;
       default:k.d=static_cast<double>(lit::literal_micros(v));break;
@@ -816,6 +894,27 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
                                           suffix(filter_plan(source,list_membership(attr.value,p.dtype,*p.literal,positive_now,false,empty_argument)),true));
         } catch(const PolarsSequenceFilterError& error) {fail(error.type,phase(eager),error.message);}
       }
+    } else if(text(query)) {
+      // Round CH: the str names a column (checked above).
+      const auto z=*index_of(source,query.value);
+      const auto in=column_is_in(attr.value,p.dtype,query.value,source_dtype(source,z));
+      if(!in.error.empty())fail("InvalidOperationError",phase(eager),in.error+suffix(filter_plan(source,membership_expr(attr.value,query,positive_now)),true));
+      p.other=z;p.other_dtype=source_dtype(source,z);p.other_super=in.super;p.other_plan=in.lhs+".is_in(["+in.rhs+"])";
+      // Round CH: a String side cast strictly to the other side's Enum fails
+      // on a str outside its categories (the String column's name; the
+      // imploded column has none).
+      const bool cast_left=p.dtype=="String"&&detail::polars_lit::enum_dtype(p.other_dtype);
+      const bool cast_right=detail::polars_lit::enum_dtype(p.dtype)&&p.other_dtype=="String";
+      if(cast_left||cast_right) {
+        const auto categories=enum_category_list(source,cast_left?z:p.column);
+        const std::set<std::string> known(categories.begin(),categories.end());
+        std::vector<std::string> failed;
+        for(std::size_t i=0;i<source.size();++i){const auto w=cell(source,i,cast_left?p.column:z);if(!null(w)&&!known.count(w.value))failed.push_back(w.value);}
+        if(!failed.empty())
+          p.collect_error=detail::polars_lit::enum_conversion_message(cast_left?attr.value:std::string(),failed,source.size())+
+                          "\n\nThis error occurred in the following expression:\n\t"+(cast_left?in.lhs:in.rhs)+
+                          "\nwhile evaluating this larger expression:\n\t"+p.other_plan+(positive_now?"":".not()")+"\n";
+      }
     } else {
     const auto qdtype=list_dtype(query);bool compatible=qdtype=="Null"||p.dtype=="Null";
     if(qdtype=="String")compatible=p.dtype=="String"||p.dtype.starts_with("Categorical")||p.dtype.starts_with("Enum(");
@@ -840,7 +939,7 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
     // Round CE: a scalar value as the resolved plan coerces it.
     std::optional<std::string> scalar;
     if(!p.literal&&!null(*call.values)&&!collection(*call.values))scalar=detail::polars_lit::coerced_scalar_is_in(attr.value,p.dtype,detail::polars_lit::value_of(*call.values));
-    const auto plan=filter_plan(source,p.literal?list_membership(attr.value,p.dtype,*p.literal,true,true,cells?cells->empty():call.values->children.empty()):scalar?*scalar:membership_expr(attr.value,*call.values,true));
+    const auto plan=filter_plan(source,p.literal?list_membership(attr.value,p.dtype,*p.literal,true,true,cells?cells->empty():call.values->children.empty()):scalar?*scalar:p.other?p.other_plan:membership_expr(attr.value,*call.values,true));
     if(integer(role))p.literal_case=true;
     else {
       const auto c=index_of(source,role.value);
@@ -848,16 +947,20 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
       p.case_column=c;p.case_dtype=source_dtype(source,*c);
     }
   }
+  if(!p.collect_error.empty())fail("InvalidOperationError",phase(eager),p.collect_error);
   return p;
 }
 std::vector<bool> matching(const EventTable& source,const Predicate& p) {
   const auto op=p.call.operation;const bool positive=truth(p.call.options.positive);std::vector<bool> flags(source.size(),false);
+  std::vector<EventAttribute> others;
+  if(p.other)for(std::size_t j=0;j<source.size();++j){const auto w=cell(source,j,*p.other);if(!null(w))others.push_back(w);}
   for(std::size_t i=0;i<source.size();++i) {
     const auto v=cell(source,i,p.column);bool yes=false;
     if(numeric(op))yes=!p.empty&&std::all_of(p.merged.begin(),p.merged.end(),[&](const Expr& node){return truth_of(node,source,i)==1;});
     else {
       if(!null(v)) {
-        if(p.literal)yes=detail::polars_lit::literal_has(*p.literal,v,p.dtype);
+        if(p.other)yes=column_has(v,p.dtype,others,p.other_dtype,p.other_super);
+        else if(p.literal)yes=detail::polars_lit::literal_has(*p.literal,v,p.dtype);
         else for(const auto& q:p.values) {
           if(null(q))continue;
           // Round CD: a datetime on a Datetime column is looked up as is_in
@@ -865,6 +968,14 @@ std::vector<bool> matching(const EventTable& source,const Predicate& p) {
           if(p.dtype.starts_with("Datetime(")&&date(q)&&!collection(q)) {
             namespace lit=detail::polars_lit;
             if(lit::literal_has(lit::literal_of(lit::Value::list({lit::value_of(q)})),v,p.dtype)){yes=true;break;}
+            continue;
+          }
+          // Round CH: a number meets a Float32 column cast to Float32
+          // (is_in([[v].cast(List(Float32))])), so 1e-5 finds the cell
+          // 1e-5 rounded to Float32.
+          if(p.dtype=="Float32"&&(real(q)||integer(q))&&!boolean(q)&&real(v)) {
+            const double x=integer(q)?detail::polars_lit::float32_of_int(detail::polars_lit::value_of(q)):static_cast<double>(static_cast<float>(number(q))),y=number(v);
+            if(x==y||(std::isnan(x)&&std::isnan(y))){yes=true;break;}
             continue;
           }
           if(scalar_equal(v,q)){yes=true;break;}
@@ -903,21 +1014,25 @@ struct CountColumn { std::optional<std::size_t> column, cases;EventAttribute lit
 CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,const PolarsAttributesFilterOptions& options,bool relative=false) {
   CountColumn result;result.literal=attr;result.once=options.keep_once_per_case&&truth(*options.keep_once_per_case);
   const auto groupnodes=result.once?std::vector<std::string>{"'group_by'","'group_by'"}:std::vector<std::string>{"'group_by'"};
+  // Per-case counts group by [case, attribute]: the case key resolves first.
+  const auto case_column=[&]{
+    col_selector(options.case_id_key);
+    if(collection(options.case_id_key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
+    const auto at=index_of(source,options.case_id_key.value);
+    if(!at)fail("ColumnNotFoundError","apply",column_prefix(source,options.case_id_key.value)+resolved("'group_by'",frame_plan(source),groupnodes));
+    return at;
+  };
   if(collection(attr)) {
-    if(attr.children.empty())fail("IndexError","apply","tuple index out of range");
+    // Round CH: an empty key list fails on its first item only after the
+    // per-case group_by resolved (a missing case key fails first).
+    if(attr.children.empty()){if(result.once)(void)case_column();fail("IndexError","apply","tuple index out of range");}
     // A key list groups by each of its items.
     if(result.once)if(const auto error=detail::polars_lit::argument_literal_error(attr))fail("TypeError","apply",*error);
     for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
       if(!result.once)fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),groupnodes));
     throw std::invalid_argument("Native Polars attribute counts accept a single key");
   }
-  // Per-case counts group by [case, attribute]: the case key resolves first.
-  if(result.once) {
-    col_selector(options.case_id_key);
-    if(collection(options.case_id_key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
-    result.cases=index_of(source,options.case_id_key.value);
-    if(!result.cases)fail("ColumnNotFoundError","apply",column_prefix(source,options.case_id_key.value)+resolved("'group_by'",frame_plan(source),groupnodes));
-  }
+  if(result.once)result.cases=case_column();
   if(text(attr)) {
     result.column=index_of(source,attr.value);
     if(!result.column)fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved("'group_by'",frame_plan(source),groupnodes));

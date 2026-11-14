@@ -226,3 +226,30 @@ in Review AY2). Review CC1 in `docs/reference-2.7.22-parity.md` lists the
 fixes (Python list literals as `pl.lit` builds them, the supertype check
 and plan casts of prefix and suffix lists, datetime casts to numeric and
 temporal columns).
+
+## Odd float activities (round CH)
+
+`scripts/polars_sequence_filter_ch_domain.py` extends the CC domain with
+`Float64` and `Float32` activity columns of odd values (`1e-5`, `1e-7`,
+`1e16`, `0.1`, `-0.0`, `1/3`, `2.5e-6`; on a second Float64 kind NaN,
+infinities, the smallest subnormal, the largest float, `1e22`) whose
+String casts (variant strings, joined activities) differ from Python's
+`repr`, and passes the column's floats (sometimes ints or strs) as
+activity values. `scripts/capture-polars-sequence-filter-bank.py --domain
+polars_sequence_filter_ch_domain.py --count 1500 --bank-seed 2026111496
+--hash-seeds 0,1 --repeats 3` writes
+`docs/polars-sequence-filter-ch-bank.json.gz`, replayed by the same test
+(`minera_polars_sequence_filter_ch_bank_parity_tests`):
+
+| Calls | Values | Errors | Not stored (no public outcome) | Varying across seeds | Unordered | Failures |
+| --- | --- | --- | --- | --- | --- | --- |
+| 19,761 | 11,219 | 8,501 | 41 | 40 | 1,304 | 0 |
+
+A second capture (bank seed 2026111497, 900 frames; 11,301 calls) also
+replays without a failure. Variant strings cast floats as Polars does
+(`0.00001`, `1e-7`, `1e+16`; Float32 cells with Float32 digits), and so do
+float suffixes of `ends_with`; a scalar activity of `activity_split` takes
+a Float32 column's type while a list meets the column as Float64; the
+grouped rows of `consecutive_act_case_grouping` compare unordered (a
+`group_by` without `maintain_order`). Review CH1 in
+`docs/reference-2.7.22-parity.md` lists the fixes.

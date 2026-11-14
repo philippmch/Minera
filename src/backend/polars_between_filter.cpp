@@ -1,5 +1,6 @@
 #include "minera/polars_between_filter.hpp"
 #include "polars_datetime.hpp"
+#include "polars_float_text.hpp"
 #include "polars_sort.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_list_literal.hpp"
@@ -306,7 +307,8 @@ std::string resolved_text(const Anchor& a, const std::string& column, const std:
   }
   if (v.kind == lit::Kind::kNone) return c + ".is_in(" + cast_list("null", lit::is_in_dtype_name(dtype)) + ")";
   if (v.kind == lit::Kind::kInt && (lit::integer_dtype(dtype) || lit::float_dtype(dtype))) {
-    const auto item = std::to_string(v.integer);
+    // Round CH: an int past the Int64 range shows its digits.
+    const auto item = lit::integer_text(v);
     if (lit::float_dtype(dtype)) return c + ".is_in(" + cast_list(item, dtype) + ")";
     if (lit::integer_range_side(v.integer, dtype) == 0) return c + ".is_in(" + cast_list(item, dtype) + ")";
     const auto [to, strict] = integer_supertype(dtype, v.integer);
@@ -324,9 +326,15 @@ std::string resolved_text(const Anchor& a, const std::string& column, const std:
 lit::Literal lookup_literal(const Anchor& a, const std::string& dtype) {
   if (!a.scalar) return a.literal;
   const auto& v = a.value;
-  const auto narrow = [&](double x) { return dtype == "Float32" ? static_cast<double>(static_cast<float>(x)) : x; };
-  if (lit::float_dtype(dtype) && (v.kind == lit::Kind::kInt || v.kind == lit::Kind::kFloat))
-    return {lit::lit_type(lit::LitType::K::kFloat64), {lit::Value::of(narrow(v.kind == lit::Kind::kInt ? static_cast<double>(v.integer) : v.real))}};
+  // Round CH: an int rounds to Float32 straight from its digits (no double
+  // in between), an int past the Int64 range as its unsigned value.
+  const bool f32 = dtype == "Float32";
+  if (lit::float_dtype(dtype) && v.kind == lit::Kind::kInt)
+    return {lit::lit_type(lit::LitType::K::kFloat64),
+            {lit::Value::of(f32 ? lit::float32_of_int(v) : lit::integer_real(v))}};
+  if (lit::float_dtype(dtype) && v.kind == lit::Kind::kFloat)
+    return {lit::lit_type(lit::LitType::K::kFloat64),
+            {lit::Value::of(f32 ? static_cast<double>(static_cast<float>(v.real)) : v.real)}};
   return a.literal;
 }
 std::vector<std::string> enum_categories(const EventTable& source, std::size_t at) {
@@ -449,7 +457,9 @@ std::string string_cast(const EventAttribute& value, const std::string& declared
   if (text(value)) return value.value;
   if (boolean(value)) return static_cast<bool>(exact(value)) ? "true" : "false";
   if (integer(value)) return exact(value).decimal();
-  if (real(value)) return real_text(number(value), true);
+  // Round CH: Polars' Float to String cast (1e-5 as "0.00001", a Float32
+  // column by its float digits).
+  if (real(value)) return detail::polars_cast_float(number(value), declared == "Float32");
   if (date(value)) {
     // cast(pl.String) of a temporal case id: its unit's fractional digits.
     if (declared == "Date" || declared.starts_with("Datetime(")) return lit::string_cast(value, declared);

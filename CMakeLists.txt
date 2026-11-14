@@ -3056,6 +3056,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_cc_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cc-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_cc_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CH: Float32 and Float64 activities with odd values (1e-5, 1e-7,
+  # 1e16, -0.0, NaN, infinities, subnormals) whose String casts differ from
+  # Python's repr.
+  add_test(NAME minera_polars_sequence_filter_ch_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-ch-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_ch_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3089,6 +3095,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cg_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cg-bank.json.gz")
   set_tests_properties(minera_polars_filter_cg_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CH: odd float activity and case columns (Polars' Float to String
+  # cast), struct texts, nested dict fields of the timeframe filter.
+  add_test(NAME minera_polars_filter_ch_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-ch-bank.json.gz")
+  set_tests_properties(minera_polars_filter_ch_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

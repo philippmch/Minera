@@ -1195,16 +1195,26 @@ int main(int argc, char** argv) try {
       // and filter_traces_intersecting (round CE seeds 4247 case 333 and
       // 2026111437 case 518, round CF seed 4251 case 94: both orders over
       // 16 runs in the reference).
-      if (!matched && qualified == "cases.filter_on_case_performance") {
+      // Round CH: filter_on_case_size and filter_df_on_attribute_values too
+      // (CG domain seed 4290 case 530, CF domain seed 2026111491 case 366:
+      // both orders about evenly over 80 runs and four hash seeds).
+      if (!matched && (qualified == "cases.filter_on_case_performance" || qualified == "cases.filter_on_case_size" ||
+                       qualified == "attributes.filter_df_on_attribute_values")) {
         const auto key = key_or("case_id_glue", "case:concept:name");
         const auto mine = case_blocks(actual, key);
         for (const auto& e : expected) matched = matched || serialize(case_blocks(e, key)) == serialize(mine);
       }
-      // Round CF: filter_case_performance too (seed 4262 case 27).
-      if (!matched && (qualified == "between.apply" || qualified == "ltl.attr_value_different_persons" ||
-                       qualified == "timestamp.filter_traces_intersecting" || qualified == "cases.filter_case_performance")) {
+      // Round CF: filter_case_performance too (seed 4262 case 27). Round CH:
+      // filter_traces_contained and apply_numeric too (CH domain seed
+      // 2026111495 case 294, a wide-int probe of apply_numeric: both orders
+      // over 60 and 20 runs).
+      const std::size_t parameters_at = qualified == "ltl.attr_value_different_persons" ? 1 : 2;
+      if (!matched && args.size() > parameters_at &&
+          (qualified == "between.apply" || qualified == "ltl.attr_value_different_persons" ||
+           qualified == "timestamp.filter_traces_intersecting" || qualified == "timestamp.filter_traces_contained" ||
+           qualified == "cases.filter_case_performance" || qualified == "attributes.apply_numeric")) {
         std::string key = "case:concept:name";
-        const auto& last = *args.at(qualified == "ltl.attr_value_different_persons" ? 1 : 2);
+        const auto& last = *args.at(parameters_at);
         // The case id key as the filters resolve it: enum keys last.
         if (is_mapping(last))
           for (const bool enum_key : {false, true})

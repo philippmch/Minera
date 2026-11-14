@@ -26373,3 +26373,160 @@ Verification (scripts in the project files under `review-harness/round-cg/`):
 | CE domain on seeds 2026111471 and 4271 | 17,432 and 17,450 calls on 600 frames each | 2 and 1 found; after: 0 |
 | Struct probes (`sp.py`, `sn.py`) | 684 dicts on 19 column dtypes, 30 null-cell probes against Polars 1.44.1 | 0 differences |
 | The base, CC, CE and CF banks | the banks in the suite | 0 mismatches |
+
+## Review CH1: re-review of round CG, and Polars' Float to String cast, nested dict fields and odd float activities in the Polars filters (2026-11-14)
+
+Round CH checked CG's CI run (43562859480: green on all six jobs, the
+CG bank on Windows for the first time), replayed fresh seeds of the CG,
+CF and CE domains, modelled Polars' own cast of a float to String and the
+nested dict fields CG refused, and added two domains of odd float
+activities (one for the table filters, one for the sequence filters).
+Findings, all fixed:
+
+- **CH1-1 Fresh CG, CF and CE seeds.** CG seeds 2026111490 and 4290
+  (6,390 and 6,333 calls on 1,000 frames), CF seed 2026111491 (26,639
+  calls on 700 frames) and CE seed 2026111492 (17,420 calls on 600
+  frames) differed in 0, 1, 1 and 0 calls, both reference-random:
+  `filter_on_case_size` (CG 4290 case 530) and
+  `filter_df_on_attribute_values` (CF 2026111491 case 366) keep their
+  cases in either order (both orders about evenly over 80 runs and four
+  hash seeds). The bank test accepts any case order for them, as it does
+  for `filter_on_case_performance`.
+- **CH1-2 Polars' Float to String cast.** Polars casts a float to String
+  with its own display, not Python's `repr`: the shortest digits that read
+  back (as a float for a Float32 column) in fixed notation while the
+  leading digit's decimal exponent is below 16 (Float32: 13) and at least
+  -5 (Float32: -6), integral values ending in `.0`, other values as
+  `d.ddde+X` or `d.ddde-X` without padding (`1e-5` casts to `"0.00001"`,
+  `1e-7` to `"1e-7"`, `1e16` to `"1e+16"`, `0.1` on Float32 to `"0.1"`).
+  `polars_cast_float` (fitted on 805,046 Float64 and Float32 values
+  against Polars 1.44.1 without a difference) replaces the `repr` in
+  `string_cast`, in the struct String cast of float fields and in the
+  String casts of the between, paths and variants filters (case ids,
+  path labels, variant strings). A dynamic float literal casts as a
+  Float64 does (9,024 values), so a float suffix of `ends_with` reads
+  `0.00001` too.
+- **CH1-3 Nested dict fields.** A dict field of a timeframe dict value is
+  a nested struct whose fields cast recursively to their supertypes with
+  the column (`Struct({'j': Struct({'a': Float64})})`); a String column
+  compares with the nested String cast (`{{1.0}}`). On an integer or float
+  column a struct of one nested field raises `InvalidOperationError:
+  Cannot cast from struct to other types` while collecting, and only when
+  the column holds a present cell. A list field never casts the column (a
+  SchemaError on integer and float columns, the String cast on String
+  columns, `{[1, 2]}`), and a list that `pl.lit` cannot build (mixed
+  types, an int list meeting a float, a list after an int) raises
+  `TypeError: cannot create expression literal for value of type dict`
+  while pm4py builds the comparison, after the attribute column is
+  selected and before the timestamp column is read (probed with 35 lists
+  and 342 dict and column pairs). A repeated key keeps its first place
+  and its last value, so an earlier value is never built. Lists of dicts
+  stay refused (declared).
+- **CH1-4 New table domain.** `scripts/polars_filter_ch_domain.py` (on
+  top of the CG domain) gives activity and case columns odd floats
+  (`1e-5`, `1e-7`, `1e16`, `0.1` on Float32, `-0.0`, `1/3`, NaN,
+  infinities, subnormals, `1.7976931348623157e308`), sometimes adds a
+  String column `zz` of struct texts (`{0.00001}`, `{[1, 2]}`, `{{1}}`,
+  `}`), passes the column's floats as activity values and gives the
+  timeframe filter dicts with odd float fields, the strs Polars casts them
+  to, lists (nested, empty, with None) and nested dicts. Its first bank
+  (seed 2026111495, 800 frames, 31,888 calls) differed in 174 calls:
+  - a number meets a Float32 column cast to Float32 in the attribute
+    filters (`1e-5` finds the cell `1e-5` rounded to Float32; the model
+    compared it as a double);
+  - a str value that names a column is that column in `is_in`
+    (`col("concept:name").is_in(col("org:resource"))`): the two columns
+    meet in their supertype (Float64 over integers; Float32 with integers
+    of up to 16 bits; the wider of two same-signed integers; a signed and
+    an unsigned integer in a signed type twice as wide, Int128 with
+    UInt64), an int column read as a float column prints
+    `.strict_cast(Float64)`, a Null side casts to the other's type, and
+    other pairs raise `'is_in' cannot check for List(Z) values in X data`
+    (probed on a 19 by 19 dtype matrix);
+  - two list values of the attribute filters merge when Polars finds them
+    equal: `-0.0` equals `0.0` and two NaNs are equal inside lists;
+  - the String casts of CH1-2 and the nested dicts of CH1-3;
+  - 61 calls carried ints past the UInt64 range (`int(1e22)`,
+    `int(1.7976931348623157e308)`) that the bank's typed JSON cannot
+    carry; the domain now keeps such values as floats.
+  The recaptured bank (31,894 calls) differed in 1 call:
+  `filter_traces_contained` keeps its cases in either order (case 294,
+  both orders over 60 runs and three hash seeds; accepted by the bank
+  test).
+- **CH1-5 New sequence domain.**
+  `scripts/polars_sequence_filter_ch_domain.py` (on top of the CC
+  sequence domain) gives the activity column the same odd floats and
+  passes them (sometimes as ints or strs) as activity values. Its first
+  bank (seed 2026111496, 1,500 frames, 19,761 calls) differed in 23
+  calls:
+  - `ends_with` casts a float suffix as Polars casts a Float64 to String
+    (`0.00001`), which the variant string of a Float activity holds; the
+    model used `repr` (`1e-05`);
+  - `activity_split` with a scalar int or float passes a dynamic literal
+    that takes a Float32 column's type (`0.1` matches the cell `0.1f`,
+    `16777217` matches `16777216.0`), while a list is a Float64 Series
+    that meets the column widened (`[0.1]` matches no `0.1f`);
+  - `consecutive_act_case_grouping` returns its groups from a `group_by`
+    without `maintain_order`, in another order on every run (both orders
+    over 30 runs under each of four hash seeds); the bank test compares
+    its rows unordered.
+  Seed 2026111497 (900 frames, 11,301 calls) differed in 0.
+- **CH1-6 Wide ints on Float32.** An int meets a Float32 column rounded
+  to Float32 straight from its digits (`2**63 + 2**39 + 1` rounds up to
+  `2**63 + 2**40`; through a double it would tie down to `2**63`), and an
+  int past the Int64 range compares as its unsigned value; the between
+  filter printed such an int as its signed bits
+  (`[-1].cast(List(Float32))` for `18446744073709551615`). A probe domain
+  of wide floats and ints on Float32 activities (seed 77, 150 frames,
+  6,021 calls) differed in 90 calls before and 1 after (an
+  `apply_numeric` case order, both orders over 20 runs; accepted by the
+  bank test). The conversion halves an unsigned int past the Int64 range
+  with a sticky bit, so it rounds the same on every compiler (checked
+  against numpy on 200,001 values).
+- **CH1-7 Fresh CH seeds.** Seed 4295 (800 frames, 32,068 calls)
+  differed in 3 calls. Each NaN reaches Python as its own float object,
+  so a variant tuple holding a NaN equals no other: two cases with NaN
+  activities are two variants of `filter_variants_top_k` (`k=-1` then
+  keeps one and fails joining it; the ties then compare `(nan,)` with
+  `(None,)` and fail the sort); the model merged them (cases 65 and 149,
+  probed with `vn.py`). `filter_df_relative_occurrence_event_attribute`
+  with an empty key tuple and `KEEP_ONCE_PER_CASE` resolves the case key
+  first (a missing one raises its ColumnNotFoundError before the tuple's
+  IndexError; case 74). Seed 2026111498 (800 frames, 32,045 calls)
+  differed in 1 call: a String attribute column read against an Enum
+  column named by a str value is cast strictly to that Enum
+  (`col("org:resource").strict_cast(Enum([...]))`), which fails while
+  collecting on a str outside the categories (``conversion from `str` to
+  `enum` failed in column 'org:resource' for 9 out of 9 values: ["r2",
+  "r2", … "r2"]``, the larger expression ending in `.not()` for a
+  negative event filter); an Enum column read against a String column
+  casts the imploded column instead and names no column (case 108,
+  probed with `en.py`).
+
+Not taken (carried to CI): dicts and the comparison model on Duration,
+Time, Decimal and Int128 columns (no table cell in the transport;
+declared), lists of dicts as dict fields (declared), the remaining
+`coerced_scalar_is_in` gaps (str and Categorical/Enum columns), `list_literal`
+with wide ints after a float and in nested lists, `lit_supertype` of
+Int128 with temporal types, ints past the UInt64 range as paths bounds,
+`plan_text_at` when the failing leaf is inside a merged node, and the
+items carried from CD.
+
+Tests: `docs/polars-filter-ch-bank.json.gz` (31,894 calls) and
+`docs/polars-sequence-filter-ch-bank.json.gz` (19,761 calls) replayed by
+`minera_polars_filter_ch_bank_parity_tests` and
+`minera_polars_sequence_filter_ch_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-ch/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Odd float activities in the table filters (CH bank, seed 2026111495) | 31,894 calls on 800 frames, hash seeds 0-1, 3 runs each | 0 mismatches (first capture: 174 before CH1-2 to CH1-4, 61 of them transport artifacts) |
+| The same domain on seeds 4295 and 2026111498 | 32,068 and 32,045 calls on 800 frames each | 3 and 1 found; after: 0 |
+| Odd float activities in the sequence filters (CH sequence bank, seed 2026111496) | 19,761 calls on 1,500 frames | 0 mismatches (23 before CH1-5) |
+| The sequence domain on seed 2026111497 | 11,301 calls on 900 frames | 0 mismatches |
+| CG domain on seeds 2026111490 and 4290 | 6,390 and 6,333 calls on 1,000 frames each | 0 and 1 found (reference-random); after: 0 |
+| CF domain on seed 2026111491, CE domain on seed 2026111492 | 26,639 calls on 700 frames, 17,420 calls on 600 frames | 1 (reference-random) and 0; after: 0 |
+| Wide ints on Float32 (probe domain, seed 77) | 6,021 calls on 150 frames | 90 found; after: 0 (1 reference-random order accepted) |
+| Float to String cast (`fs.py`) and dynamic literals (`lc.py`) | 805,046 Float64 and Float32 values, 9,024 literals against Polars 1.44.1 | 0 differences |
+| The base, CC, CE, CF and CG table banks and the base, typed, CB and CC sequence banks | the banks in the suite | 0 mismatches |

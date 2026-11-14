@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CG (2026-11-05 to 2026-11-14, cloud container)
+## Review-fix loop, rounds T–CH (2026-11-05 to 2026-11-14, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5085,28 +5085,60 @@ found 2 (None fields on all-null columns), all fixed.
 `minera_polars_filter_cg_bank_parity_tests`. No fixture changed. The
 device check on the Mac was skipped again (no device linked).
 
-Next round (CH) should start by re-reviewing round CG:
+Round CH re-reviewed CG (Review CH1). CG's CI run 43562859480 was green
+on all six jobs (the CG bank on Windows for the first time). Fresh CG
+seeds 2026111490 and 4290, CF seed 2026111491 and CE seed 2026111492
+found 2 calls, both reference-random case orders (`filter_on_case_size`,
+`filter_df_on_attribute_values`; the bank test accepts them). Polars'
+cast of a float to String (`1e-5` as `0.00001`, `1e-7` as `1e-7`,
+`1e16` as `1e+16`, Float32 digits for Float32 cells) is now modelled by
+`polars_cast_float` in `src/backend/polars_float_text.hpp` (fitted on
+805,046 values) and used by `string_cast`, the struct String cast and the
+between, paths and variants filters; a dynamic float literal casts the
+same way (`ends_with` suffixes). The timeframe filter models nested dict
+fields (nested structs cast recursively, one nested field failing the
+cast on a column with a present cell, list fields never casting, unbuildable
+lists raising pm4py's TypeError while the comparison is built). Two new
+domains of odd float activities (`scripts/polars_filter_ch_domain.py`,
+`scripts/polars_sequence_filter_ch_domain.py`) found 174 calls in the
+first table bank (Float32 lookups, `is_in` against a column named by a
+str value, list merges of -0.0 and NaN, the String casts, nested dicts,
+and 61 transport artifacts the domain now avoids) and 23 in the first
+sequence bank (`ends_with` float suffixes, `activity_split` scalars on
+Float32, `consecutive_act_case_grouping` rows in random order). Ints now
+round to Float32 straight from their digits (a probe domain of wide ints:
+90 calls), NaN variants stay distinct in `filter_variants_top_k`, and an
+empty key tuple of `filter_df_relative_occurrence_event_attribute`
+resolves the case key first (fresh CH seed 4295), and a String column read
+against an Enum column fails on strs outside the categories while
+collecting (fresh CH seed 2026111498). All fixed:
+`docs/polars-filter-ch-bank.json.gz` (31,894 calls) and
+`docs/polars-sequence-filter-ch-bank.json.gz` (19,761 calls) are in the
+suite as `minera_polars_filter_ch_bank_parity_tests` and
+`minera_polars_sequence_filter_ch_bank_parity_tests`. No fixture changed.
+The device check on the Mac was skipped again (no device linked).
 
-- the CI run of the CG commit, Windows especially (the CG bank runs
-  there for the first time);
-- fresh seeds of `scripts/polars_filter_cg_domain.py` (CG used
-  2026111480, 2026111481, 4280 and 4281), of the CF domain (CG used
-  2026111470 and 4270) and of the CE domain (CG used 2026111471 and
-  4271);
-- `src/backend/polars_lit_model.hpp`: Polars' Float to String cast
-  (`1e-5` casts to `"0.00001"`, `1e-7` to `"1e-7"`), which
-  `string_cast` and the struct String cast of float fields take from
-  Python's `repr` (they agree on the swept values only), Float32 cells
-  cast to String;
-- `src/backend/polars_timestamp_filter.cpp`: nested dict fields (lists
-  and dicts inside a struct, refused now), dicts on Duration, Time,
-  Decimal and Int128 columns;
-- still open from CF's list: `literal_list_key` (Polars list equality of
-  -0.0 and 0.0, NaN and nulls inside lists), the remaining
-  `coerced_scalar_is_in` gaps (str and Categorical/Enum columns return
-  nullopt), wide ints on `Float32` in `compare_scalar`, `list_literal`
-  with wide ints after a float and in nested lists, `lit_supertype` of
-  Int128 with temporal types; ints past the UInt64 range as paths bounds
+Next round (CI) should start by re-reviewing round CH:
+
+- the CI run of the CH commit, Windows especially (`std::to_chars` float
+  digits and the unsigned-int-to-Float32 rounding under MSVC; the CH banks
+  run there for the first time);
+- fresh seeds of `scripts/polars_filter_ch_domain.py` (CH used
+  2026111495, 4295 and 2026111498), of
+  `scripts/polars_sequence_filter_ch_domain.py` (CH used 2026111496 and
+  2026111497), of the CG domain (CH used 2026111490 and 4290), the CF
+  domain (2026111491) and the CE domain (2026111492);
+- the other Polars modules that render floats as text
+  (`src/backend/polars_attributes_filter.cpp`, `polars_case_filter.cpp`,
+  `polars_ltl_filter.cpp`, `polars_timestamp_filter.cpp` still call
+  `real_text` or `float_repr`): check each use against Polars' cast and
+  display (`polars_cast_float`, `polars_plan_float`);
+- `src/backend/polars_timestamp_filter.cpp`: lists of dicts as dict
+  fields (refused), dicts on Duration, Time, Decimal and Int128 columns;
+- still open from CF's list: the remaining `coerced_scalar_is_in` gaps
+  (str and Categorical/Enum columns return nullopt), `list_literal` with
+  wide ints after a float and in nested lists, `lit_supertype` of Int128
+  with temporal types; ints past the UInt64 range as paths bounds
   (Polars folds them to `.when(col("@@duration").is_not_null())
   .then(false).otherwise(null)`; the bank's typed JSON stops at UInt64);
   `plan_text_at` in `src/backend/polars_attributes_filter.cpp` when the
@@ -5121,6 +5153,11 @@ Next round (CH) should start by re-reviewing round CG:
   (list below);
 - the open choices on CSV timestamp columns of plain numbers and "roles to
   diagnostics groups" (still declared unless Philipp answers).
+
+Round CG's targets, taken in CH (findings CH1-1 to CH1-7): CG's CI run,
+fresh seeds of the CG, CF and CE domains, Polars' Float to String cast,
+nested dict fields, `literal_list_key` and wide ints on `Float32`. Not
+taken (carried to CI): see the CI list above.
 
 Round CF's targets, taken in CG (findings CG1-1 to CG1-6): CF's CI run,
 fresh seeds of the CF and CE domains, timeframe dict values beyond String

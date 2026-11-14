@@ -457,3 +457,40 @@ captures `docs/polars-filter-cg-bank.json.gz` (19,011 calls), replayed by
   listing of the captured form and size.
 
 Declared: nested dict fields stay refused (no probe).
+
+## Odd floats and nested dict fields (round CH)
+
+`scripts/polars_filter_ch_domain.py` builds the CG frames with odd float
+activity and case columns (`1e-5`, `1e-7`, `1e16`, `0.1` on Float32,
+`-0.0`, `1/3`, NaN, infinities, subnormals), sometimes a String column
+`zz` of struct texts, passes the column's floats as activity values and
+gives the timeframe filter dicts whose fields hold odd floats, the strs
+Polars casts them to, lists and nested dicts.
+`scripts/capture-polars-filter-bank.py --domain polars_filter_ch_domain.py
+--count 800 --bank-seed 2026111495 --hash-seeds 0,1 --repeats 3` captures
+`docs/polars-filter-ch-bank.json.gz` (31,894 calls), replayed by
+`minera_polars_filter_ch_bank_parity_tests`.
+
+* **Float to String.** Polars' cast (`polars_cast_float`): the shortest
+  digits in fixed notation for decimal exponents from -5 to 15 (Float32:
+  -6 to 12), integral values with `.0`, others as `d.ddde+X`/`d.ddde-X`;
+  used for String casts of cells, struct fields, case ids, path labels and
+  variants.
+* **Float32 lookups.** A number meets a Float32 column cast to Float32,
+  an int straight from its digits.
+* **A str naming a column.** `is_in` reads it as that column; the two
+  columns meet in their supertype or raise `'is_in' cannot check for
+  List(Z) values in X data`; a String side cast strictly to the other
+  side's Enum fails while collecting on a str outside the categories.
+* **List merges.** `-0.0` equals `0.0` and NaN equals NaN inside lists.
+* **Nested dicts.** Nested structs cast recursively; one nested field
+  fails the cast (`Cannot cast from struct to other types`) on a column
+  with a present cell; list fields never cast the column; a list `pl.lit`
+  cannot build raises pm4py's TypeError while the comparison is built.
+* **NaN variants.** A variant tuple holding a NaN equals no other in
+  `filter_variants_top_k`.
+* **Row orders.** `filter_traces_contained` and `apply_numeric` keep
+  their cases in either order (accepted by case blocks).
+
+Declared: lists of dicts as dict fields, dicts on Duration, Time, Decimal
+and Int128 columns (no table cell in the transport).
