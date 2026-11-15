@@ -3,6 +3,7 @@
 #include "polars_float_text.hpp"
 #include "polars_sort.hpp"
 #include "polars_column_hint.hpp"
+#include "polars_key_selection.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -242,7 +243,8 @@ std::string join(const EventAttribute& sequence) {
 std::vector<std::string> admitted(const EventAttribute& values){std::vector<std::string> result;for(const auto& sequence:iter(values))result.push_back(join(sequence));return result;}
 std::string contexts(const std::vector<std::string>& nodes){std::string out="\n\nThis error occurred with the following context stack:\n";for(std::size_t i=0;i<nodes.size();++i)out+="\t["+std::to_string(i+1)+"] '"+nodes[i]+"'\n";return out;}
 std::string sort_plan(const EventTable& source,const PolarsVariantsFilterOptions& options,bool statistics){return "SORT BY [col("+quote(options.case_id_key.value)+"), col("+quote(statistics?options.timestamp_key.value:"time:timestamp")+")]\n  "+frame_plan(source);}
-std::string missing_prefix(const std::string& key,const std::vector<std::string>& columns){std::string out="unable to find column "+debug_quote(key)+"; valid columns: [";for(std::size_t i=0;i<columns.size();++i){if(i)out+=", ";out+=debug_quote(columns[i]);}out+=']';if (const auto hint = detail::polars_column_hint(key, columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';return out;}
+namespace keys = detail::polars_keys;
+std::string missing_prefix(const std::string& key,const std::vector<std::string>& columns){if(keys::by_name(key))return keys::by_name_message(key);std::string out="unable to find column "+debug_quote(key)+"; valid columns: [";for(std::size_t i=0;i<columns.size();++i){if(i)out+=", ";out+=debug_quote(columns[i]);}out+=']';if (const auto hint = detail::polars_column_hint(key, columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';return out;}
 [[noreturn]] void missing(const EventTable& source,const std::string& key,bool activity,bool statistics,const PolarsVariantsFilterOptions& options,const std::string& phase,bool eager_source){
   if(eager_source){
     const auto prefix=missing_prefix(key,source.columns);
@@ -253,14 +255,28 @@ std::string missing_prefix(const std::string& key,const std::vector<std::string>
   if(!statistics){nodes.insert(nodes.end(),{"filter","select","join right","join"});}
   fail("ColumnNotFoundError",phase,missing_prefix(key,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING '"+(statistics?"group_by":"join")+"' <---\n"+(activity?sort_plan(source,options,statistics):frame_plan(source))+contexts(nodes));
 }
+// Round CM: group_by(case) refuses a dict before anything else is built; a
+// list activity key names the first item that is not a str (pl.col), and a
+// dict or list of names resolves by name in grouped().
 void validate(const PolarsVariantsFilterOptions& options){
+  if(keys::dict_key(options.case_id_key))fail("TypeError","apply",keys::dict_argument_message());
   if(!text(options.activity_key)&&!collection(options.activity_key))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(options.activity_key)+"'.");
-  if(collection(options.activity_key)&&!options.activity_key.children.empty())throw std::invalid_argument("Native Polars variants activity selector outside observed empty-list domain");
+  const auto& act=options.activity_key;
+  if(act.container==AttributeContainerKind::kList||act.container==AttributeContainerKind::kTuple){
+    if(!act.children.empty()&&!text(act.children.front()))fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(act.children.front())+"'.");
+    for(const auto& item:act.children)if(!text(item))fail("TypeError","apply","'"+python_type(item)+"' object is not an instance of 'str'");
+  }
   if(null(options.case_id_key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
 }
 struct Group{std::string key,label;bool absent=false;std::vector<Cell> activities;};
 struct Grouped{std::vector<Group> groups;std::size_t case_at=0;std::string case_dtype,activity_dtype;};
-Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& options,bool statistics,const std::string& phase,bool eager_source=false){
+PolarsVariantsFilterOptions keyed(const PolarsVariantsFilterOptions& raw,const std::vector<std::string>& columns){
+  auto options=raw;options.activity_key=keys::col_key(raw.activity_key,columns);
+  if(collection(options.activity_key)&&!options.activity_key.children.empty())throw std::invalid_argument("Native Polars variants activity selector outside observed empty-list domain");
+  return options;
+}
+Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,bool statistics,const std::string& phase,bool eager_source=false){
+  const auto options=keyed(raw,source.columns);
   source.validate();if(source.index||source.dtypes.size()!=source.columns.size())throw std::invalid_argument("Native Polars variants require declared dtypes and no dataframe index");
   if(collection(options.case_id_key)&&!statistics){
     if(!options.case_id_key.children.empty())throw std::invalid_argument("Native Polars variants case selector outside observed empty-list domain");
@@ -341,7 +357,8 @@ void sort_variants(std::vector<Variant>& values){
 }
 std::vector<std::string> top_labels(const EventTable& source,const EventAttribute& maximum,const PolarsVariantsFilterOptions& options,bool eager){
   const auto groups=grouped(source,options,true,"apply",eager);if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
-  if(collection(options.activity_key))fail("IndexError","apply","tuple index out of range");
+  // Round CM: the variant tuples are indexed only when some case exists.
+  if(collection(keyed(options,source.columns).activity_key)&&!source.rows.empty())fail("IndexError","apply","tuple index out of range");
   std::vector<Variant> variants;std::unordered_map<std::string,std::size_t> positions;
   for(const auto& group:groups.groups){
     std::string key;for(const auto& cell:group.activities){const auto item=group_key(cell,groups.activity_dtype);key+=std::to_string(item.size())+':'+item;}

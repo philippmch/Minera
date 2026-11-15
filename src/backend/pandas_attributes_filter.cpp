@@ -360,6 +360,11 @@ bool comparison(const EventAttribute& value,const EventAttribute& bound,const st
 EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,const EventAttribute& upper,const PandasAttributesFilterOptions& options,bool events){
  source.validate();
  if(empty_list(options.attribute_key)){
+  // Round CM: df[[]] has no columns, so a list bound must be empty to align
+  // (seed 2026111552 case 167).
+  for(const auto* bound:{&lower,&upper})
+   if((bound->container==AttributeContainerKind::kList||bound->container==AttributeContainerKind::kTuple)&&!bound->children.empty())
+    error("ValueError","Unable to coerce to Series, length must be 0: given "+std::to_string(bound->children.size()));
   if(events)return masked_frame(source);
   // The masked frame leaves every case id null, so the null cases match.
   const auto cases=case_column(source,options.case_id_key);std::vector<bool> nulls(source.size());
@@ -555,10 +560,12 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
   const auto key=group_key(value);const auto [position,added]=positions.emplace(key,frequencies.size());if(added)frequencies.push_back({value});
   auto& f=frequencies[position->second];if(!once)++f.count;else f.cases.insert(group_key(cell(s,i,*cases)));
  }
- // stake * count: only numbers and sequences multiply by an int.
- if(stake.is_null||stake.container==AttributeContainerKind::kContainer||stake.container==AttributeContainerKind::kSet||stake.container==AttributeContainerKind::kFrozenSet||(stake.container==AttributeContainerKind::kScalar&&date_value(stake)))
+ // stake * count: only numbers and sequences multiply by an int; round CM:
+ // the product is formed per counted value, so no value means no error
+ // (seed 2026111552 case 163: a one-row frame with a NaN activity).
+ if(!frequencies.empty()&&(stake.is_null||stake.container==AttributeContainerKind::kContainer||stake.container==AttributeContainerKind::kSet||stake.container==AttributeContainerKind::kFrozenSet||(stake.container==AttributeContainerKind::kScalar&&date_value(stake))))
   error("TypeError","unsupported operand type(s) for *: '"+qualified_type_name(stake)+"' and 'int'");
- if(is_native_na_attribute(stake))error("TypeError","boolean value of NA is ambiguous");
+ if(!frequencies.empty()&&is_native_na_attribute(stake))error("TypeError","boolean value of NA is ambiguous");
  if(!numeric(stake)&&!frequencies.empty())error("TypeError","'>=' not supported between instances of 'int' and '"+qualified_type_name(stake)+"'");
  const double threshold=!numeric(stake)?0.0:native_attribute_number(stake)*static_cast<double>(case_denominator?all_cases.size():s.size());
  std::vector<EventAttribute> admitted;for(const auto& f:frequencies)if(static_cast<double>(once?f.cases.size():f.count)>=threshold)admitted.push_back(f.value);

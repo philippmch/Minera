@@ -1,6 +1,7 @@
 #include "minera/polars_attributes_filter.hpp"
 #include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
+#include "polars_key_selection.hpp"
 #include "polars_float_text.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_lit_model.hpp"
@@ -189,7 +190,9 @@ std::string membership_expr(const std::string& key,const EventAttribute& values,
   } else operand=expression_literal(values,true)+".implode()";
   return "col("+quote(key)+").is_in(["+operand+"])"+(positive?"":".not()");
 }
+namespace keys = detail::polars_keys;
 std::string column_prefix(const EventTable& source,const std::string& key) {
+  if(keys::by_name(key))return keys::by_name_message(key);
   std::string out="unable to find column "+quote(key)+"; valid columns: [";
   for(std::size_t i=0;i<source.columns.size();++i){if(i)out+=", ";out+=debug_quote(source.columns[i]);}out+="]";
   if (const auto hint = detail::polars_column_hint(key, source.columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';
@@ -204,10 +207,19 @@ void col_selector(const EventAttribute& value) {
   // str, else the first later item that is not one.
   if(collection(value)&&!mapping(value)&&!value.children.empty()&&!text(value.children.front()))
     fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(value.children.front())+"'.");
-  if(collection(value))for(const auto& item:value.children)if(!text(item))fail("TypeError","apply","'"+python_type(item)+"' object is not an instance of 'str'");
-  if(collection(value)&&!value.children.empty())throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
+  // Round CM: a dict selects its names (str keys), so its values go unread.
+  if(collection(value)&&!mapping(value))for(const auto& item:value.children)if(!text(item))fail("TypeError","apply","'"+python_type(item)+"' object is not an instance of 'str'");
+  if(collection(value)&&!mapping(value)&&!value.children.empty())throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
 }
-PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call) {
+// The checked selector as pl.col reads it (round CM).
+EventAttribute col_key(const EventAttribute& value,const std::vector<std::string>& columns) {
+  col_selector(value);
+  auto key=keys::col_key(value,columns);
+  if(collection(key)&&!key.children.empty())throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
+  return key;
+}
+void dict_argument(const EventAttribute& key){if(mapping(key))fail("TypeError","apply",keys::dict_argument_message());}
+PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::vector<std::string>& columns) {
   const auto op=call.operation;
   std::string required;
   if(op==Op::kTraces||op==Op::kEvents||op==Op::kOnValues){if(!call.values)required="values";}
@@ -238,7 +250,7 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call) {
     for(auto [name,target]:std::vector<std::pair<std::string,std::optional<EventAttribute>*>>{{"keep_once_per_case",&call.options.keep_once_per_case},{"stream_filter_key1",&call.options.stream_filter_key1},{"stream_filter_value1",&call.options.stream_filter_value1},{"stream_filter_key2",&call.options.stream_filter_key2},{"stream_filter_value2",&call.options.stream_filter_value2}})if(auto v=get(name))*target=*v;
   }
   if(!statistics(op)) {
-    col_selector(call.options.attribute_key);
+    call.options.attribute_key=col_key(call.options.attribute_key,columns);
     auto literal=[](const EventAttribute& v){
       if(!collection(v)||v.container==AttributeContainerKind::kContainer)return;
       try{(void)detail::polars_lit::literal_of(detail::polars_lit::value_of(v));}
@@ -261,6 +273,8 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call) {
     if(traced(op)) {
       const auto& key=call.options.case_id_key;
       if(null(key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
+      // Round CM: unique(case) refuses a dict while the plan is built.
+      dict_argument(key);
       if(!text(key)&&!collection(key)&&!integer(key))col_selector(key);
     }
   }
@@ -1067,22 +1081,32 @@ EventTable filtered(const EventTable& source,const Predicate& query) {
   return case_projection(select_rows(source,matching(source,query)),query.call);
 }
 struct CountColumn { std::optional<std::size_t> column, cases;EventAttribute literal;std::string dtype;bool once=false; };
+std::size_t distinct_case_count(const EventTable& source,const EventAttribute& raw);
 CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,const PolarsAttributesFilterOptions& options,bool relative=false) {
   CountColumn result;result.literal=attr;result.once=options.keep_once_per_case&&truth(*options.keep_once_per_case);
   const auto groupnodes=result.once?std::vector<std::string>{"'group_by'","'group_by'"}:std::vector<std::string>{"'group_by'"};
   // Per-case counts group by [case, attribute]: the case key resolves first.
   const auto case_column=[&]{
-    col_selector(options.case_id_key);
-    if(collection(options.case_id_key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
-    const auto at=index_of(source,options.case_id_key.value);
-    if(!at)fail("ColumnNotFoundError","apply",column_prefix(source,options.case_id_key.value)+resolved("'group_by'",frame_plan(source),groupnodes));
+    // Round CM: group_by([case, attribute]) reads a dict case key as a
+    // struct literal, so the denominator's pl.col(dict) fails first.
+    if(mapping(options.case_id_key)){
+      if(text(attr)&&!index_of(source,attr.value))fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved("'group_by'",frame_plan(source),groupnodes));
+      (void)distinct_case_count(source,options.case_id_key);
+      throw std::invalid_argument("Native Polars per-case counts grouped by a struct literal case key are outside the modelled domain");
+    }
+    const auto key=col_key(options.case_id_key,source.columns);
+    if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
+    const auto at=index_of(source,key.value);
+    if(!at)fail("ColumnNotFoundError","apply",column_prefix(source,key.value)+resolved("'group_by'",frame_plan(source),groupnodes));
     return at;
   };
   if(collection(attr)) {
     // Round CH: an empty key list fails on its first item only after the
     // per-case group_by resolved (a missing case key fails first).
     if(attr.children.empty()){if(result.once)(void)case_column();fail("IndexError","apply","tuple index out of range");}
-    // A key list groups by each of its items.
+    // A key list groups by each of its items; round CM: a dict item is
+    // refused as unhashable first.
+    if(!result.once&&!attr.children.empty()&&mapping(attr.children.front()))fail("TypeError","apply","unhashable type: 'dict'");
     if(result.once)if(const auto error=detail::polars_lit::argument_literal_error(attr))fail("TypeError","apply",*error);
     for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
       if(!result.once)fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),groupnodes));
@@ -1115,8 +1139,8 @@ PolarsAttributeCounts counts_from(const EventTable& source,const CountColumn& co
   if(!col.column&&!col.once&&out.empty())out.push_back({clean_value(col.literal),count_value(0)});
   return out;
 }
-std::size_t distinct_case_count(const EventTable& source,const EventAttribute& key) {
-  col_selector(key);if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
+std::size_t distinct_case_count(const EventTable& source,const EventAttribute& raw) {
+  const auto key=col_key(raw,source.columns);if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
   const auto column=index_of(source,key.value);if(!column)fail("ColumnNotFoundError","apply",column_prefix(source,key.value)+resolved("'select'",frame_plan(source),{"'select'"}));
   std::unordered_set<std::string> keys;for(std::size_t i=0;i<source.size();++i)keys.insert(group_key(cell(source,i,*column),source_dtype(source,*column)));return keys.size();
 }
@@ -1163,8 +1187,26 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
   const bool explicit_cache=op==Op::kThreshold&&call.count_cache&&!(std::holds_alternative<EventAttribute>(*call.count_cache)&&null(std::get<EventAttribute>(*call.count_cache)));
   CountColumn schema;
   if(!explicit_cache) {
+    // Round CM: group_by refuses a dict key while the plan is built.
+    dict_argument(attr);
     auto countoptions=options;
     if(op!=Op::kRelative)countoptions.keep_once_per_case.reset();
+    // Round CM: a key list holding a dict (black-box): a leading dict is
+    // unhashable; after a name, the dict groups as a struct literal whose
+    // value meets the threshold; df[list] names a dict item.
+    const bool dict_items=(attr.container==AttributeContainerKind::kList||attr.container==AttributeContainerKind::kTuple)&&
+        std::any_of(attr.children.begin(),attr.children.end(),[](const EventAttribute& v){return mapping(v);});
+    if(dict_items&&op==Op::kTopActivities&&!eager)
+      fail("TypeError","apply",mapping(attr.children.front())?"cannot select columns using Sequence with elements of type 'dict'":"'dict' object is not an instance of 'str'");
+    if(dict_items&&op!=Op::kTopActivities&&!mapping(attr.children.front())&&!(countoptions.keep_once_per_case&&truth(*countoptions.keep_once_per_case))) {
+      for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
+        fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),{"'group_by'"}));
+      if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+      if(!source.rows.empty()){
+        const auto& bound=op==Op::kRelative?*call.stake:*call.threshold;
+        fail("TypeError","apply","'>=' not supported between instances of 'dict' and '"+std::string(op==Op::kRelative?(real(bound)?"float":"int"):core_type(bound))+"'");
+      }
+    }
     if(op==Op::kTopActivities) {
       if(collection(attr)) {if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");fail("AttributeError","apply","'DataFrame' object has no attribute 'to_list'");}
       if(text(attr)&&!index_of(source,attr.value))fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved(eager?"'group_by'":"'slice'",frame_plan(source),eager?std::vector<std::string>{"'group_by'"}:std::vector<std::string>{"'group_by'","'select'","'slice'"}));
@@ -1213,7 +1255,7 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
 EventTable stats_output(const EventTable& source,const PolarsAttributesFilterCall& call,const StatisticalSelection& selection,bool eager) {
   if(selection.unchanged)return source;
   if(call.operation==Op::kRelative)col_selector(selection.attribute);
-  auto filtering=call;filtering.operation=Op::kEvents;filtering.values=selection.values;filtering.options.attribute_key=selection.attribute;
+  auto filtering=call;filtering.operation=Op::kEvents;filtering.values=selection.values;filtering.options.attribute_key=col_key(selection.attribute,source.columns);
   if(call.operation!=Op::kRelative)filtering.options.positive=EventAttribute{"","true",AttributeKind::kBoolean};
   return select_rows(source,matching(source,predicate(source,filtering,eager,selection.from_cache?nullptr:&selection.values.children)));
 }
@@ -1226,13 +1268,13 @@ LazyEventTable deferred(const LazyEventTable& source,std::function<EventTable(co
 }  // namespace
 
 PolarsAttributesFilterResult invoke_polars_attributes_filter(const EventTable& source,const PolarsAttributesFilterCall& input) {
-  source.validate();const auto call=prepare(input);
+  source.validate();const auto call=prepare(input,source.columns);
   if(call.operation==Op::kCounts){const auto schema=counts_schema(source,*call.attribute,call.options);(void)schema;fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");}
   if(statistics(call.operation)){const auto selected=stats(source,call,true);return stats_output(source,call,selected,true);}
   const auto query=predicate(source,call,true);return filtered(source,query);
 }
 LazyPolarsAttributesFilterResult invoke_polars_attributes_filter(const LazyEventTable& source,const PolarsAttributesFilterCall& input) {
-  const auto call=prepare(input);const auto meta=metadata_table(source);meta.validate();
+  const auto call=prepare(input,source.columns());const auto meta=metadata_table(source);meta.validate();
   if(call.operation==Op::kCounts) {
     const auto schema=counts_schema(meta,*call.attribute,call.options);
     return counts_from(source.materialize(),schema);

@@ -1083,19 +1083,26 @@ EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterVal
   const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kTraceSortPlan, kTraceAggPlan, &none);
   require_string_activities(df, v, case_key(parameters), activity_key(parameters));
   // Each admitted trace is iterated and its items read as str or None
-  // (round CB).
+  // (round CB). Round CM: an empty dict reads as None, and a trace holding
+  // a None joins to null, which matches no variant.
+  std::vector<std::string> patterns;
+  bool any = false;
   for (const auto& item : admitted_traces.items) {
     if (!iterable(item)) fail("TypeError", "'" + py_type(item) + "' object is not iterable");
-    for (const auto& part : elements(item))
-      if (part.kind != Kind::kString && part.kind != Kind::kNone)
+    bool null_part = false;
+    for (const auto& part : elements(item)) {
+      const bool empty_dict = part.kind == Kind::kDict && part.entries.empty();
+      if (part.kind != Kind::kString && part.kind != Kind::kNone && !empty_dict)
         fail("TypeError", "decoding to str: need a bytes-like object, " + py_type(part) + " found");
+      null_part = null_part || part.kind != Kind::kString;
+    }
+    any = true;
+    if (!null_part) patterns.push_back(join_pattern(item));
   }
-  std::vector<std::string> patterns;
-  for (const auto& item : admitted_traces.items) patterns.push_back(join_pattern(item));
   std::vector<Key> matched;
   for (std::size_t c = 0; c < v.order.size(); ++c) {
     const auto variant = variant_string(v.activities[c]);
-    bool ok = patterns.empty();
+    bool ok = !any;
     for (const auto& p : patterns) ok = ok || trace_match(variant, p);
     if (ok) matched.push_back(v.order[c]);
   }
@@ -1122,7 +1129,17 @@ EventTable polars_starts_with_filter_apply(const EventTable& df, const PolarsFil
 EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilterValue& admitted_suffixes,
                                          const PolarsFilterParameters& raw_parameters) {
   const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
-  const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kSuffixSortPlan, kSuffixAggPlan);
+  // Round CM: an activity key selecting no column ({} or []) aggregates the
+  // case column alone; the items are built in Python, then the eager frame
+  // misses its "variant" column (probe tq9).
+  const bool no_activity = no_columns_key(activity_key(parameters));
+  Variants v;
+  if (no_activity) {
+    (void)require(df, case_key(parameters), kSuffixSortPlan);
+    (void)require(df, kTimestamp, kSuffixSortPlan);
+  } else {
+    v = variants_of(df, case_key(parameters), activity_key(parameters), kSuffixSortPlan, kSuffixAggPlan);
+  }
   if (admitted_suffixes.items.empty()) fail("IndexError", "list index out of range");
   // A list or tuple first item joins every item with ","; otherwise each
   // item is a literal cast to String (round CB: an int as its digits, None
@@ -1137,6 +1154,11 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
       else if (item.kind == Kind::kDict)
         if (const auto error = detail::polars_lit::dict_literal_error(item)) fail("TypeError", *error);
     }
+  if (no_activity) {
+    if (joined)
+      for (const auto& item : admitted_suffixes.items) (void)python_join(item);
+    fail("ColumnNotFoundError", "unable to find column \"variant\"; valid columns: [" + debug_quote(case_key(parameters)) + "]");
+  }
   std::vector<std::optional<std::string>> suffixes;
   for (const auto& item : admitted_suffixes.items) {
     if (joined) {
@@ -1212,6 +1234,12 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
   // other struct stays a struct of the column dtype and fails with it; on
   // any other column it fails with its own type (probe/cj/s1.py).
   std::vector<std::vector<std::optional<Value>>> lists;
+  // Round CM: a struct item whose one field casts to null equals a null
+  // activity only when some case's slice holds a present activity (the
+  // cast comparison); over all-null slices it stays a valid struct and
+  // equals nothing (probe tq7/tq8).
+  std::vector<std::vector<bool>> opaque(literals.size());
+  std::vector<bool> slices_null(literals.size(), false);
   std::vector<bool> castable(literals.size(), true);
   std::vector<std::optional<std::pair<std::string, std::vector<std::string>>>> struct_shown(literals.size());
   std::vector<bool> struct_fails(literals.size(), false);  // a struct of the column dtype that cannot compare
@@ -1250,8 +1278,10 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
         struct_shown[p] = std::make_pair(cast_name(cast_name, literal.type), std::move(parts));
       }
       if (cast && literal.type.inner.size() == 1 && literal.type.inner[0].kind != LitType::K::kStruct) {
-        for (const auto& v : literal.values)
+        for (const auto& v : literal.values) {
           list.push_back(v.kind == Kind::kNone || v.entries.empty() ? std::nullopt : cast_to(v.entries[0].second, dtype, nullptr));
+          opaque[p].push_back(v.kind != Kind::kNone && !list.back());
+        }
         continue;
       }
       castable[p] = false;
@@ -1343,6 +1373,17 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
                       {"!filter", "select", "join right", "join"}));
   };
   const auto evaluate = [&](const std::vector<std::vector<Cell>>& variants) {
+    for (std::size_t p = 0; p < literals.size(); ++p) {
+      if (opaque[p].empty()) continue;
+      const auto n = literals[p].values.size();
+      slices_null[p] = std::none_of(variants.begin(), variants.end(), [&](const std::vector<Cell>& a) {
+        const auto take = std::min(n, a.size());
+        const auto begin = tail ? a.size() - take : 0;
+        for (auto i = begin; i < begin + take; ++i)
+          if (!null_cell(a[i])) return true;
+        return false;
+      });
+    }
     if (cast_failure) cast_failure_plan();
     for (std::size_t p = 0; p < literals.size() && !any_empty && (!failed || p < *failed); ++p) {
       if (!struct_fails[p]) continue;
@@ -1394,7 +1435,8 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
       bool same = true;
       for (std::size_t i = 0; i < p.size() && same; ++i) {
         const auto& cell = activities[offset + i];
-        same = null_cell(cell) ? !p[i] : p[i] && cell_equals(*cell, *p[i], dtype);
+        if (slices_null[k] && i < opaque[k].size() && opaque[k][i]) same = false;
+        else same = null_cell(cell) ? !p[i] : p[i] && cell_equals(*cell, *p[i], dtype);
       }
       if (same) return true;
     }
@@ -1531,6 +1573,25 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
       if (std::none_of(activities.begin(), activities.end(), [&](const Value& k) { return k.text == e.first.text; })) activities.push_back(e.first);
   } else activities = {activity};
   const auto literal = list_literal(activities);
+  // Round CM: the separator is a literal that concat_horizontal casts to
+  // String: an int as its digits, a bool as true/false, a float as Polars
+  // casts a Float64, a date as its ISO text, a dict as its struct display
+  // (null with a None field, its TypeError when it cannot be built), None
+  // as null (probe tq10-tq12).
+  std::optional<std::string> separator;
+  if (concat.kind == Kind::kString) {
+    separator = concat.text;
+  } else if (concat.kind == Kind::kDict) {
+    if (const auto error = detail::polars_lit::dict_literal_error(concat)) fail("TypeError", *error);
+    separator = detail::polars_lit::struct_text(detail::polars_lit::StructModel{detail::polars_lit::struct_fields(concat), false});
+  } else if (concat.kind == Kind::kDatetime || concat.kind == Kind::kDate) {
+    const auto v = lit_value(concat);
+    separator = cast_lit(v.value, v.type, lit_type(LitType::K::kString))->text;
+  } else if (concat.kind == Kind::kFloat) {
+    separator = detail::polars_cast_float(concat.real);
+  } else if (concat.kind == Kind::kInt || concat.kind == Kind::kBool) {
+    separator = literal_item(concat);
+  }
   const auto case_column = require(
       df, case_glue,
       Plan{"select",
@@ -1606,8 +1667,8 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
     seen[key] = true;
     previous[key] = current;
     auto& cell = out.rows[i][case_column];
-    if (key.null || !counter || concat.kind != Kind::kString) cell = null_cell_of(case_glue);
-    else cell = string_cell(case_glue, case_cell->value + concat.text + std::to_string(*counter));
+    if (key.null || !counter || !separator) cell = null_cell_of(case_glue);
+    else cell = string_cell(case_glue, case_cell->value + *separator + std::to_string(*counter));
   }
   return out;
 }

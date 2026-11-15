@@ -27123,3 +27123,104 @@ Verification (scripts in the project files under `review-harness/round-cl/`):
 | Polars table dict column keys (CK seed 2026111533) | 21,903 calls on 400 frames | 771 → 497 (carried) |
 | Fresh CJ table, CJ sequence and CB sequence seeds 2026111510, 2026111511, 2026111520 | 49,999 calls | the same 3 calls (carried) |
 | Every pandas and Polars sequence and table bank in the suite | the banks in the suite | 0 mismatches |
+
+## Review CM1: re-review of round CL, dict column keys in the Polars table filters, and fresh seeds (2026-11-15)
+
+Round CM checked CL's CI (the follow-up commit 7b12783, run
+43670069978: green on all six jobs), worked the Polars table bank CL
+carried (497 calls → 65) and replayed fresh seeds of the CK, CJ, CI and
+CH domains. The device check on the Mac was skipped (no device linked).
+
+- **CM1-1 Dict column keys in the Polars table filters** (CK seed
+  2026111533, 497 calls → 65; shared model in
+  `src/backend/polars_key_selection.hpp`), observed black-box against
+  Polars 1.44.1:
+  - `pl.col(dict)` selects the dict's keys by name, as `pl.col(list)`
+    does: one existing name is that column; a name no column carries
+    fails `"k" not found` (no valid-columns list, no hint) at the node
+    where a missing str column fails, naming the first missing name in
+    dict order; `{}` is the empty selection;
+  - `group_by`, `sort`, `unique` and `over` refuse a dict while the
+    expressions are built, before anything is collected: `Cannot pass a
+    dictionary as a single positional argument.` with its bullet text;
+  - each filter checks in its own order: the timestamp filters check
+    their bounds, then the case dict, then the selectors (the timeframe
+    filter checks its attribute selector, value literal and timestamp
+    selector first); `eventually_follows` and `A_next_B_next_C` check
+    the case dict first, `four_eyes_principle` (with more than one
+    value) and `attr_value_different_persons` after the attribute
+    column and the literals; `paths` after parsing the paths and the
+    attribute column, before the timestamp check; `variants` first, then
+    the activity type checks, the values join and the by-name
+    resolution; the case filters after the bound literals;
+  - the attributes stats: a list key holding a dict fails the lazy
+    top-activities select (`cannot select columns using Sequence with
+    elements of type 'dict'`, or `'dict' object is not an instance of
+    'str'` after a str item); a `[name, dict]` case key reports a missing
+    name in `group_by` first, then fails Python's `'>=' not supported
+    between instances of 'dict' and 'T'` on present rows; a leading dict
+    item fails `unhashable type: 'dict'`;
+  - `between.apply` with an activity key selecting nothing misses
+    `_is_act1` behind its 12-node plan.
+- **CM1-2 Pandas table filters** (fresh CK seed 2026111552, 3 calls →
+  0): `variants.apply` takes an enum `POSITIVE` over the `"positive"`
+  str key in either order (the original-call workbench test expected the
+  later of the two to win and now expects the enum); the relative occurrence filter raises its stake errors only
+  when a value was counted; the numeric filter on an empty-list
+  attribute fails `Unable to coerce to Series, length must be 0: given
+  N` for a non-empty list or tuple bound.
+- **CM1-3 Trace items** (`traces.apply`, fresh CJ seed 2026111555 case
+  591): an empty dict item reads as None (a non-empty one still fails
+  `decoding to str ...`), and a trace holding None or `{}` joins to
+  null, so it matches no variant (the model used to join None as an
+  empty token, which matched an empty-string activity).
+- **CM1-4 Struct patterns over null slices** (`prefixes`/`suffixes`,
+  CJ seed 2026111555 cases 497 and 763): on an integer or float
+  activity column a one-field struct item whose field casts to null
+  (None, `""`, `"x"`) equals a null activity only when some case's
+  slice of the pattern's length holds a present activity; over all-null
+  slices it stays a struct and equals nothing.
+- **CM1-5 `ends_with` with an activity key selecting nothing** (`{}` or
+  `[]`, fresh CK seed 2026111551): the case and timestamp columns are
+  checked, an empty item list fails `list index out of range`, the items
+  are joined or built in Python (their TypeErrors first), then the eager
+  frame misses `variant` (`unable to find column "variant"; valid
+  columns: [case]`, no plan).
+- **CM1-6 Non-str `SUBCASE_CONCAT_STR`** (`activity_split`, CK seed
+  2026111551): `concat_horizontal` casts the separator literal to
+  String: an int as its digits, a bool as `true`/`false`, a float as
+  Polars casts a Float64 (`0.00001`, `1e+16`, `NaN`, `-0.0`), a date as
+  its ISO text, a dict as its struct display (`{true}`, `{""}`, `}` for
+  `{}`, null with a None field; `cannot create expression literal ...`
+  for a non-str key), None as null.
+- **CM1-7 Fresh seeds.** Matched: pandas sequence CK 2026111553 (all
+  calls), CJ table 2026111554, CI table 2026111556, CH table 2026111557,
+  CH sequence 2026111558. Polars sequence CK 2026111551 is down to 17
+  calls and the CK table seed 2026111550 differs in 85 calls, nearly all
+  in the carried classes below.
+- **CM1-8 CL's CI.** The follow-up commit 7b12783 (the mine progress
+  race of CL1-5) ran green on Linux, macOS and Windows.
+
+Carried to round CN:
+- Polars table (65 calls of seed 2026111533): case keys given as a list
+  holding a dict, which Polars reads as a struct literal column in
+  `group_by`/`over` (`literal` and `_right` columns, struct cells),
+  and dict timestamp keys in sort contexts (a sort by a struct literal).
+- Polars sequence (17 calls each in seeds 2026111532 and 2026111551):
+  the same list case keys holding a dict, `timestamp_case_grouping` with
+  dict keys, `activity_split` with a list as `SUBCASE_CONCAT_STR` (the
+  cast failure behind the `concat_horizontal` plan).
+- The fresh CK table seed's `A_next_B_next_C` cases 37 and 301 and
+  `apply_numeric` case 190, the pandas table CK seed 2026111534 case
+  501, the three CK1-1 calls, and the items carried from CJ, CI and CD
+  (see Review CK1).
+
+Tests:
+- `docs/polars-filter-ck-bank.json.gz` (seed 2026111533 without the 65
+  carried calls, 21,838 calls), replayed by
+  `minera_polars_filter_ck_bank_parity_tests`.
+- `docs/polars-sequence-filter-cm-bank.json.gz` (CK seed 2026111551
+  without its 17 carried calls, then CJ seed 2026111555; 18,908 calls),
+  replayed by `minera_polars_sequence_filter_cm_bank_parity_tests`.
+- `docs/pandas-filter-cm-bank.json.gz` (pandas table CK seed 2026111552,
+  11,730 calls), replayed by `minera_pandas_filter_cm_bank_parity_tests`.

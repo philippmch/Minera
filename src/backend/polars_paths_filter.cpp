@@ -5,6 +5,7 @@
 #include "polars_lit_model.hpp"
 #include "polars_float_text.hpp"
 #include "polars_column_hint.hpp"
+#include "polars_key_selection.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -257,14 +258,28 @@ std::vector<std::string> paths(const EventAttribute& value, bool performance) {
   for (const auto& candidate : iter(value)) result.push_back(path_text(candidate));
   return result;
 }
+namespace keys = detail::polars_keys;
+// Round CM: pl.col of a list reads every item as a name and pl.col(dict)
+// selects the dict's names; keyed() resolves both.
 void validate_column(const EventAttribute& value) {
-  if (text(value)) return;
-  if (collection(value) && value.children.empty()) return;
+  if (text(value) || mapping(value)) return;
+  if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) {
+    if (!value.children.empty() && !text(value.children.front()))
+      fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(value.children.front()) + "'.");
+    for (const auto& item : value.children) if (!text(item)) fail("TypeError", "apply", "'" + python_type(item) + "' object is not an instance of 'str'");
+    return;
+  }
   if (collection(value)) throw std::invalid_argument("Native Polars path selector outside observed empty-list domain");
   fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(value) + "'.");
 }
 std::vector<std::string> validate_apply(const EventAttribute& value, bool performance, const PolarsPathsFilterOptions& options) {
   auto result = paths(value, performance);
+  // Round CM: a dict case key fails its group_by after the attribute
+  // selector is built and before the timestamp one.
+  if (mapping(options.case_id_key)) {
+    validate_column(options.attribute_key);
+    fail("TypeError", "apply", keys::dict_argument_message());
+  }
   validate_column(options.case_id_key); validate_column(options.timestamp_key); validate_column(options.attribute_key);
   if (!performance && options.target_attribute_key) validate_column(*options.target_attribute_key);
   // A list bound becomes a Series literal when the performance filter is
@@ -292,6 +307,7 @@ std::string missing_prefix(const std::string& key, const std::vector<std::string
   for (std::size_t i = 0; i < columns.size(); ++i) { if (i) out += ", "; out += debug_quote(columns[i]); }
   out += ']';
   if (const auto hint = detail::polars_column_hint(key, columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';
+  if (keys::by_name(key)) out = keys::by_name_message(key);
   return out + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n";
 }
 [[noreturn]] void missing(const EventTable& source, const std::string& key, bool after_sort, const PolarsPathsFilterOptions& options, const std::string& phase) {
@@ -516,11 +532,28 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
   }
   return result;
 }
-EventTable eager(const EventTable& source, const EventAttribute& path, bool performance, const PolarsPathsFilterOptions& options) {
-  return collect(source, validate_apply(path, performance, options), performance, options, "apply");
+// The column keys as pl.col reads them (a refused multi-name selection stays
+// a list, outside the modelled domain).
+PolarsPathsFilterOptions keyed(const PolarsPathsFilterOptions& raw, const std::vector<std::string>& columns) {
+  auto options = raw;
+  for (auto* key : {&options.case_id_key, &options.timestamp_key, &options.attribute_key}) {
+    *key = keys::col_key(*key, columns);
+    if (collection(*key) && !key->children.empty()) throw std::invalid_argument("Native Polars path selector outside observed empty-list domain");
+  }
+  if (options.target_attribute_key) {
+    *options.target_attribute_key = keys::col_key(*options.target_attribute_key, columns);
+    if (collection(*options.target_attribute_key) && !options.target_attribute_key->children.empty())
+      throw std::invalid_argument("Native Polars path selector outside observed empty-list domain");
+  }
+  return options;
 }
-LazyEventTable lazy(const LazyEventTable& source, const EventAttribute& path, bool performance, const PolarsPathsFilterOptions& options) {
-  auto parsed = validate_apply(path, performance, options);
+EventTable eager(const EventTable& source, const EventAttribute& path, bool performance, const PolarsPathsFilterOptions& raw) {
+  auto parsed = validate_apply(path, performance, raw);
+  return collect(source, parsed, performance, keyed(raw, source.columns), "apply");
+}
+LazyEventTable lazy(const LazyEventTable& source, const EventAttribute& path, bool performance, const PolarsPathsFilterOptions& raw) {
+  auto parsed = validate_apply(path, performance, raw);
+  const auto options = keyed(raw, source.columns());
   return LazyEventTable(source.columns(), [source, parsed, performance, options](const auto& consume) {
     const auto result = collect(source.materialize(), parsed, performance, options, "collect"); for (const auto& row : result.rows) consume(row);
   }, source.attributes(), source.metadata(), std::nullopt, source.dtypes(), source.index(), source.categorical_dtypes());

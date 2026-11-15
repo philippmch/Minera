@@ -458,6 +458,9 @@ PandasVariantsFilterOptions resolve_variants_options(const std::vector<PandasVar
   else if(value.key=="decreasingFactor")options.decreasing_factor=value;
   else if(value.key=="variants_df"){if(p.table)options.variants_df=*p.table;else options.variants_df=value;}
  }
+ // Round CM: POSITIVE given as the enum member wins over its string key
+ // (seed 2026111552 case 0, probed in both orders).
+ for(const auto& p:parameters)if(p.enum_key&&p.value.key=="positive")options.positive=p.value;
  return options;
 }
 PandasVariantsFilterOptions resolve_variants_options(const EventAttribute& parameters){

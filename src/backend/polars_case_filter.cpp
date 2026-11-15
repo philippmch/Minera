@@ -1,6 +1,7 @@
 #include "minera/polars_case_filter.hpp"
 #include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
+#include "polars_key_selection.hpp"
 #include "polars_float_text.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_lit_model.hpp"
@@ -125,11 +126,13 @@ std::vector<std::string> nodes(Operation op, bool upper = false) {
   if (op == Operation::kSize) return {"group_by", "filter", "select", "join right", "join"};
   return {"group_by", "with_columns", "filter", "select", "join right", "join"};
 }
+namespace keys = detail::polars_keys;
 [[noreturn]] void missing(const EventTable& source, const std::string& key, Operation op, const std::string& phase, bool upper = false) {
   std::string message = "unable to find column " + debug_quote(key) + "; valid columns: [";
   for (std::size_t i = 0; i < source.columns.size(); ++i) { if (i) message += ", "; message += debug_quote(source.columns[i]); }
   message += ']';
   if (const auto hint = detail::polars_column_hint(key, source.columns)) message += "\n\nDid you mean " + debug_quote(*hint) + '?';
+  if (keys::by_name(key)) message = keys::by_name_message(key);
   fail("ColumnNotFoundError", phase, message + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n" + frame_plan(source) + contexts(nodes(op, upper)));
 }
 // Python builds the bound literals before any Polars step.
@@ -347,9 +350,26 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   }
   return result;
 }
-LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& options) {
-  validate_apply(op, low, options);
+// Round CM: group_by(case) refuses a dict while the plan is built, and the
+// performance filter's pl.col(timestamp) selects a dict's names.
+PolarsCaseFilterOptions keyed(const PolarsCaseFilterOptions& raw, Operation op, const std::vector<std::string>& columns) {
+  if (keys::dict_key(raw.case_id_key)) fail("TypeError", "apply", keys::dict_argument_message());
+  auto options = raw;
+  const auto& time = raw.timestamp_key;
+  if (op == Operation::kPerformance && collection(time)) {
+    if (time.container == AttributeContainerKind::kList || time.container == AttributeContainerKind::kTuple) {
+      if (!time.children.empty() && !text(time.children.front()))
+        fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(time.children.front()) + "'.");
+      for (const auto& item : time.children) if (!text(item)) fail("TypeError", "apply", "'" + python_type(item) + "' object is not an instance of 'str'");
+    }
+    options.timestamp_key = keys::col_key(time, columns);
+  }
+  return options;
+}
+LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& raw) {
+  validate_apply(op, low, raw);
   validate_literals(low, high);
+  const auto options = keyed(raw, op, source.columns());
   auto columns = source.columns(); auto dtypes = source.dtypes(); auto categories = source.categorical_dtypes();
   if (integer(options.case_id_key)) { columns.push_back("literal"); if (!dtypes.empty()) dtypes.push_back("Int32"); if (!categories.empty()) categories.push_back(std::nullopt); }
   return LazyEventTable(std::move(columns), [source, op, low, high, options](const auto& consume) {
@@ -357,9 +377,10 @@ LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttri
     for (const auto& row : result.rows) consume(row);
   }, source.attributes(), source.metadata(), std::nullopt, std::move(dtypes), source.index(), std::move(categories));
 }
-EventTable eager(const EventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& options) {
-  validate_apply(op, low, options);
+EventTable eager(const EventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& raw) {
+  validate_apply(op, low, raw);
   validate_literals(low, high);
+  const auto options = keyed(raw, op, source.columns);
   return collect(source, op, low, high, options, "apply");
 }
 std::vector<PolarsCaseFilterParameter> parameter_value(const EventAttribute& value) {

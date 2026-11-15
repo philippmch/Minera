@@ -3,6 +3,8 @@
 #include "polars_sort.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_column_hint.hpp"
+#include "polars_key_selection.hpp"
+#include "python_scalar.hpp"
 #include "polars_lit_model.hpp"
 #include "pandas_parameter_carrier.hpp"
 
@@ -329,7 +331,9 @@ std::string render(std::string_view pattern, const EventTable& source, const Pre
   }
   return out;
 }
+namespace keys = detail::polars_keys;
 std::string missing_message(const EventTable& source, const std::string& key, bool index = false) {
+  if (keys::by_name(key)) return keys::by_name_message(key);
   std::string out = "unable to find column " + debug_quote(key) + "; valid columns: [";
   for (std::size_t i = 0; i < source.columns.size(); ++i) { if (i) out += ", "; out += debug_quote(source.columns[i]); }
   if (index) { if (!source.columns.empty()) out += ", "; out += "\"_index\""; }
@@ -355,7 +359,30 @@ std::vector<PolarsLtlFilterParameter> parameters(const EventAttribute& value) {
   detail::check_parameter_carrier(value, [](const std::string& type, const std::string& message) { fail(type, "apply", message); });
   return {};
 }
-Prepared prepare(const PolarsLtlFilterCall& call) {
+// Round CM: group_by, sort and over refuse a dict key while the plan is built.
+void dict_argument(const EventAttribute& key) {
+  if (keys::dict_key(key)) fail("TypeError", "apply", keys::dict_argument_message());
+}
+// Python's repr of a key (the A_next_B_next_C selection message).
+std::string key_repr(const EventAttribute& value) {
+  return detail::pandas_container_repr(value, [](const EventAttribute& v) -> std::string {
+    if (null(v)) return "None";
+    if (boolean(v)) return truth(v) ? "True" : "False";
+    if (integer(v)) return exact(v).decimal();
+    if (real(v)) return python::float_repr(native_attribute_number(v));
+    std::string out = "'";
+    for (const char c : v.value) { if (c == '\\' || c == '\'') out += '\\'; out += c; }
+    return out + "'";
+  }, [](const std::string& k) { return "'" + k + "'"; });
+}
+// pl.col of a list: every item a str, or the first item names the type.
+void col_list(const EventAttribute& key) {
+  if (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple) return;
+  if (!key.children.empty() && !text(key.children.front()))
+    fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(key.children.front()) + "'.");
+  for (const auto& item : key.children) if (!text(item)) fail("TypeError", "apply", "'" + python_type(item) + "' object is not an instance of 'str'");
+}
+Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>& columns) {
   if (!call.values) fail("TypeError", "apply", function_name(call.operation) + "() missing 1 required positional argument: '" +
       (call.operation == Op::kDifferentPersons ? "attribute_value" : "attribute_values") + "'");
   Prepared out{call.operation, call.options, *call.values, {}};
@@ -371,6 +398,7 @@ Prepared prepare(const PolarsLtlFilterCall& call) {
     else if (entry.key == "timestamp_diff_boundaries") out.options.timestamp_diff_boundaries = entry.value;
   }
   const auto& o = out.options;
+  if (sequence_rule(out.operation)) dict_argument(o.case_id_key);
   if (sequence_rule(out.operation) && null(o.case_id_key))
     fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (out.operation == Op::kDifferentPersons) out.values = {out.original};
@@ -382,6 +410,7 @@ Prepared prepare(const PolarsLtlFilterCall& call) {
   }
   if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1)) {
     if (!text(o.attribute_key) && !collection(o.attribute_key)) invalid_col(o.attribute_key);
+    col_list(o.attribute_key);
     if (out.operation == Op::kFourEyes) {
       if (!text(o.resource_key) && !collection(o.resource_key)) invalid_col(o.resource_key);
       if (collection(o.resource_key)) fail("TypeError", "apply", "can only concatenate list (not \"str\") to list");
@@ -406,6 +435,9 @@ Prepared prepare(const PolarsLtlFilterCall& call) {
         }
       }
     }
+  if (!sequence_rule(out.operation) && (out.operation != Op::kFourEyes || out.values.size() > 1)) dict_argument(o.case_id_key);
+  // pl.col(dict) selects the dict's names (round CM).
+  if (out.operation != Op::kNext) out.options.attribute_key = keys::col_key(o.attribute_key, columns);
   return out;
 }
 
@@ -489,6 +521,12 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   }
   if (p.operation == Op::kNext) {
     if (null(o.attribute_key)) fail("TypeError", "apply", "cannot select columns using key of type 'NoneType': None");
+    if (keys::dict_key(o.attribute_key)) fail("TypeError", "apply", "cannot select columns using key of type 'dict': " + key_repr(o.attribute_key));
+    if (collection(o.attribute_key) && std::any_of(o.attribute_key.children.begin(), o.attribute_key.children.end(), [](const EventAttribute& v) { return keys::dict_key(v); })) {
+      if (keys::dict_key(o.attribute_key.children.front()))
+        fail("TypeError", "apply", "cannot select columns using Sequence with elements of type 'dict'");
+      fail("TypeError", "apply", "'dict' object is not an instance of 'str'");
+    }
     if (collection(o.attribute_key)) fail("AttributeError", "apply", "'DataFrame' object has no attribute 'to_list'");
     if (integer(o.attribute_key)) {
       std::size_t height = 0;
@@ -737,10 +775,10 @@ EventTable collect(const EventTable& source,const Prepared& p,bool eager) {
 }  // namespace
 
 EventTable invoke_polars_ltl_filter(const EventTable& source,const PolarsLtlFilterCall& call) {
-  return collect(source,prepare(call),true);
+  return collect(source,prepare(call,source.columns),true);
 }
 LazyEventTable invoke_polars_ltl_filter(const LazyEventTable& source,const PolarsLtlFilterCall& call) {
-  const auto p=prepare(call);
+  const auto p=prepare(call,source.columns());
   if(p.operation==Op::kNext) {
     const auto snapshot=source.materialize();validate_schema(snapshot,p,false);
     const auto selected=select_cases(snapshot,p);

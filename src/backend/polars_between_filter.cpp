@@ -3,6 +3,7 @@
 #include "polars_float_text.hpp"
 #include "polars_sort.hpp"
 #include "polars_column_hint.hpp"
+#include "polars_key_selection.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_lit_model.hpp"
 #include "pandas_parameter_carrier.hpp"
@@ -138,13 +139,29 @@ void validate_anchor(const EventAttribute& value, const std::string& phase = "ap
     fail(error.type, phase, error.what());
   }
 }
-std::string activity_key(const EventAttribute& value) {
+namespace keys = detail::polars_keys;
+// An activity key selecting no column ({} or []).
+constexpr char kNoActivityColumn = '\x02';
+// Round CM: pl.col(dict) selects the dict's names like pl.col(list); a list
+// item that is not a str fails as pl.col reports it.
+std::string activity_key(const EventAttribute& value, const std::vector<std::string>& columns) {
   if (text(value)) return value.value;
-  if (collection(value) && value.children.size() == 1 && text(value.children.front()))
-    return value.children.front().value;
+  if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) {
+    if (!value.children.empty() && !text(value.children.front()))
+      fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(value.children.front()) + "'.");
+    for (const auto& item : value.children)
+      if (!text(item)) fail("TypeError", "apply", "'" + python_type(item) + "' object is not an instance of 'str'");
+  }
+  if (collection(value)) {
+    const auto key = keys::col_key(value, columns);
+    if (!collection(key)) return key.value;
+    if (key.children.empty()) return std::string(1, kNoActivityColumn);
+    throw std::invalid_argument("Native Polars between activity selector accepts one column");
+  }
   fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(value) + "'.");
 }
-void validate_apply(const EventAttribute& act1, const EventAttribute& act2, const PolarsBetweenOptions& options) {
+void validate_apply(const EventAttribute& act1, const EventAttribute& act2, const PolarsBetweenOptions& options,
+                    const std::vector<std::string>& columns) {
   const auto& key = options.case_id_key;
   if (null(key)) fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (!text(key)) {
@@ -160,7 +177,7 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
     if (collection(key)) fail("TypeError", "apply", "'" + core_type(key) + "' object is not an instance of 'str'");
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(key) + "'.");
   }
-  (void)activity_key(options.activity_key);
+  (void)activity_key(options.activity_key, columns);
   validate_anchor(act1); validate_anchor(act2);
 }
 
@@ -210,6 +227,7 @@ std::string indexed_plan(const EventTable& source, const std::string& key, const
   }
   message += ']';
   if (const auto hint = detail::polars_column_hint(name, columns)) message += "\n\nDid you mean " + debug_quote(*hint) + '?';
+  if (keys::by_name(name)) message = keys::by_name_message(name);
   if (phase == "collect") {
     message += "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n";
     message += indexed ? indexed_plan(source, key, "") : frame_plan(source);
@@ -496,13 +514,35 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
   source.validate();
   if (source.index) throw std::invalid_argument("Native Polars between tables cannot have dataframe index metadata");
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars between requires declared column dtypes");
-  const auto key = options.case_id_key.value, activity = activity_key(options.activity_key);
+  const auto key = options.case_id_key.value, activity = activity_key(options.activity_key, source.columns);
   const auto position = [&](const std::string& name, bool indexed) {
     const auto found = std::find(source.columns.begin(), source.columns.end(), name);
     if (found == source.columns.end()) missing(source, name, key, indexed, phase);
     return static_cast<std::size_t>(found - source.columns.begin());
   };
-  const auto case_at = position(key, false), time_at = position("time:timestamp", false), activity_at = position(activity, true);
+  const auto case_at = position(key, false), time_at = position("time:timestamp", false);
+  // Round CM: an activity key selecting no column leaves the _is_act1 flag
+  // unwritten, so the next node misses it.
+  if (activity.size() == 1 && activity.front() == kNoActivityColumn) {
+    auto columns = source.columns;
+    columns.push_back("_event_idx");
+    std::string message = "unable to find column \"_is_act1\"; valid columns: [";
+    for (std::size_t i = 0; i < columns.size(); ++i) message += (i ? ", " : "") + debug_quote(columns[i]);
+    message += ']';
+    if (const auto hint = detail::polars_column_hint("_is_act1", columns)) message += "\n\nDid you mean " + debug_quote(*hint) + '?';
+    if (phase == "collect")
+      message += "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n WITH_COLUMNS:\n [] \n" +
+                 indexed_plan(source, key, "  ") + [] {
+        // The flag's with_columns sits one node above the activity column's.
+        const std::vector<std::string> nodes{"with_columns", "with_columns", "with_columns", "with_columns", "with_columns", "filter",
+                                             "with_columns", "join left", "join", "with_columns", "with_columns", "select"};
+        std::string out = "\n\nThis error occurred with the following context stack:\n";
+        for (std::size_t i = 0; i < nodes.size(); ++i) out += "\t[" + std::to_string(i + 1) + "] '" + nodes[i] + "'\n";
+        return out;
+      }();
+    fail("ColumnNotFoundError", phase, message);
+  }
+  const auto activity_at = position(activity, true);
   const auto case_kind = dtype(source.dtypes[case_at]), time_kind = dtype(source.dtypes[time_at]);
   (void)dtype(source.dtypes[activity_at]);
   const auto enum_dictionary = [&](std::size_t at, Dtype kind) -> std::optional<EnumRanks> {
@@ -608,12 +648,12 @@ PolarsBetweenOptions resolve_polars_between_parameter_value(const EventAttribute
 
 EventTable filter_polars_between(const EventTable& source, const EventAttribute& act1,
                                 const EventAttribute& act2, const PolarsBetweenOptions& options) {
-  validate_apply(act1, act2, options);
+  validate_apply(act1, act2, options, source.columns);
   return collect(source, act1, act2, options, "apply");
 }
 LazyEventTable filter_polars_between(const LazyEventTable& source, const EventAttribute& act1,
                                     const EventAttribute& act2, const PolarsBetweenOptions& options) {
-  validate_apply(act1, act2, options);
+  validate_apply(act1, act2, options, source.columns());
   auto dtypes = source.dtypes(); auto categories = source.categorical_dtypes();
   const auto found = std::find(source.columns().begin(), source.columns().end(), options.case_id_key.value);
   if (found != source.columns().end()) {
