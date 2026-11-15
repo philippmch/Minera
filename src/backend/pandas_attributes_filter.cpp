@@ -425,6 +425,8 @@ PandasAttributesCountMap counts(const EventTable& source,const EventAttribute& k
 bool greater_equal(const EventAttribute& left,const EventAttribute& right){
  if(is_native_na_attribute(left)||is_native_na_attribute(right))error("TypeError","boolean value of NA is ambiguous");
  if(numeric(left)&&numeric(right)){if(missing(left)||missing(right))return false;return native_scalar_key_compare(left,right)>=0;}
+ // Round CN: two strs compare by code point (UTF-8 bytes keep that order).
+ if(text_value(left)&&text_value(right))return left.value>=right.value;
  error("TypeError","'>=' not supported between instances of '"+qualified_type_name(left)+"' and '"+qualified_type_name(right)+"'");
 }
 bool python_contains(const EventAttribute& collection,const EventAttribute& value){

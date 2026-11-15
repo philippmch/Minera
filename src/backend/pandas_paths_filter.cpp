@@ -239,6 +239,8 @@ std::vector<std::optional<std::string>> query_paths(const EventAttribute& paths,
  if(performance)return {path_pair(paths)};
  std::vector<EventAttribute> values;
  if(text_value(paths)){for(std::size_t i=0;i<paths.value.size();++i)values.push_back(subscript(paths,i));}
+ // Round CN: a dict iterates its keys (each once, in insertion order).
+ else if(paths.container==AttributeContainerKind::kContainer&&!paths.is_null){for(const auto& child:paths.children)if(std::none_of(values.begin(),values.end(),[&](const EventAttribute& k){return k.value==child.key;}))values.push_back(EventAttribute{"",child.key});}
  else if(paths.container!=AttributeContainerKind::kScalar)values=paths.children;
  else error("TypeError","'"+type_name(paths)+"' object is not iterable");
  std::vector<std::optional<std::string>> result;

@@ -208,7 +208,7 @@ void col_selector(const EventAttribute& value) {
   if(collection(value)&&!mapping(value)&&!value.children.empty()&&!text(value.children.front()))
     fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(value.children.front())+"'.");
   // Round CM: a dict selects its names (str keys), so its values go unread.
-  if(collection(value)&&!mapping(value))for(const auto& item:value.children)if(!text(item))fail("TypeError","apply","'"+python_type(item)+"' object is not an instance of 'str'");
+  if(collection(value)&&!mapping(value))for(const auto& item:value.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+python_type(item)+"' object is not an instance of 'str'");
   if(collection(value)&&!mapping(value)&&!value.children.empty())throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
 }
 // The checked selector as pl.col reads it (round CM).

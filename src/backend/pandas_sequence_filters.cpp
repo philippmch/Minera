@@ -2270,7 +2270,10 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   // on an empty frame; a column's with the dtype its distinct values infer)
   // and then the other columns.
   if (dict_key(case_value) || dict_key(timestamp_value)) {
+    // Round CN: the groupby checks each key when it is built; a list key's
+    // items hash only when first() or last() aggregates.
     std::vector<std::optional<std::size_t>> keys;
+    bool unhashable = false;
     for (const auto* key : {&case_value, &timestamp_value}) {
       if (key->kind == Kind::kDict) {
         keys.emplace_back(std::nullopt);
@@ -2278,11 +2281,14 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
       }
       if (dict_key(*key)) {
         if (key->items.size() != df.size()) fail("ValueError", "Grouper and axis must be same length");
-        fail("TypeError", "unhashable type: 'dict'");
+        unhashable = true;
+        keys.emplace_back(std::nullopt);
+        continue;
       }
       keys.emplace_back(require_column(df, key_text(*key)));
     }
     if (!first && !last) fail("AttributeError", "'NoneType' object has no attribute 'reset_index'");
+    if (unhashable) fail("TypeError", "unhashable type: 'dict'");
     EventTable out = df;
     out.rows.clear();
     out.columns.clear();
@@ -2712,9 +2718,8 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
   const auto activity_view = numpy_case_view(nv, act);
   const auto activity_dtype = column_dtype(df, act);
   const bool activity_datetime = activity_dtype.starts_with("datetime64[");
-  const auto is_cut = [&](const Cell& cell) {
-    if (!container)
-      fail("TypeError", "argument of type '" + type_name(activity) + "' is not a container or iterable");
+  // One cut against a cell, as the column's values compare.
+  const auto matches = [&](const Cell& cell, const python::Scalar& cut) {
     // A datetime64 activity (numpy's datetime64 or a Timestamp, NaT
     // included) equals no str, int or None argument (round CB). A datetime
     // argument equals a naive s, ms or us activity of its wall clock (numpy
@@ -2726,23 +2731,43 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
       if (null_cell(cell) || activity_dtype == "datetime64[ns]") return false;
       const auto value = scalar_of(cell);
       if (ambiguous_wall(value, activity_dtype)) return false;
-      return std::any_of(cuts.begin(), cuts.end(), [&](const python::Scalar& cut) {
-        return cut.kind == python::Scalar::Kind::kDate && py_equal(value, cut);
-      });
+      return cut.kind == python::Scalar::Kind::kDate && py_equal(value, cut);
     }
-    if (activity_view) {
-      const auto value = numpy_case(cell);
-      return std::any_of(cuts.begin(), cuts.end(),
-                         [&](const python::Scalar& cut) { return numpy_equals(value, *activity_view, cut); });
-    }
+    if (activity_view) return numpy_equals(numpy_case(cell), *activity_view, cut);
     const auto value = scalar_of(cell);
-    for (const auto& cut : cuts) {
-      // `in` matches an element that is the same object or ==: None is
-      // None, a NaN cell is never the argument's NaN.
-      if (value.kind == python::Scalar::Kind::kNone && cut.kind == python::Scalar::Kind::kNone) return true;
-      if (py_equal(value, cut)) return true;
+    // `in` matches an element that is the same object or ==: None is
+    // None, a NaN cell is never the argument's NaN.
+    if (value.kind == python::Scalar::Kind::kNone && cut.kind == python::Scalar::Kind::kNone) return true;
+    return py_equal(value, cut);
+  };
+  // Round CN: a numpy scalar activity (a numeric or naive datetime64 column,
+  // NaT included) compares a list or tuple item element-wise, and `in` takes
+  // the truth of that array: an empty or longer one fails, a one-item one
+  // compares its item (probe as1). Items are tried in order until one
+  // matches; a dict item equals nothing.
+  const bool numpy_scalar = activity_view.has_value() || (activity_datetime && activity_dtype.find(", ") == std::string::npos);
+  const bool sequence_items = (activity.kind == Kind::kList || activity.kind == Kind::kTuple) &&
+                              std::any_of(activity.items.begin(), activity.items.end(), [](const PandasFilterValue& item) {
+                                return item.kind == Kind::kList || item.kind == Kind::kTuple;
+                              });
+  const auto is_cut = [&](const Cell& cell) {
+    if (!container)
+      fail("TypeError", "argument of type '" + type_name(activity) + "' is not a container or iterable");
+    if (numpy_scalar && sequence_items) {
+      for (const auto& item : activity.items) {
+        const PandasFilterValue* x = &item;
+        while (x->kind == Kind::kList || x->kind == Kind::kTuple) {
+          if (x->items.empty())
+            fail("ValueError", "The truth value of an empty array is ambiguous. Use `array.size > 0` to check that an array is not empty.");
+          if (x->items.size() > 1)
+            fail("ValueError", "The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()");
+          x = &x->items.front();
+        }
+        if (const auto cut = scalar_of(*x); cut && matches(cell, *cut)) return true;
+      }
+      return false;
     }
-    return false;
+    return std::any_of(cuts.begin(), cuts.end(), [&](const python::Scalar& cut) { return matches(cell, cut); });
   };
   const auto& name = df.columns[case_column];
   std::size_t written = 0;

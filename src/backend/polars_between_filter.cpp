@@ -142,16 +142,25 @@ void validate_anchor(const EventAttribute& value, const std::string& phase = "ap
 namespace keys = detail::polars_keys;
 // An activity key selecting no column ({} or []).
 constexpr char kNoActivityColumn = '\x02';
+// Round CN: pl.col names a later item that is not a str as PyO3 does
+// (None as 'None', without "object").
+std::string col_item_message(const EventAttribute& item) {
+  if (null(item)) return "'None' is not an instance of 'str'";
+  return "'" + python_type(item) + "' object is not an instance of 'str'";
+}
+// pl.col of a list or tuple: the first item names its type, a later one is
+// refused by PyO3.
+void col_items(const EventAttribute& value) {
+  if (!value.children.empty() && !text(value.children.front()))
+    fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(value.children.front()) + "'.");
+  for (const auto& item : value.children)
+    if (!text(item)) fail("TypeError", "apply", col_item_message(item));
+}
 // Round CM: pl.col(dict) selects the dict's names like pl.col(list); a list
 // item that is not a str fails as pl.col reports it.
 std::string activity_key(const EventAttribute& value, const std::vector<std::string>& columns) {
   if (text(value)) return value.value;
-  if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) {
-    if (!value.children.empty() && !text(value.children.front()))
-      fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(value.children.front()) + "'.");
-    for (const auto& item : value.children)
-      if (!text(item)) fail("TypeError", "apply", "'" + python_type(item) + "' object is not an instance of 'str'");
-  }
+  if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) col_items(value);
   if (collection(value)) {
     const auto key = keys::col_key(value, columns);
     if (!collection(key)) return key.value;
@@ -174,6 +183,12 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
            "If you need the key value pairs, use one of:\n"
            "  \xe2\x80\xa2 unpack as keywords:    df.method(**your_dict)\n"
            "  \xe2\x80\xa2 build expressions:     df.method(expr.alias(k) for k, expr in your_dict.items())");
+    // Round CN: a list or tuple case key is first built as a Series literal
+    // (strictly), then read by pl.col, before its over() refuses it.
+    if (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) {
+      if (const auto error = detail::polars_lit::argument_literal_error(key)) fail("TypeError", "apply", *error);
+      col_items(key);
+    }
     if (collection(key)) fail("TypeError", "apply", "'" + core_type(key) + "' object is not an instance of 'str'");
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(key) + "'.");
   }

@@ -266,7 +266,7 @@ void validate_column(const EventAttribute& value) {
   if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) {
     if (!value.children.empty() && !text(value.children.front()))
       fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(value.children.front()) + "'.");
-    for (const auto& item : value.children) if (!text(item)) fail("TypeError", "apply", "'" + python_type(item) + "' object is not an instance of 'str'");
+    for (const auto& item : value.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
     return;
   }
   if (collection(value)) throw std::invalid_argument("Native Polars path selector outside observed empty-list domain");
@@ -274,6 +274,11 @@ void validate_column(const EventAttribute& value) {
 }
 std::vector<std::string> validate_apply(const EventAttribute& value, bool performance, const PolarsPathsFilterOptions& options) {
   auto result = paths(value, performance);
+  // Round CN: a list or tuple case or timestamp key is a Series literal
+  // (built strictly, as the sort lists them) before any selector is read.
+  for (const auto* key : {&options.case_id_key, &options.timestamp_key})
+    if (key->container == AttributeContainerKind::kList || key->container == AttributeContainerKind::kTuple)
+      if (const auto error = detail::polars_lit::argument_literal_error(*key)) fail("TypeError", "apply", *error);
   // Round CM: a dict case key fails its group_by after the attribute
   // selector is built and before the timestamp one.
   if (mapping(options.case_id_key)) {
@@ -281,6 +286,8 @@ std::vector<std::string> validate_apply(const EventAttribute& value, bool perfor
     fail("TypeError", "apply", keys::dict_argument_message());
   }
   validate_column(options.case_id_key); validate_column(options.timestamp_key); validate_column(options.attribute_key);
+  if (keys::dict_key(options.timestamp_key))
+    if (const auto error = detail::polars_lit::dict_literal_error(options.timestamp_key)) fail("TypeError", "apply", *error);
   if (!performance && options.target_attribute_key) validate_column(*options.target_attribute_key);
   // A list bound becomes a Series literal when the performance filter is
   // built; round CJ: a dict bound a struct literal (its own TypeError).
@@ -299,8 +306,15 @@ std::string contexts(const std::vector<std::string>& nodes) {
   for (std::size_t i = 0; i < nodes.size(); ++i) out += "\t[" + std::to_string(i + 1) + "] '" + nodes[i] + "'\n";
   return out;
 }
-std::string sort_plan(const EventTable& source, const PolarsPathsFilterOptions& options, const std::string& padding = "") {
-  return padding + "SORT BY [col(" + quote(options.case_id_key.value) + "), col(" + quote(options.timestamp_key.value) + ")]\n" + padding + "  " + frame_plan(source);
+// Round CN: a dict timestamp key sorts as its struct literal (one value, so
+// the sort fails on any frame but a one-row one).
+using SortLiteral = std::optional<std::string>;
+std::string sort_time(const PolarsPathsFilterOptions& options, const SortLiteral& literal, const std::string& empty) {
+  if (literal) return *literal;
+  return collection(options.timestamp_key) ? empty : "col(" + quote(options.timestamp_key.value) + ")";
+}
+std::string sort_plan(const EventTable& source, const PolarsPathsFilterOptions& options, const SortLiteral& literal, const std::string& padding = "") {
+  return padding + "SORT BY [col(" + quote(options.case_id_key.value) + "), " + sort_time(options, literal, "[]") + "]\n" + padding + "  " + frame_plan(source);
 }
 std::string missing_prefix(const std::string& key, const std::vector<std::string>& columns) {
   std::string out = "unable to find column " + debug_quote(key) + "; valid columns: [";
@@ -310,11 +324,11 @@ std::string missing_prefix(const std::string& key, const std::vector<std::string
   if (keys::by_name(key)) out = keys::by_name_message(key);
   return out + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n";
 }
-[[noreturn]] void missing(const EventTable& source, const std::string& key, bool after_sort, const PolarsPathsFilterOptions& options, const std::string& phase) {
+[[noreturn]] void missing(const EventTable& source, const std::string& key, bool after_sort, const PolarsPathsFilterOptions& options, const SortLiteral& literal, const std::string& phase) {
   const auto nodes = after_sort ? std::vector<std::string>{"with_columns", "with_columns", "join left", "join", "select"} : std::vector<std::string>{"sort", "with_columns", "with_columns", "join left", "join", "select"};
-  fail("ColumnNotFoundError", phase, missing_prefix(key, source.columns) + (after_sort ? sort_plan(source, options) : frame_plan(source)) + contexts(nodes));
+  fail("ColumnNotFoundError", phase, missing_prefix(key, source.columns) + (after_sort ? sort_plan(source, options, literal) : frame_plan(source)) + contexts(nodes));
 }
-[[noreturn]] void empty_selector(const EventTable& source, bool performance, const PolarsPathsFilterOptions& options, const std::string& phase) {
+[[noreturn]] void empty_selector(const EventTable& source, bool performance, const PolarsPathsFilterOptions& options, const SortLiteral& literal, const std::string& phase) {
   const auto key = quote(options.case_id_key.value), activity = quote(options.attribute_key.value), time = quote(options.timestamp_key.value);
   const auto& target = performance ? options.attribute_key : options.target_attribute_key ? *options.target_attribute_key : options.attribute_key;
   auto columns = source.columns;
@@ -324,17 +338,17 @@ std::string missing_prefix(const std::string& key, const std::vector<std::string
     name = "@@path"; columns.push_back("next_activity"); if (performance) columns.push_back("next_timestamp");
     plan = " WITH_COLUMNS:\n [] \n   WITH_COLUMNS:\n   [col(" + activity + ").shift([dyn int: -1]).over([]).alias(\"next_activity\")";
     if (performance) plan += ", col(" + time + ").shift([dyn int: -1]).over([]).alias(\"next_timestamp\")";
-    plan += "] \n    SORT BY [[], col(" + time + ")]\n      " + frame_plan(source);
+    plan += "] \n    SORT BY [[], " + sort_time(options, literal, "[]") + "]\n      " + frame_plan(source);
     nodes = {"select", "unique", "join right", "join", "select"};
   } else if (collection(target)) {
     name = "next_activity"; columns.push_back("case_next"); if (performance) columns.push_back("next_timestamp");
     plan = " WITH_COLUMNS:\n [col(" + key + ").alias(\"case_next\")";
     if (performance) plan += ", col(" + time + ").shift([dyn int: -1]).over([col(" + key + ")]).alias(\"next_timestamp\")";
-    plan += "] \n" + sort_plan(source, options, "  ");
+    plan += "] \n" + sort_plan(source, options, literal, "  ");
     nodes = {"with_columns", "join left", "join", "select"};
   } else {
     name = "@@duration"; columns.push_back("case_next"); columns.push_back("next_activity"); columns.push_back("@@path");
-    plan = " WITH_COLUMNS:\n [when(col(\"case_next\") == col(" + key + ")).then(col(" + activity + ").str.concat_horizontal([\",\", col(\"next_activity\")])).otherwise(null.cast(String)).alias(\"@@path\")] \n   WITH_COLUMNS:\n   [col(" + key + ").alias(\"case_next\"), col(" + activity + ").shift([dyn int: -1]).over([col(" + key + ")]).alias(\"next_activity\")] \n    SORT BY [col(" + key + "), []]\n      " + frame_plan(source);
+    plan = " WITH_COLUMNS:\n [when(col(\"case_next\") == col(" + key + ")).then(col(" + activity + ").str.concat_horizontal([\",\", col(\"next_activity\")])).otherwise(null.cast(String)).alias(\"@@path\")] \n   WITH_COLUMNS:\n   [col(" + key + ").alias(\"case_next\"), col(" + activity + ").shift([dyn int: -1]).over([col(" + key + ")]).alias(\"next_activity\")] \n    SORT BY [col(" + key + "), " + sort_time(options, literal, "[]") + "]\n      " + frame_plan(source);
     nodes = {"select", "unique", "join right", "join", "select"};
   }
   fail("ColumnNotFoundError", phase, missing_prefix(name, columns) + plan + contexts(nodes));
@@ -442,22 +456,33 @@ bool bound_matches(std::int64_t value, const EventAttribute& bound, bool upper) 
   const auto limit = number(bound); if (std::isnan(limit)) return upper;
   return upper ? static_cast<double>(value) <= limit : static_cast<double>(value) >= limit;
 }
-EventTable collect(const EventTable& source, const std::vector<std::string>& paths, bool performance, const PolarsPathsFilterOptions& options, const std::string& phase) {
+EventTable collect(const EventTable& source, const std::vector<std::string>& paths, bool performance, const PolarsPathsFilterOptions& options, const SortLiteral& literal, const std::string& phase) {
   source.validate();
   if (source.index || source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars paths require declared dtypes and no dataframe index");
   const auto position = [&](const std::string& name, bool sorted) {
     const auto found = std::find(source.columns.begin(), source.columns.end(), name);
-    if (found == source.columns.end()) missing(source, name, sorted, options, phase);
+    if (found == source.columns.end()) missing(source, name, sorted, options, literal, phase);
     return static_cast<std::size_t>(found - source.columns.begin());
   };
-  if (collection(options.case_id_key)) empty_selector(source, performance, options, phase);
+  if (collection(options.case_id_key)) empty_selector(source, performance, options, literal, phase);
   const auto case_at = position(options.case_id_key.value, false);
   std::optional<std::size_t> time_at;
-  if (!collection(options.timestamp_key)) time_at = position(options.timestamp_key.value, false);
+  if (!literal && !collection(options.timestamp_key)) time_at = position(options.timestamp_key.value, false);
+  // The plain filter reads a dict timestamp only in its sort; the
+  // performance one selects it again (pl.col of the dict) for the next
+  // timestamp, beside the case and before the next activity.
+  if (literal && performance && !collection(options.timestamp_key)) time_at = position(options.timestamp_key.value, true);
+  if (literal && !performance) time_at = case_at;
   const auto& target = performance ? options.attribute_key : options.target_attribute_key ? *options.target_attribute_key : options.attribute_key;
-  if (collection(target) || collection(options.attribute_key)) empty_selector(source, performance, options, phase);
+  if (collection(target) || collection(options.attribute_key)) empty_selector(source, performance, options, literal, phase);
   const auto target_at = position(target.value, true), activity_at = position(options.attribute_key.value, true);
-  if (!time_at) empty_selector(source, performance, options, phase);
+  if (!time_at) empty_selector(source, performance, options, literal, phase);
+  if (literal) {
+    // No admitted path prunes the sort: the frame as it is or no rows.
+    if (!performance && paths.empty()) { if (truth(options.positive)) { auto none = source; none.rows.clear(); return none; } return source; }
+    if (source.rows.size() != 1)
+      fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
+  }
   const auto case_kind = dtype(source.dtypes[case_at]), time_kind = dtype(source.dtypes[*time_at]);
   const auto enum_dictionary = [&](std::size_t at, Dtype kind) -> std::optional<EnumRanks> {
     if (kind != Dtype::kEnum) return std::nullopt;
@@ -547,15 +572,20 @@ PolarsPathsFilterOptions keyed(const PolarsPathsFilterOptions& raw, const std::v
   }
   return options;
 }
+SortLiteral sort_literal(const PolarsPathsFilterOptions& raw) {
+  if (!keys::dict_key(raw.timestamp_key)) return std::nullopt;
+  return detail::polars_lit::dict_literal_display(raw.timestamp_key);
+}
 EventTable eager(const EventTable& source, const EventAttribute& path, bool performance, const PolarsPathsFilterOptions& raw) {
   auto parsed = validate_apply(path, performance, raw);
-  return collect(source, parsed, performance, keyed(raw, source.columns), "apply");
+  return collect(source, parsed, performance, keyed(raw, source.columns), sort_literal(raw), "apply");
 }
 LazyEventTable lazy(const LazyEventTable& source, const EventAttribute& path, bool performance, const PolarsPathsFilterOptions& raw) {
   auto parsed = validate_apply(path, performance, raw);
   const auto options = keyed(raw, source.columns());
-  return LazyEventTable(source.columns(), [source, parsed, performance, options](const auto& consume) {
-    const auto result = collect(source.materialize(), parsed, performance, options, "collect"); for (const auto& row : result.rows) consume(row);
+  const auto literal = sort_literal(raw);
+  return LazyEventTable(source.columns(), [source, parsed, performance, options, literal](const auto& consume) {
+    const auto result = collect(source.materialize(), parsed, performance, options, literal, "collect"); for (const auto& row : result.rows) consume(row);
   }, source.attributes(), source.metadata(), std::nullopt, source.dtypes(), source.index(), source.categorical_dtypes());
 }
 std::vector<PolarsPathsFilterParameter> parameters(const EventAttribute& value) {

@@ -4,6 +4,7 @@
 #include "polars_sort.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_key_selection.hpp"
+#include "polars_lit_model.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -242,7 +243,12 @@ std::string join(const EventAttribute& sequence) {
 }
 std::vector<std::string> admitted(const EventAttribute& values){std::vector<std::string> result;for(const auto& sequence:iter(values))result.push_back(join(sequence));return result;}
 std::string contexts(const std::vector<std::string>& nodes){std::string out="\n\nThis error occurred with the following context stack:\n";for(std::size_t i=0;i<nodes.size();++i)out+="\t["+std::to_string(i+1)+"] '"+nodes[i]+"'\n";return out;}
-std::string sort_plan(const EventTable& source,const PolarsVariantsFilterOptions& options,bool statistics){return "SORT BY [col("+quote(options.case_id_key.value)+"), col("+quote(statistics?options.timestamp_key.value:"time:timestamp")+")]\n  "+frame_plan(source);}
+// Round CN: a dict timestamp key sorts the statistics as its struct literal.
+std::string sort_time(const PolarsVariantsFilterOptions& options,bool statistics){
+  if(statistics&&options.timestamp_key.container==AttributeContainerKind::kContainer)return detail::polars_lit::dict_literal_display(options.timestamp_key);
+  return "col("+quote(statistics?options.timestamp_key.value:"time:timestamp")+")";
+}
+std::string sort_plan(const EventTable& source,const PolarsVariantsFilterOptions& options,bool statistics){return "SORT BY [col("+quote(options.case_id_key.value)+"), "+sort_time(options,statistics)+"]\n  "+frame_plan(source);}
 namespace keys = detail::polars_keys;
 std::string missing_prefix(const std::string& key,const std::vector<std::string>& columns){if(keys::by_name(key))return keys::by_name_message(key);std::string out="unable to find column "+debug_quote(key)+"; valid columns: [";for(std::size_t i=0;i<columns.size();++i){if(i)out+=", ";out+=debug_quote(columns[i]);}out+=']';if (const auto hint = detail::polars_column_hint(key, columns)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';return out;}
 [[noreturn]] void missing(const EventTable& source,const std::string& key,bool activity,bool statistics,const PolarsVariantsFilterOptions& options,const std::string& phase,bool eager_source){
@@ -260,11 +266,15 @@ std::string missing_prefix(const std::string& key,const std::vector<std::string>
 // dict or list of names resolves by name in grouped().
 void validate(const PolarsVariantsFilterOptions& options){
   if(keys::dict_key(options.case_id_key))fail("TypeError","apply",keys::dict_argument_message());
+  // Round CN: a list or tuple case key is a Series literal (built strictly)
+  // before anything else is read.
+  if(options.case_id_key.container==AttributeContainerKind::kList||options.case_id_key.container==AttributeContainerKind::kTuple)
+    if(const auto error=detail::polars_lit::argument_literal_error(options.case_id_key))fail("TypeError","apply",*error);
   if(!text(options.activity_key)&&!collection(options.activity_key))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(options.activity_key)+"'.");
   const auto& act=options.activity_key;
   if(act.container==AttributeContainerKind::kList||act.container==AttributeContainerKind::kTuple){
     if(!act.children.empty()&&!text(act.children.front()))fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(act.children.front())+"'.");
-    for(const auto& item:act.children)if(!text(item))fail("TypeError","apply","'"+python_type(item)+"' object is not an instance of 'str'");
+    for(const auto& item:act.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+python_type(item)+"' object is not an instance of 'str'");
   }
   if(null(options.case_id_key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
 }
@@ -279,12 +289,19 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
   const auto options=keyed(raw,source.columns);
   source.validate();if(source.index||source.dtypes.size()!=source.columns.size())throw std::invalid_argument("Native Polars variants require declared dtypes and no dataframe index");
   if(collection(options.case_id_key)&&!statistics){
-    if(!options.case_id_key.children.empty())throw std::invalid_argument("Native Polars variants case selector outside observed empty-list domain");
+    // Round CN: a list of present names or literals joins and then sorts by
+    // its one list value.
+    const auto& items=options.case_id_key.children;
+    if(!items.empty()&&std::any_of(items.begin(),items.end(),[&](const EventAttribute& v){return text(v)&&std::find(source.columns.begin(),source.columns.end(),v.value)==source.columns.end();}))
+      throw std::invalid_argument("Native Polars variants case selector outside observed empty-list domain");
+    if(!items.empty())fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");
     fail("InvalidOperationError",phase,"expected join keys/predicates\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nDF []; PROJECT */0 COLUMNS"+contexts({"join"}));
   }
   if(collection(options.case_id_key)||integer(options.case_id_key))fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");
   const auto position=[&](const std::string& key,bool activity=false){auto found=std::find(source.columns.begin(),source.columns.end(),key);if(found==source.columns.end())missing(source,key,activity,statistics,options,phase,eager_source||(!statistics&&phase=="apply"));return static_cast<std::size_t>(found-source.columns.begin());};
-  const auto case_at=position(options.case_id_key.value),time_at=position(statistics?options.timestamp_key.value:"time:timestamp");
+  const bool literal_time=statistics&&keys::dict_key(options.timestamp_key);
+  if(literal_time)if(const auto error=detail::polars_lit::dict_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
+  const auto case_at=position(options.case_id_key.value),time_at=literal_time?case_at:position(statistics?options.timestamp_key.value:"time:timestamp");
   if(collection(options.activity_key)){
     if(statistics)return {};
     fail("ColumnNotFoundError",phase,missing_prefix("variant",{options.case_id_key.value})+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nAGGREGATE[maintain_order: true]\n  [] BY [col("+quote(options.case_id_key.value)+")]\n  FROM\n  SORT BY [col("+quote(options.case_id_key.value)+"), col(\"time:timestamp\")]\n    "+frame_plan(source)+contexts({"select","join right","join"}));
@@ -292,6 +309,7 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
   const auto activity_at=position(options.activity_key.value,true);const auto case_kind=dtype(source.dtypes[case_at]),time_kind=dtype(source.dtypes[time_at]);
   // Aggregating the case column by itself names it twice (round BX).
   if(statistics&&activity_at==case_at)fail("DuplicateError",phase,"column with name '"+options.case_id_key.value+"' has more than one occurrence\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\n"+sort_plan(source,options,statistics)+contexts({"group_by"}));
+  if(literal_time&&source.rows.size()!=1)fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");
   const auto dictionary=[&](std::size_t at,Dtype kind)->std::optional<EnumRanks>{
     if(kind!=Dtype::kEnum)return std::nullopt;
     if(source.categorical_dtypes.empty()||!source.categorical_dtypes[at])throw std::invalid_argument("Native Polars variants require an Enum dictionary for selected sort column: "+source.columns[at]);

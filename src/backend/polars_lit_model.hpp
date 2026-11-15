@@ -2130,6 +2130,8 @@ inline std::optional<std::string> dict_literal_error(const Value& value) {
   return std::nullopt;
 }
 inline std::optional<std::string> dict_literal_error(const EventAttribute& value) { return dict_literal_error(value_of(value)); }
+// Round CN: a dict sort key as its struct literal shows in a plan.
+inline std::string dict_literal_display(const EventAttribute& value) { return struct_display(StructModel{struct_fields(value_of(value)), false}); }
 // Every field of a struct literal with its type, untruncated: equal keys are
 // equal literals (the interval merge of a column that is not cast).
 inline std::string struct_fields_key(const std::vector<StructField>& fields) {
@@ -2158,6 +2160,72 @@ inline int struct_truth(const Cell& cell, const std::string& dtype, const Struct
     case CompareOp::kLt: return order < 0;
   }
   return -1;
+}
+
+// Round CN: a literal's dtype as a frame schema prints it, and its value as
+// a native cell (a struct as a container of its fields, a list as a list),
+// for the `literal` columns a group_by on a list or dict key adds.
+inline std::string frame_dtype(const LitType& t) {
+  using K = LitType::K;
+  switch (t.kind) {
+    case K::kDatetime: return "Datetime(time_unit='us', time_zone=" + (t.zone.empty() ? std::string("None") : "'" + t.zone + "'") + ")";
+    case K::kList: return "List(" + frame_dtype(t.inner[0]) + ")";
+    case K::kStruct: {
+      std::string out = "Struct({";
+      for (std::size_t i = 0; i < t.inner.size(); ++i) out += (i ? ", '" : "'") + t.names[i] + "': " + frame_dtype(t.inner[i]);
+      return out + "})";
+    }
+    default: return debug_name(t);
+  }
+}
+inline EventAttribute literal_cell(const std::string& key, const LitType& t, const Value& v) {
+  using K = LitType::K;
+  EventAttribute out;
+  out.key = key;
+  if (v.kind == Kind::kNone && t.kind != K::kStruct) {
+    out.is_null = true;
+    return out;
+  }
+  switch (t.kind) {
+    case K::kList:
+      out.container = AttributeContainerKind::kList;
+      for (const auto& item : v.items) out.children.push_back(literal_cell("", t.inner[0], item));
+      return out;
+    case K::kStruct:
+      out.container = AttributeContainerKind::kContainer;
+      for (std::size_t i = 0; i < t.names.size(); ++i) {
+        const Value* field = nullptr;
+        for (const auto& [name, x] : v.entries)
+          if (name.text == t.names[i]) field = &x;
+        out.children.push_back(literal_cell(t.names[i], t.inner[i], field ? *field : Value::none()));
+      }
+      return out;
+    case K::kBoolean:
+      out.kind = AttributeKind::kBoolean;
+      out.typed_value = v.boolean;
+      out.value = v.boolean ? "true" : "false";
+      return out;
+    case K::kInt64:
+    case K::kUInt64:
+    case K::kInt128:
+      out.kind = AttributeKind::kInt;
+      out.value = integer_text(v);
+      if (!wide_int(v)) out.typed_value = v.integer;
+      return out;
+    case K::kFloat64:
+      out.kind = AttributeKind::kFloat;
+      out.typed_value = v.kind == Kind::kFloat ? v.real : integer_real(v);
+      out.value = python::float_repr(std::get<double>(out.typed_value));
+      return out;
+    case K::kDate:
+    case K::kDatetime:
+      out.kind = AttributeKind::kDate;
+      out.value = pandas_filter_value_str(v);
+      return out;
+    default:
+      out.value = v.text;
+      return out;
+  }
 }
 
 }  // namespace minera::detail::polars_lit

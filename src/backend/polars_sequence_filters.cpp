@@ -160,7 +160,7 @@ void check_col_list(const Value* key) {
     fail("TypeError", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" +
                           col_item_type(first) + "'.");
   for (const auto& item : key->items)
-    if (item.kind != Kind::kString) fail("TypeError", "'" + col_item_type(item) + "' object is not an instance of 'str'");
+    if (item.kind != Kind::kString) fail("TypeError", item.kind == Kind::kNone ? "'None' is not an instance of 'str'" : "'" + col_item_type(item) + "' object is not an instance of 'str'");
 }
 bool positive_of(const PolarsFilterParameters& p) {
   return truthy(parameter_or(p, "POSITIVE", "positive", Value::of(true)));
@@ -1516,22 +1516,50 @@ EventTable polars_consecutive_act_case_grouping_apply(const EventTable& df,
   return out;
 }
 
+// Round CN: timestamp_case_grouping groups by [case key, timestamp key]; a
+// list, tuple or dict key there is a literal (pl.lit), built while Python
+// builds the expressions (the case key first, so its build error comes
+// first), and group_by keeps it as a constant `literal` column in the key's
+// place, with every column of the frame after the keys (none is consumed).
+// Two literals collide on that output name when the plan resolves, as a str
+// key naming no column fails there (probe tcg1-tcg3).
+struct GroupingKey {
+  std::optional<std::size_t> column;
+  std::optional<LitValue> literal;
+};
+std::optional<LitValue> grouping_literal(const Value* key) {
+  if (!key || (key->kind != Kind::kList && key->kind != Kind::kTuple && key->kind != Kind::kDict)) return std::nullopt;
+  if (key->kind == Kind::kDict)
+    if (const auto error = detail::polars_lit::dict_literal_error(*key)) fail("TypeError", *error);
+  auto literal = lit_value(*key);
+  if (key->kind == Kind::kTuple) literal.type = list_of(list_literal(key->items).type);
+  return literal;
+}
 EventTable polars_timestamp_case_grouping_apply(const EventTable& df, const PolarsFilterParameters& parameters) {
   const auto type = filter_type(parameters);
   if (type != "first" && type != "last") return df;
   const Plan plan{"group_by", {"group_by"}, {}, {}};
-  const auto case_column = require(df, case_key(parameters), plan);
-  const auto ts = require(df, text_parameter(parameters, "TIMESTAMP_KEY", kPolarsFilterTimestampKeyParameter,
-                                             kPolarsFilterDefaultTimestampKey),
-                          plan);
-  if (type != "first" && type != "last") return df;
-  std::vector<std::size_t> order{case_column, ts};
+  const auto* ts_value = parameter(parameters, "TIMESTAMP_KEY", kPolarsFilterTimestampKeyParameter);
+  GroupingKey keys[2];
+  keys[0].literal = grouping_literal(case_key_value(parameters));
+  keys[1].literal = grouping_literal(ts_value);
+  if (keys[0].literal && keys[1].literal)
+    fail("DuplicateError",
+         "group_by keys contained duplicate output name 'literal'. It's possible that multiple expressions are returning the "
+         "same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid "
+         "duplicate column names." +
+             resolved("group_by", frame_plan(df.columns), {"group_by"}));
+  if (!keys[0].literal) keys[0].column = require(df, case_key(parameters), plan);
+  if (!keys[1].literal)
+    keys[1].column = require(df, ts_value ? key_text(ts_value, kPolarsFilterDefaultTimestampKey) : std::string(kPolarsFilterDefaultTimestampKey), plan);
+  std::vector<std::size_t> rest;
   for (std::size_t c = 0; c < df.columns.size(); ++c)
-    if (c != case_column && c != ts) order.push_back(c);
+    if (c != keys[0].column && c != keys[1].column) rest.push_back(c);
   std::vector<std::pair<Key, Key>> groups;
   std::map<std::pair<Key, Key>, std::vector<std::size_t>> rows;
+  const auto group_value = [&](const GroupingKey& key, std::size_t i) { return key.column ? key_of(df.rows[i][*key.column]) : Key{}; };
   for (std::size_t i = 0; i < df.size(); ++i) {
-    const std::pair<Key, Key> key{key_of(df.rows[i][case_column]), key_of(df.rows[i][ts])};
+    const std::pair<Key, Key> key{group_value(keys[0], i), group_value(keys[1], i)};
     auto [it, added] = rows.emplace(key, std::vector<std::size_t>{});
     if (added) groups.push_back(key);
     it->second.push_back(i);
@@ -1541,16 +1569,30 @@ EventTable polars_timestamp_case_grouping_apply(const EventTable& df, const Pola
   out.dtypes.clear();
   out.categorical_dtypes.clear();
   out.rows.clear();
-  for (const auto c : order) {
+  for (const auto& key : keys) {
+    if (key.column) {
+      out.columns.push_back(df.columns[*key.column]);
+      if (!df.dtypes.empty()) out.dtypes.push_back(df.dtypes[*key.column]);
+      if (!df.categorical_dtypes.empty()) out.categorical_dtypes.push_back(df.categorical_dtypes[*key.column]);
+    } else {
+      out.columns.push_back("literal");
+      if (!df.dtypes.empty()) out.dtypes.push_back(detail::polars_lit::frame_dtype(key.literal->type));
+      if (!df.categorical_dtypes.empty()) out.categorical_dtypes.emplace_back();
+    }
+  }
+  for (const auto c : rest) {
     out.columns.push_back(df.columns[c]);
     if (!df.dtypes.empty()) out.dtypes.push_back(df.dtypes[c]);
     if (!df.categorical_dtypes.empty()) out.categorical_dtypes.push_back(df.categorical_dtypes[c]);
   }
-  for (const auto& key : groups) {
-    const auto& members = rows.at(key);
+  for (const auto& group : groups) {
+    const auto& members = rows.at(group);
     const auto& source = df.rows[type == "first" ? members.front() : members.back()];
     EventTable::Row row;
-    for (const auto c : order) row.push_back(source[c]);
+    for (const auto& key : keys)
+      row.push_back(key.column ? source[*key.column]
+                               : Cell(detail::polars_lit::literal_cell("literal", key.literal->type, key.literal->value)));
+    for (const auto c : rest) row.push_back(source[c]);
     out.rows.push_back(std::move(row));
   }
   return out;

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CM (2026-11-05 to 2026-11-15, cloud container)
+## Review-fix loop, rounds T–CN (2026-11-05 to 2026-11-15, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5342,31 +5342,81 @@ The full banks and replay logs are in the project files under
 No fixture changed. The device check on the Mac was skipped again (no
 device linked).
 
-Next round (CN) should start by re-reviewing round CM:
+Round CN re-reviewed CM (Review CN1). CM's commit 5ab3d71 ran green on
+all six CI jobs (run 43677891938). CN worked literal keys in the Polars
+filters, list time bounds in pandas and fresh seeds of every recent
+domain:
+- List and tuple case keys are built as `pl.lit` builds them (strictly)
+  wherever the reference lists them among sort, `over` or join keys,
+  before anything else fails: `between.apply` then reads them with
+  `pl.col`, the LTL rules check them in their probed order, `paths`
+  right after parsing the paths, `variants` first (a list of present
+  names that builds fails the sort, `Series length: 1`). A None item in
+  a `pl.col` list fails PyO3's `'None' is not an instance of 'str'` at
+  every site.
+- Dict and list timestamp keys sort as struct or list literals: the plan
+  prints the literal, resolution errors come first, the sort then fails
+  `ShapeError` unless the frame has one row (`paths`: no admitted path
+  prunes the sort; variants statistics; `eventually_follows` with two or
+  more activities, after its activity filters resolve).
+- `timestamp_case_grouping` with list/tuple/dict keys: Polars groups by
+  a `literal` column (two literal keys fail the duplicate `literal`
+  name), pandas checks a list key's length, fails `reset_index` for
+  other aggregations, then `unhashable type: 'dict'`.
+- Pandas `eventually_follows` with list time bounds (CK case 501 and a
+  new domain `scripts/pandas_filter_cn_ltl_domain.py`, 2,400 calls): all
+  chains first, each step's lower bound filters before its upper one
+  compares, list bounds compare as pandas compares a float Series with a
+  list. Smaller pandas items: dict paths, str `>=` in the attribute
+  filter, `activity_split` items as numpy scalars.
+- The Polars table banks: seed 2026111533 65 → 40 calls, fresh seed
+  2026111560 64 → 35; the Polars sequence banks: seed 2026111532 17 → 9,
+  seed 2026111551 17 → 6, fresh seed 2026111561 5. Every other fresh
+  seed matched (pandas table and sequence CK, CJ table and sequence, CI
+  table, CH table and sequence).
 
-- CM's CI run;
+In the suite:
+- `docs/polars-filter-ck-bank.json.gz` (seed 2026111533 without the 40
+  carried calls, 21,863 calls), the new `docs/polars-filter-cn-ck-bank.json.gz`
+  (seed 2026111560 without its 35, 22,048 calls) and
+  `docs/polars-filter-cn-bank.json.gz` (117 explicit calls,
+  `scripts/polars_filter_cn_domain.py`);
+- `docs/polars-sequence-filter-ck-bank.json.gz` (seed 2026111532 without
+  the 9, 11,595 calls) and the new `docs/polars-sequence-filter-cn-bank.json.gz`
+  (seed 2026111561 without its 5, 8,611 calls);
+- `docs/pandas-filter-cn-bank.json.gz` (list time bounds, 2,400 calls).
+The full banks and replay logs are in the project files under
+`review-harness/round-cn/`.
+
+No fixture changed. The device check on the Mac was skipped again (no
+device linked).
+
+Next round (CO) should start by re-reviewing round CN:
+
+- CN's CI run;
 - fresh seeds of the CK domains (pandas table and sequence, Polars
-  sequence and table) and of the CJ, CI and CH domains;
-- the 65 Polars table calls (full bank
-  `review-harness/round-cl/banks/polars-filter-ck-2026111533.json.gz`,
-  replay log `review-harness/round-cm/out/`): about 49 are case keys
-  given as a list holding a dict, which Polars reads as a struct literal
-  column in `group_by`/`over` (`literal` and `_right` output columns,
-  struct cells the native frame cannot hold yet, ShapeErrors), and
-  about 16 are dict timestamp keys in sort contexts (a sort by a struct
-  literal: ShapeError, or a result sorted by the constant);
-- the 17 + 17 Polars sequence calls (CL's seed 2026111532 and CM's seed
-  2026111551, same classes): list case keys holding a dict (struct
-  `literal` columns, list joins, `is_in` on `List(List(Struct))`),
-  `timestamp_case_grouping` with dict keys (struct `literal` output
-  columns, `cannot create expression literal for value of type dict`),
-  `activity_split` with a list (of dicts) as `SUBCASE_CONCAT_STR` (the
-  `concat_horizontal` cast failure behind its plan);
-- the fresh Polars table CK seed 2026111550 leftovers outside those
-  classes: `A_next_B_next_C` cases 37 and 301 (the join dtype error comes
-  before the attribute select), `apply_numeric` case 190;
-- the pandas table CK seed 2026111534 case 501 (`eventually_follows`
-  with a list inside a timestamp boundary);
+  sequence and table), of the CN domains (`polars_filter_cn_domain.py`
+  is a fixed call list, so vary it by hand; `pandas_filter_cn_ltl_domain.py`
+  takes seeds) and of the CJ, CI and CH domains;
+- the 40 + 35 Polars table calls (full banks
+  `review-harness/round-cl/banks/polars-filter-ck-2026111533.json.gz`
+  and `review-harness/round-cn/banks/polars-filter-ck-2026111560.json.gz`,
+  replay dumps in `review-harness/round-cn/out/`): case keys given as a
+  list holding a dict that builds (`["case:concept:name", {"b": 1}]`
+  fails the build, `[{"b": 1}]` or `["case:concept:name", None]` do
+  not), which Polars reads as a struct or list literal column in
+  `group_by`/`over`/joins of the attributes, cases, timestamp and LTL
+  filters (`literal`/`literal_right` columns, struct cells the native
+  frame cannot hold yet, so the bank test needs an unrepresentable
+  outcome for them, join dtype errors, DuplicateErrors); dict timestamp
+  keys in the timestamp filters' comparisons; `cases.filter_on_ncases`
+  with a dict case key; `A_next_B_next_C` with a dict attribute key;
+- the 9 + 6 + 5 Polars sequence calls (seeds 2026111532, 2026111551,
+  2026111561): list case keys holding a dict in `ends_with`, `prefixes`,
+  `suffixes`, `traces`, `rework`, `start_activities`, `end_activities`,
+  `activity_split`;
+- the CM fresh table seed 2026111550 leftovers (`A_next_B_next_C` cases
+  37 and 301, `apply_numeric` case 190);
 - the three fresh-seed calls of CK1-1: CJ table case 214
   (`A_next_B_next_C`), CJ sequence case 36 (`traces.apply`, the Null case
   column join error), CB sequence case 431 (`rework.apply` with
@@ -5383,6 +5433,13 @@ Next round (CN) should start by re-reviewing round CM:
   pandas sequence filter items and the items carried from CB);
 - the open choices on CSV timestamp columns of plain numbers and "roles to
   diagnostics groups" (still declared unless Philipp answers).
+
+Round CM's targets, taken in CN (findings CN1-1 to CN1-8): CM's CI run,
+fresh seeds of the CK, CJ, CI and CH domains, the Polars table calls
+(65 → 40, fresh seed 64 → 35), the Polars sequence calls (17 → 9 and
+17 → 6), the pandas table case 501. Not taken (carried to CO): the CM
+fresh table seed leftovers, the three CK1-1 calls and the older items
+(see the CO list above).
 
 Round CL's targets, taken in CM (findings CM1-1 to CM1-8): CL's CI run,
 fresh seeds of the CK, CJ, CI and CH domains, the Polars table dict keys

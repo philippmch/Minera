@@ -271,6 +271,16 @@ std::vector<std::string> category_list(const EventTable& source, std::size_t col
     for (const auto& c : source.categorical_dtypes[column]->categories) out.push_back(c.value);
   return out;
 }
+// Round CN: the timestamp sort key as the plan prints it: a column, or a
+// dict (struct) or list literal.
+std::string time_sort(const EventAttribute& key) {
+  namespace lit = detail::polars_lit;
+  if (key.container == AttributeContainerKind::kContainer) return lit::dict_literal_display(key);
+  if (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) {
+    try { return lit::literal_list_display(lit::argument_literal(key)); } catch (const PolarsSequenceFilterError&) {}
+  }
+  return "col(" + quote(key.value) + ")";
+}
 std::string render(std::string_view pattern, const EventTable& source, const Prepared& p,
                    const std::string& expression = "") {
   const auto& o = p.options;
@@ -313,7 +323,7 @@ std::string render(std::string_view pattern, const EventTable& source, const Pre
   };
   const std::map<std::string_view, std::string> substitutions = {
     {"FRAME", frame_plan(source)}, {"CASE_Q", quote(o.case_id_key.value)},
-    {"ATTRIBUTE_Q", quote(o.attribute_key.value)}, {"TIME_Q", quote(o.timestamp_key.value)},
+    {"ATTRIBUTE_Q", quote(o.attribute_key.value)}, {"TIME_SORT", time_sort(o.timestamp_key)},
     {"RESOURCE_Q", quote(o.resource_key.value)}, {"RESOURCE2_Q", quote(o.resource_key.value + "_2")},
     {"LITERAL", integer(o.case_id_key) ? exact(o.case_id_key).decimal() : "0"},
     {"FIRST", value(0)}, {"SECOND", value(1)}, {"LAST", p.values.empty() ? value(static_cast<std::size_t>(-1)) : value(p.values.size() - 1)},
@@ -363,6 +373,13 @@ std::vector<PolarsLtlFilterParameter> parameters(const EventAttribute& value) {
 void dict_argument(const EventAttribute& key) {
   if (keys::dict_key(key)) fail("TypeError", "apply", keys::dict_argument_message());
 }
+// Round CN: a list case key becomes a Series literal (built strictly) where
+// the reference lists it among its sort, over or join keys, while Python
+// builds the expressions.
+void list_key_literal(const EventAttribute& key) {
+  if (key.is_null || (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple)) return;
+  if (const auto error = detail::polars_lit::argument_literal_error(key)) fail("TypeError", "apply", *error);
+}
 // Python's repr of a key (the A_next_B_next_C selection message).
 std::string key_repr(const EventAttribute& value) {
   return detail::pandas_container_repr(value, [](const EventAttribute& v) -> std::string {
@@ -380,7 +397,7 @@ void col_list(const EventAttribute& key) {
   if (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple) return;
   if (!key.children.empty() && !text(key.children.front()))
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(key.children.front()) + "'.");
-  for (const auto& item : key.children) if (!text(item)) fail("TypeError", "apply", "'" + python_type(item) + "' object is not an instance of 'str'");
+  for (const auto& item : key.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
 }
 Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>& columns) {
   if (!call.values) fail("TypeError", "apply", function_name(call.operation) + "() missing 1 required positional argument: '" +
@@ -398,7 +415,7 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     else if (entry.key == "timestamp_diff_boundaries") out.options.timestamp_diff_boundaries = entry.value;
   }
   const auto& o = out.options;
-  if (sequence_rule(out.operation)) dict_argument(o.case_id_key);
+  if (sequence_rule(out.operation)) { dict_argument(o.case_id_key); list_key_literal(o.case_id_key); list_key_literal(o.timestamp_key); }
   if (sequence_rule(out.operation) && null(o.case_id_key))
     fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (out.operation == Op::kDifferentPersons) out.values = {out.original};
@@ -411,15 +428,9 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
   if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1)) {
     if (!text(o.attribute_key) && !collection(o.attribute_key)) invalid_col(o.attribute_key);
     col_list(o.attribute_key);
-    if (out.operation == Op::kFourEyes) {
-      if (!text(o.resource_key) && !collection(o.resource_key)) invalid_col(o.resource_key);
-      if (collection(o.resource_key)) fail("TypeError", "apply", "can only concatenate list (not \"str\") to list");
-    }
     if (out.operation == Op::kDifferentPersons && (out.original.container == AttributeContainerKind::kSet || out.original.container == AttributeContainerKind::kFrozenSet))
       fail("TypeError", "apply", "cannot create expression literal for value of type set.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object.");
   }
-  if (!sequence_rule(out.operation) && null(o.case_id_key) && (out.operation != Op::kFourEyes || out.values.size() > 1))
-    fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
   // A list activity becomes a Series literal when its filter is built.
   if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1))
     for (const auto& query : out.values) {
@@ -435,7 +446,18 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
         }
       }
     }
-  if (!sequence_rule(out.operation) && (out.operation != Op::kFourEyes || out.values.size() > 1)) dict_argument(o.case_id_key);
+  // Round CN: the activity filters are built before the case key joins
+  // them (None, a dict, a list literal that cannot be built), and four_eyes
+  // reads its resource key after that (probe q1).
+  if (!sequence_rule(out.operation) && (out.operation != Op::kFourEyes || out.values.size() > 1)) {
+    if (null(o.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
+    dict_argument(o.case_id_key);
+    list_key_literal(o.case_id_key);
+    if (out.operation == Op::kFourEyes) {
+      if (!text(o.resource_key) && !collection(o.resource_key)) invalid_col(o.resource_key);
+      if (collection(o.resource_key)) fail("TypeError", "apply", "can only concatenate list (not \"str\") to list");
+    }
+  }
   // pl.col(dict) selects the dict's names (round CM).
   if (out.operation != Op::kNext) out.options.attribute_key = keys::col_key(o.attribute_key, columns);
   return out;
@@ -495,6 +517,8 @@ std::string missing_tail(const EventTable& source, const Prepared& p, bool eager
   return render(attribute ? kDifferentAttributeTail : kDifferentMissingTail, source, p);
 }
 void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false, bool first_only = false);
+// A timestamp key the sort reads as a literal (a dict, a list or a number).
+bool literal_sort(const EventAttribute& key) { return collection(key) || (!text(key) && !null(key)); }
 void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   source.validate();
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars LTL requires every column dtype");
@@ -514,7 +538,9 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   };
   if (sequence_rule(p.operation)) {
     required(o.case_id_key, true, false); required(o.timestamp_key, true, false);
-    if ((collection(o.timestamp_key) || (!text(o.timestamp_key) && !null(o.timestamp_key))) ||
+    // Round CN: eventually_follows sorts by a literal timestamp only with two
+    // or more activities, and only after its plan resolves (below).
+    if ((p.operation == Op::kNext && literal_sort(o.timestamp_key)) ||
         (p.operation == Op::kNext && !text(o.case_id_key)))
       fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
     if (p.operation == Op::kNext && eager) fail("AttributeError", "apply", "'DataFrame' object has no attribute 'collect'");
@@ -557,6 +583,13 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   if (integer(o.case_id_key) && p.operation != Op::kDifferentPersons) {
     if (p.values.size()!=3) throw std::invalid_argument("Native Polars LTL literal-case diagnostic plan currently covers three-operand predicates");
     fail("DuplicateError", phase, render(p.operation==Op::kEventuallyFollows?kEventLiteralJoin:kFourLiteralJoin,source,p));
+  }
+  // The literal sort key (one value) fails the sort when it runs, unless the
+  // frame has one row.
+  if (p.operation == Op::kEventuallyFollows && literal_sort(o.timestamp_key) && p.values.size() >= 2) {
+    validate_queries(source, p, eager, true);
+    if (source.rows.size() != 1)
+      fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
   }
 }
 // Round CD: each activity filter compares the attribute column with one

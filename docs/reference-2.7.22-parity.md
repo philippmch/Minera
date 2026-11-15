@@ -27224,3 +27224,118 @@ Tests:
   replayed by `minera_polars_sequence_filter_cm_bank_parity_tests`.
 - `docs/pandas-filter-cm-bank.json.gz` (pandas table CK seed 2026111552,
   11,730 calls), replayed by `minera_pandas_filter_cm_bank_parity_tests`.
+
+## Review CN1: re-review of round CM, literal sort and group keys in the Polars filters, and list time bounds in pandas (2026-11-15)
+
+Round CN checked CM's CI (run 43677891938 on 5ab3d71: green on all six
+jobs), replayed fresh seeds of the CK, CJ, CI and CH domains and worked
+the calls CM carried. The device check on the Mac was skipped (no device
+linked).
+
+- **CN1-1 List and tuple case keys are Series literals first** (Polars
+  table filters, observed black-box against Polars 1.44.1): where the
+  reference lists the case key among its sort, `over` or join keys, a
+  list or tuple key is built as `pl.lit` builds it, strictly, while
+  Python builds the plan: a mixed list fails `unexpected value while
+  building Series of type String; found value of type Struct({'b':
+  Int64}): {1}` (with its context stack and hint) before anything else
+  is read. `between.apply` then reads the key with `pl.col` (the first
+  item that is not a str names its type, a later one fails as PyO3
+  does) before its `over` refuses the list; `eventually_follows` and
+  `A_next_B_next_C` build it with the case dict check, `four_eyes_principle`
+  (more than one value) and `attr_value_different_persons` after the
+  activity literals and the null-case check, then the resource checks;
+  `paths` right after parsing the paths (case key, then timestamp key);
+  `variants` before anything else, and a list of present names or
+  literals that builds then joins and fails the sort by its one list
+  value (`ShapeError ... Series length: 1`).
+- **CN1-2 PyO3's message for a None item in a `pl.col` list**: `['a',
+  None]` fails `'None' is not an instance of 'str'` (no "object", unlike
+  `'int' object is not an instance of 'str'`); a leading None still names
+  `NoneType` in `invalid input for col`. Every `pl.col` list site of the
+  table and sequence filters now prints it.
+- **CN1-3 Dict and list timestamp keys as sort literals**: `sort([case,
+  ts])` reads a dict timestamp key as a struct literal and a list as a
+  list literal (one value). The plan prints it (`SORT BY
+  [col("case:concept:name"), {1,0.000125}]`, `{}` for an empty dict,
+  `[{0.00001}]` for a list), resolution errors come first (a missing
+  case, attribute or, for the performance paths filter, the dict's names
+  read again by `pl.col` beside the case and before the next activity),
+  and the sort fails when it runs (`sort expressions must have same
+  length as DataFrame, got DataFrame height: N and Series length: 1`)
+  unless the frame has one row. `paths.apply` with no admitted path
+  prunes the sort (the frame as it is for a negative filter, no rows for
+  a positive one); the variants statistics read the dict only in the
+  sort; `eventually_follows` sorts only with two or more activities and
+  fails after its activity filters resolve; a dict whose fields Polars
+  cannot build fails `cannot create expression literal for value of type
+  dict` while Python builds the plan.
+- **CN1-4 `timestamp_case_grouping` with list, tuple and dict keys**
+  (Polars and pandas sequence filters): Polars groups by the key as a
+  literal column named `literal` (a list or tuple as a list literal, a
+  dict as a struct literal; two literal keys fail `group_by keys
+  contained duplicate output name 'literal'` with its alias hint and
+  plan); the output holds the key columns or `literal` with the frame
+  dtype, then the other columns, first or last per group. Pandas checks
+  a list key's length when the grouper is built, fails `reset_index`
+  for an aggregation other than first/last, then `unhashable type:
+  'dict'`.
+- **CN1-5 Pandas `eventually_follows` with list time bounds** (CK seed
+  2026111534 case 501, then a new list-bound domain,
+  `scripts/pandas_filter_cn_ltl_domain.py`, seed 2026111571, 2,400 calls
+  → 0): every chain of the activities is built first; each step then
+  filters by its lower bound before it compares its upper one. A list
+  bound compares with the step's differences as pandas compares a float
+  Series with a list: a length mismatch fails `('Lengths must match to
+  compare', (n,), (k,))`, a list of strs and None fails the reflected
+  `'<=' not supported between instances of 'str' and 'float'`, numbers
+  with None compare None as False, other items fail item by item.
+- **CN1-6 Smaller pandas items** (fresh CK seeds 2026111562 table and
+  2026111563 sequence, 5 calls → 0): dict paths iterate their unique
+  keys as attribute strs; `>=` between two strs in the attribute filter
+  compares them as strs; `activity_split` compares its items as numpy
+  scalars (datetimes, numbers, one-item lists unwrapped in order, numpy's
+  array truth ValueErrors).
+- **CN1-7 Fresh seeds.** Matched: pandas table CK 2026111562, pandas
+  sequence CK 2026111563, CJ table 2026111564, CJ sequence 2026111565,
+  CI table 2026111566, CH table 2026111567, CH sequence 2026111568. The
+  Polars table CK seed 2026111560 went from 64 differing calls to 35, the
+  Polars sequence CK seed 2026111561 differs in 5.
+- **CN1-8 CM's CI.** 5ab3d71 ran green on Linux, macOS and Windows.
+
+Carried to round CO:
+- Polars table (40 calls of seed 2026111533, 35 of seed 2026111560):
+  case keys given as a list holding a dict that builds, which Polars
+  reads as a struct (or list) literal column in `group_by`/`over`/joins
+  (`literal` and `literal_right` columns, struct cells the native frame
+  cannot hold yet, join dtype errors), in the attributes, cases,
+  timestamp and LTL filters; dict timestamp keys in the timestamp
+  filters' comparisons (Categorical against datetime, unsupported
+  timestamp dtypes); single calls: `cases.filter_on_ncases` with a dict
+  case key, `A_next_B_next_C` with a dict attribute key (join dtype
+  error first), list-of-dict timestamp keys in the timeframe filter.
+- Polars sequence (9 calls of seed 2026111532, 6 of 2026111551, 5 of
+  2026111561): list case keys holding a dict in `ends_with`, `prefixes`,
+  `suffixes`, `traces`, `rework`, `start_activities`, `end_activities`
+  and `activity_split`.
+- The CM fresh table seed 2026111550 leftovers (`A_next_B_next_C` cases
+  37 and 301, `apply_numeric` case 190), the three CK1-1 calls and the
+  older items from CJ, CI and CD (see Review CK1).
+
+Tests:
+- `docs/polars-filter-ck-bank.json.gz` (seed 2026111533 without the 40
+  carried calls, 21,863 calls) and the new
+  `docs/polars-filter-cn-ck-bank.json.gz` (seed 2026111560 without its
+  35, 22,048 calls) and `docs/polars-filter-cn-bank.json.gz` (117
+  explicit calls from `scripts/polars_filter_cn_domain.py`), replayed by
+  `minera_polars_filter_ck_bank_parity_tests`,
+  `minera_polars_filter_cn_ck_bank_parity_tests` and
+  `minera_polars_filter_cn_bank_parity_tests`.
+- `docs/polars-sequence-filter-ck-bank.json.gz` (seed 2026111532
+  without the 9 carried calls, 11,595 calls) and the new
+  `docs/polars-sequence-filter-cn-bank.json.gz` (seed 2026111561 without
+  its 5, 8,611 calls), replayed by
+  `minera_polars_sequence_filter_ck_bank_parity_tests` and
+  `minera_polars_sequence_filter_cn_bank_parity_tests`.
+- `docs/pandas-filter-cn-bank.json.gz` (list time bounds, 2,400 calls),
+  replayed by `minera_pandas_filter_cn_bank_parity_tests`.

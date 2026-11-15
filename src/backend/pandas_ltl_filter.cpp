@@ -248,6 +248,89 @@ bool temporal_bound(double value,const EventAttribute& bound,bool lower,bool eag
  const auto number=native_attribute_number(bound);
  return lower?value>=number:value<=number;
 }
+// Round CN: a list bound compares item by item with the step's time
+// differences, one per chain of matching events (every later event of each
+// step's activity in the case, by row position, in merge order) that the
+// earlier steps kept. A list of another length fails to compare; an item
+// that is not a number fails at the first such item (probe pd2-pd5).
+bool listed_bound(const EventAttribute& value){return !value.is_null&&value.container==AttributeContainerKind::kList;}
+bool listed_bounds(const EventAttribute& boundaries,std::size_t steps){
+ const auto sequence=[](const EventAttribute& v){return !v.is_null&&(v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple);};
+ if(!sequence(boundaries))return false;
+ for(std::size_t i=0;i+1<steps&&i<boundaries.children.size();++i){
+  const auto& bound=boundaries.children[i];
+  if(!sequence(bound))continue;
+  for(std::size_t j=0;j<2&&j<bound.children.size();++j)if(listed_bound(bound.children[j]))return true;
+ }
+ return false;
+}
+std::vector<bool> compare_step(const std::vector<double>& differences,const EventAttribute& bound,bool lower){
+ std::vector<bool> result(differences.size(),false);
+ if(listed_bound(bound)){
+  const auto n=bound.children.size();
+  if(n!=differences.size())error("ValueError","('Lengths must match to compare', ("+std::to_string(differences.size())+",), ("+std::to_string(n)+",))");
+  const std::string op=lower?"'>='":"'<='",reflected=lower?"'<='":"'>='";
+  // pandas infers the list: strs (and Nones) make a str array, compared the
+  // other way round; numbers (no bools) and Nones a float array (None as
+  // NaN); anything else an object array, compared item by item (probe pd6).
+  const auto& items=bound.children;
+  const auto plain_null=[](const EventAttribute& x){return x.is_null&&!date_value(x)&&x.container==AttributeContainerKind::kScalar;};
+  const auto number=[](const EventAttribute& x){return !x.is_null&&x.container==AttributeContainerKind::kScalar&&numeric(x)&&type_name(x)!="bool";};
+  const bool any_text=std::any_of(items.begin(),items.end(),[](const EventAttribute& x){return text_value(x);});
+  if(any_text&&std::all_of(items.begin(),items.end(),[&](const EventAttribute& x){return text_value(x)||plain_null(x);}))
+   error("TypeError",reflected+" not supported between instances of 'str' and 'float'");
+  const bool floats=std::any_of(items.begin(),items.end(),number)&&std::all_of(items.begin(),items.end(),[&](const EventAttribute& x){return number(x)||plain_null(x);});
+  for(std::size_t j=0;j<n;++j){
+   const auto& item=items[j];
+   if(floats&&item.is_null)continue;
+   if(!item.is_null&&item.container==AttributeContainerKind::kScalar&&numeric(item)){
+    const auto value=native_attribute_number(item);
+    result[j]=lower?differences[j]>=value:differences[j]<=value;
+    continue;
+   }
+   error("TypeError",op+" not supported between instances of 'float' and '"+type_name(item)+"'");
+  }
+  return result;
+ }
+ if(missing(bound))return result;
+ if(bound.container==AttributeContainerKind::kContainer&&!bound.is_null&&differences.empty())return result;
+ for(std::size_t j=0;j<differences.size();++j)result[j]=temporal_bound(differences[j],bound,lower);
+ if(differences.empty())temporal_bound(0.0,bound,lower,true);
+ return result;
+}
+std::unordered_set<std::string> listed_steps(const EventTable& source,const std::vector<EventAttribute>& anchors,const std::vector<std::size_t>& columns,const std::vector<std::size_t>& valid,const EventAttribute& boundaries){
+ // Every chain is built first (merge order: by the first event's row, then
+ // the next one's), then each step keeps the chains within its bounds.
+ std::vector<std::vector<std::size_t>> chains;
+ for(const auto row:valid)if(matches_at(cell(source,row,columns[1]),anchors[0],row))chains.push_back({row});
+ for(std::size_t i=0;i+1<anchors.size();++i){
+  std::vector<std::vector<std::size_t>> next;
+  for(const auto& chain:chains){
+   const auto last=chain.back();
+   const auto key=group_key(cell(source,last,columns[0]));
+   for(const auto row:valid){
+    if(row<=last||group_key(cell(source,row,columns[0]))!=key||!matches_at(cell(source,row,columns[1]),anchors[i+1],row))continue;
+    auto longer=chain;longer.push_back(row);next.push_back(std::move(longer));
+   }
+  }
+  chains=std::move(next);
+ }
+ // The lower bound filters the chains before the upper one is compared.
+ for(std::size_t i=0;i+1<anchors.size();++i){
+  const auto bound=element(boundaries,i);
+  for(std::size_t side=0;side<2;++side){
+   std::vector<double> differences;
+   for(const auto& chain:chains)differences.push_back(duration(cell(source,chain[i],columns.back()),cell(source,chain[i+1],columns.back())));
+   const auto within=compare_step(differences,element(bound,side),side==0);
+   std::vector<std::vector<std::size_t>> kept;
+   for(std::size_t j=0;j<chains.size();++j)if(within[j])kept.push_back(std::move(chains[j]));
+   chains=std::move(kept);
+  }
+ }
+ std::unordered_set<std::string> result;
+ for(const auto& chain:chains)result.insert(group_key(cell(source,chain.front(),columns[0])));
+ return result;
+}
 EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> anchors,const PandasLtlFilterOptions& options,Rule rule,const EventAttribute* pattern=nullptr){
  EventAttribute empty;empty.container=AttributeContainerKind::kList;
  const auto& boundaries=options.timestamp_diff_boundaries?*options.timestamp_diff_boundaries:empty;
@@ -286,6 +369,7 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
  std::vector<std::size_t> valid;
  for(std::size_t i=0;i<source.size();++i){bool good=true;for(const auto c:columns)if(missing(cell(source,i,c))){good=false;break;}if(good)valid.push_back(i);}
  for(const auto& target:anchors)check_target(target,source.size(),source.dtypes.empty()?"object":source.dtypes[columns[1]]);
+ std::optional<std::unordered_set<std::string>> listed;
  if(rule==Rule::kEventually&&anchors.size()<2)error("IndexError","list index out of range");
  if(timed){
   const auto dtype=source.dtypes.empty()?"object":source.dtypes[columns.back()];
@@ -296,7 +380,8 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
   }
   // Each step's bounds are compared eagerly, whether or not rows remain.
   if(rule==Rule::kEventually&&boundary_count){
-   for(std::size_t i=0;i+1<anchors.size();++i){
+   if(listed_bounds(boundaries,anchors.size()))listed=listed_steps(source,anchors,columns,valid,boundaries);
+   else for(std::size_t i=0;i+1<anchors.size();++i){
     const auto bound=element(boundaries,i);
     temporal_bound(0.0,element(bound,0),true,true);temporal_bound(0.0,element(bound,1),false,true);
    }
@@ -332,7 +417,7 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
     }
     return false;
    };
-   if(search(search,0,0,0))selected.insert(key);
+   if(listed?listed->contains(key):search(search,0,0,0))selected.insert(key);
   }else if(resources){
    std::vector<const EventAttribute*> a,b;
    for(const auto row:rows){if(matches_at(cell(source,row,activity_column),anchors[0],row))a.push_back(&cell(source,row,columns[2]));if(rule==Rule::kFourEyes&&matches_at(cell(source,row,activity_column),anchors[1],row))b.push_back(&cell(source,row,columns[2]));}

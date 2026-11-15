@@ -360,7 +360,7 @@ PolarsCaseFilterOptions keyed(const PolarsCaseFilterOptions& raw, Operation op, 
     if (time.container == AttributeContainerKind::kList || time.container == AttributeContainerKind::kTuple) {
       if (!time.children.empty() && !text(time.children.front()))
         fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(time.children.front()) + "'.");
-      for (const auto& item : time.children) if (!text(item)) fail("TypeError", "apply", "'" + python_type(item) + "' object is not an instance of 'str'");
+      for (const auto& item : time.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
     }
     options.timestamp_key = keys::col_key(time, columns);
   }

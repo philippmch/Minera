@@ -203,7 +203,7 @@ EventAttribute selector(const EventAttribute& value,const std::vector<std::strin
     // Round CL: a first item that is not a str is named as the iterable's type.
     if(!value.children.empty()&&!text(value.children.front()))
       fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(value.children.front())+"'.");
-    for(const auto& item:value.children)if(!text(item))fail("TypeError","apply","'"+core_type(item)+"' object is not an instance of 'str'");
+    for(const auto& item:value.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+core_type(item)+"' object is not an instance of 'str'");
   }
   auto key=keys::col_key(value,columns);
   if(collection(key)&&!key.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
