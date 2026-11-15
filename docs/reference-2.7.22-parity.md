@@ -27079,6 +27079,13 @@ device linked).
   `timestamp_case_grouping`).
   The CJ table, CJ sequence and CB sequence calls of CK1-1 still differ
   (carried).
+- **CL1-5 CI timing race.** CL's CI run 43666938823 failed only in
+  `minera_server_mine_progress_tests` on macOS: the cancel during
+  "Reading the event log" finished and cleared the progress record
+  before the next poll, so the check "the cancel arrived while reading"
+  saw `running: false`. The three post-cancel checks now also accept a
+  cleared record; the canceled mine's error answer still proves the
+  cancel hit that mine. Fixed in a follow-up commit.
 
 Carried to round CM:
 - Polars sequence (17 calls): a case key given as a list holding a dict

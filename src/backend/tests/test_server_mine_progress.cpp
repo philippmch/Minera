@@ -249,8 +249,10 @@ int main(int argc, char** argv) {
       const double busy_to = cpu_seconds(server);
       r = client.Post("/api/cancel-mine?request_id=" + id, "", "text/plain");
       check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel-mine: " + describe(r));
+      // A fast runner can finish the cancel and clear the record before this
+      // poll; the canceled mine's error answer below proves it was this mine.
       const auto progress = poll(client, id);
-      check(progress && progress->stage == kLongStage,
+      check(progress && (!progress->running || progress->stage == kLongStage),
             "the cancel arrived inside the " + kLongStage + " stage");
       sleep_ms(1000);
       const double idle_from = cpu_seconds(server);
@@ -325,8 +327,9 @@ int main(int argc, char** argv) {
       const auto canceled_at = std::chrono::steady_clock::now();
       r = client.Post("/api/cancel-mine?request_id=" + read_id, "", "text/plain");
       check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel-mine while reading: " + describe(r));
+      // The record may already be cleared (see the long-stage cancel above).
       const auto still = poll(client, read_id);
-      check(still && still->stage == "Reading the event log", "the cancel arrived while reading");
+      check(still && (!still->running || still->stage == "Reading the event log"), "the cancel arrived while reading");
       bool stopped = false;
       while (!stopped && std::chrono::steady_clock::now() - canceled_at < std::chrono::seconds(30)) {
         const auto progress = poll(client, read_id);
@@ -384,7 +387,8 @@ int main(int argc, char** argv) {
       r = client.Post("/api/cancel-mine?request_id=" + xes_id, "", "text/plain");
       check(r && r->status == 200 && contains(r->body, "\"canceled\":true"), "cancel-mine while parsing XES: " + describe(r));
       const auto still = poll(client, xes_id);
-      check(still && still->stage == "Reading the event log", "the cancel arrived while the XES log was read");
+      check(still && (!still->running || still->stage == "Reading the event log"),
+            "the cancel arrived while the XES log was read");
       bool stopped = false;
       while (!stopped && std::chrono::steady_clock::now() - canceled_at < std::chrono::seconds(30)) {
         const auto progress = poll(client, xes_id);

@@ -5290,7 +5290,9 @@ device linked).
 
 Next round (CM) should start by re-reviewing round CL:
 
-- the CI run of the CL commit;
+- the CI run of the CL follow-up commit (CL's own run 43666938823 failed
+  only in the macOS mine progress test, a cancel/poll race fixed as
+  CL1-5);
 - fresh seeds of the CK domains (pandas table and sequence, Polars
   sequence and table) and of the CJ, CI and CH domains;
 - the 497 Polars table calls (full bank
