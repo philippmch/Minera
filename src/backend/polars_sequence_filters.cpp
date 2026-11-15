@@ -1195,6 +1195,14 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
     if (act_value->kind != Kind::kDict) (void)list_literal(act_value->items);
     else if (const auto error = detail::polars_lit::dict_literal_error(*act_value)) fail("TypeError", *error);
   }
+  // Round CL: count >= MIN_OCCURRENCES. pl.lit builds a list or dict value
+  // while Python builds the filter, before the plan resolves any column of
+  // the activity filter (round CR, fresh CK bank 2026111652 case 22).
+  const auto minimum = parameter_or(parameters, "MIN_OCCURRENCES", "min_occurrences", Value::of(std::int64_t{2}));
+  std::optional<detail::polars_lit::Literal> minimum_list;
+  if (minimum.kind == Kind::kList) minimum_list = list_literal(minimum.items);
+  if (minimum.kind == Kind::kDict)
+    if (const auto error = detail::polars_lit::dict_literal_error(minimum)) fail("TypeError", *error);
   if (activities) {
     // pl.col({}) leaves the is_in filter without an expression.
     if (no_columns_key(act_key))
@@ -1227,11 +1235,6 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   // resolves); a str, list or dict then fails the comparison on the UInt32
   // count while collecting (a dict as the struct comparisons of the table
   // filters, with a present cell when a (case, activity) group exists).
-  const auto minimum = parameter_or(parameters, "MIN_OCCURRENCES", "min_occurrences", Value::of(std::int64_t{2}));
-  std::optional<detail::polars_lit::Literal> minimum_list;
-  if (minimum.kind == Kind::kList) minimum_list = list_literal(minimum.items);
-  if (minimum.kind == Kind::kDict)
-    if (const auto error = detail::polars_lit::dict_literal_error(minimum)) fail("TypeError", *error);
   if (list_key) (void)gk::build_values(list_key->items);
   const auto case_column = list_key ? std::size_t{0} : require(df, case_glue, plan);
   if (!activities && !constant_act) act = require(df, act_key, plan);
@@ -1744,6 +1747,21 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
       cast_failure.emplace(p, "casting from Utf8View to Boolean not supported");
       break;
     }
+    // Round CR: a struct cast to String is null when its first field is
+    // null, else its fields in braces (a missing field null); a struct of
+    // no fields is "}" (probe/cr/st1.py, st2.py).
+    if (dtype == "String" && literal.type.kind == LitType::K::kStruct) {
+      for (const auto& v : literal.values) {
+        if (v.kind == Kind::kNone) { list.push_back(std::nullopt); continue; }
+        if (literal.type.inner.empty()) { list.push_back(Value::of(std::string("}"))); continue; }
+        if (v.entries.empty() || v.entries[0].second.kind == Kind::kNone) { list.push_back(std::nullopt); continue; }
+        std::string text = "{";
+        for (std::size_t i = 0; i < literal.type.inner.size(); ++i)
+          text += (i ? "," : "") + (i < v.entries.size() ? detail::polars_lit::literal_item(v.entries[i].second) : std::string("null"));
+        list.push_back(Value::of(text + "}"));
+      }
+      continue;
+    }
     for (const auto& v : literal.values) list.push_back(cast_to(v, dtype, as_enum ? &categories : nullptr));
   }
   // An empty pattern matches every case, and the plan keeps no comparison.
@@ -2126,6 +2144,17 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
          "expressions are returning the same default column name. If this is the case, try renaming the columns with "
          "`.alias(\"new_name\")` to avoid duplicate column names." +
              plan_where(df, act_plan));
+  // Round CR: pl.col({}) gives the with_columns no expression, so the next
+  // one misses `_is_split_activity` (fresh CK bank 2026111652 case 217).
+  if (no_columns_key(act_key)) {
+    auto stack = act_plan.stack;
+    stack.erase(stack.begin());
+    column_not_found(df, "_is_split_activity",
+                     Plan{"select", stack,
+                          " WITH_COLUMNS:\n [] \n   WITH_COLUMNS:\n   [col(" + quote(case_glue) + ").cum_count().over([col(" +
+                              quote(case_glue) + ")]).alias(\"_row_within_case\")] ",
+                          {"_row_within_case"}, "  " + frame_plan(df.columns)});
+  }
   const auto act = require(df, act_key, act_plan);
   // A value that is no list, tuple or str reaches is_in as itself, which
   // Polars implodes (round CC).

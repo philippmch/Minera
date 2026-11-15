@@ -104,15 +104,14 @@ void empty_and_invalid_options() {
   assert(model.root.children.empty());
   assert(!model.root.final);
 
+  // Round CR: pm4py's discover_prefix_tree takes max_path_length=0 and
+  // leaves the root alone (no children, not final).
   TrieOptions options;
   options.max_path_length = 0;
-  bool rejected = false;
-  try {
-    (void)discover_trie(log({trace({event("a")})}), options);
-  } catch (const std::invalid_argument&) {
-    rejected = true;
-  }
-  assert(rejected);
+  const auto bare = discover_trie(log({trace({event("a")})}), options);
+  assert(bare.root.children.empty());
+  assert(!bare.root.final);
+  assert(bare.truncated);
 }
 
 void json_shape() {

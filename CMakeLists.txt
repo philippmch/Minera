@@ -1418,6 +1418,15 @@ if(MINERA_BUILD_TESTS)
   endif()
   add_test(NAME minera_review_cb1_tests COMMAND minera_review_cb1_tests)
 
+  add_executable(minera_review_cr1_tests src/backend/tests/test_review_cr1.cpp)
+  target_link_libraries(minera_review_cr1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_cr1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_cr1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  if(MSVC)
+    target_compile_options(minera_review_cr1_tests PRIVATE /bigobj)
+  endif()
+  add_test(NAME minera_review_cr1_tests COMMAND minera_review_cr1_tests)
+
   add_executable(minera_resource_profiles_tests
     src/backend/tests/test_resource_profiles.cpp
   )
@@ -3117,6 +3126,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_cq_probe_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cq-probe-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_cq_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CR: a fresh CK seed (2026111636): struct prefixes cast to String
+  # (null when the first field is null).
+  add_test(NAME minera_polars_sequence_filter_cr_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cr-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_cr_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3210,6 +3224,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cq_probe_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cq-probe-bank.json.gz")
   set_tests_properties(minera_polars_filter_cq_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CR: a fresh CK seed (2026111631): relative occurrence with dict
+  # items and literal case keys, cast timeframe columns keeping both bounds,
+  # one-row A_next_B_next_C with a list case key.
+  add_test(NAME minera_polars_filter_cr_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cr-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cr_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3416,6 +3436,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_cq_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cq-bank.json.gz")
   set_tests_properties(minera_pandas_filter_cq_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CR: a fresh CK seed (2026111639): a tuple boundary names itself in
+  # the IndexError.
+  add_test(NAME minera_pandas_filter_cr_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cr-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_cr_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

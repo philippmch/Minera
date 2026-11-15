@@ -1165,7 +1165,7 @@ EventTable case_projection(EventTable source,const PolarsAttributesFilterCall& c
 EventTable filtered(const EventTable& source,const Predicate& query) {
   return case_projection(select_rows(source,matching(source,query)),query.call,query.keys?&*query.keys:nullptr);
 }
-struct CountColumn { std::optional<std::size_t> column, cases;EventAttribute literal;std::string dtype;bool once=false; };
+struct CountColumn { std::optional<std::size_t> column, cases;EventAttribute literal;std::string dtype;bool once=false,literal_case=false; };
 std::size_t distinct_case_count(const EventTable& source,const EventAttribute& raw);
 CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,const PolarsAttributesFilterOptions& options,bool relative=false) {
   CountColumn result;result.literal=attr;result.once=options.keep_once_per_case&&truth(*options.keep_once_per_case);
@@ -1177,12 +1177,22 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     if(mapping(options.case_id_key)){
       if(text(attr)&&!index_of(source,attr.value))fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved("'group_by'",frame_plan(source),groupnodes));
       (void)distinct_case_count(source,options.case_id_key);
-      throw std::invalid_argument("Native Polars per-case counts grouped by a struct literal case key are outside the modelled domain");
+      if(detail::polars_lit::dict_literal_error(options.case_id_key))
+        throw std::invalid_argument("Native Polars per-case counts grouped by a struct literal case key are outside the modelled domain");
+      // Round CR: the literal is one case, so each value counts once (fresh
+      // CK bank 2026111631 case 138).
+      result.literal_case=true;
+      return std::optional<std::size_t>{};
     }
     // Round CP: a list case key is the group_by's Series literal, built
     // strictly before pl.col reads it (CK bank 2026111590 case 212).
-    if(options.case_id_key.container==AttributeContainerKind::kList||options.case_id_key.container==AttributeContainerKind::kTuple)
+    if(options.case_id_key.container==AttributeContainerKind::kList||options.case_id_key.container==AttributeContainerKind::kTuple) {
       if(const auto error=detail::polars_lit::argument_literal_error(options.case_id_key))fail("TypeError","apply",*error);
+      // Round CR: the literal joins no column, so a missing attribute fails
+      // the group_by before pl.col reads the case key (fresh CK bank
+      // 2026111631 case 373).
+      if(text(attr)&&!index_of(source,attr.value))fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved("'group_by'",frame_plan(source),groupnodes));
+    }
     const auto key=col_key(options.case_id_key,source.columns);
     if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
     const auto at=index_of(source,key.value);
@@ -1225,7 +1235,7 @@ PolarsAttributeCounts counts_from(const EventTable& source,const CountColumn& co
     auto v=col.column?cell(source,row,*col.column):col.literal;
     const auto key=col.column?group_key(v,col.dtype):"literal";
     if(col.once) {
-      const auto k=group_key(cell(source,row,*col.cases),source_dtype(source,*col.cases));
+      const auto k=col.literal_case?std::string("literal"):group_key(cell(source,row,*col.cases),source_dtype(source,*col.cases));
       if(!pairs.insert(std::to_string(k.size())+":"+k+key).second)continue;
     }
     auto [it,inserted]=positions.emplace(key,out.size());if(inserted)out.push_back({clean_value(v),count_value(0)});
@@ -1310,10 +1320,21 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
       for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
         fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),{"'group_by'"}));
       if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
-      if(!source.rows.empty()){
-        const auto& bound=op==Op::kRelative?*call.stake:*call.threshold;
-        fail("TypeError","apply","'>=' not supported between instances of 'dict' and '"+std::string(op==Op::kRelative?(real(bound)?"float":"int"):core_type(bound))+"'");
+      if(op==Op::kRelative) {
+        // Round CR: the denominator, then the stake times it, then each
+        // count against that threshold; no count leaves pl.col(attribute)
+        // to fail (fresh CK bank 2026111631 cases 167 and 344).
+        const bool case_denominator=!options.keep_once_per_case||truth(*options.keep_once_per_case);
+        if(case_denominator)(void)distinct_case_count(source,options.case_id_key);
+        if(source.rows.empty())return selection;
+        const auto& stake=*call.stake;
+        if(null(stake)||date(stake)||mapping(stake)||stake.container==AttributeContainerKind::kSet||stake.container==AttributeContainerKind::kFrozenSet)
+          fail("TypeError","apply","unsupported operand type(s) for *: '"+core_type(stake)+"' and 'int'");
+        const std::string product=text(stake)?"str":collection(stake)?core_type(stake):real(stake)?"float":"int";
+        fail("TypeError","apply","'>=' not supported between instances of 'dict' and '"+product+"'");
       }
+      if(!source.rows.empty())
+        fail("TypeError","apply","'>=' not supported between instances of 'dict' and '"+core_type(*call.threshold)+"'");
     }
     if(op==Op::kTopActivities) {
       if(collection(attr)) {if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");fail("AttributeError","apply","'DataFrame' object has no attribute 'to_list'");}

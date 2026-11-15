@@ -1,6 +1,10 @@
 #include "minera/trie.hpp"
 
+#include "minera/dataframe_validation.hpp"
+#include "minera/frame_keys.hpp"
+
 #include <algorithm>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 
@@ -29,22 +33,38 @@ TrieNode* child_for(TrieNode& node, std::string label) {
 
 }  // namespace
 
-TrieModel discover_trie(const EventLog& log, const TrieOptions& options) {
-  if (options.max_path_length && *options.max_path_length == 0) {
-    throw std::invalid_argument("trie discovery: max_path_length must be positive");
+TrieModel discover_trie(const EventLog& log, const TrieOptions& requested) {
+  // Round CR: pm4py's discover_prefix_tree checks an upload's frame column
+  // (check_pandas_dataframe_columns: a column the frame lacks, then one of
+  // another dtype than str, then a gap) and keys the trie by its cells; a
+  // max_path_length of 0 leaves the root alone (observed black-box).
+  auto options = requested;
+  std::optional<FrameKeyedActivities> keyed;
+  if (log.dataframe_columns) {
+    const std::string key = options.activity_key == "activity" ? std::string("concept:name") : options.activity_key;
+    const auto columns = frame_keys(log, FrameKeyScope::kDataFrame);
+    if (!columns.contains(key))
+      throw std::invalid_argument("the specified activity column is not contained in the dataframe. Available columns: " +
+                                  dataframe_available_columns({columns.begin(), columns.end()}));
+    keyed = frame_keyed_activities(log, key, FrameKeyScope::kDataFrame);
+    if (keyed) {
+      if (const auto error = frame_activity_column_error(*keyed); !error.empty()) throw std::invalid_argument(error);
+      options.activity_key = "concept:name";
+    }
   }
+  const auto& source = keyed ? keyed->log : log;
 
   TrieModel result;
   result.root.label.clear();
   result.root.depth = 0;
   result.root.final = false;
-  result.input_traces = log.traces.size();
+  result.input_traces = source.traces.size();
 
-  for (const auto& trace : log.traces) {
+  for (const auto& trace : source.traces) {
     const std::size_t limit = options.max_path_length.value_or(trace.events.size());
     const std::size_t length = std::min(limit, trace.events.size());
-    if (length == 0) continue;
     if (length < trace.events.size()) result.truncated = true;
+    if (length == 0) continue;
 
     TrieNode* node = &result.root;
     for (std::size_t index = 0; index < length; ++index) {

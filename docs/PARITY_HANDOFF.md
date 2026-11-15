@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CQ (2026-11-05 to 2026-11-15, cloud container)
+## Review-fix loop, rounds T–CR (2026-11-05 to 2026-11-15, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5525,7 +5525,62 @@ project files under `review-harness/round-cq/`.
 No fixture changed. The device check on the Mac was skipped again (no
 device linked).
 
-Next round (CR) should start by re-reviewing round CQ:
+Round CR re-reviewed CQ (Review CR1). CQ's commit 4910224 ran green on
+all six CI jobs (run 43726703592). CR replayed fresh seeds and swept four
+upload routes that earlier rounds had not swept on a typed frame:
+- Label splitting (`label_splitting.cpp`) reads the frame's typed cells:
+  context tokens keyed as a Python dict keys them (one NaT, a fresh NaN per
+  float64 cell), the modularity queue's tie TypeError, relabelling in
+  global community order, and `label + suffix` raising for a label that
+  is no str; an empty suffix is accepted.
+- The prefix tree (`trie.cpp`) checks the key column with pm4py's
+  messages and reads typed keys; `max_path_length` 0 gives a bare root.
+- The interval tree (`interval_tree.cpp`) sorts intervals with their
+  events as the last key, so equal intervals of unequal XES events raise
+  TypeError; NaT and non-date timestamps raise pm4py's errors.
+- Link analysis (`link_analysis.cpp`) merges the frame on typed keys under
+  pandas' merge checks (int64 with str fails, NaN matches NaN), numbers the
+  rows in numpy's quicksort order of the sorting column (equal cells out of
+  row order from 17 rows; the reference sweep runs numpy's portable sort)
+  and reads XES rows in file order. Sweeps: 0 differing calls.
+- Fresh seeds: Polars table CK 2026111631 (6 calls), CN 2026111632, CJ
+  2026111633, CI 2026111634, CH 2026111635; Polars sequence CP 2026111630,
+  CK 2026111636 (1), CJ 2026111637, CH 2026111638; pandas CK table
+  2026111639 (1), CK sequence 2026111640, CN LTL 2026111641. A second batch
+  after the fixes (Polars table CK 2026111651 and CN 2026111654, sequence
+  CK 2026111652, pandas CK 2026111653) found 5 more calls. All 0 after.
+
+In the suite: new `docs/polars-filter-cr-bank.json.gz`,
+`docs/polars-sequence-filter-cr-bank.json.gz` and
+`docs/pandas-filter-cr-bank.json.gz` (the CK seeds with the second batch's
+fixed cases) and `minera_review_cr1_tests` (link analysis and label
+splitting on a CSV upload, pm4py values). The fresh banks, sweeps and
+probes are in the project files under `review-harness/round-cr/`.
+
+No fixture changed. The device check on the Mac was skipped again (no
+device linked).
+
+Next round (CS) should start by re-reviewing round CR:
+
+- CR's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- one-row `A_next_B_next_C` with a list case key of str, int or bool
+  items, a tuple, or None (probe `probe/cr/ln1.py` has the reference's
+  answers), still refused;
+- sweeps of other upload routes on typed frames (embeddings, log
+  clustering, the process cube, anonymization);
+- the CR list below (LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CQ's targets, taken in CR (findings CR1-1 to CR1-7): CQ's CI run,
+the fresh seeds, and new areas (label splitting, prefix tree, interval
+tree and link analysis on uploads). Not taken (carried to CS): the LTL
+list-key cases outside the model, equal-size joins and the older CJ, CF
+and CD items.
+
+Previous list for round CR (kept for its older items):
 
 - CQ's CI run;
 - fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ

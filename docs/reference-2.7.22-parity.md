@@ -27662,3 +27662,101 @@ Tests:
   k6; 1,420) and `docs/pandas-filter-cq-bank.json.gz` (pandas CK seed
   2026111619; 11,712), replayed by the `minera_*_cq_*bank_parity_tests`
   ctests. `docs/polars-filter-cj-bank.json.gz` case 71 is observed.
+
+## Review CR1: re-review of round CQ, label splitting, prefix tree, interval tree and link analysis on uploads (2026-11-15)
+
+Round CR checked CQ's CI (run 43726703592 on 4910224: green on all six
+jobs), replayed fresh seeds of every filter domain and swept four upload
+routes on the typed frame of a CSV or XES upload (pm4py's DataFrame path:
+`format_dataframe` over `read_csv`, `read_xes`). The device check on the
+Mac was skipped (no device linked).
+
+- **CR1-1 Contextual label splitting on uploads** (`/api/label-splitting`).
+  pm4py reads the frame's typed cells: the activity and context tokens are
+  Python values keyed as a dict keys them (`1`, `1.0` and `True` alike, one
+  NaT object, a fresh NaN object per float64 cell but one NaN elsewhere).
+  The communities come from networkx's greedy modularity, whose priority
+  queue compares nodes on a tie (`TypeError: ... Consider using a tuple,
+  with a priority value that can be compared.` when the tied nodes'
+  activities or contexts do not compare). Edges join only nodes of one
+  activity, labels are rewritten in global community order (largest
+  first), only str labels are targets, and an activity with two or more
+  communities whose label is no str fails on `label + suffix`
+  (`unsupported operand type(s) for +: 'int' and 'str'`). An empty
+  `label_splitting_activities_suffix` is accepted.
+- **CR1-2 Prefix tree on uploads** (`/api/trie`). The key column passes
+  pm4py's checks (`the specified activity column is not contained in the
+  dataframe. Available columns: ...`, then the column's dtype and gaps)
+  and typed keys label the nodes; `trie_max_path_length` 0 gives a bare
+  root that is not final (it was refused).
+- **CR1-3 Interval tree on uploads** (`/api/interval-tree`, OPEN_PATHS).
+  Intervals sort by (start, end, source event, target event), so two equal
+  intervals of unequal events fail (`'<' not supported between instances
+  of 'Event' and 'Event'`; CSV events never tie, their `@@index` differs).
+  A NaT timestamp fails with `NaTType does not support timestamp`, a cell
+  that is no date with `'<type>' object has no attribute 'timestamp'`, an
+  empty interval after the sort with `Start must be less than end`.
+- **CR1-4 Link analysis on uploads** (`/api/link-analysis`). pm4py sorts
+  the frame by the sorting column's typed cells (pandas' `nargsort`: the
+  present cells with numpy's default quicksort, an introsort, so equal
+  cells leave row order from 17 rows on, then the missing ones), numbers
+  the rows, and merges the frame with itself on out = in. pandas refuses
+  some key pairs (`You are trying to merge on int64 and str columns for key
+  'num'. If you wish to proceed you should use pd.concat`, also date with
+  text or numbers, text with numbers unless both infer as strings);
+  otherwise keys match as Python values (`1`, `1.0`, `True`) and missing
+  keys match each other. XES rows are read in file order. Sweeps of 120
+  seeds each (CSV, XES, and logs of up to 63 rows): 0 differing calls.
+- **CR1-5 Fresh seeds** (first batch). Polars table CK 2026111631 (6
+  calls, 0 after): `filter_df_relative_occurrence_event_attribute` with a
+  key list holding a dict computes the case count, then the stake times it
+  (`unsupported operand type(s) for *: 'dict' and 'int'`), then compares;
+  with no rows the counts are empty and `pl.col(key)` fails (`'dict'
+  object is not an instance of 'str'`); a dict case key per case is one
+  literal case (each value counts once); with a list case key the group_by
+  takes the literal, so a missing attribute column fails first;
+  `filter_traces_attribute_in_timeframe` on a column cast to Int64 or
+  Float64 keeps both bounds where equal bounds otherwise fold into `==`;
+  one-row `A_next_B_next_C` with a list case key whose first item is a
+  dict, None, a list or a float fails selecting it (`cannot select columns
+  using Sequence with elements of type 'dict'`). Polars sequence CK
+  2026111636 (1 call): a struct prefix item cast to String is null when
+  its first field is null, its fields in braces otherwise, `}` with no
+  fields. pandas CK 2026111639 (1 call): indexing a tuple or a str names
+  it (`tuple index out of range`), a set is not subscriptable. CN, CJ, CI
+  and CH table seeds, the CP, CJ and CH sequence seeds, the pandas CK
+  sequence and CN LTL seeds were clean.
+- **CR1-6 Fresh seeds** (second batch, after the fixes; 5 calls, 0 after).
+  Polars table CK 2026111651: the resolved plan of a timeframe on an
+  integer or float column prints the bounds as microseconds with the
+  column's cast (`col("cid").cast(Int64) >= 1614765600000000`). pandas CK
+  2026111653: a tuple target is coerced like a list (`Unable to coerce to
+  Series, length must be 2: given 0`); a case key list of lists is a list
+  of arrays for `set_index` (`Length mismatch: Expected 0 rows, received
+  array of length 1`). Polars sequence CK 2026111652:
+  `rework.apply_activity_set` builds its MIN_OCCURRENCES literal before
+  the activity filter resolves; `activity_split` with `pl.col({})` adds no
+  `_is_split_activity`, which the next step then misses. Polars table CN
+  2026111654 was clean.
+- **CR1-7 CQ's CI.** 4910224 ran green on Linux, macOS and Windows. The
+  edit-distance alignment route was checked and needs no change (its typed
+  path already reads the frame).
+
+Declared:
+- numpy's argsort uses SIMD sorts on hosts with AVX-512 or AVX2, whose
+  order of equal keys differs from the portable quicksort Minera models
+  (as for network analysis); reference sweeps run with
+  `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"`.
+- One-row `A_next_B_next_C` with a list case key of str, int or bool items,
+  a tuple or None stays outside the modelled domain (the reference's
+  answers are in the round's probe `ln1.py`).
+
+Tests:
+- New: `docs/polars-filter-cr-bank.json.gz` (CK 2026111631 and the fixed
+  case of CK 2026111651; 22,045 calls),
+  `docs/polars-sequence-filter-cr-bank.json.gz` (CK 2026111636 and the
+  fixed cases of CK 2026111652; 8,839) and
+  `docs/pandas-filter-cr-bank.json.gz` (CK 2026111639 and the fixed cases
+  of CK 2026111653; 11,772), replayed by the `minera_*_cr_bank_parity_tests`
+  ctests; `minera_review_cr1_tests` (link analysis and label splitting on a
+  22-row CSV upload, pm4py values).

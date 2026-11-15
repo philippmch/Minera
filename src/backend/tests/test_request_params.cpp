@@ -864,10 +864,13 @@ void trie_params_contract() {
       {"trie_activity_key", "phase"}, {"trie_max_path_length", "4"}}));
   assert(p.activity_key == "phase");
   assert(p.max_path_length && *p.max_path_length == 4);
+  // Round CR: 0 is pm4py's too (a bare root); a negative length is refused.
+  const auto zero = minera::parse_trie_params(fields({{"trie_max_path_length", "0"}}));
+  assert(zero.max_path_length && *zero.max_path_length == 0);
   bool threw = false;
   try {
     (void)minera::parse_trie_params(
-        fields({{"trie_max_path_length", "0"}}));
+        fields({{"trie_max_path_length", "-1"}}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }

@@ -1,6 +1,13 @@
 #include "minera/link_analysis.hpp"
 
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
+#include "frame_cells.hpp"
+#include "python_scalar.hpp"
+#include "numpy_object_sort.hpp"
+
+#include <optional>
 
 #include <algorithm>
 #include <map>
@@ -23,6 +30,11 @@ struct Row {
   std::string out_value;
   std::string in_value;
   std::string sorting_value;
+  // Round CR: the merge keys (the values themselves outside a frame) and an
+  // upload's typed sorting cell.
+  std::string out_key;
+  std::string in_key;
+  std::optional<python::Scalar> sorting_cell;
 };
 
 std::string value_for(const Trace& trace, const Event& event,
@@ -132,14 +144,121 @@ void write_event(std::ostream& out, const LinkAnalysisEvent& event,
   out << '}';
 }
 
+
+// ---------------------------------------------------------------- frames
+// Round CR: on an upload pm4py's link analysis reads the frame (observed
+// black-box): it sorts the rows by the sorting column's typed cells
+// (missing cells last), numbers them, and merges the frame with itself on
+// out_column = in_column, which pandas refuses for some dtype pairs and
+// otherwise matches as Python values (1, 1.0 and True alike; missing cells
+// match each other).
+
+struct FrameColumn {
+  std::string name;
+  std::optional<DataFrameColumnType> type;
+  std::string dtype;  // pandas' name of the dtype
+};
+
+std::string frame_column_name(std::string_view column) {
+  if (column == "case_id") return "case:concept:name";
+  if (column == "activity") return "concept:name";
+  if (column == "timestamp") return "time:timestamp";
+  if (column == "resource") return "org:resource";
+  if (column == "lifecycle") return "lifecycle:transition";
+  return std::string(column);
+}
+
+FrameColumn frame_column(const EventLog& frame, const std::set<std::string>& keys, std::string_view requested) {
+  FrameColumn column;
+  column.name = frame_column_name(requested);
+  if (!keys.contains(column.name)) throw std::invalid_argument("KeyError: '" + column.name + "'");
+  column.type = frame_column_type(frame, column.name);
+  const bool csv = frame.dataframe_columns && frame.dataframe_columns->csv_text;
+  switch (column.type.value_or(DataFrameColumnType::kString)) {
+    case DataFrameColumnType::kInt64: column.dtype = "int64"; break;
+    case DataFrameColumnType::kFloat64: column.dtype = "float64"; break;
+    case DataFrameColumnType::kBool: column.dtype = "bool"; break;
+    case DataFrameColumnType::kObject: column.dtype = "object"; break;
+    case DataFrameColumnType::kDate: column.dtype = "datetime64[us, UTC]"; break;
+    case DataFrameColumnType::kString:
+      column.dtype = csv && (column.name == "concept:name" || column.name == "case:concept:name") ? "string" : "str";
+      break;
+  }
+  return column;
+}
+
+// pandas' merge key check (_maybe_coerce_merge_keys) for the dtypes an
+// upload's frame holds.
+void check_merge_keys(const FrameColumn& left, const FrameColumn& right, const std::vector<std::optional<python::Scalar>>& left_cells,
+                      const std::vector<std::optional<python::Scalar>>& right_cells) {
+  using T = DataFrameColumnType;
+  const auto lt = left.type.value_or(T::kString), rt = right.type.value_or(T::kString);
+  if (left.dtype == right.dtype) return;
+  const auto fail = [&] {
+    throw std::invalid_argument("ValueError: You are trying to merge on " + left.dtype + " and " + right.dtype +
+                                " columns for key '" + left.name + "'. If you wish to proceed you should use pd.concat");
+  };
+  const auto numeric = [](T t) { return t == T::kInt64 || t == T::kFloat64 || t == T::kBool; };
+  const auto textual = [](T t) { return t == T::kString || t == T::kObject; };
+  if (numeric(lt) && numeric(rt)) return;  // same kind, int and float, or cast to object
+  if ((textual(lt) && rt == T::kBool) || (lt == T::kBool && textual(rt))) return;
+  if ((textual(lt) && numeric(rt)) || (numeric(lt) && textual(rt))) {
+    // lib.infer_dtype(skipna=False): a str column "string" (an object
+    // column of strs too, "mixed" beside other values); numbers
+    // "integer"/"floating" ("mixed-integer-float" never arises here).
+    const auto inferred = [](T t, const std::vector<std::optional<python::Scalar>>& cells) -> std::string {
+      if (t == T::kInt64) return "integer";
+      if (t == T::kFloat64) return "floating";
+      if (t == T::kBool) return "boolean";
+      if (cells.empty()) return "empty";
+      bool text = true, ints = true, bools = true;
+      for (const auto& cell : cells) {
+        const auto kind = cell ? cell->kind : python::Scalar::Kind::kFloat;
+        const bool missing = !cell || python::is_missing(*cell);
+        if (missing || kind != python::Scalar::Kind::kText) text = false;
+        if (missing || kind != python::Scalar::Kind::kInt) ints = false;
+        if (missing || kind != python::Scalar::Kind::kBool) bools = false;
+      }
+      if (text) return "string";
+      if (ints) return "integer";
+      if (bools) return "boolean";
+      return "mixed";
+    };
+    static const std::set<std::string> bool_types = {"integer", "mixed-integer", "boolean", "empty"};
+    static const std::set<std::string> string_types = {"string", "unicode", "mixed", "bytes", "empty"};
+    const auto a = inferred(lt, left_cells), b = inferred(rt, right_cells);
+    if (bool_types.contains(a) && bool_types.contains(b)) return;
+    if (string_types.contains(a) != string_types.contains(b)) fail();
+    return;
+  }
+  if ((lt == T::kDate) != (rt == T::kDate)) fail();
+}
+
+std::string merge_key(const std::optional<python::Scalar>& cell) {
+  if (!cell || python::is_missing(*cell)) return "NA";
+  return python::identity(*cell);
+}
+
+std::string cell_text(const std::optional<python::Scalar>& cell, const FrameColumn& column) {
+  if (!cell || python::is_missing(*cell)) return column.type == DataFrameColumnType::kDate ? "NaT" : "nan";
+  return python::str(*cell);
+}
+
 }  // namespace
 
 LinkAnalysisResult discover_link_analysis(const EventLog& log,
                                           const LinkAnalysisOptions& options) {
-  validate_column(log, options.out_column, "link_analysis_out_column");
-  validate_column(log, options.in_column, "link_analysis_in_column");
-  validate_column(log, options.sorting_column,
-                  "link_analysis_sorting_column");
+  std::optional<EventLog> frame;
+  if (log.dataframe_columns) {
+    frame = dataframe_frame_event_log(log);
+    if (frame->traces.size() != log.traces.size()) frame.reset();
+  }
+  if (!frame) {
+    validate_column(log, options.out_column, "link_analysis_out_column");
+    validate_column(log, options.in_column, "link_analysis_in_column");
+    validate_column(log, options.sorting_column,
+                    "link_analysis_sorting_column");
+  }
   if (options.index_column.empty())
     throw std::invalid_argument("link_analysis_index_column must not be empty");
   if (is_reserved_index_field(options.index_column))
@@ -165,13 +284,70 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
       row.in_value = value_for(trace, event, event_index, options.in_column);
       row.sorting_value =
           value_for(trace, event, event_index, options.sorting_column);
+      row.out_key = row.out_value;
+      row.in_key = row.in_value;
       rows.push_back(std::move(row));
+    }
+  }
+  if (frame) {
+    // The frame's rows in its row order (an XES upload's file order).
+    std::vector<std::size_t> offsets(frame->traces.size() + 1, 0);
+    for (std::size_t t = 0; t < frame->traces.size(); ++t) offsets[t + 1] = offsets[t] + frame->traces[t].events.size();
+    std::vector<Row> ordered;
+    ordered.reserve(rows.size());
+    for (const auto& frame_row : frame_rows(*frame)) {
+      const auto t = static_cast<std::size_t>(&frame_row.trace - frame->traces.data());
+      const auto e = static_cast<std::size_t>(&frame_row.event - frame_row.trace.events.data());
+      ordered.push_back(rows[offsets[t] + e]);
+      ordered.back().input_index = ordered.size() - 1;
+    }
+    rows = std::move(ordered);
+    const auto keys = frame_keys(*frame, FrameKeyScope::kDataFrame);
+    const auto out = frame_column(*frame, keys, options.out_column);
+    const auto in = frame_column(*frame, keys, options.in_column);
+    const auto sorting = frame_column(*frame, keys, options.sorting_column);
+    std::vector<std::optional<python::Scalar>> out_cells, in_cells;
+    for (auto& row : rows) {
+      const auto& trace = frame->traces[row.trace_index];
+      const auto& event = trace.events[row.event_index];
+      out_cells.push_back(frame_scalar(*frame, trace, event, out.name, FrameKeyScope::kDataFrame));
+      in_cells.push_back(frame_scalar(*frame, trace, event, in.name, FrameKeyScope::kDataFrame));
+      row.sorting_cell = frame_scalar(*frame, trace, event, sorting.name, FrameKeyScope::kDataFrame);
+      if (row.sorting_cell && python::is_missing(*row.sorting_cell)) row.sorting_cell.reset();
+    }
+    // pandas sorts first, then merges. sort_values (nargsort) argsorts the
+    // present cells with numpy's default quicksort, so equal cells come out
+    // in its partition order (from 17 cells on), then the missing ones
+    // follow in row order.
+    std::vector<std::size_t> present, missing;
+    for (std::size_t i = 0; i < rows.size(); ++i) (rows[i].sorting_cell ? present : missing).push_back(i);
+    std::vector<std::size_t> order;
+    try {
+      order = detail::numpy_object_quick_argsort(present.size(), [&](std::size_t a, std::size_t b) {
+        return python::compare(*rows[present[a]].sorting_cell, *rows[present[b]].sorting_cell);
+      });
+    } catch (const python::TypeError& error) {
+      throw std::invalid_argument(std::string("TypeError: ") + error.what());
+    }
+    std::vector<Row> sorted;
+    sorted.reserve(rows.size());
+    for (const auto i : order) sorted.push_back(std::move(rows[present[i]]));
+    for (const auto i : missing) sorted.push_back(std::move(rows[i]));
+    rows = std::move(sorted);
+    check_merge_keys(out, in, out_cells, in_cells);
+    for (auto& row : rows) {
+      const auto& cell_out = out_cells[row.input_index];
+      const auto& cell_in = in_cells[row.input_index];
+      row.out_key = merge_key(cell_out);
+      row.in_key = merge_key(cell_in);
+      row.out_value = cell_text(cell_out, out);
+      row.in_value = cell_text(cell_in, in);
     }
   }
 
   const auto timestamp_sort = options.sorting_column == "timestamp" ||
                               options.sorting_column == "time:timestamp";
-  std::stable_sort(rows.begin(), rows.end(), [&](const Row& left,
+  if (!frame) std::stable_sort(rows.begin(), rows.end(), [&](const Row& left,
                                                 const Row& right) {
     if (timestamp_sort) {
       const auto left_time = parse_timestamp(left.sorting_value);
@@ -189,12 +365,12 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
     rows[index].index = index;
 
   std::map<std::string, std::vector<std::size_t>> targets;
-  for (const auto& row : rows) targets[row.in_value].push_back(row.index);
+  for (const auto& row : rows) targets[row.in_key].push_back(row.index);
 
   std::map<std::size_t, std::set<std::size_t>> associations;
   std::size_t association_count = 0;
   for (const auto& source : rows) {
-    const auto target_it = targets.find(source.out_value);
+    const auto target_it = targets.find(source.out_key);
     if (target_it == targets.end()) continue;
     auto& linked = associations[source.index];
     for (const auto target_index : target_it->second) {

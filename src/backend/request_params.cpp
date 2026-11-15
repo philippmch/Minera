@@ -5473,7 +5473,7 @@ TrieParams parse_trie_params(const FieldLookup& field,
   if (supplied("trie_activity_key"))
     params.activity_key = require("trie_activity_key");
   if (supplied("trie_max_path_length")) {
-    params.max_path_length = parse_positive_size(
+    params.max_path_length = parse_nonnegative_size(
         require("trie_max_path_length"), "trie_max_path_length");
   }
   return params;
@@ -5982,7 +5982,8 @@ LabelSplittingParams parse_label_splitting_params(const FieldLookup& field,
   };
   assign_string("label_splitting_activity_key", params.activity_key);
   assign_string("label_splitting_target_key", params.target_key);
-  assign_string("label_splitting_activities_suffix", params.activities_suffix);
+  // Round CR: an empty suffix is pm4py's too (labels "a0", "a1").
+  if (supplied("label_splitting_activities_suffix")) params.activities_suffix = field("label_splitting_activities_suffix");
   if (supplied("label_splitting_prefix_length"))
     params.prefix_length = parse_nonnegative_size(require("label_splitting_prefix_length"), "label_splitting_prefix_length");
   if (supplied("label_splitting_suffix_length"))

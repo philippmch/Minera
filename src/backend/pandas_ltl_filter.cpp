@@ -160,8 +160,13 @@ EventAttribute element(const EventAttribute& value,std::size_t position){
  if(value.container==AttributeContainerKind::kScalar&&!text_value(value))error("TypeError","'"+type_name(value)+"' object is not subscriptable");
  // Round CK: a dict is subscripted by key; its keys are strs, never the int.
  if(value.container==AttributeContainerKind::kContainer&&!value.is_null)error("KeyError",std::to_string(position));
+ // Round CR: a set is not subscriptable; a tuple and a str name themselves
+ // in the IndexError.
+ if((value.container==AttributeContainerKind::kSet||value.container==AttributeContainerKind::kFrozenSet)&&!value.is_null)
+  error("TypeError","'"+type_name(value)+"' object is not subscriptable");
  const auto values=iterable(value);
- if(position>=values.size())error("IndexError","list index out of range");
+ if(position>=values.size())
+  error("IndexError",std::string(value.container==AttributeContainerKind::kTuple?"tuple":value.container==AttributeContainerKind::kScalar?"string":"list")+" index out of range");
  return values[position];
 }
 bool equal_value(const EventAttribute& a,const EventAttribute& b){return identity(a)==identity(b);}
@@ -354,7 +359,8 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
  // reindex before the second target is compared.
  if(columns[0]!=columns[1]&&resources&&columns[1]==columns[2]&&!anchors.empty()){
   const auto& target=anchors.front();
-  if((target.container==AttributeContainerKind::kContainer||target.container==AttributeContainerKind::kList)&&!target.is_null&&target.children.size()!=2)
+  // Round CR: a tuple too (fresh CK bank 2026111653 case 167).
+  if((target.container==AttributeContainerKind::kContainer||target.container==AttributeContainerKind::kList||target.container==AttributeContainerKind::kTuple)&&!target.is_null&&target.children.size()!=2)
    error("ValueError","Unable to coerce to Series, length must be 2: given "+std::to_string(target.children.size()));
  }
  if(columns[0]==columns[1]||(resources&&columns[1]==columns[2]))error("ValueError","cannot reindex on an axis with duplicate labels");

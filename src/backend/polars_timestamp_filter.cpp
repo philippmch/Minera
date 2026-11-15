@@ -277,7 +277,9 @@ std::string time_expr(const Query& q) {
     if(equal(q.low,q.high))return cover;
     return combined(combined(combined(cmp("first_timestamp",">",lo),"&",cmp("first_timestamp","<",hi)),"|",combined(cmp("last_timestamp",">",lo),"&",cmp("last_timestamp","<",hi))),"|",cover);
   }
-  if(equal(q.low,q.high)&&!nanosecond_aware(q))return cmp(time,"==",lo);
+  // Round CR: a column cast to Int64 or Float64 keeps both bounds (fresh
+  // CK bank 2026111631 case 239).
+  if(equal(q.low,q.high)&&!nanosecond_aware(q)&&!cast_time(q.time_dtype))return cmp(time,"==",lo);
   return combined(cmp(time,">=",lo),"&",cmp(time,"<=",hi_le));
 }
 // The attribute comparison inside the evaluated predicate: coerced once it
@@ -354,8 +356,13 @@ std::string attribute_plan(const EventTable& source,const Query& q) {
 std::string indent(std::string value,const std::string& prefix){std::string out=prefix;for(const char c:value){out+=c;if(c=='\n')out+=prefix;}return out;}
 std::string filtered_plan(const EventTable& source,const Query& q,bool upper) {
   std::string plan=q.op==Operation::kAttribute?attribute_plan(source,q):frame_plan(source);
-  plan="FILTER col("+quote(q.options.timestamp_key.value)+") >= "+bound_text(q.low)+"\nFROM\n"+indent(plan,"  ");
-  if(upper)plan="FILTER col("+quote(q.options.timestamp_key.value)+") <= "+at_most_text(q)+"\nFROM\n"+indent(plan,"  ");return plan;
+  // Round CR: an integer or float column shows the bounds as its physical
+  // microseconds, cast as the comparison casts it (fresh CK bank
+  // 2026111651 case 248).
+  const auto& d=q.time_dtype;
+  const auto column="col("+quote(q.options.timestamp_key.value)+")"+(cast_time(d)?std::string(".cast(")+(d=="Float32"?"Float64":"Int64")+")":std::string());
+  plan="FILTER "+column+" >= "+time_bound(q,q.low,bound_text(q.low))+"\nFROM\n"+indent(plan,"  ");
+  if(upper)plan="FILTER "+column+" <= "+time_bound(q,q.high,at_most_text(q))+"\nFROM\n"+indent(plan,"  ");return plan;
 }
 std::string missing_prefix(const std::string& key,const std::vector<std::string>& columns) {
   if(keys::by_name(key))return keys::by_name_message(key);

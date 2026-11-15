@@ -213,6 +213,15 @@ std::size_t case_column(const EventTable& source,const EventAttribute& key){
  if(empty_list(key))error("ValueError","Length mismatch: Expected axis has "+std::to_string(source.size())+" elements, new values have 0 elements");
  if(const auto found=column(source,key))return *found;
  detail::pandas_check_set_index_key(key,error);
+ // Round CR: list items that are lists are arrays; with no column name
+ // missing, set_index then checks their lengths (fresh CK bank 2026111653
+ // case 182).
+ if(key.container==AttributeContainerKind::kList&&!key.is_null&&!key.children.empty()&&
+    std::all_of(key.children.begin(),key.children.end(),[](const EventAttribute& c){return !c.is_null&&c.container==AttributeContainerKind::kList;})){
+  for(const auto& child:key.children)
+   if(child.children.size()!=source.size())error("ValueError","Length mismatch: Expected "+std::to_string(source.size())+" rows, received array of length "+std::to_string(child.children.size()));
+  error("ValueError","case keys given as arrays are outside the captured native domain");
+ }
  error("KeyError",string_key_repr("None of ["+repr(key)+"] are in the columns"));
 }
 const EventAttribute& cell(const EventTable& source,std::size_t row,std::size_t col){

@@ -721,8 +721,22 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     // or more activities, and only after its plan resolves (below).
     // Round CO: a one-row frame sorts by the literal (case 355 of the
     // fresh CK bank).
-    if (p.operation == Op::kNext && source.rows.size() == 1 && !text(o.case_id_key))
+    if (p.operation == Op::kNext && source.rows.size() == 1 && !text(o.case_id_key)) {
+      // Round CR: the literal sort passes on one row; df[key] then refuses a
+      // list whose first item is a dict, None, a list or a float (fresh CK
+      // bank 2026111631 case 143, probe/cr/ln1.py).
+      const auto& key = o.case_id_key;
+      if (!key.is_null && key.container == AttributeContainerKind::kList && !key.children.empty()) {
+        const auto& first = key.children.front();
+        const std::string type = first.is_null                                           ? "NoneType"
+                                 : first.container == AttributeContainerKind::kContainer ? "dict"
+                                 : first.container == AttributeContainerKind::kList      ? "list"
+                                 : !collection(first) && real(first)                     ? "float"
+                                                                                         : "";
+        if (!type.empty()) fail("TypeError", "apply", "cannot select columns using Sequence with elements of type '" + type + "'");
+      }
       throw std::invalid_argument("Native Polars LTL A_next_B_next_C with a literal case key on one row is outside the observed domain");
+    }
     if (p.operation == Op::kNext && source.rows.size() != 1 && (literal_sort(o.timestamp_key) || !text(o.case_id_key)))
       fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
     if (p.operation == Op::kNext && eager) fail("AttributeError", "apply", "'DataFrame' object has no attribute 'collect'");
