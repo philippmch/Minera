@@ -303,6 +303,15 @@ std::vector<bool> compare_step(const std::vector<double>& differences,const Even
  if(differences.empty())temporal_bound(0.0,bound,lower,true);
  return result;
 }
+bool dict_bounds(const EventAttribute& boundaries,std::size_t steps){
+ if(boundaries.is_null||(boundaries.container!=AttributeContainerKind::kList&&boundaries.container!=AttributeContainerKind::kTuple))return false;
+ for(std::size_t i=0;i+1<steps&&i<boundaries.children.size();++i){
+  const auto& bound=boundaries.children[i];
+  if(bound.is_null||(bound.container!=AttributeContainerKind::kList&&bound.container!=AttributeContainerKind::kTuple))continue;
+  for(std::size_t j=0;j<2&&j<bound.children.size();++j)if(!bound.children[j].is_null&&bound.children[j].container==AttributeContainerKind::kContainer)return true;
+ }
+ return false;
+}
 std::unordered_set<std::string> listed_steps(const EventTable& source,const std::vector<EventAttribute>& anchors,const std::vector<std::size_t>& columns,const std::vector<std::size_t>& valid,const EventAttribute& boundaries){
  // Every chain is built first (merge order: by the first event's row, then
  // the next one's), then each step keeps the chains within its bounds.
@@ -386,7 +395,10 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
   }
   // Each step's bounds are compared eagerly, whether or not rows remain.
   if(rule==Rule::kEventually&&boundary_count){
-   if(listed_bounds(boundaries,anchors.size()))listed=listed_steps(source,anchors,columns,valid,boundaries);
+   // Round CS: a dict bound compares row by row after every chain is
+   // built, so a step only fails when whole chains reach it (fresh pandas
+   // CK bank 2026111679 case 738).
+   if(listed_bounds(boundaries,anchors.size())||dict_bounds(boundaries,anchors.size()))listed=listed_steps(source,anchors,columns,valid,boundaries);
    else for(std::size_t i=0;i+1<anchors.size();++i){
     const auto bound=element(boundaries,i);
     temporal_bound(0.0,element(bound,0),true,true);temporal_bound(0.0,element(bound,1),false,true);

@@ -354,7 +354,9 @@ EventTable filter_pandas_case_size(const EventTable& s,const EventAttribute& min
  const auto vector_bound=[](const EventAttribute& bound){return bound.container==AttributeContainerKind::kList||bound.container==AttributeContainerKind::kTuple;};
  const bool float_sizes=std::any_of(counts.begin(),counts.end(),[](double v){return std::isnan(v);});
  std::vector<bool> lower(s.size());
- if(vector_bound(minimum))lower=duration_mask(counts,rows,minimum,true,true);
+ // Round CS: a NaN case id leaves its rows without a size, so the sizes
+ // are a float64 column (fresh pandas CK bank 2026111679 case 464).
+ if(vector_bound(minimum))lower=duration_mask(counts,rows,minimum,true,!float_sizes);
  else{validate_bound(minimum,true,false,s.size(),float_sizes);for(std::size_t i=0;i<s.size();++i)lower[i]=accepts(counts[i],minimum,true);}
  auto result=subset(s,lower);
  if(maximum.is_null)return result;
@@ -362,7 +364,7 @@ EventTable filter_pandas_case_size(const EventTable& s,const EventAttribute& min
  // label: a duplicated label takes every row carrying it, then the mask is
  // applied by position.
  std::vector<bool> upper(s.size());
- if(vector_bound(maximum))upper=duration_mask(counts,rows,maximum,false,true);
+ if(vector_bound(maximum))upper=duration_mask(counts,rows,maximum,false,!float_sizes);
  else{validate_bound(maximum,false,false,s.size(),float_sizes);for(std::size_t i=0;i<s.size();++i)upper[i]=accepts(counts[i],maximum,false);}
  const auto labels=[](const EventTable& t){std::vector<EventTableIndexLabel> r;for(std::size_t i=0;i<t.size();++i){if(t.index)r.push_back(t.index->labels[i]);else {EventAttribute label{"",std::to_string(i),AttributeKind::kInt};label.typed_value=static_cast<std::uint64_t>(i);r.push_back({std::move(label)});}}return r;};
  const auto all=labels(s),kept=labels(result);

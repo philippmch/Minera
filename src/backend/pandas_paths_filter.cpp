@@ -309,8 +309,10 @@ EventTable apply_paths(const EventTable& source,const EventAttribute& query,cons
  }
  if(performance){
   if(!sorted.dtypes.empty()&&!sorted.dtypes[time].starts_with("datetime64"))error("AttributeError","Can only use .dt accessor with datetimelike values");
-  // Occurrences without a duration (NaT) are dropped before the bounds apply.
-  std::erase_if(occurrences,[](const auto& o){return std::isnan(o.second);});
+  // Round CS: occurrences without a duration (NaT) stay in the comparison
+  // with the minimum (NaN compares false with a number, a dict raises); the
+  // maximum sees only the occurrences the minimum kept (fresh pandas CK
+  // bank 2026111679 case 291).
   // Round CK: the maximum compares only with the occurrences the minimum
   // kept, so a bad maximum passes when none are left.
   const auto lower=duration_mask(occurrences,o.min_performance,true);

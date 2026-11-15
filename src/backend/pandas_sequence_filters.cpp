@@ -1381,6 +1381,12 @@ enum class VariantMode { kTrace, kStartsWith, kEndsWith };
 // ends_with join the items with str.join, which takes str items only.
 std::string join_pattern(const Value& item, VariantMode mode) {
   std::string out;
+  // Round CS: str.join of a scalar that is no str (fresh pandas sequence CK
+  // bank 2026111680 case 913).
+  if (mode != VariantMode::kTrace &&
+      (item.kind == Kind::kNone || item.kind == Kind::kBool || item.kind == Kind::kInt || item.kind == Kind::kFloat ||
+       item.kind == Kind::kDatetime || item.kind == Kind::kDate))
+    fail("TypeError", "can only join an iterable");
   if (item.kind == Kind::kString) {
     // A str iterates over its characters (UTF-8 sequences).
     bool first = true;

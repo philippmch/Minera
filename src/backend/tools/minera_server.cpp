@@ -5925,15 +5925,17 @@ void handle_clustering_export(const httplib::Request& request,
         node = &node->children[index];
         position = end == std::string::npos ? selection.size() : end;
       }
-      std::set<std::string> leaves;
+      // Round CS: leaves name their group by place (an upload's NaN groups
+      // share the name "nan").
+      std::set<std::size_t> leaves;
       std::vector<const minera::TraceAttributeClusteringNode*> pending{node};
       while (!pending.empty()) {
         const auto* current = pending.back(); pending.pop_back();
-        if (current->leaf && current->size) leaves.insert(current->name);
+        if (current->leaf && current->size) leaves.insert(current->group);
         for (const auto& child : current->children) pending.push_back(&child);
       }
-      for (const auto& group : analysis->groups) if (leaves.contains(group.name))
-        indices.insert(indices.end(), group.trace_indices.begin(), group.trace_indices.end());
+      for (std::size_t g = 0; g < analysis->groups.size(); ++g) if (leaves.contains(g))
+        indices.insert(indices.end(), analysis->groups[g].trace_indices.begin(), analysis->groups[g].trace_indices.end());
     } else {
       if (selection.rfind("c/", 0) != 0) throw std::invalid_argument("invalid profile cluster selection");
       const auto index = clustering_index(std::string_view(selection).substr(2));

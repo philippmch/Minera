@@ -676,7 +676,176 @@ std::string missing_tail(const EventTable& source, const Prepared& p, bool eager
   if (p.operation == Op::kFourEyes) return restack(render(attribute ? kFourAttributeTail : kFourMissingTail, source, p), four_eyes_stack(p, false));
   return render(attribute ? kDifferentAttributeTail : kDifferentMissingTail, source, p);
 }
-void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false, bool first_only = false, bool coercion = false);
+void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false, bool first_only = false, bool coercion = false, std::size_t limit = static_cast<std::size_t>(-1));
+bool listed_key(const EventAttribute& key) {
+  return !key.is_null && (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple);
+}
+// Round CS: A_next_B_next_C sorts by a case key that is no str as a
+// literal and numbers each case's rows with int_range(len()).over(key)
+// (probe cs/n1): a str item of a list key naming no column fails that
+// window while the plan resolves, whatever the frame's height.
+void next_window(const EventTable& source, const Prepared& p, bool eager) {
+  namespace lit = detail::polars_lit;
+  const auto& o = p.options;
+  if (!listed_key(o.case_id_key)) return;
+  for (const auto& item : o.case_id_key.children) {
+    if (!text(item) || column(source, item)) continue;
+    if (eager) throw std::invalid_argument("Native Polars LTL A_next_B_next_C on an eager frame with a missing list case item is outside the observed domain");
+    std::string sort = "SORT BY [" + list_key_display(o.case_id_key);
+    const auto& ts = o.timestamp_key;
+    if (!null(ts)) sort += ", " + (!collection(ts) && !text(ts) ? lit::scalar_display(lit::value_of(ts)) : time_sort(ts));
+    fail("ColumnNotFoundError", "apply",
+         missing_message(source, item.value) + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'with_columns' <---\n" + sort +
+             "]\n  " + frame_plan(source) + "\n\nThis error occurred with the following context stack:\n\t[1] 'with_columns'\n");
+  }
+}
+[[noreturn]] void next_outside(const std::string& what) {
+  throw std::invalid_argument("Native Polars LTL A_next_B_next_C on one row is outside the observed domain: " + what);
+}
+// The last step on one row: a list key is no dict key, a tuple no Series
+// name (probes cs/ln2, ln6).
+[[noreturn]] void next_last_step(const EventAttribute& key) {
+  fail("TypeError", "apply", key.container == AttributeContainerKind::kTuple ? "Series name must be a string" : "unhashable type: 'list'");
+}
+// The Python type of the one-row frame's cell in column `at` (the last is
+// the "_pos" window column).
+std::string next_cell_type(const EventTable& source, std::size_t at) {
+  if (at == source.columns.size()) return "int";
+  const auto& cell = source.rows.front()[at];
+  if (!cell || cell->is_null) return "NoneType";
+  const auto& d = source.dtypes[at];
+  if (d == "String" || categorical_dtype(d) || enum_dtype(d)) return "str";
+  if (dtype(d) == Dtype::kInteger) return "int";
+  if (dtype(d) == Dtype::kFloat) return "float";
+  if (d == "Boolean") return "bool";
+  if (d == "Null") return "NoneType";
+  if (d == "Date") return "datetime.date";
+  if (d.starts_with("Datetime")) return "datetime.datetime";
+  next_outside("the cell type of a (row, column) key");
+}
+// Round CS: on one row the literal sort passes and the window runs; Python
+// then indexes the collected frame (its columns and "_pos") with the key
+// as polars' DataFrame.__getitem__ reads it, takes unique() of the
+// selection, builds pl.col(key) and the filter that compares it with the
+// selection when that has rows (probes cs/n1, ln2 to ln6). Returns when
+// only the attribute read and the last step are left (a one-item name key,
+// or a mask that selects nothing).
+void next_one_row(const EventTable& source, const Prepared& p) {
+  const auto& key = p.options.case_id_key;
+  if (std::find(source.columns.begin(), source.columns.end(), "_pos") != source.columns.end()) next_outside("a _pos column");
+  const auto width = source.columns.size() + 1;
+  const auto col_error = [](const EventAttribute& first) {
+    fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(first) + "'.");
+  };
+  if (!listed_key(key)) {
+    if (boolean(key)) {
+      if (truth(key)) fail("IndexError", "apply", "index True is out of bounds for DataFrame of height 1");
+      invalid_col(key);
+    }
+    if (integer(key)) {
+      const auto v = exact(key);
+      if (v != TokenInteger(0) && v != TokenInteger(-1)) fail("IndexError", "apply", "index " + v.decimal() + " is out of bounds for DataFrame of height 1");
+      invalid_col(key);
+    }
+    if (real(key)) fail("TypeError", "apply", "cannot select columns using key of type 'float': " + python::float_repr(native_attribute_number(key)));
+    next_outside("the scalar key type");
+  }
+  const auto& items = key.children;
+  if (items.empty()) return;  // the window failed (validate_schema)
+  const bool tuple = key.container == AttributeContainerKind::kTuple;
+  // A pair is (row, column) unless its first item is a bool or a str.
+  if (tuple && items.size() == 2 && !boolean(items[0]) && !text(items[0])) {
+    const auto& row = items[0];
+    const auto& col = items[1];
+    std::size_t at = 0;
+    if (null(col)) fail("TypeError", "apply", "cannot select columns using key of type 'NoneType': None");
+    if (real(col)) fail("TypeError", "apply", "cannot select columns using key of type 'float': " + python::float_repr(native_attribute_number(col)));
+    if (text(col)) at = *column(source, col);
+    else if (integer(col) && !boolean(col)) {
+      const auto v = exact(col);
+      const auto w = TokenInteger(static_cast<std::int64_t>(width));
+      if (v < -w || v >= w) fail("IndexError", "apply", "index " + v.decimal() + " is out of bounds for sequence of length " + std::to_string(width));
+      at = static_cast<std::size_t>((v < TokenInteger(0) ? v + w : v).small_value());
+    } else next_outside("the column item of a (row, column) key");
+    if (null(row)) fail("TypeError", "apply", "cannot select elements using key of type 'NoneType': None");
+    if (!integer(row) || boolean(row)) next_outside("the row item of a (row, column) key");
+    const auto r = exact(row);
+    if (r < TokenInteger(-1) || r >= TokenInteger(1)) fail("IndexError", "apply", "index " + r.decimal() + " is out of bounds for sequence of length 1");
+    fail("AttributeError", "apply", "'" + next_cell_type(source, at) + "' object has no attribute 'unique'");
+  }
+  const auto& first = items.front();
+  // A bool first item selects columns by mask.
+  if (boolean(first)) {
+    if (items.size() != width)
+      fail("ValueError", "apply", "expected " + std::to_string(width) + " values when selecting columns by boolean mask, got " + std::to_string(items.size()));
+    for (const auto& item : items) if (!boolean(item) && !null(item)) next_outside("a mask item");
+    if (std::any_of(items.begin(), items.end(), [](const EventAttribute& v) { return boolean(v) && truth(v); })) col_error(first);
+    // Nothing selected: the result fails before the attribute column is read.
+    next_last_step(key);
+  }
+  // Rows, when every present item is an int (a bool counts as 0 or 1).
+  bool rows = !text(first), present = false;
+  for (const auto& item : items) {
+    if (null(item)) continue;
+    if (integer(item) || boolean(item)) present = true;
+    else rows = false;
+  }
+  if (rows && present) {
+    // Polars bounds the indices by the u32 maximum first.
+    const TokenInteger limit((std::int64_t{1} << 32) - 1), zero(0), one(1);
+    for (const auto& item : items)
+      if (!null(item) && !exact(item).is_small()) next_outside("an index past the int64 range");
+    for (const auto& item : items)
+      if (!null(item) && exact(item) >= limit) fail("ValueError", "apply", "index positions should be smaller than 2^32");
+    for (const auto& item : items)
+      if (!null(item) && exact(item) < -limit) fail("ValueError", "apply", "index positions should be greater than or equal to -2^32");
+    std::vector<std::string> failed;
+    std::size_t failures = 0;
+    for (const auto& item : items) {
+      if (null(item)) continue;
+      const auto v = exact(item);
+      if (v < zero && v + one < zero) {
+        ++failures;
+        if (failed.size() < 10) failed.push_back((v + one).decimal());
+      }
+    }
+    if (failures) {
+      std::string shown = "[";
+      if (failed.size() <= 3) {
+        for (std::size_t i = 0; i < failed.size(); ++i) shown += (i ? ", " : "") + failed[i];
+      } else {
+        shown += failed[0] + ", " + failed[1] + ", \xe2\x80\xa6 " + failed.back();
+      }
+      shown += "]";
+      fail("InvalidOperationError", "apply",
+           "conversion from `i64` to `u32` failed in column 'literal' for " + std::to_string(failures) + " out of " + std::to_string(items.size()) +
+               " values: " + shown + (failures > 10 ? "\n\nDid not show all failed cases as there were too many." : "") +
+               "\n\nThis error occurred in the following expression:\n\t.when([(col(\"\")) < (0)]).then([(1) + (col(\"\"))]).otherwise(col(\"\")).strict_cast(UInt32)\n");
+    }
+    for (const auto& item : items) {
+      if (null(item)) continue;
+      const auto v = exact(item);
+      if ((v < zero ? v + one : v) >= one) fail("OutOfBoundsError", "apply", "gather indices are out of bounds");
+    }
+    col_error(first);
+  }
+  // Columns by name.
+  if (!text(first)) fail("TypeError", "apply", "cannot select columns using Sequence with elements of type '" + core_type(first) + "'");
+  for (const auto& item : items) {
+    if (null(item)) fail("TypeError", "apply", "'None' is not an instance of 'str'");
+    if (!text(item)) next_outside("a name item");
+  }
+  // The first name (in key order) that occurs again (probe cs/n2).
+  for (std::size_t i = 0; i < items.size(); ++i)
+    for (std::size_t j = i + 1; j < items.size(); ++j)
+      if (items[i].value == items[j].value)
+        fail("DuplicateError", "apply", "could not create a new DataFrame: column with name '" + items[i].value + "' has more than one occurrence");
+  if (items.size() >= 2) {
+    std::string message = "The predicate passed to 'LazyFrame.filter' expanded to multiple expressions: \n\n";
+    for (const auto& item : items) message += "\t[(col(" + quote(item.value) + ")) == (Series[" + first.value + "])],\n";
+    fail("ComputeError", "apply", message + "This is ambiguous. Try to combine the predicates with the 'all_horizontal' or `any_horizontal' expression.");
+  }
+}
 // A timestamp key the sort reads as a literal (a dict, a list or a number).
 bool literal_sort(const EventAttribute& key) { return collection(key) || (!text(key) && !null(key)); }
 // Round CQ: the first activity is the same literal (type and value) as a
@@ -721,25 +890,18 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     // or more activities, and only after its plan resolves (below).
     // Round CO: a one-row frame sorts by the literal (case 355 of the
     // fresh CK bank).
-    if (p.operation == Op::kNext && source.rows.size() == 1 && !text(o.case_id_key)) {
-      // Round CR: the literal sort passes on one row; df[key] then refuses a
-      // list whose first item is a dict, None, a list or a float (fresh CK
-      // bank 2026111631 case 143, probe/cr/ln1.py).
-      const auto& key = o.case_id_key;
-      if (!key.is_null && key.container == AttributeContainerKind::kList && !key.children.empty()) {
-        const auto& first = key.children.front();
-        const std::string type = first.is_null                                           ? "NoneType"
-                                 : first.container == AttributeContainerKind::kContainer ? "dict"
-                                 : first.container == AttributeContainerKind::kList      ? "list"
-                                 : !collection(first) && real(first)                     ? "float"
-                                                                                         : "";
-        if (!type.empty()) fail("TypeError", "apply", "cannot select columns using Sequence with elements of type '" + type + "'");
-      }
-      throw std::invalid_argument("Native Polars LTL A_next_B_next_C with a literal case key on one row is outside the observed domain");
-    }
+    // Round CR/CS: a list case item naming no column fails the window as the
+    // plan resolves; then the literal sort fails unless the frame has one
+    // row, where an empty key fails the window's group_by and Python reads
+    // the collected frame (next_one_row).
+    if (p.operation == Op::kNext) next_window(source, p, eager);
     if (p.operation == Op::kNext && source.rows.size() != 1 && (literal_sort(o.timestamp_key) || !text(o.case_id_key)))
       fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
+    const bool one_row_literal = p.operation == Op::kNext && source.rows.size() == 1 && !text(o.case_id_key);
+    if (one_row_literal && listed_key(o.case_id_key) && o.case_id_key.children.empty())
+      fail("ComputeError", "apply", "at least one key is required in a group_by operation\n\nThis error occurred in the following expression:\n\t0.int_range([len().cast(Int64)]).over([])\n");
     if (p.operation == Op::kNext && eager) fail("AttributeError", "apply", "'DataFrame' object has no attribute 'collect'");
+    if (one_row_literal) next_one_row(source, p);
   }
   if (p.operation == Op::kNext) {
     if (null(o.attribute_key)) fail("TypeError", "apply", "cannot select columns using key of type 'NoneType': None");
@@ -758,6 +920,12 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     if (collection(o.attribute_key)) fail("AttributeError", "apply", "'DataFrame' object has no attribute 'to_list'");
     if (integer(o.attribute_key)) {
       std::size_t height = 0;
+      // Round CS: a literal case key reads the one-row frame itself.
+      if (!text(o.case_id_key)) {
+        const auto v = exact(o.attribute_key);
+        if (v == TokenInteger(0) || v == TokenInteger(-1)) next_outside("an attribute index inside the frame");
+        height = 1;
+      }
       if (text(o.case_id_key)) {
         const auto ci = *column(source, o.case_id_key);std::map<std::string,std::size_t> groups;
         for (const auto& row : source.rows) ++groups[group_key(row[ci],source.dtypes[ci])];
@@ -769,6 +937,13 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   // eventually_follows without activities builds no attribute filter.
   const bool no_filter = p.operation == Op::kEventuallyFollows && p.values.empty();
   if (!no_filter) required(o.attribute_key, false, true);
+  // Round CS: a one-item name key (or a mask selecting nothing) on one row
+  // fails building the result: a list is no dict key, a tuple no Series
+  // name (probes cs/ln2, ln6).
+  if (p.operation == Op::kNext && source.rows.size() == 1 && !text(o.case_id_key)) {
+    if (!text(o.attribute_key)) next_outside("the attribute key type");
+    next_last_step(o.case_id_key);
+  }
   // The attribute filter resolves before the case and resource columns.
   if (p.operation == Op::kDifferentPersons && text(o.attribute_key)) validate_queries(source, p, eager, true);
   // The first activity's filter resolves before the first pair selects the
@@ -799,6 +974,10 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   // literal (one value) when the plan runs.
   if (literal && p.operation != Op::kDifferentPersons && p.values.size() >= 3) {
     if (p.operation == Op::kEventuallyFollows) {
+      // Round CS: the third activity's join resolves its inputs, the first
+      // three activity filters, before its schema (CK bank 2026111671 case
+      // 93).
+      validate_queries(source, p, eager, true, false, false, 3);
       std::vector<std::string> nodes{"join schema resolving", "join"};
       repeat(nodes, static_cast<std::ptrdiff_t>(p.values.size()) - 3, {"join left", "join"});
       nodes.insert(nodes.end(), {"select", "unique", "join left", "join"});
@@ -835,7 +1014,7 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
 // value as Polars types it (detail::polars_lit::check_scalar): a str with a
 // temporal column fails while the plan resolves, a number with a string
 // column, mismatched temporal types and the like when the filter runs.
-void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only, bool first_only, bool coercion) {
+void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only, bool first_only, bool coercion, std::size_t limit) {
   if (p.operation == Op::kNext || (p.operation == Op::kFourEyes && p.values.size() < 2) || p.values.empty()) return;
   namespace lit = detail::polars_lit;
   const auto ai = *column(source,p.options.attribute_key);
@@ -856,7 +1035,7 @@ void validate_queries(const EventTable& source, const Prepared& p, bool eager, b
     fail("InvalidOperationError",phase,prefix+tail);
   };
   // The whole plan resolves before any filter runs.
-  const auto count = first_only ? std::min<std::size_t>(1, p.values.size()) : p.values.size();
+  const auto count = std::min(limit, first_only ? std::min<std::size_t>(1, p.values.size()) : p.values.size());
   for (std::size_t at = 0; at < count; ++at) {
     const auto& query = p.values[at];
     if (collection(query) && query.container != AttributeContainerKind::kContainer) {
@@ -1072,9 +1251,10 @@ void append_literal(EventTable& table, const LiteralKey& key) {
   for (auto& row : table.rows) row.push_back(key.item.cell);
 }
 bool literal_extra(const Prepared& p) { return p.operation != Op::kEventuallyFollows || truth(p.options.positive); }
+// Round CS: two eventually_follows activities on one row keep the same
+// outcome: each ordered-pair selection of the literal alone has one row
+// whatever its filter kept (CK bank 2026111671 case 477).
 EventTable literal_result(const EventTable& source, const Prepared& p, const LiteralKey& key) {
-  if (p.operation == Op::kEventuallyFollows && p.values.size() >= 2)
-    throw std::invalid_argument("Native Polars LTL literal-case eventually_follows on one row is outside the observed domain");
   const bool positive = truth(p.options.positive), null = key.item.null;
   bool keep = !null;
   if (p.operation == Op::kFourEyes) keep = !positive && !null;

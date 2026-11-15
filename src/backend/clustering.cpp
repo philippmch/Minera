@@ -1,6 +1,8 @@
 #include "minera/clustering.hpp"
 #include "reference_activity_selector.hpp"
 #include "minera/log_to_features.hpp"
+#include "minera/dataframe_columns.hpp"
+#include "minera/frame_keys.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -283,6 +285,46 @@ std::vector<TraceAttributeClusteringGroup> trace_attribute_clustering_groups(
       ? trace_attribute.substr(5) : trace_attribute;
   const bool case_id_selector = key == "concept:name" || key == "id" ||
                                 key == "case:id" || key == "case_id";
+  // Round CS: on an upload pm4py clusters convert_to_event_log's traces of
+  // the frame: every trace holds every case: column, typed as the frame
+  // holds it, and a group is a Python dict key named str() of its value.
+  // A float column's NaN cells are distinct float objects (one group each,
+  // whose sublog is that trace alone: the filter matches by identity), the
+  // NaN of a text or object column is one object (one group), NaT likewise
+  // (observed black-box).
+  if (log.dataframe_columns && !case_id_selector) {
+    const DataFrameColumn* column = nullptr;
+    for (const auto& candidate : log.dataframe_columns->trace_columns)
+      if (candidate.key == key) column = &candidate;
+    if (!column) return groups;
+    const auto view = dataframe_frame_event_log(log);
+    FrameNames numbers;
+    for (std::size_t i = 0; i < view.traces.size(); ++i) {
+      const auto& trace = view.traces[i];
+      // read_xes has no row for a trace without events.
+      if (trace.events.empty()) continue;
+      const EventAttribute* cell = nullptr;
+      for (const auto& attribute : trace.attributes)
+        if (attribute.key == key) cell = &attribute;
+      if (!cell) continue;
+      const auto value = frame_attribute_value(*cell);
+      std::string identity, name;
+      if (value.missing()) {
+        name = column->type == DataFrameColumnType::kDate ? "NaT" : "nan";
+        identity = column->type == DataFrameColumnType::kFloat64 ? "nan#" + std::to_string(i) : "missing";
+      } else if (value.value_class == FrameValueClass::kNumber) {
+        name = numbers.name(value);
+        identity = "n:" + name;
+      } else {
+        name = value.text;
+        identity = (value.value_class == FrameValueClass::kDate ? "d:" : "t:") + value.text;
+      }
+      const auto [it, inserted] = indices.emplace(identity, groups.size());
+      if (inserted) groups.push_back({name, {}});
+      groups[it->second].trace_indices.push_back(i);
+    }
+    return groups;
+  }
   for (std::size_t i = 0; i < log.traces.size(); ++i) {
     const auto& trace = log.traces[i];
     const auto* value = case_id_selector ? &trace.case_id : trace.attribute(trace_attribute);
@@ -404,7 +446,7 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
   for (std::size_t i = 0; i < n; ++i) {
     cs[i].members = {i};
     cs[i].name = names[i];
-    cs[i].node = {names[i], {}, 0.0, groups[i].traces.size(), true};
+    cs[i].node = {names[i], {}, 0.0, groups[i].traces.size(), true, i};
   }
   std::size_t node_count = n;
   for (std::size_t k = 0; k < merges.size(); ++k) {
@@ -456,7 +498,7 @@ TraceAttributeClusteringResult discover_trace_attribute_clustering(const EventLo
 }
 
 std::string trace_attribute_clustering_json(const TraceAttributeClusteringResult& r) {
-  std::set<std::string> leaves;
+  std::vector<std::string> leaves;
   std::size_t node_count = 0;
   const bool empty_root = r.diagnostics.group_count == 0 && r.leaf_names.empty() &&
       r.tree.leaf && r.tree.size == 0 && r.tree.children.empty();
@@ -465,16 +507,19 @@ std::string trace_attribute_clustering_json(const TraceAttributeClusteringResult
     if (!std::isfinite(node.distance) || node.distance < 0.0)
       throw std::invalid_argument("clustering: malformed result node");
     if (node.leaf) {
-      if (!node.children.empty() || (node.size == 0 && !empty_root) ||
-          (!empty_root && !leaves.insert(node.name).second))
+      if (!node.children.empty() || (node.size == 0 && !empty_root))
         throw std::invalid_argument("clustering: malformed result leaf");
+      if (!empty_root) leaves.push_back(node.name);
     } else if (node.children.empty()) {
       throw std::invalid_argument("clustering: internal result node has no children");
     }
     for (const auto& child : node.children) validate(child);
   };
   validate(r.tree);
-  if (leaves != std::set<std::string>(r.leaf_names.begin(), r.leaf_names.end()) ||
+  auto listed = r.leaf_names;
+  std::sort(listed.begin(), listed.end());
+  std::sort(leaves.begin(), leaves.end());
+  if (leaves != listed ||
       r.diagnostics.group_count != r.leaf_names.size() ||
       r.diagnostics.node_count != node_count)
     throw std::invalid_argument("clustering: inconsistent result diagnostics");

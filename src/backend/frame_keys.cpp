@@ -172,6 +172,8 @@ std::optional<EventAttribute> typed_activity_cell(const EventLog& frame, const E
 
 }  // namespace
 
+FrameValue frame_attribute_value(const EventAttribute& attribute) { return attribute_value(attribute); }
+
 FrameValue frame_value(const EventLog& frame, const Trace& trace, const Event& event,
                        const std::string& key, FrameKeyScope scope) {
   if (const auto cell = typed_activity_cell(frame, event, key)) return attribute_value(*cell);

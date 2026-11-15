@@ -287,7 +287,9 @@ std::vector<EventAttribute> admitted_values(const EventAttribute& admitted){
   std::vector<EventAttribute> result;for(const auto& value:admitted.children)result.push_back(EventAttribute{"",value.key});return result;
  }
  if(admitted.container!=AttributeContainerKind::kScalar)return admitted.children;
- error("TypeError","only list-like objects are allowed to be passed to isin(), you passed a `"+type_name(admitted)+"`");
+ // Round CS: pandas names the type without its module (`datetime`).
+ auto name=type_name(admitted);if(name=="datetime.datetime")name="datetime";
+ error("TypeError","only list-like objects are allowed to be passed to isin(), you passed a `"+name+"`");
 }
 // A naive datetime64[ns] cell with a sub-microsecond part.
 bool nanosecond_date(const EventAttribute& value){

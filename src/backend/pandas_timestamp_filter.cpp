@@ -290,10 +290,20 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
  if(mode==Mode::kAttribute){
   const bool empty_attribute=attribute->container==AttributeContainerKind::kList&&attribute->children.empty();
   const auto selected=empty_attribute?std::optional<std::size_t>{}:std::optional<std::size_t>{direct_column(source,*attribute)};
+  // Round CS: df[[]] is a frame of no columns, which compares a list-like
+  // value as a Series over those columns (CK bank 2026111693 case 545).
+  if(empty_attribute&&!wanted->is_null){
+   const auto kind=wanted->container;
+   if(kind==AttributeContainerKind::kList||kind==AttributeContainerKind::kTuple||kind==AttributeContainerKind::kContainer||kind==AttributeContainerKind::kSet||kind==AttributeContainerKind::kFrozenSet){
+    if(!wanted->children.empty())error("ValueError","Unable to coerce to Series, length must be 0: given "+std::to_string(wanted->children.size()));
+    if(kind==AttributeContainerKind::kSet)error("TypeError","'set' type is unordered");
+    if(kind==AttributeContainerKind::kFrozenSet)error("TypeError","'frozenset' type is unordered");
+   }
+  }
   // Round CK: a str column compares a tuple as an array of equal length.
   const bool str_tuple=selected&&!source.dtypes.empty()&&source.dtypes[*selected]=="str"&&wanted->container==AttributeContainerKind::kTuple&&!wanted->is_null;
   if(str_tuple&&wanted->children.size()!=source.size())error("ValueError","Lengths of operands do not match: "+std::to_string(source.size())+" != "+std::to_string(wanted->children.size()));
-  const bool vector=wanted->container==AttributeContainerKind::kList||str_tuple;
+  const bool vector=selected&&(wanted->container==AttributeContainerKind::kList||str_tuple);
   if(vector&&wanted->children.size()!=source.size())error("ValueError","('Lengths must match to compare', ("+std::to_string(source.size())+",), ("+std::to_string(wanted->children.size())+",))");
   // Round CK: a str or datetime64 attribute compares a dict as an array of
   // its keys, held by numpy as one 0-d object.
@@ -340,6 +350,9 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
  if(options.case_id_key.is_null)error("TypeError","You have to supply one of 'by' and 'level'");
  if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("ValueError","No group keys passed!");
  const auto time_column=[&]{
+  // Round CS: a list key is hashed item by item first (CK bank 2026111693
+  // case 546).
+  if(options.timestamp_key.container==AttributeContainerKind::kList)for(const auto& item:options.timestamp_key.children)detail::pandas_check_hashable_key(item,error);
   const auto time=column(source,options.timestamp_key);if(!time){EventAttribute wrapped{"",""};wrapped.container=AttributeContainerKind::kList;wrapped.children.push_back(options.timestamp_key);detail::pandas_check_getitem_key(wrapped,error);}if(!time)error("KeyError",string_key_repr("Column not found: "+(text_value(options.timestamp_key)?options.timestamp_key.value:repr(options.timestamp_key))));
   return *time;
  };

@@ -1427,6 +1427,12 @@ if(MINERA_BUILD_TESTS)
   endif()
   add_test(NAME minera_review_cr1_tests COMMAND minera_review_cr1_tests)
 
+  add_executable(minera_review_cs1_tests src/backend/tests/test_review_cs1.cpp)
+  target_link_libraries(minera_review_cs1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_cs1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_cs1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_cs1_tests COMMAND minera_review_cs1_tests)
+
   add_executable(minera_resource_profiles_tests
     src/backend/tests/test_resource_profiles.cpp
   )
@@ -3053,6 +3059,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_sequence_filter_cp_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cp-bank.json.gz")
   set_tests_properties(minera_pandas_sequence_filter_cp_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CS: a fresh CK seed (2026111680): str.join of a pattern item that
+  # is not iterable.
+  add_test(NAME minera_pandas_sequence_filter_cs_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cs-bank.json.gz")
+  set_tests_properties(minera_pandas_sequence_filter_cs_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_sequence_filter_bank_parity_tests
     src/backend/tests/test_polars_sequence_filter_bank_parity.cpp
@@ -3131,6 +3142,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_cr_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cr-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_cr_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CS: a fresh CK seed (2026111676); rework.apply of case 285 keeps
+  # both row orders the reference's equal-size inner join gave.
+  add_test(NAME minera_polars_sequence_filter_cs_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cs-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_cs_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3230,6 +3246,20 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cr_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cr-bank.json.gz")
   set_tests_properties(minera_polars_filter_cr_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CS: fresh CK, CJ and CN seeds (2026111671, 2026111673,
+  # 2026111672): eventually_follows filters resolved before the literal
+  # join, literal list case keys in the variants filters, a by-name
+  # timestamp key before a missing attribute, a struct-cast race kept with
+  # both observed errors; CK 2026111691: folded int/datetime case ranges,
+  # narrow path timestamp dtypes, list timestamp keys in the variants sort;
+  # and probes n1, n2 (one-row A_next_B_next_C with
+  # list, tuple, mask and name case keys).
+  add_test(NAME minera_polars_filter_cs_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cs-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cs_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_filter_cs_probe_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cs-probe-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cs_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3441,6 +3471,13 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_cr_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cr-bank.json.gz")
   set_tests_properties(minera_pandas_filter_cr_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CS: fresh CK seeds (2026111679, 2026111693): isin datetime type
+  # names, NaN durations in the case size and path bounds, dict LTL bounds,
+  # list-like values against an empty attribute selection, list timestamp
+  # keys hashed item by item.
+  add_test(NAME minera_pandas_filter_cs_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cs-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_cs_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

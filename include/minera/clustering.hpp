@@ -36,6 +36,9 @@ struct TraceAttributeClusteringNode {
   double distance = 0.0;
   std::size_t size = 0;
   bool leaf = false;
+  // A leaf's place in trace_attribute_clustering_groups (names may repeat:
+  // an upload's NaN cells of a float column are one group each).
+  std::size_t group = static_cast<std::size_t>(-1);
 };
 
 struct TraceAttributeClusteringDiagnostics {

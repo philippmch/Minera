@@ -27760,3 +27760,103 @@ Tests:
   of CK 2026111653; 11,772), replayed by the `minera_*_cr_bank_parity_tests`
   ctests; `minera_review_cr1_tests` (link analysis and label splitting on a
   22-row CSV upload, pm4py values).
+
+## Review CS1: re-review of round CR, one-row A_next_B_next_C, literal variant keys, trace-attribute clustering on uploads (2026-11-15)
+
+Round CS checked CR's CI (run 43740955829 on 251318f: green on all six
+jobs), modelled the one-row `A_next_B_next_C` keys CR had declared,
+replayed two batches of fresh seeds of every filter domain and swept
+trace-attribute clustering on the typed frame of a CSV or XES upload. The
+device check on the Mac was skipped (no device linked).
+
+- **CS1-1 One-row `A_next_B_next_C` with list, tuple and None case keys**
+  (Polars, probes n1, n2, ln2 to ln6). A case key that is no str sorts as a
+  literal and numbers each case's rows with `int_range(len()).over(key)`:
+  a str item naming no column fails that window while the plan resolves,
+  whatever the frame's height; otherwise the literal sort fails unless the
+  frame has one row. On one row Python indexes the collected frame (its
+  columns and `_pos`) with the key as `DataFrame.__getitem__` reads it: a
+  pair is (row, column) unless its first item is a bool or a str, a bool
+  first item selects columns by mask, all-int items select rows (bounded by
+  the u32 maximum first), str items select columns by name and the first
+  repeated name raises. `unique()` of the selection, `pl.col(key)` and the
+  comparing filter follow when the selection has rows; a one-item name key
+  or a mask that selects nothing fails building the result (a list is no
+  dict key, a tuple no Series name). The 2,383 probe calls are bound.
+- **CS1-2 Literal case keys in the Polars variants filters** (fresh CK
+  2026111671 cases 369, 425; CN 2026111672 case 2). A list case key of
+  literals selects one literal row whatever the frame holds or the filter
+  kept: str items are columns, other items literals (None among str items
+  too), a NaN literal stays outside the model. The one row then keeps the
+  whole frame or nothing; on a one-row frame a dict or list item is
+  unhashable as the variants' dict key (`unhashable type: 'dict'`), a
+  single text item regroups by that column, and two items of one output
+  name raise `DuplicateError` while resolving the group_by (or the join of
+  the statistics path). A missing activity column fails with the literal
+  sort in the plan.
+- **CS1-3 `eventually_follows` on literal keys** (CK 2026111671 cases 93,
+  477). The third activity's join resolves its inputs, the first three
+  activity filters, before its schema raises the duplicate; two activities
+  on one row keep the same outcome, since each ordered pair selects the
+  literal alone.
+- **CS1-4 Timestamp filters with by-name keys** (CK 2026111671 case 343).
+  `filter_traces_attribute_in_timeframe` with a by-name timestamp key that
+  misses a column fails while the predicate expands, before a missing
+  attribute column.
+- **CS1-5 Trace-attribute clustering on uploads** (`/api/clustering`).
+  pm4py converts the frame to an EventLog first: every trace holds every
+  `case:` column, typed as the frame holds it (an int column with a gap as
+  floats, dates as UTC Timestamps, a gap NaN or NaT), from the case's first
+  row; the groups are the Python dict keys of those values named `str()`
+  of each. A float column's NaN cells are distinct objects (one group of
+  one trace each, so leaf names repeat), the NaN of a text or object column
+  and NaT one group each. XES uploads are read as DataFrames like CSV.
+  The export route selects groups by leaf index. Sweeps of 60 seeds each
+  (CSV and XES, four calls per seed over all five variants): 0 differing
+  calls; both sides raise on the reference's DFG TypeError and one-group
+  linkage ValueError.
+- **CS1-6 Fresh seeds, first batch** (13 calls, 0 after). Polars table CK
+  2026111671 (5, above); CJ 2026111673 case 226: `apply_numeric_events`
+  races a struct-cast error against a comparison error across FilterExec
+  partitions, both errors kept as observed outcomes. Polars sequence CK
+  2026111676 case 285: `rework.apply`'s equal-size inner join gave two row
+  orders, both kept. pandas CK 2026111679 (5): `isin` names a datetime
+  type without its module (cases 544, 737); a NaN case id leaves its rows
+  without a size, so the sizes are float64 (case 464); path occurrences
+  without a duration stay in the comparison with the minimum and the
+  maximum sees only those the minimum kept (case 291); a dict LTL bound
+  compares row by row after every chain is built (case 738). pandas sequence CK 2026111680 case 913:
+  `str.join` of a pattern item that is no iterable (`can only join an
+  iterable`). CN, CI and CH table seeds, the CP, CJ and CH sequence seeds
+  and the pandas CN LTL seed were clean.
+- **CS1-7 Fresh seeds, second batch** (5 calls, 0 after). Polars table CK
+  2026111691: `filter_case_performance` folds `(x >= lo) & (x <= hi)` to
+  false when both bounds are ints or bools within Int64 with lo > hi, both
+  str (byte order) or both datetimes, and then never computes the duration
+  (a String or numeric timestamp column raises nothing; floats never fold;
+  the paths filter folds str bounds only) (case 100); a Float32 case
+  column picked by a dict timestamp key subtracts to `f32` in the paths
+  filter's dtype error (case 29); a list timestamp key prints as a list literal in the
+  variants sort (case 183). pandas CK 2026111693: `df[[]]` is a frame of no
+  columns, which compares a list-like value as a Series over them (`Unable
+  to coerce to Series, length must be 0: given 1`, an empty set `'set' type
+  is unordered`) (case 545); the grouped timestamp filters hash a list
+  timestamp key item by item, so the first unhashable item names the type
+  (case 546). The CN table, CK and CP sequence and pandas CK sequence seeds
+  were clean.
+
+Declared:
+- The struct-cast race (CS1-6) and equal-size inner joins stay observed
+  outcomes until Polars' thread timing and hashing are modelled.
+
+Tests:
+- New: `docs/polars-filter-cs-bank.json.gz` (CK 2026111671 with the fixed
+  cases of CJ 2026111673, CN 2026111672 and CK 2026111691; 22,476 calls),
+  `docs/polars-filter-cs-probe-bank.json.gz` (probes n1, n2; 2,383),
+  `docs/polars-sequence-filter-cs-bank.json.gz` (CK 2026111676; 5,596),
+  `docs/pandas-filter-cs-bank.json.gz` (CK 2026111679 with the fixed cases
+  of CK 2026111693; 11,880) and
+  `docs/pandas-sequence-filter-cs-bank.json.gz` (CK 2026111680; 3,639),
+  replayed by the `minera_*_cs_*bank_parity_tests` ctests;
+  `minera_review_cs1_tests` (trace-attribute clustering on a CSV upload
+  over every Levenshtein and vector variant, pm4py values).

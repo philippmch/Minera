@@ -564,6 +564,10 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   // Round CM: a selector expanding to no column fails before a missing one.
   if(q.op==Operation::kAttribute&&collection(q.attribute))empty_selector(source,q,phase,false);
   if(q.op==Operation::kAttribute&&collection(q.options.timestamp_key))empty_selector(source,q,phase,true);
+  // Round CS: a by-name timestamp key missing a column fails while the
+  // predicate expands, before a plain missing attribute column (CK bank
+  // 2026111671 case 343).
+  if(q.op==Operation::kAttribute&&keys::by_name(q.options.timestamp_key.value)&&!keys::by_name(q.attribute.value))(void)position(q.options.timestamp_key.value);
   if(q.op==Operation::kAttribute)attr_at=position(q.attribute.value);
   if(collection(q.options.timestamp_key))empty_selector(source,q,phase,true);
   const auto time_at=position(q.options.timestamp_key.value);

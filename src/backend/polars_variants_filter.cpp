@@ -246,6 +246,10 @@ std::string contexts(const std::vector<std::string>& nodes){std::string out="\n\
 // Round CN: a dict timestamp key sorts the statistics as its struct literal.
 std::string sort_time(const PolarsVariantsFilterOptions& options,bool statistics){
   if(statistics&&options.timestamp_key.container==AttributeContainerKind::kContainer)return detail::polars_lit::dict_literal_display(options.timestamp_key);
+  // Round CS: a list timestamp key sorts as its Series literal (fresh CK
+  // bank 2026111691 case 183).
+  if(statistics&&(options.timestamp_key.container==AttributeContainerKind::kList||options.timestamp_key.container==AttributeContainerKind::kTuple))
+    return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(options.timestamp_key));
   return "col("+quote(statistics?options.timestamp_key.value:"time:timestamp")+")";
 }
 std::string sort_plan(const EventTable& source,const PolarsVariantsFilterOptions& options,bool statistics){return "SORT BY [col("+quote(options.case_id_key.value)+"), "+sort_time(options,statistics)+"]\n  "+frame_plan(source);}
@@ -278,6 +282,30 @@ void validate(const PolarsVariantsFilterOptions& options){
   }
   if(null(options.case_id_key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
 }
+// Round CS: a list (or int) case key groups and joins by each item, a str
+// item a column and any other value a literal named "literal", after one
+// Series literal sorts the frame. The plan resolves the group_by keys before
+// the activity column; no admitted variant folds the matching cases to the
+// literal-only selection (one row holding the literal), and a one-row frame
+// survives the sort (CK bank 2026111671 cases 369, 425).
+bool listed_key(const EventAttribute& key){return key.container==AttributeContainerKind::kList||key.container==AttributeContainerKind::kTuple;}
+std::vector<EventAttribute> key_items(const EventAttribute& key){if(listed_key(key))return key.children;return {key};}
+std::optional<std::string> duplicate_key(const EventAttribute& key){
+  std::vector<std::string> seen;
+  for(const auto& item:key_items(key)){auto name=text(item)?item.value:std::string("literal");if(std::find(seen.begin(),seen.end(),name)!=seen.end())return name;seen.push_back(std::move(name));}
+  return std::nullopt;
+}
+std::string literal_sort_plan(const EventTable& source,const PolarsVariantsFilterOptions& options,const std::string& time){
+  namespace lit=detail::polars_lit;
+  return "SORT BY ["+lit::literal_list_display(lit::argument_literal(options.case_id_key))+", "+time+"]\n  "+frame_plan(source);
+}
+void duplicate_keys(const EventTable& source,const PolarsVariantsFilterOptions& options,bool statistics,const std::string& phase,const std::string& time){
+  if(!listed_key(options.case_id_key))return;
+  const auto name=duplicate_key(options.case_id_key);if(!name)return;
+  fail("DuplicateError",phase,"group_by keys contained duplicate output name '"+*name+"'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names.\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING '"+std::string(statistics?"group_by":"join")+"' <---\n"+literal_sort_plan(source,options,time)+
+       contexts(statistics?std::vector<std::string>{"group_by"}:std::vector<std::string>{"group_by","filter","select","join right","join"}));
+}
+[[noreturn]] void literal_outside(const std::string& what){throw std::invalid_argument("Native Polars variants literal case key outside the observed domain: "+what);}
 struct Group{std::string key,label;bool absent=false;std::vector<Cell> activities;};
 struct Grouped{std::vector<Group> groups;std::size_t case_at=0;std::string case_dtype,activity_dtype;};
 PolarsVariantsFilterOptions keyed(const PolarsVariantsFilterOptions& raw,const std::vector<std::string>& columns){
@@ -302,6 +330,14 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
   const bool list_time=statistics&&(options.timestamp_key.container==AttributeContainerKind::kList||options.timestamp_key.container==AttributeContainerKind::kTuple);
   if(list_time)if(const auto error=detail::polars_lit::argument_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
   if(collection(options.case_id_key)||integer(options.case_id_key)) {
+    namespace lit=detail::polars_lit;
+    const auto present=[&](const std::string& name){return std::find(source.columns.begin(),source.columns.end(),name)!=source.columns.end();};
+    const bool dict_time=keys::dict_key(options.timestamp_key);
+    const bool time_resolves=list_time||dict_time||(text(options.timestamp_key)&&present(options.timestamp_key.value));
+    // Round CS: Python builds the sort's struct literal before any plan;
+    // the group_by keys resolve before the activity column.
+    if(dict_time)if(const auto error=lit::dict_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
+    if(time_resolves)duplicate_keys(source,options,true,phase,list_time?lit::literal_list_display(lit::argument_literal(options.timestamp_key)):sort_time(options,true));
     // Round CP: the statistics' group_by resolves the activity column before
     // the sort by the literal runs (CM bank 2026111550 case 159).
     if(statistics&&collection(options.case_id_key)&&text(options.activity_key)&&!keys::by_name(options.activity_key.value)&&
@@ -312,6 +348,24 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
       fail("ColumnNotFoundError",phase,missing_prefix(options.activity_key.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\nSORT BY ["+
            lit::literal_list_display(lit::argument_literal(options.case_id_key))+", "+time+"]\n  "+frame_plan(source)+contexts({"group_by"}));
     }
+    // Round CS: one row survives the sort; each case id becomes a dict key
+    // in Python, which a struct or list literal is not (CK bank 2026111671
+    // case 425).
+    if(source.rows.size()==1&&time_resolves){
+      const auto items=key_items(options.case_id_key);
+      if(items.size()!=1)literal_outside("several key items on one row");
+      const auto& item=items.front();
+      if(text(item)){auto inner=raw;inner.case_id_key=item;return grouped(source,inner,statistics,phase,eager_source);}
+      const auto& act=options.activity_key;
+      if(!text(act)||keys::by_name(act.value)||!present(act.value))literal_outside("the activity key");
+      if(item.container==AttributeContainerKind::kContainer)fail("TypeError","apply","unhashable type: 'dict'");
+      if(listed_key(item))fail("TypeError","apply","unhashable type: 'list'");
+      const auto activity_at=static_cast<std::size_t>(std::find(source.columns.begin(),source.columns.end(),act.value)-source.columns.begin());
+      Grouped result;result.activity_dtype=source.dtypes[activity_at];
+      Group group;group.key="literal";group.absent=null(item);group.activities.push_back(source.rows.front()[activity_at]);
+      result.groups.push_back(std::move(group));return result;
+    }
+    if(source.rows.size()==1)literal_outside("the timestamp key on one row");
     fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");
   }
   const auto position=[&](const std::string& key,bool activity=false){auto found=std::find(source.columns.begin(),source.columns.end(),key);if(found==source.columns.end())missing(source,key,activity,statistics,options,phase,eager_source||(!statistics&&phase=="apply"));return static_cast<std::size_t>(found-source.columns.begin());};
@@ -344,13 +398,55 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
   }
   return result;
 }
+// Round CS: the join keeps every row or none, unless a one-row frame joins
+// on its key columns. Round CP's empty-list rule (no admitted variant keeps
+// every row on an anti join) held only for an empty frame: the literal-only
+// selection has one row (CK bank 2026111671 case 369).
+std::optional<EventTable> literal_collect(const EventTable& source,const std::vector<std::string>& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
+  const auto& key=options.case_id_key;
+  if(!(listed_key(key)&&!key.children.empty())&&!integer(key))return std::nullopt;
+  const auto items=key_items(key);
+  const auto present=[&](const std::string& name){return std::find(source.columns.begin(),source.columns.end(),name)!=source.columns.end();};
+  // A str item is a column, any other item (None among str items too) a
+  // literal (CN bank 2026111672 case 2).
+  const bool names=std::any_of(items.begin(),items.end(),[](const EventAttribute& v){return text(v);});
+  if(std::any_of(items.begin(),items.end(),[&](const EventAttribute& v){return text(v)&&!present(v.value);}))throw std::invalid_argument("Native Polars variants case selector outside observed empty-list domain");
+  for(const auto& item:items)if(!text(item)&&!item.is_null&&real(item)&&std::isnan(number(item)))literal_outside("a NaN key");
+  if(!present("time:timestamp"))literal_outside("no timestamp column");
+  const bool eager=phase=="apply";
+  const auto shape=[&]{fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");};
+  if(eager&&source.rows.size()!=1)shape();
+  duplicate_keys(source,options,false,phase,"col(\"time:timestamp\")");
+  const auto act=keyed(options,source.columns).activity_key;
+  if(!text(act)||keys::by_name(act.value))literal_outside("the activity key");
+  if(!present(act.value)){
+    if(!listed_key(key))literal_outside("a missing activity with an int key");
+    if(eager)missing(source,act.value,true,false,options,phase,true);
+    fail("ColumnNotFoundError",phase,missing_prefix(act.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n"+literal_sort_plan(source,options,"col(\"time:timestamp\")")+
+         contexts({"group_by","filter","select","join right","join"}));
+  }
+  if(!labels.empty()&&source.rows.size()!=1)shape();
+  bool matched=false;
+  if(names){
+    if(!labels.empty()){
+      const auto& row=source.rows.front();
+      bool absent=false;
+      for(const auto& item:items){
+        if(!text(item)){if(null(item))absent=true;continue;}
+        const auto at=static_cast<std::size_t>(std::find(source.columns.begin(),source.columns.end(),item.value)-source.columns.begin());if(!row[at]||null(*row[at]))absent=true;
+      }
+      const auto at=static_cast<std::size_t>(std::find(source.columns.begin(),source.columns.end(),act.value)-source.columns.begin());
+      std::string label;if(row[at]&&!null(*row[at])&&source.dtypes[at]!="Null")label=string_cast(*row[at],source.dtypes[at]);
+      matched=!absent&&std::find(labels.begin(),labels.end(),label)!=labels.end();
+    }
+  } else {
+    matched=!null(items.front());
+  }
+  if(matched==truth(options.positive))return source;
+  auto result=source;result.rows.clear();return result;
+}
 EventTable collect(const EventTable& source,const std::vector<std::string>& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
-  // Round CP: no admitted variant folds the filter to false, so the anti
-  // join keeps every row and the sort by a literal case key never runs
-  // (CM bank 2026111550 case 182).
-  if(labels.empty()&&!truth(options.positive)&&collection(options.case_id_key)&&!options.case_id_key.children.empty()&&
-     std::none_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),[](const EventAttribute& v){return text(v);}))
-    return source;
+  if(const auto result=literal_collect(source,labels,options,phase))return *result;
   const auto groups=grouped(source,options,false,phase);std::unordered_map<std::string,bool> matches;
   for(const auto& group:groups.groups)matches.emplace(group.key,!group.absent&&std::find(labels.begin(),labels.end(),group.label)!=labels.end());
   auto result=source;result.rows.clear();

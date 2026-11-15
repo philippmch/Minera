@@ -12,6 +12,7 @@
 #include <bit>
 #include <charconv>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <map>
 #include <optional>
@@ -333,11 +334,22 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
       fail("ColumnNotFoundError", phase, "unable to find column \"end_time\"; valid columns: [" + debug_quote(key) + "]\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nAGGREGATE[maintain_order: false]\n  [] BY [col(" + quote(key) + ")]\n  FROM\n  " + frame_plan(source) + contexts({"with_columns", "filter", "select", "join right", "join"}));
     }
     time_at = position(options.timestamp_key.value);
-    validate_time_dtype(source.dtypes[time_at], phase);
   }
   // Round CG: str bounds with the lower above the upper (byte order) fold the
-  // interval to an empty one: nothing raises and no case passes.
-  const bool folded = op != Operation::kCount && text(low) && text(high) && high.value < low.value;
+  // interval to an empty one: nothing raises and no case passes. Round CS:
+  // so do two int literals (bools among them, within Int64) and two
+  // datetimes, and the duration is then never computed (a String or
+  // numeric timestamp column raises nothing); floats never fold (fresh CK
+  // bank 2026111691 case 100).
+  const auto int_literal = [](const EventAttribute& v) {
+    return (integer(v) || boolean(v)) && exact(v) >= TokenInteger(std::numeric_limits<std::int64_t>::min()) &&
+           exact(v) <= TokenInteger(std::numeric_limits<std::int64_t>::max());
+  };
+  const bool folded = op != Operation::kCount &&
+      ((text(low) && text(high) && high.value < low.value) ||
+       (int_literal(low) && int_literal(high) && exact(high) < exact(low)) ||
+       (date(low) && date(high) && date_micros(high) < date_micros(low)));
+  if (op == Operation::kPerformance && !folded) validate_time_dtype(source.dtypes[time_at], phase);
   if (op != Operation::kCount && !folded) {
     // Whether the count or the duration has a present cell (a dict bound's
     // cast fails only then).
@@ -355,7 +367,7 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     auto [found, inserted] = positions.emplace(key, groups.size());
     if (inserted) { groups.push_back({}); groups.back().absent = !groups::row_key(keys, row, cell_key); }
     auto& group = groups[found->second]; ++group.count; row_groups.push_back(found->second);
-    if (op == Operation::kPerformance && row[time_at] && !null(*row[time_at])) {
+    if (op == Operation::kPerformance && !folded && row[time_at] && !null(*row[time_at])) {
       const auto& v = *row[time_at]; const auto parsed = polars_datetime::ticks(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value, time_unit);
       if (!parsed) throw std::invalid_argument("Native Polars performance requires valid declared temporal cells");
       if (!group.first || *parsed < *group.first) group.first = parsed;

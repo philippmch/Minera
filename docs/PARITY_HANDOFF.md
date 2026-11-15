@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CR (2026-11-05 to 2026-11-15, cloud container)
+## Review-fix loop, rounds T–CS (2026-11-05 to 2026-11-15, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5560,7 +5560,70 @@ probes are in the project files under `review-harness/round-cr/`.
 No fixture changed. The device check on the Mac was skipped again (no
 device linked).
 
-Next round (CS) should start by re-reviewing round CR:
+Round CS re-reviewed CR (Review CS1). CR's commit 251318f ran green on
+all six CI jobs (run 43740955829). CS modelled the one-row
+`A_next_B_next_C` keys CR had declared, replayed two batches of fresh
+seeds and swept trace-attribute clustering on uploads:
+- One-row `A_next_B_next_C` (`polars_ltl_filter.cpp`) with list, tuple,
+  mask and None case keys: the literal window and sort, then Python's
+  indexing of the collected one-row frame (pairs, masks, rows, names,
+  repeated names) and the result's failures (probes n1, n2, ln2 to ln6;
+  2,383 calls bound).
+- Literal list case keys in the Polars variants filters
+  (`polars_variants_filter.cpp`): one literal row whatever the frame holds,
+  keep-all-or-nothing, unhashable dict/list items on one row, DuplicateError
+  while resolving the group_by or join. `eventually_follows` on literal
+  keys resolves the first three activity filters before the third join's
+  duplicate; two activities on one row keep one outcome.
+- Trace-attribute clustering (`clustering.cpp`) on CSV and XES frames: each
+  trace's typed `case:` values from the case's first row, Python dict keys
+  as groups (a fresh NaN per float64 cell, one NaN elsewhere, one NaT),
+  repeated leaf names, export by leaf index. Sweeps of 60 seeds each: 0
+  differing calls.
+- Fresh seeds, first batch: Polars table CK 2026111671 (5 calls), CN
+  2026111672, CJ 2026111673 (1: a struct-cast race, observed), CI
+  2026111674, CH 2026111675; Polars sequence CP 2026111670, CK 2026111676
+  (1: an equal-size join, observed), CJ 2026111677, CH 2026111678; pandas
+  CK table 2026111679 (5), CK sequence 2026111680 (1), CN LTL 2026111681.
+  Second batch after the fixes: Polars table CK 2026111691 (3: folded int
+  and datetime case ranges, narrow path dtypes, list timestamp keys in the
+  variants sort) and CN 2026111694, sequence CK 2026111692 and CP
+  2026111696, pandas CK table 2026111693 (2: list-like values against
+  `df[[]]`, list timestamp keys hashed item by item) and CK sequence
+  2026111695. All 0 after.
+
+In the suite: new `docs/polars-filter-cs-bank.json.gz`,
+`docs/polars-filter-cs-probe-bank.json.gz`,
+`docs/polars-sequence-filter-cs-bank.json.gz`,
+`docs/pandas-filter-cs-bank.json.gz` and
+`docs/pandas-sequence-filter-cs-bank.json.gz`, and
+`minera_review_cs1_tests` (trace-attribute clustering on a CSV upload,
+pm4py values). The fresh banks, sweeps and probes are in the project
+files under `review-harness/round-cs/`.
+
+No fixture changed. The device check on the Mac was skipped again (no
+device linked).
+
+Next round (CT) should start by re-reviewing round CS:
+
+- CS's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- sweeps of the upload routes not yet swept on typed frames (embeddings,
+  the process cube, anonymization);
+- int and datetime range folding in the other Polars filters (CS found it
+  in `filter_case_performance`; the paths filter folds str bounds only);
+- the CR list below (LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CR's targets, taken in CS (findings CS1-1 to CS1-7): CR's CI run,
+the fresh seeds, one-row `A_next_B_next_C` list keys, and trace-attribute
+clustering on uploads. Not taken (carried to CT): embeddings, the process
+cube and anonymization sweeps, the LTL list-key cases outside the model,
+equal-size joins and the older CJ, CF and CD items.
+
+Previous list for round CS (kept for its older items):
 
 - CR's CI run;
 - fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ

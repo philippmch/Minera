@@ -53,6 +53,10 @@ void require_frame_key(const std::set<std::string>& keys, const std::string& key
                                      const Event& event, const std::string& key,
                                      FrameKeyScope scope);
 
+// The frame value of one attribute of dataframe_frame_event_log's view (its
+// typed cell; a NaN or NaT cell is missing).
+[[nodiscard]] FrameValue frame_attribute_value(const EventAttribute& attribute);
+
 // Throws std::invalid_argument with pandas' KeyError text for the columns of
 // a `df[[...]]` selection the frame lacks: "['x'] not in index" when some of
 // them exist, "None of [Index([...], dtype='str')] are in the [columns]" when

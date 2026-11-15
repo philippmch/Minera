@@ -459,7 +459,13 @@ void validate_time(const std::string& dtype, const PolarsPathsFilterOptions& opt
   if (dtype == "String" || dtype == "Boolean") {
     fail("InvalidOperationError", phase, std::string(dtype == "String" ? "sub operation not supported for dtypes `str` and `str`" : "`subtract` operation not supported for dtype `bool`") + "\n\nThis error occurred in the following expression:\n\t" + expression + '\n' + larger);
   }
-  const auto name = dtype == "Int64" ? "i64" : dtype == "UInt64" ? "u64" : dtype == "Float64" ? "f64" : dtype == "Null" ? "null" : "";
+  // Round CS: every numeric dtype subtracts to itself (fresh CK bank
+  // 2026111691 case 29: a Float32 case column selected by a dict key).
+  static const std::vector<std::pair<std::string, std::string>> physical = {
+      {"Int8", "i8"}, {"Int16", "i16"}, {"Int32", "i32"}, {"Int64", "i64"}, {"UInt8", "u8"}, {"UInt16", "u16"},
+      {"UInt32", "u32"}, {"UInt64", "u64"}, {"Float32", "f32"}, {"Float64", "f64"}, {"Null", "null"}};
+  const char* name = "";
+  for (const auto& [polars, short_name] : physical) if (dtype == polars) name = short_name.c_str();
   if (!*name) throw std::invalid_argument("Unsupported native Polars path timestamp dtype: " + dtype);
   fail("SchemaError", phase, "invalid series dtype: expected `Duration`, got `" + std::string(name) + "` for series with name `next_timestamp`\n\nThis error occurred in the following expression:\n\t" + expression + ".dt.total_seconds()\n" + larger);
 }
