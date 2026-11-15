@@ -2,6 +2,7 @@
 #include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_key_selection.hpp"
+#include "polars_group_keys.hpp"
 #include "polars_float_text.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_lit_model.hpp"
@@ -317,6 +318,8 @@ struct Predicate {
   std::optional<std::size_t> case_column, stream1, stream2;
   std::string dtype, case_dtype;
   bool literal_case=false;
+  // Round CO: a non-str scalar or a non-empty list as the case key.
+  std::optional<detail::polars_group_keys::Keys> keys;
   std::vector<EventAttribute> values;
   // Round CD: a list (tuple, dict keys) argument as pl.lit builds it.
   std::optional<detail::polars_lit::Literal> literal;
@@ -862,6 +865,19 @@ int truth_of(const Expr& e,const EventTable& source,std::size_t row) {
   if(e.op=="&")return a==0||b==0?0:a<0||b<0?-1:1;
   return a==1||b==1?1:a<0||b<0?-1:0;
 }
+namespace groups=detail::polars_group_keys;
+// Round CO: the case keys of the join (polars_group_keys.hpp); a missing
+// column or a repeated output name fails at the join over the filtered
+// frame's plan (`plan()`), the duplicate as the unique's projections.
+template<typename Plan>
+groups::Keys case_keys(const EventTable& source,const EventAttribute& role,bool eager,Plan&& plan) {
+  try {
+    return groups::resolve(role,source.columns,source.dtypes,
+                           [&](const std::string& name){fail("ColumnNotFoundError",phase(eager),column_prefix(source,name)+plan());},
+                           [&](const std::string& name){fail("DuplicateError",phase(eager),groups::duplicate_message(name,"projections")+plan());});
+  } catch(const PolarsSequenceFilterError& error){fail(error.type,phase(eager),error.message);}
+}
+std::string join_cell_key(const std::optional<EventAttribute>& cell,const std::string& dtype);
 Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager) {
   const auto op=call.operation;const bool trace=op==Op::kNumericTraces;const auto& attr=call.options.attribute_key;
   // One level per Python filter call: the bounds, then each stream filter.
@@ -915,11 +931,12 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
   }
   if(trace) {
     const auto& role=call.options.case_id_key;
-    if(collection(role))fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
-    if(integer(role))p.literal_case=true;
+    if(collection(role)&&role.children.empty())fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
+    const auto plan=[&]{return eager?std::string():resolved("'join'",chain_plan(source,resolved_filters),join_stack());};
+    if(detail::polars_group_keys::modelled(role))p.keys=case_keys(source,role,eager,plan);
     else {
       const auto c=index_of(source,role.value);
-      if(!c)fail("ColumnNotFoundError",phase(eager),column_prefix(source,role.value)+(eager?"":resolved("'join'",chain_plan(source,resolved_filters),join_stack())));
+      if(!c)fail("ColumnNotFoundError",phase(eager),column_prefix(source,role.value)+plan());
       p.case_column=c;p.case_dtype=source_dtype(source,*c);
     }
   }
@@ -1005,12 +1022,12 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
   }
   if(trace) {
     const auto& role=call.options.case_id_key;
-    if(collection(role))fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
+    if(collection(role)&&role.children.empty())fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
     // Round CE: a scalar value as the resolved plan coerces it.
     std::optional<std::string> scalar;
     if(!p.literal&&!null(*call.values)&&!collection(*call.values))scalar=detail::polars_lit::coerced_scalar_is_in(attr.value,p.dtype,detail::polars_lit::value_of(*call.values));
     const auto plan=filter_plan(source,p.literal?list_membership(attr.value,p.dtype,*p.literal,true,true,cells?cells->empty():call.values->children.empty()):scalar?*scalar:p.other?p.other_plan:membership_expr(attr.value,*call.values,true));
-    if(integer(role))p.literal_case=true;
+    if(detail::polars_group_keys::modelled(role))p.keys=case_keys(source,role,eager,[&]{return suffix(plan);});
     else {
       const auto c=index_of(source,role.value);
       if(!c)fail("ColumnNotFoundError",phase(eager),column_prefix(source,role.value)+suffix(plan));
@@ -1057,28 +1074,44 @@ std::vector<bool> matching(const EventTable& source,const Predicate& p) {
     flags[i]=yes;
   }
   if(!traced(op))return flags;
-  if(p.literal_case){const bool eligible=std::any_of(flags.begin(),flags.end(),[](bool value){return value;});return std::vector<bool>(source.size(),positive?eligible:!eligible);}
+  if(p.keys) {
+    // Literal keys only select one row whatever matched; a Null literal or a
+    // null cell never joins.
+    const auto& keys=*p.keys;std::unordered_set<std::string> kept;
+    for(std::size_t i=0;i<flags.size();++i)if(flags[i])if(const auto k=groups::row_key(keys,source.rows[i],join_cell_key))kept.insert(*k);
+    for(std::size_t i=0;i<flags.size();++i) {
+      const auto k=groups::row_key(keys,source.rows[i],join_cell_key);
+      const bool found=k&&(keys.all_literal()||kept.contains(*k));
+      flags[i]=positive?found:!found;
+    }
+    return flags;
+  }
   std::unordered_set<std::string> cases;
   for(std::size_t i=0;i<flags.size();++i)if(flags[i]){const auto v=cell(source,i,*p.case_column);if(!null(v))cases.insert(group_key(v,p.case_dtype));}
   for(std::size_t i=0;i<flags.size();++i){const auto v=cell(source,i,*p.case_column);const bool found=!null(v)&&cases.contains(group_key(v,p.case_dtype));flags[i]=positive?found:!found;}
   return flags;
 }
-EventTable case_projection(EventTable source,const PolarsAttributesFilterCall& call) {
-  if(!traced(call.operation)||!integer(call.options.case_id_key))return source;
-  if(index_of(source,"literal"))throw std::invalid_argument("Native Polars literal case projection requires no existing literal column");
-  const auto n=exact(call.options.case_id_key);std::string dtype;
-  EventAttribute value{"literal",n.decimal(),AttributeKind::kInt};
-  if(n>=TokenInteger(std::numeric_limits<std::int64_t>::min())&&n<=TokenInteger(std::numeric_limits<std::int64_t>::max())) {
-    value.typed_value=static_cast<std::int64_t>(n);
-    dtype=n>=TokenInteger(std::numeric_limits<std::int32_t>::min())&&n<=TokenInteger(std::numeric_limits<std::int32_t>::max())?"Int32":"Int64";
-  }else{value.typed_value=static_cast<std::uint64_t>(n);dtype="UInt64";}
-  source.columns.push_back("literal");source.dtypes.push_back(dtype);
-  if(!source.categorical_dtypes.empty())source.categorical_dtypes.push_back(std::nullopt);
-  for(auto& row:source.rows)row.push_back(value);
-  return source;
+std::string join_cell_key(const std::optional<EventAttribute>& cell,const std::string& dtype){return cell&&!null(*cell)?group_key(*cell,dtype):std::string("n");}
+// The right keys an inner join on case keys holding a literal appends (the
+// anti join of a negative filter appends nothing).
+EventTable case_projection(EventTable source,const PolarsAttributesFilterCall& call,const groups::Keys* given=nullptr) {
+  if(!traced(call.operation)||!groups::modelled(call.options.case_id_key)||!truth(call.options.positive))return source;
+  std::optional<groups::Keys> keys;
+  if(given)keys=*given;
+  else {
+    // The lazy schema: keys that fail to resolve fail collect.
+    struct Unresolved{};
+    try{keys=groups::resolve(call.options.case_id_key,source.columns,source.dtypes,[](const std::string&){throw Unresolved{};},[](const std::string&){throw Unresolved{};});}
+    catch(const Unresolved&){return source;}
+    catch(const PolarsSequenceFilterError&){return source;}
+  }
+  auto out=source;out.rows.clear();
+  groups::append_schema(out,*keys,source);
+  for(const auto& row:source.rows){auto kept=row;groups::append_cells(kept,*keys,row);out.rows.push_back(std::move(kept));}
+  return out;
 }
 EventTable filtered(const EventTable& source,const Predicate& query) {
-  return case_projection(select_rows(source,matching(source,query)),query.call);
+  return case_projection(select_rows(source,matching(source,query)),query.call,query.keys?&*query.keys:nullptr);
 }
 struct CountColumn { std::optional<std::size_t> column, cases;EventAttribute literal;std::string dtype;bool once=false; };
 std::size_t distinct_case_count(const EventTable& source,const EventAttribute& raw);

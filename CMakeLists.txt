@@ -3147,21 +3147,30 @@ if(MINERA_BUILD_TESTS)
   # lists in the attribute value calls (CK domain, seed 2026111533). Round
   # CM: dict column keys as pl.col reads them and group_by/sort/unique/over
   # refuse them. Round CN: list case keys built strictly, dict timestamp
-  # keys as struct literals in the sorts; the bank leaves out the 40 calls
-  # carried to round CO (lists holding dicts as group_by/over/join keys).
+  # keys as struct literals in the sorts. Round CO: the whole bank again
+  # (the 40 calls carried from CN, lists holding dicts as join keys, pass).
   add_test(NAME minera_polars_filter_ck_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-ck-bank.json.gz")
   set_tests_properties(minera_polars_filter_ck_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
   # Round CN: explicit calls (polars_filter_cn_domain.py) with list and
   # tuple case keys, None items in pl.col lists and dict or list timestamp
-  # keys as sort literals, and a fresh CK seed (2026111560, without the 35
-  # calls carried to round CO).
+  # keys as sort literals, and a fresh CK seed (2026111560; round CO binds
+  # all but two A_next_B_next_C calls with dict attribute keys).
   add_test(NAME minera_polars_filter_cn_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cn-bank.json.gz")
   set_tests_properties(minera_polars_filter_cn_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
   add_test(NAME minera_polars_filter_cn_ck_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cn-ck-bank.json.gz")
   set_tests_properties(minera_polars_filter_cn_ck_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CO: a fresh CK seed (2026111580) and explicit probes of literal and
+  # one-item list case keys in the case, attributes, timestamp and LTL
+  # filters (a struct or list cell outcome counts as unrepresentable).
+  add_test(NAME minera_polars_filter_co_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-co-bank.json.gz")
+  set_tests_properties(minera_polars_filter_co_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_filter_co_probe_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-co-probe-bank.json.gz")
+  set_tests_properties(minera_polars_filter_co_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

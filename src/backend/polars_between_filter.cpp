@@ -187,6 +187,9 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
     // (strictly), then read by pl.col, before its over() refuses it.
     if (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) {
       if (const auto error = detail::polars_lit::argument_literal_error(key)) fail("TypeError", "apply", *error);
+      // Round CO: the anchors build their literals before pl.col reads the
+      // list (case 80 of the CK seed 60 bank).
+      validate_anchor(act1); validate_anchor(act2);
       col_items(key);
     }
     if (collection(key)) fail("TypeError", "apply", "'" + core_type(key) + "' object is not an instance of 'str'");

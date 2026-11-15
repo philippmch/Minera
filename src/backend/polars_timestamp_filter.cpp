@@ -2,6 +2,7 @@
 #include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_key_selection.hpp"
+#include "polars_group_keys.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_lit_model.hpp"
 #include "pandas_parameter_carrier.hpp"
@@ -209,7 +210,9 @@ EventAttribute selector(const EventAttribute& value,const std::vector<std::strin
   if(collection(key)&&!key.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
   return key;
 }
-struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;std::string attribute_dtype,time_dtype;std::vector<std::string> categories;};
+namespace groups=detail::polars_group_keys;
+// Round CO: keys holds a non-str scalar or non-empty list case key once resolved.
+struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;std::string attribute_dtype,time_dtype;std::vector<std::string> categories;std::optional<groups::Keys> keys;};
 bool scalar_value(const Query& q){return q.value.container==AttributeContainerKind::kScalar;}
 // Round CD: the attribute comparison typed by the shared comparison model.
 lit::ScalarCheck attribute_check(const Query& q){
@@ -224,6 +227,11 @@ Query prepare(const std::vector<std::string>& columns,Operation op,const EventAt
   if(op==Operation::kContained||op==Operation::kIntersecting)case_dict(options);
   if(op==Operation::kAttribute)q.attribute=selector(attribute,columns);
   if(op==Operation::kAttribute&&dict_value(value))struct_literal_check(value);
+  // Round CO: a list value builds its literal before pl.col reads the
+  // timestamp key (cases 62, 69, 143 and 382 of the CL and CK banks).
+  if(op==Operation::kAttribute&&(value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple)) {
+    try{(void)lit::literal_of(lit::value_of(value));}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.what());}
+  }
   q.options.timestamp_key=selector(options.timestamp_key,columns);
   // The attribute value literal is built before unique(case).
   if(op==Operation::kAttribute&&keys::dict_key(options.case_id_key)&&(value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple)) {
@@ -244,16 +252,33 @@ std::string at_most_text(const Query& q){
   if(nanosecond_aware(q)){v.nanoseconds+=999;if(v.nanoseconds>=1000000000){v.nanoseconds-=1000000000;++v.seconds;}}
   return bound_text(v);
 }
+// Round CO: an integer or float column meets the datetime bound as its
+// physical microseconds: Int64 and Float64 bare, the other widths that
+// compare cast to Int64 or Float64 (probe p18).
+bool cast_time(const std::string& dtype){return dtype=="Int32"||dtype=="UInt32"||dtype=="UInt64"||dtype=="Float32";}
+std::string time_bound(const Query& q,const ParsedExactTimestamp& v,const std::string& temporal_text) {
+  const auto& d=q.time_dtype;
+  const auto micros=TokenInteger(v.seconds)*TokenInteger(1000000)+TokenInteger(v.nanoseconds/1000);
+  if(d=="Int64"||d=="Int32"||d=="UInt32"||d=="UInt64")return micros.decimal();
+  if(d=="Float64"||d=="Float32")return lit::polars_frame_float(static_cast<double>(micros));
+  return temporal_text;
+}
+std::string time_compare(const Query& q,const std::string& column,const std::string& op,const std::string& value) {
+  const auto& d=q.time_dtype;
+  if(!cast_time(d))return compare_expr(column,op,value);
+  return "[(col("+quote(column)+").cast("+(d=="Float32"?"Float64":"Int64")+")) "+op+" ("+value+")]";
+}
 std::string time_expr(const Query& q) {
-  const auto lo=bound_text(q.low),hi=bound_text(q.high),hi_le=at_most_text(q);const auto& time=q.options.timestamp_key.value;
-  if(q.op==Operation::kContained)return combined(compare_expr("first_timestamp",">=",lo),"&",compare_expr("last_timestamp","<=",hi_le));
+  const auto lo=time_bound(q,q.low,bound_text(q.low)),hi=time_bound(q,q.high,bound_text(q.high)),hi_le=time_bound(q,q.high,at_most_text(q));const auto& time=q.options.timestamp_key.value;
+  const auto cmp=[&](const std::string& column,const std::string& op,const std::string& value){return time_compare(q,column,op,value);};
+  if(q.op==Operation::kContained)return combined(cmp("first_timestamp",">=",lo),"&",cmp("last_timestamp","<=",hi_le));
   if(q.op==Operation::kIntersecting){
-    const auto cover=combined(compare_expr("first_timestamp","<",lo),"&",compare_expr("last_timestamp",">",hi));
+    const auto cover=combined(cmp("first_timestamp","<",lo),"&",cmp("last_timestamp",">",hi));
     if(equal(q.low,q.high))return cover;
-    return combined(combined(combined(compare_expr("first_timestamp",">",lo),"&",compare_expr("first_timestamp","<",hi)),"|",combined(compare_expr("last_timestamp",">",lo),"&",compare_expr("last_timestamp","<",hi))),"|",cover);
+    return combined(combined(combined(cmp("first_timestamp",">",lo),"&",cmp("first_timestamp","<",hi)),"|",combined(cmp("last_timestamp",">",lo),"&",cmp("last_timestamp","<",hi))),"|",cover);
   }
-  if(equal(q.low,q.high)&&!nanosecond_aware(q))return compare_expr(time,"==",lo);
-  return combined(compare_expr(time,">=",lo),"&",compare_expr(time,"<=",hi_le));
+  if(equal(q.low,q.high)&&!nanosecond_aware(q))return cmp(time,"==",lo);
+  return combined(cmp(time,">=",lo),"&",cmp(time,"<=",hi_le));
 }
 // The attribute comparison inside the evaluated predicate: coerced once it
 // types (a Boolean column meets a string value as its String cast, round
@@ -291,17 +316,23 @@ bool mergeable_attribute(const Query& q,const std::string& expression) {
   const auto prefix="[(col("+quote(q.attribute.value)+")) == (";
   return expression.starts_with(prefix)&&expression.compare(prefix.size(),4,"dyn ")!=0;
 }
+// Whether the window comes first in the combined predicate (and so fails
+// first when it runs).
+bool time_first(const Query& q,const std::string& attribute) {
+  if(q.options.timestamp_key.value>=q.attribute.value)return false;
+  const bool merged=equal(q.low,q.high)&&!nanosecond_aware(q);
+  return !merged||mergeable_attribute(q,attribute);
+}
 std::string whole_expr(const Query& q) {
   const auto time=time_expr(q);if(q.op!=Operation::kAttribute)return time;
   const auto attribute=attribute_expr(q);
-  if(q.options.timestamp_key.value<q.attribute.value) {
-    const bool merged=equal(q.low,q.high)&&!nanosecond_aware(q);
-    if(!merged||mergeable_attribute(q,attribute))return combined(time,"&",attribute);
-  }
-  return combined(attribute,"&",time);
+  return time_first(q,attribute)?combined(time,"&",attribute):combined(attribute,"&",time);
 }
 std::string agg_plan(const EventTable& source,const Query& q) {
-  return "AGGREGATE[maintain_order: false]\n  [col("+quote(q.options.timestamp_key.value)+").min().alias(\"first_timestamp\"), col("+quote(q.options.timestamp_key.value)+").max().alias(\"last_timestamp\")] BY [col("+quote(q.options.case_id_key.value)+")]\n  FROM\n  "+frame_plan(source);
+  const auto aggs="col("+quote(q.options.timestamp_key.value)+").min().alias(\"first_timestamp\"), col("+quote(q.options.timestamp_key.value)+").max().alias(\"last_timestamp\")";
+  // Round CO: a group_by on literals only is planned as a select.
+  if(q.keys&&q.keys->all_literal())return "SELECT ["+groups::keys_text(*q.keys)+", "+aggs+"]\n  "+frame_plan(source);
+  return "AGGREGATE[maintain_order: false]\n  ["+aggs+"] BY ["+(q.keys?groups::keys_text(*q.keys):"col("+quote(q.options.case_id_key.value)+")")+"]\n  FROM\n  "+frame_plan(source);
 }
 std::string struct_plan(const Query& q) {
   const auto m=struct_model(q.value,q.attribute_dtype);
@@ -346,9 +377,11 @@ std::string intersect_plan_expr(const Query& q) {
   const auto a="col(\"first_timestamp\")",b="col(\"last_timestamp\")";const auto lo=bound_text(q.low),hi=bound_text(q.high);
   return "((("+std::string(a)+" > "+lo+") & ("+a+" < "+hi+")) | (("+b+" > "+lo+") & ("+b+" < "+hi+"))) | (("+a+" < "+lo+") & ("+b+" > "+hi+"))";
 }
-void time_dtype(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
+// Round CO: a String column fails while the plan resolves, before an empty
+// window simplifies the predicate away (case 251 of the CK seed 60 bank).
+void time_resolution(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
   const auto& dtype=source.dtypes[at];
-  if(dtype=="String"||dtype=="Categorical"||dtype.starts_with("Enum(")) {
+  if(dtype=="String") {
     std::string message="cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal column)";
     if(q.op==Operation::kEvents&&phase=="apply")fail("InvalidOperationError",phase,message);
     std::string plan;
@@ -357,15 +390,24 @@ void time_dtype(const EventTable& source,std::size_t at,const Query& q,const std
     else plan=filtered_plan(source,q,false);
     fail("InvalidOperationError",phase,message+resolved(q.op,plan,nodes(q.op,true),true));
   }
-  if(dtype=="Boolean"||polars_datetime::naive(dtype)) {
+}
+// Round CO: a Categorical or Enum column fails the comparison when it
+// runs, as narrow integers (Int8/16, UInt8/16) do; Int32, UInt32 and
+// Float32 compare like Int64 and Float64 (probes p16, p17).
+void time_dtype(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
+  const auto& dtype=source.dtypes[at];
+  const bool categorical=dtype=="Categorical"||dtype.starts_with("Categorical(")||dtype.starts_with("Enum(");
+  const bool narrow=dtype=="Int8"||dtype=="Int16"||dtype=="UInt8"||dtype=="UInt16";
+  if(dtype=="Boolean"||narrow||categorical||polars_datetime::naive(dtype)) {
     const auto column=q.op==Operation::kContained||q.op==Operation::kIntersecting?"first_timestamp":q.options.timestamp_key.value;
     const bool eq=(q.op==Operation::kEvents||q.op==Operation::kAttribute)&&equal(q.low,q.high);
     const std::string cmp=eq?"==":q.op==Operation::kIntersecting?(equal(q.low,q.high)?"<":">"):">=";
     const auto expression=compare_expr(column,cmp,bound_text(q.low));const auto larger=whole_expr(q);
-    std::string message="could not evaluate "+(eq?std::string{}:"'"+cmp+"' ")+"comparison between series '"+column+"' of dtype: "+(dtype=="Boolean"?"Boolean":"Datetime('"+polars_datetime::symbol(polars_datetime::column_unit(dtype))+"')")+" and series 'literal' of dtype: Datetime('μs', 'UTC')\n\nThis error occurred in the following expression:\n\t"+expression+'\n';
-    if(larger!=expression)message+="while evaluating this larger expression:\n\t"+larger+'\n';fail("SchemaError",phase,message);
+    std::string message=categorical?std::string("cannot compare categorical with datetime[μs, UTC]"):"could not evaluate "+(eq?std::string{}:"'"+cmp+"' ")+"comparison between series '"+column+"' of dtype: "+(dtype=="Boolean"||narrow?dtype:"Datetime('"+polars_datetime::symbol(polars_datetime::column_unit(dtype))+"')")+" and series 'literal' of dtype: Datetime('μs', 'UTC')";
+    message+="\n\nThis error occurred in the following expression:\n\t"+expression+'\n';
+    if(larger!=expression)message+="while evaluating this larger expression:\n\t"+larger+'\n';fail(categorical?"ComputeError":"SchemaError",phase,message);
   }
-  if(!polars_datetime::temporal(dtype)&&dtype!="Null"&&dtype!="Int64"&&dtype!="UInt64"&&dtype!="Float64")throw std::invalid_argument("Unsupported native Polars timestamp dtype: "+dtype);
+  if(!polars_datetime::temporal(dtype)&&dtype!="Null"&&dtype!="Int64"&&dtype!="UInt64"&&dtype!="Float64"&&dtype!="Int32"&&dtype!="UInt32"&&dtype!="Float32")throw std::invalid_argument("Unsupported native Polars timestamp dtype: "+dtype);
 }
 bool list_value(const Query& q){return q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple;}
 // Round CF: an attribute on the timestamp column itself is filtered apart
@@ -461,8 +503,8 @@ bool less(const ParsedExactTimestamp& a,const Instant& b){return less(Instant{a,
 std::optional<Instant> instant(const std::optional<EventAttribute>& cell,const std::string& dtype) {
   if(!cell||null(*cell)||dtype=="Null")return std::nullopt;
   const auto& v=*cell;
-  if(dtype=="Int64"||dtype=="UInt64")return Instant{physical_instant(static_cast<std::int64_t>(exact(v))),std::nullopt};
-  if(dtype=="Float64")return Instant{{},number(v)};
+  if(dtype=="Int64"||dtype=="UInt64"||dtype=="Int32"||dtype=="UInt32")return Instant{physical_instant(static_cast<std::int64_t>(exact(v))),std::nullopt};
+  if(dtype=="Float64"||dtype=="Float32")return Instant{{},number(v)};
   const auto parsed=parse_timestamp_exact(std::get_if<NativeDate>(&v.typed_value)?std::get<NativeDate>(v.typed_value).value:v.value);
   if(!parsed)throw std::invalid_argument("Native Polars timestamp filter requires valid declared temporal cells");
   // The column holds its unit (round BW).
@@ -495,13 +537,22 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
     try{(void)lit::literal_of(lit::value_of(q.value));}catch(const PolarsSequenceFilterError& error){fail(error.type,phase,error.what());}
   }
   const auto position=[&](const std::string& name,bool case_key=false){auto p=std::find(source.columns.begin(),source.columns.end(),name);if(p==source.columns.end())missing(source,name,q,phase,case_key);return static_cast<std::size_t>(p-source.columns.begin());};
-  const bool constant=q.op!=Operation::kEvents&&integer(q.options.case_id_key);
-  if(q.op!=Operation::kEvents&&collection(q.options.case_id_key)) {
-    if(!q.options.case_id_key.children.empty())throw std::invalid_argument("Native Polars timestamp case selector outside observed empty-list domain");
+  const bool listed=q.op!=Operation::kEvents&&groups::modelled(q.options.case_id_key);
+  if(q.op!=Operation::kEvents&&collection(q.options.case_id_key)&&q.options.case_id_key.children.empty())
     fail("InvalidOperationError",phase,"expected join keys/predicates"+resolved(q.op,(q.op==Operation::kAttribute?"UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  ":"")+std::string("DF []; PROJECT */0 COLUMNS"),{"join"}));
-  }
+  // Round CO: list and literal case keys resolve where a str one does.
+  const auto resolve_keys=[&](bool case_key){
+    try {
+      q.keys=groups::resolve(q.options.case_id_key,source.columns,source.dtypes,[&](const std::string& name){missing(source,name,q,phase,case_key);},
+        [&](const std::string& name){
+          const auto plan=case_key&&q.op==Operation::kAttribute?filtered_plan(source,q,true):frame_plan(source);
+          fail("DuplicateError",phase,groups::duplicate_message(name,q.op==Operation::kAttribute?"projections":"group_by keys")+resolved(q.op,plan,nodes(q.op)));
+        });
+    } catch(const PolarsSequenceFilterError& error){fail(error.type,phase,error.message);}
+  };
   std::optional<std::size_t> case_at;
-  if(q.op!=Operation::kEvents&&!constant&&q.op!=Operation::kAttribute)case_at=position(q.options.case_id_key.value);
+  if(listed&&q.op!=Operation::kAttribute)resolve_keys(false);
+  if(q.op!=Operation::kEvents&&!listed&&q.op!=Operation::kAttribute)case_at=position(q.options.case_id_key.value);
   std::optional<std::size_t> attr_at;
   // Round CM: a selector expanding to no column fails before a missing one.
   if(q.op==Operation::kAttribute&&collection(q.attribute))empty_selector(source,q,phase,false);
@@ -517,13 +568,29 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   }
   if(attr_at&&dict_value(q.value))(void)struct_model(q.value,q.attribute_dtype);
   if(attr_at)attribute_resolution(source,*attr_at,q,phase);
-  if(q.op==Operation::kAttribute&&!constant)case_at=position(q.options.case_id_key.value,true);
+  if(q.op==Operation::kAttribute&&listed)resolve_keys(true);
+  if(q.op==Operation::kAttribute&&!listed)case_at=position(q.options.case_id_key.value,true);
   auto result=source;result.rows.clear();
   // Lazy predicate simplification occurs before comparing the temporal schemas.
+  time_resolution(source,time_at,q,phase);
   if(same_column(q))attribute_dtype(source,*attr_at,q,phase);
-  if((q.op==Operation::kEvents||q.op==Operation::kAttribute)&&less(q.high,q.low))return result;
+  if(listed)groups::append_schema(result,*q.keys,source);
+  // Literal keys only select one row whatever passed (a Null literal joins
+  // nothing), even from an empty window.
+  const auto every=[&]{
+    if(!q.keys->null_literal())for(const auto& row:source.rows){auto kept=row;groups::append_cells(kept,*q.keys,row);result.rows.push_back(std::move(kept));}
+    return result;
+  };
+  // Round CO: a cast column keeps the predicate whole (an empty window
+  // still runs the attribute comparison, probe p19); the window and the
+  // attribute fail in the order the predicate combines them.
+  const bool window_empty=(q.op==Operation::kEvents||q.op==Operation::kAttribute)&&less(q.high,q.low);
+  if(window_empty&&!cast_time(q.time_dtype))return listed&&q.keys->all_literal()?every():result;
+  const bool window_first=!attr_at||time_first(q,attribute_expr(q));
+  if(window_first)time_dtype(source,time_at,q,phase);
   if(attr_at)attribute_dtype(source,*attr_at,q,phase);
-  time_dtype(source,time_at,q,phase);
+  if(!window_first)time_dtype(source,time_at,q,phase);
+  if(window_empty)return listed&&q.keys->all_literal()?every():result;
   // The microsecond bounds meet the column's unit as Polars 1.44.1 compares
   // a Datetime column with a datetime literal (round BW): every comparison
   // floors the bound to a millisecond column's unit; on a nanosecond column
@@ -536,7 +603,9 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   const auto low=floor_bound(q.low),high=floor_bound(q.high);
   // The cell side of a `<=` comparison.
   const auto at_most=[&](const Instant& v){return temporal_time&&!v.physical_float?Instant{polars_datetime::floor(v.temporal,polars_datetime::comparison_unit(time_unit)),std::nullopt}:v;};
-  if(constant){result.columns.push_back("literal");result.dtypes.push_back("Int32");if(!result.categorical_dtypes.empty())result.categorical_dtypes.push_back(std::nullopt);for(const auto& row:source.rows){auto kept=row;auto literal=q.options.case_id_key;literal.key="literal";kept.push_back(literal);result.rows.push_back(std::move(kept));}return result;}
+  if(listed&&q.keys->all_literal())return every();
+  if(!listed&&q.op!=Operation::kEvents){groups::Keys single;single.items.push_back({false,*case_at,q.options.case_id_key.value,source.dtypes[*case_at],{},false,{},{}});q.keys=single;}
+  const auto cell_key=[](const std::optional<EventAttribute>& cell,const std::string& dtype){return group_key(cell,dtype);};
   struct Group{bool absent=false,keep=false;std::optional<Instant> first,last;};
   std::vector<Group> groups;std::unordered_map<std::string,std::size_t> keys;std::vector<std::size_t> row_groups;
   const bool column_valid=q.op==Operation::kAttribute&&std::any_of(source.rows.begin(),source.rows.end(),[&](const auto& row){return !lit::null_cell(row[*attr_at]);});
@@ -544,8 +613,8 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
     const auto time=instant(row[time_at],source.dtypes[time_at]);
     const bool matches=time&&!less(*time,low)&&!less(high,at_most(*time))&&(q.op!=Operation::kAttribute||attribute_match(row[*attr_at],source.dtypes[*attr_at],q.value,q.categories,column_valid));
     if(q.op==Operation::kEvents){if(matches)result.rows.push_back(row);continue;}
-    const auto key=group_key(row[*case_at],source.dtypes[*case_at]);const auto [found,inserted]=keys.emplace(key,groups.size());
-    if(inserted){groups.push_back({});groups.back().absent=key=="n";}
+    const auto key=groups::group_of(*q.keys,row,cell_key);const auto [found,inserted]=keys.emplace(key,groups.size());
+    if(inserted){groups.push_back({});groups.back().absent=!groups::row_key(*q.keys,row,cell_key);}
     auto& group=groups[found->second];row_groups.push_back(found->second);
     if(q.op==Operation::kAttribute)group.keep=group.keep||matches;
     if(time){if(!group.first||less(*time,*group.first))group.first=time;if(!group.last||less(*group.last,*time))group.last=time;}
@@ -554,13 +623,18 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
     if(q.op==Operation::kContained)g.keep=!less(*g.first,low)&&!less(high,at_most(*g.last));
     else g.keep=(less(low,*g.first)&&less(*g.first,high))||(less(low,*g.last)&&less(*g.last,high))||(less(*g.first,low)&&less(high,*g.last));
   }
-  if(q.op!=Operation::kEvents)for(std::size_t i=0;i<source.rows.size();++i){const auto& g=groups[row_groups[i]];if(g.keep&&!g.absent)result.rows.push_back(source.rows[i]);}
+  if(q.op!=Operation::kEvents)for(std::size_t i=0;i<source.rows.size();++i){const auto& g=groups[row_groups[i]];if(g.keep&&!g.absent){auto kept=source.rows[i];groups::append_cells(kept,*q.keys,source.rows[i]);result.rows.push_back(std::move(kept));}}
   return result;
 }
 EventTable eager(const EventTable& source,Operation op,const EventAttribute& lower,const EventAttribute& upper,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={}) {return collect(source,prepare(source.columns,op,lower,upper,options,attribute,value),"apply");}
 LazyEventTable lazy(const LazyEventTable& source,Operation op,const EventAttribute& lower,const EventAttribute& upper,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={}) {
   const auto q=prepare(source.columns(),op,lower,upper,options,attribute,value);auto columns=source.columns(),dtypes=source.dtypes();auto categories=source.categorical_dtypes();
-  if(op!=Operation::kEvents&&integer(options.case_id_key)){columns.push_back("literal");if(!dtypes.empty())dtypes.push_back("Int32");if(!categories.empty())categories.push_back(std::nullopt);}
+  if(op!=Operation::kEvents&&groups::modelled(options.case_id_key)){
+    // The schema of the keys as collect resolves them.
+    struct Unresolved{};
+    try{const auto k=groups::resolve(options.case_id_key,columns,dtypes,[](const std::string&){throw Unresolved{};},[](const std::string&){throw Unresolved{};});groups::append_schema(columns,dtypes,categories,k,source.categorical_dtypes());}
+    catch(const Unresolved&){}catch(const PolarsSequenceFilterError&){}
+  }
   return LazyEventTable(std::move(columns),[source,q](const auto& consume){const auto filtered=collect(source.materialize(),q,"collect");for(const auto& row:filtered.rows)consume(row);},source.attributes(),source.metadata(),std::nullopt,std::move(dtypes),source.index(),std::move(categories));
 }
 std::vector<PolarsTimestampFilterParameter> parameters(const EventAttribute& value) {

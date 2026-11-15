@@ -29,6 +29,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -398,7 +399,24 @@ EventAttribute mapping_of(const Json& node) {
 // Round CD: a frame without categorical columns carries either no
 // categorical dtypes or an empty entry per column (between keeps the
 // entries of a categorical case id it casts to String); both are one frame.
+// A result value the capture cannot encode (its TypeError "unrepresentable ...").
+struct Unrepresentable : std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+
+// Round CO: the capture encodes a frame cell by cell (rows in order, then
+// columns) and refuses a struct or list cell as "no native cell for dict"
+// or "... for list" (the `literal` columns of list case keys).
+void check_cells(const EventTable& table) {
+  for (const auto& row : table.rows)
+    for (const auto& cell : row) {
+      if (!cell || cell->container == AttributeContainerKind::kScalar) continue;
+      throw Unrepresentable(std::string("no native cell for ") + (cell->container == AttributeContainerKind::kContainer ? "dict" : cell->container == AttributeContainerKind::kTuple ? "tuple" : "list"));
+    }
+}
+
 Json table_node(const EventTable& table) {
+  check_cells(table);
   if (std::none_of(table.categorical_dtypes.begin(), table.categorical_dtypes.end(),
                    [](const auto& c) { return c.has_value(); }) && !table.categorical_dtypes.empty()) {
     auto plain = table;
@@ -519,11 +537,6 @@ EventAttribute arg(const Args& args, std::size_t i) { return to_attribute(*args.
 bool is_mapping(const Json& node) { return tag_of(node) == "m"; }
 
 Json typed(const std::string& tag, std::string text) { return jtagged(tag, jstring(std::move(text))); }
-
-// A result value the capture cannot encode (its TypeError "unrepresentable ...").
-struct Unrepresentable : std::runtime_error {
-  using std::runtime_error::runtime_error;
-};
 
 // A native scalar as the reference's typed JSON.
 Json typed_attribute(const EventAttribute& v) {
@@ -832,39 +845,51 @@ const EventTable* table_of(const Json& outcome, EventTable& storage) {
 // kept {2}, {3} or {2, 3} of {null, 2, 3} over 24 reference runs. The
 // actual table must be the frame's rows of k such ids, or of k - 1 when the
 // frame has a null id.
-bool valid_ncases(const EventTable& df, const std::string& name, const Json& actual, long long k) {
+// The group label of a row over the named columns ("n" when a cell is null,
+// as a join drops it); nullopt when a name is no column. Round CO: case
+// keys given as a list of names group by all of them.
+std::optional<std::function<std::string(const EventTable::Row&)>> row_label(const EventTable& df, const std::vector<std::string>& names) {
+  std::vector<std::size_t> columns;
+  for (const auto& name : names) {
+    const auto at = std::find(df.columns.begin(), df.columns.end(), name);
+    if (at == df.columns.end()) return std::nullopt;
+    columns.push_back(static_cast<std::size_t>(at - df.columns.begin()));
+  }
+  return [columns](const EventTable::Row& row) {
+    std::string out;
+    for (const auto column : columns) {
+      if (!row[column] || row[column]->is_null) return std::string("n");
+      out += std::to_string(row[column]->value.size()) + ":v" + row[column]->value;
+    }
+    return out;
+  };
+}
+bool valid_ncases(const EventTable& df, const std::vector<std::string>& names, const Json& actual, long long k) {
   EventTable a_storage;
   const auto* a = table_of(actual, a_storage);
   if (!a || k < 0) return false;
-  const auto at = std::find(df.columns.begin(), df.columns.end(), name);
-  if (at == df.columns.end()) return false;
-  const auto column = static_cast<std::size_t>(at - df.columns.begin());
-  const auto label = [&](const EventTable::Row& row) {
-    return row[column] && !row[column]->is_null ? "v" + row[column]->value : std::string("n");
-  };
+  const auto label = row_label(df, names);
+  if (!label) return false;
   std::set<std::string> distinct, kept;
-  for (const auto& row : df.rows) distinct.insert(label(row));
-  for (const auto& row : a->rows) kept.insert(label(row));
+  for (const auto& row : df.rows) distinct.insert((*label)(row));
+  for (const auto& row : a->rows) kept.insert((*label)(row));
   if (kept.count("n")) return false;
   const auto want = std::min<std::size_t>(static_cast<std::size_t>(k), distinct.size());
   if (kept.size() != want && !(distinct.count("n") && want > 0 && kept.size() == want - 1)) return false;
   EventTable rebuilt = df;
   rebuilt.rows.clear();
   for (const auto& row : df.rows)
-    if (kept.count(label(row))) rebuilt.rows.push_back(row);
+    if (kept.count((*label)(row))) rebuilt.rows.push_back(row);
   return serialize_event_table_input_json(rebuilt) == serialize_event_table_input_json(*a);
 }
-bool same_selection(const EventTable& df, const std::string& name, const Json& expected, const Json& actual) {
+bool same_selection(const EventTable& df, const std::vector<std::string>& names, const Json& expected, const Json& actual) {
   EventTable e_storage, a_storage;
   const auto* e = table_of(expected, e_storage);
   const auto* a = table_of(actual, a_storage);
   if (!e || !a) return false;
-  const auto at = std::find(df.columns.begin(), df.columns.end(), name);
-  if (at == df.columns.end()) return false;
-  const auto column = static_cast<std::size_t>(at - df.columns.begin());
-  const auto label = [&](const EventTable::Row& row) {
-    return row[column] && !row[column]->is_null ? "v" + row[column]->value : std::string("n");
-  };
+  const auto found = row_label(df, names);
+  if (!found) return false;
+  const auto& label = *found;
   std::map<std::string, std::size_t> counts;
   for (const auto& row : df.rows) ++counts[label(row)];
   const auto kept = [&](const EventTable& table) {
@@ -1214,7 +1239,7 @@ int main(int argc, char** argv) try {
       };
       if (!matched && function == "filter_df_keeping_spno_activities") {
         const auto name = key_or("activity_key", "concept:name");
-        for (const auto& e : expected) matched = matched || same_selection(df, name, e, actual);
+        for (const auto& e : expected) matched = matched || same_selection(df, {name}, e, actual);
         const auto* maximum = keyword(kwargs, "max_no_activities");
         std::optional<long long> k;
         if (!maximum) k = 25;
@@ -1266,7 +1291,13 @@ int main(int argc, char** argv) try {
       // (round CD: an Int64 case column kept cases {4, 2, 1} in 7 of 12 runs
       // and {4, 3, 1} in 5).
       if (!matched && function == "filter_on_ncases") {
-        const auto name = key_or("case_id_glue", "case:concept:name");
+        std::vector<std::string> name{key_or("case_id_glue", "case:concept:name")};
+        if (const auto* glue = keyword(kwargs, "case_id_glue"); glue && tag_of(*glue) == "l") {
+          name.clear();
+          for (const auto& item : body(*glue).items)
+            if (tag_of(item) == "s") name.push_back(body(item).text);
+            else name.push_back("\x01literal");
+        }
         for (const auto& e : expected) matched = matched || same_selection(df, name, e, actual);
         const auto* maximum = keyword(kwargs, "max_no_cases");
         const bool tables = std::all_of(expected.begin(), expected.end(), [](const Json& e) { return e.get("value") != nullptr; });

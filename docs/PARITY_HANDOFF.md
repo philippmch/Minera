@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CN (2026-11-05 to 2026-11-15, cloud container)
+## Review-fix loop, rounds T–CO (2026-11-05 to 2026-11-15, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5391,7 +5391,88 @@ The full banks and replay logs are in the project files under
 No fixture changed. The device check on the Mac was skipped again (no
 device linked).
 
-Next round (CO) should start by re-reviewing round CN:
+Round CO re-reviewed CN (Review CO1). CN's commit 282c568 ran green on
+all six CI jobs (run 43687579084). CO worked literal case keys in the
+Polars join filters and LTL rules and timestamp columns of other dtypes:
+- A shared group-key model (`src/backend/polars_group_keys.hpp`): each
+  item of a list case key is a `group_by`/join key (a str a column, any
+  other value a `pl.lit` literal named `literal`), resolved in order
+  (missing column, duplicate output name); literals only select one row
+  whatever passed (inner join keeps all, anti join none), a Null literal
+  or null cell never joins, an inner join on literal keys appends
+  `<name>_right`/`literal`. Wired into the cases, attributes and
+  timestamp filters; struct/list output cells count as unrepresentable
+  in the bank test.
+- LTL rules with a literal case key (a non-str scalar or a one-item list
+  of a non-str): data-independent results with the `literal` column,
+  `ShapeError` for two `eventually_follows` activities, the
+  `literal_right` DuplicateError (with the third activity's plan) for
+  three or more.
+- Timestamp columns of any dtype (a dict timestamp key selects its
+  names): Int32/UInt32/Float32 compare as physical microseconds with a
+  cast in the plan, narrow ints fail the comparison, Categorical/Enum
+  fail `cannot compare categorical with datetime[μs, UTC]` when the plan
+  runs, a String column fails while resolving even with an empty window;
+  `filter_case_performance` on these dtypes.
+- Evaluation-order fixes (dict case key in the case filters, list
+  values and list timestamp keys, between anchors, the first
+  `eventually_follows` activity below a literal sort), paths concat casts
+  and list sort keys, lazy LTL diagnostic placeholders.
+- The Polars table banks: seed 2026111533 40 → 0, seed 2026111560
+  35 → 2, fresh seed 2026111580 42 → 0; fresh CH, CI, CJ table seeds
+  and the CH sequence seed matched. The Polars sequence calls were not
+  worked.
+
+In the suite: `docs/polars-filter-ck-bank.json.gz` is the whole seed
+2026111533 bank again (21,903 calls), `docs/polars-filter-cn-ck-bank.json.gz`
+seed 2026111560 without 2 calls (22,081); new
+`docs/polars-filter-co-bank.json.gz` (fresh CK seed 2026111580, 22,074
+calls) and `docs/polars-filter-co-probe-bank.json.gz` (1,388 explicit
+probe calls). The full banks, probe specs and replay logs are in the
+project files under `review-harness/round-co/`.
+
+No fixture changed. The device check on the Mac was skipped again (no
+device linked).
+
+Next round (CP) should start by re-reviewing round CO:
+
+- CO's CI run;
+- the Polars sequence calls (9 of seed 2026111532, 6 of 2026111551, 5
+  of 2026111561, 2 of the fresh 2026111581, 1 of the fresh CJ
+  2026111586; full banks in `review-harness/round-cl/banks/`,
+  `round-cm/banks/`, `round-cn/banks/` and `round-co/fresh/`): list case
+  keys holding a dict in `ends_with`, `prefixes`, `suffixes`, `traces`,
+  `rework`, `start_activities`, `end_activities`, `activity_split` (the
+  sort and `group_by` read them as literals; the native missing-column
+  message names "" today); `polars_group_keys.hpp` may carry over;
+- the fresh pandas seeds CO captured but did not replay (CK table
+  2026111582, CK sequence 2026111583, CN LTL 2026111584, in
+  `review-harness/round-co/fresh/`);
+- Polars table leftovers: `A_next_B_next_C` with a dict attribute key
+  (seed 2026111560 cases 60 and 289, CM seed 2026111550 cases 37 and
+  301: the reference fails the final join on an empty selection before
+  it reads the key), CM seed 2026111550 cases 190 (`apply_numeric`), 300
+  (`four_eyes_principle`, list case key build before the activity list),
+  22, 159, 182 and 380 (`variants` with list case or timestamp keys
+  holding a dict); LTL list case keys of several items or of str items
+  (`ColumnNotFoundError` on the `literal` select, `joining with repeated
+  key names`, duplicate `literal` outputs; probe `lit1`/`p13` outputs in
+  the harness); four or more `four_eyes_principle` activities with a
+  literal case key (the failing pair's plan);
+- fresh seeds of the CK, CN, CJ, CI and CH domains;
+- the three CK1-1 calls and the older items listed for CO below
+  (Int128 literals, CF and CD carry-overs);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CN's targets, taken in CO (findings CO1-1 to CO1-7): CN's CI run,
+the Polars table calls (40 → 0, fresh seed 60 35 → 2), the CM fresh
+table seed `cases.filter_on_ncases`/timeframe classes, fresh CK, CH, CI,
+CJ seeds. Not taken (carried to CP): the Polars sequence calls, the
+pandas fresh seeds, the A_next dict attribute calls, the three CK1-1
+calls and the older items (see the CP list above).
+
+Previous list for round CO (kept for its older items):
 
 - CN's CI run;
 - fresh seeds of the CK domains (pandas table and sequence, Polars

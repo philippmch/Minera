@@ -2,6 +2,7 @@
 #include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_key_selection.hpp"
+#include "polars_group_keys.hpp"
 #include "polars_float_text.hpp"
 #include "polars_list_literal.hpp"
 #include "polars_lit_model.hpp"
@@ -12,6 +13,7 @@
 #include <charconv>
 #include <cmath>
 #include <numeric>
+#include <map>
 #include <optional>
 #include <unordered_map>
 
@@ -150,15 +152,26 @@ void validate_literals(const EventAttribute& low, const EventAttribute& high) {
 void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseFilterOptions& options) {
   if (op == Operation::kPerformance && truth(options.business_hours))
     fail("NotImplementedError", "apply", "Business hours calculation is not yet implemented for Polars filtering");
+  // Round CO: group_by refuses a dict case key before anything else reads
+  // the bounds or the timestamp key (probe p15).
+  if (keys::dict_key(options.case_id_key)) fail("TypeError", "apply", keys::dict_argument_message());
   if (op == Operation::kPerformance && !text(options.timestamp_key) && !collection(options.timestamp_key))
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(options.timestamp_key) + "'.");
+  // Round CO: pl.col of a list timestamp key fails before the bounds build
+  // their literals (case 98 of the CL bank).
+  const auto& time = options.timestamp_key;
+  if (op == Operation::kPerformance && (time.container == AttributeContainerKind::kList || time.container == AttributeContainerKind::kTuple)) {
+    if (!time.children.empty() && !text(time.children.front()))
+      fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(time.children.front()) + "'.");
+    for (const auto& item : time.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
+  }
   if (op == Operation::kCount && !null(bound)) {
     if (text(bound)) fail("TypeError", "apply", "'<' not supported between instances of 'str' and 'int'");
     if (!integer(bound) && !boolean(bound)) fail("TypeError", "apply", "'" + core_type(bound) + "' object cannot be interpreted as an integer");
     if (exact(bound) < TokenInteger(0)) fail("ValueError", "apply", "negative slice lengths (" + exact(bound).decimal() + ") are invalid for LazyFrame");
   }
   if (null(options.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
-  if (!(text(options.case_id_key) || integer(options.case_id_key) || collection(options.case_id_key)))
+  if (!(text(options.case_id_key) || collection(options.case_id_key) || detail::polars_group_keys::modelled(options.case_id_key)))
     throw std::invalid_argument("Native Polars case selector outside observed scalar/list domain");
 }
 // Round CG: list bounds name their pl.lit type (List(Int64), List(String),
@@ -270,31 +283,52 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
 void validate_time_dtype(const std::string& dtype, const std::string& phase) {
   if (polars_datetime::temporal(dtype)) return;
   const std::string expression = "[(col(\"end_time\")) - (col(\"start_time\"))]";
-  if (dtype == "String" || dtype == "Boolean") {
-    fail("InvalidOperationError", phase, (dtype == "String" ? "sub operation not supported for dtypes `str` and `str`" : "`subtract` operation not supported for dtype `bool`") + std::string("\n\nThis error occurred in the following expression:\n\t") + expression + "\nwhile evaluating this larger expression:\n\t" + expression + ".dt.total_seconds()\n");
+  // Round CO: Categorical and Enum columns refuse the subtraction as a
+  // Boolean one does; every integer and float width subtracts and fails the
+  // duration read (probe p16).
+  const bool categorical = dtype == "Categorical" || dtype.starts_with("Categorical(");
+  if (dtype == "String" || dtype == "Boolean" || categorical || dtype.starts_with("Enum(")) {
+    const std::string short_name = dtype == "Boolean" ? "bool" : categorical ? "cat" : "enum";
+    fail("InvalidOperationError", phase, (dtype == "String" ? "sub operation not supported for dtypes `str` and `str`" : "`subtract` operation not supported for dtype `" + short_name + "`") + std::string("\n\nThis error occurred in the following expression:\n\t") + expression + "\nwhile evaluating this larger expression:\n\t" + expression + ".dt.total_seconds()\n");
   }
-  const auto name = dtype == "Int64" ? "i64" : dtype == "UInt64" ? "u64" : dtype == "Float64" ? "f64" : dtype == "Null" ? "null" : "";
+  static const std::map<std::string, const char*> names{{"Int8", "i8"}, {"Int16", "i16"}, {"Int32", "i32"}, {"Int64", "i64"}, {"UInt8", "u8"},
+    {"UInt16", "u16"}, {"UInt32", "u32"}, {"UInt64", "u64"}, {"Float32", "f32"}, {"Float64", "f64"}, {"Null", "null"}};
+  const auto found = names.find(dtype);
+  const auto name = found == names.end() ? "" : found->second;
   if (!*name) throw std::invalid_argument("Unsupported native Polars performance timestamp dtype: " + dtype);
   fail("SchemaError", phase, "invalid series dtype: expected `Duration`, got `" + std::string(name) + "` for series with name `end_time`\n\nThis error occurred in the following expression:\n\t" + expression + ".dt.total_seconds()\n");
+}
+namespace groups = detail::polars_group_keys;
+// Round CO: a non-str scalar or a non-empty list as the case key (the
+// group_by/join keys of polars_group_keys.hpp).
+groups::Keys case_keys(const EventTable& source, Operation op, const EventAttribute& high, const PolarsCaseFilterOptions& options, const std::string& phase) {
+  try {
+  return groups::resolve(options.case_id_key, source.columns, source.dtypes,
+                         [&](const std::string& name) { missing(source, name, op, phase, !null(high)); },
+                         [&](const std::string& name) {
+                           fail("DuplicateError", phase, groups::duplicate_message(name) + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n" + frame_plan(source) + contexts(nodes(op, !null(high))));
+                         });
+  } catch (const PolarsSequenceFilterError& error) { fail(error.type, phase, error.message); }
 }
 EventTable collect(const EventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& options, const std::string& phase) {
   source.validate();
   if (source.index || source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars case filters require declared dtypes and no dataframe index");
-  if (collection(options.case_id_key)) {
-    if (!options.case_id_key.children.empty()) throw std::invalid_argument("Native Polars case selector lists outside observed empty-list domain");
+  if (collection(options.case_id_key) && options.case_id_key.children.empty())
     fail("InvalidOperationError", phase, "expected join keys/predicates\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nDF []; PROJECT */0 COLUMNS" + contexts({"join"}));
-  }
-  const bool constant = integer(options.case_id_key);
+  const bool listed = groups::modelled(options.case_id_key);
   const auto position = [&](const std::string& key) {
     const auto found = std::find(source.columns.begin(), source.columns.end(), key);
     if (found == source.columns.end()) missing(source, key, op, phase, !null(high));
     return static_cast<std::size_t>(found - source.columns.begin());
   };
-  const auto case_at = constant ? 0 : position(options.case_id_key.value);
+  groups::Keys keys;
+  if (listed) keys = case_keys(source, op, high, options, phase);
+  else keys.items.push_back({false, position(options.case_id_key.value), options.case_id_key.value, source.dtypes[position(options.case_id_key.value)], {}, false});
   std::size_t time_at = 0;
   if (op == Operation::kPerformance) {
     if (collection(options.timestamp_key)) {
       if (!options.timestamp_key.children.empty()) throw std::invalid_argument("Native Polars timestamp selector lists outside observed empty-list domain");
+      if (listed) throw std::invalid_argument("Native Polars timestamp selector lists with case key lists outside observed domain");
       const auto& key = options.case_id_key.value;
       fail("ColumnNotFoundError", phase, "unable to find column \"end_time\"; valid columns: [" + debug_quote(key) + "]\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nAGGREGATE[maintain_order: false]\n  [] BY [col(" + quote(key) + ")]\n  FROM\n  " + frame_plan(source) + contexts({"with_columns", "filter", "select", "join right", "join"}));
     }
@@ -315,10 +349,11 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   const auto time_unit = op == Operation::kPerformance ? polars_datetime::column_unit(source.dtypes[time_at]) : polars_datetime::Unit::kMicroseconds;
   struct Group { std::size_t count = 0; bool absent = false, keep = false; std::optional<std::int64_t> first, last; };
   std::vector<Group> groups; std::unordered_map<std::string, std::size_t> positions; std::vector<std::size_t> row_groups;
+  const auto cell_key = [](const std::optional<EventAttribute>& cell, const std::string& dtype) { return group_key(cell, dtype); };
   for (const auto& row : source.rows) {
-    const auto key = constant ? "constant" : group_key(row[case_at], source.dtypes[case_at]);
+    const auto key = groups::group_of(keys, row, cell_key);
     auto [found, inserted] = positions.emplace(key, groups.size());
-    if (inserted) { groups.push_back({}); groups.back().absent = !constant && key == "n"; }
+    if (inserted) { groups.push_back({}); groups.back().absent = !groups::row_key(keys, row, cell_key); }
     auto& group = groups[found->second]; ++group.count; row_groups.push_back(found->second);
     if (op == Operation::kPerformance && row[time_at] && !null(*row[time_at])) {
       const auto& v = *row[time_at]; const auto parsed = polars_datetime::ticks(std::get_if<NativeDate>(&v.typed_value) ? std::get<NativeDate>(v.typed_value).value : v.value, time_unit);
@@ -335,17 +370,15 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     const auto value = op == Operation::kSize ? std::optional<std::int64_t>{static_cast<std::int64_t>(group.count)} : group.first ? std::optional<std::int64_t>{(*group.last - *group.first) / polars_datetime::per_second(time_unit)} : std::nullopt;
     group.keep = !folded && value && compare_bound(*value, low, false) && ((op == Operation::kSize && null(high)) || compare_bound(*value, high, true));
   }
+  // Literal keys only: the selected keys are one row whatever passed.
+  const bool every = keys.all_literal();
   auto result = source; result.rows.clear();
-  if (constant) {
-    if (std::find(result.columns.begin(), result.columns.end(), "literal") != result.columns.end()) throw std::invalid_argument("Native Polars constant case selector collides with existing literal column");
-    result.columns.push_back("literal"); result.dtypes.push_back("Int32");
-    if (!result.categorical_dtypes.empty()) result.categorical_dtypes.push_back(std::nullopt);
-  }
+  groups::append_schema(result, keys, source);
   for (std::size_t i = 0; i < source.rows.size(); ++i) {
     const auto& group = groups[row_groups[i]];
-    if (!group.keep || group.absent) continue;
+    if (group.absent || (!every && !group.keep)) continue;
     auto kept = source.rows[i];
-    if (constant) { auto value = options.case_id_key; value.key = "literal"; kept.push_back(std::move(value)); }
+    groups::append_cells(kept, keys, source.rows[i]);
     result.rows.push_back(std::move(kept));
   }
   return result;
@@ -356,14 +389,7 @@ PolarsCaseFilterOptions keyed(const PolarsCaseFilterOptions& raw, Operation op, 
   if (keys::dict_key(raw.case_id_key)) fail("TypeError", "apply", keys::dict_argument_message());
   auto options = raw;
   const auto& time = raw.timestamp_key;
-  if (op == Operation::kPerformance && collection(time)) {
-    if (time.container == AttributeContainerKind::kList || time.container == AttributeContainerKind::kTuple) {
-      if (!time.children.empty() && !text(time.children.front()))
-        fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(time.children.front()) + "'.");
-      for (const auto& item : time.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
-    }
-    options.timestamp_key = keys::col_key(time, columns);
-  }
+  if (op == Operation::kPerformance && collection(time)) options.timestamp_key = keys::col_key(time, columns);
   return options;
 }
 LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& raw) {
@@ -371,7 +397,16 @@ LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttri
   validate_literals(low, high);
   const auto options = keyed(raw, op, source.columns());
   auto columns = source.columns(); auto dtypes = source.dtypes(); auto categories = source.categorical_dtypes();
-  if (integer(options.case_id_key)) { columns.push_back("literal"); if (!dtypes.empty()) dtypes.push_back("Int32"); if (!categories.empty()) categories.push_back(std::nullopt); }
+  if (groups::modelled(options.case_id_key)) {
+    // The schema of the keys as collect resolves them (a key that fails to
+    // resolve fails collect).
+    struct Unresolved {};
+    try {
+      const auto keys = groups::resolve(options.case_id_key, columns, dtypes, [](const std::string&) { throw Unresolved{}; }, [](const std::string&) { throw Unresolved{}; });
+      groups::append_schema(columns, dtypes, categories, keys, source.categorical_dtypes());
+    } catch (const Unresolved&) {
+    }
+  }
   return LazyEventTable(std::move(columns), [source, op, low, high, options](const auto& consume) {
     const auto result = collect(source.materialize(), op, low, high, options, "collect");
     for (const auto& row : result.rows) consume(row);

@@ -27339,3 +27339,105 @@ Tests:
   `minera_polars_sequence_filter_cn_bank_parity_tests`.
 - `docs/pandas-filter-cn-bank.json.gz` (list time bounds, 2,400 calls),
   replayed by `minera_pandas_filter_cn_bank_parity_tests`.
+
+## Review CO1: re-review of round CN, literal and list case keys in the Polars join filters and LTL rules, timestamp columns of other dtypes (2026-11-15)
+
+Round CO checked CN's CI (run 43687579084 on 282c568: green on all six
+jobs), worked the calls CN carried and replayed fresh seeds of the CK, CJ,
+CI and CH domains. The device check on the Mac was skipped (no device
+linked).
+
+- **CO1-1 Literal and list case keys in the join filters** (cases,
+  attributes and timestamp filters, observed black-box against Polars
+  1.44.1 through explicit probes, `review-harness/round-co/probe/`): each
+  item of a list case key is one `group_by`/join key, a str naming a
+  column and any other value a `pl.lit` literal named `literal` (a dict a
+  struct, None a Null literal, an int a dyn int held as Int32 when it
+  fits); a non-str scalar key is one literal key. The keys resolve in list
+  order (a missing column fails as a missing str key does, a second output
+  name fails `group_by keys contained duplicate output name` or, in the
+  attributes filter's select, `projections contained duplicate output
+  name`, with the plan). The groups that pass are joined back on their
+  keys: literals only select one row whatever passed, so the inner join
+  keeps every row and the anti join none; a Null literal or a null cell
+  never joins. An inner join on keys holding a literal appends the right
+  side's keys (`<name>_right` for a column, `literal` for a literal), the
+  anti join appends nothing. A struct or list cell in the output counts as
+  unrepresentable in the bank test. The shared model is
+  `src/backend/polars_group_keys.hpp`.
+- **CO1-2 Literal case keys in the LTL rules** (probe `ltl2`, 924
+  calls): a non-str number or bool, or a list holding one non-str item, is
+  one literal case key (the list prints as `[1]` in the sort and the case
+  select, the literal bare elsewhere). `four_eyes_principle` with two
+  activities keeps nothing (positive) or every row, and appends `literal`;
+  `attr_value_different_persons` keeps every row with `literal`;
+  `eventually_follows` with at most one activity keeps every row with
+  `literal` (positive) or nothing; a Null literal turns each of these
+  round. Two `eventually_follows` activities fail the literal sort
+  (`ShapeError ... Series length: 1`); a third activity's join fails
+  `column with name 'literal_right' already exists` with the plan of the
+  third activity's selection (`four_eyes_principle` positive and negative
+  plans differ; four or more `four_eyes_principle` activities stay
+  declared). Lists of several items or of str items stay declared.
+- **CO1-3 Timestamp columns of other dtypes** (probes p16 to p19; a dict
+  timestamp key selects its names, so any column can be the timestamp):
+  Int32, UInt32 and Float32 compare with the bounds like Int64 and Float64
+  (as physical microseconds, printed `col("t").cast(Int64) >=
+  (1614556800000000)` or `.cast(Float64) >= (1.6146e15)`, bare for Int64
+  and Float64), and the cast keeps an empty window from simplifying the
+  predicate away; Int8, Int16, UInt8 and UInt16 fail `could not evaluate
+  '>=' comparison between series ... of dtype: UInt16 and series
+  'literal' of dtype: Datetime('μs', 'UTC')`; Categorical and Enum fail
+  `cannot compare categorical with datetime[μs, UTC]` when the plan runs
+  (no longer as a String column does while it resolves); a String column
+  fails while the plan resolves, before an empty window. The window and
+  the attribute comparison fail in the order the predicate combines them.
+  `filter_case_performance` refuses the subtraction for Categorical
+  (`cat`) and Enum (`enum`) columns and fails the duration read for every
+  integer and float width (`got u8`, `f32`, ...).
+- **CO1-4 Evaluation order** (single calls of the carried banks): a dict
+  case key fails `group_by` right after the business-hours check in every
+  case filter; a list value of the timeframe filter builds its literal
+  before `pl.col` reads the timestamp key; a list timestamp key of
+  `filter_case_performance` fails `pl.col` before the bounds build; the
+  between filter's anchors build before `pl.col` reads a list case key;
+  the first `eventually_follows` activity's filter runs below a literal
+  sort (its compute errors come first), the others after it;
+  `A_next_B_next_C` on a one-row frame passes the literal sort.
+- **CO1-5 Smaller items**: `paths.apply` reads a list timestamp key
+  holding one non-str item only as a sort literal; the paths concat casts
+  a Null activity with `.cast(String)` and any other non-String one with
+  `.strict_cast(String)` (probe p21); LTL diagnostics render only the
+  placeholders their plan names (a value outside the plan may not build).
+- **CO1-6 Fresh seeds.** Matched: Polars table CK 2026111580 (42 calls
+  before this round), CH 2026111588, CI 2026111587, CJ 2026111585, Polars
+  sequence CH 2026111589. The CN banks went from 40 (seed 2026111533) and
+  35 (seed 2026111560) differing calls to 0 and 2.
+- **CO1-7 CN's CI.** 282c568 ran green on Linux, macOS and Windows.
+
+Carried to round CP:
+- Polars table: `A_next_B_next_C` with a dict attribute key (seed
+  2026111560 cases 60 and 289, CM seed 2026111550 cases 37 and 301: the
+  reference fails the final join on an empty selection before it reads
+  the key); the CM seed 2026111550 leftovers (`apply_numeric` case 190,
+  `four_eyes_principle` case 300, `variants` cases 22, 159, 182 and 380
+  with list case or timestamp keys holding a dict); LTL list case keys of
+  several items or of str items; four or more `four_eyes_principle`
+  activities with a literal case key.
+- Polars sequence (9 calls of seed 2026111532, 6 of 2026111551, 5 of
+  2026111561, 2 of the fresh 2026111581, 1 of the fresh CJ 2026111586):
+  list case keys holding a dict in `ends_with`, `prefixes`, `suffixes`,
+  `traces`, `rework`, `start_activities`, `end_activities` and
+  `activity_split`.
+- The fresh pandas seeds (CK table 2026111582, CK sequence 2026111583,
+  CN LTL 2026111584) were captured but not replayed.
+
+Tests:
+- `docs/polars-filter-ck-bank.json.gz` is the whole seed 2026111533 bank
+  again (21,903 calls), `docs/polars-filter-cn-ck-bank.json.gz` seed
+  2026111560 without the two `A_next_B_next_C` calls (22,081 calls); the
+  new `docs/polars-filter-co-bank.json.gz` (fresh CK seed 2026111580,
+  22,074 calls) and `docs/polars-filter-co-probe-bank.json.gz` (1,388
+  probe calls, without the declared four-activity and str-list calls) are
+  replayed by `minera_polars_filter_co_bank_parity_tests` and
+  `minera_polars_filter_co_probe_bank_parity_tests`.
