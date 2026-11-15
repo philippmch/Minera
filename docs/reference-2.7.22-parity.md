@@ -27441,3 +27441,11 @@ Tests:
   probe calls, without the declared four-activity and str-list calls) are
   replayed by `minera_polars_filter_co_bank_parity_tests` and
   `minera_polars_filter_co_probe_bank_parity_tests`.
+- CI run 43698178880 on 6efa7be passed on Linux, macOS and the Python,
+  frontend and verifier jobs; Windows failed one call of the CO bank
+  (seed 2026111580 case 215, `filter_df_keeping_spno_activities` with
+  three Datetime activities tied at the cut). MSVC masks the zone word in
+  error messages (Review AY2), so the listed values never matched the
+  unmasked count keys of the tied-listing check; the bank test now masks
+  those keys alike (forcing the mask on Linux reproduced the failure and
+  passes all 13 Polars table banks with the fix). Native code unchanged.

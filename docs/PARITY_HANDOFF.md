@@ -5434,9 +5434,13 @@ project files under `review-harness/round-co/`.
 No fixture changed. The device check on the Mac was skipped again (no
 device linked).
 
+CO's CI run 43698178880 failed only on Windows, in one tied-listing call
+of the CO bank: the bank test compared MSVC's zone-masked listing with
+unmasked count keys. A follow-up commit masks the keys alike (test only).
+
 Next round (CP) should start by re-reviewing round CO:
 
-- CO's CI run;
+- CO's follow-up CI run;
 - the Polars sequence calls (9 of seed 2026111532, 6 of 2026111551, 5
   of 2026111561, 2 of the fresh 2026111581, 1 of the fresh CJ
   2026111586; full banks in `review-harness/round-cl/banks/`,

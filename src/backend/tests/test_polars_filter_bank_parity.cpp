@@ -1006,6 +1006,19 @@ bool tied_listing(const std::vector<Json>& expected, const Json& actual) {
   return true;
 }
 
+// MSVC's time-zone database takes abbreviations from ICU ("GMT+1" where
+// Polars prints "CET"; declared in Review AY2), as in the sequence filter
+// bank test: on MSVC the word after a datetime's wall text in an error
+// message is masked on both sides (CD's CC bank failed only on this on
+// Windows). Everywhere else the abbreviations must match exactly.
+std::string zone_masked_text(std::string text) {
+#if defined(_MSC_VER)
+  static const std::regex wall(R"re((\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?) [^\s,\]\)"\\]+)re");
+  text = std::regex_replace(text, wall, "$1 <zone>");
+#endif
+  return text;
+}
+
 // Round CG: the same failure may list another selection of the values tied
 // at the cut than the captured runs did (seed 2026111471 case 516: 4 of 12
 // reference runs listed a null where the capture had a datetime). The
@@ -1028,7 +1041,9 @@ bool valid_top_listing(const EventTable& df, const std::string& name, const std:
   std::map<std::string, std::size_t> counts;
   for (const auto& row : df.rows) {
     const auto v = lit::python_value(row[column], dtype);
-    ++counts[lit::lit_display(lit::lit_value(v).type, lit::lit_value(v).value)];
+    // The listing was zone masked on MSVC (round CO seed 2026111580 case
+    // 215 failed only on Windows): the count keys are masked alike.
+    ++counts[zone_masked_text(lit::lit_display(lit::lit_value(v).type, lit::lit_value(v).value))];
   }
   const std::set<std::string> listed(mine->second.begin(), mine->second.end());
   const auto want = std::min(k, counts.size());
@@ -1043,19 +1058,12 @@ bool valid_top_listing(const EventTable& df, const std::string& name, const std:
   return true;
 }
 
-// MSVC's time-zone database takes abbreviations from ICU ("GMT+1" where
-// Polars prints "CET"; declared in Review AY2), as in the sequence filter
-// bank test: on MSVC the word after a datetime's wall text in an error
-// message is masked on both sides (CD's CC bank failed only on this on
-// Windows). Everywhere else the abbreviations must match exactly.
+// The same masking on an outcome's error message.
 Json zone_masked(Json node) {
-#if defined(_MSC_VER)
   if (const auto found = node.fields.find("error"); found != node.fields.end() && found->second.items.size() == 2) {
-    static const std::regex wall(R"re((\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?) [^\s,\]\)"\\]+)re");
     auto& message = found->second.items[1].text;
-    message = std::regex_replace(message, wall, "$1 <zone>");
+    message = zone_masked_text(std::move(message));
   }
-#endif
   return node;
 }
 
