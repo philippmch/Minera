@@ -4,7 +4,9 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <functional>
 #include <limits>
+#include <numeric>
 #include <optional>
 #include <regex>
 #include <string_view>
@@ -73,6 +75,8 @@ std::string type_name(const EventAttribute& v){
 }
 std::string repr(const EventAttribute& v){
  if(text_value(v))return string_key_repr(v.value);
+ if(v.container==AttributeContainerKind::kContainer||v.container==AttributeContainerKind::kList)
+  return detail::pandas_container_repr(v,[](const EventAttribute& x){return repr(x);},[](const std::string& k){return string_key_repr(k);});
  return root_cause_attribute_category(v);
 }
 // The type's tp_name, as Python's comparison errors report it.
@@ -165,6 +169,7 @@ std::optional<std::size_t> column(const EventTable& source,const EventAttribute&
 bool empty_list(const EventAttribute& v){return v.container==AttributeContainerKind::kList&&v.children.empty();}
 // df[[...]]: every listed label must be a column.
 void check_list_columns(const EventTable& source,const EventAttribute& key){
+ detail::pandas_check_getitem_key(key,error);
  std::vector<std::string> names,absent;bool strings=true,integers=true;std::size_t missing=0;
  for(const auto& item:key.children){
   names.push_back(repr(item));strings&=text_value(item);integers&=type_name(item)=="int";
@@ -200,12 +205,14 @@ std::string key_repr(const EventAttribute& key){
 }
 std::size_t direct_column(const EventTable& source,const EventAttribute& key){
  if(const auto found=column(source,key))return *found;
+ detail::pandas_check_getitem_key(key,error);
  if(key.container==AttributeContainerKind::kList)check_list_columns(source,key);
  error("KeyError",key_repr(key));
 }
 std::size_t case_column(const EventTable& source,const EventAttribute& key){
  if(empty_list(key))error("ValueError","Length mismatch: Expected axis has "+std::to_string(source.size())+" elements, new values have 0 elements");
  if(const auto found=column(source,key))return *found;
+ detail::pandas_check_set_index_key(key,error);
  error("KeyError",string_key_repr("None of ["+repr(key)+"] are in the columns"));
 }
 const EventAttribute& cell(const EventTable& source,std::size_t row,std::size_t col){
@@ -220,6 +227,47 @@ std::vector<EventAttribute> admitted_values(const EventAttribute& values,bool al
 }
 bool member(const EventAttribute& value,const std::vector<EventAttribute>& admitted){
  const auto key=identity(value);return std::any_of(admitted.begin(),admitted.end(),[&](const auto& v){return identity(v)==key;});
+}
+// Round CK: the shape np.asarray(values, dtype=object) gives a list of
+// values (lists and tuples nest, other values are items).
+std::vector<std::size_t> object_array_shape(std::vector<const EventAttribute*> level){
+ std::vector<std::size_t> shape{level.size()};
+ while(!level.empty()){
+  std::optional<std::size_t> width;
+  for(const auto* e:level){
+   if(e->is_null||(e->container!=AttributeContainerKind::kList&&e->container!=AttributeContainerKind::kTuple))return shape;
+   if(width&&*width!=e->children.size())return shape;
+   width=e->children.size();
+  }
+  shape.push_back(*width);std::vector<const EventAttribute*> next;
+  for(const auto* e:level)for(const auto& c:e->children)next.push_back(&c);
+  level=std::move(next);
+ }
+ return shape;
+}
+// Round CK: StringArray.isin on a str column keeps, unless every value is a
+// str or null, the values that are a str or for which isna(value) is true.
+// isna of a list is an array shaped like the list, so its truth needs
+// exactly one element (the innermost one); the kept values pass through
+// np.array(..., dtype=object) again and must stay one-dimensional, a kept
+// list then matching its str().
+std::vector<EventAttribute> string_isin_values(const std::vector<EventAttribute>& values){
+ std::vector<EventAttribute> kept;
+ for(const auto& v:values){
+  if(text_value(v)||(v.container==AttributeContainerKind::kScalar&&missing(v))){kept.push_back(v);continue;}
+  if(v.is_null||v.container!=AttributeContainerKind::kList)continue;
+  const auto shape=object_array_shape({&v});
+  const auto size=std::accumulate(shape.begin(),shape.end(),std::size_t{1},std::multiplies<>());
+  if(size==0)error("ValueError","The truth value of an empty array is ambiguous. Use `array.size > 0` to check that an array is not empty.");
+  if(size>1)error("ValueError","The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()");
+  const EventAttribute* inner=&v;
+  while(!inner->is_null&&(inner->container==AttributeContainerKind::kList||inner->container==AttributeContainerKind::kTuple))inner=&inner->children.front();
+  if(inner->container==AttributeContainerKind::kScalar&&missing(*inner))kept.push_back(v);
+ }
+ std::vector<const EventAttribute*> level;for(const auto& v:kept)level.push_back(&v);
+ if(const auto dims=object_array_shape(level).size();dims>1)error("ValueError","Buffer has wrong number of dimensions (expected 1, got "+std::to_string(dims)+")");
+ for(auto& v:kept)if(v.container==AttributeContainerKind::kList)v=EventAttribute{"",repr(v)};
+ return kept;
 }
 // Series.isin: in a str column a null cell matches a None or NaN value.
 bool isin(const EventTable& source,std::size_t col,const EventAttribute& value,const std::vector<EventAttribute>& admitted){
@@ -247,7 +295,8 @@ EventTable values_filter(const EventTable& source,const EventAttribute& values,c
   return events?masked_frame(source):project_cases(source,options.case_id_key,std::vector<bool>(source.size()),truth(options.positive));
  }
  const auto attribute=direct_column(source,options.attribute_key);
- const auto admitted=admitted_values(values,!events);
+ auto admitted=admitted_values(values,!events);
+ if(attribute<source.dtypes.size()&&source.dtypes[attribute]=="str"&&values.container!=AttributeContainerKind::kContainer)admitted=string_isin_values(admitted);
  const bool positive=truth(options.positive),keep_nan=truth(options.keep_nan_values);
  std::vector<bool> selected(source.size());
  for(std::size_t i=0;i<source.size();++i){const auto& v=cell(source,i,attribute);const bool match=isin(source,attribute,v,admitted);selected[i]=events?((match||(keep_nan&&missing(v)))==positive):(match||(keep_nan&&missing(v)));}
@@ -257,11 +306,27 @@ EventAttribute float32_bound(const EventAttribute& bound){
  if(!numeric(bound)||missing(bound))return bound;
  EventAttribute result=bound;result.kind=AttributeKind::kFloat;result.typed_value=static_cast<double>(static_cast<float>(native_attribute_number(bound)));return result;
 }
+// Round CK: a str or datetime64 column compares a dict as an array of its
+// keys, which numpy then holds as one 0-d object; other columns compare it
+// as a scalar.
+void dict_operand(const EventAttribute& operand,std::size_t rows,const std::string& dtype){
+ if(operand.container!=AttributeContainerKind::kContainer||operand.is_null)return;
+ const auto n=operand.children.size();
+ if(dtype=="str"){
+  if(n!=rows)error("ValueError","Lengths of operands do not match: "+std::to_string(rows)+" != "+std::to_string(n));
+  error("IndexError","too many indices for array: array is 0-dimensional, but 1 were indexed");
+ }
+ if(dtype.starts_with("datetime64")){
+  if(n!=rows)error("ValueError","Lengths must match");
+  error("ValueError","Buffer has wrong number of dimensions (expected 1, got 0)");
+ }
+}
 // op is one of ">=", "<=", "<", ">" (value op bound).
 // Per-row bounds. A tuple is an array operand: a str column needs equal
 // lengths, other columns broadcast one item (or one row) with numpy.
 std::vector<EventAttribute> row_bounds(const EventAttribute& bound,std::size_t rows,const std::string& dtype){
  if(text_value(bound)&&dtype!="object"&&dtype!="str")error("TypeError","Invalid comparison between dtype="+dtype+" and str");
+ dict_operand(bound,rows,dtype);
  if(bound.container==AttributeContainerKind::kList){
   if(bound.children.size()!=rows)error("ValueError","('Lengths must match to compare', ("+std::to_string(rows)+",), ("+std::to_string(bound.children.size())+",))");
   return bound.children;
@@ -278,6 +343,10 @@ std::vector<EventAttribute> row_bounds(const EventAttribute& bound,std::size_t r
  error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(rows)+",) ("+std::to_string(k)+",) ");
 }
 bool comparison(const EventAttribute& value,const EventAttribute& bound,const std::string& op,const std::string& dtype){
+ // Round CK: a NaN cell of a float column still compares with a dict, list
+ // or set (Python's own comparison error).
+ if(missing(value)&&dtype.starts_with("float")&&!bound.is_null&&bound.container!=AttributeContainerKind::kScalar)
+  error("TypeError","'"+op+"' not supported between instances of 'float' and '"+qualified_type_name(bound)+"'");
  if(missing(value)||missing(bound))return false;
  int order=0;
  if(text_value(value)&&text_value(bound))order=value.value<bound.value?-1:bound.value<value.value?1:0;
@@ -322,6 +391,7 @@ EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,c
    std::vector<std::size_t> remaining;for(std::size_t i=0;i<source.size();++i)if(selected[i])remaining.push_back(i);
    if(value.container==AttributeContainerKind::kList&&value.children.size()!=remaining.size())
     error("ValueError","('Lengths must match to compare', ("+std::to_string(remaining.size())+",), ("+std::to_string(value.children.size())+",))");
+   if(!source.dtypes.empty())dict_operand(value,remaining.size(),source.dtypes[stream]);
    if(value.container==AttributeContainerKind::kTuple&&!source.dtypes.empty()&&source.dtypes[stream]=="str"){
     if(value.children.size()!=remaining.size())error("ValueError","Lengths of operands do not match: "+std::to_string(remaining.size())+" != "+std::to_string(value.children.size()));
     if(!remaining.empty())error("ValueError","attribute stream tuples are outside the captured native domain");
@@ -449,7 +519,20 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  // An empty frame only resolves a scalar attribute column.
  // groupby([case, key]) resolves the case column first, except on a two-row
  // frame, where pandas may take the key list itself as the grouper.
- if(once&&!empty_list(o.case_id_key)&&s.size()!=2)direct_column(s,o.case_id_key);
+ // Round CK: a dict case key groups the per-case counts by mapping the
+ // index labels (int labels never match its str keys), so no case forms.
+ const bool unmatched_mapping=once&&!o.case_id_key.is_null&&o.case_id_key.container==AttributeContainerKind::kContainer&&
+  (!s.index||std::all_of(s.index->labels.begin(),s.index->labels.end(),[](const auto& label){const auto* scalar=std::get_if<EventAttribute>(&label.value);return scalar&&!text_value(*scalar);}));
+ if(once&&!unmatched_mapping&&!empty_list(o.case_id_key)&&s.size()!=2){
+  // Round CK: a list case key holding a dict or list is no label, so the
+  // groupby takes it as a grouper array.
+  if(o.case_id_key.container==AttributeContainerKind::kList&&o.case_id_key.children.size()!=s.size()&&
+     std::any_of(o.case_id_key.children.begin(),o.case_id_key.children.end(),[](const auto& c){return detail::pandas_unhashable_type(c).has_value();}))
+   error("ValueError","Grouper and axis must be same length");
+  direct_column(s,o.case_id_key);
+ }
+ // Round CK: df[key] refuses a dict before it looks at the rows.
+ if(s.size()==0&&!once&&o.attribute_key.container==AttributeContainerKind::kContainer)detail::pandas_check_getitem_key(o.attribute_key,error);
  if(s.size()==0){if(o.attribute_key.container==AttributeContainerKind::kScalar)direct_column(s,o.attribute_key);return s;}
  if(once&&o.attribute_key.is_null)error("TypeError","'NoneType' object is not callable");
  // A list key is one grouper array.
@@ -459,14 +542,14 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  if(empty_list(o.attribute_key))error("ValueError","No group keys passed!");
  const auto attribute=direct_column(s,o.attribute_key);
  std::optional<std::size_t> cases;std::unordered_set<std::string> all_cases;
- if(case_denominator){
+ if(case_denominator&&!unmatched_mapping){
   if(empty_list(o.case_id_key))error("ValueError","The truth value of a Series is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().");
   cases=direct_column(s,o.case_id_key);
   for(std::size_t i=0;i<s.size();++i)if(!missing(cell(s,i,*cases)))all_cases.insert(group_key(cell(s,i,*cases)));
  }
  struct Frequency {EventAttribute value;std::size_t count=0;std::unordered_set<std::string> cases;};
  std::vector<Frequency> frequencies;std::unordered_map<std::string,std::size_t> positions;
- for(std::size_t i=0;i<s.size();++i){const auto& value=cell(s,i,attribute);if(missing(value))continue;
+ for(std::size_t i=0;i<s.size()&&!unmatched_mapping;++i){const auto& value=cell(s,i,attribute);if(missing(value))continue;
   // Per-case counts group by (case, value), which drops null cases.
   if(once&&missing(cell(s,i,*cases)))continue;
   const auto key=group_key(value);const auto [position,added]=positions.emplace(key,frequencies.size());if(added)frequencies.push_back({value});

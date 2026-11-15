@@ -73,6 +73,8 @@ std::string type_name(const EventAttribute& v){
 }
 std::string repr(const EventAttribute& v){
  if(text_value(v))return string_key_repr(v.value);
+ if(v.container==AttributeContainerKind::kContainer||v.container==AttributeContainerKind::kList)
+  return detail::pandas_container_repr(v,[](const EventAttribute& x){return repr(x);},[](const std::string& k){return string_key_repr(k);});
  return root_cause_attribute_category(v);
 }
 bool truth(const EventAttribute& v){
@@ -154,6 +156,7 @@ std::optional<std::size_t> column(const EventTable& source,const EventAttribute&
 }
 // df[[...]]: every listed label must be a column.
 void check_list_columns(const EventTable& source,const EventAttribute& key){
+ detail::pandas_check_getitem_key(key,error);
  std::vector<std::string> names,absent;bool strings=true,integers=true;std::size_t missing=0;
  for(const auto& item:key.children){
   names.push_back(repr(item));strings&=text_value(item);integers&=type_name(item)=="int";
@@ -189,6 +192,7 @@ std::string key_repr(const EventAttribute& key){
 }
 std::size_t direct_column(const EventTable& source,const EventAttribute& key){
  if(const auto found=column(source,key))return *found;
+ detail::pandas_check_getitem_key(key,error);
  if(key.container==AttributeContainerKind::kList)check_list_columns(source,key);
  error("KeyError",key_repr(key));
 }
@@ -286,8 +290,24 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
  if(mode==Mode::kAttribute){
   const bool empty_attribute=attribute->container==AttributeContainerKind::kList&&attribute->children.empty();
   const auto selected=empty_attribute?std::optional<std::size_t>{}:std::optional<std::size_t>{direct_column(source,*attribute)};
-  const bool vector=wanted->container==AttributeContainerKind::kList;
+  // Round CK: a str column compares a tuple as an array of equal length.
+  const bool str_tuple=selected&&!source.dtypes.empty()&&source.dtypes[*selected]=="str"&&wanted->container==AttributeContainerKind::kTuple&&!wanted->is_null;
+  if(str_tuple&&wanted->children.size()!=source.size())error("ValueError","Lengths of operands do not match: "+std::to_string(source.size())+" != "+std::to_string(wanted->children.size()));
+  const bool vector=wanted->container==AttributeContainerKind::kList||str_tuple;
   if(vector&&wanted->children.size()!=source.size())error("ValueError","('Lengths must match to compare', ("+std::to_string(source.size())+",), ("+std::to_string(wanted->children.size())+",))");
+  // Round CK: a str or datetime64 attribute compares a dict as an array of
+  // its keys, held by numpy as one 0-d object.
+  if(selected&&!source.dtypes.empty()&&wanted->container==AttributeContainerKind::kContainer&&!wanted->is_null){
+   const auto& dtype=source.dtypes[*selected];const auto n=wanted->children.size(),rows=source.size();
+   if(dtype=="str"){
+    if(n!=rows)error("ValueError","Lengths of operands do not match: "+std::to_string(rows)+" != "+std::to_string(n));
+    error("IndexError","too many indices for array: array is 0-dimensional, but 1 were indexed");
+   }
+   if(dtype.starts_with("datetime64")){
+    if(n!=rows)error("ValueError","Lengths must match");
+    error("ValueError","Buffer has wrong number of dimensions (expected 1, got 0)");
+   }
+  }
   if(options.timestamp_key.container==AttributeContainerKind::kList&&options.timestamp_key.children.empty())error("ValueError","Cannot index with multidimensional key");
   const auto time=direct_column(source,options.timestamp_key);check_time(source,time,mode,nullptr);
   // A datetime64 attribute parses a string value like pandas' comparison
@@ -319,12 +339,29 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
  }
  if(options.case_id_key.is_null)error("TypeError","You have to supply one of 'by' and 'level'");
  if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("ValueError","No group keys passed!");
+ const auto time_column=[&]{
+  const auto time=column(source,options.timestamp_key);if(!time){EventAttribute wrapped{"",""};wrapped.container=AttributeContainerKind::kList;wrapped.children.push_back(options.timestamp_key);detail::pandas_check_getitem_key(wrapped,error);}if(!time)error("KeyError",string_key_repr("Column not found: "+(text_value(options.timestamp_key)?options.timestamp_key.value:repr(options.timestamp_key))));
+  return *time;
+ };
+ const bool empty_time=options.timestamp_key.container==AttributeContainerKind::kList&&options.timestamp_key.children.empty();
+ // Round CK: a dict case key is a groupby mapping, so a missing timestamp
+ // column fails before the case column is read.
+ // A list case key groups by each of its items in turn: a dict maps, a
+ // label must be a column.
+ const auto mapping=[](const EventAttribute& item){return !item.is_null&&item.container==AttributeContainerKind::kContainer;};
+ bool mapping_key=mapping(options.case_id_key);
+ if(options.case_id_key.container==AttributeContainerKind::kList&&std::any_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),mapping)&&
+    std::all_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),[&](const auto& item){return mapping(item)||text_value(item);})){
+  for(const auto& item:options.case_id_key.children)if(text_value(item)&&!column(source,item))error("KeyError",repr(item));
+  mapping_key=true;
+ }
+ if(mapping_key&&!empty_time)(void)time_column();
  const auto cases=direct_column(source,options.case_id_key);
- if(options.timestamp_key.container==AttributeContainerKind::kList&&options.timestamp_key.children.empty()){
+ if(empty_time){
   if(mode==Mode::kContained||mode==Mode::kIntersecting)error("ValueError","No objects to concatenate");
   error("AttributeError","'DataFrame' object has no attribute 'to_frame'");
  }
- const auto time=column(source,options.timestamp_key);if(!time)error("KeyError",string_key_repr("Column not found: "+(text_value(options.timestamp_key)?options.timestamp_key.value:repr(options.timestamp_key))));
+ const std::optional<std::size_t> time=time_column();
  const auto grouped=aggregate(source,cases,*time,mode);check_time(source,*time,mode,nullptr);
  std::vector<bool> matched(grouped.values.size());
  for(std::size_t i=0;i<grouped.values.size();++i){const auto& group=grouped.values[i];

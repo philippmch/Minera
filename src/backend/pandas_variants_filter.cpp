@@ -75,6 +75,8 @@ std::string type_name(const EventAttribute& v){
 }
 std::string repr(const EventAttribute& v){
  if(text_value(v))return string_key_repr(v.value);
+ if(v.container==AttributeContainerKind::kContainer||v.container==AttributeContainerKind::kList)
+  return detail::pandas_container_repr(v,[](const EventAttribute& x){return repr(x);},[](const std::string& k){return string_key_repr(k);});
  return root_cause_attribute_category(v);
 }
 bool truth(const EventAttribute& v){
@@ -219,6 +221,19 @@ std::vector<Group> groups(const EventTable& source,std::size_t cases){
  return result;
 }
 struct CacheRow {EventAttribute id;EventAttribute variant;};
+// Round CK: a dict case key, alone or listed with column labels, groups by
+// mapping the index labels through the dict. The dicts have str keys, so on
+// an index without str labels every row maps to NaN and no case forms.
+bool unmatched_mapping_key(const EventTable& source,const EventAttribute& key){
+ if(source.index)for(const auto& label:source.index->labels){
+  const auto* scalar=std::get_if<EventAttribute>(&label.value);
+  if(!scalar||text_value(*scalar))return false;
+ }
+ const auto mapping=[](const EventAttribute& item){return !item.is_null&&item.container==AttributeContainerKind::kContainer;};
+ if(mapping(key))return true;
+ return key.container==AttributeContainerKind::kList&&std::any_of(key.children.begin(),key.children.end(),mapping)&&
+  std::all_of(key.children.begin(),key.children.end(),[&](const auto& item){return mapping(item)||column(source,item).has_value();});
+}
 std::vector<CacheRow> membership_cache(const EventTable& source,const PandasVariantsFilterOptions& options){
  if(options.variants_df){
   const auto* table=std::get_if<EventTable>(&*options.variants_df);
@@ -241,10 +256,13 @@ std::vector<CacheRow> membership_cache(const EventTable& source,const PandasVari
  }
  if(options.case_id_key.is_null)error("TypeError","You have to supply one of 'by' and 'level'");
  if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("ValueError","No group keys passed!");
- const auto cases=direct_column(source,options.case_id_key);
+ const bool unmatched=unmatched_mapping_key(source,options.case_id_key);
+ const auto cases=unmatched?0:direct_column(source,options.case_id_key);
  if(options.activity_key.container==AttributeContainerKind::kList&&options.activity_key.children.empty())error("AttributeError","'DataFrame' object has no attribute 'to_frame'");
  const auto activity=column(source,options.activity_key);
+ if(!activity){EventAttribute wrapped{"",""};wrapped.container=AttributeContainerKind::kList;wrapped.children.push_back(options.activity_key);detail::pandas_check_getitem_key(wrapped,error);}
  if(!activity)error("KeyError",string_key_repr("Column not found: "+(text_value(options.activity_key)?options.activity_key.value:repr(options.activity_key))));
+ if(unmatched)return {};
  std::vector<CacheRow> result;
  for(const auto& group:groups(source,cases)){
   std::vector<EventAttribute> values;for(auto i:group.rows)values.push_back(cell(source,i,*activity));
@@ -283,6 +301,7 @@ EventTable membership(const EventTable& source,const PandasVariantsFilterOptions
  };
  std::unordered_set<std::string> selected;for(const auto& row:cache)if(!unmatched(row.variant)&&variants.contains(identity(row.variant)))selected.insert(identity(row.id));
  const auto cases=column(source,options.case_id_key);
+ if(!cases)detail::pandas_check_set_index_key(options.case_id_key,error);
  if(!cases)error("KeyError",string_key_repr("None of ["+repr(options.case_id_key)+"] are in the columns"));
  const bool positive=truth(options.positive);
  for(std::size_t i=0;i<source.size();++i)keep[i]=selected.contains(identity(cell(source,i,*cases)))==positive;
@@ -352,6 +371,8 @@ Statistics statistics(const EventTable& frame,const PandasVariantsFilterOptions&
  const auto cases=direct_column(frame,options.case_id_key);
  (void)direct_column(frame,options.timestamp_key);
  if(options.activity_key.container==AttributeContainerKind::kList&&options.activity_key.children.empty())error("TypeError","unhashable type: 'numpy.ndarray'");
+ // Round CK: the activity column is read as df[activity_key].
+ if(!column(frame,options.activity_key))detail::pandas_check_getitem_key(options.activity_key,error);
  const auto activity=direct_column(frame,options.activity_key);
  // np.unique and the variant tuples read both columns through to_numpy()
  // (round BZ): an Int64 column with a gap is a float array holding NaN.

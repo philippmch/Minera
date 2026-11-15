@@ -70,6 +70,8 @@ std::string type_name(const EventAttribute& v){
 }
 std::string repr(const EventAttribute& v){
  if(text_value(v))return string_key_repr(v.value);
+ if(v.container==AttributeContainerKind::kContainer||v.container==AttributeContainerKind::kList)
+  return detail::pandas_container_repr(v,[](const EventAttribute& x){return repr(x);},[](const std::string& k){return string_key_repr(k);});
  return root_cause_attribute_category(v);
 }
 bool truth(const EventAttribute& v){
@@ -156,13 +158,33 @@ std::size_t length(const EventAttribute& value){
 }
 EventAttribute element(const EventAttribute& value,std::size_t position){
  if(value.container==AttributeContainerKind::kScalar&&!text_value(value))error("TypeError","'"+type_name(value)+"' object is not subscriptable");
+ // Round CK: a dict is subscripted by key; its keys are strs, never the int.
+ if(value.container==AttributeContainerKind::kContainer&&!value.is_null)error("KeyError",std::to_string(position));
  const auto values=iterable(value);
  if(position>=values.size())error("IndexError","list index out of range");
  return values[position];
 }
 bool equal_value(const EventAttribute& a,const EventAttribute& b){return identity(a)==identity(b);}
 bool matches(const EventAttribute& value,const EventAttribute& target){return !missing(value)&&!missing(target)&&equal_value(value,target);}
+// Round CK: a list target with one item per row compares item by item.
+bool matches_at(const EventAttribute& value,const EventAttribute& target,std::size_t row){
+ if(!target.is_null&&target.container==AttributeContainerKind::kList&&row<target.children.size())return matches(value,target.children[row]);
+ return matches(value,target);
+}
 void check_target(const EventAttribute& target,std::size_t rows,const std::string& dtype){
+ // Round CK: a str or datetime64 column compares a dict as an array of its
+ // keys, which numpy then holds as one 0-d object.
+ if(target.container==AttributeContainerKind::kContainer&&!target.is_null){
+  const auto n=target.children.size();
+  if(dtype=="str"){
+   if(n!=rows)error("ValueError","Lengths of operands do not match: "+std::to_string(rows)+" != "+std::to_string(n));
+   error("IndexError","too many indices for array: array is 0-dimensional, but 1 were indexed");
+  }
+  if(dtype.starts_with("datetime64")){
+   if(n!=rows)error("ValueError","Lengths must match");
+   error("ValueError","Buffer has wrong number of dimensions (expected 1, got 0)");
+  }
+ }
  if(target.container==AttributeContainerKind::kList&&target.children.size()!=rows)
   error("ValueError","('Lengths must match to compare', ("+std::to_string(rows)+",), ("+std::to_string(target.children.size())+",))");
  // A str column compares a tuple as an array.
@@ -173,6 +195,8 @@ void check_target(const EventAttribute& target,std::size_t rows,const std::strin
 }
 std::vector<std::size_t> selected_columns(const EventTable& source,const std::vector<EventAttribute>& requested){
  std::vector<std::size_t> result;std::vector<std::string> absent;std::vector<std::string> names;std::size_t missing_count=0;
+ // Round CK: the keys hash before the columns are read.
+ for(const auto& key:requested)detail::pandas_check_hashable_key(key,error);
  for(const auto& key:requested){
   names.push_back(key.is_null?"nan":repr(key));
   const auto found=text_value(key)?std::find(source.columns.begin(),source.columns.end(),key.value):source.columns.end();
@@ -212,8 +236,14 @@ double duration(const EventAttribute& a,const EventAttribute& b){
  const auto ns=(TokenInteger(y->seconds)-TokenInteger(x->seconds))*TokenInteger(1'000'000'000)+(TokenInteger(y->nanoseconds)-TokenInteger(x->nanoseconds));
  return static_cast<double>(ns)/1e9;
 }
-bool temporal_bound(double value,const EventAttribute& bound,bool lower){
+bool temporal_bound(double value,const EventAttribute& bound,bool lower,bool eager=false){
  if(missing(bound))return false;
+ // Round CK: a dict bound compares row by row, so only a step with rows
+ // fails (Python's own comparison error).
+ if(bound.container==AttributeContainerKind::kContainer&&!bound.is_null){
+  if(eager)return false;
+  error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'float' and 'dict'");
+ }
  if(!numeric(bound))error("TypeError","Invalid comparison between dtype=float64 and "+type_name(bound));
  const auto number=native_attribute_number(bound);
  return lower?value>=number:value<=number;
@@ -235,6 +265,15 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
  // The resource naming the case column fails first, when the case column
  // is set from the selection (round BZ: also with all three keys equal).
  if(resources&&columns[0]==columns[2])error("ValueError","Cannot set a DataFrame with multiple columns to the single column @@conceptname");
+ // Round CK: when the attribute and resource columns are one label, the
+ // attribute reads as a two-column frame, which a dict or list as the first
+ // target, of another size, cannot be coerced against; the frame fails to
+ // reindex before the second target is compared.
+ if(columns[0]!=columns[1]&&resources&&columns[1]==columns[2]&&!anchors.empty()){
+  const auto& target=anchors.front();
+  if((target.container==AttributeContainerKind::kContainer||target.container==AttributeContainerKind::kList)&&!target.is_null&&target.children.size()!=2)
+   error("ValueError","Unable to coerce to Series, length must be 2: given "+std::to_string(target.children.size()));
+ }
  if(columns[0]==columns[1]||(resources&&columns[1]==columns[2]))error("ValueError","cannot reindex on an axis with duplicate labels");
  // With timestamp differences the timestamp key joins the selection: on the
  // activity column it duplicates a label, on the case column the sort by
@@ -259,7 +298,7 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
   if(rule==Rule::kEventually&&boundary_count){
    for(std::size_t i=0;i+1<anchors.size();++i){
     const auto bound=element(boundaries,i);
-    temporal_bound(0.0,element(bound,0),true);temporal_bound(0.0,element(bound,1),false);
+    temporal_bound(0.0,element(bound,0),true,true);temporal_bound(0.0,element(bound,1),false,true);
    }
   }
  }
@@ -282,11 +321,12 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
    const auto search=[&](auto&& self,std::size_t depth,std::size_t begin,std::size_t previous)->bool{
     if(depth==anchors.size())return true;
     for(std::size_t i=begin;i<rows.size();++i){const auto row=rows[i];
-     if(!matches(cell(source,row,activity_column),anchors[depth]))continue;
+     if(!matches_at(cell(source,row,activity_column),anchors[depth],row))continue;
      if(depth&&timed&&boundary_count){
       const auto bound=element(boundaries,depth-1);
       const auto elapsed=duration(cell(source,previous,columns.back()),cell(source,row,columns.back()));
-      if(!temporal_bound(elapsed,element(bound,0),true)||!temporal_bound(elapsed,element(bound,1),false))continue;
+      const bool above=temporal_bound(elapsed,element(bound,0),true),below=temporal_bound(elapsed,element(bound,1),false);
+      if(!above||!below)continue;
      }
      if(self(self,depth+1,i+1,row))return true;
     }
@@ -295,7 +335,7 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
    if(search(search,0,0,0))selected.insert(key);
   }else if(resources){
    std::vector<const EventAttribute*> a,b;
-   for(const auto row:rows){if(matches(cell(source,row,activity_column),anchors[0]))a.push_back(&cell(source,row,columns[2]));if(rule==Rule::kFourEyes&&matches(cell(source,row,activity_column),anchors[1]))b.push_back(&cell(source,row,columns[2]));}
+   for(const auto row:rows){if(matches_at(cell(source,row,activity_column),anchors[0],row))a.push_back(&cell(source,row,columns[2]));if(rule==Rule::kFourEyes&&matches_at(cell(source,row,activity_column),anchors[1],row))b.push_back(&cell(source,row,columns[2]));}
    if(rule==Rule::kDifferent){bool different=false;for(const auto* x:a)for(const auto* y:a)if(!equal_value(*x,*y))different=true;if(different)selected.insert(key);}
    else {
     const auto member=identity(cell(source,rows.front(),columns[0]));
@@ -315,13 +355,13 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
   for(const auto& [key,rows]:groups){
    std::optional<std::size_t> b,c;
    for(const auto row:rows){
-    if(matches(cell(source,row,activity_column),anchors[1]))b=row;
-    if(matches(cell(source,row,activity_column),anchors[2]))c=row;
+    if(matches_at(cell(source,row,activity_column),anchors[1],row))b=row;
+    if(matches_at(cell(source,row,activity_column),anchors[2],row))c=row;
    }
    if(!b||!c||*b==0||*c!=*b+1)continue;
    const auto a=*b-1;
    if(!missing(cell(source,a,columns[0]))&&!missing(cell(source,a,activity_column))&&
-      key==group_key(cell(source,a,columns[0]))&&matches(cell(source,a,activity_column),anchors[0]))selected.insert(key);
+      key==group_key(cell(source,a,columns[0]))&&matches_at(cell(source,a,activity_column),anchors[0],a))selected.insert(key);
   }
  }
  const bool positive=truth(options.positive);

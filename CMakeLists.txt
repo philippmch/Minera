@@ -3294,6 +3294,10 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-bank.json.gz")
   set_tests_properties(minera_pandas_filter_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CK: dicts and lists as column keys, values and parameters.
+  add_test(NAME minera_pandas_filter_ck_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-ck-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_ck_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

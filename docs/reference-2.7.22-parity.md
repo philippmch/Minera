@@ -26830,3 +26830,163 @@ Verification (scripts in the project files under `review-harness/round-cj/`):
 | CI, CH, CG, CF and CE seeds 2026111420 to 2026111425 | 18,277, 32,007, 11,601, 6,314, 26,624 and 17,422 calls | 0, 0, 0, 0, 0 and 1 found; after: 0 |
 | Dict literals through `pl.lit` (`dl/gen.py`) | 8,000 random dicts against Polars 1.44.1 | modelled |
 | The base, CC, CE, CF, CG, CH and CI table banks and the base, typed, CB, CC and CH sequence banks | the banks in the suite | 0 mismatches |
+
+## Review CK1: re-review of round CJ, and dicts as column keys, values and parameters of the pandas table filters (2026-11-15)
+
+Round CK checked CJ's CI run (43591565043: green on all six jobs, so the
+struct partition race tolerance of CJ1-3 held on the Windows and macOS
+runners), replayed fresh seeds of the CJ, CI, CH, CG, CF, CE, CC and CB
+domains, and added four domains: dicts in the pandas table filters,
+dicts in the pandas sequence filters, Categorical and Enum activity
+columns with cast plans and dict items in the Polars sequence filters,
+and dicts as column keys in the Polars table filters. The pandas table
+domain is fixed and in the suite; the other three found differences that
+are carried to round CL (list below).
+
+- **CK1-1 Fresh CJ, CI, CH, CG, CF, CE, CC and CB seeds.** CJ table seed
+  2026111510 (26,812 calls on 500 frames), CJ sequence seed 2026111511
+  (12,871 calls on 1,000 frames), CI seed 2026111512 (18,209), CH table
+  seed 2026111513 (31,927), CH sequence seed 2026111514 (11,736), CG seed
+  2026111515 (6,361), CF seed 2026111516 (26,469), CE seed 2026111517
+  (17,404), CC table seed 2026111518 (16,593), CC sequence seed
+  2026111519 (10,421) and CB sequence seed 2026111520 (10,316) differed
+  in 3 calls, all carried:
+  - CJ table case 214, `ltl.A_next_B_next_C` with a dict activity whose
+    list field holds dicts with a str and an empty-list value under one
+    key: Polars resolves the plan first and fails on the missing
+    `time:timestamp` column, the model builds the literal first and
+    fails on the field types;
+  - CJ sequence case 36, `traces.apply` with a dict pattern next to an
+    empty-str pattern on an Int64 case column: Polars fails the join on
+    a Null case column (`datatypes of join keys don't match`), the model
+    returns a frame;
+  - CB sequence case 431, `rework.apply` with `MIN_OCCURRENCES` 1 on a
+    two-row frame with a null activity: a different row is kept.
+- **CK1-2 Dict and list column keys in the pandas table filters.** A new
+  domain (`scripts/pandas_filter_ck_domain.py`) puts dicts, lists of
+  dicts and dicts next to other values into the column keys, the values
+  and the parameters of every pandas table filter. Its first bank (seed
+  2026111530, 11,694 calls on 400 frames) differed in 812 calls. Fixed:
+  - Python's repr of list and dict keys and values in the KeyErrors
+    (`pandas_container_repr` in `src/backend/pandas_parameter_carrier.hpp`);
+  - the three ways pandas refuses an unhashable key before the lookup:
+    `key in df.columns` (`unhashable type: 'dict'`), `df[key]` on a dict,
+    set, tuple holding one or list with an unhashable item (`Passing a
+    dict as an indexer is not supported. Use a list instead.`), and
+    `df.set_index(key)` (`The parameter "keys" may be a column key, ...
+    Received column of type <class 'dict'>`);
+  - a dict compared with a str or datetime64 column is an array of its
+    keys held as one 0-d object; on other columns it is a scalar, so a
+    dict bound fails only on a step with rows (Python's own comparison
+    error);
+  - per-row case sizes compare with an object bound row by row (an empty
+    frame never fails), and are float64 when a case is missing;
+  - the LTL filters hash the keys before reading the columns, subscript
+    a dict path item by its int position, and evaluate `path[0]` before
+    `path[1]` as Python does (the model's two calls had no fixed order in
+    C++); when the attribute and resource columns are one label, a dict
+    or list first target of another size fails the frame's coercion;
+  - the activity column of the variants statistics is read as
+    `df[activity_key]`.
+- **CK1-3 `StringArray.isin` with nested lists.** On a str column pandas
+  keeps only the values that are a str or for which `isna(value)` is
+  true, unless every value is a str or null. `isna` of a list is an array
+  shaped like `np.asarray(list, dtype=object)`, so its truth fails on more
+  than one element (`The truth value of an array with more than one
+  element is ambiguous`) or none (`The truth value of an empty array is
+  ambiguous`); a one-element list counts when its innermost item is null.
+  The kept values pass through `np.array(..., dtype=object)` again, which
+  fails when they are all lists (`Buffer has wrong number of dimensions
+  (expected 1, got 2)`); a kept list otherwise matches its `str()`.
+- **CK1-4 None in the case filters' list bounds.** A list of numbers with
+  None becomes a float array (None compares false); any other list, and
+  every tuple, stays an object array whose None fails like another
+  non-number (`'<=' not supported between instances of 'int' and
+  'NoneType'`). A one-item tuple holding a nested list or tuple is a
+  numpy array of shape (1, ...): its items compare with every case, and
+  the two-dimensional result does not fit the index (`Length of values
+  (1) does not match length of index (n)`).
+- **CK1-5 `paths.apply_performance` bounds in order.** The maximum
+  compares only with the occurrences the minimum kept, so a bad maximum
+  passes when none are left.
+- **CK1-6 Dict case keys as groupby mappings.** A dict case key, alone
+  or listed with column labels, groups by mapping the index labels
+  through the dict. The captured dicts have str keys and the frames int
+  labels, so no case forms: `variants.apply` keeps every row when
+  negative and none when positive, and the timeframe filters fail on a
+  missing timestamp column (`Column not found`) before the case column is
+  read. A list case key holding a dict of another length than the frame
+  is a grouper array in `filter_df_relative_occurrence_event_attribute`
+  (`Grouper and axis must be same length`).
+- **CK1-7 A fresh pandas table seed.** Seed 2026111534 (17,565 calls on
+  600 frames) differed in 15 calls; 14 are fixed:
+  - a NaN cell of a float column still compares with a dict or list
+    bound (`'<=' not supported between instances of 'float' and 'dict'`);
+  - a tuple value of the timeframe attribute filter on a str column is an
+    array that needs one item per row (`Lengths of operands do not match:
+    7 != 0`), before the timestamp column is read;
+  - a dict among the LTL timestamp boundaries is subscripted by key
+    (`KeyError: 0`);
+  - a list key keeps its nested lists unless it is a regular 2-D array
+    (`unhashable type: 'list'` for `[[{...}], "rd"]`);
+  - a list LTL target with one item per row compares item by item;
+  - `filter_df_relative_occurrence_event_attribute` refuses a dict
+    attribute key on an empty frame (`Passing a dict as an indexer`), and
+    with `KEEP_ONCE_PER_CASE` a dict case key is a groupby mapping that
+    forms no case (an empty result);
+  - a list case key of the timeframe filters holding a dict and labels
+    groups by each item in turn: a missing label fails (`KeyError:
+    'missing'`), else the timestamp column is read first.
+
+  The last call is carried: `eventually_follows` with a list inside a
+  timestamp boundary compares it with the joined frame of its step
+  (`('Lengths must match to compare', (0,), (1,))`), whose size the model
+  does not track.
+- **CK1-8 The pandas sequence bank test survives native exceptions.** A
+  `std::exception` from one call (the model's `std::out_of_range` on a
+  dict `FILTER_TYPE` in `consecutive_act_case_grouping`) is now that
+  call's mismatch instead of the end of the replay.
+
+Carried to round CL:
+- The pandas sequence dict domain
+  (`scripts/pandas_sequence_filter_ck_domain.py`, seed 2026111531, 9,377
+  calls on 800 frames) differs in 1,037 calls: `rework`, `prefixes` and
+  `suffixes` with dict values (`Lengths must match`), the
+  `consecutive_act_case_grouping` dict `FILTER_TYPE` (`list indices must
+  be integers or slices, not dict`), `start_activities`/`end_activities`
+  on dict keys (`KeyError: 'Column not found: '`), the `set_index`
+  messages and `'list' object has no attribute 'items'`.
+- The Polars sequence CK domain
+  (`scripts/polars_sequence_filter_ck_domain.py`, seed 2026111532,
+  11,688 calls on 800 frames) differs in 315 calls, 100 of them in
+  `consecutive_act_case_grouping` (dict keys: `Cannot pass a dictionary
+  as a single positional argument.`, `invalid input for col`, missing
+  `_group_id`), struct `>=` comparisons of `MIN_OCCURRENCES`, and casts
+  of struct lists to String.
+- The Polars table CK domain (`scripts/polars_filter_ck_domain.py`, seed
+  2026111533, 21,903 calls on 400 frames) differs in 771 calls over 25
+  functions: dict column keys (`invalid input for col`, `Cannot pass a
+  dictionary as a single positional argument.`, `"..." not found` where
+  the model refuses the key or reports a non-str key), and
+  `[{"a": 1}, [-1], 5]` (Polars names the list item, the model the
+  scalar).
+- The three fresh-seed calls of CK1-1 and the `eventually_follows` call
+  of CK1-7.
+- Int128 literals, `list[u64]` with a datetime struct field, a `bytes`
+  anchor on a Null column, and the items carried from CI and CD (see
+  Review CJ1).
+
+Tests:
+- `docs/pandas-filter-ck-bank.json.gz` (seed 2026111530, 11,694 calls),
+  replayed by `minera_pandas_filter_ck_bank_parity_tests`.
+
+Verification (scripts in the project files under `review-harness/round-ck/`):
+
+| Check | Comparisons | Result |
+|---|---|---|
+| Pandas table dicts (CK seeds 2026111530 and 2026111534) | 11,694 and 17,565 calls on 400 and 600 frames, hash seeds 0-1 | 812 and 15 found; after: 0 and 1 (carried) |
+| Fresh CJ, CI, CH, CG, CF, CE, CC and CB seeds 2026111510 to 2026111520 | 189,119 calls | 3 found, carried |
+| Pandas sequence dicts (CK seed 2026111531) | 9,377 calls on 800 frames | 1,037 found, carried |
+| Polars sequence Categorical/Enum, cast plans and dicts (CK seed 2026111532) | 11,688 calls on 800 frames | 315 found, carried |
+| Polars table dict column keys (CK seed 2026111533) | 21,903 calls on 400 frames | 771 found, carried |
+| The base pandas table bank and the base, typed, CB and CC pandas sequence banks | the banks in the suite | 0 mismatches |

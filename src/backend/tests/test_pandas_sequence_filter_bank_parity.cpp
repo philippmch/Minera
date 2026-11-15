@@ -490,6 +490,11 @@ Json run_call(Call&& call) {
   } catch (const PandasSequenceFilterError& error) {
     out.fields.clear();
     out.fields.emplace("error", jarray({jstring(error.type), jstring(error.message)}));
+  } catch (const std::exception& error) {
+    // Round CK: any other failure is a mismatch of its own, not the end of
+    // the replay.
+    out.fields.clear();
+    out.fields.emplace("error", jarray({jstring("native"), jstring(error.what())}));
   }
   return out;
 }

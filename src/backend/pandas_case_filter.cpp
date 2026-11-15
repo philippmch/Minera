@@ -74,6 +74,8 @@ std::string type_name(const EventAttribute& v){
 }
 std::string repr(const EventAttribute& v){
  if(text_value(v))return string_key_repr(v.value);
+ if(v.container==AttributeContainerKind::kContainer||v.container==AttributeContainerKind::kList)
+  return detail::pandas_container_repr(v,[](const EventAttribute& x){return repr(x);},[](const std::string& k){return string_key_repr(k);});
  return root_cause_attribute_category(v);
 }
 bool truth(const EventAttribute& v){
@@ -126,12 +128,13 @@ std::string missing_columns(const std::vector<EventAttribute>& keys,bool all){
  return string_key_repr(list+" not in index");
 }
 std::size_t size_column(const EventTable& s,const EventAttribute& key){
- if(key.container==AttributeContainerKind::kContainer)error("TypeError","unhashable type: 'dict'");
+ // df[[key]] (round CK: a list key becomes a tuple, which must hash).
+ {EventAttribute wrapped{"",""};wrapped.container=AttributeContainerKind::kList;wrapped.children.push_back(key);detail::pandas_check_getitem_key(wrapped,error);}
  if(const auto i=find_column(s,key))return *i;
  error("KeyError",missing_columns({key},true));
 }
 std::size_t ncases_column(const EventTable& s,const EventAttribute& key){
- if(key.container==AttributeContainerKind::kContainer)error("TypeError","Passing a dict as an indexer is not supported. Use a list instead.");
+ detail::pandas_check_getitem_key(key,error);
  if(key.container==AttributeContainerKind::kList&&key.children.empty())error("ValueError","No group keys passed!");
  if(const auto i=find_column(s,key))return *i;
  error("KeyError",repr(key));
@@ -190,11 +193,16 @@ EventTable subset(const EventTable& source,const std::vector<bool>& keep){
  if(result.index->kind=="RangeIndex"&&!arithmetic_index(result.index->labels))result.index->kind="Index";
  return result;
 }
-void validate_bound(const EventAttribute& bound,bool lower,bool duration){
+// Round CK: an object bound compares with each per-row size, so an empty
+// frame never fails, and a size Series with a missing case is float64.
+void validate_bound(const EventAttribute& bound,bool lower,bool duration,std::size_t rows=1,bool float_sizes=false){
  const std::string dtype=duration?"float64":"int64";
  if(text_value(bound))error("TypeError","Invalid comparison between dtype="+dtype+" and str");
  if(date_value(bound)&&std::holds_alternative<NativeDate>(bound.typed_value))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
- if(!bound.is_null&&!numeric(bound))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of '"+(duration?"float":"int")+"' and '"+type_name(bound)+"'");
+ if(!bound.is_null&&!numeric(bound)){
+  if(!duration&&rows==0)return;
+  error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of '"+(duration||float_sizes?"float":"int")+"' and '"+type_name(bound)+"'");
+ }
 }
 // One Series comparison of case durations with a bound: a str fails for any
 // length, a list must have one item per case and compares item by item, a
@@ -205,12 +213,42 @@ std::vector<bool> duration_mask(const std::vector<double>& durations,const std::
  const auto n=cases.size();const std::string op=lower?"'>='":"'<='";const std::string item_type=sizes?"int":"float";
  if(text_value(bound))error("TypeError",std::string("Invalid comparison between dtype=")+(sizes?"int64":"float64")+" and str");
  if(date_value(bound)&&std::holds_alternative<NativeDate>(bound.typed_value))error("TypeError",op+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
+ // Round CK: a list of numbers with None becomes a float array (None is
+ // NaN and compares false); any other list or tuple stays an object array
+ // whose None fails like any other non-number.
+ const auto plain_number=[](const EventAttribute& item){return !item.is_null&&item.container==AttributeContainerKind::kScalar&&numeric(item)&&!is_native_na_attribute(item)&&item.kind!=AttributeKind::kBoolean&&!std::holds_alternative<bool>(item.typed_value);};
+ const bool none_is_nan=bound.container==AttributeContainerKind::kList&&std::any_of(bound.children.begin(),bound.children.end(),plain_number)&&std::all_of(bound.children.begin(),bound.children.end(),[&](const auto& item){return item.is_null||plain_number(item);});
  const auto compare=[&](double value,const EventAttribute& item)->bool{
-  if(item.is_null)return false;
-  if(item.container!=AttributeContainerKind::kScalar||!numeric(item)||is_native_na_attribute(item))error("TypeError",op+" not supported between instances of '"+item_type+"' and '"+type_name(item)+"'");
+  if(item.is_null&&(none_is_nan||bound.container==AttributeContainerKind::kScalar))return false;
+  if(item.is_null||item.container!=AttributeContainerKind::kScalar||!numeric(item)||is_native_na_attribute(item))error("TypeError",op+" not supported between instances of '"+item_type+"' and '"+type_name(item)+"'");
   const auto number=native_attribute_number(item);return lower?value>=number:value<=number;
  };
  std::vector<bool> result(n);
+ // Round CK: a one-item tuple holding a nested list or tuple is a numpy
+ // array of shape (1, ...): its items compare with every case, and the
+ // two-dimensional result does not fit the index.
+ if(bound.container==AttributeContainerKind::kTuple&&bound.children.size()==1&&!bound.children[0].is_null&&
+    (bound.children[0].container==AttributeContainerKind::kList||bound.children[0].container==AttributeContainerKind::kTuple)){
+  std::vector<std::size_t> shape{1};std::vector<const EventAttribute*> level{&bound.children[0]};
+  while(true){
+   std::optional<std::size_t> width;bool regular=true;
+   for(const auto* e:level){
+    if(e->is_null||(e->container!=AttributeContainerKind::kList&&e->container!=AttributeContainerKind::kTuple)){regular=false;break;}
+    if(width&&*width!=e->children.size()){regular=false;break;}
+    width=e->children.size();
+   }
+   if(!regular||!width)break;
+   shape.push_back(*width);std::vector<const EventAttribute*> next;
+   for(const auto* e:level)for(const auto& c:e->children)next.push_back(&c);
+   level=std::move(next);
+  }
+  if(shape.back()!=1&&shape.back()!=n&&n!=1){
+   std::string dims="(";for(std::size_t i=0;i<shape.size();++i)dims+=(i?",":"")+std::to_string(shape[i]);
+   error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(n)+",) "+dims+") ");
+  }
+  for(const auto* item:level)for(std::size_t i=0;i<n;++i)compare(durations[cases[i]],*item);
+  error("ValueError","Length of values (1) does not match length of index ("+std::to_string(n)+")");
+ }
  if(bound.container==AttributeContainerKind::kList||bound.container==AttributeContainerKind::kTuple){
   const auto k=bound.children.size();
   if(bound.container==AttributeContainerKind::kList&&k!=n)error("ValueError","('Lengths must match to compare', ("+std::to_string(n)+",), ("+std::to_string(k)+",))");
@@ -294,9 +332,10 @@ EventTable filter_pandas_case_size(const EventTable& s,const EventAttribute& min
  std::vector<double> counts(s.size());std::vector<std::size_t> rows(s.size());std::iota(rows.begin(),rows.end(),0);
  for(std::size_t i=0;i<s.size();++i)counts[i]=grouped.rows[i]?static_cast<double>(grouped.values[*grouped.rows[i]].count):std::numeric_limits<double>::quiet_NaN();
  const auto vector_bound=[](const EventAttribute& bound){return bound.container==AttributeContainerKind::kList||bound.container==AttributeContainerKind::kTuple;};
+ const bool float_sizes=std::any_of(counts.begin(),counts.end(),[](double v){return std::isnan(v);});
  std::vector<bool> lower(s.size());
  if(vector_bound(minimum))lower=duration_mask(counts,rows,minimum,true,true);
- else{validate_bound(minimum,true,false);for(std::size_t i=0;i<s.size();++i)lower[i]=accepts(counts[i],minimum,true);}
+ else{validate_bound(minimum,true,false,s.size(),float_sizes);for(std::size_t i=0;i<s.size();++i)lower[i]=accepts(counts[i],minimum,true);}
  auto result=subset(s,lower);
  if(maximum.is_null)return result;
  // The upper mask is computed on every row and aligned to the kept rows by
@@ -304,7 +343,7 @@ EventTable filter_pandas_case_size(const EventTable& s,const EventAttribute& min
  // applied by position.
  std::vector<bool> upper(s.size());
  if(vector_bound(maximum))upper=duration_mask(counts,rows,maximum,false,true);
- else{validate_bound(maximum,false,false);for(std::size_t i=0;i<s.size();++i)upper[i]=accepts(counts[i],maximum,false);}
+ else{validate_bound(maximum,false,false,s.size(),float_sizes);for(std::size_t i=0;i<s.size();++i)upper[i]=accepts(counts[i],maximum,false);}
  const auto labels=[](const EventTable& t){std::vector<EventTableIndexLabel> r;for(std::size_t i=0;i<t.size();++i){if(t.index)r.push_back(t.index->labels[i]);else {EventAttribute label{"",std::to_string(i),AttributeKind::kInt};label.typed_value=static_cast<std::uint64_t>(i);r.push_back({std::move(label)});}}return r;};
  const auto all=labels(s),kept=labels(result);
  std::vector<bool> aligned;

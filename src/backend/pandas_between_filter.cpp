@@ -228,6 +228,7 @@ std::optional<std::size_t> column(const EventTable& source, const EventAttribute
     if (source.rows.empty()) return std::nullopt;
     error("ValueError", "The truth value of an empty array is ambiguous. Use `array.size > 0` to check that an array is not empty.");
   }
+  detail::pandas_check_getitem_key(key, error);
   error("KeyError", representation(key));
 }
 

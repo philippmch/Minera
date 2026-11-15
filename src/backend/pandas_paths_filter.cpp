@@ -193,6 +193,8 @@ EventAttribute subscript(const EventAttribute& value,std::size_t i){
  if(value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple){
   if(i<value.children.size())return value.children[i];error("IndexError",type_name(value)+" index out of range");
  }
+ // Round CK: a dict path item is subscripted by its int position.
+ if(value.container==AttributeContainerKind::kContainer&&!value.is_null)error("KeyError",std::to_string(i));
  error("TypeError","'"+type_name(value)+"' object is not subscriptable");
 }
 // `column + ","` on a typed column is vectorised: NumPy dtypes have no string
@@ -225,14 +227,22 @@ std::optional<std::string> encoded_pair(const EventAttribute& a,const EventAttri
  if(!text_value(b))error("TypeError","can only concatenate str (not \""+type_name(b)+"\") to str");
  return a.value+","+b.value;
 }
+// path[0] + "," + path[1] in Python's order (round CK): the left operand
+// fails before the second item is read.
+std::optional<std::string> path_pair(const EventAttribute& path){
+ const auto a=subscript(path,0);
+ if(!is_native_na_attribute(a)&&!text_value(a))(void)encoded_pair(a,EventAttribute{"",""});
+ const auto b=subscript(path,1);
+ return encoded_pair(a,b);
+}
 std::vector<std::optional<std::string>> query_paths(const EventAttribute& paths,bool performance){
- if(performance)return {encoded_pair(subscript(paths,0),subscript(paths,1))};
+ if(performance)return {path_pair(paths)};
  std::vector<EventAttribute> values;
  if(text_value(paths)){for(std::size_t i=0;i<paths.value.size();++i)values.push_back(subscript(paths,i));}
  else if(paths.container!=AttributeContainerKind::kScalar)values=paths.children;
  else error("TypeError","'"+type_name(paths)+"' object is not iterable");
  std::vector<std::optional<std::string>> result;
- for(const auto& v:values)result.push_back(encoded_pair(subscript(v,0),subscript(v,1)));
+ for(const auto& v:values)result.push_back(path_pair(v));
  return result;
 }
 // One comparison of the occurrence durations with a bound. A list needs one
@@ -299,9 +309,13 @@ EventTable apply_paths(const EventTable& source,const EventAttribute& query,cons
   if(!sorted.dtypes.empty()&&!sorted.dtypes[time].starts_with("datetime64"))error("AttributeError","Can only use .dt accessor with datetimelike values");
   // Occurrences without a duration (NaT) are dropped before the bounds apply.
   std::erase_if(occurrences,[](const auto& o){return std::isnan(o.second);});
+  // Round CK: the maximum compares only with the occurrences the minimum
+  // kept, so a bad maximum passes when none are left.
   const auto lower=duration_mask(occurrences,o.min_performance,true);
-  const auto upper=duration_mask(occurrences,o.max_performance,false);
-  for(std::size_t k=0;k<occurrences.size();++k)if(lower[k]&&upper[k])selected.insert(group_key(cell(sorted,occurrences[k].first,cases)));
+  std::vector<std::pair<std::size_t,double>> kept;
+  for(std::size_t k=0;k<occurrences.size();++k)if(lower[k])kept.push_back(occurrences[k]);
+  const auto upper=duration_mask(kept,o.max_performance,false);
+  for(std::size_t k=0;k<kept.size();++k)if(upper[k])selected.insert(group_key(cell(sorted,kept[k].first,cases)));
  }
  const bool positive=truth(o.positive);std::vector<std::size_t> keep;
  for(std::size_t i=0;i<sorted.size();++i){const auto& value=cell(sorted,i,cases);const bool found=!missing(value)&&selected.contains(group_key(value));if(found==positive)keep.push_back(i);}
