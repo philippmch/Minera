@@ -1,4 +1,5 @@
 #include "minera/polars_variants_filter.hpp"
+#include "polars_group_keys.hpp"
 #include "polars_datetime.hpp"
 #include "polars_float_text.hpp"
 #include "polars_sort.hpp"
@@ -268,7 +269,7 @@ std::string missing_prefix(const std::string& key,const std::vector<std::string>
 // Round CM: group_by(case) refuses a dict before anything else is built; a
 // list activity key names the first item that is not a str (pl.col), and a
 // dict or list of names resolves by name in grouped().
-void validate(const PolarsVariantsFilterOptions& options){
+void validate(const PolarsVariantsFilterOptions& options,bool statistics=false){
   if(keys::dict_key(options.case_id_key))fail("TypeError","apply",keys::dict_argument_message());
   // Round CN: a list or tuple case key is a Series literal (built strictly)
   // before anything else is read.
@@ -280,7 +281,7 @@ void validate(const PolarsVariantsFilterOptions& options){
     if(!act.children.empty()&&!text(act.children.front()))fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(act.children.front())+"'.");
     for(const auto& item:act.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+python_type(item)+"' object is not an instance of 'str'");
   }
-  if(null(options.case_id_key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
+  if(null(options.case_id_key)&&!statistics)fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
 }
 // Round CS: a list (or int) case key groups and joins by each item, a str
 // item a column and any other value a literal named "literal", after one
@@ -297,7 +298,10 @@ std::optional<std::string> duplicate_key(const EventAttribute& key){
 }
 std::string literal_sort_plan(const EventTable& source,const PolarsVariantsFilterOptions& options,const std::string& time){
   namespace lit=detail::polars_lit;
-  return "SORT BY ["+lit::literal_list_display(lit::argument_literal(options.case_id_key))+", "+time+"]\n  "+frame_plan(source);
+  // Round CT: an int key sorts as its scalar literal (probe ct/l2).
+  const auto& key=options.case_id_key;
+  const auto shown=collection(key)?lit::literal_list_display(lit::argument_literal(key)):lit::scalar_display(lit::value_of(key));
+  return "SORT BY ["+shown+", "+time+"]\n  "+frame_plan(source);
 }
 void duplicate_keys(const EventTable& source,const PolarsVariantsFilterOptions& options,bool statistics,const std::string& phase,const std::string& time){
   if(!listed_key(options.case_id_key))return;
@@ -329,7 +333,11 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
   // while Python builds the sort), sorted as its one value.
   const bool list_time=statistics&&(options.timestamp_key.container==AttributeContainerKind::kList||options.timestamp_key.container==AttributeContainerKind::kTuple);
   if(list_time)if(const auto error=detail::polars_lit::argument_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
-  if(collection(options.case_id_key)||integer(options.case_id_key)) {
+  // Round CT: the statistics sort by a None case key sorts by the timestamp
+  // alone and group_by(None) keeps every row in one literal group (probe
+  // ct/l1); the join by None fails in Python afterwards (top_k).
+  const bool none_key=statistics&&null(options.case_id_key);
+  if(collection(options.case_id_key)||integer(options.case_id_key)||none_key) {
     namespace lit=detail::polars_lit;
     const auto present=[&](const std::string& name){return std::find(source.columns.begin(),source.columns.end(),name)!=source.columns.end();};
     const bool dict_time=keys::dict_key(options.timestamp_key);
@@ -337,16 +345,59 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
     // Round CS: Python builds the sort's struct literal before any plan;
     // the group_by keys resolve before the activity column.
     if(dict_time)if(const auto error=lit::dict_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
-    if(time_resolves)duplicate_keys(source,options,true,phase,list_time?lit::literal_list_display(lit::argument_literal(options.timestamp_key)):sort_time(options,true));
+    const auto time=list_time?lit::literal_list_display(lit::argument_literal(options.timestamp_key)):sort_time(options,true);
+    const auto case_sort=[&]{
+      if(none_key)return std::string();
+      return (collection(options.case_id_key)?lit::literal_list_display(lit::argument_literal(options.case_id_key)):lit::scalar_display(lit::value_of(options.case_id_key)))+", ";
+    };
+    const auto group_failure=[&](const std::string& name){
+      fail("ColumnNotFoundError",phase,missing_prefix(name,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\nSORT BY ["+
+           case_sort()+time+"]\n  "+frame_plan(source)+contexts({"group_by"}));
+    };
+    // Round CT: the sort's timestamp column resolves first, then the
+    // group_by keys' str items, then the activity column (probe ct/l1).
+    if(statistics&&text(options.timestamp_key)&&!present(options.timestamp_key.value))
+      fail("ColumnNotFoundError",phase,missing_prefix(options.timestamp_key.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\n"+
+           frame_plan(source)+contexts({"sort","group_by"}));
+    if(statistics&&time_resolves&&listed_key(options.case_id_key))
+      for(const auto& item:options.case_id_key.children)if(text(item)&&!present(item.value))group_failure(item.value);
+    if(time_resolves)duplicate_keys(source,options,true,phase,time);
     // Round CP: the statistics' group_by resolves the activity column before
-    // the sort by the literal runs (CM bank 2026111550 case 159).
-    if(statistics&&collection(options.case_id_key)&&text(options.activity_key)&&!keys::by_name(options.activity_key.value)&&
-       std::find(source.columns.begin(),source.columns.end(),options.activity_key.value)==source.columns.end()&&
-       (list_time||keys::dict_key(options.timestamp_key)||std::find(source.columns.begin(),source.columns.end(),options.timestamp_key.value)!=source.columns.end())) {
-      namespace lit=detail::polars_lit;
-      const auto time=list_time?lit::literal_list_display(lit::argument_literal(options.timestamp_key)):sort_time(options,true);
-      fail("ColumnNotFoundError",phase,missing_prefix(options.activity_key.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\nSORT BY ["+
-           lit::literal_list_display(lit::argument_literal(options.case_id_key))+", "+time+"]\n  "+frame_plan(source)+contexts({"group_by"}));
+    // the sort by the literal runs (CM bank 2026111550 case 159); round CT:
+    // an int or None key too.
+    if(statistics&&text(options.activity_key)&&!keys::by_name(options.activity_key.value)&&!present(options.activity_key.value)&&time_resolves)
+      group_failure(options.activity_key.value);
+    if(none_key){
+      if(!time_resolves||!text(options.timestamp_key))literal_outside("a None key with a literal timestamp");
+      const auto& act=options.activity_key;
+      if(!text(act)||keys::by_name(act.value))literal_outside("the activity key");
+      const auto time_at=static_cast<std::size_t>(std::find(source.columns.begin(),source.columns.end(),options.timestamp_key.value)-source.columns.begin());
+      const auto activity_at=static_cast<std::size_t>(std::find(source.columns.begin(),source.columns.end(),act.value)-source.columns.begin());
+      const auto time_kind=dtype(source.dtypes[time_at]);
+      if(time_kind==Dtype::kEnum)literal_outside("an Enum timestamp with a None key");
+      std::vector<std::size_t> order(source.rows.size());std::iota(order.begin(),order.end(),0);
+      const auto earlier=[&](std::size_t a,std::size_t b){return compare(source.rows[a][time_at],source.rows[b][time_at],time_kind,nullptr)<0;};
+      std::stable_sort(order.begin(),order.end(),earlier);
+      // Only the first non-str activity matters (the variant's join); a tie
+      // that mixes str and other cells before it has no single order.
+      for(std::size_t at=0;at<order.size();){
+        auto end=at+1;while(end<order.size()&&!earlier(order[at],order[end]))++end;
+        bool strs=false,others=false;
+        for(auto i=at;i<end;++i){const auto& c=source.rows[order[i]][activity_at];(c&&!null(*c)&&source.dtypes[activity_at]=="String"?strs:others)=true;}
+        if(strs&&others)literal_outside("tied timestamps mixing activity types with a None key");
+        if(others){
+          bool nulls=false,values=false;
+          for(auto i=at;i<end;++i){const auto& c=source.rows[order[i]][activity_at];(c&&!null(*c)?values:nulls)=true;}
+          if(nulls&&values)literal_outside("tied timestamps mixing null and other activities with a None key");
+          break;
+        }
+        at=end;
+      }
+      Grouped result;result.activity_dtype=source.dtypes[activity_at];
+      if(order.empty())return result;
+      Group group;group.key="literal";group.absent=true;
+      for(const auto i:order)group.activities.push_back(source.rows[i][activity_at]);
+      result.groups.push_back(std::move(group));return result;
     }
     // Round CS: one row survives the sort; each case id becomes a dict key
     // in Python, which a struct or list literal is not (CK bank 2026111671
@@ -410,17 +461,28 @@ std::optional<EventTable> literal_collect(const EventTable& source,const std::ve
   // A str item is a column, any other item (None among str items too) a
   // literal (CN bank 2026111672 case 2).
   const bool names=std::any_of(items.begin(),items.end(),[](const EventAttribute& v){return text(v);});
-  if(std::any_of(items.begin(),items.end(),[&](const EventAttribute& v){return text(v)&&!present(v.value);}))throw std::invalid_argument("Native Polars variants case selector outside observed empty-list domain");
-  for(const auto& item:items)if(!text(item)&&!item.is_null&&real(item)&&std::isnan(number(item)))literal_outside("a NaN key");
-  if(!present("time:timestamp"))literal_outside("no timestamp column");
   const bool eager=phase=="apply";
+  // Round CT: the sort by the literal and time:timestamp resolves its
+  // column before the group_by keys (fresh CK bank 2026111713 case 380).
+  if(!present("time:timestamp")){
+    if(eager)literal_outside("no timestamp column");
+    fail("ColumnNotFoundError",phase,missing_prefix("time:timestamp",source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n"+frame_plan(source)+
+         contexts({"sort","group_by","filter","select","join right","join"}));
+  }
+  // Round CT: then the group_by keys' str items (probe ct/l2).
+  for(const auto& item:items)if(text(item)&&!present(item.value)){
+    if(eager)throw std::invalid_argument("Native Polars variants case selector outside observed empty-list domain");
+    fail("ColumnNotFoundError",phase,missing_prefix(item.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n"+literal_sort_plan(source,options,"col(\"time:timestamp\")")+
+         contexts({"group_by","filter","select","join right","join"}));
+  }
+  for(const auto& item:items)if(!text(item)&&!item.is_null&&real(item)&&std::isnan(number(item)))literal_outside("a NaN key");
   const auto shape=[&]{fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");};
   if(eager&&source.rows.size()!=1)shape();
   duplicate_keys(source,options,false,phase,"col(\"time:timestamp\")");
   const auto act=keyed(options,source.columns).activity_key;
   if(!text(act)||keys::by_name(act.value))literal_outside("the activity key");
   if(!present(act.value)){
-    if(!listed_key(key))literal_outside("a missing activity with an int key");
+    if(eager&&!listed_key(key))literal_outside("a missing activity with an int key");
     if(eager)missing(source,act.value,true,false,options,phase,true);
     fail("ColumnNotFoundError",phase,missing_prefix(act.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n"+literal_sort_plan(source,options,"col(\"time:timestamp\")")+
          contexts({"group_by","filter","select","join right","join"}));
@@ -458,6 +520,8 @@ EventTable collect(const EventTable& source,const std::vector<std::string>& labe
   std::vector<std::string> kept;std::size_t listed=0;
   for(const auto& group:groups.groups){if(matches.at(group.key))kept.push_back(group.key);if(group.absent&&std::find(labels.begin(),labels.end(),group.label)!=labels.end())++listed;}
   listed+=kept.size();
+  // Round CT: a one-row NaN float case key joins nothing (probe ct/j1).
+  if(truth(options.positive)&&detail::polars_group_keys::one_row_nan_join(source,groups.case_at,listed))return result;
   if(truth(options.positive)&&source.rows.size()<=listed){
     for(const auto& key:kept)for(const auto& row:source.rows)if(group_key(row[groups.case_at],groups.case_dtype)==key)result.rows.push_back(row);
     return result;
@@ -536,8 +600,11 @@ PolarsVariantsFilterOptions statistics_parameters(const std::vector<PolarsVarian
 PolarsVariantsFilterOptions resolve_polars_variants_filter_parameters(const std::vector<PolarsVariantsFilterParameter>& values){PolarsVariantsFilterOptions options;for(bool enum_key:{false,true})for(const auto& value:values){if(value.enum_key!=enum_key)continue;if(value.key=="pm4py:param:case_id_key")options.case_id_key=value.value;else if(value.key=="pm4py:param:activity_key")options.activity_key=value.value;else if(value.key=="pm4py:param:timestamp_key")options.timestamp_key=value.value;else if(value.key=="positive")options.positive=value.value;}return options;}
 EventTable filter_polars_variants(const EventTable& source,const EventAttribute& values,const PolarsVariantsFilterOptions& options){validate(options);return collect(source,admitted(values),options,"apply");}
 LazyEventTable filter_polars_variants(const LazyEventTable& source,const EventAttribute& values,const PolarsVariantsFilterOptions& options){validate(options);return lazy(source,admitted(values),options);}
-EventTable filter_polars_variants_top_k(const EventTable& source,const EventAttribute& maximum,const PolarsVariantsFilterOptions& options){validate(options);(void)top_labels(source,maximum,options,true);throw std::logic_error("Unreachable eager Polars top-k");}
-LazyEventTable filter_polars_variants_top_k(const LazyEventTable& source,const EventAttribute& maximum,const PolarsVariantsFilterOptions& options){validate(options);return lazy(source,top_labels(source.materialize(),maximum,options,false),options);}
+EventTable filter_polars_variants_top_k(const EventTable& source,const EventAttribute& maximum,const PolarsVariantsFilterOptions& options){validate(options,true);(void)top_labels(source,maximum,options,true);throw std::logic_error("Unreachable eager Polars top-k");}
+LazyEventTable filter_polars_variants_top_k(const LazyEventTable& source,const EventAttribute& maximum,const PolarsVariantsFilterOptions& options){
+  validate(options,true);auto labels=top_labels(source.materialize(),maximum,options,false);
+  validate(options);return lazy(source,std::move(labels),options);
+}
 EventTable filter_polars_variants_from_list(const EventTable&,const EventAttribute&,const PolarsVariantsFilterOptions&){unavailable();}
 LazyEventTable filter_polars_variants_from_list(const LazyEventTable&,const EventAttribute&,const PolarsVariantsFilterOptions&){unavailable();}
 EventTable auto_filter_polars_variants(const EventTable&,const PolarsVariantsFilterOptions&){unavailable();}
@@ -555,15 +622,18 @@ LazyEventTable filter_polars_variants_from_list_parameters(const LazyEventTable&
 LazyEventTable filter_polars_variants_from_list_parameter_value(const LazyEventTable& s,const EventAttribute& v,const EventAttribute& p){return filter_polars_variants_from_list_parameters(s,v,parameters(p));}
 LazyEventTable filter_polars_variants_from_list(const LazyEventTable&,std::nullopt_t,const PolarsVariantsFilterOptions&){missing_argument("apply_from_variant_list","variants");}
 EventTable filter_polars_variants_top_k_parameters(const EventTable& source,const EventAttribute& maximum,const std::vector<PolarsVariantsFilterParameter>& values) {
-  const auto statistics=statistics_parameters(values);validate(statistics);
+  const auto statistics=statistics_parameters(values);validate(statistics,true);
   (void)top_labels(source,maximum,statistics,true);throw std::logic_error("Unreachable eager Polars top-k");
 }
 EventTable filter_polars_variants_top_k_parameter_value(const EventTable& s,const EventAttribute& v,const EventAttribute& p){return filter_polars_variants_top_k_parameters(s,v,parameters(p));}
 EventTable filter_polars_variants_top_k(const EventTable&,std::nullopt_t,const PolarsVariantsFilterOptions&){missing_argument("filter_variants_top_k","k");}
 LazyEventTable filter_polars_variants_top_k_parameters(const LazyEventTable& source,const EventAttribute& maximum,const std::vector<PolarsVariantsFilterParameter>& values) {
-  const auto statistics=statistics_parameters(values);validate(statistics);
+  const auto statistics=statistics_parameters(values);validate(statistics,true);
   const auto labels=top_labels(source.materialize(),maximum,statistics,false);
-  return lazy(source,labels,resolve_polars_variants_filter_parameters(values));
+  // Round CT: the join by a None case key fails once the labels exist.
+  const auto filter=resolve_polars_variants_filter_parameters(values);
+  if(null(filter.case_id_key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
+  return lazy(source,labels,filter);
 }
 LazyEventTable filter_polars_variants_top_k_parameter_value(const LazyEventTable& s,const EventAttribute& v,const EventAttribute& p){return filter_polars_variants_top_k_parameters(s,v,parameters(p));}
 LazyEventTable filter_polars_variants_top_k(const LazyEventTable&,std::nullopt_t,const PolarsVariantsFilterOptions&){missing_argument("filter_variants_top_k","k");}

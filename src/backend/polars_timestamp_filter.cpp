@@ -419,9 +419,11 @@ void time_dtype(const EventTable& source,std::size_t at,const Query& q,const std
 bool list_value(const Query& q){return q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple;}
 // Round CF: an attribute on the timestamp column itself is filtered apart
 // from the time window: its errors name no larger expression, and an empty
-// window does not skip them.
+// window does not skip them. Round CT: only on an Int64 or Float64 column;
+// a column the window casts (Int32, UInt32, UInt64, Float32) keeps the
+// predicate whole, so its errors name it (probe inv/tf2.py).
 bool same_column(const Query& q){return q.op==Operation::kAttribute&&q.attribute.value==q.options.timestamp_key.value;}
-std::string larger_expr(const Query& q){return same_column(q)?std::string("\n"):"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n';}
+std::string larger_expr(const Query& q){return same_column(q)&&!cast_time(q.time_dtype)?std::string("\n"):"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n';}
 // A list value as the comparison prints it.
 std::string list_display(const lit::Literal& list){return lit::lit_display(lit::list_of(list.type),lit::Value::list(list.values));}
 void attribute_dtype(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
@@ -628,11 +630,23 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
     if(inserted){groups.push_back({});groups.back().absent=!groups::row_key(*q.keys,row,cell_key);}
     auto& group=groups[found->second];row_groups.push_back(found->second);
     if(q.op==Operation::kAttribute)group.keep=group.keep||matches;
-    if(time){if(!group.first||less(*time,*group.first))group.first=time;if(!group.last||less(*group.last,*time))group.last=time;}
+    // Round CT: the group's min and max skip NaN cells unless every cell is
+    // NaN (Polars' float aggregations; probe inv/ti1.py).
+    if(time){
+      const auto nan=[](const std::optional<Instant>& v){return v&&v->physical_float&&std::isnan(*v->physical_float);};
+      const bool skip=nan(time);
+      if(!group.first||(!skip&&(nan(group.first)||less(*time,*group.first))))group.first=time;
+      if(!group.last||(!skip&&(nan(group.last)||less(*group.last,*time))))group.last=time;
+    }
   }
   if(q.op==Operation::kContained||q.op==Operation::kIntersecting)for(auto& g:groups)if(g.first&&g.last){
     if(q.op==Operation::kContained)g.keep=!less(*g.first,low)&&!less(high,at_most(*g.last));
     else g.keep=(less(low,*g.first)&&less(*g.first,high))||(less(low,*g.last)&&less(*g.last,high))||(less(*g.first,low)&&less(high,*g.last));
+  }
+  // Round CT: a one-row NaN float case key joins nothing (probe ct/j1).
+  if(q.op!=Operation::kEvents){
+    std::size_t right=0;for(const auto& g:groups)right+=g.keep&&!g.absent;
+    if(groups::one_row_nan_join(source,*q.keys,right))return result;
   }
   if(q.op!=Operation::kEvents)for(std::size_t i=0;i<source.rows.size();++i){const auto& g=groups[row_groups[i]];if(g.keep&&!g.absent){auto kept=source.rows[i];groups::append_cells(kept,*q.keys,source.rows[i]);result.rows.push_back(std::move(kept));}}
   return result;

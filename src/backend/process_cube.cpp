@@ -1,5 +1,7 @@
 #include "minera/process_cube.hpp"
 
+#include "minera/filtering_common.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -97,55 +99,92 @@ std::string categorical_display(const std::vector<std::string>& values) {
   return display.str();
 }
 
-std::vector<double> normalise_edges(std::vector<double> edges) {
-  for (double v : edges) if (!std::isfinite(v)) throw std::invalid_argument("process cube bins must be finite");
-  std::sort(edges.begin(), edges.end());
-  edges.erase(std::unique(edges.begin(), edges.end()), edges.end());
-  if (edges.size() < 2) throw std::invalid_argument("process cube requires at least two bin edges");
-  for (std::size_t i = 1; i < edges.size(); ++i)
-    if (!(edges[i] > edges[i - 1])) throw std::invalid_argument("process cube bins must increase");
-  return edges;
+// pandas' pd.cut labels (precision 3, include_lowest): each edge rounded by
+// _round_frac at the smallest precision from 3 that keeps the edges
+// distinct, the lowest one lowered by 10**-precision, printed as a Python
+// Interval "(left, right]" of float reprs (round CT; checked against pandas
+// on 20,000 edge lists, review-harness round-ct cube/lab.py).
+double pandas_round_frac(double x, int precision) {
+  if (!std::isfinite(x) || x == 0.0) return x;
+  double whole = 0.0;
+  const double frac = std::modf(x, &whole);
+  const int digits = whole == 0.0
+      ? -static_cast<int>(std::floor(std::log10(std::abs(frac)))) - 1 + precision
+      : precision;
+  const double factor = std::pow(10.0, digits);
+  return std::nearbyint(x * factor) / factor;
 }
 
+std::vector<std::string> pandas_cut_labels(const std::vector<double>& edges) {
+  int precision = 3;
+  for (int candidate = 3; candidate < 20; ++candidate) {
+    std::vector<double> levels;
+    for (double e : edges) levels.push_back(pandas_round_frac(e, candidate));
+    std::sort(levels.begin(), levels.end());
+    if (std::adjacent_find(levels.begin(), levels.end()) == levels.end()) { precision = candidate; break; }
+  }
+  std::vector<double> breaks;
+  for (double e : edges) breaks.push_back(pandas_round_frac(e, precision));
+  breaks.front() -= std::pow(10.0, -precision);
+  std::vector<std::string> labels;
+  for (std::size_t i = 0; i + 1 < breaks.size(); ++i)
+    labels.push_back("(" + filtering_float_repr(breaks[i]) + ", " + filtering_float_repr(breaks[i + 1]) + "]");
+  return labels;
+}
+
+// The numeric dimension as the reference's process cube bins it (round CT):
+// explicit edges sorted and deduplicated; otherwise numpy's linspace over the
+// column's range in max_divisions steps, or one bin [v - 0.5, v + 0.5] around
+// a constant column. Fewer than two edges leave no bin (an empty cube); an
+// empty column has no range (pandas raises "bins must increase
+// monotonically.").
 Axis numeric_axis(const std::string& name, const std::vector<double>& values,
                   const std::vector<double>& requested, std::size_t max_divisions) {
   Axis axis; axis.mode = Axis::Mode::kNumeric; axis.name = name;
   std::vector<double> edges;
-  if (!requested.empty()) edges = normalise_edges(requested);
-  else {
-    if (max_divisions == 0) throw std::invalid_argument("process cube division limit must be positive");
-    if (values.empty()) edges = {0.0, 1.0};
-    else {
-      auto [lo, hi] = std::minmax_element(values.begin(), values.end());
-      if (*lo == *hi) edges = {*lo - 0.5, *hi + 0.5};
-      else {
-        const std::size_t n = max_divisions;
-        const double step = (*hi - *lo) / static_cast<double>(n);
-        edges.reserve(n + 1);
-        for (std::size_t i = 0; i <= n; ++i) edges.push_back(i == n ? *hi : *lo + step * i);
-      }
+  if (!requested.empty()) {
+    for (double v : requested) if (!std::isfinite(v)) throw std::invalid_argument("process cube bins must be finite");
+    edges = requested;
+    std::sort(edges.begin(), edges.end());
+    edges.erase(std::unique(edges.begin(), edges.end()), edges.end());
+  } else {
+    if (values.empty())
+      throw std::invalid_argument("process cube: bins must increase monotonically (the dimension has no values)");
+    const auto [lo, hi] = std::minmax_element(values.begin(), values.end());
+    if (*lo == *hi) edges = {*lo - 0.5, *hi + 0.5};
+    else if (max_divisions > 0) {
+      // numpy.linspace: start + i * step, the last edge exactly stop.
+      const std::size_t n = max_divisions;
+      const double step = (*hi - *lo) / static_cast<double>(n);
+      edges.reserve(n + 1);
+      for (std::size_t i = 0; i <= n; ++i) edges.push_back(i == n ? *hi : static_cast<double>(i) * step + *lo);
+      for (std::size_t i = 1; i < edges.size(); ++i)
+        if (!(edges[i] > edges[i - 1])) throw std::invalid_argument("process cube: bin edges must be unique");
     }
   }
-  for (std::size_t i = 0; i + 1 < edges.size(); ++i) {
-    std::ostringstream label;
-    label.precision(17);
-    label << '[' << edges[i] << ',' << edges[i + 1]
-          << (i + 2 == edges.size() ? ']' : ')');
-    axis.bins.push_back({label.str(), edges[i], edges[i + 1], true});
-  }
+  if (edges.size() < 2) return axis;
+  const auto labels = pandas_cut_labels(edges);
+  for (std::size_t i = 0; i + 1 < edges.size(); ++i)
+    axis.bins.push_back({labels[i], edges[i], edges[i + 1], true});
   return axis;
 }
 
+// A prefix dimension: every column named NAME_..., in the table's column
+// order, labelled by its full name; a row falls in each one whose value is at
+// least 1. No such column leaves no bin.
 Axis prefix_axis(const std::string& name, const ProcessCubeTable& table) {
   Axis axis; axis.mode = Axis::Mode::kPrefix; axis.name = name;
   const std::string prefix = name + "_";
-  for (const auto& [column, values] : table.columns) {
-    if (column.rfind(prefix, 0) != 0 || column.size() == prefix.size()) continue;
-    ProcessCubeBin b; b.label = column.substr(prefix.size()); b.numeric = false;
-    axis.labels.emplace(b.label, axis.bins.size());
+  std::vector<std::string> order = table.column_order;
+  if (order.empty())
+    for (const auto& [column, values] : table.columns) { (void)values; order.push_back(column); }
+  for (const auto& column : order) {
+    if (column.rfind(prefix, 0) != 0 || !table.columns.contains(column)) continue;
+    ProcessCubeBin b; b.label = column; b.numeric = false;
+    axis.labels.emplace(column, axis.bins.size());
+    axis.columns.push_back(column);
     axis.bins.push_back(std::move(b));
   }
-  if (axis.bins.empty()) throw std::invalid_argument("unknown process cube dimension: " + name);
   return axis;
 }
 
@@ -220,22 +259,33 @@ Axis make_axis(const std::vector<std::string>& columns,
   return prefix_axis(name, table);
 }
 
+// pd.cut's right-closed bins, the lowest edge included.
 std::size_t numeric_index(const Axis& axis, double value) {
   for (std::size_t i = 0; i < axis.bins.size(); ++i) {
     const auto& b = axis.bins[i];
-    if (value >= b.lower && (value < b.upper || (i + 1 == axis.bins.size() && value <= b.upper))) return i;
+    if ((value > b.lower || (i == 0 && value == b.lower)) && value <= b.upper) return i;
   }
   return axis.bins.size();
+}
+
+double kahan_sum(const std::vector<double>& values) {
+  double sum = 0.0, compensation = 0.0;
+  for (double v : values) {
+    const double y = v - compensation;
+    const double t = sum + y;
+    compensation = (t - sum) - y;
+    sum = t;
+  }
+  return sum;
 }
 
 double aggregate(const std::vector<double>& values, ProcessCubeAggregation fn) {
   if (values.empty()) return 0.0;
   switch (fn) {
     case ProcessCubeAggregation::kCount: return static_cast<double>(values.size());
-    case ProcessCubeAggregation::kMean: {
-      double s = 0; for (double v : values) s += v; return s / values.size();
-    }
-    case ProcessCubeAggregation::kSum: { double s = 0; for (double v : values) s += v; return s; }
+    // pandas' grouped sum and mean add with Kahan compensation.
+    case ProcessCubeAggregation::kMean: return kahan_sum(values) / static_cast<double>(values.size());
+    case ProcessCubeAggregation::kSum: return kahan_sum(values);
     case ProcessCubeAggregation::kMin: return *std::min_element(values.begin(), values.end());
     case ProcessCubeAggregation::kMax: return *std::max_element(values.begin(), values.end());
     case ProcessCubeAggregation::kMedian: {
@@ -267,6 +317,8 @@ struct JsonValue {
   using Array = std::vector<JsonValue>;
   using Object = std::map<std::string, JsonValue>;
   std::variant<std::nullptr_t, bool, double, std::string, Array, Object> value;
+  // An object's keys in document order.
+  std::vector<std::string> keys;
   bool is_string() const { return std::holds_alternative<std::string>(value); }
   bool is_number() const { return std::holds_alternative<double>(value); }
   bool is_array() const { return std::holds_alternative<Array>(value); }
@@ -384,19 +436,21 @@ class JsonParser {
     if (ch == '{') {
       ++pos_;
       JsonValue::Object object;
+      std::vector<std::string> keys;
       skip();
-      if (pos_ < input_.size() && input_[pos_] == '}') { ++pos_; return JsonValue{std::move(object)}; }
+      if (pos_ < input_.size() && input_[pos_] == '}') { ++pos_; return JsonValue{std::move(object), {}}; }
       while (true) {
         skip();
         if (pos_ >= input_.size() || input_[pos_] != '"') fail("object key must be string");
         auto key = parse_string();
         expect(':');
         if (!object.emplace(key, parse_value()).second) fail("duplicate object key");
+        keys.push_back(key);
         skip();
         if (pos_ < input_.size() && input_[pos_] == '}') { ++pos_; break; }
         expect(',');
       }
-      return JsonValue{std::move(object)};
+      return JsonValue{std::move(object), std::move(keys)};
     }
     if (ch == '[') {
       ++pos_;
@@ -499,8 +553,6 @@ ProcessCubeResult process_cube(const ProcessCubeTable& table, const ProcessCubeO
       throw std::invalid_argument("process cube column has both numeric and categorical values: " + name);
     (void)values;
   }
-  if (options.max_divisions_x == 0 || options.max_divisions_y == 0)
-    throw std::invalid_argument("process cube division limits must be positive");
   if (table.case_ids.size() == 0) {
     for (const auto& [name, values] : data.columns)
       if (values.size() != 0) throw std::invalid_argument("process cube row lengths differ");
@@ -531,8 +583,9 @@ ProcessCubeResult process_cube(const ProcessCubeTable& table, const ProcessCubeO
   const std::string value_name = choose(options.aggregation_column, options.value_column);
   if (value_name.empty())
     throw std::invalid_argument("aggregation column is required");
+  // The aggregation column is read only once some row falls in a cell: an
+  // empty cube never looks it up (round CT).
   auto vit = data.columns.find(value_name);
-  if (vit == data.columns.end()) throw std::invalid_argument("unknown aggregation column: " + value_name);
   switch (options.aggregation) {
     case ProcessCubeAggregation::kMean:
     case ProcessCubeAggregation::kSum:
@@ -572,10 +625,8 @@ ProcessCubeResult process_cube(const ProcessCubeTable& table, const ProcessCubeO
       const auto it = x.labels.find(categorical_axis_key(parts));
       if (it != x.labels.end()) xi.push_back(it->second);
     } else {
-      for (const auto& [label, i] : x.labels) {
-        auto it = data.columns.find(xname + "_" + label);
-        if (it != data.columns.end() && it->second[r] >= 1.0) xi.push_back(i);
-      }
+      for (std::size_t i = 0; i < x.columns.size(); ++i)
+        if (data.columns.at(x.columns[i])[r] >= 1.0) xi.push_back(i);
     }
     if (y.mode == Axis::Mode::kNumeric) {
       const auto it = data.columns.find(y.columns.front());
@@ -587,11 +638,11 @@ ProcessCubeResult process_cube(const ProcessCubeTable& table, const ProcessCubeO
       const auto it = y.labels.find(categorical_axis_key(parts));
       if (it != y.labels.end()) yi.push_back(it->second);
     } else {
-      for (const auto& [label, i] : y.labels) {
-        auto it = data.columns.find(yname + "_" + label);
-        if (it != data.columns.end() && it->second[r] >= 1.0) yi.push_back(i);
-      }
+      for (std::size_t i = 0; i < y.columns.size(); ++i)
+        if (data.columns.at(y.columns[i])[r] >= 1.0) yi.push_back(i);
     }
+    if (!xi.empty() && !yi.empty() && vit == data.columns.end())
+      throw std::invalid_argument("unknown aggregation column: " + value_name);
     for (auto i : xi) for (auto j : yi) {
       const auto k = i * y.bins.size() + j;
       result.case_ids[i][j].insert(data.case_ids[r]);
@@ -599,9 +650,16 @@ ProcessCubeResult process_cube(const ProcessCubeTable& table, const ProcessCubeO
       else values[k].push_back(1.0);
     }
   }
+  bool any = false;
   for (std::size_t i = 0; i < x.bins.size(); ++i) for (std::size_t j = 0; j < y.bins.size(); ++j) {
     auto& v = values[i * y.bins.size() + j];
-    if (!v.empty()) result.cells[i][j] = aggregate(v, options.aggregation);
+    if (!v.empty()) { result.cells[i][j] = aggregate(v, options.aggregation); any = true; }
+  }
+  // The reference's pivot spans every bin of both dimensions once a row
+  // falls in some cell, and is empty otherwise (round CT).
+  if (!any) {
+    result.x_bins.clear(); result.y_bins.clear();
+    result.cells.clear(); result.case_ids.clear();
   }
   result.pivot = result.cells;
   result.cell_case_ids = result.case_ids;
@@ -625,6 +683,7 @@ ProcessCubeTable parse_process_cube_table_json(std::string_view json) {
       throw std::invalid_argument("process cube case ids must be strings");
     table.case_ids.push_back(value.string());
   }
+  table.column_order = columns_value.keys;
   for (const auto& [name, values] : columns_value.object()) {
     if (name.empty() || !values.is_array())
       throw std::invalid_argument("process cube columns must be named scalar arrays");

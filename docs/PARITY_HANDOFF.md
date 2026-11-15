@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CS (2026-11-05 to 2026-11-15, cloud container)
+## Review-fix loop, rounds T–CT (2026-11-05 to 2026-11-15, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5604,7 +5604,88 @@ files under `review-harness/round-cs/`.
 No fixture changed. The device check on the Mac was skipped again (no
 device linked).
 
-Next round (CT) should start by re-reviewing round CS:
+Round CT re-reviewed CS (Review CT1). CS's commit 6514e53 ran green on
+all six CI jobs (run 43754352187). CT probed range folding across the
+Polars filters, rebuilt the process cube's binning on pm4py's, swept
+SaCoFa on uploads and replayed two batches of fresh seeds:
+- Range folding (probes f1, f2; 2,824 calls): the Polars range filters
+  already folded reversed and equal bounds as the reference does. Two
+  timestamp filter details were fixed (`polars_timestamp_filter.cpp`): a
+  Float64 timestamp group's min and max skip NaN unless every cell is NaN,
+  and `filter_traces_attribute_in_timeframe` on the timestamp column drops
+  "while evaluating this larger expression" only on Int64 and Float64
+  columns.
+- The process cube (`process_cube.cpp`, `/api/process-cube`,
+  `minera_process_cube`) now bins numeric and prefix dimensions as
+  `statistics.process_cube` does: `pd.cut(include_lowest=True)` labels and
+  edges, a constant column as one bin, sorted unique explicit edges,
+  prefix columns in the table's column order, empty cubes that never read
+  the aggregation column, Kahan sums, 0 to 10,000 divisions. Sweep of
+  1,800 calls: 0 differing. Categorical and composite dimensions stay
+  Minera extensions (declared).
+- SaCoFa on CSV and XES uploads (560 calls) matched. PRIPEL and the
+  embeddings route need packages the pinned reference lacks (declared).
+- pandas `apply_numeric` with a list stream key masks the rows
+  (`DataFrame.where`): list-like values align by position or key, length
+  and set errors, NaN case ids matching every missing case id
+  (`pandas_attributes_filter.cpp`, probe p1, 1,917 calls).
+- Polars sequence: selector counts in the consecutive grouping (probe s1,
+  1,176 calls); `rework.apply` on one column as both keys raises
+  DuplicateError.
+- Literal case keys in `eventually_follows` and the variants filters
+  (`polars_ltl_filter.cpp`, `polars_variants_filter.cpp`; probes l1, l2,
+  870 calls): literal sorts and windows, None keys as one literal group in
+  the statistics, plan resolution order before the literal ShapeError.
+- One-row NaN joins (`polars_group_keys.hpp` and the case, attribute,
+  timestamp, variants and sequence filters; probes j1, s2, 578 calls): a
+  one-row frame joined with a one-row right side on a single float key
+  never matches a NaN key.
+- Fresh seeds, first batch: Polars table CK 2026111701 (2 calls), CN
+  2026111702, CJ 2026111703, CI 2026111704, CH 2026111705; Polars
+  sequence CP 2026111700 (1), CK 2026111706, CJ 2026111707, CH 2026111708;
+  pandas CK table 2026111709 (1), CK sequence 2026111710, CN LTL
+  2026111711. Second batch after the fixes: sequence CP 2026111712 (1:
+  one-row NaN joins), table CK 2026111713 (1: variants join resolution
+  order), CN 2026111714, CJ 2026111715, CI 2026111716, CH 2026111717;
+  sequence CK 2026111718, CJ 2026111719, CH 2026111720; pandas CK table
+  2026111721 (1: a dict bound against an empty attribute key), CK sequence
+  2026111722, CN LTL 2026111723. All 0 after.
+
+In the suite: new `docs/polars-filter-ct-bank.json.gz`,
+`docs/polars-filter-ct-probe-bank.json.gz`,
+`docs/polars-sequence-filter-ct-bank.json.gz` and
+`docs/pandas-filter-ct-bank.json.gz`, and `minera_process_cube_tests`
+rewritten on pm4py's values. The fresh banks, sweeps and probes are in the
+project files under `review-harness/round-ct/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (CU) should start by re-reviewing round CT:
+
+- CT's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- one-row NaN joins in the filters CT did not probe (LTL, paths, between,
+  `ncases`) and the other one-row join shapes (two float keys, an
+  Int/Float key pair);
+- `filter_df_on_end_activities` with a list `case_id_glue` keyword
+  (outside the model, probe s2);
+- set values in the pandas bank codec (the drivers cannot carry them yet);
+- upload routes no round has swept on typed frames yet (compare the
+  server's route list with the sweeps named in the round notes);
+- the CS list below (LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CS's targets, taken in CT (findings CT1-1 to CT1-8): CS's CI run,
+the fresh seeds, the process cube and anonymization sweeps, and int and
+datetime range folding in the other Polars filters. Not taken (carried to
+CU): the LTL list-key cases outside the model, equal-size joins and the
+older CJ, CF and CD items; the embeddings route cannot be compared against
+the pinned reference.
+
+Previous list for round CT (kept for its older items):
 
 - CS's CI run;
 - fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ

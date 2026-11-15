@@ -2323,8 +2323,8 @@ std::vector<double> process_cube_query_bins(const httplib::Request& request,
       throw std::invalid_argument(std::string(name) + ": expected finite numeric edges");
     result.push_back(parsed);
   }
-  if (!result.empty() && result.size() < 2)
-    throw std::invalid_argument(std::string(name) + ": expected at least two edges");
+  // One edge (or repeated ones) leave no bin: the reference returns an
+  // empty cube (round CT).
   return result;
 }
 
@@ -11846,10 +11846,9 @@ void handle_process_cube(const httplib::Request& request,
         request, "max_divisions_x", options.max_divisions_x);
     options.max_divisions_y = ocel_query_size(
         request, "max_divisions_y", options.max_divisions_y);
-    if (options.max_divisions_x == 0 || options.max_divisions_x > 10000 ||
-        options.max_divisions_y == 0 || options.max_divisions_y > 10000)
+    if (options.max_divisions_x > 10000 || options.max_divisions_y > 10000)
       throw std::invalid_argument(
-          "process cube division limits must be from 1 through 10000");
+          "process cube division limits must be from 0 through 10000");
     options.x_bins = process_cube_query_bins(request, "x_bins");
     options.y_bins = process_cube_query_bins(request, "y_bins");
     response.set_content(minera::serialize_process_cube_json(

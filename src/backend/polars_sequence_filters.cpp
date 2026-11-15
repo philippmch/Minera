@@ -333,7 +333,26 @@ std::string group_of_row(const gk::Keys& keys, const EventTable::Row& row) { ret
 // for a Null literal). An inner join no taller than its right side comes in
 // the right side's order and appends the right side's keys when a key is a
 // literal.
+// Round CT: Polars joins one row with one row on a single float key by
+// comparing the two values, so a NaN key matches nothing there, while the
+// hash join of taller sides (and every anti join) matches NaN with NaN
+// (fresh CP bank 2026111712 case 411).
+bool nan_cell(const Cell& cell) {
+  if (!cell || cell->is_null || is_native_na_attribute(*cell)) return false;
+  if (const auto* d = std::get_if<double>(&cell->typed_value)) return std::isnan(*d);
+  return cell->kind == AttributeKind::kFloat && (cell->value == "NaN" || cell->value == "nan");
+}
+bool single_float_join(const EventTable& df, std::size_t column, std::size_t right_rows) {
+  return df.size() == 1 && right_rows == 1 && column < df.dtypes.size() && df.dtypes[column].starts_with("Float") &&
+         nan_cell(df.rows.front()[column]);
+}
 EventTable join_keys(const EventTable& df, const gk::Keys& keys, const std::vector<std::string>& kept, bool positive) {
+  if (positive && keys.items.size() == 1 && !keys.items.front().literal && single_float_join(df, keys.items.front().column, kept.size())) {
+    EventTable out = df;
+    out.rows.clear();
+    gk::append_schema(out, keys, df);
+    return out;
+  }
   EventTable out = df;
   out.rows.clear();
   if (positive) gk::append_schema(out, keys, df);
@@ -564,6 +583,7 @@ EventTable subset(const EventTable& df, const std::vector<bool>& keep) {
 // join no taller than its right side comes in the right side's order, each
 // right row followed by its matching left rows.
 EventTable join_cases(const EventTable& df, std::size_t case_column, const std::vector<Key>& right, bool positive) {
+  if (positive && single_float_join(df, case_column, right.size())) return subset(df, std::vector<bool>(df.size()));
   const std::set<Key> cases(right.begin(), right.end());
   if (positive && df.size() <= right.size()) {
     EventTable out = df;
@@ -1238,6 +1258,10 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   if (list_key) (void)gk::build_values(list_key->items);
   const auto case_column = list_key ? std::size_t{0} : require(df, case_glue, plan);
   if (!activities && !constant_act) act = require(df, act_key, plan);
+  // Round CT: group_by([case, activity]) on one column names it twice
+  // (probe ct/s2).
+  if (!activities && !constant_act && !list_key && !by_name_key(case_glue) && !by_name_key(act_key) && case_column == act)
+    fail("DuplicateError", gk::duplicate_message(act_key) + resolved("join", frame_plan(df.columns), kReworkPlan.stack));
   std::optional<gk::Keys> keys;
   if (list_key) {
     // Two literal keys (the list case key and a dict or list activity key)
@@ -1945,6 +1969,16 @@ EventTable polars_consecutive_act_case_grouping_apply(const EventTable& df,
     if (by_name_key(key))
       for (const auto& name : by_names(key))
         if (!find_column(df, name)) column_not_found(df, key, plan);
+  // Round CQ: the activity and case keys' names combine pairwise in the
+  // `_group_id` expression, so two counts other than one must agree (probe
+  // cq/q3); round CT: an empty key counts 0 against two or more names (probe
+  // ct/s1).
+  const auto count = [](const std::string& key) {
+    return no_columns_key(key) ? std::size_t{0} : by_name_key(key) ? by_names(key).size() : std::size_t{1};
+  };
+  if (const auto nc = count(case_key(parameters)), na = count(activity_key(parameters)); nc != 1 && na != 1 && nc != na)
+    fail("InvalidOperationError", "cannot combine selectors that produce a different number of columns (" + std::to_string(na) +
+                                      " != " + std::to_string(nc) + ")" + plan_where(df, plan));
   // A key given as {} empties the _group_id expression (with_columns of
   // nothing); the select then misses _group_id, by name when ungrouped.
   if (no_columns_key(case_key(parameters)) || no_columns_key(activity_key(parameters))) {
@@ -1959,12 +1993,6 @@ EventTable polars_consecutive_act_case_grouping_apply(const EventTable& df,
   }
   for (const auto& key : {case_key(parameters), activity_key(parameters)})
     if (!by_name_key(key) && !find_column(df, key)) column_not_found(df, key, plan);
-  // Round CQ: the activity and case keys' names combine pairwise in the
-  // `_group_id` expression, so two counts above one must agree (probe cq/q3).
-  const auto count = [](const std::string& key) { return by_name_key(key) ? by_names(key).size() : std::size_t{1}; };
-  if (const auto nc = count(case_key(parameters)), na = count(activity_key(parameters)); nc > 1 && na > 1 && nc != na)
-    fail("InvalidOperationError", "cannot combine selectors that produce a different number of columns (" + std::to_string(na) +
-                                      " != " + std::to_string(nc) + ")" + plan_where(df, plan));
   // Round CP: several names give several `_group_id` expressions (probe cp/k1).
   for (const auto& key : {case_key(parameters), activity_key(parameters)})
     if (by_name_key(key))

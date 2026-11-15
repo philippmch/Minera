@@ -1131,6 +1131,8 @@ std::vector<bool> matching(const EventTable& source,const Predicate& p) {
     // null cell never joins.
     const auto& keys=*p.keys;std::unordered_set<std::string> kept;
     for(std::size_t i=0;i<flags.size();++i)if(flags[i])if(const auto k=groups::row_key(keys,source.rows[i],join_cell_key))kept.insert(*k);
+    // Round CT: a one-row NaN float key joins nothing (probe ct/j1).
+    if(positive&&groups::one_row_nan_join(source,keys,kept.size()))return std::vector<bool>(source.size(),false);
     for(std::size_t i=0;i<flags.size();++i) {
       const auto k=groups::row_key(keys,source.rows[i],join_cell_key);
       const bool found=k&&(keys.all_literal()||kept.contains(*k));
@@ -1140,6 +1142,7 @@ std::vector<bool> matching(const EventTable& source,const Predicate& p) {
   }
   std::unordered_set<std::string> cases;
   for(std::size_t i=0;i<flags.size();++i)if(flags[i]){const auto v=cell(source,i,*p.case_column);if(!null(v))cases.insert(group_key(v,p.case_dtype));}
+  if(positive&&groups::one_row_nan_join(source,*p.case_column,cases.size()))return std::vector<bool>(source.size(),false);
   for(std::size_t i=0;i<flags.size();++i){const auto v=cell(source,i,*p.case_column);const bool found=!null(v)&&cases.contains(group_key(v,p.case_dtype));flags[i]=positive?found:!found;}
   return flags;
 }

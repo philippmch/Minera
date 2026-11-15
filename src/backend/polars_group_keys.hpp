@@ -231,6 +231,24 @@ inline std::optional<std::string> row_key(const Keys& keys, const EventTable::Ro
   return out;
 }
 
+// Round CT: Polars joins a one-row frame with a one-row right side on a
+// single float key by comparing the two values, so a NaN key matches
+// nothing there (inner and left joins), while the hash join of taller sides,
+// several keys and semi or anti joins match NaN with NaN (fresh CP bank
+// 2026111712 case 411, probe ct/j1).
+inline bool nan_float_cell(const std::optional<EventAttribute>& cell, const std::string& dtype) {
+  if (!dtype.starts_with("Float") || !cell || cell->is_null || is_native_na_attribute(*cell)) return false;
+  if (const auto* d = std::get_if<double>(&cell->typed_value)) return *d != *d;
+  return cell->value == "NaN" || cell->value == "nan";
+}
+inline bool one_row_nan_join(const EventTable& source, std::size_t column, std::size_t right_rows) {
+  return source.rows.size() == 1 && right_rows == 1 && column < source.dtypes.size() &&
+         nan_float_cell(source.rows.front()[column], source.dtypes[column]);
+}
+inline bool one_row_nan_join(const EventTable& source, const Keys& keys, std::size_t right_rows) {
+  return keys.items.size() == 1 && !keys.items.front().literal && one_row_nan_join(source, keys.items.front().column, right_rows);
+}
+
 // The group of a row as group_by keys it (nulls form their own group).
 inline std::string group_of(const Keys& keys, const EventTable::Row& row,
                             const std::function<std::string(const std::optional<EventAttribute>&, const std::string&)>& cell_key) {

@@ -284,16 +284,21 @@ bool isin(const EventTable& source,std::size_t col,const EventAttribute& value,c
   return std::any_of(admitted.begin(),admitted.end(),[](const auto& v){const auto key=identity(v);return key=="None"||key=="NaN";});
  return member(value,admitted);
 }
-EventTable project_cases(const EventTable& source,const EventAttribute& case_key,const std::vector<bool>& selected,bool positive){
- const auto cases=case_column(source,case_key);std::unordered_set<std::string> ids;
- for(std::size_t i=0;i<source.size();++i)if(selected[i])ids.insert(identity(cell(source,i,cases)));
+// Round CT: alive marks the cells a DataFrame.where kept; a selected row
+// whose case cell it dropped holds a NaN case id, which Index.isin matches
+// with every missing case id (an object index only with NaN).
+EventTable project_cases(const EventTable& source,const EventAttribute& case_key,const std::vector<bool>& selected,bool positive,const std::vector<std::vector<char>>* alive=nullptr){
+ const auto cases=case_column(source,case_key);std::unordered_set<std::string> ids;bool nan=false;
+ for(std::size_t i=0;i<source.size();++i)if(selected[i]){if(alive&&!alive->empty()&&!(*alive)[i][cases])nan=true;else ids.insert(identity(cell(source,i,cases)));}
  // Index.isin on a masked numeric index (Int64, Float64, ...) never matches
  // a <NA> label, even when the selected cases hold one (round BZ).
  const bool masked=cases<source.dtypes.size()&&detail::masked_numeric_dtype(source.dtypes[cases]);
+ const bool object=source.dtypes.empty()||source.dtypes[cases]=="object";
  std::vector<bool> keep(source.size());
  for(std::size_t i=0;i<source.size();++i){
   const auto& id=cell(source,i,cases);
-  keep[i]=(!(masked&&(id.is_null||is_native_na_attribute(id)))&&ids.contains(identity(id)))==positive;
+  const bool nan_match=nan&&(object?identity(id)=="NaN":missing(id));
+  keep[i]=(!(masked&&(id.is_null||is_native_na_attribute(id)))&&(ids.contains(identity(id))||nan_match))==positive;
  }
  return subset(source,keep);
 }
@@ -371,9 +376,13 @@ EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,c
  if(empty_list(options.attribute_key)){
   // Round CM: df[[]] has no columns, so a list bound must be empty to align
   // (seed 2026111552 case 167).
-  for(const auto* bound:{&lower,&upper})
-   if((bound->container==AttributeContainerKind::kList||bound->container==AttributeContainerKind::kTuple)&&!bound->children.empty())
-    error("ValueError","Unable to coerce to Series, length must be 0: given "+std::to_string(bound->children.size()));
+  // Round CT: a dict bound is list-like too (its keys), and an empty set has
+  // no order (fresh CK bank 2026111721 case 433).
+  for(const auto* bound:{&lower,&upper}){
+   if(bound->is_null||bound->container==AttributeContainerKind::kScalar)continue;
+   if(!bound->children.empty())error("ValueError","Unable to coerce to Series, length must be 0: given "+std::to_string(bound->children.size()));
+   if(bound->container==AttributeContainerKind::kSet||bound->container==AttributeContainerKind::kFrozenSet)error("TypeError","'"+type_name(*bound)+"' type is unordered");
+  }
   if(events)return masked_frame(source);
   // The masked frame leaves every case id null, so the null cases match.
   const auto cases=case_column(source,options.case_id_key);std::vector<bool> nulls(source.size());
@@ -393,16 +402,50 @@ EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,c
  for(std::size_t i=0;i<source.size();++i)high[i]=comparison(cell(source,i,attribute),highs[i],outside?">":"<=",dtype);
  for(std::size_t i=0;i<source.size();++i){const auto& value=cell(source,i,attribute);const bool within=low[i]&&high[i];selected[i]=events?((outside?(low[i]||high[i]):within)||(keep_nan&&missing(value))):(within||(keep_nan&&missing(value)));}
  if(!events){
+  // Round CT: df[list] == value is a frame, so df[mask] masks the rows
+  // (DataFrame.where) instead of dropping them: a cell stays only where its
+  // column is listed and equals the value, every other cell turns NaN
+  // (seed 2026111709 case 120).
+  std::vector<std::vector<char>> alive;
   for(const auto& control:{std::pair{&options.stream_filter_key1,&options.stream_filter_value1},std::pair{&options.stream_filter_key2,&options.stream_filter_value2}}){
    if(!*control.first||(*control.first)->is_null)continue;
-   // A list key compares a sub-frame, which keeps no row.
-   if((*control.first)->container==AttributeContainerKind::kList){check_list_columns(source,**control.first);std::fill(selected.begin(),selected.end(),false);continue;}
-   const auto stream=direct_column(source,**control.first);
-   // Each stream filter compares the rows that remain; a list value needs one
-   // item per remaining row.
    static const EventAttribute none{"","",AttributeKind::kString,true};
    const auto& value=*control.second?**control.second:none;
    std::vector<std::size_t> remaining;for(std::size_t i=0;i<source.size();++i)if(selected[i])remaining.push_back(i);
+   const auto visible=[&](std::size_t row,std::size_t c){return alive.empty()||alive[row][c];};
+   if((*control.first)->container==AttributeContainerKind::kList){
+    const auto& key=**control.first;check_list_columns(source,key);
+    std::vector<std::size_t> listed;for(const auto& item:key.children)listed.push_back(*column(source,item));
+    // A list-like value aligns to the listed columns: a list or tuple by
+    // position, a dict by its keys; a set has no order.
+    std::vector<const EventAttribute*> operands(listed.size(),&value);
+    const bool sequence=value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple;
+    const bool set=value.container==AttributeContainerKind::kSet||value.container==AttributeContainerKind::kFrozenSet;
+    if(!value.is_null&&(sequence||set||value.container==AttributeContainerKind::kContainer)){
+     if(value.children.size()!=listed.size())error("ValueError","Unable to coerce to Series, length must be "+std::to_string(listed.size())+": given "+std::to_string(value.children.size()));
+     if(set)error("TypeError","'"+type_name(value)+"' type is unordered");
+     for(std::size_t j=0;j<listed.size();++j){
+      if(sequence){operands[j]=&value.children[j];continue;}
+      operands[j]=&none;
+      for(const auto& child:value.children)if(child.key==source.columns[listed[j]]){operands[j]=&child;break;}
+     }
+    }
+    for(std::size_t j=0;j<listed.size();++j)for(std::size_t k=0;k<j;++k)
+     if(listed[j]==listed[k])error("ValueError","cannot reindex on an axis with duplicate labels");
+    if(alive.empty())alive.assign(source.size(),std::vector<char>(source.columns.size(),1));
+    for(const auto row:remaining){
+     std::vector<char> next(source.columns.size(),0);
+     for(std::size_t j=0;j<listed.size();++j){
+      const auto c=listed[j];const auto& v=cell(source,row,c);const auto& item=*operands[j];
+      next[c]=alive[row][c]&&!missing(item)&&!missing(v)&&identity(v)==identity(item);
+     }
+     alive[row]=std::move(next);
+    }
+    continue;
+   }
+   const auto stream=direct_column(source,**control.first);
+   // Each stream filter compares the rows that remain; a list value needs one
+   // item per remaining row.
    if(value.container==AttributeContainerKind::kList&&value.children.size()!=remaining.size())
     error("ValueError","('Lengths must match to compare', ("+std::to_string(remaining.size())+",), ("+std::to_string(value.children.size())+",))");
    if(!source.dtypes.empty())dict_operand(value,remaining.size(),source.dtypes[stream]);
@@ -412,9 +455,10 @@ EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,c
    }
    for(std::size_t k=0;k<remaining.size();++k){
     const auto& item=value.container==AttributeContainerKind::kList?value.children[k]:value;const auto& v=cell(source,remaining[k],stream);
-    selected[remaining[k]]=!missing(item)&&!missing(v)&&identity(v)==identity(item);
+    selected[remaining[k]]=visible(remaining[k],stream)&&!missing(item)&&!missing(v)&&identity(v)==identity(item);
    }
   }
+  return project_cases(source,options.case_id_key,selected,positive,&alive);
  }
  return events?subset(source,selected):project_cases(source,options.case_id_key,selected,positive);
 }

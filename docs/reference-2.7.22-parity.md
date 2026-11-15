@@ -27860,3 +27860,118 @@ Tests:
   replayed by the `minera_*_cs_*bank_parity_tests` ctests;
   `minera_review_cs1_tests` (trace-attribute clustering on a CSV upload
   over every Levenshtein and vector variant, pm4py values).
+
+## Review CT1: re-review of round CS, range folding, the process cube on uploads, one-row NaN joins (2026-11-15)
+
+Round CT checked CS's CI (run 43754352187 on 6514e53: green on all six
+jobs), probed int and datetime range folding across the other Polars
+filters, swept the process cube, anonymization and embeddings routes on
+typed upload frames, and replayed two batches of fresh seeds of every
+filter domain. The device check on the Mac was skipped (no device linked).
+
+- **CT1-1 Range folding in the other Polars filters** (probes f1, f2;
+  2,200 and 624 calls). Reversed and equal int, bool, float, str and
+  datetime bounds across `apply_numeric(_events)`, the timestamp filters,
+  `filter_on_case_size`, `filter_on_case_performance` and the paths
+  performance filter already folded as the reference does. Two timestamp
+  filter details differed: a Float64 timestamp group's min and max skip NaN
+  cells unless every cell is NaN (Polars' float aggregations), which decides
+  `filter_traces_contained` and `filter_traces_intersecting`; and
+  `filter_traces_attribute_in_timeframe` on the timestamp column itself
+  leaves out "while evaluating this larger expression" only on an Int64 or
+  Float64 column, since the window casts Int32, UInt32, UInt64 and Float32
+  columns and keeps the predicate whole there.
+- **CT1-2 The process cube** (`/api/process-cube`, `minera_process_cube`;
+  1,800 sweep calls, 0 differing). The numeric and prefix dimensions now
+  bin as pm4py's `statistics.process_cube` (pandas classic) does: bins are
+  `pd.cut(..., include_lowest=True)`, right-closed with the lowest edge
+  included, labelled `(left, right]` with pandas' precision (from 3 decimals
+  up, the lowest edge minus 10^-precision); `max_divisions` edges are
+  `linspace(min, max)` and a constant column is one bin `[v - 0.5, v + 0.5]`;
+  explicit edges are sorted and deduplicated; a prefix dimension lists the
+  `NAME_` columns in the table's column order, labelled by their full names,
+  and a row belongs to each column holding a value of at least 1. No
+  division, a single edge or a dimension without columns gives an empty
+  cube that never reads the aggregation column; otherwise a missing
+  aggregation column fails. Sums and means add with Kahan compensation as
+  pandas' groupby does. Division limits are 0 through 10,000 in the server
+  and the CLI.
+- **CT1-3 Anonymization and embeddings on uploads.** SaCoFa on CSV (320
+  calls) and XES (240) frames matched the reference with its seeded
+  `random` and numpy generators. PRIPEL needs diffprivlib and the
+  embeddings route sentence_transformers, neither installed with the pinned
+  reference, so both raise there (declared below); Laplace raises in the
+  reference as before.
+- **CT1-4 A list stream key in pandas `apply_numeric`** (fresh CK
+  2026111709 case 120, probe p1, 1,917 calls). `df[list] == value` is a
+  frame, so `df[mask]` masks the remaining rows (`DataFrame.where`) instead
+  of dropping them: a cell stays only where its column is listed and equals
+  the value, every other cell turns NaN. A list-like value aligns to the
+  listed columns (a list or tuple by position, a dict by its keys) and must
+  match their count (`Unable to coerce to Series, length must be N: given
+  M`); a set of that length has no order; repeated listed columns fail the
+  mask's reindex. The case ids that turn NaN then match every missing case
+  id of the frame (an object index only NaN). An empty attribute key also
+  coerces a dict bound (fresh CK 2026111721 case 433).
+- **CT1-5 Selector counts in the consecutive grouping** (Polars sequence,
+  fresh CP 2026111700 case 466, probe s1, 1,176 calls). An empty activity or
+  case key counts 0 names against two or more names of the other key
+  (`cannot combine selectors that produce a different number of columns`);
+  against a single column the `_group_id` expression stays empty.
+- **CT1-6 Literal case keys in `eventually_follows` and the variants
+  filters** (fresh CK 2026111701 cases 287, 756, CK 2026111713 case 380,
+  probes l1, l2; 510 and 360 calls). A list or int case key in
+  `eventually_follows` with a missing attribute column prints the literal
+  sort and windows over its items (`over([{null}])`, `SORT BY [[{null}],
+  col("ts")]`, `dyn int: 5`), a str item naming no column fails that window
+  first, and an empty key without activities fails its one case join. The
+  variants statistics (`filter_variants_top_k`) with a list, int or None
+  case key resolve the sort's timestamp column first, then the group_by
+  keys' str items, then the activity column, before the literal sort's
+  ShapeError; a None key sorts by the timestamp alone and groups every row
+  in one literal group, so the variant's join of names may raise, and the
+  join by None fails after the labels exist. The join path (`apply`,
+  `apply_from_variant_list`) resolves `time:timestamp`, the str items and
+  the activity in that order too.
+- **CT1-7 One-row NaN joins** (fresh CP 2026111712 case 411, probes j1,
+  s2; 464 and 114 calls). Polars joins a one-row frame with a one-row right
+  side on a single float key by comparing the two values, so a NaN case key
+  matches nothing there, while taller sides, several keys and semi or anti
+  joins match NaN with NaN. This empties the positive case filters (size,
+  performance), the case-level attribute filters, the timestamp trace
+  filters, the variants filters and the Polars sequence joins on such a
+  frame. `rework.apply` on one column as both case and activity key raises
+  group_by's DuplicateError.
+- **CT1-8 Fresh seeds** (7 calls in both batches, 0 after). First batch:
+  Polars table CK 2026111701 (2: cases 287 and 756, CT1-6), CN 2026111702,
+  CJ 2026111703, CI 2026111704, CH 2026111705; Polars sequence CP
+  2026111700 (1: case 466, CT1-5), CK 2026111706, CJ 2026111707, CH
+  2026111708; pandas CK table 2026111709 (1: case 120, CT1-4), CK sequence
+  2026111710, CN LTL 2026111711. Second batch after the fixes: Polars
+  sequence CP 2026111712 (1: case 411, CT1-7), table CK 2026111713 (1:
+  case 380, CT1-6), CN 2026111714, CJ 2026111715, CI 2026111716, CH
+  2026111717; sequence CK 2026111718, CJ 2026111719, CH 2026111720; pandas
+  CK table 2026111721 (1: case 433, CT1-4), CK sequence 2026111722, CN LTL
+  2026111723.
+
+Declared:
+- PRIPEL and the embeddings route: the pinned reference lacks diffprivlib
+  and sentence_transformers, so its outcome is the ModuleNotFoundError;
+  Minera keeps its own results.
+- Process cube: categorical and composite dimensions and string
+  aggregation columns are Minera extensions (pm4py raises numpy's
+  DTypePromotionError or a TypeError); the frontend keeps 1 through 10,000
+  divisions and two or more explicit edges.
+- `filter_df_on_end_activities` with a list `case_id_glue` keyword stays
+  outside the model (probe s2).
+
+Tests:
+- New: `docs/polars-filter-ct-bank.json.gz` (CK 2026111701 cases 0-399
+  and 756, CK 2026111713 case 380; 22,117 calls),
+  `docs/polars-filter-ct-probe-bank.json.gz` (probes f1, f2, l1, l2, j1;
+  4,158), `docs/polars-sequence-filter-ct-bank.json.gz` (CP 2026111700
+  cases 0-399 and 466, CP 2026111712 case 411, probes s1, s2; 6,931) and
+  `docs/pandas-filter-ct-bank.json.gz` (CK 2026111709 cases 0-399, CK
+  2026111721 case 433, probe p1; 13,665), replayed by the
+  `minera_*_ct_*bank_parity_tests` ctests; `minera_process_cube_tests`
+  rewritten on pm4py's labels, cells and member sets.

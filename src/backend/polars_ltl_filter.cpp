@@ -310,14 +310,17 @@ std::string time_sort(const EventAttribute& key) {
   }
   return "col(" + quote(key.value) + ")";
 }
+// Round CT: an int case key sorts as its scalar literal and windows over
+// itself (probe ct/l1).
 std::string list_key_display(const EventAttribute& key) {
   namespace lit = detail::polars_lit;
+  if (key.container == AttributeContainerKind::kScalar) return lit::scalar_display(lit::value_of(key));
   if (key.children.empty()) return "[]";
   return lit::literal_list_display(lit::argument_literal(key));
 }
 std::string over_keys_display(const EventAttribute& key) {
   std::string out;
-  for (const auto& item : key.children) {
+  for (const auto& item : key.container == AttributeContainerKind::kScalar ? std::vector<EventAttribute>{key} : key.children) {
     if (!out.empty()) out += ", ";
     out += groups::text_key(item) ? "col(" + quote(item.value) + ")" : literal_alias(LiteralKey{groups::literal_item(item), false});
   }
@@ -550,6 +553,9 @@ void repeat(std::vector<std::string>& nodes, std::ptrdiff_t times, std::initiali
 std::vector<std::string> eventually_stack(const Prepared& p, std::size_t at, bool filter, bool empty_join = false) {
   const auto n = static_cast<std::ptrdiff_t>(p.values.size());
   std::vector<std::string> nodes;
+  // Round CT: without activities the empty key fails the one case join
+  // (probe ct/l1).
+  if (empty_join && n == 0) return {"join", "select"};
   if (filter) nodes.push_back("filter' failed");
   if (empty_join) nodes.push_back("join");
   else nodes.insert(nodes.end(), {"select", "unique", "join right", "join"});
@@ -670,8 +676,15 @@ std::vector<std::string> four_first_join_stack(const Prepared& p) {
 }
 std::string missing_tail(const EventTable& source, const Prepared& p, bool eager, bool sorting, bool attribute) {
   if (eager) return p.operation == Op::kDifferentPersons && !attribute ? render(kDifferentEagerGroupTail, source, p) : "";
-  if (p.operation == Op::kEventuallyFollows)
-    return sorting ? render(kEventSortTail, source, p) : restack(render(kEventAttributeTail, source, p), eventually_stack(p, 0, false));
+  if (p.operation == Op::kEventuallyFollows) {
+    if (sorting) return render(kEventSortTail, source, p);
+    // Round CT: a list or int case key sorts as a literal and windows over
+    // its items (probe ct/l1).
+    const auto& key = p.options.case_id_key;
+    const bool literal = !key.is_null && (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple ||
+                                          (key.container == AttributeContainerKind::kScalar && integer(key)));
+    return restack(render(literal ? kEventListOver : kEventAttributeTail, source, p), eventually_stack(p, 0, false));
+  }
   if (p.operation == Op::kNext) return sorting ? render(kNextSortTail, source, p) : "";
   if (p.operation == Op::kFourEyes) return restack(render(attribute ? kFourAttributeTail : kFourMissingTail, source, p), four_eyes_stack(p, false));
   return render(attribute ? kDifferentAttributeTail : kDifferentMissingTail, source, p);
@@ -936,6 +949,11 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   }
   // eventually_follows without activities builds no attribute filter.
   const bool no_filter = p.operation == Op::kEventuallyFollows && p.values.empty();
+  // Round CT: a list case key's str item naming no column fails the window
+  // before the attribute filter resolves (probe ct/l1).
+  if (p.operation == Op::kEventuallyFollows && !no_filter && listed_key(o.case_id_key) && text(o.attribute_key) && !column(source, o.attribute_key))
+    for (const auto& item : o.case_id_key.children)
+      if (text(item) && !column(source, item)) fail("ColumnNotFoundError", phase, missing_message(source, item.value) + render(kEventListSort, source, p));
   if (!no_filter) required(o.attribute_key, false, true);
   // Round CS: a one-item name key (or a mask selecting nothing) on one row
   // fails building the result: a list is no dict key, a tuple no Series

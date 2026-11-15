@@ -2,46 +2,105 @@
 
 #include <cassert>
 #include <cmath>
+#include <set>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 using namespace minera;
 
+namespace {
+const ProcessCubeResult& expect_labels(const ProcessCubeResult& r, std::vector<std::string> xs,
+                                       std::vector<std::string> ys) {
+  assert(r.x_bins.size() == xs.size() && r.y_bins.size() == ys.size());
+  for (std::size_t i = 0; i < xs.size(); ++i) assert(r.x_bins[i].label == xs[i]);
+  for (std::size_t i = 0; i < ys.size(); ++i) assert(r.y_bins[i].label == ys[i]);
+  return r;
+}
+}  // namespace
+
+// Round CT: the numeric and prefix dimensions bin as pm4py 2.7.22's
+// statistics.process_cube (pandas classic) does; every expected label, cell
+// and member set below is the reference's (review-harness round-ct
+// t1/cube_ref.py).
 int main() {
   ProcessCubeTable t{{"a", "b", "c"}, {{"x", {0, 1, 2}}, {"y", {0, 1, 2}}, {"v", {2, 4, 8}}}};
   ProcessCubeOptions o; o.x_dimension = "x"; o.y_dimension = "y"; o.aggregation_column = "v";
   o.max_divisions_x = o.max_divisions_y = 2;
   auto r = process_cube(t, o);
-  assert(r.x_bins.size() == 2 && r.y_bins.size() == 2);
-  assert(r.cells[0][0].has_value() && std::abs(*r.cells[0][0] - 2.0) < 1e-9);
-  assert(r.case_ids[1][1].count("c") == 1);
+  // Right-closed bins, the lowest edge included: x = 1 falls in the first.
+  expect_labels(r, {"(-0.001, 1.0]", "(1.0, 2.0]"}, {"(-0.001, 1.0]", "(1.0, 2.0]"});
+  assert(r.cells[0][0].has_value() && *r.cells[0][0] == 3.0);
+  assert(!r.cells[0][1] && !r.cells[1][0] && *r.cells[1][1] == 8.0);
+  assert(r.case_ids[0][0] == (std::set<std::string>{"a", "b"}) && r.case_ids[1][1].count("c") == 1);
+  assert(r.x_edges == (std::vector<double>{0, 1, 2}));
 
   o.aggregation = ProcessCubeAggregation::kCount;
   r = process_cube(t, o);
-  assert(r.cells[0][0].has_value() && *r.cells[0][0] == 1.0);
+  assert(r.cells[0][0].has_value() && *r.cells[0][0] == 2.0 && *r.cells[1][1] == 1.0);
 
+  // Prefix dimensions list the NAME_ columns in the table's column order,
+  // labelled by their full names; a row is in each column holding >= 1.
   ProcessCubeTable p{{"a", "b"}, {{"x_A", {1, 0}}, {"x_B", {1, 1}}, {"y_Q", {1, 1}}, {"v", {3, 5}}}};
+  p.column_order = {"x_B", "x_A", "y_Q", "v"};
   o = {}; o.x_dimension = "x"; o.y_dimension = "y"; o.aggregation_column = "v";
   r = process_cube(p, o);
-  assert(r.x_bins.size() == 2 && r.case_ids[0][0].count("a") == 1 && r.case_ids[1][0].count("b") == 1);
+  expect_labels(r, {"x_B", "x_A"}, {"y_Q"});
+  assert(*r.cells[0][0] == 4.0 && *r.cells[1][0] == 3.0);
+  assert(r.case_ids[0][0] == (std::set<std::string>{"a", "b"}) && r.case_ids[1][0] == (std::set<std::string>{"a"}));
+  const auto ordered = parse_process_cube_table_json(
+      R"({"case_ids":["a","b"],"columns":{"x_B":[1,1],"x_A":[1,0],"y_Q":[1,1],"v":[3,5]}})");
+  assert(ordered.column_order == (std::vector<std::string>{"x_B", "x_A", "y_Q", "v"}));
+  expect_labels(process_cube(ordered, o), {"x_B", "x_A"}, {"y_Q"});
 
+  // No division, a single edge or a dimension without columns leaves an
+  // empty cube, which never reads the aggregation column.
+  ProcessCubeOptions none = o; none.x_dimension = "x"; none.max_divisions_x = 0;
+  r = process_cube(t, none);
+  assert(r.x_bins.empty() && r.y_bins.empty() && r.cells.empty() && r.case_ids.empty());
+  none = {}; none.x_dimension = "x"; none.y_dimension = "y"; none.aggregation_column = "v"; none.x_bins = {1.0};
+  assert(process_cube(t, none).x_bins.empty());
+  none = {}; none.x_dimension = "nope"; none.y_dimension = "y"; none.aggregation_column = "missing";
+  assert(process_cube(t, none).cells.empty());
   bool threw = false;
-  try { ProcessCubeOptions bad = o; bad.max_divisions_x = 0; (void)process_cube(p, bad); } catch (const std::invalid_argument&) { threw = true; }
+  try { none.x_dimension = "x"; (void)process_cube(t, none); } catch (const std::invalid_argument&) { threw = true; }
+  assert(threw);
+  // An empty numeric dimension has no range to divide.
+  threw = false;
+  try { (void)process_cube(ProcessCubeTable{{}, {{"x", {}}, {"y", {}}, {"v", {}}}}, o.x_dimension == "x" ? o : o); }
+  catch (const std::invalid_argument&) { threw = true; }
   assert(threw);
 
-  // Explicit edges are retained even when they exceed the automatic division
-  // limit, and values outside the configured range are omitted from cells.
+  // A constant column has one bin [v - 0.5, v + 0.5] whatever the division.
+  ProcessCubeTable c{{"a", "b"}, {{"x", {7, 7}}, {"y", {0, 1}}, {"v", {1, 2}}}};
+  o = {}; o.x_dimension = "x"; o.y_dimension = "y"; o.aggregation_column = "v";
+  r = process_cube(c, o);
+  expect_labels(r, {"(6.499, 7.5]"}, {"(-0.001, 0.25]", "(0.25, 0.5]", "(0.5, 0.75]", "(0.75, 1.0]"});
+  assert(*r.cells[0][0] == 1.0 && !r.cells[0][1] && !r.cells[0][2] && *r.cells[0][3] == 2.0);
+
+  // Explicit edges, sorted; values outside them fall in no cell.
   o = {};
   o.x_dimension = "x";
   o.y_dimension = "y";
   o.aggregation_column = "v";
   o.max_divisions_x = o.max_divisions_y = 1;
-  o.x_bins = {-1.0, 0.5, 1.5, 3.0};
+  o.x_bins = {3.0, -1.0, 1.5, 0.5, 1.5};
   o.y_bins = {-1.0, 3.0};
   r = process_cube(t, o);
+  expect_labels(r, {"(-1.001, 0.5]", "(0.5, 1.5]", "(1.5, 3.0]"}, {"(-1.001, 3.0]"});
   assert(r.x_bins.size() == 3 && r.x_edges.size() == 4);
   assert(r.cells[0][0].has_value() && *r.cells[0][0] == 2.0);
   assert(r.cells[1][0].has_value() && *r.cells[1][0] == 4.0);
   assert(r.cells[2][0].has_value() && *r.cells[2][0] == 8.0);
+
+  // pandas adds a group's values with Kahan compensation.
+  ProcessCubeTable f{{"a", "b", "c", "d"}, {{"x", {0.1, 0.2, 0.7, 0.3}}, {"y", {1, 1, 1, 1}}, {"v", {0.1, 0.2, 0.7, 0.3}}}};
+  o = {}; o.x_dimension = "x"; o.y_dimension = "y"; o.aggregation_column = "v"; o.max_divisions_x = 3;
+  r = process_cube(f, o);
+  expect_labels(r, {"(0.099, 0.3]", "(0.3, 0.5]", "(0.5, 0.7]"}, {"(0.499, 1.5]"});
+  assert(*r.cells[0][0] == 0.19999999999999998 && !r.cells[1][0] && *r.cells[2][0] == 0.7);
+  o.x_dimension = "y"; o.aggregation = ProcessCubeAggregation::kSum;
+  assert(*process_cube(f, o).cells[0][0] == 1.3);
 
   const auto round_trip = parse_process_cube_table_json(
       R"({"case_ids":["a","b"],"columns":{"x":[1,2],"y":[3,4],"v":[5,6]}})");
@@ -76,7 +135,8 @@ int main() {
   category_result = process_cube(categorical, category_options);
   assert(category_result.x_bins.size() == 3);
   assert(category_result.x_bins[0].label == "(DE,retail)");
-  assert(category_result.case_ids[0][2].count("c2") == 1);
+  // score 1.0 is in the right-closed bin (0.5, 1.0].
+  assert(category_result.case_ids[0][1].count("c2") == 1);
 
   const auto categorical_json = parse_process_cube_table_json(
       R"({"case_ids":["a","b"],"columns":{"region":["US","DE"],"value":[2,4]}})");

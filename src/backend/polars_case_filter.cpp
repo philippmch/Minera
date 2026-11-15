@@ -386,6 +386,13 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   const bool every = keys.all_literal();
   auto result = source; result.rows.clear();
   groups::append_schema(result, keys, source);
+  // Round CT: the size and performance filters join the frame with the
+  // selected keys; a one-row NaN float key joins nothing (probe ct/j1).
+  if (op != Operation::kCount && !every) {
+    std::size_t right = 0;
+    for (const auto& group : groups) right += !group.absent && group.keep;
+    if (groups::one_row_nan_join(source, keys, right)) return result;
+  }
   for (std::size_t i = 0; i < source.rows.size(); ++i) {
     const auto& group = groups[row_groups[i]];
     if (group.absent || (!every && !group.keep)) continue;

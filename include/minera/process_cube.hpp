@@ -21,6 +21,9 @@ struct ProcessCubeTable {
   std::map<std::string, std::vector<std::string>> categorical_columns;
   // Compatibility spelling for callers that use the shorter string name.
   std::map<std::string, std::vector<std::string>> string_columns;
+  // The columns in the table's own order (the JSON document's); a prefix
+  // dimension lists its columns in this order. Empty: the maps' order.
+  std::vector<std::string> column_order;
 };
 
 enum class ProcessCubeAggregation {
@@ -31,7 +34,11 @@ enum class ProcessCubeAggregation {
 using ProcessCubeAggregationFunction = ProcessCubeAggregation;
 
 struct ProcessCubeOptions {
-  // x_dimension/y_dimension name either a numeric column or a prefix group.
+  // x_dimension/y_dimension name either a numeric column or a prefix group
+  // (every column NAME_...), binned as the reference's process cube bins
+  // them: pd.cut's right-closed equal-width bins with the lowest edge
+  // included, pandas' interval labels, prefix bins labelled by column name.
+  // max_divisions 0 leaves a non-constant numeric dimension without bins.
   std::string x_dimension;
   std::string y_dimension;
   // Short column spellings are accepted as equivalent aliases.

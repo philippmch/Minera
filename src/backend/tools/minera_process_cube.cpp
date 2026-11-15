@@ -21,8 +21,8 @@ std::size_t parse_size(std::string_view text, std::string_view option) {
   const std::string value(text);
   const auto parsed = std::strtoull(value.c_str(), &end, 10);
   if (end != value.c_str() + value.size() ||
-      parsed > std::numeric_limits<std::size_t>::max() || parsed == 0 || parsed > 10000)
-    throw std::invalid_argument(std::string(option) + " expects an integer from 1 through 10000");
+      parsed > std::numeric_limits<std::size_t>::max() || parsed > 10000)
+    throw std::invalid_argument(std::string(option) + " expects an integer from 0 through 10000");
   return static_cast<std::size_t>(parsed);
 }
 
@@ -45,8 +45,6 @@ std::vector<double> parse_bins(std::string_view text, std::string_view option) {
     if (end == std::string_view::npos) break;
     begin = end + 1;
   }
-  if (result.size() < 2)
-    throw std::invalid_argument(std::string(option) + " expects at least two edges");
   return result;
 }
 
