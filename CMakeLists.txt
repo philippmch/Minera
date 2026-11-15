@@ -3111,6 +3111,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_cp_fresh_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cp-fresh-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_cp_fresh_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CQ: activity keys naming several columns (probes cq/q1-q3 and
+  # cp/k6): the repeated aggregation alias, the expanded is_in predicate,
+  # the duplicate split flag and the grouping selector counts.
+  add_test(NAME minera_polars_sequence_filter_cq_probe_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cq-probe-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_cq_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3194,6 +3200,16 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cp_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cp-bank.json.gz")
   set_tests_properties(minera_polars_filter_cp_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CQ: a fresh CK seed (2026111611) and the struct-cast error order
+  # CP carried (FilterExec's row partitions; one call races and is
+  # observed), and LTL list case keys of several or str items with four or
+  # more four_eyes activities (probes cq/q4, q5).
+  add_test(NAME minera_polars_filter_cq_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cq-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cq_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_filter_cq_probe_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cq-probe-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cq_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3395,6 +3411,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_cp_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cp-bank.json.gz")
   set_tests_properties(minera_pandas_filter_cp_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CQ: a fresh CK seed (2026111619): business-hours durations as
+  # Python ints, lexicographic list comparisons in the threshold filters.
+  add_test(NAME minera_pandas_filter_cq_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cq-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_cq_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

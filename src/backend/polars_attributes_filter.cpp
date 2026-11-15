@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <limits>
 #include <map>
+#include <set>
 #include <numeric>
 #include <unordered_map>
 #include <unordered_set>
@@ -325,6 +326,8 @@ struct Predicate {
   std::optional<detail::polars_lit::Literal> literal;
   std::vector<Expr> chain,merged;
   bool empty=false;
+  // Round CQ: the rows the numeric filters keep (every node, in order).
+  std::vector<bool> keep;
   // Round CH: a str value naming a column (is_in(col(value).implode())).
   std::optional<std::size_t> other;
   std::string other_dtype,other_super,other_plan;
@@ -945,14 +948,63 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
   // Round CE: an empty interval in the lowest node empties the frame; the
   // filters above it still run (and raise) on the empty frame.
   if(empty)p.empty=true;
-  for(const auto& node:p.merged) {
-    const Expr* at=nullptr;
-    if(const auto error=first_error(node,at)) {
-      // Round CJ: a failing struct cast names the cast, inside the node.
-      if(!error->expression.empty())fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error->expression+"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n");
-      fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error_text(*at)+(node.leaf?"\n":"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n"));
-    }
+  // Round CQ: the nodes run bottom-up, each on the rows the nodes below it
+  // keep (a null filter keeps none, so the nodes above it run on an empty
+  // frame). Polars filters a frame with an elementwise predicate in row
+  // partitions when the frame has at least as many columns as Polars has
+  // threads (4 on the host the reference banks were captured on): the first
+  // three hold n/4 rows each (none below 4 rows), the last the rest, and the
+  // first failing partition's error is raised. A struct cast fails only on a
+  // partition with a present cell, so on a partition without one a
+  // comparison error anywhere in the node wins over a cast left of it; a
+  // cast column's null structs are per partition too. A null filter
+  // (null.repeat) is not elementwise and filters the whole frame. The trace
+  // filters read only the projected case key and filter columns.
+  constexpr std::size_t kReferenceThreads=4;
+  std::size_t width=source.columns.size();
+  if(trace&&!eager) {
+    std::set<std::string> used;
+    for(const auto& node:p.merged)each_leaf(node,[&](const Leaf& l){used.insert(l.column);});
+    if(p.keys){for(const auto& item:p.keys->items)if(!item.literal)used.insert(source.columns[item.column]);}
+    else if(p.case_column)used.insert(source.columns[*p.case_column]);
+    width=used.size();
   }
+  std::vector<std::size_t> rows;
+  if(!p.empty)for(std::size_t i=0;i<source.size();++i)rows.push_back(i);
+  for(auto node:p.merged) {
+    bool streamable=true;each_leaf(node,[&](const Leaf& l){if(null_leaf(l))streamable=false;});
+    std::vector<std::pair<std::size_t,std::size_t>> parts;
+    if(rows.empty()||!streamable||width<kReferenceThreads)parts.emplace_back(0,rows.size());
+    else {
+      const auto size=rows.size()/kReferenceThreads;
+      for(std::size_t i=0;i+1<kReferenceThreads;++i)parts.emplace_back(i*size,(i+1)*size);
+      parts.emplace_back((kReferenceThreads-1)*size,rows.size());
+    }
+    const auto mark=[&](std::size_t begin,std::size_t end) {
+      each_leaf(node,[&](Leaf& l) {
+        const auto c=index_of(source,l.column);
+        l.present=c&&std::any_of(rows.begin()+static_cast<std::ptrdiff_t>(begin),rows.begin()+static_cast<std::ptrdiff_t>(end),
+                                 [&](std::size_t r){return !detail::polars_lit::null_cell(source.rows[r][*c]);});
+      });
+    };
+    for(const auto& [begin,end]:parts) {
+      mark(begin,end);
+      const Expr* at=nullptr;
+      if(const auto error=first_error(node,at)) {
+        // Round CJ: a failing struct cast names the cast, inside the node.
+        if(!error->expression.empty())fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error->expression+"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n");
+        fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error_text(*at)+(node.leaf?"\n":"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n"));
+      }
+    }
+    std::vector<std::size_t> kept;
+    for(const auto& [begin,end]:parts) {
+      mark(begin,end);
+      for(std::size_t i=begin;i<end;++i)if(truth_of(node,source,rows[i])==1)kept.push_back(rows[i]);
+    }
+    rows=std::move(kept);
+  }
+  p.keep.assign(source.size(),false);
+  for(const auto r:rows)p.keep[r]=true;
   return p;
 }
 Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager,const std::vector<EventAttribute>* cells=nullptr) {
@@ -1043,7 +1095,7 @@ std::vector<bool> matching(const EventTable& source,const Predicate& p) {
   if(p.other)for(std::size_t j=0;j<source.size();++j){const auto w=cell(source,j,*p.other);if(!null(w))others.push_back(w);}
   for(std::size_t i=0;i<source.size();++i) {
     const auto v=cell(source,i,p.column);bool yes=false;
-    if(numeric(op))yes=!p.empty&&std::all_of(p.merged.begin(),p.merged.end(),[&](const Expr& node){return truth_of(node,source,i)==1;});
+    if(numeric(op))yes=p.keep[i];
     else {
       if(!null(v)) {
         if(p.other)yes=column_has(v,p.dtype,others,p.other_dtype,p.other_super);
@@ -1145,6 +1197,13 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     // refused as unhashable first.
     if(!result.once&&!attr.children.empty()&&mapping(attr.children.front()))fail("TypeError","apply","unhashable type: 'dict'");
     if(result.once)if(const auto error=detail::polars_lit::argument_literal_error(attr))fail("TypeError","apply",*error);
+    // Round CQ: per case, a one-item key list holding a dict or a list counts
+    // that value, which the counts dict cannot take as a key.
+    if(result.once&&attr.children.size()==1&&!attr.children[0].is_null&&
+       (mapping(attr.children[0])||attr.children[0].container==AttributeContainerKind::kList)) {
+      (void)case_column();
+      fail("TypeError","apply",std::string("unhashable type: '")+(mapping(attr.children[0])?"dict":"list")+"'");
+    }
     for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
       if(!result.once)fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),groupnodes));
     throw std::invalid_argument("Native Polars attribute counts accept a single key");

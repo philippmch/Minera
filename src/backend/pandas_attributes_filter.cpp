@@ -423,6 +423,14 @@ PandasAttributesCountMap counts(const EventTable& source,const EventAttribute& k
  return result;
 }
 bool greater_equal(const EventAttribute& left,const EventAttribute& right){
+ // Round CQ: two lists (or two tuples) compare item by item: the first pair
+ // that is not equal decides (and may fail), else the longer one is greater.
+ const auto sequence=[](const EventAttribute& e){return !e.is_null&&(e.container==AttributeContainerKind::kList||e.container==AttributeContainerKind::kTuple);};
+ if(sequence(left)&&sequence(right)&&left.container==right.container){
+  const auto n=std::min(left.children.size(),right.children.size());
+  for(std::size_t i=0;i<n;++i)if(identity(left.children[i])!=identity(right.children[i]))return greater_equal(left.children[i],right.children[i]);
+  return left.children.size()>=right.children.size();
+ }
  if(is_native_na_attribute(left)||is_native_na_attribute(right))error("TypeError","boolean value of NA is ambiguous");
  if(numeric(left)&&numeric(right)){if(missing(left)||missing(right))return false;return native_scalar_key_compare(left,right)>=0;}
  // Round CN: two strs compare by code point (UTF-8 bytes keep that order).

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CP (2026-11-05 to 2026-11-15, cloud container)
+## Review-fix loop, rounds T–CQ (2026-11-05 to 2026-11-15, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5483,7 +5483,70 @@ pandas case probes and replay logs are in the project files under
 No fixture changed. The device check on the Mac was skipped again (no
 device linked).
 
-Next round (CQ) should start by re-reviewing round CP:
+Round CQ re-reviewed CP (Review CQ1). CP's commit a299246 ran green on
+all six CI jobs (run 43714424998). CQ took the calls CP carried and fresh
+seeds:
+- Struct-cast error order (`polars_attributes_filter.cpp`): Polars
+  evaluates an elementwise filter predicate in four row partitions (the
+  capture host's thread count; three of n/4 rows, the last the rest) when
+  the frame is at least four columns wide, and the first failing partition
+  decides. A struct cast fails only on a partition with a present cell, a
+  comparison on any partition; trace filters read the projection of the
+  case and filter columns, null bounds run whole. The three carried
+  `apply_numeric` calls pass; CK 2026111550 case 320 and the CJ docs
+  bank's case 71 race in the reference and compare against both observed
+  outcomes.
+- Activity keys naming several columns in the Polars sequence filters
+  (k6 18 → 0, probes q1–q3): repeated aggregation aliases, the expanded
+  `is_in` predicate of `rework.apply_activity_set`, the duplicate
+  `_is_split_activity`, and the grouping's selector counts.
+- LTL list case keys of several or str items (probes q4, q5, 514 → 0):
+  one List literal in the select and group_by, the items in the joins and
+  the window; four_eyes' first-join stack by pair count and sign (the empty
+  list key's stack too); four or more four_eyes activities with a literal
+  key fail at the third pair, (0, 3); `eventually_follows` with at most
+  one activity joins on the named columns.
+- Fresh seeds (all 0): Polars table CK 2026111611 (4 calls fixed), CN
+  2026111612, CJ 2026111613, CI 2026111614, CH 2026111615 (case 580's
+  four_eyes join unordered); Polars sequence CP 2026111610 (1 call: a
+  positional struct row), CK 2026111616, CJ 2026111617, CH 2026111618;
+  pandas CK table 2026111619 (2 calls: business-hours ints, lexicographic
+  list comparisons), CK sequence 2026111620, CN LTL 2026111621.
+- CK1-1: two calls pass since earlier rounds; CB sequence case 431 is a
+  join with no fixed row order in the reference.
+
+In the suite: new `docs/polars-filter-cq-bank.json.gz` (22,231 calls),
+`docs/polars-filter-cq-probe-bank.json.gz` (558),
+`docs/polars-sequence-filter-cq-probe-bank.json.gz` (1,420) and
+`docs/pandas-filter-cq-bank.json.gz` (11,712); the CJ docs bank's case 71
+is observed. The fresh banks, probe specs and replay logs are in the
+project files under `review-harness/round-cq/`.
+
+No fixture changed. The device check on the Mac was skipped again (no
+device linked).
+
+Next round (CR) should start by re-reviewing round CQ:
+
+- CQ's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the LTL list-key cases left outside the model: str items naming the
+  resource, `count`, `_index` or the timestamp column, None next to str
+  items, a non-column timestamp key, and composite `eventually_follows`
+  keys with null or NaN cells;
+- inner joins of two equal-size sides (row order from a per-process hash
+  seed) stay unordered unless Polars' hashing is modelled;
+- the older items of the CQ list below (CJ, CF and CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CP's targets, taken in CQ (findings CQ1-1 to CQ1-6): CP's CI run,
+the three `apply_numeric` calls, the k6 probe, LTL list case keys of
+several or str items, four or more `four_eyes_principle` activities with a
+literal key, the fresh seeds and the CK1-1 calls. Not taken (carried to
+CR): the older CJ, CF and CD items (see the list below).
+
+Previous list for round CQ (kept for its older items):
 
 - CP's CI run;
 - the three `apply_numeric` calls with struct-cast error order (CM seed

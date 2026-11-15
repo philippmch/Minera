@@ -27557,3 +27557,108 @@ Tests:
   `docs/pandas-sequence-filter-cp-bank.json.gz` (CK 2026111583 and
   2026111593; 13,658 calls), replayed by the
   `minera_*_cp_*bank_parity_tests` ctests.
+
+## Review CQ1: re-review of round CP, FilterExec row partitions, several-column activity keys, LTL list case keys (2026-11-15)
+
+Round CQ checked CP's CI (run 43714424998 on a299246: green on all six
+jobs), worked the calls CP carried and replayed fresh seeds of the CK, CN,
+CJ, CI and CH table domains, the CP, CK, CJ and CH sequence domains and
+the pandas CK and CN domains. The device check on the Mac was skipped (no
+device linked).
+
+- **CQ1-1 Struct-cast error order in the Polars attribute filters** (the
+  three `apply_numeric` calls CP carried: CK seed 2026111550 case 190, CK
+  seed 2026111590 case 46, CJ seed 2026111595 case 451; 0 after). Polars
+  1.44.1 evaluates an elementwise filter predicate in vertical row
+  partitions when the frame is at least as wide as its thread count: four
+  partitions on the capture host, the first three n/4 rows long and the
+  last the rest (three empty ones below four rows). The first partition
+  that fails decides the error. A struct cast (`must specify one field in
+  the struct`, `Cannot cast from struct to other types`) fails only on a
+  partition holding a present cell of the column, a comparison or type
+  error on every partition, empty ones included. A narrower frame runs as
+  one partition, so the conjuncts fail left first. Trace filters read the
+  projection of the case key and filter columns, the events filter the
+  whole frame; a null bound (`null.repeat`) is not elementwise, so its node
+  runs whole, and nodes run bottom up on the rows the lower nodes kept.
+  When partition 0 has no error and a later one does, the reference races
+  between the two (the cast error in about 1 run in 10): CK seed
+  2026111550 case 320 and the CJ docs bank's case 71 compare against both
+  observed outcomes. The outcome depends on the capture host's thread
+  count (declared).
+- **CQ1-2 Activity keys naming several columns in the Polars sequence
+  filters** (CP probe `k6`: 18 → 0; probes `q1` to `q3`, 1,420 calls).
+  `pl.col` over a list, tuple or dict of names that all exist expands to
+  one expression per distinct name. The boundary filters, `traces`,
+  `starts_with`, `ends_with`, `prefixes` and `suffixes` then repeat their
+  aggregation alias (`DuplicateError: column with name 'start_activity'
+  has more than one occurrence`, likewise `end_activity`, `variant_list`,
+  `variant`, `activities`) at the plan where a missing name fails;
+  `rework.apply_activity_set` expands its `is_in` predicate (`The
+  predicate passed to 'LazyFrame.filter' expanded to multiple
+  expressions`, one line per column, also for an empty activity list);
+  `activity_split` repeats `_is_split_activity`; the consecutive grouping
+  combines the case and activity names pairwise, so two counts above one
+  must agree (`cannot combine selectors that produce a different number of
+  columns (activity != case)`) before the duplicate `_group_id`. A name no
+  column carries fails first.
+- **CQ1-3 LTL list case keys of several items or of str items** (probes
+  `q4`, `q5`: 514 differing calls, 0 after). The rules select and group by
+  `[case key, resource]`, where a list is one List literal named
+  `literal` (printed as the list), and join and window over its items (a
+  str a column, any other value a literal). `four_eyes_principle` fails at
+  its first pair join: `joining with repeated key names; already joined
+  on literal and literal` for several literals, the first str item missing
+  from `["literal", resource]` otherwise. `attr_value_different_persons`
+  fails its second `group_by` (`group_by keys contained duplicate output
+  name 'literal'`, or the item missing from `["literal", resource,
+  "count"]`). `eventually_follows` resolves its window first (a str item
+  missing from the frame), then each activity's select (`projections
+  contained duplicate output name` for several literals or a repeated
+  str), then, with two or more activities, the second activity's select
+  (the first str item missing from `["literal", "_index", timestamp]`);
+  with at most one activity it joins on the named columns. The context
+  stacks follow the activity count: four_eyes' first pair join sits under
+  all pair joins (positive) or inside the filtered ones (negative), which
+  also corrects the empty list key's stack, and four or more activities
+  with a literal case key fail at the third pair join, the pair (0, 3).
+- **CQ1-4 Fresh seeds.** Polars table CK 2026111611 (4 calls, 0 after: a
+  one-item list of a dict as the relative occurrence key is unhashable; a
+  wide int `between` anchor casts the column strictly to Float64, or a
+  UInt column to UInt64; an `eventually_follows` activity's compute error
+  precedes the literal sort's `ShapeError` only when the first activity's
+  literal repeats later, as the plan then caches the filter; a literal
+  case key prints in the filter-failure plan's window and sort), CN
+  2026111612, CJ 2026111613, CI 2026111614 and CH 2026111615 (one
+  `four_eyes_principle` inner join of two equal-size sides keeps its rows
+  in no fixed order: unordered); Polars sequence CP 2026111610 (a struct
+  Series takes a list as long as its fields as a positional row), CK
+  2026111616, CJ 2026111617, CH 2026111618; pandas CK table 2026111619 (2
+  calls, 0 after: a business-hours duration is a Python int unless a slot
+  bound is a float, the end is not after the start or an end falls inside
+  a slot, so the threshold errors name `int`/`int64`; the
+  activity-exception threshold compares lists and tuples
+  lexicographically), CK sequence 2026111620, CN LTL 2026111621.
+- **CQ1-5 CK1-1.** CJ table case 214 and CJ sequence case 36 pass (fixed
+  by later rounds); CB sequence case 431 (`rework.apply` on two rows of two
+  cases) joins two equal-size sides, whose row order varies between runs
+  of the reference.
+- **CQ1-6 CP's CI.** a299246 ran green on Linux, macOS and Windows.
+
+Declared:
+- Polars inner joins of two sides with equally many rows probe the right
+  side, whose order comes from a hash table seeded per process; such calls
+  compare unordered.
+- LTL list case keys naming the resource (`four_eyes_principle`,
+  `attr_value_different_persons`), `count`, `_index` or the timestamp
+  column, mixing None with str items, or meeting a non-column timestamp
+  key stay outside the modelled domain.
+
+Tests:
+- New: `docs/polars-filter-cq-bank.json.gz` (CK seed 2026111611 with the
+  carried cases and CH seed 2026111615 case 580; 22,231 calls),
+  `docs/polars-filter-cq-probe-bank.json.gz` (probes q4 and q5; 558),
+  `docs/polars-sequence-filter-cq-probe-bank.json.gz` (probes q1 to q3 and
+  k6; 1,420) and `docs/pandas-filter-cq-bank.json.gz` (pandas CK seed
+  2026111619; 11,712), replayed by the `minera_*_cq_*bank_parity_tests`
+  ctests. `docs/polars-filter-cj-bank.json.gz` case 71 is observed.

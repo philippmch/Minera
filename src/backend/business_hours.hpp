@@ -195,4 +195,25 @@ inline double business_elapsed_seconds_microseconds(
          business_prefix_seconds(start_offset, slots);
 }
 
+// Round CQ: pm4py's business duration is a Python int unless a slot bound
+// is a float, the case ends at or before its start (0.0), or the start or
+// the end falls inside a slot, after its start and up to its end (weekly
+// offsets; probed on the default slots: 07:00 to 18:00 and 06:00 to 07:00
+// are ints, 17:00 to 18:00, 06:00 to 17:00 and 05:00 to 05:00 floats); a
+// pandas Series of int durations is int64.
+inline bool business_elapsed_is_float(std::int64_t start, std::int64_t end,
+                                      const std::vector<BusinessHourSlot>& slots) {
+  if (end <= start) return true;
+  constexpr std::int64_t epoch_to_monday_microseconds = 3 * 86400 * kMicrosecondsPerSecond;
+  const auto offset = [](std::int64_t value) {
+    auto remainder = (value + epoch_to_monday_microseconds) % kMicrosecondsPerWeek;
+    if (remainder < 0) remainder += kMicrosecondsPerWeek;
+    return static_cast<double>(remainder) / static_cast<double>(kMicrosecondsPerSecond);
+  };
+  const double a = offset(start), b = offset(end);
+  for (const auto& slot : slots)
+    if ((a > slot.start_seconds && a <= slot.end_seconds) || (b > slot.start_seconds && b <= slot.end_seconds)) return true;
+  return false;
+}
+
 }  // namespace minera::detail

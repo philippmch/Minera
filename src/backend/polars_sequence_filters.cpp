@@ -266,6 +266,27 @@ std::size_t require(const EventTable& df, const std::string& name, const Plan& p
   if (!found) column_not_found(df, name, plan);
   return *found;
 }
+// Round CQ: an activity key naming two or more columns (a list, tuple or
+// dict whose names all exist) expands pl.col into one expression per name
+// when the plan resolves (probes cp/k6, cq/q1): the aggregations then
+// repeat their alias, a filter predicate expands to several. A name no
+// column carries fails first (column_not_found).
+std::optional<std::vector<std::string>> expanded_names(const EventTable& df, const std::string& key) {
+  if (!by_name_key(key)) return std::nullopt;
+  auto names = by_names(key);
+  if (names.size() < 2) return std::nullopt;
+  for (const auto& name : names)
+    if (!find_column(df, name)) return std::nullopt;
+  return names;
+}
+void repeated_alias(const EventTable& df, const std::string& key, const std::string& alias, const Plan& plan) {
+  if (alias.empty() || !expanded_names(df, key)) return;
+  fail("DuplicateError", "column with name '" + alias + "' has more than one occurrence" + plan_where(df, plan));
+}
+std::size_t require_activity(const EventTable& df, const std::string& key, const std::string& alias, const Plan& plan) {
+  repeated_alias(df, key, alias, plan);
+  return require(df, key, plan);
+}
 
 // ------------------------------------------------------------------ list case keys
 
@@ -760,7 +781,7 @@ EventTable boundary_filter(const EventTable& df, const Value& values, const std:
   const std::string alias = end ? "end_activity" : "start_activity";
   if (no_columns_key(act_key))
     no_columns_aggregate(df, case_glue, false, NoColumns{alias, "", {}, "join", {"select", "join right", "join"}});
-  const auto act = require(df, act_key, kBoundaryPlan);
+  const auto act = require_activity(df, act_key, alias, kBoundaryPlan);
   check_is_in(df, act, literal, "join",
              "FILTER col(" + quote(alias) + ").is_in(" + literal_text(literal) +
                  ")\nFROM\n  AGGREGATE[maintain_order: false]\n    [col(" + quote(act_key) + ")." +
@@ -788,7 +809,7 @@ EventTable boundary_list_filter(const EventTable& df, const Value& values, const
   const auto text = case_text(keys, key, false);
   if (no_columns_key(act_key))
     no_columns_aggregate(df, text, false, NoColumns{alias, "", {}, "join", {"select", "join right", "join"}});
-  const auto act = require(df, act_key, kBoundaryPlan);
+  const auto act = require_activity(df, act_key, alias, kBoundaryPlan);
   const auto aggregation = "col(" + quote(act_key) + ")." + (end ? "last" : "first") + "().alias(" + quote(alias) + ")";
   const auto source = group_node(text, false, aggregation, frame_plan(df.columns), 2);
   check_is_in(df, act, literal, "join",
@@ -857,7 +878,7 @@ struct Variants {
 };
 Variants variants_of(const EventTable& df, const std::string& case_glue, const std::string& act_key,
                      const Plan& sort_plan, const Plan& agg_plan, const NoColumns* none = nullptr,
-                     const Value* list_key = nullptr, bool unused_activity = false) {
+                     const Value* list_key = nullptr, bool unused_activity = false, const std::string& alias = "") {
   Variants out;
   // Round CP: a filter that never reads the activities (only empty
   // patterns) does not miss them when the key selects no column.
@@ -872,7 +893,10 @@ Variants variants_of(const EventTable& df, const std::string& case_glue, const s
     out.text = case_text(*out.keys, *list_key);
     if (none && no_columns_key(act_key)) no_columns_aggregate(df, out.text, true, *none);
     out.act = skip ? 0 : find_column(df, act_key).value_or(df.columns.size());
-    if (out.act == df.columns.size()) column_not_found(df, act_key, plan);
+    if (out.act == df.columns.size()) {
+      repeated_alias(df, act_key, alias, plan);
+      column_not_found(df, act_key, plan);
+    }
     out.shape = df.size() != 1;
     if (!out.shape) {
       out.order.push_back(Key{});
@@ -890,6 +914,7 @@ Variants variants_of(const EventTable& df, const std::string& case_glue, const s
   if (out.act == df.columns.size()) {
     auto plan = agg_plan;
     plan.above = "SORT BY [col(" + quote(case_glue) + "), col(" + quote(kTimestamp) + ")]";
+    repeated_alias(df, act_key, alias, plan);
     column_not_found(df, act_key, plan);
   }
   const auto case_order = cell_order(df, out.case_column);
@@ -1110,7 +1135,7 @@ EventTable lazy_variant_filter(const EventTable& df, const PolarsFilterParameter
                                const std::function<void(const Variants&)>& resolve = {}, bool every = false) {
   const NoColumns none{alias, "", {}, "join", {"select", "join right", "join"}};
   const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kLazySortPlan, kLazyAggPlan, &none,
-                             list_case(parameters), every);
+                             list_case(parameters), every, alias);
   if (v.keys) {
     // Round CP: the rest of the plan resolves (the filter's casts, the join
     // keys) before the sort runs.
@@ -1177,6 +1202,15 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
            "The predicate expanded to zero expressions. This may for example be caused by a regex not matching column names "
            "or a column dtype match not hitting any dtypes in the DataFrame" +
                resolved(kReworkPlan.node, frame_plan(df.columns), kReworkPlan.stack));
+    // Round CQ: several names expand the is_in predicate (probe cq/q1).
+    if (const auto names = expanded_names(df, act_key)) {
+      std::string message = "The predicate passed to 'LazyFrame.filter' expanded to multiple expressions: \n\n";
+      for (const auto& name : *names) message += "\tcol(" + quote(name) + ").is_in(" + literal_text(literal) + "),\n";
+      fail("ComputeError", message +
+                               "This is ambiguous. Try to combine the predicates with the 'all_horizontal' or `any_horizontal' "
+                               "expression." +
+                               resolved(kReworkPlan.node, frame_plan(df.columns), kReworkPlan.stack));
+    }
     act = require(df, act_key, kReworkPlan);
     plan.above = (activities->items.empty() ? "FILTER false.alias(" + quote(act_key) + ")"
                                             : "FILTER col(" + quote(act_key) + ").is_in(" + literal_text(literal) + ")") +
@@ -1442,7 +1476,7 @@ EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterVal
   const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
   const NoColumns none{"variant_list", "len().alias(\"count\")", {"count"}, "with_columns", {"with_columns"}};
   const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kTraceSortPlan, kTraceAggPlan, &none,
-                             list_case(parameters));
+                             list_case(parameters), false, "variant_list");
   require_string_activities(df, v, case_key(parameters), activity_key(parameters));
   if (v.shape) sort_shape_error(df);
   // Each admitted trace is iterated and its items read as str or None
@@ -1527,7 +1561,8 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
     (void)require(df, kTimestamp, kSuffixSortPlan);
     v.text = case_text(case_key(parameters));
   } else {
-    v = variants_of(df, case_key(parameters), activity_key(parameters), kSuffixSortPlan, kSuffixAggPlan, nullptr, list_key);
+    v = variants_of(df, case_key(parameters), activity_key(parameters), kSuffixSortPlan, kSuffixAggPlan, nullptr, list_key,
+                    false, "variant");
   }
   if (v.shape) sort_shape_error(df);
   if (admitted_suffixes.items.empty()) fail("IndexError", "list index out of range");
@@ -1906,6 +1941,12 @@ EventTable polars_consecutive_act_case_grouping_apply(const EventTable& df,
   }
   for (const auto& key : {case_key(parameters), activity_key(parameters)})
     if (!by_name_key(key) && !find_column(df, key)) column_not_found(df, key, plan);
+  // Round CQ: the activity and case keys' names combine pairwise in the
+  // `_group_id` expression, so two counts above one must agree (probe cq/q3).
+  const auto count = [](const std::string& key) { return by_name_key(key) ? by_names(key).size() : std::size_t{1}; };
+  if (const auto nc = count(case_key(parameters)), na = count(activity_key(parameters)); nc > 1 && na > 1 && nc != na)
+    fail("InvalidOperationError", "cannot combine selectors that produce a different number of columns (" + std::to_string(na) +
+                                      " != " + std::to_string(nc) + ")" + plan_where(df, plan));
   // Round CP: several names give several `_group_id` expressions (probe cp/k1).
   for (const auto& key : {case_key(parameters), activity_key(parameters)})
     if (by_name_key(key))
@@ -2077,6 +2118,14 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
                       " WITH_COLUMNS:\n [col(" + quote(case_glue) + ").cum_count().over([col(" + quote(case_glue) +
                           ")]).alias(\"_row_within_case\")] ",
                       {"_row_within_case"}};
+  // Round CQ: several names give several `_is_split_activity` expressions
+  // (probe cq/q1).
+  if (expanded_names(df, act_key))
+    fail("ComputeError",
+         "the name '_is_split_activity' passed to `LazyFrame.with_columns` is duplicate\n\nIt's possible that multiple "
+         "expressions are returning the same default column name. If this is the case, try renaming the columns with "
+         "`.alias(\"new_name\")` to avoid duplicate column names." +
+             plan_where(df, act_plan));
   const auto act = require(df, act_key, act_plan);
   // A value that is no list, tuple or str reaches is_in as itself, which
   // Polars implodes (round CC).

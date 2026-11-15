@@ -684,10 +684,14 @@ inline std::vector<Value> build_strict(const LitType& type, const std::vector<Li
       return out;
     }
     // Round CL: a one-field struct also takes a one-item list or tuple (a
-    // positional row) without complaint.
+    // positional row) without complaint. Round CQ: so does any struct a
+    // list of as many items as it has fields; each field then builds the
+    // item at its place (the list's own element type).
+    const auto positional = [&](const LitValue& v) {
+      return v.type.kind == K::kList && v.value.items.size() == type.inner.size();
+    };
     for (const auto& v : values)
-      if (v.type.kind != K::kNull && v.type.kind != K::kStruct &&
-          !(v.type.kind == K::kList && type.inner.size() == 1 && v.value.items.size() == 1))
+      if (v.type.kind != K::kNull && v.type.kind != K::kStruct && !positional(v))
         build_error("unexpected value while building Series of type " + debug_name(type) + "; found value of type " +
                     debug_name(v.type) + ": " + lit_display(v.type, v.value));
     std::vector<std::vector<Value>> fields;
@@ -695,7 +699,10 @@ inline std::vector<Value> build_strict(const LitType& type, const std::vector<Li
       std::vector<LitValue> column;
       for (const auto& v : values) {
         LitValue cell{lit_type(K::kNull), Value::none()};
-        if (v.type.kind == K::kStruct) {
+        if (positional(v)) {
+          const auto& item = v.value.items[f];
+          if (item.kind != Kind::kNone) cell = {v.type.inner[0], item};
+        } else if (v.type.kind == K::kStruct) {
           const auto at = std::find(v.type.names.begin(), v.type.names.end(), type.names[f]);
           const auto i = static_cast<std::size_t>(at - v.type.names.begin());
           if (at != v.type.names.end() && i < v.value.entries.size()) cell = {v.type.inner[i], v.value.entries[i].second};
@@ -717,7 +724,7 @@ inline std::vector<Value> build_strict(const LitType& type, const std::vector<Li
       }
     }
     for (std::size_t r = 0; r < values.size(); ++r) {
-      if (values[r].type.kind != K::kStruct) {
+      if (values[r].type.kind != K::kStruct && !positional(values[r])) {
         out.emplace_back();
         continue;
       }

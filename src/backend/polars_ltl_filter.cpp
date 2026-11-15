@@ -278,8 +278,8 @@ std::optional<LiteralKey> literal_key(const EventAttribute& key) {
     return groups::modelled(key) ? std::optional<LiteralKey>(LiteralKey{groups::literal_item(key), false}) : std::nullopt;
   if (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple) return std::nullopt;
   if (key.children.empty() || (key.children.size() == 1 && groups::text_key(key.children.front()))) return std::nullopt;
-  if (key.children.size() != 1)
-    throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: several items");
+  // Round CQ: several items are no one literal (list_key_failure).
+  if (key.children.size() != 1) return std::nullopt;
   const auto& item = key.children.front();
   if (item.container != AttributeContainerKind::kContainer && !item.is_null && !is_native_na_attribute(item) && !groups::modelled(item))
     throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: the item type");
@@ -310,6 +310,22 @@ std::string time_sort(const EventAttribute& key) {
   }
   return "col(" + quote(key.value) + ")";
 }
+std::string list_key_display(const EventAttribute& key) {
+  namespace lit = detail::polars_lit;
+  if (key.children.empty()) return "[]";
+  return lit::literal_list_display(lit::argument_literal(key));
+}
+std::string over_keys_display(const EventAttribute& key) {
+  std::string out;
+  for (const auto& item : key.children) {
+    if (!out.empty()) out += ", ";
+    out += groups::text_key(item) ? "col(" + quote(item.value) + ")" : literal_alias(LiteralKey{groups::literal_item(item), false});
+  }
+  return out;
+}
+// Round CQ: four or more four_eyes activities with a literal case key fail
+// at the third pair join, the pairs counted in (i, j) order (probe cq/q5).
+std::pair<std::size_t, std::size_t> third_pair(std::size_t n) { return n == 3 ? std::pair<std::size_t, std::size_t>{1, 2} : std::pair<std::size_t, std::size_t>{0, 3}; }
 std::string render(std::string_view pattern, const EventTable& source, const Prepared& p,
                    const std::string& expression = "") {
   const auto& o = p.options;
@@ -365,9 +381,18 @@ std::string render(std::string_view pattern, const EventTable& source, const Pre
     {"LITERAL", [&] { return literal ? literal_alias(*literal) : std::string("0"); }},
     {"LITERAL_S", [&] { return literal ? groups::key_text(literal->item) : std::string("0"); }},
     {"LITERAL_K", [&] { return literal ? literal_sort_key(*literal) : std::string("0"); }},
+    // Round CQ: the filter-failure tail names a literal case key as the
+    // window and sort key (case 373 of the fresh CK 11 bank).
+    // Round CQ: a list case key as the select, group_by and sort print it
+    // (one List literal) and as over() prints its items.
+    {"LIST_KEY", [&] { return list_key_display(o.case_id_key); }},
+    {"OVER_KEYS", [&] { return over_keys_display(o.case_id_key); }},
+    {"TIME_Q", [&] { return quote(o.timestamp_key.value); }},
+    {"CASE_OVER", [&] { return literal ? literal_alias(*literal) : "col(" + quote(o.case_id_key.value) + ")"; }},
+    {"CASE_SORT", [&] { return literal ? literal_sort_key(*literal) : "col(" + quote(o.case_id_key.value) + ")"; }},
     {"FIRST", item_at(0)}, {"SECOND", item_at(1)}, {"THIRD", item_at(2)}, {"LAST", item_at(p.values.empty() ? none : p.values.size() - 1)},
-    {"PAIR_A", item_at(p.values.size() < 2 ? none : p.values.size() - 2)},
-    {"PAIR_B", item_at(p.values.empty() ? none : p.values.size() - 1)}, {"EXPR", [&] { return expression; }}
+    {"PAIR_A", item_at(p.values.size() < 3 ? none : third_pair(p.values.size()).first)},
+    {"PAIR_B", item_at(p.values.size() < 3 ? none : third_pair(p.values.size()).second)}, {"EXPR", [&] { return expression; }}
   };
   std::string out;
   for (std::size_t at = 0; at < pattern.size();) {
@@ -552,6 +577,97 @@ std::vector<std::string> four_eyes_stack(const Prepared& p, bool filter, std::si
   nodes.insert(nodes.end(), {"join right", "join"});
   return nodes;
 }
+// Round CQ: a list case key of several items or of str items (probes cq/q4,
+// q5). The reference selects and groups by [case key, resource] (the list
+// one List literal named "literal") and joins and windows over the key's
+// items (a str a column, any other value a literal): several literals repeat
+// the name "literal", a str item is missing from the select or group_by
+// output, and eventually_follows' window resolves its str items against the
+// frame. Mixed items fail earlier (list_key_literal). Returns only for
+// eventually_follows over present, distinct str items with at most one
+// activity, which joins on those columns (row_case_key).
+std::vector<std::string> list_names(const EventAttribute& key) {
+  std::vector<std::string> out;
+  for (const auto& item : key.children) out.push_back(item.value);
+  return out;
+}
+bool str_items(const EventAttribute& key) {
+  return !key.children.empty() && std::all_of(key.children.begin(), key.children.end(), [](const EventAttribute& v) { return groups::text_key(v); });
+}
+std::vector<std::string> four_first_join_stack(const Prepared& p);
+void list_key_failure(const EventTable& source, const Prepared& p, const std::string& phase) {
+  const auto& o = p.options;
+  const auto& items = o.case_id_key.children;
+  const bool strs = str_items(o.case_id_key);
+  const bool literals = std::all_of(items.begin(), items.end(), [](const EventAttribute& v) {
+    return v.container == AttributeContainerKind::kScalar && (null(v) || groups::modelled(v));
+  });
+  if (!strs && !literals) throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: the item types");
+  const auto names = strs ? list_names(o.case_id_key) : std::vector<std::string>{};
+  const auto missing = [&](const std::string& name, const std::vector<std::string>& valid) {
+    std::string out = "unable to find column " + debug_quote(name) + "; valid columns: [";
+    for (std::size_t i = 0; i < valid.size(); ++i) { if (i) out += ", "; out += debug_quote(valid[i]); }
+    out += ']';
+    if (const auto hint = detail::polars_column_hint(name, valid)) out += "\n\nDid you mean " + debug_quote(*hint) + '?';
+    return out;
+  };
+  const auto literal_repeat = [&](const std::string& node) { return groups::duplicate_message("literal", node); };
+  if (p.operation == Op::kFourEyes) {
+    if (strs && std::find(names.begin(), names.end(), o.resource_key.value) != names.end())
+      throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: the resource as a case item");
+    const auto tail = restack(render(kFourListJoin, source, p), four_first_join_stack(p));
+    if (strs) fail("ColumnNotFoundError", phase, missing(names.front(), {"literal", o.resource_key.value}) + tail);
+    fail("InvalidOperationError", phase, "joining with repeated key names; already joined on literal and literal" + tail);
+  }
+  if (p.operation == Op::kDifferentPersons) {
+    if (strs && std::any_of(names.begin(), names.end(), [&](const std::string& n) { return n == o.resource_key.value || n == "count"; }))
+      throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: a grouped column as a case item");
+    const auto tail = render(kDifferentListGroup, source, p);
+    if (strs) fail("ColumnNotFoundError", phase, missing(names.front(), {"literal", o.resource_key.value, "count"}) + tail);
+    fail("DuplicateError", phase, literal_repeat("group_by keys") + tail);
+  }
+  if (p.operation != Op::kEventuallyFollows) throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: the operation");
+  if (!text(o.timestamp_key)) throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: the timestamp key");
+  const auto n = p.values.size();
+  // The window resolves its columns first.
+  for (const auto& name : names)
+    if (std::find(source.columns.begin(), source.columns.end(), name) == source.columns.end())
+      fail("ColumnNotFoundError", phase, missing(name, source.columns) + render(kEventListSort, source, p));
+  // Then each activity's select repeats a name.
+  std::optional<std::string> repeated;
+  if (literals) repeated = "literal";
+  for (std::size_t i = 0; i < names.size() && !repeated; ++i)
+    for (std::size_t j = 0; j < i; ++j)
+      if (names[i] == names[j]) { repeated = names[i]; break; }
+  if (repeated) {
+    if (n == 0) fail("DuplicateError", phase, groups::duplicate_message(*repeated, "projections") + restack(render(kEventListOver, source, p), {"select", "unique", "join right", "join", "select"}));
+    fail("DuplicateError", phase, groups::duplicate_message(*repeated, "projections") + restack(render(kEventListFilter, source, p), eventually_stack(p, 0, false)));
+  }
+  if (n <= 1) return;
+  if (std::any_of(names.begin(), names.end(), [&](const std::string& c) { return c == "_index" || c == o.timestamp_key.value; }))
+    throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: a selected column as a case item");
+  std::vector<std::string> nodes{"join", "filter", "select", "unique", "join right", "join"};
+  repeat(nodes, static_cast<std::ptrdiff_t>(n) - 2, {"join left", "join"});
+  nodes.insert(nodes.end(), {"join right", "join", "select"});
+  fail("ColumnNotFoundError", phase, missing(names.front(), {"literal", "_index", o.timestamp_key.value}) + restack(render(kEventListSelect, source, p), nodes));
+}
+// Round CQ: four_eyes fails at its first pair join when a list case key
+// cannot join (no key, repeated literal keys, a str item the select left out):
+// after every pair join when positive, inside the filtered joins otherwise
+// (probe cq/q5).
+std::vector<std::string> four_first_join_stack(const Prepared& p) {
+  const auto pairs = static_cast<std::ptrdiff_t>(p.values.size() * (p.values.size() - 1) / 2);
+  std::vector<std::string> nodes{"join"};
+  if (truth(p.options.positive)) {
+    nodes.insert(nodes.end(), {"select", "unique"});
+    repeat(nodes, pairs, {"join left", "join"});
+  } else {
+    nodes.insert(nodes.end(), {"filter", "select", "unique"});
+    repeat(nodes, pairs - 1, {"join left", "join"});
+  }
+  nodes.insert(nodes.end(), {"join right", "join"});
+  return nodes;
+}
 std::string missing_tail(const EventTable& source, const Prepared& p, bool eager, bool sorting, bool attribute) {
   if (eager) return p.operation == Op::kDifferentPersons && !attribute ? render(kDifferentEagerGroupTail, source, p) : "";
   if (p.operation == Op::kEventuallyFollows)
@@ -563,6 +679,25 @@ std::string missing_tail(const EventTable& source, const Prepared& p, bool eager
 void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false, bool first_only = false, bool coercion = false);
 // A timestamp key the sort reads as a literal (a dict, a list or a number).
 bool literal_sort(const EventAttribute& key) { return collection(key) || (!text(key) && !null(key)); }
+// Round CQ: the first activity is the same literal (type and value) as a
+// later one, so both filters are one shared plan (probed: ['a', 'a'] and
+// ['a', 'b', 'a'] share, ['b', 'a', 'a'], [1, 1.0] and ['a', ('a',)] do not).
+bool first_activity_shared(const Prepared& p) {
+  namespace lit = detail::polars_lit;
+  if (p.values.size() < 2) return false;
+  const auto shape = [](const EventAttribute& v) {
+    try {
+      const auto value = lit::value_of(v);
+      if (lit::scalar_literal(value)) return lit::debug_name(lit::lit_value(value).type) + "|" + lit::scalar_display(value);
+      return std::string(v.container == AttributeContainerKind::kTuple ? "t|" : "l|") + lit::literal_text(lit::argument_literal(v));
+    } catch (const std::exception&) {
+      return std::string();
+    }
+  };
+  const auto first = shape(p.values.front());
+  if (first.empty()) return false;
+  return std::any_of(p.values.begin() + 1, p.values.end(), [&](const EventAttribute& v) { return shape(v) == first; });
+}
 void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   source.validate();
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars LTL requires every column dtype");
@@ -633,10 +768,13 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   if (!sequence_rule(p.operation)) { required(o.case_id_key, false, false); required(o.resource_key, false, false); }
   const auto literal = literal_key(o.case_id_key);
   if (collection(o.case_id_key) && !literal) {
-    if (!o.case_id_key.children.empty())
-      throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: str items");
-    if (p.operation == Op::kEventuallyFollows) fail("InvalidOperationError", phase, restack(render(kEventEmptyJoin, source, p), eventually_stack(p, 0, false, true)));
-    fail("InvalidOperationError", phase, render(p.operation == Op::kFourEyes ? kFourEmptyJoin : kDifferentEmptyJoin,source,p));
+    if (!o.case_id_key.children.empty()) list_key_failure(source, p, phase);
+    else {
+      if (p.operation == Op::kEventuallyFollows) fail("InvalidOperationError", phase, restack(render(kEventEmptyJoin, source, p), eventually_stack(p, 0, false, true)));
+      // Round CQ: the stack follows the activity count and sign (probe cq/q5).
+      if (p.operation == Op::kFourEyes) fail("InvalidOperationError", phase, restack(render(kFourEmptyJoin, source, p), four_first_join_stack(p)));
+      fail("InvalidOperationError", phase, render(kDifferentEmptyJoin, source, p));
+    }
   }
   if (p.operation != Op::kNext && collection(o.attribute_key) && !no_filter) {
     fail("ComputeError", phase, "The predicate expanded to zero expressions. This may for example be caused by a regex not matching column names or a column dtype match not hitting any dtypes in the DataFrame" + missing_tail(source,p,eager,false,true));
@@ -654,20 +792,27 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
       nodes.insert(nodes.end(), {"join right", "join", "select"});
       fail("DuplicateError", phase, restack(render(kEventLiteralJoin, source, p), nodes));
     }
-    if (p.values.size() != 3) throw std::invalid_argument("Native Polars LTL literal-case diagnostic plan covers three four_eyes activities");
-    fail("DuplicateError", phase, render(truth(o.positive) ? kFourLiteralJoin : kFourLiteralJoinNegative, source, p));
+    // Round CQ: later pairs add their joins below (probe cq/q5).
+    const auto pairs = static_cast<std::ptrdiff_t>(p.values.size() * (p.values.size() - 1) / 2);
+    std::vector<std::string> nodes{"join schema resolving", "join"};
+    repeat(nodes, pairs - 3, {"join left", "join"});
+    nodes.insert(nodes.end(), {"join right", "join"});
+    fail("DuplicateError", phase, restack(render(truth(o.positive) ? kFourLiteralJoin : kFourLiteralJoinNegative, source, p), nodes));
   }
   // Round CO: the activity filters run below the sort, so their compute
-  // errors come first (probe p20).
+  // errors come first (probe p20). Round CQ: only when the first activity's
+  // filter is shared with another activity (the same literal: the plan then
+  // caches it and resolves its schema before anything runs); otherwise the
+  // sort fails first (CK bank 2026111611 case 114).
   if (literal && p.operation == Op::kEventuallyFollows && p.values.size() == 2) {
-    validate_queries(source, p, eager, true); validate_queries(source, p, eager, false, false, true);
+    validate_queries(source, p, eager, true); if (first_activity_shared(p)) validate_queries(source, p, eager, false, false, true);
     if (source.rows.size() != 1)
       fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
   }
   // The literal sort key (one value) fails the sort when it runs, unless the
   // frame has one row.
   if (p.operation == Op::kEventuallyFollows && literal_sort(o.timestamp_key) && p.values.size() >= 2) {
-    validate_queries(source, p, eager, true); validate_queries(source, p, eager, false, false, true);
+    validate_queries(source, p, eager, true); if (first_activity_shared(p)) validate_queries(source, p, eager, false, false, true);
     if (source.rows.size() != 1)
       fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
   }
@@ -790,6 +935,26 @@ std::vector<std::size_t> sorted_rows(const EventTable& source, const Prepared& p
 std::string schema_join_error(const std::string& key,const std::string& left,const std::string& right) {
   return "datatypes of join keys don't match - `"+key+"`: "+left+" on left does not match `"+key+"`: "+right+" on right (and no other type was available to cast to)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nDF ["+quote(key)+"]; PROJECT */1 COLUMNS\n\nThis error occurred with the following context stack:\n\t[1] 'join'\n\t[2] 'select'\n";
 }
+// Round CQ: a row's join key: its case cell, or the cells of the columns a
+// list of str names (eventually_follows with at most one activity; probe
+// cq/q4); "n" when any is null.
+std::string row_case_key(const EventTable& source, const Prepared& p, const EventTable::Row& row) {
+  const auto& key = p.options.case_id_key;
+  if (collection(key) && str_items(key)) {
+    std::string out;
+    for (const auto& name : list_names(key)) {
+      const auto at = static_cast<std::size_t>(std::find(source.columns.begin(), source.columns.end(), name) - source.columns.begin());
+      if (at >= source.columns.size()) throw std::invalid_argument("Native Polars LTL list case key names a missing column");
+      const auto part = group_key(row[at], source.dtypes[at]);
+      if (part == "n") return "n";
+      out += part;
+      out += '\x1f';
+    }
+    return out;
+  }
+  const auto ci = column(source, key);
+  return ci ? group_key(row[*ci], source.dtypes[*ci]) : std::string("L");
+}
 Selection select_cases(const EventTable& source,const Prepared& p) {
   const auto ci=column(source,p.options.case_id_key),ai=column(source,p.options.attribute_key),ri=column(source,p.options.resource_key);
   namespace lit = detail::polars_lit;
@@ -804,7 +969,7 @@ Selection select_cases(const EventTable& source,const Prepared& p) {
     if(!lit::scalar_literal(v))return matches(cell,value);
     return lit::compare_scalar(cell,source.dtypes[*ai],v,lit::CompareOp::kEq,&categories)==1;
   };
-  const auto case_key=[&](std::size_t i){return ci?group_key(source.rows[i][*ci],source.dtypes[*ci]):std::string("L");};
+  const auto case_key=[&](std::size_t i){return row_case_key(source,p,source.rows[i]);};
   std::map<std::string,std::vector<std::size_t>> groups;
   for(const auto i:sorted_rows(source,p))groups[case_key(i)].push_back(i);
   Selection selected;const bool positive=truth(p.options.positive);
@@ -868,11 +1033,11 @@ Selection select_cases(const EventTable& source,const Prepared& p) {
 }
 EventTable project(const EventTable& source,const Prepared& p,const Selection& selected,bool eager) {
   if(!selected.deferred_type.empty())fail(selected.deferred_type,"collect",selected.deferred_message);
-  const auto ci=column(source,p.options.case_id_key);EventTable result=source;result.rows.clear();if(result.index)result.index->labels.clear();
+  EventTable result=source;result.rows.clear();if(result.index)result.index->labels.clear();
   auto order=std::vector<std::size_t>(source.rows.size());std::iota(order.begin(),order.end(),0);
   if(eager && p.operation==Op::kEventuallyFollows)order=sorted_rows(source,p);
   for(const auto i:order) {
-    const auto key=ci?group_key(source.rows[i][*ci],source.dtypes[*ci]):std::string("L");
+    const auto key=row_case_key(source,p,source.rows[i]);
     if(selected.keys.contains(key)){result.rows.push_back(source.rows[i]);if(result.index)result.index->labels.push_back(source.index->labels[i]);}
   }
   return result;

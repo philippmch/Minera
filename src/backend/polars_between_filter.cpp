@@ -355,6 +355,13 @@ std::string resolved_text(const Anchor& a, const std::string& column, const std:
     // Round CH: an int past the Int64 range shows its digits.
     const auto item = lit::integer_text(v);
     if (lit::float_dtype(dtype)) return c + ".is_in(" + cast_list(item, dtype) + ")";
+    // Round CQ: an int past the Int64 range is a UInt64: an unsigned column
+    // meets it in UInt64, a signed one in Float64 (cast strictly).
+    if (lit::wide_int(v)) {
+      if (dtype == "UInt64") return c + ".is_in(" + cast_list(item, "UInt64") + ")";
+      if (dtype.rfind("UInt", 0) == 0) return c + ".cast(UInt64).is_in(" + cast_list(item, "UInt64") + ")";
+      return c + ".strict_cast(Float64).is_in(" + cast_list(item, "Float64") + ")";
+    }
     if (lit::integer_range_side(v.integer, dtype) == 0) return c + ".is_in(" + cast_list(item, dtype) + ")";
     const auto [to, strict] = integer_supertype(dtype, v.integer);
     return c + (strict ? ".strict_cast(" : ".cast(") + to + ").is_in(" + cast_list(item, to) + ")";

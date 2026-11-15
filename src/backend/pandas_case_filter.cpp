@@ -302,7 +302,7 @@ std::vector<BusinessHourSlot> business_slots(const EventAttribute& value){
  for(const auto& slot:result){if(!merged.empty()&&slot.start_seconds<=merged.back().end_seconds+1)merged.back().end_seconds=std::max(merged.back().end_seconds,slot.end_seconds);else merged.push_back(slot);}
  return merged;
 }
-double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>& slots,bool nanosecond_column=true){
+double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>& slots,bool nanosecond_column=true,bool* fractional=nullptr){
  if(!g.first||!g.last){if(business)error("ValueError","cannot convert float NaN to integer");return std::numeric_limits<double>::quiet_NaN();}
  if(!date_value(*g.first)||!date_value(*g.last)){
   if(text_value(*g.first)||text_value(*g.last))error("TypeError","unsupported operand type(s) for -: '"+type_name(*g.last)+"' and '"+type_name(*g.first)+"'");
@@ -312,6 +312,7 @@ double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>
   const auto* a=std::get_if<NativeDate>(&g.first->typed_value);const auto* b=std::get_if<NativeDate>(&g.last->typed_value);
   const auto start=detail::local_wall_timestamp_microseconds(a?a->value:g.first->value),end=detail::local_wall_timestamp_microseconds(b?b->value:g.last->value);
   if(!start||!end)error("ValueError","cannot convert float NaN to integer");
+  if(fractional&&detail::business_elapsed_is_float(*start,*end,slots))*fractional=true;
   return detail::business_elapsed_seconds_microseconds(*start,*end,slots);
  }
  const auto a=instant(*g.first),b=instant(*g.last);if(!a||!b)return std::numeric_limits<double>::quiet_NaN();
@@ -450,7 +451,12 @@ EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribu
  const auto slots=business?business_slots(o.business_hour_slots):std::vector<BusinessHourSlot>{};
  // The datetime column's resolution (ns by default) sets the Timedelta unit.
  const bool nanosecond_column=s.dtypes.empty()||!(s.dtypes[t].starts_with("datetime64[us")||s.dtypes[t].starts_with("datetime64[ms")||s.dtypes[t].starts_with("datetime64[s"));
- std::vector<double> durations;for(const auto& g:grouped.values)durations.push_back(duration(g,business,slots,nanosecond_column));
+ // Round CQ: business durations are ints unless a slot bound is a float or
+ // a case starts or ends inside a slot (business_elapsed_is_float).
+ bool fractional=!business||(o.business_hour_slots.container!=AttributeContainerKind::kScalar&&
+  std::any_of(o.business_hour_slots.children.begin(),o.business_hour_slots.children.end(),[](const EventAttribute& pair){
+   return std::any_of(pair.children.begin(),pair.children.end(),[](const EventAttribute& bound){return type_name(bound)=="float";});}));
+ std::vector<double> durations;for(const auto& g:grouped.values)durations.push_back(duration(g,business,slots,nanosecond_column,&fractional));
  if(!business&&!s.dtypes.empty()&&!s.dtypes[t].starts_with("datetime64"))error("AttributeError","Can only use .dt accessor with datetimelike values");
  // Durations are a Series over the cases in sorted case order. The maximum
  // is applied first, then the minimum to the cases that remain.
@@ -458,9 +464,9 @@ EventTable filter_pandas_case_performance(const EventTable& s,const EventAttribu
  const auto order=sorted_groups(s,c,grouped);
  std::vector<bool> accepted(grouped.values.size());
  std::vector<std::size_t> remaining;
- const auto upper=duration_mask(durations,order,maximum,false);
+ const auto upper=duration_mask(durations,order,maximum,false,!fractional);
  for(std::size_t i=0;i<order.size();++i)if(upper[i])remaining.push_back(order[i]);
- const auto lower=duration_mask(durations,remaining,minimum,true);
+ const auto lower=duration_mask(durations,remaining,minimum,true,!fractional);
  for(std::size_t i=0;i<remaining.size();++i)if(lower[i])accepted[remaining[i]]=true;
  std::vector<bool> keep(s.size());for(std::size_t i=0;i<s.size();++i)keep[i]=grouped.rows[i]&&accepted[*grouped.rows[i]];
  // The accepted case ids select rows through an index whose dtype pandas
