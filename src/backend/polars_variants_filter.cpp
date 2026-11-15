@@ -297,10 +297,26 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
     if(!items.empty())fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");
     fail("InvalidOperationError",phase,"expected join keys/predicates\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nDF []; PROJECT */0 COLUMNS"+contexts({"join"}));
   }
-  if(collection(options.case_id_key)||integer(options.case_id_key))fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");
+  // Round CP: a list timestamp key is a Series literal too (built strictly
+  // while Python builds the sort), sorted as its one value.
+  const bool list_time=statistics&&(options.timestamp_key.container==AttributeContainerKind::kList||options.timestamp_key.container==AttributeContainerKind::kTuple);
+  if(list_time)if(const auto error=detail::polars_lit::argument_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
+  if(collection(options.case_id_key)||integer(options.case_id_key)) {
+    // Round CP: the statistics' group_by resolves the activity column before
+    // the sort by the literal runs (CM bank 2026111550 case 159).
+    if(statistics&&collection(options.case_id_key)&&text(options.activity_key)&&!keys::by_name(options.activity_key.value)&&
+       std::find(source.columns.begin(),source.columns.end(),options.activity_key.value)==source.columns.end()&&
+       (list_time||keys::dict_key(options.timestamp_key)||std::find(source.columns.begin(),source.columns.end(),options.timestamp_key.value)!=source.columns.end())) {
+      namespace lit=detail::polars_lit;
+      const auto time=list_time?lit::literal_list_display(lit::argument_literal(options.timestamp_key)):sort_time(options,true);
+      fail("ColumnNotFoundError",phase,missing_prefix(options.activity_key.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\nSORT BY ["+
+           lit::literal_list_display(lit::argument_literal(options.case_id_key))+", "+time+"]\n  "+frame_plan(source)+contexts({"group_by"}));
+    }
+    fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");
+  }
   const auto position=[&](const std::string& key,bool activity=false){auto found=std::find(source.columns.begin(),source.columns.end(),key);if(found==source.columns.end())missing(source,key,activity,statistics,options,phase,eager_source||(!statistics&&phase=="apply"));return static_cast<std::size_t>(found-source.columns.begin());};
-  const bool literal_time=statistics&&keys::dict_key(options.timestamp_key);
-  if(literal_time)if(const auto error=detail::polars_lit::dict_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
+  const bool literal_time=statistics&&(keys::dict_key(options.timestamp_key)||list_time);
+  if(literal_time&&!list_time)if(const auto error=detail::polars_lit::dict_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
   const auto case_at=position(options.case_id_key.value),time_at=literal_time?case_at:position(statistics?options.timestamp_key.value:"time:timestamp");
   if(collection(options.activity_key)){
     if(statistics)return {};
@@ -329,6 +345,12 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
   return result;
 }
 EventTable collect(const EventTable& source,const std::vector<std::string>& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
+  // Round CP: no admitted variant folds the filter to false, so the anti
+  // join keeps every row and the sort by a literal case key never runs
+  // (CM bank 2026111550 case 182).
+  if(labels.empty()&&!truth(options.positive)&&collection(options.case_id_key)&&!options.case_id_key.children.empty()&&
+     std::none_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),[](const EventAttribute& v){return text(v);}))
+    return source;
   const auto groups=grouped(source,options,false,phase);std::unordered_map<std::string,bool> matches;
   for(const auto& group:groups.groups)matches.emplace(group.key,!group.absent&&std::find(labels.begin(),labels.end(),group.label)!=labels.end());
   auto result=source;result.rows.clear();

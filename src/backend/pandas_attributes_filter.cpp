@@ -477,6 +477,19 @@ PandasAttributesFilterOptions resolve_attributes_options(const std::vector<Panda
  };
  for(const auto& p:parameters)if(p.enum_key==relative)assign(p.value);
  for(const auto& p:parameters)if(p.enum_key!=relative)assign(p.value);
+ if(relative){
+  // Round CP: the case count reads the case key enum first, the per-case
+  // grouping the key given last; the event filter reads the attribute key
+  // enum first.
+  std::optional<EventAttribute> enum_case,string_case,last_case,enum_attribute,string_attribute;
+  for(const auto& p:parameters){
+   if(p.value.key=="pm4py:param:case_id_key"){(p.enum_key?enum_case:string_case)=p.value;last_case=p.value;}
+   else if(p.value.key=="pm4py:param:attribute_key")(p.enum_key?enum_attribute:string_attribute)=p.value;
+  }
+  if(enum_case)result.case_id_key=*enum_case;
+  if(last_case)result.relative_case_id_key_last=*last_case;
+  if(enum_attribute||string_attribute)result.relative_attribute_key_enum=enum_attribute?*enum_attribute:*string_attribute;
+ }
  return result;
 }
 PandasAttributesFilterOptions resolve_attributes_options(const EventAttribute& parameters,bool relative=false){
@@ -528,19 +541,43 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  // frame, where pandas may take the key list itself as the grouper.
  // Round CK: a dict case key groups the per-case counts by mapping the
  // index labels (int labels never match its str keys), so no case forms.
- const bool unmatched_mapping=once&&!o.case_id_key.is_null&&o.case_id_key.container==AttributeContainerKind::kContainer&&
+ const EventAttribute& group_case=o.relative_case_id_key_last?*o.relative_case_id_key_last:o.case_id_key;
+ const bool unmatched_mapping=once&&!group_case.is_null&&group_case.container==AttributeContainerKind::kContainer&&
   (!s.index||std::all_of(s.index->labels.begin(),s.index->labels.end(),[](const auto& label){const auto* scalar=std::get_if<EventAttribute>(&label.value);return scalar&&!text_value(*scalar);}));
- if(once&&!unmatched_mapping&&!empty_list(o.case_id_key)&&s.size()!=2){
+ if(once&&!unmatched_mapping&&!empty_list(group_case)&&s.size()!=2){
   // Round CK: a list case key holding a dict or list is no label, so the
   // groupby takes it as a grouper array.
-  if(o.case_id_key.container==AttributeContainerKind::kList&&o.case_id_key.children.size()!=s.size()&&
-     std::any_of(o.case_id_key.children.begin(),o.case_id_key.children.end(),[](const auto& c){return detail::pandas_unhashable_type(c).has_value();}))
+  if(group_case.container==AttributeContainerKind::kList&&group_case.children.size()!=s.size()&&
+     std::any_of(group_case.children.begin(),group_case.children.end(),[](const auto& c){return detail::pandas_unhashable_type(c).has_value();}))
    error("ValueError","Grouper and axis must be same length");
-  direct_column(s,o.case_id_key);
+  direct_column(s,group_case);
  }
- // Round CK: df[key] refuses a dict before it looks at the rows.
- if(s.size()==0&&!once&&o.attribute_key.container==AttributeContainerKind::kContainer)detail::pandas_check_getitem_key(o.attribute_key,error);
- if(s.size()==0){if(o.attribute_key.container==AttributeContainerKind::kScalar)direct_column(s,o.attribute_key);return s;}
+ // Round CK: df[key] refuses a dict before it looks at the rows. Round CP:
+ // on an empty frame the per-event path reads df[key] (a list selects its
+ // columns, a tuple is one label), the per-case path groups by the key (a
+ // list is one grouper array, a tuple one label that must hash).
+ if(s.size()==0){
+  const auto& key=o.attribute_key;
+  if(key.container==AttributeContainerKind::kScalar){direct_column(s,key);return s;}
+  if(key.container==AttributeContainerKind::kList){
+   if(once){if(!key.children.empty())error("ValueError","Grouper and axis must be same length");}
+   else check_list_columns(s,key);
+   return s;
+  }
+  if(key.container==AttributeContainerKind::kTuple){
+   if(once)detail::pandas_check_hashable_key(key,error);
+   else {
+    for(const auto& child:key.children){
+     if(child.container==AttributeContainerKind::kContainer)error("TypeError","Passing a dict as an indexer is not supported. Use a list instead.");
+     if(child.container==AttributeContainerKind::kSet)error("TypeError","Passing a set as an indexer is not supported. Use a list instead.");
+    }
+    if(detail::pandas_unhashable_type(key))error("InvalidIndexError",repr(key));
+   }
+   error("KeyError",repr(key));
+  }
+  detail::pandas_check_getitem_key(key,error);
+  return s;
+ }
  if(once&&o.attribute_key.is_null)error("TypeError","'NoneType' object is not callable");
  // A list key is one grouper array.
  if(once&&o.attribute_key.container==AttributeContainerKind::kList){
@@ -548,19 +585,20 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  }
  if(empty_list(o.attribute_key))error("ValueError","No group keys passed!");
  const auto attribute=direct_column(s,o.attribute_key);
- std::optional<std::size_t> cases;std::unordered_set<std::string> all_cases;
+ std::optional<std::size_t> cases,grouped;std::unordered_set<std::string> all_cases;
  if(case_denominator&&!unmatched_mapping){
   if(empty_list(o.case_id_key))error("ValueError","The truth value of a Series is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().");
   cases=direct_column(s,o.case_id_key);
   for(std::size_t i=0;i<s.size();++i)if(!missing(cell(s,i,*cases)))all_cases.insert(group_key(cell(s,i,*cases)));
+  if(once)grouped=o.relative_case_id_key_last?direct_column(s,group_case):*cases;
  }
  struct Frequency {EventAttribute value;std::size_t count=0;std::unordered_set<std::string> cases;};
  std::vector<Frequency> frequencies;std::unordered_map<std::string,std::size_t> positions;
  for(std::size_t i=0;i<s.size()&&!unmatched_mapping;++i){const auto& value=cell(s,i,attribute);if(missing(value))continue;
   // Per-case counts group by (case, value), which drops null cases.
-  if(once&&missing(cell(s,i,*cases)))continue;
+  if(once&&missing(cell(s,i,*grouped)))continue;
   const auto key=group_key(value);const auto [position,added]=positions.emplace(key,frequencies.size());if(added)frequencies.push_back({value});
-  auto& f=frequencies[position->second];if(!once)++f.count;else f.cases.insert(group_key(cell(s,i,*cases)));
+  auto& f=frequencies[position->second];if(!once)++f.count;else f.cases.insert(group_key(cell(s,i,*grouped)));
  }
  // stake * count: only numbers and sequences multiply by an int; round CM:
  // the product is formed per counted value, so no value means no error
@@ -572,7 +610,9 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  const double threshold=!numeric(stake)?0.0:native_attribute_number(stake)*static_cast<double>(case_denominator?all_cases.size():s.size());
  std::vector<EventAttribute> admitted;for(const auto& f:frequencies)if(static_cast<double>(once?f.cases.size():f.count)>=threshold)admitted.push_back(f.value);
  EventAttribute values{"",""};values.container=AttributeContainerKind::kList;values.children=std::move(admitted);
- return values_filter(s,values,o,true);
+ if(!o.relative_attribute_key_enum)return values_filter(s,values,o,true);
+ auto events=o;events.attribute_key=*o.relative_attribute_key_enum;
+ return values_filter(s,values,events,true);
 }
 #define MINERA_ATTRIBUTES_ONE(name,relative) \
 EventTable name(const EventTable& s,const EventAttribute& v,const EventAttribute& p){return name(s,v,resolve_attributes_options(p,relative));} \

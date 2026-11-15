@@ -2163,8 +2163,13 @@ EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, cons
     // elementwise, so an NA cell takes part as the value stored under the
     // mask: an int of an IntN/UIntN column, NaN of a FloatN column, a bool of
     // a boolean column. Its key is NA either way.
+    // Round CP: a pandas string array (StringDtype, "str" or "string") on
+    // the left adds a masked activity column by its mask, so the NA rows
+    // stay missing; a masked case column on the left adds its stored values.
+    const auto string_array = [](const std::string& name) { return name == "str" || name == "string"; };
+    const bool string_partner = string_array(dtype(case_column));
     const auto stored = [&](const Cell& cell, const std::optional<NumericDtype>& dtype) -> Cell {
-      if (!dtype || !dtype->masked || !null_cell(cell)) return cell;
+      if (!dtype || !dtype->masked || !null_cell(cell) || string_partner) return cell;
       const auto& name = cell ? cell->key : std::string();
       if (dtype->kind == NumericDtype::Kind::kFloat) return float_cell(name, std::numeric_limits<double>::quiet_NaN());
       if (dtype->kind != NumericDtype::Kind::kBool) return int_cell(name, 1);
@@ -2738,6 +2743,9 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     // `in` matches an element that is the same object or ==: None is
     // None, a NaN cell is never the argument's NaN.
     if (value.kind == python::Scalar::Kind::kNone && cut.kind == python::Scalar::Kind::kNone) return true;
+    // Round CP: `in` a dict hashes first, so pd.NA meets no key and is never
+    // compared.
+    if (activity.kind == Kind::kDict && value.kind == python::Scalar::Kind::kNA) return false;
     return py_equal(value, cut);
   };
   // Round CN: a numpy scalar activity (a numeric or naive datetime64 column,

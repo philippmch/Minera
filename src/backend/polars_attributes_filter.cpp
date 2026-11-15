@@ -1127,6 +1127,10 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
       (void)distinct_case_count(source,options.case_id_key);
       throw std::invalid_argument("Native Polars per-case counts grouped by a struct literal case key are outside the modelled domain");
     }
+    // Round CP: a list case key is the group_by's Series literal, built
+    // strictly before pl.col reads it (CK bank 2026111590 case 212).
+    if(options.case_id_key.container==AttributeContainerKind::kList||options.case_id_key.container==AttributeContainerKind::kTuple)
+      if(const auto error=detail::polars_lit::argument_literal_error(options.case_id_key))fail("TypeError","apply",*error);
     const auto key=col_key(options.case_id_key,source.columns);
     if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
     const auto at=index_of(source,key.value);
@@ -1229,6 +1233,18 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     // value meets the threshold; df[list] names a dict item.
     const bool dict_items=(attr.container==AttributeContainerKind::kList||attr.container==AttributeContainerKind::kTuple)&&
         std::any_of(attr.children.begin(),attr.children.end(),[](const EventAttribute& v){return mapping(v);});
+    // Round CP: head(n) is built (and checks n) before the collected
+    // frame is indexed by the list (CK bank 2026111590 case 191).
+    if(dict_items&&op==Op::kTopActivities&&!eager) {
+      const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
+      if(!null(maximum)) {
+        if(text(maximum))fail("TypeError","apply","'<' not supported between instances of 'str' and 'int'");
+        if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
+        const auto n=exact(maximum);
+        if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");
+        if(n>TokenInteger(std::numeric_limits<std::int64_t>::max()))fail("OverflowError","apply","number too large to fit in target type");
+      }
+    }
     if(dict_items&&op==Op::kTopActivities&&!eager)
       fail("TypeError","apply",mapping(attr.children.front())?"cannot select columns using Sequence with elements of type 'dict'":"'dict' object is not an instance of 'str'");
     if(dict_items&&op!=Op::kTopActivities&&!mapping(attr.children.front())&&!(countoptions.keep_once_per_case&&truth(*countoptions.keep_once_per_case))) {

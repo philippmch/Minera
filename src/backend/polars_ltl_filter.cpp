@@ -472,7 +472,12 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
   }
   // A list activity becomes a Series literal when its filter is built.
   if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1))
-    for (const auto& query : out.values) {
+    for (std::size_t at = 0; at < out.values.size(); ++at) {
+      const auto& query = out.values[at];
+      // Round CP: four_eyes selects [case, resource] from each activity's
+      // filter as it builds it, so a list case key's literal fails after
+      // the first activity's (CM bank 2026111550 case 300).
+      if (out.operation == Op::kFourEyes && at == 1) list_key_literal(o.case_id_key);
       if (query.container == AttributeContainerKind::kList || query.container == AttributeContainerKind::kTuple)
         if (const auto error = detail::polars_lit::argument_literal_error(query)) fail("TypeError", "apply", *error);
       // Round CI: a dict becomes a struct literal then too (a list field
@@ -589,6 +594,12 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   }
   if (p.operation == Op::kNext) {
     if (null(o.attribute_key)) fail("TypeError", "apply", "cannot select columns using key of type 'NoneType': None");
+    // Round CP: an empty frame selects no case, so a dict key (or a list
+    // holding one) is never read; the empty selection fails the join.
+    const bool dict_read = keys::dict_key(o.attribute_key) ||
+                           (collection(o.attribute_key) && std::any_of(o.attribute_key.children.begin(), o.attribute_key.children.end(),
+                                                                       [](const EventAttribute& v) { return keys::dict_key(v); }));
+    if (dict_read && source.rows.empty()) return;
     if (keys::dict_key(o.attribute_key)) fail("TypeError", "apply", "cannot select columns using key of type 'dict': " + key_repr(o.attribute_key));
     if (collection(o.attribute_key) && std::any_of(o.attribute_key.children.begin(), o.attribute_key.children.end(), [](const EventAttribute& v) { return keys::dict_key(v); })) {
       if (keys::dict_key(o.attribute_key.children.front()))
@@ -614,6 +625,11 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   // The first activity's filter resolves before the first pair selects the
   // case and resource columns.
   if (p.operation == Op::kFourEyes && text(o.attribute_key)) validate_queries(source, p, eager, true, true);
+  // Round CP: a selector key expanding to no column fails the attribute
+  // filter before the case and resource columns resolve (CK bank 2026111590
+  // cases 156, 399).
+  if (!sequence_rule(p.operation) && collection(o.attribute_key) && !no_filter)
+    fail("ComputeError", phase, "The predicate expanded to zero expressions. This may for example be caused by a regex not matching column names or a column dtype match not hitting any dtypes in the DataFrame" + missing_tail(source,p,eager,false,true));
   if (!sequence_rule(p.operation)) { required(o.case_id_key, false, false); required(o.resource_key, false, false); }
   const auto literal = literal_key(o.case_id_key);
   if (collection(o.case_id_key) && !literal) {

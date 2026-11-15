@@ -128,6 +128,25 @@ std::string missing_columns(const std::vector<EventAttribute>& keys,bool all){
  return string_key_repr(list+" not in index");
 }
 std::size_t size_column(const EventTable& s,const EventAttribute& key){
+ // Round CP: df[[key]] with a list key nesting lists of one length builds
+ // an array of three or more dimensions: numeric leaves fail the Index, any
+ // other leaf the object buffer.
+ if(key.container==AttributeContainerKind::kList){
+  const auto sequence=[](const EventAttribute* e){return !e->is_null&&(e->container==AttributeContainerKind::kList||e->container==AttributeContainerKind::kTuple);};
+  std::vector<const EventAttribute*> level{&key};std::size_t dims=1;
+  for(;;){
+   if(!std::all_of(level.begin(),level.end(),sequence))break;
+   if(std::any_of(level.begin(),level.end(),[&](const auto* e){return e->children.size()!=level.front()->children.size();}))break;
+   ++dims;std::vector<const EventAttribute*> next;for(const auto* e:level)for(const auto& c:e->children)next.push_back(&c);
+   level=std::move(next);if(level.empty())break;
+  }
+  if(dims>=3&&!level.empty()&&std::none_of(level.begin(),level.end(),sequence)){
+   const bool numeric_leaves=std::all_of(level.begin(),level.end(),[](const auto* e){
+    return e->container==AttributeContainerKind::kScalar&&!e->is_null&&(type_name(*e)=="int"||type_name(*e)=="float"||type_name(*e)=="bool");});
+   if(numeric_leaves)error("ValueError","Index data must be 1-dimensional");
+   error("ValueError","Buffer has wrong number of dimensions (expected 1, got "+std::to_string(dims)+")");
+  }
+ }
  // df[[key]] (round CK: a list key becomes a tuple, which must hash).
  {EventAttribute wrapped{"",""};wrapped.container=AttributeContainerKind::kList;wrapped.children.push_back(key);detail::pandas_check_getitem_key(wrapped,error);}
  if(const auto i=find_column(s,key))return *i;

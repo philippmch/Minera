@@ -73,13 +73,12 @@ inline bool modelled(const EventAttribute& key) {
                             std::holds_alternative<double>(key.typed_value) || std::holds_alternative<bool>(key.typed_value));
 }
 
-// The dtype and cell of a literal key.
-inline Item literal_item(const EventAttribute& value) {
+// The dtype and cell of a literal key (a Python value).
+inline Item literal_item(const polars_lit::Value& v) {
   namespace lit = polars_lit;
   Item item;
   item.literal = true;
   item.name = "literal";
-  const auto v = lit::value_of(value);
   if (v.kind == lit::Kind::kDict)
     if (const auto error = lit::dict_literal_error(v)) lit::fail("TypeError", *error);
   auto typed = lit::lit_value(v);
@@ -98,6 +97,7 @@ inline Item literal_item(const EventAttribute& value) {
   item.value = typed.value;
   return item;
 }
+inline Item literal_item(const EventAttribute& value) { return literal_item(polars_lit::value_of(value)); }
 
 // A key as a plan prints it (col("c"), dyn int: 1, dyn float: 2.5, true,
 // null, {1,"x"}, [1, 2]).
@@ -162,6 +162,47 @@ Keys resolve(const EventAttribute& key, const std::vector<std::string>& columns,
       keys.appended.push_back(std::move(name));
     }
   }
+  return keys;
+}
+
+// Round CP: the same keys given as Python values (the Polars sequence
+// filters' parameters): a str item names a column, any other is a literal.
+inline std::vector<std::optional<Item>> build_values(const std::vector<polars_lit::Value>& key) {
+  std::vector<std::optional<Item>> out;
+  for (const auto& value : key)
+    out.push_back(value.kind == polars_lit::Kind::kString ? std::nullopt : std::optional<Item>(literal_item(value)));
+  return out;
+}
+template <typename Missing, typename Duplicate>
+Keys resolve_values(const std::vector<polars_lit::Value>& key, const std::vector<std::string>& columns, const std::vector<std::string>& dtypes,
+                    Missing&& missing, Duplicate&& duplicate) {
+  Keys keys;
+  auto built = build_values(key);
+  std::vector<std::string> names;
+  for (std::size_t i = 0; i < key.size(); ++i) {
+    Item item;
+    if (!built[i]) {
+      const auto at = std::find(columns.begin(), columns.end(), key[i].text);
+      if (at == columns.end()) missing(key[i].text);
+      item.column = static_cast<std::size_t>(at - columns.begin());
+      item.name = key[i].text;
+      item.dtype = item.column < dtypes.size() ? dtypes[item.column] : std::string();
+    } else {
+      item = std::move(*built[i]);
+    }
+    if (std::find(names.begin(), names.end(), item.name) != names.end()) duplicate(item.name);
+    names.push_back(item.name);
+    keys.items.push_back(std::move(item));
+  }
+  keys.extras = keys.any_literal();
+  if (keys.extras)
+    for (const auto& item : keys.items) {
+      auto name = std::find(columns.begin(), columns.end(), item.name) == columns.end() ? item.name : item.name + "_right";
+      if (std::find(columns.begin(), columns.end(), name) != columns.end() ||
+          std::find(keys.appended.begin(), keys.appended.end(), name) != keys.appended.end())
+        throw std::invalid_argument("Native Polars join keys outside observed domain: the right key column " + name + " exists");
+      keys.appended.push_back(std::move(name));
+    }
   return keys;
 }
 

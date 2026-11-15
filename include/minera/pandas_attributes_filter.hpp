@@ -27,6 +27,12 @@ struct PandasAttributesFilterOptions {
   std::optional<EventAttribute> stream_filter_value2;
   std::optional<std::variant<EventAttribute, PandasAttributesCountMap>> act_count0;
   std::optional<EventAttribute> most_common_variant;
+  // Round CP: the relative occurrence filter groups the per-case counts by
+  // the case key given last (enum or literal key), counts the cases by the
+  // enum key first, and filters the events by the enum attribute key first;
+  // case_id_key and attribute_key hold the other reads there.
+  std::optional<EventAttribute> relative_case_id_key_last;
+  std::optional<EventAttribute> relative_attribute_key_enum;
 };
 struct PandasAttributesFilterParameter { EventAttribute value; bool enum_key = false; };
 class PandasAttributesFilterError : public std::invalid_argument {

@@ -257,6 +257,18 @@ std::vector<CacheRow> membership_cache(const EventTable& source,const PandasVari
  if(options.case_id_key.is_null)error("TypeError","You have to supply one of 'by' and 'level'");
  if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("ValueError","No group keys passed!");
  const bool unmatched=unmatched_mapping_key(source,options.case_id_key);
+ // Round CP: a list of groupers holding a mapping reads its items in order:
+ // a mapping maps the index labels, None is called, a list must match the
+ // rows and any other item names a column.
+ if(!unmatched&&options.case_id_key.container==AttributeContainerKind::kList&&
+    std::any_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),[](const auto& item){return !item.is_null&&item.container==AttributeContainerKind::kContainer;})&&
+    (!source.index||std::all_of(source.index->labels.begin(),source.index->labels.end(),[](const auto& label){const auto* scalar=std::get_if<EventAttribute>(&label.value);return scalar&&!text_value(*scalar);})))
+  for(const auto& item:options.case_id_key.children){
+   if(item.container==AttributeContainerKind::kContainer)continue;
+   if(item.container==AttributeContainerKind::kScalar&&item.is_null)error("TypeError","'NoneType' object is not callable");
+   if(item.container==AttributeContainerKind::kList){if(item.children.size()!=source.size())error("ValueError","Grouper and axis must be same length");continue;}
+   if(!column(source,item))error("KeyError",repr(item));
+  }
  const auto cases=unmatched?0:direct_column(source,options.case_id_key);
  if(options.activity_key.container==AttributeContainerKind::kList&&options.activity_key.children.empty())error("AttributeError","'DataFrame' object has no attribute 'to_frame'");
  const auto activity=column(source,options.activity_key);

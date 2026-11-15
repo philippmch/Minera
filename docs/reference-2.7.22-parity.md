@@ -27449,3 +27449,111 @@ Tests:
   unmasked count keys of the tied-listing check; the bank test now masks
   those keys alike (forcing the mask on Linux reproduced the failure and
   passes all 13 Polars table banks with the fix). Native code unchanged.
+
+## Review CP1: re-review of round CO, list case keys in the Polars sequence filters, pandas key reads (2026-11-15)
+
+Round CP checked CO's CI (run 43702198127 on 02f8f96: green on all six
+jobs), worked the calls CO carried, captured a new Polars sequence domain
+for list and tuple case keys (`scripts/polars_sequence_filter_cp_domain.py`)
+and replayed fresh seeds of the CK, CJ, CI and CH domains and the pandas
+seeds CO captured. The device check on the Mac was skipped (no device
+linked).
+
+- **CP1-1 List case keys in the Polars sequence filters** (observed
+  black-box against Polars 1.44.1 through pm4py 2.7.22, probes `k1` to
+  `k10` in `review-harness/round-cp/probe/`, CP domain seed 2026111600:
+  121 differing calls before this round, 0 after). Polars reads a list or
+  tuple case key two ways. `sort([case, timestamp])` and
+  `group_by([case, activity])` take the whole list as one list literal,
+  which `pl.lit` builds while Python builds the plan (a `TypeError` when
+  its items mix types); in a sort it is one row long, so the sort fails
+  with `ShapeError` when it runs on a frame of any other height.
+  `group_by`, `select` and `join` take each item as one key (a str a
+  column, any other value a literal named `literal`, the rules of
+  `polars_group_keys.hpp`); a `group_by` on literal keys only plans as a
+  `SELECT` of the keys and the aggregations, one row whatever passed, so
+  the inner join keeps every row (none for a Null literal) and the anti
+  join none. An empty list joins with no keys (`expected join
+  keys/predicates`). A filter whose patterns are all empty never reads the
+  activities, so the sort is pruned and the groups come in the order they
+  first appear. `traces.apply` keys the matching case ids by the case key,
+  which a list cannot be (`unhashable type`, `KeyError` of the repr, an
+  empty list's `IndexError`, `Series name must be a string`). `rework`
+  with a dict or list activity key builds its literal in both callables
+  and fails `DuplicateError` on the two `literal` keys; `activity_split`
+  builds a list separator's literal, then fails `cannot cast List type
+  (inner: '...', to: 'String')` when the concat runs. The consecutive
+  activity grouping reads a list case key through `pl.col` (its names),
+  so a missing name fails before an empty dict selects nothing, before a
+  plain missing key, before the duplicate `_group_id`.
+- **CP1-2 Polars table leftovers** (single calls of the carried CK, CM and
+  CN banks): `A_next_B_next_C` on an empty frame never reads a dict
+  attribute key (or a list holding one), the empty selection fails the
+  join; a selector attribute key expanding to no column fails the LTL
+  attribute rules before the case and resource columns resolve;
+  `four_eyes_principle` builds a list case key's literal after the first
+  activity's filter; `filter_df_keeping_spno_activities` builds `head(n)`
+  (checking n) before it indexes the collected frame by a list; a list
+  case key of the count schema and a list timestamp key of the variants
+  statistics are Series literals built strictly while Python builds the
+  plan; the statistics' `group_by` resolves the activity column before the
+  sort by a literal runs; no admitted variant folds the filter to false,
+  so the anti join keeps every row and the literal sort never runs; a str
+  struct field cast to Float64 parses as a float.
+- **CP1-3 pandas key reads** (CO's fresh seeds 2026111582 and 2026111583,
+  CP's 2026111592 and 2026111593: 6 differing calls, 0 after):
+  `filter_df_relative_occurrence_event_attribute` reads its keys three
+  ways: the per-case grouping (with `KEEP_ONCE_PER_CASE` given) takes the
+  case key given last of the enum and the literal key, the case count
+  takes the enum key first, the event filter the enum attribute key first
+  (the value count the literal one first); on an empty frame the per-event
+  path reads `df[key]` (a list selects columns, a tuple is one label, a
+  tuple holding a list fails `InvalidIndexError`), the per-case path
+  groups by the key (a list is one grouper array, a tuple must hash).
+  `variants.apply` with a list of groupers holding a dict reads the items
+  in order (a dict maps the index labels, None is called, a list must
+  match the rows, any other item names a column). `filter_on_case_size`
+  with a list case key nesting lists of one length builds an array of
+  three or more dimensions (`Index data must be 1-dimensional` for numeric
+  leaves, `Buffer has wrong number of dimensions` otherwise).
+  `activity_split` tests a dict of activities by hash, so pd.NA meets no
+  key; the consecutive grouping adds a masked activity column to a pandas
+  string case column by its mask (the NA rows stay missing), while a
+  masked case column on the left adds its stored values.
+- **CP1-4 Fresh seeds.** Matched: Polars table CI 2026111597, CH
+  2026111598, the whole CN seed 2026111560; Polars sequence CJ 2026111596;
+  pandas CN LTL 2026111584 and 2026111594. Fixed to 0: Polars sequence CK
+  2026111532 (9 calls), 2026111551 (6), 2026111561 (5), 2026111581 (2),
+  2026111591 (1), CJ 2026111586 (1); one rework join of CH 2026111599
+  (case 542) keeps its rows in no fixed order (`unique(maintain_order=
+  False)` before the join), so the bank compares it unordered.
+- **CP1-5 CO's CI.** 02f8f96 ran green on Linux, macOS and Windows.
+
+Carried to round CQ:
+- Polars table: three `apply_numeric` calls whose struct-cast error order
+  differs (CM seed 2026111550 case 190, CK seed 2026111590 case 46, CJ
+  seed 2026111595 case 451). The conjuncts of the attribute filter fail in
+  an order that depends on the operator and on which side casts a struct
+  (`A & D` fails D's error, `D & A` A's, `D | A` D's; null bounds fold in a
+  single filter and split sequential ones); a right-first model broke 360
+  calls of the bound banks, so the left-first order stays.
+- Polars sequence: list activity keys naming two columns (probe `k6`, 18
+  calls).
+- LTL list case keys of several items or of str items; four or more
+  `four_eyes_principle` activities with a literal case key.
+
+Tests:
+- `docs/polars-sequence-filter-ck-bank.json.gz`,
+  `docs/polars-sequence-filter-cm-bank.json.gz`,
+  `docs/polars-sequence-filter-cn-bank.json.gz` and
+  `docs/polars-filter-cn-ck-bank.json.gz` hold their whole seeds again
+  (11,604, 18,925, 8,616 and 22,083 calls).
+- New: `docs/polars-sequence-filter-cp-bank.json.gz` (CP domain seed
+  2026111600, 8,324 calls), `docs/polars-sequence-filter-cp-fresh-bank.json.gz`
+  (CK 2026111581 and 2026111591, CH 2026111599; 25,300 calls),
+  `docs/polars-filter-cp-bank.json.gz` (CK 2026111590 without case 46's
+  carried call; 22,006 calls), `docs/pandas-filter-cp-bank.json.gz` (CK
+  2026111582 and 2026111592; 23,430 calls) and
+  `docs/pandas-sequence-filter-cp-bank.json.gz` (CK 2026111583 and
+  2026111593; 13,658 calls), replayed by the
+  `minera_*_cp_*bank_parity_tests` ctests.

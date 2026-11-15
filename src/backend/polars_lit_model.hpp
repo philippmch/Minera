@@ -1185,6 +1185,14 @@ inline std::optional<Value> cast_to(const Value& v, const std::string& dtype, co
     if (v.kind == Kind::kInt)
       return dtype == "Float32" ? Value::of(float32_of_int(v)) : in_float(static_cast<double>(v.integer));
     if (v.kind == Kind::kBool) return Value::of(v.boolean ? 1.0 : 0.0);
+    // Round CP: a str (a struct field cast with the struct) parses as a
+    // float, as cast_lit casts String to Float64.
+    if (v.kind == Kind::kString) {
+      char* end = nullptr;
+      const double d = std::strtod(v.text.c_str(), &end);
+      if (v.text.empty() || *end) return std::nullopt;
+      return in_float(d);
+    }
     return std::nullopt;
   }
   if (dtype == "Boolean") {
