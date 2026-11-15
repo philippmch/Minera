@@ -196,8 +196,12 @@ std::string bound_text(const ParsedExactTimestamp& v) {
 void selector(const EventAttribute& value) {
   if(!text(value)&&!collection(value))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(value)+"'.");
   // pl.col of a list reads every item as a column name (round CD).
-  if(collection(value)&&value.container!=AttributeContainerKind::kContainer)
+  if(collection(value)&&value.container!=AttributeContainerKind::kContainer){
+    // Round CL: a first item that is not a str is named as the iterable's type.
+    if(!value.children.empty()&&!text(value.children.front()))
+      fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(value.children.front())+"'.");
     for(const auto& item:value.children)if(!text(item))fail("TypeError","apply","'"+core_type(item)+"' object is not an instance of 'str'");
+  }
   if(collection(value)&&!value.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
 }
 struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;std::string attribute_dtype,time_dtype;std::vector<std::string> categories;};

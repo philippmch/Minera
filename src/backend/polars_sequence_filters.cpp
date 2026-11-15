@@ -59,13 +59,16 @@ bool at_least(const Number& a, const Number& b) {
   return x >= y;
 }
 
+// A parameter given twice keeps its last value (a Python dict literal).
 const Value* parameter(const PolarsFilterParameters& parameters, std::string_view member, std::string_view literal) {
   if (!parameters) return nullptr;
+  const Value* found = nullptr;
   for (const auto& p : *parameters)
-    if (p.enum_member && p.key == member) return &p.value;
+    if (p.enum_member && p.key == member) found = &p.value;
+  if (found) return found;
   for (const auto& p : *parameters)
-    if (!p.enum_member && p.key == literal) return &p.value;
-  return nullptr;
+    if (!p.enum_member && p.key == literal) found = &p.value;
+  return found;
 }
 Value parameter_or(const PolarsFilterParameters& parameters, std::string_view member, std::string_view literal,
                    Value fallback) {
@@ -77,11 +80,87 @@ std::string text_parameter(const PolarsFilterParameters& parameters, std::string
   const auto* found = parameter(parameters, member, literal);
   return found ? found->text : std::string(fallback);
 }
-std::string case_key(const PolarsFilterParameters& p) {
-  return text_parameter(p, "CASE_ID_KEY", kPolarsFilterCaseIdKeyParameter, kPolarsFilterCaseConceptName);
+// Round CL: a key given as a dict. pl.col(dict) selects the dict's keys by
+// name, so a dict naming no column fails `"k" not found` when the plan
+// resolves; the model keeps such a key as a name no column carries (marked
+// by a leading \x01). An empty dict selects nothing (\x02).
+constexpr char kByNameKey = '\x01';
+constexpr char kNoColumnsKey = '\x02';
+std::string key_text(const Value* found, std::string_view fallback) {
+  if (!found) return std::string(fallback);
+  if (found->kind == Kind::kDict) {
+    if (found->entries.empty()) return std::string(1, kNoColumnsKey);
+    std::string out;
+    for (const auto& [name, value] : found->entries) out += kByNameKey + (name.kind == Kind::kString ? name.text : std::string());
+    return out;
+  }
+  return found->text;
 }
+// The names of a by-name key, each once, in dict order.
+std::vector<std::string> by_names(const std::string& key) {
+  std::vector<std::string> names;
+  if (key.empty() || key.front() != kByNameKey) return names;
+  std::size_t at = 1;
+  while (true) {
+    const auto next = key.find(kByNameKey, at);
+    auto name = key.substr(at, next == std::string::npos ? std::string::npos : next - at);
+    if (std::find(names.begin(), names.end(), name) == names.end()) names.push_back(std::move(name));
+    if (next == std::string::npos) break;
+    at = next + 1;
+  }
+  return names;
+}
+const Value* case_key_value(const PolarsFilterParameters& p) {
+  return parameter(p, "CASE_ID_KEY", kPolarsFilterCaseIdKeyParameter);
+}
+const Value* activity_key_value(const PolarsFilterParameters& p) {
+  return parameter(p, "ACTIVITY_KEY", kPolarsFilterActivityKeyParameter);
+}
+std::string case_key(const PolarsFilterParameters& p) { return key_text(case_key_value(p), kPolarsFilterCaseConceptName); }
 std::string activity_key(const PolarsFilterParameters& p) {
-  return text_parameter(p, "ACTIVITY_KEY", kPolarsFilterActivityKeyParameter, kPolarsFilterDefaultNameKey);
+  return key_text(activity_key_value(p), kPolarsFilterDefaultNameKey);
+}
+bool by_name_key(const std::string& key) { return !key.empty() && key.front() == kByNameKey; }
+bool no_columns_key(const std::string& key) { return key.size() == 1 && key.front() == kNoColumnsKey; }
+
+// The reference builds its expressions before it collects: group_by, sort or
+// unique on a dict fail at once, and so does pl.col on a list.
+[[noreturn]] void dict_argument_error() {
+  fail("TypeError",
+       "Cannot pass a dictionary as a single positional argument.\n"
+       "If you merely want the *keys*, use:\n"
+       "  \xe2\x80\xa2 df.method(*your_dict.keys())\n"
+       "If you need the key value pairs, use one of:\n"
+       "  \xe2\x80\xa2 unpack as keywords:    df.method(**your_dict)\n"
+       "  \xe2\x80\xa2 build expressions:     df.method(expr.alias(k) for k, expr in your_dict.items())");
+}
+void check_dict_argument(const Value* key) {
+  if (key && key->kind == Kind::kDict) dict_argument_error();
+}
+std::string col_item_type(const Value& v) {
+  switch (v.kind) {
+    case Kind::kNone: return "NoneType";
+    case Kind::kBool: return "bool";
+    case Kind::kInt: return "int";
+    case Kind::kFloat: return "float";
+    case Kind::kString: return "str";
+    case Kind::kList: return "list";
+    case Kind::kTuple: return "tuple";
+    case Kind::kDict: return "dict";
+    case Kind::kDatetime: return "datetime";
+    case Kind::kDate: return "date";
+  }
+  return "object";
+}
+// pl.col on a list: every item a str, or the first item names the type.
+void check_col_list(const Value* key) {
+  if (!key || (key->kind != Kind::kList && key->kind != Kind::kTuple) || key->items.empty()) return;
+  const auto& first = key->items.front();
+  if (first.kind != Kind::kString)
+    fail("TypeError", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" +
+                          col_item_type(first) + "'.");
+  for (const auto& item : key->items)
+    if (item.kind != Kind::kString) fail("TypeError", "'" + col_item_type(item) + "' object is not an instance of 'str'");
 }
 bool positive_of(const PolarsFilterParameters& p) {
   return truthy(parameter_or(p, "POSITIVE", "positive", Value::of(true)));
@@ -137,6 +216,19 @@ struct Plan {
 };
 
 [[noreturn]] void column_not_found(const EventTable& df, const std::string& key, const Plan& plan) {
+  const auto source = plan.source.empty() ? frame_plan(df.columns) : plan.source;
+  const auto where = resolved(plan.node, plan.above.empty() ? source : plan.above + "\n  " + source, plan.stack);
+  if (by_name_key(key)) {
+    // The first name no column carries.
+    const auto names = by_names(key);
+    auto missing = names.front();
+    for (const auto& name : names)
+      if (std::find(df.columns.begin(), df.columns.end(), name) == df.columns.end()) {
+        missing = name;
+        break;
+      }
+    fail("ColumnNotFoundError", debug_quote(missing) + " not found" + where);
+  }
   auto valid = df.columns;
   valid.insert(valid.end(), plan.extra_columns.begin(), plan.extra_columns.end());
   std::string message = "unable to find column " + debug_quote(key) + "; valid columns: [";
@@ -146,9 +238,7 @@ struct Plan {
   }
   message += ']';
   if (const auto hint = detail::polars_column_hint(key, valid)) message += "\n\nDid you mean " + debug_quote(*hint) + '?';
-  const auto source = plan.source.empty() ? frame_plan(df.columns) : plan.source;
-  fail("ColumnNotFoundError", message + resolved(plan.node, plan.above.empty() ? source : plan.above + "\n  " + source,
-                                                 plan.stack));
+  fail("ColumnNotFoundError", message + where);
 }
 
 std::optional<std::size_t> find_column(const EventTable& df, const std::string& name) {
@@ -160,6 +250,30 @@ std::size_t require(const EventTable& df, const std::string& name, const Plan& p
   const auto found = find_column(df, name);
   if (!found) column_not_found(df, name, plan);
   return *found;
+}
+
+// Round CL: an activity key given as {} selects no column, so the grouped
+// frame holds the case column (and the other aggregations) only and the next
+// node misses the alias the activities would have had.
+struct NoColumns {
+  std::string alias;
+  std::string aggregations;  // the AGGREGATE list without the activities
+  std::vector<std::string> extra;
+  std::string node;
+  std::vector<std::string> stack;
+};
+[[noreturn]] void no_columns_aggregate(const EventTable& df, const std::string& case_glue, bool sorted,
+                                       const NoColumns& none) {
+  std::string message = "unable to find column " + debug_quote(none.alias) + "; valid columns: [" + debug_quote(case_glue);
+  for (const auto& c : none.extra) message += ", " + debug_quote(c);
+  message += ']';
+  const auto source = sorted ? "SORT BY [col(" + quote(case_glue) + "), col(" + quote(std::string(kPolarsFilterDefaultTimestampKey)) + ")]\n    " + frame_plan(df.columns)
+                             : frame_plan(df.columns);
+  fail("ColumnNotFoundError", message + resolved(none.node,
+                                                 std::string("AGGREGATE[maintain_order: ") + (sorted ? "true" : "false") +
+                                                     "]\n  [" + none.aggregations + "] BY [col(" + quote(case_glue) +
+                                                     ")]\n  FROM\n  " + source,
+                                                 none.stack));
 }
 
 std::string dtype_of(const EventTable& df, std::size_t column) {
@@ -470,8 +584,10 @@ EventTable boundary_filter(const EventTable& df, const Value& values, const std:
                            const std::string& act_key, bool positive, bool end) {
   const auto literal = list_literal(values.items);
   const auto case_column = require(df, case_glue, kBoundaryPlan);
-  const auto act = require(df, act_key, kBoundaryPlan);
   const std::string alias = end ? "end_activity" : "start_activity";
+  if (no_columns_key(act_key))
+    no_columns_aggregate(df, case_glue, false, NoColumns{alias, "", {}, "join", {"select", "join right", "join"}});
+  const auto act = require(df, act_key, kBoundaryPlan);
   check_is_in(df, act, literal, "join",
              "FILTER col(" + quote(alias) + ").is_in(" + literal_text(literal) +
                  ")\nFROM\n  AGGREGATE[maintain_order: false]\n    [col(" + quote(act_key) + ")." +
@@ -523,10 +639,11 @@ struct Variants {
   std::vector<std::vector<Cell>> activities;           // per case, sorted
 };
 Variants variants_of(const EventTable& df, const std::string& case_glue, const std::string& act_key,
-                     const Plan& sort_plan, const Plan& agg_plan) {
+                     const Plan& sort_plan, const Plan& agg_plan, const NoColumns* none = nullptr) {
   Variants out;
   out.case_column = require(df, case_glue, sort_plan);
   const auto ts = require(df, kTimestamp, sort_plan);
+  if (none && no_columns_key(act_key)) no_columns_aggregate(df, case_glue, true, *none);
   out.act = find_column(df, act_key).value_or(df.columns.size());
   if (out.act == df.columns.size()) {
     auto plan = agg_plan;
@@ -747,8 +864,10 @@ EventTable join_case_list(const EventTable& df, std::size_t case_column, const s
 // A lazy variants filter over the sorted, grouped rows.
 template <typename Predicate>
 EventTable lazy_variant_filter(const EventTable& df, const PolarsFilterParameters& parameters, Predicate&& matches,
-                               const std::function<void(const std::vector<std::vector<Cell>>&)>& evaluate = {}) {
-  const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kLazySortPlan, kLazyAggPlan);
+                               const std::function<void(const std::vector<std::vector<Cell>>&)>& evaluate = {},
+                               const std::string& alias = "variant") {
+  const NoColumns none{alias, "", {}, "join", {"select", "join right", "join"}};
+  const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kLazySortPlan, kLazyAggPlan, &none);
   if (evaluate) evaluate(v.activities);
   std::vector<Key> kept;
   for (std::size_t c = 0; c < v.order.size(); ++c)
@@ -766,7 +885,21 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   auto plan = kReworkPlan;
   std::size_t act = 0;
   const auto literal = list_literal(activities ? activities->items : std::vector<Value>{});
+  // Round CL: rework.apply groups by [case, activity], so an activity key
+  // given as a dict or list is a literal there (one constant group per case).
+  const auto* act_value = activity_key_value(parameters);
+  const bool constant_act = !activities && act_value && (act_value->kind == Kind::kDict || act_value->kind == Kind::kList);
+  if (constant_act) {
+    if (act_value->kind == Kind::kList) (void)list_literal(act_value->items);
+    else if (const auto error = detail::polars_lit::dict_literal_error(*act_value)) fail("TypeError", *error);
+  }
   if (activities) {
+    // pl.col({}) leaves the is_in filter without an expression.
+    if (no_columns_key(act_key))
+      fail("ComputeError",
+           "The predicate expanded to zero expressions. This may for example be caused by a regex not matching column names "
+           "or a column dtype match not hitting any dtypes in the DataFrame" +
+               resolved(kReworkPlan.node, frame_plan(df.columns), kReworkPlan.stack));
     act = require(df, act_key, kReworkPlan);
     plan.above = (activities->items.empty() ? "FILTER false.alias(" + quote(act_key) + ")"
                                             : "FILTER col(" + quote(act_key) + ").is_in(" + literal_text(literal) + ")") +
@@ -778,15 +911,40 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
       plan.above = "FILTER " + coerced_is_in(act_key, dtype_of(df, act), literal) + "\nFROM";
     }
   }
-  const auto case_column = require(df, case_glue, plan);
-  if (!activities) act = require(df, act_key, plan);
+  // Round CL: count >= MIN_OCCURRENCES. pl.lit builds a list or dict value
+  // while Python builds the filter (a build error before any column
+  // resolves); a str, list or dict then fails the comparison on the UInt32
+  // count while collecting (a dict as the struct comparisons of the table
+  // filters, with a present cell when a (case, activity) group exists).
   const auto minimum = parameter_or(parameters, "MIN_OCCURRENCES", "min_occurrences", Value::of(std::int64_t{2}));
+  std::optional<detail::polars_lit::Literal> minimum_list;
+  if (minimum.kind == Kind::kList) minimum_list = list_literal(minimum.items);
+  if (minimum.kind == Kind::kDict)
+    if (const auto error = detail::polars_lit::dict_literal_error(minimum)) fail("TypeError", *error);
+  const auto case_column = require(df, case_glue, plan);
+  if (!activities && !constant_act) act = require(df, act_key, plan);
   const auto threshold = number_of(minimum);
   std::vector<std::size_t> rows;
   for (std::size_t i = 0; i < df.size(); ++i)
     if (!activities || literal_has(literal, df.rows[i][act], dtype_of(df, act))) rows.push_back(i);
+  const auto in_expression = [](const std::string& expression, const std::string& larger = {}) {
+    return "\n\nThis error occurred in the following expression:\n\t" + expression + "\n" +
+           (larger.empty() ? std::string() : "while evaluating this larger expression:\n\t" + larger + "\n");
+  };
+  if (minimum.kind == Kind::kString)
+    fail("ComputeError", "cannot compare string with numeric type (u32)" +
+                             in_expression("[(col(\"count\")) >= (" + debug_quote(minimum.text) + ")]"));
+  if (minimum_list)
+    fail("SchemaError", "could not evaluate '>=' comparison between series 'count' of dtype: UInt32 and series 'literal' of dtype: " +
+                            debug_name(list_of(minimum_list->type)) +
+                            in_expression("[(col(\"count\")) >= (" + detail::polars_lit::literal_list_display(*minimum_list) + ")]"));
+  if (minimum.kind == Kind::kDict) {
+    const auto failure = detail::polars_lit::struct_failure("count", "UInt32", detail::polars_lit::struct_model(minimum, "UInt32"),
+                                                            !rows.empty(), detail::polars_lit::CompareOp::kGe);
+    if (failure) fail(failure->type, failure->message + in_expression(failure->expression, failure->larger));
+  }
   std::map<std::pair<Key, Key>, std::int64_t> counts;
-  for (const auto i : rows) ++counts[{key_of(df.rows[i][case_column]), key_of(df.rows[i][act])}];
+  for (const auto i : rows) ++counts[{key_of(df.rows[i][case_column]), constant_act ? Key{} : key_of(df.rows[i][act])}];
   std::vector<Key> kept;
   if (threshold)
     for (const auto& [key, count] : counts)
@@ -803,16 +961,61 @@ std::string filter_type(const PolarsFilterParameters& parameters) {
   return value.kind == Kind::kString ? value.text : std::string();
 }
 
+// Round CL: the construction-time checks of the case and activity keys, in
+// the order each filter builds its expressions, then the parameters with a
+// dict key naming exactly one column taken as that column's name.
+enum class KeyChecks {
+  kGrouped,    // group_by(case) before pl.col(activity): boundary and variant filters
+  kRework,     // group_by(case) only
+  kReworkSet,  // pl.col(activity) before group_by(case)
+  kColumns,    // pl.col on both keys
+  kSplit,      // group_by(case), then pl.col on both keys
+};
+PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterParameters& raw, KeyChecks checks) {
+  const auto* case_value = case_key_value(raw);
+  const auto* activity_value = activity_key_value(raw);
+  switch (checks) {
+    case KeyChecks::kGrouped:
+      check_dict_argument(case_value);
+      check_col_list(activity_value);
+      break;
+    case KeyChecks::kRework: check_dict_argument(case_value); break;
+    case KeyChecks::kReworkSet: check_col_list(activity_value); break;  // then the is_in literal, then group_by(case)
+    case KeyChecks::kColumns:
+      check_col_list(case_value);
+      check_col_list(activity_value);
+      break;
+    case KeyChecks::kSplit:
+      check_dict_argument(case_value);
+      check_col_list(case_value);
+      check_col_list(activity_value);
+      break;
+  }
+  // rework.apply groups by the activity key as given (see rework).
+  if (!raw || checks == KeyChecks::kRework) return raw;
+  auto out = raw;
+  for (auto& p : *out) {
+    const bool key = p.enum_member ? (p.key == "CASE_ID_KEY" || p.key == "ACTIVITY_KEY")
+                                   : (p.key == kPolarsFilterCaseIdKeyParameter || p.key == kPolarsFilterActivityKeyParameter);
+    if (!key || p.value.kind != Kind::kDict) continue;
+    const auto names = by_names(key_text(&p.value, ""));
+    if (names.size() == 1 && find_column(df, names.front())) p.value = Value::of(names.front());
+  }
+  return out;
+}
+
 }  // namespace
 
 // ------------------------------------------------------------------ public
 
 EventTable polars_start_activities_apply(const EventTable& df, const PolarsFilterValue& values,
-                                         const PolarsFilterParameters& parameters) {
+                                         const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
   return boundary_filter(df, values, case_key(parameters), activity_key(parameters), positive_of(parameters), false);
 }
 EventTable polars_end_activities_apply(const EventTable& df, const PolarsFilterValue& values,
-                                       const PolarsFilterParameters& parameters) {
+                                       const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
   return boundary_filter(df, values, case_key(parameters), activity_key(parameters), positive_of(parameters), true);
 }
 EventTable polars_filter_df_on_end_activities(const EventTable& df, const PolarsFilterValue& values,
@@ -874,8 +1077,10 @@ EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const s
 }
 
 EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterValue& admitted_traces,
-                                     const PolarsFilterParameters& parameters) {
-  const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kTraceSortPlan, kTraceAggPlan);
+                                     const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
+  const NoColumns none{"variant_list", "len().alias(\"count\")", {"count"}, "with_columns", {"with_columns"}};
+  const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kTraceSortPlan, kTraceAggPlan, &none);
   require_string_activities(df, v, case_key(parameters), activity_key(parameters));
   // Each admitted trace is iterated and its items read as str or None
   // (round CB).
@@ -898,7 +1103,8 @@ EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterVal
 }
 
 EventTable polars_starts_with_filter_apply(const EventTable& df, const PolarsFilterValue& prefixes,
-                                           const PolarsFilterParameters& parameters) {
+                                           const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
   if (prefixes.items.empty()) fail("TypeError", "invalid predicate for `filter`: None");
   std::vector<std::string> patterns;
   for (const auto& item : prefixes.items) patterns.push_back(python_join(item));
@@ -914,7 +1120,8 @@ EventTable polars_starts_with_filter_apply(const EventTable& df, const PolarsFil
 }
 
 EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilterValue& admitted_suffixes,
-                                         const PolarsFilterParameters& parameters) {
+                                         const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
   const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kSuffixSortPlan, kSuffixAggPlan);
   if (admitted_suffixes.items.empty()) fail("IndexError", "list index out of range");
   // A list or tuple first item joins every item with ","; otherwise each
@@ -1192,28 +1399,37 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
       if (same) return true;
     }
     return false;
-  }, evaluate);
+  }, evaluate, "activities");
 }
 }  // namespace
 
 EventTable polars_prefix_filter_apply(const EventTable& df, const PolarsFilterValue& prefixes,
-                                      const PolarsFilterParameters& parameters) {
+                                      const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
   return list_filter(df, prefixes, parameters, false);
 }
 EventTable polars_suffix_filter_apply(const EventTable& df, const PolarsFilterValue& suffixes,
-                                      const PolarsFilterParameters& parameters) {
+                                      const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
   return list_filter(df, suffixes, parameters, true);
 }
 
-EventTable polars_rework_filter_apply(const EventTable& df, const PolarsFilterParameters& parameters) {
+EventTable polars_rework_filter_apply(const EventTable& df, const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kRework);
   return rework(df, parameters, nullptr);
 }
 EventTable polars_rework_filter_apply_activity_set(const EventTable& df, const PolarsFilterValue& activities,
-                                                   const PolarsFilterParameters& parameters) {
+                                                   const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kReworkSet);
+  // The is_in literal is built before group_by(case).
+  (void)list_literal(activities.items);
+  check_dict_argument(case_key_value(raw_parameters));
   return rework(df, parameters, &activities);
 }
 
-EventTable polars_consecutive_act_case_grouping_apply(const EventTable& df, const PolarsFilterParameters& parameters) {
+EventTable polars_consecutive_act_case_grouping_apply(const EventTable& df,
+                                                     const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kColumns);
   const auto type = filter_type(parameters);
   const bool grouped = type == "first" || type == "last";
   const Plan plan{"select",
@@ -1221,6 +1437,22 @@ EventTable polars_consecutive_act_case_grouping_apply(const EventTable& df, cons
                           : std::vector<std::string>{"with_columns", "select"},
                   " WITH_COLUMNS:\n [dyn int: 1.cum_sum().alias(\"_row_num\")] ",
                   {"_row_num"}};
+  // Both keys go through pl.col; a dict's names expand before any column
+  // resolves (round CL).
+  for (const auto& key : {case_key(parameters), activity_key(parameters)})
+    if (by_name_key(key)) column_not_found(df, key, plan);
+  // A key given as {} empties the _group_id expression (with_columns of
+  // nothing); the select then misses _group_id, by name when ungrouped.
+  if (no_columns_key(case_key(parameters)) || no_columns_key(activity_key(parameters))) {
+    const auto where = resolved("select",
+                                " WITH_COLUMNS:\n [] \n   WITH_COLUMNS:\n   [dyn int: 1.cum_sum().alias(\"_row_num\")] \n    " +
+                                    frame_plan(df.columns),
+                                grouped ? std::vector<std::string>{"group_by", "select", "select"} : std::vector<std::string>{"select"});
+    if (!grouped) fail("ColumnNotFoundError", "\"_group_id\" not found" + where);
+    std::string message = "unable to find column \"_group_id\"; valid columns: [";
+    for (const auto& c : df.columns) message += debug_quote(c) + ", ";
+    fail("ColumnNotFoundError", message + "\"_row_num\"]" + where);
+  }
   const auto case_column = require(df, case_key(parameters), plan);
   const auto act = require(df, activity_key(parameters), plan);
   if (!grouped) return df;
@@ -1283,7 +1515,8 @@ EventTable polars_timestamp_case_grouping_apply(const EventTable& df, const Pola
 }
 
 EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterValue& activity,
-                                       const PolarsFilterParameters& parameters) {
+                                       const PolarsFilterParameters& raw_parameters) {
+  const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kSplit);
   const auto case_glue = case_key(parameters);
   const auto act_key = activity_key(parameters);
   const auto mode = parameter_or(parameters, "CUT_MODE", "cut_mode", Value::of("this"));

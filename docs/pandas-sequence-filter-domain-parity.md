@@ -239,3 +239,20 @@ set's order). Review CC1 in `docs/reference-2.7.22-parity.md` lists the
 fixes (named zones of object Timestamps, `isin` of datetime lists on
 `datetime64` columns, datetime arguments of the activity split, float keys
 of masked integer end activities).
+
+Round CL: `scripts/pandas_sequence_filter_ck_domain.py` puts dicts, lists
+holding dicts and dicts next to other values into the case and activity
+keys, the activity values and the parameters (including a parameters
+argument that is not a dict). `scripts/capture-pandas-sequence-filter-bank.py
+--domain pandas_sequence_filter_ck_domain.py --count 800 --bank-seed
+2026111531 --hash-seeds 0,1` writes
+`docs/pandas-sequence-filter-ck-bank.json.gz`, replayed by the same test
+(`minera_pandas_sequence_filter_ck_bank_parity_tests`):
+
+| Calls | Values | Errors | Not stored (no public outcome) | Varying across seeds | Failures |
+| --- | --- | --- | --- | --- | --- |
+| 9,377 | 5,278 | 4,098 | 1 | 0 | 0 |
+
+`rework.apply` with two missing key columns lists them in the KeyError in
+a hash-seed dependent order; the test accepts either order. Review CL1 in
+`docs/reference-2.7.22-parity.md` lists the fixes.

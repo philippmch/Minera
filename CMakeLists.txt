@@ -3033,6 +3033,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_sequence_filter_cc_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cc-bank.json.gz")
   set_tests_properties(minera_pandas_sequence_filter_cc_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CL: dicts, lists holding dicts and dicts next to other values as
+  # column keys, activity values and parameters (pandas sequence CK domain).
+  add_test(NAME minera_pandas_sequence_filter_ck_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-ck-bank.json.gz")
+  set_tests_properties(minera_pandas_sequence_filter_ck_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_sequence_filter_bank_parity_tests
     src/backend/tests/test_polars_sequence_filter_bank_parity.cpp
@@ -3067,6 +3072,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_cj_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cj-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_cj_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CL: Categorical/Enum activities, dicts and lists of dicts as case and
+  # activity keys, dict and list MIN_OCCURRENCES (CK domain, seed 2026111532,
+  # without the 17 calls carried to round CM).
+  add_test(NAME minera_polars_sequence_filter_ck_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-ck-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_ck_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3117,6 +3128,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cj_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cj-bank.json.gz")
   set_tests_properties(minera_polars_filter_cj_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CL: dicts where a column name goes and [{"a": 1}, [-1], 5]-style
+  # lists in the attribute value calls (CK domain, seed 2026111533, without
+  # the 497 calls carried to round CM).
+  add_test(NAME minera_polars_filter_ck_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-ck-bank.json.gz")
+  set_tests_properties(minera_polars_filter_ck_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

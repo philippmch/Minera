@@ -72,6 +72,14 @@ struct PandasFilterParameter {
 // std::nullopt is a None parameters argument.
 using PandasFilterParameters = std::optional<std::vector<PandasFilterParameter>>;
 
+// Round CL: a parameters argument that is neither None nor a dict. The
+// reference reads every key of it (parameters[k] for k in parameters) before
+// looking a parameter up: a list or tuple fails on its first item that is
+// not a valid index, a str on its first character, any other value on
+// iteration (PandasSequenceFilterError). A carrier that survives (an empty
+// list, or valid indices) reads as no parameters.
+void pandas_check_filter_parameters_carrier(const PandasFilterValue& parameters);
+
 // A public reference failure: the Python exception class and its str().
 class PandasSequenceFilterError : public std::invalid_argument {
  public:
@@ -106,6 +114,12 @@ inline constexpr std::string_view kPandasReworkIntCaseActSize = "@@int_case_act_
 [[nodiscard]] EventTable pandas_filter_df_on_start_activities(
     const EventTable& df, const PandasFilterValue& values, const std::string& case_id_glue = "case:concept:name",
     const std::string& activity_key = "concept:name", const PandasFilterValue& positive = PandasFilterValue::of(true));
+// Round CL: the column keys as the reference receives them (a dict case key
+// groups nothing and fails set_index; a dict activity key does not hash).
+[[nodiscard]] EventTable pandas_filter_df_on_start_activities(const EventTable& df, const PandasFilterValue& values,
+                                                              const PandasFilterValue& case_id_glue,
+                                                              const PandasFilterValue& activity_key,
+                                                              const PandasFilterValue& positive);
 // Keeps the cases whose start activity is counted at least `nocc` times
 // (counts by first appearance of the case, or sa_count0); a call that keeps
 // every counted activity returns the table unchanged.
@@ -113,12 +127,20 @@ inline constexpr std::string_view kPandasReworkIntCaseActSize = "@@int_case_act_
     const EventTable& df, const PandasFilterValue& nocc,
     const std::optional<PandasFilterValue>& sa_count0 = std::nullopt,
     const std::string& case_id_glue = "case:concept:name", const std::string& activity_key = "concept:name");
+[[nodiscard]] EventTable pandas_filter_df_on_start_activities_nocc(const EventTable& df, const PandasFilterValue& nocc,
+                                                                   const std::optional<PandasFilterValue>& sa_count0,
+                                                                   const PandasFilterValue& case_id_glue,
+                                                                   const PandasFilterValue& activity_key);
 
 [[nodiscard]] EventTable pandas_end_activities_apply(const EventTable& df, const PandasFilterValue& values,
                                                      const PandasFilterParameters& parameters = std::nullopt);
 [[nodiscard]] EventTable pandas_filter_df_on_end_activities(
     const EventTable& df, const PandasFilterValue& values, const std::string& case_id_glue = "case:concept:name",
     const std::string& activity_key = "concept:name", const PandasFilterValue& positive = PandasFilterValue::of(true));
+[[nodiscard]] EventTable pandas_filter_df_on_end_activities(const EventTable& df, const PandasFilterValue& values,
+                                                            const PandasFilterValue& case_id_glue,
+                                                            const PandasFilterValue& activity_key,
+                                                            const PandasFilterValue& positive);
 // The last activity of most_common_variant is kept whatever its count. With
 // return_dict the result also carries the kept counts (a dict whose null key
 // is NaN); an empty table is returned alone.
@@ -131,6 +153,10 @@ struct PandasEndActivitiesNocc {
     const std::optional<PandasFilterValue>& ea_count0 = std::nullopt,
     const std::string& case_id_glue = "case:concept:name", const std::string& activity_key = "concept:name",
     bool return_dict = false, const std::optional<PandasFilterValue>& most_common_variant = std::nullopt);
+[[nodiscard]] PandasEndActivitiesNocc pandas_filter_df_on_end_activities_nocc(
+    const EventTable& df, const PandasFilterValue& nocc, const std::optional<PandasFilterValue>& ea_count0,
+    const PandasFilterValue& case_id_glue, const PandasFilterValue& activity_key, bool return_dict,
+    const std::optional<PandasFilterValue>& most_common_variant);
 
 // trace_filter / starts_with_filter / ends_with_filter over each case's
 // variant string (its activities joined by ","; a null activity raises the

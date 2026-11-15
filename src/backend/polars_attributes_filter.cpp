@@ -200,6 +200,10 @@ std::optional<std::size_t> index_of(const EventTable& table,const std::string& n
 }
 void col_selector(const EventAttribute& value) {
   if(!text(value)&&!collection(value))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(value)+"'.");
+  // Round CL: pl.col of a list names the first item's type when it is not a
+  // str, else the first later item that is not one.
+  if(collection(value)&&!mapping(value)&&!value.children.empty()&&!text(value.children.front()))
+    fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(value.children.front())+"'.");
   if(collection(value))for(const auto& item:value.children)if(!text(item))fail("TypeError","apply","'"+python_type(item)+"' object is not an instance of 'str'");
   if(collection(value)&&!value.children.empty())throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
 }

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CK (2026-11-05 to 2026-11-15, cloud container)
+## Review-fix loop, rounds T–CL (2026-11-05 to 2026-11-15, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5248,40 +5248,79 @@ All fixed on the pandas table side:
 No fixture changed. The device check on the Mac was skipped again (no
 device linked).
 
-Next round (CL) should start by re-reviewing round CK:
+Round CL re-reviewed CK (Review CL1). CK's CI run 43657977486 was green
+on all six jobs. CL worked the three banks CK carried:
+- The pandas sequence dict bank (seed 2026111531) went from 1,037 calls
+  to 0: `Series == value` by dtype family for dict, list and tuple
+  values, dict and list keys in each filter's order of groupby,
+  selection, `df[...]`, hashing and `set_index`, the start/end `isin`
+  and nocc checks, non-dict parameter carriers, trace parts, a non-str
+  `SUBCASE_CONCAT_STR`, dict keys of `timestamp_case_grouping`. A fresh
+  seed (2026111541, 6,759 calls) matched.
+- The Polars sequence bank (seed 2026111532) went from 315 calls to 17:
+  construction-time key errors (`Cannot pass a dictionary ...`,
+  `invalid input for col`) in each filter's order, `pl.col(dict)` as a
+  by-name selection (`"k" not found`, first missing name), `{}` keys
+  (missing alias, `_group_id`, zero expressions), the activity literal
+  of `rework.apply`, str/list/dict `MIN_OCCURRENCES` (the struct
+  comparison model of the table filters, now also built from a
+  `PolarsFilterValue`), repeated parameters keeping the last value. A
+  fresh seed (2026111542, 4,366 calls) found 6 calls in the carried
+  classes.
+- The Polars table bank (seed 2026111533) went from 771 calls to 497:
+  one-field struct Series take one-item list or tuple rows, `pl.col`
+  lists name a non-str first item as the iterable's type, a dict case
+  key of `between.apply` is refused as a positional argument.
 
-- the CI run of the CK commit;
-- fresh seeds of `scripts/pandas_filter_ck_domain.py` (CK used 2026111530
-  and 2026111534) and of the CJ, CI and CH domains;
-- the pandas sequence dict bank (seed 2026111531, 1,037 calls): `rework`,
-  `prefixes` and `suffixes` with dict values (`Lengths must match`),
-  `consecutive_act_case_grouping` with a dict `FILTER_TYPE` (`list
-  indices must be integers or slices, not dict`; the model raised
-  `std::out_of_range`), `start_activities`/`end_activities` on dict keys
-  (`KeyError: 'Column not found: '`), the `set_index` messages and
-  `'list' object has no attribute 'items'`; the CK table helpers in
-  `src/backend/pandas_parameter_carrier.hpp` should carry over;
-- the Polars sequence CK bank (seed 2026111532, 315 calls; 100 in
-  `consecutive_act_case_grouping`): dict keys (`Cannot pass a dictionary
-  as a single positional argument.`, `invalid input for col`), the
-  missing `_group_id` column, struct `>=` comparisons of
-  `MIN_OCCURRENCES`, casts of struct lists to String;
-- the Polars table CK bank (seed 2026111533, 771 calls over 25
-  functions): dict column keys, where Polars raises `invalid input for
-  col`, `Cannot pass a dictionary as a single positional argument.` or
-  `"..." not found` and the model refuses the key ("outside observed
-  empty-list domain", `'dict' object is not an instance of 'str'`); and
-  `[{"a": 1}, [-1], 5]` (Polars names the list item, the model the
-  scalar);
-- the pandas table CK seed 2026111534 case 501: `eventually_follows`
-  with a list inside a timestamp boundary compares it with the joined
-  frame of its step (`('Lengths must match to compare', (0,), (1,))`);
-  the model does not track that frame's size;
+All three are in the suite:
+- `docs/pandas-sequence-filter-ck-bank.json.gz` (9,376 calls) as
+  `minera_pandas_sequence_filter_ck_bank_parity_tests`;
+- `docs/polars-sequence-filter-ck-bank.json.gz` (11,587 calls, the CK
+  seed without the 17 carried calls) as
+  `minera_polars_sequence_filter_ck_bank_parity_tests`;
+- `docs/polars-filter-ck-bank.json.gz` (21,406 calls, the CK seed
+  without the 497 carried calls) as
+  `minera_polars_filter_ck_bank_parity_tests`.
+The full banks with the carried calls are in the project files under
+`review-harness/round-cl/banks/` (`tools/dropcalls.py` and
+`tools/dropdump.py` drop a replay's mismatches from a bank).
+
+No fixture changed. The device check on the Mac was skipped again (no
+device linked).
+
+Next round (CM) should start by re-reviewing round CL:
+
+- the CI run of the CL commit;
+- fresh seeds of the CK domains (pandas table and sequence, Polars
+  sequence and table) and of the CJ, CI and CH domains;
+- the 497 Polars table calls (full bank
+  `review-harness/round-cl/banks/polars-filter-ck-2026111533.json.gz`):
+  dict column keys in all 25 functions. Each filter needs its own
+  probed order of `group_by`/`over`/`sort`/`unique` on a dict (`Cannot
+  pass a dictionary as a single positional argument.`), `pl.col` on a
+  list (`invalid input for col`) and `pl.col(dict)` as a by-name
+  selection (`"k" not found`, or the column when the dict names one);
+  the model still refuses the key ("outside observed empty-list
+  domain", "accepts only literal String or captured empty list") or
+  reports `'T' object is not an instance of 'str'` for a dict. The
+  Polars sequence helpers (`checked_keys`, `by_names`,
+  `no_columns_aggregate` in `src/backend/polars_sequence_filters.cpp`)
+  show the pattern;
+- the 17 Polars sequence calls (full bank
+  `review-harness/round-cl/banks/polars-sequence-filter-ck-2026111532.json.gz`):
+  a case key given as a list holding a dict is a literal in `group_by`
+  (a `literal` struct column; sort ShapeErrors, list joins,
+  DuplicateError with a literal activity), `timestamp_case_grouping`
+  with dict keys (struct `literal` output columns), a `[{}]` suffix
+  pattern with a `{}` activity key, `activity_split` with a list of
+  dicts as `SUBCASE_CONCAT_STR`;
+- the pandas table CK seed 2026111534 case 501 (`eventually_follows`
+  with a list inside a timestamp boundary);
 - the three fresh-seed calls of CK1-1: CJ table case 214
-  (`A_next_B_next_C`, Polars resolves the missing timestamp column before
-  building a failing dict literal), CJ sequence case 36 (`traces.apply`,
-  the Null case column join error), CB sequence case 431 (`rework.apply`
-  with `MIN_OCCURRENCES` 1 keeps another row);
+  (`A_next_B_next_C`), CJ sequence case 36 (`traces.apply`, the Null case
+  column join error), CB sequence case 431 (`rework.apply` with
+  `MIN_OCCURRENCES` 1 keeps the rows in another order; the model orders
+  the kept cases by text, Polars by its `unique` output);
 - still open from CJ's list: Int128 literals, `list[u64]` with a
   datetime struct field, a `bytes` anchor on a Null column, the items
   carried from CF (`coerced_scalar_is_in` on str and Categorical/Enum
@@ -5294,6 +5333,12 @@ Next round (CL) should start by re-reviewing round CK:
   pandas sequence filter items and the items carried from CB);
 - the open choices on CSV timestamp columns of plain numbers and "roles to
   diagnostics groups" (still declared unless Philipp answers).
+
+Round CK's targets, taken in CL (findings CL1-1 to CL1-4): CK's CI run,
+the pandas sequence dict bank (fixed), the Polars sequence bank (17
+carried), the Polars table bank (497 carried). Not taken (carried to CM):
+fresh seeds of the CJ, CI and CH domains, the pandas table case 501, the
+three CK1-1 calls and the older items (see the CM list above).
 
 Round CJ's targets, taken in CK (findings CK1-1 to CK1-8): CJ's CI run,
 fresh seeds of the CJ, CI, CH, CG, CF and CE domains, dict case ids and

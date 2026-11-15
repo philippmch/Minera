@@ -683,8 +683,11 @@ inline std::vector<Value> build_strict(const LitType& type, const std::vector<Li
       for (const auto& v : values) out.push_back(v.type.kind == K::kNull ? Value::none() : Value::dict({}));
       return out;
     }
+    // Round CL: a one-field struct also takes a one-item list or tuple (a
+    // positional row) without complaint.
     for (const auto& v : values)
-      if (v.type.kind != K::kNull && v.type.kind != K::kStruct)
+      if (v.type.kind != K::kNull && v.type.kind != K::kStruct &&
+          !(v.type.kind == K::kList && type.inner.size() == 1 && v.value.items.size() == 1))
         build_error("unexpected value while building Series of type " + debug_name(type) + "; found value of type " +
                     debug_name(v.type) + ": " + lit_display(v.type, v.value));
     std::vector<std::vector<Value>> fields;
@@ -1938,8 +1941,8 @@ struct StructModel {
   std::vector<StructField> fields;
   bool cast_column = false;  // the plan casts the column (integer and float with every supertype, Null)
 };
-inline StructModel struct_model(const EventAttribute& value, const std::string& dtype) {
-  StructModel m{struct_fields(value), false};
+inline StructModel struct_model(std::vector<StructField> fields, const std::string& dtype) {
+  StructModel m{std::move(fields), false};
   if (dtype == "Null") {
     m.cast_column = true;
     return m;
@@ -1952,6 +1955,10 @@ inline StructModel struct_model(const EventAttribute& value, const std::string& 
   m.cast_column = true;
   return m;
 }
+inline StructModel struct_model(const EventAttribute& value, const std::string& dtype) {
+  return struct_model(struct_fields(value), dtype);
+}
+inline StructModel struct_model(const Value& value, const std::string& dtype) { return struct_model(struct_fields(value), dtype); }
 inline bool struct_null(const StructField& f) { return !f.nested && f.value.kind == Kind::kNone; }
 // A field value as a number of its supertype (Booleans 0 and 1, datetimes
 // their microseconds, dates their days).

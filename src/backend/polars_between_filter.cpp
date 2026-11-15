@@ -148,6 +148,15 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
   const auto& key = options.case_id_key;
   if (null(key)) fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (!text(key)) {
+    // Round CL: a dict case key is refused as a positional argument.
+    if (key.container == AttributeContainerKind::kContainer)
+      fail("TypeError", "apply",
+           "Cannot pass a dictionary as a single positional argument.\n"
+           "If you merely want the *keys*, use:\n"
+           "  \xe2\x80\xa2 df.method(*your_dict.keys())\n"
+           "If you need the key value pairs, use one of:\n"
+           "  \xe2\x80\xa2 unpack as keywords:    df.method(**your_dict)\n"
+           "  \xe2\x80\xa2 build expressions:     df.method(expr.alias(k) for k, expr in your_dict.items())");
     if (collection(key)) fail("TypeError", "apply", "'" + core_type(key) + "' object is not an instance of 'str'");
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(key) + "'.");
   }

@@ -279,8 +279,14 @@ PandasFilterValue value_of(const Json& node) {
 }
 
 // A parameters dictionary: "enum:NAME" keys are Parameters members.
+// Round CL: any other carrier is checked as the reference reads it and
+// then reads as no parameters.
 PandasFilterParameters parameters_of(const Json& node) {
   if (tag_of(node) == "n") return std::nullopt;
+  if (tag_of(node) != "m") {
+    pandas_check_filter_parameters_carrier(value_of(node));
+    return std::nullopt;
+  }
   std::vector<PandasFilterParameter> out;
   for (const auto& pair : body(node).items) {
     const auto& key = body(pair.items.at(0)).text;
@@ -372,6 +378,26 @@ std::string keyword_text(const Json& kwargs, const std::string& name, const std:
   const auto* found = keyword(kwargs, name);
   return found ? body(*found).text : fallback;
 }
+// Round CL: a column key keyword as passed (a dict or list included).
+PandasFilterValue keyword_value(const Json& kwargs, const std::string& name, const std::string& fallback) {
+  const auto* found = keyword(kwargs, name);
+  return found ? value_of(*found) : PandasFilterValue::of(fallback);
+}
+// Python's truth value of an argument.
+bool python_truth(const PandasFilterValue& v) {
+  using K = PandasFilterValue::Kind;
+  switch (v.kind) {
+    case K::kNone: return false;
+    case K::kBool: return v.boolean;
+    case K::kInt: return v.integer != 0;
+    case K::kFloat: return v.real != 0.0;
+    case K::kString: return !v.text.empty();
+    case K::kList:
+    case K::kTuple: return !v.items.empty();
+    case K::kDict: return !v.entries.empty();
+    default: return true;
+  }
+}
 
 // ------------------------------------------------------------ modules
 
@@ -404,8 +430,8 @@ using Args = std::vector<const Json*>;
 Json start_activities_module(const std::string& function, const EventTable& df, const Args& args,
                              const Json& kwargs) {
   if (function == "apply") return table_node(pandas_start_activities_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
-  const auto glue = keyword_text(kwargs, "case_id_glue", "case:concept:name");
-  const auto activity = keyword_text(kwargs, "activity_key", "concept:name");
+  const auto glue = keyword_value(kwargs, "case_id_glue", "case:concept:name");
+  const auto activity = keyword_value(kwargs, "activity_key", "concept:name");
   if (function == "filter_df_on_start_activities") {
     const auto* positive = keyword(kwargs, "positive");
     return table_node(pandas_filter_df_on_start_activities(df, value_of(*args.at(0)), glue, activity,
@@ -421,8 +447,8 @@ Json start_activities_module(const std::string& function, const EventTable& df, 
 
 Json end_activities_module(const std::string& function, const EventTable& df, const Args& args, const Json& kwargs) {
   if (function == "apply") return table_node(pandas_end_activities_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
-  const auto glue = keyword_text(kwargs, "case_id_glue", "case:concept:name");
-  const auto activity = keyword_text(kwargs, "activity_key", "concept:name");
+  const auto glue = keyword_value(kwargs, "case_id_glue", "case:concept:name");
+  const auto activity = keyword_value(kwargs, "activity_key", "concept:name");
   if (function == "filter_df_on_end_activities") {
     const auto* positive = keyword(kwargs, "positive");
     return table_node(pandas_filter_df_on_end_activities(df, value_of(*args.at(0)), glue, activity,
@@ -434,7 +460,7 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
     const auto* variant = keyword(kwargs, "most_common_variant");
     const auto out = pandas_filter_df_on_end_activities_nocc(
         df, value_of(*args.at(0)), counts ? std::optional(value_of(*counts)) : std::nullopt, glue, activity,
-        dict && body(*dict).boolean, variant ? std::optional(value_of(*variant)) : std::nullopt);
+        dict && python_truth(value_of(*dict)), variant ? std::optional(value_of(*variant)) : std::nullopt);
     if (out.counts) return jtagged("t", jarray({table_node(out.table), typed_value(*out.counts)}));
     return table_node(out.table);
   }
@@ -478,6 +504,31 @@ Json timestamp_case_grouping_module(const std::string& function, const EventTabl
 Json activity_split_module(const std::string& function, const EventTable& df, const Args& args) {
   if (function == "apply") return table_node(pandas_activity_split_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
   throw std::runtime_error("unbound function " + function);
+}
+
+// Round CL: rework.apply selects df[list({activity, case})]; the order of
+// that set (and so of the two names in the KeyError when both columns are
+// missing) follows the str hashes of the interpreter's hash seed. Either
+// order is the reference's.
+std::vector<Json> with_hash_orders(const std::vector<Json>& expected) {
+  auto out = expected;
+  for (const auto& e : expected) {
+    const auto* error = e.get("error");
+    if (!error || error->items.size() != 2 || error->items[0].text != "KeyError") continue;
+    const auto& message = error->items[1].text;
+    const auto open = message.find("None of [Index([");
+    const auto close = message.find("], dtype=");
+    if (open == std::string::npos || close == std::string::npos) continue;
+    const auto from = open + 16;
+    const auto names = message.substr(from, close - from);
+    const auto comma = names.find(", ");
+    if (comma == std::string::npos || names.find(", ", comma + 2) != std::string::npos) continue;
+    auto swapped = e;
+    swapped.fields.at("error").items[1].text =
+        message.substr(0, from) + names.substr(comma + 2) + ", " + names.substr(0, comma) + message.substr(close);
+    out.push_back(std::move(swapped));
+  }
+  return out;
 }
 
 // The value of a call or the public failure it raised.
@@ -549,6 +600,7 @@ int main(int argc, char** argv) try {
       if (const auto* single = node.get("outcome")) expected.push_back(normalized(*single));
       else
         for (const auto& observed : node.at("observed").items) expected.push_back(normalized(observed));
+      if (module == "rework") expected = with_hash_orders(expected);
       bool matched = false;
       for (const auto& e : expected) matched = matched || serialize(e) == serialize(actual);
       auto& counts = tally[qualified];
