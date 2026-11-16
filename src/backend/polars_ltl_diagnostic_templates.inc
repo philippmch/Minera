@@ -407,6 +407,30 @@ constexpr std::string_view kFourListJoin =
   "      %FRAME%\n"
   "\n"
   "This error occurred with the following context stack:\n";
+// Round DD: a list case key naming only the resource: the first pair joins
+// on the resource (probe dd/lt1). The context stack is set by the caller.
+constexpr std::string_view kFourListResourceJoin =
+  "\n"
+  "\n"
+  "Resolved plan until failure:\n"
+  "\n"
+  "\t---> FAILED HERE RESOLVING 'join' <---\n"
+  "INNER JOIN:\n"
+  "LEFT PLAN ON: [col(%RESOURCE_Q%)]\n"
+  "  UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n"
+  "    SELECT [%LIST_KEY%, col(%RESOURCE_Q%)]\n"
+  "      FILTER %FIRST%\n"
+  "      FROM\n"
+  "        %FRAME%\n"
+  "RIGHT PLAN ON: [col(%RESOURCE_Q%)]\n"
+  "  UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n"
+  "    SELECT [%LIST_KEY%, col(%RESOURCE_Q%)]\n"
+  "      FILTER %SECOND%\n"
+  "      FROM\n"
+  "        %FRAME%\n"
+  "END INNER JOIN\n"
+  "\n"
+  "This error occurred with the following context stack:\n";
 constexpr std::string_view kDifferentListGroup =
   "\n"
   "\n"
@@ -450,6 +474,21 @@ constexpr std::string_view kEventListFilter =
   "   WITH_COLUMNS:\n"
   "   [0.int_range([len().cast(Int64)]).over([%OVER_KEYS%]).alias(\"_index\")] \n"
   "    SORT BY [%LIST_KEY%, %TIME_SORT%]\n"
+  "      %FRAME%\n"
+  "\n"
+  "This error occurred with the following context stack:\n";
+// Round DD: a None timestamp key drops out of the sort (probe dd/lt1).
+constexpr std::string_view kEventListFilterUntimed =
+  "\n"
+  "\n"
+  "Resolved plan until failure:\n"
+  "\n"
+  "\t---> FAILED HERE RESOLVING 'select' <---\n"
+  "FILTER %FIRST%\n"
+  "FROM\n"
+  "   WITH_COLUMNS:\n"
+  "   [0.int_range([len().cast(Int64)]).over([%OVER_KEYS%]).alias(\"_index\")] \n"
+  "    SORT BY [%LIST_KEY%]\n"
   "      %FRAME%\n"
   "\n"
   "This error occurred with the following context stack:\n";

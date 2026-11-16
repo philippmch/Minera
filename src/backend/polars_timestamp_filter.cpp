@@ -595,8 +595,11 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   }
   const auto position=[&](const std::string& name,bool case_key=false){auto p=std::find(source.columns.begin(),source.columns.end(),name);if(p==source.columns.end())missing(source,name,q,phase,case_key);return static_cast<std::size_t>(p-source.columns.begin());};
   const bool listed=q.op!=Operation::kEvents&&groups::modelled(q.options.case_id_key);
-  if(q.op!=Operation::kEvents&&collection(q.options.case_id_key)&&q.options.case_id_key.children.empty())
-    fail("InvalidOperationError",phase,"expected join keys/predicates"+resolved(q.op,(q.op==Operation::kAttribute?"UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  ":"")+std::string("DF []; PROJECT */0 COLUMNS"),{"join"}));
+  const auto no_join_keys=[&]{
+    if(collection(q.options.case_id_key)&&q.options.case_id_key.children.empty())
+      fail("InvalidOperationError",phase,"expected join keys/predicates"+resolved(q.op,(q.op==Operation::kAttribute?"UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  ":"")+std::string("DF []; PROJECT */0 COLUMNS"),{"join"}));
+  };
+  if(q.op!=Operation::kEvents&&q.op!=Operation::kAttribute)no_join_keys();
   // Round CO: list and literal case keys resolve where a str one does.
   const auto resolve_keys=[&](bool case_key){
     try {
@@ -639,6 +642,10 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   // of its case key, so a String timestamp column fails before a missing
   // or repeated case key (fresh CK bank 2026112401 case 349).
   if(q.op==Operation::kAttribute)time_resolution(source,time_at,q,phase);
+  // Round DD: the attribute filter checks its join keys once the case
+  // selection (its right side) resolved: a by-name attribute missing a
+  // column fails first (set probe pltblcj-4 case 94).
+  if(q.op==Operation::kAttribute)no_join_keys();
   if(q.op==Operation::kAttribute&&listed)resolve_keys(true);
   if(q.op==Operation::kAttribute&&!listed)case_at=position(q.options.case_id_key.value,true);
   auto result=source;result.rows.clear();

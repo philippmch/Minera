@@ -29026,3 +29026,115 @@ Tests:
   calls), replayed by the `minera_*_dc_set_bank_parity_tests` ctests.
 - Replaced: DB's four Polars set banks by their recaptures (DC1-1).
 - 566 tests, all passing.
+
+## Review DD1: re-review of round DC, set probes on five more domains, several-column keys, LTL list keys, fresh seeds (2026-11-16)
+
+Round DD checked DC's CI (run 43913617519 on da99db9: green on all six
+jobs), replayed two batches of fresh seeds, ran set probes on the five
+domains DC had not probed with sets, modelled the several-column shapes
+DC left refused and most of the LTL list-key cases carried since round
+CQ. The device check on the Mac was skipped (no device linked).
+
+- **DD1-1 Several columns in `filter_df_on_attribute_values` and the
+  stream keys** (probes `dd/av1.py`, `dd/sk1.py`, `dd/sk2.py`). A list,
+  tuple or set of str names selects as `pl.col` does in the filters whose
+  predicate it builds: one name is that column, a repeated name counts
+  once (its first place), a missing one fails by name, several distinct
+  existing names expand the predicate. `filter_df_on_attribute_values`
+  expands as the trace filter does (the `is_in` once per column, no sign,
+  at the join); a stream key naming several columns expands its equality
+  once per column after the filters below it resolved. The refusal
+  message lists each predicate as Python wrote its literal (`dyn int: 8`,
+  `dyn float: 1.5`, `null`, `true`, `"a"`, `[1, 2]`, a dict as its struct,
+  a datetime as `2021-01-04 00:00:00`), so bounds other than int or float
+  are no longer refused; None is an empty list in the trace filters and a
+  null literal in the events filter.
+- **DD1-2 Several attribute names beside a single paths target**
+  (probes `dd/pa3.py`-`pa7.py`). `concat_str` expands `pl.col` of the
+  names: each row's label is the String casts of its distinct names in
+  order (null when any part is null), then `,` and the next row's target.
+  Kept to a str case key and a str timestamp key; several target names
+  stay as DC1-6 models them.
+- **DD1-3 Dicts holding a set** (a struct with an Object field, at any
+  depth; probe set-ddsc-5). Polars resolves the comparison uncast (the
+  plan prints the struct as written, `col("x") >= {{1, 2}}`) and panics
+  once the literal is materialised at collect (`nested objects are not
+  allowed`, a PanicException the bank drivers skip as declared), so every
+  plan error that comes earlier (a missing column, a duplicate literal,
+  another bound's cast) now fails as the reference does. Probe set-ddsc-5
+  (several-column attribute, numeric, paths and timeframe calls on CJ
+  frames, 400 cases, 4,166 calls): 2,527 differing before, 0 after.
+- **DD1-4 Timestamp filter check order** (set probe set-pltblcj-4 case
+  94). The attribute filter checks its join keys once the case selection
+  (its right side) resolved, so a by-name attribute missing a column
+  fails first.
+- **DD1-5 Threshold filter on an empty frame** (fresh Polars CK
+  2026112701 case 237, probe `dd/th1.py`). `filter_df_keeping_activ_exc_thresh`
+  with a key list holding a dict after a name returns the empty frame as
+  given (no count meets the threshold) instead of refusing the several
+  keys.
+- **DD1-6 LTL list case keys** (probes `dd/specs/lt1.py`, `lt2.py`, 1,514
+  calls on four base frames; carried since CQ). The join or group_by
+  input holds the literal, the resource and what the step adds, and the
+  first name outside them is the missing one (`four_eyes_principle`:
+  `literal` and the resource; `attr_value_different_persons`: also
+  `count`; `eventually_follows`: `literal`, `_index` and the timestamp),
+  whatever its place in the list. Newly modelled: a four_eyes key naming
+  only the resource joins the first pair on it and misses the right
+  side's `<resource>_2`; different_persons keys naming only the resource
+  group the cases by its values (value), `count` or the resource beside
+  `count` repeat the count column, a repeated resource repeats a group_by
+  key; None beside str items in four_eyes and different_persons joins or
+  groups on the str items, None beside the resource in different_persons
+  and None beside a present name in eventually_follows with at most one
+  activity never join (an empty frame with `literal` (Null) and
+  `<name>_right` appended in item order; the eventually_follows anti join
+  keeps every row); eventually_follows over the timestamp alone sorts by
+  a one-row literal (`ShapeError ... Series length: 1` on frames of two or
+  more rows); a timestamp key that is no str (an int, None, a list of
+  names) sorts as a literal, so two or more positive activities repeat
+  `literal` in each activity's select, and one activity selects its cases
+  as a str key does. lt1 256 differing before, 40 after; lt2 (other
+  resource keys, more activities, more timestamp keys, captured after the
+  lt1 model) 600 then, 440 after; every remaining call is a native
+  refusal (listed for DE) apart from four declared ones below and lt1's
+  twelve `A_next_B_next_C` calls the spec passed the wrong number of
+  arguments.
+- **DD1-7 Fresh set probes on five domains** (`dom/_probe_*_set_domain.py`,
+  300 cases each, seed 4): set-pltblcj-4 (16,205 calls) 3 before, 1 after;
+  set-pltblcf-4 (11,405) 2, both declared; set-pltblcg-4 (1,911) 0;
+  set-plseqch-4 (3,906) 0; set-pdltl4-4 (the pandas LTL calls with three
+  set-mutated copies each, `four_eyes_principle` and
+  `attr_value_different_persons` included, 4,800 calls) 0.
+- **DD1-8 Fresh seeds.** Batch 1 (2026112700-11, twelve banks): two
+  calls; one fixed (DD1-5), one declared (Polars CK sequence 2026112706
+  case 361, `rework` over two one-event cases: the equal-size join order
+  declared in DC). Batch 2 (2026112712-23, twelve banks): two calls,
+  both the same declared join order (Polars CJ 2026112715 case 522,
+  `four_eyes_principle` negative over two one-event cases; CJ sequence
+  2026112719 case 9, `rework` over two one-event cases).
+- All 84 docs banks (the four new ones included) replayed with the final
+  code: 0 mismatches.
+
+Declared:
+- `get_attribute_values` over several keys where a first value pairs with
+  several second values (set-pltblcj-4 case 60, set-pltblcf-4 case 35),
+  as in DC.
+- A one-item set case key holding a tuple in `filter_case_performance`
+  (set-pltblcf-4 case 72): List cells, as in DC.
+- `eventually_follows` without activities over a composite key whose
+  cells are unique per row (lt1, four calls): the inner join of
+  equal-size sides returns the rows in Polars' random order.
+- `rework` and `four_eyes_principle` equal-size join order (fresh CK
+  sequence 2026112706 case 361, CJ sequence 2026112719 case 9, CJ 2026112715
+  case 522), as in DC and CX.
+
+Tests:
+- New: `docs/polars-filter-dd-set-bank.json.gz` (set-pltblcj-4,
+  set-pltblcf-4, set-pltblcg-4, set-ddsc-5 and fresh CK 2026112701 case
+  237, 33,733 calls), `docs/polars-sequence-filter-dd-set-bank.json.gz`
+  (set-plseqch-4, 3,898 calls), `docs/pandas-filter-dd-set-ltl-bank.json.gz`
+  (set-pdltl4-4, 4,800 calls) and `docs/polars-filter-dd-ltl-bank.json.gz`
+  (lt1 and lt2 without the refused calls, 1,034 calls), replayed by the
+  `minera_*_dd_*_bank_parity_tests` ctests.
+- 570 tests, all passing.

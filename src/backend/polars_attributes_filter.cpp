@@ -173,6 +173,13 @@ std::string expression_literal(const EventAttribute& value,bool dynamic=false,bo
   if(real(value)) {auto out=real_text(number(value));if(decimal && std::isfinite(number(value)) && out.find_first_of(".eE")==std::string::npos)out+=".0";return out;}
   return quote(value.value);
 }
+// Round DD: a literal as an expression list shows it before simplification
+// (an int or float `dyn`, a dict its struct, None null).
+std::string dsl_literal(const EventAttribute& v) {
+  if(null(v))return "null";
+  if(mapping(v))return detail::polars_lit::dict_literal_display(v);
+  return expression_literal(v,true);
+}
 std::string membership_expr(const std::string& key,const EventAttribute& values,bool positive) {
   std::string operand;
   // Polars folds membership in an empty literal list to a false literal.
@@ -234,13 +241,27 @@ bool expanded_key(const EventAttribute& key,const std::vector<std::string>& colu
   const auto c=key.container;
   if(c!=AttributeContainerKind::kList&&c!=AttributeContainerKind::kTuple&&c!=AttributeContainerKind::kSet&&c!=AttributeContainerKind::kFrozenSet)return false;
   if(key.children.size()<2)return false;
+  // Round DD: a repeated name counts once (pl.col keeps the first place).
   std::vector<std::string> names;
   for(const auto& item:key.children) {
     if(!text(item)||std::find(columns.begin(),columns.end(),item.value)==columns.end())return false;
-    if(std::find(names.begin(),names.end(),item.value)!=names.end())return false;
-    names.push_back(item.value);
+    if(std::find(names.begin(),names.end(),item.value)==names.end())names.push_back(item.value);
   }
-  return true;
+  return names.size()>=2;
+}
+// Round DD: the distinct names of an expanded key, in their first places.
+EventAttribute distinct_names(const EventAttribute& key) {
+  EventAttribute names{key.key,""};names.container=AttributeContainerKind::kList;
+  for(const auto& item:key.children)
+    if(std::none_of(names.children.begin(),names.children.end(),[&](const EventAttribute& n){return n.value==item.value;}))names.children.push_back(EventAttribute{"",item.value});
+  return names;
+}
+// Round DD: a non-empty list, tuple or set of str names, which pl.col reads
+// by name (keys::col_key) in the filters whose predicate it selects.
+bool name_list(const EventAttribute& key) {
+  const auto c=key.container;
+  if(c!=AttributeContainerKind::kList&&c!=AttributeContainerKind::kTuple&&c!=AttributeContainerKind::kSet&&c!=AttributeContainerKind::kFrozenSet)return false;
+  return !key.children.empty()&&std::all_of(key.children.begin(),key.children.end(),[](const EventAttribute& item){return keys::plain_text(item);});
 }
 PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::vector<std::string>& columns) {
   const auto op=call.operation;
@@ -275,8 +296,16 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
   if(!statistics(op)) {
     // Round DB: a key list the native selector cannot model is refused only
     // after the literals Python builds with it (set bounds and values).
-    const bool expanded=(numeric(op)||op==Op::kTraces||op==Op::kEvents)&&expanded_key(call.options.attribute_key,columns);
-    bool refused=!expanded&&col_selector_unmodelled(call.options.attribute_key);
+    // Round DD: filter_df_on_attribute_values expands as the trace filter
+    // does (probe dd/av1: the is_in once per column, no sign, at the join).
+    // Round DD: a list or tuple of names selects as a set does (a missing
+    // name by name, a repeated one once, one name that column; probe
+    // set-ddsc-5).
+    const bool selecting=numeric(op)||op==Op::kTraces||op==Op::kEvents||op==Op::kOnValues;
+    const bool listed=selecting&&name_list(call.options.attribute_key);
+    const bool expanded=selecting&&expanded_key(call.options.attribute_key,columns);
+    if(expanded)call.options.attribute_key=distinct_names(call.options.attribute_key);
+    bool refused=!expanded&&!listed&&col_selector_unmodelled(call.options.attribute_key);
     if(!refused&&!expanded) {
       auto key=keys::col_key(call.options.attribute_key,columns);
       refused=collection(key)&&!key.children.empty();
@@ -300,9 +329,16 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
       scalar_literal(*call.lower);scalar_literal(*call.upper);
       if(op==Op::kNumericTraces)for(auto [key,value]:std::vector<std::pair<std::optional<EventAttribute>*,const std::optional<EventAttribute>*>>{{&call.options.stream_filter_key1,&call.options.stream_filter_value1},{&call.options.stream_filter_key2,&call.options.stream_filter_value2}}) {
         if(!*key||null(**key))continue;
-        col_selector(**key);
-        // Round DB: a set stream key selects its names as pl.col does.
-        if(detail::polars_lit::set_argument(**key))**key=col_key(**key,columns);
+        // Round DB: a set stream key selects its names as pl.col does; round
+        // DD: a list or tuple too (probe dd/sk2: one name is that column, a
+        // repeated name counts once, a missing one fails by name, several
+        // existing names expand the stream predicate, numeric_predicate).
+        (void)col_selector_unmodelled(**key);
+        if(collection(**key)&&!mapping(**key)) {
+          auto selected=keys::col_key(**key,columns);
+          if(collection(selected)&&!selected.children.empty())selected=distinct_names(selected);
+          **key=selected;
+        }
         if(*value)scalar_literal(**value);
       }
     }
@@ -564,6 +600,20 @@ int wide_truth(const Leaf& l,const EventAttribute& v,std::uint64_t u) {
   if(l.dtype=="Boolean"||lit::integer_dtype(l.dtype))return lit::apply_order(-1,op);
   return -1;
 }
+// Round DD: a dict holding a set (a struct with an Object field, at any
+// depth). Polars resolves its comparison uncast (the plan prints the struct
+// as written, `{{1, 2}}`) and panics once the literal is materialised while
+// collecting ("nested objects are not allowed"); later plan errors come
+// first (probe set-ddsc-5).
+bool object_fields(const std::vector<detail::polars_lit::StructField>& fields) {
+  for(const auto& f:fields)if(f.nested?object_fields(f.fields):f.type.kind==detail::polars_lit::LitType::K::kObject)return true;
+  return false;
+}
+bool object_struct(const EventAttribute& v) {
+  if(!mapping(v))return false;
+  try{return object_fields(detail::polars_lit::struct_fields(v));}catch(const PolarsSequenceFilterError&){return false;}
+}
+const char* const kObjectPanic="called `Result::unwrap()` on an `Err` value: Context { error: InvalidOperation(ErrString(\"nested objects are not allowed\")), msg: ErrString(\"while constructing Series 'literal'\") }";
 // The (lhs, rhs) operands Polars prints once the literal is coerced to the
 // column; a None literal folds the comparison to a null column.
 // Round CD: scalars as detail::polars_lit types them for any column dtype
@@ -572,6 +622,7 @@ detail::polars_lit::Operands operands(const Leaf& l,bool cast_list=false) {
   namespace lit=detail::polars_lit;
   const auto column="col("+quote(l.column)+")";
   const auto& v=l.value;
+  if(object_struct(v))return {column,lit::struct_display(lit::StructModel{lit::struct_fields(v),false}),{}};
   // Round CJ: a dict compares as a struct (cast column, String cast).
   if(mapping(v))return lit::struct_operands(l.column,l.dtype,lit::struct_model(v,l.dtype));
   if(collection(v)) {
@@ -656,6 +707,7 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
   // Round CJ: on any other column a dict merges when the column is not cast
   // (Boolean, temporal, a field without a supertype), and only with an equal
   // dict: any other literal leaves the bound as it is (probe/cj/m1.py).
+  if(object_struct(l.value))return {};
   if(mapping(l.value)) {
     if(l.dtype!="String") {
       if(o.lhs!="col("+quote(l.column)+")")return {};
@@ -863,7 +915,7 @@ struct LeafError { std::string first,second,expression; };
 std::optional<LeafError> leaf_error(const Leaf& l) {
   namespace lit=detail::polars_lit;
   const auto& v=l.value;
-  if(null(v))return {};
+  if(null(v)||object_struct(v))return {};
   if(mapping(v)) {
     const auto f=lit::struct_failure(l.column,l.dtype,lit::struct_model(v,l.dtype),l.present,lit::compare_op(l.op));
     if(!f)return {};
@@ -904,6 +956,7 @@ std::optional<LeafError> first_error(const Expr& e,const Expr*& at) {
 }
 // Kleene truth of a comparison: -1 null, 0 false, 1 true.
 int leaf_truth(const Leaf& l,const EventAttribute& v) {
+  if(object_struct(l.value))fail("PanicException","collect",kObjectPanic);
   if(mapping(l.value)) {
     namespace lit=detail::polars_lit;
     return lit::struct_truth(null(v)?lit::Cell{}:lit::Cell(v),l.dtype,lit::struct_model(l.value,l.dtype),lit::compare_op(l.op),l.present);
@@ -935,12 +988,12 @@ std::string join_cell_key(const std::optional<EventAttribute>& cell,const std::s
 Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager) {
   const auto op=call.operation;const bool trace=op==Op::kNumericTraces;const auto& attr=call.options.attribute_key;
   // One level per Python filter call: the bounds, then each stream filter.
-  std::vector<std::vector<Expr>> levels;std::vector<const EventAttribute*> keys{&attr};
+  std::vector<std::vector<Expr>> levels;std::vector<const EventAttribute*> keys{&attr};std::vector<EventAttribute> compared{nil()};
   if(trace||truth(call.options.positive))levels.push_back({leaf_expr(attr.value,">=",*call.lower),leaf_expr(attr.value,"<=",*call.upper)});
   else levels.push_back({binary(leaf_expr(attr.value,"<",*call.lower),"|",leaf_expr(attr.value,">",*call.upper))});
   if(trace)for(auto [key,value]:std::vector<std::pair<const std::optional<EventAttribute>*,const std::optional<EventAttribute>*>>{{&call.options.stream_filter_key1,&call.options.stream_filter_value1},{&call.options.stream_filter_key2,&call.options.stream_filter_value2}}) {
     if(!*key||null(**key))continue;
-    levels.push_back({leaf_expr((**key).value,"==",*value?**value:nil())});keys.push_back(&**key);
+    levels.push_back({leaf_expr((**key).value,"==",*value?**value:nil())});keys.push_back(&**key);compared.push_back(*value?**value:nil());
   }
   const auto fail_at=[&](std::size_t level,bool typed,const std::string& type,const std::string& message,const std::string& plan) {
     std::string suffix;
@@ -958,10 +1011,8 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
     const auto& key=*keys[i];
     if(i==0&&collection(key)&&!key.children.empty()) {
       // Round DC: the bound predicate as Python wrote it, once per column.
-      const auto bound=[&](const EventAttribute& v) {
-        if(boolean(v)||!(integer(v)||real(v))||wide_literal(v))throw std::invalid_argument("Native Polars numeric filters expand several columns over int or float bounds only");
-        return expression_literal(v,true);
-      };
+      // Round DD: any bound as Python wrote its literal (probe set-ddsc-5).
+      const auto bound=[&](const EventAttribute& v){return dsl_literal(v);};
       const bool both=trace||truth(call.options.positive);
       std::string message="The predicate passed to 'LazyFrame.filter' expanded to multiple expressions: \n\n";
       for(const auto& item:key.children) {
@@ -970,6 +1021,15 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
                      :"\t[([("+c+") < ("+bound(*call.lower)+")]) | ([("+c+") > ("+bound(*call.upper)+")])],\n";
       }
       fail_at(0,false,"ComputeError",message+"This is ambiguous. Try to combine the predicates with the 'all_horizontal' or `any_horizontal' expression.",chain_plan(source,resolved_filters));
+    }
+    if(i>0&&collection(key)&&!key.children.empty()) {
+      // Round DD: a stream key naming several columns (its distinct names,
+      // prepare) expands its equality once per column, as Python wrote it
+      // (probes dd/sk1, dd/sk2), after the filters below it resolved.
+      const auto shown=dsl_literal(compared[i]);
+      std::string message="The predicate passed to 'LazyFrame.filter' expanded to multiple expressions: \n\n";
+      for(const auto& item:key.children)message+="\t[(col("+quote(item.value)+")) == ("+shown+")],\n";
+      fail_at(i,false,"ComputeError",message+"This is ambiguous. Try to combine the predicates with the 'all_horizontal' or `any_horizontal' expression.",chain_plan(source,resolved_filters));
     }
     if(collection(key))fail_at(i,false,"ComputeError","The predicate expanded to zero expressions. This may for example be caused by a regex not matching column names or a column dtype match not hitting any dtypes in the DataFrame",chain_plan(source,resolved_filters));
     const auto column=index_of(source,key.value);
@@ -1086,8 +1146,10 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
     // its join.
     const auto& query=*call.values;
     std::string operand;
+    // Round DD: None is an empty list in the trace filters, a null literal
+    // in the events filter; any other scalar its literal (probe set-ddsc-5).
     if(text(query))operand="col("+quote(query.value)+")";
-    else if(null(query))operand="[]";
+    else if(null(query))operand=op==Op::kEvents?"null":"[]";
     else if(query.container==AttributeContainerKind::kContainer) {
       EventAttribute keys=query;keys.container=AttributeContainerKind::kList;keys.children.clear();
       for(const auto& v:query.children)
@@ -1095,7 +1157,7 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
       operand=expression_literal(keys);
     } else if(collection(query)) {
       auto listed=query;listed.container=AttributeContainerKind::kList;operand=expression_literal(listed);
-    } else throw std::invalid_argument("Native Polars attribute membership over several columns takes str, None or collection values only");
+    } else operand=dsl_literal(query);
     const auto negation=op==Op::kEvents&&!truth(call.options.positive)?".not()":"";
     std::string message="The predicate passed to 'LazyFrame.filter' expanded to multiple expressions: \n\n";
     for(const auto& item:attr.children)message+="\tcol("+quote(item.value)+").is_in(["+operand+"])"+negation+",\n";
@@ -1517,6 +1579,9 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
       }
       if(!source.rows.empty())
         fail("TypeError","apply","'>=' not supported between instances of 'dict' and '"+core_type(*call.threshold)+"'");
+      // Round DD: no count meets the threshold on an empty frame, so the
+      // frame comes back as given (fresh CK bank 2026112701 case 237).
+      if(op==Op::kThreshold){selection.unchanged=true;return selection;}
     }
     if(op==Op::kTopActivities) {
       // Round DB: group_by(set) takes the set's items as keys; head(n) checks

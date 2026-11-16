@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DC (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–DD (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6045,6 +6045,85 @@ domains and fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DD re-reviewed DC (Review DD1). DC's commit da99db9 ran CI run
+43913617519 (green on all six jobs). DD ran set probes on the five
+domains DC had not probed with sets, modelled the several-column shapes
+DC left refused and most of the LTL list-key cases carried since CQ, and
+replayed two batches of fresh seeds:
+- Several columns: `filter_df_on_attribute_values` and the stream keys
+  select a list, tuple or set of names as `pl.col` does (one name that
+  column, a repeated one once, a missing one by name, several distinct
+  existing names expand the predicate); the refusal lists every
+  predicate with its literal as Python wrote it, any bound type.
+- Several attribute names beside a single paths target: the label
+  concatenates the String casts of the distinct names (null when any is
+  null), then `,` and the next row's target.
+- Dicts holding a set (a struct with an Object field): the plan prints
+  the struct uncast and collect panics (`nested objects are not
+  allowed`), so earlier plan errors fail as the reference does (probe
+  set-ddsc-5: 2,527 -> 0 of 4,166 calls).
+- The timestamp attribute filter checks its join keys after the case
+  selection resolved; the threshold filter on an empty frame with a key
+  list holding a dict returns the frame.
+- LTL list case keys: the first name the join or group_by input lacks
+  is the missing one, wherever it stands; a four_eyes key of only the
+  resource misses `<resource>_2`; different_persons keys of only the
+  resource group by its values, `count` repeats the count column, a
+  repeated resource a group_by key; None beside str items joins on the
+  str items, None beside a present name never joins (empty frame with
+  `literal` and `<name>_right`); eventually_follows over the timestamp
+  alone fails `ShapeError`; timestamp keys that are no str sort as a
+  literal (two or more positive activities repeat `literal`). Probes
+  lt1 256 -> 40 and lt2 600 -> 440 (captured after the lt1 model), the
+  rest native refusals.
+- Fresh set probes (seed 4): Polars CJ table 3 -> 1 of 16,205, CF table
+  2 of 11,405 (both declared), CG table 0 of 1,911, CH sequence 0 of
+  3,906, pandas LTL 0 of 4,800.
+- Fresh seeds 2026112700-11: two calls, one fixed (the threshold filter
+  above), one declared (rework's equal-size join order).
+  Fresh seeds 2026112712-23: two calls, both declared (equal-size joins
+  in rework and four_eyes_principle).
+- Declared: as in DC, plus `eventually_follows` without activities over
+  a composite key unique per row (the equal-size join order).
+
+In the suite: new `docs/polars-filter-dd-set-bank.json.gz`,
+`docs/polars-sequence-filter-dd-set-bank.json.gz`,
+`docs/pandas-filter-dd-set-ltl-bank.json.gz` and
+`docs/polars-filter-dd-ltl-bank.json.gz` with their ctests. The probes,
+set domains and fresh banks are in the project files under
+`review-harness/round-dd/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DE) should start by re-reviewing round DD:
+
+- DD's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the LTL list-key shapes still refused (probe `dd/specs/lt2.py`, 440
+  calls, and lt1's 24): `eventually_follows` with a timestamp key that is
+  no str and no activity, a negative sign, a float, a bool or a
+  two-name list; None beside str items in `eventually_follows` with two
+  or more activities (`DuplicateError ... <name>_right already exists`
+  through a `_POLARS_1` key), None beside a missing name and three-item
+  keys with None; `four_eyes_principle` with None beside the resource
+  (values and `literal_right`/`<resource>_right` duplicates) and a
+  repeated resource;
+- second-seed set probes on the busiest table domains (CJ, CI, CH), now
+  that every filter domain has one;
+- the rest of the CU list (equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DC's targets, taken in DD (findings DD1-1 to DD1-8): DC's CI run,
+the fresh seeds, set probes on the five domains, the several-column
+shapes and most LTL list-key cases. Not taken (carried to DE): the LTL
+list-key shapes listed above, equal-size joins and the older CJ, CF and
+CD items.
+
+Previous list for round DD (kept for its older items):
 
 Next round (DD) should start by re-reviewing round DC:
 

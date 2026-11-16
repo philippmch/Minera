@@ -611,10 +611,19 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
   // (CH set probe case 26, probes dc/pa1, dc/pa2); several attribute names
   // beside a single target are outside the model.
   if (several_names(target) && !listed && !literal) duplicate_with_columns(source, "next_activity", options, literal, phase);
-  if (several_names(target) || several_names(options.attribute_key))
+  // Round DD (probes dd/pa4-pa7): several attribute names beside a single
+  // target join the path with concat_str, which expands pl.col of the names:
+  // each row's label is the String casts of its distinct names in order (a
+  // null one makes it null), then "," and the next row's target. Kept to a
+  // str case key and a str timestamp key.
+  const bool concatenated = !performance && several_names(options.attribute_key) && !several_names(target) && !listed && !literal;
+  if (several_names(target) || (several_names(options.attribute_key) && !concatenated))
     throw std::invalid_argument("Native Polars path selector outside observed domain: several attribute names beside a single target");
-  if (collection(target) || collection(options.attribute_key)) empty_selector(source, performance, options, literal, phase);
-  const auto target_at = position(target.value, true), activity_at = position(options.attribute_key.value, true);
+  if (collection(target) || (!concatenated && collection(options.attribute_key))) empty_selector(source, performance, options, literal, phase);
+  const auto target_at = position(target.value, true);
+  std::vector<std::size_t> activities;
+  if (concatenated) for (const auto& name : case_names(options.attribute_key)) activities.push_back(position(name, true));
+  else activities.push_back(position(options.attribute_key.value, true));
   if (listed) {
     const auto names = case_names(options.case_id_key);
     if (names.size() > 1) duplicate_with_columns(source, "case_next", options, literal, phase);
@@ -691,8 +700,11 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
     const auto& id = source.rows[order[begin]][case_at];
     if (id && !null(*id) && case_kind != Dtype::kNull) for (auto i = begin; i + 1 < end && !matched; ++i) {
       const auto& row = source.rows[order[i]]; const auto& next = source.rows[order[i + 1]];
-      if (!row[activity_at] || !next[target_at] || null(*row[activity_at]) || null(*next[target_at])) continue;
-      const auto label = string_cast(*row[activity_at], source.dtypes[activity_at]) + ',' + string_cast(*next[target_at], source.dtypes[target_at]);
+      if (!next[target_at] || null(*next[target_at])) continue;
+      if (std::any_of(activities.begin(), activities.end(), [&](std::size_t at) { return !row[at] || null(*row[at]); })) continue;
+      std::string label;
+      for (const auto at : activities) label += string_cast(*row[at], source.dtypes[at]);
+      label += ',' + string_cast(*next[target_at], source.dtypes[target_at]);
       if (std::find(paths.begin(), paths.end(), label) == paths.end()) continue;
       if (performance) {
         if (!row[*time_at] || !next[*time_at] || null(*row[*time_at]) || null(*next[*time_at])) continue;
