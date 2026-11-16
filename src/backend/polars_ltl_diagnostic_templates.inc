@@ -540,7 +540,8 @@ constexpr std::string_view kFourListJoin =
   "\n"
   "This error occurred with the following context stack:\n";
 // Round DD: a list case key naming only the resource: the first pair joins
-// on the resource (probe dd/lt1). The context stack is set by the caller.
+// on the resource (probe dd/lt1); round DF: or on a `literal` item and the
+// resource, in item order (probe de/lt5). The context stack is set by the caller.
 constexpr std::string_view kFourListResourceJoin =
   "\n"
   "\n"
@@ -548,13 +549,13 @@ constexpr std::string_view kFourListResourceJoin =
   "\n"
   "\t---> FAILED HERE RESOLVING 'join' <---\n"
   "INNER JOIN:\n"
-  "LEFT PLAN ON: [col(%RESOURCE_Q%)]\n"
+  "LEFT PLAN ON: [%OVER_KEYS%]\n"
   "  UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n"
   "    SELECT [%LIST_KEY%, col(%RESOURCE_Q%)]\n"
   "      FILTER %FIRST%\n"
   "      FROM\n"
   "        %FRAME%\n"
-  "RIGHT PLAN ON: [col(%RESOURCE_Q%)]\n"
+  "RIGHT PLAN ON: [%OVER_KEYS%]\n"
   "  UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n"
   "    SELECT [%LIST_KEY%, col(%RESOURCE_Q%)]\n"
   "      FILTER %SECOND%\n"

@@ -3220,6 +3220,10 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_dd_set_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dd-set-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_dd_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DF: seed-7 set probes of the CP, CK and CJ sequence domains.
+  add_test(NAME minera_polars_sequence_filter_df_set_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-df-set-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_df_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3415,6 +3419,16 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_de_set_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-de-set-bank.json.gz")
   set_tests_properties(minera_polars_filter_de_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DF: LTL list case keys with a `literal` item (probes lt5, lt6),
+  # four_eyes failing joins after the filters they resolve (probe fe2) and
+  # Python ints past the Int64 range (probe i1).
+  add_test(NAME minera_polars_filter_df_ltl_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-df-ltl-bank.json.gz")
+  set_tests_properties(minera_polars_filter_df_ltl_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DF: seed-7 set probes of the CK and CN table domains.
+  add_test(NAME minera_polars_filter_df_set_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-df-set-bank.json.gz")
+  set_tests_properties(minera_polars_filter_df_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

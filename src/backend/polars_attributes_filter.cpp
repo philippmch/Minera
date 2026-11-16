@@ -326,6 +326,8 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
       // Python builds the bound literals, then each stream filter's column and
       // literal; round CJ: a dict literal converts strictly (its TypeError).
       const auto scalar_literal=[&](const EventAttribute& v){
+        // Round DF: pl.lit refuses an int past the Int128 range (probe df/i1).
+        try{detail::polars_lit::scalar_int_range(v);}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
         // Round DB: pl.lit refuses a set bound or stream value.
         if(detail::polars_lit::set_argument(v))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
         if(mapping(v)){if(const auto error=detail::polars_lit::dict_literal_error(v))fail("TypeError","apply",*error);return;}

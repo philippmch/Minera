@@ -561,6 +561,20 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     if (out.operation == Op::kDifferentPersons && (out.original.container == AttributeContainerKind::kSet || out.original.container == AttributeContainerKind::kFrozenSet))
       fail("TypeError", "apply", "cannot create expression literal for value of type set.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object.");
   }
+  // Round DF: four_eyes joins its first pair once both of their filters are
+  // built, before the third activity's literal: a None or dict case key
+  // fails that join, then the resource key's suffix (probes df/p5, df/p7).
+  const auto first_pair_join = [&] {
+    if (null(o.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
+    dict_argument(o.case_id_key);
+    if (!text(o.resource_key) && !collection(o.resource_key)) invalid_col(o.resource_key);
+    // Round DB: a set resource key is refused by pl.lit where a list one
+    // is concatenated.
+    if (detail::polars_lit::set_argument(o.resource_key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
+    if (o.resource_key.container == AttributeContainerKind::kContainer) fail("TypeError", "apply", "unsupported operand type(s) for +: 'dict' and 'str'");
+    if (o.resource_key.container == AttributeContainerKind::kTuple) fail("TypeError", "apply", "can only concatenate tuple (not \"str\") to tuple");
+    if (collection(o.resource_key)) fail("TypeError", "apply", "can only concatenate list (not \"str\") to list");
+  };
   // A list activity becomes a Series literal when its filter is built.
   if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1))
     for (std::size_t at = 0; at < out.values.size(); ++at) {
@@ -569,6 +583,11 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
       // filter as it builds it, so a list case key's literal fails after
       // the first activity's (CM bank 2026111550 case 300).
       if (out.operation == Op::kFourEyes && at == 1) list_key_literal(o.case_id_key);
+      // Round DF: the first pair joins on a dict case key (refused) once
+      // both of its activities' literals are built, before the third
+      // activity's (set probe pltblck-7 case 157, fresh CK 2026112901 case
+      // 735).
+      if (out.operation == Op::kFourEyes && at == 2) first_pair_join();
       // Round DE: that select refuses a set resource key as pl.lit does,
       // before the next activity's literal (set probe pltblci-6 cases 163, 194).
       if (out.operation == Op::kFourEyes && at == 1 && detail::polars_lit::set_argument(o.resource_key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
@@ -592,16 +611,10 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
   // them (None, a dict, a list literal that cannot be built), and four_eyes
   // reads its resource key after that (probe q1).
   if (!sequence_rule(out.operation) && (out.operation != Op::kFourEyes || out.values.size() > 1)) {
+    if (out.operation == Op::kFourEyes) first_pair_join();
     if (null(o.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
     dict_argument(o.case_id_key);
     list_key_literal(o.case_id_key);
-    if (out.operation == Op::kFourEyes) {
-      if (!text(o.resource_key) && !collection(o.resource_key)) invalid_col(o.resource_key);
-      // Round DB: a set resource key is refused by pl.lit where a list one
-      // is concatenated.
-      if (detail::polars_lit::set_argument(o.resource_key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
-      if (collection(o.resource_key)) fail("TypeError", "apply", "can only concatenate list (not \"str\") to list");
-    }
     // Round DB: attr_value_different_persons groups by [case, resource], so
     // pl.lit refuses a set resource key while the plan is built (probe
     // set-pltblck-2 case 188).
@@ -744,7 +757,84 @@ std::string untimed(std::string text, const Prepared& p) {
   }
   return text;
 }
+// Round DF: four_eyes over a list case key whose only item is a `literal`
+// str joins every activity pair on the key's List literal (an anti join of
+// each pair's cases with its same-resource cases when positive, the
+// same-resource cases otherwise), inner-joins the pairs left to right, and
+// fails the final join back to the frame (probe de/lt5, df/fegen.py).
+std::string four_final_join(const EventTable& source, const Prepared& p) {
+  const auto activity = [&](std::size_t k) { Prepared q = p; q.values = {p.values[k]}; return render("%FIRST%", source, q); };
+  const auto resource = quote(p.options.resource_key.value), resource2 = quote(p.options.resource_key.value + "_2");
+  const auto list_key = list_key_display(p.options.case_id_key), frame = frame_plan(source);
+  using Lines = std::vector<std::string>;
+  using Build = std::function<Lines(std::size_t)>;
+  const auto pad = [](std::size_t d) { return std::string(d, ' '); };
+  const auto append = [](Lines& out, const Lines& more) { out.insert(out.end(), more.begin(), more.end()); };
+  const auto select = [&](std::size_t k, std::size_t d) {
+    return Lines{pad(d) + "UNIQUE[maintain_order: false, keep_strategy: Any] BY None", pad(d) + "  SELECT [" + list_key + ", col(" + resource + ")]",
+                 pad(d) + "    FILTER " + activity(k), pad(d) + "    FROM", pad(d) + "      " + frame};
+  };
+  const auto join = [&](const std::string& kind, const Build& left, const Build& right, std::size_t d) {
+    Lines out{pad(d) + kind + " JOIN:", pad(d) + "LEFT PLAN ON: [col(\"literal\")]"};
+    append(out, left(d + 2));
+    out.push_back(pad(d) + "RIGHT PLAN ON: [col(\"literal\")]");
+    append(out, right(d + 2));
+    out.push_back(pad(d) + "END " + kind + " JOIN");
+    return out;
+  };
+  const auto pair = [&](std::size_t i, std::size_t j, std::size_t d) {
+    return join("INNER", [&](std::size_t e) { return select(i, e); }, [&](std::size_t e) { return select(j, e); }, d);
+  };
+  const auto all_cases = [&](std::size_t i, std::size_t j, std::size_t d) {
+    Lines out{pad(d) + "UNIQUE[maintain_order: false, keep_strategy: Any] BY None", pad(d) + "  SELECT [col(\"literal\")]"};
+    append(out, pair(i, j, d + 4));
+    return out;
+  };
+  const auto same = [&](std::size_t i, std::size_t j, std::size_t d) {
+    Lines out{pad(d) + "UNIQUE[maintain_order: false, keep_strategy: Any] BY None", pad(d) + "  SELECT [col(\"literal\")]",
+              pad(d) + "    FILTER col(" + resource + ") == col(" + resource2 + ")", pad(d) + "    FROM"};
+    append(out, pair(i, j, d + 6));
+    return out;
+  };
+  const bool positive = truth(p.options.positive);
+  const auto unit = [&](std::size_t i, std::size_t j, std::size_t d) {
+    if (!positive) return same(i, j, d);
+    return join("ANTI", [&](std::size_t e) { return all_cases(i, j, e); }, [&](std::size_t e) { return same(i, j, e); }, d);
+  };
+  std::vector<std::pair<std::size_t, std::size_t>> pairs;
+  for (std::size_t i = 0; i < p.values.size(); ++i)
+    for (std::size_t j = i + 1; j < p.values.size(); ++j) pairs.emplace_back(i, j);
+  std::function<Lines(std::size_t, std::size_t)> build = [&](std::size_t k, std::size_t d) -> Lines {
+    if (k == 0) return unit(pairs[0].first, pairs[0].second, d);
+    return join("INNER", [&](std::size_t e) { return build(k - 1, e); }, [&](std::size_t e) { return unit(pairs[k].first, pairs[k].second, e); }, d);
+  };
+  std::string out = "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n";
+  for (const auto& line : build(pairs.size() - 1, 0)) out += line + '\n';
+  return out + "\nThis error occurred with the following context stack:\n\t[1] 'join'\n";
+}
+// Round DF: attr_value_different_persons over a list case key with a
+// `literal` str item counts the resources per key and fails the final join
+// back to the frame on the key's items (probe de/lt5).
+std::string different_final_join(const EventTable& source, const Prepared& p) {
+  std::string items;
+  for (const auto& item : p.options.case_id_key.children) { if (!items.empty()) items += ", "; items += "col(" + quote(item.value) + ")"; }
+  return "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nSELECT [" + items + "]\n  FILTER col(\"unique_resources\") " +
+         (truth(p.options.positive) ? "> 1" : "== 1") + "\n  FROM\n    SELECT [" + items + ", col(\"count\").alias(\"unique_resources\")]\n" +
+         "      AGGREGATE[maintain_order: false]\n        [len().alias(\"count\")] BY [" + items + "]\n        FROM\n" +
+         "        AGGREGATE[maintain_order: false]\n          [len().alias(\"count\")] BY [" + list_key_display(p.options.case_id_key) + ", col(" +
+         quote(p.options.resource_key.value) + ")]\n          FROM\n          FILTER " + render("%FIRST%", source, p) + "\n          FROM\n            " +
+         frame_plan(source) + "\n\nThis error occurred with the following context stack:\n\t[1] 'join'\n";
+}
+void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false, bool first_only = false, bool coercion = false, std::size_t limit = static_cast<std::size_t>(-1));
 void list_key_failure(const EventTable& source, const Prepared& p, const std::string& phase, bool eager) {
+  // Round DF: four_eyes joins resolve their inputs before their keys, so an
+  // activity filter failing to resolve (a list literal against a String
+  // column) fails first when its activity is in the first `count` (probe
+  // df/p8: 2 at the first pair's join, all at the final join).
+  const auto inputs = [&](std::size_t count) {
+    if (p.operation == Op::kFourEyes && text(p.options.attribute_key) && column(source, p.options.attribute_key))
+      validate_queries(source, p, eager, true, false, false, count);
+  };
   const auto& o = p.options;
   const auto& items = o.case_id_key.children;
   const bool strs = str_items(o.case_id_key);
@@ -819,8 +909,26 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
          "column with name '" + first + "_right' already exists\n\nYou may want to try:\n- renaming the column prior to joining\n- using the `suffix` parameter to specify a suffix different to the default one ('_right')" +
              restack(untimed(render(kEventListNoneJoin, source, p), p), nodes));
   }
-  if ((strs || none_strs) && std::find(names.begin(), names.end(), "literal") != names.end())
+  // Round DF: a str item named `literal` is a column like any other where
+  // the frame is read (eventually_follows' window, the final joins back to
+  // the frame: missing there), and names the key's own List literal column
+  // after the select or group_by of [key, resource] (probe de/lt5). Frames
+  // with a `literal` column and eager frames stay outside the model.
+  const bool literal_item = (strs || none_strs) && std::find(names.begin(), names.end(), "literal") != names.end();
+  if (literal_item && (eager || std::find(source.columns.begin(), source.columns.end(), "literal") != source.columns.end()))
     throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: literal as a case item");
+  // Each item's output name (None as `literal`).
+  const auto output_names = [&] {
+    std::vector<std::string> out;
+    for (const auto& item : items) out.push_back(groups::text_key(item) ? item.value : std::string("literal"));
+    return out;
+  };
+  const auto first_repeat = [](const std::vector<std::string>& outputs) -> std::optional<std::string> {
+    for (std::size_t i = 0; i < outputs.size(); ++i)
+      for (std::size_t j = 0; j < i; ++j)
+        if (outputs[i] == outputs[j]) return outputs[i];
+    return std::nullopt;
+  };
   // Round DE: attr_value_different_persons groups the joined counts by the
   // key's items in order: an item naming no column of [literal, resource,
   // count] or repeating an earlier output name (None as `literal`) fails,
@@ -841,12 +949,15 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
   if (none_strs) {
     const auto tail = p.operation == Op::kFourEyes ? restack(render(kFourListJoin, source, p), four_first_join_stack(p)) : render(kDifferentListGroup, source, p);
     const auto valid = p.operation == Op::kFourEyes ? std::vector<std::string>{"literal", resource} : std::vector<std::string>{"literal", resource, "count"};
-    if (const auto name = first_missing(valid)) fail("ColumnNotFoundError", phase, missing(*name, valid) + tail);
+    if (const auto name = first_missing(valid)) { inputs(2); fail("ColumnNotFoundError", phase, missing(*name, valid) + tail); }
     // Round DE: four_eyes over None beside the resource repeated joins the
-    // first pair on the resource twice (probe de/lt3).
-    if (p.operation == Op::kFourEyes && names.size() >= 2 && p.values.size() >= 2 && column(source, o.resource_key) &&
-        std::all_of(names.begin(), names.end(), [&](const std::string& name) { return name == resource; }))
-      fail("InvalidOperationError", phase, "joining with repeated key names; already joined on " + resource + " and " + resource + tail);
+    // first pair on the resource twice (probe de/lt3). Round DF: any output
+    // name repeated (None and a `literal` item, two Nones; probe de/lt5).
+    if (p.operation == Op::kFourEyes && p.values.size() >= 2 && column(source, o.resource_key))
+      if (const auto again = first_repeat(output_names())) {
+        inputs(2);
+        fail("InvalidOperationError", phase, "joining with repeated key names; already joined on " + *again + " and " + *again + tail);
+      }
     // Round DE: None beside the resource joins every pair on both items;
     // the third pair's join repeats the first item's _right copy (two
     // pairs never join: none_beside_name; probe de/lt3).
@@ -858,11 +969,14 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
       std::vector<std::string> nodes{"join schema resolving", "join"};
       repeat(nodes, pairs - 3, {"join left", "join"});
       nodes.insert(nodes.end(), {"join right", "join"});
+      // The third pair's join resolves pairs (0,1), (0,2) and (0,3) or (1,2).
+      inputs(4);
       fail("DuplicateError", phase, restack(render(truth(o.positive) ? kFourNoneJoin : kFourNoneJoinNegative, source, p), nodes));
     }
     // Round DD: count beside None repeats the count column; None beside the
-    // resource never joins (none_beside_name; probe dd/lt2).
-    if (p.operation == Op::kDifferentPersons && names.size() == 1 && names.front() == "count")
+    // resource never joins (none_beside_name; probe dd/lt2). Round DF:
+    // count beside the resource as well (probe de/lt5).
+    if (p.operation == Op::kDifferentPersons && std::find(names.begin(), names.end(), "count") != names.end())
       fail("DuplicateError", phase, "column with name 'count' has more than one occurrence" + tail);
     if (!eager && none_beside_name(p, source.columns)) return;
     throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: None beside present str items");
@@ -870,23 +984,38 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
   if (p.operation == Op::kFourEyes) {
     const auto tail = restack(render(kFourListJoin, source, p), four_first_join_stack(p));
     if (strs) {
-      if (const auto name = first_missing({"literal", resource})) fail("ColumnNotFoundError", phase, missing(*name, {"literal", resource}) + tail);
+      if (const auto name = first_missing({"literal", resource})) { inputs(2); fail("ColumnNotFoundError", phase, missing(*name, {"literal", resource}) + tail); }
       // Round DE: the resource repeated joins the first pair on it twice
-      // (probe dd/lt2).
-      if (names.size() >= 2 && p.values.size() >= 2 && column(source, o.resource_key) &&
-          std::all_of(names.begin(), names.end(), [&](const std::string& name) { return name == resource; }))
-        fail("InvalidOperationError", phase, "joining with repeated key names; already joined on " + resource + " and " + resource + tail);
+      // (probe dd/lt2). Round DF: any repeated name (`literal` items too).
+      if (p.values.size() >= 2 && column(source, o.resource_key))
+        if (const auto again = first_repeat(names)) {
+          inputs(2);
+          fail("InvalidOperationError", phase, "joining with repeated key names; already joined on " + *again + " and " + *again + tail);
+        }
+      if (p.values.size() < 2 || !column(source, o.resource_key))
+        throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: the resource as a case item");
+      // Round DF: a `literal` item alone joins every pair on the key's List
+      // literal; the final join back to the frame misses it (probe de/lt5).
+      if (names.size() == 1 && names.front() == "literal") {
+        inputs(p.values.size());
+        fail("ColumnNotFoundError", phase, missing_message(source, "literal") + four_final_join(source, p));
+      }
       // Round DD: the resource alone: the first pair joins on it, and the
-      // select after the join misses the right side's resource copy.
-      if (names.size() != 1 || p.values.size() < 2 || !column(source, o.resource_key))
+      // select after the join misses the right side's resource copy. Round
+      // DF: beside a `literal` item alike, joining on both (no literal_2).
+      const bool beside = names.size() == 2 && literal_item && std::find(names.begin(), names.end(), resource) != names.end();
+      if (names.size() != 1 && !beside)
         throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: the resource as a case item");
       const auto pairs = static_cast<std::ptrdiff_t>(p.values.size() * (p.values.size() - 1) / 2);
       std::vector<std::string> nodes{"select", "unique"};
       if (truth(o.positive)) nodes.insert(nodes.end(), {"join right", "join"});
       repeat(nodes, pairs - 1, {"join left", "join"});
       nodes.insert(nodes.end(), {"join right", "join"});
-      fail("ColumnNotFoundError", phase, missing(resource + "_2", {"literal", resource, "literal_2"}) + restack(render(kFourListResourceJoin, source, p), nodes));
+      const auto valid = beside ? std::vector<std::string>{"literal", resource} : std::vector<std::string>{"literal", resource, "literal_2"};
+      inputs(2);
+      fail("ColumnNotFoundError", phase, missing(resource + "_2", valid) + restack(render(kFourListResourceJoin, source, p), nodes));
     }
+    inputs(2);
     fail("InvalidOperationError", phase, "joining with repeated key names; already joined on literal and literal" + tail);
   }
   if (p.operation == Op::kDifferentPersons) {
@@ -899,9 +1028,15 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
       // A repeated resource repeats a group_by key first (probe dd/lt2).
       if (names.size() == 2 && names[0] == resource && names[1] == resource)
         fail("DuplicateError", phase, groups::duplicate_message(resource, "group_by keys") + tail);
-      const bool counted = std::find(names.begin(), names.end(), "count") != names.end();
-      const bool distinct = names.size() == 1 || (names.size() == 2 && names[0] != names[1]);
-      if (counted && distinct) fail("DuplicateError", phase, "column with name 'count' has more than one occurrence" + tail);
+      // Round DF: count beside any other names (the scan above failed
+      // repeated ones; probe de/lt5).
+      if (std::find(names.begin(), names.end(), "count") != names.end())
+        fail("DuplicateError", phase, "column with name 'count' has more than one occurrence" + tail);
+      // Round DF: a `literal` item (alone or beside the resource) groups
+      // the counts by the key's List literal; the final join back to the
+      // frame misses it (probe de/lt5).
+      if (literal_item && column(source, o.resource_key))
+        fail("ColumnNotFoundError", phase, missing_message(source, "literal") + different_final_join(source, p));
       if (names.size() != 1 || names.front() != resource || !column(source, o.resource_key))
         throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: a grouped column as a case item");
       return;
@@ -1011,7 +1146,6 @@ std::string missing_tail(const EventTable& source, const Prepared& p, bool eager
   if (p.operation == Op::kFourEyes) return restack(render(attribute ? kFourAttributeTail : kFourMissingTail, source, p), four_eyes_stack(p, false));
   return render(attribute ? kDifferentAttributeTail : kDifferentMissingTail, source, p);
 }
-void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false, bool first_only = false, bool coercion = false, std::size_t limit = static_cast<std::size_t>(-1));
 void compute_query(const EventTable& source, const Prepared& p, bool eager, std::size_t at);
 bool listed_key(const EventAttribute& key) {
   return !key.is_null && (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple);
@@ -1307,7 +1441,11 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     else {
       if (p.operation == Op::kEventuallyFollows) fail("InvalidOperationError", phase, restack(render(kEventEmptyJoin, source, p), eventually_stack(p, 0, false, true)));
       // Round CQ: the stack follows the activity count and sign (probe cq/q5).
-      if (p.operation == Op::kFourEyes) fail("InvalidOperationError", phase, restack(render(kFourEmptyJoin, source, p), four_first_join_stack(p)));
+      if (p.operation == Op::kFourEyes) {
+        // Round DF: after the first pair's filters resolve (probe df/p8).
+        if (text(o.attribute_key)) validate_queries(source, p, eager, true, false, false, 2);
+        fail("InvalidOperationError", phase, restack(render(kFourEmptyJoin, source, p), four_first_join_stack(p)));
+      }
       fail("InvalidOperationError", phase, render(kDifferentEmptyJoin, source, p));
     }
   }

@@ -148,6 +148,8 @@ namespace keys = detail::polars_keys;
 // build fails it with the dict TypeError).
 void validate_literals(const EventAttribute& low, const EventAttribute& high) {
   for (const auto* value : {&low, &high}) {
+    // Round DF: pl.lit refuses an int past the Int128 range (probe df/i1).
+    if (detail::polars_lit::big_int(*value) == detail::polars_lit::BigInt::kPast) fail("InvalidOperationError", "apply", detail::polars_lit::kIntegerTooLarge);
     // Round DB: pl.lit refuses a set bound.
     if (detail::polars_lit::set_argument(*value)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
     if (mapping(*value)) {

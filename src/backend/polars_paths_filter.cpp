@@ -331,6 +331,8 @@ std::vector<std::string> validate_apply(const EventAttribute& value, bool perfor
   // built; round CJ: a dict bound a struct literal (its own TypeError).
   if (performance)
     for (const auto* bound : {&options.min_performance, &options.max_performance}) {
+      // Round DF: pl.lit refuses an int past the Int128 range (probe df/i1).
+      if (detail::polars_lit::big_int(*bound) == detail::polars_lit::BigInt::kPast) fail("InvalidOperationError", "apply", detail::polars_lit::kIntegerTooLarge);
       if (detail::polars_lit::set_argument(*bound)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
       if (bound->container == AttributeContainerKind::kList || bound->container == AttributeContainerKind::kTuple) {
         if (const auto error = detail::polars_lit::argument_literal_error(*bound)) fail("TypeError", "apply", *error);
@@ -475,6 +477,12 @@ void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFi
                ") & ([(col(\"@@path\")) == (" + quote(path) + ")])]\n";
     fail(type, phase, message);
   }
+  // Round DF: Polars folds a comparison with an Int128 literal outside the
+  // duration's Int64 range (.when(is_not_null()).then(true)...; probe
+  // df/i1); that printout is not modelled.
+  for (const auto* other : {&lo, &hi})
+    if (lit::big_int(*other) == lit::BigInt::kInt128)
+      throw std::invalid_argument("Native Polars path bound printout with an Int128 literal is outside the observed domain");
   // A null bound folds away: after the failing bound it drops with the AND,
   // before it the failing bound keeps a null mask and the path test folds.
   const auto path_test = "[(col(\"@@path\")) == (" + quote(path) + ")]";

@@ -19,6 +19,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <variant>
 #include <vector>
@@ -84,6 +85,40 @@ inline std::optional<std::uint64_t> wide_cell(const EventAttribute& cell) {
   const auto r = std::from_chars(first, last, u);
   if (r.ec == std::errc{} && r.ptr == last && u > top) return u;
   return std::nullopt;
+}
+// Round DF: a Python int past the Int64 and UInt64 ranges keeps only its
+// decimal text. Polars builds a scalar inside the Int128 range as an Int128
+// literal and refuses one past it while Python builds the expression
+// (kIntegerTooLarge; probe df/i1); a list of them builds Int128 or UInt128
+// Series (not modelled: value_of refuses them).
+enum class BigInt { kNone, kInt128, kPast };
+inline BigInt big_int(const EventAttribute& a) {
+  if (a.kind != AttributeKind::kInt || a.container != AttributeContainerKind::kScalar || a.is_null ||
+      !std::holds_alternative<std::monostate>(a.typed_value))
+    return BigInt::kNone;
+  std::string_view digits = a.value;
+  const bool negative = !digits.empty() && digits.front() == '-';
+  if (negative) digits.remove_prefix(1);
+  if (digits.empty() || digits.find_first_not_of("0123456789") != std::string_view::npos) return BigInt::kNone;
+  while (digits.size() > 1 && digits.front() == '0') digits.remove_prefix(1);
+  // 2**127: the Int128 range is [-2**127, 2**127 - 1].
+  constexpr std::string_view limit = "170141183460469231731687303715884105728";
+  const int order = digits.size() != limit.size() ? (digits.size() < limit.size() ? -1 : 1) : digits.compare(limit);
+  if (order < 0 || (negative && order == 0)) {
+    std::int64_t s = 0;
+    std::uint64_t u = 0;
+    const auto* first = a.value.data();
+    const auto* last = first + a.value.size();
+    if (const auto r = std::from_chars(first, last, s); r.ec == std::errc{} && r.ptr == last) return BigInt::kNone;
+    if (const auto r = std::from_chars(first, last, u); r.ec == std::errc{} && r.ptr == last) return BigInt::kNone;
+    return BigInt::kInt128;
+  }
+  return BigInt::kPast;
+}
+inline constexpr const char* kIntegerTooLarge = "integer too large for Polars: OverflowError: Python int too large to convert to C long";
+// pl.lit of a scalar int past the Int128 range.
+inline void scalar_int_range(const EventAttribute& a) {
+  if (big_int(a) == BigInt::kPast) fail("InvalidOperationError", kIntegerTooLarge);
 }
 inline double integer_real(const Value& v) {
   if (const auto u = wide_int(v)) return static_cast<double>(*u);
@@ -1486,6 +1521,8 @@ inline Value value_of(const EventAttribute& a) {
     case python::Scalar::Kind::kBool: return Value::of(scalar.boolean);
     case python::Scalar::Kind::kInt: {
       if (const auto u = wide_cell(a)) return wide_value(*u);
+      // Round DF: refused rather than failing to parse (probe df/i1).
+      if (big_int(a) != BigInt::kNone) throw std::invalid_argument("Native Polars filters take ints in the Int64 and UInt64 ranges only");
       return Value::of(integer_of(a));
     }
     case python::Scalar::Kind::kFloat: return Value::of(scalar.real);

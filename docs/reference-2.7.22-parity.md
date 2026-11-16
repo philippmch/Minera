@@ -29247,3 +29247,101 @@ Tests:
   set-pltblch-6 and ts6 without the declared calls, 43,819 calls),
   replayed by the `minera_polars_filter_de_*_bank_parity_tests` ctests.
 - 572 tests, all passing.
+
+## Review DF1: re-review of round DE, `literal` list items, four_eyes check order, ints past Int64, second-seed set probes, fresh seeds (2026-11-16)
+
+Round DF checked DE's CI (run 43943728731 on 5ba9a67: green on all six jobs),
+took the LTL list-key shapes DE left refused, ran second-seed set probes
+on the CK and CN table and the CP, CK and CJ sequence domains, probed
+the four_eyes check order and Python ints past the Int64 range, and
+replayed two batches of fresh seeds. The device check on the Mac was
+skipped (no device linked).
+
+- **DF1-1 LTL list case keys with a str item named `literal`** (probe
+  `de/specs/lt5.py`, new `df/specs/lt6.py`, 2,800 calls). The key's own
+  List literal is named `literal`, so a str item of that name resolves
+  to it once the key is selected or grouped, and misses wherever the
+  plan reads the source frame. In `four_eyes_principle` a `literal` item
+  alone joins every pair and fails the final join back to the frame
+  (`unable to find column "literal"`, with the plan of every pair and
+  the context stack `[1] 'join'`); beside the resource it joins on both
+  and misses `R_2` after the first pair's join; any repeated output name
+  (a `literal` item beside None, two Nones beside the resource) fails
+  `joining with repeated key names; already joined on X and X` at the
+  first pair. In `attr_value_different_persons` `count` among the items
+  repeats the count column (`DuplicateError: column with name 'count'
+  has more than one occurrence`), and a `literal` item fails the final
+  join back to the frame (the plan of the grouped selection). The native
+  filter still refuses a `literal` item when the frame itself has a
+  `literal` column, and in eager calls. lt5 311 -> 4 of 3,600 (the
+  declared equal-size join order), lt6 0 of 2,800.
+- **DF1-2 `four_eyes_principle` check order** (probes `df/p5.py`,
+  `p7.py`, `p8.py`, spec `df/specs/fe2.py`, 900 calls). The first pair
+  joins once both of its activities' literals are built, before the
+  third activity's literal, and that join checks, in order: a None case
+  key (`must specify on OR left_on and right_on`), a dict case key, then
+  the resource key's `_2` suffix (an int, float, bool or None resource
+  fails `invalid input for col`, a tuple `can only concatenate tuple
+  (not "str") to tuple`, a dict `unsupported operand type(s) for +:
+  'dict' and 'str'`, a list `can only concatenate list`). With list case
+  keys the joins resolve their inputs before their keys, so a list
+  activity against a String column (`cannot cast List type`) fails
+  first when it is one of the activities the failing join resolved: the
+  first two when the first pair's join misses a key (or the key list is
+  empty), the first four when None beside the resource repeats at the
+  third pair's join, all of them when only the final join fails (a
+  `literal` item alone). fe2 66 -> 0 of 900.
+- **DF1-3 Python ints past the Int64 range** (probe `df/specs/i1.py`,
+  1,000 calls on four frames). Polars builds scalar ints in [-2**127,
+  2**127) as Int128 and refuses the rest while building the literal
+  (`InvalidOperationError: integer too large for Polars: OverflowError:
+  Python int too large to convert to C long`): modelled for the numeric
+  attribute bounds, the case performance bounds and the path
+  performance bounds. An Int128-range scalar and an `is_in` list holding
+  ints past UInt64 are refused natively instead of reaching a parse
+  failure (the Int128 literal model is listed for DG). i1 534 -> 409,
+  all 409 left are those refusals.
+- **DF1-4 `four_eyes_principle` with a dict case key** (set probe
+  set-pltblck-7 case 157, fresh CK 2026112901 case 735). The dict fails
+  the first pair's join: after activity 1's literal (a list literal
+  there fails first), before activity 2's.
+- **DF1-5 Second-seed set probes** (seed 7, 300 cases each):
+  set-pltblck-7 (16,512 calls) 2 before, 1 after (declared below);
+  set-pltblcn-7 (117), set-plseqcp-7 (4,374), set-plseqck-7 (4,374) and
+  set-plseqcj-7 (4,101): 0.
+- **DF1-6 Fresh seeds.** Batch 1 (2026112900-11, twelve banks): one
+  differing call (DF1-4), 0 after. Batch 2 (2026112912-23, twelve
+  banks): three differing calls, each one the reference itself answers
+  differently from run to run: `attributes.apply` (CI 2026112916 case
+  198) and `rework.apply` (sequence CH 2026112920 case 395) come back in
+  two row orders over twelve runs each (the declared equal-size join
+  order), and DF1-7.
+- **DF1-7 Struct casts in row partitions race** (fresh CJ 2026112915
+  case 588, probe `df/p9.py`). `apply_numeric_events` with `{}` as the
+  lower bound on a Float64 column of five rows whose first cell is null:
+  the frame is filtered in four row partitions; the first one (the null
+  row) casts and fails the comparison of the empty structs, the others
+  fail the cast (`must specify one field in the struct`), and Polars
+  raises whichever partition fails first in time. Over 30 runs the
+  reference raised the cast error 25 times and the comparison 5 times
+  (with the null row last: the cast error 30 times). The native filter
+  raises the first partition's error (CQ's model). Declared.
+- All 89 docs banks replayed with the final code: 0 mismatches.
+
+Declared:
+- `get_attribute_values` over several keys where a first value pairs
+  with several second values (set-pltblck-7 case 192), as in DC and DE.
+- The equal-size join order (lt5, four calls; fresh CI 2026112916 case
+  198 and sequence CH 2026112920 case 395), as in DC to DE.
+- The partition race of DF1-7 (fresh CJ 2026112915 case 588).
+
+Tests:
+- New: `docs/polars-filter-df-ltl-bank.json.gz` (lt5 without the
+  declared calls, lt6, fe2 and i1 without the refused calls, 7,887
+  calls), `docs/polars-filter-df-set-bank.json.gz` (set-pltblck-7
+  without the declared call, set-pltblcn-7 and fresh CK 2026112901 case
+  735, 16,679 calls) and `docs/polars-sequence-filter-df-set-bank.json.gz`
+  (set-plseqcp-7, set-plseqck-7 and set-plseqcj-7, 12,757 calls),
+  replayed by the `minera_polars_filter_df_*_bank_parity_tests` and
+  `minera_polars_sequence_filter_df_set_bank_parity_tests` ctests.
+- 575 tests, all passing.

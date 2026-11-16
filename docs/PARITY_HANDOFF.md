@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DE (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–DF (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6137,6 +6137,77 @@ set domains and fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DF re-reviewed DE (Review DF1). DE's commit 5ba9a67 ran CI run
+43943728731 (green on all six jobs). DF took the LTL list-key shapes DE left
+refused, probed the four_eyes check order and Python ints past the Int64
+range, ran second-seed set probes on the CK and CN table and the CP, CK
+and CJ sequence domains and replayed two batches of fresh seeds:
+- LTL list case keys with a str item named `literal` (the key's own List
+  literal column): four_eyes fails the final join back to the frame for
+  `literal` alone, misses `R_2` beside the resource and fails `already
+  joined on X and X` for any repeated output name (two Nones included);
+  attr_value_different_persons repeats `count` or fails its final join.
+  lt5 311 -> 4 of 3,600 (declared order), new lt6 0 of 2,800. Still
+  refused: a `literal` item when the frame has a `literal` column, and
+  eager calls.
+- four_eyes check order: the first pair's join runs after activity 1's
+  literal and before activity 2's (None or dict case key, then the
+  resource suffix: `invalid input for col`, tuple/list concatenation,
+  `unsupported operand type(s) for +: 'dict' and 'str'`); with list case
+  keys an activity filter that fails to resolve comes first when the
+  failing join resolved it (first two activities, first four, or all for
+  the final join). Probe fe2 66 -> 0 of 900.
+- Python ints outside [-2**127, 2**127) fail `integer too large for
+  Polars` in the numeric attribute, case performance and path
+  performance bounds; Int128-range scalars and `is_in` lists past UInt64
+  are refused natively (probe i1 534 -> 409, all refusals).
+- Set probes (seed 7): CK table 2 -> 1 of 16,512 (declared several-key
+  value pairs), CN table, CP, CK and CJ sequence 0.
+- Fresh seeds 2026112900-11: one call (four_eyes with a dict case key),
+  fixed; 2026112912-23: three calls the reference itself answers
+  differently from run to run (two equal-size join orders, one struct
+  cast whose row partitions race: the cast error 25 of 30 runs), declared.
+
+In the suite: new `docs/polars-filter-df-ltl-bank.json.gz`,
+`docs/polars-filter-df-set-bank.json.gz` and
+`docs/polars-sequence-filter-df-set-bank.json.gz` with their ctests. The
+probes, set domains and fresh banks are in the project files under
+`review-harness/round-df/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DG) should start by re-reviewing round DF:
+
+- DF's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- Int128 literals in the Polars filters (probe `df/specs/i1.py`, 409
+  native refusals): scalars in [-2**63-1 .. -2**127] and [2**64 ..
+  2**127-1] as Int128 literals in the numeric bounds, `is_in` lists of
+  ints past UInt64 as Int128/UInt128 Series (`int value too large for
+  Polars integer types` past u128), comparisons folded to
+  `when(col.is_not_null())` and the path performance printout with an
+  Int128 bound;
+- the `literal` list item where the frame has a `literal` column, and in
+  eager calls (still refused);
+- third-seed set probes on the CJ, CI and CH table domains (seed 8);
+- maybe the majority outcome of the partition race (DF1-7): a cast error
+  in a later partition beat an earlier partition's comparison error in
+  25 of 30 runs;
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DE's targets, taken in DF (findings DF1-1 to DF1-6): DE's CI run,
+the fresh seeds, the `literal` items and two Nones beside the resource,
+and the second-seed set probes on CK, CN, CP, CK and CJ. Partly taken:
+ints past Int64 (the refusals above). Not taken (carried to DG):
+equal-size joins and the older CJ, CF and CD items.
+
+Previous list for round DF (kept for its older items):
 
 Next round (DF) should start by re-reviewing round DE:
 
