@@ -531,7 +531,10 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     if (out.operation != Op::kEventuallyFollows && !text(out.original) && !collection(out.original))
       fail("TypeError", "apply", "object of type '" + core_type(out.original) + "' has no len()");
     out.values = iter(out.original);
-    if (out.operation != Op::kNext && out.values.size() > 1) for (std::size_t i = 0; i < out.values.size(); ++i) (void)item(out.original, i);
+    // Round DC: eventually_follows builds every activity's filter before it
+    // indexes the values (probe dc/ef3); four_eyes indexes first (dc/fe1).
+    if (out.operation != Op::kNext && out.operation != Op::kEventuallyFollows && out.values.size() > 1)
+      for (std::size_t i = 0; i < out.values.size(); ++i) (void)item(out.original, i);
   }
   if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1)) {
     if (!text(o.attribute_key) && !collection(o.attribute_key)) invalid_col(o.attribute_key);
@@ -561,6 +564,8 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
         }
       }
     }
+  if (out.operation == Op::kEventuallyFollows && out.values.size() > 1)
+    for (std::size_t i = 0; i < out.values.size(); ++i) (void)item(out.original, i);
   // Round CN: the activity filters are built before the case key joins
   // them (None, a dict, a list literal that cannot be built), and four_eyes
   // reads its resource key after that (probe q1).
@@ -977,7 +982,8 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     const bool dict_read = keys::dict_key(o.attribute_key) ||
                            (collection(o.attribute_key) && std::any_of(o.attribute_key.children.begin(), o.attribute_key.children.end(),
                                                                        [](const EventAttribute& v) { return keys::dict_key(v); }));
-    if (dict_read && source.rows.empty()) return;
+    // Round DC: a set key as well (CI set probe cases 173, 228).
+    if ((dict_read || detail::polars_lit::set_argument(o.attribute_key)) && source.rows.empty()) return;
     if (keys::dict_key(o.attribute_key)) fail("TypeError", "apply", "cannot select columns using key of type 'dict': " + key_repr(o.attribute_key));
     if (collection(o.attribute_key) && std::any_of(o.attribute_key.children.begin(), o.attribute_key.children.end(), [](const EventAttribute& v) { return keys::dict_key(v); })) {
       if (keys::dict_key(o.attribute_key.children.front()))
@@ -1438,7 +1444,11 @@ EventTable project(const EventTable& source,const Prepared& p,const Selection& s
   if(!selected.deferred_type.empty())fail(selected.deferred_type,"collect",selected.deferred_message);
   EventTable result=source;result.rows.clear();if(result.index)result.index->labels.clear();
   auto order=std::vector<std::size_t>(source.rows.size());std::iota(order.begin(),order.end(),0);
-  if(eager && p.operation==Op::kEventuallyFollows)order=sorted_rows(source,p);
+  // Round DC: a lazy frame keeps the sorted order when its one activity is
+  // None and the anti join runs (col == None filters to an empty frame; CH
+  // set probe case 182, probe dc/ef2); two or more activities do not.
+  const bool null_anti=p.values.size()==1&&null(p.values.front())&&!truth(p.options.positive);
+  if((eager||null_anti) && p.operation==Op::kEventuallyFollows)order=sorted_rows(source,p);
   for(const auto i:order) {
     const auto key=row_case_key(source,p,source.rows[i]);
     if(selected.keys.contains(key)){result.rows.push_back(source.rows[i]);if(result.index)result.index->labels.push_back(source.index->labels[i]);}

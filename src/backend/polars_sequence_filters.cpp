@@ -889,6 +889,79 @@ Counts end_counts(const EventTable& df, const std::string& case_glue, const std:
   return out;
 }
 
+// Round DC: the keyword helpers' keys given as a set, list or tuple (probes
+// dc/ea1, dc/ea2 against pm4py 2.7.22 on Polars 1.44.1). get_end_activities
+// is group_by(case).agg(pl.col(activity).last().alias("end_activity")), then
+// a count per end activity. Python builds the case key's item literals, then
+// pl.col of the activity's items (each must be a str); the plan resolves the
+// case keys (a str a column, any other item a literal named `literal`), then
+// the activity: no names leave the grouped frame without "end_activity",
+// one name is its column (a missing one `"x" not found`), several existing
+// names repeat the alias. Literal keys only group the whole frame into one
+// row, an empty frame included (its end activity null).
+Counts end_counts(const EventTable& df, const Value& case_key, const Value& act_value) {
+  const bool listed = list_value(&case_key);
+  if (!listed && case_key.kind != Kind::kString)
+    throw std::invalid_argument("Native Polars end activity counts outside the observed case key domain");
+  if (!list_value(&act_value) && act_value.kind != Kind::kString)
+    throw std::invalid_argument("Native Polars end activity counts outside the observed activity key domain");
+  if (act_value.kind == Kind::kList || act_value.kind == Kind::kTuple)
+    if (by_names(key_text(&act_value, "")).size() != act_value.items.size())
+      throw std::invalid_argument("Native Polars end activity counts outside the observed domain: a repeated activity name");
+  if (listed) (void)gk::build_values(case_key.items);
+  check_col_list(&act_value);
+  auto act_key = key_text(&act_value, "");
+  std::optional<gk::Keys> keys;
+  std::size_t case_column = 0;
+  CaseText text;
+  if (listed) {
+    keys = list_keys(df, case_key, kEndCountPlan);
+    text = case_text(*keys, case_key, false);
+  } else {
+    case_column = require(df, case_key.text, kEndCountPlan);
+    text = case_text(case_key.text);
+  }
+  if (no_columns_key(act_key))
+    no_columns_aggregate(df, text, false, NoColumns{"end_activity", "", {}, "group_by", {"group_by"}});
+  if (by_name_key(act_key)) {
+    const auto names = by_names(act_key);
+    if (names.size() == 1 && find_column(df, names.front())) act_key = names.front();
+  }
+  const auto act = require_activity(df, act_key, "end_activity", kEndCountPlan);
+  std::vector<std::optional<std::size_t>> last;  // per group in first-appearance order; none: the empty frame's one row
+  if (!listed) {
+    const auto groups = groups_of(df, case_column, all_rows(df));
+    for (const auto& key : groups.order) last.push_back(groups.rows.at(key).back());
+  } else if (keys->all_literal()) {
+    last.push_back(df.size() ? std::optional<std::size_t>(df.size() - 1) : std::nullopt);
+  } else {
+    std::vector<std::string> order;
+    std::map<std::string, std::size_t> at;
+    for (std::size_t i = 0; i < df.size(); ++i) {
+      const auto g = group_of_row(*keys, df.rows[i]);
+      if (at.emplace(g, order.size()).second) {
+        order.push_back(g);
+        last.push_back(i);
+      } else {
+        last[at.at(g)] = i;
+      }
+    }
+  }
+  Counts out;
+  for (const auto& row : last) {
+    const auto activity = python_value(row ? df.rows[*row][act] : Cell(), dtype_of(df, act));
+    bool found = false;
+    for (auto& [k, v] : out)
+      if (same_key(k, activity)) {
+        ++v.integer;
+        found = true;
+        break;
+      }
+    if (!found) out.emplace_back(activity, Value::of(std::int64_t{1}));
+  }
+  return out;
+}
+
 // ------------------------------------------------------------------ variants
 
 const std::string kTimestamp(kPolarsFilterDefaultTimestampKey);
@@ -1497,11 +1570,44 @@ PolarsFilterValue polars_get_end_activities(const EventTable& df, const std::str
   return Value::dict(end_counts(df, case_id_key, activity_key));
 }
 
+PolarsFilterValue polars_get_end_activities(const EventTable& df, const PolarsFilterValue& case_id_key,
+                                            const PolarsFilterValue& activity_key) {
+  return Value::dict(end_counts(df, case_id_key, activity_key));
+}
+
+namespace {
+// The nocc filter after its counts: str keys filter by boundary_filter, other
+// keys (round DC) by the PolarsFilterValue overload of
+// polars_filter_df_on_end_activities.
+PolarsEndActivitiesNocc nocc_filter(const EventTable& df, const PolarsFilterValue& nocc, const Counts& counts,
+                                    bool return_dict, const std::optional<PolarsFilterValue>& most_common_variant,
+                                    const std::function<EventTable(const Value&)>& filter);
+}  // namespace
+
+PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
+    const EventTable& df, const PolarsFilterValue& nocc, const std::optional<PolarsFilterValue>& ea_count0,
+    const PolarsFilterValue& case_id_glue, const PolarsFilterValue& activity_key, bool return_dict,
+    const std::optional<PolarsFilterValue>& most_common_variant) {
+  const Counts counts = ea_count0 ? ea_count0->entries : end_counts(df, case_id_glue, activity_key);
+  return nocc_filter(df, nocc, counts, return_dict, most_common_variant, [&](const Value& values) {
+    return polars_filter_df_on_end_activities(df, values, case_id_glue, activity_key, Value::of(true));
+  });
+}
+
 PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
     const EventTable& df, const PolarsFilterValue& nocc, const std::optional<PolarsFilterValue>& ea_count0,
     const std::string& case_id_glue, const std::string& activity_key, bool return_dict,
     const std::optional<PolarsFilterValue>& most_common_variant) {
   const Counts counts = ea_count0 ? ea_count0->entries : end_counts(df, case_id_glue, activity_key);
+  return nocc_filter(df, nocc, counts, return_dict, most_common_variant, [&](const Value& values) {
+    return boundary_filter(df, values, case_id_glue, activity_key, true, true);
+  });
+}
+
+namespace {
+PolarsEndActivitiesNocc nocc_filter(const EventTable& df, const PolarsFilterValue& nocc, const Counts& counts,
+                                    bool return_dict, const std::optional<PolarsFilterValue>& most_common_variant,
+                                    const std::function<EventTable(const Value&)>& filter) {
   const auto threshold = number_of(nocc);
   // Round DA: each count is compared with nocc (none without a count); a
   // count below it reads the variant's last activity, which a set cannot
@@ -1526,28 +1632,41 @@ PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
   } else {
     std::vector<Value> values;
     for (const auto& entry : kept) values.push_back(entry.first);
-    out.table = boundary_filter(df, Value::list(values), case_id_glue, activity_key, true, true);
+    out.table = filter(Value::list(values));
   }
   if (return_dict) out.counts = Value::dict(kept);
   return out;
 }
+}  // namespace
 
 EventTable polars_trace_filter_get_variants_df(const EventTable& df, const std::string& case_id_key,
                                                const std::string& activity_key) {
-  const auto v = variants_of(df, case_id_key, activity_key, kTraceSortPlan, kTraceAggPlan);
+  // Round DC: a key selecting no column aggregates the case column alone,
+  // which then misses "variant_list" (probe dc/gv1).
+  const NoColumns none{"variant_list", "len().alias(\"count\")", {"count"}, "with_columns", {"with_columns"}};
+  const auto v = variants_of(df, case_id_key, activity_key, kTraceSortPlan, kTraceAggPlan, &none);
   require_string_activities(df, v, case_id_key, activity_key);
   return trace_variants_frame(df, v);
 }
 
 EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const std::string& case_id_key,
                                                    const std::string& activity_key) {
-  const auto v = variants_of(df, case_id_key, activity_key, kSuffixSortPlan, kSuffixAggPlan);
+  // Round DC: a key selecting no column leaves the sorted cases alone
+  // (probe dc/gv1).
+  const bool no_activity = no_columns_key(activity_key);
+  const auto v = variants_of(df, case_id_key, activity_key, kSuffixSortPlan, kSuffixAggPlan, nullptr, nullptr, no_activity);
   EventTable out;
-  out.columns = {df.columns[v.case_column], "variant"};
-  out.dtypes = {dtype_of(df, v.case_column), "String"};
-  out.categorical_dtypes = case_descriptor(df, v.case_column, 2);
-  for (std::size_t c = 0; c < v.order.size(); ++c)
-    out.rows.push_back({v.case_cells[c], string_cell("variant", variant_string(v.activities[c], dtype_of(df, v.act)))});
+  out.columns = {df.columns[v.case_column]};
+  out.dtypes = {dtype_of(df, v.case_column)};
+  if (!no_activity) {
+    out.columns.push_back("variant");
+    out.dtypes.push_back("String");
+  }
+  out.categorical_dtypes = case_descriptor(df, v.case_column, out.columns.size());
+  for (std::size_t c = 0; c < v.order.size(); ++c) {
+    out.rows.push_back({v.case_cells[c]});
+    if (!no_activity) out.rows.back().push_back(string_cell("variant", variant_string(v.activities[c], dtype_of(df, v.act))));
+  }
   return out;
 }
 
@@ -1562,6 +1681,8 @@ std::pair<std::string, std::string> variants_df_keys(const EventTable& df, const
     throw std::invalid_argument("Polars get_variants_df keys other than a str or a set are outside the native domain");
   check_col_list(&activity_key);
   if (activity_key.kind == Kind::kString) return {case_id_key.text, activity_key.text};
+  // Round DC: an empty set selects no column (plseqcj set probe case 233).
+  if (activity_key.items.empty()) return {case_id_key.text, key_text(&activity_key, "")};
   if (activity_key.items.size() == 1 && find_column(df, activity_key.items.front().text))
     return {case_id_key.text, activity_key.items.front().text};
   // A name no column carries fails the group_by by name (probe set-plseqcp-2

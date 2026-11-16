@@ -197,7 +197,7 @@ std::string bound_text(const ParsedExactTimestamp& v) {
 }
 namespace keys = detail::polars_keys;
 // Round CM: the key as pl.col reads it (a dict selects its names).
-EventAttribute selector(const EventAttribute& value,const std::vector<std::string>& columns) {
+EventAttribute selector(const EventAttribute& value,const std::vector<std::string>& columns,bool several=false) {
   if(!text(value)&&!collection(value))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(value)+"'.");
   // pl.col of a list reads every item as a column name (round CD).
   if(collection(value)&&value.container!=AttributeContainerKind::kContainer){
@@ -207,7 +207,7 @@ EventAttribute selector(const EventAttribute& value,const std::vector<std::strin
     for(const auto& item:value.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+core_type(item)+"' object is not an instance of 'str'");
   }
   auto key=keys::col_key(value,columns);
-  if(collection(key)&&!key.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
+  if(!several&&collection(key)&&!key.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
   return key;
 }
 namespace groups=detail::polars_group_keys;
@@ -225,7 +225,10 @@ void case_dict(const PolarsTimestampFilterOptions& options){if(keys::dict_key(op
 Query prepare(const std::vector<std::string>& columns,Operation op,const EventAttribute& low,const EventAttribute& high,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={}) {
   Query q{op,bound(low),bound(high),options,attribute,value,{},{}};
   if(op==Operation::kContained||op==Operation::kIntersecting)case_dict(options);
-  if(op==Operation::kAttribute)q.attribute=selector(attribute,columns);
+  // Round DC: pl.col(attribute) == value builds the value's literal after
+  // pl.col, so a set value fails before a selector naming several columns
+  // is refused (probe set-pltblci-3 case 2).
+  if(op==Operation::kAttribute)q.attribute=selector(attribute,columns,true);
   if(op==Operation::kAttribute&&dict_value(value))struct_literal_check(value);
   // Round CO: a list value builds its literal before pl.col reads the
   // timestamp key (cases 62, 69, 143 and 382 of the CL and CK banks).
@@ -234,6 +237,7 @@ Query prepare(const std::vector<std::string>& columns,Operation op,const EventAt
   if(op==Operation::kAttribute&&(value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple)) {
     try{(void)lit::literal_of(lit::value_of(value));}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.what());}
   }
+  if(op==Operation::kAttribute&&collection(q.attribute)&&!q.attribute.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
   q.options.timestamp_key=selector(options.timestamp_key,columns);
   // The attribute value literal is built before unique(case).
   if(op==Operation::kAttribute&&keys::dict_key(options.case_id_key)&&(value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple)) {
@@ -607,7 +611,13 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   if(listed&&q.op!=Operation::kAttribute)resolve_keys(false);
   if(q.op!=Operation::kEvents&&!listed&&q.op!=Operation::kAttribute)case_at=position(q.options.case_id_key.value);
   std::optional<std::size_t> attr_at;
-  // Round CM: a selector expanding to no column fails before a missing one.
+  // Round DC: a by-name selector (a dict or list naming a missing column)
+  // fails while the predicate expands, before the other selector's zero
+  // expansion; the attribute's first (fresh CK 2026112601 case 312, probe
+  // dc/tf1).
+  if(q.op==Operation::kAttribute&&keys::by_name(q.attribute.value))(void)position(q.attribute.value);
+  if(q.op==Operation::kAttribute&&keys::by_name(q.options.timestamp_key.value))(void)position(q.options.timestamp_key.value);
+  // Round CM: a selector expanding to no column fails before a missing str one.
   if(q.op==Operation::kAttribute&&collection(q.attribute))empty_selector(source,q,phase,false);
   if(q.op==Operation::kAttribute&&collection(q.options.timestamp_key))empty_selector(source,q,phase,true);
   // Round CS: a by-name timestamp key missing a column fails while the

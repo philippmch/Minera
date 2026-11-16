@@ -281,6 +281,11 @@ bool literal_time_list(const EventAttribute& key, bool performance) {
   return !performance && (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) &&
          key.children.size() == 1 && !text(key.children.front());
 }
+// Round DC: a key pl.col expands to several existing columns.
+bool several_names(const EventAttribute& key) {
+  return collection(key) && !keys::dict_key(key) && key.children.size() >= 2 &&
+         std::all_of(key.children.begin(), key.children.end(), [](const EventAttribute& item) { return keys::plain_text(item); });
+}
 // Round CU (probe u2): a non-empty list or tuple case key of str names
 // sorts as its list literal (one value: any frame but a one-row one fails the
 // sort), then is pl.col of its names: a missing name fails first, then the
@@ -572,6 +577,14 @@ std::string bound_filter(const EventAttribute& bound, bool upper) {
   }
   fail("DuplicateError", phase, detail::polars_group_keys::duplicate_message(name, "projections") + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n" + plan + contexts({"select", "unique", "join right", "join", "select"}));
 }
+// The first with_columns names one alias twice.
+[[noreturn]] void duplicate_with_columns(const EventTable& source, const std::string& name, const PolarsPathsFilterOptions& options, const SortLiteral& literal, const std::string& phase) {
+  fail("ComputeError", phase,
+       "the name '" + name + "' passed to `LazyFrame.with_columns` is duplicate\n\nIt's possible that multiple expressions are returning the same "
+       "default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names.\n\n"
+       "Resolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n" +
+           sort_plan(source, options, literal) + contexts({"with_columns", "with_columns", "join left", "join", "select"}));
+}
 EventTable collect(const EventTable& source, const std::vector<std::string>& paths, bool performance, const PolarsPathsFilterOptions& options, const SortLiteral& literal, const std::string& phase) {
   source.validate();
   if (source.index || source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars paths require declared dtypes and no dataframe index");
@@ -593,16 +606,18 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
   if (literal && performance && !collection(options.timestamp_key)) time_at = position(options.timestamp_key.value, true);
   if (literal && !performance) time_at = case_at;
   const auto& target = performance ? options.attribute_key : options.target_attribute_key ? *options.target_attribute_key : options.attribute_key;
+  // Round DC: a target expanding to several columns aliases "next_activity"
+  // once per column in the first with_columns, before the attribute resolves
+  // (CH set probe case 26, probes dc/pa1, dc/pa2); several attribute names
+  // beside a single target are outside the model.
+  if (several_names(target) && !listed && !literal) duplicate_with_columns(source, "next_activity", options, literal, phase);
+  if (several_names(target) || several_names(options.attribute_key))
+    throw std::invalid_argument("Native Polars path selector outside observed domain: several attribute names beside a single target");
   if (collection(target) || collection(options.attribute_key)) empty_selector(source, performance, options, literal, phase);
   const auto target_at = position(target.value, true), activity_at = position(options.attribute_key.value, true);
   if (listed) {
     const auto names = case_names(options.case_id_key);
-    if (names.size() > 1)
-      fail("ComputeError", phase,
-           "the name 'case_next' passed to `LazyFrame.with_columns` is duplicate\n\nIt's possible that multiple expressions are returning the same "
-           "default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names.\n\n"
-           "Resolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n" +
-               sort_plan(source, options, literal) + contexts({"with_columns", "with_columns", "join left", "join", "select"}));
+    if (names.size() > 1) duplicate_with_columns(source, "case_next", options, literal, phase);
     // A repeated name selects its column once in the with_columns and twice
     // in the final select: round DA models the DuplicateError and its plan
     // (probe d1; the CU leftover), on str timestamp keys.
@@ -708,11 +723,13 @@ PolarsPathsFilterOptions keyed(const PolarsPathsFilterOptions& raw, const std::v
       continue;
     }
     *key = keys::col_key(*key, columns);
+    // Round DC: several names of the attribute key stay listed (collect).
+    if (key == &options.attribute_key && several_names(*key)) continue;
     if (collection(*key) && !key->children.empty()) throw std::invalid_argument("Native Polars path selector outside observed empty-list domain");
   }
   if (options.target_attribute_key) {
     *options.target_attribute_key = keys::col_key(*options.target_attribute_key, columns);
-    if (collection(*options.target_attribute_key) && !options.target_attribute_key->children.empty())
+    if (collection(*options.target_attribute_key) && !options.target_attribute_key->children.empty() && !several_names(*options.target_attribute_key))
       throw std::invalid_argument("Native Polars path selector outside observed empty-list domain");
   }
   return options;

@@ -86,6 +86,17 @@ struct PolarsEndActivitiesNocc {
     const std::optional<PolarsFilterValue>& ea_count0 = std::nullopt,
     const std::string& case_id_glue = "case:concept:name", const std::string& activity_key = "concept:name",
     bool return_dict = false, const std::optional<PolarsFilterValue>& most_common_variant = std::nullopt);
+// Round DC: the keys given as a str or a set, list or tuple: the case key
+// groups by each item (a str a column, any other item a literal named
+// `literal`), the activity key is pl.col of its names; the filtering step is
+// polars_filter_df_on_end_activities with the same keys. Other key values
+// throw std::invalid_argument.
+[[nodiscard]] PolarsFilterValue polars_get_end_activities(const EventTable& df, const PolarsFilterValue& case_id_key,
+                                                          const PolarsFilterValue& activity_key);
+[[nodiscard]] PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
+    const EventTable& df, const PolarsFilterValue& nocc, const std::optional<PolarsFilterValue>& ea_count0,
+    const PolarsFilterValue& case_id_glue, const PolarsFilterValue& activity_key, bool return_dict,
+    const std::optional<PolarsFilterValue>& most_common_variant);
 
 // Variants follow the rows sorted by case and "time:timestamp" as Polars'
 // unstable multi-column sort orders tied rows (polars_sort.hpp);

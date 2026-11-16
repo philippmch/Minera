@@ -28885,3 +28885,144 @@ Tests:
   `docs/pandas-filter-db-set-ltl-bank.json.gz` (set-pdltl-2, 1,800
   calls), replayed by the `minera_*_db_set*_bank_parity_tests` ctests
   (563 tests, all passing).
+
+## Review DC1: re-review of round DB, set probes on six more domains, listed set order, fresh seeds (2026-11-16)
+
+Round DC checked DB's CI (run 43898017238 on ed683a4: green on all six
+jobs), replayed two batches of fresh seeds, ran set probes on the six
+domains DB had not probed with sets and recaptured DB's four Polars set
+probes with sets listed in the order they iterate. The device check on
+the Mac was skipped (no device linked).
+
+- **DC1-1 Sets listed in the order they iterate** (the round's harness,
+  `dom/setcommon.py`; no model change). The main capture process lists
+  each set in an order a set can iterate in, and every worker copy of the
+  set codec (the table domains load their own copy through the sequence
+  domain) inserts the items in an order whose iteration gives that
+  listing, searching insertion orders where hash collisions (-1/-2,
+  255/-129) give two-cycles. The listed order is then the order the
+  reference saw, except where a set holds NaN (hashed by identity). DB's
+  17 calls declared as showing a set's order are gone: the recaptured
+  probes set-pltbl-1 (16,185 calls) differ in 2 calls, set-pltblck-2
+  (16,419) in 1, set-plseq-1 (6,611) in 0 and set-plseqcp-2 (4,473) in 1
+  (all declared below), so DB's four banks are replaced by the
+  recaptures (16,183, 16,418, 6,603 and 4,431 calls, 87 more than
+  before).
+- **DC1-2 Set keys in the Polars end-activity keyword helpers.**
+  `polars_get_end_activities` and `polars_filter_df_on_end_activities_nocc`
+  take `PolarsFilterValue` keys: a set, list or tuple case key groups by
+  its items as the join filters' group keys do (a str a column, any other
+  value a literal; an all-literal key one group, an empty frame one null
+  row), a set or list activity key goes through `pl.col` (one existing
+  name that column, a missing one by name, `{}`/empty the no-column
+  aggregate), a list activity key repeating a name is refused; the nocc
+  filter keeps its threshold logic for both overloads. The bank driver
+  tries the overload and falls back to the str call outside its domain.
+  Probes set-plseqck-3 (4,326 calls) 36 differing before, 0 after;
+  set-plseqcj-3 (3,861) 21 before, 0 after.
+- **DC1-3 Several keys in `get_attribute_values`** (probe `dc/ga1.py`).
+  A set or list of plain keys groups by each item in order (a missing
+  name fails at its place, a second literal or a repeated name repeats
+  its output name) and the dict maps each group's first key value to its
+  second; the groups come in no fixed order and a later one replaces an
+  earlier entry, so a first value paired with several second values is
+  outside the model (refused). The relative occurrence filter's paired
+  values read Datetime and Date columns as `datetime.datetime` and
+  `datetime.date`.
+- **DC1-4 Predicates over several columns** (probes `dc/nm1.py`,
+  `dc/ap1.py`). A set or list key naming several distinct existing
+  columns expands `apply_numeric`, `apply_numeric_events`, `apply` and
+  `apply_events` to one predicate per column, which `LazyFrame.filter`
+  refuses: `The predicate passed to 'LazyFrame.filter' expanded to
+  multiple expressions` listing each predicate as Python wrote it
+  (`[([(col("x")) >= (dyn int: 50)]) & ([(col("x")) <= (dyn float:
+  100)])]`, the events filter's negation `[(... < ...) | (... > ...)]`,
+  `col("x").is_in([["a", "b"]])`, `is_in([col("a")])` for a str value,
+  `is_in([[]])` for None or an empty list, `.not()` for the negative
+  events filter), at the trace filters' join (before the case key) or
+  at the events filter's node. Bounds other than int or float are
+  refused in that shape.
+- **DC1-5 Set keys of `filter_df_keeping_spno_activities`** (probe
+  `dc/gb1.py`). `group_by` builds a nested set or tuple item as a literal
+  first, then resolves the keys in order: a missing name fails at its
+  place, a second item that is no str repeats the name `literal`
+  (`DuplicateError` at the slice), as Polars resolves group keys.
+- **DC1-6 Several target names in the paths filter** (probes
+  `dc/pa1.py`, `dc/pa2.py`). A target (the attribute key, or
+  `target_attribute_key`) naming several existing columns aliases
+  `next_activity` once per column in the first `with_columns`: after a
+  missing case or timestamp column fails the sort, `the name
+  'next_activity' passed to LazyFrame.with_columns is duplicate` with the
+  sorted plan, before a missing attribute.
+- **DC1-7 `eventually_follows` literal order and None** (probes
+  `dc/ef1.py`-`ef3.py`, `dc/fe1.py`). It builds every activity's filter
+  before it indexes the values, so a set or dict holding an item that
+  cannot build its Series fails with the builder's error before `'set'
+  object is not subscriptable` or `KeyError: 0` (`four_eyes_principle`
+  indexes first). On a lazy frame one None activity with the anti join
+  (positive false or None) keeps the frame's sorted order (`col == None`
+  filters to an empty frame); two or more activities keep the original
+  order.
+- **DC1-8 Smaller set shapes.** `A_next_B_next_C` on an empty frame with
+  a set attribute key never reads it: the empty selection fails the join
+  on the key dtypes, as a dict key does. `get_variants_df` with an empty
+  set activity key selects no column, as `[]` and `{}` do (probe
+  `dc/gv1.py`): the trace filter misses `variant_list` after aggregating
+  the case column, the ends_with filter returns the sorted cases alone.
+- **DC1-9 Fresh set probes on six domains** (`dom/_probe_*_set_domain.py`,
+  300 cases each, seed 3): set-pltblcn (the Polars CN table domain, seeds
+  3-10, 936 calls) 0 differing; set-pltblci-3 (13,701 calls) 13 before, 3
+  after; set-pltblch-3 (12,014) 8 before, 3 after; set-plseqck-3 and
+  set-plseqcj-3 as in DC1-2; set-pdseqck-3 (the pandas CK sequence
+  domain, 3,430 calls) 0. The timestamp filters resolve a by-name
+  selector (a dict or list naming a missing column) while the predicate
+  expands, the attribute's before the timestamp key's and before the
+  other selector's zero expansion, and refuse a several-name attribute
+  selector only after the value literals (fresh Polars CK 2026112601 case
+  312, probe `dc/tf1.py`).
+- **DC1-10 pandas empty-list attribute keys** (probe `dc/pn1.py`). The
+  numeric filter with an empty-list attribute key (`df[[]]`, a frame of
+  NaN) still runs its stream filters on the masked frame (fresh pandas CK
+  2026112609 case 175: `KeyError: inf` for a float stream key), and the
+  values filter keeps the cases whose masked case id is null (case 455:
+  the result keeps the source index).
+- **DC1-11 Fresh seeds.** Batch 1 (2026112600-11, twelve banks): four
+  calls; three fixed (DC1-9, DC1-10), one declared (Polars CJ sequence
+  2026112607 case 488, below). Batch 2 (2026112612-23, twelve banks):
+  0 differing calls.
+
+Declared:
+- A set holding NaN, or a tuple holding NaN inside a set: the reference
+  hashes NaN by identity, so the iteration order (and the first item a
+  builder error names) is not the listed one (four probe calls: CI cases
+  21 and 275, CH case 292, CP case 73).
+- `get_attribute_values` over several keys where a first value pairs with
+  several second values: the surviving entry follows Polars' random
+  group order (CH case 160; set-pltbl-1 case 18, whose dates the bank
+  cannot represent).
+- A one-item set case key holding a tuple in `filter_on_ncases` and
+  `filter_on_case_size`: the literal column holds List cells, which the
+  native frame has not (CH case 251, set-pltbl-1 case 44).
+- A dict value holding a set (a struct with an Object field) as the
+  timeframe filter's attribute value and as a numeric bound: Polars
+  resolves the comparison and fails later (a case key's duplicate
+  literal, a stream value's cast), which the struct model does not
+  reach (CI case 49, set-pltblck-2 case 295).
+- `filter_variants_top_k` on a one-row frame whose second key column is
+  a List, Struct, Binary, Decimal, Duration or Time column (probes
+  `dc/tk1.py`-`tk4.py`): outside the native frame's dtypes.
+- `rework` whose inner join is between equal-size frames: Polars returns
+  the rows in random order (probe `dc/rw1.py`: about half the runs each
+  way; fresh CJ 2026112607 case 488).
+- Several attribute names beside a single target in the paths filter
+  (refused natively; Polars concatenates the columns).
+
+Tests:
+- New: `docs/polars-filter-dc-set-bank.json.gz` (set-pltblci-3,
+  set-pltblch-3 and set-pltblcn-3 to 5, 26,060 calls),
+  `docs/polars-sequence-filter-dc-set-bank.json.gz` (set-plseqck-3 and
+  set-plseqcj-3, 8,151 calls) and
+  `docs/pandas-sequence-filter-dc-set-bank.json.gz` (set-pdseqck-3, 3,428
+  calls), replayed by the `minera_*_dc_set_bank_parity_tests` ctests.
+- Replaced: DB's four Polars set banks by their recaptures (DC1-1).
+- 566 tests, all passing.

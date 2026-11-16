@@ -316,7 +316,13 @@ EventTable values_filter(const EventTable& source,const EventAttribute& values,c
  source.validate();
  if(empty_list(options.attribute_key)){
   if(!values.is_null&&values.container==AttributeContainerKind::kScalar)error("TypeError","only list-like or dict-like objects are allowed to be passed to DataFrame.isin(), you passed a '"+type_name(values)+"'");
-  return events?masked_frame(source):project_cases(source,options.case_id_key,std::vector<bool>(source.size()),truth(options.positive));
+  if(events)return masked_frame(source);
+  // Round DC: df[df[[]].isin(values)] is the masked frame, whose case ids
+  // are all NaN, so the null cases match as in numeric_filter (fresh pandas
+  // CK 2026112609 case 455).
+  const auto cases=case_column(source,options.case_id_key);std::vector<bool> nulls(source.size());
+  for(std::size_t i=0;i<source.size();++i)nulls[i]=missing(cell(source,i,cases));
+  return project_cases(source,options.case_id_key,nulls,truth(options.positive));
  }
  const auto attribute=direct_column(source,options.attribute_key);
  auto admitted=admitted_values(values,!events);
@@ -383,42 +389,9 @@ bool comparison(const EventAttribute& value,const EventAttribute& bound,const st
  else error("TypeError","'"+op+"' not supported between instances of '"+qualified_type_name(value)+"' and '"+qualified_type_name(bound)+"'");
  return op==">="?order>=0:op=="<="?order<=0:op=="<"?order<0:order>0;
 }
-EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,const EventAttribute& upper,const PandasAttributesFilterOptions& options,bool events){
- source.validate();
- if(empty_list(options.attribute_key)){
-  // Round CM: df[[]] has no columns, so a list bound must be empty to align
-  // (seed 2026111552 case 167).
-  // Round CT: a dict bound is list-like too (its keys), and an empty set has
-  // no order (fresh CK bank 2026111721 case 433).
-  for(const auto* bound:{&lower,&upper}){
-   if(bound->is_null||bound->container==AttributeContainerKind::kScalar)continue;
-   if(!bound->children.empty())error("ValueError","Unable to coerce to Series, length must be 0: given "+std::to_string(bound->children.size()));
-   if(bound->container==AttributeContainerKind::kSet||bound->container==AttributeContainerKind::kFrozenSet)error("TypeError","'"+type_name(*bound)+"' type is unordered");
-  }
-  if(events)return masked_frame(source);
-  // The masked frame leaves every case id null, so the null cases match.
-  const auto cases=case_column(source,options.case_id_key);std::vector<bool> nulls(source.size());
-  for(std::size_t i=0;i<source.size();++i)nulls[i]=missing(cell(source,i,cases));
-  return project_cases(source,options.case_id_key,nulls,truth(options.positive));
- }
- const auto attribute=direct_column(source,options.attribute_key);
- const bool positive=truth(options.positive),keep_nan=truth(options.keep_nan_values);
- const auto dtype=source.dtypes.empty()?"object":source.dtypes[attribute];
- std::vector<bool> low(source.size()),high(source.size()),selected(source.size());
- // Pandas evaluates complete vector comparisons before combining the masks;
- // negative event filtering keeps (value < lower) | (value > upper).
- const bool outside=events&&!positive;
- const auto lows=row_bounds(lower,source.size(),dtype);
- for(std::size_t i=0;i<source.size();++i)low[i]=comparison(cell(source,i,attribute),lows[i],outside?"<":">=",dtype);
- const auto highs=row_bounds(upper,source.size(),dtype);
- for(std::size_t i=0;i<source.size();++i)high[i]=comparison(cell(source,i,attribute),highs[i],outside?">":"<=",dtype);
- for(std::size_t i=0;i<source.size();++i){const auto& value=cell(source,i,attribute);const bool within=low[i]&&high[i];selected[i]=events?((outside?(low[i]||high[i]):within)||(keep_nan&&missing(value))):(within||(keep_nan&&missing(value)));}
- if(!events){
-  // Round CT: df[list] == value is a frame, so df[mask] masks the rows
-  // (DataFrame.where) instead of dropping them: a cell stays only where its
-  // column is listed and equals the value, every other cell turns NaN
-  // (seed 2026111709 case 120).
-  std::vector<std::vector<char>> alive;
+// The stream filters of apply_numeric: each compares the rows that remain
+// (`alive` holds the cells a list key's DataFrame.where left visible).
+void stream_filters(const EventTable& source,const PandasAttributesFilterOptions& options,std::vector<bool>& selected,std::vector<std::vector<char>>& alive){
   for(const auto& control:{std::pair{&options.stream_filter_key1,&options.stream_filter_value1},std::pair{&options.stream_filter_key2,&options.stream_filter_value2}}){
    if(!*control.first||(*control.first)->is_null)continue;
    static const EventAttribute none{"","",AttributeKind::kString,true};
@@ -470,6 +443,54 @@ EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,c
     selected[remaining[k]]=visible(remaining[k],stream)&&!missing(item)&&!missing(v)&&identity(v)==identity(item);
    }
   }
+}
+EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,const EventAttribute& upper,const PandasAttributesFilterOptions& options,bool events){
+ source.validate();
+ if(empty_list(options.attribute_key)){
+  // Round CM: df[[]] has no columns, so a list bound must be empty to align
+  // (seed 2026111552 case 167).
+  // Round CT: a dict bound is list-like too (its keys), and an empty set has
+  // no order (fresh CK bank 2026111721 case 433).
+  for(const auto* bound:{&lower,&upper}){
+   if(bound->is_null||bound->container==AttributeContainerKind::kScalar)continue;
+   if(!bound->children.empty())error("ValueError","Unable to coerce to Series, length must be 0: given "+std::to_string(bound->children.size()));
+   if(bound->container==AttributeContainerKind::kSet||bound->container==AttributeContainerKind::kFrozenSet)error("TypeError","'"+type_name(*bound)+"' type is unordered");
+  }
+  if(events)return masked_frame(source);
+  // Round DC: the stream filters then read the masked frame, whose cells are
+  // all NaN: a key that names no column raises its KeyError, a str key keeps
+  // no row, a list key masks nothing more (fresh pandas CK 2026112609 case
+  // 175, probe dc/pn1).
+  if((options.stream_filter_key1&&!options.stream_filter_key1->is_null)||(options.stream_filter_key2&&!options.stream_filter_key2->is_null)){
+   std::vector<bool> selected(source.size(),true);
+   std::vector<std::vector<char>> alive(source.size(),std::vector<char>(source.columns.size(),0));
+   stream_filters(source,options,selected,alive);
+   return project_cases(source,options.case_id_key,selected,truth(options.positive),&alive);
+  }
+  // The masked frame leaves every case id null, so the null cases match.
+  const auto cases=case_column(source,options.case_id_key);std::vector<bool> nulls(source.size());
+  for(std::size_t i=0;i<source.size();++i)nulls[i]=missing(cell(source,i,cases));
+  return project_cases(source,options.case_id_key,nulls,truth(options.positive));
+ }
+ const auto attribute=direct_column(source,options.attribute_key);
+ const bool positive=truth(options.positive),keep_nan=truth(options.keep_nan_values);
+ const auto dtype=source.dtypes.empty()?"object":source.dtypes[attribute];
+ std::vector<bool> low(source.size()),high(source.size()),selected(source.size());
+ // Pandas evaluates complete vector comparisons before combining the masks;
+ // negative event filtering keeps (value < lower) | (value > upper).
+ const bool outside=events&&!positive;
+ const auto lows=row_bounds(lower,source.size(),dtype);
+ for(std::size_t i=0;i<source.size();++i)low[i]=comparison(cell(source,i,attribute),lows[i],outside?"<":">=",dtype);
+ const auto highs=row_bounds(upper,source.size(),dtype);
+ for(std::size_t i=0;i<source.size();++i)high[i]=comparison(cell(source,i,attribute),highs[i],outside?">":"<=",dtype);
+ for(std::size_t i=0;i<source.size();++i){const auto& value=cell(source,i,attribute);const bool within=low[i]&&high[i];selected[i]=events?((outside?(low[i]||high[i]):within)||(keep_nan&&missing(value))):(within||(keep_nan&&missing(value)));}
+ if(!events){
+  // Round CT: df[list] == value is a frame, so df[mask] masks the rows
+  // (DataFrame.where) instead of dropping them: a cell stays only where its
+  // column is listed and equals the value, every other cell turns NaN
+  // (seed 2026111709 case 120).
+  std::vector<std::vector<char>> alive;
+  stream_filters(source,options,selected,alive);
   return project_cases(source,options.case_id_key,selected,positive,&alive);
  }
  return events?subset(source,selected):project_cases(source,options.case_id_key,selected,positive,nullptr,true);

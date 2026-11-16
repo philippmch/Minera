@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DB (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–DC (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5996,6 +5996,82 @@ probes, set domains and fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DC re-reviewed DB (Review DC1). DB's commit ed683a4 ran CI run
+43898017238 (green on all six jobs). DC ran set probes on the six domains
+DB had not probed with sets, removed the set-order artefact in the
+harness and replayed two batches of fresh seeds:
+- Sets listed in the order they iterate (harness `dom/setcommon.py`):
+  the main process lists each set in an achievable iteration order and
+  every worker copy of the set codec inserts the items so the set
+  iterates as listed. DB's four Polars set probes recaptured: 2, 1, 0
+  and 1 differing calls (all declared), and the four DB banks replaced
+  by the recaptures.
+- Set, list and tuple keys in `get_end_activities` and
+  `filter_df_on_end_activities_nocc` (`PolarsFilterValue` overloads);
+  several plain keys in `get_attribute_values` (the dict of first to
+  second key values; a first value with several seconds is refused).
+- Predicates over several columns: a set or list naming several
+  existing columns in `apply`, `apply_events`, `apply_numeric` and
+  `apply_numeric_events` fails `expanded to multiple expressions` with
+  each predicate as written; spno set keys repeat `literal` in order;
+  a paths target naming several columns aliases `next_activity` twice.
+- `eventually_follows` builds every activity's literal before indexing
+  the values; on a lazy frame one None activity with the anti join keeps
+  the sorted order. `A_next_B_next_C` on an empty frame with a set key
+  fails the join; `get_variants_df` with an empty set key selects no
+  column.
+- Fresh set probes: Polars CN table 0 of 936, CI table 13 -> 3 of 13,701,
+  CH table 8 -> 3 of 12,014, CK sequence 36 -> 0 of 4,326, CJ sequence
+  21 -> 0 of 3,861, pandas CK sequence 0 of 3,430.
+- Fresh seeds 2026112600-11: four calls, three fixed (the timestamp
+  filters' by-name selectors before zero expansion; pandas empty-list
+  attribute keys with stream filters and null cases), one declared (a
+  rework join of equal-size frames in random order).
+  Fresh seeds 2026112612-23: 0 differing calls.
+- Declared: sets holding NaN (identity hash order), the random group a
+  several-key `get_attribute_values` keeps, one-item set case keys
+  holding a tuple (List cells), dicts holding a set (struct with an
+  Object field), `filter_variants_top_k` on one-row frames with List,
+  Struct, Binary, Decimal, Duration or Time second columns, equal-size
+  rework joins, several attribute names beside a single paths target.
+
+In the suite: new `docs/polars-filter-dc-set-bank.json.gz`,
+`docs/polars-sequence-filter-dc-set-bank.json.gz` and
+`docs/pandas-sequence-filter-dc-set-bank.json.gz` with their ctests;
+DB's four Polars set banks replaced by their recaptures. The probes, set
+domains and fresh banks are in the project files under
+`review-harness/round-dc/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DD) should start by re-reviewing round DC:
+
+- DC's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- set probes on the domains still without one (the Polars CJ, CF and CG
+  table domains, the Polars CH sequence domain, the pandas CN LTL domain
+  with `four_eyes_principle` and `attr_value_different_persons`;
+  `review-harness/round-dc/tools/setcap.sh` with a new
+  `dom/_probe_*_set_domain.py` patched by `dom/setcommon.py`);
+- the several-column shapes left refused: `filter_df_on_attribute_values`
+  and the stream filter keys over several columns, several attribute
+  names beside a single paths target, dicts holding a set (a struct with
+  an Object field);
+- the rest of the CU list (LTL list-key cases, equal-size joins, CJ/CF/CD
+  items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DB's targets, taken in DC (findings DC1-1 to DC1-11): DB's CI run,
+the fresh seeds, set probes on the six domains, the keyword helpers' set
+keys, the set-order artefact (harness), `filter_variants_top_k` one-row
+second columns (declared). Not taken (carried to DD): the rest of the CU
+list.
+
+Previous list for round DC (kept for its older items):
 
 Next round (DC) should start by re-reviewing round DB:
 

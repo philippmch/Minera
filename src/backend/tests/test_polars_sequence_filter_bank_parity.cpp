@@ -461,21 +461,54 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
     return table_node(polars_filter_df_on_end_activities(df, value_of(*args.at(0)), glue, activity,
                                                          positive ? value_of(*positive) : PandasFilterValue::of(true)));
   }
+  // Round DC: set, list or tuple keys go through the PolarsFilterValue overloads.
+  const auto listed_key = [](const Json* node) {
+    if (!node) return false;
+    const auto& tag = node->fields.begin()->first;
+    return tag == "S" || tag == "l" || tag == "t";
+  };
+  const auto* act_node = keyword(kwargs, "activity_key");
   if (function == "filter_df_on_end_activities_nocc") {
     const auto* counts = keyword(kwargs, "ea_count0");
     const auto* dict = keyword(kwargs, "return_dict");
     const auto* variant = keyword(kwargs, "most_common_variant");
-    const auto out = polars_filter_df_on_end_activities_nocc(
-        df, value_of(*args.at(0)), counts ? std::optional(value_of(*counts)) : std::nullopt, glue, activity,
-        // Round DB: `if return_dict:` reads a set by its truthiness.
-        dict && (dict->fields.begin()->first == "S" ? !value_of(*dict).items.empty() : body(*dict).boolean),
-        variant ? std::optional(value_of(*variant)) : std::nullopt);
+    // Round DB: `if return_dict:` reads a set by its truthiness.
+    const bool want = dict && (dict->fields.begin()->first == "S" ? !value_of(*dict).items.empty() : body(*dict).boolean);
+    const auto* glue_node = keyword(kwargs, "case_id_glue");
+    const auto str_call = [&] {
+      return polars_filter_df_on_end_activities_nocc(df, value_of(*args.at(0)),
+                                                     counts ? std::optional(value_of(*counts)) : std::nullopt, glue,
+                                                     activity, want, variant ? std::optional(value_of(*variant)) : std::nullopt);
+    };
+    const auto out = [&] {
+      if (!listed_key(glue_node) && !listed_key(act_node)) return str_call();
+      try {
+        return polars_filter_df_on_end_activities_nocc(
+            df, value_of(*args.at(0)), counts ? std::optional(value_of(*counts)) : std::nullopt,
+            glue_node ? value_of(*glue_node) : PandasFilterValue::of("case:concept:name"),
+            act_node ? value_of(*act_node) : PandasFilterValue::of("concept:name"), want,
+            variant ? std::optional(value_of(*variant)) : std::nullopt);
+      } catch (const PolarsSequenceFilterError&) {
+        throw;
+      } catch (const std::invalid_argument&) {  // outside the overload's domain: the str call as before
+        return str_call();
+      }
+    }();
     if (out.counts) return jtagged("t", jarray({table_node(out.table), typed_value(*out.counts)}));
     return table_node(out.table);
   }
-  if (function == "get_end_activities")
+  if (function == "get_end_activities") {
+    const auto* case_node = keyword(kwargs, "case_id_key");
+    if (listed_key(case_node) || listed_key(act_node)) try {
+        return typed_value(polars_get_end_activities(df, case_node ? value_of(*case_node) : PandasFilterValue::of("case:concept:name"),
+                                                     act_node ? value_of(*act_node) : PandasFilterValue::of("concept:name")));
+      } catch (const PolarsSequenceFilterError&) {
+        throw;
+      } catch (const std::invalid_argument&) {  // outside the overload's domain: the str call as before
+      }
     return typed_value(polars_get_end_activities(df, keyword_text(kwargs, "case_id_key", "case:concept:name"),
                                                  activity));
+  }
   return constant(function);
 }
 
