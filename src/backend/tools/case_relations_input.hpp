@@ -76,6 +76,8 @@ inline EventTable relation_xes_table(const EventLog& log,
   const auto case_source = canonical_case ? std::string("case:concept:name")
       : (options.case_id_key.starts_with("case:") ? options.case_id_key
                                                   : "case:" + options.case_id_key);
+  // read_xes reads a log without events as a frame without columns.
+  if (table.columns.empty() && table.rows.empty()) return table;
   if (std::find(table.columns.begin(), table.columns.end(), case_source) == table.columns.end())
     throw std::invalid_argument("case relations: missing XES trace case attribute " + case_source);
   relation_column_alias(table, case_source, options.case_id_key);
@@ -131,6 +133,24 @@ inline EventTable relation_xes_table(const EventLog& log,
   }
   return table;
 }
+// The merged table for the opened log: read_csv keeps a CSV upload's
+// timestamps as text, which the merge sorts as text; the opened log reads
+// the timestamp column's text cells that are timestamps as dates, as the
+// merge did before round CY (the table itself stays as pandas holds it).
+inline EventTable relation_open_log_table(EventTable table, const std::string& timestamp) {
+  const auto found = std::find(table.columns.begin(), table.columns.end(), timestamp);
+  if (found == table.columns.end()) return table;
+  const auto column = static_cast<std::size_t>(found - table.columns.begin());
+  for (auto& row : table.rows) {
+    auto& cell = row[column];
+    if (!cell || cell->is_null || cell->kind != AttributeKind::kString ||
+        cell->container != AttributeContainerKind::kScalar)
+      continue;
+    if (parse_timestamp_exact(cell->value)) cell->kind = AttributeKind::kDate;
+  }
+  return table;
+}
+
 inline void relation_csv_dates(EventTable& table, const std::string& timestamp) {
   const auto found = std::find(table.columns.begin(), table.columns.end(), timestamp);
   if (found == table.columns.end()) return;

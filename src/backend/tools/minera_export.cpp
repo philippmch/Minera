@@ -1,3 +1,4 @@
+#include "minera/pandas_read_csv.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "csv_frame_table.hpp"
 #include "minera/exact_filter_discovery_json.hpp"
@@ -6592,28 +6593,22 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const bool incoming_is_xes = is_xes_path(merge_incoming_path);
       std::string body;
       if (!input_is_xes && !incoming_is_xes) {
-        if (!csv_data)
-          throw std::logic_error("CSV merge did not retain its source table");
-        auto incoming_csv =
-            minera::import_csv_event_data(merge_incoming_path, options);
-        auto relation_table =
-            minera::parse_case_relations_table_csv(relation_input);
+        // pm4py merges the three files as read_csv reads them (round CY,
+        // observed black-box): every row, each column typed by read_csv,
+        // the timestamps text.
+        std::ifstream base_input(input, std::ios::binary);
+        std::ifstream incoming_input(merge_incoming_path, std::ios::binary);
+        if (!base_input || !incoming_input)
+          throw std::invalid_argument("cannot open a merged CSV log");
+        const auto relation_table =
+            minera::read_csv_reference_table(relation_input, options.delimiter);
         params.relation_left_column = left;
         params.relation_right_column = right;
-        auto base_table = csv_data->table;
-        auto incoming_table = std::move(incoming_csv.table);
-        normalize_csv_timestamp_missingness(base_table);
-        normalize_csv_timestamp_missingness(incoming_table);
+        const auto base_table = minera::read_csv_reference_table(base_input, options.delimiter);
+        const auto incoming_table =
+            minera::read_csv_reference_table(incoming_input, options.delimiter);
         if (!merge_case_key_supplied)
           params.case_id_key = csv_case_column(base_table, options);
-        // Keys joining a CSV case-id column follow its typed column.
-        minera::type_csv_case_relation_keys(
-            relation_table, left, right,
-            minera::tools::csv_case_id_key(base_table, params.case_id_key)
-                ? &base_table : nullptr,
-            minera::tools::csv_case_id_key(incoming_table, params.case_id_key)
-                ? &incoming_table : nullptr,
-            params.case_id_key);
         if (!merge_fields.contains("merge_timestamp_key")) {
           adapt_case_relations_table_timestamp(params, base_table,
                                                 incoming_table, options);
@@ -6647,6 +6642,14 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
         if (!incoming_is_xes) { normalize_csv_timestamp_missingness(incoming_table); minera::tools::relation_csv_dates(incoming_table, params.timestamp_key); }
         params.relation_left_column = left;
         params.relation_right_column = right;
+        if (input_is_xes && incoming_is_xes) {
+          // Two read_xes frames and the relations as read_csv reads them.
+          body = minera::case_relations_json(
+              minera::merge_case_relations(base_table, incoming_table,
+                                           minera::read_csv_reference_table(relation_input),
+                                           params),
+              params);
+        } else {
         auto relation_table = minera::parse_case_relations_table_csv(relation_input);
         // Keys joining a CSV case-id column follow its typed column; XES
         // keys stay literal.
@@ -6659,6 +6662,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
             params.case_id_key);
         body = minera::case_relations_json(
             minera::merge_case_relations(base_table, incoming_table, relation_table, params), params);
+        }
       }
       if (output.empty()) {
         std::cout << body << '\n';

@@ -1,6 +1,7 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/cancellation.hpp"
 #include "minera/dataframe_columns.hpp"
+#include "minera/pandas_read_csv.hpp"
 
 #include <algorithm>
 #include <array>
@@ -2095,15 +2096,20 @@ std::string python_float_text(double value) {
 // only trimming exposed (" NA"), which read_csv keeps as text (review Z1-4).
 ReferenceCsvColumn infer_reference_column(
     const std::vector<std::string>& cells,
-    const std::vector<char>* values = nullptr) {
+    const std::vector<char>* values = nullptr,
+    bool* literal_text = nullptr) {
   const auto count = cells.size();
   using Column = std::vector<std::optional<std::string>>;
   using Kind = ReferenceCsvColumnKind;
   const auto na = [&](std::size_t i) {
     return !(values && (*values)[i] != 0) && is_reference_na_token(cells[i]);
   };
-  // Every cell's text as written, NA spellings included.
-  const auto literal = [&] { return Column(cells.begin(), cells.end()); };
+  // Every cell's text as written, NA spellings included (pandas 3 reads
+  // such a column as str).
+  const auto literal = [&] {
+    if (literal_text) *literal_text = true;
+    return Column(cells.begin(), cells.end());
+  };
   // A column read as Python ints (NA cells missing), when every cell is one.
   const auto python_ints = [&]() -> std::optional<Column> {
     Column column(count);
@@ -3240,6 +3246,148 @@ CsvEventData import_csv_event_data(
 
 bool is_pandas_csv_na_text(std::string_view text) {
   return is_reference_na_token(text);
+}
+
+EventTable read_csv_reference_table(std::istream& input, char kDelimiter) {
+  std::string line;
+  std::size_t line_number = 1;
+  bool lone_cr = false, after_lone_cr_blank = false;
+  const auto read_record = [&]() {
+    if (!read_csv_record(input, line, kDelimiter, &lone_cr)) return false;
+    if (after_lone_cr_blank) apply_lone_cr_blank_quirk(line, kDelimiter, line_number + 1);
+    after_lone_cr_blank = false;
+    return true;
+  };
+  constexpr const char* kNoColumns =
+      "pandas.read_csv refuses the file: No columns to parse from file";
+  if (!read_record()) throw std::invalid_argument(kNoColumns);
+  if (line.size() >= 3 && static_cast<unsigned char>(line[0]) == 0xEF &&
+      static_cast<unsigned char>(line[1]) == 0xBB &&
+      static_cast<unsigned char>(line[2]) == 0xBF)
+    line.erase(0, 3);
+  while (is_reference_blank_line(line, kDelimiter)) {
+    after_lone_cr_blank = lone_cr;
+    if (!read_record()) throw std::invalid_argument(kNoColumns);
+    ++line_number;
+  }
+  const auto header = reference_csv_header_names(parse_csv_row(line, kDelimiter, false));
+  std::vector<std::vector<std::string>> rows;
+  bool first = true;
+  while (read_record()) {
+    ++line_number;
+    if (line.empty() || is_reference_blank_line(line, kDelimiter)) {
+      after_lone_cr_blank = lone_cr;
+      continue;
+    }
+    auto fields = parse_csv_row(line, kDelimiter, false);
+    if (fields.size() > header.size()) {
+      if (first)
+        throw std::invalid_argument(
+            "CSV line " + std::to_string(line_number) + " has more fields than the header, "
+            "which pandas.read_csv reads as index columns; this reader keeps a RangeIndex "
+            "and refuses the file");
+      throw std::invalid_argument(
+          "pandas.read_csv refuses the file: Error tokenizing data. C error: Expected " +
+          std::to_string(header.size()) + " fields in line " + std::to_string(line_number) +
+          ", saw " + std::to_string(fields.size()));
+    }
+    first = false;
+    fields.resize(header.size());  // read_csv pads a short row with NaN
+    rows.push_back(std::move(fields));
+  }
+
+  EventTable table;
+  table.columns = header;
+  table.dtypes.assign(header.size(), "object");
+  table.rows.assign(rows.size(), EventTable::Row(header.size()));
+  const auto null_cell = [](const std::string& key) {
+    EventAttribute cell{key, "", AttributeKind::kString};
+    cell.is_null = true;
+    return cell;
+  };
+  std::vector<std::string> cells(rows.size());
+  for (std::size_t column = 0; column < header.size() && !rows.empty(); ++column) {
+    const auto& key = header[column];
+    for (std::size_t row = 0; row < rows.size(); ++row) cells[row] = rows[row][column];
+    bool literal = false;
+    const auto typed = infer_reference_column(cells, nullptr, &literal);
+    bool has_na = false;
+    for (const auto& text : typed.text) has_na = has_na || !text;
+    bool unsigned_column = false;
+    if (typed.kind == ReferenceCsvColumnKind::kInteger)
+      for (const auto& text : typed.text) {
+        std::int64_t value = 0;
+        if (text && signed_cell(*text, value) != IntegerCell::kFits) unsigned_column = true;
+      }
+    switch (typed.kind) {
+      case ReferenceCsvColumnKind::kInteger: table.dtypes[column] = unsigned_column ? "uint64" : "int64"; break;
+      case ReferenceCsvColumnKind::kFloat: table.dtypes[column] = "float64"; break;
+      case ReferenceCsvColumnKind::kBoolean: table.dtypes[column] = has_na ? "object" : "bool"; break;
+      case ReferenceCsvColumnKind::kText: table.dtypes[column] = "str"; break;
+      case ReferenceCsvColumnKind::kObject: table.dtypes[column] = literal ? "str" : "object"; break;
+    }
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+      auto& cell = table.rows[row][column];
+      const auto& text = typed.text[row];
+      if (!text) {
+        cell = null_cell(key);
+        continue;
+      }
+      switch (typed.kind) {
+        case ReferenceCsvColumnKind::kInteger: {
+          EventAttribute value{key, *text, AttributeKind::kInt};
+          std::int64_t integer = 0;
+          if (!unsigned_column && signed_cell(*text, integer) == IntegerCell::kFits) {
+            value.typed_value = integer;
+          } else {
+            UnsignedScan scan;
+            std::uint64_t magnitude = 0;
+            unsigned_cell(*text, scan, magnitude);
+            value.typed_value = magnitude;
+          }
+          cell = std::move(value);
+          break;
+        }
+        case ReferenceCsvColumnKind::kFloat: {
+          EventAttribute value{key, *text, AttributeKind::kFloat};
+          value.typed_value = *text == "inf" ? HUGE_VAL
+                              : *text == "-inf" ? -HUGE_VAL
+                                                : std::strtod(text->c_str(), nullptr);
+          cell = std::move(value);
+          break;
+        }
+        case ReferenceCsvColumnKind::kBoolean: {
+          EventAttribute value{key, *text, AttributeKind::kBoolean};
+          value.typed_value = *text == "True";
+          cell = std::move(value);
+          break;
+        }
+        case ReferenceCsvColumnKind::kText:
+          cell = EventAttribute{key, *text, AttributeKind::kString};
+          break;
+        case ReferenceCsvColumnKind::kObject: {
+          // Python ints (also past 64 bits), or every cell's literal text.
+          if (literal) {
+            cell = EventAttribute{key, *text, AttributeKind::kString};
+          } else if (auto digits = python_int_text(cells[row])) {
+            EventAttribute value{key, *digits, AttributeKind::kInt};
+            std::int64_t integer = 0;
+            UnsignedScan scan;
+            std::uint64_t magnitude = 0;
+            if (signed_cell(*digits, integer) == IntegerCell::kFits) value.typed_value = integer;
+            else if (unsigned_cell(*digits, scan, magnitude) == IntegerCell::kFits && !scan.saw_minus)
+              value.typed_value = magnitude;
+            cell = std::move(value);
+          } else {
+            cell = EventAttribute{key, *text, AttributeKind::kString};
+          }
+          break;
+        }
+      }
+    }
+  }
+  table.validate();
+  return table;
 }
 
 EventTable project_csv_event_table(const EventTable& source,

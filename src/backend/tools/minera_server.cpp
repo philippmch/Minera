@@ -99,6 +99,7 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "csv_frame_table.hpp"
+#include "minera/pandas_read_csv.hpp"
 #include "minera/data_petri_net.hpp"
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
@@ -8311,7 +8312,8 @@ void handle_case_relations(const httplib::Request& request,
         if (include_format_table)
           payload += ",\"format_table\":" + minera::serialize_event_table_json(table);
         if (include_open_log) try {
-          const auto log = minera::case_relations_projected_log(table, options);
+          const auto log = minera::case_relations_projected_log(
+              minera::tools::relation_open_log_table(table, options.timestamp_key), options);
           std::string activity = "concept:name";
           bool complete = true, first = true;
           for (const auto& trace : log.traces) for (const auto& event : trace.events) {
@@ -8340,28 +8342,19 @@ void handle_case_relations(const httplib::Request& request,
     const bool incoming_is_xes =
         looks_like_xes(incoming_file.filename, incoming_file.content);
     if (!base_is_xes && !incoming_is_xes) {
-      auto relation_table =
-          minera::parse_case_relations_table_csv(relation_input);
+      // pm4py merges the three files as read_csv reads them (round CY,
+      // observed black-box): every row, each column typed by read_csv, the
+      // timestamps text; the merge joins and sorts those typed cells.
       options.relation_left_column = left_column;
       options.relation_right_column = right_column;
-      auto base_data = minera::import_csv_event_data(base_input);
-      auto incoming_data = minera::import_csv_event_data(incoming_input);
-      // Keys joining a CSV case-id column follow its typed column.
-      minera::type_csv_case_relation_keys(
-          relation_table, left_column, right_column,
-          minera::tools::csv_case_id_key(base_data.table, options.case_id_key)
-              ? &base_data.table : nullptr,
-          minera::tools::csv_case_id_key(incoming_data.table, options.case_id_key)
-              ? &incoming_data.table : nullptr,
-          options.case_id_key);
-      normalize_csv_timestamp_missingness(base_data.table);
-      normalize_csv_timestamp_missingness(incoming_data.table);
+      const auto relation_table = minera::read_csv_reference_table(relation_input);
+      const auto base_table = minera::read_csv_reference_table(base_input);
+      const auto incoming_table = minera::read_csv_reference_table(incoming_input);
       if (!request.has_param("merge_timestamp_key")) {
-        adapt_case_relations_table_timestamp(options, base_data.table,
-                                              incoming_data.table);
+        adapt_case_relations_table_timestamp(options, base_table, incoming_table);
       }
       publish_merge(minera::merge_case_relations(
-          base_data.table, incoming_data.table, relation_table, options));
+          base_table, incoming_table, relation_table, options));
     } else {
       std::optional<decltype(minera::import_csv_event_data(base_input))> base_csv;
       std::optional<decltype(minera::import_csv_event_data(incoming_input))> incoming_csv;
@@ -8391,6 +8384,13 @@ void handle_case_relations(const httplib::Request& request,
       if (!incoming_is_xes) { normalize_csv_timestamp_missingness(incoming_table); minera::tools::relation_csv_dates(incoming_table, options.timestamp_key); }
       options.relation_left_column = left_column;
       options.relation_right_column = right_column;
+      if (base_is_xes && incoming_is_xes) {
+        // Two read_xes frames and the relations as read_csv reads them.
+        publish_merge(minera::merge_case_relations(
+            base_table, incoming_table, minera::read_csv_reference_table(relation_input),
+            options));
+        return;
+      }
       auto relation_table = minera::parse_case_relations_table_csv(relation_input);
       // Keys joining a CSV case-id column follow its typed column; XES keys
       // stay literal.

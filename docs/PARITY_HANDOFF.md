@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CX (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–CY (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5838,7 +5838,57 @@ the project files under `review-harness/round-cx/`.
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
 
-Next round (CY) should start by re-reviewing round CX:
+Round CY re-reviewed CX (Review CY1). CX's commit 26aaabb ran CI run
+43835939800 (green on all six jobs). CY replayed a batch of fresh seeds and
+swept the case-relations merge on uploads against pm4py:
+- CSV uploads (`pandas_read_csv.hpp` `read_csv_reference_table`, server
+  and CLI): the three files are read as `pandas.read_csv` reads them
+  (every row, `read_csv` dtypes, timestamps as text, blank lines skipped,
+  short rows NaN-padded) and merged by the typed-table merge, so dtypes,
+  promotions (`7.0` for an int case beside a float LEFT column), merge
+  errors, index and order follow pandas. Sweep: 54 of 60 calls differed
+  before, 0 of 900 after.
+- XES uploads: the relation file is a `read_csv` frame (numeric ids raise
+  against XES's str ids, as pandas' merge does), an XES log without
+  events is left out of the concat, and a timestamp column suffixed away
+  raises a clear error. Sweep: 27 of 60 before, 0 of 300 after.
+- A CSV log beside an XES log keeps Minera's alias adapter (pm4py
+  concatenates frames sharing no column names); declared.
+- Fresh seeds 2026112200-11 (12 banks): two pandas CK calls, fixed
+  (relative occurrence per event on an all-NaN attribute never reads the
+  case key, a `None` case key fails per case as `groupby(None)`; a list
+  activity key in the variants filter hashes its items and names the
+  missing columns); probe y1 equal but for two hash-seed `KeyError`
+  orders (declared).
+
+In the suite: new `docs/pandas-filter-cy-bank.json.gz` with its ctest and
+new `read_csv` table and merge cases in `minera_case_relations_tests`. The
+fresh banks, the merge sweep and probe y1 are in the project files under
+`review-harness/round-cy/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (CZ) should start by re-reviewing round CY:
+
+- CY's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- other routes that read an upload with `read_csv` in pm4py rather than
+  `format_dataframe` (compare each route's reference call with the reading
+  the server uses; `read_csv_reference_table` now gives that frame);
+- the CU list below (paths list case keys repeating a name,
+  `filter_variants_top_k` one-row second columns, set values in the pandas
+  bank codec, LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CX's targets, taken in CY (findings CY1-1 to CY1-3): CX's CI run,
+the fresh seeds and the merge case relations sweep. Not taken (carried to
+CZ): the CU list.
+
+Previous list for round CY (kept for its older items):
+
 
 - CX's CI run;
 - fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ

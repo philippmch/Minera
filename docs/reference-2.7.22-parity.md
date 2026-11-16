@@ -20316,8 +20316,12 @@ Fixed:
   - the importer-contract workbenches (edit distance, Bose, discovery), which
     record `import_xes_result` itself.
   - live-stream and stream-reader XES batches, which are event streams.
-  - the case-relation merge (server and `minera_export --merge-case-relations`), whose
-    table is the frame's rows, one per imported event.
+  - the case-relation merge (server and `minera_export --merge-case-relations`)
+    of a CSV log beside an XES log, whose table is the frame's rows, one per
+    imported event, with the XES case and timestamp columns aliased to the
+    CSV names (pm4py concatenates two frames sharing no column names; round
+    CY). Two CSV logs merge as `read_csv` reads them, two XES logs as
+    `read_xes` frames with a `read_csv` relation file (Review CY1).
   - the `minera_query` exact-report path, which records the module calls on
     the log as imported.
 
@@ -28432,3 +28436,89 @@ Tests:
   interleavings tests a naive-as-UTC case, `minera_core_tests` the
   relation typing of uploads, and `minera_organizational_mining_tests` a
   NaN variant case (each checked against pm4py first).
+
+## Review CY1: re-review of round CX, merge case relations on uploads, fresh seeds (2026-11-16)
+
+Round CY checked CX's CI (run 43835939800 on 26aaabb: green on all six
+jobs), replayed a batch of fresh seeds of every filter domain and swept the
+last upload route the parity doc still listed on Minera's own reading, the
+case-relations merge.
+The device check on the Mac was skipped (no device linked).
+
+- **CY1-1 Merge case relations on CSV uploads** (`/api/merge-case-relations`,
+  `minera_export --merge-case-relations`, new `pandas_read_csv.hpp`
+  `read_csv_reference_table`). pm4py's `case_relations.algorithm.apply`
+  runs on three `pandas.read_csv` frames, not on `format_dataframe` ones:
+  every row is kept (an NA case id or activity too), each column is typed
+  as `read_csv` types it (int64, uint64 past the signed range, float64
+  with NaN, bool, object for bools with NaN and for Python ints past 64
+  bits, str otherwise), the timestamps stay text and sort as text, blank
+  lines are skipped and short rows padded with NaN, and the header names
+  follow `reference_csv_header_names`. Minera read the two logs through
+  its event importer (rows with NA first-class cells dropped, keys typed
+  through the case-id column) and so differed on most uploads. The three
+  files now go through `read_csv_reference_table` and the typed-table
+  merge (round BB's dtype engine): the merged dtypes, the concat's
+  promotion (an int case column beside a float LEFT column reads `7.0`
+  in every row; the trace ids of the opened log follow), pandas' merge
+  errors (a str key against an int64 one), the index and the row order
+  match. A file `read_csv` reads with index columns (a first data row
+  longer than the header) is refused with a message saying so, and a
+  later longer row fails with pandas' tokenizing message. Sweep
+  (`review-harness/round-cy/up/mg.py`, random logs with typed extra
+  columns, odd spellings, NA cells, missing timestamp columns, suffixes,
+  relation extras): before, 54 of 60 calls differed; after, 0 of 900 on
+  fresh seeds (76 raise in both, the error kinds corresponding).
+- **CY1-2 Merge case relations on XES uploads.** Two XES logs merge as
+  pm4py's `read_xes` frames (already so), but the relation file is a
+  `read_csv` frame, so numeric relation ids are int64 and meet XES's str
+  ids only to raise pandas' merge `ValueError`, as Minera now does (it read
+  the relation ids as text). A log without events (`read_xes` gives a
+  frame without columns) is left out of pandas' concat; Minera refused it.
+  When a relation column named as the timestamp suffixes the incoming
+  timestamp away and no base row carries it, pandas raises `KeyError` on
+  the sort; Minera now says so instead of an internal plan error. The
+  opened log reads the timestamp column's text cells that are timestamps
+  as dates, as before. Sweep: before, 27 of 60 calls differed; after, 0 of
+  300 (57 raise in both).
+- **CY1-3 Fresh seeds** (12 banks: Polars table CK 2026112201, CN
+  2026112202, CJ 2026112203, CI 2026112204, CH 2026112205; Polars sequence
+  CP 2026112200, CK 2026112206, CJ 2026112207, CH 2026112208; pandas CK
+  2026112209, pandas sequence CK 2026112210, pandas CN LTL 2026112211).
+  Two calls differed, both pandas CK 2026112209:
+  - `attributes.filter_df_relative_occurrence_event_attribute` (case 537):
+    per event, the relative occurrence counts the attribute's values
+    first; on an all-NaN attribute no value passes and the case column is
+    never read, so a missing case key returns the empty frame (Minera
+    raised the `KeyError`). Per case, a `None` case key fails as pandas'
+    `groupby(None)` does (`TypeError: 'NoneType' object is not callable`,
+    probe y1) (`pandas_attributes_filter.cpp`).
+  - `variants.apply` (case 86): a list activity key is a column list;
+    pandas hashes its items in order (a dict item raises `unhashable type`),
+    names the missing ones in a `KeyError` ("Columns not found: ..."), and
+    with all present fails on the grouped frame (`'DataFrame' object has no
+    attribute 'to_frame'`) (`pandas_variants_filter.cpp`). Probe y1 (423
+    calls around both) is equal but for two calls whose `KeyError` lists a
+    set of missing names in hash-seed order.
+
+Declared:
+- A CSV log merged with an XES log keeps Minera's adapter, which aliases
+  the XES case and timestamp columns to the CSV names: pm4py concatenates
+  the two frames as they are, which share no column names, so the CSV rows
+  have no case id (31 of 40 sweep calls differ, the other 9 raise alike).
+- A `read_csv` file with index columns is refused (CY1-1).
+- `KeyError: Columns not found` listing several missing names of a list key
+  follows Python's set order, which depends on the hash seed (CY1-3);
+  Minera names them in the order the key lists them.
+
+Tests:
+- New: `docs/pandas-filter-cy-bank.json.gz` (CK 2026112209 cases 86 and
+  537 and probe y1 without its two hash-seed calls, 480 calls), replayed
+  by `minera_pandas_filter_cy_bank_parity_tests`;
+  `minera_case_relations_tests` gained `read_csv` table cases (dtypes,
+  NaN padding, uint64 and Python ints, bool with NaN, the tokenizing
+  error) and merges of `read_csv` tables (the float `7.0` promotion, the
+  int LEFT column, the str/int64 merge error, an empty base, the suffixed
+  timestamp column), each checked against pm4py first. The CLI ctests
+  `minera_csv_relations_merge_typed_cli` and `_float_key_cli` keep their
+  expectations (pm4py gives case `7` and `7.0` on the fixtures).

@@ -1213,9 +1213,14 @@ std::optional<EventAttribute> coerce_cell_to_dtype(
     if (parsed.width == 32)
       value = static_cast<double>(static_cast<float>(value));
     result.kind = AttributeKind::kFloat;
-    std::ostringstream text;
-    text << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
-    result.value = text.str();
+    if (parsed.width == 32) {
+      std::ostringstream text;
+      text << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
+      result.value = text.str();
+    } else {
+      // str() of a float64 cell: an int promoted by the concat reads "7.0".
+      result.value = reference_csv_float_text(value);
+    }
     result.typed_value = value;
     return result;
   }
@@ -1889,10 +1894,16 @@ EventTable merge_case_relations(const EventTable& base,
   incoming.validate();
   relations.validate();
 
-  const auto base_case_index = resolve_case_column(base, options.case_id_key);
+  // A frame without columns or rows (read_xes of a log without events) is
+  // left out of pandas' concat: the result is the joined incoming rows alone
+  // (observed black-box, round CY).
+  const bool base_absent = base.columns.empty() && base.rows.empty();
+  const auto base_case_index = base_absent
+      ? std::size_t{0} : resolve_case_column(base, options.case_id_key);
   const auto incoming_case_index =
       resolve_case_column(incoming, options.case_id_key);
-  const auto base_case_name = base.columns[base_case_index];
+  const auto base_case_name =
+      base_absent ? options.case_id_key : base.columns[base_case_index];
   const auto relation_left_name =
       options.relation_left_column.empty()
           ? options.case_id_key + options.left_suffix
@@ -1958,6 +1969,13 @@ EventTable merge_case_relations(const EventTable& base,
   const auto output_timestamp_name =
       base_time_index ? base.columns[*base_time_index]
                       : incoming.columns[*incoming_time_index];
+  // A relation column of the timestamp's name renames both copies (_x/_y),
+  // so the merged frame has no timestamp column to sort by (pandas raises
+  // KeyError, observed black-box in round CY).
+  if (std::find(result.columns.begin(), result.columns.end(), output_timestamp_name) ==
+      result.columns.end())
+    throw std::invalid_argument("case relations: missing timestamp column " +
+                                output_timestamp_name + " after the merge suffixed it");
   const auto output_timestamp_index = output_index(output_timestamp_name);
   std::vector<std::optional<std::size_t>> incoming_sources(result.columns.size());
   std::vector<std::optional<std::size_t>> relation_sources(result.columns.size());
@@ -2109,9 +2127,9 @@ EventTable merge_case_relations(const EventTable& base,
 
       bool missing = false;
       // Pandas concatenation pads an absent column with nulls even when the
-      // frame lacking it is empty.
+      // frame lacking it is empty (but not a frame without any column).
       if (!base_source) {
-        missing = true;
+        missing = !base_absent;
       } else if (!base.rows.empty()) {
         {
           for (const auto& row : base.rows)

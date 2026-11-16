@@ -3572,6 +3572,14 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_cv_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cv-bank.json.gz")
   set_tests_properties(minera_pandas_filter_cv_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CY: a fresh CK seed (2026112209 cases 86 and 537) and probe y1:
+  # relative occurrence per event on an all-NaN attribute keeps no row, a
+  # None case key fails per case as pandas' groupby(None) does; a list
+  # activity key in the variants filter hashes its items in order and names
+  # the missing ones (two calls listing a set in hash-seed order dropped).
+  add_test(NAME minera_pandas_filter_cy_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cy-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_cy_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

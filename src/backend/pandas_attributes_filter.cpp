@@ -598,6 +598,10 @@ EventTable filter_pandas_attributes_top_activities(const EventTable& s,const Eve
  if(native_attribute_number(maximum)<static_cast<double>(counter.entries.size())&&type_name(maximum)=="float")error("TypeError","slice indices must be integers or None or have an __index__ method");
  return s;
 }
+static bool group_case_is_null(const PandasAttributesFilterOptions& o){
+ const EventAttribute& key=o.relative_case_id_key_last?*o.relative_case_id_key_last:o.case_id_key;
+ return key.is_null&&key.container==AttributeContainerKind::kScalar;
+}
 EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,const EventAttribute& stake,const PandasAttributesFilterOptions& o){
  s.validate();
  const bool once=o.keep_once_per_case&&truth(*o.keep_once_per_case);
@@ -607,6 +611,22 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  // frame, where pandas may take the key list itself as the grouper.
  // Round CK: a dict case key groups the per-case counts by mapping the
  // index labels (int labels never match its str keys), so no case forms.
+ // Round CY: counted per event, an attribute column of NaN cells only
+ // counts no value, and the events are filtered by the empty list before the
+ // case key (the denominator) or the stake is read (observed black-box: no
+ // KeyError for a missing case column, no grouper length check; fresh pandas
+ // CK 2026112209 case 537). Counted per case, the groupby reads the case key
+ // first, and a None key is called there.
+ if(once&&group_case_is_null(o))error("TypeError","'NoneType' object is not callable");
+ if(!once&&s.size()!=0&&!o.attribute_key.is_null&&o.attribute_key.container==AttributeContainerKind::kScalar)
+  if(const auto counted=column(s,o.attribute_key)){
+   bool any=false;for(std::size_t i=0;i<s.size()&&!any;++i)any=!missing(cell(s,i,*counted));
+   if(!any){
+    EventAttribute none{"",""};none.container=AttributeContainerKind::kList;
+    auto events=o;if(o.relative_attribute_key_enum)events.attribute_key=*o.relative_attribute_key_enum;
+    return values_filter(s,none,events,true);
+   }
+  }
  const EventAttribute& group_case=o.relative_case_id_key_last?*o.relative_case_id_key_last:o.case_id_key;
  const bool unmatched_mapping=once&&!group_case.is_null&&group_case.container==AttributeContainerKind::kContainer&&
   (!s.index||std::all_of(s.index->labels.begin(),s.index->labels.end(),[](const auto& label){const auto* scalar=std::get_if<EventAttribute>(&label.value);return scalar&&!text_value(*scalar);}));

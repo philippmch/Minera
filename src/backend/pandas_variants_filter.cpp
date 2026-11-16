@@ -272,6 +272,19 @@ std::vector<CacheRow> membership_cache(const EventTable& source,const PandasVari
  const auto cases=unmatched?0:direct_column(source,options.case_id_key);
  if(options.activity_key.container==AttributeContainerKind::kList&&options.activity_key.children.empty())error("AttributeError","'DataFrame' object has no attribute 'to_frame'");
  const auto activity=column(source,options.activity_key);
+ // Round CY: groupby(case)[list] hashes the list's items in order, then
+ // names the items that are no column ("Columns not found: ...", the set of
+ // them, whose order follows the hash seed when several miss), and a list of
+ // columns is a DataFrameGroupBy without to_frame (observed black-box).
+ if(!activity&&!options.activity_key.is_null&&options.activity_key.container==AttributeContainerKind::kList){
+  for(const auto& item:options.activity_key.children)detail::pandas_check_hashable_key(item,error);
+  std::vector<std::string> bad;std::unordered_set<std::string> seen;
+  for(const auto& item:options.activity_key.children)
+   if(!column(source,item)&&seen.insert(identity(item)).second)bad.push_back(repr(item));
+  if(bad.empty())error("AttributeError","'DataFrame' object has no attribute 'to_frame'");
+  std::string names;for(const auto& name:bad)names+=(names.empty()?"":", ")+name;
+  error("KeyError",string_key_repr("Columns not found: "+names));
+ }
  if(!activity){EventAttribute wrapped{"",""};wrapped.container=AttributeContainerKind::kList;wrapped.children.push_back(options.activity_key);detail::pandas_check_getitem_key(wrapped,error);}
  if(!activity)error("KeyError",string_key_repr("Column not found: "+(text_value(options.activity_key)?options.activity_key.value:repr(options.activity_key))));
  if(unmatched)return {};

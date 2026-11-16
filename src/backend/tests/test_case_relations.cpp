@@ -3,10 +3,12 @@
 #include "minera/case_relations.hpp"
 #include "../tools/case_relations_typed_input.hpp"
 #include "minera/json_export.hpp"
+#include "minera/pandas_read_csv.hpp"
 #include "case_relations_dtype_reference_cases.hpp"
 #include "case_relations_index_reference_cases.hpp"
 #include "case_relations_reference_cases.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
@@ -1005,6 +1007,134 @@ void typed_table_route_accepts_ordinary_json_and_preserves_native_errors() {
   assert(!native_error.empty() && route_error == native_error);
 }
 
+
+// Round CY: pm4py merges three CSV uploads as pandas.read_csv reads them
+// (pandas 3.0.5, observed black-box).
+EventTable read_csv_text(const std::string& text) {
+  std::istringstream input(text);
+  return read_csv_reference_table(input);
+}
+
+const EventAttribute& cell_at(const EventTable& table, std::size_t row,
+                              const std::string& column) {
+  const auto found = std::find(table.columns.begin(), table.columns.end(), column);
+  assert(found != table.columns.end());
+  const auto& cell = table.rows.at(row).at(static_cast<std::size_t>(found - table.columns.begin()));
+  assert(cell.has_value());
+  return *cell;
+}
+
+bool null_at(const EventTable& table, std::size_t row, const std::string& column) {
+  const auto found = std::find(table.columns.begin(), table.columns.end(), column);
+  assert(found != table.columns.end());
+  const auto& cell = table.rows.at(row).at(static_cast<std::size_t>(found - table.columns.begin()));
+  return !cell || cell->is_null;
+}
+
+void read_csv_tables_follow_pandas() {
+  using V = std::vector<std::string>;
+  {
+    const auto table = read_csv_text("case_id,activity,timestamp\n007,a,2024-01-01\n,b,\n");
+    assert((table.columns == V{"case_id", "activity", "timestamp"}));
+    assert((table.dtypes == V{"float64", "str", "str"}));
+    assert(cell_at(table, 0, "case_id").value == "7.0");
+    assert(cell_at(table, 0, "case_id").kind == AttributeKind::kFloat);
+    assert(null_at(table, 1, "case_id"));
+    assert(cell_at(table, 0, "timestamp").kind == AttributeKind::kString);
+    assert(null_at(table, 1, "timestamp"));
+  }
+  {
+    // Past the signed range uint64; past 64 bits Python ints (object); a
+    // bool column with NaN is object, without it bool.
+    const auto unsigned_table = read_csv_text("k,b\n18446744073709551615,True\n1,\n");
+    assert((unsigned_table.dtypes == V{"uint64", "object"}));
+    const auto wide = read_csv_text("k,b\n99999999999999999999,True\n1,False\n");
+    assert((wide.dtypes == V{"object", "bool"}));
+    assert(cell_at(wide, 0, "k").value == "99999999999999999999");
+  }
+  {
+    // Blank lines are skipped, short rows padded with NaN, cells untrimmed.
+    const auto table = read_csv_text("a,b\n1\n\n2,x\n");
+    assert((table.dtypes == V{"int64", "str"}) && table.rows.size() == 2);
+    assert(null_at(table, 0, "b") && cell_at(table, 1, "b").value == "x");
+    const auto spaced = read_csv_text(" a ,b\n x ,+5\n");
+    assert((spaced.columns == V{" a ", "b"}) && cell_at(spaced, 0, " a ").value == " x ");
+    assert(cell_at(spaced, 0, "b").value == "5");
+    const auto empty = read_csv_text("a,b\n");
+    assert((empty.dtypes == V{"object", "object"}) && empty.rows.empty());
+  }
+  bool refused = false;
+  try { (void)read_csv_text("a,b\n1,2\n1,2,3\n"); }
+  catch (const std::invalid_argument& error) {
+    refused = std::string(error.what()).find("Expected 2 fields in line 3, saw 3") != std::string::npos;
+  }
+  assert(refused);
+}
+
+void merges_read_csv_tables_as_pandas() {
+  const std::string base = "case_id,activity,timestamp\n007,a,2024-01-01 10:00:00+00:00\n007,b,2024-01-01 12:00:00+00:00\n";
+  const std::string incoming = "case_id,activity,timestamp\n9,x,2024-01-01 11:00:00+00:00\n9,y,2024-01-01 13:00:00+00:00\n";
+  CaseRelationsOptions options;
+  options.case_id_key = "case_id";
+  options.timestamp_key = "timestamp";
+  {
+    // An NA relation key makes the LEFT column float64: the concatenated
+    // case column is float64 and reads 7.0 for every row.
+    const auto merged = merge_case_relations(read_csv_text(base), read_csv_text(incoming),
+        read_csv_text("case_id_LEFT,case_id_RIGHT\n007,09\nNA,5\n"), options);
+    assert(merged.rows.size() == 4 && merged.dtypes.at(0) == "float64");
+    for (std::size_t row = 0; row < merged.rows.size(); ++row)
+      assert(cell_at(merged, row, "case_id").value == "7.0");
+    assert(cell_at(merged, 1, "activity").value == "x");
+  }
+  {
+    const auto merged = merge_case_relations(read_csv_text(base), read_csv_text(incoming),
+        read_csv_text("case_id_LEFT,case_id_RIGHT\n007,09\n"), options);
+    assert(merged.dtypes.at(0) == "int64" && cell_at(merged, 1, "case_id").value == "7");
+    // The LEFT column is NaN on the base rows, so float64.
+    assert(merged.dtypes.at(3) == "float64");
+  }
+  {
+    // pandas cannot merge a str key with an int64 one.
+    bool refused = false;
+    try {
+      (void)merge_case_relations(read_csv_text(base),
+          read_csv_text("case_id,activity,timestamp\nq,x,2024-01-01\n"),
+          read_csv_text("case_id_LEFT,case_id_RIGHT\n007,09\n"), options);
+    } catch (const std::invalid_argument&) { refused = true; }
+    assert(refused);
+  }
+  {
+    // A log without events (read_xes gives a frame without columns) is left
+    // out of the concat: the merged rows are the incoming ones.
+    const auto merged = merge_case_relations(EventTable{}, read_csv_text(incoming),
+        read_csv_text("case_id_LEFT,case_id_RIGHT\n007,9\n"), options);
+    assert(merged.rows.size() == 2 && merged.columns.at(0) == "case_id");
+    assert(merged.dtypes.at(0) == "int64" && cell_at(merged, 0, "case_id").value == "7");
+  }
+  {
+    // A relation column named as the timestamp suffixes the incoming one
+    // (timestamp_x, timestamp_y); the sort reads the base rows' timestamp
+    // and puts the incoming rows (NaN there) last.
+    const auto merged = merge_case_relations(read_csv_text(base), read_csv_text(incoming),
+        read_csv_text("case_id_LEFT,case_id_RIGHT,timestamp\n007,9,x\n"), options);
+    using V = std::vector<std::string>;
+    assert((merged.columns == V{"case_id", "activity", "timestamp", "timestamp_x",
+                                "case_id_LEFT", "case_id_RIGHT", "timestamp_y"}));
+    assert(cell_at(merged, 1, "activity").value == "b" && cell_at(merged, 2, "activity").value == "x");
+    assert(null_at(merged, 2, "timestamp"));
+    // Without base rows no timestamp column is left: pandas raises KeyError
+    // on the sort, Minera a clear error.
+    bool refused = false;
+    try {
+      (void)merge_case_relations(EventTable{}, read_csv_text(incoming),
+          read_csv_text("case_id_LEFT,case_id_RIGHT,timestamp\n007,9,x\n"), options);
+    } catch (const std::invalid_argument& error) {
+      refused = std::string(error.what()).find("missing timestamp column") != std::string::npos;
+    }
+    assert(refused);
+  }
+}
 }  // namespace
 
 int main() try {
@@ -1036,6 +1166,8 @@ int main() try {
   incompatible_category_numeric_metadata_promotes_without_narrowing();
   categorical_nested_null_state_is_semantic();
   categorical_state_null_cells_sort_last();
+  read_csv_tables_follow_pandas();
+  merges_read_csv_tables_as_pandas();
 } catch (const std::exception& error) {
   std::cerr << error.what() << '\n';
   return 1;
