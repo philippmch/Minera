@@ -1190,7 +1190,7 @@ EventTable lazy_variant_filter(const EventTable& df, const PolarsFilterParameter
 
 const Plan kReworkPlan{"join", {"group_by", "filter", "select", "unique", "join right", "join"}, {}, {}};
 
-EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters, const Value* activities) {
+EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters, const Value* activities, const PolarsFilterParameters& raw) {
   const auto case_glue = case_key(parameters);
   const auto act_key = activity_key(parameters);
   auto plan = kReworkPlan;
@@ -1202,6 +1202,13 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   const auto* list_key = list_case(parameters);
   std::optional<Literal> case_literal;
   if (list_key) case_literal = list_literal(list_key->items);
+  // Round CU (fresh CK bank 2026111806): group_by([case, activity]) builds
+  // a dict case key's struct literal; the select by the dict fails once the
+  // count filter is built (below).
+  const auto* raw_case = case_key_value(raw);
+  const bool dict_case = raw_case && raw_case->kind == Kind::kDict;
+  if (dict_case)
+    if (const auto error = detail::polars_lit::dict_literal_error(*raw_case)) fail("TypeError", *error);
   // Round CL: rework.apply groups by [case, activity], so an activity key
   // given as a dict or list is a literal there (one constant group per case).
   const auto* act_value = activity_key_value(parameters);
@@ -1211,10 +1218,12 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   // Round CP: group_by([case, activity]) builds the literal of a dict or
   // list activity key in apply_activity_set too (its pl.col filter resolves
   // later).
-  if (literal_act) {
-    if (act_value->kind != Kind::kDict) (void)list_literal(act_value->items);
-    else if (const auto error = detail::polars_lit::dict_literal_error(*act_value)) fail("TypeError", *error);
-  }
+  // Round CU (probe u3): the group_by takes the dict as given, also where
+  // the activity filter selected its one column by name.
+  const auto* raw_act = activity_key_value(raw);
+  if (literal_act && act_value->kind != Kind::kDict) (void)list_literal(act_value->items);
+  if (raw_act && raw_act->kind == Kind::kDict)
+    if (const auto error = detail::polars_lit::dict_literal_error(*raw_act)) fail("TypeError", *error);
   // Round CL: count >= MIN_OCCURRENCES. pl.lit builds a list or dict value
   // while Python builds the filter, before the plan resolves any column of
   // the activity filter (round CR, fresh CK bank 2026111652 case 22).
@@ -1223,6 +1232,7 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   if (minimum.kind == Kind::kList) minimum_list = list_literal(minimum.items);
   if (minimum.kind == Kind::kDict)
     if (const auto error = detail::polars_lit::dict_literal_error(minimum)) fail("TypeError", *error);
+  if (dict_case) dict_argument_error();
   if (activities) {
     // pl.col({}) leaves the is_in filter without an expression.
     if (no_columns_key(act_key))
@@ -1391,7 +1401,7 @@ PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterPara
       }
       check_col_list(activity_value);
       break;
-    case KeyChecks::kRework: check_dict_argument(case_value); break;
+    case KeyChecks::kRework: break;  // the dict case key fails in rework()
     case KeyChecks::kReworkSet: check_col_list(activity_value); break;  // then the is_in literal, then group_by(case)
     case KeyChecks::kColumns:
       check_col_list(case_value);
@@ -1444,6 +1454,13 @@ EventTable polars_filter_df_on_end_activities(const EventTable& df, const Polars
                                               const std::string& case_id_glue, const std::string& activity_key,
                                               const PolarsFilterValue& positive) {
   return boundary_filter(df, values, case_id_glue, activity_key, truthy(positive), true);
+}
+EventTable polars_filter_df_on_end_activities(const EventTable& df, const PolarsFilterValue& values,
+                                              const PolarsFilterValue& case_id_glue, const PolarsFilterValue& activity_key,
+                                              const PolarsFilterValue& positive) {
+  std::vector<PolarsFilterParameter> parameters{{"CASE_ID_KEY", true, case_id_glue}, {"ACTIVITY_KEY", true, activity_key},
+                                                {"POSITIVE", true, positive}};
+  return polars_end_activities_apply(df, values, std::move(parameters));
 }
 
 PolarsFilterValue polars_get_end_activities(const EventTable& df, const std::string& case_id_key,
@@ -1940,15 +1957,14 @@ EventTable polars_suffix_filter_apply(const EventTable& df, const PolarsFilterVa
 
 EventTable polars_rework_filter_apply(const EventTable& df, const PolarsFilterParameters& raw_parameters) {
   const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kRework);
-  return rework(df, parameters, nullptr);
+  return rework(df, parameters, nullptr, raw_parameters);
 }
 EventTable polars_rework_filter_apply_activity_set(const EventTable& df, const PolarsFilterValue& activities,
                                                    const PolarsFilterParameters& raw_parameters) {
   const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kReworkSet);
   // The is_in literal is built before group_by(case).
   (void)list_literal(activities.items);
-  check_dict_argument(case_key_value(raw_parameters));
-  return rework(df, parameters, &activities);
+  return rework(df, parameters, &activities, raw_parameters);
 }
 
 EventTable polars_consecutive_act_case_grouping_apply(const EventTable& df,

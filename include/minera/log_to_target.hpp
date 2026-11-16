@@ -24,12 +24,20 @@ struct LogToTargetOptions {
   LogToTargetVariant variant = LogToTargetVariant::NEXT_ACTIVITY;
   std::string activity_key = "activity";
   std::string timestamp_key = "time:timestamp";
+  // As the reference's ENABLE_PADDING and PAD_SIZE (round CU, observed
+  // black-box): with padding, each trace shorter than the pad size gets zero
+  // rows up to it and longer traces stay as they are; without, pad_size is
+  // ignored. The pad size defaults to the longest trace: pad_size 0 means
+  // that default unless explicit_pad_size says 0 was given.
   bool enable_padding = false;
   std::size_t pad_size = 0;
-  // An empty list derives sorted unique classes from the log.  Otherwise the
-  // supplied order is retained and activities not present in it are encoded
-  // as an all-zero row.
+  bool explicit_pad_size = false;
+  // The classes of NEXT_ACTIVITY (ignored by the time targets). Empty and
+  // not explicit_activities: the log's sorted distinct activities. Otherwise
+  // the list as given, repeats and blanks included: a next activity takes the
+  // column of the first equal class, an activity outside the list a zero row.
   std::vector<std::string> activities;
+  bool explicit_activities = false;
 };
 
 struct LogToTargetResult {

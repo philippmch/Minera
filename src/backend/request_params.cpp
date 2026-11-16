@@ -5442,12 +5442,15 @@ LogToTargetParams parse_log_to_target_params(const FieldLookup& field,
     params.enable_padding = parse_boolean(require("target_enable_padding"),
                                           "target_enable_padding");
   }
-  if (supplied("target_pad_size"))
+  if (supplied("target_pad_size")) {
     params.pad_size = parse_nonnegative_size(require("target_pad_size"),
                                              "target_pad_size");
+    params.explicit_pad_size = true;
+  }
   if (supplied("target_activities")) {
     const auto value = require("target_activities");
     params.activities = split_target_activities(value);
+    params.explicit_activities = true;
     if (params.activities.empty())
       throw std::invalid_argument("target_activities: expected a non-empty list");
   }

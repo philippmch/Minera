@@ -3155,6 +3155,9 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_ct_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-ct-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_ct_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_sequence_filter_cu_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cu-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_cu_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3281,6 +3284,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_ct_probe_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-ct-probe-bank.json.gz")
   set_tests_properties(minera_polars_filter_ct_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_filter_cu_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cu-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cu_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_filter_cu_probe_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cu-probe-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cu_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3506,6 +3515,9 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_ct_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-ct-bank.json.gz")
   set_tests_properties(minera_pandas_filter_ct_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_pandas_filter_cu_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cu-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_cu_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

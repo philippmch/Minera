@@ -438,6 +438,13 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
   const auto activity = keyword_text(kwargs, "activity_key", "concept:name");
   if (function == "filter_df_on_end_activities") {
     const auto* positive = keyword(kwargs, "positive");
+    // Round CU (probe u3): a list or tuple glue groups as the CASE_ID_KEY parameter.
+    if (const auto* list_glue = keyword(kwargs, "case_id_glue"); list_glue && (list_glue->fields.begin()->first == "l" || list_glue->fields.begin()->first == "t")) {
+      const auto* act = keyword(kwargs, "activity_key");
+      return table_node(polars_filter_df_on_end_activities(df, value_of(*args.at(0)), value_of(*list_glue),
+                                                           act ? value_of(*act) : PandasFilterValue::of("concept:name"),
+                                                           positive ? value_of(*positive) : PandasFilterValue::of(true)));
+    }
     return table_node(polars_filter_df_on_end_activities(df, value_of(*args.at(0)), glue, activity,
                                                          positive ? value_of(*positive) : PandasFilterValue::of(true)));
   }

@@ -79,7 +79,10 @@ export function isTransformationRun(value:unknown):value is Omit<TransformationR
     return true;
   }
   if(isLogToTargetResult(run.result)) {
-    const r=run.result;return run.transformed_xes===null&&r.trace_count===cases.length&&r.rows.length===cases.length&&r.classes.length===r.target_width&&r.rows.every((rows,i)=>(r.padded?rows.length>=cases[i].event_count&&rows.length===(r.rows[0]?.length??0):rows.length===cases[i].event_count)&&rows.every(row=>row.length===r.target_width));
+    // pm4py pads each case shorter than the pad size up to it and leaves longer cases as they are.
+    const r=run.result;if(run.transformed_xes!==null||r.trace_count!==cases.length||r.rows.length!==cases.length||r.classes.length!==r.target_width)return false;
+    const pad=r.rows.reduce((size,rows,i)=>rows.length>(cases[i]?.event_count??0)?Math.max(size,rows.length):size,0);
+    return r.rows.every((rows,i)=>rows.length===(r.padded?Math.max(cases[i].event_count,pad):cases[i].event_count)&&rows.every(row=>row.length===r.target_width));
   }
   if(!isLabelSplittingResult(run.result)||!(typeof run.transformed_xes==="string"&&(run.transformed_xes_error===undefined||run.transformed_xes_error===null)||run.transformed_xes===null&&typeof run.transformed_xes_error==="string")||typeof run.activity_attribute!=="string"||!run.activity_attribute||typeof run.complete_activity_field!=="boolean"||!Array.isArray(run.label_rows)||run.result.log.traces.length!==cases.length||!run.result.log.traces.every((trace,i)=>trace.case_id===cases[i].case_id&&trace.events.length===cases[i].event_count))return false;
   let position=0;for(const trace of cases)for(let event=0;event<trace.event_count;event++){const row=run.label_rows[position++];if(!row||row.case_index!==trace.index||row.event_index!==event||![row.input,row.previous,row.output].every(value=>typeof value==="string"))return false;}return position===run.label_rows.length&&run.complete_activity_field===run.label_rows.every(row=>!!row.output);

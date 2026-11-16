@@ -363,6 +363,19 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
  // label must be a column.
  const auto mapping=[](const EventAttribute& item){return !item.is_null&&item.container==AttributeContainerKind::kContainer;};
  bool mapping_key=mapping(options.case_id_key);
+ // Round CU (fresh pandas CK 2026111821 case 690, probe u5): a list key
+ // holding anything but labels makes groupby read its items in order: a
+ // dict maps, a label (str, tuple or other scalar) naming no column raises
+ // KeyError, a list of another length than the frame "Grouper and axis must
+ // be same length" and None "'NoneType' object is not callable".
+ if(options.case_id_key.container==AttributeContainerKind::kList&&!std::all_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),[](const auto& item){return text_value(item);}))
+  for(const auto& item:options.case_id_key.children){
+   if(mapping(item))continue;
+   if(item.is_null)error("TypeError","'NoneType' object is not callable");
+   if(item.container==AttributeContainerKind::kList){if(item.children.size()!=source.size())error("ValueError","Grouper and axis must be same length");continue;}
+   if(item.container==AttributeContainerKind::kScalar||item.container==AttributeContainerKind::kTuple){if(!column(source,item))error("KeyError",repr(item));continue;}
+   break;
+  }
  if(options.case_id_key.container==AttributeContainerKind::kList&&std::any_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),mapping)&&
     std::all_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),[&](const auto& item){return mapping(item)||text_value(item);})){
   for(const auto& item:options.case_id_key.children)if(text_value(item)&&!column(source,item))error("KeyError",repr(item));

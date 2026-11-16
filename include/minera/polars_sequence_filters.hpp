@@ -61,6 +61,13 @@ inline constexpr std::string_view kPolarsFilterReturnEaCountDictAutofilter = "re
 [[nodiscard]] EventTable polars_filter_df_on_end_activities(
     const EventTable& df, const PolarsFilterValue& values, const std::string& case_id_glue = "case:concept:name",
     const std::string& activity_key = "concept:name", const PolarsFilterValue& positive = PolarsFilterValue::of(true));
+// Round CU (probe u3): a case_id_glue of any other value (a list or tuple of
+// names, a literal) groups and joins as the CASE_ID_KEY parameter of
+// polars_end_activities_apply does.
+[[nodiscard]] EventTable polars_filter_df_on_end_activities(const EventTable& df, const PolarsFilterValue& values,
+                                                            const PolarsFilterValue& case_id_glue,
+                                                            const PolarsFilterValue& activity_key,
+                                                            const PolarsFilterValue& positive);
 // End activity -> number of cases (the null case group and a null activity
 // included), in an unspecified order.
 [[nodiscard]] PolarsFilterValue polars_get_end_activities(const EventTable& df,

@@ -6619,6 +6619,9 @@ std::string log_to_target_json(const LogToTargetResult& result) {
     throw std::invalid_argument("log-to-target result has an unknown variant");
   };
   std::ostringstream out;
+  // Full precision (round CU: the stream's six digits rounded remaining
+  // times past 11 days and every fractional second).
+  out << std::setprecision(std::numeric_limits<double>::max_digits10);
   out << "{\"family\":\"LOG_TO_TARGET\",\"variant\":";
   write_json_string(out, variant_name());
   out << ",\"trace_count\":" << result.trace_count

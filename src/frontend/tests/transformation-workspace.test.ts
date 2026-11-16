@@ -42,6 +42,8 @@ describe("native transformation workflows",()=>{
   });
   it("validates padding dimensions and exposes actual event versus padding rows",()=>{
     expect(isTransformationRun(envelope(targetResult))).toBe(true);expect(isTransformationRun(envelope({...targetResult,target_width:1}))).toBe(false);expect(isTransformationRun(envelope({...targetResult,rows:[targetResult.rows[0],[],targetResult.rows[2]]}))).toBe(false);
+    // A pad size below the longest case pads only the shorter cases (pm4py's PAD_SIZE).
+    expect(isTransformationRun(envelope({...targetResult,rows:[[[1,0],[0,0]],[[0,0]],[[0,0]]]}))).toBe(true);expect(isTransformationRun(envelope({...targetResult,rows:[[[1,0],[0,0]],[],[[0,0]]]}))).toBe(true);expect(isTransformationRun(envelope({...targetResult,rows:[[[1,0],[0,0]],[[0,0]],[[0,0],[0,0]]]}))).toBe(false);
     const matrix=transformationMatrix(run(targetResult));expect(matrix.count).toBe(9);expect(matrix.rowAt(1).metadata).toEqual([0,"same",1,"event"]);expect(matrix.rowAt(2).metadata).toEqual([0,"same",2,"padding"]);expect(matrix.rowAt(3).metadata).toEqual([1,"empty",0,"padding"]);expect(matrix.rowAt(6).metadata).toEqual([2,"same",0,"event"]);
   });
   it("retains padded empty traces without inventing source events or changing source indices",()=>{

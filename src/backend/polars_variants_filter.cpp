@@ -404,6 +404,35 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
     // case 425).
     if(source.rows.size()==1&&time_resolves){
       const auto items=key_items(options.case_id_key);
+      // Round CU (probe u2): with several str items the statistics take each
+      // group row's second value as its variant: a str iterates to its
+      // characters, any other value fails to iterate.
+      if(items.size()!=1&&statistics&&std::all_of(items.begin(),items.end(),[](const EventAttribute& v){return text(v);})){
+        const auto& act=options.activity_key;
+        if(!text(act)||keys::by_name(act.value)||!present(act.value))literal_outside("the activity key");
+        const auto at=static_cast<std::size_t>(std::find(source.columns.begin(),source.columns.end(),items[1].value)-source.columns.begin());
+        if(at>=source.columns.size())literal_outside("a missing second key item");
+        const auto& cell=source.rows.front()[at];const auto& dt=source.dtypes[at];
+        std::string type;
+        if(!cell||null(*cell)||dt=="Null")type="NoneType";
+        else if(dt=="String"||categorical_dtype(dt)||enum_dtype(dt))type.clear();
+        else if(dtype(dt)==Dtype::kInteger)type="int";
+        else if(dtype(dt)==Dtype::kFloat)type="float";
+        else if(dt=="Boolean")type="bool";
+        else if(dt=="Date")type="datetime.date";
+        else if(dt.rfind("Datetime",0)==0)type="datetime.datetime";
+        else literal_outside("a second key item of dtype "+dt);
+        if(!type.empty())fail("TypeError","apply","'"+type+"' object is not iterable");
+        Grouped result;result.activity_dtype="String";
+        Group group;group.key="literal";
+        const auto& text_value=cell->value;
+        for(std::size_t i=0;i<text_value.size();){
+          const auto lead=static_cast<unsigned char>(text_value[i]);
+          const std::size_t width=lead<0x80?1:lead>=0xF0?4:lead>=0xE0?3:lead>=0xC0?2:1;
+          group.activities.push_back(EventAttribute{"",text_value.substr(i,width)});i+=width;
+        }
+        result.groups.push_back(std::move(group));return result;
+      }
       if(items.size()!=1)literal_outside("several key items on one row");
       const auto& item=items.front();
       if(text(item)){auto inner=raw;inner.case_id_key=item;return grouped(source,inner,statistics,phase,eager_source);}
@@ -453,6 +482,24 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
 // on its key columns. Round CP's empty-list rule (no admitted variant keeps
 // every row on an anti join) held only for an empty frame: the literal-only
 // selection has one row (CK bank 2026111671 case 369).
+// Round CU (fresh CK 2026111813 case 490, probe u4): the positive (inner)
+// join on a key of one literal appends the right side's literal as a
+// `literal` column (Int32 for a small int, Null for None, a struct for a
+// dict), whatever rows it keeps; the anti join appends nothing.
+std::optional<detail::polars_group_keys::Item> joined_literal(const PolarsVariantsFilterOptions& options){
+  const auto& key=options.case_id_key;
+  if(!truth(options.positive))return std::nullopt;
+  const bool listed=listed_key(key)&&key.children.size()==1&&!text(key.children.front());
+  if(!listed&&!integer(key))return std::nullopt;
+  try{return detail::polars_group_keys::literal_item(listed?key.children.front():key);}catch(const std::exception&){return std::nullopt;}
+}
+EventTable with_literal(EventTable table,const PolarsVariantsFilterOptions& options){
+  const auto item=joined_literal(options);if(!item)return table;
+  table.columns.push_back("literal");table.dtypes.push_back(item->dtype);
+  if(!table.categorical_dtypes.empty())table.categorical_dtypes.push_back(std::nullopt);
+  for(auto& row:table.rows)row.push_back(item->cell);
+  return table;
+}
 std::optional<EventTable> literal_collect(const EventTable& source,const std::vector<std::string>& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
   const auto& key=options.case_id_key;
   if(!(listed_key(key)&&!key.children.empty())&&!integer(key))return std::nullopt;
@@ -504,8 +551,8 @@ std::optional<EventTable> literal_collect(const EventTable& source,const std::ve
   } else {
     matched=!null(items.front());
   }
-  if(matched==truth(options.positive))return source;
-  auto result=source;result.rows.clear();return result;
+  if(matched==truth(options.positive))return with_literal(source,options);
+  auto result=source;result.rows.clear();return with_literal(std::move(result),options);
 }
 EventTable collect(const EventTable& source,const std::vector<std::string>& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
   if(const auto result=literal_collect(source,labels,options,phase))return *result;
@@ -529,7 +576,10 @@ EventTable collect(const EventTable& source,const std::vector<std::string>& labe
   for(const auto& row:source.rows){const auto key=group_key(row[groups.case_at],groups.case_dtype);if(matches.at(key)==truth(options.positive))result.rows.push_back(row);}return result;
 }
 LazyEventTable lazy(const LazyEventTable& source,std::vector<std::string> labels,const PolarsVariantsFilterOptions& options){
-  validate(options);return LazyEventTable(source.columns(),[source,labels=std::move(labels),options](const auto& consume){const auto result=collect(source.materialize(),labels,options,"collect");for(const auto& row:result.rows)consume(row);},source.attributes(),source.metadata(),std::nullopt,source.dtypes(),source.index(),source.categorical_dtypes());
+  validate(options);
+  auto columns=source.columns();auto dtypes=source.dtypes();auto categorical=source.categorical_dtypes();
+  if(const auto item=joined_literal(options)){columns.push_back("literal");if(!dtypes.empty())dtypes.push_back(item->dtype);if(!categorical.empty())categorical.push_back(std::nullopt);}
+  return LazyEventTable(columns,[source,labels=std::move(labels),options](const auto& consume){const auto result=collect(source.materialize(),labels,options,"collect");for(const auto& row:result.rows)consume(row);},source.attributes(),source.metadata(),std::nullopt,dtypes,source.index(),categorical);
 }
 bool py_equal(const Cell& a,const Cell& b){if(!a||null(*a))return !b||null(*b);if(!b||null(*b))return false;if((integer(*a)||boolean(*a))&&(integer(*b)||boolean(*b)))return exact(*a)==exact(*b);if((real(*a)||integer(*a)||boolean(*a))&&(real(*b)||integer(*b)||boolean(*b)))return number(*a)==number(*b);if(date(*a)&&date(*b))return compare(a,b,Dtype::kDate)==0;return text(*a)&&text(*b)?a->value==b->value:a==b;}
 bool py_less(const Cell& a,const Cell& b){

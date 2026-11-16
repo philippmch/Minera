@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CT (2026-11-05 to 2026-11-15, cloud container)
+## Review-fix loop, rounds T–CU (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5661,7 +5661,91 @@ project files under `review-harness/round-ct/`.
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
 
-Next round (CU) should start by re-reviewing round CT:
+Round CU re-reviewed CT (Review CU1). CT's commit ae025ec ran green on
+all six CI jobs (run 43770672377). CU swept the transform-target route on
+uploads, probed the one-row join shapes and list keys CT left open and
+replayed two batches of fresh seeds:
+- Transform targets on uploads (`log_to_target.cpp`, `request_params.cpp`,
+  `literal_controls_json.cpp`, `json_export.cpp`, the frontend's result
+  check; 708 sweep calls, 0 differing): activities and timestamps come from
+  the frame's typed cells, derived classes are `sorted(set(...))` with
+  Python's ordering and errors, an explicit list still reads every event,
+  the first equal class takes the one-hot, padding pads only shorter cases
+  (a pad size of 0 means the longest case unless given), an empty log
+  raises `max()`, and the JSON carries 17 digits.
+- List case keys in the Polars paths filters (`polars_paths_filter.cpp`;
+  probes j2, u2, 1,376 calls): the list literal sorts first (ShapeError on
+  frames of more than one row), then the names resolve after the sort, two
+  distinct names alias `case_next` twice. A repeated existing name stays
+  refused (declared).
+- `filter_variants_top_k` with several key names on a one-row frame
+  (`polars_variants_filter.cpp`): the second key value is the variant, a
+  str iterating to characters, any other value raising "not iterable".
+- The rework build order with dict keys (`polars_sequence_filters.cpp`,
+  fresh CK 2026111806, probe u3): the dict case and activity literals, then
+  `MIN_OCCURRENCES`, then the select's "Cannot pass a dictionary".
+- `filter_df_on_end_activities` with a list or tuple `case_id_glue`
+  (probe u3, 720 calls with the rework calls): grouped and joined as the
+  `CASE_ID_KEY` parameter of `end_activities.apply`.
+- The positive variants joins with an int or one-item literal list case
+  key (`polars_variants_filter.cpp`, fresh CK 2026111813 case 490, probe
+  u4): the inner join keeps the literal as a `literal` column.
+- List case keys of mixed items in the grouped pandas timestamp filters
+  (`pandas_timestamp_filter.cpp`, fresh pandas CK 2026111821 case 690,
+  probe u5): groupby reads the items in order (a dict maps, a missing label
+  raises `KeyError`, a list of another length the grouper length error,
+  None "'NoneType' object is not callable").
+- One-row NaN joins in LTL, paths, between and `ncases`, two float keys and
+  an Int/Float pair (probe j2) already matched.
+- Fresh seeds, first batch: Polars table CK 2026111801, CN 2026111802, CJ
+  2026111803, CI 2026111804 (1: an equal-size timeframe join in random
+  order, marked unordered), CH 2026111805; Polars sequence CP 2026111800,
+  CK 2026111806 (2: the rework build order), CJ 2026111807, CH 2026111808;
+  pandas CK table 2026111809, CK sequence 2026111810, CN LTL 2026111811.
+  Second batch after the fixes: sequence CP 2026111812 (1: an equal-size
+  `starts_with` join, marked unordered), table CK 2026111813 (1: the
+  variants literal column), CN 2026111814, CJ 2026111815, CI 2026111816,
+  CH 2026111817; sequence CK 2026111818, CJ 2026111819, CH 2026111820;
+  pandas CK table 2026111821 (1: mixed list keys), CK sequence 2026111822,
+  CN LTL 2026111823. All 0 after.
+
+In the suite: new `docs/polars-filter-cu-bank.json.gz`,
+`docs/polars-filter-cu-probe-bank.json.gz`,
+`docs/polars-sequence-filter-cu-bank.json.gz` and
+`docs/pandas-filter-cu-bank.json.gz`, upload-frame cases in
+`minera_log_to_target_tests` and partial padding in the transformation
+workspace test. The fresh banks, sweeps and probes are in the
+project files under `review-harness/round-cu/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (CV) should start by re-reviewing round CU:
+
+- CU's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the paths filters with a list case key that repeats a name (pm4py's
+  `DuplicateError` plan) and `filter_variants_top_k` with several key names
+  on one-row frames whose second column is a List, Struct, Binary,
+  Decimal, Duration or Time column;
+- set values in the pandas bank codec (not taken in CU; the drivers cannot
+  carry them yet);
+- upload routes no round has swept on typed frames yet (CU found the
+  transform-target route; compare the server's route list with the sweeps
+  named in the round notes);
+- the CS list below (LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CT's targets, taken in CU (findings CU1-1 to CU1-9): CT's CI run,
+the fresh seeds, one-row NaN joins in the other filters, the list glue of
+`filter_df_on_end_activities` and the upload routes (transform targets).
+Not taken (carried to CV): set values in the pandas bank codec, the LTL
+list-key cases outside the model, equal-size joins and the older CJ, CF and
+CD items.
+
+Previous list for round CU (kept for its older items):
 
 - CT's CI run;
 - fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ

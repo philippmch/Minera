@@ -74,9 +74,17 @@ void literal_vectors_and_structural_errors(){
 void target_exact_and_legacy_are_independent(){
  Fields fields={{"target_activities_json",R"([" B "," A "] )"}};auto options=parse_log_to_target_literal_params(lookup(fields),present(fields));assert((options.activities==std::vector<std::string>{" B "," A "}));
  const auto result=log_to_target(log_of({" A "," B "}),options);assert(result.classes==options.activities&&result.rows[0][0][0]==1&&result.rows[0][0][1]==0);
- fields["target_activities_json"]="[]";options=parse_log_to_target_literal_params(lookup(fields),present(fields));assert(options.activities.empty()&&log_to_target(log_of(),options).classes.size()==2);
- fields["target_activities_json"]=R"([""])";options=parse_log_to_target_literal_params(lookup(fields),present(fields));assert(options.activities.size()==1&&options.activities[0].empty());rejects([&]{(void)log_to_target(log_of(),options);});
- fields["target_activities_json"]=R"(["A","A"])";options=parse_log_to_target_literal_params(lookup(fields),present(fields));assert(options.activities.size()==2);rejects([&]{(void)log_to_target(log_of(),options);});
+ // Round CU: an explicit empty list is pm4py's activities=[] (width 0), not the derived classes.
+ fields["target_activities_json"]="[]";options=parse_log_to_target_literal_params(lookup(fields),present(fields));assert(options.activities.empty()&&options.explicit_activities);
+ {const auto empty=log_to_target(log_of(),options);assert(empty.classes.empty()&&empty.rows.size()==1&&empty.rows[0].size()==2&&empty.rows[0][0].empty()&&empty.rows[0][1].empty());}
+ // Round CU: pm4py keeps an explicit class no event names (a zero column)
+ // and gives the one-hot of a repeated class to its first copy.
+ fields["target_activities_json"]=R"([""])";options=parse_log_to_target_literal_params(lookup(fields),present(fields));assert(options.activities.size()==1&&options.activities[0].empty());
+ {const auto unknown=log_to_target(log_of(),options);assert((unknown.classes==std::vector<std::string>{""})&&(unknown.rows[0]==std::vector<std::vector<double>>{{0.0},{0.0}}));}
+ fields["target_activities_json"]=R"(["A","A"])";options=parse_log_to_target_literal_params(lookup(fields),present(fields));assert(options.activities.size()==2);
+ assert((log_to_target(log_of(),options).rows[0]==std::vector<std::vector<double>>{{0.0,0.0},{0.0,0.0}}));
+ fields["target_activities_json"]=R"(["B","B"])";options=parse_log_to_target_literal_params(lookup(fields),present(fields));
+ assert((log_to_target(log_of(),options).rows[0]==std::vector<std::vector<double>>{{1.0,0.0},{0.0,0.0}}));
  fields["target_activities"]="legacy";rejects([&]{(void)parse_log_to_target_literal_params(lookup(fields),present(fields));});
  fields={{"target_activities","  A  , B "}};assert(parse_log_to_target_literal_params(lookup(fields),present(fields)).activities==parse_log_to_target_params(lookup(fields),present(fields)).activities);
  fields["target_activities"]="";rejects([&]{(void)parse_log_to_target_literal_params(lookup(fields),present(fields));});

@@ -27975,3 +27975,124 @@ Tests:
   2026111721 case 433, probe p1; 13,665), replayed by the
   `minera_*_ct_*bank_parity_tests` ctests; `minera_process_cube_tests`
   rewritten on pm4py's labels, cells and member sets.
+
+## Review CU1: re-review of round CT, transform targets on uploads, list case keys in the paths and variants filters, list glue in `filter_df_on_end_activities` (2026-11-16)
+
+Round CU checked CT's CI (run 43770672377 on ae025ec: green on all six
+jobs), swept the transform-target route on typed upload frames, probed the
+one-row join shapes CT had not covered, list case keys in the Polars paths
+and variants statistics, `filter_df_on_end_activities` with a list glue and
+the rework build order, and replayed two batches of fresh seeds of every
+filter domain. The device check on the Mac was skipped (no device linked).
+
+- **CU1-1 Transform targets on uploads** (`/api/transform-target`,
+  `log_to_target`; 480 CSV and 228 XES sweep calls, 81 of the first 180
+  differing before, 0 after). pm4py reads an upload through its frame's
+  log, so every event holds the frame's typed cells: an activity is the
+  cell's Python value (a missing cell is NaN, or NaT in a date column), a
+  key the frame lacks raises `KeyError` even beside an explicit class
+  list, and the derived classes are `sorted(set(values))` with Python's
+  ordering, whose `TypeError` on mixed types also raises beside an explicit
+  list. A row's one-hot column is the first class equal to the next
+  activity (an explicit list may repeat a class; an explicit empty list
+  gives width 0). The time targets read every event's
+  `Timestamp.timestamp()` (NaT raises `ValueError`, any other cell an
+  `AttributeError`) and subtract as given, negative values included.
+  Padding pads each case shorter than the pad size with zero rows and
+  leaves longer cases alone; a pad size of 0 means the longest case unless
+  it was given explicitly, and an empty log raises `max() arg is an empty
+  sequence`. The JSON carries 17 significant digits. The frontend's result
+  check and hint follow the partial padding.
+- **CU1-2 List case keys in the Polars paths filters** (probes j2, u2;
+  725 and 672 calls, 72 and 468 differing before). A list or tuple case key
+  of str names sorts as its list literal and is `pl.col` of its names after
+  the sort: a missing timestamp column fails the sort first, then the first
+  missing name of the list (`"name" not found`), then the attribute column,
+  then two distinct names, which alias `case_next` twice (`ComputeError`
+  with the sorted plan). One name runs as that column on a one-row frame and
+  fails the literal sort (`ShapeError`) on any other, unless no path is
+  admitted and the plan prunes the sort. Before, one name ran as a plain
+  column (rows where pm4py raises) and several names were refused.
+- **CU1-3 Several key names in `filter_variants_top_k` on a one-row
+  frame** (probes j2, u2). The statistics take each group row's second
+  value as its variant: a str cell (String, Categorical, Enum) iterates to
+  its characters, which the join then compares with the case's real
+  variant, and any other cell fails (`'float' object is not iterable`,
+  `int`, `bool`, `NoneType`, `datetime.datetime`, `datetime.date`).
+- **CU1-4 The rework build order with dict keys** (fresh Polars sequence
+  CK 2026111806 cases 396 and 632, probe u3; 720 calls). `group_by([case,
+  activity])` builds a dict case key's struct literal first and a dict
+  activity key's literal next (also where the activity filter of
+  `apply_activity_set` selected the dict's one column by name), then the
+  `MIN_OCCURRENCES` literal; only then does the select by the dict case key
+  raise "Cannot pass a dictionary as a single positional argument".
+- **CU1-5 A list glue in `filter_df_on_end_activities`** (probe u3). A
+  list or tuple `case_id_glue` groups and joins as the `CASE_ID_KEY`
+  parameter of `end_activities.apply` does (str items as columns, other
+  items as literals, `[]` failing the join, a repeated name failing the
+  group_by); before, Minera looked up a column named "".
+- **CU1-6 One-row joins** (probe j2). NaN case keys in the LTL, paths,
+  between and `filter_on_ncases` filters on one-row frames, and one-row
+  joins on two float keys or an Int/Float pair, already matched.
+- **CU1-7 Fresh seeds** (6 calls in both batches, 0 after, two of them marked unordered). First batch: Polars table CK
+  2026111801, CN 2026111802, CJ 2026111803, CI 2026111804 (1: case 1,
+  `filter_traces_attribute_in_timeframe` returning two equal-size cases
+  in a random order, marked unordered), CH 2026111805; Polars sequence CP
+  2026111800, CK 2026111806 (2: cases 396 and 632, CU1-4), CJ 2026111807,
+  CH 2026111808; pandas CK table 2026111809, CK sequence 2026111810, CN LTL
+  2026111811. Second batch after the fixes: Polars sequence CP
+  2026111812 (1: case 72, `starts_with.apply` returning two equal-size
+  cases in a random order, marked unordered), table CK 2026111813 (1: case
+  490, CU1-8), CN 2026111814, CJ 2026111815, CI 2026111816, CH 2026111817;
+  sequence CK 2026111818, CJ 2026111819, CH 2026111820; pandas CK table
+  2026111821 (1: case 690, CU1-9), CK sequence 2026111822, CN LTL
+  2026111823.
+
+- **CU1-8 The literal column of a positive variants join** (fresh Polars
+  table CK 2026111813 case 490, probe u4; 324 calls). A positive
+  `variants.apply` or `apply_from_variant_list` whose case key is an int or
+  a one-item list of a non-str value joins on that literal, and the inner
+  join keeps the right side's literal as a `literal` column (Int32 for a
+  small int, Int64 past it, Null for None, a struct for a dict) whatever
+  rows it keeps; the anti join adds nothing. Minera dropped the column.
+- **CU1-9 List case keys of mixed items in the grouped pandas timestamp
+  filters** (fresh pandas CK 2026111821 case 690, probe u5; 165 calls).
+  A list key holding anything but str labels makes groupby read its items
+  in order: a dict maps the index, a label (str, tuple or another scalar)
+  that names no column raises `KeyError` with its repr, a list of another
+  length than the frame raises "Grouper and axis must be same length" and
+  None raises "'NoneType' object is not callable". Minera raised the
+  unhashable-type error of the later column lookup instead.
+
+Declared:
+- Transform targets: the workbench form still asks for non-empty unique
+  class names (its comma query cannot carry an empty list or an empty
+  name); `target_activities_json` takes every list pm4py takes. The
+  historical, non-replayable `literal-controls` records
+  `target-explicit-empty-infers`, `target-native-empty-element` and
+  `target-native-duplicate` show the earlier contract.
+- Transform targets: a float column's NaN activities are distinct objects
+  that CPython hashes by address, so their places among the derived
+  classes vary from run to run; Minera puts them last in cell order.
+- A paths list case key that repeats an existing name selects its column
+  once in the `with_columns` and twice in the final select; pm4py's
+  `DuplicateError` carries the whole filter plan, which Minera does not
+  build (it refuses the call).
+- `filter_variants_top_k` with several key names on a one-row frame whose
+  second column is a List, Struct, Binary, Decimal, Duration or Time
+  column stays outside the model.
+
+Tests:
+- New: `docs/polars-filter-cu-bank.json.gz` (CK 2026111813 cases 0-399
+  and 490, CI 2026111804 case 1; 22,176 calls),
+  `docs/polars-filter-cu-probe-bank.json.gz` (probes j2, u2, u4; 1,700),
+  `docs/polars-sequence-filter-cu-bank.json.gz` (CK 2026111806 cases 0-399
+  and 632, CP 2026111812 case 72, probe u3; 6,558) and
+  `docs/pandas-filter-cu-bank.json.gz` (CK 2026111821 cases 0-399 and 690,
+  probe u5; 11,910), replayed by the `minera_*_cu_*bank_parity_tests`
+  ctests; `minera_log_to_target_tests` gained upload-frame cases (typed
+  classes, `KeyError` beside an explicit list, partial padding, the
+  `AttributeError` of a float timestamp), `minera_literal_controls_json_tests`
+  follows pm4py on an explicit empty list (width 0), a class no event names
+  (a zero column) and a repeated class, and the transformation workspace
+  test covers partial padding.

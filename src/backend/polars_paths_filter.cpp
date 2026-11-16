@@ -279,6 +279,20 @@ bool literal_time_list(const EventAttribute& key, bool performance) {
   return !performance && (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) &&
          key.children.size() == 1 && !text(key.children.front());
 }
+// Round CU (probe u2): a non-empty list or tuple case key of str names
+// sorts as its list literal (one value: any frame but a one-row one fails the
+// sort), then is pl.col of its names: a missing name fails first, then the
+// attribute, then two distinct names alias "case_next" twice.
+bool case_list(const EventAttribute& key) {
+  return (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) && !key.children.empty() &&
+         std::all_of(key.children.begin(), key.children.end(), [](const EventAttribute& item) { return keys::plain_text(item); });
+}
+std::vector<std::string> case_names(const EventAttribute& key) {
+  std::vector<std::string> names;
+  for (const auto& item : key.children)
+    if (std::find(names.begin(), names.end(), item.value) == names.end()) names.push_back(item.value);
+  return names;
+}
 std::vector<std::string> validate_apply(const EventAttribute& value, bool performance, const PolarsPathsFilterOptions& options) {
   auto result = paths(value, performance);
   // Round CN: a list or tuple case or timestamp key is a Series literal
@@ -322,8 +336,12 @@ std::string sort_time(const PolarsPathsFilterOptions& options, const SortLiteral
   if (literal) return *literal;
   return collection(options.timestamp_key) ? empty : "col(" + quote(options.timestamp_key.value) + ")";
 }
+std::string case_sort(const PolarsPathsFilterOptions& options) {
+  if (case_list(options.case_id_key)) return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(options.case_id_key));
+  return "col(" + quote(options.case_id_key.value) + ")";
+}
 std::string sort_plan(const EventTable& source, const PolarsPathsFilterOptions& options, const SortLiteral& literal, const std::string& padding = "") {
-  return padding + "SORT BY [col(" + quote(options.case_id_key.value) + "), " + sort_time(options, literal, "[]") + "]\n" + padding + "  " + frame_plan(source);
+  return padding + "SORT BY [" + case_sort(options) + ", " + sort_time(options, literal, "[]") + "]\n" + padding + "  " + frame_plan(source);
 }
 std::string missing_prefix(const std::string& key, const std::vector<std::string>& columns) {
   std::string out = "unable to find column " + debug_quote(key) + "; valid columns: [";
@@ -343,7 +361,7 @@ std::string missing_prefix(const std::string& key, const std::vector<std::string
   auto columns = source.columns;
   std::string name, plan;
   std::vector<std::string> nodes;
-  if (collection(options.case_id_key)) {
+  if (collection(options.case_id_key) && !case_list(options.case_id_key)) {
     name = "@@path"; columns.push_back("next_activity"); if (performance) columns.push_back("next_timestamp");
     plan = " WITH_COLUMNS:\n [] \n   WITH_COLUMNS:\n   [col(" + activity + ").shift([dyn int: -1]).over([]).alias(\"next_activity\")";
     if (performance) plan += ", col(" + time + ").shift([dyn int: -1]).over([]).alias(\"next_timestamp\")";
@@ -362,7 +380,7 @@ std::string missing_prefix(const std::string& key, const std::vector<std::string
     const auto at = std::find(source.columns.begin(), source.columns.end(), options.attribute_key.value);
     const auto dtype = at == source.columns.end() || source.dtypes.size() != source.columns.size() ? std::string("String") : source.dtypes[static_cast<std::size_t>(at - source.columns.begin())];
     const std::string cast = dtype == "String" ? "" : dtype == "Null" ? ".cast(String)" : ".strict_cast(String)";
-    plan = " WITH_COLUMNS:\n [when(col(\"case_next\") == col(" + key + ")).then(col(" + activity + ")" + cast + ".str.concat_horizontal([\",\", col(\"next_activity\")" + cast + "])).otherwise(null.cast(String)).alias(\"@@path\")] \n   WITH_COLUMNS:\n   [col(" + key + ").alias(\"case_next\"), col(" + activity + ").shift([dyn int: -1]).over([col(" + key + ")]).alias(\"next_activity\")] \n    SORT BY [col(" + key + "), " + sort_time(options, literal, "[]") + "]\n      " + frame_plan(source);
+    plan = " WITH_COLUMNS:\n [when(col(\"case_next\") == col(" + key + ")).then(col(" + activity + ")" + cast + ".str.concat_horizontal([\",\", col(\"next_activity\")" + cast + "])).otherwise(null.cast(String)).alias(\"@@path\")] \n   WITH_COLUMNS:\n   [col(" + key + ").alias(\"case_next\"), col(" + activity + ").shift([dyn int: -1]).over([col(" + key + ")]).alias(\"next_activity\")] \n    SORT BY [" + case_sort(options) + ", " + sort_time(options, literal, "[]") + "]\n      " + frame_plan(source);
     nodes = {"select", "unique", "join right", "join", "select"};
   }
   fail("ColumnNotFoundError", phase, missing_prefix(name, columns) + plan + contexts(nodes));
@@ -484,10 +502,13 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
     if (found == source.columns.end()) missing(source, name, sorted, options, literal, phase);
     return static_cast<std::size_t>(found - source.columns.begin());
   };
-  if (collection(options.case_id_key)) empty_selector(source, performance, options, literal, phase);
-  const auto case_at = position(options.case_id_key.value, false);
+  const bool listed = case_list(options.case_id_key);
+  if (collection(options.case_id_key) && !listed) empty_selector(source, performance, options, literal, phase);
+  std::size_t case_at = listed ? 0 : position(options.case_id_key.value, false);
   std::optional<std::size_t> time_at;
   if (!literal && !collection(options.timestamp_key)) time_at = position(options.timestamp_key.value, false);
+  // The list case key's names resolve after the sort, before the attribute.
+  if (listed && keys::by_name(options.case_id_key.value)) missing(source, options.case_id_key.value, true, options, literal, phase);
   // The plain filter reads a dict timestamp only in its sort; the
   // performance one selects it again (pl.col of the dict) for the next
   // timestamp, beside the case and before the next activity.
@@ -496,8 +517,23 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
   const auto& target = performance ? options.attribute_key : options.target_attribute_key ? *options.target_attribute_key : options.attribute_key;
   if (collection(target) || collection(options.attribute_key)) empty_selector(source, performance, options, literal, phase);
   const auto target_at = position(target.value, true), activity_at = position(options.attribute_key.value, true);
+  if (listed) {
+    const auto names = case_names(options.case_id_key);
+    if (names.size() > 1)
+      fail("ComputeError", phase,
+           "the name 'case_next' passed to `LazyFrame.with_columns` is duplicate\n\nIt's possible that multiple expressions are returning the same "
+           "default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names.\n\n"
+           "Resolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n" +
+               sort_plan(source, options, literal) + contexts({"with_columns", "with_columns", "join left", "join", "select"}));
+    // A repeated name selects its column once in the with_columns and twice
+    // in the final select (a DuplicateError whose plan is not modelled).
+    if (names.size() != options.case_id_key.children.size())
+      throw std::invalid_argument("Native Polars path selector outside observed domain: a repeated name in a list case key");
+    case_at = position(names.front(), true);
+    if (literal && !performance) time_at = case_at;
+  }
   if (!time_at) empty_selector(source, performance, options, literal, phase);
-  if (literal) {
+  if (literal || listed) {
     // No admitted path prunes the sort: the frame as it is or no rows.
     if (!performance && paths.empty()) { if (truth(options.positive)) { auto none = source; none.rows.clear(); return none; } return source; }
     if (source.rows.size() != 1)
@@ -583,6 +619,13 @@ PolarsPathsFilterOptions keyed(const PolarsPathsFilterOptions& raw, const std::v
   auto options = raw;
   for (auto* key : {&options.case_id_key, &options.timestamp_key, &options.attribute_key}) {
     if (key == &options.timestamp_key && literal_time_list(raw.timestamp_key, performance)) continue;
+    // Round CU: a list case key stays a list (its sort literal) and carries
+    // the name pl.col resolves (a first missing name behind the marker).
+    if (key == &options.case_id_key && case_list(raw.case_id_key)) {
+      const auto resolved = keys::col_key(raw.case_id_key, columns);
+      key->value = collection(resolved) ? std::string() : resolved.value;
+      continue;
+    }
     *key = keys::col_key(*key, columns);
     if (collection(*key) && !key->children.empty()) throw std::invalid_argument("Native Polars path selector outside observed empty-list domain");
   }
