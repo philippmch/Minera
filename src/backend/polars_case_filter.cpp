@@ -68,6 +68,11 @@ std::string core_type(const EventAttribute& v) {
   }
   return python_type(v);
 }
+// PyO3's downcast errors print the type's short __name__ ('date', 'datetime').
+std::string pyo3_type(const EventAttribute& v) {
+  const std::string name = core_type(v);
+  return name.rfind("datetime.", 0) == 0 ? name.substr(9) : name;
+}
 std::string quote(const std::string& v) { return '"' + v + '"'; }
 std::string debug_quote(const std::string& v) {
   std::string result = "\"";
@@ -168,7 +173,7 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
                                         detail::polars_lit::set_argument(time))) {
     if (!time.children.empty() && !text(time.children.front()))
       fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(time.children.front()) + "'.");
-    for (const auto& item : time.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
+    for (const auto& item : time.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + pyo3_type(item) + "' object is not an instance of 'str'");
   }
   if (op == Operation::kCount && !null(bound)) {
     // Round DB: head(n) compares a truthy str or container with 0 first; an
@@ -334,10 +339,18 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   std::size_t time_at = 0;
   if (op == Operation::kPerformance) {
     if (collection(options.timestamp_key)) {
-      if (!options.timestamp_key.children.empty()) throw std::invalid_argument("Native Polars timestamp selector lists outside observed empty-list domain");
-      if (listed) throw std::invalid_argument("Native Polars timestamp selector lists with case key lists outside observed domain");
-      const auto& key = options.case_id_key.value;
-      fail("ColumnNotFoundError", phase, "unable to find column \"end_time\"; valid columns: [" + debug_quote(key) + "]\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nAGGREGATE[maintain_order: false]\n  [] BY [col(" + quote(key) + ")]\n  FROM\n  " + frame_plan(source) + contexts({"with_columns", "filter", "select", "join right", "join"}));
+      // Round DE: a key naming several columns repeats start_time in the
+      // aggregation once the case keys resolved (probe de/cp1).
+      if (!options.timestamp_key.children.empty())
+        fail("DuplicateError", phase, "column with name 'start_time' has more than one occurrence\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n" + frame_plan(source) + contexts(nodes(op, !null(high))));
+      // Round DE: the aggregation keeps the case keys' output names, a
+      // select when no key reads a column (set probes pltblci-6 and
+      // pltblcj-6 case 185).
+      std::string names;
+      for (const auto& item : keys.items) names += (names.empty() ? "" : ", ") + debug_quote(item.name);
+      const auto by = groups::keys_text(keys);
+      const auto plan = keys.all_literal() ? "SELECT [" + by + "]\n  " + frame_plan(source) : "AGGREGATE[maintain_order: false]\n  [] BY [" + by + "]\n  FROM\n  " + frame_plan(source);
+      fail("ColumnNotFoundError", phase, "unable to find column \"end_time\"; valid columns: [" + names + "]\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n" + plan + contexts({"with_columns", "filter", "select", "join right", "join"}));
     }
     time_at = position(options.timestamp_key.value);
   }

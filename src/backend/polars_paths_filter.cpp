@@ -120,6 +120,11 @@ std::string core_type(const EventAttribute& value) {
   }
   return python_type(value);
 }
+// PyO3's downcast errors print the type's short __name__ ('date', 'datetime').
+std::string pyo3_type(const EventAttribute& v) {
+  const std::string name = core_type(v);
+  return name.rfind("datetime.", 0) == 0 ? name.substr(9) : name;
+}
 
 
 Dtype dtype(const std::string& value) {
@@ -268,7 +273,7 @@ void validate_column(const EventAttribute& value) {
   if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple || detail::polars_lit::set_argument(value)) {
     if (!value.children.empty() && !text(value.children.front()))
       fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(value.children.front()) + "'.");
-    for (const auto& item : value.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
+    for (const auto& item : value.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + pyo3_type(item) + "' object is not an instance of 'str'");
     return;
   }
   if (collection(value)) throw std::invalid_argument("Native Polars path selector outside observed empty-list domain");

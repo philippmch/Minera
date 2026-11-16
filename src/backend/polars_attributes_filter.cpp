@@ -75,6 +75,11 @@ std::string core_type(const EventAttribute& v) {
   }
   return python_type(v);
 }
+// PyO3's downcast errors print the type's short __name__ ('date', 'datetime').
+std::string pyo3_type(const EventAttribute& v) {
+  const std::string name = core_type(v);
+  return name.rfind("datetime.", 0) == 0 ? name.substr(9) : name;
+}
 std::string quote(const std::string& v) { return '"' + v + '"'; }
 std::string debug_quote(const std::string& v) {
   std::string result = "\"";
@@ -219,7 +224,7 @@ bool col_selector_unmodelled(const EventAttribute& value) {
   if(collection(value)&&!mapping(value)&&!value.children.empty()&&!text(value.children.front()))
     fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(value.children.front())+"'.");
   // Round CM: a dict selects its names (str keys), so its values go unread.
-  if(collection(value)&&!mapping(value))for(const auto& item:value.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+python_type(item)+"' object is not an instance of 'str'");
+  if(collection(value)&&!mapping(value))for(const auto& item:value.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+pyo3_type(item)+"' object is not an instance of 'str'");
   // Round DB: a set selects its names as pl.col does (keys::col_key).
   return collection(value)&&!mapping(value)&&!value.children.empty()&&!detail::polars_lit::set_argument(value);
 }
@@ -1328,6 +1333,7 @@ bool pair_item(const EventAttribute& item){
   if(item.container!=AttributeContainerKind::kScalar)return false;
   return text(item)||null(item)||integer(item)||boolean(item)||real(item)||date(item);
 }
+bool sequence_item(const EventAttribute& item){return item.container==AttributeContainerKind::kList||item.container==AttributeContainerKind::kTuple;}
 // The keys resolve in order: a missing name fails at its place, a second
 // literal or a repeated name repeats its output name there.
 void resolve_pair_keys(const EventTable& source,const std::vector<EventAttribute>& items,const std::vector<std::string>& groupnodes){
@@ -1401,6 +1407,10 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     if(relative&&attr.children.size()>=2)return result;
     // Round DC: get_attribute_values maps the first key to the second.
     if(pairs&&attr.children.size()>=2&&std::all_of(attr.children.begin(),attr.children.end(),pair_item)){result.pairs=attr.children;return result;}
+    // Round DE: a list or tuple first key groups as a List literal, which the
+    // dict cannot take as a key once a group exists (set probe pltblcj-6
+    // case 49, probe de/ga2).
+    if(pairs&&attr.children.size()>=2&&sequence_item(attr.children.front())&&std::all_of(attr.children.begin()+1,attr.children.end(),pair_item)){result.pairs=attr.children;return result;}
   }
   if(collection(attr)) {
     // Round CH: an empty key list fails on its first item only after the
@@ -1418,6 +1428,14 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
        (mapping(attr.children[0])||attr.children[0].container==AttributeContainerKind::kList)) {
       (void)case_column();
       fail("TypeError","apply",std::string("unhashable type: '")+(mapping(attr.children[0])?"dict":"list")+"'");
+    }
+    // Round DE: a list or tuple first key builds its Series literal, the
+    // keys resolve, and the dict refuses the List key once a group exists
+    // (probe de/ga2).
+    if(pairs&&!result.once&&attr.children.size()>=2&&sequence_item(attr.children.front())&&std::all_of(attr.children.begin()+1,attr.children.end(),pair_item)){
+      if(const auto error=detail::polars_lit::argument_literal_error(attr.children.front()))fail("TypeError","apply",*error);
+      resolve_pair_keys(source,attr.children,groupnodes);
+      result.pairs=attr.children;return result;
     }
     // Round DC: get_attribute_values with several plain keys (probe dc/ga1).
     if(pairs&&!result.once&&attr.children.size()>=2&&std::all_of(attr.children.begin(),attr.children.end(),pair_item)){
@@ -1445,6 +1463,8 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
 // so a first value paired with several second values is outside the model;
 // each NaN is a key of its own.
 PolarsAttributeCounts pair_counts(const EventTable& source,const CountColumn& col) {
+  // Round DE: a List literal first key cannot key the dict (probe de/ga2).
+  if(sequence_item(col.pairs.front())){if(source.size())fail("TypeError","apply","unhashable type: 'list'");return {};}
   std::vector<std::optional<std::size_t>> at;
   for(const auto& item:col.pairs)at.push_back(text(item)?index_of(source,item.value):std::nullopt);
   const auto value=[&](std::size_t i,std::size_t row){return at[i]?clean_value(cell(source,row,*at[i])):clean_value(col.pairs[i]);};

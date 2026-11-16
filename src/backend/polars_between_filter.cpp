@@ -119,6 +119,11 @@ std::string core_type(const EventAttribute& value) {
   }
   return python_type(value);
 }
+// PyO3's downcast errors print the type's short __name__ ('date', 'datetime').
+std::string pyo3_type(const EventAttribute& v) {
+  const std::string name = core_type(v);
+  return name.rfind("datetime.", 0) == 0 ? name.substr(9) : name;
+}
 
 std::vector<EventAttribute> anchors(const EventAttribute& value) {
   if (!collection(value)) return {value};
@@ -146,7 +151,7 @@ constexpr char kNoActivityColumn = '\x02';
 // (None as 'None', without "object").
 std::string col_item_message(const EventAttribute& item) {
   if (null(item)) return "'None' is not an instance of 'str'";
-  return "'" + python_type(item) + "' object is not an instance of 'str'";
+  return "'" + pyo3_type(item) + "' object is not an instance of 'str'";
 }
 // pl.col of a list or tuple: the first item names its type, a later one is
 // refused by PyO3.

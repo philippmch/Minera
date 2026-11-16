@@ -29138,3 +29138,112 @@ Tests:
   (lt1 and lt2 without the refused calls, 1,034 calls), replayed by the
   `minera_*_dd_*_bank_parity_tests` ctests.
 - 570 tests, all passing.
+
+## Review DE1: re-review of round DD, LTL list keys, second-seed set probes, several-column timestamp keys, fresh seeds (2026-11-16)
+
+Round DE checked DD's CI (run 43929965710 on 92fcffb: green on all six
+jobs), replayed two batches of fresh seeds, took the LTL list-key shapes
+DD left refused, ran second-seed set probes on the three busiest Polars
+table domains and modelled what they found. The device check on the Mac
+was skipped (no device linked).
+
+- **DE1-1 LTL list case keys** (probes `dd/specs/lt1.py`, `lt2.py` and the
+  new `de/specs/lt3.py`, `lt4.py`, `lt5.py`, 12,970 calls on four base
+  frames). Newly modelled in `eventually_follows`: one None beside any
+  number of distinct present names with at most one activity never joins
+  (as DD modelled one name); with two or more activities the None key
+  joins through a `_POLARS_1` null column and the second join repeats
+  `<first name>_right` (`DuplicateError ... already exists`, after a
+  missing window column or a repeated output name); a literal case key
+  with two activities and a timestamp key that is no str repeats
+  `literal`; timestamp keys that are no str follow the str path for a
+  missing window column or repeated names and repeat `literal` from two
+  activities whatever the sign. In `four_eyes_principle`: a repeated
+  resource name in the key, or the resource beside itself, fails
+  `joining with repeated key names; already joined on R and R`; None
+  beside the resource with three or more activities joins the pairs and
+  repeats `<first name>_right` (or `literal_right`). In
+  `attr_value_different_persons` the items are scanned in order: the
+  first one outside {`literal`, the resource, `count`} or the first
+  repeated output name fails, whichever comes first. A timestamp key that
+  is None drops out of the sort (the `untimed` plans). Before and after
+  (against DD's code): lt1 40 -> 16 (twelve calls where the spec passed
+  `A_next_B_next_C` the wrong number of arguments, four declared), lt2
+  440 -> 6, lt3 3,752 -> 21, lt4 828 -> 11, lt5 965 -> 311. Every value
+  difference left is the declared equal-size join order; lt5 keeps 306
+  native refusals of a str item named `literal` (that name meets the
+  key's own Series literal column) and one key with two Nones beside the
+  resource (`already joined on literal and literal`), both listed for DF.
+- **DE1-2 Timestamp filters with keys naming several columns** (set probe
+  set-pltblci-6 case 177, probes `de/ts3.py`-`ts7.py`, probe spec
+  `de/specs/ts6.py`). `pl.col` of a list, tuple, dict or set of names
+  selects as in DD1-1: one name is that column, a repeated name counts
+  once, a missing one fails by name. Several distinct names expand the
+  predicate while the plan converts, before any column resolves: the
+  events and attribute filters fail with each expanded predicate as
+  Python wrote it (the bounds as datetimes whatever the column dtype, the
+  attribute value as its literal: `dyn int: 1`, `"a"`, `null`, a dict as
+  its struct, a list as its Series); a str key beside a several-column
+  one repeats, two several-column keys pair up, or fail `cannot combine
+  selectors that produce a different number of columns (T != A)` (the
+  timestamp count first) when their counts differ, an empty one
+  included. The contained and intersecting filters repeat
+  `first_timestamp` in the aggregation once the case key resolved. Probe
+  ts6 (2,000 calls): 705 differing before, 4 after (the declared
+  equal-size join order).
+- **DE1-3 Trace filters with an empty case key list** (probes ts6, ts7).
+  `group_by([])` resolves its aggregation and the filter before the join
+  finds no keys, so a missing or repeated timestamp column, an empty
+  timestamp selector or a String timestamp column fails first (the plan
+  shows `SELECT [aggregations]`); a Categorical column fails only while
+  the plan runs, so `expected join keys/predicates` comes first there. An
+  empty timestamp selector beside list or literal case keys lists the
+  keys' output names (`["case:concept:name", "literal"]`) and plans the
+  aggregation as `AGGREGATE ... BY [keys]`, or `SELECT [keys]` when no
+  key reads a column.
+- **DE1-4 Case performance with set case keys and several timestamp
+  names** (set probes set-pltblcj-6 and set-pltblci-6 case 185, probe
+  `de/cp1.py`). An empty timestamp selector beside list, set or literal
+  case keys fails on `end_time` with the keys' output names, as DE1-3;
+  several timestamp names repeat `start_time` once the case keys
+  resolved.
+- **DE1-5 PyO3 type names** (set probe set-pltblcj-6 case 249). `pl.col`
+  of a list holding a date or datetime names the item's short type
+  (`'date' object is not an instance of 'str'`, `'datetime' ...`) in the
+  timestamp, attribute, between, case, LTL, paths and variants filters.
+- **DE1-6 `four_eyes_principle` with a set resource key** (set probe
+  set-pltblci-6 cases 163, 194). The first activity's select of `[case,
+  resource]` refuses the set as `pl.lit` does, before the next
+  activity's literal is built.
+- **DE1-7 `get_attribute_values` with a list or tuple first key beside
+  plain ones** (set probe set-pltblcj-6 case 49, probes `de/ga1.py`,
+  `ga2.py`). The first key groups as a List literal (built strictly
+  before the keys resolve), and the dict refuses it (`unhashable type:
+  'list'`) once a group exists; an empty frame returns `{}`.
+- **DE1-8 Second-seed set probes** (`dom/_probe_pltbl{cj,ci,ch}_set_domain.py`,
+  seed 6, 300 cases each): set-pltblcj-6 (16,150 calls) 4 before, 1
+  after; set-pltblci-6 (13,687) 6, 2; set-pltblch-6 (11,993) 4, 4. All
+  seven left are declared below.
+- **DE1-9 Fresh seeds.** Batch 1 (2026112800-11, twelve banks) and batch
+  2 (2026112812-23, twelve banks): 0 differing calls.
+- All 84 docs banks replayed with the final code: 0 mismatches.
+
+Declared:
+- `get_attribute_values` over several keys where a first value pairs with
+  several second values (set-pltblcj-6 case 289, set-pltblci-6 case 99,
+  set-pltblch-6 cases 68 and 287), as in DC.
+- Sets holding NaN iterate in identity-hash order (`paths.apply` with a
+  set of paths, set-pltblch-6 case 126; `attributes.apply_events` with a
+  set of values, case 174), as in DC.
+- A one-item set case key holding a tuple (set-pltblci-6 case 254): List
+  cells, as in DC.
+- The equal-size join order (lt1-lt5, 46 calls; ts6, four calls over a
+  composite case key unique per row), as in DC and DD.
+
+Tests:
+- New: `docs/polars-filter-de-ltl-bank.json.gz` (lt1-lt5 without the
+  refused and declared calls, 12,605 calls) and
+  `docs/polars-filter-de-set-bank.json.gz` (set-pltblcj-6, set-pltblci-6,
+  set-pltblch-6 and ts6 without the declared calls, 43,819 calls),
+  replayed by the `minera_polars_filter_de_*_bank_parity_tests` ctests.
+- 572 tests, all passing.

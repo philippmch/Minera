@@ -120,6 +120,11 @@ std::string core_type(const EventAttribute& value) {
   }
   return python_type(value);
 }
+// PyO3's downcast errors print the type's short __name__ ('date', 'datetime').
+std::string pyo3_type(const EventAttribute& v) {
+  const std::string name = core_type(v);
+  return name.rfind("datetime.", 0) == 0 ? name.substr(9) : name;
+}
 
 
 Dtype dtype(const std::string& value) {
@@ -282,7 +287,7 @@ void validate(const PolarsVariantsFilterOptions& options,bool statistics=false){
   // Round DB: pl.col reads a set's items like a list's.
   if(act.container==AttributeContainerKind::kList||act.container==AttributeContainerKind::kTuple||detail::polars_lit::set_argument(act)){
     if(!act.children.empty()&&!text(act.children.front()))fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(act.children.front())+"'.");
-    for(const auto& item:act.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+python_type(item)+"' object is not an instance of 'str'");
+    for(const auto& item:act.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+pyo3_type(item)+"' object is not an instance of 'str'");
   }
   if(null(options.case_id_key)&&!statistics)fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
 }

@@ -3404,6 +3404,17 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_dd_ltl_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dd-ltl-bank.json.gz")
   set_tests_properties(minera_polars_filter_dd_ltl_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DE: LTL list case keys with None beside several names or the
+  # resource, repeated resource names and literal case keys beside timestamp
+  # keys that are no str (probes lt1-lt5).
+  add_test(NAME minera_polars_filter_de_ltl_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-de-ltl-bank.json.gz")
+  set_tests_properties(minera_polars_filter_de_ltl_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DE: second-seed set probes of the CJ, CI and CH table domains and
+  # the timestamp filters with keys naming several columns (probe ts6).
+  add_test(NAME minera_polars_filter_de_set_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-de-set-bank.json.gz")
+  set_tests_properties(minera_polars_filter_de_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

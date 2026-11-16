@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DD (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–DE (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6096,6 +6096,69 @@ set domains and fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DE re-reviewed DD (Review DE1). DD's commit 92fcffb ran CI run
+43929965710 (green on all six jobs). DE took the LTL list-key shapes DD
+left refused, ran second-seed set probes on the CJ, CI and CH table
+domains, modelled what they found and replayed two batches of fresh
+seeds:
+- LTL list case keys: one None beside several present names in
+  `eventually_follows` (no join up to one activity, a repeated
+  `<first name>_right` from two), literal keys and timestamp keys that
+  are no str repeating `literal`, None as the timestamp key dropping out
+  of the sort; `four_eyes_principle` with a repeated resource (`already
+  joined on R and R`) and None beside the resource from three
+  activities; `attr_value_different_persons` items scanned in order.
+  Probes lt1 40 -> 16, lt2 440 -> 6, lt3 3,752 -> 21, lt4 828 -> 11,
+  lt5 965 -> 311 (306 refusals of a str item named `literal`, one key
+  with two Nones beside the resource; the rest the declared join order).
+- Timestamp filters with keys naming several columns: the events and
+  attribute filters fail with the expanded predicates as Python wrote
+  them (pairs of several-column keys, or `cannot combine selectors`),
+  the trace filters repeat `first_timestamp`; an empty case key list
+  resolves the aggregation and filter before `expected join keys`; an
+  empty timestamp selector names the case keys' output columns. Probe
+  ts6 705 -> 4 of 2,000 (declared order). Case performance: the same
+  for `end_time` with set case keys, `start_time` repeated for several
+  timestamp names.
+- Smaller: PyO3's short type names for date and datetime items in
+  `pl.col` lists, four_eyes refusing a set resource key at the first
+  activity's select, `get_attribute_values` with a list or tuple first
+  key (`unhashable type: 'list'` once a group exists).
+- Set probes (seed 6): CJ table 4 -> 1 of 16,150, CI 6 -> 2 of 13,687,
+  CH 4 -> 4 of 11,993, all seven declared (several-key value pairs, NaN
+  set order, List cells).
+- Fresh seeds 2026112800-11 and 2026112812-23: 0 differing calls.
+
+In the suite: new `docs/polars-filter-de-ltl-bank.json.gz` and
+`docs/polars-filter-de-set-bank.json.gz` with their ctests. The probes,
+set domains and fresh banks are in the project files under
+`review-harness/round-de/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DF) should start by re-reviewing round DE:
+
+- DE's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the LTL list keys still refused (probe `de/specs/lt5.py`): a str item
+  named `literal`, which meets the key's own Series literal column (306
+  calls), and two Nones beside the resource in four_eyes (`already
+  joined on literal and literal`);
+- second-seed set probes on the CK and CN table domains and the CP, CK
+  and CJ sequence domains;
+- the rest of the CU list (equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DD's targets, taken in DE (findings DE1-1 to DE1-9): DD's CI run,
+the fresh seeds, the LTL list-key shapes DD listed and the second-seed
+set probes on CJ, CI and CH. Not taken (carried to DF): the `literal`
+items above, equal-size joins and the older CJ, CF and CD items.
+
+Previous list for round DE (kept for its older items):
 
 Next round (DE) should start by re-reviewing round DD:
 

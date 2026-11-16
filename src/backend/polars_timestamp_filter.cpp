@@ -69,6 +69,11 @@ std::string core_type(const EventAttribute& v) {
   }
   return python_type(v);
 }
+// PyO3's downcast errors print the type's short __name__ ('date', 'datetime').
+std::string pyo3_type(const EventAttribute& v) {
+  const std::string name = core_type(v);
+  return name.rfind("datetime.", 0) == 0 ? name.substr(9) : name;
+}
 std::string quote(const std::string& v) { return '"' + v + '"'; }
 std::string debug_quote(const std::string& v) {
   std::string result = "\"";
@@ -204,10 +209,16 @@ EventAttribute selector(const EventAttribute& value,const std::vector<std::strin
     // Round CL: a first item that is not a str is named as the iterable's type.
     if(!value.children.empty()&&!text(value.children.front()))
       fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(value.children.front())+"'.");
-    for(const auto& item:value.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+core_type(item)+"' object is not an instance of 'str'");
+    for(const auto& item:value.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+pyo3_type(item)+"' object is not an instance of 'str'");
   }
   auto key=keys::col_key(value,columns);
   if(!several&&collection(key)&&!key.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
+  // Round DE: pl.col expands a repeated name once, in its first place.
+  if(collection(key)&&!key.children.empty()){
+    std::vector<EventAttribute> distinct;
+    for(const auto& item:key.children)if(std::none_of(distinct.begin(),distinct.end(),[&](const EventAttribute& d){return d.value==item.value;}))distinct.push_back(item);
+    key.children=std::move(distinct);key.container=AttributeContainerKind::kList;
+  }
   return key;
 }
 namespace groups=detail::polars_group_keys;
@@ -237,8 +248,8 @@ Query prepare(const std::vector<std::string>& columns,Operation op,const EventAt
   if(op==Operation::kAttribute&&(value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple)) {
     try{(void)lit::literal_of(lit::value_of(value));}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.what());}
   }
-  if(op==Operation::kAttribute&&collection(q.attribute)&&!q.attribute.children.empty())throw std::invalid_argument("Native Polars timestamp selector collection outside observed empty-list domain");
-  q.options.timestamp_key=selector(options.timestamp_key,columns);
+  // Round DE: a key naming several columns expands in collect (probes de/ts3-ts5).
+  q.options.timestamp_key=selector(options.timestamp_key,columns,true);
   // The attribute value literal is built before unique(case).
   if(op==Operation::kAttribute&&keys::dict_key(options.case_id_key)&&(value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple)) {
     try{(void)lit::literal_of(lit::value_of(value));}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.what());}
@@ -349,10 +360,13 @@ std::string whole_expr(const Query& q) {
   const auto attribute=attribute_expr(q);
   return time_first(q,attribute)?combined(time,"&",attribute):combined(attribute,"&",time);
 }
+bool empty_case_key(const Query& q){return collection(q.options.case_id_key)&&q.options.case_id_key.children.empty();}
 std::string agg_plan(const EventTable& source,const Query& q) {
   const auto aggs="col("+quote(q.options.timestamp_key.value)+").min().alias(\"first_timestamp\"), col("+quote(q.options.timestamp_key.value)+").max().alias(\"last_timestamp\")";
   // Round CO: a group_by on literals only is planned as a select.
   if(q.keys&&q.keys->all_literal())return "SELECT ["+groups::keys_text(*q.keys)+", "+aggs+"]\n  "+frame_plan(source);
+  // Round DE: group_by([]) is planned as a select of the aggregations too.
+  if(!q.keys&&empty_case_key(q))return "SELECT ["+std::string(aggs)+"]\n  "+frame_plan(source);
   return "AGGREGATE[maintain_order: false]\n  ["+aggs+"] BY ["+(q.keys?groups::keys_text(*q.keys):"col("+quote(q.options.case_id_key.value)+")")+"]\n  FROM\n  "+frame_plan(source);
 }
 std::string struct_plan(const Query& q) {
@@ -397,7 +411,13 @@ std::string missing_prefix(const std::string& key,const std::vector<std::string>
 [[noreturn]] void empty_selector(const EventTable& source,const Query& q,const std::string& phase,bool time) {
   if(!time||q.op==Operation::kEvents||q.op==Operation::kAttribute)
     fail("ComputeError",phase,"The predicate expanded to zero expressions. This may for example be caused by a regex not matching column names or a column dtype match not hitting any dtypes in the DataFrame"+resolved(q.op,frame_plan(source),nodes(q.op)));
-  fail("ColumnNotFoundError",phase,missing_prefix("first_timestamp",{q.options.case_id_key.value})+resolved(q.op,"AGGREGATE[maintain_order: false]\n  [] BY [col("+quote(q.options.case_id_key.value)+")]\n  FROM\n  "+frame_plan(source),{"select","join right","join"}));
+  // Round DE: the aggregation keeps the case keys' output names, a select
+  // when no key reads a column (probe de/ts7).
+  std::vector<std::string> names;std::string by;
+  if(q.keys){for(const auto& item:q.keys->items)names.push_back(item.name);by=groups::keys_text(*q.keys);}
+  else if(!empty_case_key(q)){names.push_back(q.options.case_id_key.value);by="col("+quote(q.options.case_id_key.value)+")";}
+  const auto plan=!q.keys&&!empty_case_key(q)||(q.keys&&!q.keys->all_literal())?"AGGREGATE[maintain_order: false]\n  [] BY ["+by+"]\n  FROM\n  "+frame_plan(source):"SELECT ["+by+"]\n  "+frame_plan(source);
+  fail("ColumnNotFoundError",phase,missing_prefix("first_timestamp",names)+resolved(q.op,plan,{"select","join right","join"}));
 }
 std::string intersect_plan_expr(const Query& q) {
   const auto a="col(\"first_timestamp\")",b="col(\"last_timestamp\")";const auto lo=bound_text(q.low),hi=bound_text(q.high);
@@ -585,6 +605,45 @@ bool attribute_match(const std::optional<EventAttribute>& cell,const std::string
   }
   return false;
 }
+// Round DE: a key selecting several columns (probes de/ts3-ts5, set probe
+// pltblci-6 case 177). The filter predicate expands while the plan
+// converts, as Python wrote it, so before any column resolves: the
+// attribute and events filters fail with the expanded predicates (a str key
+// repeats beside a several-column one, two several-column keys pair up or
+// fail on their counts, the timestamp key's first); the contained and
+// intersecting filters' aggregation repeats first_timestamp once the case
+// key resolved.
+std::size_t expansion(const EventAttribute& key){return collection(key)?key.children.size():1;}
+std::string expanded_name(const EventAttribute& key,std::size_t i){return collection(key)?key.children[i].value:key.value;}
+std::string dsl_value(const EventAttribute& v){
+  if(null(v))return "null";
+  if(dict_value(v))return lit::dict_literal_display(v);
+  if(v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple)return list_display(lit::literal_of(lit::value_of(v)));
+  if(date(v))return lit::scalar_display(lit::value_of(v));
+  return literal(v,true);
+}
+void several_columns(const EventTable& source,const Query& q,const std::string& phase){
+  const auto& time=q.options.timestamp_key;
+  const bool attribute=q.op==Operation::kAttribute;
+  if(q.op==Operation::kContained||q.op==Operation::kIntersecting){
+    if(collection(time)&&time.children.size()>1)
+      fail("DuplicateError",phase,"column with name 'first_timestamp' has more than one occurrence"+resolved(q.op,frame_plan(source),nodes(q.op)));
+    return;
+  }
+  const bool several_time=collection(time)&&time.children.size()>1,several_attribute=attribute&&collection(q.attribute)&&q.attribute.children.size()>1;
+  if(!several_time&&!several_attribute)return;
+  if(attribute&&collection(time)&&collection(q.attribute)&&time.children.size()!=q.attribute.children.size())
+    fail("InvalidOperationError",phase,"cannot combine selectors that produce a different number of columns ("+std::to_string(time.children.size())+" != "+std::to_string(q.attribute.children.size())+")"+resolved(q.op,frame_plan(source),nodes(q.op)));
+  const auto n=std::max(expansion(time),attribute?expansion(q.attribute):std::size_t(1));
+  const auto lo=bound_text(q.low),hi=bound_text(q.high);
+  std::string message="The predicate passed to 'LazyFrame.filter' expanded to multiple expressions: \n\n";
+  for(std::size_t i=0;i<n;++i){
+    const auto t=expanded_name(time,i);
+    const auto low=compare_expr(t,">=",lo),high=compare_expr(t,"<=",hi);
+    message+="\t"+(attribute?combined(combined(compare_expr(expanded_name(q.attribute,i),"==",dsl_value(q.value)),"&",low),"&",high):combined(low,"&",high))+",\n";
+  }
+  fail("ComputeError",phase,message+"This is ambiguous. Try to combine the predicates with the 'all_horizontal' or `any_horizontal' expression."+resolved(q.op,frame_plan(source),nodes(q.op)));
+}
 EventTable collect(const EventTable& source,const Query& query,const std::string& phase) {
   auto q=query;
   source.validate();if(source.index||source.dtypes.size()!=source.columns.size())throw std::invalid_argument("Native Polars timestamp filters require declared dtypes and no dataframe index");
@@ -599,7 +658,6 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
     if(collection(q.options.case_id_key)&&q.options.case_id_key.children.empty())
       fail("InvalidOperationError",phase,"expected join keys/predicates"+resolved(q.op,(q.op==Operation::kAttribute?"UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  ":"")+std::string("DF []; PROJECT */0 COLUMNS"),{"join"}));
   };
-  if(q.op!=Operation::kEvents&&q.op!=Operation::kAttribute)no_join_keys();
   // Round CO: list and literal case keys resolve where a str one does.
   const auto resolve_keys=[&](bool case_key){
     try {
@@ -612,7 +670,7 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   };
   std::optional<std::size_t> case_at;
   if(listed&&q.op!=Operation::kAttribute)resolve_keys(false);
-  if(q.op!=Operation::kEvents&&!listed&&q.op!=Operation::kAttribute)case_at=position(q.options.case_id_key.value);
+  if(q.op!=Operation::kEvents&&!listed&&q.op!=Operation::kAttribute&&!empty_case_key(q))case_at=position(q.options.case_id_key.value);
   std::optional<std::size_t> attr_at;
   // Round DC: a by-name selector (a dict or list naming a missing column)
   // fails while the predicate expands, before the other selector's zero
@@ -620,6 +678,7 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   // dc/tf1).
   if(q.op==Operation::kAttribute&&keys::by_name(q.attribute.value))(void)position(q.attribute.value);
   if(q.op==Operation::kAttribute&&keys::by_name(q.options.timestamp_key.value))(void)position(q.options.timestamp_key.value);
+  if(q.op==Operation::kAttribute||q.op==Operation::kEvents)several_columns(source,q,phase);
   // Round CM: a selector expanding to no column fails before a missing str one.
   if(q.op==Operation::kAttribute&&collection(q.attribute))empty_selector(source,q,phase,false);
   if(q.op==Operation::kAttribute&&collection(q.options.timestamp_key))empty_selector(source,q,phase,true);
@@ -628,6 +687,7 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   // 2026111671 case 343).
   if(q.op==Operation::kAttribute&&keys::by_name(q.options.timestamp_key.value)&&!keys::by_name(q.attribute.value))(void)position(q.options.timestamp_key.value);
   if(q.op==Operation::kAttribute)attr_at=position(q.attribute.value);
+  if(q.op!=Operation::kAttribute)several_columns(source,q,phase);
   if(collection(q.options.timestamp_key))empty_selector(source,q,phase,true);
   const auto time_at=position(q.options.timestamp_key.value);
   q.time_dtype=source.dtypes[time_at];
@@ -651,6 +711,10 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   auto result=source;result.rows.clear();
   // Lazy predicate simplification occurs before comparing the temporal schemas.
   if(q.op!=Operation::kAttribute)time_resolution(source,time_at,q,phase);
+  // Round DE: group_by([]) resolves its aggregation and filter before the
+  // join finds no keys; a Categorical column fails only while it runs
+  // (probes de/ts6, de/ts7).
+  if(q.op==Operation::kContained||q.op==Operation::kIntersecting)no_join_keys();
   if(listed)groups::append_schema(result,*q.keys,source);
   // Literal keys only select one row whatever passed (a Null literal joins
   // nothing), even from an empty window.
