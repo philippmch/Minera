@@ -13,11 +13,12 @@
 namespace minera {
 
 // A Python argument value of the pandas sequence filters: None, bool, int,
-// float, str, list, tuple or dict (entries in insertion order), and the
+// float, str, list, tuple, dict (entries in insertion order) or set (round
+// DA: items in the order Python iterates them; a frozenset reads alike), and the
 // temporal keys of returned dicts: a datetime.datetime (pandas' Timestamp
 // included) or a datetime.date.
 struct PandasFilterValue {
-  enum class Kind { kNone, kBool, kInt, kFloat, kString, kList, kTuple, kDict, kDatetime, kDate };
+  enum class Kind { kNone, kBool, kInt, kFloat, kString, kList, kTuple, kDict, kDatetime, kDate, kSet };
   Kind kind = Kind::kNone;
   bool boolean = false;
   // kDatetime: the wall clock in nanoseconds since 1970-01-01T00:00 (local
@@ -41,6 +42,7 @@ struct PandasFilterValue {
   [[nodiscard]] static PandasFilterValue of(const char* value) { return of(std::string(value)); }
   [[nodiscard]] static PandasFilterValue list(std::vector<PandasFilterValue> values);
   [[nodiscard]] static PandasFilterValue tuple(std::vector<PandasFilterValue> values);
+  [[nodiscard]] static PandasFilterValue set(std::vector<PandasFilterValue> values);
   [[nodiscard]] static PandasFilterValue dict(std::vector<std::pair<PandasFilterValue, PandasFilterValue>> values);
   [[nodiscard]] static PandasFilterValue datetime(std::int64_t wall_nanoseconds,
                                                   std::optional<std::int32_t> offset_minutes = std::nullopt,

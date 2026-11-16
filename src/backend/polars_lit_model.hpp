@@ -379,6 +379,9 @@ inline LitValue lit_value(const Value& v) {
       }
       return {std::move(type), Value::dict(std::move(entries))};
     }
+    // Round DA: a set item is a Polars Object value, outside the model
+    // (carried to round DB).
+    case Kind::kSet: break;
   }
   fail("TypeError", "unsupported list literal item");
 }
@@ -1372,6 +1375,8 @@ inline Value value_of(const EventAttribute& a) {
   if (a.container != AttributeContainerKind::kScalar) {
     std::vector<Value> items;
     for (const auto& child : a.children) items.push_back(value_of(child));
+    // Round DA: a set keeps its kind (pl.lit refuses it, set_literal_error).
+    if (a.container == AttributeContainerKind::kSet || a.container == AttributeContainerKind::kFrozenSet) return Value::set(std::move(items));
     return a.container == AttributeContainerKind::kTuple ? Value::tuple(std::move(items)) : Value::list(std::move(items));
   }
   const auto scalar = python::from_attribute(a);
@@ -1405,7 +1410,15 @@ inline std::vector<Value> python_values(const std::vector<EventAttribute>& cells
   for (const auto& c : cells) out.push_back(python_value(Cell(c), dtype));
   return out;
 }
-// The Literal of a list or tuple argument (a dict: its keys).
+// Round DA: pl.lit of a set (a comparison operand or a whole argument).
+inline const char* const kSetLiteralError =
+    "cannot create expression literal for value of type set.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of "
+    "type Object.";
+inline void set_literal_error(const Value& v) {
+  if (v.kind == Kind::kSet) fail("TypeError", kSetLiteralError);
+}
+// The Literal of a list or tuple argument (a dict: its keys; round DA: a
+// set's items, as is_in takes them).
 inline Literal literal_of(const Value& v) {
   if (v.kind == Kind::kDict) {
     // Round CI: a repeated key once, in its first place (Python's dict).
@@ -1861,6 +1874,7 @@ inline std::string coerced_comparison(const std::string& column, const std::stri
 // the comparison types, as written otherwise.
 inline std::string comparison_plan(const std::string& column, const std::optional<std::string>& dtype, const Value& v,
                                    CompareOp op, const std::vector<std::string>* categories = nullptr) {
+  set_literal_error(v);
   if (dtype && check_scalar(column, *dtype, v, op, categories).ok()) return coerced_comparison(column, *dtype, v, op);
   return "col(" + quote(column) + ") " + op_text(op) + " " + scalar_display(v);
 }

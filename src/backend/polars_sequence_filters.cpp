@@ -34,7 +34,8 @@ bool truthy(const Value& v) {
     case Kind::kFloat: return v.real != 0.0;
     case Kind::kString: return !v.text.empty();
     case Kind::kList:
-    case Kind::kTuple: return !v.items.empty();
+    case Kind::kTuple:
+    case Kind::kSet: return !v.items.empty();
     case Kind::kDict: return !v.entries.empty();
     case Kind::kDatetime:
     case Kind::kDate: return true;
@@ -98,7 +99,8 @@ std::string key_text(const Value* found, std::string_view fallback) {
   }
   // Round CP: pl.col on a list of str selects those names (a list holding
   // anything else fails check_col_list first).
-  if (found->kind == Kind::kList || found->kind == Kind::kTuple) {
+  // Round DA: a set iterates as a list does.
+  if (found->kind == Kind::kList || found->kind == Kind::kTuple || found->kind == Kind::kSet) {
     if (found->items.empty()) return std::string(1, kNoColumnsKey);
     std::string out;
     for (const auto& item : found->items) out += kByNameKey + (item.kind == Kind::kString ? item.text : std::string());
@@ -157,6 +159,7 @@ std::string col_item_type(const Value& v) {
     case Kind::kList: return "list";
     case Kind::kTuple: return "tuple";
     case Kind::kDict: return "dict";
+    case Kind::kSet: return "set";
     case Kind::kDatetime: return "datetime";
     case Kind::kDate: return "date";
   }
@@ -164,7 +167,7 @@ std::string col_item_type(const Value& v) {
 }
 // pl.col on a list: every item a str, or the first item names the type.
 void check_col_list(const Value* key) {
-  if (!key || (key->kind != Kind::kList && key->kind != Kind::kTuple) || key->items.empty()) return;
+  if (!key || (key->kind != Kind::kList && key->kind != Kind::kTuple && key->kind != Kind::kSet) || key->items.empty()) return;
   const auto& first = key->items.front();
   if (first.kind != Kind::kString)
     fail("TypeError", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" +
@@ -299,7 +302,10 @@ std::size_t require_activity(const EventTable& df, const std::string& key, const
 // as one list literal, which pl.lit builds while Python builds the plan (a
 // TypeError when its items mix types); in a sort it is one row long, so the
 // sort fails with a ShapeError when it runs on a frame of any other height.
-bool list_value(const Value* v) { return v && (v->kind == Kind::kList || v->kind == Kind::kTuple); }
+// Round DA: a set key is iterated where a list key is, and refused where the
+// whole list is one pl.lit literal (set_literal_error).
+bool list_value(const Value* v) { return v && (v->kind == Kind::kList || v->kind == Kind::kTuple || v->kind == Kind::kSet); }
+void set_literal_error(const Value& v) { detail::polars_lit::set_literal_error(v); }
 const Value* list_case(const PolarsFilterParameters& p) {
   const auto* v = case_key_value(p);
   return list_value(v) ? v : nullptr;
@@ -737,6 +743,7 @@ std::string py_type(const Value& v) {
     case Kind::kList: return "list";
     case Kind::kTuple: return "tuple";
     case Kind::kDict: return "dict";
+    case Kind::kSet: return "set";
     // Python's messages print the C type name (round CC).
     case Kind::kDatetime: return "datetime.datetime";
     case Kind::kDate: return "datetime.date";
@@ -770,6 +777,11 @@ std::string value_repr(const Value& v) {
       if (v.kind == Kind::kTuple) return "(" + out + (v.items.size() == 1 ? ",)" : ")");
       return "[" + out + "]";
     }
+    case Kind::kSet: {
+      std::string out;
+      for (std::size_t i = 0; i < v.items.size(); ++i) out += (i ? ", " : "") + value_repr(v.items[i]);
+      return v.items.empty() ? "set()" : "{" + out + "}";
+    }
     case Kind::kDict: {
       std::string out;
       for (std::size_t i = 0; i < v.entries.size(); ++i)
@@ -781,14 +793,15 @@ std::string value_repr(const Value& v) {
 }
 // hash(): the first unhashable item's type (a tuple hashes its items).
 std::optional<std::string> unhashable(const Value& v) {
-  if (v.kind == Kind::kList || v.kind == Kind::kDict) return py_type(v);
+  if (v.kind == Kind::kList || v.kind == Kind::kDict || v.kind == Kind::kSet) return py_type(v);
   if (v.kind == Kind::kTuple)
     for (const auto& item : v.items)
       if (auto t = unhashable(item)) return t;
   return std::nullopt;
 }
 bool iterable(const Value& v) {
-  return v.kind == Kind::kString || v.kind == Kind::kList || v.kind == Kind::kTuple || v.kind == Kind::kDict;
+  return v.kind == Kind::kString || v.kind == Kind::kList || v.kind == Kind::kTuple || v.kind == Kind::kDict ||
+         v.kind == Kind::kSet;
 }
 // ------------------------------------------------------------------ boundaries
 
@@ -1201,7 +1214,10 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   // keys (probe cp/k5).
   const auto* list_key = list_case(parameters);
   std::optional<Literal> case_literal;
-  if (list_key) case_literal = list_literal(list_key->items);
+  if (list_key) {
+    set_literal_error(*list_key);
+    case_literal = list_literal(list_key->items);
+  }
   // Round CU (fresh CK bank 2026111806): group_by([case, activity]) builds
   // a dict case key's struct literal; the select by the dict fails once the
   // count filter is built (below).
@@ -1221,7 +1237,10 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   // Round CU (probe u3): the group_by takes the dict as given, also where
   // the activity filter selected its one column by name.
   const auto* raw_act = activity_key_value(raw);
-  if (literal_act && act_value->kind != Kind::kDict) (void)list_literal(act_value->items);
+  if (literal_act && act_value->kind != Kind::kDict) {
+    set_literal_error(*act_value);
+    (void)list_literal(act_value->items);
+  }
   if (raw_act && raw_act->kind == Kind::kDict)
     if (const auto error = detail::polars_lit::dict_literal_error(*raw_act)) fail("TypeError", *error);
   // Round CL: count >= MIN_OCCURRENCES. pl.lit builds a list or dict value
@@ -1229,6 +1248,7 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   // the activity filter (round CR, fresh CK bank 2026111652 case 22).
   const auto minimum = parameter_or(parameters, "MIN_OCCURRENCES", "min_occurrences", Value::of(std::int64_t{2}));
   std::optional<detail::polars_lit::Literal> minimum_list;
+  set_literal_error(minimum);
   if (minimum.kind == Kind::kList) minimum_list = list_literal(minimum.items);
   if (minimum.kind == Kind::kDict)
     if (const auto error = detail::polars_lit::dict_literal_error(minimum)) fail("TypeError", *error);
@@ -1396,7 +1416,10 @@ PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterPara
       // Round CP: a list case key is the sort's list literal (variant
       // filters), then the group_by keys' literals.
       if (list_value(case_value)) {
-        if (checks == KeyChecks::kGrouped) (void)list_literal(case_value->items);
+        if (checks == KeyChecks::kGrouped) {
+          set_literal_error(*case_value);
+          (void)list_literal(case_value->items);
+        }
         (void)gk::build_values(case_value->items);
       }
       check_col_list(activity_value);
@@ -1424,7 +1447,8 @@ PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterPara
     // grouping (the other filters group and sort by a list case key as a
     // literal).
     const bool activity = p.enum_member ? p.key == "ACTIVITY_KEY" : p.key == kPolarsFilterActivityKeyParameter;
-    const bool by_list = (checks == KeyChecks::kColumns || activity) && (p.value.kind == Kind::kList || p.value.kind == Kind::kTuple);
+    const bool by_list = (checks == KeyChecks::kColumns || activity) &&
+                         (p.value.kind == Kind::kList || p.value.kind == Kind::kTuple || p.value.kind == Kind::kSet);
     if (!key || (p.value.kind != Kind::kDict && !by_list)) continue;
     const auto names = by_names(key_text(&p.value, ""));
     if (names.size() == 1 && find_column(df, names.front())) p.value = Value::of(names.front());
@@ -1474,13 +1498,20 @@ PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
     const std::optional<PolarsFilterValue>& most_common_variant) {
   const Counts counts = ea_count0 ? ea_count0->entries : end_counts(df, case_id_glue, activity_key);
   const auto threshold = number_of(nocc);
-  if (!threshold) fail("TypeError", "'>=' not supported between instances of 'int' and 'NoneType'");
-  const Value* protected_end = most_common_variant && truthy(*most_common_variant) ? &most_common_variant->items.back()
-                                                                                    : nullptr;
+  // Round DA: each count is compared with nocc (none without a count); a
+  // count below it reads the variant's last activity, which a set cannot
+  // index.
+  if (!threshold && !counts.empty())
+    fail("TypeError", "'>=' not supported between instances of 'int' and '" + py_type(nocc) + "'");
+  const bool set_variant = most_common_variant && most_common_variant->kind == Kind::kSet && truthy(*most_common_variant);
+  const Value* protected_end = most_common_variant && truthy(*most_common_variant) && !set_variant
+                                   ? &most_common_variant->items.back()
+                                   : nullptr;
   Counts kept;
   for (const auto& entry : counts) {
     const auto count = number_of(entry.second);
     const bool ok = count && at_least(*count, *threshold);
+    if (!ok && set_variant) fail("TypeError", "'set' object is not subscriptable");
     const bool keep_end = protected_end && same_key(entry.first, *protected_end);
     if (ok || keep_end) kept.push_back(entry);
   }
@@ -1953,6 +1984,14 @@ EventTable polars_suffix_filter_apply(const EventTable& df, const PolarsFilterVa
                                       const PolarsFilterParameters& raw_parameters) {
   const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
   return list_filter(df, suffixes, parameters, true);
+}
+
+void polars_check_filter_parameters_carrier(const PolarsFilterValue& parameters, bool reads_get) {
+  if (parameters.kind == Kind::kNone || parameters.kind == Kind::kDict) return;
+  if (parameters.kind != Kind::kSet)
+    throw std::invalid_argument("Polars filter parameters other than a dict, None or a set are outside the captured native domain");
+  if (!parameters.items.empty()) fail("TypeError", "'set' object is not subscriptable");
+  if (reads_get) fail("AttributeError", "'set' object has no attribute 'get'");
 }
 
 EventTable polars_rework_filter_apply(const EventTable& df, const PolarsFilterParameters& raw_parameters) {

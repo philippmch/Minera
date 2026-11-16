@@ -285,8 +285,10 @@ EventAttribute to_attribute(const Json& node, std::string key = {}) {
       out.typed_value = signed_value;
     else if (const auto u = std::from_chars(first, last, unsigned_value); u.ec == std::errc{} && u.ptr == last)
       out.typed_value = unsigned_value;
-    else
-      throw std::runtime_error("integer argument outside the UInt64 range: " + value.text);
+    // Round DA: past the UInt64 range (an Int128 literal) the int keeps only
+    // its decimal text.
+    else if (value.text.find_first_not_of("-0123456789") != std::string::npos)
+      throw std::runtime_error("integer argument is not decimal: " + value.text);
   } else if (tag == "f") {
     const double number = hex_bits(value.text);
     out.value = shortest(number);
@@ -305,8 +307,9 @@ EventAttribute to_attribute(const Json& node, std::string key = {}) {
     out.value = text;
     // A Python datetime carries no native payload.
     out.kind = AttributeKind::kDate;
-  } else if (tag == "l" || tag == "t") {
-    out.container = tag == "l" ? AttributeContainerKind::kList : AttributeContainerKind::kTuple;
+  } else if (tag == "l" || tag == "t" || tag == "S") {
+    // Round DA: a set lists its items in the order Python iterates them.
+    out.container = tag == "l" ? AttributeContainerKind::kList : tag == "S" ? AttributeContainerKind::kSet : AttributeContainerKind::kTuple;
     for (const auto& item : value.items) out.children.push_back(to_attribute(item, std::to_string(out.children.size())));
   } else if (tag == "m") {
     out.container = AttributeContainerKind::kContainer;
@@ -418,8 +421,8 @@ void check_cells(const EventTable& table) {
     }
 }
 
-Json table_node(const EventTable& table) {
-  check_cells(table);
+Json table_node(const EventTable& table, bool check = true) {
+  if (check) check_cells(table);
   if (std::none_of(table.categorical_dtypes.begin(), table.categorical_dtypes.end(),
                    [](const auto& c) { return c.has_value(); }) && !table.categorical_dtypes.empty()) {
     auto plain = table;
@@ -434,7 +437,9 @@ Json table_node(const LazyEventTable& table) { return table_node(table.materiali
 // through the native carrier's canonical serialization.
 Json normalized(const Json& node) {
   if (node.kind == Json::kObject && node.fields.size() == 1 && node.fields.begin()->first == "table")
-    return table_node(parse_event_table_json(serialize(node.fields.begin()->second)));
+    // Round DA: an expected frame can hold list cells (a set probe's List
+    // column); only native results are checked for cells the capture refuses.
+    return table_node(parse_event_table_json(serialize(node.fields.begin()->second)), false);
   Json out = node;
   for (auto& item : out.items) item = normalized(item);
   for (auto& [key, item] : out.fields) item = normalized(item);

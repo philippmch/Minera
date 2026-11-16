@@ -267,8 +267,9 @@ PandasFilterValue value_of(const Json& node) {
   if (tag == "s") return PandasFilterValue::of(v.text);
   if (tag == "w" || tag == "date") return temporal_of(tag, v);
   std::vector<PandasFilterValue> items;
-  if (tag == "l" || tag == "t") {
+  if (tag == "l" || tag == "t" || tag == "S") {
     for (const auto& item : v.items) items.push_back(value_of(item));
+    if (tag == "S") return PandasFilterValue::set(std::move(items));
     return tag == "l" ? PandasFilterValue::list(std::move(items)) : PandasFilterValue::tuple(std::move(items));
   }
   if (tag == "m") {
@@ -335,10 +336,11 @@ Json typed_value(const PandasFilterValue& v) {
     case K::kDatetime: return datetime_node(v);
     case K::kDate: return typed("date", pandas_filter_value_str(v));
     case K::kList:
-    case K::kTuple: {
+    case K::kTuple:
+    case K::kSet: {
       std::vector<Json> items;
       for (const auto& item : v.items) items.push_back(typed_value(item));
-      return jtagged(v.kind == K::kList ? "l" : "t", jarray(std::move(items)));
+      return jtagged(v.kind == K::kList ? "l" : v.kind == K::kSet ? "S" : "t", jarray(std::move(items)));
     }
     case K::kDict: {
       std::vector<Json> items;
@@ -394,7 +396,8 @@ bool python_truth(const PandasFilterValue& v) {
     case K::kFloat: return v.real != 0.0;
     case K::kString: return !v.text.empty();
     case K::kList:
-    case K::kTuple: return !v.items.empty();
+    case K::kTuple:
+    case K::kSet: return !v.items.empty();
     case K::kDict: return !v.entries.empty();
     default: return true;
   }

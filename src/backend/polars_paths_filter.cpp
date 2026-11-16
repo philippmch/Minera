@@ -6,6 +6,7 @@
 #include "polars_float_text.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_key_selection.hpp"
+#include "polars_group_keys.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -494,6 +495,78 @@ bool bound_matches(std::int64_t value, const EventAttribute& bound, bool upper) 
   const auto limit = number(bound); if (std::isnan(limit)) return upper;
   return upper ? static_cast<double>(value) <= limit : static_cast<double>(value) >= limit;
 }
+// Round DA (probe d1): a list case key naming one column several times
+// resolves every filter and fails at the select of the case ids
+// (pl.col of the names, twice the same output name). The plan shows the
+// path filter (is_in of the path strings, or == and the two duration
+// bounds as separate filters) over both with_columns, the over() listing
+// every item of the key.
+std::string bound_filter(const EventAttribute& bound, bool upper) {
+  namespace lit = detail::polars_lit;
+  const std::string column = "col(\"@@duration\")", op = upper ? " <= " : " >= ";
+  if (null(bound)) return "null.repeat([col(\"@@duration\").len()])";
+  // A dict bound casts the duration to its struct (fields typed as with
+  // the Int64 duration), a list bound is its list literal (probe d2).
+  if (mapping(bound)) {
+    const auto m = lit::struct_model(bound, "Int64");
+    return (m.cast_column ? lit::struct_cast_text("@@duration", m) : column) + op + lit::struct_display(m);
+  }
+  if (collection(bound)) return column + op + lit::literal_list_display(lit::argument_literal(bound));
+  if (date(bound)) return column + op + std::to_string(date_micros(bound));
+  // An int past the UInt64 range (or below Int64's) is an Int128 literal the
+  // simplifier folds against the Int64 duration.
+  if (integer(bound) && !boolean(bound)) {
+    const TokenInteger x(std::string_view(bound.value));
+    const TokenInteger low(std::numeric_limits<std::int64_t>::min()), high(std::string_view("18446744073709551615"));
+    if (x < low || high < x) {
+      const bool above = high < x;
+      return std::string("when(col(\"@@duration\").is_not_null()).then(") + ((upper ? above : !above) ? "true" : "false") + ").otherwise(null)";
+    }
+  }
+  return lit::comparison_plan("@@duration", std::string("Int64"), lit::value_of(bound), upper ? lit::CompareOp::kLe : lit::CompareOp::kGe);
+}
+[[noreturn]] void repeated_case_name(const EventTable& source, const std::vector<std::string>& paths, bool performance, const PolarsPathsFilterOptions& options, const std::string& name, const std::string& phase) {
+  namespace lit = detail::polars_lit;
+  const auto key = quote(name), activity = quote(options.attribute_key.value), time = quote(options.timestamp_key.value);
+  std::string over;
+  for (std::size_t i = 0; i < options.case_id_key.children.size(); ++i) over += std::string(i ? ", " : "") + "col(" + key + ")";
+  const auto at = std::find(source.columns.begin(), source.columns.end(), options.attribute_key.value);
+  const auto dtype = at == source.columns.end() || source.dtypes.size() != source.columns.size() ? std::string("String") : source.dtypes[static_cast<std::size_t>(at - source.columns.begin())];
+  const std::string cast = dtype == "String" ? "" : dtype == "Null" ? ".cast(String)" : ".strict_cast(String)";
+  std::string path_column = "when(col(\"case_next\") == col(" + key + ")).then(col(" + activity + ")" + cast + ".str.concat_horizontal([\",\", col(\"next_activity\")" + cast + "])).otherwise(null.cast(String)).alias(\"@@path\")";
+  std::string shifted = "col(" + key + ").alias(\"case_next\"), col(" + activity + ").shift([dyn int: -1]).over([" + over + "]).alias(\"next_activity\")";
+  if (performance) {
+    path_column += ", when(col(\"case_next\") == col(" + key + ")).then(((col(\"next_timestamp\") - col(" + time + "))).dt.total_seconds()).otherwise(null.cast(Int64)).alias(\"@@duration\")";
+    shifted += ", col(" + time + ").shift([dyn int: -1]).over([" + over + "]).alias(\"next_timestamp\")";
+  }
+  const std::string body = " WITH_COLUMNS:\n [" + path_column + "] \n   WITH_COLUMNS:\n   [" + shifted + "] \n    SORT BY [" + case_sort(options) + ", col(" + time + ")]\n      " + frame_plan(source);
+  std::vector<std::string> filters;
+  if (performance) {
+    filters = {"col(\"@@path\") == " + quote(paths.front()), bound_filter(options.min_performance, false), bound_filter(options.max_performance, true)};
+  } else if (paths.empty()) {
+    filters = {"false.alias(\"@@path\")"};
+  } else {
+    EventAttribute list{"", "", AttributeKind::kString};
+    list.container = AttributeContainerKind::kList;
+    for (const auto& path : paths) list.children.push_back(EventAttribute{"", path, AttributeKind::kString});
+    filters = {"col(\"@@path\").is_in([" + lit::literal_list_display(lit::argument_literal(list)) + "])"};
+  }
+  // The filters nest from the last (outermost) to the first, each one's
+  // input indented two more spaces.
+  std::string plan = body;
+  for (const auto& filter : filters) {
+    std::string indented;
+    for (std::size_t i = 0, start = 0; start <= plan.size(); ++i) {
+      const auto end = plan.find('\n', start);
+      indented += "  " + plan.substr(start, end == std::string::npos ? std::string::npos : end - start);
+      if (end == std::string::npos) break;
+      indented += '\n';
+      start = end + 1;
+    }
+    plan = "FILTER " + filter + "\nFROM\n" + indented;
+  }
+  fail("DuplicateError", phase, detail::polars_group_keys::duplicate_message(name, "projections") + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n" + plan + contexts({"select", "unique", "join right", "join", "select"}));
+}
 EventTable collect(const EventTable& source, const std::vector<std::string>& paths, bool performance, const PolarsPathsFilterOptions& options, const SortLiteral& literal, const std::string& phase) {
   source.validate();
   if (source.index || source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars paths require declared dtypes and no dataframe index");
@@ -526,9 +599,12 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
            "Resolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n" +
                sort_plan(source, options, literal) + contexts({"with_columns", "with_columns", "join left", "join", "select"}));
     // A repeated name selects its column once in the with_columns and twice
-    // in the final select (a DuplicateError whose plan is not modelled).
-    if (names.size() != options.case_id_key.children.size())
-      throw std::invalid_argument("Native Polars path selector outside observed domain: a repeated name in a list case key");
+    // in the final select: round DA models the DuplicateError and its plan
+    // (probe d1; the CU leftover), on str timestamp keys.
+    if (names.size() != options.case_id_key.children.size()) {
+      if (literal) throw std::invalid_argument("Native Polars path selector outside observed domain: a repeated name beside a literal sort key");
+      repeated_case_name(source, paths, performance, options, names.front(), phase);
+    }
     case_at = position(names.front(), true);
     if (literal && !performance) time_at = case_at;
   }

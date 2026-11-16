@@ -209,20 +209,30 @@ std::size_t direct_column(const EventTable& source,const EventAttribute& key){
  if(key.container==AttributeContainerKind::kList)check_list_columns(source,key);
  error("KeyError",key_repr(key));
 }
-std::size_t case_column(const EventTable& source,const EventAttribute& key){
+// set_index(key) as pandas checks it: list items that are lists are arrays,
+// every other item a label; the labels missing from the columns fail first
+// (KeyError naming only them), then each array whose length is not the
+// frame's. Round DA: pm4py sets the index of the whole frame first and then
+// of the filtered rows (`second`), so an array the length of the whole frame
+// fails on the filtered one (fresh CK bank 2026112409 case 409).
+std::size_t case_column(const EventTable& source,const EventAttribute& key,std::optional<std::size_t> second=std::nullopt){
  if(empty_list(key))error("ValueError","Length mismatch: Expected axis has "+std::to_string(source.size())+" elements, new values have 0 elements");
  if(const auto found=column(source,key))return *found;
  detail::pandas_check_set_index_key(key,error);
- // Round CR: list items that are lists are arrays; with no column name
- // missing, set_index then checks their lengths (fresh CK bank 2026111653
- // case 182).
- if(key.container==AttributeContainerKind::kList&&!key.is_null&&!key.children.empty()&&
-    std::all_of(key.children.begin(),key.children.end(),[](const EventAttribute& c){return !c.is_null&&c.container==AttributeContainerKind::kList;})){
+ if(key.container==AttributeContainerKind::kList&&!key.is_null&&!key.children.empty()){
+  const auto array=[](const EventAttribute& c){return !c.is_null&&c.container==AttributeContainerKind::kList;};
+  std::string absent;
   for(const auto& child:key.children)
-   if(child.children.size()!=source.size())error("ValueError","Length mismatch: Expected "+std::to_string(source.size())+" rows, received array of length "+std::to_string(child.children.size()));
-  error("ValueError","case keys given as arrays are outside the captured native domain");
+   if(!array(child)&&!column(source,child))absent+=(absent.empty()?"":", ")+key_repr(child);
+  if(!absent.empty())error("KeyError",string_key_repr("None of ["+absent+"] are in the columns"));
+  for(const auto rows:{std::optional<std::size_t>(source.size()),second}){
+   if(!rows)continue;
+   for(const auto& child:key.children)
+    if(array(child)&&child.children.size()!=*rows)error("ValueError","Length mismatch: Expected "+std::to_string(*rows)+" rows, received array of length "+std::to_string(child.children.size()));
+  }
+  error("ValueError","case keys given as arrays or several columns are outside the captured native domain");
  }
- error("KeyError",string_key_repr("None of ["+repr(key)+"] are in the columns"));
+ error("KeyError",string_key_repr("None of ["+key_repr(key)+"] are in the columns"));
 }
 const EventAttribute& cell(const EventTable& source,std::size_t row,std::size_t col){
  static const EventAttribute none{"","",AttributeKind::kString,true};
@@ -287,8 +297,8 @@ bool isin(const EventTable& source,std::size_t col,const EventAttribute& value,c
 // Round CT: alive marks the cells a DataFrame.where kept; a selected row
 // whose case cell it dropped holds a NaN case id, which Index.isin matches
 // with every missing case id (an object index only with NaN).
-EventTable project_cases(const EventTable& source,const EventAttribute& case_key,const std::vector<bool>& selected,bool positive,const std::vector<std::vector<char>>* alive=nullptr){
- const auto cases=case_column(source,case_key);std::unordered_set<std::string> ids;bool nan=false;
+EventTable project_cases(const EventTable& source,const EventAttribute& case_key,const std::vector<bool>& selected,bool positive,const std::vector<std::vector<char>>* alive=nullptr,bool row_subset=false){
+ const auto cases=case_column(source,case_key,row_subset?std::optional<std::size_t>(static_cast<std::size_t>(std::count(selected.begin(),selected.end(),true))):std::nullopt);std::unordered_set<std::string> ids;bool nan=false;
  for(std::size_t i=0;i<source.size();++i)if(selected[i]){if(alive&&!alive->empty()&&!(*alive)[i][cases])nan=true;else ids.insert(identity(cell(source,i,cases)));}
  // Index.isin on a masked numeric index (Int64, Float64, ...) never matches
  // a <NA> label, even when the selected cases hold one (round BZ).
@@ -314,7 +324,7 @@ EventTable values_filter(const EventTable& source,const EventAttribute& values,c
  const bool positive=truth(options.positive),keep_nan=truth(options.keep_nan_values);
  std::vector<bool> selected(source.size());
  for(std::size_t i=0;i<source.size();++i){const auto& v=cell(source,i,attribute);const bool match=isin(source,attribute,v,admitted);selected[i]=events?((match||(keep_nan&&missing(v)))==positive):(match||(keep_nan&&missing(v)));}
- return events?subset(source,selected):project_cases(source,options.case_id_key,selected,positive);
+ return events?subset(source,selected):project_cases(source,options.case_id_key,selected,positive,nullptr,true);
 }
 EventAttribute float32_bound(const EventAttribute& bound){
  if(!numeric(bound)||missing(bound))return bound;
@@ -460,7 +470,7 @@ EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,c
   }
   return project_cases(source,options.case_id_key,selected,positive,&alive);
  }
- return events?subset(source,selected):project_cases(source,options.case_id_key,selected,positive);
+ return events?subset(source,selected):project_cases(source,options.case_id_key,selected,positive,nullptr,true);
 }
 PandasAttributesCountMap counts(const EventTable& source,const EventAttribute& key){
  if(empty_list(key))error("ValueError","No group keys passed!");

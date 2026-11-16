@@ -168,6 +168,8 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
   }
   if (op == Operation::kCount && !null(bound)) {
     if (text(bound)) fail("TypeError", "apply", "'<' not supported between instances of 'str' and 'int'");
+    // Round DA: head(n) compares a set with 0.
+    if (bound.container == AttributeContainerKind::kSet) fail("TypeError", "apply", "'<' not supported between instances of 'set' and 'int'");
     if (!integer(bound) && !boolean(bound)) fail("TypeError", "apply", "'" + core_type(bound) + "' object cannot be interpreted as an integer");
     if (exact(bound) < TokenInteger(0)) fail("ValueError", "apply", "negative slice lengths (" + exact(bound).decimal() + ") are invalid for LazyFrame");
   }

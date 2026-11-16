@@ -28639,3 +28639,111 @@ Tests:
   empty-side skips, the overlap, not-unique and suffix errors, the frame
   columns of a CSV header with a byte-order mark, blank lines and repeated
   names), each checked against pm4py first.
+
+## Review DA1: re-review of round CZ, sets in the sequence filters, paths list case keys repeating a name, fresh seeds (2026-11-16)
+
+Round DA checked CZ's CI (run 43864008901 on d64f45e: green on all six
+jobs), replayed two batches of fresh seeds of every filter
+domain, gave the sequence filters' value model a set kind and took the CU
+item on paths list case keys. The device check on the Mac was skipped (no
+device linked). No upload route was left whose side file pm4py reads with
+another reader than Minera's (CZ's survey stands; the OCEL and streaming
+routes have their own readers).
+
+- **DA1-1 Sets and frozensets in the pandas sequence filters**
+  (`PandasFilterValue::Kind::kSet`, the bank codec's `S` tag decoded as a
+  set in both sequence drivers). Probe banks set-pdseq-1 and set-pdseq-2
+  (the CC domain with sets put into values, list items and parameters,
+  13,544 calls) differed on 2,288 calls before; after, 0:
+  - `isin` takes a set as a list in its iteration order; `in` a set
+    (`activity_split`) hashes like `in` a dict's keys;
+  - a column compares a set like a dict of its length (pandas' length,
+    0-d and buffer errors per dtype family);
+  - `groupby(set)` maps the index labels through the set as a function
+    (`'set' object is not callable`; on an empty frame nothing is mapped
+    and no group forms; a set item of a list key fails after the str
+    items before it); `df.groupby(...)[set]` and a list holding a set do
+    not hash; `df[set]` is refused as an indexer; `set_index` names
+    `<class 'set'>`;
+  - `timestamp_case_grouping`: two plain keys on a two-row frame are
+    looked up as columns first (a set does not hash), a key that is not a
+    column makes the key list one array grouper whose set item fails
+    `first()`/`last()`;
+  - a set parameters carrier: a non-empty one cannot be indexed by its
+    keys (`'set' object is not subscriptable`), an empty one reads as no
+    parameters; `filter_df_on_end_activities_nocc` indexes a set
+    `most_common_variant` as soon as a count is below `nocc`.
+  Found on the way (probe `probe2/prec.py`): `starts_with`, `ends_with`
+  and `traces` read a plain `pm4py:param:case_id_key` or
+  `pm4py:param:activity_key` before the Parameters member of the same
+  value (their POSITIVE reads the member first); Minera read the member
+  first everywhere.
+- **DA1-2 Sets in the Polars filters, first pass.** In the Polars sequence
+  filters a set key goes through `pl.col` like a list key and is refused
+  where pm4py hands the whole key to `pl.lit` (`cannot create expression
+  literal for value of type set.`), as is a set `MIN_OCCURRENCES`; a set
+  carrier fails `'set' object is not subscriptable` (empty: no
+  parameters, except `parameters.get` in the trace and ends_with filters);
+  `nocc` compares each count with a non-number (none without a count); a
+  set `filter_df_on_end_activities` glue or activity key groups as the
+  CASE_ID_KEY/ACTIVITY_KEY parameter. Probe set-plseq-1 (the CH domain,
+  6,603 calls): 649 differing calls before, 346 after. In the Polars table
+  filters a set comparison operand is refused as a literal and `head(n)`
+  compares a set with 0; probe set-pltbl-1 (the CJ domain, 16,185 calls):
+  2,041 before, 1,996 after. The calls Minera matches are bound
+  (`docs/polars-sequence-filter-da-bank.json.gz`, 6,257 calls;
+  `docs/polars-filter-da-set-bank.json.gz`, 11,600 calls).
+- **DA1-3 Paths filter list case keys repeating a name** (the CU item,
+  `polars_paths_filter.cpp`). pm4py fails at the select of the case key
+  with `DuplicateError` and the whole filter plan: the path and duration
+  `WITH_COLUMNS` over the shifted columns, the sort by the case keys and
+  the timestamp, and the path, duration-bound or `is_in` filters with
+  their literals (an out-of-range int bound as Polars folds it). Probes d1
+  and d2 (3,164 calls): 0 differing.
+- **DA1-4 Fresh seeds.** Batch 1 (2026112400-11) found three calls:
+  - Polars CK 2026112401 case 349: `filter_traces_attribute_in_timeframe`
+    resolves the time window before selecting the case key, so a String
+    timestamp column fails before a missing or repeated case key
+    (`polars_timestamp_filter.cpp`);
+  - pandas CK 2026112409 case 409: `set_index` with a list case key holding
+    arrays names only the missing labels, then checks each array against
+    the whole frame and only then against the filtered rows
+    (`filter_df_on_attribute_values`, `apply_numeric`;
+    `pandas_attributes_filter.cpp`);
+  - pandas sequence CK 2026112410 case 837: `pd.NA == None` (or a list,
+    tuple, dict or set) is False, so a `boolean` or `string` activity's
+    missing boundary meets such a `most_common_variant` without the
+    ambiguous-NA error (`pandas_sequence_filters.cpp`).
+  Batch 2 (2026112412-23) found one: Polars CK 2026112413 case 442,
+  `filter_df_relative_occurrence_event_attribute` keeping once per case
+  with a None attribute key beside a dict case key groups by two literals,
+  whose duplicate name is `literal` (`polars_attributes_filter.cpp`).
+
+Declared (carried to round DB):
+- Lists holding a set as Polars builds them with `pl.lit`/`pl.Series`
+  (`not yet implemented: Nested object types`, `failed to determine
+  supertype of X and object` / `of object and X`, the String builder's
+  `found value of type Object: ...`; probe `probe2/objlit.py` has the
+  pairs), set bounds of the Polars numeric, case-size and case-performance
+  comparisons, set timestamp keys in the sort lists of the Polars variant
+  filters and set keys in the Polars table filters' selectors: the rest of
+  the two Polars set probes.
+- The Polars sequence keyword helpers (`get_variants_df`,
+  `get_end_activities`, `filter_df_on_end_activities_nocc`) take str keys
+  natively; their set-key calls are outside the native API.
+- `filter_variants_top_k` with several key names on a one-row frame whose
+  second column is a List, Struct, Binary, Decimal, Duration or Time column
+  (pm4py's `DuplicateError` with the join's plan) stays declared.
+
+Tests:
+- New: `docs/pandas-sequence-filter-da-bank.json.gz` (set-pdseq-1 and -2,
+  pandas sequence CK 2026112410 case 837; 13,556 calls),
+  `docs/pandas-filter-da-bank.json.gz` (pandas CK 2026112409 case 409),
+  `docs/polars-filter-da-bank.json.gz` (probes d1, d2, Polars CK 2026112401
+  case 349, CK 2026112413 case 442; 3,272 calls),
+  `docs/polars-filter-da-set-bank.json.gz` and
+  `docs/polars-sequence-filter-da-bank.json.gz` (above), replayed by the
+  `minera_*_da_bank_parity_tests` and
+  `minera_polars_filter_da_set_bank_parity_tests` ctests. The Polars table
+  bank driver keeps an integer argument past the UInt64 range as its
+  decimal text and no longer refuses list cells in expected frames.

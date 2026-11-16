@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CZ (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–DA (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5907,6 +5907,72 @@ under `review-harness/round-cz/`.
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DA re-reviewed CZ (Review DA1). CZ's commit d64f45e ran CI run
+43864008901 (green on all six jobs). DA replayed two batches of fresh
+seeds, gave the sequence filters' value model a set kind and took the
+paths list case keys repeating a name:
+- Sets and frozensets in the pandas sequence filters
+  (`PandasFilterValue::Kind::kSet`, `S` decoded as a set in both sequence
+  drivers): `isin` lists a set, `in` hashes it, columns compare it like a
+  dict, `groupby` calls it on the labels, indexers and hashes refuse it,
+  a set carrier cannot be indexed. Probes set-pdseq-1/-2: 2,288 of 13,544
+  calls differed before, 0 after. Also: `starts_with`, `ends_with` and
+  `traces` read the plain case and activity keys before the enum member.
+- Sets in the Polars filters, first pass: set keys through `pl.col` like
+  lists, refused where pm4py hands them to `pl.lit`; set carriers; `nocc`
+  against non-numbers; set comparison operands and `head(n)` bounds.
+  Probes: Polars sequence 649 -> 346 of 6,603 (126 of them the keyword
+  helpers, which take str keys natively), Polars table 2,041 -> 1,996 of
+  16,185; the matching calls are bound.
+- Paths filter list case keys repeating a name: pm4py's `DuplicateError`
+  with the whole filter plan, modelled (`repeated_case_name`); probes d1/d2
+  3,164 calls, 0 differing.
+- Fresh seeds 2026112400-11 found three calls (Polars CK timeframe window
+  before the case key, pandas CK `set_index` array checks on the whole
+  frame then the filtered rows, pandas sequence CK `pd.NA == None` False),
+  2026112412-23 one (Polars CK two literal group keys named `literal`);
+  all fixed.
+- Declared: lists holding a set in `pl.lit`/`pl.Series`, set comparison
+  bounds and timestamp keys in the Polars filters (the rest of the two
+  Polars set probes), the keyword helpers' set keys, and
+  `filter_variants_top_k` one-row second columns.
+
+In the suite: new `docs/pandas-sequence-filter-da-bank.json.gz`,
+`docs/pandas-filter-da-bank.json.gz`, `docs/polars-filter-da-bank.json.gz`,
+`docs/polars-filter-da-set-bank.json.gz` and
+`docs/polars-sequence-filter-da-bank.json.gz` with their ctests. The
+probes, set domains and fresh banks are in the project files under
+`review-harness/round-da/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DB) should start by re-reviewing round DA:
+
+- DA's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the rest of the Polars set probes (`review-harness/round-da/`,
+  `tools/setcap.sh plseq|pltbl`): lists holding a set as `pl.lit` builds
+  them (`probe2/objlit.py`: `Nested object types`, the supertype pairs
+  with `object`, the String builder's `found value of type Object`), set
+  bounds of the numeric, case-size and case-performance comparisons, set
+  timestamp keys in the variant filters' sort lists, set keys in the
+  table filters' selectors; then fresh set probes of the pandas table
+  and LTL domains;
+- the rest of the CU list (`filter_variants_top_k` one-row second
+  columns, LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CZ's targets, taken in DA (findings DA1-1 to DA1-4): CZ's CI run,
+the fresh seeds, sets in the sequence filters (pandas complete, Polars
+first pass) and the paths list case keys repeating a name. No upload
+route was left for the side-file readers item. Not taken (carried to DB):
+the rest of the Polars set probes and of the CU list.
+
+Previous list for round DA (kept for its older items):
 
 Next round (DA) should start by re-reviewing round CZ:
 

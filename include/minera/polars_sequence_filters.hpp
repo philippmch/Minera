@@ -97,6 +97,13 @@ struct PolarsEndActivitiesNocc {
 [[nodiscard]] EventTable polars_ends_with_filter_get_variants_df(const EventTable& df,
                                                                  const std::string& case_id_key = "case:concept:name",
                                                                  const std::string& activity_key = "concept:name");
+// Round DA: a parameters argument that is a set. Each module first reads
+// every key as parameters[k], which a non-empty set cannot index
+// (PolarsSequenceFilterError TypeError); an empty set reads as no
+// parameters, except where the module calls parameters.get (the trace and
+// ends_with filters, `reads_get`: AttributeError). Other carriers than a
+// dict, None or a set are outside the captured domain (std::invalid_argument).
+void polars_check_filter_parameters_carrier(const PolarsFilterValue& parameters, bool reads_get = false);
 // trace_filter: the variant equals a ",".join of an admitted trace, where a
 // "..." activity stands for any run of activities; an empty admitted list
 // admits every case. The admitted case ids are joined back as a Python list.

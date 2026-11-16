@@ -273,6 +273,9 @@ PandasFilterValue value_of(const Json& node) {
   std::vector<PandasFilterValue> items;
   if (tag == "l" || tag == "t" || tag == "S") {
     for (const auto& item : v.items) items.push_back(value_of(item));
+    // Round DA: a set keeps its kind (apply_activity_set's set argument is
+    // replayed in each order as a list).
+    if (tag == "S") return PandasFilterValue::set(std::move(items));
     return tag == "t" ? PandasFilterValue::tuple(std::move(items)) : PandasFilterValue::list(std::move(items));
   }
   if (tag == "m") {
@@ -284,8 +287,13 @@ PandasFilterValue value_of(const Json& node) {
 }
 
 // A parameters dictionary: "enum:NAME" keys are Parameters members.
-PandasFilterParameters parameters_of(const Json& node) {
+PandasFilterParameters parameters_of(const Json& node, bool reads_get = false) {
   if (tag_of(node) == "n") return std::nullopt;
+  // Round DA: a set carrier is checked as the modules read it.
+  if (tag_of(node) != "m") {
+    polars_check_filter_parameters_carrier(value_of(node), reads_get);
+    return std::nullopt;
+  }
   std::vector<PandasFilterParameter> out;
   for (const auto& pair : body(node).items) {
     const auto& key = body(pair.items.at(0)).text;
@@ -333,10 +341,11 @@ Json typed_value(const PandasFilterValue& v) {
     case K::kDatetime: return datetime_node(v);
     case K::kDate: return typed("date", pandas_filter_value_str(v));
     case K::kList:
-    case K::kTuple: {
+    case K::kTuple:
+    case K::kSet: {
       std::vector<Json> items;
       for (const auto& item : v.items) items.push_back(typed_value(item));
-      return jtagged(v.kind == K::kList ? "l" : "t", jarray(std::move(items)));
+      return jtagged(v.kind == K::kList ? "l" : v.kind == K::kSet ? "S" : "t", jarray(std::move(items)));
     }
     case K::kDict: {
       std::vector<Json> items;
@@ -440,9 +449,12 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
   if (function == "filter_df_on_end_activities") {
     const auto* positive = keyword(kwargs, "positive");
     // Round CU (probe u3): a list or tuple glue groups as the CASE_ID_KEY parameter.
-    if (const auto* list_glue = keyword(kwargs, "case_id_glue"); list_glue && (list_glue->fields.begin()->first == "l" || list_glue->fields.begin()->first == "t")) {
-      const auto* act = keyword(kwargs, "activity_key");
-      return table_node(polars_filter_df_on_end_activities(df, value_of(*args.at(0)), value_of(*list_glue),
+    // Round DA: so does a set glue, or a set activity key.
+    const auto* act = keyword(kwargs, "activity_key");
+    const auto* list_glue = keyword(kwargs, "case_id_glue");
+    const auto tag = [](const Json* node) { return node ? node->fields.begin()->first : std::string("s"); };
+    if (tag(list_glue) == "l" || tag(list_glue) == "t" || tag(list_glue) == "S" || tag(act) == "S") {
+      return table_node(polars_filter_df_on_end_activities(df, value_of(*args.at(0)), list_glue ? value_of(*list_glue) : PandasFilterValue::of("case:concept:name"),
                                                            act ? value_of(*act) : PandasFilterValue::of("concept:name"),
                                                            positive ? value_of(*positive) : PandasFilterValue::of(true)));
     }
@@ -467,7 +479,7 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
 
 Json traces_module(const std::string& function, const EventTable& df, const Args& args, const Json& kwargs) {
   if (function == "apply")
-    return table_node(polars_trace_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
+    return table_node(polars_trace_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1), true)));
   if (function == "get_variants_df")
     return table_node(polars_trace_filter_get_variants_df(df, keyword_text(kwargs, "case_id_key", "case:concept:name"),
                                                           keyword_text(kwargs, "activity_key", "concept:name")));
@@ -480,7 +492,7 @@ Json starts_with_module(const std::string& function, const EventTable& df, const
 }
 Json ends_with_module(const std::string& function, const EventTable& df, const Args& args, const Json& kwargs) {
   if (function == "apply")
-    return table_node(polars_ends_with_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
+    return table_node(polars_ends_with_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1), true)));
   if (function == "get_variants_df")
     return table_node(polars_ends_with_filter_get_variants_df(
         df, keyword_text(kwargs, "case_id_key", "case:concept:name"), keyword_text(kwargs, "activity_key", "concept:name")));
@@ -579,7 +591,7 @@ int main(int argc, char** argv) try {
       // A Python set argument reaches the filter in its iteration order,
       // which depends on the hash seed: any order may stand for it.
       std::vector<Json> set_orders;
-      if (function == "apply_activity_set" && tag_of(*args.at(0)) == "S") {
+      if (function == "apply_activity_set" && !args.empty() && tag_of(*args.at(0)) == "S") {
         auto items = body(*args.at(0)).items;
         std::vector<std::size_t> perm(items.size());
         for (std::size_t i = 0; i < perm.size(); ++i) perm[i] = i;

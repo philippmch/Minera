@@ -1244,7 +1244,9 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     result.dtype=source_dtype(source,*result.column);
   }
   if(result.once) {
-    if(result.column==result.cases)fail("DuplicateError","apply","group_by keys contained duplicate output name '"+attr.value+"'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+resolved("'group_by'",frame_plan(source),groupnodes));
+    // Round DA: two literal keys (a None attribute beside a literal case key)
+    // share the name `literal` (fresh CK bank 2026112413 case 442).
+    if(result.column==result.cases)fail("DuplicateError","apply","group_by keys contained duplicate output name '"+(result.column?attr.value:std::string("literal"))+"'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+resolved("'group_by'",frame_plan(source),groupnodes));
   }
   return result;
 }
@@ -1327,6 +1329,8 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
       const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
       if(!null(maximum)) {
         if(text(maximum))fail("TypeError","apply","'<' not supported between instances of 'str' and 'int'");
+        // Round DA: head(n) compares a set with 0.
+        if(maximum.container==AttributeContainerKind::kSet)fail("TypeError","apply","'<' not supported between instances of 'set' and 'int'");
         if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
         const auto n=exact(maximum);
         if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");
@@ -1370,6 +1374,8 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
     if(!null(maximum)) {
       if(text(maximum))fail("TypeError","apply","'<' not supported between instances of 'str' and 'int'");
+        // Round DA: head(n) compares a set with 0.
+        if(maximum.container==AttributeContainerKind::kSet)fail("TypeError","apply","'<' not supported between instances of 'set' and 'int'");
       if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
       const auto n=exact(maximum);
       if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");

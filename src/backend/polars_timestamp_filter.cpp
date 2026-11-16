@@ -622,11 +622,15 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   }
   if(attr_at&&dict_value(q.value))(void)struct_model(q.value,q.attribute_dtype);
   if(attr_at)attribute_resolution(source,*attr_at,q,phase);
+  // Round DA: the attribute filter's time window resolves before the select
+  // of its case key, so a String timestamp column fails before a missing
+  // or repeated case key (fresh CK bank 2026112401 case 349).
+  if(q.op==Operation::kAttribute)time_resolution(source,time_at,q,phase);
   if(q.op==Operation::kAttribute&&listed)resolve_keys(true);
   if(q.op==Operation::kAttribute&&!listed)case_at=position(q.options.case_id_key.value,true);
   auto result=source;result.rows.clear();
   // Lazy predicate simplification occurs before comparing the temporal schemas.
-  time_resolution(source,time_at,q,phase);
+  if(q.op!=Operation::kAttribute)time_resolution(source,time_at,q,phase);
   if(listed)groups::append_schema(result,*q.keys,source);
   // Literal keys only select one row whatever passed (a Null literal joins
   // nothing), even from an empty window.

@@ -62,6 +62,12 @@ PandasFilterValue PandasFilterValue::tuple(std::vector<PandasFilterValue> values
   out.items = std::move(values);
   return out;
 }
+PandasFilterValue PandasFilterValue::set(std::vector<PandasFilterValue> values) {
+  PandasFilterValue out;
+  out.kind = Kind::kSet;
+  out.items = std::move(values);
+  return out;
+}
 PandasFilterValue PandasFilterValue::dict(std::vector<std::pair<PandasFilterValue, PandasFilterValue>> values) {
   PandasFilterValue out;
   out.kind = Kind::kDict;
@@ -163,6 +169,13 @@ bool pandas_filter_values_equal(const PandasFilterValue& a, const PandasFilterVa
       for (std::size_t i = 0; i < a.items.size(); ++i)
         if (!pandas_filter_values_equal(a.items[i], b.items[i])) return false;
       return true;
+    case K::kSet:
+      // Round DA: sets compare as sets (the items are hashable and distinct).
+      if (a.items.size() != b.items.size()) return false;
+      for (const auto& x : a.items)
+        if (std::none_of(b.items.begin(), b.items.end(), [&](const PandasFilterValue& y) { return pandas_filter_values_equal(x, y); }))
+          return false;
+      return true;
     case K::kDict:
       if (a.entries.size() != b.entries.size()) return false;
       for (std::size_t i = 0; i < a.entries.size(); ++i)
@@ -211,6 +224,7 @@ std::string type_name(const Value& v) {
     case Kind::kList: return "list";
     case Kind::kTuple: return "tuple";
     case Kind::kDict: return "dict";
+    case Kind::kSet: return "set";
     // Python's messages print the C type name (round CC).
     case Kind::kDatetime: return "datetime.datetime";
     case Kind::kDate: return "datetime.date";
@@ -226,7 +240,8 @@ bool truthy(const Value& v) {
     case Kind::kFloat: return v.real != 0.0;
     case Kind::kString: return !v.text.empty();
     case Kind::kList:
-    case Kind::kTuple: return !v.items.empty();
+    case Kind::kTuple:
+    case Kind::kSet: return !v.items.empty();
     case Kind::kDict: return !v.entries.empty();
     case Kind::kDatetime:
     case Kind::kDate: return true;
@@ -283,6 +298,15 @@ Value case_key(const PandasFilterParameters& p) {
 Value activity_key(const PandasFilterParameters& p) {
   return key_parameter(p, "ACTIVITY_KEY", kPandasFilterActivityKeyParameter, kPandasFilterDefaultNameKey);
 }
+// Round DA (probed): starts_with, ends_with and traces read a plain case or
+// activity key before the Parameters member of the same value.
+Value literal_first_key(const PandasFilterParameters& parameters, std::string_view member, std::string_view literal,
+                        std::string_view fallback) {
+  if (parameters)
+    for (const auto& p : *parameters)
+      if (!p.enum_member && p.key == literal) return p.value;
+  return key_parameter(parameters, member, literal, fallback);
+}
 // The column name of a str key; any other key reads as the empty name, as
 // before round CL.
 std::string key_text(const Value& key) { return key.kind == Kind::kString ? key.text : std::string(); }
@@ -291,6 +315,21 @@ bool dict_key(const Value& key) {
   if (key.kind == Kind::kDict) return true;
   if (key.kind != Kind::kList) return false;
   return std::any_of(key.items.begin(), key.items.end(), [](const Value& item) { return item.kind == Kind::kDict; });
+}
+// Round DA: a set key, or a list key holding a set.
+bool set_key(const Value& key) {
+  if (key.kind == Kind::kSet) return true;
+  if (key.kind != Kind::kList) return false;
+  return std::any_of(key.items.begin(), key.items.end(), [](const Value& item) { return item.kind == Kind::kSet; });
+}
+// The type of a dict or set key, or of the first dict or set item of a list
+// key: the first part a hash refuses.
+std::string unhashable_key_type(const Value& key) {
+  if (key.kind == Kind::kDict) return "dict";
+  if (key.kind == Kind::kSet) return "set";
+  for (const auto& item : key.items)
+    if (item.kind == Kind::kDict || item.kind == Kind::kSet) return item.kind == Kind::kDict ? "dict" : "set";
+  return "list";
 }
 
 // ------------------------------------------------------------------ cells
@@ -547,6 +586,11 @@ Value value_of(const python::Scalar& s) {
   }
 }
 bool is_nan(const python::Scalar& s) { return s.kind == python::Scalar::Kind::kFloat && std::isnan(s.real); }
+// Whether pd.NA == v answers pd.NA (a number, str, bool or datetime) rather
+// than False (None and the containers).
+bool na_compares(const Value& v) {
+  return v.kind != Kind::kNone && v.kind != Kind::kList && v.kind != Kind::kTuple && v.kind != Kind::kDict;
+}
 // Python's bool(a == b) as `in` and dict lookups use it for two distinct
 // objects: numbers by value (1, 1.0 and True), text exactly, None only to
 // None, a NaN to nothing; pd.NA's answer has no truth value.
@@ -757,7 +801,21 @@ std::size_t require_column(const EventTable& df, const std::string& name, bool g
 // df.groupby(key): a dict maps the index labels (strs, which no row label
 // is, so no group forms); a list checks its str items as columns in order.
 // std::nullopt when no group forms.
+// Round DA: a set (also as a list item, after the str items before it) is
+// mapped over the index labels as a function, which it is not; on an empty
+// frame nothing is mapped and no group forms.
 std::optional<std::size_t> groupby_key(const EventTable& df, const Value& key) {
+  if (key.kind == Kind::kSet) {
+    if (df.size() != 0) fail("TypeError", "'set' object is not callable");
+    return std::nullopt;
+  }
+  if (set_key(key)) {
+    for (const auto& item : key.items) {
+      if (item.kind == Kind::kString) require_column(df, item.text);
+      if (item.kind == Kind::kSet && df.size() != 0) fail("TypeError", "'set' object is not callable");
+    }
+    return std::nullopt;
+  }
   if (!dict_key(key)) return require_column(df, key_text(key));
   if (key.kind == Kind::kList)
     for (const auto& item : key.items)
@@ -766,25 +824,28 @@ std::optional<std::size_t> groupby_key(const EventTable& df, const Value& key) {
 }
 // df.groupby(...)[key]: a dict (or a list holding one) does not hash.
 std::size_t selection_key(const EventTable& df, const Value& key) {
-  if (dict_key(key)) fail("TypeError", "unhashable type: 'dict'");
+  if (dict_key(key) || set_key(key)) fail("TypeError", "unhashable type: '" + unhashable_key_type(key) + "'");
   return require_column(df, key_text(key), true);
 }
 // df[key]: a dict is refused as an indexer, a list's dict does not hash.
 std::size_t getitem_key(const EventTable& df, const Value& key) {
-  if (key.kind == Kind::kDict) fail("TypeError", "Passing a dict as an indexer is not supported. Use a list instead.");
-  if (dict_key(key)) fail("TypeError", "unhashable type: 'dict'");
+  if (key.kind == Kind::kDict || key.kind == Kind::kSet)
+    fail("TypeError", "Passing a " + type_name(key) + " as an indexer is not supported. Use a list instead.");
+  if (dict_key(key) || set_key(key)) fail("TypeError", "unhashable type: '" + unhashable_key_type(key) + "'");
   return require_column(df, key_text(key));
 }
 // hash(key) of a dict or list key.
 void hash_key(const Value& key) {
   if (key.kind == Kind::kDict) fail("TypeError", "unhashable type: 'dict'");
+  if (key.kind == Kind::kSet) fail("TypeError", "unhashable type: 'set'");
   if (key.kind == Kind::kList) fail("TypeError", "unhashable type: 'list'");
 }
 // df.set_index(key) of a dict key or a list key holding a dict.
 void set_index_key(const Value& key) {
-  if (!dict_key(key)) return;
+  if (!dict_key(key) && !set_key(key)) return;
   fail("TypeError", "The parameter \"keys\" may be a column key, one-dimensional array, or a list containing only "
-                    "valid column keys and one-dimensional arrays.. Received column of type <class 'dict'>");
+                    "valid column keys and one-dimensional arrays.. Received column of type <class '" +
+                        unhashable_key_type(key) + "'>");
 }
 
 EventAttribute make_cell(const std::string& column, std::string text, AttributeKind kind) {
@@ -1014,8 +1075,9 @@ std::vector<bool> series_equals(const EventTable& df, std::size_t column, const 
     for (std::size_t i = 0; i < n; ++i) out[i] = item_equals(df.rows[i][column], items[i], dtype);
     return out;
   };
-  if (v.kind == Kind::kDict) {
-    const auto k = v.entries.size();
+  // Round DA: a set compares as a dict of its length does.
+  if (v.kind == Kind::kDict || v.kind == Kind::kSet) {
+    const auto k = v.kind == Kind::kSet ? v.items.size() : v.entries.size();
     const auto size = std::to_string(k);
     switch (family) {
       case EqualityFamily::kObject:
@@ -1099,6 +1161,7 @@ std::string short_type_name(const Value& v) {
 // The first part of a value that hash() refuses (round CL).
 std::optional<std::string> unhashable_type(const Value& v) {
   if (v.kind == Kind::kDict) return std::string("dict");
+  if (v.kind == Kind::kSet) return std::string("set");
   if (v.kind == Kind::kList) return std::string("list");
   if (v.kind == Kind::kTuple)
     for (const auto& item : v.items)
@@ -1162,10 +1225,12 @@ EventTable boundary_filter(const EventTable& df, const Value& raw_values, const 
   const auto case_column = groupby_key(df, case_glue);
   const auto act = selection_key(df, act_key);
   if (case_column) reject_float16_aggregation(df, *case_column, !end, inferred_dtype(df, act));
-  if (raw_values.kind != Kind::kList && raw_values.kind != Kind::kTuple && raw_values.kind != Kind::kDict)
+  if (raw_values.kind != Kind::kList && raw_values.kind != Kind::kTuple && raw_values.kind != Kind::kDict &&
+      raw_values.kind != Kind::kSet)
     fail("TypeError", "only list-like objects are allowed to be passed to isin(), you passed a `" +
                           short_type_name(raw_values) + "`");
-  Value values = raw_values;
+  // Round DA: isin lists a set in its iteration order.
+  Value values = raw_values.kind == Kind::kSet ? Value::list(raw_values.items) : raw_values;
   if (raw_values.kind == Kind::kDict) {
     values = Value::list({});
     for (const auto& entry : raw_values.entries) values.items.push_back(entry.first);
@@ -1301,11 +1366,17 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
   Counts kept;
   for (const auto& entry : counts) {
     const bool ok = python_at_least(entry.second, nocc);
+    // Round DA: a count below nocc reads the variant's last activity, which
+    // a set cannot index.
+    if (!ok && most_common_variant && most_common_variant->kind == Kind::kSet && !most_common_variant->items.empty())
+      fail("TypeError", "'set' object is not subscriptable");
     // The last activity of the most common variant is always kept; a pd.NA
     // boundary (a "boolean" or "string" column) fails that comparison (round
     // CA); a masked number column's missing boundary is NaN (round CB).
+    // Round DA: pd.NA == None, a list, tuple, dict or set is False (fresh
+    // CK bank 2026112410 case 837).
     if (!ok && !count0 && !entry.first && most_common_variant && !most_common_variant->items.empty() &&
-        (dtype == "boolean" || dtype == "string"))
+        (dtype == "boolean" || dtype == "string") && na_compares(most_common_variant->items.back()))
       fail("TypeError", "boolean value of NA is ambiguous");
     const bool protected_end = most_common_variant && !most_common_variant->items.empty() && entry.first &&
                                scalar_of(most_common_variant->items.back()) &&
@@ -1545,8 +1616,10 @@ EventTable variant_filter(const EventTable& df, const Value& admitted, const Pan
                           VariantMode mode) {
   // Round CL: a dict case key groups nothing (no case keeps a row unless
   // negative); a dict activity key does not hash as the groupby selection.
-  const auto grouped = groupby_key(df, case_key(parameters));
-  const auto act = selection_key(df, activity_key(parameters));
+  const auto grouped = groupby_key(
+      df, literal_first_key(parameters, "CASE_ID_KEY", kPandasFilterCaseIdKeyParameter, kPandasFilterCaseConceptName));
+  const auto act = selection_key(
+      df, literal_first_key(parameters, "ACTIVITY_KEY", kPandasFilterActivityKeyParameter, kPandasFilterDefaultNameKey));
   const bool positive = truthy(parameter_or(parameters, "POSITIVE", "positive", Value::of(true)));
   if (!grouped) return subset(df, std::vector<bool>(df.size(), !positive));
   const auto case_column = *grouped;
@@ -1794,6 +1867,11 @@ void pandas_check_filter_parameters_carrier(const PandasFilterValue& parameters)
     }
     return;
   }
+  // Round DA: a set iterates its keys but cannot be indexed by them.
+  if (parameters.kind == Kind::kSet) {
+    if (!parameters.items.empty()) fail("TypeError", "'set' object is not subscriptable");
+    return;
+  }
   if (parameters.kind == Kind::kString) {
     if (parameters.text.empty()) fail("TypeError", "'in <string>' requires string as left operand, not Parameters");
     fail("TypeError", "string indices must be integers, not 'str'");
@@ -1891,8 +1969,8 @@ EventTable pandas_rework_filter_apply(const EventTable& df, const PandasFilterVa
   const bool positive = truthy(parameter_or(parameters, "POSITIVE", "positive", Value::of(true)));
   // Round CL: the two keys are hashed (activity first) before the columns
   // are selected.
-  if (act_value.kind == Kind::kDict || act_value.kind == Kind::kList) hash_key(act_value);
-  if (case_value.kind == Kind::kDict || case_value.kind == Kind::kList) hash_key(case_value);
+  if (act_value.kind == Kind::kDict || act_value.kind == Kind::kList || act_value.kind == Kind::kSet) hash_key(act_value);
+  if (case_value.kind == Kind::kDict || case_value.kind == Kind::kList || case_value.kind == Kind::kSet) hash_key(case_value);
   const auto case_name = key_text(case_value);
   const auto act_name = key_text(act_value);
   require_columns(df, {act_name, case_name});
@@ -2292,26 +2370,45 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   // result is empty: the key columns (a dict's as level_i, object, or int64
   // on an empty frame; a column's with the dtype its distinct values infer)
   // and then the other columns.
-  if (dict_key(case_value) || dict_key(timestamp_value)) {
+  if (dict_key(case_value) || dict_key(timestamp_value) || set_key(case_value) || set_key(timestamp_value)) {
+    // Round DA: two keys for a two-row frame, neither a dict nor a list,
+    // are first looked up as columns in order (a set does not hash); a key
+    // that is not a column makes the key list itself one array grouper,
+    // whose set item does not hash when first() or last() aggregates.
+    const auto plain = [](const Value& key) { return key.kind != Kind::kDict && key.kind != Kind::kList && key.kind != Kind::kTuple; };
+    if (df.size() == 2 && plain(case_value) && plain(timestamp_value))
+      for (const auto* key : {&case_value, &timestamp_value}) {
+        if (key->kind == Kind::kSet) fail("TypeError", "unhashable type: 'set'");
+        if (!find_column(df, key_text(*key))) {
+          if (!first && !last) fail("AttributeError", "'NoneType' object has no attribute 'reset_index'");
+          fail("TypeError", "unhashable type: 'set'");
+        }
+      }
     // Round CN: the groupby checks each key when it is built; a list key's
-    // items hash only when first() or last() aggregates.
+    // items hash only when first() or last() aggregates. Round DA: a set
+    // key is mapped over the index labels as a function.
     std::vector<std::optional<std::size_t>> keys;
-    bool unhashable = false;
+    std::optional<std::string> unhashable;
     for (const auto* key : {&case_value, &timestamp_value}) {
       if (key->kind == Kind::kDict) {
         keys.emplace_back(std::nullopt);
         continue;
       }
-      if (dict_key(*key)) {
+      if (key->kind == Kind::kSet) {
+        if (df.size() != 0) fail("TypeError", "'set' object is not callable");
+        keys.emplace_back(std::nullopt);
+        continue;
+      }
+      if (dict_key(*key) || set_key(*key)) {
         if (key->items.size() != df.size()) fail("ValueError", "Grouper and axis must be same length");
-        unhashable = true;
+        if (!unhashable) unhashable = unhashable_key_type(*key);
         keys.emplace_back(std::nullopt);
         continue;
       }
       keys.emplace_back(require_column(df, key_text(*key)));
     }
     if (!first && !last) fail("AttributeError", "'NoneType' object has no attribute 'reset_index'");
-    if (unhashable) fail("TypeError", "unhashable type: 'dict'");
+    if (unhashable) fail("TypeError", "unhashable type: '" + *unhashable + "'");
     EventTable out = df;
     out.rows.clear();
     out.columns.clear();
@@ -2736,6 +2833,11 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     for (const auto& [key, value] : activity.entries) {
       if (const auto s = scalar_of(key)) cuts.push_back(*s);
     }
+  // Round DA: `in` a set hashes as `in` a dict's keys does.
+  else if (activity.kind == Kind::kSet)
+    for (const auto& item : activity.items) {
+      if (const auto s = scalar_of(item)) cuts.push_back(*s);
+    }
   else container = false;
   // A numeric activity column is read as numpy reads the case column.
   const auto activity_view = numpy_case_view(nv, act);
@@ -2763,7 +2865,7 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     if (value.kind == python::Scalar::Kind::kNone && cut.kind == python::Scalar::Kind::kNone) return true;
     // Round CP: `in` a dict hashes first, so pd.NA meets no key and is never
     // compared.
-    if (activity.kind == Kind::kDict && value.kind == python::Scalar::Kind::kNA) return false;
+    if ((activity.kind == Kind::kDict || activity.kind == Kind::kSet) && value.kind == python::Scalar::Kind::kNA) return false;
     return py_equal(value, cut);
   };
   // Round CN: a numpy scalar activity (a numeric or naive datetime64 column,
