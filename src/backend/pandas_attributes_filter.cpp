@@ -332,9 +332,11 @@ EventAttribute float32_bound(const EventAttribute& bound){
 }
 // Round CK: a str or datetime64 column compares a dict as an array of its
 // keys, which numpy then holds as one 0-d object; other columns compare it
-// as a scalar.
+// as a scalar. Round DB: a set or frozenset compares the same way over its
+// items, as in the LTL filters (probe set-pdtblck-2).
 void dict_operand(const EventAttribute& operand,std::size_t rows,const std::string& dtype){
- if(operand.container!=AttributeContainerKind::kContainer||operand.is_null)return;
+ const auto kind=operand.container;
+ if((kind!=AttributeContainerKind::kContainer&&kind!=AttributeContainerKind::kSet&&kind!=AttributeContainerKind::kFrozenSet)||operand.is_null)return;
  const auto n=operand.children.size();
  if(dtype=="str"){
   if(n!=rows)error("ValueError","Lengths of operands do not match: "+std::to_string(rows)+" != "+std::to_string(n));
@@ -644,6 +646,10 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  // grouper array of its items (any items, an empty list too), which must
  // match the rows; a tuple is a label that must hash. Neither lets a
  // two-row frame take the key list itself as the grouper.
+ // Round DB: a set case key is called on each index label (probe
+ // set-pdtblck-2 cases 151, 232).
+ if(once&&!group_case.is_null&&(group_case.container==AttributeContainerKind::kSet||group_case.container==AttributeContainerKind::kFrozenSet)&&s.size()!=0)
+  error("TypeError","'"+type_name(group_case)+"' object is not callable");
  const bool list_grouper=once&&!unmatched_mapping&&group_case.container==AttributeContainerKind::kList;
  if(list_grouper&&group_case.children.size()!=s.size())error("ValueError","Grouper and axis must be same length");
  if(once&&!unmatched_mapping&&group_case.container==AttributeContainerKind::kTuple)detail::pandas_check_hashable_key(group_case,error);
@@ -676,6 +682,10 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
   return s;
  }
  if(once&&o.attribute_key.is_null)error("TypeError","'NoneType' object is not callable");
+ // Round DB: per case, groupby calls a set key on each index label (probe
+ // set-pdtblck-2 case 116).
+ if(once&&(o.attribute_key.container==AttributeContainerKind::kSet||o.attribute_key.container==AttributeContainerKind::kFrozenSet))
+  error("TypeError","'"+type_name(o.attribute_key)+"' object is not callable");
  // A list key is one grouper array.
  if(once&&o.attribute_key.container==AttributeContainerKind::kList){
   if(o.attribute_key.children.size()!=s.size())error("ValueError","Grouper and axis must be same length");

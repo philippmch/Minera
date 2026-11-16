@@ -1228,8 +1228,10 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   // Round CL: rework.apply groups by [case, activity], so an activity key
   // given as a dict or list is a literal there (one constant group per case).
   const auto* act_value = activity_key_value(parameters);
+  // Round DB: a set there is refused by pl.lit (below).
   const bool literal_act =
-      act_value && (act_value->kind == Kind::kDict || act_value->kind == Kind::kList || act_value->kind == Kind::kTuple);
+      act_value && (act_value->kind == Kind::kDict || act_value->kind == Kind::kList || act_value->kind == Kind::kTuple ||
+                    act_value->kind == Kind::kSet);
   const bool constant_act = !activities && literal_act;
   // Round CP: group_by([case, activity]) builds the literal of a dict or
   // list activity key in apply_activity_set too (its pl.col filter resolves
@@ -1237,6 +1239,9 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   // Round CU (probe u3): the group_by takes the dict as given, also where
   // the activity filter selected its one column by name.
   const auto* raw_act = activity_key_value(raw);
+  // Round DB: apply_activity_set selected a one-name set's column, but the
+  // group_by still takes the set as given (probe set-plseq-1 case 357).
+  if (raw_act && raw_act->kind == Kind::kSet) set_literal_error(*raw_act);
   if (literal_act && act_value->kind != Kind::kDict) {
     set_literal_error(*act_value);
     (void)list_literal(act_value->items);
@@ -1546,6 +1551,38 @@ EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const s
   return out;
 }
 
+namespace {
+// Round DB: the get_variants_df keys given as sets. The sort by [case,
+// timestamp] builds a set case key's literal, which pl.lit refuses; pl.col
+// then reads a set activity key's items (one existing name is that column).
+std::pair<std::string, std::string> variants_df_keys(const EventTable& df, const PolarsFilterValue& case_id_key,
+                                                     const PolarsFilterValue& activity_key) {
+  if (case_id_key.kind == Kind::kSet) set_literal_error(case_id_key);
+  if (case_id_key.kind != Kind::kString || (activity_key.kind != Kind::kString && activity_key.kind != Kind::kSet))
+    throw std::invalid_argument("Polars get_variants_df keys other than a str or a set are outside the native domain");
+  check_col_list(&activity_key);
+  if (activity_key.kind == Kind::kString) return {case_id_key.text, activity_key.text};
+  if (activity_key.items.size() == 1 && find_column(df, activity_key.items.front().text))
+    return {case_id_key.text, activity_key.items.front().text};
+  // A name no column carries fails the group_by by name (probe set-plseqcp-2
+  // case 264).
+  if (std::any_of(activity_key.items.begin(), activity_key.items.end(), [&](const Value& item) { return !find_column(df, item.text); }))
+    return {case_id_key.text, key_text(&activity_key, "")};
+  throw std::invalid_argument("Polars get_variants_df set activity keys other than one existing name are outside the native domain");
+}
+}  // namespace
+
+EventTable polars_trace_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
+                                               const PolarsFilterValue& activity_key) {
+  const auto [c, a] = variants_df_keys(df, case_id_key, activity_key);
+  return polars_trace_filter_get_variants_df(df, c, a);
+}
+EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
+                                                   const PolarsFilterValue& activity_key) {
+  const auto [c, a] = variants_df_keys(df, case_id_key, activity_key);
+  return polars_ends_with_filter_get_variants_df(df, c, a);
+}
+
 EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterValue& admitted_traces,
                                      const PolarsFilterParameters& raw_parameters) {
   const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
@@ -1651,6 +1688,7 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
   if (!joined)
     for (const auto& item : admitted_suffixes.items) {
       if (item.kind == Kind::kList || item.kind == Kind::kTuple) (void)list_literal(item.items);
+      else if (item.kind == Kind::kSet) set_literal_error(item);  // round DB: pl.lit refuses a set
       else if (item.kind == Kind::kDict)
         if (const auto error = detail::polars_lit::dict_literal_error(item)) fail("TypeError", *error);
     }
@@ -2089,9 +2127,14 @@ struct GroupingKey {
   std::optional<LitValue> literal;
 };
 std::optional<LitValue> grouping_literal(const Value* key) {
+  // Round DB: pl.lit refuses a set key.
+  if (key) set_literal_error(*key);
   if (!key || (key->kind != Kind::kList && key->kind != Kind::kTuple && key->kind != Kind::kDict)) return std::nullopt;
   if (key->kind == Kind::kDict)
     if (const auto error = detail::polars_lit::dict_literal_error(*key)) fail("TypeError", *error);
+  // Round DB: the list's Series literal is built strictly (a list of sets
+  // is List(Object): "Nested object types").
+  if (key->kind != Kind::kDict) (void)list_literal(key->items);
   auto literal = lit_value(*key);
   if (key->kind == Kind::kTuple) literal.type = list_of(list_literal(key->items).type);
   return literal;
@@ -2170,7 +2213,8 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
   // A list or tuple holds the activities; any other value is one (round CB).
   // Round CJ: is_in takes a dict as the list of its keys (Python's list()).
   std::vector<Value> activities;
-  if (activity.kind == Kind::kList || activity.kind == Kind::kTuple) activities = activity.items;
+  // Round DB: is_in takes a set's items too (in Python's iteration order).
+  if (activity.kind == Kind::kList || activity.kind == Kind::kTuple || activity.kind == Kind::kSet) activities = activity.items;
   else if (activity.kind == Kind::kDict) {
     for (const auto& e : activity.entries)
       if (std::none_of(activities.begin(), activities.end(), [&](const Value& k) { return k.text == e.first.text; })) activities.push_back(e.first);
@@ -2181,6 +2225,8 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
   // casts a Float64, a date as its ISO text, a dict as its struct display
   // (null with a None field, its TypeError when it cannot be built), None
   // as null (probe tq10-tq12).
+  // Round DB: pl.lit refuses a set separator while Python builds the plan.
+  if (concat.kind == Kind::kSet) set_literal_error(concat);
   std::optional<std::string> separator;
   if (concat.kind == Kind::kString) {
     separator = concat.text;
@@ -2203,7 +2249,7 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
   // where a column name must be a str, after the activities and the
   // separator are built (probes cp/k1, k9).
   if (const auto* key = list_case(parameters))
-    fail("TypeError", std::string("'") + (key->kind == Kind::kTuple ? "tuple" : "list") + "' object is not an instance of 'str'");
+    fail("TypeError", std::string("'") + (key->kind == Kind::kTuple ? "tuple" : key->kind == Kind::kSet ? "set" : "list") + "' object is not an instance of 'str'");
   const auto case_column = require(
       df, case_glue,
       Plan{"select",
@@ -2241,7 +2287,8 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
   const auto act = require(df, act_key, act_plan);
   // A value that is no list, tuple or str reaches is_in as itself, which
   // Polars implodes (round CC).
-  const bool scalar = activity.kind != Kind::kList && activity.kind != Kind::kTuple && activity.kind != Kind::kString && activity.kind != Kind::kDict;
+  const bool scalar = activity.kind != Kind::kList && activity.kind != Kind::kTuple && activity.kind != Kind::kString && activity.kind != Kind::kDict &&
+                      activity.kind != Kind::kSet;
   std::string shown = literal_text(literal);
   if (scalar) {
     const auto v = literal.values.empty() ? Value::none() : literal.values.front();

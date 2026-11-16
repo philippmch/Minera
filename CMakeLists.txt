@@ -3204,6 +3204,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_da_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-da-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_da_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_sequence_filter_db_set_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-db-set-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_db_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_sequence_filter_db_set_cp_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-db-set-cp-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_db_set_cp_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3367,6 +3373,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_da_set_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-da-set-bank.json.gz")
   set_tests_properties(minera_polars_filter_da_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_filter_db_set_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-db-set-bank.json.gz")
+  set_tests_properties(minera_polars_filter_db_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_polars_filter_db_set_ck_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-db-set-ck-bank.json.gz")
+  set_tests_properties(minera_polars_filter_db_set_ck_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3622,6 +3634,15 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_da_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-da-bank.json.gz")
   set_tests_properties(minera_pandas_filter_da_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DB: sets in the CK domain (a set bound against a string column, a
+  # set grouper called per label, a set coverage share) and in the CN LTL
+  # domain (probes set-pdtblck-2, set-pdltl-2).
+  add_test(NAME minera_pandas_filter_db_set_ck_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-db-set-ck-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_db_set_ck_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  add_test(NAME minera_pandas_filter_db_set_ltl_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-db-set-ltl-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_db_set_ltl_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

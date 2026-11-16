@@ -264,11 +264,16 @@ std::vector<CacheRow> membership_cache(const EventTable& source,const PandasVari
  // Round CP: a list of groupers holding a mapping reads its items in order:
  // a mapping maps the index labels, None is called, a list must match the
  // rows and any other item names a column.
+ // Round DB: a set item is called on each index label as well (probe
+ // set-pdtblck-2 case 259).
+ const auto set_item=[](const EventAttribute& item){return !item.is_null&&(item.container==AttributeContainerKind::kSet||item.container==AttributeContainerKind::kFrozenSet);};
  if(!unmatched&&options.case_id_key.container==AttributeContainerKind::kList&&
-    std::any_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),[](const auto& item){return !item.is_null&&item.container==AttributeContainerKind::kContainer;})&&
-    (!source.index||std::all_of(source.index->labels.begin(),source.index->labels.end(),[](const auto& label){const auto* scalar=std::get_if<EventAttribute>(&label.value);return scalar&&!text_value(*scalar);})))
+    ((std::any_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),[](const auto& item){return !item.is_null&&item.container==AttributeContainerKind::kContainer;})&&
+      (!source.index||std::all_of(source.index->labels.begin(),source.index->labels.end(),[](const auto& label){const auto* scalar=std::get_if<EventAttribute>(&label.value);return scalar&&!text_value(*scalar);})))||
+     std::any_of(options.case_id_key.children.begin(),options.case_id_key.children.end(),set_item)))
   for(const auto& item:options.case_id_key.children){
    if(item.container==AttributeContainerKind::kContainer)continue;
+   if(set_item(item)){if(source.size())error("TypeError","'"+type_name(item)+"' object is not callable");continue;}
    if(item.container==AttributeContainerKind::kScalar&&item.is_null)error("TypeError","'NoneType' object is not callable");
    if(item.container==AttributeContainerKind::kList){if(item.children.size()!=source.size())error("ValueError","Grouper and axis must be same length");continue;}
    if(!column(source,item))error("KeyError",repr(item));
@@ -464,7 +469,8 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& criterion
  }else{
   if(!stats.variants.empty()){
    if(is_native_na_attribute(criterion))error("TypeError","boolean value of NA is ambiguous");
-   if(criterion.is_null||criterion.container==AttributeContainerKind::kContainer||date_value(criterion))error("TypeError","unsupported operand type(s) for *: '"+type_name(criterion)+"' and 'int'");
+   // Round DB: a set or frozenset cannot multiply either (probe set-pdtblck-2).
+   if(criterion.is_null||criterion.container==AttributeContainerKind::kContainer||criterion.container==AttributeContainerKind::kSet||criterion.container==AttributeContainerKind::kFrozenSet||date_value(criterion))error("TypeError","unsupported operand type(s) for *: '"+type_name(criterion)+"' and 'int'");
    if(!numeric(criterion))error("TypeError",std::string(mode==Mode::kMinimum?"'>='":"'<='")+" not supported between instances of 'int' and '"+type_name(criterion)+"'");
    for(const auto& variant:stats.variants){
     bool keep;

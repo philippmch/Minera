@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DA (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–DB (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5947,6 +5947,80 @@ probes, set domains and fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DB re-reviewed DA (Review DB1). DA's commit e717be3 ran CI run
+43878323668 (green on all six jobs). DB replayed two batches of fresh
+seeds, finished the Polars set probes and ran fresh set probes on four
+other domains:
+- Sets as Polars literals (`LitType::K::kObject`): a set item of a list
+  `pl.lit`/`pl.Series` builds is an Object value (`Nested object types`,
+  `nested objects are not allowed`, the supertype pairs with `object`,
+  the String builder's `found value of type Object: {...}`); a whole set
+  is refused by `pl.lit` at every literal site (bounds, stream and
+  timeframe values, separators, rework/four-eyes/different-persons keys,
+  set items of group keys, per-case `group_by([case, set])`, sort keys).
+  A datetime literal column holds the typed instant.
+- Set keys as Polars column selectors: `pl.col`, `group_by` and `sort`
+  iterate a set like a list (one name a column, a missing one by name,
+  the item checks); the attribute filters model set selectors and refuse
+  several names after the literals; `get_attribute_values` and the
+  relative occurrence filter group by the items in order (a one-tuple
+  item `unhashable type: 'list'`; several items pair the first key with
+  the second against the stake, then `pl.col(set)`); per case on an empty
+  frame a literal key still forms its group; `df[set]` in spno/A_next;
+  `get_variants_df` overloads for set keys. Probes: Polars table 1,996 ->
+  10 of 16,185, Polars sequence 346 -> 65 of 6,603 (62 of them the
+  keyword helpers).
+- Fresh set probes: Polars CK table 19 -> 10 of 16,419, Polars CP
+  sequence 36 -> 27 of 4,432 (24 keyword-helper calls), pandas CK table
+  92 -> 0 of 8,785 (a set against a pandas `string` column compares as a
+  dict, `groupby` calls a set case key in the relative, timeframe and
+  variants filters, a set coverage share cannot multiply), pandas CN LTL
+  0 of 1,800.
+- Fresh seeds 2026112500-11 and 2026112512-23 found one call each, both
+  declared (Polars CJ 2026112503 case 677: two stream predicates printing
+  alike rebuilt in another order; pandas CK 2026112521 case 435: a dict
+  plain attribute key with an empty-tuple member on an empty frame).
+- Declared: a set's iteration order where it shows (the reference
+  rebuilds the set in its worker; 17 probe calls), several-name set keys,
+  the keyword helpers' set keys, and four one-call shapes (Review DB1).
+
+In the suite: new `docs/polars-filter-db-set-bank.json.gz`,
+`docs/polars-filter-db-set-ck-bank.json.gz`,
+`docs/polars-sequence-filter-db-set-bank.json.gz`,
+`docs/polars-sequence-filter-db-set-cp-bank.json.gz`,
+`docs/pandas-filter-db-set-ck-bank.json.gz` and
+`docs/pandas-filter-db-set-ltl-bank.json.gz` with their ctests. The
+probes, set domains and fresh banks are in the project files under
+`review-harness/round-db/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DC) should start by re-reviewing round DB:
+
+- DB's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- fresh set probes on the domains not yet probed with sets (the Polars
+  CN/CI/CH table and CK/CJ sequence domains, the pandas sequence CK
+  domain; `review-harness/round-db/tools/setcap.sh` with a new
+  `dom/_probe_*_set_domain.py`), and the set-key calls of the Polars
+  keyword helpers `get_end_activities` and
+  `filter_df_on_end_activities_nocc` if a native overload is wanted;
+- the set-order artefact could be removed by capturing the worker's
+  iteration order in the bank (a harness change, not a model one);
+- the rest of the CU list (`filter_variants_top_k` one-row second
+  columns, LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DA's targets, taken in DB (findings DB1-1 to DB1-4): DA's CI run,
+the fresh seeds, the rest of the Polars set probes and fresh set probes of
+the pandas table and LTL domains (plus the Polars CK table and CP
+sequence domains). Not taken (carried to DC): the rest of the CU list.
+
+Previous list for round DB (kept for its older items):
 
 Next round (DB) should start by re-reviewing round DA:
 

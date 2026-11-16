@@ -28747,3 +28747,141 @@ Tests:
   `minera_polars_filter_da_set_bank_parity_tests` ctests. The Polars table
   bank driver keeps an integer argument past the UInt64 range as its
   decimal text and no longer refuses list cells in expected frames.
+
+## Review DB1: re-review of round DA, Python sets in the Polars filters, fresh set probes, fresh seeds (2026-11-16)
+
+Round DB checked DA's CI (run 43878323668 on e717be3: green on all six
+jobs), replayed two batches of fresh seeds of every filter domain,
+finished the Polars set probes DA left open and ran four fresh set probes
+on other domains. The device check on the Mac was skipped (no device
+linked).
+
+- **DB1-1 Sets as Polars literals** (`polars_lit_model.hpp`, a new
+  `LitType::K::kObject`). A set or frozenset item of a list pm4py hands to
+  `pl.lit`/`pl.Series` is an Object value, observed black-box on Polars
+  1.44.1 (`probe2/objlit.py` and the two set probes): a list whose items
+  are all sets (or nested lists of them) is `List(Object)` and fails
+  `not yet implemented: Nested object types` while the Series is built
+  (also a `timestamp_case_grouping` list case key holding a set); a
+  struct with an Object field fails `nested objects are not allowed`
+  after its fields; a set beside other items folds the supertype with
+  `object` (`failed to determine supertype of X and object` / `of object
+  and X`); the String builder names the item `found value of type Object:
+  {...}` with Python's set repr. A whole set handed to `pl.lit` is refused
+  (`cannot create expression literal for value of type set.`) where pm4py
+  builds one: numeric, case-size and case-performance bounds, stream
+  filter values, timeframe values (before the timestamp key is read),
+  `subcase_concat_str` separators (`activity_split`, `between`), the set
+  activity key of `rework`'s `group_by([case, activity])` (also in
+  `apply_activity_set`, where the filter already selected the one-name
+  set's column), the four-eyes and different-persons resource keys, a set
+  item of a list case key in the join filters' group keys, a set item of
+  a key list the statistics filters group by (before `head(n)` checks
+  its bound), the case key of the per-case counts' `group_by([case,
+  attribute])`, and set timestamp keys in the variant and paths filters'
+  sort lists. A datetime literal column (a set or list case key holding a
+  datetime) holds the typed instant as the frame's own datetime cells do.
+- **DB1-2 Set keys as Polars column selectors.** `pl.col`, `group_by` and
+  `sort` take a set's items as they take a list's (the iteration order
+  is Python's): `keys::col_key` selects one existing name as that column
+  and a missing one as `"x" not found`, the group keys of the join
+  filters read each item (a str a column, any other value a literal
+  named `literal`), and the `pl.col` item checks (`Expected iterable of
+  type str ... got iterable of type 'T'`, `'T' object is not an instance
+  of 'str'`) cover sets in the case-performance timestamp key, the LTL
+  attribute keys, the between and variants activity keys and the paths
+  attribute key. The attribute filters model a set selector (one
+  existing name, a missing name, the empty set) and refuse a several-name
+  key only after the literals Python builds with it, so a set bound or
+  value fails first; the between filter builds its anchors before it
+  refuses a several-column activity selector. `get_attribute_values`
+  groups by a set's items in order: a nested set or a tuple that cannot
+  build its Series fails first, a missing name fails at its place, a
+  second item that is no str repeats the name `literal`
+  (`DuplicateError`), one tuple item groups as a List literal the counts
+  dict cannot take (`unhashable type: 'list'`, with or without rows), and
+  one other item counts that column or literal.
+  `filter_df_relative_occurrence_event_attribute` with several set items
+  pairs each group's first key with its second, compares that value with
+  the stake times the denominator (`'>=' not supported between instances
+  of 'list' and 'float'` and the like), then `pl.col(set)` checks its
+  items; grouped per case on an empty frame, a literal key still forms
+  its group, so a set or dict stake fails the product (probe
+  `db/rel1.py`-`rel4.py`). `filter_df_keeping_spno_activities` and
+  `A_next_B_next_C` read the collected frame with the set as a selector:
+  `cannot select columns using key of type 'set': {...}`, after the
+  `head(n)` bound checks and the columns' resolution. Set stream filter
+  keys select their name. The `activity_split` plan shows a set of
+  activities as a list (`is_in([[...]])`) and names a set case key
+  `'set' object is not an instance of 'str'`. `get_variants_df` (trace
+  and ends_with filters) has a `PolarsFilterValue` overload for set keys:
+  a set case key fails the sort literal, a set activity key goes through
+  `pl.col` (one existing name is that column, a missing one fails the
+  `group_by` by name). Probe set-pltbl-1 (16,185 calls): 1,996 differing
+  before, 10 after; set-plseq-1 (6,603 calls): 346 before, 65 after (the
+  keyword helpers `get_end_activities` and
+  `filter_df_on_end_activities_nocc` and three calls showing a set's
+  order). The sequence bank driver reads a set `return_dict` by its
+  truthiness.
+- **DB1-3 Fresh set probes on other domains** (the round's harness:
+  `dom/_probe_*_set_domain.py`, 300 cases each, seed 2).
+  - set-pltblck-2, the Polars CK table domain (16,419 calls): 19
+    differing calls before, 10 after (all declared below).
+  - set-plseqcp-2, the Polars CP sequence domain (4,432 calls): 36
+    before, 27 after (24 keyword-helper calls, 3 showing a set's order).
+  - set-pdtblck-2, the pandas CK table domain (8,785 calls): 92 before,
+    0 after. A set bound or stream filter value against a pandas
+    `string` column compares as a dict does (`Lengths of operands do not
+    match: N != k`, then the 0-d array's `too many indices`;
+    `pandas_attributes_filter.cpp`); `groupby` calls a set case key on
+    each index label (`'set' object is not callable`) in the relative
+    occurrence filter per case (a set attribute key too), the timeframe
+    filters (before the timestamp column) and as a set item of the
+    variants filters' list case key; a set coverage share cannot
+    multiply the case count (`filter_variants_by_coverage_percentage`
+    and the maximum variant).
+  - set-pdltl-2, the pandas CN LTL domain (`eventually_follows`, 1,800
+    calls): 0 differing.
+- **DB1-4 Fresh seeds.** Batch 1 (2026112500-11, twelve banks): one call,
+  Polars CJ 2026112503 case 677, declared below. Batch 2
+  (2026112512-23, twelve banks): one call, pandas CK 2026112521 case
+  435, declared below.
+
+Declared:
+- Where a set's order shows (a plan's `is_in` list, a repr, the builder
+  error naming the first item of another type, the first item `pl.col`
+  or `str.join` names, the first missing name), the reference iterates
+  the set its worker rebuilt from the bank, whose order can differ from
+  the listed one under hash collisions (strings, NaN, mixed numbers); the
+  native model follows the listed order (17 calls of the four Polars
+  probes).
+- Set keys naming several columns, or mixing names and literals, in the
+  attribute counts and selectors, as list keys (refused natively; four
+  calls).
+- The other Polars sequence keyword helpers (`get_end_activities`,
+  `filter_df_on_end_activities_nocc`) take str keys natively.
+- Two stream filter comparisons that print alike but differ (struct
+  literals of different field names) on one column: Polars rebuilds the
+  conjunction in an order Minera does not model (fresh CJ 2026112503 case
+  677: `((hi & s) & lo)` instead of `s & (lo & hi)`).
+- `eventually_follows` with a set of activities whose items are built as
+  Series (two calls), a set case key holding a tuple (a List literal
+  column), `A_next_B_next_C` whose join fails on the key dtypes before
+  the set selector, and a dict numeric bound holding a set beside a
+  stream filter whose cast fails first (one call each).
+- pandas `filter_df_relative_occurrence_event_attribute` keeping once
+  per case with a dict plain attribute key and an empty-tuple member on
+  an empty frame with a missing case key (pm4py's `KeyError: 'missing'`
+  first; fresh pandas CK 2026112521 case 435).
+
+Tests:
+- New: `docs/polars-filter-db-set-bank.json.gz` (set-pltbl-1, 16,161
+  calls), `docs/polars-filter-db-set-ck-bank.json.gz` (set-pltblck-2,
+  16,391 calls), `docs/polars-sequence-filter-db-set-bank.json.gz`
+  (set-plseq-1, 6,538 calls),
+  `docs/polars-sequence-filter-db-set-cp-bank.json.gz` (set-plseqcp-2,
+  4,401 calls), `docs/pandas-filter-db-set-ck-bank.json.gz`
+  (set-pdtblck-2, 8,785 calls) and
+  `docs/pandas-filter-db-set-ltl-bank.json.gz` (set-pdltl-2, 1,800
+  calls), replayed by the `minera_*_db_set*_bank_parity_tests` ctests
+  (563 tests, all passing).

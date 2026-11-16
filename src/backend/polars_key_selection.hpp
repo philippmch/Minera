@@ -53,7 +53,9 @@ inline EventAttribute col_key(const EventAttribute& key, const std::vector<std::
   if (dict_key(key)) {
     for (const auto& child : key.children)
       if (std::find(names.begin(), names.end(), child.key) == names.end()) names.push_back(child.key);
-  } else if (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) {
+  } else if (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple ||
+             key.container == AttributeContainerKind::kSet || key.container == AttributeContainerKind::kFrozenSet) {
+    // Round DB: pl.col iterates a set's items like a list's.
     for (const auto& item : key.children) {
       if (!plain_text(item)) return key;
       if (std::find(names.begin(), names.end(), item.value) == names.end()) names.push_back(item.value);

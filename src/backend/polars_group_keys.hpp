@@ -60,8 +60,10 @@ inline bool text_key(const EventAttribute& v) {
   return v.container == AttributeContainerKind::kScalar && !v.is_null && !is_native_na_attribute(v) &&
          v.kind == AttributeKind::kString && std::holds_alternative<std::monostate>(v.typed_value);
 }
+// Round DB: group_by/sort take a set's items as keys, like a list's.
 inline bool sequence_key(const EventAttribute& v) {
-  return v.container == AttributeContainerKind::kList || v.container == AttributeContainerKind::kTuple;
+  return v.container == AttributeContainerKind::kList || v.container == AttributeContainerKind::kTuple ||
+         v.container == AttributeContainerKind::kSet || v.container == AttributeContainerKind::kFrozenSet;
 }
 
 // A non-str scalar or a non-empty list/tuple: the keys this model reads.
@@ -79,6 +81,8 @@ inline Item literal_item(const polars_lit::Value& v) {
   Item item;
   item.literal = true;
   item.name = "literal";
+  // Round DB: pl.lit refuses a set group key.
+  lit::set_literal_error(v);
   if (v.kind == lit::Kind::kDict)
     if (const auto error = lit::dict_literal_error(v)) lit::fail("TypeError", *error);
   auto typed = lit::lit_value(v);

@@ -273,11 +273,14 @@ void validate(const PolarsVariantsFilterOptions& options,bool statistics=false){
   if(keys::dict_key(options.case_id_key))fail("TypeError","apply",keys::dict_argument_message());
   // Round CN: a list or tuple case key is a Series literal (built strictly)
   // before anything else is read.
+  // Round DB: pl.lit refuses a set case key there.
+  if(detail::polars_lit::set_argument(options.case_id_key))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
   if(options.case_id_key.container==AttributeContainerKind::kList||options.case_id_key.container==AttributeContainerKind::kTuple)
     if(const auto error=detail::polars_lit::argument_literal_error(options.case_id_key))fail("TypeError","apply",*error);
   if(!text(options.activity_key)&&!collection(options.activity_key))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(options.activity_key)+"'.");
   const auto& act=options.activity_key;
-  if(act.container==AttributeContainerKind::kList||act.container==AttributeContainerKind::kTuple){
+  // Round DB: pl.col reads a set's items like a list's.
+  if(act.container==AttributeContainerKind::kList||act.container==AttributeContainerKind::kTuple||detail::polars_lit::set_argument(act)){
     if(!act.children.empty()&&!text(act.children.front()))fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(act.children.front())+"'.");
     for(const auto& item:act.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+python_type(item)+"' object is not an instance of 'str'");
   }
@@ -332,6 +335,7 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
   // Round CP: a list timestamp key is a Series literal too (built strictly
   // while Python builds the sort), sorted as its one value.
   const bool list_time=statistics&&(options.timestamp_key.container==AttributeContainerKind::kList||options.timestamp_key.container==AttributeContainerKind::kTuple);
+  if(statistics&&detail::polars_lit::set_argument(options.timestamp_key))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
   if(list_time)if(const auto error=detail::polars_lit::argument_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
   // Round CT: the statistics sort by a None case key sorts by the timestamp
   // alone and group_by(None) keeps every row in one literal group (probe

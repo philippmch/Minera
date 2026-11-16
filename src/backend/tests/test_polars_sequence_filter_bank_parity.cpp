@@ -467,7 +467,9 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
     const auto* variant = keyword(kwargs, "most_common_variant");
     const auto out = polars_filter_df_on_end_activities_nocc(
         df, value_of(*args.at(0)), counts ? std::optional(value_of(*counts)) : std::nullopt, glue, activity,
-        dict && body(*dict).boolean, variant ? std::optional(value_of(*variant)) : std::nullopt);
+        // Round DB: `if return_dict:` reads a set by its truthiness.
+        dict && (dict->fields.begin()->first == "S" ? !value_of(*dict).items.empty() : body(*dict).boolean),
+        variant ? std::optional(value_of(*variant)) : std::nullopt);
     if (out.counts) return jtagged("t", jarray({table_node(out.table), typed_value(*out.counts)}));
     return table_node(out.table);
   }
@@ -477,12 +479,29 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
   return constant(function);
 }
 
+// Round DB: get_variants_df keys of which one is a set go through the
+// PolarsFilterValue overload.
+std::optional<std::pair<PandasFilterValue, PandasFilterValue>> set_variants_keys(const Json& kwargs) {
+  const auto* c = keyword(kwargs, "case_id_key");
+  const auto* a = keyword(kwargs, "activity_key");
+  const auto tag = [](const Json* node) { return node ? node->fields.begin()->first : std::string("s"); };
+  if (tag(c) != "S" && tag(a) != "S") return std::nullopt;
+  return std::pair{c ? value_of(*c) : PandasFilterValue::of("case:concept:name"),
+                   a ? value_of(*a) : PandasFilterValue::of("concept:name")};
+}
 Json traces_module(const std::string& function, const EventTable& df, const Args& args, const Json& kwargs) {
   if (function == "apply")
     return table_node(polars_trace_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1), true)));
-  if (function == "get_variants_df")
+  if (function == "get_variants_df") {
+    if (const auto keys = set_variants_keys(kwargs)) try {
+        return table_node(polars_trace_filter_get_variants_df(df, keys->first, keys->second));
+      } catch (const PolarsSequenceFilterError&) {
+        throw;
+      } catch (const std::invalid_argument&) {  // outside the overload's domain: the str call as before
+      }
     return table_node(polars_trace_filter_get_variants_df(df, keyword_text(kwargs, "case_id_key", "case:concept:name"),
                                                           keyword_text(kwargs, "activity_key", "concept:name")));
+  }
   return constant(function);
 }
 Json starts_with_module(const std::string& function, const EventTable& df, const Args& args) {
@@ -493,9 +512,16 @@ Json starts_with_module(const std::string& function, const EventTable& df, const
 Json ends_with_module(const std::string& function, const EventTable& df, const Args& args, const Json& kwargs) {
   if (function == "apply")
     return table_node(polars_ends_with_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1), true)));
-  if (function == "get_variants_df")
+  if (function == "get_variants_df") {
+    if (const auto keys = set_variants_keys(kwargs)) try {
+        return table_node(polars_ends_with_filter_get_variants_df(df, keys->first, keys->second));
+      } catch (const PolarsSequenceFilterError&) {
+        throw;
+      } catch (const std::invalid_argument&) {  // outside the overload's domain: the str call as before
+      }
     return table_node(polars_ends_with_filter_get_variants_df(
         df, keyword_text(kwargs, "case_id_key", "case:concept:name"), keyword_text(kwargs, "activity_key", "concept:name")));
+  }
   return constant(function);
 }
 Json rework_module(const std::string& function, const EventTable& df, const Args& args) {

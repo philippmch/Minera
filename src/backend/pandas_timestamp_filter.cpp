@@ -374,6 +374,8 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
   for(const auto& item:options.case_id_key.children){
    if(mapping(item))continue;
    if(item.is_null)error("TypeError","'NoneType' object is not callable");
+   // Round DB: groupby calls a set item on each index label.
+   if(item.container==AttributeContainerKind::kSet||item.container==AttributeContainerKind::kFrozenSet){if(source.size())error("TypeError","'"+type_name(item)+"' object is not callable");break;}
    if(item.container==AttributeContainerKind::kList){if(item.children.size()!=source.size())error("ValueError","Grouper and axis must be same length");continue;}
    if(item.container==AttributeContainerKind::kScalar||item.container==AttributeContainerKind::kTuple){if(!column(source,item))error("KeyError",repr(item));continue;}
    break;
@@ -383,6 +385,10 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
   for(const auto& item:options.case_id_key.children)if(text_value(item)&&!column(source,item))error("KeyError",repr(item));
   mapping_key=true;
  }
+ // Round DB: groupby calls a set key on each index label while it groups,
+ // before the timestamp column is read (probe set-pdtblck-2 cases 63, 75).
+ if((options.case_id_key.container==AttributeContainerKind::kSet||options.case_id_key.container==AttributeContainerKind::kFrozenSet)&&source.size())
+  error("TypeError","'"+type_name(options.case_id_key)+"' object is not callable");
  if(mapping_key&&!empty_time)(void)time_column();
  const auto cases=direct_column(source,options.case_id_key);
  if(empty_time){

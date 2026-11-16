@@ -203,7 +203,9 @@ std::string column_prefix(const EventTable& source,const std::string& key) {
 std::optional<std::size_t> index_of(const EventTable& table,const std::string& name) {
   auto p=std::find(table.columns.begin(),table.columns.end(),name);if(p==table.columns.end())return {};return std::distance(table.columns.begin(),p);
 }
-void col_selector(const EventAttribute& value) {
+// The pl.col checks Python makes; true where a non-empty key list remains
+// that the native selector cannot model.
+bool col_selector_unmodelled(const EventAttribute& value) {
   if(!text(value)&&!collection(value))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(value)+"'.");
   // Round CL: pl.col of a list names the first item's type when it is not a
   // str, else the first later item that is not one.
@@ -211,7 +213,11 @@ void col_selector(const EventAttribute& value) {
     fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(value.children.front())+"'.");
   // Round CM: a dict selects its names (str keys), so its values go unread.
   if(collection(value)&&!mapping(value))for(const auto& item:value.children)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+python_type(item)+"' object is not an instance of 'str'");
-  if(collection(value)&&!mapping(value)&&!value.children.empty())throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
+  // Round DB: a set selects its names as pl.col does (keys::col_key).
+  return collection(value)&&!mapping(value)&&!value.children.empty()&&!detail::polars_lit::set_argument(value);
+}
+void col_selector(const EventAttribute& value) {
+  if(col_selector_unmodelled(value))throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
 }
 // The checked selector as pl.col reads it (round CM).
 EventAttribute col_key(const EventAttribute& value,const std::vector<std::string>& columns) {
@@ -252,7 +258,14 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
     for(auto [name,target]:std::vector<std::pair<std::string,std::optional<EventAttribute>*>>{{"keep_once_per_case",&call.options.keep_once_per_case},{"stream_filter_key1",&call.options.stream_filter_key1},{"stream_filter_value1",&call.options.stream_filter_value1},{"stream_filter_key2",&call.options.stream_filter_key2},{"stream_filter_value2",&call.options.stream_filter_value2}})if(auto v=get(name))*target=*v;
   }
   if(!statistics(op)) {
-    call.options.attribute_key=col_key(call.options.attribute_key,columns);
+    // Round DB: a key list the native selector cannot model is refused only
+    // after the literals Python builds with it (set bounds and values).
+    bool refused=col_selector_unmodelled(call.options.attribute_key);
+    if(!refused) {
+      auto key=keys::col_key(call.options.attribute_key,columns);
+      refused=collection(key)&&!key.children.empty();
+      if(!refused)call.options.attribute_key=key;
+    }
     auto literal=[](const EventAttribute& v){
       if(!collection(v)||v.container==AttributeContainerKind::kContainer)return;
       try{(void)detail::polars_lit::literal_of(detail::polars_lit::value_of(v));}
@@ -263,13 +276,18 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
       // Python builds the bound literals, then each stream filter's column and
       // literal; round CJ: a dict literal converts strictly (its TypeError).
       const auto scalar_literal=[&](const EventAttribute& v){
+        // Round DB: pl.lit refuses a set bound or stream value.
+        if(detail::polars_lit::set_argument(v))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
         if(mapping(v)){if(const auto error=detail::polars_lit::dict_literal_error(v))fail("TypeError","apply",*error);return;}
         literal(v);
       };
       scalar_literal(*call.lower);scalar_literal(*call.upper);
-      if(op==Op::kNumericTraces)for(auto [key,value]:std::vector<std::pair<const std::optional<EventAttribute>*,const std::optional<EventAttribute>*>>{{&call.options.stream_filter_key1,&call.options.stream_filter_value1},{&call.options.stream_filter_key2,&call.options.stream_filter_value2}}) {
+      if(op==Op::kNumericTraces)for(auto [key,value]:std::vector<std::pair<std::optional<EventAttribute>*,const std::optional<EventAttribute>*>>{{&call.options.stream_filter_key1,&call.options.stream_filter_value1},{&call.options.stream_filter_key2,&call.options.stream_filter_value2}}) {
         if(!*key||null(**key))continue;
-        col_selector(**key);if(*value)scalar_literal(**value);
+        col_selector(**key);
+        // Round DB: a set stream key selects its names as pl.col does.
+        if(detail::polars_lit::set_argument(**key))**key=col_key(**key,columns);
+        if(*value)scalar_literal(**value);
       }
     }
     if(traced(op)) {
@@ -279,6 +297,7 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
       dict_argument(key);
       if(!text(key)&&!collection(key)&&!integer(key))col_selector(key);
     }
+    if(refused)throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
   }
   return call;
 }
@@ -1191,6 +1210,9 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
   const auto groupnodes=result.once?std::vector<std::string>{"'group_by'","'group_by'"}:std::vector<std::string>{"'group_by'"};
   // Per-case counts group by [case, attribute]: the case key resolves first.
   const auto case_column=[&]{
+    // Round DB: group_by([case, attribute]) builds a set case key's literal,
+    // which pl.lit refuses while the plan is built.
+    if(detail::polars_lit::set_argument(options.case_id_key))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
     // Round CM: group_by([case, attribute]) reads a dict case key as a
     // struct literal, so the denominator's pl.col(dict) fails first.
     if(mapping(options.case_id_key)){
@@ -1218,6 +1240,32 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     if(!at)fail("ColumnNotFoundError","apply",column_prefix(source,key.value)+resolved("'group_by'",frame_plan(source),groupnodes));
     return at;
   };
+  // Round DB: group_by(set) takes the set's items as keys, so one str item
+  // counts that column; per case, group_by([case, set]) builds the set's
+  // literal, which pl.lit refuses.
+  if(detail::polars_lit::set_argument(attr)) {
+    if(result.once)fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
+    // Each item that is no str is a literal built with the plan: a nested set
+    // is refused, a tuple builds its Series (probe set-pltblck-2).
+    for(const auto& item:attr.children) {
+      if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
+      if(item.container==AttributeContainerKind::kList||item.container==AttributeContainerKind::kTuple)
+        if(const auto error=detail::polars_lit::argument_literal_error(item))fail("TypeError","apply",*error);
+    }
+    // The keys resolve in order: a missing name fails at its place, a second
+    // item that is no str repeats the name `literal` there.
+    std::size_t literals=0;
+    for(const auto& item:attr.children) {
+      if(text(item)){if(!index_of(source,item.value))fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),groupnodes));continue;}
+      if(++literals==2)fail("DuplicateError","apply","group_by keys contained duplicate output name 'literal'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+resolved("'group_by'",frame_plan(source),groupnodes));
+    }
+    // One tuple item groups as a List literal, which the counts dict cannot
+    // take as a key, with or without rows (set-pltblck-2 case 119).
+    if(attr.children.size()==1&&collection(attr.children.front()))fail("TypeError","apply","unhashable type: 'list'");
+    if(attr.children.size()==1)return counts_schema(source,attr.children.front(),options,relative);
+    // Several items: the relative filter reads the pairs (stats).
+    if(relative&&attr.children.size()>=2)return result;
+  }
   if(collection(attr)) {
     // Round CH: an empty key list fails on its first item only after the
     // per-case group_by resolved (a missing case key fails first).
@@ -1225,6 +1273,8 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     // A key list groups by each of its items; round CM: a dict item is
     // refused as unhashable first.
     if(!result.once&&!attr.children.empty()&&mapping(attr.children.front()))fail("TypeError","apply","unhashable type: 'dict'");
+    // Round DB: a set item is refused as group_by builds its literal.
+    if(!result.once)for(const auto& item:attr.children){if(mapping(item))break;if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);}
     if(result.once)if(const auto error=detail::polars_lit::argument_literal_error(attr))fail("TypeError","apply",*error);
     // Round CQ: per case, a one-item key list holding a dict or a list counts
     // that value, which the counts dict cannot take as a key.
@@ -1262,8 +1312,10 @@ PolarsAttributeCounts counts_from(const EventTable& source,const CountColumn& co
     auto [it,inserted]=positions.emplace(key,out.size());if(inserted)out.push_back({clean_value(v),count_value(0)});
     auto& n=out[it->second].count;const auto count=static_cast<std::uint64_t>(exact(n));n=count_value(count+1);
   }
-  // Grouping an empty frame by a literal still yields the literal's group.
-  if(!col.column&&!col.once&&out.empty())out.push_back({clean_value(col.literal),count_value(0)});
+  // Grouping an empty frame by a literal still yields the literal's group;
+  // round DB: per case too (the stake then multiplies; probe set-pltbl-1
+  // case 294).
+  if(!col.column&&out.empty())out.push_back({clean_value(col.literal),count_value(0)});
   return out;
 }
 std::size_t distinct_case_count(const EventTable& source,const EventAttribute& raw) {
@@ -1318,6 +1370,11 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     dict_argument(attr);
     auto countoptions=options;
     if(op!=Op::kRelative)countoptions.keep_once_per_case.reset();
+    // Round DB: group_by builds each item of a key list that is no str as a
+    // literal, so a set item is refused while the plan is built, before
+    // head(n) checks its bound (probe set-pltblck-2 case 13).
+    if((attr.container==AttributeContainerKind::kList||attr.container==AttributeContainerKind::kTuple)&&!(countoptions.keep_once_per_case&&truth(*countoptions.keep_once_per_case)))
+      for(const auto& item:attr.children){if(mapping(item))break;if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);}
     // Round CM: a key list holding a dict (black-box): a leading dict is
     // unhashable; after a name, the dict groups as a struct literal whose
     // value meets the threshold; df[list] names a dict item.
@@ -1328,9 +1385,9 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     if(dict_items&&op==Op::kTopActivities&&!eager) {
       const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
       if(!null(maximum)) {
-        if(text(maximum))fail("TypeError","apply","'<' not supported between instances of 'str' and 'int'");
-        // Round DA: head(n) compares a set with 0.
-        if(maximum.container==AttributeContainerKind::kSet)fail("TypeError","apply","'<' not supported between instances of 'set' and 'int'");
+        // Round DB: head(n) compares a truthy str or container with 0 first; an
+        // empty one fails the integer conversion.
+        if((text(maximum)||collection(maximum))&&truth(maximum))fail("TypeError","apply","'<' not supported between instances of '"+core_type(maximum)+"' and 'int'");
         if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
         const auto n=exact(maximum);
         if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");
@@ -1360,6 +1417,21 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
         fail("TypeError","apply","'>=' not supported between instances of 'dict' and '"+core_type(*call.threshold)+"'");
     }
     if(op==Op::kTopActivities) {
+      // Round DB: group_by(set) takes the set's items as keys; head(n) checks
+      // its bound while the plan is built, the slice resolves the columns,
+      // then the collected frame refuses a set as a column selector.
+      if(detail::polars_lit::set_argument(attr)&&!eager) {
+        const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
+        if(!null(maximum)) {
+          if((text(maximum)||collection(maximum))&&truth(maximum))fail("TypeError","apply","'<' not supported between instances of '"+core_type(maximum)+"' and 'int'");
+          if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
+          const auto n=exact(maximum);
+          if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");
+        }
+        for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
+          fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'slice'",frame_plan(source),std::vector<std::string>{"'group_by'","'select'","'slice'"}));
+        fail("TypeError","apply",detail::polars_lit::set_selector_error(attr));
+      }
       if(collection(attr)) {if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");fail("AttributeError","apply","'DataFrame' object has no attribute 'to_list'");}
       if(text(attr)&&!index_of(source,attr.value))fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved(eager?"'group_by'":"'slice'",frame_plan(source),eager?std::vector<std::string>{"'group_by'"}:std::vector<std::string>{"'group_by'","'select'","'slice'"}));
       if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
@@ -1368,14 +1440,50 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     }
     schema=counts_schema(source,attr,countoptions,op==Op::kRelative);
     if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+    // Round DB: grouped by several set items, the counts pair each group's
+    // first key with its second, which the threshold compares; then
+    // pl.col(set) checks its items (probe set-pltblck-2 case 201).
+    if(op==Op::kRelative&&detail::polars_lit::set_argument(attr)&&attr.children.size()>=2) {
+      const bool case_denominator=!options.keep_once_per_case||truth(*options.keep_once_per_case);
+      if(case_denominator)(void)distinct_case_count(source,options.case_id_key);
+      if(!source.rows.empty()) {
+        const auto& stake=*call.stake;
+        if(null(stake)||date(stake)||mapping(stake)||detail::polars_lit::set_argument(stake))
+          fail("TypeError","apply","unsupported operand type(s) for *: '"+core_type(stake)+"' and 'int'");
+        // The stake times the denominator: a str or a sequence repeats.
+        const std::string product=text(stake)?"str":collection(stake)?core_type(stake):real(stake)?"float":"int";
+        const auto& second=attr.children[1];
+        std::string paired;
+        if(text(second)) {
+          const auto at=*index_of(source,second.value);const auto dtype=source_dtype(source,at);
+          if(std::any_of(source.rows.begin(),source.rows.end(),[&](const auto& row){return detail::polars_lit::null_cell(row[at]);}))throw std::invalid_argument("Native Polars relative occurrence on several set keys: null paired values");
+          if(dtype.starts_with("String")||dtype.starts_with("Categorical")||dtype.starts_with("Enum"))paired="str";
+          else if(dtype.starts_with("Int")||dtype.starts_with("UInt"))paired="int";
+          else if(dtype.starts_with("Float"))paired="float";
+          else if(dtype=="Boolean")paired="bool";
+          else throw std::invalid_argument("Native Polars relative occurrence on several set keys: the paired dtype");
+        } else if(null(second))paired="NoneType";
+        else if(collection(second))paired="list";
+        else if(boolean(second))paired="bool";
+        else if(integer(second))paired="int";
+        else if(real(second))paired="float";
+        else throw std::invalid_argument("Native Polars relative occurrence on several set keys: the paired literal");
+        const auto number_type=[](const std::string& t){return t=="int"||t=="float"||t=="bool";};
+        if(paired=="list"&&product=="list")throw std::invalid_argument("Native Polars relative occurrence on several set keys: list against list");
+        if(!(number_type(paired)&&number_type(product))&&!(paired=="str"&&product=="str"))
+          fail("TypeError","apply","'>=' not supported between instances of '"+paired+"' and '"+product+"'");
+      }
+      col_selector(attr);
+      throw std::invalid_argument("Native Polars relative occurrence selects one set key only");
+    }
     counts=counts_from(source,schema);
   } else {counts=cache_counts(*call.count_cache);selection.from_cache=true;}
   if(op==Op::kTopActivities) {
     const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
     if(!null(maximum)) {
-      if(text(maximum))fail("TypeError","apply","'<' not supported between instances of 'str' and 'int'");
-        // Round DA: head(n) compares a set with 0.
-        if(maximum.container==AttributeContainerKind::kSet)fail("TypeError","apply","'<' not supported between instances of 'set' and 'int'");
+      // Round DB: head(n) compares a truthy str or container with 0 first; an
+      // empty one fails the integer conversion.
+      if((text(maximum)||collection(maximum))&&truth(maximum))fail("TypeError","apply","'<' not supported between instances of '"+core_type(maximum)+"' and 'int'");
       if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
       const auto n=exact(maximum);
       if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");

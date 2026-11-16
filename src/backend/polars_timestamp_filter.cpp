@@ -229,6 +229,8 @@ Query prepare(const std::vector<std::string>& columns,Operation op,const EventAt
   if(op==Operation::kAttribute&&dict_value(value))struct_literal_check(value);
   // Round CO: a list value builds its literal before pl.col reads the
   // timestamp key (cases 62, 69, 143 and 382 of the CL and CK banks).
+  // Round DB: pl.lit refuses a set value there (probe set-pltblck-2).
+  if(op==Operation::kAttribute&&lit::set_argument(value))fail("TypeError","apply",lit::kSetLiteralError);
   if(op==Operation::kAttribute&&(value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple)) {
     try{(void)lit::literal_of(lit::value_of(value));}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.what());}
   }
@@ -582,7 +584,8 @@ bool attribute_match(const std::optional<EventAttribute>& cell,const std::string
 EventTable collect(const EventTable& source,const Query& query,const std::string& phase) {
   auto q=query;
   source.validate();if(source.index||source.dtypes.size()!=source.columns.size())throw std::invalid_argument("Native Polars timestamp filters require declared dtypes and no dataframe index");
-  // Python builds the attribute value literal first.
+  // Python builds the attribute value literal first (round DB: refusing a set).
+  if(q.op==Operation::kAttribute&&lit::set_argument(q.value))fail("TypeError",phase,lit::kSetLiteralError);
   if(q.op==Operation::kAttribute&&(q.value.container==AttributeContainerKind::kList||q.value.container==AttributeContainerKind::kTuple)) {
     try{(void)lit::literal_of(lit::value_of(q.value));}catch(const PolarsSequenceFilterError& error){fail(error.type,phase,error.what());}
   }

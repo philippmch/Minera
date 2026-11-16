@@ -97,6 +97,15 @@ struct PolarsEndActivitiesNocc {
 [[nodiscard]] EventTable polars_ends_with_filter_get_variants_df(const EventTable& df,
                                                                  const std::string& case_id_key = "case:concept:name",
                                                                  const std::string& activity_key = "concept:name");
+// Round DB: keys given as a str or a set. A set case key fails pm4py's sort
+// literal (pl.lit refuses a set); a set activity key is read by pl.col (its
+// items must be str; one existing name selects that column). Other values,
+// and other set activity keys, are outside the native domain
+// (std::invalid_argument).
+[[nodiscard]] EventTable polars_trace_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
+                                                             const PolarsFilterValue& activity_key);
+[[nodiscard]] EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
+                                                                 const PolarsFilterValue& activity_key);
 // Round DA: a parameters argument that is a set. Each module first reads
 // every key as parameters[k], which a non-empty set cannot index
 // (PolarsSequenceFilterError TypeError); an empty set reads as no

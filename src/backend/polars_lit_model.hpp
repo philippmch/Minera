@@ -253,8 +253,15 @@ inline std::string string_cast(const EventAttribute& cell, const std::string& dt
 // the order the Python dict holds them (a repeated key keeps its first place
 // and its last value), each typed as pl.lit types a value; inside a list,
 // struct types meet field by field (see lit_supertype).
+// Round DB: a set (or frozenset) item is an Object value (probe/objlit
+// pairs): Object meets Null in Object and String in String and nothing
+// else; an Object Series takes any value; a Series of List(Object) fails
+// at once ("not yet implemented: Nested object types", the pl.lit Series
+// 'literal' when the whole literal's elements are Objects), a Series of
+// structs with an Object field after its fields are built ("nested objects
+// are not allowed").
 struct LitType {
-  enum class K { kNull, kBoolean, kInt64, kFloat64, kString, kDate, kDatetime, kList, kUInt64, kInt128, kStruct };
+  enum class K { kNull, kBoolean, kInt64, kFloat64, kString, kDate, kDatetime, kList, kUInt64, kInt128, kStruct, kObject };
   K kind = K::kNull;
   std::string zone;                // kDatetime: empty when naive
   std::vector<LitType> inner;      // kList: the element type; kStruct: the field types
@@ -292,6 +299,7 @@ inline std::string short_name(const LitType& t) {
     case K::kUInt64: return "u64";
     case K::kInt128: return "i128";
     case K::kStruct: return "struct[" + std::to_string(t.inner.size()) + "]";
+    case K::kObject: return "object";
   }
   return "?";
 }
@@ -322,6 +330,7 @@ inline std::string debug_name(const LitType& t) {
       for (std::size_t i = 0; i < t.inner.size(); ++i) out += (i ? ", '" : "'") + t.names[i] + "': " + debug_name(t.inner[i]);
       return out + "})";
     }
+    case K::kObject: return "Object";
   }
   return "?";
 }
@@ -344,6 +353,74 @@ inline Value literal_datetime(const Value& v) {
   return Value::datetime(wall, *v.offset_minutes, v.text);
 }
 inline Literal list_literal(const std::vector<Value>& items);
+inline Literal nested_list_literal(const std::vector<Value>& items);
+// Python's repr() of a set item or a set (round DB: an Object value as Polars
+// prints it in a builder error; the items in the order Python iterates them).
+inline std::string object_str_repr(const std::string& text) {
+  const bool double_quotes = text.find('\'') != std::string::npos && text.find('"') == std::string::npos;
+  const char q = double_quotes ? '"' : '\'';
+  std::string out(1, q);
+  for (const char c : text) {
+    if (c == '\\') out += "\\\\";
+    else if (c == q) out += std::string("\\") + q;
+    else if (c == '\n') out += "\\n";
+    else if (c == '\r') out += "\\r";
+    else if (c == '\t') out += "\\t";
+    else out += c;
+  }
+  return out + q;
+}
+inline std::string object_repr(const Value& v) {
+  switch (v.kind) {
+    case Kind::kNone: return "None";
+    case Kind::kBool: return v.boolean ? "True" : "False";
+    case Kind::kInt: return integer_text(v);
+    case Kind::kFloat: return python::float_repr(v.real);
+    case Kind::kString: return object_str_repr(v.text);
+    case Kind::kList:
+    case Kind::kTuple: {
+      std::string out;
+      for (std::size_t i = 0; i < v.items.size(); ++i) out += (i ? ", " : "") + object_repr(v.items[i]);
+      if (v.kind == Kind::kTuple) return "(" + out + (v.items.size() == 1 ? ",)" : ")");
+      return "[" + out + "]";
+    }
+    case Kind::kSet: {
+      std::string out;
+      for (std::size_t i = 0; i < v.items.size(); ++i) out += (i ? ", " : "") + object_repr(v.items[i]);
+      return v.items.empty() ? "set()" : "{" + out + "}";
+    }
+    case Kind::kDict: {
+      std::string out;
+      for (std::size_t i = 0; i < v.entries.size(); ++i)
+        out += (i ? ", " : "") + object_repr(v.entries[i].first) + ": " + object_repr(v.entries[i].second);
+      return "{" + out + "}";
+    }
+    case Kind::kDate: {
+      const auto text = pandas_filter_value_str(v);  // YYYY-MM-DD
+      return "datetime.date(" + std::to_string(std::stoll(text.substr(0, text.size() - 6))) + ", " +
+             std::to_string(std::stoi(text.substr(text.size() - 5, 2))) + ", " + std::to_string(std::stoi(text.substr(text.size() - 2))) + ")";
+    }
+    case Kind::kDatetime: {
+      // datetime.datetime(Y, M, D, h, m[, s[, us]][, tzinfo=...]) of the wall clock.
+      const auto day = floor_div(v.integer, 86'400'000'000'000);
+      const auto date = object_repr(Value::date(day));
+      const auto rest = v.integer - day * 86'400'000'000'000;
+      const auto micros = rest / 1000 % 1'000'000;
+      const auto seconds = rest / 1'000'000'000;
+      std::string out = "datetime.datetime(" + date.substr(14, date.size() - 15) + ", " + std::to_string(seconds / 3600) + ", " +
+                        std::to_string(seconds / 60 % 60);
+      if (seconds % 60 || micros) out += ", " + std::to_string(seconds % 60);
+      if (micros) out += ", " + std::to_string(micros);
+      if (v.offset_minutes) {
+        if (v.text == "UTC" || (*v.offset_minutes == 0 && v.text.empty())) out += ", tzinfo=datetime.timezone.utc";
+        else if (v.text.empty()) out += ", tzinfo=datetime.timezone(datetime.timedelta(" + std::string(*v.offset_minutes < 0 ? "days=-1, seconds=" + std::to_string(86'400 + *v.offset_minutes * 60) : "seconds=" + std::to_string(*v.offset_minutes * 60)) + "))";
+        else out += ", tzinfo=zoneinfo.ZoneInfo(key='" + v.text + "')";
+      }
+      return out + ")";
+    }
+    default: return pandas_filter_value_str(v);
+  }
+}
 inline LitValue lit_value(const Value& v) {
   using K = LitType::K;
   switch (v.kind) {
@@ -359,7 +436,7 @@ inline LitValue lit_value(const Value& v) {
     }
     case Kind::kList:
     case Kind::kTuple: {
-      auto inner = list_literal(v.items);
+      auto inner = nested_list_literal(v.items);
       return {list_of(inner.type), Value::list(std::move(inner.values))};
     }
     case Kind::kDict: {
@@ -379,9 +456,8 @@ inline LitValue lit_value(const Value& v) {
       }
       return {std::move(type), Value::dict(std::move(entries))};
     }
-    // Round DA: a set item is a Polars Object value, outside the model
-    // (carried to round DB).
-    case Kind::kSet: break;
+    // Round DB: a set item is a Polars Object value.
+    case Kind::kSet: return {lit_type(K::kObject), v};
   }
   fail("TypeError", "unsupported list literal item");
 }
@@ -403,6 +479,7 @@ inline std::string scalar_display(const Value& v);
 // A literal value as Polars displays it (errors, plans).
 inline std::string lit_display(const LitType& type, const Value& v) {
   if (v.kind == Kind::kNone) return "null";
+  if (type.kind == LitType::K::kObject) return object_repr(v);
   if (type.kind == LitType::K::kList) {
     std::vector<std::string> parts;
     for (const auto& item : v.items) parts.push_back(lit_display(type.inner[0], item));
@@ -511,6 +588,8 @@ inline std::optional<Value> cast_lit(const Value& v, const LitType& from, const 
   using K = LitType::K;
   if (v.kind == Kind::kNone || from.kind == K::kNull) return std::nullopt;
   if (from == to) return v;
+  // Round DB: an Object value casts to nothing else.
+  if (from.kind == K::kObject || to.kind == K::kObject) return std::nullopt;
   // Round CI (probed in nested pl.lit lists): a struct casts field by field
   // (by name, a missing field null), a number into a struct of one
   // non-nested field, a struct to String as it displays ({1,"y"}). A field
@@ -692,6 +771,13 @@ inline std::vector<Value> build_strict(const LitType& type, const std::vector<Li
   using K = LitType::K;
   std::vector<Value> out;
   if (type.kind == K::kNull) return std::vector<Value>(values.size());
+  // Round DB: an Object Series takes any value; a List(Object) one fails
+  // before it reads a value.
+  if (type.kind == K::kObject) {
+    for (const auto& v : values) out.push_back(v.type.kind == K::kNull ? Value::none() : v.value);
+    return out;
+  }
+  if (type.kind == K::kList && type.inner[0].kind == K::kObject) build_error("not yet implemented: Nested object types");
   // Round CI: a struct Series takes structs and nulls only (any other value
   // fails first), then builds each field strictly in field order.
   if (type.kind == K::kStruct) {
@@ -740,6 +826,9 @@ inline std::vector<Value> build_strict(const LitType& type, const std::vector<Li
                          type.names[f] + "'\n\t[" + std::to_string(k + 1) + e.message.substr(at));
       }
     }
+    // Round DB: an Object field fails the struct once every field is built.
+    if (std::any_of(type.inner.begin(), type.inner.end(), [](const LitType& f) { return f.kind == K::kObject; }))
+      build_error("nested objects are not allowed");
     for (std::size_t r = 0; r < values.size(); ++r) {
       if (values[r].type.kind != K::kStruct && !positional(values[r])) {
         out.emplace_back();
@@ -809,7 +898,9 @@ inline Literal from_values_strict(const std::vector<LitValue>& values) {
   }
   return {type, build_strict(type, values)};
 }
-inline Literal list_literal(const std::vector<Value>& items) {
+// A list's items as one Series level builds them (a nested list item's, or
+// the elements of pl.lit's list).
+inline Literal nested_list_literal(const std::vector<Value>& items) {
   using K = LitType::K;
   if (items.empty()) return {};
   std::vector<LitValue> values;
@@ -859,6 +950,16 @@ inline Literal list_literal(const std::vector<Value>& items) {
     type = *s;
   }
   return {type, build_strict(type, values)};
+}
+// pl.lit of a list: its elements (above), then the Series 'literal' of one
+// list value, which refuses Object elements (round DB).
+inline Literal list_literal(const std::vector<Value>& items) {
+  auto out = nested_list_literal(items);
+  if (out.type.kind == LitType::K::kObject)
+    fail("TypeError",
+         "not yet implemented: Nested object types\n\nThis error occurred with the following context stack:\n\t[1] while "
+         "constructing Series 'literal'\n\n\nHint: Try setting `strict=False` to allow passing data with mixed types.");
+  return out;
 }
 // A datetime literal as Polars prints it: wall clock in its zone with 3 or 6
 // fractional digits only when needed, then the zone's abbreviation (round
@@ -942,6 +1043,7 @@ inline std::string lit_kind(const Literal& literal) {
     case K::kUInt64: return "UInt64";
     case K::kInt128: return "Int128";
     case K::kStruct: return "Struct";
+    case K::kObject: return "Object";
   }
   return "List";
 }
@@ -1416,6 +1518,19 @@ inline const char* const kSetLiteralError =
     "type Object.";
 inline void set_literal_error(const Value& v) {
   if (v.kind == Kind::kSet) fail("TypeError", kSetLiteralError);
+}
+// Round DB: a set or frozenset argument (pl.lit refuses it as a comparison
+// operand or a whole literal; is_in takes its items).
+inline bool set_argument(const EventAttribute& a) {
+  return a.container == AttributeContainerKind::kSet || a.container == AttributeContainerKind::kFrozenSet;
+}
+// "cannot select columns using key of type 'set': {...}" (DataFrame
+// __getitem__ refusing a set or frozenset selector).
+inline std::string set_selector_error(const EventAttribute& a) {
+  const bool frozen = a.container == AttributeContainerKind::kFrozenSet;
+  auto shown = object_repr(value_of(a));
+  if (frozen) shown = a.children.empty() ? "frozenset()" : "frozenset(" + shown + ")";
+  return std::string("cannot select columns using key of type '") + (frozen ? "frozenset" : "set") + "': " + shown;
 }
 // The Literal of a list or tuple argument (a dict: its keys; round DA: a
 // set's items, as is_in takes them).
@@ -2265,9 +2380,20 @@ inline EventAttribute literal_cell(const std::string& key, const LitType& t, con
       out.value = python::float_repr(std::get<double>(out.typed_value));
       return out;
     case K::kDate:
+      out.kind = AttributeKind::kDate;
+      out.value = pandas_filter_value_str(v);
+      return out;
     case K::kDatetime:
       out.kind = AttributeKind::kDate;
       out.value = pandas_filter_value_str(v);
+      // Round DB: a datetime literal column holds the typed instant, as the
+      // frame's own datetime cells (isoformat; probe set-pltblck-2 case 115).
+      if (v.kind == Kind::kDatetime && out.value.size() > 10 && out.value[10] == ' ' && (!v.offset_minutes || !v.text.empty())) {
+        out.value[10] = 'T';
+        NativeDate typed{out.value};
+        if (!v.text.empty()) typed.timezone = v.text;
+        out.typed_value = typed;
+      }
       return out;
     default:
       out.value = v.text;

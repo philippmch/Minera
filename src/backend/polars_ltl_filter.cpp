@@ -449,6 +449,8 @@ void dict_argument(const EventAttribute& key) {
 // the reference lists it among its sort, over or join keys, while Python
 // builds the expressions.
 void list_key_literal(const EventAttribute& key) {
+  // Round DB: pl.lit refuses a set key.
+  if (!key.is_null && detail::polars_lit::set_argument(key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
   if (key.is_null || (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple)) return;
   if (const auto error = detail::polars_lit::argument_literal_error(key)) fail("TypeError", "apply", *error);
 }
@@ -499,7 +501,8 @@ std::string key_repr(const EventAttribute& value) {
 }
 // pl.col of a list: every item a str, or the first item names the type.
 void col_list(const EventAttribute& key) {
-  if (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple) return;
+  // Round DB: a set's items too.
+  if (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple && !detail::polars_lit::set_argument(key)) return;
   if (!key.children.empty() && !text(key.children.front()))
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(key.children.front()) + "'.");
   for (const auto& item : key.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
@@ -546,6 +549,8 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
       if (out.operation == Op::kFourEyes && at == 1) list_key_literal(o.case_id_key);
       if (query.container == AttributeContainerKind::kList || query.container == AttributeContainerKind::kTuple)
         if (const auto error = detail::polars_lit::argument_literal_error(query)) fail("TypeError", "apply", *error);
+      // Round DB: and a set activity is refused by pl.lit.
+      if (detail::polars_lit::set_argument(query)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
       // Round CI: a dict becomes a struct literal then too (a list field
       // that cannot be built fails it, as in the timeframe filter).
       if (query.container == AttributeContainerKind::kContainer) {
@@ -565,8 +570,16 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     list_key_literal(o.case_id_key);
     if (out.operation == Op::kFourEyes) {
       if (!text(o.resource_key) && !collection(o.resource_key)) invalid_col(o.resource_key);
+      // Round DB: a set resource key is refused by pl.lit where a list one
+      // is concatenated.
+      if (detail::polars_lit::set_argument(o.resource_key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
       if (collection(o.resource_key)) fail("TypeError", "apply", "can only concatenate list (not \"str\") to list");
     }
+    // Round DB: attr_value_different_persons groups by [case, resource], so
+    // pl.lit refuses a set resource key while the plan is built (probe
+    // set-pltblck-2 case 188).
+    if (out.operation == Op::kDifferentPersons && detail::polars_lit::set_argument(o.resource_key))
+      fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
   }
   // pl.col(dict) selects the dict's names (round CM).
   if (out.operation != Op::kNext) out.options.attribute_key = keys::col_key(o.attribute_key, columns);
@@ -971,6 +984,8 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
         fail("TypeError", "apply", "cannot select columns using Sequence with elements of type 'dict'");
       fail("TypeError", "apply", "'dict' object is not an instance of 'str'");
     }
+    // Round DB: the collected frame refuses a set as a column selector.
+    if (detail::polars_lit::set_argument(o.attribute_key)) fail("TypeError", "apply", detail::polars_lit::set_selector_error(o.attribute_key));
     if (collection(o.attribute_key)) fail("AttributeError", "apply", "'DataFrame' object has no attribute 'to_list'");
     if (integer(o.attribute_key)) {
       std::size_t height = 0;

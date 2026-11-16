@@ -264,7 +264,8 @@ namespace keys = detail::polars_keys;
 // selects the dict's names; keyed() resolves both.
 void validate_column(const EventAttribute& value) {
   if (text(value) || mapping(value)) return;
-  if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) {
+  // Round DB: pl.col reads a set's items like a list's.
+  if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple || detail::polars_lit::set_argument(value)) {
     if (!value.children.empty() && !text(value.children.front()))
       fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(value.children.front()) + "'.");
     for (const auto& item : value.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
@@ -298,9 +299,12 @@ std::vector<std::string> validate_apply(const EventAttribute& value, bool perfor
   auto result = paths(value, performance);
   // Round CN: a list or tuple case or timestamp key is a Series literal
   // (built strictly, as the sort lists them) before any selector is read.
-  for (const auto* key : {&options.case_id_key, &options.timestamp_key})
+  for (const auto* key : {&options.case_id_key, &options.timestamp_key}) {
+    // Round DB: pl.lit refuses a set key.
+    if (detail::polars_lit::set_argument(*key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
     if (key->container == AttributeContainerKind::kList || key->container == AttributeContainerKind::kTuple)
       if (const auto error = detail::polars_lit::argument_literal_error(*key)) fail("TypeError", "apply", *error);
+  }
   // Round CM: a dict case key fails its group_by after the attribute
   // selector is built and before the timestamp one.
   if (mapping(options.case_id_key)) {
@@ -317,6 +321,7 @@ std::vector<std::string> validate_apply(const EventAttribute& value, bool perfor
   // built; round CJ: a dict bound a struct literal (its own TypeError).
   if (performance)
     for (const auto* bound : {&options.min_performance, &options.max_performance}) {
+      if (detail::polars_lit::set_argument(*bound)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
       if (bound->container == AttributeContainerKind::kList || bound->container == AttributeContainerKind::kTuple) {
         if (const auto error = detail::polars_lit::argument_literal_error(*bound)) fail("TypeError", "apply", *error);
       } else if (mapping(*bound)) {

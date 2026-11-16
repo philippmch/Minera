@@ -143,6 +143,8 @@ namespace keys = detail::polars_keys;
 // build fails it with the dict TypeError).
 void validate_literals(const EventAttribute& low, const EventAttribute& high) {
   for (const auto* value : {&low, &high}) {
+    // Round DB: pl.lit refuses a set bound.
+    if (detail::polars_lit::set_argument(*value)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
     if (mapping(*value)) {
       if (const auto error = detail::polars_lit::dict_literal_error(*value)) fail("TypeError", "apply", *error);
     } else if (collection(*value)) {
@@ -161,15 +163,17 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
   // Round CO: pl.col of a list timestamp key fails before the bounds build
   // their literals (case 98 of the CL bank).
   const auto& time = options.timestamp_key;
-  if (op == Operation::kPerformance && (time.container == AttributeContainerKind::kList || time.container == AttributeContainerKind::kTuple)) {
+  // Round DB: pl.col reads a set's items like a list's.
+  if (op == Operation::kPerformance && (time.container == AttributeContainerKind::kList || time.container == AttributeContainerKind::kTuple ||
+                                        detail::polars_lit::set_argument(time))) {
     if (!time.children.empty() && !text(time.children.front()))
       fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(time.children.front()) + "'.");
     for (const auto& item : time.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + python_type(item) + "' object is not an instance of 'str'");
   }
   if (op == Operation::kCount && !null(bound)) {
-    if (text(bound)) fail("TypeError", "apply", "'<' not supported between instances of 'str' and 'int'");
-    // Round DA: head(n) compares a set with 0.
-    if (bound.container == AttributeContainerKind::kSet) fail("TypeError", "apply", "'<' not supported between instances of 'set' and 'int'");
+    // Round DB: head(n) compares a truthy str or container with 0 first; an
+    // empty one fails the integer conversion.
+    if ((text(bound) || collection(bound)) && truth(bound)) fail("TypeError", "apply", "'<' not supported between instances of '" + core_type(bound) + "' and 'int'");
     if (!integer(bound) && !boolean(bound)) fail("TypeError", "apply", "'" + core_type(bound) + "' object cannot be interpreted as an integer");
     if (exact(bound) < TokenInteger(0)) fail("ValueError", "apply", "negative slice lengths (" + exact(bound).decimal() + ") are invalid for LazyFrame");
   }

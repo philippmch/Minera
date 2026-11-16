@@ -158,13 +158,16 @@ void col_items(const EventAttribute& value) {
 }
 // Round CM: pl.col(dict) selects the dict's names like pl.col(list); a list
 // item that is not a str fails as pl.col reports it.
-std::string activity_key(const EventAttribute& value, const std::vector<std::string>& columns) {
+std::string activity_key(const EventAttribute& value, const std::vector<std::string>& columns, bool* several = nullptr) {
   if (text(value)) return value.value;
-  if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) col_items(value);
+  // Round DB: pl.col reads a set's items like a list's.
+  if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple || detail::polars_lit::set_argument(value))
+    col_items(value);
   if (collection(value)) {
     const auto key = keys::col_key(value, columns);
     if (!collection(key)) return key.value;
     if (key.children.empty()) return std::string(1, kNoActivityColumn);
+    if (several) { *several = true; return {}; }
     throw std::invalid_argument("Native Polars between activity selector accepts one column");
   }
   fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(value) + "'.");
@@ -183,6 +186,8 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
            "If you need the key value pairs, use one of:\n"
            "  \xe2\x80\xa2 unpack as keywords:    df.method(**your_dict)\n"
            "  \xe2\x80\xa2 build expressions:     df.method(expr.alias(k) for k, expr in your_dict.items())");
+    // Round DB: a set case key is refused by that literal (before the anchors).
+    if (detail::polars_lit::set_argument(key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
     // Round CN: a list or tuple case key is first built as a Series literal
     // (strictly), then read by pl.col, before its over() refuses it.
     if (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) {
@@ -195,8 +200,13 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
     if (collection(key)) fail("TypeError", "apply", "'" + core_type(key) + "' object is not an instance of 'str'");
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(key) + "'.");
   }
-  (void)activity_key(options.activity_key, columns);
+  // Round DB: pl.col checks its items, the anchors build their literals,
+  // then a selector of several columns is refused (probe set-pltblck-2
+  // case 99).
+  bool several = false;
+  (void)activity_key(options.activity_key, columns, &several);
   validate_anchor(act1); validate_anchor(act2);
+  if (several) throw std::invalid_argument("Native Polars between activity selector accepts one column");
 }
 
 Dtype dtype(const std::string& value) {
@@ -534,6 +544,8 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
                    const PolarsBetweenOptions& options, const std::string& phase) {
   // Python builds the anchor and separator literals before Polars runs.
   validate_anchor(act1, phase); validate_anchor(act2, phase);
+  // Round DB: pl.lit refuses a set separator.
+  if (detail::polars_lit::set_argument(options.subcase_concat_str)) fail("TypeError", phase, detail::polars_lit::kSetLiteralError);
   if (collection(options.subcase_concat_str) && options.subcase_concat_str.container != AttributeContainerKind::kContainer)
     if (const auto error = detail::polars_lit::argument_literal_error(options.subcase_concat_str)) fail("TypeError", phase, *error);
   source.validate();
