@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CY (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–CZ (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5868,6 +5868,69 @@ fresh banks, the merge sweep and probe y1 are in the project files under
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round CZ re-reviewed CY (Review CZ1). CY's commit 5d0a5dc2 ran CI run
+43849161728 (green on all six jobs). CZ replayed two batches of fresh
+seeds, took the timestamp interleavings route (the last upload route whose
+pm4py call reads a file with `read_csv`) and carried Python sets through
+the pandas bank codec:
+- Timestamp interleavings on uploads (`upload_case_relations.hpp`, server
+  and CLI): the relation file is a `read_csv` frame joined to the logs'
+  str-keyed frames by pandas' two merges, so a str or object column meets
+  cases by its str cells, a number column raises the merge `ValueError`
+  (skipped when exactly one merged frame is empty), and overlapping,
+  repeated or suffix-colliding names raise pandas' errors. Sweep: 26 of
+  150 calls differed before, 0 of 1,050 after.
+- Sets and frozensets in the pandas table filters (probes z1-z3, 4,404
+  calls): a str or datetime64 column compares a set target like a dict
+  (pandas' length and 0-d errors), a two-column selection cannot coerce
+  one, and a set case key in `variants.apply` is called by `groupby`.
+- Fresh seeds 2026112300-11 equal; 2026112312-23 found four calls, fixed:
+  a null number field cast to a one-field struct is `{null}` (Polars CJ),
+  repeated predicates are dropped by value, not display (Polars CI),
+  `activity_split`'s resolved scalar `is_in` (Polars sequence CP), and a
+  kept `None` alone matches no NaT on a datetime64 column (pandas
+  sequence CK).
+- Declared: sets in the sequence filters' codecs, groupby lists mixing a
+  set with other keys, and again the two CU plan cases (paths repeated
+  list key names, `filter_variants_top_k` one-row second columns; pm4py's
+  `DuplicateError` carries the whole plan).
+
+In the suite: new `docs/pandas-filter-cz-bank.json.gz`,
+`docs/polars-filter-cz-bank.json.gz`,
+`docs/polars-sequence-filter-cz-bank.json.gz` and
+`docs/pandas-sequence-filter-cz-bank.json.gz` with their ctests, new
+interleavings cases in `minera_case_relations_tests`, and the two
+interleavings CLI ctests now expect pandas' merge `ValueError`. The fresh
+banks, the interleavings sweep and probes z1-z3 are in the project files
+under `review-harness/round-cz/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DA) should start by re-reviewing round CZ:
+
+- CZ's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- sets and frozensets in the pandas and Polars sequence filters (their
+  value models and bank codecs have no set kind yet) and in the Polars
+  table filters' `pl.lit` model;
+- upload routes whose relation or side files pm4py reads with other
+  readers than `format_dataframe` (CZ found none left among the CSV
+  routes; the OCEL and streaming routes have their own readers);
+- the CU list (paths list case keys repeating a name,
+  `filter_variants_top_k` one-row second columns, LTL list-key cases,
+  equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CY's targets, taken in CZ (findings CZ1-1 to CZ1-3): CY's CI run,
+the fresh seeds, the `read_csv` upload routes (timestamp interleavings)
+and set values in the pandas bank codec. Not taken (carried to DA): the
+rest of the CU list.
+
+Previous list for round CZ (kept for its older items):
 
 Next round (CZ) should start by re-reviewing round CY:
 

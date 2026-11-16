@@ -721,9 +721,10 @@ if(MINERA_BUILD_TESTS)
                    --case-relations "${MINERA_CSV_TYPING_FIXTURES}/relations.csv")
   # Round CX: interleavings run on format_dataframe frames, whose case
   # column is str, while read_csv types the relation ids as int64: pm4py's
-  # merge raises ValueError (str and int64 columns), and so does Minera.
+  # merge raises ValueError (string and int64 columns), and so does Minera,
+  # with pandas' message since round CZ.
   set_tests_properties(minera_csv_relations_interleavings_typed_cli PROPERTIES
-    PASS_REGULAR_EXPRESSION "cannot be joined \\(str and number\\)")
+    PASS_REGULAR_EXPRESSION "merge on string and int64 columns for key 'case:concept:name'")
   # An NA cell makes the LEFT column float64: its 7.0 still meets the int64
   # case 7, and the concatenated case column reads 7.0 for every row.
   add_test(NAME minera_csv_relations_merge_float_key_cli
@@ -738,7 +739,7 @@ if(MINERA_BUILD_TESTS)
                    --timestamp-interleavings "${MINERA_CSV_TYPING_FIXTURES}/incoming.csv"
                    --case-relations "${MINERA_CSV_TYPING_FIXTURES}/relations_na.csv")
   set_tests_properties(minera_csv_relations_interleavings_float_key_cli PROPERTIES
-    PASS_REGULAR_EXPRESSION "cannot be joined \\(str and number\\)")
+    PASS_REGULAR_EXPRESSION "merge on string and float64 columns for key 'case:concept:name'")
   add_test(NAME minera_csv_activity_typing_cli
            COMMAND minera_query "${MINERA_CSV_TYPING_FIXTURES}/activities.csv"
                    --sql "SELECT activity FROM dataframe")
@@ -3091,6 +3092,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_sequence_filter_cx_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cx-bank.json.gz")
   set_tests_properties(minera_pandas_sequence_filter_cx_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CZ: a fresh CK seed (2026112322 case 339): on a datetime64
+  # activity column the kept end activities convert to datetimes only when
+  # one of them is a datetime, so a None alone matches no NaT boundary.
+  add_test(NAME minera_pandas_sequence_filter_cz_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cz-bank.json.gz")
+  set_tests_properties(minera_pandas_sequence_filter_cz_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_sequence_filter_bank_parity_tests
     src/backend/tests/test_polars_sequence_filter_bank_parity.cpp
@@ -3185,6 +3192,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_cu_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cu-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_cu_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CZ: a fresh CP seed (2026112312 case 950): activity_split's
+  # resolved plan shows a scalar split activity imploded and cast to the
+  # column's supertype.
+  add_test(NAME minera_polars_sequence_filter_cz_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-cz-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_cz_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3336,6 +3349,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cx_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cx-bank.json.gz")
   set_tests_properties(minera_polars_filter_cx_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CZ: fresh CJ (2026112315 case 547: a null number field cast to a
+  # struct of one field is {null}) and CI (2026112316 case 82: two equal-
+  # looking float predicates on one column stay two, their interval empty).
+  add_test(NAME minera_polars_filter_cz_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cz-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cz_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3580,6 +3599,14 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_cy_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cy-bank.json.gz")
   set_tests_properties(minera_pandas_filter_cy_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CZ: probes z1-z3 (4,404 calls): Python sets and frozensets as
+  # values (attribute values, admitted variants, paths), as targets (a str
+  # or datetime64 column compares one like a dict; a two-column selection
+  # cannot coerce one of another size and finds one of size 2 unordered)
+  # and as keys (pandas refuses a set indexer; groupby calls a set case key).
+  add_test(NAME minera_pandas_filter_cz_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cz-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_cz_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

@@ -2221,7 +2221,14 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
     const auto concat_text = c + (dtype_of(df, case_column) == "String" ? "" : ".strict_cast(String)") +
                              ".str.concat_horizontal([" + detail::polars_lit::literal_list_display(*separator_list) +
                              ", col(\"_subcase_idx\").strict_cast(String)])";
-    const auto is_in = "[" + (scalar ? "col(" + quote(act_key) + ").is_in(" + shown + ")" : coerced_is_in(act_key, dtype_of(df, act), literal)) +
+    // Round CZ (fresh CP 2026112312 case 950): the resolved is_in of a
+    // scalar is the imploded scalar cast to the supertype (round CE's model).
+    const auto scalar_is_in = [&] {
+      const auto v = literal.values.empty() ? Value::none() : literal.values.front();
+      return detail::polars_lit::coerced_scalar_is_in(act_key, dtype_of(df, act), v)
+          .value_or("col(" + quote(act_key) + ").is_in(" + shown + ")");
+    };
+    const auto is_in = "[" + (scalar ? scalar_is_in() : coerced_is_in(act_key, dtype_of(df, act), literal)) +
                        ".alias(\"_is_split_activity\")] ";
     const auto row = "[" + c + ".cum_count().over([" + c + "]).alias(\"_row_within_case\")] ";
     std::string plan = " WITH_COLUMNS:\n [" + concat_text + "] \n";

@@ -1,4 +1,5 @@
 #include "minera/pandas_read_csv.hpp"
+#include "minera/upload_case_relations.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "csv_frame_table.hpp"
 #include "minera/exact_filter_discovery_json.hpp"
@@ -6540,10 +6541,25 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto right_column = merge_fields.contains("merge_right_column")
                                     ? merge_fields.at("merge_right_column")
                                     : std::string("case_id_RIGHT");
-      auto relations = minera::parse_case_relations_csv(
-          relation_input, left_column, right_column);
-      // format_dataframe and read_xes give str case ids (round CX).
-      minera::type_case_relations_like_logs(relations, log, false, right, false);
+      // format_dataframe and read_xes give str case ids, and the relations
+      // file is a read_csv frame (rounds CX, CZ).
+      const auto file_text = [](const std::filesystem::path& path) {
+        std::ifstream stream(path, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+      };
+      const bool right_is_xes = is_xes_path(timestamp_interleavings_right_path);
+      const minera::InterleavingsUploadSide left_side{
+          log, input_is_xes,
+          input_is_xes ? minera::interleavings_xes_frame_columns(log)
+                       : minera::interleavings_csv_frame_columns(file_text(input))};
+      const minera::InterleavingsUploadSide right_side{
+          right, right_is_xes,
+          right_is_xes ? minera::interleavings_xes_frame_columns(right)
+                       : minera::interleavings_csv_frame_columns(
+                             file_text(timestamp_interleavings_right_path))};
+      const auto relations = minera::upload_interleavings_relations(
+          minera::read_csv_reference_table(relation_input), left_column, right_column,
+          left_side, right_side);
       const auto lookup = [&](std::string_view name) {
         const auto it = timestamp_interleavings_fields.find(std::string(name));
         return it == timestamp_interleavings_fields.end() ? std::string{} : it->second;

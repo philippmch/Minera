@@ -1327,9 +1327,14 @@ NoccOutcome nocc_filter(const EventTable& df, const Value& nocc, const std::opti
   // datetime64[ns] activity is then the int of its nanoseconds, which no
   // boundary activity is `isin` (round CB).
   const bool int_keys = dtype == "datetime64[ns]";
+  // Round CZ (fresh pandas sequence CK 2026112322 case 339): a datetime64
+  // column converts the kept values to datetimes only when one of them is
+  // a datetime, so a missing boundary (None) alone matches no NaT.
+  const bool none_matches = count0 || !dtype.starts_with("datetime64") ||
+                            std::any_of(kept.begin(), kept.end(), [](const auto& entry) { return entry.first.has_value(); });
   for (const auto& [key, a] : boundary)
     for (const auto& entry : kept)
-      if (!int_keys && same_activity(entry.first, a)) {
+      if (!int_keys && (a || none_matches) && same_activity(entry.first, a)) {
         keep.insert(key);
         break;
       }

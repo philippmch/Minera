@@ -100,6 +100,7 @@
 #include "minera/dataframe_columns.hpp"
 #include "csv_frame_table.hpp"
 #include "minera/pandas_read_csv.hpp"
+#include "minera/upload_case_relations.hpp"
 #include "minera/data_petri_net.hpp"
 #include "minera/declare.hpp"
 #include "minera/declare_playout.hpp"
@@ -8451,12 +8452,12 @@ void handle_timestamp_interleavings(const httplib::Request& request,
     std::istringstream left_input(left_file.content);
     std::istringstream right_input(right_file.content);
     std::istringstream relation_input(relation_file.content);
-    const auto left = looks_like_xes(left_file.filename, left_file.content)
-                          ? minera::import_xes_dataframe_log(left_input)
-                          : minera::import_csv_event_log(left_input);
-    const auto right = looks_like_xes(right_file.filename, right_file.content)
-                           ? minera::import_xes_dataframe_log(right_input)
-                           : minera::import_csv_event_log(right_input);
+    const bool left_xes = looks_like_xes(left_file.filename, left_file.content);
+    const bool right_xes = looks_like_xes(right_file.filename, right_file.content);
+    const auto left = left_xes ? minera::import_xes_dataframe_log(left_input)
+                               : minera::import_csv_event_log(left_input);
+    const auto right = right_xes ? minera::import_xes_dataframe_log(right_input)
+                                 : minera::import_csv_event_log(right_input);
     const auto value = [&](std::string_view key, std::string fallback) {
       return request.has_param(std::string(key))
                  ? request.get_param_value(std::string(key))
@@ -8466,13 +8467,20 @@ void handle_timestamp_interleavings(const httplib::Request& request,
         value("interleavings_left_column", "case_id_LEFT");
     const auto right_column =
         value("interleavings_right_column", "case_id_RIGHT");
-    auto relations = minera::parse_case_relations_csv(
-        relation_input, left_column, right_column);
     // pm4py's interleavings need datetime columns, so an upload reaches it
     // through format_dataframe (CSV) or read_xes, whose case:concept:name is
-    // str on both: text keys join by text, numeric keys fail the join as
-    // pandas' merge does (round CX, observed black-box).
-    minera::type_case_relations_like_logs(relations, left, false, right, false);
+    // str on both, and the relations file through read_csv: str cells join
+    // by text, numeric columns fail the join as pandas' merge does (rounds
+    // CX, CZ; observed black-box).
+    const auto side = [](const minera::EventLog& log, bool xes, const std::string& content) {
+      return minera::InterleavingsUploadSide{
+          log, xes,
+          xes ? minera::interleavings_xes_frame_columns(log)
+              : minera::interleavings_csv_frame_columns(content)};
+    };
+    const auto relations = minera::upload_interleavings_relations(
+        minera::read_csv_reference_table(relation_input), left_column, right_column,
+        side(left, left_xes, left_file.content), side(right, right_xes, right_file.content));
     const auto lookup = [&](std::string_view key) {
       return request.has_param(std::string(key))
                  ? request.get_param_value(std::string(key))

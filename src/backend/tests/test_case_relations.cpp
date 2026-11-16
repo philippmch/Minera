@@ -4,6 +4,7 @@
 #include "../tools/case_relations_typed_input.hpp"
 #include "minera/json_export.hpp"
 #include "minera/pandas_read_csv.hpp"
+#include "minera/upload_case_relations.hpp"
 #include "case_relations_dtype_reference_cases.hpp"
 #include "case_relations_index_reference_cases.hpp"
 #include "case_relations_reference_cases.hpp"
@@ -1137,6 +1138,92 @@ void merges_read_csv_tables_as_pandas() {
 }
 }  // namespace
 
+// Round CZ: pm4py's interleavings join the relations file as pandas.read_csv
+// reads it with two str-keyed upload frames (pandas 3.0.5, observed
+// black-box: format_dataframe CSV logs o1 (two events) and o2, i1 and i2).
+void interleavings_relations_follow_read_csv_frames() {
+  const auto trace = [](std::string id, std::size_t events) {
+    Trace result;
+    result.case_id = id;
+    for (std::size_t i = 0; i < events; ++i) result.events.push_back(event(id, "a", "2024-01-01T00:00:00Z"));
+    return result;
+  };
+  const EventLog left_log{{trace("o1", 2), trace("o2", 1)}};
+  const EventLog right_log{{trace("i1", 1), trace("i2", 1)}};
+  const EventLog empty_log{};
+  const std::vector<std::string> csv_columns = {"case_id", "activity", "timestamp"};
+  const InterleavingsUploadSide left{left_log, false, csv_columns};
+  const InterleavingsUploadSide right{right_log, false, csv_columns};
+  const InterleavingsUploadSide left_xes{left_log, true, {"concept:name", "time:timestamp", "case:concept:name"}};
+  const InterleavingsUploadSide no_left{empty_log, false, csv_columns};
+  const InterleavingsUploadSide no_right{empty_log, false, csv_columns};
+  const auto run = [](const std::string& text, const InterleavingsUploadSide& l,
+                      const InterleavingsUploadSide& r) {
+    return upload_interleavings_relations(read_csv_text(text), "case_id_LEFT", "case_id_RIGHT", l, r);
+  };
+  const auto error_of = [&](const std::string& text, const InterleavingsUploadSide& l,
+                            const InterleavingsUploadSide& r) {
+    try {
+      (void)run(text, l, r);
+    } catch (const std::invalid_argument& error) {
+      return std::string(error.what());
+    }
+    return std::string();
+  };
+  // NaN cells meet nothing, padding is kept, quotes are read, a short row
+  // is padded with NaN.
+  const auto kept = run("case_id_LEFT,case_id_RIGHT\no1,i1\n,i2\n o1,i1\no2,\"i2\"\no2\n", left, right);
+  assert((kept == std::vector<CaseRelation>{{"o1", "i1"}, {"o2", "i2"}}));
+  // Bools (also with NaN, an object column) and Python ints meet no str
+  // case, without an error.
+  assert(run("case_id_LEFT,case_id_RIGHT\no1,True\no2,False\n", left, right).empty());
+  assert(run("case_id_LEFT,case_id_RIGHT\nTrue,i1\n,i2\n", left, right).empty());
+  assert(run("case_id_LEFT,case_id_RIGHT\n18446744073709551616,i1\n1,i2\n", left, right).empty());
+  // A numeric column fails pandas' merge, naming the frame's dtype.
+  assert(error_of("case_id_LEFT,case_id_RIGHT\n1,i1\n", left, right) ==
+         "ValueError: You are trying to merge on string and int64 columns for key "
+         "'case:concept:name'. If you wish to proceed you should use pd.concat");
+  assert(error_of("case_id_LEFT,case_id_RIGHT\n1,i1\n", left_xes, right) ==
+         "ValueError: You are trying to merge on str and int64 columns for key "
+         "'case:concept:name'. If you wish to proceed you should use pd.concat");
+  assert(error_of("case_id_LEFT,case_id_RIGHT\no1,2.5\n", left, right) ==
+         "ValueError: You are trying to merge on float64 and string columns for key "
+         "'case:concept:name_RIGHT_REL'. If you wish to proceed you should use pd.concat");
+  // pandas skips the check when exactly one merged frame is empty: an empty
+  // left log, a right log without events beside met relations, unmet
+  // relations beside a right log with events.
+  assert(run("case_id_LEFT,case_id_RIGHT\n1,i1\n", no_left, right).empty());
+  assert(run("case_id_LEFT,case_id_RIGHT\no1,\n", left, no_right).empty());
+  assert(run("case_id_LEFT,case_id_RIGHT\nzz,1\n", left, right).empty());
+  assert(error_of("case_id_LEFT,case_id_RIGHT\nzz,1\n", left, no_right).find(
+             "merge on int64 and string columns for key 'case:concept:name_RIGHT_REL'") !=
+         std::string::npos);
+  assert(run("case_id_LEFT,case_id_RIGHT\n", left, right).empty());
+  // Column clashes with the merged frames.
+  assert(error_of("case_id_LEFT,case_id_RIGHT,timestamp,activity_2,case_id\no1,i1,z,y,x\n", left,
+                  right) ==
+         "ValueError: columns overlap but no suffix specified: Index(['case_id', 'timestamp', "
+         "'activity_2'], dtype='str')");
+  assert(error_of("case_id_LEFT,case_id_RIGHT,timestamp,concept:name_2,case:concept:name\n"
+                  "o1,i1,z,y,x\n",
+                  left_xes, right) ==
+         "ValueError: columns overlap but no suffix specified: Index(['case:concept:name', "
+         "'concept:name_2'], dtype='str')");
+  assert(error_of("case_id_LEFT,case_id_RIGHT,case:concept:name_RIGHT_REL\no1,i1,z\n", left, right) ==
+         "ValueError: The column label 'case:concept:name_RIGHT_REL' is not unique.");
+  assert(error_of("case_id_LEFT,case_id_RIGHT,concept:name_LEFT\no1,i1,z\n", left, right) ==
+         "MergeError: Passing 'suffixes' which cause duplicate columns {'concept:name_LEFT'} is "
+         "not allowed.");
+  // Extra columns that clash with nothing change nothing.
+  assert((run("case_id_LEFT,case_id_RIGHT,res_LEFT,@@direction\no2,i2,z,q\n", left, right) ==
+          std::vector<CaseRelation>{{"o2", "i2"}}));
+  // The CSV frame's columns come from the read_csv header.
+  assert((interleavings_csv_frame_columns("\xEF\xBB\xBF" "case_id,,activity\r\no1,x,a\n") ==
+          std::vector<std::string>{"case_id", "Unnamed: 1", "activity"}));
+  assert((interleavings_csv_frame_columns("\n\ncase_id,a,a\n") ==
+          std::vector<std::string>{"case_id", "a", "a.1"}));
+}
+
 int main() try {
 #ifdef _WIN32
   _set_error_mode(_OUT_TO_STDERR);
@@ -1168,6 +1255,7 @@ int main() try {
   categorical_state_null_cells_sort_last();
   read_csv_tables_follow_pandas();
   merges_read_csv_tables_as_pandas();
+  interleavings_relations_follow_read_csv_frames();
 } catch (const std::exception& error) {
   std::cerr << error.what() << '\n';
   return 1;

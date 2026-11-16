@@ -1,4 +1,6 @@
 #include "minera/case_relations.hpp"
+#include "minera/upload_case_relations.hpp"
+#include "minera/pandas_read_csv.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -2330,6 +2332,202 @@ EventTable merge_case_relations(const EventTable& base,
         EventAttribute{right_column, relation.right_case_id, AttributeKind::kString}});
   }
   return merge_case_relations(base, incoming, relation_table, options);
+}
+
+namespace {
+
+const char* const kInterleavingsLeftKey = "case:concept:name_LEFT";
+const char* const kInterleavingsRightKey = "case:concept:name_RIGHT";
+const char* const kInterleavingsRightRelKey = "case:concept:name_RIGHT_REL";
+
+std::string python_str_list(const std::vector<std::string>& names) {
+  std::string text = "[";
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    if (i) text += ", ";
+    text += "'" + names[i] + "'";
+  }
+  return text + "]";
+}
+
+// The frame interleavings work on: the standard columns first, then the
+// others in frame order, the row index columns, then a shifted copy ("_2")
+// of each (observed black-box).
+std::vector<std::string> interleavings_merge_columns(const std::vector<std::string>& frame,
+                                                     bool xes) {
+  std::vector<std::string> columns = {"case:concept:name", "time:timestamp", "concept:name"};
+  const auto add = [&](const std::string& name) {
+    if (std::find(columns.begin(), columns.end(), name) == columns.end()) columns.push_back(name);
+  };
+  for (const auto& name : frame) add(name);
+  add("@@index");
+  if (!xes) add("@@case_index");  // format_dataframe adds both, read_xes neither
+  const auto count = columns.size();
+  for (std::size_t i = 0; i < count; ++i) columns.push_back(columns[i] + "_2");
+  return columns;
+}
+
+bool log_has_events(const EventLog& log) {
+  for (const auto& trace : log.traces)
+    if (!trace.events.empty()) return true;
+  return false;
+}
+
+}  // namespace
+
+std::vector<std::string> interleavings_csv_frame_columns(const std::string& csv_text) {
+  // The header record alone (the first line that is not blank).
+  std::size_t begin = 0;
+  std::string header;
+  while (begin < csv_text.size()) {
+    auto end = csv_text.find('\n', begin);
+    if (end == std::string::npos) end = csv_text.size();
+    header = csv_text.substr(begin, end - begin);
+    if (!header.empty() && header.back() == '\r') header.pop_back();
+    if (!trim(header).empty()) break;
+    header.clear();
+    begin = end + 1;
+  }
+  if (header.empty()) return {};
+  std::istringstream input(header + "\n");
+  try {
+    return read_csv_reference_table(input).columns;
+  } catch (const std::exception&) {
+    return {};
+  }
+}
+
+std::vector<std::string> interleavings_xes_frame_columns(const EventLog& log) {
+  std::vector<std::string> columns;
+  std::unordered_set<std::string> seen;
+  const auto add = [&](const std::string& name) {
+    if (!name.empty() && seen.insert(name).second) columns.push_back(name);
+  };
+  for (const auto& trace : log.traces) {
+    for (const auto& event : trace.events) {
+      add(event.activity_source_key);
+      add(event.timestamp_source_key);
+      add(event.resource_source_key);
+      add(event.lifecycle_source_key);
+      for (const auto& attribute : event.attributes) add(attribute.key);
+    }
+    add("case:concept:name");
+    for (const auto& attribute : trace.attributes) add("case:" + attribute.key);
+  }
+  return columns;
+}
+
+std::vector<CaseRelation> upload_interleavings_relations(
+    const EventTable& relations, const std::string& left_column,
+    const std::string& right_column, const InterleavingsUploadSide& left,
+    const InterleavingsUploadSide& right) {
+  if (left_column.empty() || right_column.empty() || left_column == right_column)
+    throw std::invalid_argument("case relations: relation columns must differ");
+  const auto column = [&](const std::string& name) {
+    const auto index = table_column(relations, name);
+    if (!index) throw std::invalid_argument("case relations: missing column " + name);
+    return *index;
+  };
+  const auto left_index = column(left_column);
+  const auto right_index = column(right_column);
+  const auto dtype = [&](std::size_t index) {
+    return index < relations.dtypes.size() ? relations.dtypes[index] : std::string("object");
+  };
+  // The relation columns once the selected ones carry pm4py's key names.
+  std::vector<std::string> relation_columns = relations.columns;
+  relation_columns[left_index] = kInterleavingsLeftKey;
+  relation_columns[right_index] = kInterleavingsRightKey;
+  const auto occurrences = [](const std::vector<std::string>& names, const std::string& name) {
+    return std::count(names.begin(), names.end(), name);
+  };
+  const auto not_unique = [](const std::string& name) {
+    return std::invalid_argument("ValueError: The column label '" + name + "' is not unique.");
+  };
+  // pandas refuses to merge a str-like key with a numeric one (the log
+  // frame's dtype is "string" after format_dataframe, "str" from read_xes),
+  // but skips that check when exactly one side has no rows.
+  const auto check = [&](std::size_t index, bool xes, bool log_first, const char* key,
+                         bool log_rows, bool relation_rows) {
+    if (log_rows != relation_rows) return;
+    const auto type = dtype(index);
+    if (type != "int64" && type != "uint64" && type != "float64") return;
+    const std::string log_type = xes ? "str" : "string";
+    throw std::invalid_argument(
+        "ValueError: You are trying to merge on " + (log_first ? log_type : type) + " and " +
+        (log_first ? type : log_type) + " columns for key '" + key +
+        "'. If you wish to proceed you should use pd.concat");
+  };
+  // The text a key cell meets a case by: str cells only.
+  const auto key_text = [&](std::size_t row, std::size_t index) -> std::optional<std::string> {
+    const auto type = dtype(index);
+    if (type != "str" && type != "object") return std::nullopt;
+    const auto& cell = relations.rows[row][index];
+    if (!cell || cell->is_null || cell->kind != AttributeKind::kString) return std::nullopt;
+    return cell->value;
+  };
+
+  // First merge: the left frame with the relations, no suffixes.
+  const auto left_frame = interleavings_merge_columns(left.columns, left.xes);
+  if (occurrences(relation_columns, kInterleavingsLeftKey) > 1)
+    throw not_unique(kInterleavingsLeftKey);
+  check(left_index, left.xes, true, "case:concept:name", log_has_events(left.log),
+        !relations.rows.empty());
+  std::vector<std::string> overlap;
+  for (const auto& name : left_frame)
+    if (occurrences(relation_columns, name) > 0) overlap.push_back(name);
+  if (!overlap.empty())
+    throw std::invalid_argument("ValueError: columns overlap but no suffix specified: Index(" +
+                                python_str_list(overlap) + ", dtype='str')");
+  std::unordered_set<std::string> left_cases;
+  for (const auto& trace : left.log.traces)
+    if (!trace.events.empty()) left_cases.insert(trace.case_id);
+  std::vector<std::optional<std::string>> left_keys(relations.rows.size());
+  bool met = false;
+  for (std::size_t row = 0; row < relations.rows.size(); ++row) {
+    left_keys[row] = key_text(row, left_index);
+    met = met || (left_keys[row] && left_cases.contains(*left_keys[row]));
+  }
+
+  // Second merge: the LEFT key dropped, the RIGHT key renamed, suffixes
+  // _LEFT/_RIGHT on the names both frames hold.
+  std::vector<std::string> merged = left_frame;
+  for (const auto& name : relation_columns) {
+    if (name == kInterleavingsLeftKey) continue;
+    merged.push_back(name == kInterleavingsRightKey ? kInterleavingsRightRelKey : name);
+  }
+  if (occurrences(merged, kInterleavingsRightRelKey) > 1) throw not_unique(kInterleavingsRightRelKey);
+  check(right_index, right.xes, false, kInterleavingsRightRelKey, log_has_events(right.log), met);
+  const auto right_frame = interleavings_merge_columns(right.columns, right.xes);
+  const std::unordered_set<std::string> merged_names(merged.begin(), merged.end());
+  const std::unordered_set<std::string> right_names(right_frame.begin(), right_frame.end());
+  std::vector<std::string> labels;
+  for (const auto& name : merged) labels.push_back(right_names.contains(name) ? name + "_LEFT" : name);
+  for (const auto& name : right_frame)
+    labels.push_back(merged_names.contains(name) ? name + "_RIGHT" : name);
+  std::map<std::string, std::size_t> counts;
+  for (const auto& label : labels) ++counts[label];
+  std::vector<std::string> repeated;
+  for (const auto& [label, count] : counts)
+    if (count > 1) repeated.push_back(label);
+  if (!repeated.empty()) {
+    std::string names;
+    for (std::size_t i = 0; i < repeated.size(); ++i)
+      names += (i ? ", '" : "'") + repeated[i] + "'";
+    throw std::invalid_argument("MergeError: Passing 'suffixes' which cause duplicate columns {" +
+                                names + "} is not allowed.");
+  }
+  if (!met) return {};
+  std::unordered_set<std::string> right_cases;
+  for (const auto& trace : right.log.traces)
+    if (!trace.events.empty()) right_cases.insert(trace.case_id);
+  std::vector<CaseRelation> result;
+  for (std::size_t row = 0; row < relations.rows.size(); ++row) {
+    auto right_key = key_text(row, right_index);
+    if (!left_keys[row] || !right_key || !left_cases.contains(*left_keys[row]) ||
+        !right_cases.contains(*right_key))
+      continue;
+    result.push_back({*left_keys[row], std::move(*right_key)});
+  }
+  return result;
 }
 
 }  // namespace minera

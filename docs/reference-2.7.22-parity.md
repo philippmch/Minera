@@ -28522,3 +28522,120 @@ Tests:
   timestamp column), each checked against pm4py first. The CLI ctests
   `minera_csv_relations_merge_typed_cli` and `_float_key_cli` keep their
   expectations (pm4py gives case `7` and `7.0` on the fixtures).
+
+## Review CZ1: re-review of round CY, timestamp interleavings on `read_csv` relation frames, set values in the pandas filters, fresh seeds (2026-11-16)
+
+Round CZ checked CY's CI (run 43849161728 on 5d0a5dc2: green on all six
+jobs), replayed two batches of fresh seeds of every filter domain, took the
+last upload route that reads a file with `read_csv` in pm4py and carried
+Python sets through the pandas bank codec. The device check on the Mac was
+skipped (no device linked).
+
+- **CZ1-1 Timestamp interleavings on uploads** (`/api/timestamp-interleavings`,
+  `minera_export --timestamp-interleavings`, new
+  `upload_case_relations.hpp`). pm4py's interleavings read the relation
+  file as a `pandas.read_csv` frame and join it with the two logs' frames
+  (format_dataframe's "string" case column for a CSV log, read_xes's "str"
+  one for an XES log): the selected columns are renamed
+  `case:concept:name_LEFT`/`_RIGHT`, the left frame merges first without
+  suffixes, the LEFT key is dropped and the RIGHT key renamed
+  `case:concept:name_RIGHT_REL`, then the right frame merges with the
+  suffixes `_LEFT`/`_RIGHT`. Minera read the relation ids as text and typed
+  them like the logs' case ids, so it differed whenever `read_csv` typed a
+  column otherwise. Now: a str or object column meets a case by the text of
+  its str cells (a NaN cell, a bool or a Python int meets nothing, a bool
+  column too); an int64, uint64 or float64 column (an all-NaN one too)
+  fails with pandas' merge `ValueError` ("You are trying to merge on string
+  and int64 columns for key 'case:concept:name'..."), except when exactly
+  one of the merged frames is empty, where pandas skips the dtype check; a
+  relation column named as a column of the left frame fails the first
+  merge ("columns overlap but no suffix specified: Index([...])", the
+  frame's columns as pm4py builds them: the standard columns, the other
+  columns, `@@index`, `@@case_index` for a CSV log, a `_2` copy of each),
+  a repeated key column fails "not unique", and suffixed names that repeat
+  a column raise pandas' `MergeError`. The relations keep their file order.
+  Sweep (`review-harness/round-cz/up/il2.py`, random CSV and XES logs with
+  odd relation files: NaN cells, quotes, bools, big ints, floats, short
+  rows, overlapping and suffixed names, empty logs): before, 26 of 150 calls
+  differed; after, 0 of 1,050, and 0 of 600 more on fresh seeds with the final
+  server binary (CX's interleavings sweep still 0 of 200).
+  The CLI ctests `minera_csv_relations_interleavings_typed_cli` and
+  `_float_key_cli` now expect pandas' merge `ValueError` on the int64 and
+  float64 fixtures (checked against pm4py).
+- **CZ1-2 Python sets in the pandas table filters** (the CU item; the bank
+  codec's new `S` tag carries a set's items in Python's iteration order).
+  Probes z1-z3 (4,404 calls over the CK domain's frames) put sets and
+  frozensets where pm4py takes values, targets and keys. As values
+  (attribute values, admitted variants, paths) and in key positions
+  (pandas refuses a set indexer, a set is unhashable) Minera already
+  agreed. It differed on targets and case keys:
+  - a str column compares a set or frozenset like a dict, as an array of
+    its items: of another length `ValueError: Lengths of operands do not
+    match`, of the same length numpy's 0-d `IndexError`; a datetime64
+    column gives `Lengths must match` or `Buffer has wrong number of
+    dimensions`; number, bool and object columns compare all False (LTL
+    `A_next_B_next_C`, `four_eyes_principle`, `attr_value_different_persons`,
+    `eventually_follows` and `filter_traces_attribute_in_timeframe`;
+    `pandas_ltl_filter.cpp`, `pandas_timestamp_filter.cpp`);
+  - where the attribute and resource keys name one column, the two-column
+    selection cannot coerce a set of another size ("Unable to coerce to
+    Series, length must be 2") and finds one of size 2 unordered
+    (`TypeError: 'set' type is unordered`);
+  - `variants.apply` with a set or frozenset case key: `groupby` calls it on
+    each index label (`TypeError: 'set' object is not callable`), and an
+    empty frame forms no case (`pandas_variants_filter.cpp`).
+- **CZ1-3 Fresh seeds.** Batch 1 (2026112300-11: Polars table CK, CN, CJ,
+  CI, CH; Polars sequence CP, CK, CJ, CH; pandas CK, pandas sequence CK,
+  pandas CN LTL) was equal. Batch 2 (2026112312-23, the same twelve
+  domains) found four calls:
+  - Polars CJ 2026112315 case 547: a `pl.lit` list of structs whose field
+    is a float in one item and a struct in another casts the number column
+    to the struct of one field, and that column's null cell becomes `{null}`
+    (a struct of a null), not `null` (`polars_lit_model.hpp`);
+  - Polars CI 2026112316 case 82: `apply_numeric` with two stream filters on
+    one column whose floats print alike (`0.00001`) but differ: Polars
+    drops a repeated predicate by its value, so both equalities stay, their
+    interval is empty and the frame comes back empty before the range's
+    list comparison can fail; Minera dropped the second by its display
+    (`polars_attributes_filter.cpp`). A comparison folded to a form without
+    its literal and datetimes of one instant in other zones still repeat
+    by their display (CF bank case 795, fresh CK 2026112313 case 627);
+  - Polars sequence CP 2026112312 case 950: `activity_split` with a scalar
+    split activity and a failing separator shows the resolved `is_in` as
+    the imploded scalar cast to the supertype (`[[0.00001].cast(List(Float32))]`,
+    round CE's model, None cast to the column's type) (`polars_sequence_filters.cpp`);
+  - pandas sequence CK 2026112322 case 339: `filter_df_on_end_activities_nocc`
+    on a datetime64 activity column: `isin` converts the kept activities to
+    datetimes only when one of them is a datetime, so a kept `None` alone
+    matches no NaT boundary and the frame comes back empty (`pandas_sequence_filters.cpp`).
+
+Declared:
+- An XES or CSV upload's padded case ids are trimmed by Minera's importers
+  (Z1-4), so the interleavings sweep leaves padding out by default.
+- A relation file whose byte-order mark is not at the start of the file is
+  read as Minera's CSV reader reads it.
+- Sets in the pandas and Polars sequence filters are not carried by their
+  banks' codecs yet (the sequence filters' value model has no set kind).
+- A `groupby` list key holding a set among other keys (`['case', {'x'},
+  'nope']`) is outside the model: pandas resolves such lists item by item
+  with orders the probes did not settle.
+- The CU leftovers stay: a paths list case key repeating a name and
+  `filter_variants_top_k` with several key names on a one-row frame whose
+  second column is a List, Struct, Binary, Decimal, Duration or Time column
+  both fail in pm4py with a `DuplicateError` carrying the whole filter plan
+  (probed again: `column with name 'variant' has more than one occurrence`
+  with the join's plan, or Python's `sequence item 0: expected str
+  instance`), which Minera does not build.
+
+Tests:
+- New: `docs/pandas-filter-cz-bank.json.gz` (probes z1-z3, 4,404 calls),
+  `docs/polars-filter-cz-bank.json.gz` (CJ 2026112315 case 547, CI
+  2026112316 case 82; 99 calls), `docs/polars-sequence-filter-cz-bank.json.gz`
+  (CP 2026112312 case 950) and `docs/pandas-sequence-filter-cz-bank.json.gz`
+  (CK 2026112322 case 339), replayed by the `minera_*_cz_bank_parity_tests`
+  ctests; `minera_case_relations_tests` gained interleavings cases on
+  `read_csv` relation tables (NaN, padding, quotes and short rows, bool,
+  object and big-int columns, the string/str/float64 merge errors, the
+  empty-side skips, the overlap, not-unique and suffix errors, the frame
+  columns of a CSV header with a byte-order mark, blank lines and repeated
+  names), each checked against pm4py first.

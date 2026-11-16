@@ -782,7 +782,23 @@ Expr build_node(const std::vector<Expr>& pending,const Expr* own,bool scan,bool&
     if(found==groups.end()){groups.emplace(key,item);continue;}
     std::vector<const Expr*> present;conjuncts(found->second,present);
     const auto text=plan_text(item);
-    if(item.leaf&&std::any_of(present.begin(),present.end(),[&](const Expr* e){return e->leaf&&plan_text(*e)==text;}))continue;
+    // Round CZ (fresh CI 2026112316 case 82): Polars drops a repeated
+    // comparison by its literal's value, so two floats printed alike stay
+    // two comparisons (whose interval can then be empty). A comparison
+    // folded to a form without the literal (CF bank case 795) and datetimes
+    // of one instant in other zones (fresh CK 2026112313 case 627) repeat
+    // by their display.
+    const auto distinct_floats=[](const EventAttribute& a,const EventAttribute& b){
+      if(collection(a)||collection(b)||!real(a)||!real(b)||integer(a)||integer(b))return false;
+      const double x=number(a),y=number(b);
+      if(std::isnan(x)&&std::isnan(y))return false;
+      return std::bit_cast<std::uint64_t>(x)!=std::bit_cast<std::uint64_t>(y);
+    };
+    const auto repeated=[&](const Expr* e){
+      if(!e->leaf||plan_text(*e)!=text)return false;
+      return null_leaf(*e->leaf)||!operands(*e->leaf).whole.empty()||!distinct_floats(e->leaf->value,item.leaf->value);
+    };
+    if(item.leaf&&std::any_of(present.begin(),present.end(),repeated))continue;
     found->second=binary(item,"&",std::move(found->second));
   }
   std::vector<Expr> entries;bool placed=own==nullptr;

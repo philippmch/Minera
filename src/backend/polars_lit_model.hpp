@@ -521,6 +521,16 @@ inline std::optional<Value> cast_lit(const Value& v, const LitType& from, const 
         Value field = Value::none();
         if (at != from.names.end()) {
           const auto i = static_cast<std::size_t>(at - from.names.begin());
+          // Round CZ (fresh CJ 2026112315 case 547): a null field of a
+          // number column cast to a struct of one field is that struct of a
+          // null ({null}); a Null or struct field stays null.
+          const auto& source_type = from.inner[i];
+          const auto& target_type = to.inner[f];
+          const bool null_cell = i >= v.entries.size() || v.entries[i].second.kind == Kind::kNone;
+          if (null_cell && source_type.kind != K::kNull && source_type.kind != K::kStruct && source_type.kind != K::kList &&
+              target_type.kind == K::kStruct && target_type.inner.size() == 1 && target_type.inner[0].kind != K::kStruct &&
+              target_type.inner[0].kind != K::kList)
+            field = Value::dict({{Value::of(target_type.names[0]), Value::none()}});
           if (i < v.entries.size() && v.entries[i].second.kind != Kind::kNone) {
             auto cast = cast_lit(v.entries[i].second, from.inner[i], to.inner[f]);
             if (!cast) return std::nullopt;
@@ -1051,9 +1061,13 @@ inline std::optional<std::string> coerced_scalar_is_in(const std::string& column
     if (v.kind == Kind::kInt) return form(".cast(Unknown(Int(" + integer_text(v) + ")))", "");
     if (v.kind == Kind::kFloat) return form(".cast(Unknown(Float))", "");
     if (v.kind == Kind::kBool || v.kind == Kind::kDatetime) return form(".cast(" + debug_name(lit_value(v).type) + ")", "");
+    if (v.kind == Kind::kNone) return form("", "");
     return std::nullopt;
   }
   if (dtype == "Boolean" && v.kind == Kind::kBool) return form("", "");
+  // Round CZ (fresh CP 2026112312 case 950): None is cast to the column's
+  // type, whatever it is.
+  if (v.kind == Kind::kNone) return form("", is_in_dtype_name(dtype));
   // Round CF: a datetime on a Datetime column (a date on a Date column)
   // stays as it is, without a cast.
   if ((datetime_dtype(dtype) && v.kind == Kind::kDatetime) || (dtype == "Date" && v.kind == Kind::kDate)) return form("", "");

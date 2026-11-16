@@ -279,8 +279,11 @@ EventAttribute to_attribute(const Json& node, std::string key = {}) {
     out.value = text;
     // A Python datetime carries no native payload.
     out.kind = AttributeKind::kDate;
-  } else if (tag == "l" || tag == "t") {
-    out.container = tag == "l" ? AttributeContainerKind::kList : AttributeContainerKind::kTuple;
+  } else if (tag == "l" || tag == "t" || tag == "S") {
+    // Round CZ: a set ("S") lists its items in the order Python iterates it.
+    out.container = tag == "l"   ? AttributeContainerKind::kList
+                    : tag == "t" ? AttributeContainerKind::kTuple
+                                 : AttributeContainerKind::kSet;
     for (const auto& item : value.items) out.children.push_back(to_attribute(item, std::to_string(out.children.size())));
   } else if (tag == "m") {
     out.container = AttributeContainerKind::kContainer;

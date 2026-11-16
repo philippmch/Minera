@@ -178,8 +178,10 @@ bool matches_at(const EventAttribute& value,const EventAttribute& target,std::si
 }
 void check_target(const EventAttribute& target,std::size_t rows,const std::string& dtype){
  // Round CK: a str or datetime64 column compares a dict as an array of its
- // keys, which numpy then holds as one 0-d object.
- if(target.container==AttributeContainerKind::kContainer&&!target.is_null){
+ // keys, which numpy then holds as one 0-d object. Round CZ: a set or a
+ // frozenset compares the same way over its items.
+ const auto kind=target.container;
+ if((kind==AttributeContainerKind::kContainer||kind==AttributeContainerKind::kSet||kind==AttributeContainerKind::kFrozenSet)&&!target.is_null){
   const auto n=target.children.size();
   if(dtype=="str"){
    if(n!=rows)error("ValueError","Lengths of operands do not match: "+std::to_string(rows)+" != "+std::to_string(n));
@@ -369,8 +371,11 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
  if(columns[0]!=columns[1]&&resources&&columns[1]==columns[2]&&!anchors.empty()){
   const auto& target=anchors.front();
   // Round CR: a tuple too (fresh CK bank 2026111653 case 167).
-  if((target.container==AttributeContainerKind::kContainer||target.container==AttributeContainerKind::kList||target.container==AttributeContainerKind::kTuple)&&!target.is_null&&target.children.size()!=2)
+  // Round CZ: a set or a frozenset too, which of size 2 has no order.
+  const bool set=target.container==AttributeContainerKind::kSet||target.container==AttributeContainerKind::kFrozenSet;
+  if((target.container==AttributeContainerKind::kContainer||target.container==AttributeContainerKind::kList||target.container==AttributeContainerKind::kTuple||set)&&!target.is_null&&target.children.size()!=2)
    error("ValueError","Unable to coerce to Series, length must be 2: given "+std::to_string(target.children.size()));
+  if(set&&!target.is_null)error("TypeError","'"+std::string(target.container==AttributeContainerKind::kSet?"set":"frozenset")+"' type is unordered");
  }
  if(columns[0]==columns[1]||(resources&&columns[1]==columns[2]))error("ValueError","cannot reindex on an axis with duplicate labels");
  // With timestamp differences the timestamp key joins the selection: on the

@@ -306,8 +306,10 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
   const bool vector=selected&&(wanted->container==AttributeContainerKind::kList||str_tuple);
   if(vector&&wanted->children.size()!=source.size())error("ValueError","('Lengths must match to compare', ("+std::to_string(source.size())+",), ("+std::to_string(wanted->children.size())+",))");
   // Round CK: a str or datetime64 attribute compares a dict as an array of
-  // its keys, held by numpy as one 0-d object.
-  if(selected&&!source.dtypes.empty()&&wanted->container==AttributeContainerKind::kContainer&&!wanted->is_null){
+  // its keys, held by numpy as one 0-d object. Round CZ: a set or a
+  // frozenset compares the same way over its items.
+  const auto wanted_kind=wanted->container;
+  if(selected&&!source.dtypes.empty()&&(wanted_kind==AttributeContainerKind::kContainer||wanted_kind==AttributeContainerKind::kSet||wanted_kind==AttributeContainerKind::kFrozenSet)&&!wanted->is_null){
    const auto& dtype=source.dtypes[*selected];const auto n=wanted->children.size(),rows=source.size();
    if(dtype=="str"){
     if(n!=rows)error("ValueError","Lengths of operands do not match: "+std::to_string(rows)+" != "+std::to_string(n));

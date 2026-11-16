@@ -256,7 +256,11 @@ std::vector<CacheRow> membership_cache(const EventTable& source,const PandasVari
  }
  if(options.case_id_key.is_null)error("TypeError","You have to supply one of 'by' and 'level'");
  if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("ValueError","No group keys passed!");
- const bool unmatched=unmatched_mapping_key(source,options.case_id_key);
+ // Round CZ: groupby calls a set or a frozenset key on each index label, so
+ // any row raises and an empty frame forms no case.
+ const bool set_key=!options.case_id_key.is_null&&(options.case_id_key.container==AttributeContainerKind::kSet||options.case_id_key.container==AttributeContainerKind::kFrozenSet);
+ if(set_key&&source.size())error("TypeError","'"+type_name(options.case_id_key)+"' object is not callable");
+ const bool unmatched=set_key||unmatched_mapping_key(source,options.case_id_key);
  // Round CP: a list of groupers holding a mapping reads its items in order:
  // a mapping maps the index labels, None is called, a list must match the
  // rows and any other item names a column.
