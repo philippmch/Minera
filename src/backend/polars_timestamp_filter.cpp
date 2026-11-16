@@ -255,7 +255,15 @@ std::string at_most_text(const Query& q){
 // Round CO: an integer or float column meets the datetime bound as its
 // physical microseconds: Int64 and Float64 bare, the other widths that
 // compare cast to Int64 or Float64 (probe p18).
-bool cast_time(const std::string& dtype){return dtype=="Int32"||dtype=="UInt32"||dtype=="UInt64"||dtype=="Float32";}
+// Round CW: a Date column meets the bounds cast to Datetime('μs', 'UTC'),
+// which keeps the predicate whole as the numeric casts do (probe cw/w5).
+std::string window_cast(const std::string& dtype){
+  if(dtype=="Int32"||dtype=="UInt32"||dtype=="UInt64")return "Int64";
+  if(dtype=="Float32")return "Float64";
+  if(dtype=="Date")return "Datetime('\xce\xbcs', 'UTC')";
+  return {};
+}
+bool cast_time(const std::string& dtype){return !window_cast(dtype).empty();}
 std::string time_bound(const Query& q,const ParsedExactTimestamp& v,const std::string& temporal_text) {
   const auto& d=q.time_dtype;
   const auto micros=TokenInteger(v.seconds)*TokenInteger(1000000)+TokenInteger(v.nanoseconds/1000);
@@ -266,7 +274,7 @@ std::string time_bound(const Query& q,const ParsedExactTimestamp& v,const std::s
 std::string time_compare(const Query& q,const std::string& column,const std::string& op,const std::string& value) {
   const auto& d=q.time_dtype;
   if(!cast_time(d))return compare_expr(column,op,value);
-  return "[(col("+quote(column)+").cast("+(d=="Float32"?"Float64":"Int64")+")) "+op+" ("+value+")]";
+  return "[(col("+quote(column)+").cast("+window_cast(d)+")) "+op+" ("+value+")]";
 }
 std::string time_expr(const Query& q) {
   const auto lo=time_bound(q,q.low,bound_text(q.low)),hi=time_bound(q,q.high,bound_text(q.high)),hi_le=time_bound(q,q.high,at_most_text(q));const auto& time=q.options.timestamp_key.value;
@@ -320,9 +328,14 @@ bool mergeable_attribute(const Query& q,const std::string& expression) {
 }
 // Whether the window comes first in the combined predicate (and so fails
 // first when it runs).
+// Round CW: a None attribute (null.repeat) comes after a window on its own
+// column (probe cw/w5).
+bool null_attribute(const Query& q){return q.op==Operation::kAttribute&&scalar_value(q)&&null(q.value);}
 bool time_first(const Query& q,const std::string& attribute) {
-  if(q.options.timestamp_key.value>=q.attribute.value)return false;
-  const bool merged=equal(q.low,q.high)&&!nanosecond_aware(q);
+  // A cast column keeps both bounds (time_expr), so nothing merges.
+  const bool merged=equal(q.low,q.high)&&!nanosecond_aware(q)&&!cast_time(q.time_dtype);
+  const auto& time=q.options.timestamp_key.value;
+  if(null_attribute(q)&&!merged?time>q.attribute.value:time>=q.attribute.value)return false;
   return !merged||mergeable_attribute(q,attribute);
 }
 std::string whole_expr(const Query& q) {
@@ -360,7 +373,7 @@ std::string filtered_plan(const EventTable& source,const Query& q,bool upper) {
   // microseconds, cast as the comparison casts it (fresh CK bank
   // 2026111651 case 248).
   const auto& d=q.time_dtype;
-  const auto column="col("+quote(q.options.timestamp_key.value)+")"+(cast_time(d)?std::string(".cast(")+(d=="Float32"?"Float64":"Int64")+")":std::string());
+  const auto column="col("+quote(q.options.timestamp_key.value)+")"+(cast_time(d)?".cast("+window_cast(d)+")":std::string());
   plan="FILTER "+column+" >= "+time_bound(q,q.low,bound_text(q.low))+"\nFROM\n"+indent(plan,"  ");
   if(upper)plan="FILTER "+column+" <= "+time_bound(q,q.high,at_most_text(q))+"\nFROM\n"+indent(plan,"  ");return plan;
 }
@@ -405,12 +418,15 @@ void time_dtype(const EventTable& source,std::size_t at,const Query& q,const std
   const auto& dtype=source.dtypes[at];
   const bool categorical=dtype=="Categorical"||dtype.starts_with("Categorical(")||dtype.starts_with("Enum(");
   const bool narrow=dtype=="Int8"||dtype=="Int16"||dtype=="UInt8"||dtype=="UInt16";
-  if(dtype=="Boolean"||narrow||categorical||polars_datetime::naive(dtype)) {
+  // Round CW: an aware column in another zone than the UTC bounds fails as a
+  // naive one does (probe cw/w5).
+  const bool foreign=polars_datetime::datetime(dtype)&&!polars_datetime::naive(dtype)&&dtype.find("time_zone='UTC'")==std::string::npos;
+  if(dtype=="Boolean"||narrow||categorical||polars_datetime::naive(dtype)||foreign) {
     const auto column=q.op==Operation::kContained||q.op==Operation::kIntersecting?"first_timestamp":q.options.timestamp_key.value;
     const bool eq=(q.op==Operation::kEvents||q.op==Operation::kAttribute)&&equal(q.low,q.high);
     const std::string cmp=eq?"==":q.op==Operation::kIntersecting?(equal(q.low,q.high)?"<":">"):">=";
     const auto expression=compare_expr(column,cmp,bound_text(q.low));const auto larger=whole_expr(q);
-    std::string message=categorical?std::string("cannot compare categorical with datetime[μs, UTC]"):"could not evaluate "+(eq?std::string{}:"'"+cmp+"' ")+"comparison between series '"+column+"' of dtype: "+(dtype=="Boolean"||narrow?dtype:"Datetime('"+polars_datetime::symbol(polars_datetime::column_unit(dtype))+"')")+" and series 'literal' of dtype: Datetime('μs', 'UTC')";
+    std::string message=categorical?std::string("cannot compare categorical with datetime[μs, UTC]"):"could not evaluate "+(eq?std::string{}:"'"+cmp+"' ")+"comparison between series '"+column+"' of dtype: "+(dtype=="Boolean"||narrow?dtype:polars_datetime::display(dtype))+" and series 'literal' of dtype: Datetime('μs', 'UTC')";
     message+="\n\nThis error occurred in the following expression:\n\t"+expression+'\n';
     if(larger!=expression)message+="while evaluating this larger expression:\n\t"+larger+'\n';fail(categorical?"ComputeError":"SchemaError",phase,message);
   }
@@ -423,7 +439,32 @@ bool list_value(const Query& q){return q.value.container==AttributeContainerKind
 // a column the window casts (Int32, UInt32, UInt64, Float32) keeps the
 // predicate whole, so its errors name it (probe inv/tf2.py).
 bool same_column(const Query& q){return q.op==Operation::kAttribute&&q.attribute.value==q.options.timestamp_key.value;}
-std::string larger_expr(const Query& q){return same_column(q)&&!cast_time(q.time_dtype)?std::string("\n"):"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n';}
+// Round CW: only a bare equality on a typed literal (col == v, as the
+// window's merge reads it) is filtered apart: Polars folds the window into
+// it, evaluating the bounds on the literal. A cast, a dynamic literal, a
+// struct cast or a None attribute stays in the whole predicate, which an
+// empty window simplifies away (probes cw/w5, cw/w6).
+bool folded(const Query& q){return same_column(q)&&!cast_time(q.time_dtype)&&!null_attribute(q)&&mergeable_attribute(q,attribute_expr(q));}
+// The folded bounds on the literal: whether it lies in the window, or none
+// when the literal and the datetime bounds do not compare (a str, bool,
+// narrow integer or naive datetime literal), which drops the window.
+std::optional<bool> fold_window(const Query& q){
+  const auto& d=q.time_dtype;const auto& v=q.value;
+  if(d=="Int64"||d=="Float64") {
+    if(!(integer(v)||real(v)||boolean(v)))return std::nullopt;
+    const auto micros=[](const ParsedExactTimestamp& t){return TokenInteger(t.seconds)*TokenInteger(1000000)+TokenInteger(t.nanoseconds/1000);};
+    if(d=="Int64"&&(integer(v)||boolean(v))){const auto x=exact(v);return !(x<micros(q.low))&&!(micros(q.high)<x);}
+    const auto x=number(v);return x>=static_cast<double>(micros(q.low))&&x<=static_cast<double>(micros(q.high));
+  }
+  if(date(v)) {
+    const auto parsed=parse_timestamp_exact(std::get_if<NativeDate>(&v.typed_value)?std::get<NativeDate>(v.typed_value).value:v.value);
+    if(!parsed||!parsed->timezone_aware)return std::nullopt;
+    auto t=*parsed;t.offset_minutes=0;t.nanoseconds=t.nanoseconds/1000*1000;
+    return !less(t,q.low)&&!less(q.high,t);
+  }
+  return std::nullopt;
+}
+std::string larger_expr(const Query& q){return folded(q)?std::string("\n"):"\nwhile evaluating this larger expression:\n\t"+whole_expr(q)+'\n';}
 // A list value as the comparison prints it.
 std::string list_display(const lit::Literal& list){return lit::lit_display(lit::list_of(list.type),lit::Value::list(list.values));}
 void attribute_dtype(const EventTable& source,std::size_t at,const Query& q,const std::string& phase) {
@@ -586,7 +627,6 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   auto result=source;result.rows.clear();
   // Lazy predicate simplification occurs before comparing the temporal schemas.
   time_resolution(source,time_at,q,phase);
-  if(same_column(q))attribute_dtype(source,*attr_at,q,phase);
   if(listed)groups::append_schema(result,*q.keys,source);
   // Literal keys only select one row whatever passed (a Null literal joins
   // nothing), even from an empty window.
@@ -594,16 +634,24 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
     if(!q.keys->null_literal())for(const auto& row:source.rows){auto kept=row;groups::append_cells(kept,*q.keys,row);result.rows.push_back(std::move(kept));}
     return result;
   };
+  // Round CW: a folded window runs only the equality, or nothing when the
+  // literal lies outside it.
+  const bool fold=attr_at&&folded(q);
+  const auto fold_in=fold?fold_window(q):std::nullopt;
+  if(fold&&fold_in&&!*fold_in)return listed&&q.keys->all_literal()?every():result;
+  if(fold)attribute_dtype(source,*attr_at,q,phase);
   // Round CO: a cast column keeps the predicate whole (an empty window
   // still runs the attribute comparison, probe p19); the window and the
   // attribute fail in the order the predicate combines them.
   const bool window_empty=(q.op==Operation::kEvents||q.op==Operation::kAttribute)&&less(q.high,q.low);
-  if(window_empty&&!cast_time(q.time_dtype))return listed&&q.keys->all_literal()?every():result;
+  // Round CW: a None attribute keeps an empty window (null.repeat is not
+  // simplified away; CK bank 2026111913 case 650).
+  if(window_empty&&!fold&&!cast_time(q.time_dtype)&&!null_attribute(q))return listed&&q.keys->all_literal()?every():result;
   const bool window_first=!attr_at||time_first(q,attribute_expr(q));
-  if(window_first)time_dtype(source,time_at,q,phase);
-  if(attr_at)attribute_dtype(source,*attr_at,q,phase);
-  if(!window_first)time_dtype(source,time_at,q,phase);
-  if(window_empty)return listed&&q.keys->all_literal()?every():result;
+  if(window_first&&!fold)time_dtype(source,time_at,q,phase);
+  if(attr_at&&!fold)attribute_dtype(source,*attr_at,q,phase);
+  if(!window_first&&!fold)time_dtype(source,time_at,q,phase);
+  if(window_empty&&!fold)return listed&&q.keys->all_literal()?every():result;
   // The microsecond bounds meet the column's unit as Polars 1.44.1 compares
   // a Datetime column with a datetime literal (round BW): every comparison
   // floors the bound to a millisecond column's unit; on a nanosecond column
@@ -623,8 +671,9 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   std::vector<Group> groups;std::unordered_map<std::string,std::size_t> keys;std::vector<std::size_t> row_groups;
   const bool column_valid=q.op==Operation::kAttribute&&std::any_of(source.rows.begin(),source.rows.end(),[&](const auto& row){return !lit::null_cell(row[*attr_at]);});
   for(const auto& row:source.rows){
-    const auto time=instant(row[time_at],source.dtypes[time_at]);
-    const bool matches=time&&!less(*time,low)&&!less(high,at_most(*time))&&(q.op!=Operation::kAttribute||attribute_match(row[*attr_at],source.dtypes[*attr_at],q.value,q.categories,column_valid));
+    const auto time=fold?std::nullopt:instant(row[time_at],source.dtypes[time_at]);
+    const bool in_window=fold||(time&&!less(*time,low)&&!less(high,at_most(*time)));
+    const bool matches=in_window&&(q.op!=Operation::kAttribute||attribute_match(row[*attr_at],source.dtypes[*attr_at],q.value,q.categories,column_valid));
     if(q.op==Operation::kEvents){if(matches)result.rows.push_back(row);continue;}
     const auto key=groups::group_of(*q.keys,row,cell_key);const auto [found,inserted]=keys.emplace(key,groups.size());
     if(inserted){groups.push_back({});groups.back().absent=!groups::row_key(*q.keys,row,cell_key);}

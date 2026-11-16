@@ -16,6 +16,7 @@
 #include "minera/pandas_variants_filter.hpp"
 
 #include "../gzip_codec.hpp"
+#include "bank_dict_pairs.hpp"
 
 #include <charconv>
 #include <cmath>
@@ -603,7 +604,8 @@ int main(int argc, char** argv) try {
   }
   const bool verbose = argc > 2;
   const auto text = read_bank(argv[1]);
-  const auto bank = JsonReader(text).value();
+  auto bank = JsonReader(text).value();
+  minera::bank_dict_pairs::python_dict_pairs_in_calls(bank);
   std::map<std::string, std::pair<std::size_t, std::size_t>> tally;  // function -> passed, failed
   std::size_t failures = 0, shown = 0;
   std::size_t case_index = 0;

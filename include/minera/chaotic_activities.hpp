@@ -47,6 +47,13 @@ struct ChaoticActivitiesResult {
 [[nodiscard]] ChaoticActivitiesResult discover_chaotic_activities(
     const EventLog& log, const ChaoticActivitiesOptions& options = {});
 
+// An upload's frame (log.dataframe_columns) as pm4py's DataFrame path reads
+// it: a key other than concept:name reads the frame's typed column (KeyError
+// when the frame lacks it; typed values sorted with Python's ordering; each
+// NaN cell its own activity). Any other log: discover_chaotic_activities.
+[[nodiscard]] ChaoticActivitiesResult discover_chaotic_activities_as_uploaded(
+    const EventLog& log, const ChaoticActivitiesOptions& options = {});
+
 [[nodiscard]] inline ChaoticActivitiesResult chaotic_activities(
     const EventLog& log, const ChaoticActivitiesOptions& options = {}) {
   return discover_chaotic_activities(log, options);

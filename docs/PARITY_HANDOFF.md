@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CV (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–CW (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5757,7 +5757,74 @@ probes are in the project files under `review-harness/round-cv/`.
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
 
-Next round (CW) should start by re-reviewing round CV:
+Round CW re-reviewed CV (Review CW1). CV's commit c3b64c0 ran green on
+all six CI jobs (run 43805250373). CW fixed the three calls CV carried,
+made every bank decoder build repeated dict keys as Python does, moved
+four upload routes onto the frame and replayed a batch of fresh seeds:
+- `eventually_follows` cached plan (`polars_ltl_filter.cpp`,
+  `polars_ltl_cse_model.hpp`; fresh CK 2026111913 case 117, probes w1-w4):
+  the activity filters and sorts run in the order of the reference's
+  common-subplan caches (filled first, depth first); a filter sits below
+  its own sort when the attribute is the case column; equal literals
+  share a plan as Polars coerced them (aware datetimes as one UTC
+  literal); a None activity keeps the whole frame's sort.
+- Timeframe windows folded into the equality
+  (`polars_timestamp_filter.cpp`; cases 410 and 650, probes w5 and w6):
+  an attribute equality on the timestamp column itself takes the window
+  as bounds on its literal (inside: the equality alone; outside: empty;
+  not comparable: dropped); struct casts, dynamic literals, None and cast
+  time columns (Date included) keep the predicate; aware non-UTC time
+  columns fail as naive ones.
+- `dict(pairs)` in all four bank decoders (`tests/bank_dict_pairs.hpp`);
+  every docs bank replays at 0.
+- Rework, boundary activities and cycle time on uploads (`rework.cpp`
+  `discover_rework_as_uploaded`, `boundary_activities.cpp`,
+  `cycle_time.cpp`, server and CLI): pm4py's DataFrame checks and errors,
+  the case column's groups, the start key defaulting to the timestamp key
+  and the set of the two columns. Case arrival and passed time were
+  already equal. Sweeps: 1,640 calls in the final runs on CSV and XES
+  uploads, all equal (one passed-time message in hash-seed order,
+  declared).
+- Fresh seeds 2026112000-11: 0 calls differing.
+- Chaotic activities on uploads (`discover_chaotic_activities_as_uploaded`,
+  server and CLI; 320 sweep calls equal after up to ties): the frame's
+  typed column (`KeyError` when missing, Python's `<` order and its
+  `TypeError`, each NaN cell its own activity with gain 0). The entropy's
+  last bits and near-tie order follow the hash order of the reference's
+  activity set (168 of 400 string logs differ between hash seeds 0 and
+  1): declared.
+
+In the suite: new `docs/polars-filter-cw-probe-bank.json.gz` and
+`minera_server_upload_frame_routes_tests` (rework, boundary, cycle time and
+chaotic activities on uploads). The fresh banks, sweeps, probes and the
+chaotic-activity fits are in the project files under
+`review-harness/round-cw/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (CX) should start by re-reviewing round CW:
+
+- CW's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the upload routes still on Minera's log: log util, merge case
+  relations, timestamp interleavings, organizational SNA (passed time was
+  swept in CW: equal);
+- the CU list below (paths list case keys repeating a name,
+  `filter_variants_top_k` one-row second columns, set values in the pandas
+  bank codec, LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CV's targets, taken in CW (findings CW1-1 to CW1-8): CV's CI run,
+the three carried calls, the fresh seeds, `dict(pairs)` in every decoder
+and the upload routes rework, cycle time, case arrival, boundary
+activities and chaotic activities (passed time swept, equal). Not taken
+(carried to CX): log util, merge case relations, timestamp
+interleavings, organizational SNA and the CU list.
+
+Previous list for round CW (kept for its older items):
 
 - CV's CI run;
 - the three carried calls of fresh Polars CK 2026111913: case 117

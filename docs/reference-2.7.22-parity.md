@@ -28196,3 +28196,139 @@ Tests:
   `minera_server_concept_drift_upload_tests` mines a CSV and an XES upload
   and checks the drift route against pm4py's values (four of its seven
   checks fail on the previous build).
+
+## Review CW1: re-review of round CV, the eventually-follows cached plan, timeframe windows folded into the equality, rework, boundary activities, cycle time and chaotic activities on uploads (2026-11-16)
+
+Round CW checked CV's CI (run 43805250373 on c3b64c0: green on all six
+jobs), fixed the three Polars calls CV carried, made every bank decoder
+build repeated dict keys as Python does, replayed a batch of fresh seeds
+of every filter domain and moved four more upload routes onto the
+upload's frame. The device check on the Mac was skipped (no device
+linked).
+
+- **CW1-1 The `eventually_follows` cached plan** (`polars_ltl_filter.cpp`,
+  `polars_ltl_cse_model.hpp`; fresh Polars CK 2026111913 case 117, probes
+  w1-w4, 0 differing after). pm4py's plan sorts by case and timestamp,
+  numbers the rows per case, filters each activity, joins the case sets
+  and keeps `_index < _index_next` for each consecutive pair. Polars
+  pushes an activity filter below the sort and numbering when the
+  attribute is the case column (each selection sorts only its own rows),
+  drops the sort wherever nothing reads `_index`, shares common subplans
+  (the first repeat becomes a cache, a cache with one consumer is inlined
+  again) and fills every cache before the rest of the plan, depth first.
+  The first error is the first failing step in that order: an activity
+  filter's compute error (the struct comparison of a dict activity) or
+  the literal sort key failing a sort whose frame is not one row. Equal
+  activity literals share one plan as Polars coerced them (1, 1.0 and
+  True on a Float column; an aware datetime is its UTC instant); a None
+  activity filters on `null.repeat(len())`, which stays above the sort.
+  A timestamp key naming the case column selects that column twice in the
+  first pair's input (`DuplicateError`), and a scalar timestamp key that
+  is no column sorts as its literal (`dyn int: 1`).
+- **CW1-2 Timeframe windows folded into the equality**
+  (`filter_traces_attribute_in_timeframe`, `polars_timestamp_filter.cpp`;
+  fresh Polars CK 2026111913 cases 410 and 650, probes w5 and w6). When the
+  attribute's equality reads the timestamp column itself, Polars folds the
+  window into `col == literal`: the bounds are evaluated on the literal,
+  so inside the window only the equality remains (no time dtype check, no
+  instant per row), outside it the result is empty, and a literal that
+  cannot be compared with the bounds drops the window. Comparable means a
+  number against an Int64 or Float64 time column, or an aware datetime
+  against any time column. A struct cast, a dynamic literal, a None value
+  (`null.repeat`) or a cast time column keeps the whole predicate; Date
+  counts as cast (`Datetime('μs', 'UTC')`) and an equal window on a cast
+  column never merges. An empty window is pruned unless the value is None
+  or the column is cast. An aware time column in another zone than UTC
+  fails with the `SchemaError` of a naive one. None comes after a window
+  on its own column.
+- **CW1-3 Repeated dict keys in every bank decoder**
+  (`src/backend/tests/bank_dict_pairs.hpp`). The pandas table, pandas
+  sequence and Polars sequence bank replays now build a generated dict
+  that repeats a key as `dict(pairs)` too (first place, last value; keys
+  equal under Python's `==`: 1, 1.0 and True; aware and naive datetimes
+  never equal; NaN never equal). Every docs bank replays at 0. No library
+  change.
+- **CW1-4 Rework on uploads** (`/api/rework`, `rework.cpp`
+  `discover_rework_as_uploaded`, also the CLI). The activities variant is
+  `pm4py.get_rework_cases_per_activity` on the frame: it checks the case
+  column (missing, then not of type str, then gaps) before the activity
+  column, and counts the groups of the case column holding an activity
+  more than once, so any str column can be the case key. The cases
+  variant raises `KeyError: '<case key>'` for a missing case column,
+  `KeyError: 'Column not found: <activity key>'` for a missing activity
+  column and `KeyError: 'case:concept:name'` for any other case key, and
+  skips NaN activity cells. Before, both read Minera's log.
+- **CW1-5 Boundary activities on uploads** (`boundary_activities.cpp`
+  `discover_boundary_activities_as_uploaded`). The frame's case columns
+  can be the activity key (`case:concept:name` keys each case by its id),
+  and a column the frame lacks fails pm4py's column check ("the specified
+  activity column is not contained in the dataframe. Available columns:
+  [...]"); an XES upload's frame holds only the file's own keys, where
+  Minera returned empty counts.
+- **CW1-6 Cycle time on uploads** (`/api/cycle-time`, `cycle_time.cpp`,
+  CLI). pm4py's DataFrame cycle time defaults the start key to the
+  timestamp key (the EventLog path to `time:timestamp`) and selects the
+  set of the two columns: one label when they are equal (`KeyError`
+  "None of [Index(['ts'], ...)]"), the present one dropped from the
+  missing list ("['ts'] not in index").
+- **CW1-7 Fresh seeds** (0 calls differing). Polars table CK 2026112001,
+  CN 2026112002, CJ 2026112003, CI 2026112004, CH 2026112005; Polars
+  sequence CP 2026112000, CK 2026112006, CJ 2026112007, CH 2026112008;
+  pandas CK table 2026112009, CK sequence 2026112010, CN LTL 2026112011.
+- **CW1-8 Chaotic activities on uploads** (`/api/chaotic-activities`,
+  `chaotic_activities.cpp` `discover_chaotic_activities_as_uploaded`, also
+  the CLI; `chs.py`, 240 CSV and 80 XES sweep calls, all equal after up to the
+  declared ties; before, 38 of the first 80 differed). pm4py reads the
+  frame's column as pandas holds it: a column the frame lacks raises
+  `KeyError: '<key>'`; ints, floats, bools and dates stay typed (labels
+  as Python prints them: `1000.0`) and are sorted with Python's `<` (a str
+  column with NaN gaps fails "'<' not supported between instances of
+  'str' and 'float'"); each NaN cell is an activity of its own (frequency
+  1), and removing a NaN removes nothing (`x != nan` holds for every
+  cell), so its entropy gain is 0. Before, Minera read its own log's text
+  and refused the gaps.
+
+Upload sweeps (`review-harness/round-cw/up`, `sw.py`): rework (both
+variants), cycle time, case arrival and boundary activities with random
+keys on CSV uploads (blank cells in every other one; 60 seeds while
+porting, then seeds 300-329) and on 30 XES uploads written out of case
+order (seeds 200-229). The final runs, 1,440 calls, are all equal or raise
+alike; before the last two fixes the XES run differed on 39 calls (24
+boundary counts where pm4py fails the column check, 15 cycle-time
+messages naming the column twice). Case arrival was already equal.
+Passed time (`pts.py`, all three variants with random activity, timestamp
+and start keys) was already on the frame: 100 CSV and 100 XES calls, all
+equal or raising alike but one message whose column order differs.
+
+The chaotic-activity entropies differ from Minera's in the last one or
+two bits on about 7% of the raw values and 19% of the smoothed ones, also
+on string logs, which can reorder near ties. The reference's summation
+order follows the hash order of a set: on 400 random string logs, 168 give
+different bits between hash seeds 0 and 1 (11 a different order), and
+every raw entropy checked (1,290 of 1,334, those with up to nine terms) is
+some ordering of the `c/n * log2(c/n)` terms summed one by one (the
+reference venv's Python 3.11 `sum`; Python 3.12 and later compensate float
+sums, so fits must run under the reference's Python;
+`review-harness/round-cw/chaos`). The output is a stable sort by score
+over the sorted activities.
+
+Declared:
+- Cycle time and passed time select a Python set of columns: when two or
+  more are missing, the `KeyError` names them in the set's hash order,
+  which varies with the hash seed (Minera names them in parameter order).
+- Chaotic activities: the entropy fields' last bits and the order of
+  near ties follow the hash order of the reference's activity set (string
+  activities vary with the hash seed); Minera sums in sorted order. Checks
+  compare the fields within a few ulps and the order up to such ties.
+- Chaotic activities: which two types the `TypeError` of a mixed column
+  names first follows the same set order (5 of the 240 CSV sweep calls
+  name them the other way round).
+
+Tests:
+- New: `docs/polars-filter-cw-probe-bank.json.gz` (probes w1-w6 and fresh
+  CK 2026111913 cases 117, 410 and 650; 64 cases, 5,761 calls), replayed
+  by `minera_polars_filter_cw_probe_bank_parity_tests`;
+  `minera_server_upload_frame_routes_tests` mines the CV1 CSV and XES
+  uploads and checks 40 rework, boundary-activity, cycle-time and
+  chaotic-activity answers, each checked against pm4py first (the chaotic
+  ones as sorted label:frequency pairs).

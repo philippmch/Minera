@@ -6087,7 +6087,7 @@ void handle_chaotic_activities(const httplib::Request& request,
       throw std::invalid_argument("chaotic-activities safety bound exceeded");
     response.set_content(
         minera::chaotic_activities_json(
-            minera::discover_chaotic_activities(require_prepared_log(*session), options)),
+            minera::discover_chaotic_activities_as_uploaded(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -6206,7 +6206,7 @@ void handle_rework(const httplib::Request& request,
     };
     const auto options = minera::parse_rework_params(lookup, present);
     response.set_content(
-        minera::rework_json(minera::discover_rework(require_prepared_log(*session), options)),
+        minera::rework_json(minera::discover_rework_as_uploaded(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
@@ -6240,7 +6240,15 @@ void handle_cycle_time(const httplib::Request& request,
     const auto present = [&](std::string_view name) {
       return request.has_param(std::string(name));
     };
-    const auto options = minera::parse_cycle_time_params(lookup, present);
+    auto options = minera::parse_cycle_time_params(lookup, present);
+    // Round CW: pm4py's DataFrame cycle time (a CSV or XES upload) starts
+    // each interval at the timestamp key unless a start key is given; its
+    // EventLog path at time:timestamp (observed black-box).
+    const bool dataframe = !session->active_source ||
+                           session->active_source->file().format == "csv" ||
+                           session->active_source->file().format == "xes";
+    if (dataframe && !present("cycle_time_start_timestamp_key"))
+      options.start_timestamp_key = options.timestamp_key;
     response.set_content(
         minera::cycle_time_json(
             minera::discover_cycle_time(require_prepared_log(*session), options)),

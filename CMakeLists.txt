@@ -2086,6 +2086,15 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_concept_drift_upload_tests minera_server)
     add_test(NAME minera_server_concept_drift_upload_tests
              COMMAND minera_server_concept_drift_upload_tests $<TARGET_FILE:minera_server>)
+    # Round CW: rework, boundary activities and cycle time on upload frames.
+    add_executable(minera_server_upload_frame_routes_tests
+      src/backend/tests/test_server_upload_frame_routes.cpp)
+    target_include_directories(minera_server_upload_frame_routes_tests PRIVATE third_party)
+    target_link_libraries(minera_server_upload_frame_routes_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_upload_frame_routes_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_upload_frame_routes_tests minera_server)
+    add_test(NAME minera_server_upload_frame_routes_tests
+             COMMAND minera_server_upload_frame_routes_tests $<TARGET_FILE:minera_server>)
     # A long route whose client disconnects stops within a second.
     add_executable(minera_server_cancellation_tests
       src/backend/tests/test_server_cancellation.cpp)
@@ -3306,6 +3315,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cv_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cv-bank.json.gz")
   set_tests_properties(minera_polars_filter_cv_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CW: eventually_follows filter and literal-sort order as the Polars
+  # plan runs it; the timeframe window folded into an equality on its own
+  # column (with CK seed 2026111913 cases 117, 410 and 650).
+  add_test(NAME minera_polars_filter_cw_probe_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cw-probe-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cw_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

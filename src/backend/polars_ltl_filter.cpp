@@ -7,6 +7,7 @@
 #include "python_scalar.hpp"
 #include "polars_lit_model.hpp"
 #include "polars_group_keys.hpp"
+#include "polars_ltl_cse_model.hpp"
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
@@ -309,6 +310,9 @@ std::string time_sort(const EventAttribute& key) {
   if (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) {
     try { return lit::literal_list_display(lit::argument_literal(key)); } catch (const PolarsSequenceFilterError&) {}
   }
+  // Round CW: a scalar that is no column name (an int, a float, a bool)
+  // sorts as its literal (fresh probe w2: dyn int: 1).
+  if (key.container == AttributeContainerKind::kScalar && !text(key) && !null(key)) return lit::scalar_display(lit::value_of(key));
   return "col(" + quote(key.value) + ")";
 }
 // Round CT: an int case key sorts as its scalar literal and windows over
@@ -724,6 +728,7 @@ std::string missing_tail(const EventTable& source, const Prepared& p, bool eager
   return render(attribute ? kDifferentAttributeTail : kDifferentMissingTail, source, p);
 }
 void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false, bool first_only = false, bool coercion = false, std::size_t limit = static_cast<std::size_t>(-1));
+void compute_query(const EventTable& source, const Prepared& p, bool eager, std::size_t at);
 bool listed_key(const EventAttribute& key) {
   return !key.is_null && (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple);
 }
@@ -914,6 +919,8 @@ bool first_activity_shared(const Prepared& p) {
   if (first.empty()) return false;
   return std::any_of(p.values.begin() + 1, p.values.end(), [&](const EventAttribute& v) { return shape(v) == first; });
 }
+void eventually_steps(const EventTable& source, const Prepared& p, bool eager);
+std::string filter_plan(const EventTable& source, const Prepared& p, std::size_t at);
 void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   source.validate();
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars LTL requires every column dtype");
@@ -1054,6 +1061,27 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     if (source.rows.size() != 1)
       fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
   }
+  // Round CW: a case column runs the activity filters and sorts in the
+  // order of the reference's cached plan (polars_ltl_cse_model.hpp): fresh
+  // CK 2026111913 case 117 (attribute key = case key: each filter runs below
+  // its own sort, whose height is that selection's) and repeated activities.
+  if (p.operation == Op::kEventuallyFollows && p.values.size() >= 2 && text(o.case_id_key)) {
+    validate_queries(source, p, eager, true);
+    // Round CW: a timestamp key naming the case column selects that column
+    // twice in the first pair's left input once every filter has resolved
+    // (probe cw/w3).
+    if (text(o.timestamp_key) && column(source, o.timestamp_key) == column(source, o.case_id_key)) {
+      std::vector<std::string> nodes{"select", "join left", "join", "filter", "select", "unique", "join right", "join"};
+      repeat(nodes, static_cast<std::ptrdiff_t>(p.values.size()) - 2, {"join left", "join"});
+      nodes.insert(nodes.end(), {"join right", "join", "select"});
+      fail("DuplicateError", eager ? "apply" : "collect",
+           "projections contained duplicate output name '" + o.case_id_key.value +
+               "'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names." +
+               restack(render(kEventFilterTail, source, p, filter_plan(source, p, 0)), nodes));
+    }
+    eventually_steps(source, p, eager);
+    return;
+  }
   // The literal sort key (one value) fails the sort when it runs, unless the
   // frame has one row.
   if (p.operation == Op::kEventuallyFollows && literal_sort(o.timestamp_key) && p.values.size() >= 2) {
@@ -1117,8 +1145,19 @@ void validate_queries(const EventTable& source, const Prepared& p, bool eager, b
   // one's, then the others in order (round CI: probed with 3 to 5
   // activities; round CE fitted three).
   const bool backward = p.operation == Op::kEventuallyFollows;
-  for (std::size_t step = 0; step < (coercion ? std::min<std::size_t>(1, p.values.size()) : p.values.size()); ++step) {
-    const auto at = backward && step ? (step == 1 ? p.values.size() - 1 : step - 1) : step;
+  for (std::size_t step = 0; step < (coercion ? std::min<std::size_t>(1, p.values.size()) : p.values.size()); ++step)
+    compute_query(source, p, eager, backward && step ? (step == 1 ? p.values.size() - 1 : step - 1) : step);
+}
+
+// One activity filter's compute-stage error (the plan has resolved).
+void compute_query(const EventTable& source, const Prepared& p, bool eager, std::size_t at) {
+  namespace lit = detail::polars_lit;
+  const auto ai = *column(source, p.options.attribute_key);
+  const auto& declared = source.dtypes[ai];
+  const auto categories = category_list(source, ai);
+  const auto phase = eager ? "apply" : "collect";
+  const auto& key = p.options.attribute_key.value;
+  {
     const auto value = lit::value_of(p.values[at]);
     // Round CI: a dict compares as a struct (the timeframe filter's model).
     if (value.kind == lit::Kind::kDict) {
@@ -1127,15 +1166,15 @@ void validate_queries(const EventTable& source, const Prepared& p, bool eager, b
       if (const auto f = lit::struct_failure(key, declared, m, present))
         fail(f->type, phase, f->message + "\n\nThis error occurred in the following expression:\n\t" + f->expression +
                                  (f->larger.empty() ? std::string() : "\nwhile evaluating this larger expression:\n\t" + f->larger) + "\n");
-      continue;
+      return;
     }
     if (!lit::scalar_literal(value)) {
       // A list compares with any column but a String (cast above) or Null
       // one as a List literal (round CE: temporal, Boolean, Categorical and
       // Enum columns too; probed in Polars 1.44.1).
-      if (value.kind == lit::Kind::kDict || declared == "String" || declared == "Null") continue;
+      if (value.kind == lit::Kind::kDict || declared == "String" || declared == "Null") return;
       std::optional<lit::Literal> list;
-      try { list = lit::list_literal(value.items); } catch (const PolarsSequenceFilterError&) { continue; }
+      try { list = lit::list_literal(value.items); } catch (const PolarsSequenceFilterError&) { return; }
       const auto shown = "\n\nThis error occurred in the following expression:\n\t[(col("+quote(key)+")) == ("+lit::lit_display(lit::list_of(list->type),lit::Value::list(list->values))+")]\n";
       if (lit::categorical_dtype(declared) || lit::enum_dtype(declared))
         fail("ComputeError",phase,"cannot compare categorical with "+lit::short_name(lit::list_of(list->type))+shown);
@@ -1158,6 +1197,110 @@ bool matches(const Cell& cell, const EventAttribute& value) {
     return date(*cell) && date(value) && day(*cell) == day(value) && root_cause_scalar_keys_equal(*cell,value);
   }
   return root_cause_scalar_keys_equal(*cell,value);
+}
+// Round CW: equal activity literals build equal filter plans, which the
+// plan's common-subplan elimination shares. The literal is compared as
+// Polars coerced it to the column (probe t3/ident.py): on a Float column a
+// bool, int or float is the column's float (1, 1.0 and True share; 0.1 and
+// its float32 neighbours share on Float32; -0.0 and 0.0 do not); on an
+// integer column a bool is the int it equals, a float keeps its own
+// (Float64) compare.
+std::string activity_identity(const EventAttribute& v, const std::string& declared) {
+  if (v.container == AttributeContainerKind::kScalar && !null(v)) {
+    // An aware datetime's literal is its instant in UTC whatever its offset.
+    const auto typed = detail::polars_lit::value_of(v);
+    if (typed.kind == detail::polars_lit::Kind::kDatetime) {
+      const auto literal = detail::polars_lit::literal_datetime(typed);
+      return "dt:" + literal.text + ":" + std::to_string(literal.integer);
+    }
+    const auto s = python::from_attribute(v);
+    using K = python::Scalar::Kind;
+    const bool number = s.kind == K::kBool || s.kind == K::kInt || s.kind == K::kFloat;
+    const auto as_double = [&]() {
+      if (s.kind == K::kBool) return s.boolean ? 1.0 : 0.0;
+      if (s.kind == K::kFloat) return s.real;
+      return std::stod((s.negative ? "-" : "") + s.digits);
+    };
+    static const std::unordered_set<std::string> integers{"Int8", "Int16", "Int32", "Int64", "Int128", "UInt8", "UInt16", "UInt32", "UInt64"};
+    if (number && declared == "Float32") return "f32:" + std::to_string(std::bit_cast<std::uint32_t>(static_cast<float>(as_double())));
+    if (number && declared == "Float64") return "f64:" + std::to_string(std::bit_cast<std::uint64_t>(as_double()));
+    if (integers.contains(declared)) {
+      if (s.kind == K::kBool) return std::string("i:") + (s.boolean ? "1" : "0");
+      if (s.kind == K::kInt) return "i:" + std::string(s.negative && s.digits != "0" ? "-" : "") + s.digits;
+      if (s.kind == K::kFloat) return "f64:" + std::to_string(std::bit_cast<std::uint64_t>(s.real));
+    }
+  }
+  std::string out = std::to_string(static_cast<int>(v.container)) + ":";
+  if (v.container == AttributeContainerKind::kScalar) return out + (null(v) ? std::string("n") : std::to_string(static_cast<int>(v.kind)) + "=" + v.value);
+  out += "[";
+  for (const auto& child : v.children) out += child.key + "=" + activity_identity(child, std::string()) + ",";
+  return out + "]";
+}
+// The rows one activity filter keeps (select_cases' comparison).
+std::size_t activity_rows(const EventTable& source, const Prepared& p, std::size_t at) {
+  namespace lit = detail::polars_lit;
+  const auto ai = *column(source, p.options.attribute_key);
+  const auto categories = category_list(source, ai);
+  const auto& value = p.values[at];
+  const auto typed = lit::value_of(value);
+  const bool column_valid = std::any_of(source.rows.begin(), source.rows.end(), [&](const auto& row) { return !lit::null_cell(row[ai]); });
+  std::size_t kept = 0;
+  for (const auto& row : source.rows) {
+    bool hit = false;
+    if (typed.kind == lit::Kind::kDict) hit = lit::struct_matches(row[ai], source.dtypes[ai], lit::struct_model(value, source.dtypes[ai]), column_valid);
+    else if (!lit::scalar_literal(typed)) hit = matches(row[ai], value);
+    else hit = lit::compare_scalar(row[ai], source.dtypes[ai], typed, lit::CompareOp::kEq, &categories) == 1;
+    if (hit) ++kept;
+  }
+  return kept;
+}
+// Round CW: an activity filter as a resolved plan prints it (the literal
+// coerced to the column where Polars casts it; probe cw/w3).
+std::string filter_plan(const EventTable& source, const Prepared& p, std::size_t at) {
+  namespace lit = detail::polars_lit;
+  const auto ai = *column(source, p.options.attribute_key);
+  const auto& declared = source.dtypes[ai];
+  const auto& key = p.options.attribute_key.value;
+  const auto& value = p.values[at];
+  if (null(value)) return "null.repeat([col(" + quote(key) + ").len()])";
+  const auto typed = lit::value_of(value);
+  if (typed.kind == lit::Kind::kDict) {
+    const auto m = lit::struct_model(value, declared);
+    if (declared == "String") return "col(" + quote(key) + ") == " + lit::struct_literal(m);
+    if (m.cast_column) return lit::struct_cast_text(key, m) + " == " + lit::struct_display(m);
+    return "col(" + quote(key) + ") == " + lit::struct_display(m);
+  }
+  if (!lit::scalar_literal(typed)) {
+    try { return "col(" + quote(key) + ") == " + lit::literal_list_display(lit::argument_literal(value)); } catch (const PolarsSequenceFilterError&) {}
+    return "col(" + quote(key) + ") == " + literal(value);
+  }
+  const auto categories = category_list(source, ai);
+  return lit::comparison_plan(key, declared, typed, lit::CompareOp::kEq, &categories);
+}
+void eventually_steps(const EventTable& source, const Prepared& p, bool eager) {
+  const auto& o = p.options;
+  const auto ai = column(source, o.attribute_key), ci = column(source, o.case_id_key);
+  if (!ai || !ci) return;
+  std::vector<std::string> ids;
+  std::vector<std::size_t> first;
+  std::vector<int> groups;
+  std::vector<bool> bound;
+  for (std::size_t at = 0; at < p.values.size(); ++at) {
+    const auto id = activity_identity(p.values[at], source.dtypes[*ai]);
+    const auto found = std::find(ids.begin(), ids.end(), id);
+    if (found == ids.end()) { ids.push_back(id); first.push_back(at); bound.push_back(null(p.values[at])); groups.push_back(static_cast<int>(ids.size()) - 1); }
+    else groups.push_back(static_cast<int>(found - ids.begin()));
+  }
+  const bool sorting = literal_sort(o.timestamp_key);
+  const auto phase = eager ? "apply" : "collect";
+  namespace cse = detail::polars_ltl_cse;
+  for (const auto& step : cse::eventually_unit_order(groups, *ai == *ci, bound)) {
+    if (step.kind == cse::StepKind::kFilter) { compute_query(source, p, eager, first[static_cast<std::size_t>(step.group)]); continue; }
+    if (!sorting) continue;
+    const auto height = step.group < 0 ? source.rows.size() : activity_rows(source, p, first[static_cast<std::size_t>(step.group)]);
+    if (height != 1)
+      fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(height) + " and Series length: 1");
+  }
 }
 struct Selection { std::unordered_set<std::string> keys; std::string deferred_type, deferred_message; };
 std::vector<std::size_t> sorted_rows(const EventTable& source, const Prepared& p) {

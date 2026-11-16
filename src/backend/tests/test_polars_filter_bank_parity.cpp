@@ -20,6 +20,7 @@
 #include "minera/timestamp.hpp"
 
 #include "../gzip_codec.hpp"
+#include "bank_dict_pairs.hpp"
 #include "../polars_lit_model.hpp"
 
 #include <algorithm>
@@ -309,21 +310,9 @@ EventAttribute to_attribute(const Json& node, std::string key = {}) {
     for (const auto& item : value.items) out.children.push_back(to_attribute(item, std::to_string(out.children.size())));
   } else if (tag == "m") {
     out.container = AttributeContainerKind::kContainer;
-    // dict(pairs) (round CV): a repeated key keeps its first place and takes
-    // the last value.
-    std::vector<std::pair<std::string, std::string>> keys;
-    for (const auto& pair : value.items) {
-      const auto& key = pair.items.at(0);
-      std::pair<std::string, std::string> id{tag_of(key), body(key).text};
-      auto child = to_attribute(pair.items.at(1), body(key).text);
-      const auto found = std::find(keys.begin(), keys.end(), id);
-      if (found != keys.end()) {
-        out.children[static_cast<std::size_t>(found - keys.begin())] = std::move(child);
-      } else {
-        keys.push_back(std::move(id));
-        out.children.push_back(std::move(child));
-      }
-    }
+    // Repeated keys were merged as dict(pairs) when the bank was read
+    // (bank_dict_pairs.hpp).
+    for (const auto& pair : value.items) out.children.push_back(to_attribute(pair.items.at(1), body(pair.items.at(0)).text));
   } else {
     throw std::runtime_error("unsupported typed argument tag " + tag);
   }
@@ -1174,7 +1163,8 @@ int main(int argc, char** argv) try {
   // MINERA_BANK_ONLY=text replays only the functions whose name contains it.
   const char* only = std::getenv("MINERA_BANK_ONLY");
   const auto text = read_bank(argv[1]);
-  const auto bank = JsonReader(text).value();
+  auto bank = JsonReader(text).value();
+  minera::bank_dict_pairs::python_dict_pairs_in_calls(bank);
   std::map<std::string, std::pair<std::size_t, std::size_t>> tally;  // function -> passed, failed
   std::size_t failures = 0, shown = 0;
   std::size_t case_index = 0;

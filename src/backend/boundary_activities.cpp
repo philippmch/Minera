@@ -1,6 +1,7 @@
 #include "minera/boundary_activities.hpp"
 #include "reference_activity_selector.hpp"
 #include "minera/frame_keys.hpp"
+#include "minera/dataframe_validation.hpp"
 
 #include <stdexcept>
 #include <string_view>
@@ -75,7 +76,17 @@ BoundaryActivitiesResult discover_boundary_activities(
 
 BoundaryActivitiesResult discover_boundary_activities_as_uploaded(
     const EventLog& log, const BoundaryActivitiesOptions& options) {
-  if (const auto keyed = frame_keyed_activities(log, options.activity_key)) {
+  // Round CW: the frame's case columns too (case:concept:name keys each
+  // case by its id); a column the frame lacks fails pm4py's column check
+  // (observed black-box on XES uploads, whose frame has only its own keys).
+  if (log.dataframe_columns && !options.activity_key.empty() && options.activity_key != "activity" &&
+      options.activity_key != "concept:name") {
+    const auto columns = frame_keys(log, FrameKeyScope::kDataFrame);
+    if (!columns.contains(options.activity_key))
+      throw std::invalid_argument("the specified activity column is not contained in the dataframe. Available columns: " +
+                                  dataframe_available_columns({columns.begin(), columns.end()}));
+  }
+  if (const auto keyed = frame_keyed_activities(log, options.activity_key, FrameKeyScope::kDataFrame)) {
     if (const auto error = frame_activity_column_error(*keyed); !error.empty())
       throw std::invalid_argument(error);
     auto projected = options;

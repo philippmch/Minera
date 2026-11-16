@@ -6892,7 +6892,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       };
       const auto params = minera::parse_chaotic_activities_params(lookup, present);
       const auto body = minera::chaotic_activities_json(
-          minera::discover_chaotic_activities(log, params));
+          minera::discover_chaotic_activities_as_uploaded(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {
@@ -6967,7 +6967,7 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       };
       const auto params = minera::parse_rework_params(lookup, present);
       const auto body = minera::rework_json(
-          minera::discover_rework(log, params));
+          minera::discover_rework_as_uploaded(log, params));
       if (output.empty()) {
         std::cout << body << '\n';
       } else {
@@ -6988,7 +6988,10 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto present = [&](std::string_view name) {
         return cycle_time_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_cycle_time_params(lookup, present);
+      auto params = minera::parse_cycle_time_params(lookup, present);
+      // The input is a CSV or XES file: pm4py's DataFrame path starts each
+      // interval at the timestamp key unless a start key is given (round CW).
+      if (!present("cycle_time_start_timestamp_key")) params.start_timestamp_key = params.timestamp_key;
       const auto body = minera::cycle_time_json(
           minera::discover_cycle_time(log, params));
       if (output.empty()) {

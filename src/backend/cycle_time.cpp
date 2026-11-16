@@ -48,7 +48,11 @@ std::vector<std::pair<double, double>> frame_cycle_events(const EventLog& log, c
   const frame_times::Frame frame(log);
   const auto start_key = frame_times::timestamp_column(options.start_timestamp_key);
   const auto end_key = frame_times::timestamp_column(options.timestamp_key);
-  require_frame_columns(frame.keys(), {start_key, end_key});
+  // pm4py selects the set {start, completion}: one label when they are
+  // equal; two missing labels come in the set's hash order, which varies
+  // with the hash seed (start first here; round CW, observed black-box).
+  require_frame_columns(frame.keys(), start_key == end_key ? std::vector<std::string>{start_key}
+                                                           : std::vector<std::string>{start_key, end_key});
   const auto seconds = [&](const Trace& trace, const Event& event, const std::string& key) {
     const auto value = frame.cell(trace, event, key);
     if (value && value->kind == python::Scalar::Kind::kDate) return frame_times::epoch_seconds(*frame.date(trace, event, key));

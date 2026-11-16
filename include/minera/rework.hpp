@@ -38,6 +38,13 @@ struct ReworkResult {
 [[nodiscard]] ReworkResult discover_rework(const EventLog& log,
                                            const ReworkOptions& options = {});
 
+// An upload's rework as pm4py gives it on its frame (round CW): the
+// activities variant as get_rework_cases_per_activity with its column
+// checks and the case column's groups, the cases variant as the pandas
+// cases statistic; any other log is read as discover_rework does.
+[[nodiscard]] ReworkResult discover_rework_as_uploaded(const EventLog& log,
+                                                       const ReworkOptions& options = {});
+
 [[nodiscard]] inline ReworkResult rework(
     const EventLog& log, const ReworkOptions& options = {}) {
   return discover_rework(log, options);
