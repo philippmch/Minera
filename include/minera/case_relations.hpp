@@ -82,6 +82,12 @@ void type_csv_case_relation_keys(EventTable& relations,
 void type_case_relations_like_csv_logs(std::vector<CaseRelation>& relations,
                                        const EventLog* left_csv,
                                        const EventLog* right_csv);
+// The same for uploads, where an XES side (`*_csv` false) is read_xes's
+// frame: its case ids are str, so a numeric relation column fails the join
+// as pandas does, and the left join's stop applies to it too.
+void type_case_relations_like_logs(std::vector<CaseRelation>& relations,
+                                   const EventLog& left, bool left_csv,
+                                   const EventLog& right, bool right_csv);
 
 [[nodiscard]] EventLog merge_case_relations(
     const EventLog& base, const EventLog& incoming,

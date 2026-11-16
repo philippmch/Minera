@@ -217,6 +217,72 @@ void until_activity_on_csv_import_uses_typed_activities() {
   assert((result.elapsed_seconds == std::vector<double>{3600.0, 1800.0}));
 }
 
+// Round CX: on an upload's frame the prefix utilities read
+// convert_to_event_log's typed cells (values captured from pm4py 2.7.22
+// get_log_traces_until_activity / get_log_traces_to_activities /
+// get_prefixes_from_log on format_dataframe(read_csv) of this table).
+void prefix_utilities_on_csv_frame_read_typed_cells() {
+  const std::string csv =
+      "case,act,ts,num,flt,ts2,res\n"
+      "1,a,2020-01-01 00:00:05,3,1.5,2020-01-01 00:00:09,r1\n"
+      "1,b,2020-01-01 00:00:07,5,2.0,2020-01-01 00:00:01,10\n"
+      "2,a,2020-01-01 00:00:01,7,,2020-01-02 00:00:00,\n"
+      "2,b,2020-01-01 00:00:03,1,0.5,,r2\n";
+  std::istringstream input(csv);
+  CsvImportOptions import;
+  import.case_id_column = "case";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  const auto log = import_csv_event_log(input, import);
+  assert(log.dataframe_columns);
+  const auto until = [&](const std::string& activity, std::string activity_key, std::string timestamp_key) {
+    LogUtilityOptions options;
+    if (!activity_key.empty()) options.activity_key = std::move(activity_key);
+    if (!timestamp_key.empty()) options.timestamp_key = std::move(timestamp_key);
+    return get_log_traces_until_activity(log, activity, options);
+  };
+  const auto literals = [&](const std::string& timestamp_key) {
+    const auto result = until("b", "", timestamp_key);
+    assert(result.log.traces.size() == 2);
+    const auto json = log_until_activity_json(result);
+    return json.substr(json.find("\"elapsed_seconds\""));
+  };
+  assert(literals("") == "\"elapsed_seconds\":[2.0,2.0]}");
+  assert(literals("ts") == "\"elapsed_seconds\":[2.0,2.0]}");
+  assert(literals("ts2") == "\"elapsed_seconds\":[-8.0,null]}");  // NaT
+  assert(literals("num") == "\"elapsed_seconds\":[2,-6]}");       // int - int
+  assert(literals("flt") == "\"elapsed_seconds\":[0.5,null]}");   // NaN
+  const auto fails = [&](const std::string& activity_key, const std::string& timestamp_key,
+                         const std::string& message) {
+    try {
+      (void)until("b", activity_key, timestamp_key);
+    } catch (const std::invalid_argument& error) {
+      assert(std::string(error.what()) == message);
+      return;
+    }
+    assert(false);
+  };
+  fails("", "res", "TypeError: unsupported operand type(s) for -: 'str' and 'str'");
+  fails("", "missing", "KeyError: 'missing'");
+  fails("missing", "", "KeyError: 'missing'");
+  // A typed cell equals no text: the int column num holds 5, not "5".
+  assert(until("5", "num", "").log.traces.empty());
+  assert(until("b", "act", "").log.traces.size() == 2);
+  // get_log_traces_to_activities selects nothing for a key no event holds.
+  LogUtilityOptions options;
+  options.activity_key = "missing";
+  const auto targets = get_log_traces_to_activities(log, {"b", "zz"}, options);
+  assert(targets.activities.empty() && targets.logs.empty());
+  options.activity_key = "activity";
+  options.timestamp_key = "res";
+  bool raised = false;
+  try { (void)get_log_traces_to_activities(log, {"b"}, options); } catch (const std::invalid_argument&) { raised = true; }
+  assert(raised);
+  // get_prefixes_from_log(frame, 0) keeps no rows, so no case.
+  assert(get_log_prefixes(log, 0).traces.empty());
+  assert(get_log_prefixes(log, 1).traces.size() == 2);
+}
+
 void activity_targets_exclude_competing_targets() {
   auto log = source_log();
   Trace third;
@@ -310,6 +376,7 @@ int main() {
   until_activity_returns_prefix_and_duration();
   activity_targets_exclude_competing_targets();
   until_activity_on_csv_import_uses_typed_activities();
+  prefix_utilities_on_csv_frame_read_typed_cells();
   feature_selection_keeps_useful_typed_attributes();
   std::cout << "Log utility tests passed\n";
 }

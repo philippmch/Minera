@@ -1387,6 +1387,13 @@ std::string join_pattern(const Value& item, VariantMode mode) {
       (item.kind == Kind::kNone || item.kind == Kind::kBool || item.kind == Kind::kInt || item.kind == Kind::kFloat ||
        item.kind == Kind::kDatetime || item.kind == Kind::kDate))
     fail("TypeError", "can only join an iterable");
+  // Round CX (probed): the trace filter iterates each admitted trace in
+  // turn, so a scalar one fails as not iterable (fresh pandas sequence CK
+  // bank 2026112110 case 85).
+  if (mode == VariantMode::kTrace &&
+      (item.kind == Kind::kNone || item.kind == Kind::kBool || item.kind == Kind::kInt || item.kind == Kind::kFloat ||
+       item.kind == Kind::kDatetime || item.kind == Kind::kDate))
+    fail("TypeError", "'" + type_name(item) + "' object is not iterable");
   if (item.kind == Kind::kString) {
     // A str iterates over its characters (UTF-8 sequences).
     bool first = true;

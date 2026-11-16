@@ -8703,6 +8703,30 @@ void csv_import_types_activities_case_attributes_and_relations_like_reference() 
       right_rejected = true;
     }
     assert(right_rejected);
+    // Round CX: uploads reach the interleavings through format_dataframe or
+    // read_xes, whose case ids are str on both sides: text keys stay
+    // literal ("007" never meets the case "7"), numeric keys fail the join
+    // (pandas: "You are trying to merge on str and int64 columns"), and the
+    // left join's stop applies.
+    std::vector<minera::CaseRelation> upload_text{{"7", "c1"}, {"007", "c1"}, {"c1", "7"}};
+    bool upload_numeric_rejected = false;
+    try {
+      minera::type_case_relations_like_logs(upload_text, ints, false, text, false);
+    } catch (const std::invalid_argument&) {
+      upload_numeric_rejected = true;  // the LEFT column mixes, but reads str
+    }
+    assert(!upload_numeric_rejected && upload_text.size() == 3);
+    std::vector<minera::CaseRelation> upload_numbers{{"7", "x"}, {"8", "y"}};
+    upload_numeric_rejected = false;
+    try {
+      minera::type_case_relations_like_logs(upload_numbers, ints, false, text, false);
+    } catch (const std::invalid_argument&) {
+      upload_numeric_rejected = true;
+    }
+    assert(upload_numeric_rejected);
+    std::vector<minera::CaseRelation> upload_unmatched{{"c9", "7"}};
+    minera::type_case_relations_like_logs(upload_unmatched, text, false, ints, false);
+    assert(upload_unmatched.empty());  // no left case met: the right join is not tried
 
     // A merge: the incoming side joins like the interleavings; the base
     // case ids and the LEFT keys form one column, here float64 (the LEFT

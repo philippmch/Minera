@@ -15,6 +15,10 @@ namespace minera {
 struct TimestampInterleavingOptions {
   std::string timestamp_key = "time:timestamp";
   std::size_t max_interleavings = 1'000'000;
+  // Uploaded files: pm4py reads them with format_dataframe or read_xes,
+  // which give UTC-aware timestamps, so a naive one is read as UTC (round
+  // CX). Otherwise a naive timestamp raises, as on a naive frame.
+  bool naive_as_utc = false;
 };
 
 enum class TimestampInterleavingDirection { kLeftToRight, kRightToLeft };

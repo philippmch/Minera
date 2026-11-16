@@ -1067,7 +1067,8 @@ export interface LogUtilityResult {
   testing?: LogUtilityLog;
   log?: LogUtilityLog;
   change_indexes?: number[][];
-  elapsed_seconds?: number[];
+  // null for a NaN or NaT difference of an upload's typed cells.
+  elapsed_seconds?: (number | null)[];
   activities?: string[];
   logs?: LogUtilityLog[];
   event_attributes?: string[];
@@ -1131,7 +1132,7 @@ export function isLogUtilityResult(value: unknown): value is LogUtilityResult {
   if (candidate.variant === "TO_ACTIVITIES") return Array.isArray(candidate.activities) && candidate.activities.every((activity) => typeof activity === "string") && Array.isArray(candidate.logs) && candidate.logs.length === candidate.activities.length && candidate.logs.every(isLogUtilityLog);
   if (!isLogUtilityLog(candidate.log)) return false;
   if (candidate.variant === "ALL_PREFIXES") return Array.isArray(candidate.change_indexes) && candidate.change_indexes.every((row) => Array.isArray(row) && row.every((index) => Number.isSafeInteger(index) && index >= 0));
-  if (candidate.variant === "UNTIL_ACTIVITY") return Array.isArray(candidate.elapsed_seconds) && candidate.elapsed_seconds.length === candidate.log.traces.length && candidate.elapsed_seconds.every((value) => typeof value === "number" && Number.isFinite(value) && value >= 0);
+  if (candidate.variant === "UNTIL_ACTIVITY") return Array.isArray(candidate.elapsed_seconds) && candidate.elapsed_seconds.length === candidate.log.traces.length && candidate.elapsed_seconds.every((value) => value === null || (typeof value === "number" && Number.isFinite(value)));
   return true;
 }
 

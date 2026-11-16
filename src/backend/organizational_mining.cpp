@@ -457,9 +457,14 @@ OrganizationalSnaResult discover_organizational_sna(
       }
       if (options.variant == OrganizationalSnaVariant::kSubcontractingPandas) {
         // A frame's resources compare as their typed values (numbers by value).
+        // Round CX: a NaN cell (no value) sorts above every value. The
+        // reference's order of equal-count variants holding NaN is not a
+        // total order (pm4py compares NaN as unordered); of the orders tried
+        // black-box this one agrees most often (1,342 of 1,500 random float
+        // frames with NaN cells; NaN first, as before, 1,264). Declared.
         const auto element_less = [&](const std::optional<std::string>& left,
                                       const std::optional<std::string>& right) {
-          if (!left || !right) return !left && right.has_value();
+          if (!left || !right) return left.has_value() && !right;
           return frame ? frame_names.less(*left, *right) : *left < *right;
         };
         std::sort(variants.begin(), variants.end(),

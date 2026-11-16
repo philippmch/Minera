@@ -67,6 +67,7 @@ struct ParsedEvent {
   const Event* event = nullptr;
   Instant time;
   std::size_t sequence = 0;
+  bool naive = false;  // read as UTC (naive_as_utc)
 };
 
 // Each case becomes start boundary, events by (timestamp, input order), end
@@ -74,7 +75,8 @@ struct ParsedEvent {
 // in case-id order, then every case's events in that order, then the end
 // boundaries.
 std::map<std::string, Timeline> build_timelines(const EventLog& log,
-                                                 std::string_view key) {
+                                                 std::string_view key,
+                                                 bool naive_as_utc) {
   std::map<std::string, std::vector<ParsedEvent>> grouped;
   std::size_t sequence = 0;
   for (const auto& trace : log.traces) {
@@ -93,14 +95,14 @@ std::map<std::string, Timeline> build_timelines(const EventLog& log,
             *raw_timestamp + "'");
       }
       // Timezone-naive columns cannot be ordered against the boundaries.
-      if (!parsed->timezone_aware) {
+      if (!parsed->timezone_aware && !naive_as_utc) {
         throw std::invalid_argument(
             "timestamp interleavings: timezone-naive timestamp '" +
             *raw_timestamp + "'");
       }
       events.push_back({&event,
                         Instant{parsed->seconds, static_cast<std::int64_t>(parsed->nanoseconds)},
-                        sequence++});
+                        sequence++, !parsed->timezone_aware});
     }
   }
   std::erase_if(grouped, [](const auto& entry) { return entry.second.empty(); });
@@ -123,9 +125,11 @@ std::map<std::string, Timeline> build_timelines(const EventLog& log,
     timeline.push_back({nullptr, std::string(kStartActivity),
                         std::string(kStartTimestamp), kStartBoundary, rank, true});
     for (const auto& parsed : events) {
+      // A naive time read as UTC is reported as that UTC instant, as str()
+      // of the reference's aware Timestamp would show it.
       timeline.push_back({parsed.event, parsed.event->activity,
-                          *timestamp_text(*parsed.event, key), parsed.time,
-                          position++, false});
+                          *timestamp_text(*parsed.event, key) + (parsed.naive ? "+00:00" : ""),
+                          parsed.time, position++, false});
     }
     timeline.push_back({nullptr, std::string(kEndActivity),
                         std::string(kEndTimestamp), kEndTime,
@@ -179,8 +183,8 @@ TimestampInterleavingsResult discover_timestamp_interleavings(
         "timestamp interleavings: max_interleavings must be positive");
   }
 
-  const auto left_timelines = build_timelines(left, options.timestamp_key);
-  const auto right_timelines = build_timelines(right, options.timestamp_key);
+  const auto left_timelines = build_timelines(left, options.timestamp_key, options.naive_as_utc);
+  const auto right_timelines = build_timelines(right, options.timestamp_key, options.naive_as_utc);
 
   TimestampInterleavingsResult result;
   result.options = options;

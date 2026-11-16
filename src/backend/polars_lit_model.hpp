@@ -436,6 +436,10 @@ inline std::optional<LitType> lit_supertype(const LitType& l, const LitType& r) 
     if ((x == K::kInt128 || x == K::kUInt64) && y == K::kFloat64) return lit_type(K::kFloat64);
     if ((x == K::kInt64 && y == K::kBoolean) || ((x == K::kDate || x == K::kDatetime) && y == K::kInt64))
       return lit_type(K::kInt64);
+    // Round CX (probed in pl.lit lists of lists): a date or datetime with a
+    // UInt64 also meets in Int64 (the UInt64 value then fails the strict
+    // build); with an Int128 there is no supertype.
+    if ((x == K::kDate || x == K::kDatetime) && y == K::kUInt64) return lit_type(K::kInt64);
     if ((x == K::kInt64 || x == K::kBoolean || x == K::kDate || x == K::kDatetime) && y == K::kFloat64)
       return lit_type(K::kFloat64);
     if (x == K::kDate && y == K::kDatetime) return b;

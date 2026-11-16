@@ -67,6 +67,10 @@ struct LogUntilActivityResult {
   // Elapsed seconds from the event immediately before the target to the first
   // target event, aligned with the returned traces.
   std::vector<double> elapsed_seconds;
+  // On an upload's frame (round CX) each target as the JSON literal of the
+  // reference's difference of the two typed cells: seconds for dates, an
+  // int for two int cells, null for NaN or NaT. Empty otherwise.
+  std::vector<std::string> elapsed_literals;
 };
 
 struct LogActivityTargetResult {

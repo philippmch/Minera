@@ -89,6 +89,32 @@ void frame_path_reads_pm4py_keys() {
                 "TypeError: '<' not supported"));
 }
 
+// Round CX (pm4py 2.7.22 on read_csv + format_dataframe of this CSV): of
+// the two one-case variants pm4py takes case 0's window first; Minera sorts
+// a NaN above every value, which agrees here (case 0 starts with NaN).
+void subcontracting_pandas_sorts_nan_variants_first() {
+  std::istringstream csv("case,act,ts,res\n"
+                         "0,a,2024-01-01 00:00:00,\n"
+                         "0,b,2024-01-01 00:01:00,1.0\n"
+                         "0,c,2024-01-01 00:02:00,2.0\n"
+                         "0,d,2024-01-01 00:03:00,1.0\n"
+                         "1,a,2024-01-01 00:04:00,3.0\n"
+                         "1,b,2024-01-01 00:05:00,1.0\n"
+                         "1,c,2024-01-01 00:06:00,4.0\n"
+                         "1,d,2024-01-01 00:07:00,1.0\n");
+  minera::CsvImportOptions import;
+  import.case_id_column = "case";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  const auto log = minera::import_csv_event_log(csv, import);
+  assert(log.dataframe_columns);
+  minera::OrganizationalSnaOptions options;
+  options.variant = minera::OrganizationalSnaVariant::kSubcontractingPandas;
+  options.resource_attribute = "res";
+  const std::map<std::pair<std::string, std::string>, double> expected{{{"1.0", "2.0"}, 0.5}};
+  assert(edges_of(minera::discover_organizational_sna(log, options)) == expected);
+}
+
 minera::EventLog sample() {
   minera::EventLog log;
   log.traces.push_back({"c1", {{"c1", "A", "", "alice", 0, {}, ""},
@@ -103,6 +129,7 @@ minera::EventLog sample() {
 
 int main() {
   frame_path_reads_pm4py_keys();
+  subcontracting_pandas_sorts_nan_variants_first();
   minera::OrganizationalSnaOptions options;
   options.beta = 0.5;
   const auto handover = minera::discover_organizational_sna(sample(), options);

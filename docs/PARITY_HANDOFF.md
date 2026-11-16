@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CW (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–CX (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5803,7 +5803,62 @@ chaotic-activity fits are in the project files under
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
 
-Next round (CX) should start by re-reviewing round CW:
+Round CX re-reviewed CW (Review CX1). CW's commit ae4ae5bc ran green on all six CI jobs
+(run 43821403493). CX replayed a batch of fresh seeds and swept three
+upload routes against pm4py on the upload's frame:
+- Log util on uploads (`log_util.cpp`, `log_util_json.cpp`, server and
+  CLI): until-activity and to-activities read the frame's typed cells
+  (Python equality for the activity; the elapsed value is the difference
+  of the typed cells: seconds for dates, an int for ints, null for NaN or
+  NaT, `TypeError` for text, `KeyError` for a missing column), fixed
+  prefixes drop the cases left empty; `elapsed_seconds` may carry null
+  and negative values (frontend validator fixed). Sweep: 145 of 960 calls
+  differed before, 0 of 960 after.
+- Timestamp interleavings on uploads (`timestamp_interleavings.cpp`
+  `naive_as_utc`, `case_relations.cpp` `type_case_relations_like_logs`,
+  server and CLI): relation ids join as str on both sides (numeric
+  relation ids raise, as pandas' merge does) and naive CSV timestamps
+  count as UTC, as `format_dataframe` makes them. Sweep: 31 of 200 before,
+  0 after. Two BB CLI ctests now expect the error.
+- Organizational SNA on uploads: 640 calls, 4 differing, all the
+  subcontracting pandas variant with NaN resource cells, whose variant
+  order in pm4py is no total order. Minera now sorts NaN above every
+  value (the closest order found: 1,342 of 1,500 random frames); declared.
+- Fresh seeds 2026112100-11 (12 banks): three calls; the `pl.lit`
+  Date/Datetime + UInt64 supertype (Int64) and the trace filter's
+  not-iterable scalar trace fixed, four_eyes' equal-size join order marked
+  unordered (it varies between runs of the reference).
+
+In the suite: new `docs/polars-filter-cx-bank.json.gz` and
+`docs/pandas-sequence-filter-cx-bank.json.gz` with their ctests, and new
+cases in the log util, timestamp interleavings, core and organizational
+mining tests. The fresh banks, sweeps and the subcontracting study are in
+the project files under `review-harness/round-cx/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (CY) should start by re-reviewing round CX:
+
+- CX's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- merge case relations on uploads: the route deliberately reads both
+  files as `read_csv` tables (parity doc, "These deliberately stay ... on
+  the frame's rows"); a sweep against pm4py's case-relations merge on
+  `read_csv` and `read_xes` frames is still owed;
+- the CU list below (paths list case keys repeating a name,
+  `filter_variants_top_k` one-row second columns, set values in the pandas
+  bank codec, LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CW's targets, taken in CX (findings CX1-1 to CX1-4): CW's CI run,
+the fresh seeds and the upload routes log util, timestamp interleavings
+and organizational SNA. Not taken (carried to CY): merge case relations
+and the CU list.
+
+Previous list for round CX (kept for its older items):
 
 - CW's CI run;
 - fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ

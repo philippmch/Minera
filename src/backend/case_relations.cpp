@@ -1726,6 +1726,53 @@ void type_case_relations_like_csv_logs(std::vector<CaseRelation>& relations,
   relations.resize(kept);
 }
 
+void type_case_relations_like_logs(std::vector<CaseRelation>& relations,
+                                   const EventLog& left, bool left_csv,
+                                   const EventLog& right, bool right_csv) {
+  std::vector<bool> keep(relations.size(), true);
+  // A CSV side's case column is typed as read_csv typed it; an XES side's
+  // (read_xes) is str, which meets text keys only: pandas refuses to merge it
+  // with a numeric key column (round CX, observed black-box).
+  const auto apply = [&](const EventLog& log, bool csv, std::string CaseRelation::*member,
+                         const char* side) {
+    std::vector<std::string> cells;
+    cells.reserve(relations.size());
+    for (const auto& relation : relations) cells.push_back(relation.*member);
+    KeyKind kind = KeyKind::kText;
+    if (csv) {
+      std::vector<std::string> case_ids;
+      case_ids.reserve(log.traces.size());
+      for (const auto& trace : log.traces) case_ids.push_back(trace.case_id);
+      kind = log_key_kind(case_ids);
+    }
+    const auto joined = joined_key_text(kind, key_column(cells), side);
+    for (std::size_t row = 0; row < relations.size(); ++row) {
+      if (joined[row]) relations[row].*member = *joined[row];
+      else keep[row] = false;
+    }
+  };
+  apply(left, left_csv, &CaseRelation::left_case_id, "left");
+  // The reference joins the left log first and stops when no relation met
+  // one of its cases, so the right join is not attempted (and cannot fail).
+  std::unordered_set<std::string> cases;
+  for (const auto& trace : left.traces) cases.insert(trace.case_id);
+  bool met = false;
+  for (std::size_t row = 0; row < relations.size() && !met; ++row)
+    met = keep[row] && cases.contains(relations[row].left_case_id);
+  if (!met) {
+    relations.clear();
+    return;
+  }
+  apply(right, right_csv, &CaseRelation::right_case_id, "right");
+  std::size_t kept = 0;
+  for (std::size_t row = 0; row < relations.size(); ++row)
+    if (keep[row]) {
+      if (kept != row) relations[kept] = std::move(relations[row]);
+      ++kept;
+    }
+  relations.resize(kept);
+}
+
 EventLog merge_case_relations(const EventLog& base, const EventLog& incoming,
                               const std::vector<CaseRelation>& relations,
                               const CaseRelationsOptions& options) {

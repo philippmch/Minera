@@ -386,6 +386,18 @@ std::string log_prefix_json(
 }
 
 std::string log_until_activity_json(const LogUntilActivityResult& result) {
+  if (!result.elapsed_literals.empty()) {
+    if (result.log.traces.size() != result.elapsed_literals.size())
+      throw std::invalid_argument("until-activity durations do not match the log");
+    std::ostringstream out;
+    out << "{\"family\":\"LOG_UTIL\",\"variant\":\"UNTIL_ACTIVITY\",\"log\":";
+    write_event_log(out, result.log);
+    out << ",\"elapsed_seconds\":[";
+    for (std::size_t i = 0; i < result.elapsed_literals.size(); ++i)
+      out << (i != 0 ? "," : "") << result.elapsed_literals[i];
+    out << "]}";
+    return out.str();
+  }
   if (result.log.traces.size() != result.elapsed_seconds.size()) {
     throw std::invalid_argument("until-activity durations do not match the log");
   }

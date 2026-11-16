@@ -8468,11 +8468,11 @@ void handle_timestamp_interleavings(const httplib::Request& request,
         value("interleavings_right_column", "case_id_RIGHT");
     auto relations = minera::parse_case_relations_csv(
         relation_input, left_column, right_column);
-    // Keys joining a CSV log follow its typed case-id column.
-    minera::type_case_relations_like_csv_logs(
-        relations,
-        looks_like_xes(left_file.filename, left_file.content) ? nullptr : &left,
-        looks_like_xes(right_file.filename, right_file.content) ? nullptr : &right);
+    // pm4py's interleavings need datetime columns, so an upload reaches it
+    // through format_dataframe (CSV) or read_xes, whose case:concept:name is
+    // str on both: text keys join by text, numeric keys fail the join as
+    // pandas' merge does (round CX, observed black-box).
+    minera::type_case_relations_like_logs(relations, left, false, right, false);
     const auto lookup = [&](std::string_view key) {
       return request.has_param(std::string(key))
                  ? request.get_param_value(std::string(key))
@@ -8481,8 +8481,11 @@ void handle_timestamp_interleavings(const httplib::Request& request,
     const auto present = [&](std::string_view key) {
       return request.has_param(std::string(key));
     };
-    const auto options =
+    auto options =
         minera::parse_timestamp_interleavings_params(lookup, present);
+    // Uploaded files reach pm4py through format_dataframe or read_xes, whose
+    // timestamps are UTC-aware (round CX).
+    options.naive_as_utc = true;
     response.set_content(
         minera::timestamp_interleavings_json(
             minera::discover_timestamp_interleavings(left, right, relations,

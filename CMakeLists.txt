@@ -719,8 +719,11 @@ if(MINERA_BUILD_TESTS)
            COMMAND minera_export "${MINERA_CSV_TYPING_FIXTURES}/base.csv"
                    --timestamp-interleavings "${MINERA_CSV_TYPING_FIXTURES}/incoming.csv"
                    --case-relations "${MINERA_CSV_TYPING_FIXTURES}/relations.csv")
+  # Round CX: interleavings run on format_dataframe frames, whose case
+  # column is str, while read_csv types the relation ids as int64: pm4py's
+  # merge raises ValueError (str and int64 columns), and so does Minera.
   set_tests_properties(minera_csv_relations_interleavings_typed_cli PROPERTIES
-    PASS_REGULAR_EXPRESSION "\"source_activity\":\"x\",\"target_activity\":\"b\"")
+    PASS_REGULAR_EXPRESSION "cannot be joined \\(str and number\\)")
   # An NA cell makes the LEFT column float64: its 7.0 still meets the int64
   # case 7, and the concatenated case column reads 7.0 for every row.
   add_test(NAME minera_csv_relations_merge_float_key_cli
@@ -735,7 +738,7 @@ if(MINERA_BUILD_TESTS)
                    --timestamp-interleavings "${MINERA_CSV_TYPING_FIXTURES}/incoming.csv"
                    --case-relations "${MINERA_CSV_TYPING_FIXTURES}/relations_na.csv")
   set_tests_properties(minera_csv_relations_interleavings_float_key_cli PROPERTIES
-    PASS_REGULAR_EXPRESSION "\"source_activity\":\"x\",\"target_activity\":\"b\"")
+    PASS_REGULAR_EXPRESSION "cannot be joined \\(str and number\\)")
   add_test(NAME minera_csv_activity_typing_cli
            COMMAND minera_query "${MINERA_CSV_TYPING_FIXTURES}/activities.csv"
                    --sql "SELECT activity FROM dataframe")
@@ -3083,6 +3086,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_sequence_filter_cs_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cs-bank.json.gz")
   set_tests_properties(minera_pandas_sequence_filter_cs_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CX: a fresh CK seed (2026112110 case 85): the trace filter fails on
+  # an admitted trace that is not iterable.
+  add_test(NAME minera_pandas_sequence_filter_cx_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-cx-bank.json.gz")
+  set_tests_properties(minera_pandas_sequence_filter_cx_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_sequence_filter_bank_parity_tests
     src/backend/tests/test_polars_sequence_filter_bank_parity.cpp
@@ -3321,6 +3329,13 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cw_probe_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cw-probe-bank.json.gz")
   set_tests_properties(minera_polars_filter_cw_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CX: a fresh CH seed (2026112105 case 418: a pl.lit list of a
+  # datetime, a UInt64 and a str item meets in String; case 312: four_eyes'
+  # negative filter keeps rows in its equal-size join order, which varies
+  # between runs, so the call is marked unordered).
+  add_test(NAME minera_polars_filter_cx_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cx-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cx_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

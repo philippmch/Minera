@@ -99,6 +99,24 @@ void naive_timestamps_and_start_overflow_raise() {
     threw = true;
   }
   assert(threw);
+  // Round CX: uploads are read as UTC (format_dataframe, read_xes), so a
+  // naive time joins the aware ones and is reported as its UTC instant.
+  minera::TimestampInterleavingOptions upload;
+  upload.naive_as_utc = true;
+  const auto result = minera::discover_timestamp_interleavings(
+      log_with("L", {event("L", "A", "2024-01-01 00:00:01", 0),
+                     event("L", "B", "2024-01-01 00:00:04", 1)}),
+      log_with("R", {event("R", "X", "2024-01-01T00:00:02+00:00", 0),
+                     event("R", "Y", "2024-01-01T00:00:05Z", 1)}),
+      {minera::CaseRelation{"L", "R"}}, upload);
+  bool found = false;
+  for (const auto& row : result.interleavings)
+    if (row.source_activity == "A" && row.target_activity == "X") {
+      found = true;
+      assert(row.source_timestamp == "2024-01-01 00:00:01+00:00");
+      assert(row.timestamp_diff_seconds == 1.0);
+    }
+  assert(found);
 }
 
 void equality_and_unrelated_relations_are_excluded() {

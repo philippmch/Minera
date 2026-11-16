@@ -28332,3 +28332,103 @@ Tests:
   uploads and checks 40 rework, boundary-activity, cycle-time and
   chaotic-activity answers, each checked against pm4py first (the chaotic
   ones as sorted label:frequency pairs).
+
+## Review CX1: re-review of round CW, log util, timestamp interleavings and organizational SNA on uploads, fresh seeds (2026-11-16)
+
+Round CX checked CW's CI (run 43821403493 on ae4ae5bc: green on all six jobs),
+replayed a batch of fresh seeds of every filter domain and moved two more
+upload routes onto the upload's frame (log util and timestamp
+interleavings); the organizational SNA was already on the frame and
+equal but for one declared corner. The device check on the Mac was
+skipped (no device linked).
+
+- **CX1-1 Log util on uploads** (`/api/log-util`, `log_util.cpp`,
+  `log_util_json.cpp`, also the CLI). pm4py runs the prefix utilities on
+  `convert_to_event_log` of the upload's frame, so on a CSV or XES upload
+  every key is a frame column (the role names `activity` and `timestamp`
+  stand for `concept:name` and `time:timestamp`), each cell is the value
+  pandas typed, and an activity matches by Python equality with the
+  requested text (an int activity column never matches "5"). The elapsed
+  time `get_log_traces_until_activity` returns is the plain difference of
+  the target's and the previous event's typed cells: seconds for two
+  dates (`Timedelta.total_seconds()`), an int for two int cells, a float
+  otherwise, null for NaN or NaT; text, or a date beside a number, raises
+  `TypeError: unsupported operand type(s) for -: 'str' and 'str'` (NaN
+  and NaT named `float` and `NaTType`); a key no column holds raises
+  `KeyError`. `get_log_traces_to_activities` with an activity key the
+  frame lacks returns no activities, checks the timestamp key per kept
+  trace and leaves out targets without traces. `get_prefixes_from_log`
+  on the frame drops the cases a prefix length of 0 leaves empty. The JSON
+  carries the elapsed values as those literals, so `elapsed_seconds` may
+  hold null and negative numbers; the frontend validator accepted
+  neither (fixed in `types.ts`). Sweep (`review-harness/round-cx/up/lu.py`:
+  split, fixed and all prefixes, until activity, to activities): before,
+  145 of 960 calls on 30 CSV and 30 XES uploads differed (until activity
+  53 values and 22 messages, to activities 17 and 10, fixed prefixes 43);
+  after, 0 of 960 on fresh seeds (61 raise alike).
+- **CX1-2 Timestamp interleavings on uploads**
+  (`/api/timestamp-interleavings`, `timestamp_interleavings.cpp`,
+  `case_relations.cpp` `type_case_relations_like_logs`, server and CLI).
+  `format_dataframe` and `read_xes` give str case ids on both sides, so
+  the relation columns join as text and a relation file whose ids
+  `read_csv` types as numbers raises, as pandas' merge does ("You are
+  trying to merge on string and int64 columns"; before, Minera typed the
+  CSV case column as int64 and joined). `format_dataframe` also makes
+  naive CSV timestamps UTC-aware, so a naive log interleaves with an aware
+  one and its timestamps print with `+00:00` (before, the naive log was
+  refused). Sweep (`il.py`, CSV or XES on either side): before, 31 of 200
+  calls differed; after, 0 of 200 (162 raise alike, most of them the
+  reference's `OverflowError` on the boundary timestamps). The two CLI
+  ctests that expected the old join (`minera_csv_relations_interleavings_typed_cli`
+  and `_float_key_cli`, round BB) now expect the error; pm4py raises on
+  both fixtures.
+- **CX1-3 Organizational SNA on uploads** (`/api/organizational-sna`,
+  `sna.py`, all eight variants, typed resource columns): 640 calls on CSV
+  and XES uploads, 4 differ, all the subcontracting pandas variant on a
+  float column with NaN cells. The variant order decides which window of
+  a resource counts, and pm4py's order of equal-count variants holding
+  NaN is no total order (NaN compares as unordered): of the orders tried
+  black-box on 1,500 random float frames with NaN cells (`sn/hyp*.py`:
+  Python's sort over several input orders, pandas `value_counts` and
+  `sort_values`, numpy object sorts, two-pass sorts, NaN as the smallest
+  or largest value), none agrees on all; NaN above every value agrees
+  most often (1,342; Minera's previous NaN-first order 1,264), and
+  `organizational_mining.cpp` now uses it. One of the 4 sweep calls is
+  the known case where pm4py's only edge points to a NaN resource, which
+  no JSON name can carry.
+- **CX1-4 Fresh seeds** (12 banks: Polars table CK 2026112101, CN
+  2026112102, CJ 2026112103, CI 2026112104, CH 2026112105; Polars
+  sequence CP 2026112100, CK 2026112106, CJ 2026112107, CH 2026112108;
+  pandas CK 2026112109, pandas sequence CK 2026112110, pandas CN LTL
+  2026112111). Three calls differed:
+  - `attributes.apply_events` (CH 2026112105 case 418): a `pl.lit` list
+    of `[(datetime,), (2**64-1,), ('b',)]` meets in `List(String)`: a date
+    or datetime with a UInt64 has the supertype Int64 (probed), so the
+    fold reaches String and the plan fails on the missing column first
+    (`polars_lit_model.hpp`).
+  - `traces.apply` (pandas sequence CK 2026112110 case 85): the trace
+    filter iterates each admitted trace in turn, so a scalar one (None, a
+    bool, number, date or datetime) raises `'<type>' object is not
+    iterable` before a later trace's `decoding to str` error
+    (`pandas_sequence_filters.cpp`, probed).
+  - `ltl.four_eyes_principle` negative (CH 2026112105 case 312): the
+    rows come in the order of an equal-size join, which varies between
+    runs (12 runs of the reference: 7 one way, 5 the other); the
+    capture's six runs happened to agree. Marked unordered in the CX bank
+    (the equal-size join case declared since CQ).
+
+Declared:
+- Subcontracting pandas variant: the order of equal-count variants
+  holding NaN (CX1-3); Minera sorts NaN above every value.
+
+Tests:
+- New: `docs/polars-filter-cx-bank.json.gz` (CH 2026112105 cases 312 and
+  418, 80 calls) and `docs/pandas-sequence-filter-cx-bank.json.gz` (CK
+  2026112110 case 85, 14 calls), replayed by
+  `minera_polars_filter_cx_bank_parity_tests` and
+  `minera_pandas_sequence_filter_cx_bank_parity_tests`;
+  `minera_log_util_tests` gained a CSV-frame case (typed elapsed values,
+  `KeyError` and `TypeError`, empty prefixes), the timestamp
+  interleavings tests a naive-as-UTC case, `minera_core_tests` the
+  relation typing of uploads, and `minera_organizational_mining_tests` a
+  NaN variant case (each checked against pm4py first).

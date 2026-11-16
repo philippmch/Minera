@@ -6541,10 +6541,8 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                                     : std::string("case_id_RIGHT");
       auto relations = minera::parse_case_relations_csv(
           relation_input, left_column, right_column);
-      // Keys joining a CSV log follow its typed case-id column.
-      minera::type_case_relations_like_csv_logs(
-          relations, input_is_xes ? nullptr : &log,
-          is_xes_path(timestamp_interleavings_right_path) ? nullptr : &right);
+      // format_dataframe and read_xes give str case ids (round CX).
+      minera::type_case_relations_like_logs(relations, log, false, right, false);
       const auto lookup = [&](std::string_view name) {
         const auto it = timestamp_interleavings_fields.find(std::string(name));
         return it == timestamp_interleavings_fields.end() ? std::string{} : it->second;
@@ -6552,8 +6550,9 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
       const auto present = [&](std::string_view name) {
         return timestamp_interleavings_fields.contains(std::string(name));
       };
-      const auto params = minera::parse_timestamp_interleavings_params(
+      auto params = minera::parse_timestamp_interleavings_params(
           lookup, present);
+      params.naive_as_utc = true;  // read_csv/read_xes inputs (round CX)
       const auto body = minera::timestamp_interleavings_json(
           minera::discover_timestamp_interleavings(log, right, relations,
                                                    params));
