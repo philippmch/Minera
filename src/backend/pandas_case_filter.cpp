@@ -158,8 +158,40 @@ std::size_t ncases_column(const EventTable& s,const EventAttribute& key){
  if(const auto i=find_column(s,key))return *i;
  error("KeyError",repr(key));
 }
+// Round CV: df[[case, timestamp]] reads the two keys through numpy
+// (asarray_tuplesafe): two list or tuple keys of one length whose items are
+// no sequences form a 2-D array, whose rows become tuples (an unhashable
+// item fails their hash, else no tuple names a column); deeper nesting fails
+// the Index; ragged keys stay one object array, whose items must hash.
+void check_performance_key_pair(const EventAttribute& c,const EventAttribute& t){
+ const auto sequence=[](const EventAttribute* e){return !e->is_null&&(e->container==AttributeContainerKind::kList||e->container==AttributeContainerKind::kTuple);};
+ std::vector<const EventAttribute*> level{&c,&t};std::size_t dims=1;
+ for(;;){
+  if(!std::all_of(level.begin(),level.end(),sequence))break;
+  if(std::any_of(level.begin(),level.end(),[&](const auto* e){return e->children.size()!=level.front()->children.size();}))break;
+  ++dims;std::vector<const EventAttribute*> next;for(const auto* e:level)for(const auto& x:e->children)next.push_back(&x);
+  level=std::move(next);if(level.empty())break;
+ }
+ if(dims<2||std::any_of(level.begin(),level.end(),sequence))return;
+ if(dims>=3){
+  const bool numeric_leaves=!level.empty()&&std::all_of(level.begin(),level.end(),[](const auto* e){
+   return e->container==AttributeContainerKind::kScalar&&!e->is_null&&(type_name(*e)=="int"||type_name(*e)=="float"||type_name(*e)=="bool");});
+  if(numeric_leaves)error("ValueError","Index data must be 1-dimensional");
+  error("ValueError","Buffer has wrong number of dimensions (expected 1, got "+std::to_string(dims)+")");
+ }
+ std::string items;
+ for(const auto* key:{&c,&t}){
+  for(const auto& item:key->children)if(const auto type=detail::pandas_unhashable_type(item))error("TypeError","unhashable type: '"+*type+"'");
+  std::string tuple="(";
+  for(std::size_t i=0;i<key->children.size();++i)tuple+=(i?", ":"")+(key->children[i].is_null?std::string("None"):repr(key->children[i]));
+  tuple+=key->children.size()==1?",)":")";
+  items+=(items.empty()?"":", ")+tuple;
+ }
+ error("KeyError",string_key_repr("None of [Index(["+items+"], dtype='object')] are in the [columns]"));
+}
 std::pair<std::size_t,std::size_t> performance_columns(const EventTable& s,const PandasCaseFilterOptions& o){
- for(const auto* key:{&o.case_id_key,&o.timestamp_key})if(!root_cause_key_is_hashable(*key))error("TypeError","unhashable type: '"+type_name(*key)+"'");
+ check_performance_key_pair(o.case_id_key,o.timestamp_key);
+ for(const auto* key:{&o.case_id_key,&o.timestamp_key})if(const auto type=detail::pandas_unhashable_type(*key))error("TypeError","unhashable type: '"+*type+"'");
  const auto c=find_column(s,o.case_id_key),t=find_column(s,o.timestamp_key);
  if(c&&t)return {*c,*t};
  if(!c&&!t)error("KeyError",missing_columns({o.case_id_key,o.timestamp_key},true));

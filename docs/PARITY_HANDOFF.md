@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–CU (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–CV (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -5720,7 +5720,79 @@ project files under `review-harness/round-cu/`.
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
 
-Next round (CV) should start by re-reviewing round CU:
+Round CV re-reviewed CU (Review CV1). CU's commit a614862 ran green on
+all six CI jobs (run 43784803653). CV moved the concept-drift route onto
+pm4py's DataFrame adapter for uploads, followed the fresh seeds into three
+filters and replayed two batches of fresh seeds:
+- Concept drift on uploads (`concept_drift_table.cpp`
+  `detect_concept_drift_table`, `csv_frame_table.hpp`
+  `formatted_csv_frame_table`/`formatted_xes_frame_table`,
+  `request_params.cpp`; 1,200 sweep calls, 0 differing): BOSE runs on the
+  upload's frame (typed columns, text copies of the case and activity,
+  NaN gaps), cases sorted by the frame's case text, change times from the
+  selected case groups, pm4py's errors (`KeyError` order, `.timestamp()`,
+  `ZeroDivisionError` for 0 permutations, `str.join` of non-str
+  activities). The frame path polls the client's disconnect. The
+  reference sweeps need `OPENBLAS_CORETYPE=Haswell` (permutation ties
+  follow the OpenBLAS kernel).
+- Relative occurrence (`pandas_attributes_filter.cpp`, fresh pandas CK
+  2026111909, probe v1): the per-case count reads the keep-once parameter
+  given last, the denominator the enum first; a list case key is a grouper
+  array (length must match), a tuple a label that must hash, a list
+  denominator key a Series without a truth value.
+- `A_next_B_next_C` dict-key message with a datetime
+  (`polars_ltl_filter.cpp`, fresh CK 2026111901 case 561).
+- Case-performance key pairs through numpy (`pandas_case_filter.cpp`,
+  fresh pandas CK 2026111921 case 460).
+- Repeated keys of a generated dict argument are `dict(pairs)` in the
+  Polars table bank replay (fresh CK 2026111913 case 509).
+- Fresh seeds: first batch 2026111900-11 (4 calls, 0 after), second batch
+  2026111912-23 (5 calls; 3 carried: CK 2026111913 cases 117, 410, 650).
+
+In the suite: new `docs/polars-filter-cv-bank.json.gz`,
+`docs/pandas-filter-cv-bank.json.gz` and
+`minera_server_concept_drift_upload_tests`. The fresh banks, sweeps and
+probes are in the project files under `review-harness/round-cv/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (CW) should start by re-reviewing round CV:
+
+- CV's CI run;
+- the three carried calls of fresh Polars CK 2026111913: case 117
+  (`eventually_follows` with a dict activity and a dict timestamp key: the
+  struct comparison fails before the literal sort), cases 410 and 650
+  (`filter_traces_attribute_in_timeframe` with a dict timestamp key
+  naming the case column: an empty result on Int64 with a dict value, the
+  categorical comparison error on Enum with a None value);
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- repeated dict keys (`dict(pairs)`) in the other three bank decoders
+  (pandas table, pandas sequence, Polars sequence), with a replay of every
+  docs bank;
+- upload routes still on Minera's log rather than the frame: rework
+  (`/api/rework`, pm4py's rework statistics on the frame), chaotic
+  activities, passed time, cycle time, case arrival, boundary activities,
+  log util, merge case relations, timestamp interleavings, organizational
+  SNA (compare the server's route list with the sweeps named in the round
+  notes; CR-CV swept label splitting, prefix tree, interval tree, link
+  analysis, trace-attribute clustering, process cube, SaCoFa, transform
+  targets and concept drift);
+- the CU list below (paths list case keys repeating a name,
+  `filter_variants_top_k` one-row second columns, set values in the pandas
+  bank codec, LTL list-key cases, equal-size joins, CJ/CF/CD items);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round CU's targets, taken in CV (findings CV1-1 to CV1-6): CU's CI run,
+the fresh seeds and the upload routes (concept drift). Not taken (carried
+to CW): paths list case keys repeating a name, `filter_variants_top_k`
+one-row second columns, set values in the pandas bank codec, the LTL
+list-key cases outside the model, equal-size joins and the older CJ, CF
+and CD items.
+
+Previous list for round CV (kept for its older items):
 
 - CU's CI run;
 - fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ

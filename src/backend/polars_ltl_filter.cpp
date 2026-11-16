@@ -10,6 +10,7 @@
 #include "pandas_parameter_carrier.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <bit>
 #include <cstdint>
 #include <functional>
@@ -447,10 +448,43 @@ void list_key_literal(const EventAttribute& key) {
   if (key.is_null || (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple)) return;
   if (const auto error = detail::polars_lit::argument_literal_error(key)) fail("TypeError", "apply", *error);
 }
-// Python's repr of a key (the A_next_B_next_C selection message).
+// repr() of a Python datetime (its text is ISO with an optional fraction
+// and UTC offset).
+std::string datetime_repr(const std::string& text) {
+  const auto number = [&](std::size_t at, std::size_t width) { return std::stoi(text.substr(at, width)); };
+  std::string result = "datetime.datetime(" + std::to_string(number(0, 4)) + ", " + std::to_string(number(5, 2)) + ", " +
+                       std::to_string(number(8, 2)) + ", " + std::to_string(number(11, 2)) + ", " + std::to_string(number(14, 2));
+  const int second = number(17, 2);
+  std::size_t position = 19;
+  int micro = 0;
+  if (position < text.size() && text[position] == '.') {
+    std::string digits;
+    ++position;
+    while (position < text.size() && std::isdigit(static_cast<unsigned char>(text[position]))) digits += text[position++];
+    digits.resize(6, '0');
+    micro = std::stoi(digits.substr(0, 6));
+  }
+  if (second || micro) result += ", " + std::to_string(second);
+  if (micro) result += ", " + std::to_string(micro);
+  if (position < text.size()) {
+    const int sign = text[position] == '-' ? -1 : 1;
+    const int minutes = sign * (number(position + 1, 2) * 60 + number(position + 4, 2));
+    if (minutes == 0) {
+      result += ", tzinfo=datetime.timezone.utc";
+    } else {
+      const int seconds = minutes * 60;
+      result += ", tzinfo=datetime.timezone(datetime.timedelta(" +
+                std::string(seconds < 0 ? "days=-1, seconds=" + std::to_string(86400 + seconds) : "seconds=" + std::to_string(seconds)) + "))";
+    }
+  }
+  return result + ")";
+}
+// Python's repr of a key (the A_next_B_next_C selection message). Round CV:
+// a datetime item is datetime.datetime(...).
 std::string key_repr(const EventAttribute& value) {
   return detail::pandas_container_repr(value, [](const EventAttribute& v) -> std::string {
     if (null(v)) return "None";
+    if (date(v) && !std::holds_alternative<NativeDate>(v.typed_value) && v.value.size() >= 19) return datetime_repr(v.value);
     if (boolean(v)) return truth(v) ? "True" : "False";
     if (integer(v)) return exact(v).decimal();
     if (real(v)) return python::float_repr(native_attribute_number(v));

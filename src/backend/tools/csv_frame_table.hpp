@@ -7,9 +7,11 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "minera/event_data.hpp"
+#include "../python_scalar.hpp"
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -211,5 +213,175 @@ inline std::optional<minera::EventTable> indexed_csv_frame_table(const minera::A
   const auto& log = source.checked_log();
   if (log.dataframe_columns)
     type_csv_frame_cells(*table, *log.dataframe_columns, source.selectors().activity_key);
+  return table;
+}
+
+// A CSV upload's table as the whole frame format_dataframe hands pm4py's
+// DataFrame functions: read_csv's columns with their typed cells (the case
+// and activity columns typed too, every date column UTC dates, NaN cells
+// null), then the copies case:concept:name and concept:name (the str of the
+// case and activity cells: an int case 007 is "7", a float activity 1 is
+// "1.0") and time:timestamp, then "@@index" and "@@case_index"; rows in the
+// frame's order (round CV, observed black-box: BOSE concept drift groups
+// and sorts by these keys). A header column of a copy's name is replaced by
+// the copy. nullopt as csv_frame_table.
+inline std::optional<minera::EventTable> formatted_csv_frame_table(const minera::ActiveEventSource& source) {
+  auto table = indexed_csv_frame_table(source);
+  if (!table) return table;
+  const auto& frame = *source.checked_log().dataframe_columns;
+  const auto& selectors = source.selectors();
+  const auto find = [&](std::string_view key) -> std::optional<std::size_t> {
+    const auto found = std::find(table->columns.begin(), table->columns.end(), key);
+    if (found == table->columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table->columns.begin());
+  };
+  const bool dtypes = table->dtypes.size() == table->columns.size();
+  // The case and activity columns as read_csv typed them, and the dates.
+  for (std::size_t index = 0; index < table->columns.size(); ++index) {
+    const auto& key = table->columns[index];
+    std::optional<minera::DataFrameColumn> column;
+    if (key == selectors.activity_key) {
+      column = minera::DataFrameColumn{key, frame.activity_type};
+    } else {
+      for (const auto& candidate : frame.columns)
+        if (candidate.key == key) column = candidate;
+      if (!column) continue;
+      if (column->role != minera::FirstClassAttributeRole::kCaseId &&
+          column->type != minera::DataFrameColumnType::kDate) continue;
+    }
+    if (column->type == minera::DataFrameColumnType::kDate) {
+      for (auto& row : table->rows) {
+        if (index >= row.size() || !row[index] || row[index]->is_null) continue;
+        if (row[index]->kind == minera::AttributeKind::kDate) continue;
+        if (auto date = minera::csv_utc_date_cell(key, row[index]->value)) *row[index] = *date;
+      }
+      continue;
+    }
+    const char* dtype = nullptr;
+    switch (column->type) {
+      case minera::DataFrameColumnType::kInt64: dtype = "int64"; break;
+      case minera::DataFrameColumnType::kFloat64: dtype = "float64"; break;
+      case minera::DataFrameColumnType::kBool: dtype = "bool"; break;
+      case minera::DataFrameColumnType::kObject: dtype = "object"; break;
+      case minera::DataFrameColumnType::kString: case minera::DataFrameColumnType::kDate: break;
+    }
+    if (!dtype) continue;
+    if (dtypes) table->dtypes[index] = dtype;
+    for (auto& row : table->rows)
+      if (index < row.size() && row[index] && !row[index]->is_null)
+        *row[index] = minera::csv_dataframe_cell(*column, row[index]->value);
+  }
+  // read_csv's missing cells: NaN, a new float per cell in a float64 column
+  // and one shared NaN object elsewhere (NaT in a date column stays null).
+  for (std::size_t index = 0; index < table->columns.size(); ++index) {
+    const auto& key = table->columns[index];
+    bool date = false;
+    for (const auto& candidate : frame.columns)
+      if (candidate.key == key && candidate.type == minera::DataFrameColumnType::kDate) date = true;
+    if (date || key == "@@index" || key == "@@case_index") continue;
+    const bool float64 = dtypes && table->dtypes[index] == "float64";
+    std::optional<minera::EventAttribute> shared;
+    for (auto& row : table->rows) {
+      if (index >= row.size() || (row[index] && !row[index]->is_null)) continue;
+      if (!float64 && shared) { row[index] = shared; continue; }
+      minera::EventAttribute nan{key, "nan", minera::AttributeKind::kFloat};
+      nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+      if (!float64) shared = nan;
+      row[index] = std::move(nan);
+    }
+  }
+  // The copies, before "@@index".
+  const auto insert_at = find("@@index").value_or(table->columns.size());
+  std::size_t added = 0;
+  const auto copy = [&](const char* name, const std::string& selected, bool text) {
+    const auto source_column = find(selected);
+    if (selected == name || !source_column) return;
+    auto target = find(name);
+    if (!target) {
+      const auto at = insert_at + added++;
+      table->columns.insert(table->columns.begin() + static_cast<std::ptrdiff_t>(at), name);
+      if (dtypes) table->dtypes.insert(table->dtypes.begin() + static_cast<std::ptrdiff_t>(at), "string");
+      if (!table->categorical_dtypes.empty())
+        table->categorical_dtypes.insert(table->categorical_dtypes.begin() + static_cast<std::ptrdiff_t>(at), std::nullopt);
+      for (auto& row : table->rows) row.insert(row.begin() + static_cast<std::ptrdiff_t>(std::min(at, row.size())), std::nullopt);
+      target = at;
+    }
+    const auto from = *find(selected);
+    if (dtypes) table->dtypes[*target] = text ? std::string("string") : table->dtypes[from];
+    for (auto& row : table->rows) {
+      if (from >= row.size() || *target >= row.size()) continue;
+      auto cell = row[from];
+      if (cell && !cell->is_null && text) {
+        const auto value = minera::python::str(minera::python::from_attribute(*cell));
+        cell = minera::EventAttribute{name, value, minera::AttributeKind::kString};
+      } else if (cell) {
+        cell->key = name;
+      }
+      row[*target] = std::move(cell);
+    }
+  };
+  copy("case:concept:name", selectors.case_id_key, true);
+  copy("concept:name", selectors.activity_key, true);
+  copy("time:timestamp", selectors.timestamp_key, false);
+  return table;
+}
+
+
+// An XES upload's table as read_xes's frame hands it to pm4py's DataFrame
+// functions: an event or case: column's missing cells NaN (a new float per
+// cell in a float64 column, one shared NaN object elsewhere; NaT in a date
+// column stays null), a float64 column's ints floats (round CV, observed
+// black-box: BOSE concept drift sorts and joins these cells). nullopt for
+// other sources.
+inline std::optional<minera::EventTable> formatted_xes_frame_table(const minera::ActiveEventSource& source) {
+  if (source.file().format == "csv") return std::nullopt;
+  const auto& log = source.checked_log();
+  if (!log.dataframe_columns || log.dataframe_columns->csv_text) return std::nullopt;
+  const auto& frame = *log.dataframe_columns;
+  auto table = source.checked_table();
+  const auto& selectors = source.selectors();
+  for (std::size_t index = 0; index < table.columns.size(); ++index) {
+    const auto& key = table.columns[index];
+    std::optional<minera::DataFrameColumnType> type;
+    for (const auto& candidate : frame.columns)
+      if (candidate.key == key) type = candidate.type;
+    if (!type && key.starts_with("case:"))
+      for (const auto& candidate : frame.trace_columns)
+        if ("case:" + candidate.key == key) type = candidate.type;
+    if (!type) {
+      // The selected timestamp and any column of dates hold NaT.
+      if (key == selectors.timestamp_key) continue;
+      bool dates = false, others = false;
+      for (const auto& row : table.rows) {
+        if (index >= row.size() || !row[index] || row[index]->is_null) continue;
+        (row[index]->kind == minera::AttributeKind::kDate ? dates : others) = true;
+      }
+      if (dates && !others) continue;
+    }
+    if (type == minera::DataFrameColumnType::kDate) continue;
+    const bool float64 = type == minera::DataFrameColumnType::kFloat64;
+    std::optional<minera::EventAttribute> shared;
+    for (auto& row : table.rows) {
+      if (index >= row.size()) continue;
+      auto& cell = row[index];
+      if (cell && !cell->is_null) {
+        if (float64) {
+          double value = 0.0;
+          if (const auto* integer = std::get_if<std::int64_t>(&cell->typed_value)) value = static_cast<double>(*integer);
+          else if (const auto* natural = std::get_if<std::uint64_t>(&cell->typed_value)) value = static_cast<double>(*natural);
+          else continue;
+          minera::EventAttribute converted{key, minera::python::str(minera::python::real(value)), minera::AttributeKind::kFloat};
+          converted.typed_value = value;
+          cell = std::move(converted);
+        }
+        continue;
+      }
+      if (!float64 && shared) { cell = shared; continue; }
+      minera::EventAttribute nan{key, "nan", minera::AttributeKind::kFloat};
+      nan.typed_value = std::numeric_limits<double>::quiet_NaN();
+      if (!float64) shared = nan;
+      cell = std::move(nan);
+    }
+  }
   return table;
 }

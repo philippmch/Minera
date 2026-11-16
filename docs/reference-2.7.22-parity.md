@@ -28096,3 +28096,103 @@ Tests:
   follows pm4py on an explicit empty list (width 0), a class no event names
   (a zero column) and a repeated class, and the transformation workspace
   test covers partial padding.
+
+## Review CV1: re-review of round CU, concept drift on uploads, relative-occurrence keep-once reads, pandas case-performance key pairs (2026-11-16)
+
+Round CV checked CU's CI (run 43784803653 on a614862: green on all six
+jobs), moved the concept-drift route onto pm4py's DataFrame adapter for
+uploads, followed the fresh seeds into the relative-occurrence filter, the
+Polars `A_next_B_next_C` key message and the pandas case-performance keys,
+and replayed two batches of fresh seeds of every filter domain. The device
+check on the Mac was skipped (no device linked).
+
+- **CV1-1 Concept drift on uploads** (`/api/concept-drift`,
+  `concept_drift_table.cpp` `detect_concept_drift_table`,
+  `csv_frame_table.hpp`; 800 CSV and 400 XES sweep calls, 0 differing
+  after; before, the route ran BOSE on Minera's own log). pm4py runs BOSE's
+  DataFrame adapter on the upload's frame: `format_dataframe(read_csv)`
+  for a CSV (its typed columns, the copies `case:concept:name` and
+  `concept:name` as the str of the typed cells, so int case ids 1..12 sort
+  as text, NaN cells as floats) and `read_xes` for an XES file (a float
+  attribute with gaps is a float64 column whose gaps are NaN). Cases are
+  sorted by `case:concept:name`, the change times come from the selected
+  case and time groups (sorted by the selected case key) at
+  `sublog_index * sub_log_size`, the activities keep their frame types
+  (sorted with Python's ordering and `TypeError`; a non-str activity fails
+  the frames' `str.join` with "sequence item 0: expected str instance,
+  numpy.int64 found" after the detector has drawn), missing columns raise
+  `KeyError` in pm4py's order (case key, time key, standard columns,
+  activity key), a case start that is no Timestamp has no `.timestamp()`
+  and `drift_num_permutations=0` is accepted and divides by zero. The
+  frame path polls the client's disconnect between permutations.
+- **CV1-2 Relative occurrence keep-once reads**
+  (`filter_df_relative_occurrence_event_attribute`, fresh pandas CK
+  2026111909 cases 207, 434, 531, probe v1; 279 calls). The per-case count
+  reads the keep-once parameter given last (either key, so the dict order
+  decides), the denominator reads `KEEP_ONCE_PER_CASE` enum first (unset:
+  the case count). A list case key is a grouper array of its items (any
+  items, an empty list too) and fails "Grouper and axis must be same
+  length" unless it matches the rows, even on a two-row frame; a tuple
+  case key is a label that must hash; a list case key in the denominator
+  makes `df[list].nunique()` a Series, which the stake comparison cannot
+  take as a truth value.
+- **CV1-3 The `A_next_B_next_C` dict-key message** (fresh Polars CK
+  2026111901 case 561). A datetime inside a dict column key prints as
+  `datetime.datetime(2021, 3, 2, 9, 0)`.
+- **CV1-4 Case-performance key pairs** (`filter_on_case_performance`,
+  `filter_case_performance`; fresh pandas CK 2026111921 case 460). pandas
+  reads `df[[case, timestamp]]` through numpy's `asarray_tuplesafe`: two
+  list or tuple keys of one length whose items are no sequences form a 2-D
+  array whose rows become tuples (an unhashable item fails their hash with
+  its own type, else `KeyError` "None of [Index([('x',), ('y',)],
+  dtype='object')] are in the [columns]"); deeper nesting fails the Index
+  ("Index data must be 1-dimensional"); ragged keys stay one object array
+  whose items must hash (a tuple holding a dict fails on the dict).
+- **CV1-5 Repeated dict keys in the bank decoder** (fresh Polars CK
+  2026111913 case 509). A generated dict argument that repeats a key is
+  Python's `dict(pairs)` (first place, last value); the Polars table bank
+  replay now builds it so. No library change.
+- **CV1-6 Fresh seeds** (4 calls in the first batch, 0 after; 5 in the
+  second, 3 after, carried). First batch: Polars table CK 2026111901 (1:
+  case 561, CV1-3), CN 2026111902, CJ 2026111903, CI 2026111904, CH
+  2026111905; Polars sequence CP 2026111900, CK 2026111906, CJ 2026111907,
+  CH 2026111908; pandas CK table 2026111909 (3: cases 207, 434, 531,
+  CV1-2), CK sequence 2026111910, CN LTL 2026111911. Second batch after the
+  fixes: Polars sequence CP 2026111912, table CK 2026111913 (4: case 509,
+  CV1-5; cases 117, 410 and 650 carried), CN 2026111914, CJ 2026111915, CI
+  2026111916, CH 2026111917; sequence CK 2026111918, CJ 2026111919, CH
+  2026111920; pandas CK table 2026111921 (1: case 460, CV1-4), CK sequence
+  2026111922, CN LTL 2026111923.
+
+Carried to round CW (fresh Polars CK 2026111913):
+- Case 117: `eventually_follows` with a dict activity, a dict timestamp
+  key and a Float32 attribute column fails the struct comparison
+  (`SchemaError`) before the literal sort; Minera raises the sort's
+  `ShapeError` first.
+- Cases 410 and 650: `filter_traces_attribute_in_timeframe` with the dict
+  timestamp key `{'case:concept:name': None}` (pl.col of its key): on an
+  Int64 case column with a dict attribute value pm4py returns an empty
+  frame where Minera fails the struct cast; on an Enum case column with a
+  None value pm4py fails "cannot compare categorical with datetime" where
+  Minera returns the frame.
+
+Declared:
+- Concept drift: when the activities mix types, which pair `sorted()`
+  compares first follows the set's hash order, so the '<' message may name
+  the two types in the other order (2 of 800 CSV sweep calls).
+- Concept drift: the reference's permutation-test ties depend on the
+  OpenBLAS kernel (`np.linalg.norm`); Minera models the Haswell kernel, so
+  the sweeps run the reference with `OPENBLAS_CORETYPE=Haswell`.
+- Concept drift: the Conformance form still asks for at least one
+  permutation; the route takes 0 as pm4py does (on a Minera-built log the
+  detector refuses it).
+
+Tests:
+- New: `docs/polars-filter-cv-bank.json.gz` (CK 2026111901 cases 0-399
+  and 561, CK 2026111913 cases 0-399 and 509 without the carried call;
+  44,182 calls) and `docs/pandas-filter-cv-bank.json.gz` (CK 2026111909
+  cases 0-399, 434, 531, CK 2026111921 cases 0-399 and 460, probe v1;
+  23,799), replayed by the `minera_*_cv_bank_parity_tests` ctests;
+  `minera_server_concept_drift_upload_tests` mines a CSV and an XES upload
+  and checks the drift route against pm4py's values (four of its seven
+  checks fail on the previous build).

@@ -5383,9 +5383,11 @@ ConceptDriftParams parse_concept_drift_params(const FieldLookup& field,
   if (supplied("drift_window_size"))
     params.window_size = parse_positive_size(require("drift_window_size"), "drift_window_size");
   if (supplied("drift_num_permutations")) {
-    params.num_permutations = parse_positive_size(require("drift_num_permutations"), "drift_num_permutations");
+    // 0 passes: pm4py's BOSE on an upload frame takes it (no window tested
+    // returns, a tested one divides by zero); the EventLog detector refuses it.
+    params.num_permutations = parse_nonnegative_size(require("drift_num_permutations"), "drift_num_permutations");
     if (params.num_permutations > 1'000'000)
-      throw std::invalid_argument("drift_num_permutations must be in [1, 1000000]");
+      throw std::invalid_argument("drift_num_permutations must be in [0, 1000000]");
   }
   if (supplied("drift_threshold")) {
     params.threshold = parse_finite_double(require("drift_threshold"), "drift_threshold");

@@ -33,6 +33,10 @@ struct PandasAttributesFilterOptions {
   // case_id_key and attribute_key hold the other reads there.
   std::optional<EventAttribute> relative_case_id_key_last;
   std::optional<EventAttribute> relative_attribute_key_enum;
+  // Round CV: it counts per case by the keep_once_per_case given last (the
+  // field above) but divides by the cases by KEEP_ONCE_PER_CASE read enum
+  // first (this read; unset divides by the cases).
+  std::optional<EventAttribute> relative_keep_once_enum;
 };
 struct PandasAttributesFilterParameter { EventAttribute value; bool enum_key = false; };
 class PandasAttributesFilterError : public std::invalid_argument {

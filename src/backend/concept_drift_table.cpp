@@ -1,4 +1,5 @@
 #include "minera/concept_drift.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -21,6 +22,7 @@
 #include "concept_drift_table_limits.hpp"
 #include "exact_count_ratio.hpp"
 #include "root_cause_trace_key.hpp"
+#include "python_scalar.hpp"
 
 namespace minera {
 namespace {
@@ -1231,9 +1233,21 @@ compute_concept_drift_typed_follows_relation(
   return relations;
 }
 
-ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
-    const EventTable& table, ConceptDriftTableOptions options, std::mt19937& rng,
-    std::size_t trace_limit) {
+namespace {
+
+// The steps of pm4py's BOSE DataFrame adapter up to the detector, shared by
+// apply_concept_drift_table and the detector-shaped detect_concept_drift_table.
+struct BoseTableRun {
+  std::vector<double> timestamps;        // first selected time per selected case group
+  std::vector<std::size_t> group_sizes;  // events per projected case, in projection order
+  std::vector<std::vector<std::string>> encoded, displayed;
+  std::vector<std::string> activity_labels;  // the displayed alphabet in encoding order
+  bool nonstring = false;
+  ConceptDriftTraceResult detected;
+};
+
+BoseTableRun run_bose_table(const EventTable& table, const ConceptDriftTableOptions& options,
+                            std::mt19937& rng, std::size_t trace_limit) {
   table.validate();
   if (table.rows.size() > kTableEventLimit)
     throw std::invalid_argument("concept drift table: event materialization exceeds safe bound");
@@ -1243,10 +1257,10 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
   // the public adapter. Group-first timestamps skip null cells.
   const auto selected_groups = collect_selected_groups(
       table, selected_case, selected_time, trace_limit);
-  std::vector<double> timestamps;
-  timestamps.reserve(selected_groups.size());
+  BoseTableRun run;
+  run.timestamps.reserve(selected_groups.size());
   for (const auto& group : selected_groups)
-    timestamps.push_back(table_epoch(group.first_time));
+    run.timestamps.push_back(table_epoch(group.first_time));
 
   check_dataframe_columns(table);
   const auto standard_case = table.column_index("case:concept:name");
@@ -1291,6 +1305,7 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
   for (const auto& group : projection) {
     auto& cells = activity_cells.emplace_back();
     cells.reserve(group.count);
+    run.group_sizes.push_back(group.count);
     for (std::size_t i = group.first; i < group.first + group.count; ++i) {
       const auto* value = table.rows[i][activity]
                               ? &*table.rows[i][activity]
@@ -1298,44 +1313,66 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
       cells.push_back(value);
     }
   }
-  const auto encoding = ordered_activity_encoding([&](const auto& collect) {
+  const auto visit = [&](const auto& collect) {
     for (const auto& cells : activity_cells)
       for (const auto* value : cells) collect(*value);
-  });
-  std::vector<std::vector<std::string>> encoded, displayed;
-  encoded.reserve(projection.size());
-  displayed.reserve(projection.size());
+  };
+  const auto encoding = ordered_activity_encoding(visit);
+  for (const auto& entry : ordered_unique_activity_values(visit))
+    run.activity_labels.push_back(root_cause_attribute_category(*entry.value));
+  run.nonstring = encoding.nonstring;
+  run.encoded.reserve(projection.size());
+  run.displayed.reserve(projection.size());
   for (const auto& cells : activity_cells) {
-    encoded.emplace_back(); displayed.emplace_back();
-    encoded.back().reserve(cells.size()); displayed.back().reserve(cells.size());
+    run.encoded.emplace_back(); run.displayed.emplace_back();
+    run.encoded.back().reserve(cells.size()); run.displayed.back().reserve(cells.size());
     for (const auto* value : cells) {
       const auto found = encoding.labels.find(activity_identity(*value));
       if (found == encoding.labels.end())
         throw std::invalid_argument(
             "concept drift table: activity key encoding failed");
-      encoded.back().push_back(found->second);
-      displayed.back().push_back(
+      run.encoded.back().push_back(found->second);
+      run.displayed.back().push_back(
           encoding.nonstring ? std::string{}
                              : root_cause_attribute_category(*value));
     }
   }
-  const auto detected = detect_concept_drift_traces(encoded, options, rng);
+  run.detected = detect_concept_drift_traces(run.encoded, options, rng);
+  return run;
+}
+
+// The change time of one ranked change point: the selected group at
+// sublog_index * sub_log_size (Python indexing, so negative indices count
+// from the end).
+double bose_change_timestamp(const BoseTableRun& run, std::int64_t sublog_index,
+                             std::int64_t sub_log_size) {
+  // The product can exceed int64 even when either option alone fits. Only
+  // products within the bounded timestamp vector can be valid indices;
+  // those small integer products are exact even on double-width long double.
+  long double index = static_cast<long double>(sublog_index) * sub_log_size;
+  const auto count = static_cast<long double>(run.timestamps.size());
+  if (index < 0) index += count;
+  if (index < 0 || index >= count)
+    throw std::invalid_argument("concept drift table: change timestamp index is out of range");
+  return run.timestamps[static_cast<std::size_t>(index)];
+}
+
+}  // namespace
+
+ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
+    const EventTable& table, ConceptDriftTableOptions options, std::mt19937& rng,
+    std::size_t trace_limit) {
+  auto run = run_bose_table(table, options, rng, trace_limit);
+  const auto& detected = run.detected;
   ConceptDriftTableResult result;
   for (const auto& point : detected.change_points) {
-    // The product can exceed int64 even when either option alone fits. Only
-    // products within the bounded timestamp vector can be valid indices;
-    // those small integer products are exact even on double-width long double.
-    long double index = static_cast<long double>(point.sublog_index) * options.sub_log_size;
-    const auto count = static_cast<long double>(timestamps.size());
-    if (index < 0) index += count;
-    if (index < 0 || index >= count)
-      throw std::invalid_argument("concept drift table: change timestamp index is out of range");
-    result.change_timestamps.push_back(timestamps[static_cast<std::size_t>(index)]);
+    result.change_timestamps.push_back(
+        bose_change_timestamp(run, point.sublog_index, options.sub_log_size));
     result.p_values.push_back(point.p_value);
   }
   // The public adapter joins activity strings only when emitting frames;
   // numeric labels therefore reject after the detector has advanced RNG.
-  if (encoding.nonstring && !detected.sublogs.empty())
+  if (run.nonstring && !detected.sublogs.empty())
     throw std::invalid_argument("concept drift table: output activities must be strings");
   std::set<std::int64_t> boundaries;
   for (const auto& point : detected.change_points) boundaries.insert(point.sublog_index);
@@ -1344,12 +1381,193 @@ ConceptDriftTableResult detail::apply_concept_drift_table_bounded(
   std::size_t cursor = 0;
   for (std::size_t i = 0; i < detected.sublogs.size(); ++i) {
     for (std::size_t j = 0; j < detected.sublogs[i].size(); ++j)
-      current.push_back(std::move(displayed.at(cursor++)));
+      current.push_back(std::move(run.displayed.at(cursor++)));
     if (boundaries.contains(static_cast<std::int64_t>(i + 1)) || i + 1 == detected.sublogs.size()) {
       partitions.push_back(std::move(current)); current.clear();
     }
   }
   result.returned_tables = detail::make_bose_output_tables(partitions);
+  return result;
+}
+
+// The error pm4py raises on an upload frame for one of the adapter's
+// failures (observed black-box): missing columns are KeyErrors, a case start
+// that is no Timestamp has no .timestamp() (NaT refuses it), a tested window
+// with no permutation divides by zero, a change past the selected groups
+// indexes out of range, unsortable activities fail sorted() and non-string
+// ones the frames' str.join. Other messages pass through.
+static std::string bose_python_error(const EventTable& table, const ConceptDriftTableOptions& options,
+                              const std::string& message) {
+  constexpr std::string_view missing = "event table: column not found: ";
+  if (message.starts_with(missing))
+    return "KeyError: '" + message.substr(missing.size()) + "'";
+  if (message == "concept drift: num_permutations must not be zero")
+    return "ZeroDivisionError: division by zero";
+  if (message == "concept drift table: change timestamp index is out of range")
+    return "IndexError: list index out of range";
+  const auto type_of = [](const EventAttribute& cell) {
+    return python::type_name(python::from_attribute(cell));
+  };
+  if (message == "concept drift table: case-start value must be a date") {
+    const auto case_column = table.column_index(options.case_id_attribute);
+    const auto time_column = table.column_index(options.timestamp_attribute);
+    const auto groups = collect_selected_groups(table, case_column, time_column, kTableTraceLimit);
+    bool dates = time_column < table.dtypes.size() && table.dtypes[time_column].starts_with("datetime");
+    for (const auto& row : table.rows)
+      if (row[time_column] && !row[time_column]->is_null &&
+          row[time_column]->kind == AttributeKind::kDate) dates = true;
+    for (const auto& group : groups) {
+      if (!group.first_time)
+        return dates ? "ValueError: NaTType does not support timestamp"
+                     : "AttributeError: 'float' object has no attribute 'timestamp'";
+      if (group.first_time->kind != AttributeKind::kDate &&
+          !std::holds_alternative<NativeDate>(group.first_time->typed_value))
+        return "AttributeError: '" + type_of(*group.first_time) + "' object has no attribute 'timestamp'";
+    }
+    return message;
+  }
+  const auto activity = table.column_index(options.activity_attribute);
+  const auto activity_value = [&](const EventTable::Row& row) {
+    EventAttribute none{options.activity_attribute, "", AttributeKind::kString, true};
+    return row[activity] ? *row[activity] : none;
+  };
+  if (message == "concept drift table: incompatible activity key types") {
+    // sorted() compares a later value with an earlier one; which pair fails
+    // first follows the set's hash order (declared), so name the first two
+    // families in row order.
+    std::optional<EventAttribute> first;
+    for (const auto& row : table.rows) {
+      const auto value = activity_value(row);
+      if (!first) { first = value; continue; }
+      if (activity_family_shallow(value) != activity_family_shallow(*first))
+        return "TypeError: '<' not supported between instances of '" + type_of(value) +
+               "' and '" + type_of(*first) + "'";
+    }
+    return message;
+  }
+  if (message == "concept drift table: output activities must be strings") {
+    const auto dtype = activity < table.dtypes.size() ? table.dtypes[activity] : std::string{};
+    std::string name;
+    if (dtype == "int64" || dtype == "float64" || dtype == "bool") {
+      name = "numpy." + dtype;
+    } else if (dtype.starts_with("datetime")) {
+      name = "Timestamp";
+    } else {
+      // The first activity of the first projected case (the smallest id).
+      const auto standard_case = table.column_index("case:concept:name");
+      const EventTable::Row* first = nullptr;
+      for (const auto& row : table.rows) {
+        if (missing_table_cell(row[standard_case])) continue;
+        if (!first || ScalarLess{}(*row[standard_case], *(*first)[standard_case])) first = &row;
+      }
+      if (!first) return message;
+      const auto value = activity_value(*first);
+      name = type_of(value);
+      if (dtype.empty() && name != "str" && name != "Timestamp") {
+        // An XES frame column (no recorded dtype) of one numeric type.
+        name = name == "int" ? "numpy.int64" : name == "float" ? "numpy.float64"
+             : name == "bool" ? "numpy.bool" : name;
+      }
+    }
+    return "TypeError: sequence item 0: expected str instance, " + name + " found";
+  }
+  return message;
+}
+
+ConceptDriftResult detect_concept_drift_table(const EventTable& table,
+                                              const ConceptDriftOptions& options) {
+  ConceptDriftTableOptions table_options;
+  const auto signed_size = [](std::size_t value) {
+    return static_cast<std::int64_t>(std::min<std::size_t>(
+        value, static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max())));
+  };
+  table_options.sub_log_size = signed_size(options.sub_log_size);
+  table_options.window_size = signed_size(options.window_size);
+  table_options.num_permutations = signed_size(options.num_permutations);
+  table_options.threshold = options.threshold;
+  table_options.max_no_change_points = signed_size(options.max_no_change_points);
+  table_options.seed = options.seed;
+  table_options.activity_attribute = options.activity_attribute;
+  table_options.timestamp_attribute = options.timestamp_attribute;
+  table_options.case_id_attribute = options.case_id_attribute;
+  table_options.cancelled = options.cancelled;
+  std::mt19937 rng;
+  if (options.seed <= std::numeric_limits<std::uint32_t>::max()) {
+    rng.seed(static_cast<std::uint32_t>(options.seed));
+  } else {
+    std::seed_seq sequence{static_cast<std::uint32_t>(options.seed),
+                           static_cast<std::uint32_t>(options.seed >> 32)};
+    rng.seed(sequence);
+  }
+  BoseTableRun run;
+  std::vector<double> change_times;
+  try {
+    run = run_bose_table(table, table_options, rng, kTableTraceLimit);
+    // Every change point's time is looked up, and a non-string activity
+    // fails the frames' join, whether or not the caller asked for the times.
+    for (const auto& point : run.detected.change_points)
+      change_times.push_back(
+          bose_change_timestamp(run, point.sublog_index, table_options.sub_log_size));
+    if (run.nonstring && !run.detected.sublogs.empty())
+      throw std::invalid_argument("concept drift table: output activities must be strings");
+  } catch (const OperationCancelled&) {
+    throw;
+  } catch (const std::exception& error) {
+    throw std::invalid_argument(bose_python_error(table, table_options, error.what()));
+  }
+  ConceptDriftResult result;
+  result.variant = options.variant;
+  result.activity_attribute = options.activity_attribute;
+  result.timestamp_attribute = options.timestamp_attribute;
+  result.case_id_attribute = options.case_id_attribute;
+  result.activities = run.activity_labels;
+  std::vector<std::string> alphabet;
+  {
+    std::set<std::string> labels;
+    for (const auto& trace : run.encoded) labels.insert(trace.begin(), trace.end());
+    alphabet.assign(labels.begin(), labels.end());
+  }
+  std::size_t begin = 0, cumulative_events = 0;
+  for (const auto& group : run.detected.sublogs) {
+    std::vector<Trace> traces;
+    traces.reserve(group.size());
+    std::size_t events = 0;
+    for (std::size_t i = 0; i < group.size(); ++i) {
+      Trace trace;
+      for (const auto& label : run.encoded[begin + i]) {
+        Event event;
+        event.activity = label;
+        trace.events.push_back(std::move(event));
+      }
+      events += run.group_sizes[begin + i];
+      traces.push_back(std::move(trace));
+    }
+    result.feature_vectors.push_back(extract_concept_drift_features(traces, alphabet));
+    cumulative_events += events;
+    result.sublog_ranges.push_back({begin, begin + group.size(), events});
+    result.cumulative_sublog_ranges.push_back({0, begin + group.size(), cumulative_events});
+    if (options.include_timestamps) {
+      const auto at = static_cast<long double>(result.sublog_ranges.size() - 1) * table_options.sub_log_size;
+      if (at < static_cast<long double>(run.timestamps.size()))
+        result.sublog_start_timestamps.push_back(run.timestamps[static_cast<std::size_t>(at)]);
+    }
+    begin += group.size();
+  }
+  for (const auto& point : run.detected.change_points)
+    result.change_points.push_back({static_cast<std::size_t>(point.sublog_index), point.p_value});
+  if (options.include_timestamps) result.change_timestamps = change_times;
+  std::set<std::int64_t> boundaries;
+  for (const auto& point : run.detected.change_points) boundaries.insert(point.sublog_index);
+  ConceptDriftTraceRange segment;
+  for (std::size_t i = 0; i < result.sublog_ranges.size(); ++i) {
+    const auto& range = result.sublog_ranges[i];
+    segment.end = range.end;
+    segment.event_count += range.event_count;
+    if (boundaries.contains(static_cast<std::int64_t>(i + 1)) || i + 1 == result.sublog_ranges.size()) {
+      result.returned_sublog_ranges.push_back(segment);
+      segment = ConceptDriftTraceRange{range.end, range.end, 0};
+    }
+  }
   return result;
 }
 

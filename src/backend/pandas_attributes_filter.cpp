@@ -542,11 +542,16 @@ PandasAttributesFilterOptions resolve_attributes_options(const std::vector<Panda
   // Round CP: the case count reads the case key enum first, the per-case
   // grouping the key given last; the event filter reads the attribute key
   // enum first.
-  std::optional<EventAttribute> enum_case,string_case,last_case,enum_attribute,string_attribute;
+  // Round CV: the per-case count reads the keep_once_per_case given last
+  // (either key), the denominator KEEP_ONCE_PER_CASE enum first.
+  std::optional<EventAttribute> enum_case,string_case,last_case,enum_attribute,string_attribute,enum_once,string_once,last_once;
   for(const auto& p:parameters){
    if(p.value.key=="pm4py:param:case_id_key"){(p.enum_key?enum_case:string_case)=p.value;last_case=p.value;}
    else if(p.value.key=="pm4py:param:attribute_key")(p.enum_key?enum_attribute:string_attribute)=p.value;
+   else if(p.value.key=="keep_once_per_case"){(p.enum_key?enum_once:string_once)=p.value;last_once=p.value;}
   }
+  if(last_once)result.keep_once_per_case=*last_once;
+  if(enum_once||string_once)result.relative_keep_once_enum=enum_once?*enum_once:*string_once;
   if(enum_case)result.case_id_key=*enum_case;
   if(last_case)result.relative_case_id_key_last=*last_case;
   if(enum_attribute||string_attribute)result.relative_attribute_key_enum=enum_attribute?*enum_attribute:*string_attribute;
@@ -596,7 +601,7 @@ EventTable filter_pandas_attributes_top_activities(const EventTable& s,const Eve
 EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,const EventAttribute& stake,const PandasAttributesFilterOptions& o){
  s.validate();
  const bool once=o.keep_once_per_case&&truth(*o.keep_once_per_case);
- const bool case_denominator=!o.keep_once_per_case||once;
+ const bool case_denominator=o.relative_keep_once_enum?truth(*o.relative_keep_once_enum):!o.keep_once_per_case||once;
  // An empty frame only resolves a scalar attribute column.
  // groupby([case, key]) resolves the case column first, except on a two-row
  // frame, where pandas may take the key list itself as the grouper.
@@ -605,14 +610,15 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  const EventAttribute& group_case=o.relative_case_id_key_last?*o.relative_case_id_key_last:o.case_id_key;
  const bool unmatched_mapping=once&&!group_case.is_null&&group_case.container==AttributeContainerKind::kContainer&&
   (!s.index||std::all_of(s.index->labels.begin(),s.index->labels.end(),[](const auto& label){const auto* scalar=std::get_if<EventAttribute>(&label.value);return scalar&&!text_value(*scalar);}));
- if(once&&!unmatched_mapping&&!empty_list(group_case)&&s.size()!=2){
-  // Round CK: a list case key holding a dict or list is no label, so the
-  // groupby takes it as a grouper array.
-  if(group_case.container==AttributeContainerKind::kList&&group_case.children.size()!=s.size()&&
-     std::any_of(group_case.children.begin(),group_case.children.end(),[](const auto& c){return detail::pandas_unhashable_type(c).has_value();}))
-   error("ValueError","Grouper and axis must be same length");
+ // Round CV: a list case key is no label, so the groupby takes it as a
+ // grouper array of its items (any items, an empty list too), which must
+ // match the rows; a tuple is a label that must hash. Neither lets a
+ // two-row frame take the key list itself as the grouper.
+ const bool list_grouper=once&&!unmatched_mapping&&group_case.container==AttributeContainerKind::kList;
+ if(list_grouper&&group_case.children.size()!=s.size())error("ValueError","Grouper and axis must be same length");
+ if(once&&!unmatched_mapping&&group_case.container==AttributeContainerKind::kTuple)detail::pandas_check_hashable_key(group_case,error);
+ if(once&&!unmatched_mapping&&!list_grouper&&(s.size()!=2||group_case.container==AttributeContainerKind::kTuple))
   direct_column(s,group_case);
- }
  // Round CK: df[key] refuses a dict before it looks at the rows. Round CP:
  // on an empty frame the per-event path reads df[key] (a list selects its
  // columns, a tuple is one label), the per-case path groups by the key (a
@@ -648,18 +654,26 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  const auto attribute=direct_column(s,o.attribute_key);
  std::optional<std::size_t> cases,grouped;std::unordered_set<std::string> all_cases;
  if(case_denominator&&!unmatched_mapping){
-  if(empty_list(o.case_id_key))error("ValueError","The truth value of a Series is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().");
+  // Round CV: df[list].nunique() is a Series, which the stake comparison
+  // cannot take as a truth value.
+  if(o.case_id_key.container==AttributeContainerKind::kList){
+   check_list_columns(s,o.case_id_key);
+   error("ValueError","The truth value of a Series is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().");
+  }
   cases=direct_column(s,o.case_id_key);
   for(std::size_t i=0;i<s.size();++i)if(!missing(cell(s,i,*cases)))all_cases.insert(group_key(cell(s,i,*cases)));
-  if(once)grouped=o.relative_case_id_key_last?direct_column(s,group_case):*cases;
+  if(once&&!list_grouper)grouped=o.relative_case_id_key_last?direct_column(s,group_case):*cases;
  }
+ if(once&&!list_grouper&&!unmatched_mapping&&!grouped)grouped=direct_column(s,group_case);
+ // A list grouper's items are the rows' cases.
+ const auto grouped_cell=[&](std::size_t i)->const EventAttribute&{return list_grouper?group_case.children[i]:cell(s,i,*grouped);};
  struct Frequency {EventAttribute value;std::size_t count=0;std::unordered_set<std::string> cases;};
  std::vector<Frequency> frequencies;std::unordered_map<std::string,std::size_t> positions;
  for(std::size_t i=0;i<s.size()&&!unmatched_mapping;++i){const auto& value=cell(s,i,attribute);if(missing(value))continue;
   // Per-case counts group by (case, value), which drops null cases.
-  if(once&&missing(cell(s,i,*grouped)))continue;
+  if(once&&missing(grouped_cell(i)))continue;
   const auto key=group_key(value);const auto [position,added]=positions.emplace(key,frequencies.size());if(added)frequencies.push_back({value});
-  auto& f=frequencies[position->second];if(!once)++f.count;else f.cases.insert(group_key(cell(s,i,*grouped)));
+  auto& f=frequencies[position->second];if(!once)++f.count;else f.cases.insert(group_key(grouped_cell(i)));
  }
  // stake * count: only numbers and sequences multiply by an int; round CM:
  // the product is formed per counted value, so no value means no error

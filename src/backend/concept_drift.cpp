@@ -693,10 +693,13 @@ std::vector<EventLog> split_concept_drift_sublogs(
   return result;
 }
 
-double concept_drift_permutation_test(
+namespace {
+
+double permutation_test_polled(
     const std::vector<std::vector<double>>& first,
     const std::vector<std::vector<double>>& second,
-    std::int64_t num_permutations, std::mt19937& rng) {
+    std::int64_t num_permutations, std::mt19937& rng,
+    const std::function<bool()>& cancel) {
   const std::size_t dimensions = validate_permutation_shape(first, second);
   if (num_permutations == 0) {
     throw std::invalid_argument(
@@ -708,11 +711,22 @@ double concept_drift_permutation_test(
   const std::size_t row_count = checked_combined_row_count(first, second);
   validate_permutation_work(num_permutations, row_count, dimensions);
   double exceedances = 0.0;
+  CancellationCheck cancelled(cancel, "concept drift detection was cancelled", 32);
   for (std::int64_t permutation = 0; permutation < num_permutations;
        ++permutation) {
+    cancelled();
     exceedances += permutation_p_value(first, second, rng);
   }
   return exceedances / static_cast<double>(num_permutations);
+}
+
+}  // namespace
+
+double concept_drift_permutation_test(
+    const std::vector<std::vector<double>>& first,
+    const std::vector<std::vector<double>>& second,
+    std::int64_t num_permutations, std::mt19937& rng) {
+  return permutation_test_polled(first, second, num_permutations, rng, {});
 }
 
 double concept_drift_permutation_test(
@@ -798,8 +812,9 @@ ConceptDriftTraceResult detect_concept_drift_traces(
       throw std::invalid_argument("concept drift: requested permutation work exceeds safe bound");
     std::vector<std::vector<double>> first(features.begin() + a, features.begin() + b);
     std::vector<std::vector<double>> second(features.begin() + c, features.begin() + d);
-    const double probability = concept_drift_permutation_test(
-        first, second, options.num_permutations, rng);
+    throw_if_cancelled(options.cancelled, "concept drift detection was cancelled");
+    const double probability = permutation_test_polled(
+        first, second, options.num_permutations, rng, options.cancelled);
     if (probability < options.threshold)
       result.change_points.push_back({i + window, probability});
   }

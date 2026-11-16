@@ -7469,7 +7469,20 @@ void handle_concept_drift(const httplib::Request& request,
     // The route reports partition sizes only, so no sub-log is copied.
     options.materialize_sublogs = false;
     options.cancelled = connection_cancel_hook(request);
-    const auto result = minera::detect_concept_drift(require_prepared_log(*session), options);
+    // pm4py reads an upload as its frame and runs BOSE's DataFrame adapter
+    // there: keys are frame columns, cases sorted by id, activities typed,
+    // change times from the selected case column (round CV).
+    const auto& log = require_prepared_log(*session);
+    const minera::EventTable* frame = nullptr;
+    std::optional<minera::EventTable> upload_frame;
+    if (log.dataframe_columns && session->active_source) {
+      upload_frame = session->active_source->file().format == "csv"
+                         ? formatted_csv_frame_table(*session->active_source)
+                         : formatted_xes_frame_table(*session->active_source);
+      if (upload_frame) frame = &*upload_frame;
+    }
+    const auto result = frame ? minera::detect_concept_drift_table(*frame, options)
+                              : minera::detect_concept_drift(log, options);
     response.set_content(minera::concept_drift_json(result), "application/json");
   } catch (const std::exception& error) {
     response.status = 400;

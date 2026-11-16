@@ -2076,6 +2076,16 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_traces_route_tests minera_server)
     add_test(NAME minera_server_traces_route_tests
              COMMAND minera_server_traces_route_tests $<TARGET_FILE:minera_server>)
+    # Review CV1: /api/concept-drift on CSV and XES uploads runs pm4py's BOSE
+    # DataFrame adapter on the upload's frame.
+    add_executable(minera_server_concept_drift_upload_tests
+      src/backend/tests/test_server_concept_drift_upload.cpp)
+    target_include_directories(minera_server_concept_drift_upload_tests PRIVATE third_party)
+    target_link_libraries(minera_server_concept_drift_upload_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_concept_drift_upload_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_concept_drift_upload_tests minera_server)
+    add_test(NAME minera_server_concept_drift_upload_tests
+             COMMAND minera_server_concept_drift_upload_tests $<TARGET_FILE:minera_server>)
     # A long route whose client disconnects stops within a second.
     add_executable(minera_server_cancellation_tests
       src/backend/tests/test_server_cancellation.cpp)
@@ -3290,6 +3300,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_cu_probe_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cu-probe-bank.json.gz")
   set_tests_properties(minera_polars_filter_cu_probe_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CV: fresh CK seeds (2026111901 case 561: the A_next_B_next_C
+  # dict-key message shows a datetime as datetime.datetime(...); 2026111913
+  # case 509: a dict argument that repeats a key is built as dict(pairs)).
+  add_test(NAME minera_polars_filter_cv_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-cv-bank.json.gz")
+  set_tests_properties(minera_polars_filter_cv_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3518,6 +3534,14 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_cu_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cu-bank.json.gz")
   set_tests_properties(minera_pandas_filter_cu_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round CV: fresh CK seeds (2026111909 cases 434 and 531, 2026111921
+  # case 460) and probe v1: relative occurrence counts per case by the
+  # keep_once_per_case given last and divides by the cases by the enum
+  # first; a list case key is a grouper array; the case-performance keys
+  # pass through numpy as a pair.
+  add_test(NAME minera_pandas_filter_cv_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-cv-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_cv_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

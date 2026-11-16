@@ -100,6 +100,9 @@ struct ConceptDriftTraceOptions {
   double threshold = 0.5;
   std::int64_t max_no_change_points = 5;
   std::uint64_t seed = 0;
+  // Polled between permutations (a server route's client disconnect); unset
+  // never cancels, and a run that is not cancelled is unchanged.
+  std::function<bool()> cancelled;
 };
 
 struct ConceptDriftTraceChangePoint {
@@ -286,5 +289,15 @@ compute_concept_drift_typed_follows_relation(
 
 [[nodiscard]] ConceptDriftResult detect_concept_drift(
     const EventLog& log, ConceptDriftOptions options = {});
+
+// pm4py's BOSE DataFrame adapter (apply_concept_drift_table) on a frame, in
+// the detector's result shape: sub-logs, ranges and feature vectors over the
+// projected cases (sorted by case id, each case its rows from its first row),
+// change points as the detector ranks them, and the change and sub-log start
+// times looked up among the selected case groups. Activities are the frame's
+// typed values in the adapter's order; sub-logs are never materialized. The
+// server runs it on upload frames (round CV).
+[[nodiscard]] ConceptDriftResult detect_concept_drift_table(
+    const EventTable& table, const ConceptDriftOptions& options);
 
 }  // namespace minera

@@ -309,7 +309,21 @@ EventAttribute to_attribute(const Json& node, std::string key = {}) {
     for (const auto& item : value.items) out.children.push_back(to_attribute(item, std::to_string(out.children.size())));
   } else if (tag == "m") {
     out.container = AttributeContainerKind::kContainer;
-    for (const auto& pair : value.items) out.children.push_back(to_attribute(pair.items.at(1), body(pair.items.at(0)).text));
+    // dict(pairs) (round CV): a repeated key keeps its first place and takes
+    // the last value.
+    std::vector<std::pair<std::string, std::string>> keys;
+    for (const auto& pair : value.items) {
+      const auto& key = pair.items.at(0);
+      std::pair<std::string, std::string> id{tag_of(key), body(key).text};
+      auto child = to_attribute(pair.items.at(1), body(key).text);
+      const auto found = std::find(keys.begin(), keys.end(), id);
+      if (found != keys.end()) {
+        out.children[static_cast<std::size_t>(found - keys.begin())] = std::move(child);
+      } else {
+        keys.push_back(std::move(id));
+        out.children.push_back(std::move(child));
+      }
+    }
   } else {
     throw std::runtime_error("unsupported typed argument tag " + tag);
   }
