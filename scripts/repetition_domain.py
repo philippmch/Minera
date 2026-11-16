@@ -29,6 +29,10 @@ INSTANTS = ("2021-03-28 01:30:00", "2021-03-28 02:30:00", "2021-10-31 02:30:00",
 
 
 def int_cell(key, value):
+    # Round DG: a Polars Int128/UInt128 cell (a `literal` column of an
+    # Int128 case key) has no native carrier.
+    if not -(1 << 63) <= value < (1 << 64):
+        raise TypeError("no native cell for 128-bit int")
     storage = "int64" if -(1 << 63) <= value < (1 << 63) else "uint64"
     return {"key": key, "value": str(value), "kind": "int", "typed_value": value, "integer_storage": storage}
 

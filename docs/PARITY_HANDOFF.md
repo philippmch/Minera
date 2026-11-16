@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DF (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–DG (2026-11-05 to 2026-11-16, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6177,6 +6177,71 @@ probes, set domains and fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DG re-reviewed DF (Review DG1). DF's commit 10ebbb7 ran CI run
+43955891315 (green on all six jobs). DG modelled the Python ints DF still
+refused, widened them to five table domains, ran third-seed set probes on
+the CJ, CI and CH table domains and replayed two batches of fresh seeds:
+- Ints in Polars' 128-bit ranges (`polars_lit_model.hpp`: HugeInt,
+  huge_value, lit types Int128/UInt128): scalars past Int64 are Int128
+  literals (UInt64 in [2**63, 2**64)), list items Int128 or UInt128
+  (OverflowError past u128), with their supertypes, strict builders,
+  casts, comparisons and `is_in` casts; `head(n)` refuses n past Int64
+  and past u32 with Python's and Polars' messages. Probe i1 409 -> 0 of
+  1,000.
+- A struct beside an Int128 value takes the ordinary struct/number
+  supertype (DF's "struct keeps its fields" rule was wrong); float cells
+  cast to String inside nested literals as Polars casts a Float64.
+- An Int128 `literal` result column has no native cell: the capture
+  refuses it (`no native cell for 128-bit int`, scripts/repetition_domain.py)
+  and the bank replay checks native frames the same way.
+- New big-int probes on the CJ, CI, CH, CK and CN table domains (29,447
+  calls): 902 left after the fixes (parameter lists indexed by huge ints,
+  int keys past Int128 in the counts and case keys, list bounds, dict
+  bounds, UInt64 literal cells, the paths timestamp sort key). Of those,
+  831 are native refusals in the LTL, between, timestamp and variants
+  filters, 65 are those filters' check order with an int past Int128, 6
+  attribute counts over unmodelled key lists: carried to DH.
+- pandas LTL filters compare a str column with a tuple of one item per
+  row element-wise, as numpy holds the tuple (str array, object array or
+  number array).
+- Set probes (seed 8): CJ 4, CI 1, CH 1 of 42,194, all declared kinds.
+- Fresh seeds 2026113000-11: eight calls, all fixed; 2026113012-23: 0.
+
+In the suite: new `docs/polars-filter-dg-int-bank.json.gz`,
+`docs/polars-filter-dg-set-bank.json.gz` and
+`docs/pandas-filter-dg-bank.json.gz` with their ctests. The probes, big-int
+and set domains and fresh banks are in the project files under
+`review-harness/round-dg/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DH) should start by re-reviewing round DG:
+
+- DG's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- ints past the Int64 range in the LTL, between, timestamp and variants
+  filters (the 896 calls DG dropped from the big-int probes,
+  `dom/_probe_pltbl*_big_domain.py` seed 1): native refusals today; the
+  `pl.lit` refusal past Int128 comes before the column and join checks;
+- the Polars sequence filters with ints past Int64 (no big-int probe yet);
+- the `literal` list item where the frame has a `literal` column, and in
+  eager calls (still refused);
+- maybe the majority outcome of the partition race (DF1-7);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DF's targets, taken in DG (findings DG1-1 to DG1-8): DF's CI run, the
+fresh seeds, the Int128 literals and the third-seed set probes on CJ, CI and
+CH. Not taken (carried to DH): the `literal` item with a frame `literal`
+column or eager, the partition race, equal-size joins and the older CJ, CF
+and CD items.
+
+Previous list for round DG (kept for its older items):
 
 Next round (DG) should start by re-reviewing round DF:
 

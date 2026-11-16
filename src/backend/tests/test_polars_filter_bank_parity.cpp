@@ -39,6 +39,7 @@
 #include <optional>
 #include <regex>
 #include <set>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -413,9 +414,23 @@ struct Unrepresentable : std::runtime_error {
 // Round CO: the capture encodes a frame cell by cell (rows in order, then
 // columns) and refuses a struct or list cell as "no native cell for dict"
 // or "... for list" (the `literal` columns of list case keys).
+// Round DG: so is an int past the Int64/UInt64 ranges (an Int128 `literal`
+// column), "no native cell for 128-bit int".
+bool int128_cell(const EventAttribute& cell) {
+  if (cell.is_null || cell.kind != AttributeKind::kInt || !std::holds_alternative<std::monostate>(cell.typed_value)) return false;
+  const auto& text = cell.value;
+  const auto* end = text.data() + text.size();
+  std::int64_t s{};
+  std::uint64_t u{};
+  const auto a = std::from_chars(text.data(), end, s);
+  const auto b = std::from_chars(text.data(), end, u);
+  return !(a.ec == std::errc{} && a.ptr == end) && !(b.ec == std::errc{} && b.ptr == end);
+}
 void check_cells(const EventTable& table) {
   for (const auto& row : table.rows)
     for (const auto& cell : row) {
+      if (cell && cell->container == AttributeContainerKind::kScalar && int128_cell(*cell))
+        throw Unrepresentable("no native cell for 128-bit int");
       if (!cell || cell->container == AttributeContainerKind::kScalar) continue;
       throw Unrepresentable(std::string("no native cell for ") + (cell->container == AttributeContainerKind::kContainer ? "dict" : cell->container == AttributeContainerKind::kTuple ? "tuple" : "list"));
     }
@@ -1154,6 +1169,16 @@ std::string read_bank(const char* path) {
   return detail::gzip_decompress(bytes, std::size_t{1} << 31);
 }
 
+// Round DG: a Python int bound as a long long, saturated past its range
+// (the bank holds ints past Int64 too).
+long long saturated_integer(const std::string& text) {
+  try {
+    return std::stoll(text);
+  } catch (const std::out_of_range&) {
+    return !text.empty() && text.front() == '-' ? std::numeric_limits<long long>::min() : std::numeric_limits<long long>::max();
+  }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) try {
@@ -1260,7 +1285,7 @@ int main(int argc, char** argv) try {
         const auto* maximum = keyword(kwargs, "max_no_activities");
         std::optional<long long> k;
         if (!maximum) k = 25;
-        else if (tag_of(*maximum) == "i") k = std::stoll(body(*maximum).text);
+        else if (tag_of(*maximum) == "i") k = saturated_integer(body(*maximum).text);
         if (!matched && k && *k >= 0 && std::any_of(expected.begin(), expected.end(), [](const Json& e) { return e.get("value") != nullptr; }))
           matched = valid_top_selection(df, name, actual, static_cast<std::size_t>(*k));
         if (!matched) matched = tied_listing(expected, actual);
@@ -1319,7 +1344,7 @@ int main(int argc, char** argv) try {
         const auto* maximum = keyword(kwargs, "max_no_cases");
         const bool tables = std::all_of(expected.begin(), expected.end(), [](const Json& e) { return e.get("value") != nullptr; });
         if (!matched && tables && (!maximum || tag_of(*maximum) == "i"))
-          matched = valid_ncases(df, name, actual, maximum ? std::stoll(body(*maximum).text) : 1000);
+          matched = valid_ncases(df, name, actual, maximum ? saturated_integer(body(*maximum).text) : 1000);
       }
       if (!matched)
         for (const auto& e : expected) matched = matched || struct_partition_race(e, actual);

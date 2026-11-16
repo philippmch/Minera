@@ -1,5 +1,7 @@
 #pragma once
 
+#include <charconv>
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -52,7 +54,16 @@ void check_parameter_carrier(const EventAttribute& parameters, Fail&& fail) {
       if (const auto* flag = std::get_if<bool>(&key.typed_value)) index = *flag ? 1 : 0;
       else if (const auto* number = std::get_if<std::int64_t>(&key.typed_value)) index = *number;
       else if (type == "bool") index = key.value == "true" ? 1 : 0;
-      else index = std::stoll(key.value);
+      else {
+        // Round DG: an int past the Int64 range is no index (probe
+        // big-pltbl, get_param_value indexing a list of such ints).
+        std::int64_t parsed = 0;
+        const auto* end = key.value.data() + key.value.size();
+        const auto read = std::from_chars(key.value.data(), end, parsed);
+        if (std::holds_alternative<std::uint64_t>(key.typed_value) || read.ec != std::errc{} || read.ptr != end)
+          fail("IndexError", "cannot fit 'int' into an index-sized integer");
+        index = parsed;
+      }
       if (index < -size || index >= size) fail("IndexError", name + " index out of range");
     }
     return;

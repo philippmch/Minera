@@ -161,7 +161,7 @@ std::string expression_literal(const EventAttribute& value,bool dynamic=false,bo
   if(collection(value)) {
     // Round CE: a list or tuple as pl.lit built it.
     if(value.container!=AttributeContainerKind::kContainer)
-      try{return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(value));}catch(const PolarsSequenceFilterError&){}
+      try{return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(value,true));}catch(const PolarsSequenceFilterError&){}
     // Polars prints the first two and the last item of a longer list.
     const auto& items=value.children;std::string out="[";
     for(std::size_t i=0;i<items.size();++i) {
@@ -171,7 +171,7 @@ std::string expression_literal(const EventAttribute& value,bool dynamic=false,bo
     return out+"]";
   }
   if(boolean(value))return truth(value)?"true":"false";
-  if(date(value))return detail::polars_lit::scalar_display(detail::polars_lit::value_of(value));
+  if(date(value))return detail::polars_lit::scalar_display(detail::polars_lit::value_of(value,true));
   if(integer(value))return decimal?real_text(number(value))+ (real_text(number(value)).find('.')==std::string::npos?".0":"") : (dynamic?"dyn int: ":"")+exact(value).decimal();
   // Round CF: a dynamic float prints as Rust's Display (1e17 in full).
   if(real(value)&&dynamic)return "dyn float: "+detail::polars_dyn_float(number(value));
@@ -318,10 +318,12 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
     }
     auto literal=[](const EventAttribute& v){
       if(!collection(v)||v.container==AttributeContainerKind::kContainer)return;
-      try{(void)detail::polars_lit::literal_of(detail::polars_lit::value_of(v));}
+      try{(void)detail::polars_lit::literal_of(detail::polars_lit::value_of(v,true));}
       catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
     };
     if(call.values)literal(*call.values);
+    // Round DG: pl.lit refuses a scalar value past the Int128 range too.
+    if(call.values&&!collection(*call.values))try{detail::polars_lit::scalar_int_range(*call.values);}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
     if(numeric(op)) {
       // Python builds the bound literals, then each stream filter's column and
       // literal; round CJ: a dict literal converts strictly (its TypeError).
@@ -512,15 +514,15 @@ std::string list_dtype(const EventAttribute& query) {
     if(integer(query))return "Unknown(Int("+exact(query).decimal()+"))";
     if(real(query))return "Unknown(Float)";
     if(null(query))return "Null";
-    if(date(query))return detail::polars_lit::debug_name(detail::polars_lit::lit_value(detail::polars_lit::value_of(query)).type);
+    if(date(query))return detail::polars_lit::debug_name(detail::polars_lit::lit_value(detail::polars_lit::value_of(query,true)).type);
     return "String";
   }
   if(query.container==AttributeContainerKind::kContainer)return "String";
   // Round CE: the element type as pl.lit builds the list.
-  try{return detail::polars_lit::debug_name(detail::polars_lit::argument_literal(query).type);}catch(const PolarsSequenceFilterError&){}
+  try{return detail::polars_lit::debug_name(detail::polars_lit::argument_literal(query,true).type);}catch(const PolarsSequenceFilterError&){}
   for(const auto& v:query.children)if(!null(v)) {
     if(collection(v))return "List("+list_dtype(v)+")";
-    if(date(v))return detail::polars_lit::debug_name(detail::polars_lit::lit_value(detail::polars_lit::value_of(v)).type);
+    if(date(v))return detail::polars_lit::debug_name(detail::polars_lit::lit_value(detail::polars_lit::value_of(v,true)).type);
     return detail::polars_literal_dtype(v);
   }
   return "Null";
@@ -636,11 +638,11 @@ detail::polars_lit::Operands operands(const Leaf& l,bool cast_list=false) {
     if(l.dtype=="String"||l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum("))return {column,expression_literal(v)+(cast_list?".cast(String)":""),{}};
     // Round CE: a Null column casts to the list's type.
     if(l.dtype=="Null"&&v.container!=AttributeContainerKind::kContainer)
-      try{return {column+".cast("+lit::debug_name(lit::list_of(lit::argument_literal(v).type))+")",expression_literal(v),{}};}catch(const PolarsSequenceFilterError&){}
+      try{return {column+".cast("+lit::debug_name(lit::list_of(lit::argument_literal(v,true).type))+")",expression_literal(v),{}};}catch(const PolarsSequenceFilterError&){}
     return {column,expression_literal(v),{}};
   }
   if(auto wide=wide_operands(l))return *wide;
-  const auto value=lit::value_of(v);const auto op=lit::compare_op(l.op);
+  const auto value=lit::value_of(v,true);const auto op=lit::compare_op(l.op);
   if(!lit::check_scalar(l.column,l.dtype,value,op,l.categories.empty()?nullptr:&l.categories).ok())return {column,lit::scalar_display(value),{}};
   return lit::coerced_operands(l.column,l.dtype,value,op);
 }
@@ -653,7 +655,7 @@ std::string plan_text_at(const Expr& e,const Leaf* cast,bool& past) {
     if(&l==cast){past=true;return operands(l,true).text(detail::polars_lit::compare_op(l.op));}
     // Round CJ: a dict as written is its struct ({null,false}).
     if(past&&mapping(l.value))return "col("+quote(l.column)+") "+l.op+" "+detail::polars_lit::struct_display(detail::polars_lit::StructModel{detail::polars_lit::struct_fields(l.value),false});
-    if(past)return "col("+quote(l.column)+") "+l.op+" "+(null_leaf(l)?std::string("null"):collection(l.value)?expression_literal(l.value):detail::polars_lit::scalar_display(detail::polars_lit::value_of(l.value)));
+    if(past)return "col("+quote(l.column)+") "+l.op+" "+(null_leaf(l)?std::string("null"):collection(l.value)?expression_literal(l.value):detail::polars_lit::scalar_display(detail::polars_lit::value_of(l.value,true)));
     if(null_leaf(l))return null_text(l);
     return operands(l).text(detail::polars_lit::compare_op(l.op));
   }
@@ -731,7 +733,7 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
   // and [3] never merge or fold, [1] and [1.0] neither).
   if(collection(l.value)) {
     MergeKey k;k.tag=20;
-    try{k.s=lit::literal_list_key(lit::argument_literal(l.value));}catch(const PolarsSequenceFilterError&){return {};}
+    try{k.s=lit::literal_list_key(lit::argument_literal(l.value,true));}catch(const PolarsSequenceFilterError&){return {};}
     return k;
   }
   if((!o.whole.empty()&&!ns_point)||o.rhs.rfind("dyn ",0)==0)return {};
@@ -741,7 +743,7 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
     if(!lit::float_dtype(l.dtype)&&!lit::integer_dtype(l.dtype))return {};
     k.tag=1;k.d=l.dtype=="Float32"?lit::float32_of_u64(*u):static_cast<double>(*u);return k;
   }
-  const auto v=lit::value_of(l.value);const auto op=lit::compare_op(l.op);
+  const auto v=lit::value_of(l.value,true);const auto op=lit::compare_op(l.op);
   const auto check=lit::check_scalar(l.column,l.dtype,v,op,l.categories.empty()?nullptr:&l.categories);
   MergeKey k;
   // Round CE: str literals on an Enum column merge as text, members or not.
@@ -775,7 +777,7 @@ std::optional<MergeKey> merge_key(const Leaf& l) {
     k.tag=1;
     switch(v.kind){
       case lit::Kind::kFloat:k.d=narrow(v.real);break;
-      case lit::Kind::kInt:k.d=f32?lit::float32_of_int(v):static_cast<double>(v.integer);break;
+      case lit::Kind::kInt:k.d=f32?lit::float32_of_int(v):lit::integer_real(v);break;
       case lit::Kind::kBool:k.d=v.boolean?1.0:0.0;break;
       case lit::Kind::kDate:k.d=static_cast<double>(v.integer);break;
       default:k.d=static_cast<double>(lit::literal_micros(v));break;
@@ -933,7 +935,7 @@ std::optional<LeafError> leaf_error(const Leaf& l) {
     // but cannot order lists.
     if(l.dtype=="Null"&&l.op!="=="&&l.op!="!=") {
       try {
-        const auto name=lit::physical_name(lit::list_of(lit::literal_of(lit::value_of(v)).type));
+        const auto name=lit::physical_name(lit::list_of(lit::literal_of(lit::value_of(v,true)).type));
         return LeafError{"InvalidOperationError","cannot perform '"+l.op+"' comparison between series '"+l.column+"' of dtype: "+name+" and series 'literal' of dtype: "+name};
       } catch(const PolarsSequenceFilterError&) {return {};}
     }
@@ -941,7 +943,7 @@ std::optional<LeafError> leaf_error(const Leaf& l) {
     if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum(")) {
       // Round CD: a list never compares with a categorical column.
       try {
-        const auto list=detail::polars_lit::literal_of(detail::polars_lit::value_of(v));
+        const auto list=detail::polars_lit::literal_of(detail::polars_lit::value_of(v,true));
         return LeafError{"ComputeError","cannot compare categorical with "+detail::polars_lit::short_name(detail::polars_lit::list_of(list.type))};
       } catch(const PolarsSequenceFilterError&) {return {};}
     }
@@ -952,7 +954,7 @@ std::optional<LeafError> leaf_error(const Leaf& l) {
     if(l.dtype.starts_with("Categorical")||l.dtype.starts_with("Enum("))return LeafError{"ComputeError","cannot compare categorical with u64"};
     return {};
   }
-  const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(v),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
+  const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(v,true),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
   if(check.stage==lit::ScalarCheck::Stage::kCompute)return LeafError{check.type,check.message};
   return {};
 }
@@ -971,7 +973,7 @@ int leaf_truth(const Leaf& l,const EventAttribute& v) {
   if(null(v)||null(l.value))return -1;
   if(const auto u=wide_literal(l.value))return wide_truth(l,v,*u);
   namespace lit=detail::polars_lit;
-  return lit::compare_scalar(std::optional<EventAttribute>(v),l.dtype,lit::value_of(l.value),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
+  return lit::compare_scalar(std::optional<EventAttribute>(v),l.dtype,lit::value_of(l.value,true),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
 }
 int truth_of(const Expr& e,const EventTable& source,std::size_t row) {
   if(e.leaf)return leaf_truth(*e.leaf,cell(source,row,*index_of(source,e.leaf->column)));
@@ -1058,7 +1060,7 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
         }
         if(wide_literal(l.value))return;
         namespace lit=detail::polars_lit;
-        const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(l.value),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
+        const auto check=lit::check_scalar(l.column,l.dtype,lit::value_of(l.value,true),lit::compare_op(l.op),l.categories.empty()?nullptr:&l.categories);
         if(check.stage==lit::ScalarCheck::Stage::kResolve){bad=&l;message=check.message;}
       });
       if(bad){auto with=resolved_filters;with.push_back(plan_text(node,bad));fail_at(i,true,"InvalidOperationError",message,chain_plan(source,with));}
@@ -1180,7 +1182,7 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
     const bool positive_now=trace||truth(call.options.positive);
     if(cells||collection(query)) {
       // Statistics filter on the column's own values as Python reads them.
-      const auto value=cells?detail::polars_lit::Value::list(detail::polars_lit::python_values(*cells,p.dtype)):detail::polars_lit::value_of(query);
+      const auto value=cells?detail::polars_lit::Value::list(detail::polars_lit::python_values(*cells,p.dtype)):detail::polars_lit::value_of(query,true);
       p.literal=detail::polars_lit::literal_of(value);
       const bool empty_argument=cells?cells->empty():query.children.empty();
       if(!(positive_now&&empty_argument)) {
@@ -1221,7 +1223,7 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
     // Round CD: a datetime scalar checks its unit and zone like a list.
     if(qdtype.starts_with("Datetime(")&&p.dtype.starts_with("Datetime(")) {
       try {
-        detail::polars_lit::check_is_in(p.dtype,{},detail::polars_lit::literal_of(detail::polars_lit::Value::list({detail::polars_lit::value_of(query)})),
+        detail::polars_lit::check_is_in(p.dtype,{},detail::polars_lit::literal_of(detail::polars_lit::Value::list({detail::polars_lit::value_of(query,true)})),
                                         suffix(filter_plan(source,membership_expr(attr.value,query,trace||truth(call.options.positive))),true));
       } catch(const PolarsSequenceFilterError& error) {fail(error.type,phase(eager),error.message);}
     }
@@ -1233,7 +1235,7 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
     if(collection(role)&&role.children.empty())fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
     // Round CE: a scalar value as the resolved plan coerces it.
     std::optional<std::string> scalar;
-    if(!p.literal&&!null(*call.values)&&!collection(*call.values))scalar=detail::polars_lit::coerced_scalar_is_in(attr.value,p.dtype,detail::polars_lit::value_of(*call.values));
+    if(!p.literal&&!null(*call.values)&&!collection(*call.values))scalar=detail::polars_lit::coerced_scalar_is_in(attr.value,p.dtype,detail::polars_lit::value_of(*call.values,true));
     const auto plan=filter_plan(source,p.literal?list_membership(attr.value,p.dtype,*p.literal,true,true,cells?cells->empty():call.values->children.empty()):scalar?*scalar:p.other?p.other_plan:membership_expr(attr.value,*call.values,true));
     if(detail::polars_group_keys::modelled(role))p.keys=case_keys(source,role,eager,[&]{return suffix(plan);});
     else {
@@ -1262,14 +1264,14 @@ std::vector<bool> matching(const EventTable& source,const Predicate& p) {
           // looks it up, by its microseconds whatever the zones.
           if(p.dtype.starts_with("Datetime(")&&date(q)&&!collection(q)) {
             namespace lit=detail::polars_lit;
-            if(lit::literal_has(lit::literal_of(lit::Value::list({lit::value_of(q)})),v,p.dtype)){yes=true;break;}
+            if(lit::literal_has(lit::literal_of(lit::Value::list({lit::value_of(q,true)})),v,p.dtype)){yes=true;break;}
             continue;
           }
           // Round CH: a number meets a Float32 column cast to Float32
           // (is_in([[v].cast(List(Float32))])), so 1e-5 finds the cell
           // 1e-5 rounded to Float32.
           if(p.dtype=="Float32"&&(real(q)||integer(q))&&!boolean(q)&&real(v)) {
-            const double x=integer(q)?detail::polars_lit::float32_of_int(detail::polars_lit::value_of(q)):static_cast<double>(static_cast<float>(number(q))),y=number(v);
+            const double x=integer(q)?detail::polars_lit::float32_of_int(detail::polars_lit::value_of(q,true)):static_cast<double>(static_cast<float>(number(q))),y=number(v);
             if(x==y||(std::isnan(x)&&std::isnan(y))){yes=true;break;}
             continue;
           }
@@ -1349,6 +1351,12 @@ void resolve_pair_keys(const EventTable& source,const std::vector<EventAttribute
 }
 CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,const PolarsAttributesFilterOptions& options,bool relative=false,bool pairs=false) {
   CountColumn result;result.literal=attr;result.once=options.keep_once_per_case&&truth(*options.keep_once_per_case);
+  // Round DG: an int key (or key item) past the Int128 range fails its
+  // pl.lit while the plan is built (probe big-pltblcj).
+  if(detail::polars_lit::scalar_too_large(attr))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
+  if(attr.container==AttributeContainerKind::kList||attr.container==AttributeContainerKind::kTuple)
+    for(const auto& item:attr.children){if(mapping(item)||detail::polars_lit::set_argument(item))break;
+      if(detail::polars_lit::scalar_too_large(item))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);}
   const auto groupnodes=result.once?std::vector<std::string>{"'group_by'","'group_by'"}:std::vector<std::string>{"'group_by'"};
   // Per-case counts group by [case, attribute]: the case key resolves first.
   const auto case_column=[&]{
@@ -1554,13 +1562,17 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
   if(!explicit_cache) {
     // Round CM: group_by refuses a dict key while the plan is built.
     dict_argument(attr);
+    // Round DG: group_by builds an int key as pl.lit, which refuses one past
+    // the Int128 range (probe big-pltblcj).
+    if(detail::polars_lit::scalar_too_large(attr))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
     auto countoptions=options;
     if(op!=Op::kRelative)countoptions.keep_once_per_case.reset();
     // Round DB: group_by builds each item of a key list that is no str as a
     // literal, so a set item is refused while the plan is built, before
     // head(n) checks its bound (probe set-pltblck-2 case 13).
     if((attr.container==AttributeContainerKind::kList||attr.container==AttributeContainerKind::kTuple)&&!(countoptions.keep_once_per_case&&truth(*countoptions.keep_once_per_case)))
-      for(const auto& item:attr.children){if(mapping(item))break;if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);}
+      for(const auto& item:attr.children){if(mapping(item))break;if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
+        if(detail::polars_lit::scalar_too_large(item))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);}
     // Round CM: a key list holding a dict (black-box): a leading dict is
     // unhashable; after a name, the dict groups as a struct literal whose
     // value meets the threshold; df[list] names a dict item.
@@ -1577,7 +1589,9 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
         if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
         const auto n=exact(maximum);
         if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");
-        if(n>TokenInteger(std::numeric_limits<std::int64_t>::max()))fail("OverflowError","apply","number too large to fit in target type");
+        // Round DG: Python converts n to a C long, then Polars to its u32 index (probe dg/h1).
+        if(n>TokenInteger(std::numeric_limits<std::int64_t>::max()))fail("OverflowError","apply","Python int too large to convert to C long");
+        if(n>TokenInteger(std::numeric_limits<std::uint32_t>::max()))fail("OverflowError","apply","number too large to fit in target type");
       }
     }
     if(dict_items&&op==Op::kTopActivities&&!eager)
@@ -1639,7 +1653,13 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
       if(text(attr)&&!index_of(source,attr.value))fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved(eager?"'group_by'":"'slice'",frame_plan(source),eager?std::vector<std::string>{"'group_by'"}:std::vector<std::string>{"'group_by'","'select'","'slice'"}));
       if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
       if(null(attr))fail("TypeError","apply","cannot select columns using key of type 'NoneType': None");
-      if(integer(attr))fail("IndexError","apply","index "+exact(attr).decimal()+" is out of bounds for DataFrame of height 1");
+      if(integer(attr)) {
+        // Round DG: the literal key's one group, unless head(0) or an empty
+        // frame leaves none (probe big-pltblck case 52).
+        const auto mx=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
+        const bool empty=source.rows.empty()||(!null(mx)&&(integer(mx)||boolean(mx))&&exact(mx)==TokenInteger(0));
+        fail("IndexError","apply","index "+exact(attr).decimal()+" is out of bounds for DataFrame of height "+(empty?"0":"1"));
+      }
     }
     schema=counts_schema(source,attr,countoptions,op==Op::kRelative);
     if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
@@ -1694,7 +1714,9 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
       if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
       const auto n=exact(maximum);
       if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");
-      if(n>TokenInteger(std::numeric_limits<std::int64_t>::max()))fail("OverflowError","apply","number too large to fit in target type");
+      // Round DG: Python converts n to a C long, then Polars to its u32 index (probe dg/h1).
+        if(n>TokenInteger(std::numeric_limits<std::int64_t>::max()))fail("OverflowError","apply","Python int too large to convert to C long");
+        if(n>TokenInteger(std::numeric_limits<std::uint32_t>::max()))fail("OverflowError","apply","number too large to fit in target type");
       std::stable_sort(counts.begin(),counts.end(),[](const auto& a,const auto& b){return exact(a.count)>exact(b.count);});
       if(n<TokenInteger(counts.size()))counts.resize(static_cast<std::size_t>(n));
     }

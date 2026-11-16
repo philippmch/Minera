@@ -29345,3 +29345,114 @@ Tests:
   replayed by the `minera_polars_filter_df_*_bank_parity_tests` and
   `minera_polars_sequence_filter_df_set_bank_parity_tests` ctests.
 - 575 tests, all passing.
+
+## Review DG1: re-review of round DF, Python ints in Polars' 128-bit range, third-seed set probes, fresh seeds (2026-11-16)
+
+Round DG checked DF's CI (run 43955891315 on 10ebbb7: green on all six
+jobs), modelled the Python ints DF still refused, widened that to five
+table domains, ran third-seed set probes on the CJ, CI and CH table
+domains and replayed two batches of fresh seeds. The device check on the
+Mac was skipped (no device linked).
+
+- **DG1-1 Python ints in Polars' Int128 and UInt128 ranges** (probe
+  `df/specs/i1.py`, 1,000 calls). Polars types a scalar int in
+  [2**63, 2**64) as UInt64 and one in [-2**127, 2**127) past the Int64
+  range as Int128; `pl.lit` refuses the rest (`integer too large for
+  Polars`). In a list literal, non-negative ints within the UInt64 range
+  still build UInt64 (round CE); otherwise ints past the Int64 range are
+  Int128 values up to 2**127 and UInt128 in [2**127, 2**128), and past
+  that the list fails `OverflowError:
+  int value too large for Polars integer types: N`. The supertypes:
+  UInt128 with a signed int is Int128, with a bool or UInt64 UInt128,
+  with a float Float64; a strict builder of Int128 takes Int64 values, one
+  of UInt128 the non-negative Int64 and Int128 values. Comparisons with a
+  column follow DF's scalar model with the 128-bit value (a String column
+  names `i128`, a categorical `cannot compare categorical with i128`, an
+  integer or Boolean column folds the comparison by the value's sign,
+  float columns compare by the correctly rounded value); `is_in` casts
+  an unsigned column's values to UInt128 and a signed one's to Int128.
+  `filter_on_ncases` and the top-activities counts hand n to `head(n)`:
+  past the Int64 range `Python int too large to convert to C long`, past
+  u32 `number too large to fit in target type` (the retained vector
+  PAF-B1-647, n = 2**63, held the second message in its native and
+  workbench copies; the pinned reference raises the first, both
+  corrected). The model keeps the
+  value's digits with a portable magnitude (no `__int128`, for MSVC).
+  i1 409 -> 0 of 1,000.
+- **DG1-2 A struct beside an Int128 value** (fresh CJ 2026113003 cases
+  84, 254, 437; CK 2026113001 cases 189, 576; CI 2026113004 case 607). A
+  list literal that meets a struct and a 2**63..2**127 int takes the
+  supertype like any number: each field takes its supertype with the
+  int, and a field without one (a `List(Null)` field) fails `failed to
+  determine supertype of struct[N] and i128`. DF's guess that a struct
+  met first kept its fields was wrong: that list takes the first value's
+  type only on the constructor path (when the last scanned value is a
+  primitive).
+- **DG1-3 Float cells cast to String inside a nested literal** (fresh CJ
+  2026113003 case 471): a float field cast to a String field reads as
+  Polars casts a Float64 (`1e-5` as `0.00001`), not as a plan prints it.
+- **DG1-4 Int128 result columns** (probe big-pltblcj): a case key past
+  the UInt64 range is a `literal` column of dtype Int128 in the result.
+  The native carrier has no 128-bit cell, so the capture refuses such a
+  frame (`no native cell for 128-bit int`, `scripts/repetition_domain.py`)
+  and the bank replay checks the native frame the same way.
+- **DG1-5 Ints past the Int64 range as keys and parameters** (new probe
+  domains `dom/_probe_pltbl{cj,ci,ch,ck,cn}_big_domain.py`, seed 1, 150
+  cases each, 29,447 calls; 1,214 differing after DG1-1, 902 after):
+  - a parameters list indexes itself with its items, so an int past the
+    Int64 range fails `IndexError: cannot fit 'int' into an index-sized
+    integer` (`pandas_parameter_carrier.hpp`, all filters);
+  - `get_attribute_values` and the threshold, top-activities and relative
+    occurrence counts build an int key (or a key list's int items, in
+    order with the set checks) as `pl.lit`, which refuses one past the
+    Int128 range before any column resolves; `filter_df_keeping_spno_
+    activities` with an int key indexes a frame of height 0 after
+    `head(0)`;
+  - the case filters' list case keys and list bounds hold Int128/UInt128
+    items (a list bound past u128 fails `OverflowError`, a key item past
+    the Int128 range `integer too large`, at expression build time);
+  - dict bounds with 128-bit fields cast and display by their value
+    (`{1.2677e30}`);
+  - a UInt64 `literal` result cell keeps its value; an int timestamp key
+    past the Int128 range fails the paths sort before `pl.col` reads it.
+  The 902 left: 831 native refusals of 128-bit ints in the LTL (453),
+  between (287), timestamp (84) and variants (7) filters, 65 calls of
+  those filters where `integer too large` comes before a column or join
+  error natively checked first, and six attribute counts over key lists
+  outside the modelled domain (`[5]`, `[None]`, `[2, -2**63]`). All carried
+  to DH.
+- **DG1-6 A str column compared with a tuple of one item per row**
+  (pandas LTL filters, fresh pandas CK 2026113009 case 469). numpy holds
+  the tuple first: with a str among scalars of str, bool, float and ints
+  in the UInt64 range it is a str array (each item as `str()` gives it,
+  so `1` equals `"1"`), with a None, a dict or a larger int an object
+  array (Python `==`), with numbers only a number array that no str
+  equals; the comparison is then element-wise. A tuple holding a
+  sequence or a date stays refused.
+- **DG1-7 Third-seed set probes** (seed 8, 300 cases each):
+  set-pltblcj-8 (16,297 calls) 4, set-pltblci-8 (13,818) 1,
+  set-pltblch-8 (12,079) 1, all six declared below.
+- **DG1-8 Fresh seeds.** Batch 1 (2026113000-11, twelve banks): eight
+  differing calls (DG1-2, DG1-3, DG1-6), 0 after. Batch 2
+  (2026113012-23, twelve banks): 0 differing calls.
+- All 89 docs banks replayed with the final code: 0 mismatches.
+
+Declared:
+- `get_attribute_values` over several keys where a first value pairs
+  with several second values (set-pltblcj-8 cases 2, 70 and 233,
+  set-pltblci-8 case 68), as in DC to DF.
+- A one-item set case key holding a tuple (set-pltblch-8 case 236): List
+  cells, as in DC and DE.
+- A dict value holding a struct and a list field in
+  `filter_traces_attribute_in_timeframe` (set-pltblcj-8 case 238):
+  refused natively (`dict (struct) values of the observed shapes only`).
+
+Tests:
+- New: `docs/polars-filter-dg-int-bank.json.gz` (the five big-int probes
+  without the 902 calls above, i1's 409 DF refusals and the fresh CJ, CK
+  and CI cases, 29,314 calls), `docs/polars-filter-dg-set-bank.json.gz`
+  (the three seed-8 set probes without the declared calls, 42,188 calls)
+  and `docs/pandas-filter-dg-bank.json.gz` (fresh pandas CK 2026113009
+  case 469), replayed by the `minera_polars_filter_dg_*_bank_parity_tests`
+  and `minera_pandas_filter_dg_bank_parity_tests` ctests.
+- Full suite: 578 tests, all passing; workbench fixtures 2,673 unchanged.

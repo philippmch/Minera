@@ -88,9 +88,11 @@ inline Item literal_item(const polars_lit::Value& v) {
   auto typed = lit::lit_value(v);
   item.null = typed.type.kind == lit::LitType::K::kNull;
   if (v.kind == lit::Kind::kInt) {
-    // A dyn int: Int32 when it fits, Int64, then UInt64.
+    // A dyn int: Int32 when it fits, Int64, then UInt64 (round DG: Int128
+    // past both).
     const auto wide = lit::wide_int(v);
-    if (!wide && v.integer >= std::numeric_limits<std::int32_t>::min() && v.integer <= std::numeric_limits<std::int32_t>::max()) item.dtype = "Int32";
+    if (lit::huge_int(v)) item.dtype = "Int128";
+    else if (!wide && v.integer >= std::numeric_limits<std::int32_t>::min() && v.integer <= std::numeric_limits<std::int32_t>::max()) item.dtype = "Int32";
     else if (!wide) item.dtype = "Int64";
     else item.dtype = "UInt64";
   } else {
@@ -101,7 +103,12 @@ inline Item literal_item(const polars_lit::Value& v) {
   item.value = typed.value;
   return item;
 }
-inline Item literal_item(const EventAttribute& value) { return literal_item(polars_lit::value_of(value)); }
+// Round DG: pl.lit refuses an int key past the Int128 range; one inside it
+// is an Int128 literal (probe big-pltblcj).
+inline Item literal_item(const EventAttribute& value) {
+  polars_lit::scalar_int_range(value);
+  return literal_item(polars_lit::value_of(value, true));
+}
 
 // A key as a plan prints it (col("c"), dyn int: 1, dyn float: 2.5, true,
 // null, {1,"x"}, [1, 2]).

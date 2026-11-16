@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include "minera/timestamp.hpp"
 #include "minera/token_integer.hpp"
+#include "python_scalar.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
 namespace minera { namespace {
@@ -176,6 +177,60 @@ bool matches_at(const EventAttribute& value,const EventAttribute& target,std::si
  if(!target.is_null&&target.container==AttributeContainerKind::kList&&row<target.children.size())return matches(value,target.children[row]);
  return matches(value,target);
 }
+// Round DG (fresh pandas CK 2026113009 case 469): a str column compares a
+// tuple of one item per row element-wise as numpy holds the tuple. With a
+// str among scalars of str, bool, float and ints in the UInt64 range it is a
+// str array (each item as str() gives it, so 1 equals "1"); with a None,
+// NaN-free dict or a larger int an object array (Python ==); with numbers
+// only a number array that no str equals. A tuple holding a sequence, a
+// date or another value stays refused.
+enum class RowTuple{kNone,kText,kObject,kNumber};
+bool tuple_int_fits(const EventAttribute& v){
+ if(std::holds_alternative<std::int64_t>(v.typed_value)||std::holds_alternative<std::uint64_t>(v.typed_value))return true;
+ const auto& t=v.value;
+ const bool negative=!t.empty()&&t[0]=='-';
+ const auto digits=t.substr(negative?1:0);
+ if(digits.empty()||digits.find_first_not_of("0123456789")!=std::string::npos)return false;
+ const std::string limit=negative?"9223372036854775808":"18446744073709551615";
+ return digits.size()<limit.size()||(digits.size()==limit.size()&&digits<=limit);
+}
+RowTuple row_tuple(const EventAttribute& target){
+ bool text=false,object=false;
+ for(const auto& item:target.children){
+  if(item.container==AttributeContainerKind::kContainer&&!item.is_null){object=true;continue;}
+  if(item.container!=AttributeContainerKind::kScalar)return RowTuple::kNone;
+  if(item.is_null&&!date_value(item)&&!is_native_na_attribute(item)){object=true;continue;}
+  if(item.is_null||is_native_na_attribute(item)||date_value(item))return RowTuple::kNone;
+  if(text_value(item)){text=true;continue;}
+  if(item.kind==AttributeKind::kBoolean||std::holds_alternative<bool>(item.typed_value))continue;
+  if(item.kind==AttributeKind::kFloat||std::holds_alternative<double>(item.typed_value))continue;
+  if(item.kind==AttributeKind::kInt){if(!tuple_int_fits(item))object=true;continue;}
+  return RowTuple::kNone;
+ }
+ return object?RowTuple::kObject:text?RowTuple::kText:RowTuple::kNumber;
+}
+// The tuple as a list of one target per row (see row_tuple).
+EventAttribute row_targets(const EventAttribute& target){
+ const auto kind=row_tuple(target);
+ EventAttribute out=target;
+ out.container=AttributeContainerKind::kList;
+ for(auto& item:out.children){
+  if(kind==RowTuple::kObject)continue;
+  EventAttribute cell;cell.key=item.key;
+  if(kind==RowTuple::kNumber){cell.is_null=true;item=cell;continue;}
+  if(text_value(item))continue;
+  if(item.kind==AttributeKind::kBoolean||std::holds_alternative<bool>(item.typed_value)){
+   const bool b=std::holds_alternative<bool>(item.typed_value)?std::get<bool>(item.typed_value):(item.value=="true"||item.value=="True"||item.value=="1");
+   cell.value=b?"True":"False";
+  }else if(item.kind==AttributeKind::kFloat||std::holds_alternative<double>(item.typed_value)){
+   cell.value=python::float_repr(native_attribute_number(item));
+  }else if(const auto* i=std::get_if<std::int64_t>(&item.typed_value))cell.value=std::to_string(*i);
+  else if(const auto* u=std::get_if<std::uint64_t>(&item.typed_value))cell.value=std::to_string(*u);
+  else cell.value=item.value;
+  item=cell;
+ }
+ return out;
+}
 void check_target(const EventAttribute& target,std::size_t rows,const std::string& dtype){
  // Round CK: a str or datetime64 column compares a dict as an array of its
  // keys, which numpy then holds as one 0-d object. Round CZ: a set or a
@@ -197,7 +252,7 @@ void check_target(const EventAttribute& target,std::size_t rows,const std::strin
  // A str column compares a tuple as an array.
  if(target.container==AttributeContainerKind::kTuple&&dtype=="str"){
   if(target.children.size()!=rows)error("ValueError","Lengths of operands do not match: "+std::to_string(rows)+" != "+std::to_string(target.children.size()));
-  if(rows)error("ValueError","ltl filter vector targets are outside the captured native domain");
+  if(rows&&row_tuple(target)==RowTuple::kNone)error("ValueError","ltl filter vector targets are outside the captured native domain");
  }
 }
 std::vector<std::size_t> selected_columns(const EventTable& source,const std::vector<EventAttribute>& requested){
@@ -388,7 +443,11 @@ EventTable apply_rule(const EventTable& source,std::vector<EventAttribute> ancho
  }
  std::vector<std::size_t> valid;
  for(std::size_t i=0;i<source.size();++i){bool good=true;for(const auto c:columns)if(missing(cell(source,i,c))){good=false;break;}if(good)valid.push_back(i);}
- for(const auto& target:anchors)check_target(target,source.size(),source.dtypes.empty()?"object":source.dtypes[columns[1]]);
+ for(auto& target:anchors){
+  const auto dtype=source.dtypes.empty()?"object":source.dtypes[columns[1]];
+  check_target(target,source.size(),dtype);
+  if(target.container==AttributeContainerKind::kTuple&&!target.is_null&&dtype=="str"&&source.size())target=row_targets(target);
+ }
  std::optional<std::unordered_set<std::string>> listed;
  if(rule==Rule::kEventually&&anchors.size()<2)error("IndexError","list index out of range");
  if(timed){

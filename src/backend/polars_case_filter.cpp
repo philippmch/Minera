@@ -146,16 +146,24 @@ namespace keys = detail::polars_keys;
 // Python builds the bound literals before any Polars step.
 // Round CJ: a dict bound converts strictly too (a list field that fails to
 // build fails it with the dict TypeError).
-void validate_literals(const EventAttribute& low, const EventAttribute& high) {
+void validate_literals(Operation op, const EventAttribute& low, const EventAttribute& high) {
+  // Round DG: the case count goes to head(n), not to a literal.
+  if (op == Operation::kCount) return;
   for (const auto* value : {&low, &high}) {
     // Round DF: pl.lit refuses an int past the Int128 range (probe df/i1).
-    if (detail::polars_lit::big_int(*value) == detail::polars_lit::BigInt::kPast) fail("InvalidOperationError", "apply", detail::polars_lit::kIntegerTooLarge);
+    if (detail::polars_lit::scalar_too_large(*value)) fail("InvalidOperationError", "apply", detail::polars_lit::kIntegerTooLarge);
     // Round DB: pl.lit refuses a set bound.
     if (detail::polars_lit::set_argument(*value)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
     if (mapping(*value)) {
       if (const auto error = detail::polars_lit::dict_literal_error(*value)) fail("TypeError", "apply", *error);
     } else if (collection(*value)) {
-      if (const auto error = detail::polars_lit::argument_literal_error(*value)) fail("TypeError", "apply", *error);
+      // Round DG: a list bound holds ints in the Int128/UInt128 ranges; one
+      // past them fails the list's construction (OverflowError).
+      try {
+        (void)detail::polars_lit::argument_literal(*value, true);
+      } catch (const PolarsSequenceFilterError& error) {
+        fail(error.type, "apply", error.message);
+      }
     }
   }
 }
@@ -183,6 +191,10 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
     if ((text(bound) || collection(bound)) && truth(bound)) fail("TypeError", "apply", "'<' not supported between instances of '" + core_type(bound) + "' and 'int'");
     if (!integer(bound) && !boolean(bound)) fail("TypeError", "apply", "'" + core_type(bound) + "' object cannot be interpreted as an integer");
     if (exact(bound) < TokenInteger(0)) fail("ValueError", "apply", "negative slice lengths (" + exact(bound).decimal() + ") are invalid for LazyFrame");
+    // Round DG: head(n) converts n to a C long, then to Polars' u32 index
+    // (probe dg/h1).
+    if (TokenInteger(std::numeric_limits<std::int64_t>::max()) < exact(bound)) fail("OverflowError", "apply", "Python int too large to convert to C long");
+    if (TokenInteger(std::numeric_limits<std::uint32_t>::max()) < exact(bound)) fail("OverflowError", "apply", "number too large to fit in target type");
   }
   if (null(options.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
   if (!(text(options.case_id_key) || collection(options.case_id_key) || detail::polars_group_keys::modelled(options.case_id_key)))
@@ -212,7 +224,7 @@ detail::polars_lit::StructModel bound_struct(const EventAttribute& v, Operation 
 }
 std::string bound_literal(const EventAttribute& v, Operation op) {
   if (mapping(v)) return detail::polars_lit::struct_display(bound_struct(v, op));
-  if (list_bound(v)) return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(v));
+  if (list_bound(v)) return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(v, true));
   return literal(v);
 }
 void validate_bound(const EventAttribute& bound, const EventAttribute& other, bool upper, Operation op, const std::string& phase, bool present) {
@@ -230,7 +242,7 @@ void validate_bound(const EventAttribute& bound, const EventAttribute& other, bo
     error = failure->message;
     if (!failure->larger.empty()) node = failure->expression;
   } else {
-    const auto type = list_bound(bound) ? lit::debug_name(lit::list_of(lit::argument_literal(bound).type)) : std::string("List(Null)");
+    const auto type = list_bound(bound) ? lit::debug_name(lit::list_of(lit::argument_literal(bound, true).type)) : std::string("List(Null)");
     error = "could not evaluate '" + cmp + "' comparison between series '" + column + "' of dtype: " + dtype + " and series 'literal' of dtype: " + type;
   }
   const auto expression = [&](const EventAttribute& v, bool at_most) -> std::string {
@@ -240,7 +252,8 @@ void validate_bound(const EventAttribute& bound, const EventAttribute& other, bo
       return "[(" + operands.lhs + ") " + lit::op_text(comparison) + " (" + operands.rhs + ")]";
     }
     if (text(v) || collection(v)) return "[(col(" + quote(column) + ")) " + lit::op_text(comparison) + " (" + bound_literal(v, op) + ")]";
-    const auto operands = lit::coerced_operands(column, dtype, lit::value_of(v), comparison);
+    // Round DG: an Int128 bound folds against the count or duration.
+    const auto operands = lit::coerced_operands(column, dtype, lit::value_of(v, true), comparison);
     if (!operands.whole.empty()) return operands.whole.starts_with("when(") ? "." + operands.whole : operands.whole;
     return "[(" + operands.lhs + ") " + lit::op_text(comparison) + " (" + operands.rhs + ")]";
   };
@@ -252,7 +265,7 @@ void validate_bound(const EventAttribute& bound, const EventAttribute& other, bo
   };
   const auto key = [&](const EventAttribute& v) {
     if (mapping(v)) return "d" + lit::struct_key(bound_struct(v, op));
-    return text(v) ? "s" + v.value : "l" + lit::literal_list_key(lit::argument_literal(v));
+    return text(v) ? "s" + v.value : "l" + lit::literal_list_key(lit::argument_literal(v, true));
   };
   if (mergeable(other) && mergeable(bound) && key(bound) == key(other)) {
     if (!text(bound)) error.replace(error.find("'" + cmp + "' "), cmp.size() + 3, "");
@@ -434,7 +447,7 @@ PolarsCaseFilterOptions keyed(const PolarsCaseFilterOptions& raw, Operation op, 
 }
 LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& raw) {
   validate_apply(op, low, raw);
-  validate_literals(low, high);
+  validate_literals(op, low, high);
   const auto options = keyed(raw, op, source.columns());
   auto columns = source.columns(); auto dtypes = source.dtypes(); auto categories = source.categorical_dtypes();
   if (groups::modelled(options.case_id_key)) {
@@ -445,6 +458,10 @@ LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttri
       const auto keys = groups::resolve(options.case_id_key, columns, dtypes, [](const std::string&) { throw Unresolved{}; }, [](const std::string&) { throw Unresolved{}; });
       groups::append_schema(columns, dtypes, categories, keys, source.categorical_dtypes());
     } catch (const Unresolved&) {
+    } catch (const PolarsSequenceFilterError& error) {
+      // Round DG: pl.lit refuses a key item past the Int128 range while
+      // the expressions build (probe big-pltblck).
+      fail(error.type, "apply", error.message);
     }
   }
   return LazyEventTable(std::move(columns), [source, op, low, high, options](const auto& consume) {
@@ -454,7 +471,7 @@ LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttri
 }
 EventTable eager(const EventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& raw) {
   validate_apply(op, low, raw);
-  validate_literals(low, high);
+  validate_literals(op, low, high);
   const auto options = keyed(raw, op, source.columns);
   return collect(source, op, low, high, options, "apply");
 }
