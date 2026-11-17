@@ -29693,3 +29693,105 @@ Tests:
   was going. After the rebuild all 95 Polars and sequence tests pass, that
   one included. Python script tests 406 (scripts unchanged); workbench
   fixtures 2,673 unchanged.
+
+## Review DJ1: re-review of round DI, datetime, None and NaN case keys in the Polars sequence filters, attribute counts and LTL filters on frames with a `literal` column, fresh seeds (2026-11-17)
+
+Round DJ checked DI's CI (run 44001970825 on 1e9dd4e: green on all six jobs;
+the DI sequence bank test that failed in DI's full run only because its bank
+was rebound while the run was going passes there), modelled the 113
+scalar-key sequence calls DI carried, probed None, NaN and datetime case keys
+on four sequence domains, took two new areas (the attribute counts over key
+lists on frames with a `literal` column or no rows, and the LTL filters on
+frames with their own `literal` column) and replayed two batches of fresh
+seeds. The device check on the Mac was skipped (no device linked).
+
+- **DJ1-1 Datetime, None and NaN case keys in the Polars sequence filters**
+  (the 113 calls DI carried, `out/s4-scal-plseq*.jsonl`; black-box probes
+  `dj/k1.py` to `dj/k7.py`). The sequence bank test routes a datetime or
+  None key to the `PolarsFilterValue` overloads, as DI did for ints, floats
+  and bools. Observed and modelled:
+  - a datetime case key is a literal named `literal`: the sort and group_by
+    plans print it as `2020-01-01 03:00:00 UTC` (no zone for a naive
+    datetime; a fixed offset is shown in UTC), and a frame cell holding it
+    writes nine fraction digits;
+  - a None case key: `sort([None, timestamp])` leaves the None out (a
+    stable sort by the timestamp alone; `sort(None)` alone is the
+    ShapeError), `group_by(None)` is one Null group named `literal` (an
+    empty frame included), and a join on it fails `ValueError: must specify
+    `on` OR `left_on` and `right_on`` as the join is built: in the lazy
+    filters before anything resolves, in the trace and ends_with filters
+    after the variants are collected, in rework after the dict-key check;
+    prefixes and suffixes over empty patterns fail `'None' is not an
+    instance of 'str'` before the Series name check;
+  - a NaN case key alone joins nothing (a NaN list item beside other items
+    joins as before), and a literal cell holding a non-finite float prints
+    `NaN`, `INF` or `-INF`;
+  - `get_variants_df` with a scalar literal case key returns its one-row
+    frame (the literal, then the variant and count columns) instead of being
+    refused; `traces.apply` checks the scalar key's `pl.col` first.
+  113 -> 0.
+- **DJ1-2 None, NaN and datetime case-key probes** (new domains
+  `dom/_probe_plseq{cp,ck,cj,ch}_dj_domain.py`, seed 1, 8,522 calls; DI's
+  scalar domains again at seed 2, 8,856 calls). First replay: 36 and 0
+  differing; the 36 were the cases above. 36 -> 0.
+- **DJ1-3 Attribute counts over key lists on frames with a `literal` column
+  or no rows** (new probes `dj/lit1.py`, 2,520 calls over four frames with
+  an Int64, String or Float64 `literal` column or no rows, and `dj/lit2.py`,
+  1,344 calls with key lists naming a missing column). Observed and
+  modelled (`list_key_stats` and `stats_output` in
+  `polars_attributes_filter.cpp`):
+  - per case, the aggregation over `[case, key list]` leaves out the frame's
+    own `literal` column, whose name the key's List literal takes, and an
+    empty frame has no groups (both were refused);
+  - `pl.col(names)` finds every name in the frame first, in list order: the
+    first missing one fails `ColumnNotFoundError: "name" not found` at the
+    source frame, before the several-names expansion error (probe `dj/k8.py`;
+    a single name in a list fails the same way, not with `unable to find
+    column`).
+  lit1 847 -> 61, lit2 28 -> 18 differing; all left are the random group
+  order declared in DI1-3 (a first key paired with several second values;
+  `dj/k10.py` and `dj/k11.py` give a different dict in each process).
+- **DJ1-4 LTL filters on frames with their own `literal` column** (new
+  probe `dj/lt7.py`, 2,000 calls over four frames with an Int64 or String
+  `literal` column: list case keys with a `literal` item, None, numbers and
+  names, and scalar literal case keys, in eventually_follows, four_eyes,
+  attr_value_different_persons and A_next_B_next_C). First replay: 1,104
+  differing, 1,030 of them refused natively and 74 with another outcome.
+  Modelled: four_eyes selects and attr_value_different_persons groups by
+  `[key, resource]`, so with a resource column named `literal` the key's
+  List literal repeats that output name and fails `DuplicateError:
+  projections contained duplicate output name 'literal'` (`group_by keys
+  contained ...`) where a missing resource would fail. Refused now instead
+  of answering differently: eventually_follows with a scalar literal case
+  key and two or more activities on such a frame (the reference joins the
+  frame's column beside the key's literal and fails `literal_right` one
+  join later than the native model). 1,104 -> 917, all refused natively
+  (carried).
+- **DJ1-5 Fresh seeds.** Batch 1 (2026120300-11, twelve banks): two
+  differing calls, both varying in the reference itself: fresh CJ
+  2026120303 case 667 is the struct-cast partition race of DF1-7 (six
+  reruns of the case: four cast errors as the bank holds, two comparison
+  errors as the native raises), and fresh sequence CJ 2026120307 case 186
+  is `rework.apply` on a Categorical case column with a null case (eight
+  reruns: four in the bank's row order, four in the native's).
+  Batch 2 (2026120312-23, twelve banks): 0 differing.
+- All docs banks replayed with the changed code: 0 mismatches.
+
+Declared:
+- The random group order of DI1-3 in the lit1 and lit2 probes (79 calls).
+- The partition race of DF1-7 (fresh CJ 2026120303 case 667) and the
+  rework row order (fresh sequence CJ 2026120307 case 186).
+
+Tests:
+- New: `docs/polars-sequence-filter-dj-bank.json.gz` (DI's 113 carried
+  calls and the four None/NaN/datetime probes, 8,635 calls),
+  `docs/polars-filter-dj-bank.json.gz` (lit1 and lit2 less their 79
+  declared calls, 3,785 calls) and `docs/polars-filter-dj-ltl-bank.json.gz`
+  (lt7 less its 917 refused calls, 1,083 calls), replayed by
+  `minera_polars_sequence_filter_dj_bank_parity_tests`,
+  `minera_polars_filter_dj_bank_parity_tests` and
+  `minera_polars_filter_dj_ltl_bank_parity_tests`.
+- Full suite: 584 tests passed (before the LTL change and its bank); the
+  96 Polars and LTL tests again after it, the new LTL bank test included
+  (585 tests in all). Python script tests not rerun (scripts unchanged);
+  no workbench fixture changed (the fixture replay was not rerun).

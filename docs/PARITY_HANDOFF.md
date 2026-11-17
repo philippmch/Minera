@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DI (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DJ (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6286,6 +6286,73 @@ files under `review-harness/round-di/`.
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DJ re-reviewed DI (Review DJ1). DI's commit 1e9dd4e ran CI run
+44001970825 (green on all six jobs; the DI sequence bank test that failed in
+DI's full run only because its bank was rebound mid-run passes there). DJ
+modelled the sequence calls DI carried, probed None, NaN and datetime case
+keys, took two new areas and replayed two batches of fresh seeds:
+- Datetime and None case keys reach the sequence filters'
+  `PolarsFilterValue` overloads: a datetime is a literal printed in UTC in
+  the plans, a None key drops out of the sort, is one Null group, and fails
+  the join as it is built (`must specify `on` OR `left_on` and
+  `right_on``); a lone NaN key joins nothing; non-finite literal cells print
+  `NaN`/`INF`/`-INF`; `get_variants_df` with a scalar literal key builds
+  its one-row frame. DI's 113 -> 0; new None/NaN/datetime probes on the CP,
+  CK, CJ and CH sequence domains (8,522 calls) 36 -> 0.
+- Attribute counts over key lists on frames with a `literal` column or no
+  rows (per case the frame's own `literal` column is left out of the
+  aggregation, an empty frame has no groups) and key lists naming a missing
+  column (`pl.col(names)` fails `"name" not found` first). Probes lit1 and
+  lit2: all left (79) follow the random group order declared in DI.
+- LTL filters on frames with their own `literal` column (probe lt7, 2,000
+  calls): a resource named `literal` beside a list case key fails the
+  duplicate output name in four_eyes and attr_value_different_persons;
+  eventually_follows with a scalar literal key on such frames is refused
+  instead of answering differently. 1,104 -> 917, all refused (carried).
+- Fresh seeds 2026120300-11: two calls, both varying in the reference itself
+  (the DF1-7 partition race and a rework row order; declared).
+  2026120312-23: 0.
+
+In the suite: new `docs/polars-sequence-filter-dj-bank.json.gz`,
+`docs/polars-filter-dj-bank.json.gz` and
+`docs/polars-filter-dj-ltl-bank.json.gz` with their ctests. The probes,
+None/NaN/datetime sequence domains and fresh banks are in the project files
+under `review-harness/round-dj/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DK) should start by re-reviewing round DJ:
+
+- DJ's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the 917 LTL calls on frames with their own `literal` column that the
+  native still refuses (probe `dj/lt7.py`, dump `cp/out/lt7d.jsonl` in the
+  harness): list keys with a `literal` item (join keys of mismatched
+  dtypes, `literal_right` repeats, missing names against `[literal,
+  resource]`), scalar literal keys in eventually_follows (the
+  `literal_right` repeat one join later) and in four_eyes and
+  attr_value_different_persons (the frame's column beside the appended
+  literal);
+- LTL and other filters in eager calls with a `literal` list item (still
+  refused; the bank tests only call the lazy overloads);
+- maybe the majority outcome of the partition race (DF1-7, seen again in
+  DI and DJ; the reference itself varies);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DI's targets, taken in DJ (findings DJ1-1 to DJ1-5): DI's CI run, the
+fresh seeds, the 113 scalar-key sequence calls, the per-case attribute
+counts on frames with a `literal` column or no rows, and a first pass at the
+`literal` item on frames with a `literal` column (LTL). Not taken (carried
+to DK): eager `literal` items, the partition race, equal-size joins and the
+older CJ, CF and CD items.
+
+Previous list for round DJ (kept for its older items):
 
 Next round (DJ) should start by re-reviewing round DI:
 

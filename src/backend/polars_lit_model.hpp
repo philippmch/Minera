@@ -2629,7 +2629,11 @@ inline EventAttribute literal_cell(const std::string& key, const LitType& t, con
     case K::kFloat64:
       out.kind = AttributeKind::kFloat;
       out.typed_value = v.kind == Kind::kFloat ? v.real : integer_real(v);
-      out.value = python::float_repr(std::get<double>(out.typed_value));
+      // Round DJ: a non-finite literal cell reads as a frame's own float
+      // cells do (NaN, INF, -INF; a NaN case key's group_by column, probe
+      // scal-plseqcp-1 case 23).
+      if (const double d = std::get<double>(out.typed_value); !std::isfinite(d)) out.value = std::isnan(d) ? "NaN" : d < 0 ? "-INF" : "INF";
+      else out.value = python::float_repr(d);
       return out;
     case K::kDate:
       out.kind = AttributeKind::kDate;
@@ -2642,6 +2646,13 @@ inline EventAttribute literal_cell(const std::string& key, const LitType& t, con
       // frame's own datetime cells (isoformat; probe set-pltblck-2 case 115).
       if (v.kind == Kind::kDatetime && out.value.size() > 10 && out.value[10] == ' ' && (!v.offset_minutes || !v.text.empty())) {
         out.value[10] = 'T';
+        // Round DJ: a fraction reads in nanoseconds, as the frame's own cells
+        // (2020-01-01T00:00:00.123456000+00:00; probe dj-plseqcp-1 case 0).
+        if (out.value.size() > 19 && out.value[19] == '.') {
+          auto end = out.value.find_first_not_of("0123456789", 20);
+          if (end == std::string::npos) end = out.value.size();
+          if (end - 20 < 9) out.value.insert(end, 9 - (end - 20), '0');
+        }
         NativeDate typed{out.value};
         if (!v.text.empty()) typed.timezone = v.text;
         out.typed_value = typed;

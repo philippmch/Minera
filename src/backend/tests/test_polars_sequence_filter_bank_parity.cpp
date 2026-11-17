@@ -459,7 +459,7 @@ Json start_activities_module(const std::string& function, const EventTable& df, 
 bool scalar_case_tag(const Json* node) {
   if (!node) return false;
   const auto& tag = node->fields.begin()->first;
-  return tag == "i" || tag == "f" || tag == "b";
+  return tag == "i" || tag == "f" || tag == "b" || tag == "w" || tag == "n";  // Round DJ: a datetime or None too
 }
 bool scalar_activity_tag(const Json* node) {
   if (!node) return false;

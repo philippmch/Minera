@@ -1654,7 +1654,8 @@ std::vector<ListEntry> list_entries(const EventTable& frame,const ListGroups& gr
 // as its plan prints it.
 std::string aggregate_plan(const EventTable& source,std::size_t case_column,const EventAttribute& attr) {
   std::string out="AGGREGATE[maintain_order: false]\n  [";bool first=true;
-  for(std::size_t i=0;i<source.columns.size();++i){if(i==case_column)continue;if(!first)out+=", ";first=false;out+="col("+quote(source.columns[i])+").first()";}
+  // Round DJ: a frame's own `literal` column is the List key's name, left out (probe dj/lit1).
+  for(std::size_t i=0;i<source.columns.size();++i){if(i==case_column||source.columns[i]=="literal")continue;if(!first)out+=", ";first=false;out+="col("+quote(source.columns[i])+").first()";}
   std::vector<detail::polars_lit::Value> values;for(const auto& item:attr.children)values.push_back(detail::polars_lit::value_of(item,true));
   const bool nested=std::any_of(attr.children.begin(),attr.children.end(),[](const EventAttribute& v){return collection(v);});
   out+="] BY [col("+quote(source.columns[case_column])+"), "+detail::polars_lit::literal_list_display(nested?detail::polars_lit::nested_list_literal(values):detail::polars_lit::list_literal(values))+"]\n  FROM\n  "+frame_plan(source);
@@ -1741,11 +1742,12 @@ StatisticalSelection list_key_stats(const EventTable& source,const PolarsAttribu
     const auto case_column=index_of(source,case_key.value);
     if(!case_column)fail("ColumnNotFoundError","apply",column_prefix(source,case_key.value)+resolved("'group_by'",frame_plan(source),{"'group_by'","'group_by'"}));
     // A str item `literal` reads the List literal column (the key list).
-    if(std::find(source.columns.begin(),source.columns.end(),"literal")!=source.columns.end())
-      throw std::invalid_argument("Native Polars per-case counts over a key list on a frame with a `literal` column");
-    if(source.rows.empty())throw std::invalid_argument("Native Polars per-case counts over a key list on an empty frame");
+    // Round DJ: a frame's own `literal` column is that group key's name, so
+    // the aggregation leaves it out; an empty frame has no groups (probe
+    // dj/lit1).
+    const auto own=[&](std::size_t i){return i!=*case_column&&source.columns[i]!="literal";};
     frame=source;frame.columns={source.columns[*case_column],"literal"};frame.dtypes={source.dtypes[*case_column],"List"};
-    for(std::size_t i=0;i<source.columns.size();++i)if(i!=*case_column){frame.columns.push_back(source.columns[i]);frame.dtypes.push_back(source.dtypes[i]);}
+    for(std::size_t i=0;i<source.columns.size();++i)if(own(i)){frame.columns.push_back(source.columns[i]);frame.dtypes.push_back(source.dtypes[i]);}
     resolve_list_keys(frame,items,"'group_by'",aggregate_plan(source,*case_column,attr),{"'group_by'"});
     if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
     // The first row of each case (a null case is a group too), reindexed to
@@ -1756,7 +1758,7 @@ StatisticalSelection list_key_stats(const EventTable& source,const PolarsAttribu
       if(!seen.insert(group_key(cell(source,i,*case_column),case_dtype)).second)continue;
       auto listed=attr;listed.container=AttributeContainerKind::kList;
       std::vector<std::optional<EventAttribute>> row{source.rows[i][*case_column],listed};
-      for(std::size_t c=0;c<source.columns.size();++c)if(c!=*case_column)row.push_back(source.rows[i][c]);
+      for(std::size_t c=0;c<source.columns.size();++c)if(own(c))row.push_back(source.rows[i][c]);
       frame.rows.push_back(std::move(row));
     }
     for(std::size_t i=0;i<frame.size();++i)rows.push_back(i);
@@ -2039,8 +2041,13 @@ EventTable stats_output(const EventTable& source,const PolarsAttributesFilterCal
   auto filtering=call;filtering.operation=Op::kEvents;filtering.values=selection.values;
   // Round DI: pl.col(key list): one name is that column, several expand the
   // predicate, which the filter refuses as ambiguous.
-  if(plain_list_key(selection.attribute))filtering.options.attribute_key=list_selector(selection.attribute);
-  else {
+  if(plain_list_key(selection.attribute)) {
+    filtering.options.attribute_key=list_selector(selection.attribute);
+    // Round DJ: pl.col(names) finds each name in the frame first, in list
+    // order, before it expands (probes dj/k8, dj/lit2).
+    for(const auto& name:distinct_names(selection.attribute).children)
+      if(!index_of(source,name.value))fail("ColumnNotFoundError",phase(eager),quote(name.value)+" not found"+(eager?std::string{}:resolved("THIS_NODE",frame_plan(source))));
+  } else {
     if(call.operation==Op::kRelative)col_selector(selection.attribute);
     filtering.options.attribute_key=col_key(selection.attribute,source.columns);
   }

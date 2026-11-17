@@ -338,7 +338,11 @@ const Value* list_case(const PolarsFilterParameters& p) {
 // refuses it with the scalar message. The model carries it as a one-item
 // list marked by kScalarKey in its text.
 constexpr char kScalarKey = '\x03';
-bool scalar_literal(const Value* v) { return v && (v->kind == Kind::kInt || v->kind == Kind::kFloat || v->kind == Kind::kBool); }
+// Round DJ: a datetime key is one pl.lit literal too (a Datetime('μs') of the
+// wall clock, a fixed offset in UTC; probe scal-plseq*-1).
+bool scalar_literal(const Value* v) {
+  return v && (v->kind == Kind::kInt || v->kind == Kind::kFloat || v->kind == Kind::kBool || v->kind == Kind::kDatetime);
+}
 bool scalar_list(const Value& v) {
   return v.kind == Kind::kList && v.items.size() == 1 && v.text.size() == 1 && v.text.front() == kScalarKey;
 }
@@ -347,6 +351,14 @@ Value scalar_as_list(const Value& v) {
   out.text = std::string(1, kScalarKey);
   return out;
 }
+// Round DJ: a None case key is carried the same way. group_by(None) groups
+// by a Null literal (one group, `null` in plans, an empty frame included),
+// sort([None, timestamp]) leaves it out (a stable sort by the timestamp
+// alone) and join(on=None) fails while Python builds it, before any plan
+// resolves (probes dj/k1, dj/k4-k6).
+bool scalar_case_key(const Value* v) { return scalar_literal(v) || (v && v->kind == Kind::kNone); }
+bool none_key(const Value& v) { return scalar_list(v) && v.items.front().kind == Kind::kNone; }
+[[noreturn]] void join_on_none() { fail("ValueError", "must specify `on` OR `left_on` and `right_on`"); }
 // pl.lit of a scalar int past the Int128 range.
 void scalar_range(const Value& v) {
   if (v.kind == Kind::kInt && !v.text.empty())
@@ -422,6 +434,10 @@ EventTable join_keys(const EventTable& df, const gk::Keys& keys, const std::vect
     out.rows.push_back(std::move(copy));
   };
   if (keys.all_literal()) {
+    // Round DJ: on one NaN literal key the inner join compares the two
+    // values and matches nothing, the anti join hashes them and matches
+    // every row (probe dj/k2; a NaN beside a column key matches).
+    if (keys.items.size() == 1 && keys.items.front().value.kind == Kind::kFloat && std::isnan(keys.items.front().value.real)) return out;
     if (positive != keys.null_literal())
       for (const auto& row : df.rows) push(row);
     return out;
@@ -456,13 +472,19 @@ CaseText case_text(const gk::Keys& keys, const Value& key, bool sorted = true) {
   CaseText out;
   for (const auto& item : keys.items) out.names.push_back(item.name);
   out.by = gk::keys_text(keys);
-  if (sorted) out.sort = list_display(key);
+  if (sorted && !none_key(key)) out.sort = list_display(key);
   out.literal_only = keys.all_literal();
   return out;
 }
 // A group_by node over `source` (already indented below it): AGGREGATE, or
 // (round CP) a SELECT of the keys and the aggregations when every key is a
 // literal. `pad` is the node's own indentation.
+// The sort node above a grouping: SORT BY [case, timestamp], the timestamp
+// alone under a None case key (round DJ).
+std::string sort_by(const CaseText& text) {
+  return "SORT BY [" + (text.sort.empty() ? std::string() : text.sort + ", ") + "col(" +
+         quote(std::string(kPolarsFilterDefaultTimestampKey)) + ")]";
+}
 std::string group_node(const CaseText& text, bool sorted, const std::string& aggregations, const std::string& source,
                        std::size_t pad = 0) {
   const std::string in(pad + 2, ' ');
@@ -497,7 +519,7 @@ struct NoColumns {
     first = false;
   }
   message += ']';
-  const auto source = sorted ? "SORT BY [" + text.sort + ", col(" + quote(std::string(kPolarsFilterDefaultTimestampKey)) + ")]\n    " + frame_plan(df.columns)
+  const auto source = sorted ? sort_by(text) + "\n    " + frame_plan(df.columns)
                              : frame_plan(df.columns);
   fail("ColumnNotFoundError", message + resolved(none.node, group_node(text, sorted, none.aggregations, source), none.stack));
 }
@@ -891,6 +913,7 @@ EventTable boundary_filter(const EventTable& df, const Value& values, const std:
 EventTable boundary_list_filter(const EventTable& df, const Value& values, const Value& key, const std::string& act_key,
                                 bool positive, bool end) {
   const auto literal = list_literal(values.items);
+  if (none_key(key)) join_on_none();
   const auto keys = list_keys(df, key, kBoundaryPlan);
   const std::string alias = end ? "end_activity" : "start_activity";
   const auto text = case_text(keys, key, false);
@@ -956,7 +979,8 @@ Counts end_counts(const EventTable& df, const std::string& case_glue, const std:
 Counts end_counts(const EventTable& df, const Value& case_key, const Value& act_value) {
   // Round DI: an int, float or bool case key groups as its literal (probe
   // di/k5), as a one-item list does.
-  if (scalar_literal(&case_key)) {
+  // Round DJ: so does a None case key (a Null literal).
+  if (scalar_case_key(&case_key)) {
     scalar_range(case_key);
     return end_counts(df, scalar_as_list(case_key), act_value);
   }
@@ -1055,9 +1079,9 @@ Variants variants_of(const EventTable& df, const std::string& case_glue, const s
   if (skip) none = nullptr;
   if (list_key) {
     const auto ts = require(df, kTimestamp, sort_plan);
-    (void)ts;
     auto plan = agg_plan;
-    plan.above = "SORT BY [" + list_display(*list_key) + ", col(" + quote(kTimestamp) + ")]";
+    plan.above = none_key(*list_key) ? "SORT BY [col(" + quote(kTimestamp) + ")]"
+                                     : "SORT BY [" + list_display(*list_key) + ", col(" + quote(kTimestamp) + ")]";
     out.keys = list_keys(df, *list_key, plan);
     out.text = case_text(*out.keys, *list_key);
     if (none && no_columns_key(act_key)) no_columns_aggregate(df, out.text, true, *none);
@@ -1065,6 +1089,19 @@ Variants variants_of(const EventTable& df, const std::string& case_glue, const s
     if (out.act == df.columns.size()) {
       repeated_alias(df, act_key, alias, plan);
       column_not_found(df, act_key, plan);
+    }
+    // Round DJ: a None case key sorts by the timestamp alone (stably) and
+    // groups every row, an empty frame included, into its one Null group.
+    if (none_key(*list_key)) {
+      auto rows = all_rows(df);
+      const CellOrder ts_order;
+      std::stable_sort(rows.begin(), rows.end(), [&](std::size_t a, std::size_t b) { return cell_less(df.rows[a][ts], df.rows[b][ts], ts_order); });
+      out.order.push_back(Key{});
+      out.case_cells.push_back(out.keys->items.front().cell);
+      out.activities.emplace_back();
+      for (const auto i : rows) out.activities.back().push_back(df.rows[i][out.act]);
+      out.join_key.push_back(std::nullopt);
+      return out;
     }
     out.shape = df.size() != 1;
     if (!out.shape) {
@@ -1255,7 +1292,7 @@ void require_string_activities(const EventTable& df, const Variants& v, const st
        "attempted list join with non-string dtype: list[" + short_dtype(dtype) + "]" +
            resolved("with_columns",
                     group_node(v.text, true, "col(" + quote(act_key) + ").implode().alias(\"variant_list\"), len().alias(\"count\")",
-                               "SORT BY [" + v.text.sort + ", col(" + quote(kTimestamp) + ")]\n    " + frame_plan(df.columns)),
+                               sort_by(v.text) + "\n    " + frame_plan(df.columns)),
                     {"with_columns"}));
 }
 
@@ -1303,6 +1340,9 @@ EventTable lazy_variant_filter(const EventTable& df, const PolarsFilterParameter
                                const std::string& alias = "variant",
                                const std::function<void(const Variants&)>& resolve = {}, bool every = false) {
   const NoColumns none{alias, "", {}, "join", {"select", "join right", "join"}};
+  // Round DJ: the lazy plan's join on a None case key fails while Python
+  // builds it (probe dj/k4).
+  if (const auto* key = list_case(parameters); key && none_key(*key)) join_on_none();
   const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kLazySortPlan, kLazyAggPlan, &none,
                              list_case(parameters), every, alias);
   if (v.keys) {
@@ -1396,6 +1436,8 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   if (minimum.kind == Kind::kDict)
     if (const auto error = detail::polars_lit::dict_literal_error(minimum)) fail("TypeError", *error);
   if (dict_case) dict_argument_error();
+  // Round DJ: every expression is built; the join on a None case key fails.
+  if (list_key && none_key(*list_key)) join_on_none();
   if (activities) {
     // pl.col({}) leaves the is_in filter without an expression.
     if (no_columns_key(act_key))
@@ -1550,10 +1592,11 @@ PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterPara
   // Round DI: a scalar case key (int, float, bool) where pm4py groups, sorts
   // or joins by it is carried as a marked one-item list (scalar_as_list).
   auto raw = given;
-  if (checks != KeyChecks::kColumns && checks != KeyChecks::kSplit && scalar_literal(case_key_value(raw)))
+  // Round DJ: so is a None case key (a Null literal).
+  if (checks != KeyChecks::kColumns && checks != KeyChecks::kSplit && scalar_case_key(case_key_value(raw)))
     for (auto& p : *raw)
       if (p.enum_member ? p.key == "CASE_ID_KEY" : p.key == kPolarsFilterCaseIdKeyParameter)
-        if (scalar_literal(&p.value)) p.value = scalar_as_list(p.value);
+        if (scalar_case_key(&p.value)) p.value = scalar_as_list(p.value);
   const auto* case_value = case_key_value(raw);
   const auto* activity_value = activity_key_value(raw);
   switch (checks) {
@@ -1778,9 +1821,12 @@ std::pair<std::string, std::string> variants_df_keys(const EventTable& df, const
 // activity under the sort, which then fails on a frame of more than one row.
 // A list or tuple case key builds its strict Series literal there, then
 // each item's group_by literal, as in the variant filters.
-[[noreturn]] void literal_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key, const PolarsFilterValue& activity_key,
-                                      const Plan& sort_plan, const Plan& agg_plan) {
-  const auto key = scalar_literal(&case_id_key) ? scalar_as_list(case_id_key) : case_id_key;
+// Round DJ: a None case key groups every row into its Null group, sorted by
+// the timestamp alone: the frame has a Null `literal` column and that one
+// row (probe dj/k6).
+EventTable literal_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key, const PolarsFilterValue& activity_key,
+                               const Plan& sort_plan, const Plan& agg_plan) {
+  const auto key = scalar_case_key(&case_id_key) ? scalar_as_list(case_id_key) : case_id_key;
   case_literal_built(key);
   (void)gk::build_values(key.items);
   check_col_list(&activity_key);
@@ -1792,22 +1838,46 @@ std::pair<std::string, std::string> variants_df_keys(const EventTable& df, const
   // scal-plseqcp-1 case 22).
   if (&sort_plan == &kTraceSortPlan) require_string_activities(df, v, "", activity_key.text);
   if (v.shape) sort_shape_error(df);
-  throw std::invalid_argument("Polars get_variants_df of one row with a literal case key is outside the native domain");
+  // Round DJ: a scalar literal (an int, float, bool or datetime) sorts a
+  // one-row frame and groups it into one row too (probe dj-plseqcp-1 cases 12, 55).
+  if (!scalar_list(key))
+    throw std::invalid_argument("Polars get_variants_df of one row with a list case key is outside the native domain");
+  const auto& item = v.keys->items.front();
+  const auto& activities = v.activities.front();
+  EventTable out;
+  out.columns = {"literal"};
+  out.dtypes = {item.dtype};
+  EventTable::Row row{item.cell};
+  if (&sort_plan == &kTraceSortPlan) {
+    EventAttribute list;
+    list.key = "variant_list";
+    list.container = AttributeContainerKind::kList;
+    for (const auto& cell : activities) list.children.push_back(null_cell(cell) ? null_cell_of("") : string_cell("", cell->value));
+    out.columns.insert(out.columns.end(), {"variant_list", "count"});
+    out.dtypes.insert(out.dtypes.end(), {"List(String)", "UInt32"});
+    row.push_back(list);
+    row.push_back(int_cell("count", static_cast<std::int64_t>(activities.size())));
+  }
+  out.columns.push_back("variant");
+  out.dtypes.push_back("String");
+  row.push_back(string_cell("variant", variant_string(activities, dtype_of(df, v.act))));
+  out.rows.push_back(std::move(row));
+  return out;
 }
 bool literal_case_key(const PolarsFilterValue& key) {
-  return scalar_literal(&key) || key.kind == Kind::kList || key.kind == Kind::kTuple;
+  return scalar_case_key(&key) || key.kind == Kind::kList || key.kind == Kind::kTuple;
 }
 }  // namespace
 
 EventTable polars_trace_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
                                                const PolarsFilterValue& activity_key) {
-  if (literal_case_key(case_id_key)) literal_variants_df(df, case_id_key, activity_key, kTraceSortPlan, kTraceAggPlan);
+  if (literal_case_key(case_id_key)) return literal_variants_df(df, case_id_key, activity_key, kTraceSortPlan, kTraceAggPlan);
   const auto [c, a] = variants_df_keys(df, case_id_key, activity_key);
   return polars_trace_filter_get_variants_df(df, c, a);
 }
 EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
                                                    const PolarsFilterValue& activity_key) {
-  if (literal_case_key(case_id_key)) literal_variants_df(df, case_id_key, activity_key, kSuffixSortPlan, kSuffixAggPlan);
+  if (literal_case_key(case_id_key)) return literal_variants_df(df, case_id_key, activity_key, kSuffixSortPlan, kSuffixAggPlan);
   const auto [c, a] = variants_df_keys(df, case_id_key, activity_key);
   return polars_ends_with_filter_get_variants_df(df, c, a);
 }
@@ -1857,7 +1927,8 @@ EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterVal
       if (const auto t = unhashable(named)) fail("TypeError", "unhashable type: '" + *t + "'");
       fail("KeyError", value_repr(named));
     }
-    if (!scalar_list(key)) check_col_list(&key);
+    // Round DJ: pl.col refuses a scalar key on its type (probe dj/k5).
+    check_col_list(scalar_list(key) ? &named : &key);
     if (key.items.empty()) fail("IndexError", "list index out of range");
     if (const auto t = unhashable(named)) fail("TypeError", "unhashable type: '" + *t + "'");
     fail("TypeError", "Series name must be a string");
@@ -1972,6 +2043,9 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
       }
   }
   if (v.keys) {
+    // Round DJ: the variants were collected; the join on a None case key
+    // fails as it is built (probe dj/k6).
+    if (none_key(*list_key)) join_on_none();
     if (v.keys->items.empty()) no_join_keys();
     return join_keys(df, *v.keys, kept_keys, positive_of(parameters));
   }
@@ -1993,6 +2067,8 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
     // a list cannot be; a hashable tuple then names the Series.
     if (const auto* key = list_case(parameters)) {
       if (const auto t = unhashable(scalar_list(*key) ? key->items.front() : *key)) fail("TypeError", "unhashable type: '" + *t + "'");
+      // Round DJ: a None name fails the frame's schema check (probe dj-plseqcp-1 case 33).
+      if (none_key(*key)) fail("TypeError", "'None' is not an instance of 'str'");
       fail("TypeError", "Series name must be a string");
     }
     const auto case_glue = case_key(parameters);
@@ -2168,7 +2244,7 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
              resolved("join",
                       "FILTER " + tree + "\nFROM\n  " +
                           group_node(text, true, "col(" + quote(activity_key(parameters)) + ").implode().alias(\"activities\")",
-                                     "SORT BY [" + text.sort + ", col(" + quote(kTimestamp) + ")]\n      " + frame_plan(df.columns), 2),
+                                     sort_by(text) + "\n      " + frame_plan(df.columns), 2),
                       {"!filter", "select", "join right", "join"}));
   };
   const auto evaluate = [&](const std::vector<std::vector<Cell>>& variants) {

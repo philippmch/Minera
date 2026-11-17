@@ -3234,6 +3234,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_di_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-di-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_di_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DJ: the 113 scalar-key calls DI carried (datetime, None and NaN
+  # case keys) and None/NaN/datetime case-key probes dj-plseq{cp,ck,cj,ch}-1.
+  add_test(NAME minera_polars_sequence_filter_dj_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dj-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_dj_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3460,6 +3465,17 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_di_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-di-bank.json.gz")
   set_tests_properties(minera_polars_filter_di_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DJ: attribute counts over key lists on frames with a `literal`
+  # column or no rows, and key lists naming a missing column (probes dj/lit1
+  # and dj/lit2, less the calls that follow the reference's random group order).
+  add_test(NAME minera_polars_filter_dj_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dj-bank.json.gz")
+  set_tests_properties(minera_polars_filter_dj_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DJ: LTL filters with list and literal case keys on frames with
+  # their own `literal` column (probe dj/lt7, less the calls still refused).
+  add_test(NAME minera_polars_filter_dj_ltl_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dj-ltl-bank.json.gz")
+  set_tests_properties(minera_polars_filter_dj_ltl_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

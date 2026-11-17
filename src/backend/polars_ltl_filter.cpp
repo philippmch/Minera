@@ -844,6 +844,7 @@ std::string different_final_join(const EventTable& source, const Prepared& p) {
          frame_plan(source) + "\n\nThis error occurred with the following context stack:\n\t[1] 'join'\n";
 }
 void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only = false, bool first_only = false, bool coercion = false, std::size_t limit = static_cast<std::size_t>(-1));
+std::string missing_tail(const EventTable& source, const Prepared& p, bool eager, bool sorting, bool attribute);
 void list_key_failure(const EventTable& source, const Prepared& p, const std::string& phase, bool eager) {
   // Round DF: four_eyes joins resolve their inputs before their keys, so an
   // activity filter failing to resolve (a list literal against a String
@@ -932,6 +933,14 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
   // the frame: missing there), and names the key's own List literal column
   // after the select or group_by of [key, resource] (probe de/lt5). Frames
   // with a `literal` column and eager frames stay outside the model.
+  // Round DJ: four_eyes selects and attr_value_different_persons groups by
+  // [key, resource]; the key's List literal and a resource column named
+  // `literal` share that output name, which fails where a missing resource
+  // would (probe dj/lt7).
+  if ((p.operation == Op::kFourEyes || p.operation == Op::kDifferentPersons) && (strs || none_strs || literals) && !eager && resource == "literal" &&
+      column(source, o.resource_key))
+    fail("DuplicateError", phase,
+         groups::duplicate_message("literal", p.operation == Op::kFourEyes ? "projections" : "group_by keys") + missing_tail(source, p, eager, false, false));
   const bool literal_item = (strs || none_strs) && std::find(names.begin(), names.end(), "literal") != names.end();
   if (literal_item && (eager || std::find(source.columns.begin(), source.columns.end(), "literal") != source.columns.end()))
     throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: literal as a case item");
@@ -1491,6 +1500,10 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
       // three activity filters, before its schema (CK bank 2026111671 case
       // 93).
       validate_queries(source, p, eager, true, false, false, 3);
+      // Round DJ: a frame with its own `literal` column joins it beside the
+      // key's literal; outside the model (probe dj/lt7).
+      if (std::find(source.columns.begin(), source.columns.end(), "literal") != source.columns.end())
+        throw std::invalid_argument("Native Polars LTL eventually_follows with a literal case key on a frame with a literal column is outside the observed domain");
       std::vector<std::string> nodes{"join schema resolving", "join"};
       repeat(nodes, static_cast<std::ptrdiff_t>(p.values.size()) - 3, {"join left", "join"});
       nodes.insert(nodes.end(), {"select", "unique", "join left", "join"});
@@ -1518,6 +1531,10 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
   // sort fails first (CK bank 2026111611 case 114).
   if (literal && p.operation == Op::kEventuallyFollows && p.values.size() == 2) {
     validate_queries(source, p, eager, true);
+    // Round DJ: a frame with its own `literal` column joins it beside the
+    // key's literal; outside the model (probe dj/lt7).
+    if (std::find(source.columns.begin(), source.columns.end(), "literal") != source.columns.end())
+      throw std::invalid_argument("Native Polars LTL eventually_follows with a literal case key on a frame with a literal column is outside the observed domain");
     // Round DE: a timestamp key that is no str adds a second literal to the
     // first activity's select (probe de/lt4).
     if (!text(o.timestamp_key) && literal_time(o.timestamp_key)) {
