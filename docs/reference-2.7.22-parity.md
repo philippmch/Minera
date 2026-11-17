@@ -30698,3 +30698,101 @@ Tests:
 - Full suite: 602 tests passed. Python script and frontend tests not
   rerun (scripts and frontend unchanged); the workbench fixture replay
   gave 2,673 responses unchanged.
+
+## Review DR1: re-review of round DQ, pandas' merge order in the LTL list bounds and link analysis, list keys in the pandas attribute filters, fresh seeds (2026-11-17)
+
+Round DR checked DQ's CI (run 44169814298 on 6e35984: the Python,
+verifier and frontend jobs green, and the macOS job green for the first
+time since round DO), looked for pandas' merge order in the other modules
+that read a merge of non-unique keys in row order, and replayed a batch of
+fresh seeds. The device check on the Mac was skipped (the Mac was not
+linked).
+
+- **DR1-1 The merge's plain order on sorted keys** (`eventually_follows`
+  with list time bounds; probes `dr/specs/r1.py`, 451 calls over frames
+  sorted by case, and `r2.py`, 947 calls over shuffled and sorted frames
+  with missing case keys, NaN amounts, NaT timestamps and the timestamp
+  and resource columns as case keys). When both key arrays are
+  non-decreasing (no missing key, every pair of neighbours ordered) and
+  one of them holds no key twice, pandas 3.0.5 merges in plain order (by
+  left row, then right row), not in DQ's label order. The model now lives
+  in `pandas_merge_order.hpp`, shared by the LTL filter and link
+  analysis, and fuzzed black-box against DataFrame.merge over every dtype
+  pair (harness `dr/la/mo1.py`-`mo4.py`); a datetime key's NaT is an
+  ordinary label there, not a missing key. r1: 6 -> 0; r2 -> 0.
+- **DR1-2 Link analysis in pandas' merge order** (`/api/link-analysis` on
+  CSV uploads whose doc/ref columns are drawn from two or three ints,
+  texts, floats with blank cells, bools or mixed values, under every
+  flag combination; `dr/la/sw/link4.py`, 3,200 calls). pm4py merges the
+  numbered frame with itself on out = in and reads the pairs in merge
+  order: int, float, bool and datetime keys merge as numbers (a bool
+  beside an int or float as objects); KEEP_FIRST_OCCURRENCE keeps each
+  source's first target in that order after the look-forward filter;
+  each source's targets are a CPython set filled in that order, so they
+  come in the set's iteration order (`python::number_set_order`); the
+  links come from a second merge of the numbered rows with the (source,
+  target) rows. 84 -> 0 (the dense sweep), and 1,600 calls of seeds
+  0-199 agree in exact order (41 of them were wrong before).
+- **DR1-3 List keys in the pandas attribute filters** (fresh pandas CK
+  2026121109 case 255; probes `p1.py`, 2,499 calls, and `p2.py`, 9,800
+  calls). Observed on pandas 3.0.5 and modelled
+  (`pandas_attributes_filter.cpp`):
+  - `filter_df_relative_occurrence_event_attribute` counted per case on a
+    two-row frame: groupby([case, key]) takes the key list itself as one
+    grouper array (pandas' index replacement) unless a key is a dict, list
+    or tuple, or every key names a column or an index level (None names
+    the default index); a set key is unhashable there; a case key equal to
+    the attribute key gives reset_index two columns of one name
+    (`cannot insert X, already exists`); after the replacement a None
+    attribute key is a missing column (`KeyError: None`);
+  - a list attribute key counts the listed columns' tuples (per case on
+    the grouped frame, per event with `value_counts`, rows with a missing
+    listed cell dropped), reads the denominator and the stake only once a
+    tuple counts, and filters the events on tuples no cell holds;
+  - `apply`, `apply_events` and `filter_df_on_attribute_values` with a
+    list attribute key filter `df[list].isin(values)`, a frame: a listed
+    cell holding a value stays, every other cell is masked
+    (DataFrame.where: int64 turns float64, bool object), a dict maps each
+    column to its values, duplicate column labels raise `cannot reindex
+    on an axis with duplicate labels`; per case the masked frame's case
+    ids select the cases.
+  p1: 293 -> 0; p2: 1,306 -> 0.
+- **DR1-4 Other merges.** `case_relations` already follows the same order
+  (its monotonic path included); the interleavings merge keeps its own
+  model and binds every row in order. The OCEL links bank now binds the
+  link pairs in the reference's exact order (it sorted the targets within
+  a source before), except under PROPAGATE (declared below). Not checked
+  yet: the two-key merge of the temporal profile conformance on a frame
+  and the OCEL flattening's merges (carried to DS).
+- **DR1-5 Fresh seeds** (2026121100-11, twelve banks): three calls. The
+  pandas CK call is DR1-3. Polars CJ 2026121103 case 795 is the struct
+  cast partition race the bank test accepts (declared since CJ: on the
+  8-column frame Polars raises the cast's or the comparison's error, about
+  two runs in three the former, depending on scheduling); Polars sequence
+  CH 2026121108 case 899 is `rework`'s equal-size join order (declared).
+  Every other call replays clean.
+
+Declared:
+- Link analysis under PROPAGATE: a source's target set grown by
+  `set.union` lists its targets in an order that depends on CPython's set
+  table copy and presizing; native lists them ascending (compared sorted
+  within each source).
+- Still declared from earlier rounds: the keep-once relative occurrence
+  count with a dict case key naming several columns (DQ1-5), the
+  nanosecond window at pandas' int64 range ends (DQ1-2), dateutil-only
+  date strings (DP1-4, DQ1-4), the eager paths performance race (DO1-2),
+  the thread-count quirk of DN1-6, the struct cast race and equal-size
+  join orders.
+
+Tests:
+- New: `docs/pandas-filter-dr-bank.json.gz` (13,697 calls in 82 cases:
+  r1, r2, p1 and p2), replayed by
+  `minera_pandas_filter_dr_bank_parity_tests`; `minera_review_dr2_tests`
+  (208 link analysis calls on 26 dense CSV uploads, exact order without
+  PROPAGATE); `minera_ocel_links_parity_tests` binds the exact link order.
+- All 33 docs pandas table and pandas sequence banks replay clean with the
+  changes (the Polars filters are unchanged), and every call of the fresh
+  batch replays clean or is declared.
+- Full suite: 604 tests passed. Python script and frontend tests not
+  rerun (scripts and frontend unchanged); the workbench fixture replay
+  gave 2,673 responses unchanged.

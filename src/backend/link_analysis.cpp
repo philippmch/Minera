@@ -6,6 +6,7 @@
 #include "frame_cells.hpp"
 #include "python_scalar.hpp"
 #include "numpy_object_sort.hpp"
+#include "pandas_merge_order.hpp"
 
 #include <optional>
 
@@ -35,6 +36,9 @@ struct Row {
   std::string out_key;
   std::string in_key;
   std::optional<python::Scalar> sorting_cell;
+  // Round DR: an upload's typed link cells, for the merge's row order.
+  std::optional<python::Scalar> out_cell;
+  std::optional<python::Scalar> in_cell;
 };
 
 std::string value_for(const Trace& trace, const Event& event,
@@ -268,6 +272,7 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
     throw std::invalid_argument("link_analysis_max_links must be positive");
 
   std::vector<Row> rows;
+  bool merge_numeric = false, out_dates = false, in_dates = false;
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
        ++trace_index) {
     const auto& trace = log.traces[trace_index];
@@ -335,11 +340,21 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
     for (const auto i : missing) sorted.push_back(std::move(rows[i]));
     rows = std::move(sorted);
     check_merge_keys(out, in, out_cells, in_cells);
+    using T = DataFrameColumnType;
+    const auto lt = out.type.value_or(T::kString), rt = in.type.value_or(T::kString);
+    const auto numeric_type = [](T t) { return t == T::kInt64 || t == T::kFloat64 || t == T::kBool || t == T::kDate; };
+    // int, float, bool and datetime keys merge as numbers, a bool beside an
+    // int or float as objects (dr/la mo1, la3).
+    merge_numeric = numeric_type(lt) && numeric_type(rt) && ((lt == T::kBool) == (rt == T::kBool));
+    out_dates = lt == T::kDate;
+    in_dates = rt == T::kDate;
     for (auto& row : rows) {
       const auto& cell_out = out_cells[row.input_index];
       const auto& cell_in = in_cells[row.input_index];
       row.out_key = merge_key(cell_out);
       row.in_key = merge_key(cell_in);
+      row.out_cell = cell_out;
+      row.in_cell = cell_in;
       row.out_value = cell_text(cell_out, out);
       row.in_value = cell_text(cell_in, in);
     }
@@ -364,25 +379,60 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
   for (std::size_t index = 0; index < rows.size(); ++index)
     rows[index].index = index;
 
-  std::map<std::string, std::vector<std::size_t>> targets;
-  for (const auto& row : rows) targets[row.in_key].push_back(row.index);
-
-  std::map<std::size_t, std::set<std::size_t>> associations;
-  std::size_t association_count = 0;
-  for (const auto& source : rows) {
-    const auto target_it = targets.find(source.out_key);
-    if (target_it == targets.end()) continue;
-    auto& linked = associations[source.index];
-    for (const auto target_index : target_it->second) {
-      if (options.look_forward && target_index <= source.index) continue;
-      if (linked.insert(target_index).second) {
-        ++association_count;
-        if (association_count > options.max_links)
-          throw std::invalid_argument("link analysis exceeded max_links");
-      }
-      if (options.keep_first_occurrence) break;
+  // Round DR: pm4py merges the numbered frame with itself on out = in and
+  // reads the pairs in pandas' merge order (pandas_merge_order.hpp): keep
+  // first occurrence keeps each source's first target in that order (after
+  // the look-forward filter), and the sources' targets are sets filled in
+  // that order. Its links come from a second merge of the frame with the
+  // (source, target) rows in the sources' first-appearance order (ascending
+  // with keep first occurrence), a CPython set's order within a source.
+  std::vector<detail::PandasMergeKey> out_keys, in_keys;
+  const auto key_of = [&](const Row& row, bool out) -> detail::PandasMergeKey {
+    if (!frame) return out ? row.out_key : row.in_key;
+    const auto& cell = out ? row.out_cell : row.in_cell;
+    if (!cell || python::is_missing(*cell)) {
+      // A datetime key's NaT is an ordinary label (dr/la mo4).
+      if (out ? out_dates : in_dates) return std::string("NaT");
+      return std::nullopt;
     }
+    return out ? row.out_key : row.in_key;
+  };
+  for (const auto& row : rows) {
+    out_keys.push_back(key_of(row, true));
+    in_keys.push_back(key_of(row, false));
   }
+  const auto monotonic = [&](bool out) {
+    if (!frame) {
+      std::vector<const std::string*> values;
+      for (const auto& row : rows) values.push_back(out ? &row.out_key : &row.in_key);
+      return detail::pandas_keys_monotonic(values, [](const std::string*) { return false; },
+                                           [](const std::string* a, const std::string* b) { return a->compare(*b); });
+    }
+    std::vector<const std::optional<python::Scalar>*> values;
+    for (const auto& row : rows) values.push_back(out ? &row.out_cell : &row.in_cell);
+    return detail::pandas_keys_monotonic(
+        values, [](const std::optional<python::Scalar>* cell) { return !*cell || python::is_missing(**cell); },
+        [](const std::optional<python::Scalar>* a, const std::optional<python::Scalar>* b) { return python::compare(**a, **b); });
+  };
+  const auto pairs = detail::pandas_inner_merge_order(out_keys, in_keys, frame && merge_numeric, monotonic(true), monotonic(false));
+
+  std::vector<std::size_t> sources;  // in first-appearance order
+  std::map<std::size_t, std::vector<std::size_t>> added;  // targets in insertion order
+  std::size_t association_count = 0;
+  for (const auto& [source_index, target_index] : pairs) {
+    if (options.look_forward && target_index <= source_index) continue;
+    auto [it, fresh] = added.try_emplace(source_index);
+    if (fresh) sources.push_back(source_index);
+    else if (options.keep_first_occurrence) continue;
+    it->second.push_back(target_index);
+    if (++association_count > options.max_links)
+      throw std::invalid_argument("link analysis exceeded max_links");
+  }
+  // groupby(...).first() orders the kept pairs by source.
+  if (options.keep_first_occurrence) std::sort(sources.begin(), sources.end());
+  std::map<std::size_t, std::set<std::size_t>> associations;
+  for (const auto& [source, targets] : added) associations[source].insert(targets.begin(), targets.end());
+  std::set<std::size_t> grown;
 
   if (options.propagate) {
     bool changed = true;
@@ -400,6 +450,7 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
         for (const auto target : additions) {
           if (linked.insert(target).second) {
             changed = true;
+            grown.insert(source);
             ++association_count;
             if (association_count > options.max_links)
               throw std::invalid_argument("link analysis exceeded max_links");
@@ -409,18 +460,40 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
     }
   }
 
+  // The (source, target) rows: a set's iteration order for the targets
+  // added one by one; a set propagation grew (built by set unions) lists
+  // its targets ascending, its order is not modelled (declared).
+  std::vector<std::pair<std::size_t, std::size_t>> relation;
+  for (const auto source : sources) {
+    if (grown.contains(source)) {
+      for (const auto target : associations[source]) relation.emplace_back(source, target);
+      continue;
+    }
+    const auto& targets = added[source];
+    std::vector<python::Scalar> values;
+    for (const auto target : targets) values.push_back(python::integer(static_cast<std::int64_t>(target)));
+    for (const auto i : python::number_set_order(values)) relation.emplace_back(source, targets[i]);
+  }
+  std::vector<detail::PandasMergeKey> row_keys, relation_keys;
+  for (std::size_t index = 0; index < rows.size(); ++index) row_keys.push_back(std::to_string(index));
+  bool relation_monotonic = true;
+  for (std::size_t r = 0; r < relation.size(); ++r) {
+    relation_keys.push_back(std::to_string(relation[r].first));
+    if (r && relation[r].first < relation[r - 1].first) relation_monotonic = false;
+  }
+  const auto linked = detail::pandas_inner_merge_order(row_keys, relation_keys, true, true, relation_monotonic);
+
   LinkAnalysisResult result;
   result.options = options;
   result.event_count = rows.size();
-  for (const auto& [source_index, linked] : associations) {
-    const auto& source = rows[source_index];
-    for (const auto target_index : linked) {
-      const auto& target = rows[target_index];
-      if (result.links.size() >= options.max_links)
-        throw std::invalid_argument("link analysis exceeded max_links");
-      result.links.push_back({event_ref(source, source.out_value),
-                              event_ref(target, target.in_value)});
-    }
+  for (const auto& [row, r] : linked) {
+    (void)row;
+    const auto& source = rows[relation[r].first];
+    const auto& target = rows[relation[r].second];
+    if (result.links.size() >= options.max_links)
+      throw std::invalid_argument("link analysis exceeded max_links");
+    result.links.push_back({event_ref(source, source.out_value),
+                            event_ref(target, target.in_value)});
   }
   return result;
 }

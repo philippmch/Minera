@@ -1452,6 +1452,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_review_cs1_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_cs1_tests COMMAND minera_review_cs1_tests)
 
+  add_executable(minera_review_dr2_tests src/backend/tests/test_review_dr2.cpp)
+  target_link_libraries(minera_review_dr2_tests PRIVATE minera::core)
+  target_compile_features(minera_review_dr2_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_dr2_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_dr2_tests COMMAND minera_review_dr2_tests)
+
   add_executable(minera_resource_profiles_tests
     src/backend/tests/test_resource_profiles.cpp
   )
@@ -3858,6 +3864,13 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_dq_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-dq-bank.json.gz")
   set_tests_properties(minera_pandas_filter_dq_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DR: list time bounds in eventually_follows over frames whose merge
+  # keys are sorted (pandas' plain merge order; probes r1, r2), key lists that
+  # replace the grouping index of a two-row frame in the relative occurrence
+  # filter (p1), and list attribute keys in the values filters (p2).
+  add_test(NAME minera_pandas_filter_dr_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-dr-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_dr_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

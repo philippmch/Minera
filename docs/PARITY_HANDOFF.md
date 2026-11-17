@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DQ (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DR (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6625,6 +6625,73 @@ project files under `review-harness/round-dq/`.
 
 Full suite 602 passed; no fixture changed (2,673 responses). The device
 check on the Mac was skipped (the Mac was not linked).
+
+Round DR re-reviewed DQ (Review DR1). DQ's commit 6e35984 ran CI run
+44169814298: Python, verifier and frontend green, and the macOS job green
+for the first time since DO. DR followed pandas' merge order into the
+other modules and replayed a batch of fresh seeds:
+- The merge's plain order (probes r1, 451 calls, and r2, 947 calls of
+  `eventually_follows` list bounds): when both key arrays are
+  non-decreasing and one side holds no key twice, pandas merges by left
+  row, then right row. The model moved to `pandas_merge_order.hpp`
+  (shared by the LTL filter and link analysis); a datetime NaT key is an
+  ordinary label. r1 6 -> 0, r2 -> 0.
+- Link analysis on CSV uploads (dense doc/ref collisions, every flag
+  combination; 3,200 calls): the self-merge's pairs in merge order,
+  keep-first keeping the first target in that order, each source's
+  targets in a CPython set's order, the links from a second merge. 84 ->
+  0; 1,600 calls of seeds 0-199 agree in exact order.
+- List keys in the pandas attribute filters (fresh pandas CK 2026121109
+  case 255; probes p1, 2,499 calls, p2, 9,800 calls): the relative
+  occurrence count on two-row frames takes a key list as one grouper
+  array (pandas' index replacement), list attribute keys count tuples,
+  and the values filters mask `df[list].isin(values)` (DataFrame.where).
+  p1 293 -> 0, p2 1,306 -> 0.
+- Fresh seeds 2026121100-11: three calls, the CK one above, a struct cast
+  race (CJ 2026121103 case 795) and an equal-size rework join (sequence
+  CH 2026121108 case 899), both declared.
+
+In the suite: new `docs/pandas-filter-dr-bank.json.gz` (13,697 calls)
+with `minera_pandas_filter_dr_bank_parity_tests`, `minera_review_dr2_tests`
+(208 link analysis calls), and `minera_ocel_links_parity_tests` now binds
+the exact link order except under PROPAGATE (declared: the order of a set
+grown by `set.union`). The probes, the fuzzers (`la/`), the dumps and the
+fresh banks are in the project files under `review-harness/round-dr/`.
+
+Full suite 604 passed; no fixture changed (2,673 responses). The device
+check on the Mac was skipped (the Mac was not linked).
+
+Next round (DS) should start by re-reviewing round DR:
+
+- DR's CI run (and DQ's Linux and Windows jobs, still running when DR
+  pushed);
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- pandas' merge order in the two-key merge of the temporal profile
+  conformance on a frame (per-case deviation order when a profile lacks
+  some activity pairs) and in the OCEL flattening's merges (row order of
+  the flattened frame);
+- link analysis under PROPAGATE: the target order of a set grown by
+  `set.union` (CPython's set_merge copies the table when sizes allow and
+  presizes otherwise; declared);
+- the keep-once relative occurrence count with a dict case key naming
+  several existing columns (declared, outside the native domain);
+- the nanosecond window at pandas' int64 range ends (declared);
+- the eager paths performance race on frames of four rows or more (DO1-2,
+  declared) and the thread-count quirk of DN1-6 (declared);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet
+  (the table transport has no cells for them);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DQ's targets, taken in DR (findings DR1-1 to DR1-5): DQ's CI run,
+the fresh seeds and pandas' merge order elsewhere (the LTL list bounds'
+plain order, link analysis, case relations checked). Not taken (carried
+to DS): the declared items, the CU list, the new dtypes and the open
+choices.
+
+Previous list for round DR (kept for its older items):
 
 Next round (DR) should start by re-reviewing round DQ:
 

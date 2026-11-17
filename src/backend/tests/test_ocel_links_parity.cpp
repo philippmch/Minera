@@ -274,9 +274,11 @@ Json interleavings_case(const BankCase& item) {
   return rows;
 }
 
-// Link rows come grouped by ascending source index; within a source the
-// reference lists targets in its hash-set iteration order, which is not bound:
-// targets are compared sorted.
+// Link rows come grouped by source; within a source the reference lists the
+// targets in a CPython set's iteration order, which the native analysis gives
+// (round DR). A set grown by propagation's set unions lists its targets in an
+// order that is not modelled (declared), so with PROPAGATE the targets are
+// compared sorted.
 Json sorted_within_sources(const Json& pairs) {
   auto out = pairs;
   std::stable_sort(out.items.begin(), out.items.end(), [](const Json& a, const Json& b) {
@@ -302,12 +304,13 @@ Json iso_rows(const Json& rows) {
   return out;
 }
 
-// The bound projection of a reference outcome: link pairs or interleaving rows.
-Json projection(const Json& expected) {
+// The bound projection of a reference outcome: link pairs (in order, or
+// sorted within sources when propagated) or interleaving rows.
+Json projection(const Json& expected, bool propagate) {
   Json out;
   out.kind = Json::kObject;
   if (expected.get("error")) out.fields["error"] = text("raised");
-  else if (const auto* pairs = expected.get("pairs")) out.fields["value"] = sorted_within_sources(*pairs);
+  else if (const auto* pairs = expected.get("pairs")) out.fields["value"] = propagate ? sorted_within_sources(*pairs) : *pairs;
   else out.fields["value"] = iso_rows(*expected.get("rows"));
   return out;
 }
@@ -316,15 +319,17 @@ std::string difference(const BankCase& item, const std::function<Json()>& produc
   Json actual;
   actual.kind = Json::kObject;
   std::string message;
+  const bool propagate = item.name.starts_with("links-") && item.call.ends_with("1") && item.call != "default";
   try {
     actual.fields["value"] = produce();
+    if (propagate) actual.fields["value"] = sorted_within_sources(actual.fields["value"]);
   } catch (const std::exception& error) {
     actual.fields["error"] = text("raised");
     message = error.what();
   }
   const auto rendered = render(actual);
   std::vector<std::string> admissible;
-  for (const auto& expected : item.expected) admissible.push_back(render(projection(expected)));
+  for (const auto& expected : item.expected) admissible.push_back(render(projection(expected, propagate)));
   if (std::find(admissible.begin(), admissible.end(), rendered) != admissible.end()) return {};
   return "native " + rendered.substr(0, 900) + (message.empty() ? "" : " (" + message + ")") + " reference " +
          admissible.front().substr(0, 900);

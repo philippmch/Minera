@@ -17,6 +17,7 @@
 #include <unordered_set>
 #include "minera/timestamp.hpp"
 #include "minera/token_integer.hpp"
+#include "python_scalar.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
 #include "zone_database.hpp"
@@ -161,6 +162,29 @@ EventTable masked_frame(const EventTable& source){
    if(nullable)value=make_native_na_attribute(source.columns[c]);
    else if(date){value=EventAttribute{source.columns[c],"NaT",AttributeKind::kDate,true};value.typed_value=NativeDate{"NaT",NativeDateResolution::kNanosecond};}
    row[c]=std::move(value);
+  }
+ }
+ return result;
+}
+// Round DR: df.where(mask) for a mask of cells (alive[row][column]): a
+// column with a masked cell turns int64 into float64 and bool into object,
+// its masked cells null as in masked_frame; a column without one keeps its
+// cells and dtype.
+EventTable where_frame(const EventTable& source,const std::vector<std::vector<char>>& alive){
+ const auto masked=masked_frame(source);
+ EventTable result=source;
+ for(std::size_t c=0;c<source.columns.size();++c){
+  bool any=false;for(std::size_t i=0;i<source.size();++i)any|=!alive[i][c];
+  if(!any)continue;
+  if(!result.dtypes.empty())result.dtypes[c]=masked.dtypes[c];
+  const bool to_float=!source.dtypes.empty()&&(source.dtypes[c]=="int64"||source.dtypes[c]=="uint64");
+  for(std::size_t i=0;i<source.size();++i){
+   if(!alive[i][c]){result.rows[i][c]=masked.rows[i][c];continue;}
+   if(!to_float||!source.rows[i][c])continue;
+   auto value=*source.rows[i][c];
+   const double number=native_attribute_number(value);
+   value.kind=AttributeKind::kFloat;value.typed_value=number;value.value=python::float_repr(number);
+   result.rows[i][c]=std::move(value);
   }
  }
  return result;
@@ -327,6 +351,40 @@ EventTable values_filter(const EventTable& source,const EventAttribute& values,c
   const auto cases=case_column(source,options.case_id_key);std::vector<bool> nulls(source.size());
   for(std::size_t i=0;i<source.size();++i)nulls[i]=missing(cell(source,i,cases));
   return project_cases(source,options.case_id_key,nulls,truth(options.positive));
+ }
+ // Round DR: a list key filters df[list].isin(values), a frame: each listed
+ // cell holding a value (or NaN, keeping NaN values) stays, every other
+ // cell is masked (DataFrame.where); per case the masked frame's case ids
+ // are read as in numeric_filter (probe dr/p1).
+ if(!options.attribute_key.is_null&&options.attribute_key.container==AttributeContainerKind::kList){
+  check_list_columns(source,options.attribute_key);
+  // apply_events passes None on (the case filters read it as []).
+  if((values.is_null&&events)||(!values.is_null&&values.container==AttributeContainerKind::kScalar))error("TypeError","only list-like or dict-like objects are allowed to be passed to DataFrame.isin(), you passed a '"+type_name(values)+"'");
+  const auto admitted=values.is_null?std::vector<EventAttribute>{}:values.children;
+  const bool positive=truth(options.positive),keep_nan=truth(options.keep_nan_values);
+  std::vector<std::vector<char>> alive(source.size(),std::vector<char>(source.columns.size(),0));
+  std::vector<std::size_t> columns;
+  for(const auto& item:options.attribute_key.children)columns.push_back(*column(source,item));
+  for(const auto c:columns){
+   // A dict maps a column name to that column's values (Series.isin, which
+   // takes only a list-like); a column it does not name matches nothing.
+   std::vector<EventAttribute> listed;
+   if(values.container==AttributeContainerKind::kContainer){
+    for(const auto& entry:values.children)if(entry.key==source.columns[c]){listed=admitted_values(entry);break;}
+   } else listed=admitted;
+   if(c<source.dtypes.size()&&source.dtypes[c]=="str")listed=string_isin_values(listed);
+   for(std::size_t i=0;i<source.size();++i){
+    const auto& v=cell(source,i,c);
+    const bool match=isin(source,c,v,listed)||(keep_nan&&missing(v));
+    alive[i][c]=(events&&!positive)?!match:match;
+   }
+  }
+  // df[mask] aligns the mask's columns to the frame's.
+  for(std::size_t j=0;j<columns.size();++j)for(std::size_t k=0;k<j;++k)
+   if(columns[j]==columns[k])error("ValueError","cannot reindex on an axis with duplicate labels");
+  if(events)return source.size()==0?source:where_frame(source,alive);
+  std::vector<bool> selected(source.size(),true);
+  return project_cases(source,options.case_id_key,selected,positive,&alive);
  }
  const auto attribute=direct_column(source,options.attribute_key);
  auto admitted=admitted_values(values,!events);
@@ -862,7 +920,32 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  // KeyError for a missing case column, no grouper length check; fresh pandas
  // CK 2026112209 case 537). Counted per case, the groupby reads the case key
  // first, and a None key is called there.
- if(once&&group_case_is_null(o))error("TypeError","'NoneType' object is not callable");
+ // Round DR: on a two-row frame groupby([case, key]) takes the key list
+ // itself as one grouper array (pandas' index replacement) unless a key is
+ // a dict, list or tuple, or every key names a column or an index level
+ // (None names the default index); a set key is unhashable there, in the
+ // membership test or when the array is grouped (probe dr/p1).
+ const EventAttribute& replaced_case=o.relative_case_id_key_last?*o.relative_case_id_key_last:o.case_id_key;
+ bool replacement=false;
+ if(once&&s.size()==2){
+  const auto blocks=[](const EventAttribute& k){return !k.is_null&&(k.container==AttributeContainerKind::kContainer||k.container==AttributeContainerKind::kList||k.container==AttributeContainerKind::kTuple);};
+  if(!blocks(replaced_case)&&!blocks(o.attribute_key)){
+   const auto unhashable_set=[](const EventAttribute& k){return !k.is_null&&k.container==AttributeContainerKind::kSet;};
+   if(unhashable_set(replaced_case)||unhashable_set(o.attribute_key))error("TypeError","unhashable type: 'set'");
+   const auto listed=[&](const EventAttribute& k){
+    if(k.is_null&&k.container==AttributeContainerKind::kScalar){
+     if(!s.index)return true;
+     return std::find(s.index->names.begin(),s.index->names.end(),std::nullopt)!=s.index->names.end();
+    }
+    if(k.container!=AttributeContainerKind::kScalar||!text_value(k))return false;
+    if(column(s,k))return true;
+    return s.index&&std::find(s.index->names.begin(),s.index->names.end(),std::optional<std::string>(k.value))!=s.index->names.end();
+   };
+   replacement=!(listed(replaced_case)&&listed(o.attribute_key));
+  }
+ }
+ // On an empty frame a None case key groups nothing and fails no call.
+ if(once&&!replacement&&s.size()!=0&&group_case_is_null(o))error("TypeError","'NoneType' object is not callable");
  if(!once&&s.size()!=0&&!o.attribute_key.is_null&&o.attribute_key.container==AttributeContainerKind::kScalar)
   if(const auto counted=column(s,o.attribute_key)){
    bool any=false;for(std::size_t i=0;i<s.size()&&!any;++i)any=!missing(cell(s,i,*counted));
@@ -886,8 +969,15 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  const bool list_grouper=once&&!unmatched_mapping&&group_case.container==AttributeContainerKind::kList;
  if(list_grouper&&group_case.children.size()!=s.size())error("ValueError","Grouper and axis must be same length");
  if(once&&!unmatched_mapping&&group_case.container==AttributeContainerKind::kTuple)detail::pandas_check_hashable_key(group_case,error);
- if(once&&!unmatched_mapping&&!list_grouper&&(s.size()!=2||group_case.container==AttributeContainerKind::kTuple))
+ // Round DR: so a dict, list or tuple attribute key lets a two-row frame
+ // resolve the case column too (fresh pandas CK 2026121109 case 255).
+ if(once&&!unmatched_mapping&&!list_grouper&&!replacement&&!(s.size()==0&&group_case_is_null(o)))
   direct_column(s,group_case);
+ // Round DR: grouping by the case column twice (the attribute key names
+ // it too) gives reset_index two columns of that name, on any frame
+ // (probe dr/p1).
+ if(once&&!unmatched_mapping&&!list_grouper&&text_value(group_case)&&text_value(o.attribute_key)&&group_case.value==o.attribute_key.value&&column(s,group_case))
+  error("ValueError","cannot insert "+group_case.value+", already exists");
  // Round CK: df[key] refuses a dict before it looks at the rows. Round CP:
  // on an empty frame the per-event path reads df[key] (a list selects its
  // columns, a tuple is one label), the per-case path groups by the key (a
@@ -914,6 +1004,9 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
   detail::pandas_check_getitem_key(key,error);
   return s;
  }
+ // After the index replacement the grouped frame is indexed by the key:
+ // df[None] is a missing column.
+ if(once&&o.attribute_key.is_null&&replacement)error("KeyError","None");
  if(once&&o.attribute_key.is_null)error("TypeError","'NoneType' object is not callable");
  // Round DB: per case, groupby calls a set key on each index label (probe
  // set-pdtblck-2 case 116).
@@ -922,8 +1015,86 @@ EventTable filter_pandas_attributes_relative_occurrence(const EventTable& s,cons
  // A list key is one grouper array.
  if(once&&o.attribute_key.container==AttributeContainerKind::kList){
   if(o.attribute_key.children.size()!=s.size())error("ValueError","Grouper and axis must be same length");
+  // Round DR: the grouped frame (one row per case and array item, each
+  // column's first non-null cell) keeps every column, so df[list] reads
+  // the listed columns' tuples; the denominator and the stake are read once
+  // a tuple counts, and the events are filtered on tuples no cell holds
+  // (probe dr/p1).
+  if(!unmatched_mapping&&!list_grouper&&!replacement){
+   check_list_columns(s,o.attribute_key);
+   std::vector<std::size_t> listed;for(const auto& item:o.attribute_key.children)listed.push_back(*column(s,item));
+   const auto cases=direct_column(s,group_case);
+   std::unordered_map<std::string,std::vector<std::size_t>> groups;
+   for(std::size_t i=0;i<s.size();++i){
+    const auto& item=o.attribute_key.children[i];
+    if(missing(cell(s,i,cases))||missing(item))continue;
+    groups[group_key(cell(s,i,cases))+'\x1f'+group_key(item)].push_back(i);
+   }
+   bool counted=false;
+   for(const auto& [key,rows]:groups){
+    bool complete=true;
+    for(const auto c:listed)complete&=std::any_of(rows.begin(),rows.end(),[&](std::size_t i){return !missing(cell(s,i,c));});
+    counted|=complete;
+   }
+   if(counted){
+    if(case_denominator){
+     if(o.case_id_key.container==AttributeContainerKind::kList){
+      check_list_columns(s,o.case_id_key);
+      error("ValueError","The truth value of a Series is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().");
+     }
+     direct_column(s,o.case_id_key);
+    }
+    if(stake.is_null||stake.container==AttributeContainerKind::kContainer||stake.container==AttributeContainerKind::kSet||stake.container==AttributeContainerKind::kFrozenSet||(stake.container==AttributeContainerKind::kScalar&&date_value(stake)))
+     error("TypeError","unsupported operand type(s) for *: '"+qualified_type_name(stake)+"' and 'int'");
+    if(is_native_na_attribute(stake))error("TypeError","boolean value of NA is ambiguous");
+    if(!numeric(stake))error("TypeError","'>=' not supported between instances of 'int' and '"+qualified_type_name(stake)+"'");
+   }
+   EventAttribute values{"",""};values.container=AttributeContainerKind::kList;
+   if(!o.relative_attribute_key_enum)return values_filter(s,values,o,true);
+   auto events=o;events.attribute_key=*o.relative_attribute_key_enum;
+   return values_filter(s,values,events,true);
+  }
  }
  if(empty_list(o.attribute_key))error("ValueError","No group keys passed!");
+ // Round DR: counted per event, a list key counts df[list].value_counts(),
+ // the rows' tuples (a row with a missing listed cell drops); the
+ // denominator and the stake are read only once a tuple counts; the
+ // events are then filtered on the tuples, which no cell holds (probe
+ // dr/p1).
+ if(!once&&o.attribute_key.container==AttributeContainerKind::kList){
+  check_list_columns(s,o.attribute_key);
+  std::vector<std::size_t> listed;for(const auto& item:o.attribute_key.children)listed.push_back(*column(s,item));
+  struct Tuple {EventAttribute value;std::size_t count=0;};
+  std::vector<Tuple> tuples;std::unordered_map<std::string,std::size_t> seen;
+  for(std::size_t i=0;i<s.size();++i){
+   EventAttribute row{"",""};row.container=AttributeContainerKind::kTuple;bool complete=true;
+   for(const auto c:listed){const auto& v=cell(s,i,c);if(missing(v)){complete=false;break;}row.children.push_back(v);}
+   if(!complete)continue;
+   std::string key;for(const auto& v:row.children)key+=group_key(v)+'\x1f';
+   const auto [it,added]=seen.emplace(key,tuples.size());if(added)tuples.push_back({row});
+   ++tuples[it->second].count;
+  }
+  std::size_t denominator=s.size();
+  if(!tuples.empty()&&case_denominator&&!unmatched_mapping){
+   if(o.case_id_key.container==AttributeContainerKind::kList){
+    check_list_columns(s,o.case_id_key);
+    error("ValueError","The truth value of a Series is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().");
+   }
+   const auto cases=direct_column(s,o.case_id_key);std::unordered_set<std::string> ids;
+   for(std::size_t i=0;i<s.size();++i)if(!missing(cell(s,i,cases)))ids.insert(group_key(cell(s,i,cases)));
+   denominator=ids.size();
+  }
+  if(!tuples.empty()&&(stake.is_null||stake.container==AttributeContainerKind::kContainer||stake.container==AttributeContainerKind::kSet||stake.container==AttributeContainerKind::kFrozenSet||(stake.container==AttributeContainerKind::kScalar&&date_value(stake))))
+   error("TypeError","unsupported operand type(s) for *: '"+qualified_type_name(stake)+"' and 'int'");
+  if(!tuples.empty()&&is_native_na_attribute(stake))error("TypeError","boolean value of NA is ambiguous");
+  if(!numeric(stake)&&!tuples.empty())error("TypeError","'>=' not supported between instances of 'int' and '"+qualified_type_name(stake)+"'");
+  const double threshold=!numeric(stake)?0.0:native_attribute_number(stake)*static_cast<double>(denominator);
+  EventAttribute values{"",""};values.container=AttributeContainerKind::kList;
+  for(const auto& t:tuples)if(static_cast<double>(t.count)>=threshold)values.children.push_back(t.value);
+  if(!o.relative_attribute_key_enum)return values_filter(s,values,o,true);
+  auto events=o;events.attribute_key=*o.relative_attribute_key_enum;
+  return values_filter(s,values,events,true);
+ }
  const auto attribute=direct_column(s,o.attribute_key);
  std::optional<std::size_t> cases,grouped;std::unordered_set<std::string> all_cases;
  if(case_denominator&&!unmatched_mapping){
