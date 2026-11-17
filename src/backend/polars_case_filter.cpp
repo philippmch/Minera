@@ -373,9 +373,18 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   const bool eager = phase == "apply";
   source.validate();
   if (source.index || source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars case filters require declared dtypes and no dataframe index");
-  if (collection(options.case_id_key) && options.case_id_key.children.empty())
+  // Round DN: on an eager frame the group_by over no key, the duration and
+  // the filters run as on any key (each raising first); only the join back
+  // onto the frame finds no key (probe dn/c2).
+  const bool keyless = collection(options.case_id_key) && options.case_id_key.children.empty();
+  // Round DN: the join's right side resolves first, so a missing timestamp
+  // column fails before the join finds no key (probe dn/c2, lazy).
+  if (keyless && !eager && op == Operation::kPerformance && text(options.timestamp_key) &&
+      std::find(source.columns.begin(), source.columns.end(), options.timestamp_key.value) == source.columns.end())
+    missing(source, options.timestamp_key.value, op, phase, !null(high));
+  if (keyless && !eager)
     fail("InvalidOperationError", phase, "expected join keys/predicates\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nDF []; PROJECT */0 COLUMNS" + contexts({"join"}));
-  const bool listed = groups::modelled(options.case_id_key);
+  const bool listed = !keyless && groups::modelled(options.case_id_key);
   const auto position = [&](const std::string& key) {
     const auto found = std::find(source.columns.begin(), source.columns.end(), key);
     if (found == source.columns.end()) missing(source, key, op, phase, !null(high));
@@ -383,7 +392,7 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   };
   groups::Keys keys;
   if (listed) keys = case_keys(source, op, high, options, phase);
-  else keys.items.push_back({false, position(options.case_id_key.value), options.case_id_key.value, source.dtypes[position(options.case_id_key.value)], {}, false});
+  else if (!keyless) keys.items.push_back({false, position(options.case_id_key.value), options.case_id_key.value, source.dtypes[position(options.case_id_key.value)], {}, false});
   std::size_t time_at = 0;
   if (op == Operation::kPerformance) {
     if (collection(options.timestamp_key)) {
@@ -469,6 +478,7 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     const auto value = op == Operation::kSize ? std::optional<std::int64_t>{static_cast<std::int64_t>(group.count)} : group.first ? std::optional<std::int64_t>{(*group.last - *group.first) / polars_datetime::per_second(time_unit)} : std::nullopt;
     group.keep = !folded && value && compare_bound(*value, low, false) && ((op == Operation::kSize && null(high)) || compare_bound(*value, high, true));
   }
+  if (keyless) fail("InvalidOperationError", phase, "expected join keys/predicates");
   // Literal keys only: the selected keys are one row whatever passed.
   const bool every = keys.all_literal();
   auto result = source; result.rows.clear();

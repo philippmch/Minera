@@ -2299,6 +2299,10 @@ inline std::optional<std::string> struct_supertype(const std::string& dtype, con
     case K::kBoolean: return dtype;
     case K::kFloat64: return std::string("Float64");
     case K::kInt128: return std::string("Int128");
+    // Round DN: a UInt128 field (2**127 and up) meets an unsigned column in
+    // UInt128 and a signed one in Int128, where its value is null (probe
+    // dn/s1.py: every integer dtype, rows or none).
+    case K::kUInt128: return std::string(dtype.starts_with("UInt") ? "UInt128" : "Int128");
     case K::kInt64:
     case K::kUInt64: return std::string(dtype == "UInt64" ? "Float64" : "Int64");
     case K::kDatetime:
@@ -2353,7 +2357,10 @@ inline StructModel struct_model(const EventAttribute& value, const std::string& 
   return struct_model(struct_fields(value), dtype);
 }
 inline StructModel struct_model(const Value& value, const std::string& dtype) { return struct_model(struct_fields(value), dtype); }
-inline bool struct_null(const StructField& f) { return !f.nested && f.value.kind == Kind::kNone; }
+// Round DN: a UInt128 field cast to Int128 is null there.
+inline bool struct_null(const StructField& f) {
+  return !f.nested && (f.value.kind == Kind::kNone || (f.cast == "Int128" && f.type.kind == LitType::K::kUInt128));
+}
 // A field value as a number of its supertype (Booleans 0 and 1, datetimes
 // their microseconds, dates their days).
 inline Wide field_integer(const StructField& f) {

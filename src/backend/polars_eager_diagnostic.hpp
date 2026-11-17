@@ -25,7 +25,14 @@ inline std::string polars_eager_diagnostic(const std::string& message) {
   // The plan text below the FAILED HERE line, up to the context stack.
   const auto failed = message.find("<---\n", at);
   if (failed == std::string::npos || failed > context) return message;
-  const auto input = message.substr(failed + 5, context - failed - 5);
+  auto input = message.substr(failed + 5, context - failed - 5);
+  // Round DN: a sort ran on the eager frame before the group_by, which then
+  // reads the sorted frame (same columns) as its input (t9 probes,
+  // filter_variants_top_k).
+  if (input.rfind("SORT BY [", 0) == 0) {
+    const auto line = input.find("\n  DF [");
+    if (line != std::string::npos && input.find('\n', line + 1) == std::string::npos) input = input.substr(line + 3);
+  }
   if (input.rfind("DF [", 0) != 0 || input.find('\n') != std::string::npos) return message;
   return head + plan + "\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\n" + input + stack + "\t[1] 'group_by'\n";
 }

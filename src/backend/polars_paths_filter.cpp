@@ -283,9 +283,10 @@ void validate_column(const EventAttribute& value) {
 // Round CO: the plain filter reads a list timestamp key holding one item
 // that is not a str only in its sort, as a one-value Series literal (case
 // 134 of the fresh CK bank).
+// Round DN: of any length (probe dn/p2).
 bool literal_time_list(const EventAttribute& key, bool performance) {
   return !performance && (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) &&
-         key.children.size() == 1 && !text(key.children.front());
+         !key.children.empty() && !text(key.children.front());
 }
 // Round DC: a key pl.col expands to several existing columns.
 bool several_names(const EventAttribute& key) {
@@ -313,8 +314,10 @@ std::vector<std::string> validate_apply(const EventAttribute& value, bool perfor
   for (const auto* key : {&options.case_id_key, &options.timestamp_key}) {
     // Round DB: pl.lit refuses a set key.
     if (detail::polars_lit::set_argument(*key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
+    // Round DN: an int item past the UInt128 range is an OverflowError
+    // (probe dn/p1).
     if (key->container == AttributeContainerKind::kList || key->container == AttributeContainerKind::kTuple)
-      if (const auto error = detail::polars_lit::argument_literal_error(*key)) fail("TypeError", "apply", *error);
+      if (const auto error = detail::polars_lit::argument_literal_fault(*key)) fail(error->type, "apply", error->message);
   }
   // Round CM: a dict case key fails its group_by after the attribute
   // selector is built and before the timestamp one.
@@ -797,8 +800,10 @@ void eager_sort(const EventTable& source, const PolarsPathsFilterOptions& option
     if (null(*key) || text(*key)) continue;
     literal = true;
     if (lit::set_argument(*key)) fail("TypeError", "apply", lit::kSetLiteralError);
+    // Round DN: an int item past the UInt128 range is an OverflowError (t9
+    // probes).
     if (key->container == AttributeContainerKind::kList || key->container == AttributeContainerKind::kTuple) {
-      if (const auto error = lit::argument_literal_error(*key)) fail("TypeError", "apply", *error);
+      if (const auto error = lit::argument_literal_fault(*key)) fail(error->type, "apply", error->message);
     } else if (key->container == AttributeContainerKind::kContainer) {
       if (const auto error = lit::dict_literal_error(*key)) fail("TypeError", "apply", *error);
     } else if (lit::scalar_too_large(*key)) fail("InvalidOperationError", "apply", lit::kIntegerTooLarge);

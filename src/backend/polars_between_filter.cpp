@@ -183,7 +183,7 @@ std::string activity_key(const EventAttribute& value, const std::vector<std::str
   fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(value) + "'.");
 }
 void validate_apply(const EventAttribute& act1, const EventAttribute& act2, const PolarsBetweenOptions& options,
-                    const std::vector<std::string>& columns) {
+                    const std::vector<std::string>& columns, bool eager = false) {
   const auto& key = options.case_id_key;
   if (null(key)) fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (!text(key)) {
@@ -230,7 +230,7 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
   if (several) throw std::invalid_argument("Native Polars between activity selector accepts one column");
   // Round DH: a scalar separator past the Int128 range fails pl.lit while
   // the expressions build (probe dh/p7).
-  if (lit::scalar_too_large(options.subcase_concat_str)) fail("InvalidOperationError", "apply", lit::kIntegerTooLarge);
+  if (!eager && lit::scalar_too_large(options.subcase_concat_str)) fail("InvalidOperationError", "apply", lit::kIntegerTooLarge);
 }
 
 Dtype dtype(const std::string& value) {
@@ -572,9 +572,16 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
   // Python builds the anchor and separator literals before Polars runs.
   validate_anchor(act1, phase); validate_anchor(act2, phase);
   // Round DB: pl.lit refuses a set separator.
-  if (detail::polars_lit::set_argument(options.subcase_concat_str)) fail("TypeError", phase, detail::polars_lit::kSetLiteralError);
-  if (collection(options.subcase_concat_str) && options.subcase_concat_str.container != AttributeContainerKind::kContainer)
-    if (const auto error = detail::polars_lit::argument_literal_fault(options.subcase_concat_str)) fail(error->type, phase, error->message);
+  // Round DN: on an eager frame the separator's literal is built by its own
+  // statement, after the is_in flags ran (t9 probes).
+  const bool eager = phase == "apply";
+  const auto separator_literal = [&] {
+    if (detail::polars_lit::set_argument(options.subcase_concat_str)) fail("TypeError", phase, detail::polars_lit::kSetLiteralError);
+    if (collection(options.subcase_concat_str) && options.subcase_concat_str.container != AttributeContainerKind::kContainer)
+      if (const auto error = detail::polars_lit::argument_literal_fault(options.subcase_concat_str)) fail(error->type, phase, error->message);
+    if (eager && lit::scalar_too_large(options.subcase_concat_str)) fail("InvalidOperationError", phase, lit::kIntegerTooLarge);
+  };
+  if (!eager) separator_literal();
   source.validate();
   if (source.index) throw std::invalid_argument("Native Polars between tables cannot have dataframe index metadata");
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars between requires declared column dtypes");
@@ -629,6 +636,7 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
   const auto* time_dictionary = time_at == case_at ? case_dictionary : time_ranks ? &*time_ranks : nullptr;
   const auto anchor1 = anchor_of(act1), anchor2 = anchor_of(act2);
   validate_membership(source, activity_at, key, anchor1, anchor2, phase);
+  if (eager) separator_literal();
   const auto& activity_dtype = source.dtypes[activity_at];
   const auto lookup1 = lookup_literal(anchor1, activity_dtype), lookup2 = lookup_literal(anchor2, activity_dtype);
   validate_separator(source, key, activity, anchor1, anchor2, activity_dtype, options.subcase_concat_str, phase);
@@ -740,7 +748,7 @@ EventTable filter_polars_between(const EventTable& source, const EventAttribute&
                                 const EventAttribute& act2, const PolarsBetweenOptions& options) {
   try {
     eager_sort(source, options);
-    validate_apply(act1, act2, options, source.columns);
+    validate_apply(act1, act2, options, source.columns, true);
     return collect(source, act1, act2, options, "apply");
   } catch (const PolarsBetweenError& error) {
     // Round DL: an eager frame's diagnostics (polars_eager_diagnostic.hpp).

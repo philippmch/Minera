@@ -136,8 +136,12 @@ void polars_tied_timestamps() {
         "e0 e2 e4 e6 e8 e10 e12 e14 e16 e18 e20 e22");
   PolarsVariantsFilterOptions options;
   options.activity_key = text(kCase);
+  // Round DN: this is a LazyFrame's message (the sort in the resolved plan);
+  // on an eager frame the sort ran before the group_by, which shows the frame
+  // alone.
+  const auto lazy_tied = LazyEventTable::from_table(tied);
   check_error<PolarsVariantsFilterError>(
-      "Polars top_k with the activity key on the case column", [&] { (void)filter_polars_variants_top_k(tied, integer(1), options); },
+      "Polars top_k with the activity key on the case column", [&] { (void)filter_polars_variants_top_k(lazy_tied, integer(1), options); },
       "DuplicateError",
       "column with name 'case:concept:name' has more than one occurrence\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING "
       "'group_by' <---\nSORT BY [col(\"case:concept:name\"), col(\"time:timestamp\")]\n  DF [\"case:concept:name\", \"concept:name\", "

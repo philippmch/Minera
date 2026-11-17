@@ -1033,7 +1033,7 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
   // partitions when the frame has at least as many columns as Polars has
   // threads (4 on the host the reference banks were captured on): the first
   // three hold n/4 rows each (none below 4 rows), the last the rest, and the
-  // first failing partition's error is raised. A struct cast fails only on a
+  // errors race (round DN, below). A struct cast fails only on a
   // partition with a present cell, so on a partition without one a
   // comparison error anywhere in the node wins over a cast left of it; a
   // cast column's null structs are per partition too. A null filter
@@ -1058,14 +1058,38 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
                                  [&](std::size_t r){return !detail::polars_lit::null_cell(source.rows[r][*c]);});
       });
     };
+    // Round DN: the partitions run at once and the error Polars raises is the
+    // first in time (DF1-7). Over the reference's runs (probes dn/s2.py,
+    // dn/s3.py: 617 row layouts, 20-30 runs each) a struct cast error wins
+    // over the other partitions' comparison error when at least two
+    // partitions fail the cast or one of them holds four present cells of
+    // the cast column; otherwise the comparison error wins (a single cast
+    // partition with fewer present cells loses in most runs).
+    struct PartError{LeafError error;const Expr* at;std::size_t present;};
+    std::vector<PartError> errors;
     for(const auto& [begin,end]:parts) {
       mark(begin,end);
       const Expr* at=nullptr;
       if(const auto error=first_error(node,at)) {
-        // Round CJ: a failing struct cast names the cast, inside the node.
-        if(!error->expression.empty())fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error->expression+"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n");
-        fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error_text(*at)+(node.leaf?"\n":"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n"));
+        std::size_t present=0;
+        if(const auto c=index_of(source,at->leaf->column))
+          for(std::size_t i=begin;i<end;++i)if(!detail::polars_lit::null_cell(source.rows[rows[i]][*c]))++present;
+        errors.push_back({*error,at,present});
       }
+    }
+    if(!errors.empty()) {
+      const auto cast=[](const PartError& e){return !e.error.expression.empty();};
+      const PartError* pick=&errors.front();
+      const auto casts=static_cast<std::size_t>(std::count_if(errors.begin(),errors.end(),cast));
+      if(casts&&casts<errors.size()) {
+        const bool big=std::any_of(errors.begin(),errors.end(),[&](const PartError& e){return cast(e)&&e.present>=4;});
+        const bool want=casts>=2||big;
+        pick=&*std::find_if(errors.begin(),errors.end(),[&](const PartError& e){return cast(e)==want;});
+      }
+      const auto& error=pick->error;
+      // Round CJ: a failing struct cast names the cast, inside the node.
+      if(!error.expression.empty())fail(error.first,phase(eager),error.second+"\n\nThis error occurred in the following expression:\n\t"+error.expression+"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n");
+      fail(error.first,phase(eager),error.second+"\n\nThis error occurred in the following expression:\n\t"+error_text(*pick->at)+(node.leaf?"\n":"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n"));
     }
     std::vector<std::size_t> kept;
     for(const auto& [begin,end]:parts) {
@@ -1108,6 +1132,12 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
       const auto categories=enum_category_list(source,*column);
       const bool present=has_present_cell(source,*column);
       each_leaf(node,[&](Leaf& l){l.dtype=dtype;l.categories=categories;l.present=present;});
+      // Round DN: on an eager frame a dict bound whose String cast is null
+      // (a None field) against a String column is a null bound, a null
+      // column in place (t9 probes, apply_numeric_events).
+      if(eager)each_leaf(node,[&](Leaf& l){
+        if(mapping(l.value)&&l.op!="=="&&l.dtype=="String"&&!detail::polars_lit::struct_text(detail::polars_lit::struct_model(l.value,"String")))l.value=nil();
+      });
       const Leaf* bad=nullptr;std::string message;
       each_leaf(node,[&](const Leaf& l) {
         if(bad||null(l.value))return;
@@ -1372,6 +1402,14 @@ EventTable filtered(const EventTable& source,const Predicate& query) {
 bool plain_list_key(const EventAttribute& attr);
 struct CountColumn { std::optional<std::size_t> column, cases;EventAttribute literal;std::string dtype;bool once=false,literal_case=false;std::vector<EventAttribute> pairs; };
 std::size_t distinct_case_count(const EventTable& source,const EventAttribute& raw);
+// Round DN: a list or tuple of str items naming one existing column (pl.col
+// reads it as that column).
+bool one_name_list(const EventTable& source,const EventAttribute& key){
+  if((key.container!=AttributeContainerKind::kList&&key.container!=AttributeContainerKind::kTuple)||key.children.empty())return false;
+  if(!std::all_of(key.children.begin(),key.children.end(),[](const EventAttribute& v){return keys::plain_text(v);}))return false;
+  const auto name=keys::col_key(key,source.columns);
+  return text(name)&&index_of(source,name.value).has_value();
+}
 // Round DC: the plain keys of several items get_attribute_values groups by
 // (a str a column, a scalar a literal named `literal`); other items stay
 // outside the model.
@@ -1380,6 +1418,16 @@ bool pair_item(const EventAttribute& item){
   return text(item)||null(item)||integer(item)||boolean(item)||real(item)||date(item);
 }
 bool sequence_item(const EventAttribute& item){return item.container==AttributeContainerKind::kList||item.container==AttributeContainerKind::kTuple;}
+// Round DN: a dict of plain fields as a group key is one struct literal whose
+// Python value is the dict again (probe dn/a1).
+bool plain_struct(const EventAttribute& v){
+  if(!mapping(v)||v.children.empty())return false;
+  return std::all_of(v.children.begin(),v.children.end(),[](const EventAttribute& f){
+    if(f.container!=AttributeContainerKind::kScalar)return false;
+    if(integer(f))return !(exact(f)<TokenInteger(std::numeric_limits<std::int64_t>::min()))&&!(TokenInteger(std::numeric_limits<std::int64_t>::max())<exact(f));
+    return null(f)||text(f)||boolean(f)||(real(f)&&std::isfinite(number(f)));
+  });
+}
 // The keys resolve in order: a missing name fails at its place, a second
 // literal or a repeated name repeats its output name there.
 void resolve_pair_keys(const EventTable& source,const std::vector<EventAttribute>& items,const std::vector<std::string>& groupnodes){
@@ -1408,7 +1456,12 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     // Round CM: group_by([case, attribute]) reads a dict case key as a
     // struct literal, so the denominator's pl.col(dict) fails first.
     if(mapping(options.case_id_key)){
+      // Round DN: on an eager frame the group_by runs with the struct
+      // literal and the counts' .collect() fails before the denominator
+      // (t9 probes).
+      if(eager)if(const auto error=detail::polars_lit::dict_literal_error(options.case_id_key))fail("TypeError","apply",*error);
       if(text(attr)&&!index_of(source,attr.value))fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved("'group_by'",frame_plan(source),groupnodes));
+      if(eager){result.literal_case=true;return std::optional<std::size_t>{};}
       (void)distinct_case_count(source,options.case_id_key);
       if(detail::polars_lit::dict_literal_error(options.case_id_key))
         throw std::invalid_argument("Native Polars per-case counts grouped by a struct literal case key are outside the modelled domain");
@@ -1425,7 +1478,23 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
       // the group_by before pl.col reads the case key (fresh CK bank
       // 2026111631 case 373).
       if(text(attr)&&!index_of(source,attr.value))fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved("'group_by'",frame_plan(source),groupnodes));
+      // Round DN: on an eager frame the group_by takes the list (empty or
+      // not) as one literal group and the counts' .collect() fails (probe
+      // dn/a1).
+      if(eager){result.literal_case=true;return std::optional<std::size_t>{};}
+      // Round DN: lazily the group_by counts each value once beside the List
+      // literal, and the denominator's pl.col reads a one-name list as that
+      // column (probe dn/a1).
+      if(one_name_list(source,options.case_id_key)){result.literal_case=true;return std::optional<std::size_t>{};}
     }
+    // Round DN: a None case key is pl.lit(None) in the eager group_by too.
+    if(eager&&null(options.case_id_key)){result.literal_case=true;return std::optional<std::size_t>{};}
+    // Round DN: a scalar case key is pl.lit's literal in group_by([case,
+    // attribute]): one past the Int128 range fails it; on an eager frame the
+    // group_by runs and the counts' .collect() fails before the denominator
+    // reads the key (probe dn/a1, t9 probes).
+    if(detail::polars_lit::scalar_too_large(options.case_id_key))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
+    if(eager&&!text(options.case_id_key)&&!collection(options.case_id_key)&&!null(options.case_id_key)){result.literal_case=true;return std::optional<std::size_t>{};}
     const auto key=col_key(options.case_id_key,source.columns);
     if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
     const auto at=index_of(source,key.value);
@@ -1455,8 +1524,13 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     }
     // One tuple item groups as a List literal, which the counts dict cannot
     // take as a key, with or without rows (set-pltblck-2 case 119).
-    if(attr.children.size()==1&&collection(attr.children.front()))fail("TypeError","apply","unhashable type: 'list'");
-    if(attr.children.size()==1)return counts_schema(source,attr.children.front(),options,relative);
+    // Round DN: on an eager frame the counts' .collect() fails first (t9
+    // probes, probe dn/a1).
+    if(attr.children.size()==1&&collection(attr.children.front())){if(eager)return result;fail("TypeError","apply","unhashable type: 'list'");}
+    if(attr.children.size()==1)return counts_schema(source,attr.children.front(),options,relative,false,eager);
+    // Round DN: on an eager frame the group_by by several items ran and the
+    // counts' .collect() fails (t9 probes).
+    if(eager)return result;
     // Several items: the relative filter reads the pairs (stats).
     if(relative&&attr.children.size()>=2)return result;
     // Round DC: get_attribute_values maps the first key to the second.
@@ -1474,7 +1548,17 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     if(attr.children.empty()){if(result.once)(void)case_column();if(eager)return result;fail("IndexError","apply","tuple index out of range");}
     // A key list groups by each of its items; round CM: a dict item is
     // refused as unhashable first.
-    if(!result.once&&!attr.children.empty()&&mapping(attr.children.front()))fail("TypeError","apply","unhashable type: 'dict'");
+    // Round DN: several items holding a dict resolve in order as the
+    // group_by keys (a dict, list or scalar item a literal named `literal`)
+    // before the counts are read (probe dn/a1).
+    if(!result.once&&attr.children.size()>=2&&std::any_of(attr.children.begin(),attr.children.end(),[](const EventAttribute& v){return mapping(v);})) {
+      for(const auto& item:attr.children)if(mapping(item))if(const auto error=detail::polars_lit::dict_literal_error(item))fail("TypeError","apply",*error);
+      resolve_pair_keys(source,attr.children,groupnodes);
+      // get_attribute_values maps the first key to the second, a dict there
+      // being its struct literal's value (probe dn/a1).
+      if(pairs&&pair_item(attr.children.front())&&std::all_of(attr.children.begin()+1,attr.children.end(),[](const EventAttribute& v){return pair_item(v)||plain_struct(v);})){result.pairs=attr.children;return result;}
+    }
+    if(!result.once&&!attr.children.empty()&&mapping(attr.children.front())){if(eager&&attr.children.size()==1)return result;fail("TypeError","apply","unhashable type: 'dict'");}
     // Round DB: a set item is refused as group_by builds its literal.
     if(!result.once)for(const auto& item:attr.children){if(mapping(item))break;if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);}
     if(result.once)if(const auto error=detail::polars_lit::argument_literal_error(attr))fail("TypeError","apply",*error);
@@ -1483,6 +1567,7 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     if(result.once&&attr.children.size()==1&&!attr.children[0].is_null&&
        (mapping(attr.children[0])||attr.children[0].container==AttributeContainerKind::kList)) {
       (void)case_column();
+      if(eager)return result;
       fail("TypeError","apply",std::string("unhashable type: '")+(mapping(attr.children[0])?"dict":"list")+"'");
     }
     // Round DE: a list or tuple first key builds its Series literal, the
@@ -1498,8 +1583,8 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     // key (probe dh/specs/a1.py).
     if(pairs&&!result.once&&attr.children.size()==1&&!mapping(attr.children.front())&&!detail::polars_lit::set_argument(attr.children.front())) {
       const auto& item=attr.children.front();
-      if(sequence_item(item)){if(const auto error=detail::polars_lit::argument_literal_fault(item))fail(error->type,"apply",error->message);fail("TypeError","apply","unhashable type: 'list'");}
-      return counts_schema(source,item,options,relative,pairs);
+      if(sequence_item(item)){if(const auto error=detail::polars_lit::argument_literal_fault(item))fail(error->type,"apply",error->message);if(eager)return result;fail("TypeError","apply","unhashable type: 'list'");}
+      return counts_schema(source,item,options,relative,pairs,eager);
     }
     // Round DC: get_attribute_values with several plain keys (probe dc/ga1).
     if(pairs&&!result.once&&attr.children.size()>=2&&std::all_of(attr.children.begin(),attr.children.end(),pair_item)){
@@ -1578,7 +1663,7 @@ PolarsAttributeCounts counts_from(const EventTable& source,const CountColumn& co
   return out;
 }
 std::size_t distinct_case_count(const EventTable& source,const EventAttribute& raw) {
-  const auto key=col_key(raw,source.columns);if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
+  const auto key=one_name_list(source,raw)?keys::col_key(raw,source.columns):col_key(raw,source.columns);if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
   const auto column=index_of(source,key.value);if(!column)fail("ColumnNotFoundError","apply",column_prefix(source,key.value)+resolved("'select'",frame_plan(source),{"'select'"}));
   std::unordered_set<std::string> keys;for(std::size_t i=0;i<source.size();++i)keys.insert(group_key(cell(source,i,*column),source_dtype(source,*column)));return keys.size();
 }
@@ -1786,6 +1871,23 @@ std::size_t group_height(const EventTable& source,const EventAttribute& attr) {
   }
   fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
 }
+// Per case, group_by([case, key list]) builds the list's Series (a List
+// literal) and keeps each case's first row: the case column, the literal,
+// then the other columns (no rows here).
+EventTable once_frame(const EventTable& source,const EventAttribute& case_key,const EventAttribute& attr,std::size_t& case_column) {
+  if(!text(case_key))throw std::invalid_argument("Native Polars per-case counts over a key list need a str case key");
+  if(const auto error=detail::polars_lit::argument_literal_fault(attr))fail(error->type,"apply",error->message);
+  const auto at=index_of(source,case_key.value);
+  if(!at)fail("ColumnNotFoundError","apply",column_prefix(source,case_key.value)+resolved("'group_by'",frame_plan(source),{"'group_by'","'group_by'"}));
+  case_column=*at;
+  // A str item `literal` reads the List literal column (the key list).
+  // Round DJ: a frame's own `literal` column is that group key's name, so
+  // the aggregation leaves it out; an empty frame has no groups (probe
+  // dj/lit1).
+  EventTable frame=source;frame.rows.clear();frame.columns={source.columns[*at],"literal"};frame.dtypes={source.dtypes[*at],"List"};
+  for(std::size_t i=0;i<source.columns.size();++i)if(i!=*at&&source.columns[i]!="literal"){frame.columns.push_back(source.columns[i]);frame.dtypes.push_back(source.dtypes[i]);}
+  return frame;
+}
 StatisticalSelection list_key_stats(const EventTable& source,const PolarsAttributesFilterCall& call,const EventAttribute& attr,bool eager) {
   const auto op=call.operation;const auto& options=call.options;const auto& items=attr.children;
   const bool once=op==Op::kRelative&&options.keep_once_per_case&&truth(*options.keep_once_per_case);
@@ -1806,19 +1908,13 @@ StatisticalSelection list_key_stats(const EventTable& source,const PolarsAttribu
   } else {
     // Per case: group_by([case, key list]) builds the list's Series (a List
     // literal), keeps each case's first row, then groups those by the list.
-    const auto& case_key=options.case_id_key;
-    if(!text(case_key))throw std::invalid_argument("Native Polars per-case counts over a key list need a str case key");
-    if(const auto error=detail::polars_lit::argument_literal_fault(attr))fail(error->type,"apply",error->message);
-    const auto case_column=index_of(source,case_key.value);
-    if(!case_column)fail("ColumnNotFoundError","apply",column_prefix(source,case_key.value)+resolved("'group_by'",frame_plan(source),{"'group_by'","'group_by'"}));
-    // A str item `literal` reads the List literal column (the key list).
-    // Round DJ: a frame's own `literal` column is that group key's name, so
-    // the aggregation leaves it out; an empty frame has no groups (probe
-    // dj/lit1).
+    std::size_t at=0;
+    frame=once_frame(source,options.case_id_key,attr,at);
+    const auto case_column=std::optional<std::size_t>{at};
     const auto own=[&](std::size_t i){return i!=*case_column&&source.columns[i]!="literal";};
-    frame=source;frame.columns={source.columns[*case_column],"literal"};frame.dtypes={source.dtypes[*case_column],"List"};
-    for(std::size_t i=0;i<source.columns.size();++i)if(own(i)){frame.columns.push_back(source.columns[i]);frame.dtypes.push_back(source.dtypes[i]);}
-    resolve_list_keys(frame,items,"'group_by'",aggregate_plan(source,*case_column,attr),{"'group_by'"});
+    // Round DN: on an eager frame the per-case group_by ran, so the second
+    // reads its frame (t9 probes, relative occurrence).
+    resolve_list_keys(frame,items,"'group_by'",eager?frame_plan(frame):aggregate_plan(source,*case_column,attr),{"'group_by'"});
     if(eager)eager_collect(source,call,attr);
     // The first row of each case (a null case is a group too), reindexed to
     // the aggregated columns.
@@ -1956,9 +2052,21 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     }
     if(dict_items&&op==Op::kTopActivities&&!eager)
       fail("TypeError","apply",mapping(attr.children.front())?"cannot select columns using Sequence with elements of type 'dict'":"'dict' object is not an instance of 'str'");
+    // Round DN: per case, several items holding a dict build the key list's
+    // Series for group_by([case, list]), whose frame the counts then group
+    // by each item (a second literal repeating `literal`; probe dn/a1).
+    if(dict_items&&op==Op::kRelative&&attr.children.size()>=2&&countoptions.keep_once_per_case&&truth(*countoptions.keep_once_per_case)) {
+      std::size_t at=0;
+      const auto frame=once_frame(source,countoptions.case_id_key,attr,at);
+      resolve_list_keys(frame,attr.children,"'group_by'",eager?frame_plan(frame):aggregate_plan(source,at,attr),{"'group_by'"});
+      if(eager)eager_collect(source,call,attr);
+      throw std::invalid_argument("Native Polars per-case counts over a key list holding a dict are outside the modelled domain");
+    }
     if(dict_items&&op!=Op::kTopActivities&&!mapping(attr.children.front())&&!(countoptions.keep_once_per_case&&truth(*countoptions.keep_once_per_case))) {
-      for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
-        fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),{"'group_by'"}));
+      // Round DN: the items resolve in order, a second literal repeating the
+      // name `literal` (probe dn/a1).
+      for(const auto& item:attr.children)if(mapping(item))if(const auto error=detail::polars_lit::dict_literal_error(item))fail("TypeError","apply",*error);
+      resolve_pair_keys(source,attr.children,{"'group_by'"});
       if(eager)eager_collect(source,call,attr);
       if(op==Op::kRelative) {
         // Round CR: the denominator, then the stake times it, then each

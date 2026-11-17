@@ -564,6 +564,18 @@ Json typed(const std::string& tag, std::string text) { return jtagged(tag, jstri
 
 // A native scalar as the reference's typed JSON.
 Json typed_attribute(const EventAttribute& v) {
+  // Round DN: a list (a tuple literal read back) or a dict (a struct
+  // literal's value) as the capture writes them.
+  if (v.container == AttributeContainerKind::kList) {
+    std::vector<Json> items;
+    for (const auto& item : v.children) items.push_back(typed_attribute(item));
+    return jtagged("l", jarray(std::move(items)));
+  }
+  if (v.container == AttributeContainerKind::kContainer) {
+    std::vector<Json> items;
+    for (const auto& item : v.children) items.push_back(jarray({typed("s", item.key), typed_attribute(item)}));
+    return jtagged("m", jarray(std::move(items)));
+  }
   if (v.is_null) {
     Json null;
     return jtagged("n", null);

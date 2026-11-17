@@ -30131,3 +30131,159 @@ Tests:
   filters while calling the `EventTable` overload; the checks now call the
   `LazyEventTable` overloads.
 - Full suite: 591 tests passed. Python script tests not rerun (scripts unchanged); the workbench fixture replay gave 2,673 responses unchanged.
+
+## Review DN1: re-review of round DM, the carried eager table calls, literal case keys in the variants filters, eager sequence probes over `literal`-column and empty frames, the partition race, fresh seeds (2026-11-17)
+
+Round DN checked DM's CI (run 44088769580 on 478ee7f7: green on all six
+jobs), worked down the 138 eager table calls DM carried, probed the shapes
+they pointed at eagerly and lazily, took the eager sequence filters on to
+frames with their own `literal` column and to frames of no row or one row,
+modelled the majority outcome of the struct-cast partition race (DF1-7)
+and replayed two batches of fresh seeds. The device check on the Mac was
+skipped (the Mac was offline).
+
+- **DN1-1 DM's carried eager table calls** (probes t941-t960 of DM1-3,
+  dumps `dm/out/t9*.jsonl`; 138 calls). Observed and modelled:
+  - attribute counts and the relative occurrence: on an eager frame the
+    group_by runs (a dict key as its struct literal, a list key, empty or
+    not, as one literal group, a None case key as pl.lit(None), a scalar
+    case key as its literal, an int past the Int128 range refused first)
+    and the counts' missing `.collect()` fails before the denominator reads
+    the key; lazily the group_by counts each value once beside a List
+    literal, and pl.col reads a list or tuple of str items naming one
+    existing column as that column; several items holding a dict resolve
+    in order as group keys (a dict, list or scalar item a literal named
+    `literal`, a second one repeating it), per case through the key list's
+    Series (`polars_attributes_filter.cpp`, probe `dn/specs/a1.py`);
+  - the numeric attribute filters on an eager frame: a dict bound whose
+    String cast is null (a None field) against a String column is a null
+    bound;
+  - the case filters: on an eager frame the group_by over no key (an empty
+    set, list or tuple), the duration and the filters run as on any key,
+    each raising first, and only the join back onto the frame finds no
+    key; lazily the join's right side resolves first, so a missing
+    timestamp column fails before the missing key (probe `dn/specs/c2.py`,
+    1,254 calls each way);
+  - a dict bound holding 2**127 or more: the UInt128 field meets an
+    unsigned column in UInt128 and a signed one in Int128, where its value
+    is null (`polars_lit_model.hpp`, probe `dn/s1.py` over every integer
+    dtype with rows or none);
+  - the between filter on an eager frame builds its separator literal in
+    its own statement, after the `is_in` flags ran;
+  - LTL: a key selecting no column expands the first activity's predicate
+    to nothing as that filter runs, before the next activity's literal;
+    the sort builds each key's literal (a scalar past the Int128 range
+    refused) and on an eager frame runs before the window spreads a list
+    case key into its items; pl.col reads a list resource key's items
+    before the suffix is concatenated; `four_eyes_principle` and
+    `attr_value_different_persons` build a list resource key's Series
+    literal strictly (probe `dn/specs/l1.py`);
+  - paths: a list timestamp key of any length is the sort's Series
+    literal; an int item past the UInt128 range is an OverflowError (probes
+    `dn/specs/p1.py`, `p2.py`);
+  - the variants filters' sort on an eager frame runs before the group_by
+    reads the activity key, the sorted frame then the group_by's input;
+    an int, float or bool timestamp key sorts as its literal and a None
+    one drops out (the case column then sorts alone, stably).
+  138 -> 5, all declared: a set holding NaN (t944, `between.apply`, the
+  set's iteration order), two List literal cells the bank encoding cannot
+  hold (t945 case 89, t946 case 281), an equal-size join (t954 case 185;
+  reference reruns gave both orders) and DN1-6 (t955 case 243).
+- **DN1-2 Literal case keys in the variants filters** (probe
+  `dn/specs/v1.py`, 3,150 calls eagerly and lazily over five frames: the
+  CK base frame, a wider one, one row, no row and renamed columns). After
+  DN1-1, 19 eager and 107 lazy calls were refused natively. Observed and
+  modelled (`polars_variants_filter.cpp`):
+  - `apply` with a literal or listed case key and an empty activity list
+    (or empty set) aggregates nothing, so the join misses the `variant`
+    column: the valid columns are the group keys' names (each literal
+    `literal`), the plan a `SELECT` of the literal when no key item is a
+    str, else an `AGGREGATE` with no aggregation, over the sort; on an
+    eager frame the join follows the group_by and the variants Python
+    joined, with no plan;
+  - lazily an activity naming a str key item aggregates that group key
+    again (DuplicateError), and an empty activity list leaves each group a
+    tuple without items (`tuple index out of range`), a None case key
+    included, on frames of any height;
+  - `filter_variants_top_k` with a None case key: a literal or None
+    timestamp alone sorts a frame of one row only (ShapeError otherwise;
+    a None timestamp beside the None key sorts as one `null`), the one
+    row is the one group and the join by None fails afterwards; a missing
+    activity fails the group_by over `SORT BY [null]`;
+  - several key items on one row: an empty activity list leaves the row
+    holding the keys alone, and a None second item fails to iterate
+    (`'NoneType' object is not iterable`);
+  - a key list mixing str items and literals in the positive join keeps
+    the right side's keys, each str item as `<name>_right`, each literal
+    as `literal`;
+  - an eager int case key with a missing activity fails the group_by as a
+    listed key does (no longer refused).
+  v1: 0 differing each way.
+- **DN1-3 Eager sequence probes over `literal`-column and empty frames**
+  (new wrapper `dn/seqwrap.sh`: the DK `literal`-column wrapper under the
+  DM eager wrapper, and a sequence variant of DM's empty-frame wrapper
+  that cuts about 45% of the frames to no row and 25% to one row; the CK,
+  CP, CJ and CH sequence domains, 300 cases each): `literal` columns
+  eagerly (sl-*, seeds 2026120811 and 2026120813), empty frames eagerly
+  (se-*, 2026120821/23) and lazily (sz-*, 2026120822/24); 12 probes,
+  49,888 calls. 0 differing except two `rework.apply` calls (sl-cj cases
+  137 and 172) whose equal-size join comes back in either row order
+  (30 reference reruns of each under hash seeds 0 and 1 gave both),
+  declared and left out of the bank.
+- **DN1-4 The struct-cast partition race (DF1-7) by its majority
+  outcome.** A numeric filter whose struct bound casts a numeric column
+  runs its predicate in four row partitions when the frame has at least
+  four columns; a partition with a present cell fails the cast (`must
+  specify one field in the struct`), one without casts and fails the
+  struct comparison, and Polars raises the first error in time. Probes
+  `dn/s2.py` and `dn/s3.py` (617 row layouts of 2-40 rows, 20-30 runs
+  each; partition sizes measured with an elementwise UDF: n // 4 rows for
+  each of the first three, the rest in the last, three empty partitions
+  below four rows): the cast error wins whenever at least two partitions
+  fail the cast or one of them holds four or more present cells of the
+  cast column, and loses otherwise (the majority outcome of all 617
+  layouts, and of all but one of about 150 random layouts in a later
+  check, where one present cell gave the cast error in 8 of 15 runs;
+  layouts with a single present cell stay racy in some runs).
+  The native filter now picks the error by this rule instead of the first
+  partition's (`polars_attributes_filter.cpp`). Fresh CK 2026120701 case
+  197 (DF1-7's shape: five rows, the first two null) now matches; all 47
+  docs Polars table banks replay clean with the change.
+- **DN1-5 Fresh seeds.** Batch 1 (2026120700-11, twelve banks): the
+  partition race of DN1-4 (fixed) and one `prefixes.apply` call (sequence
+  CH 2026120708 case 466, an empty activity list inside a list) whose
+  rows come back in either order (20 reference reruns under each of hash
+  seeds 0-3 gave both), declared. Batch 2 (2026120712-23, twelve banks):
+  one `rework.apply` equal-size join order (sequence CJ 2026120719 case
+  10, reruns gave both orders), declared; the rest 0 differing.
+- **DN1-6 Thread count in a filter over several columns** (t955 case 243,
+  `filter_traces_attribute_in_timeframe` on the CI big-int domain): a
+  filter over at least four columns with a struct comparison on null
+  numeric cells drops those rows only when Polars runs four threads
+  (POLARS_MAX_THREADS dependent). Declared.
+
+Declared:
+- The equal-size join and row orders of DN1-1, DN1-3 and DN1-5 (the
+  reference itself varies), the NaN set order and the two unrepresentable
+  List cells of DN1-1, and DN1-6.
+- The partition race keeps its single-present-cell layouts racy in the
+  reference; the native filter gives their majority outcome.
+
+Tests:
+- New: `docs/polars-filter-dn-bank.json.gz` (26,582 calls in 4,124 cases:
+  every error signature of t941-t960 and of the a1, c2, v1, l1, p1 and p2
+  probes eagerly and lazily up to ten calls each, every 25th value call,
+  and the race call of fresh CK 2026120701 case 197; the declared calls
+  left out) and `docs/polars-sequence-filter-dn-bank.json.gz` (9,561
+  calls in 2,831 cases from the twelve DN1-3 probes, the two rework calls
+  left out), replayed by `minera_polars_filter_dn_bank_parity_tests` and
+  `minera_polars_sequence_filter_dn_bank_parity_tests`.
+- The table bank driver writes a list attribute as `{"l": [...]}` and a
+  dict as `{"m": [...]}`, as the capture does.
+- `test_review_bx1.cpp` held a LazyFrame message of `filter_variants_top_k`
+  (the sort in the resolved plan) while calling the `EventTable` overload,
+  whose eager sort now runs before the group_by; the check calls the
+  `LazyEventTable` overload.
+- Full suite: 593 tests passed (`minera_review_bx1_tests` after the change
+  above). Python script tests not rerun (scripts unchanged); the workbench
+  fixture replay gave 2,673 responses unchanged.

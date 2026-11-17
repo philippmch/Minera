@@ -603,6 +603,13 @@ void compute_query(const EventTable& source, const Prepared& p, bool eager, std:
 void eager_filter(const EventTable& source, Prepared p, std::size_t at) {
   p.options.attribute_key = keys::col_key(p.options.attribute_key, source.columns);
   const auto& attribute = p.options.attribute_key;
+  // Round DN: a key selecting no column (an empty list or set) expands the
+  // first activity's predicate to nothing as that filter runs, before the
+  // next activity's literal (t9 probes).
+  if (collection(attribute) && attribute.children.empty()) {
+    if (at == 0) fail("ComputeError", "apply", "The predicate expanded to zero expressions. This may for example be caused by a regex not matching column names or a column dtype match not hitting any dtypes in the DataFrame");
+    return;
+  }
   if (!text(attribute)) return;
   // A dict or list key naming no column fails by name (probe dl/e2).
   if (keys::by_name(attribute.value)) {
@@ -638,9 +645,16 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     if (!eager_source) dict_argument(o.case_id_key);
     else if (o.case_id_key.container == AttributeContainerKind::kContainer)
       if (const auto error = detail::polars_lit::dict_literal_error(o.case_id_key)) fail("TypeError", "apply", *error);
-    list_key_literal(o.case_id_key); list_key_literal(o.timestamp_key); spread_key(o.case_id_key);
+    // Round DN: the sort builds each key's literal (a scalar past the Int128
+    // range refused); on an eager frame it runs before the window spreads a
+    // list case key into its items (t9 probes, probe dn/l1).
+    list_key_literal(o.case_id_key);
+    scalar_range(o.case_id_key);
+    list_key_literal(o.timestamp_key);
+    scalar_range(o.timestamp_key);
+    if (!eager_source) spread_key(o.case_id_key);
   }
-  if (eager_source && sequence_rule(out.operation)) { eager_sort(*eager_source, o); dict_argument(o.case_id_key); }
+  if (eager_source && sequence_rule(out.operation)) { eager_sort(*eager_source, o); spread_key(o.case_id_key); dict_argument(o.case_id_key); }
   if (sequence_rule(out.operation) && null(o.case_id_key))
     fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (out.operation == Op::kDifferentPersons) out.values = {out.original};
@@ -675,6 +689,9 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     // is concatenated.
     if (detail::polars_lit::set_argument(o.resource_key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
     if (o.resource_key.container == AttributeContainerKind::kContainer) fail("TypeError", "apply", "unsupported operand type(s) for +: 'dict' and 'str'");
+    // Round DN: pl.col(resource) reads a list's items before the suffix is
+    // concatenated (probe dn/l1).
+    if (o.resource_key.container == AttributeContainerKind::kList || o.resource_key.container == AttributeContainerKind::kTuple) col_list(o.resource_key);
     if (o.resource_key.container == AttributeContainerKind::kTuple) fail("TypeError", "apply", "can only concatenate tuple (not \"str\") to tuple");
     if (collection(o.resource_key)) fail("TypeError", "apply", "can only concatenate list (not \"str\") to list");
   };
@@ -685,7 +702,9 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
       // Round CP: four_eyes selects [case, resource] from each activity's
       // filter as it builds it, so a list case key's literal fails after
       // the first activity's (CM bank 2026111550 case 300).
-      if (out.operation == Op::kFourEyes && at == 1) list_key_literal(o.case_id_key);
+      // Round DN: a scalar key past the Int128 range fails its pl.lit there
+      // too (probe dn/l1).
+      if (out.operation == Op::kFourEyes && at == 1) { list_key_literal(o.case_id_key); scalar_range(o.case_id_key); }
       // Round DF: the first pair joins on a dict case key (refused) once
       // both of its activities' literals are built, before the third
       // activity's (set probe pltblck-7 case 157, fresh CK 2026112901 case
@@ -695,7 +714,7 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
       // before the next activity's literal (set probe pltblci-6 cases 163, 194).
       // Round DH: and builds a list resource key as a Series literal
       // (strictly) there (big-int probe pltblch case 59).
-      if (out.operation == Op::kFourEyes && at == 1) list_key_literal(o.resource_key);
+      if (out.operation == Op::kFourEyes && at == 1) { list_key_literal(o.resource_key); scalar_range(o.resource_key); }
       if (eager_source && out.operation == Op::kFourEyes && at == 1) eager_key_step(*eager_source, o, out.operation);
       if (query.container == AttributeContainerKind::kList || query.container == AttributeContainerKind::kTuple)
         if (const auto error = detail::polars_lit::argument_literal_fault(query)) fail(error->type, "apply", error->message);
@@ -724,12 +743,18 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     if (null(o.case_id_key) && !eager_group) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
     dict_argument(o.case_id_key);
     list_key_literal(o.case_id_key);
+    // Round DN: a scalar case key past the Int128 range fails its pl.lit
+    // (probe dn/l1).
+    scalar_range(o.case_id_key);
     spread_key(o.case_id_key);
     // Round DB: attr_value_different_persons groups by [case, resource], so
     // pl.lit refuses a set resource key while the plan is built (probe
     // set-pltblck-2 case 188).
     if (out.operation == Op::kDifferentPersons && detail::polars_lit::set_argument(o.resource_key))
       fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
+    // Round DN: and builds a list resource key's Series literal strictly, a
+    // scalar one past the Int128 range refused (probe dn/l1).
+    if (out.operation == Op::kDifferentPersons) { list_key_literal(o.resource_key); scalar_range(o.resource_key); }
     if (eager_group) {
       eager_key_step(*eager_source, o, out.operation);
       if (null(o.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");

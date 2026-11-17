@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DM (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DN (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6440,6 +6440,77 @@ the project files under `review-harness/round-dm/`.
 
 No fixture changed. The device check on the Mac was skipped (the Mac was
 offline).
+
+Round DN re-reviewed DM (Review DN1). DM's commit 478ee7f7 ran CI run
+44088769580 (green on all six jobs). DN worked down DM's carried eager
+table calls, probed the shapes behind them eagerly and lazily, took the
+eager sequence filters on to `literal`-column and empty frames, modelled
+the partition race by its majority outcome and replayed two batches of
+fresh seeds:
+- DM's 138 carried eager table calls -> 5 declared: eager group_bys of
+  the attribute counts and relative occurrence run before the missing
+  collect() (dict, list, None and scalar keys), lazily a one-name list key
+  reads that column and several items holding a dict resolve in order;
+  eager case filters over no key run the group_by and filters before the
+  join finds no key (lazily the right side's timestamp first); UInt128
+  dict fields meet signed columns as a null Int128; the eager between
+  separator after `is_in`; LTL keys selecting no column, big-int keys and
+  list resource keys; paths list timestamps of any length and items past
+  UInt128; the variants sort before the group_by with literal timestamps.
+  Probes a1, c2, l1, p1, p2 (eager and lazy) 0 differing but six
+  random-order a1 calls.
+- Literal case keys in the variants filters (probe v1, 3,150 calls each
+  way): empty activity lists (the join misses `variant` over a `SELECT`
+  or an empty `AGGREGATE`), activities naming a key item, a None case key
+  beside a literal or None timestamp, several key items on one row with a
+  None second item; 126 native refusals -> 0.
+- Eager sequence probes over `literal`-column frames and frames of no row
+  or one row, eagerly and lazily (dn/seqwrap.sh, twelve probes over the
+  CK, CP, CJ and CH sequence domains, 49,888 calls): 0 differing but two
+  equal-size rework joins (declared).
+- The struct-cast partition race (DF1-7): the cast error wins when at
+  least two of the four row partitions fail the cast or one holds four
+  present cells of the cast column (the majority outcome of 617 probed
+  layouts); the native filter now picks the error that way.
+- Fresh seeds 2026120700-11 and 2026120712-23: the race (fixed), one
+  `prefixes.apply` and one `rework.apply` row order the reference varies
+  itself (declared); the rest 0.
+
+In the suite: new `docs/polars-filter-dn-bank.json.gz` (26,582 calls) and
+`docs/polars-sequence-filter-dn-bank.json.gz` (9,561 calls) with their
+ctests. The probes, the wrappers and the fresh banks are in the project
+files under `review-harness/round-dn/`.
+
+No fixture changed. The device check on the Mac was skipped (the Mac was
+offline).
+
+Next round (DO) should start by re-reviewing round DN:
+
+- DN's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- whether the other filters with struct-cast bounds (the case, timestamp
+  and paths performance filters) also filter in row partitions on frames
+  of four or more columns, and race as the numeric attribute filters do
+  (only `numeric_predicate` models partitions);
+- eager sequence probes over the set, big-int and scalar domains on
+  `literal`-column frames (DN covered the base CK, CP, CJ and CH domains
+  only), and the v1 shapes (literal case keys, empty activity lists, None
+  keys beside literal timestamps) in the sequence variant filters;
+- the declared thread-count quirk of DN1-6 (a filter over four or more
+  columns with a struct comparison on null numeric cells);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet
+  (the table transport has no cells for them);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DM's targets, taken in DN (findings DN1-1 to DN1-6): DM's CI run,
+the fresh seeds, the 138 carried eager table calls, the eager sequence
+probes over `literal`-column and empty frames and the partition race. Not
+taken (carried to DO): the CU list and the open choices.
+
+Previous list for round DN (kept for its older items):
 
 Next round (DN) should start by re-reviewing round DM:
 
